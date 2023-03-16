@@ -32,7 +32,7 @@ public class Texteditor {
 
 }
 
-class KeyChecker implements KeyListener { // for some reason, this allows me to access KeyChecker method. Figure out why!
+class KeyChecker implements KeyListener { // for some reason, this allows me to access KeyChecker class. Figure out why!
 
     public void keyTyped(KeyEvent theevent) {
         if (theevent.getKeyCode() == 27) { // fix this, escape key is not being detected

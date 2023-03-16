@@ -28,6 +28,7 @@ public class Texteditor {
     // runtime 
     public static void main(String[] args) {
         Texteditor t1 = new Texteditor();
+        // System.out.println(writingArea.getText());
     }
 
 }
@@ -35,14 +36,14 @@ public class Texteditor {
 class KeyChecker implements KeyListener { // for some reason, this allows me to access KeyChecker class. Figure out why!
 
     public void keyTyped(KeyEvent theevent) {
-        if (theevent.getKeyCode() == 27) { // fix this, escape key is not being detected
+    }
+
+    public void keyPressed(KeyEvent theevent) {
+        if (theevent.getKeyCode() == KeyEvent.VK_ESCAPE) {
             System.out.println("Normal mode");
         } else {
             System.out.println("my man");
         }
-    }
-
-    public void keyPressed(KeyEvent theevent) {
     }
 
     public void keyReleased(KeyEvent theevent) {

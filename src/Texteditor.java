@@ -10,7 +10,7 @@ import java.awt.Toolkit;
 public class Texteditor extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
 
 // --- static attributes
-    static int editorMode = 0; // 0: Normal mode, 1: Insert mode, 2: Command mode
+    static int editorMode = 1; // 0: Normal mode, 1: Insert mode, 2: Command mode
 
 // --- constructor method
     Texteditor() {
@@ -31,17 +31,35 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
 // --- methods implemented from the KeyListener interface 
 
+    // --- keyPressed method called whenever a key is pressed (ie. a KeyEvent triggered)
     @Override
     public void keyPressed(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // escape key recognized
-            System.out.println("Normal mode");
-        } else if (e.getKeyCode() == KeyEvent.VK_BACK_SPACE) {
-            System.out.println("deleted");
-        } else {
-            System.out.println(e.getKeyChar()); // other keys recognized
-        } 
+        // --- to check editors current mode
+        switch(editorMode) {
+
+            case 0: // 0: normal mode
+                System.out.println("normal mode");
+                break;
+
+            case 1: // 1: insert mode
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // escape key brings you to normal mode
+                    editorMode = 0;
+                } else {
+                    System.out.println(e.getKeyChar());
+                }
+                System.out.println("insert mode");
+                break;
+
+            case 2: // 2: command mode
+                System.out.println("command mode");
+                break;
+
+            default:
+                System.out.println("edge case detected");
+        }
+        // ^^ Merge below logic within the relevant mode above!
+        // ^^ add static method logic to the above chunk for true modal editing, detect i, a, o, u, <CR>-r keys, j, k, b, w
     }
-    // ^^ add static method logic to the above chunk for true modal editing, detect i, a, o, u, <CR>-r keys, j, k, b, w
     
     public void keyReleased (KeyEvent e) {}
     public void keyTyped (KeyEvent e) {}

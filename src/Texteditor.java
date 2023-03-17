@@ -7,46 +7,42 @@ import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent; // Keyevent is a data type, used with Class KeyListener
 import java.awt.Toolkit;
 
-public class Texteditor {
-    
-    // constructor method
-    Texteditor() {
-        Dimension machinescreen = Toolkit.getDefaultToolkit().getScreenSize();
+public class Texteditor extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
 
-        JFrame baseFrame = new JFrame("Shed");
-        baseFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        baseFrame.setSize(machinescreen.width/2, machinescreen.height);
+// --- static attributes
+    static int editorMode = 0; // 0: Normal mode, 1: Insert mode, 2: Command mode
+
+// --- constructor method
+    Texteditor() {
+        
+        // --- initializing JFrame with JTextArea
+        this.setTitle("Shed");
+        this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        Dimension machinescreen = Toolkit.getDefaultToolkit().getScreenSize();
+        this.setSize(machinescreen.width/2, machinescreen.height);
 
         JTextArea writingArea = new JTextArea();
-        writingArea.addKeyListener(new KeyChecker());
+        writingArea.addKeyListener(this);
+        this.add(writingArea);
 
-        baseFrame.add(writingArea);
-
-        baseFrame.setVisible(true);
+        this.setVisible(true);
+        
     }
 
-    // runtime 
-    public static void main(String[] args) {
-        Texteditor t1 = new Texteditor();
-        // System.out.println(writingArea.getText());
-    }
+// --- methods implemented from the KeyListener interface 
 
-}
-
-class KeyChecker implements KeyListener { // for some reason, this allows me to access KeyChecker class. Figure out why!
-
-    public void keyTyped(KeyEvent theevent) {
-    }
-
-    public void keyPressed(KeyEvent theevent) {
-        if (theevent.getKeyCode() == KeyEvent.VK_ESCAPE) {
+    @Override
+    public void keyPressed(KeyEvent e) {
+        if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // escape key recognized
             System.out.println("Normal mode");
+        } else if (e.getKeyCode() == KeyEvent.VK_BACK_SPACE) {
+            System.out.println("deleted");
         } else {
-            System.out.println("my man");
-        }
+            System.out.println(e.getKeyChar()); // other keys recognized
+        } 
     }
-
-    public void keyReleased(KeyEvent theevent) {
-    }
-
+    // ^^ add static method logic to the above chunk for true modal editing, detect i, a, o, u, <CR>-r keys, j, k, b, w
+    
+    public void keyReleased (KeyEvent e) {}
+    public void keyTyped (KeyEvent e) {}
 }

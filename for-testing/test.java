@@ -5,6 +5,7 @@ import javax.swing.JLabel;
 import javax.swing.JTextArea;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
+import java.awt.Color;
 
 public class test extends JFrame implements KeyListener{
 
@@ -15,14 +16,16 @@ public class test extends JFrame implements KeyListener{
         this.setTitle("test");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         this.setLayout(null);
-        this.setSize(600,600);
+        this.setSize(600,630);
+
+        JTextArea text1 = new JTextArea();
+        text1.setBounds(0,0,600,500);
+        text1.addKeyListener(this);
 
         label1 = new JLabel();
-        label1.setBounds(50,25,100,30); 
-        
-        JTextArea text1 = new JTextArea();
-        text1.setBounds(20,75,250,200);
-        text1.addKeyListener(this);
+        label1.setBackground(Color.lightGray);
+        label1.setBounds(0,500,600,30);
+        label1.setText("counter: " + counter);
 
         this.add(text1);
         this.add(label1);
@@ -32,9 +35,10 @@ public class test extends JFrame implements KeyListener{
     
     @Override
     public void keyPressed(KeyEvent e) {
+        if (e.getKeyChar() == 'y') {
         counter += 1;
-        System.out.println(counter);
         label1.setText("counter: " + counter);
+        }
     }
 
     public void keyTyped(KeyEvent e) {}

@@ -12,19 +12,21 @@ import javax.swing.JFileChooser;
 import java.io.FileReader;
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
-import java.io.BufferedWriter;
 
 // --- writing changes to a file
+import java.io.FileWriter;
+import java.io.BufferedWriter;
 
 public class test extends JFrame implements KeyListener{
 
     public int counter = 0;
     JLabel label1; // --- declare this variable first and then reference it later in my other overridden method!!!
+    JTextArea text1;
 
 // --- opening a file
     String currLine;
     BufferedReader bufReader;
+    File targetFile;
 
 // --- same constructor statement
     test() {
@@ -33,7 +35,7 @@ public class test extends JFrame implements KeyListener{
         this.setLayout(null);
         this.setSize(600,630);
 
-        JTextArea text1 = new JTextArea();
+        text1 = new JTextArea();
         text1.setBounds(0,0,600,500);
         text1.addKeyListener(this);
 
@@ -44,7 +46,7 @@ public class test extends JFrame implements KeyListener{
 
         if (result == JFileChooser.APPROVE_OPTION) {
             System.out.println("done");
-            File targetFile = fileSelector.getSelectedFile();
+            targetFile = fileSelector.getSelectedFile();
 
             try {
 
@@ -83,7 +85,23 @@ public class test extends JFrame implements KeyListener{
         if (e.getKeyChar() == 'y') {
         counter += 1;
         label1.setText("counter: " + counter);
+        } else if (e.getKeyChar() == '?') {
+
+// --- TO WRITE CHANGES TO THE AFOREMENTIONED TEXT FILE
+            try {
+
+                FileWriter writeToFile = new FileWriter(targetFile);
+                BufferedWriter bufWriter = new BufferedWriter(writeToFile);
+                text1.write(bufWriter);
+                bufWriter.close();
+                text1.setText("");
+                text1.requestFocus();
+
+            }
+
+            catch (Exception e2) {}
         }
+
     }
 
     public void keyTyped(KeyEvent e) {}

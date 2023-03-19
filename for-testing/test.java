@@ -1,10 +1,23 @@
-// *translate these changes over to the stable version of the Texteditor.java!
+// ~ NOTE TO USER:~
+// This is an unstable build of Shed, used to test features before implementing them into the actual program. For the stable build, git clone /src file directory!
+// - Gong 💀
 
+
+// * figure out how to implement packages later
+// * customise text color and background color for a cool theme
+// * figure out why the mode changes one key press behind, and rectify it!
+
+// --- JFrame GUI and components
 import javax.swing.JFrame;
-import javax.swing.JLabel;
 import javax.swing.JTextArea;
+import javax.swing.JLabel;
 import java.awt.event.KeyListener;
-import java.awt.event.KeyEvent;
+import java.io.BufferedReader;
+import java.awt.event.KeyEvent; // Keyevent is a data type, used with Class KeyListener
+import java.awt.event.WindowEvent;
+import java.awt.Toolkit;
+import java.awt.Dimension;
+import java.awt.BorderLayout;
 import java.awt.Color;
 
 // --- opening a file
@@ -15,101 +28,176 @@ import java.io.File;
 
 // --- writing changes to a file
 import java.io.FileWriter;
+import java.nio.Buffer;
 import java.io.BufferedWriter;
 
-public class test extends JFrame implements KeyListener{
+public class test extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
 
-    public int counter = 0;
-    JLabel label1; // --- declare this variable first and then reference it later in my other overridden method!!!
-    JTextArea text1;
+// --- static attributes
+    static int editorMode = 0; // 0: Normal mode, 1: Insert mode, 2: Command mode
+    JLabel editorModeLabel;
+    JTextArea writingArea;
 
 // --- opening a file
-    String currLine;
+    String currentLine;
     BufferedReader bufReader;
     File targetFile;
 
-// --- same constructor statement
+// --- constructor method
     test() {
-        this.setTitle("test");
+        
+        // --- initializing JFrame with JTextArea
+        this.setTitle("Shed");
         this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        this.setLayout(null);
-        this.setSize(600,630);
+        Dimension machinescreen = Toolkit.getDefaultToolkit().getScreenSize();
+        this.setSize(machinescreen.width/2, machinescreen.height);
+        this.setLayout(new BorderLayout(5,5));
 
-        text1 = new JTextArea();
-        text1.setBounds(0,0,600,500);
-        text1.addKeyListener(this);
+        writingArea = new JTextArea();
+        writingArea.setPreferredSize(new Dimension(machinescreen.width/2, machinescreen.height -130));
+        // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
+        writingArea.addKeyListener(this);
 
-// --- TO OPEN AND DISPLAY AN EDITABLE TEXT FILE IN THE TEXT AREA
+        editorModeLabel = new JLabel();
+        editorModeLabel.setBackground(Color.lightGray);
+        editorModeLabel.setPreferredSize(new Dimension(machinescreen.width/2, 30));
+        // editorModeLabel.setBounds(0, machinescreen.height - 130, machinescreen.width/2, 30);
+        editorModeLabel.setText("normal mode");
+
+// --- Open and display an editable text file in text area
         JFileChooser fileSelector = new JFileChooser();
         fileSelector.setCurrentDirectory(new File(System.getProperty("user.home")));
-        int result = fileSelector.showOpenDialog(label1);
+        int result = fileSelector.showOpenDialog(editorModeLabel);
 
         if (result == JFileChooser.APPROVE_OPTION) {
-            System.out.println("done");
             targetFile = fileSelector.getSelectedFile();
 
             try {
-
                 bufReader = new BufferedReader(new FileReader(targetFile));
-                text1.read(bufReader, null);
+                writingArea.read(bufReader, null);
                 bufReader.close();
-                text1.requestFocus();
-                // --- alternative implementation
-                /*** while ((currLine = bufReader.readLine()) != null) {
-                    System.out.println(currLine); ***/
+                writingArea.requestFocus();
             }
 
             catch (Exception e2) {
                 System.out.println(e2);
             }
-            
+
         }
 
-        label1 = new JLabel();
-        label1.setBackground(Color.lightGray);
-        label1.setBounds(0,500,600,30);
-        label1.setText("counter: " + counter);
-
-        this.add(text1);
-        this.add(label1);
+        this.add(writingArea, BorderLayout.NORTH);
+        this.add(editorModeLabel, BorderLayout.SOUTH);
 
         this.setVisible(true);
+// * ADD A TEXT LABEL AREA THAT SHOWS CURRENT COMMAND ENTERED DURING NORMAL MODE
+    }
 
+// --- methods implemented from the KeyListener interface 
 
-    };
-    
-// --- 
-
+    // --- keyPressed method called whenever a key is pressed (ie. a KeyEvent triggered)
     @Override
     public void keyPressed(KeyEvent e) {
-        if (e.getKeyChar() == 'y') {
-        counter += 1;
-        label1.setText("counter: " + counter);
-        } else if (e.getKeyChar() == '?') {
+        // --- to check editors current mode
+        switch(editorMode) {
 
-// --- TO WRITE CHANGES TO THE AFOREMENTIONED TEXT FILE
-            try {
+            case 0: // 0: normal mode --> (navigation with cursor), (entering insert mode), (enter command mode)
+                editorModeLabel.setText("normal mode");
+                writingArea.setEditable(false); // --- allows for instant inability to edit
+                System.out.println("normal mode");
+                // --- 'i', 'I', 'a', 'A', 'o', 'O' bring you to insert mode
+                if (e.getKeyChar() == 'i') {
+                    editorMode = 1;
+                } else if (e.getKeyChar() == 'a') {
+                    editorMode = 1;
+                } else if (e.getKeyChar() == 'o') {
+                    editorMode = 1;
+                } else if (e.getKeyChar() == 'I') {
+                    editorMode = 1;
+                } else if (e.getKeyChar() == 'A') {
+                    editorMode = 1;
+                } else if (e.getKeyChar() == 'O') {
+                    editorMode = 1;
+// * IMPLEMENT LOGIC FOR THE ABOVE POSITION OF THE CURSOR
+                // --- 'k', 'j', 'w' and 'b' move cursor up and down, one word forward and one word back
+                } else if (e.getKeyChar() == 'j') {
+                    
+                } else if (e.getKeyChar() == 'k') {
 
-                FileWriter writeToFile = new FileWriter(targetFile);
-                BufferedWriter bufWriter = new BufferedWriter(writeToFile);
-                text1.write(bufWriter);
-                bufWriter.close();
-                text1.setText("");
-                text1.requestFocus();
+                } else if (e.getKeyChar() == 'w') {
 
-            }
+                } else if (e.getKeyChar() == 'b') { 
+// * IMPLEMENT LOGIC FOR THIS ABOVE PORTION REGARDING CURSOR NAVIGATION (no change in mode)
+                // --- 'u' undos the previous change
+                } else if (e.getKeyChar() == 'u') {
+                    System.out.println("Change undone");
+// * IMPLEMENT LOGIC FOR THE ABOVE UNDO COMMAND 
+                // --- ':' brings you to command mode
+                } else if (e.getKeyChar() == ':') {
+                    editorMode = 2;
+                } else {};
+                break;
 
-            catch (Exception e2) {}
+            case 1: // 1: insert mode --> (typing)
+                editorModeLabel.setText("insert mode");
+                writingArea.setEditable(true); // --- allows for instant ability to edit
+                System.out.println("insert mode");
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // --- escape key brings you to normal mode
+                    editorMode = 0;
+                } else {
+                    System.out.println(e.getKeyChar());  // * REMEMBER TO HASH THIS OUT EVENTUALLY ONCE THE EDITOR HAS BEEN TESTED
+                }
+                break;
+
+            case 2: // 2: command mode
+                // editorModeLabel.setText("command mode");
+                System.out.println("command mode");
+                if (e.getKeyChar() == 'w') {
+                    System.out.println("Changes written (saved)"); 
+                    editorModeLabel.setText("Changes written.");
+                    // --- saves and writes changes to the same file
+                    try {
+                        FileWriter writeToFile = new FileWriter(targetFile);
+                        BufferedWriter bufWriter = new BufferedWriter(writeToFile);
+                        writingArea.write(bufWriter);
+                        bufWriter.close();
+                        // writingArea.setText(""); --- to give the impression of clearing the screen
+                        writingArea.requestFocus();
+                    }
+
+                    catch (Exception e2) {}
+
+                    editorMode = 0;
+
+                } else if (e.getKeyChar() == 'q') {
+                    System.out.println("Quitting now. Your changes have been saved!");
+                    editorModeLabel.setText("Quitting.");
+                    // --- quietly saves changes to the same file, and exits the program
+                    try {
+                        FileWriter writeToFile = new FileWriter(targetFile);
+                        BufferedWriter bufWriter = new BufferedWriter(writeToFile);
+                        writingArea.write(bufWriter);
+                        bufWriter.close();
+                        this.dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING));
+                    }
+
+                    catch (Exception e2) {}
+
+                } else {
+                    System.out.println("Command not recognised");
+                    editorModeLabel.setText("Command not recognised");
+                    editorMode = 0;
+                };
+                break;
+
+            default:
+                System.out.println("edge case detected");
         }
-
     }
-
-    public void keyTyped(KeyEvent e) {}
-
-    public void keyReleased(KeyEvent e) {}
+    
+    public void keyReleased (KeyEvent e) {}
+    public void keyTyped (KeyEvent e) {}
 
     public static void main(String[] args) {
-        new test(); 
+        new test();
     }
-
 }

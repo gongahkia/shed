@@ -96,6 +96,7 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
             case 0: // 0: normal mode --> (navigation with cursor), (entering insert mode), (enter command mode)
                 editorModeLabel.setText("normal mode");
+                writingArea.setEditable(false); // --- disables editor typing mode
                 System.out.println("normal mode");
                 // --- 'i', 'I', 'a', 'A', 'o', 'O' bring you to insert mode
                 if (e.getKeyChar() == 'i') {
@@ -132,13 +133,13 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
             case 1: // 1: insert mode --> (typing)
                 editorModeLabel.setText("insert mode");
+                writingArea.setEditable(true); // --- enables editor typing mode
                 System.out.println("insert mode");
                 if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // --- escape key brings you to normal mode
                     editorMode = 0;
                 } else {
                     System.out.println(e.getKeyChar());  // * REMEMBER TO HASH THIS OUT EVENTUALLY ONCE THE EDITOR HAS BEEN TESTED
                 }
-// * DO I NEED TO IMPLEMENT LOGIC FOR DELETING CHARACTERS IN THIS, OR DOES JTEXTAREA DO IT FOR ME?`
                 break;
 
             case 2: // 2: command mode
@@ -181,7 +182,6 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                     editorMode = 0;
                 };
                 break;
-// * IMPLEMENT LOGIC TO REMOVE THE ':' CHARACTER THAT IS INSERTED BEFORE THE ':w' and ':q' COMMANDS
 
             default:
                 System.out.println("edge case detected");

@@ -1,5 +1,4 @@
-// * figure out how to implement packages later
-// * customise text color and background color for a cool theme
+// SHit EDitor (Shed) Version 1.0 <Stable Build>
 
 // --- JFrame GUI and components
 import javax.swing.JFrame;
@@ -25,6 +24,10 @@ import java.io.FileWriter;
 import java.nio.Buffer;
 import java.io.BufferedWriter;
 
+// --- determine current time and date (used when writing changes to file)
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 public class Texteditor extends JFrame implements KeyListener { // taking JFrame as the parent class, Texteditor as the child class
 
 // --- static attributes
@@ -36,6 +39,10 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
     String currentLine;
     BufferedReader bufReader;
     File targetFile;
+
+// --- date and time
+    DateTimeFormatter formatForTimeAndDate = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy");
+    LocalDateTime timeAndDate;
 
 // --- constructor method
     Texteditor() {
@@ -49,6 +56,7 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
         writingArea = new JTextArea();
         writingArea.setPreferredSize(new Dimension(machinescreen.width/2, machinescreen.height -130));
+        writingArea.setTabSize(4); // text editor preference
         // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
         writingArea.addKeyListener(this);
 
@@ -88,32 +96,19 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
 // --- methods implemented from the KeyListener interface 
 
-    // --- keyPressed method called whenever a key is pressed (ie. a KeyEvent triggered)
     @Override
-    public void keyPressed(KeyEvent e) {
-        // --- to check editors current mode
-        switch(editorMode) {
+    public void keyPressed(KeyEvent e) { // --- keyPressed method called whenever a key is pressed (ie. a KeyEvent triggered)
+    
+        switch(editorMode) { // --- to check editors current mode
 
             case 0: // 0: normal mode --> (navigation with cursor), (entering insert mode), (enter command mode)
                 editorModeLabel.setText("normal mode");
                 writingArea.setEditable(false); // --- disables editor typing mode
                 System.out.println("normal mode");
-                // --- 'i', 'I', 'a', 'A', 'o', 'O' bring you to insert mode
-                if (e.getKeyChar() == 'i') {
+
+                if (e.getKeyChar() == 'i') { // --- 'i' brings you to insert mode
                     editorMode = 1;
-                } else if (e.getKeyChar() == 'a') {
-                    editorMode = 1;
-                } else if (e.getKeyChar() == 'o') {
-                    editorMode = 1;
-                } else if (e.getKeyChar() == 'I') {
-                    editorMode = 1;
-                } else if (e.getKeyChar() == 'A') {
-                    editorMode = 1;
-                } else if (e.getKeyChar() == 'O') {
-                    editorMode = 1;
-// * IMPLEMENT LOGIC FOR THE ABOVE POSITION OF THE CURSOR
-                // --- 'k', 'j', 'w' and 'b' move cursor up and down, one word forward and one word back
-                } else if (e.getKeyChar() == 'j') {
+                } else if (e.getKeyChar() == 'j') { // --- 'k', 'j', 'w' and 'b' move cursor up and down, one word forward and one word back
                     
                 } else if (e.getKeyChar() == 'k') {
 
@@ -121,12 +116,7 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
                 } else if (e.getKeyChar() == 'b') { 
 // * IMPLEMENT LOGIC FOR THIS ABOVE PORTION REGARDING CURSOR NAVIGATION (no change in mode)
-                // --- 'u' undos the previous change
-                } else if (e.getKeyChar() == 'u') {
-                    System.out.println("Change undone");
-// * IMPLEMENT LOGIC FOR THE ABOVE UNDO COMMAND 
-                // --- ':' brings you to command mode
-                } else if (e.getKeyChar() == ':') {
+                } else if (e.getKeyChar() == ':') { // --- ':' brings you to command mode
                     editorMode = 2;
                 } else {};
                 break;
@@ -142,12 +132,12 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                 }
                 break;
 
-            case 2: // 2: command mode
+            case 2: // 2: command mode --> (save, quit)
                 // editorModeLabel.setText("command mode");
                 System.out.println("command mode");
                 if (e.getKeyChar() == 'w') {
                     System.out.println("Changes written (saved)"); 
-                    editorModeLabel.setText("Changes written.");
+                    editorModeLabel.setText("Changes written as of " + formatForTimeAndDate.format(timeAndDate.now()));
                     // --- saves and writes changes to the same file
                     try {
                         FileWriter writeToFile = new FileWriter(targetFile);

@@ -7,7 +7,7 @@
 // TO-DO
     // * figure out how to implement packages later
     // * customise text color and background color for a cool theme
-    
+
 // -----
 
 // stuff i was unable to implement:

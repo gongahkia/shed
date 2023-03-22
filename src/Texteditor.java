@@ -59,6 +59,9 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
         writingArea.setTabSize(4); // text editor preference
         // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
         writingArea.addKeyListener(this);
+        writingArea.getCaret().setBlinkRate(0);
+        writingArea.setBackground(Color.lightGray);
+        writingArea.setEditable(false);
 
         editorModeLabel = new JLabel();
         editorModeLabel.setBackground(Color.lightGray);
@@ -102,11 +105,10 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
         switch(editorMode) { // --- to check editors current mode
 
             case 0: // 0: normal mode --> (navigation with cursor), (entering insert mode), (enter command mode)
-                editorModeLabel.setText("normal mode");
                 writingArea.setEditable(false); // --- disables editor typing mode
-                System.out.println("normal mode");
-
                 if (e.getKeyChar() == 'i') { // --- 'i' brings you to insert mode
+                    editorModeLabel.setText("insert mode");
+                    writingArea.setBackground(Color.white);
                     editorMode = 1;
                 } else if (e.getKeyChar() == 'j') { // --- 'k', 'j', 'w' and 'b' move cursor up and down, one word forward and one word back
                     
@@ -122,21 +124,18 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                 break;
 
             case 1: // 1: insert mode --> (typing)
-                editorModeLabel.setText("insert mode");
                 writingArea.setEditable(true); // --- enables editor typing mode
-                System.out.println("insert mode");
                 if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // --- escape key brings you to normal mode
+                    editorModeLabel.setText("normal mode");
+                    writingArea.setBackground(Color.lightGray);
                     editorMode = 0;
                 } else {
-                    System.out.println(e.getKeyChar());  // * REMEMBER TO HASH THIS OUT EVENTUALLY ONCE THE EDITOR HAS BEEN TESTED
                 }
                 break;
 
             case 2: // 2: command mode --> (save, quit)
                 // editorModeLabel.setText("command mode");
-                System.out.println("command mode");
                 if (e.getKeyChar() == 'w') {
-                    System.out.println("Changes written (saved)"); 
                     editorModeLabel.setText("Changes written as of " + formatForTimeAndDate.format(timeAndDate.now()));
                     // --- saves and writes changes to the same file
                     try {
@@ -167,7 +166,6 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                     catch (Exception e2) {}
 
                 } else {
-                    System.out.println("Command not recognised");
                     editorModeLabel.setText("Command not recognised");
                     editorMode = 0;
                 };

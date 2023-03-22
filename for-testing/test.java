@@ -3,11 +3,11 @@
 // - Gong 💀
 
 // -----
+
 // TO-DO
     // * figure out how to implement packages later
     // * customise text color and background color for a cool theme
-    // * figure out why the mode changes one key press behind, and rectify it!
-
+    
 // -----
 
 // stuff i was unable to implement:
@@ -81,12 +81,17 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
         writingArea.setTabSize(4); // preference to set tab size
         // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
         writingArea.addKeyListener(this);
+        writingArea.getCaret().setBlinkRate(0);
+        writingArea.setBackground(Color.lightGray);
+        writingArea.setEditable(false); // --- allows for instant inability to edit
+        System.out.println("normal mode");
 
         editorModeLabel = new JLabel();
         editorModeLabel.setBackground(Color.lightGray);
         editorModeLabel.setPreferredSize(new Dimension(machinescreen.width/2, 30));
-        // editorModeLabel.setBounds(0, machinescreen.height - 130, machinescreen.width/2, 30);
         editorModeLabel.setText("normal mode");
+        // editorModeLabel.setBounds(0, machinescreen.height - 130, machinescreen.width/2, 30);
+
 
 // --- Open and display an editable text file in text area
         JFileChooser fileSelector = new JFileChooser();
@@ -124,11 +129,12 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
         switch(editorMode) {
 
             case 0: // 0: normal mode --> (navigation with cursor), (entering insert mode), (enter command mode) 
-                editorModeLabel.setText("normal mode");
                 writingArea.setEditable(false); // --- allows for instant inability to edit
-                System.out.println("normal mode");
                 // --- 'i' brings you to insert mode
                 if (e.getKeyChar() == 'i') {
+                    editorModeLabel.setText("insert mode");
+                    writingArea.setBackground(Color.white);
+                    System.out.println("insert mode");
                     editorMode = 1;
                     // System.out.println(writingArea.getLineCount()); --- just to check how the .getLineCount() method works
                     // writingArea.setCaretPosition(0); --- to implement this
@@ -143,15 +149,17 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
 // * IMPLEMENT LOGIC FOR THIS ABOVE PORTION REGARDING CURSOR NAVIGATION (no change in mode)
                 // --- ':' brings you to command mode
                 } else if (e.getKeyChar() == ':') {
+                    System.out.println(e.getKeyChar());
                     editorMode = 2;
                 } else {};
                 break;
 
             case 1: // 1: insert mode --> (typing)
-                editorModeLabel.setText("insert mode");
                 writingArea.setEditable(true); // --- allows for instant ability to edit
-                System.out.println("insert mode");
                 if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // --- escape key brings you to normal mode
+                    editorModeLabel.setText("normal mode");
+                    writingArea.setBackground(Color.lightGray);
+                    System.out.println("normal mode");
                     editorMode = 0;
                 } else {
                     System.out.println(e.getKeyChar());  // * REMEMBER TO HASH THIS OUT EVENTUALLY ONCE THE EDITOR HAS BEEN TESTED
@@ -175,7 +183,6 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
                     }
 
                     catch (Exception e2) {}
-
                     editorMode = 0;
 
                 } else if (e.getKeyChar() == 'q') {
@@ -193,8 +200,6 @@ public class test extends JFrame implements KeyListener { // taking JFrame as th
                     catch (Exception e2) {}
 
                 } else {
-                    System.out.println("Command not recognised");
-                    editorModeLabel.setText("Command not recognised");
                     editorMode = 0;
                 };
                 break;

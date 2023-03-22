@@ -86,6 +86,19 @@ sudo apt install jdk-20_linux-x64_bin.rpm
   <img src="https://www.codejava.net/images/articles/javase/install-jdk-17/oracle_jdk_17_installer_macos.png" />
 </p>
 
+## Build Shed yourself
+
+1. In your terminal, run the following commands.
+
+```bash
+git clone https://github.com/gongahkia/shed
+cd src
+javac Texteditor.java
+java Texteditor
+```
+
+> Note that the instructions above assume JDK 17 or JDK 20 have already been downloaded and added to PATH.
+
 ## Fonts
 
 * Hack Nerd Font: https://www.nerdfonts.com/font-downloads

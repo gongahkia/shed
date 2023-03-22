@@ -89,3 +89,15 @@ sudo apt install jdk-20_linux-x64_bin.rpm
 ## Fonts
 
 * Hack Nerd Font: https://www.nerdfonts.com/font-downloads
+
+## Features to be added
+
+* Full VIM key-bindings
+  * Enter `Insert` mode from `Normal` mode (a, o, I, A, O)
+  * Undo, Redo, Delete, Paste, Yank (u, Ctrl + r, d, p, y)
+  * `Normal` mode navigation (h, j, k, l, w, b) and chaining numbers and commands
+  * Chaining commands (:wq, :q! etc.)
+* Built-in terminal that calls the local machine's shell
+* Customisable theme
+* File manager
+* Call Shed to open a file from the CLI (similar to `nvim example.txt`) 

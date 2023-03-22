@@ -187,4 +187,8 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
     
     public void keyReleased (KeyEvent e) {}
     public void keyTyped (KeyEvent e) {}
+
+    public static void main(String[] args) {
+        new Texteditor();
+    }
 }

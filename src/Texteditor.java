@@ -12,6 +12,9 @@ import java.awt.Toolkit;
 import java.awt.Dimension;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontFormatException;
+import java.awt.GraphicsEnvironment;
 
 // --- opening a file
 import javax.swing.JFileChooser;
@@ -23,6 +26,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.nio.Buffer;
 import java.io.BufferedWriter;
+import java.io.IOException;
 
 // --- determine current time and date (used when writing changes to file)
 import java.time.LocalDateTime;
@@ -56,17 +60,29 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
 
         writingArea = new JTextArea();
         writingArea.setPreferredSize(new Dimension(machinescreen.width/2, machinescreen.height -130));
-        writingArea.setTabSize(4); // text editor preference
-        // writingArea.setBounds(0,0,machinescreen.width/2, machinescreen.height - 130);
         writingArea.addKeyListener(this);
+
+        // --- import custom hack nerd font 
+        try {
+            Font hackNerdFont = Font.createFont(Font.TRUETYPE_FONT, new File("../assets/hackregfont.ttf")).deriveFont(16f);
+            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
+            ge.registerFont(hackNerdFont);
+            writingArea.setFont(hackNerdFont);
+        } catch (IOException | FontFormatException e) {
+            e.printStackTrace();
+        }
+        
+        // --- caret and editor customisation
+        writingArea.setTabSize(4);
         writingArea.getCaret().setBlinkRate(0);
-        writingArea.setBackground(Color.lightGray);
+        writingArea.setCaretColor(Color.decode("#02862a"));
+        writingArea.setForeground(Color.decode("#FAF9F6"));
+        writingArea.setBackground(Color.decode("#BC0E4C"));
         writingArea.setEditable(false);
 
         editorModeLabel = new JLabel();
         editorModeLabel.setBackground(Color.lightGray);
         editorModeLabel.setPreferredSize(new Dimension(machinescreen.width/2, 30));
-        // editorModeLabel.setBounds(0, machinescreen.height - 130, machinescreen.width/2, 30);
         editorModeLabel.setText("normal mode");
 
 // --- Open and display an editable text file in text area
@@ -94,7 +110,6 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
         this.add(editorModeLabel, BorderLayout.SOUTH);
 
         this.setVisible(true);
-// * ADD A TEXT LABEL AREA THAT SHOWS CURRENT COMMAND ENTERED DURING NORMAL MODE
     }
 
 // --- methods implemented from the KeyListener interface 
@@ -108,33 +123,28 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                 writingArea.setEditable(false); // --- disables editor typing mode
                 if (e.getKeyChar() == 'i') { // --- 'i' brings you to insert mode
                     editorModeLabel.setText("insert mode");
-                    writingArea.setBackground(Color.white);
+                    writingArea.setBackground(Color.decode("#354F60"));
                     editorMode = 1;
-                } else if (e.getKeyChar() == 'j') { // --- 'k', 'j', 'w' and 'b' move cursor up and down, one word forward and one word back
-                    
-                } else if (e.getKeyChar() == 'k') {
-
-                } else if (e.getKeyChar() == 'w') {
-
-                } else if (e.getKeyChar() == 'b') { 
-// * IMPLEMENT LOGIC FOR THIS ABOVE PORTION REGARDING CURSOR NAVIGATION (no change in mode)
                 } else if (e.getKeyChar() == ':') { // --- ':' brings you to command mode
                     editorMode = 2;
-                } else {};
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+                    editorModeLabel.setText("Already in normal mode.");
+                    writingArea.setBackground(Color.decode("#BC0E4C"));
+                    editorMode = 0;
+                } else {}
                 break;
 
             case 1: // 1: insert mode --> (typing)
                 writingArea.setEditable(true); // --- enables editor typing mode
                 if (e.getKeyCode() == KeyEvent.VK_ESCAPE) { // --- escape key brings you to normal mode
                     editorModeLabel.setText("normal mode");
-                    writingArea.setBackground(Color.lightGray);
+                    writingArea.setBackground(Color.decode("#BC0E4C"));
                     editorMode = 0;
-                } else {
-                }
+                } else {}
                 break;
 
             case 2: // 2: command mode --> (save, quit)
-                // editorModeLabel.setText("command mode");
+                writingArea.setBackground(Color.decode("#FFC501"));
                 if (e.getKeyChar() == 'w') {
                     editorModeLabel.setText("Changes written as of " + formatForTimeAndDate.format(timeAndDate.now()));
                     // --- saves and writes changes to the same file
@@ -143,7 +153,6 @@ public class Texteditor extends JFrame implements KeyListener { // taking JFrame
                         BufferedWriter bufWriter = new BufferedWriter(writeToFile);
                         writingArea.write(bufWriter);
                         bufWriter.close();
-                        // writingArea.setText(""); --- to give the impression of clearing the screen
                         writingArea.requestFocus();
                     }
 

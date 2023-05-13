@@ -2,8 +2,6 @@
 
 Shed is a bare-bones, opinionated, modal text editor with limited Vim bindings, written in Java.
 
-> *Shed is in Version 1.0 (more changes to come).*
-
 <h3>Technologies used:</h3>
 
 <p align="left">
@@ -106,15 +104,3 @@ java Texteditor
 ## Fonts
 
 * Hack Nerd Font: https://www.nerdfonts.com/font-downloads
-
-## Features to be added
-
-* Full VIM key-bindings
-  * Enter `Insert` mode from `Normal` mode (a, o, I, A, O)
-  * Undo, Redo, Delete, Paste, Yank (u, Ctrl + r, d, p, y)
-  * `Normal` mode navigation (h, j, k, l, w, b) and chaining numbers and commands
-  * Chaining commands (:wq, :q! etc.)
-* Built-in terminal that calls the local machine's shell
-* Customisable theme
-* File manager
-* Call Shed to open a file from the CLI (similar to `nvim example.txt`) 

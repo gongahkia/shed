@@ -1,3 +1,5 @@
+![](https://img.shields.io/badge/shed_1.0-passing-green)
+
 # Shed - a SHit EDitor
 
 Shed is a bare-bones, opinionated, modal text editor with limited Vim bindings, written in Java.

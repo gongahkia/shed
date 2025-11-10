@@ -1,4 +1,5 @@
-![](https://img.shields.io/badge/shed_2.0-passing-green)
+[![](https://img.shields.io/badge/shed_1.0-passing-dark_green)](https://github.com/gongahkia/shed/releases/tag/1.0)
+[![](https://img.shields.io/badge/shed_2.0-passing-green)](https://github.com/gongahkia/shed/releases/tag/2.0)
 
 # Shed - a SHit EDitor
 
@@ -7,11 +8,11 @@ Shed is a bare-bones, opinionated, modal text editor with extended Vim bindings,
 ## Features
 
 * Open source, MIT LICENSE
-* Highly customisable using Java Swing components and config file *(~/.shedrc)*
+* Highly customisable using Java Swing components and config file `~/.shedrc`
 * Stable, crash-proof
 * 32KB executable
 * Respects your privacy, no telemetry whatsoever
-* Extended VIM bindings *(a great primer for newcomers interested in VIM/NEOVIM)*
+* Extended VIM bindings 
 * Multiple file editing with buffer management
 * Search and replace with visual highlighting
 * Undo/redo with per-buffer history
@@ -206,7 +207,6 @@ https://user-images.githubusercontent.com/117062305/226877220-1900ca35-50b4-4623
 | `ESC` | Cancel command |
 | `BACKSPACE` | Delete character |
 
-
 ## Installation
 
 ### Pre-requisites
@@ -231,9 +231,9 @@ The Java Runtime Environment (JRE) or Java Development Kit (JDK) is required to 
 1. Download the Java Development Kit (JDK) [Linux distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-linux).
 2. Assuming the JDK file has been downloaded to the *Downloads* directory, run the following commands in your terminal.
 
-```bash
-cd Downloads
-sudo apt install jdk-20_linux-x64_bin.rpm 
+```console
+$ cd Downloads
+$ sudo apt install jdk-20_linux-x64_bin.rpm 
 ```
 
 > Note that the instructions above assume a Debian-based distro. Run the relevant commands for your distro.  
@@ -257,12 +257,11 @@ sudo apt install jdk-20_linux-x64_bin.rpm
 
 1. In your terminal, run the following commands.
 
-```bash
-git clone https://github.com/gongahkia/shed
-cd shed/src
-javac *.java
-jar cfm ../build/Shed.jar ../build/Manifest.txt *.class
-java -jar ../build/Shed.jar
+```console
+$ git clone https://github.com/gongahkia/shed && cd shed/src
+$ javac *.java
+$ jar cfm ../build/Shed.jar ../build/Manifest.txt *.class
+$ java -jar ../build/Shed.jar
 ```
 
 > Note that the instructions above assume JDK 17 or JDK 20 have already been downloaded and added to PATH.
@@ -271,17 +270,10 @@ java -jar ../build/Shed.jar
 
 Run Shed from the command line:
 
-```bash
-java -jar Shed.jar                 # Opens file chooser dialog
-java -jar Shed.jar filename.txt    # Opens specific file
+```console
+$ java -jar Shed.jar                 # Opens file chooser dialog
+$ java -jar Shed.jar filename.txt    # Opens specific file
 ```
-
-## Documentation
-
-* **[FEATURES.md](FEATURES.md)** - Comprehensive feature documentation
-* **[KEYBINDINGS.md](KEYBINDINGS.md)** - Quick keybinding reference
-* **[ARCHITECTURE.md](ARCHITECTURE.md)** - Developer documentation
-* **[CHANGELOG.md](CHANGELOG.md)** - Version history and upgrade guide
 
 ## Fonts
 

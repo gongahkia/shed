@@ -9,7 +9,7 @@ Shed is a bare-bones, opinionated, modal text editor with limited Vim bindings, 
 * Open source, MIT LICENSE
 * Highly customisable using Java Swing components *(self-documenting code)*
 * Stable, crash-proof
-* 4KB executable
+* 32KB executable
 * Respects your privacy, no telemetry whatsoever
 * Limited VIM bindings *(a good primer for newcomers interested in VIM/NEOVIM)*
 

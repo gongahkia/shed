@@ -1,178 +1,19 @@
-name: Shed CI/CD on Push
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
-
-env:
-  SHED_BUILD_COMMIT: ${{ github.sha }}
+    branches: [main]
 
 jobs:
-  java-desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    timeout-minutes: 20
-    runs-on: ${{ matrix.os }}
-    env:
-      JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
+  build-and-test:
+    runs-on: macos-14
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Test and package portable JAR
-        run: mvn -B -ntp '-Djava.awt.headless=true' clean package
-      - name: Retain test reports
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-tests-${{ matrix.os }}
-          path: target/surefire-reports/
-          retention-days: 14
-          if-no-files-found: warn
-      - name: Deliver portable JAR
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-portable-jar
-          path: target/shed-*.jar
-          retention-days: 14
-          if-no-files-found: error
-  swing-integration:
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Install virtual display
-        run: sudo apt-get update && sudo apt-get install -y xvfb openbox
-      - name: Run Swing integration tests with a display
-        run: |
-          xvfb-run -a -s "-screen 0 2560x1600x24" bash -c '
-            openbox >/tmp/shed-openbox.log 2>&1 &
-            sleep 1
-            mvn -B -Djava.awt.headless=false -Dshed.ai.native=true -Dtest=TexteditorSwingIntegrationTest,FocusedAiNativeAcceptanceTest test
-          '
-      - name: Retain desktop test reports and rendered captures
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-swing-reports
-          path: |
-            target/surefire-reports/
-            target/ai-acceptance/
-          retention-days: 14
-          if-no-files-found: warn
-  package-linux:
-    needs: [java-desktop, swing-integration]
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Install packaging tools
-        run: sudo apt-get update && sudo apt-get install -y fakeroot
-      - name: Build and verify Debian installer
-        run: bash scripts/package-linux.sh
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-installer-linux-x64
-          path: target/linux-package/dist/*
-          if-no-files-found: error
-  package-macos:
-    needs: [java-desktop, swing-integration]
-    timeout-minutes: 30
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Build and verify macOS installer
-        run: bash scripts/package-macos.sh
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-installer-macos-arm64
-          path: target/macos-package/dist/*
-          if-no-files-found: error
-  package-windows:
-    needs: [java-desktop, swing-integration]
-    timeout-minutes: 30
-    runs-on: windows-2025
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Build and verify Windows installer
-        shell: pwsh
-        run: ./scripts/package-windows.ps1
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-installer-windows-x64
-          path: target/windows-package/dist/*
-          if-no-files-found: error
-  release-verify:
-    needs: [package-linux, package-macos, package-windows]
-    timeout-minutes: 30
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          pattern: shed-installer-*
-          path: target/release-artifacts
-          merge-multiple: true
-      - name: Verify release artifacts
-        run: |
-          version=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
-          bash scripts/verify-release-artifacts.sh --artifacts target/release-artifacts --version "$version"
-          cd target/release-artifacts
-          sha256sum -c SHA256SUMS
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: shed-verified-release-bundle
-          path: target/release-artifacts/*
-          retention-days: 30
-          if-no-files-found: error
+      - uses: actions/checkout@v4
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test

@@ -22,7 +22,7 @@ public class ConfigManager {
     private static final String DEFAULT_FONT_FAMILY = "Hack";
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final int DEFAULT_TAB_SIZE = 4;
-    private static final boolean DEFAULT_LINE_NUMBERS = false;
+    private static final LineNumberMode DEFAULT_LINE_NUMBER_MODE = LineNumberMode.ABSOLUTE;
     private static final boolean DEFAULT_SHOW_CURRENT_LINE = true;
     private static final boolean DEFAULT_EXPAND_TAB = true;
     private static final boolean DEFAULT_AUTO_INDENT = true;
@@ -60,7 +60,7 @@ public class ConfigManager {
         config.put("font.family", DEFAULT_FONT_FAMILY);
         config.put("font.size", String.valueOf(DEFAULT_FONT_SIZE));
         config.put("tab.size", String.valueOf(DEFAULT_TAB_SIZE));
-        config.put("line.numbers", String.valueOf(DEFAULT_LINE_NUMBERS));
+        config.put("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
         config.put("show.current.line", String.valueOf(DEFAULT_SHOW_CURRENT_LINE));
         config.put("expand.tab", String.valueOf(DEFAULT_EXPAND_TAB));
         config.put("auto.indent", String.valueOf(DEFAULT_AUTO_INDENT));
@@ -183,8 +183,15 @@ public class ConfigManager {
 
     // Get line numbers preference
     public boolean getLineNumbers() {
-        String value = config.getOrDefault("line.numbers", String.valueOf(DEFAULT_LINE_NUMBERS));
-        return Boolean.parseBoolean(value);
+        return getLineNumberMode() != LineNumberMode.NONE;
+    }
+
+    public LineNumberMode getLineNumberMode() {
+        return LineNumberMode.fromConfigValue(config.getOrDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue()));
+    }
+
+    public void setLineNumberMode(LineNumberMode mode) {
+        config.put("line.numbers", mode.toConfigValue());
     }
 
     public boolean getShowCurrentLine() {

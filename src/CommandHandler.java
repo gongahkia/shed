@@ -30,7 +30,11 @@ public class CommandHandler {
         boolean isSearch = command.startsWith("/");
         if (isSearch) {
             command = command.substring(1);
-            return handleSearch(command);
+            return editor.search(command);
+        }
+
+        if (command.startsWith("?")) {
+            return editor.searchBackward(command.substring(1));
         }
 
         if (command.equals("s") || command.equals("%s") ||
@@ -50,7 +54,7 @@ public class CommandHandler {
             switch (cmd) {
                 case "w":
                 case "write":
-                    return handleWrite();
+                    return handleWrite(parts.length > 1 ? parts[1] : null);
 
                 case "q":
                 case "quit":
@@ -58,7 +62,7 @@ public class CommandHandler {
 
                 case "wq":
                 case "x":
-                    return handleWriteQuit();
+                    return handleWriteQuit(parts.length > 1 ? parts[1] : null);
 
                 case "e":
                 case "edit":
@@ -114,7 +118,7 @@ public class CommandHandler {
     }
 
     // :w - Write (save) current buffer
-    private String handleWrite() {
+    private String handleWrite(String targetPath) {
         try {
             FileBuffer buffer = editor.getCurrentBuffer();
             if (buffer == null) {
@@ -122,7 +126,11 @@ public class CommandHandler {
             }
 
             buffer.setContent(editor.getTextArea().getText());
-            buffer.save();
+            if (targetPath != null && !targetPath.isEmpty()) {
+                buffer.saveAs(new File(targetPath));
+            } else {
+                buffer.save();
+            }
 
             String timestamp = timeFormat.format(LocalDateTime.now());
             return "\"" + buffer.getDisplayName() + "\" " +
@@ -138,8 +146,8 @@ public class CommandHandler {
     }
 
     // :wq - Write and quit
-    private String handleWriteQuit() {
-        String writeResult = handleWrite();
+    private String handleWriteQuit(String targetPath) {
+        String writeResult = handleWrite(targetPath);
         if (writeResult.startsWith("Error")) {
             return writeResult;
         }
@@ -186,17 +194,44 @@ public class CommandHandler {
         } else if (option.equals("nonu") || option.equals("nonumber")) {
             editor.toggleLineNumbers(false);
             return "Line numbers disabled";
+        } else if (option.equals("rnu") || option.equals("relativenumber")) {
+            editor.setLineNumberMode(LineNumberMode.RELATIVE);
+            return "Relative line numbers enabled";
+        } else if (option.equals("nornu") || option.equals("norelativenumber")) {
+            editor.setLineNumberMode(LineNumberMode.ABSOLUTE);
+            return "Relative line numbers disabled";
+        } else if (option.equals("hls") || option.equals("hlsearch")) {
+            editor.setHighlightSearch(true);
+            return "Search highlighting enabled";
+        } else if (option.equals("nohls") || option.equals("nohlsearch")) {
+            editor.setHighlightSearch(false);
+            return "Search highlighting disabled";
+        } else if (option.equals("ai") || option.equals("autoindent")) {
+            editor.setAutoIndent(true);
+            return "Auto-indent enabled";
+        } else if (option.equals("noai") || option.equals("noautoindent")) {
+            editor.setAutoIndent(false);
+            return "Auto-indent disabled";
+        } else if (option.equals("et") || option.equals("expandtab")) {
+            editor.setExpandTab(true);
+            return "Expand tab enabled";
+        } else if (option.equals("noet") || option.equals("noexpandtab")) {
+            editor.setExpandTab(false);
+            return "Expand tab disabled";
+        } else if (option.equals("cul") || option.equals("cursorline")) {
+            editor.setShowCurrentLine(true);
+            return "Current line highlight enabled";
+        } else if (option.equals("nocul") || option.equals("nocursorline")) {
+            editor.setShowCurrentLine(false);
+            return "Current line highlight disabled";
+        } else if (option.startsWith("tabstop=") || option.startsWith("ts=")) {
+            String value = option.substring(option.indexOf('=') + 1);
+            return editor.setTabSizeFromCommand(value);
+        } else if (option.startsWith("line.numbers=")) {
+            return editor.setLineNumberMode(option.substring(option.indexOf('=') + 1));
         } else {
             return "Unknown option: " + option;
         }
-    }
-
-    // /pattern - Search
-    private String handleSearch(String pattern) {
-        if (pattern.isEmpty()) {
-            return "Error: Empty search pattern";
-        }
-        return editor.search(pattern);
     }
 
     // :help - Show help

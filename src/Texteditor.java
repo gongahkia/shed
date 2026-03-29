@@ -20,6 +20,7 @@ import java.util.Deque;
 import java.util.List;
 
 public class Texteditor extends JFrame implements KeyListener {
+    private static final long serialVersionUID = 1L;
 
     // Core components
     private EditorMode currentMode;
@@ -1894,7 +1895,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void collectFiles(File directory, List<String> results) {
-        if (directory == null || results.size() >= 200 || directory.getName().startsWith(".")) {
+        if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
             return;
         }
         File[] files = directory.listFiles();
@@ -1923,7 +1924,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void grepFilesRecursive(File directory, String pattern, List<String> results) {
-        if (directory == null || results.size() >= 200 || directory.getName().startsWith(".")) {
+        if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
             return;
         }
         File[] files = directory.listFiles();
@@ -2007,6 +2008,17 @@ public class Texteditor extends JFrame implements KeyListener {
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
         return selection[0];
+    }
+
+    private boolean shouldSkipHiddenPath(File file) {
+        if (file == null) {
+            return true;
+        }
+        String path = file.getPath();
+        if (".".equals(path) || "./".equals(path)) {
+            return false;
+        }
+        return file.getName().startsWith(".");
     }
 
     public String showRegisters() {
@@ -2107,11 +2119,66 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showLspCompletionStatus() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || buffer.getFileType() == FileType.UNKNOWN || buffer.getFileType() == FileType.TEXT) {
-            return "No LSP completion available for this buffer";
+        String prefix = currentCompletionPrefix();
+        if (prefix.isEmpty()) {
+            return "No completion prefix";
         }
-        return "LSP completion is not configured in this build";
+
+        List<String> completions = collectBufferCompletions(prefix);
+        if (completions.isEmpty()) {
+            return "No completions";
+        }
+        return "Completions: " + String.join(", ", completions);
+    }
+
+    private String currentCompletionPrefix() {
+        String text = writingArea.getText();
+        int caret = Math.min(writingArea.getCaretPosition(), text.length());
+        int start = caret;
+        while (start > 0 && isWordCharacter(text.charAt(start - 1))) {
+            start--;
+        }
+        return text.substring(start, caret);
+    }
+
+    private List<String> collectBufferCompletions(String prefix) {
+        List<String> matches = new ArrayList<>();
+        if (prefix == null || prefix.isEmpty()) {
+            return matches;
+        }
+
+        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
+        StringBuilder word = new StringBuilder();
+        String text = writingArea.getText();
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (isWordCharacter(c)) {
+                word.append(c);
+            } else if (!word.isEmpty()) {
+                addCompletionCandidate(prefix, unique, word.toString());
+                word.setLength(0);
+            }
+        }
+        if (!word.isEmpty()) {
+            addCompletionCandidate(prefix, unique, word.toString());
+        }
+
+        for (String candidate : unique) {
+            matches.add(candidate);
+            if (matches.size() >= 10) {
+                break;
+            }
+        }
+        return matches;
+    }
+
+    private void addCompletionCandidate(String prefix, java.util.LinkedHashSet<String> unique, String candidate) {
+        if (candidate.length() <= prefix.length()) {
+            return;
+        }
+        if (candidate.startsWith(prefix)) {
+            unique.add(candidate);
+        }
     }
 
     // Repeat last command
@@ -2927,6 +2994,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
 // Line Number Panel for displaying line numbers
 class LineNumberPanel extends JPanel {
+    private static final long serialVersionUID = 1L;
     private final JTextArea textArea;
     private LineNumberMode mode;
     private boolean highlightCurrentLine;

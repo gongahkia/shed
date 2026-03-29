@@ -79,6 +79,10 @@ public class RegisterManager {
         this.lastInserted = inserted == null ? "" : inserted;
     }
 
+    public void setMacro(char register, List<NormalizedKeyStroke> macroKeys) {
+        namedRegisters.put(register, RegisterContent.macro(macroKeys));
+    }
+
     public List<String> getDisplayLines() {
         List<String> lines = new ArrayList<>();
         appendLine(lines, '"', unnamedRegister);

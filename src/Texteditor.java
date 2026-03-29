@@ -85,6 +85,10 @@ public class Texteditor extends JFrame implements KeyListener {
     private int changeIndex;
     private char lastFindChar;
     private char lastFindType;
+    private Character recordingRegister;
+    private Character lastMacroRegister;
+    private List<NormalizedKeyStroke> macroBuffer;
+    private int macroPlaybackDepth;
 
     // Visual mode state
     private int visualStartPos;
@@ -133,6 +137,10 @@ public class Texteditor extends JFrame implements KeyListener {
         changeIndex = -1;
         lastFindChar = '\0';
         lastFindType = '\0';
+        recordingRegister = null;
+        lastMacroRegister = null;
+        macroBuffer = new ArrayList<>();
+        macroPlaybackDepth = 0;
         loadRecentFiles();
         lastMessage = "";
 
@@ -363,6 +371,9 @@ public class Texteditor extends JFrame implements KeyListener {
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
+        if (currentMode == EditorMode.NORMAL && recordingRegister != null && !(pendingKey == '\0' && e.getKeyChar() == 'q')) {
+            macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
+        }
         switch (currentMode) {
             case NORMAL:
                 handleNormalMode(e);
@@ -498,6 +509,20 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (c == 'G') {
             pendingCount = "";
             moveFileEnd();
+        } else if (c == 'q') {
+            if (recordingRegister != null) {
+                registerManager.setMacro(recordingRegister, macroBuffer);
+                lastMacroRegister = recordingRegister;
+                showMessage("Recorded macro to @" + recordingRegister);
+                recordingRegister = null;
+                macroBuffer = new ArrayList<>();
+            } else {
+                pendingKey = 'q';
+            }
+            return;
+        } else if (c == '@') {
+            pendingKey = '@';
+            return;
         } else if (c == '"') {
             pendingKey = '"';
         } else if (c == 'm' || c == '\'' || c == '`') {
@@ -672,6 +697,18 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             pendingKey = '\0';
             pendingCount = "";
+        } else if (pendingKey == 'q') {
+            recordingRegister = c;
+            macroBuffer = new ArrayList<>();
+            pendingKey = '\0';
+            showMessage("recording @" + c);
+        } else if (pendingKey == '@') {
+            if (c == '@') {
+                showMessage(playMacro(lastMacroRegister));
+            } else {
+                showMessage(playMacro(c));
+            }
+            pendingKey = '\0';
         } else if (pendingKey == '"') {
             pendingRegister = c;
             pendingKey = '\0';
@@ -2354,6 +2391,30 @@ public class Texteditor extends JFrame implements KeyListener {
         clipboardManager.pasteContent(writingArea, content.getText(), content.isLineWise(), before);
         markModified();
         return "Pasted";
+    }
+
+    private String playMacro(Character register) {
+        if (register == null) {
+            return "No previously executed macro";
+        }
+        RegisterContent content = registerManager.get(register);
+        if (content == null || !content.isMacro()) {
+            return "Register @" + register + " is empty or not a macro";
+        }
+        if (macroPlaybackDepth >= 20) {
+            return "Macro recursion limit reached";
+        }
+
+        macroPlaybackDepth++;
+        try {
+            lastMacroRegister = register;
+            for (NormalizedKeyStroke keyStroke : content.getMacroKeys()) {
+                keyPressed(keyStroke.toKeyEvent(writingArea));
+            }
+        } finally {
+            macroPlaybackDepth--;
+        }
+        return "Executed macro @" + register;
     }
 
     // Mode management

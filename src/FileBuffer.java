@@ -72,8 +72,13 @@ public class FileBuffer {
 
     // Update content and mark as modified
     public void setContent(String content) {
+        setContent(content, true);
+    }
+
+    // Update content while explicitly controlling modification state
+    public void setContent(String content, boolean modified) {
         this.content = content;
-        this.modified = true;
+        this.modified = modified;
         updateLineCount();
     }
 

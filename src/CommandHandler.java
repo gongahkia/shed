@@ -139,14 +139,7 @@ public class CommandHandler {
 
     // :q - Quit current buffer
     private String handleQuit(boolean force) {
-        FileBuffer buffer = editor.getCurrentBuffer();
-
-        if (!force && buffer != null && buffer.isModified()) {
-            return "Error: No write since last change (use :q! to override)";
-        }
-
-        editor.closeEditor();
-        return "Quitting";
+        return editor.requestQuit(force);
     }
 
     // :wq - Write and quit
@@ -155,7 +148,7 @@ public class CommandHandler {
         if (writeResult.startsWith("Error")) {
             return writeResult;
         }
-        editor.closeEditor();
+        editor.requestQuit(true);
         return "Saved and quitting";
     }
 

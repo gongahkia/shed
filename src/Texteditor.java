@@ -38,6 +38,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private UndoManager undoManager;
     private String lastCommand;
     private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
+    private boolean suppressDocumentEvents;
+    private boolean closingDown;
 
     // Visual mode state
     private int visualStartPos;
@@ -55,6 +57,8 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingKey = '\0';
         visualStartPos = -1;
         lastCommand = "";
+        suppressDocumentEvents = false;
+        closingDown = false;
 
         // Initialize UI
         initializeUI();
@@ -121,9 +125,9 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Add document listener for modification tracking
         writingArea.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { markModified(); }
-            public void removeUpdate(DocumentEvent e) { markModified(); }
-            public void changedUpdate(DocumentEvent e) { markModified(); }
+            public void insertUpdate(DocumentEvent e) { handleDocumentChange(); }
+            public void removeUpdate(DocumentEvent e) { handleDocumentChange(); }
+            public void changedUpdate(DocumentEvent e) { handleDocumentChange(); }
         });
 
         // Create line number panel
@@ -745,6 +749,50 @@ public class Texteditor extends JFrame implements KeyListener {
         statusBar.setText(status.toString());
     }
 
+    private void handleDocumentChange() {
+        if (!suppressDocumentEvents) {
+            markModified();
+        }
+    }
+
+    private void withSuppressedDocumentEvents(Runnable action) {
+        suppressDocumentEvents = true;
+        try {
+            action.run();
+        } finally {
+            suppressDocumentEvents = false;
+        }
+    }
+
+    private void detachUndoManager() {
+        if (undoManager != null) {
+            writingArea.getDocument().removeUndoableEditListener(undoManager);
+        }
+    }
+
+    private void attachUndoManager(UndoManager newUndoManager) {
+        detachUndoManager();
+        undoManager = newUndoManager;
+        if (undoManager != null) {
+            writingArea.getDocument().addUndoableEditListener(undoManager);
+        }
+    }
+
+    private void loadBufferIntoEditor(FileBuffer buffer) {
+        detachUndoManager();
+        withSuppressedDocumentEvents(() -> writingArea.setText(buffer.getContent()));
+        attachUndoManager(buffer.getUndoManager());
+        writingArea.setCaretPosition(0);
+        updateStatusBar();
+    }
+
+    private void persistCurrentBufferState() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer != null) {
+            buffer.setContent(writingArea.getText(), buffer.isModified());
+        }
+    }
+
     // Mark buffer as modified
     private void markModified() {
         FileBuffer buffer = getCurrentBuffer();
@@ -781,16 +829,12 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public void openFile(File file) throws IOException {
+        persistCurrentBufferState();
+
         FileBuffer buffer = new FileBuffer(file);
         buffers.add(buffer);
         currentBufferIndex = buffers.size() - 1;
-
-        writingArea.setText(buffer.getContent());
-        undoManager = buffer.getUndoManager();
-        writingArea.getDocument().addUndoableEditListener(undoManager);
-        writingArea.setCaretPosition(0);
-
-        updateStatusBar();
+        loadBufferIntoEditor(buffer);
         addToRecentFiles(file.getAbsolutePath());
     }
 
@@ -811,8 +855,8 @@ public class Texteditor extends JFrame implements KeyListener {
             return "No buffers open";
         }
 
-        currentBufferIndex = (currentBufferIndex + 1) % buffers.size();
-        switchToBuffer(currentBufferIndex);
+        int nextIndex = (currentBufferIndex + 1) % buffers.size();
+        switchToBuffer(nextIndex);
         return "Buffer " + (currentBufferIndex + 1) + " of " + buffers.size();
     }
 
@@ -821,11 +865,11 @@ public class Texteditor extends JFrame implements KeyListener {
             return "No buffers open";
         }
 
-        currentBufferIndex--;
-        if (currentBufferIndex < 0) {
-            currentBufferIndex = buffers.size() - 1;
+        int prevIndex = currentBufferIndex - 1;
+        if (prevIndex < 0) {
+            prevIndex = buffers.size() - 1;
         }
-        switchToBuffer(currentBufferIndex);
+        switchToBuffer(prevIndex);
         return "Buffer " + (currentBufferIndex + 1) + " of " + buffers.size();
     }
 
@@ -857,22 +901,29 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         FileBuffer buffer = getCurrentBuffer();
-        if (!force && buffer != null && buffer.isModified()) {
+        if (!force && buffer != null && buffer.isModified() && buffers.size() > 1) {
             return "Error: No write since last change (use :bd! to override)";
+        }
+
+        if (buffers.size() == 1) {
+            if (!force && hasUnsavedChanges(buffer)) {
+                int result = confirmDiscardChanges("Close the last buffer and quit anyway?");
+                if (result != JOptionPane.YES_OPTION) {
+                    return "Buffer close cancelled";
+                }
+            }
+            closeEditor();
+            return "Last buffer closed";
         }
 
         buffers.remove(currentBufferIndex);
 
-        if (buffers.isEmpty()) {
-            closeEditor();
-            return "Last buffer closed";
-        } else {
-            if (currentBufferIndex >= buffers.size()) {
-                currentBufferIndex = buffers.size() - 1;
-            }
-            switchToBuffer(currentBufferIndex);
-            return "Buffer deleted";
+        if (currentBufferIndex >= buffers.size()) {
+            currentBufferIndex = buffers.size() - 1;
         }
+
+        loadBufferIntoEditor(buffers.get(currentBufferIndex));
+        return "Buffer deleted";
     }
 
     private void switchToBuffer(int index) {
@@ -880,19 +931,11 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        // Save current buffer content
-        if (currentBufferIndex >= 0 && currentBufferIndex < buffers.size()) {
-            FileBuffer oldBuffer = buffers.get(currentBufferIndex);
-            oldBuffer.setContent(writingArea.getText());
-        }
+        persistCurrentBufferState();
 
-        // Load new buffer
         FileBuffer newBuffer = buffers.get(index);
-        writingArea.setText(newBuffer.getContent());
-        undoManager = newBuffer.getUndoManager();
-        writingArea.setCaretPosition(0);
-
-        updateStatusBar();
+        currentBufferIndex = index;
+        loadBufferIntoEditor(newBuffer);
     }
 
     // Search methods
@@ -1032,25 +1075,43 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Quit handling
     private void handleQuit(boolean force) {
+        String message = requestQuit(force);
+        if (!"Quitting".equals(message)) {
+            showMessage(message);
+        }
+    }
+
+    private boolean hasUnsavedChanges(FileBuffer buffer) {
+        return buffer != null && buffer.isModified();
+    }
+
+    private int confirmDiscardChanges(String prompt) {
+        return JOptionPane.showConfirmDialog(this,
+            prompt,
+            "Unsaved Changes",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE);
+    }
+
+    public String requestQuit(boolean force) {
         FileBuffer buffer = getCurrentBuffer();
-
-        if (!force && buffer != null && buffer.isModified()) {
-            int result = JOptionPane.showConfirmDialog(this,
-                "File has unsaved changes. Quit anyway?",
-                "Unsaved Changes",
-                JOptionPane.YES_NO_OPTION,
-                JOptionPane.WARNING_MESSAGE);
-
+        if (!force && hasUnsavedChanges(buffer)) {
+            int result = confirmDiscardChanges("File has unsaved changes. Quit anyway?");
             if (result != JOptionPane.YES_OPTION) {
-                return;
+                return "Quit cancelled";
             }
         }
 
         closeEditor();
+        return "Quitting";
     }
 
     public void closeEditor() {
-        this.dispatchEvent(new WindowEvent(this, WindowEvent.WINDOW_CLOSING));
+        if (closingDown) {
+            return;
+        }
+        closingDown = true;
+        dispose();
         System.exit(0);
     }
 

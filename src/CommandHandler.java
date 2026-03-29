@@ -162,6 +162,7 @@ public class CommandHandler {
             } else {
                 buffer.save();
             }
+            editor.notifyCurrentBufferSaved();
 
             String timestamp = timeFormat.format(LocalDateTime.now());
             return "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;

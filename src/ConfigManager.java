@@ -256,6 +256,18 @@ public class ConfigManager {
         return config.getOrDefault(key, defaultValue);
     }
 
+    public String getLspCommand(String extension) {
+        return config.get("lsp." + extension + ".command");
+    }
+
+    public String[] getLspArgs(String extension) {
+        String raw = config.get("lsp." + extension + ".args");
+        if (raw == null || raw.isBlank()) {
+            return new String[0];
+        }
+        return raw.trim().split("\\s+");
+    }
+
     // Get config file path
     public String getConfigPath() {
         return configPath;

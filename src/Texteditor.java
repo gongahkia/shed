@@ -478,37 +478,52 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Navigation
         else if (code == KeyEvent.VK_UP || c == 'k') {
-            moveUp();
+            repeatAction(consumePendingCount(), this::moveUp);
         } else if (code == KeyEvent.VK_DOWN || c == 'j') {
-            moveDown();
+            repeatAction(consumePendingCount(), this::moveDown);
         } else if (code == KeyEvent.VK_LEFT || c == 'h') {
-            moveLeft();
+            repeatAction(consumePendingCount(), this::moveLeft);
         } else if (code == KeyEvent.VK_RIGHT || c == 'l') {
-            moveRight();
+            repeatAction(consumePendingCount(), this::moveRight);
         }
 
         // Word movements
         else if (c == 'w') {
-            moveWordForward();
+            repeatAction(consumePendingCount(), this::moveWordForward);
         } else if (c == 'b') {
-            moveWordBackward();
+            repeatAction(consumePendingCount(), this::moveWordBackward);
         } else if (c == 'e') {
-            moveWordEnd();
+            repeatAction(consumePendingCount(), this::moveWordEnd);
+        } else if (c == 'W') {
+            repeatAction(consumePendingCount(), this::moveWordForwardBig);
+        } else if (c == 'B') {
+            repeatAction(consumePendingCount(), this::moveWordBackwardBig);
+        } else if (c == 'E') {
+            repeatAction(consumePendingCount(), this::moveWordEndBig);
         }
 
         // Line movements
         else if (c == '0') {
             moveLineStart();
+            pendingCount = "";
+        } else if (c == '^') {
+            moveLineFirstNonBlank();
+            pendingCount = "";
         } else if (c == '$') {
             moveLineEnd();
+            pendingCount = "";
         }
 
         // File movements
         else if (c == 'g') {
             pendingKey = 'g';
         } else if (c == 'G') {
-            pendingCount = "";
-            moveFileEnd();
+            int count = consumePendingCount();
+            if (count > 1) {
+                showMessage(gotoLine(count));
+            } else {
+                moveFileEnd();
+            }
         } else if (c == 'q') {
             if (recordingRegister != null) {
                 registerManager.setMacro(recordingRegister, macroBuffer);
@@ -527,24 +542,50 @@ public class Texteditor extends JFrame implements KeyListener {
             pendingKey = '"';
         } else if (c == 'm' || c == '\'' || c == '`') {
             pendingKey = c;
-        } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=') {
+        } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=' || c == 'r') {
             pendingKey = c;
+        } else if (c == 'z') {
+            pendingKey = 'z';
+        } else if (c == '{') {
+            repeatAction(consumePendingCount(), this::moveParagraphBackward);
+        } else if (c == '}') {
+            repeatAction(consumePendingCount(), this::moveParagraphForward);
+        } else if (c == '(') {
+            repeatAction(consumePendingCount(), this::moveSentenceBackward);
+        } else if (c == ')') {
+            repeatAction(consumePendingCount(), this::moveSentenceForward);
+        } else if (c == '%') {
+            int count = consumePendingCount();
+            if (count > 1) {
+                moveToFilePercent(count);
+            } else {
+                moveMatchingBracket();
+            }
+        } else if (c == 'H') {
+            moveToScreenPosition('H');
+            pendingCount = "";
+        } else if (c == 'M') {
+            moveToScreenPosition('M');
+            pendingCount = "";
+        } else if (c == 'L') {
+            moveToScreenPosition('L');
+            pendingCount = "";
         }
 
         // Clipboard operations
         else if (c == 'y') {
-            pendingCount = "";
             pendingKey = 'y';
         } else if (c == 'd') {
-            pendingCount = "";
             pendingKey = 'd';
         } else if (c == 'c') {
-            pendingCount = "";
             pendingKey = 'c';
         } else if (c == 'x') {
             pendingCount = "";
             storeDelete(consumePendingRegister(), clipboardManager.deleteChar(writingArea), false);
             markModified();
+        } else if (c == 'Y') {
+            pendingCount = "";
+            showMessage(yankToEndOfLine());
         } else if (c == 'p') {
             pendingCount = "";
             showMessage(pasteFromRegister(false));
@@ -652,6 +693,19 @@ public class Texteditor extends JFrame implements KeyListener {
                 } else {
                     showMessage(gotoLine(Integer.parseInt(pendingCount)));
                 }
+            } else if (c == 'e') {
+                repeatAction(consumePendingCount(), this::moveWordEndBackward);
+            } else if (c == 'E') {
+                repeatAction(consumePendingCount(), this::moveWordEndBackwardBig);
+            } else if (c == '0') {
+                moveLineStart();
+                pendingCount = "";
+            } else if (c == '$') {
+                moveLineEnd();
+                pendingCount = "";
+            } else if (c == '_') {
+                moveLineLastNonBlank();
+                pendingCount = "";
             } else if (c == 'J') {
                 joinCurrentLine(false);
             } else if (c == ';') {
@@ -666,6 +720,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 lastCommand = "yy";
                 storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
                 showMessage("Line yanked");
+            } else if (c == 'g') {
+                pendingKey = 'Y';
+                return;
+            } else {
+                showMessage(applyMotionOperator('y', String.valueOf(c)));
             }
             pendingKey = '\0';
             pendingCount = "";
@@ -675,11 +734,16 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 markModified();
                 showMessage("Line deleted");
+            } else if (c == 'g') {
+                pendingKey = 'D';
+                return;
             } else if (c == 'w') {
                 lastCommand = "dw";
                 storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
                 markModified();
                 showMessage("Word deleted");
+            } else {
+                showMessage(applyMotionOperator('d', String.valueOf(c)));
             }
             pendingKey = '\0';
             pendingCount = "";
@@ -689,11 +753,16 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
+            } else if (c == 'g') {
+                pendingKey = 'C';
+                return;
             } else if (c == 'w') {
                 lastCommand = "cw";
                 storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
+            } else {
+                showMessage(applyMotionOperator('c', String.valueOf(c)));
             }
             pendingKey = '\0';
             pendingCount = "";
@@ -743,10 +812,17 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (pendingKey == 'f' || pendingKey == 'F' || pendingKey == 't' || pendingKey == 'T') {
             showMessage(findCharacter(pendingKey, c));
             pendingKey = '\0';
+        } else if (pendingKey == 'r') {
+            showMessage(replaceCharacter(c));
+            pendingKey = '\0';
         } else if (pendingKey == '>' || pendingKey == '<' || pendingKey == '=') {
             if (c == pendingKey) {
                 showMessage(applyLineOperator(pendingKey));
             }
+            pendingKey = '\0';
+        } else if (pendingKey == 'D' || pendingKey == 'C' || pendingKey == 'Y') {
+            char operator = pendingKey == 'D' ? 'd' : pendingKey == 'C' ? 'c' : 'y';
+            showMessage(applyMotionOperator(operator, "g" + c));
             pendingKey = '\0';
         } else if (pendingKey == '\u0017') {
             switch (c) {
@@ -779,6 +855,15 @@ public class Texteditor extends JFrame implements KeyListener {
                     break;
                 default:
                     break;
+            }
+            pendingKey = '\0';
+        } else if (pendingKey == 'z') {
+            if (c == 't') {
+                scrollCurrentLineTo('t');
+            } else if (c == 'z') {
+                scrollCurrentLineTo('z');
+            } else if (c == 'b') {
+                scrollCurrentLineTo('b');
             }
             pendingKey = '\0';
         }
@@ -1127,6 +1212,79 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(pos, text.length()));
     }
 
+    private void moveWordForwardBig() {
+        String text = writingArea.getText();
+        int pos = writingArea.getCaretPosition();
+        while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
+            pos++;
+        }
+        while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
+            pos++;
+        }
+        writingArea.setCaretPosition(Math.min(pos, text.length()));
+    }
+
+    private void moveWordBackwardBig() {
+        String text = writingArea.getText();
+        int pos = writingArea.getCaretPosition();
+        if (pos > 0) {
+            pos--;
+            while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
+                pos--;
+            }
+            while (pos > 0 && !Character.isWhitespace(text.charAt(pos - 1))) {
+                pos--;
+            }
+        }
+        writingArea.setCaretPosition(pos);
+    }
+
+    private void moveWordEndBig() {
+        String text = writingArea.getText();
+        int pos = writingArea.getCaretPosition();
+        if (pos < text.length()) {
+            while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
+                pos++;
+            }
+            while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
+                pos++;
+            }
+            if (pos > 0) {
+                pos--;
+            }
+        }
+        writingArea.setCaretPosition(Math.min(pos, text.length()));
+    }
+
+    private void moveWordEndBackward() {
+        moveWordEndBackwardInternal(false);
+    }
+
+    private void moveWordEndBackwardBig() {
+        moveWordEndBackwardInternal(true);
+    }
+
+    private void moveWordEndBackwardInternal(boolean bigWord) {
+        String text = writingArea.getText();
+        int pos = Math.max(0, writingArea.getCaretPosition() - 1);
+        while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
+            pos--;
+        }
+        while (pos > 0 && isMotionWordChar(text.charAt(pos - 1), bigWord)) {
+            pos--;
+        }
+        if (pos < text.length()) {
+            while (pos < text.length() - 1 && isMotionWordChar(text.charAt(pos + 1), bigWord)) {
+                pos++;
+            }
+        }
+        writingArea.setCaretPosition(Math.max(0, pos));
+    }
+
+    private boolean isMotionWordChar(char c, boolean bigWord) {
+        return bigWord ? !Character.isWhitespace(c) : isWordCharacter(c);
+    }
+
     private void moveLineStart() {
         try {
             int pos = writingArea.getCaretPosition();
@@ -1149,12 +1307,211 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void moveLineFirstNonBlank() {
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            int lineStart = writingArea.getLineStartOffset(line);
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText().substring(lineStart, lineEnd);
+            int offset = 0;
+            while (offset < lineText.length() && Character.isWhitespace(lineText.charAt(offset)) && lineText.charAt(offset) != '\n') {
+                offset++;
+            }
+            writingArea.setCaretPosition(Math.min(lineStart + offset, writingArea.getText().length()));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void moveLineLastNonBlank() {
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            int lineStart = writingArea.getLineStartOffset(line);
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText().substring(lineStart, lineEnd);
+            int offset = lineText.length() - 1;
+            while (offset > 0 && Character.isWhitespace(lineText.charAt(offset))) {
+                offset--;
+            }
+            writingArea.setCaretPosition(Math.min(lineStart + offset, Math.max(lineStart, writingArea.getText().length())));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
     private void moveFileStart() {
         writingArea.setCaretPosition(0);
     }
 
     private void moveFileEnd() {
         writingArea.setCaretPosition(writingArea.getText().length());
+    }
+
+    private void moveParagraphForward() {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            for (int i = line + 1; i < writingArea.getLineCount(); i++) {
+                if (lineText(i).isBlank()) {
+                    int targetLine = Math.min(i + 1, writingArea.getLineCount() - 1);
+                    writingArea.setCaretPosition(writingArea.getLineStartOffset(targetLine));
+                    return;
+                }
+            }
+            moveFileEnd();
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void moveParagraphBackward() {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            for (int i = Math.max(0, line - 1); i >= 0; i--) {
+                if (lineText(i).isBlank()) {
+                    int targetLine = Math.max(0, i - 1);
+                    writingArea.setCaretPosition(writingArea.getLineStartOffset(targetLine));
+                    return;
+                }
+            }
+            moveFileStart();
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void moveSentenceForward() {
+        String text = writingArea.getText();
+        int pos = writingArea.getCaretPosition();
+        while (pos < text.length()) {
+            char c = text.charAt(pos);
+            if (c == '.' || c == '!' || c == '?') {
+                pos++;
+                while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
+                    pos++;
+                }
+                writingArea.setCaretPosition(Math.min(pos, text.length()));
+                return;
+            }
+            pos++;
+        }
+        moveFileEnd();
+    }
+
+    private void moveSentenceBackward() {
+        String text = writingArea.getText();
+        int pos = Math.max(0, writingArea.getCaretPosition() - 1);
+        while (pos > 0) {
+            char c = text.charAt(pos);
+            if (c == '.' || c == '!' || c == '?') {
+                pos++;
+                while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
+                    pos++;
+                }
+                writingArea.setCaretPosition(Math.min(pos, text.length()));
+                return;
+            }
+            pos--;
+        }
+        moveFileStart();
+    }
+
+    private void moveMatchingBracket() {
+        String text = writingArea.getText();
+        int pos = writingArea.getCaretPosition();
+        if (text.isEmpty() || pos < 0 || pos >= text.length()) {
+            return;
+        }
+        char current = text.charAt(pos);
+        String opens = "([{<";
+        String closes = ")]}>";
+        int openIndex = opens.indexOf(current);
+        int closeIndex = closes.indexOf(current);
+        if (openIndex >= 0) {
+            char close = closes.charAt(openIndex);
+            int depth = 0;
+            for (int i = pos; i < text.length(); i++) {
+                char c = text.charAt(i);
+                if (c == current) {
+                    depth++;
+                } else if (c == close) {
+                    depth--;
+                    if (depth == 0) {
+                        writingArea.setCaretPosition(i);
+                        return;
+                    }
+                }
+            }
+        } else if (closeIndex >= 0) {
+            char open = opens.charAt(closeIndex);
+            int depth = 0;
+            for (int i = pos; i >= 0; i--) {
+                char c = text.charAt(i);
+                if (c == current) {
+                    depth++;
+                } else if (c == open) {
+                    depth--;
+                    if (depth == 0) {
+                        writingArea.setCaretPosition(i);
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    private void moveToFilePercent(int percent) {
+        int clamped = Math.max(0, Math.min(100, percent));
+        String text = writingArea.getText();
+        int target = (int) Math.round((text.length() * clamped) / 100.0);
+        writingArea.setCaretPosition(Math.min(target, text.length()));
+    }
+
+    private void moveToScreenPosition(char position) {
+        try {
+            Rectangle visible = writingArea.getVisibleRect();
+            int y;
+            switch (position) {
+                case 'H':
+                    y = visible.y;
+                    break;
+                case 'L':
+                    y = visible.y + visible.height;
+                    break;
+                case 'M':
+                default:
+                    y = visible.y + (visible.height / 2);
+                    break;
+            }
+            int offset = writingArea.viewToModel2D(new Point(0, y));
+            writingArea.setCaretPosition(Math.min(offset, writingArea.getText().length()));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void scrollCurrentLineTo(char anchor) {
+        try {
+            Rectangle lineBounds = writingArea.modelToView2D(writingArea.getCaretPosition()).getBounds();
+            Rectangle visible = writingArea.getVisibleRect();
+            int targetY = visible.y;
+            switch (anchor) {
+                case 'b':
+                    targetY = Math.max(0, lineBounds.y - visible.height + lineBounds.height);
+                    break;
+                case 'z':
+                    targetY = Math.max(0, lineBounds.y - (visible.height / 2));
+                    break;
+                case 't':
+                default:
+                    targetY = Math.max(0, lineBounds.y);
+                    break;
+            }
+            writingArea.scrollRectToVisible(new Rectangle(visible.x, targetY, visible.width, visible.height));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private String lineText(int line) throws BadLocationException {
+        int start = writingArea.getLineStartOffset(line);
+        int end = writingArea.getLineEndOffset(line);
+        return writingArea.getText().substring(start, end);
     }
 
     private void scrollHalfPageDown() {
@@ -2369,6 +2726,21 @@ public class Texteditor extends JFrame implements KeyListener {
         showMessage("Repeated: " + lastCommand);
     }
 
+    private int consumePendingCount() {
+        if (pendingCount == null || pendingCount.isEmpty()) {
+            return 1;
+        }
+        int count = Integer.parseInt(pendingCount);
+        pendingCount = "";
+        return Math.max(1, count);
+    }
+
+    private void repeatAction(int count, Runnable action) {
+        for (int i = 0; i < Math.max(1, count); i++) {
+            action.run();
+        }
+    }
+
     private Character consumePendingRegister() {
         Character register = pendingRegister;
         pendingRegister = null;
@@ -2415,6 +2787,154 @@ public class Texteditor extends JFrame implements KeyListener {
             macroPlaybackDepth--;
         }
         return "Executed macro @" + register;
+    }
+
+    private String yankToEndOfLine() {
+        try {
+            int start = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(start);
+            int end = writingArea.getLineEndOffset(line);
+            String text = writingArea.getText().substring(start, end);
+            storeYank(consumePendingRegister(), text, false);
+            return "Yanked " + text.length() + " characters";
+        } catch (BadLocationException e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String replaceCharacter(char replacement) {
+        int caret = writingArea.getCaretPosition();
+        String text = writingArea.getText();
+        if (caret >= text.length()) {
+            return "No character to replace";
+        }
+        writingArea.replaceRange(String.valueOf(replacement), caret, caret + 1);
+        markModified();
+        return "Replaced character";
+    }
+
+    private String applyMotionOperator(char operator, String motion) {
+        MotionRange range = resolveMotionRange(motion);
+        if (range == null || range.start == range.end) {
+            return "Unsupported motion: " + motion;
+        }
+
+        String selected = writingArea.getText().substring(range.start, Math.min(range.end, writingArea.getText().length()));
+        switch (operator) {
+            case 'y':
+                storeYank(consumePendingRegister(), selected, range.lineWise);
+                lastCommand = "y" + motion;
+                return "Yanked " + selected.length() + " characters";
+            case 'd':
+                storeDelete(consumePendingRegister(), selected, range.lineWise);
+                writingArea.replaceRange("", range.start, range.end);
+                writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
+                lastCommand = "d" + motion;
+                markModified();
+                return "Deleted " + selected.length() + " characters";
+            case 'c':
+                storeDelete(consumePendingRegister(), selected, range.lineWise);
+                writingArea.replaceRange("", range.start, range.end);
+                writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
+                lastInsertedText = "";
+                lastCommand = "c" + motion;
+                markModified();
+                setMode(EditorMode.INSERT);
+                return "Changed " + selected.length() + " characters";
+            default:
+                return "Unsupported operator";
+        }
+    }
+
+    private MotionRange resolveMotionRange(String motion) {
+        try {
+            int original = writingArea.getCaretPosition();
+            if ("gg".equals(motion) || "G".equals(motion)) {
+                int originalLine = writingArea.getLineOfOffset(original);
+                if ("gg".equals(motion)) {
+                    moveFileStart();
+                } else {
+                    moveFileEnd();
+                }
+                int targetLine = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                writingArea.setCaretPosition(original);
+                int startLine = Math.min(originalLine, targetLine);
+                int endLine = Math.max(originalLine, targetLine);
+                int start = writingArea.getLineStartOffset(startLine);
+                int end = writingArea.getLineEndOffset(endLine);
+                return new MotionRange(start, end, true);
+            }
+
+            int target = previewMotionTarget(motion);
+            if (target < 0) {
+                return null;
+            }
+
+            boolean inclusive = "e".equals(motion) || "E".equals(motion) || "ge".equals(motion) || "gE".equals(motion) || "$".equals(motion) || "g$".equals(motion) || "l".equals(motion);
+            int start = Math.min(original, target);
+            int end = Math.max(original, target);
+            if (inclusive) {
+                end = Math.min(end + 1, writingArea.getText().length());
+            }
+            return new MotionRange(start, end, false);
+        } catch (BadLocationException e) {
+            return null;
+        }
+    }
+
+    private int previewMotionTarget(String motion) {
+        int original = writingArea.getCaretPosition();
+        switch (motion) {
+            case "h":
+                moveLeft();
+                break;
+            case "l":
+                moveRight();
+                break;
+            case "w":
+                moveWordForward();
+                break;
+            case "b":
+                moveWordBackward();
+                break;
+            case "e":
+                moveWordEnd();
+                break;
+            case "W":
+                moveWordForwardBig();
+                break;
+            case "B":
+                moveWordBackwardBig();
+                break;
+            case "E":
+                moveWordEndBig();
+                break;
+            case "0":
+            case "g0":
+                moveLineStart();
+                break;
+            case "^":
+                moveLineFirstNonBlank();
+                break;
+            case "$":
+            case "g$":
+                moveLineEnd();
+                break;
+            case "g_":
+                moveLineLastNonBlank();
+                break;
+            case "ge":
+                moveWordEndBackward();
+                break;
+            case "gE":
+                moveWordEndBackwardBig();
+                break;
+            default:
+                return -1;
+        }
+        int target = writingArea.getCaretPosition();
+        writingArea.setCaretPosition(original);
+        return target;
     }
 
     // Mode management
@@ -3321,6 +3841,18 @@ public class Texteditor extends JFrame implements KeyListener {
             this.pattern = pattern;
             this.startLine = startLine;
             this.endLine = endLine;
+        }
+    }
+
+    private static class MotionRange {
+        private final int start;
+        private final int end;
+        private final boolean lineWise;
+
+        private MotionRange(int start, int end, boolean lineWise) {
+            this.start = Math.max(0, start);
+            this.end = Math.max(this.start, end);
+            this.lineWise = lineWise;
         }
     }
 

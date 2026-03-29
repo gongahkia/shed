@@ -98,6 +98,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Character pendingSurroundTarget;
     private Map<String, LspClient> lspClients;
     private Map<String, Integer> lspDocumentVersions;
+    private Map<String, String> lspErrors;
 
     // Visual mode state
     private int visualStartPos;
@@ -157,6 +158,7 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingSurroundTarget = null;
         lspClients = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
+        lspErrors = new HashMap<>();
         loadRecentFiles();
         lastMessage = "";
 
@@ -2683,6 +2685,7 @@ public class Texteditor extends JFrame implements KeyListener {
         String prefix = currentCompletionPrefix();
         List<String> completions = new ArrayList<>();
         LspClient client = resolveLspClient(buffer);
+        String fallbackReason = null;
         if (buffer != null && client != null && buffer.hasFilePath()) {
             String uri = bufferUri(buffer);
             try {
@@ -2691,23 +2694,26 @@ public class Texteditor extends JFrame implements KeyListener {
                 completions = client.completion(uri, line, column);
             } catch (BadLocationException ignored) {
             }
+        } else if (buffer != null) {
+            String extension = bufferExtension(buffer);
+            fallbackReason = lspErrors.get(extension);
         }
 
         if (completions.isEmpty()) {
             if (prefix.isEmpty()) {
-                return "No completion prefix";
+                return fallbackReason == null ? "No completion prefix" : "LSP unavailable: " + fallbackReason;
             }
             completions = collectBufferCompletions(prefix);
         }
         if (completions.isEmpty()) {
-            return "No completions";
+            return fallbackReason == null ? "No completions" : "LSP unavailable: " + fallbackReason + "; no local completions";
         }
         String selection = showPaletteDialog("Completions", completions);
         if (selection == null || selection.isEmpty()) {
             return "Completion cancelled";
         }
         applyCompletion(prefix, selection);
-        return "Inserted completion";
+        return fallbackReason == null ? "Inserted completion" : "Inserted completion (local fallback; LSP unavailable: " + fallbackReason + ")";
     }
 
     private String currentCompletionPrefix() {
@@ -2779,6 +2785,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         LspClient existing = lspClients.get(extension);
         if (existing != null && existing.isAlive()) {
+            lspErrors.remove(extension);
             return existing;
         }
 
@@ -2796,8 +2803,10 @@ public class Texteditor extends JFrame implements KeyListener {
         try {
             LspClient client = new LspClient(command, args, new File(".").toPath());
             lspClients.put(extension, client);
+            lspErrors.remove(extension);
             return client;
         } catch (IOException e) {
+            lspErrors.put(extension, e.getMessage());
             return null;
         }
     }
@@ -4109,25 +4118,32 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String getHelpText(String topic) {
-        if (topic.isEmpty()) {
+        String normalizedTopic = topic == null ? "" : topic.trim().toLowerCase();
+        if (normalizedTopic.isEmpty()) {
             return "Shed v" + VERSION + "\n\n" +
                    "NORMAL MODE\n" +
                    "  h/j/k/l        Move left/down/up/right\n" +
                    "  w/b/e          Move by word\n" +
+                   "  W/B/E ge/gE    WORD and backward-end motions\n" +
                    "  f/F/t/T ; ,    Find/till-char and repeat\n" +
-                   "  0/$            Line start/end\n" +
-                   "  gg/G           File start/end\n" +
+                   "  0/^/$ g0/g$ g_ Line start/indent/end variants\n" +
+                   "  gg/G 50%       File start/end and percent jump\n" +
+                   "  { } ( ) H M L  Paragraph, sentence, screen motions\n" +
+                   "  zt/zz/zb       Scroll current line to top/center/bottom\n" +
                    "  i/a/A/I/o/O    Insert variants\n" +
                    "  v/V/R          Visual/visual-line/replace\n" +
                    "  yy/dd/cc       Yank/delete/change line\n" +
-                   "  dw/cw          Delete/change word\n" +
-                   "  D/C            Delete/change to end of line\n" +
+                   "  dw/cw diw ci\"  Motion and text-object operators\n" +
+                   "  D/C/Y r{char}  End-of-line yank/delete/change and replace-char\n" +
                    "  >>/<</==       Indent/dedent/auto-indent line\n" +
                    "  J/gJ           Join lines with/without space\n" +
+                   "  cs/ds/ys       Surround change/delete/add\n" +
+                   "  q{a-z} @a @@   Macro record and playback\n" +
                    "  m{a-z}         Set mark\n" +
                    "  '{a-z}/`{a-z}  Jump to mark\n" +
                    "  Ctrl-o/Ctrl-i  Jump back/forward\n" +
                    "  g;/g,          Previous/next change\n" +
+                   "  \"ap \"+p      Register-targeted edit and paste\n" +
                    "  p/P            Paste after/before\n" +
                    "  u/Ctrl-r       Undo/redo\n" +
                    "  /pattern       Search forward\n" +
@@ -4147,6 +4163,9 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :Files         File finder\n" +
                    "  :Buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
+                   "  :split/:vsplit Split the active window\n" +
+                   "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
+                   "  Ctrl-w h/j/k/l Move window focus\n" +
                    "  :registers     Show registers\n" +
                    "  :marks         Show marks\n" +
                    "  :Goyo          Toggle zen mode\n" +
@@ -4159,10 +4178,56 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :1,5s/a/b/g    Substitute a range\n" +
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
                    "note: this is a help buffer. use :q to return.\n";
-        } else {
-            return "Shed help: " + topic + "\n\n" +
-                   "General help is currently the authoritative reference.\n" +
-                   "Use :q to return to the previous buffer.";
+        }
+
+        switch (normalizedTopic) {
+            case "windows":
+            case "split":
+            case "vsplit":
+                return "Help: windows\n\n"
+                    + ":split / :sp creates a horizontal split.\n"
+                    + ":vsplit / :vsp creates a vertical split.\n"
+                    + ":close closes the active split when more than one window exists.\n"
+                    + "Ctrl-w s/v/c mirrors the split commands.\n"
+                    + "Ctrl-w h/j/k/l changes window focus.\n"
+                    + "Ctrl-w w cycles focus and Ctrl-w = equalizes split ratios.\n";
+            case "registers":
+            case "reg":
+                return "Help: registers\n\n"
+                    + "Use \"{register} before yank/delete/change/paste.\n"
+                    + "Supported special registers: \", 0, %, :, ., +, *, _.\n"
+                    + "Named registers a-z and A-Z are also supported.\n"
+                    + ":registers opens a scratch buffer with current register contents.\n";
+            case "macros":
+            case "macro":
+                return "Help: macros\n\n"
+                    + "q{register} starts recording into a named register.\n"
+                    + "q stops recording.\n"
+                    + "@{register} replays a macro and @@ replays the last executed macro.\n"
+                    + "Macro playback is recursion-limited to avoid runaway loops.\n";
+            case "textobjects":
+            case "text-objects":
+            case "objects":
+                return "Help: text objects\n\n"
+                    + "Supported forms include iw/aw, iW/aW, ip/ap, is/as,\n"
+                    + "quoted objects for \", ', ` and bracket objects for () [] {} <>.\n"
+                    + "Use them with d/c/y, for example diw, ci\", ya(, or dap.\n";
+            case "surround":
+                return "Help: surround\n\n"
+                    + "cs{old}{new} changes an existing surround pair.\n"
+                    + "ds{char} removes a surround pair.\n"
+                    + "ys{object}{char} adds a surround around a supported text object.\n"
+                    + "Examples: cs\"', ds), ysw].\n";
+            case "lsp":
+            case "completion":
+                return "Help: completion\n\n"
+                    + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
+                    + "If no server is available, Shed falls back to local buffer-word completion.\n"
+                    + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
+            default:
+                return "Shed help: " + topic + "\n\n"
+                    + "No dedicated topic entry exists yet for this help topic.\n"
+                    + "Use :help for the full command reference.\n";
         }
     }
 

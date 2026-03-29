@@ -38,6 +38,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private UndoManager undoManager;
     private String lastCommand;
     private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
+    private String pendingCount;
     private boolean suppressDocumentEvents;
     private boolean closingDown;
 
@@ -55,6 +56,7 @@ public class Texteditor extends JFrame implements KeyListener {
         currentBufferIndex = -1;
         commandBuffer = "";
         pendingKey = '\0';
+        pendingCount = "";
         visualStartPos = -1;
         lastCommand = "";
         suppressDocumentEvents = false;
@@ -194,6 +196,16 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
+        // Accumulate numeric prefix for COUNTgg without breaking 0 line-start
+        if (Character.isDigit(c) && (!pendingCount.isEmpty() || c != '0')) {
+            pendingCount += c;
+            return;
+        }
+
+        if (!pendingCount.isEmpty() && c != 'g') {
+            pendingCount = "";
+        }
+
         // Mode switches
         if (c == 'i') {
             setMode(EditorMode.INSERT);
@@ -242,33 +254,53 @@ public class Texteditor extends JFrame implements KeyListener {
         else if (c == 'g') {
             pendingKey = 'g';
         } else if (c == 'G') {
+            pendingCount = "";
             moveFileEnd();
         }
 
         // Clipboard operations
         else if (c == 'y') {
+            pendingCount = "";
             pendingKey = 'y';
         } else if (c == 'd') {
+            pendingCount = "";
             pendingKey = 'd';
         } else if (c == 'c') {
+            pendingCount = "";
             pendingKey = 'c';
         } else if (c == 'x') {
+            pendingCount = "";
             clipboardManager.deleteChar(writingArea);
             markModified();
         } else if (c == 'p') {
+            pendingCount = "";
             clipboardManager.paste(writingArea, false);
             markModified();
         } else if (c == 'P') {
+            pendingCount = "";
             clipboardManager.paste(writingArea, true);
             markModified();
+        } else if (c == 'D') {
+            pendingCount = "";
+            lastCommand = "D";
+            clipboardManager.deleteToEndOfLine(writingArea);
+            markModified();
+        } else if (c == 'C') {
+            pendingCount = "";
+            lastCommand = "C";
+            clipboardManager.deleteToEndOfLine(writingArea);
+            markModified();
+            setMode(EditorMode.INSERT);
         }
 
         // Undo/Redo
         else if (c == 'u') {
+            pendingCount = "";
             if (undoManager.canUndo()) {
                 undoManager.undo();
             }
         } else if (e.isControlDown() && c == 'r') {
+            pendingCount = "";
             if (undoManager.canRedo()) {
                 undoManager.redo();
             }
@@ -276,27 +308,34 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Search navigation
         else if (c == 'n') {
+            pendingCount = "";
             showMessage(searchManager.nextMatch());
         } else if (c == 'N') {
+            pendingCount = "";
             showMessage(searchManager.prevMatch());
         }
 
         // Repeat last command
         else if (c == '.') {
+            pendingCount = "";
             repeatLastCommand();
         }
 
         // Ctrl combinations
         else if (e.isControlDown()) {
             if (c == 'd' || code == KeyEvent.VK_D) {
+                pendingCount = "";
                 scrollHalfPageDown();
             } else if (c == 'u' || code == KeyEvent.VK_U) {
+                pendingCount = "";
                 scrollHalfPageUp();
             }
         }
 
         // Escape (no-op in normal mode, but clear any messages)
         else if (code == KeyEvent.VK_ESCAPE) {
+            pendingCount = "";
+            pendingKey = '\0';
             showMessage("Already in normal mode");
         }
     }
@@ -305,9 +344,14 @@ public class Texteditor extends JFrame implements KeyListener {
     private void handlePendingKey(char c, int code) {
         if (pendingKey == 'g') {
             if (c == 'g') {
-                moveFileStart();
+                if (pendingCount.isEmpty()) {
+                    moveFileStart();
+                } else {
+                    showMessage(gotoLine(Integer.parseInt(pendingCount)));
+                }
             }
             pendingKey = '\0';
+            pendingCount = "";
         } else if (pendingKey == 'y') {
             if (c == 'y') {
                 lastCommand = "yy";
@@ -315,6 +359,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Line yanked");
             }
             pendingKey = '\0';
+            pendingCount = "";
         } else if (pendingKey == 'd') {
             if (c == 'd') {
                 lastCommand = "dd";
@@ -328,6 +373,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Word deleted");
             }
             pendingKey = '\0';
+            pendingCount = "";
         } else if (pendingKey == 'c') {
             if (c == 'c') {
                 lastCommand = "cc";
@@ -339,23 +385,9 @@ public class Texteditor extends JFrame implements KeyListener {
                 setMode(EditorMode.INSERT);
             }
             pendingKey = '\0';
+            pendingCount = "";
         }
 
-        // Handle 'D' - delete to end of line
-        if (c == 'D') {
-            lastCommand = "D";
-            clipboardManager.deleteToEndOfLine(writingArea);
-            markModified();
-            pendingKey = '\0';
-        }
-
-        // Handle 'C' - change to end of line
-        if (c == 'C') {
-            lastCommand = "C";
-            clipboardManager.deleteToEndOfLine(writingArea);
-            setMode(EditorMode.INSERT);
-            pendingKey = '\0';
-        }
     }
 
     // Insert mode key handling

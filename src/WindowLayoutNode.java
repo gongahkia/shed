@@ -7,11 +7,11 @@ public class WindowLayoutNode {
         VERTICAL
     }
 
-    private final EditorPane pane;
-    private final Orientation orientation;
-    private final double ratio;
-    private final WindowLayoutNode first;
-    private final WindowLayoutNode second;
+    private EditorPane pane;
+    private Orientation orientation;
+    private double ratio;
+    private WindowLayoutNode first;
+    private WindowLayoutNode second;
 
     private WindowLayoutNode(EditorPane pane, Orientation orientation, double ratio, WindowLayoutNode first, WindowLayoutNode second) {
         this.pane = pane;
@@ -59,5 +59,68 @@ public class WindowLayoutNode {
         splitPane.setResizeWeight(ratio);
         splitPane.setContinuousLayout(true);
         return splitPane;
+    }
+
+    public boolean splitLeaf(EditorPane target, EditorPane newPane, Orientation newOrientation) {
+        if (isLeaf()) {
+            if (pane != target) {
+                return false;
+            }
+            EditorPane originalPane = pane;
+            pane = null;
+            orientation = newOrientation;
+            ratio = 0.5;
+            first = WindowLayoutNode.leaf(originalPane);
+            second = WindowLayoutNode.leaf(newPane);
+            return true;
+        }
+
+        return (first != null && first.splitLeaf(target, newPane, newOrientation))
+            || (second != null && second.splitLeaf(target, newPane, newOrientation));
+    }
+
+    public WindowLayoutNode removeLeaf(EditorPane target) {
+        if (isLeaf()) {
+            return pane == target ? null : this;
+        }
+        if (first != null) {
+            first = first.removeLeaf(target);
+        }
+        if (second != null) {
+            second = second.removeLeaf(target);
+        }
+        if (first == null) {
+            return second;
+        }
+        if (second == null) {
+            return first;
+        }
+        return this;
+    }
+
+    public void collectLeaves(java.util.List<EditorPane> leaves) {
+        if (isLeaf()) {
+            leaves.add(pane);
+            return;
+        }
+        if (first != null) {
+            first.collectLeaves(leaves);
+        }
+        if (second != null) {
+            second.collectLeaves(leaves);
+        }
+    }
+
+    public void equalize() {
+        if (isLeaf()) {
+            return;
+        }
+        ratio = 0.5;
+        if (first != null) {
+            first.equalize();
+        }
+        if (second != null) {
+            second.equalize();
+        }
     }
 }

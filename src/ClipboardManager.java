@@ -90,23 +90,29 @@ public class ClipboardManager {
     }
 
     // Delete character at cursor position
-    public void deleteChar(JTextArea textArea) {
+    public String deleteChar(JTextArea textArea) {
         try {
             int caretPos = textArea.getCaretPosition();
             String text = textArea.getText();
 
             if (caretPos < text.length()) {
+                String deleted = text.substring(caretPos, caretPos + 1);
+                this.clipboardBuffer = deleted;
+                this.lastYankWasLine = false;
+                systemClipboard.setContents(new StringSelection(deleted), null);
                 String newText = text.substring(0, caretPos) + text.substring(caretPos + 1);
                 textArea.setText(newText);
                 textArea.setCaretPosition(caretPos);
+                return deleted;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return "";
     }
 
     // Delete word forward
-    public void deleteWord(JTextArea textArea) {
+    public String deleteWord(JTextArea textArea) {
         try {
             int caretPos = textArea.getCaretPosition();
             String text = textArea.getText();
@@ -116,18 +122,21 @@ public class ClipboardManager {
                 String deleted = text.substring(caretPos, wordEnd);
                 this.clipboardBuffer = deleted;
                 this.lastYankWasLine = false;
+                systemClipboard.setContents(new StringSelection(deleted), null);
 
                 String newText = text.substring(0, caretPos) + text.substring(wordEnd);
                 textArea.setText(newText);
                 textArea.setCaretPosition(caretPos);
+                return deleted;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return "";
     }
 
     // Delete to end of line
-    public void deleteToEndOfLine(JTextArea textArea) {
+    public String deleteToEndOfLine(JTextArea textArea) {
         try {
             int caretPos = textArea.getCaretPosition();
             String text = textArea.getText();
@@ -137,14 +146,17 @@ public class ClipboardManager {
                 String deleted = text.substring(caretPos, lineEnd);
                 this.clipboardBuffer = deleted;
                 this.lastYankWasLine = false;
+                systemClipboard.setContents(new StringSelection(deleted), null);
 
                 String newText = text.substring(0, caretPos) + text.substring(lineEnd);
                 textArea.setText(newText);
                 textArea.setCaretPosition(caretPos);
+                return deleted;
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+        return "";
     }
 
     // Paste after cursor (P = before cursor)
@@ -163,8 +175,21 @@ public class ClipboardManager {
                 }
             }
 
-            if (lastYankWasLine) {
-                // Line-wise paste
+            pasteContent(textArea, content, lastYankWasLine, before);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void pasteContent(JTextArea textArea, String content, boolean lineWise, boolean before) {
+        try {
+            String text = textArea.getText();
+            int caretPos = textArea.getCaretPosition();
+            if (content == null) {
+                content = "";
+            }
+
+            if (lineWise) {
                 int lineStart = getLineStart(text, caretPos);
                 int lineEnd = getLineEnd(text, caretPos);
 
@@ -177,7 +202,6 @@ public class ClipboardManager {
                 textArea.setText(newText);
                 textArea.setCaretPosition(pastePos);
             } else {
-                // Character-wise paste
                 int pastePos = before ? caretPos : (caretPos < text.length() ? caretPos + 1 : caretPos);
                 String newText = text.substring(0, pastePos) + content + text.substring(pastePos);
                 textArea.setText(newText);

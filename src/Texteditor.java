@@ -11,7 +11,11 @@ import java.awt.event.KeyEvent;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 
@@ -42,6 +46,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private String pendingCount;
     private boolean suppressDocumentEvents;
     private boolean closingDown;
+    private List<String> recentFiles;
+    private File recentFilesStore;
+    private Deque<SpecialBufferReturnState> specialBufferReturns;
 
     // Visual mode state
     private int visualStartPos;
@@ -62,6 +69,10 @@ public class Texteditor extends JFrame implements KeyListener {
         lastCommand = "";
         suppressDocumentEvents = false;
         closingDown = false;
+        recentFiles = new ArrayList<>();
+        recentFilesStore = new File(System.getProperty("user.home"), ".shed_recent");
+        specialBufferReturns = new ArrayDeque<>();
+        loadRecentFiles();
 
         // Initialize UI
         initializeUI();
@@ -71,7 +82,7 @@ public class Texteditor extends JFrame implements KeyListener {
         searchManager = new SearchManager(writingArea);
         commandHandler = new CommandHandler(this);
 
-        // Open file from command line or file chooser
+        // Open file from command line or landing page
         if (args.length > 0) {
             try {
                 File file = new File(args[0]);
@@ -80,7 +91,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Error opening file: " + e.getMessage());
             }
         } else {
-            openFileChooser();
+            openLandingPage();
         }
 
         // Set initial mode
@@ -910,14 +921,56 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void openLandingPage() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("shed ").append(VERSION).append("\n");
+        builder.append("swing modal editor\n\n");
+        builder.append(":help        view help\n");
+        builder.append(":e <file>    open a file\n");
+        builder.append(":recent      show recent files\n");
+        builder.append("Ctrl-p       file finder (planned from bitsy parity)\n\n");
+        builder.append("note: this is a scratch buffer and can be edited.\n");
+
+        FileBuffer landing = FileBuffer.createScratch("[landing]", builder.toString());
+        if (buffers.isEmpty()) {
+            buffers.add(landing);
+            currentBufferIndex = 0;
+        } else {
+            buffers.set(0, landing);
+            currentBufferIndex = 0;
+        }
+        loadBufferIntoEditor(landing);
+    }
+
     public void openFile(File file) throws IOException {
         persistCurrentBufferState();
 
-        FileBuffer buffer = new FileBuffer(file);
-        buffers.add(buffer);
-        currentBufferIndex = buffers.size() - 1;
+        FileBuffer existing = findBufferByPath(file);
+        if (existing != null) {
+            currentBufferIndex = buffers.indexOf(existing);
+            loadBufferIntoEditor(existing);
+            return;
+        }
+
+        FileBuffer buffer;
+        if (file.exists()) {
+            buffer = new FileBuffer(file, configManager);
+        } else {
+            buffer = new FileBuffer(file.getAbsolutePath());
+        }
+
+        if (shouldReplaceSingleLandingBuffer()) {
+            buffers.set(0, buffer);
+            currentBufferIndex = 0;
+        } else {
+            buffers.add(buffer);
+            currentBufferIndex = buffers.size() - 1;
+        }
         loadBufferIntoEditor(buffer);
         addToRecentFiles(file.getAbsolutePath());
+        if (buffer.isShowingPreviewOnly()) {
+            showMessage("Large-file preview loaded");
+        }
     }
 
     // Buffer management methods (called by CommandHandler)
@@ -1018,6 +1071,27 @@ public class Texteditor extends JFrame implements KeyListener {
         FileBuffer newBuffer = buffers.get(index);
         currentBufferIndex = index;
         loadBufferIntoEditor(newBuffer);
+    }
+
+    private FileBuffer findBufferByPath(File file) {
+        if (file == null) {
+            return null;
+        }
+        String targetPath = file.getAbsolutePath();
+        for (FileBuffer buffer : buffers) {
+            if (buffer.hasFilePath() && targetPath.equals(buffer.getFilePath())) {
+                return buffer;
+            }
+        }
+        return null;
+    }
+
+    private boolean shouldReplaceSingleLandingBuffer() {
+        if (buffers.size() != 1) {
+            return false;
+        }
+        FileBuffer current = buffers.get(0);
+        return current.isScratch() && "[landing]".equals(current.getDisplayName()) && !current.isModified();
     }
 
     // Search methods
@@ -1136,70 +1210,74 @@ public class Texteditor extends JFrame implements KeyListener {
     // Help system
     public void showHelp(String topic) {
         String helpText = getHelpText(topic);
-        JTextArea textArea = new JTextArea(helpText);
-        textArea.setEditable(false);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(600, 400));
-
-        JOptionPane.showMessageDialog(this, scrollPane, "Shed Help", JOptionPane.INFORMATION_MESSAGE);
+        openScratchBuffer(topic == null || topic.isEmpty() ? "[help]" : "[help " + topic + "]", helpText, true);
     }
 
     private String getHelpText(String topic) {
         if (topic.isEmpty()) {
-            return "SHED - SHit EDitor v" + VERSION + "\n\n" +
-                   "NORMAL MODE:\n" +
-                   "  h/j/k/l      - Move left/down/up/right\n" +
-                   "  w/b/e        - Word forward/backward/end\n" +
-                   "  0/$          - Line start/end\n" +
-                   "  gg/G         - File start/end\n" +
-                   "  Ctrl+d/u     - Half page down/up\n" +
-                   "  i            - Enter INSERT mode\n" +
-                   "  v            - Enter VISUAL mode\n" +
-                   "  R            - Enter REPLACE mode\n" +
-                   "  yy           - Yank (copy) line\n" +
-                   "  dd           - Delete line\n" +
-                   "  dw           - Delete word\n" +
-                   "  D            - Delete to end of line\n" +
-                   "  cc           - Change line\n" +
-                   "  cw           - Change word\n" +
-                   "  C            - Change to end of line\n" +
-                   "  x            - Delete character\n" +
-                   "  p/P          - Paste after/before\n" +
-                   "  u            - Undo\n" +
-                   "  Ctrl+r       - Redo\n" +
-                   "  /pattern     - Search\n" +
-                   "  n/N          - Next/previous match\n" +
-                   "  .            - Repeat last command\n" +
-                   "  :            - Enter command mode\n\n" +
-                   "COMMANDS:\n" +
-                   "  :w           - Write (save)\n" +
-                   "  :q           - Quit\n" +
-                   "  :q!          - Force quit\n" +
-                   "  :wq          - Write and quit\n" +
-                   "  :e file      - Edit file\n" +
-                   "  :bn/:bp      - Next/previous buffer\n" +
-                   "  :ls          - List buffers\n" +
-                   "  :bd          - Delete buffer\n" +
-                   "  :set nu      - Enable line numbers\n" +
-                   "  :set nonu    - Disable line numbers\n" +
-                   "  :45          - Go to line 45\n" +
-                   "  :wc          - Word count\n" +
-                   "  :%s/old/new/g - Replace all\n" +
-                   "  :help        - Show this help\n";
+            return "Shed v" + VERSION + "\n\n" +
+                   "NORMAL MODE\n" +
+                   "  h/j/k/l        Move left/down/up/right\n" +
+                   "  w/b/e          Move by word\n" +
+                   "  0/$            Line start/end\n" +
+                   "  gg/G           File start/end\n" +
+                   "  i/v/R          Insert/visual/replace\n" +
+                   "  yy/dd/cc       Yank/delete/change line\n" +
+                   "  dw/cw          Delete/change word\n" +
+                   "  D/C            Delete/change to end of line\n" +
+                   "  p/P            Paste after/before\n" +
+                   "  u/Ctrl-r       Undo/redo\n" +
+                   "  /pattern       Search forward\n" +
+                   "  n/N            Next/previous match\n" +
+                   "  .              Repeat last command\n\n" +
+                   "COMMANDS\n" +
+                   "  :w [file]      Write current buffer\n" +
+                   "  :q / :q!       Quit buffer/editor\n" +
+                   "  :wq / :x       Write and quit\n" +
+                   "  :e file        Edit file\n" +
+                   "  :bn / :bp      Next/previous buffer\n" +
+                   "  :ls            List buffers\n" +
+                   "  :bd            Delete buffer\n" +
+                   "  :recent        Show recent files\n" +
+                   "  :set nu        Enable line numbers\n" +
+                   "  :45            Go to line 45\n" +
+                   "  :s/a/b         Substitute current line\n" +
+                   "  :%s/a/b/g      Substitute whole buffer\n\n" +
+                   "note: this is a help buffer. use :q to return.\n";
         } else {
-            return "No specific help for: " + topic + "\nUse :help for general help.";
+            return "Shed help: " + topic + "\n\n" +
+                   "General help is currently the authoritative reference.\n" +
+                   "Use :q to return to the previous buffer.";
         }
     }
 
     // Recent files management
     private void addToRecentFiles(String filepath) {
-        // TODO: Implement recent files tracking
+        if (filepath == null || filepath.isEmpty()) {
+            return;
+        }
+
+        recentFiles.remove(filepath);
+        recentFiles.add(0, filepath);
+        while (recentFiles.size() > 50) {
+            recentFiles.remove(recentFiles.size() - 1);
+        }
+        saveRecentFiles();
     }
 
     public String showRecentFiles() {
-        return "Recent files feature not yet implemented";
+        if (recentFiles.isEmpty()) {
+            return "No recent files";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("Recent files\n\n");
+        for (int i = 0; i < recentFiles.size(); i++) {
+            builder.append(i + 1).append(". ").append(recentFiles.get(i)).append("\n");
+        }
+        builder.append("\nuse :e <path> to reopen a file.");
+        openScratchBuffer("[recent files]", builder.toString(), true);
+        return "Showing recent files";
     }
 
     private void showBufferListDialog(String list) {
@@ -1234,6 +1312,10 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String requestQuit(boolean force) {
+        if (closeReturnableScratchBuffer()) {
+            return "Returned from scratch buffer";
+        }
+
         FileBuffer buffer = getCurrentBuffer();
         if (!force && hasUnsavedChanges(buffer)) {
             int result = confirmDiscardChanges("File has unsaved changes. Quit anyway?");
@@ -1244,6 +1326,72 @@ public class Texteditor extends JFrame implements KeyListener {
 
         closeEditor();
         return "Quitting";
+    }
+
+    public void showScratchBuffer(String title, String content) {
+        openScratchBuffer(title, content, true);
+    }
+
+    private void openScratchBuffer(String title, String content, boolean returnable) {
+        persistCurrentBufferState();
+
+        FileBuffer scratchBuffer = FileBuffer.createScratch(title, content);
+        FileBuffer returnBuffer = getCurrentBuffer();
+        int returnCaretPosition = writingArea.getCaretPosition();
+
+        buffers.add(scratchBuffer);
+        currentBufferIndex = buffers.size() - 1;
+        if (returnable && returnBuffer != null) {
+            specialBufferReturns.push(new SpecialBufferReturnState(scratchBuffer, returnBuffer, returnCaretPosition));
+        }
+        loadBufferIntoEditor(scratchBuffer);
+    }
+
+    private boolean closeReturnableScratchBuffer() {
+        FileBuffer current = getCurrentBuffer();
+        if (current == null || specialBufferReturns.isEmpty()) {
+            return false;
+        }
+
+        SpecialBufferReturnState state = specialBufferReturns.peek();
+        if (state.scratchBuffer != current) {
+            return false;
+        }
+
+        specialBufferReturns.pop();
+        buffers.remove(currentBufferIndex);
+
+        int returnIndex = buffers.indexOf(state.returnBuffer);
+        if (returnIndex < 0) {
+            if (buffers.isEmpty()) {
+                openLandingPage();
+                return true;
+            }
+            returnIndex = Math.max(0, currentBufferIndex - 1);
+        }
+
+        currentBufferIndex = returnIndex;
+        loadBufferIntoEditor(buffers.get(returnIndex));
+        writingArea.setCaretPosition(Math.min(state.returnCaretPosition, writingArea.getText().length()));
+        return true;
+    }
+
+    private void loadRecentFiles() {
+        recentFiles.clear();
+        if (!recentFilesStore.exists()) {
+            return;
+        }
+        try {
+            recentFiles.addAll(Files.readAllLines(recentFilesStore.toPath(), StandardCharsets.UTF_8));
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void saveRecentFiles() {
+        try {
+            Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
+        } catch (IOException ignored) {
+        }
     }
 
     public void closeEditor() {
@@ -1270,6 +1418,18 @@ public class Texteditor extends JFrame implements KeyListener {
             this.updatedText = updatedText;
             this.matchCount = matchCount;
             this.firstMatchOffset = firstMatchOffset;
+        }
+    }
+
+    private static class SpecialBufferReturnState {
+        private final FileBuffer scratchBuffer;
+        private final FileBuffer returnBuffer;
+        private final int returnCaretPosition;
+
+        private SpecialBufferReturnState(FileBuffer scratchBuffer, FileBuffer returnBuffer, int returnCaretPosition) {
+            this.scratchBuffer = scratchBuffer;
+            this.returnBuffer = returnBuffer;
+            this.returnCaretPosition = returnCaretPosition;
         }
     }
 

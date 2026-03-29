@@ -1,7 +1,16 @@
 import java.awt.Component;
+import java.util.ArrayList;
+import java.util.List;
 import javax.swing.JSplitPane;
 
 public class WindowLayoutNode {
+    public enum Direction {
+        LEFT,
+        RIGHT,
+        UP,
+        DOWN
+    }
+
     public enum Orientation {
         HORIZONTAL,
         VERTICAL
@@ -121,6 +130,66 @@ public class WindowLayoutNode {
         }
         if (second != null) {
             second.equalize();
+        }
+    }
+
+    public List<EditorPane> findNeighborCandidates(EditorPane target, Direction direction) {
+        List<PathStep> path = new ArrayList<>();
+        if (!buildPath(target, path)) {
+            return List.of();
+        }
+
+        for (int i = path.size() - 1; i >= 0; i--) {
+            PathStep step = path.get(i);
+            WindowLayoutNode node = step.node;
+            if (node.isLeaf()) {
+                continue;
+            }
+
+            boolean matchesDirection =
+                (direction == Direction.LEFT && node.orientation == Orientation.HORIZONTAL && !step.fromFirst)
+                || (direction == Direction.RIGHT && node.orientation == Orientation.HORIZONTAL && step.fromFirst)
+                || (direction == Direction.UP && node.orientation == Orientation.VERTICAL && !step.fromFirst)
+                || (direction == Direction.DOWN && node.orientation == Orientation.VERTICAL && step.fromFirst);
+
+            if (!matchesDirection) {
+                continue;
+            }
+
+            WindowLayoutNode siblingSubtree = step.fromFirst ? node.second : node.first;
+            List<EditorPane> leaves = new ArrayList<>();
+            if (siblingSubtree != null) {
+                siblingSubtree.collectLeaves(leaves);
+            }
+            return leaves;
+        }
+
+        return List.of();
+    }
+
+    private boolean buildPath(EditorPane target, List<PathStep> path) {
+        if (isLeaf()) {
+            return pane == target;
+        }
+
+        if (first != null && first.buildPath(target, path)) {
+            path.add(new PathStep(this, true));
+            return true;
+        }
+        if (second != null && second.buildPath(target, path)) {
+            path.add(new PathStep(this, false));
+            return true;
+        }
+        return false;
+    }
+
+    private static class PathStep {
+        private final WindowLayoutNode node;
+        private final boolean fromFirst;
+
+        private PathStep(WindowLayoutNode node, boolean fromFirst) {
+            this.node = node;
+            this.fromFirst = fromFirst;
         }
     }
 }

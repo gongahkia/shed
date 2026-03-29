@@ -2691,7 +2691,12 @@ public class Texteditor extends JFrame implements KeyListener {
             try {
                 int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
                 int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-                completions = client.completion(uri, line, column);
+                List<LspClient.CompletionItem> items = client.completion(uri, line, column);
+                for (LspClient.CompletionItem item : items) {
+                    if (item.getLabel() != null && !item.getLabel().isEmpty()) {
+                        completions.add(item.getLabel());
+                    }
+                }
             } catch (BadLocationException ignored) {
             }
         } else if (buffer != null) {
@@ -2780,6 +2785,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         String extension = bufferExtension(buffer);
         if (extension.isEmpty()) {
+            lspErrors.put("", "file has no recognized extension");
             return null;
         }
 
@@ -2794,6 +2800,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (command == null || command.isBlank()) {
             String[] builtin = builtinLspCommand(extension);
             if (builtin == null) {
+                lspErrors.put(extension, "no server configured for ." + extension);
                 return null;
             }
             command = builtin[0];
@@ -2852,6 +2859,20 @@ public class Texteditor extends JFrame implements KeyListener {
         if (client != null) {
             client.didSave(bufferUri(buffer));
         }
+    }
+
+    private void pollLspNotifications(FileBuffer buffer) {
+        LspClient client = existingLspClient(buffer);
+        if (client != null) {
+            client.drainNotifications();
+        }
+    }
+
+    private LspClient existingLspClient(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return null;
+        }
+        return lspClients.get(bufferExtension(buffer));
     }
 
     private String bufferUri(FileBuffer buffer) {
@@ -3485,6 +3506,7 @@ public class Texteditor extends JFrame implements KeyListener {
         StringBuilder status = new StringBuilder();
 
         if (buffer != null) {
+            pollLspNotifications(buffer);
             status.append(buffer.getDisplayName());
             if (buffer.isModified()) {
                 status.append(" [+]");
@@ -3506,6 +3528,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (buffer != null) {
             status.append(buffer.getFileType().getDisplayName()).append("  ");
             status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
+            appendLspStatus(status, buffer);
         }
 
         if (gitBranch != null && !gitBranch.isEmpty()) {
@@ -3526,6 +3549,17 @@ public class Texteditor extends JFrame implements KeyListener {
             commandBar.setText(lastMessage);
         } else {
             commandBar.setText("");
+        }
+    }
+
+    private void appendLspStatus(StringBuilder status, FileBuffer buffer) {
+        LspClient client = existingLspClient(buffer);
+        if (client == null || !buffer.hasFilePath()) {
+            return;
+        }
+        List<LspClient.Diagnostic> diagnosticEntries = client.getDiagnostics(bufferUri(buffer));
+        if (!diagnosticEntries.isEmpty()) {
+            status.append("diag:").append(diagnosticEntries.size()).append("  ");
         }
     }
 

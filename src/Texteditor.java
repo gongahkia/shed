@@ -33,6 +33,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Managers
     private ClipboardManager clipboardManager;
+    private RegisterManager registerManager;
     private SearchManager searchManager;
     private CommandHandler commandHandler;
     private ConfigManager configManager;
@@ -54,6 +55,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private String lastCommand;
     private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
     private String pendingCount;
+    private Character pendingRegister;
     private boolean suppressDocumentEvents;
     private boolean closingDown;
     private List<String> recentFiles;
@@ -101,6 +103,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commandBuffer = "";
         pendingKey = '\0';
         pendingCount = "";
+        pendingRegister = null;
         visualStartPos = -1;
         lastCommand = "";
         suppressDocumentEvents = false;
@@ -138,6 +141,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Initialize managers that depend on UI
         clipboardManager = new ClipboardManager();
+        registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
 
         // Open file from command line or landing page
@@ -494,6 +498,8 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (c == 'G') {
             pendingCount = "";
             moveFileEnd();
+        } else if (c == '"') {
+            pendingKey = '"';
         } else if (c == 'm' || c == '\'' || c == '`') {
             pendingKey = c;
         } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=') {
@@ -512,25 +518,23 @@ public class Texteditor extends JFrame implements KeyListener {
             pendingKey = 'c';
         } else if (c == 'x') {
             pendingCount = "";
-            clipboardManager.deleteChar(writingArea);
+            storeDelete(consumePendingRegister(), clipboardManager.deleteChar(writingArea), false);
             markModified();
         } else if (c == 'p') {
             pendingCount = "";
-            clipboardManager.paste(writingArea, false);
-            markModified();
+            showMessage(pasteFromRegister(false));
         } else if (c == 'P') {
             pendingCount = "";
-            clipboardManager.paste(writingArea, true);
-            markModified();
+            showMessage(pasteFromRegister(true));
         } else if (c == 'D') {
             pendingCount = "";
             lastCommand = "D";
-            clipboardManager.deleteToEndOfLine(writingArea);
+            storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
             markModified();
         } else if (c == 'C') {
             pendingCount = "";
             lastCommand = "C";
-            clipboardManager.deleteToEndOfLine(writingArea);
+            storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
             markModified();
             lastInsertedText = "";
             setMode(EditorMode.INSERT);
@@ -635,7 +639,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (pendingKey == 'y') {
             if (c == 'y') {
                 lastCommand = "yy";
-                clipboardManager.yankLine(writingArea);
+                storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
                 showMessage("Line yanked");
             }
             pendingKey = '\0';
@@ -643,12 +647,12 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (pendingKey == 'd') {
             if (c == 'd') {
                 lastCommand = "dd";
-                clipboardManager.deleteLine(writingArea);
+                storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 markModified();
                 showMessage("Line deleted");
             } else if (c == 'w') {
                 lastCommand = "dw";
-                clipboardManager.deleteWord(writingArea);
+                storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
                 markModified();
                 showMessage("Word deleted");
             }
@@ -657,17 +661,20 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (pendingKey == 'c') {
             if (c == 'c') {
                 lastCommand = "cc";
-                clipboardManager.deleteLine(writingArea);
+                storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
             } else if (c == 'w') {
                 lastCommand = "cw";
-                clipboardManager.deleteWord(writingArea);
+                storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
             }
             pendingKey = '\0';
             pendingCount = "";
+        } else if (pendingKey == '"') {
+            pendingRegister = c;
+            pendingKey = '\0';
         } else if (pendingKey == 'm') {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer != null) {
@@ -744,6 +751,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // Insert mode key handling
     private void handleInsertMode(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+            registerManager.updateLastInserted(lastInsertedText);
             setMode(EditorMode.NORMAL);
             // Move cursor back one position (Vim behavior)
             int pos = writingArea.getCaretPosition();
@@ -815,6 +823,7 @@ public class Texteditor extends JFrame implements KeyListener {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
                 clipboardManager.yankSelection(selected);
+                storeYank(consumePendingRegister(), selected, lineMode);
                 showMessage("Selection yanked");
             }
             setMode(EditorMode.NORMAL);
@@ -822,6 +831,7 @@ public class Texteditor extends JFrame implements KeyListener {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
                 clipboardManager.yankSelection(selected);
+                storeDelete(consumePendingRegister(), selected, lineMode);
                 writingArea.replaceSelection("");
                 markModified();
                 showMessage("Selection deleted");
@@ -831,6 +841,7 @@ public class Texteditor extends JFrame implements KeyListener {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
                 clipboardManager.yankSelection(selected);
+                storeDelete(consumePendingRegister(), selected, lineMode);
                 writingArea.replaceSelection("");
                 markModified();
             }
@@ -2136,22 +2147,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showRegisters() {
-        List<String> lines = new ArrayList<>();
-        String unnamed = clipboardManager.getClipboardContent();
-        if (!unnamed.isEmpty()) {
-            lines.add("\" " + trimForRegisterDisplay(unnamed));
-            lines.add("0 " + trimForRegisterDisplay(unnamed));
-        }
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer != null && buffer.getFilePath() != null) {
-            lines.add("% " + buffer.getFilePath());
-        }
-        if (!lastCommand.isEmpty()) {
-            lines.add(": " + lastCommand);
-        }
-        if (!lastInsertedText.isEmpty()) {
-            lines.add(". " + trimForRegisterDisplay(lastInsertedText));
-        }
+        List<String> lines = registerManager.getDisplayLines();
         if (lines.isEmpty()) {
             return "No registers populated";
         }
@@ -2336,6 +2332,30 @@ public class Texteditor extends JFrame implements KeyListener {
         showMessage("Repeated: " + lastCommand);
     }
 
+    private Character consumePendingRegister() {
+        Character register = pendingRegister;
+        pendingRegister = null;
+        return register;
+    }
+
+    private void storeYank(Character register, String text, boolean lineWise) {
+        registerManager.setYank(register, lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text));
+    }
+
+    private void storeDelete(Character register, String text, boolean lineWise) {
+        registerManager.setDelete(register, lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text));
+    }
+
+    private String pasteFromRegister(boolean before) {
+        RegisterContent content = registerManager.get(consumePendingRegister());
+        if (content == null || content.getText().isEmpty()) {
+            return "Register empty";
+        }
+        clipboardManager.pasteContent(writingArea, content.getText(), content.isLineWise(), before);
+        markModified();
+        return "Pasted";
+    }
+
     // Mode management
     private void setMode(EditorMode mode) {
         this.currentMode = mode;
@@ -2471,6 +2491,7 @@ public class Texteditor extends JFrame implements KeyListener {
             attachActiveDocumentListener();
             undoManager = buffer.getUndoManager();
             currentBufferIndex = buffers.indexOf(buffer);
+            registerManager.updateFilename(buffer.getFilePath());
             updateCurrentLineHighlight();
             applySyntaxHighlighting();
             refreshLineNumberPanel();
@@ -3206,6 +3227,10 @@ public class Texteditor extends JFrame implements KeyListener {
         closingDown = true;
         dispose();
         System.exit(0);
+    }
+
+    public void rememberExCommand(String command) {
+        registerManager.updateLastCommand(command);
     }
 
     @Override

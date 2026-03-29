@@ -24,6 +24,7 @@ public class CommandHandler {
         if (command.startsWith(":")) {
             command = command.substring(1);
         }
+        editor.rememberExCommand(":" + command);
 
         if (command.startsWith("/")) {
             return editor.search(command.substring(1));

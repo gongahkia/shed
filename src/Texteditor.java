@@ -64,6 +64,12 @@ public class Texteditor extends JFrame implements KeyListener {
     private Highlighter.HighlightPainter substitutePreviewPainter;
     private boolean zenModeEnabled;
     private String lastInsertedText;
+    private Timer externalChangeTimer;
+    private boolean reloadPromptActive;
+    private List<Object> syntaxHighlightTags;
+    private Highlighter.HighlightPainter syntaxKeywordPainter;
+    private Highlighter.HighlightPainter syntaxStringPainter;
+    private File lastPreviewedMarkdown;
 
     // Visual mode state
     private int visualStartPos;
@@ -98,6 +104,11 @@ public class Texteditor extends JFrame implements KeyListener {
         substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x6D, 0x59, 0x3A));
         zenModeEnabled = false;
         lastInsertedText = "";
+        reloadPromptActive = false;
+        syntaxHighlightTags = new ArrayList<>();
+        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x2B, 0x4C, 0x7E));
+        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x5E, 0x3C, 0x4C));
+        lastPreviewedMarkdown = null;
         loadRecentFiles();
         lastMessage = "";
 
@@ -126,6 +137,9 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
 
         this.setVisible(true);
+
+        externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
+        externalChangeTimer.start();
     }
 
     // Initialize UI components
@@ -446,6 +460,9 @@ public class Texteditor extends JFrame implements KeyListener {
             if (c == 'p' || code == KeyEvent.VK_P) {
                 pendingCount = "";
                 showMessage(showFileFinder());
+            } else if (c == 'n' || code == KeyEvent.VK_N) {
+                pendingCount = "";
+                showMessage(showLspCompletionStatus());
             } else if (c == 'd' || code == KeyEvent.VK_D) {
                 pendingCount = "";
                 scrollHalfPageDown();
@@ -1096,6 +1113,98 @@ public class Texteditor extends JFrame implements KeyListener {
         editorScrollPane.repaint();
     }
 
+    private void applySyntaxHighlighting() {
+        clearSyntaxHighlighting();
+
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null) {
+            return;
+        }
+
+        String text = writingArea.getText();
+        if (text.isEmpty()) {
+            return;
+        }
+
+        String[] keywords = syntaxKeywordsFor(buffer.getFileType());
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (String keyword : keywords) {
+            int index = 0;
+            while (index <= text.length() - keyword.length()) {
+                int match = text.indexOf(keyword, index);
+                if (match < 0) {
+                    break;
+                }
+                if (isWordBoundary(text, match - 1) && isWordBoundary(text, match + keyword.length())) {
+                    try {
+                        syntaxHighlightTags.add(highlighter.addHighlight(match, match + keyword.length(), syntaxKeywordPainter));
+                    } catch (BadLocationException ignored) {
+                    }
+                }
+                index = match + keyword.length();
+            }
+        }
+
+        int stringStart = -1;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (stringStart < 0 && (c == '"' || c == '\'')) {
+                stringStart = i;
+            } else if (stringStart >= 0 && (c == '"' || c == '\'')) {
+                try {
+                    syntaxHighlightTags.add(highlighter.addHighlight(stringStart, i + 1, syntaxStringPainter));
+                } catch (BadLocationException ignored) {
+                }
+                stringStart = -1;
+            }
+        }
+    }
+
+    private void clearSyntaxHighlighting() {
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (Object tag : syntaxHighlightTags) {
+            highlighter.removeHighlight(tag);
+        }
+        syntaxHighlightTags.clear();
+    }
+
+    private String[] syntaxKeywordsFor(FileType fileType) {
+        switch (fileType) {
+            case JAVA:
+                return new String[] {"class", "public", "private", "protected", "static", "void", "new", "return", "if", "else", "try", "catch"};
+            case JAVASCRIPT:
+            case TYPESCRIPT:
+                return new String[] {"function", "const", "let", "var", "return", "if", "else", "class", "import", "export"};
+            case PYTHON:
+                return new String[] {"def", "class", "return", "if", "elif", "else", "import", "from", "for", "while", "try", "except"};
+            case RUST:
+                return new String[] {"fn", "let", "mut", "impl", "struct", "enum", "match", "pub", "use", "mod", "return"};
+            case GO:
+                return new String[] {"func", "package", "import", "return", "if", "else", "struct", "interface", "type"};
+            case C:
+            case CPP:
+                return new String[] {"int", "char", "void", "return", "if", "else", "struct", "class", "include"};
+            case HTML:
+                return new String[] {"<html", "<body", "<div", "<span", "<script", "<style", "<head", "<section"};
+            case CSS:
+                return new String[] {"display", "position", "color", "background", "padding", "margin", "flex", "grid"};
+            case JSON:
+                return new String[] {"true", "false", "null"};
+            case MARKDOWN:
+                return new String[] {"# ", "## ", "### ", "- ", "* "};
+            default:
+                return new String[0];
+        }
+    }
+
+    private boolean isWordBoundary(String text, int index) {
+        if (index < 0 || index >= text.length()) {
+            return true;
+        }
+        char c = text.charAt(index);
+        return !Character.isLetterOrDigit(c) && c != '_';
+    }
+
     private void updateSubstitutePreview() {
         clearSubstitutePreview();
         if (currentMode != EditorMode.COMMAND || commandBuffer == null || !commandBuffer.startsWith(":")) {
@@ -1228,6 +1337,109 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException e) {
             return "";
         }
+    }
+
+    private void checkForExternalChanges() {
+        if (reloadPromptActive) {
+            return;
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isModified()) {
+            return;
+        }
+        if (!buffer.hasExternalChanges()) {
+            return;
+        }
+
+        reloadPromptActive = true;
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            "File changed on disk. Reload it?",
+            "External Change",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+        reloadPromptActive = false;
+
+        if (result == JOptionPane.YES_OPTION) {
+            try {
+                buffer.load(configManager);
+                loadBufferIntoEditor(buffer);
+                showMessage("Reloaded from disk");
+            } catch (IOException e) {
+                showMessage("Reload failed: " + e.getMessage());
+            }
+        } else {
+            buffer.refreshExternalTimestamp();
+        }
+    }
+
+    private void maybePreviewMarkdown(FileBuffer buffer) {
+        if (buffer == null || buffer.getFileType() != FileType.MARKDOWN || buffer.getFile() == null) {
+            return;
+        }
+        if (buffer.getFile().equals(lastPreviewedMarkdown)) {
+            return;
+        }
+        lastPreviewedMarkdown = buffer.getFile();
+        try {
+            File previewFile = File.createTempFile("shed-markdown-", ".html");
+            previewFile.deleteOnExit();
+            String html = renderMarkdownPreview(buffer.getFullContent(), buffer.getDisplayName());
+            Files.writeString(previewFile.toPath(), html, StandardCharsets.UTF_8);
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(previewFile.toURI());
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private String renderMarkdownPreview(String markdown, String title) {
+        StringBuilder html = new StringBuilder();
+        html.append("<!doctype html><html><head><meta charset=\"utf-8\">");
+        html.append("<title>").append(title).append("</title>");
+        html.append("<style>body{font-family:Georgia,serif;max-width:880px;margin:40px auto;padding:0 24px;line-height:1.6;background:#faf7ef;color:#1f2933;}pre{background:#111827;color:#f9fafb;padding:16px;overflow:auto;}code{background:#e5e7eb;padding:2px 4px;}h1,h2,h3{line-height:1.2;}blockquote{border-left:4px solid #cbd5e1;padding-left:12px;color:#475569;}</style>");
+        html.append("</head><body>");
+        boolean inCode = false;
+        for (String line : markdown.split("\n", -1)) {
+            String escaped = escapeHtml(line);
+            if (line.startsWith("```")) {
+                html.append(inCode ? "</pre>" : "<pre>");
+                inCode = !inCode;
+                continue;
+            }
+            if (inCode) {
+                html.append(escaped).append("\n");
+                continue;
+            }
+            if (line.startsWith("### ")) {
+                html.append("<h3>").append(escapeHtml(line.substring(4))).append("</h3>");
+            } else if (line.startsWith("## ")) {
+                html.append("<h2>").append(escapeHtml(line.substring(3))).append("</h2>");
+            } else if (line.startsWith("# ")) {
+                html.append("<h1>").append(escapeHtml(line.substring(2))).append("</h1>");
+            } else if (line.startsWith("> ")) {
+                html.append("<blockquote>").append(escapeHtml(line.substring(2))).append("</blockquote>");
+            } else if (line.startsWith("- ") || line.startsWith("* ")) {
+                html.append("<p>&bull; ").append(escapeHtml(line.substring(2))).append("</p>");
+            } else if (line.isBlank()) {
+                html.append("<br/>");
+            } else {
+                html.append("<p>").append(escaped).append("</p>");
+            }
+        }
+        if (inCode) {
+            html.append("</pre>");
+        }
+        html.append("</body></html>");
+        return html.toString();
+    }
+
+    private String escapeHtml(String value) {
+        return value
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;");
     }
 
     public String deleteLineRange(int startLine, int endLine) {
@@ -1598,6 +1810,14 @@ public class Texteditor extends JFrame implements KeyListener {
         return getCurrentCaretLine() + 1;
     }
 
+    public String showLspCompletionStatus() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || buffer.getFileType() == FileType.UNKNOWN || buffer.getFileType() == FileType.TEXT) {
+            return "No LSP completion available for this buffer";
+        }
+        return "LSP completion is not configured in this build";
+    }
+
     // Repeat last command
     private void repeatLastCommand() {
         if (lastCommand.isEmpty()) {
@@ -1720,6 +1940,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!suppressDocumentEvents) {
             markModified();
             updateCurrentLineHighlight();
+            applySyntaxHighlighting();
             lineNumberPanel.repaint();
         }
     }
@@ -1753,7 +1974,9 @@ public class Texteditor extends JFrame implements KeyListener {
         attachUndoManager(buffer.getUndoManager());
         writingArea.setCaretPosition(0);
         updateCurrentLineHighlight();
+        applySyntaxHighlighting();
         refreshLineNumberPanel();
+        maybePreviewMarkdown(buffer);
         updateStatusBar();
     }
 

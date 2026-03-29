@@ -29,6 +29,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private JLabel commandBar;
     private LineNumberPanel lineNumberPanel;
     private JScrollPane editorScrollPane;
+    private JPanel editorHostPanel;
 
     // Managers
     private ClipboardManager clipboardManager;
@@ -39,6 +40,10 @@ public class Texteditor extends JFrame implements KeyListener {
     // Buffer management
     private List<FileBuffer> buffers;
     private int currentBufferIndex;
+    private List<EditorPane> editorPanes;
+    private int activePaneIndex;
+    private WindowLayoutNode windowLayoutRoot;
+    private Component renderedLayoutComponent;
 
     // State variables
     private String commandBuffer;
@@ -91,6 +96,8 @@ public class Texteditor extends JFrame implements KeyListener {
         configManager = new ConfigManager();
         buffers = new ArrayList<>();
         currentBufferIndex = -1;
+        editorPanes = new ArrayList<>();
+        activePaneIndex = -1;
         commandBuffer = "";
         pendingKey = '\0';
         pendingCount = "";
@@ -164,50 +171,20 @@ public class Texteditor extends JFrame implements KeyListener {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         this.setSize(screenSize.width / 2, screenSize.height);
         this.setLayout(new BorderLayout(5, 5));
-
-        // Create text area
-        writingArea = new JTextArea();
-        writingArea.setPreferredSize(new Dimension(screenSize.width / 2, screenSize.height - 130));
-        writingArea.addKeyListener(this);
-
-        // Load font
-        writingArea.setFont(resolveEditorFont());
-
-        // Configure text area
-        writingArea.setTabSize(configManager.getTabSize());
-        writingArea.getCaret().setBlinkRate(0);
-        writingArea.setCaretColor(Color.decode("#02862a"));
-        writingArea.setForeground(Color.decode("#FAF9F6"));
-        writingArea.setEditable(false);
-        writingArea.setSelectionColor(new Color(0x4E, 0x5D, 0x6C));
-        writingArea.setSelectedTextColor(Color.decode("#FAF9F6"));
-        writingArea.addCaretListener(e -> {
-            updateCurrentLineHighlight();
-            lineNumberPanel.repaint();
-            updateStatusBar();
-        });
-
-        // Setup undo manager
+        editorHostPanel = new JPanel(new BorderLayout());
         undoManager = new UndoManager();
-
-        // Add document listener for modification tracking
         bufferDocumentListener = new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { handleDocumentChange(); }
             public void removeUpdate(DocumentEvent e) { handleDocumentChange(); }
             public void changedUpdate(DocumentEvent e) { handleDocumentChange(); }
         };
-        writingArea.getDocument().addDocumentListener(bufferDocumentListener);
 
-        // Create line number panel
-        lineNumberPanel = new LineNumberPanel(writingArea);
-        lineNumberPanel.setMode(lineNumberMode);
-        lineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
-
-        // Create scroll pane with line numbers
-        editorScrollPane = new JScrollPane(writingArea);
-        if (lineNumberMode != LineNumberMode.NONE) {
-            editorScrollPane.setRowHeaderView(lineNumberPanel);
-        }
+        EditorPane initialPane = createEditorPane(screenSize);
+        editorPanes.add(initialPane);
+        activePaneIndex = 0;
+        bindActivePane(initialPane);
+        windowLayoutRoot = WindowLayoutNode.leaf(initialPane);
+        renderWindowLayout();
 
         // Create footer
         statusBar = new JLabel();
@@ -229,7 +206,7 @@ public class Texteditor extends JFrame implements KeyListener {
         footerPanel.add(commandBar);
 
         // Add components
-        this.add(editorScrollPane, BorderLayout.CENTER);
+        this.add(editorHostPanel, BorderLayout.CENTER);
         this.add(footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
@@ -239,6 +216,101 @@ public class Texteditor extends JFrame implements KeyListener {
                 handleQuit(false);
             }
         });
+    }
+
+    private EditorPane createEditorPane(Dimension screenSize) {
+        JTextArea textArea = new JTextArea();
+        textArea.setPreferredSize(new Dimension(screenSize.width / 2, screenSize.height - 130));
+        textArea.addKeyListener(this);
+        textArea.setFont(resolveEditorFont());
+        textArea.setTabSize(configManager.getTabSize());
+        textArea.getCaret().setBlinkRate(0);
+        textArea.setCaretColor(Color.decode("#02862a"));
+        textArea.setForeground(Color.decode("#FAF9F6"));
+        textArea.setEditable(false);
+        textArea.setSelectionColor(new Color(0x4E, 0x5D, 0x6C));
+        textArea.setSelectedTextColor(Color.decode("#FAF9F6"));
+
+        LineNumberPanel paneLineNumberPanel = new LineNumberPanel(textArea);
+        paneLineNumberPanel.setMode(lineNumberMode);
+        paneLineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
+
+        JScrollPane paneScrollPane = new JScrollPane(textArea);
+        if (lineNumberMode != LineNumberMode.NONE) {
+            paneScrollPane.setRowHeaderView(paneLineNumberPanel);
+        }
+
+        SearchManager paneSearchManager = new SearchManager(textArea);
+        final EditorPane[] paneRef = new EditorPane[1];
+        textArea.addCaretListener(e -> {
+            if (paneRef[0] != null && paneRef[0] != getActivePane()) {
+                activateEditorPane(paneRef[0]);
+            }
+            updateCurrentLineHighlight();
+            if (lineNumberPanel != null) {
+                lineNumberPanel.repaint();
+            }
+            updateStatusBar();
+        });
+        textArea.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                if (paneRef[0] != null) {
+                    activateEditorPane(paneRef[0]);
+                }
+            }
+        });
+        textArea.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                if (paneRef[0] != null) {
+                    activateEditorPane(paneRef[0]);
+                }
+            }
+        });
+
+        EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
+        paneRef[0] = pane;
+        return pane;
+    }
+
+    private void bindActivePane(EditorPane pane) {
+        if (pane == null) {
+            return;
+        }
+        writingArea = pane.getTextArea();
+        lineNumberPanel = pane.getLineNumberPanel();
+        editorScrollPane = pane.getScrollPane();
+        searchManager = pane.getSearchManager();
+    }
+
+    private EditorPane getActivePane() {
+        if (activePaneIndex < 0 || activePaneIndex >= editorPanes.size()) {
+            return null;
+        }
+        return editorPanes.get(activePaneIndex);
+    }
+
+    private void activateEditorPane(EditorPane pane) {
+        int index = editorPanes.indexOf(pane);
+        if (index < 0 || index == activePaneIndex) {
+            return;
+        }
+        activePaneIndex = index;
+        bindActivePane(pane);
+        updateCurrentLineHighlight();
+        refreshLineNumberPanel();
+        updateStatusBar();
+    }
+
+    private void renderWindowLayout() {
+        if (renderedLayoutComponent != null) {
+            editorHostPanel.remove(renderedLayoutComponent);
+        }
+        renderedLayoutComponent = windowLayoutRoot == null ? new JPanel() : windowLayoutRoot.render();
+        editorHostPanel.add(renderedLayoutComponent, BorderLayout.CENTER);
+        editorHostPanel.revalidate();
+        editorHostPanel.repaint();
     }
 
     private Font resolveEditorFont() {
@@ -1172,16 +1244,18 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void refreshLineNumberPanel() {
-        lineNumberPanel.setMode(lineNumberMode);
-        lineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
-        if (lineNumberMode == LineNumberMode.NONE) {
-            editorScrollPane.setRowHeaderView(null);
-        } else {
-            editorScrollPane.setRowHeaderView(lineNumberPanel);
+        for (EditorPane pane : editorPanes) {
+            pane.getLineNumberPanel().setMode(lineNumberMode);
+            pane.getLineNumberPanel().setHighlightCurrentLine(configManager.getShowCurrentLine());
+            if (lineNumberMode == LineNumberMode.NONE) {
+                pane.getScrollPane().setRowHeaderView(null);
+            } else {
+                pane.getScrollPane().setRowHeaderView(pane.getLineNumberPanel());
+            }
+            pane.getLineNumberPanel().repaint();
         }
-        lineNumberPanel.repaint();
-        editorScrollPane.revalidate();
-        editorScrollPane.repaint();
+        editorHostPanel.revalidate();
+        editorHostPanel.repaint();
     }
 
     private void applySyntaxHighlighting() {
@@ -2084,14 +2158,16 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void updateZenModeLayout() {
-        if (!zenModeEnabled) {
-            editorScrollPane.setBorder(null);
-            return;
+        for (EditorPane pane : editorPanes) {
+            if (!zenModeEnabled) {
+                pane.getScrollPane().setBorder(null);
+                continue;
+            }
+            int width = getWidth();
+            int desired = configManager.getZenModeWidth() * Math.max(8, pane.getTextArea().getFontMetrics(pane.getTextArea().getFont()).charWidth('M'));
+            int horizontalPadding = Math.max(12, (width - desired) / 2);
+            pane.getScrollPane().setBorder(BorderFactory.createEmptyBorder(0, horizontalPadding, 0, horizontalPadding));
         }
-        int width = getWidth();
-        int desired = configManager.getZenModeWidth() * Math.max(8, writingArea.getFontMetrics(writingArea.getFont()).charWidth('M'));
-        int horizontalPadding = Math.max(12, (width - desired) / 2);
-        editorScrollPane.setBorder(BorderFactory.createEmptyBorder(0, horizontalPadding, 0, horizontalPadding));
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -2705,7 +2781,9 @@ public class Texteditor extends JFrame implements KeyListener {
         try {
             int parsed = Math.max(1, Math.min(16, Integer.parseInt(value)));
             configManager.set("tab.size", String.valueOf(parsed));
-            writingArea.setTabSize(parsed);
+            for (EditorPane pane : editorPanes) {
+                pane.getTextArea().setTabSize(parsed);
+            }
             return "Tab size set to " + parsed;
         } catch (NumberFormatException e) {
             return "Invalid tab size: " + value;
@@ -2990,82 +3068,5 @@ public class Texteditor extends JFrame implements KeyListener {
     // Main method
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> new Texteditor(args));
-    }
-}
-
-// Line Number Panel for displaying line numbers
-class LineNumberPanel extends JPanel {
-    private static final long serialVersionUID = 1L;
-    private final JTextArea textArea;
-    private LineNumberMode mode;
-    private boolean highlightCurrentLine;
-
-    public LineNumberPanel(JTextArea textArea) {
-        this.textArea = textArea;
-        setPreferredSize(new Dimension(40, Integer.MAX_VALUE));
-        setBackground(Color.decode("#161B22"));
-        this.mode = LineNumberMode.ABSOLUTE;
-        this.highlightCurrentLine = true;
-    }
-
-    public void setMode(LineNumberMode mode) {
-        this.mode = mode == null ? LineNumberMode.ABSOLUTE : mode;
-    }
-
-    public void setHighlightCurrentLine(boolean highlightCurrentLine) {
-        this.highlightCurrentLine = highlightCurrentLine;
-    }
-
-    @Override
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
-        g.setColor(Color.decode("#8B949E"));
-        g.setFont(textArea.getFont());
-
-        FontMetrics fm = g.getFontMetrics();
-        int lineCount = textArea.getLineCount();
-        int currentLine = 0;
-        try {
-            currentLine = textArea.getLineOfOffset(textArea.getCaretPosition());
-        } catch (BadLocationException ignored) {
-        }
-
-        try {
-            Rectangle visible = textArea.getVisibleRect();
-            int startLine = textArea.getLineOfOffset(textArea.viewToModel2D(new Point(0, visible.y)));
-            int endLine = textArea.getLineOfOffset(textArea.viewToModel2D(new Point(0, visible.y + visible.height)));
-
-            for (int i = startLine; i <= endLine && i < lineCount; i++) {
-                int lineStart = textArea.getLineStartOffset(i);
-                Point p = textArea.modelToView2D(lineStart).getBounds().getLocation();
-                int y = p.y + fm.getAscent();
-
-                String lineNum = formatLineNumber(i, currentLine);
-                if (highlightCurrentLine && i == currentLine) {
-                    g.setColor(Color.decode("#FAF9F6"));
-                } else {
-                    g.setColor(Color.decode("#8B949E"));
-                }
-                int x = getWidth() - fm.stringWidth(lineNum) - 5;
-                g.drawString(lineNum, x, y);
-            }
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private String formatLineNumber(int line, int currentLine) {
-        switch (mode) {
-            case NONE:
-                return "";
-            case RELATIVE:
-                return line == currentLine ? "0" : String.valueOf(Math.abs(line - currentLine));
-            case RELATIVE_ABSOLUTE:
-                return line == currentLine ? String.valueOf(line + 1) : String.valueOf(Math.abs(line - currentLine));
-            case ABSOLUTE:
-            default:
-                return String.valueOf(line + 1);
-        }
     }
 }

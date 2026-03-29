@@ -7,8 +7,10 @@ public enum EditorMode {
     NORMAL("normal mode", "#BC0E4C", false),
     INSERT("insert mode", "#354F60", true),
     VISUAL("visual mode", "#2E8B57", false),
+    VISUAL_LINE("visual line mode", "#2E8B57", false),
     REPLACE("replace mode", "#8B4513", true),
-    COMMAND("command mode", "#FFC501", false);
+    COMMAND("command mode", "#FFC501", false),
+    SEARCH("search mode", "#FFC501", false);
 
     private final String displayName;
     private final String backgroundColor;

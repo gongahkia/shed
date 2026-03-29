@@ -4,11 +4,12 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
 import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.WindowEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -17,7 +18,6 @@ import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.List;
-import java.util.Locale;
 
 public class Texteditor extends JFrame implements KeyListener {
 
@@ -25,7 +25,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private EditorMode currentMode;
     private JTextArea writingArea;
     private JLabel statusBar;
+    private JLabel commandBar;
     private LineNumberPanel lineNumberPanel;
+    private JScrollPane editorScrollPane;
 
     // Managers
     private ClipboardManager clipboardManager;
@@ -39,7 +41,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // State variables
     private String commandBuffer;
-    private boolean lineNumbersEnabled;
+    private String lastMessage;
+    private Timer messageResetTimer;
     private UndoManager undoManager;
     private String lastCommand;
     private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
@@ -49,6 +52,16 @@ public class Texteditor extends JFrame implements KeyListener {
     private List<String> recentFiles;
     private File recentFilesStore;
     private Deque<SpecialBufferReturnState> specialBufferReturns;
+    private List<String> commandHistory;
+    private int commandHistoryIndex;
+    private String commandHistoryPrefix;
+    private LineNumberMode lineNumberMode;
+    private boolean searchForward;
+    private String gitBranch;
+    private Object currentLineHighlightTag;
+    private List<Object> substitutePreviewTags;
+    private Highlighter.HighlightPainter currentLinePainter;
+    private Highlighter.HighlightPainter substitutePreviewPainter;
 
     // Visual mode state
     private int visualStartPos;
@@ -72,7 +85,17 @@ public class Texteditor extends JFrame implements KeyListener {
         recentFiles = new ArrayList<>();
         recentFilesStore = new File(System.getProperty("user.home"), ".shed_recent");
         specialBufferReturns = new ArrayDeque<>();
+        commandHistory = new ArrayList<>();
+        commandHistoryIndex = -1;
+        commandHistoryPrefix = "";
+        lineNumberMode = configManager.getLineNumberMode();
+        searchForward = true;
+        gitBranch = resolveGitBranch();
+        substitutePreviewTags = new ArrayList<>();
+        currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x2A, 0x32, 0x3B));
+        substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x6D, 0x59, 0x3A));
         loadRecentFiles();
+        lastMessage = "";
 
         // Initialize UI
         initializeUI();
@@ -124,6 +147,13 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretColor(Color.decode("#02862a"));
         writingArea.setForeground(Color.decode("#FAF9F6"));
         writingArea.setEditable(false);
+        writingArea.setSelectionColor(new Color(0x4E, 0x5D, 0x6C));
+        writingArea.setSelectedTextColor(Color.decode("#FAF9F6"));
+        writingArea.addCaretListener(e -> {
+            updateCurrentLineHighlight();
+            lineNumberPanel.repaint();
+            updateStatusBar();
+        });
 
         // Setup undo manager
         undoManager = new UndoManager();
@@ -138,24 +168,37 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Create line number panel
         lineNumberPanel = new LineNumberPanel(writingArea);
-        lineNumbersEnabled = configManager.getLineNumbers();
+        lineNumberPanel.setMode(lineNumberMode);
+        lineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
 
         // Create scroll pane with line numbers
-        JScrollPane scrollPane = new JScrollPane(writingArea);
-        if (lineNumbersEnabled) {
-            scrollPane.setRowHeaderView(lineNumberPanel);
+        editorScrollPane = new JScrollPane(writingArea);
+        if (lineNumberMode != LineNumberMode.NONE) {
+            editorScrollPane.setRowHeaderView(lineNumberPanel);
         }
 
-        // Create status bar
+        // Create footer
         statusBar = new JLabel();
-        statusBar.setBackground(Color.lightGray);
+        statusBar.setBackground(Color.decode("#1D242B"));
         statusBar.setOpaque(true);
         statusBar.setPreferredSize(new Dimension(screenSize.width / 2, 30));
         statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        statusBar.setForeground(Color.decode("#FAF9F6"));
+
+        commandBar = new JLabel();
+        commandBar.setBackground(Color.decode("#12181F"));
+        commandBar.setOpaque(true);
+        commandBar.setPreferredSize(new Dimension(screenSize.width / 2, 28));
+        commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+        commandBar.setForeground(Color.decode("#C9D1D9"));
+
+        JPanel footerPanel = new JPanel(new GridLayout(2, 1));
+        footerPanel.add(statusBar);
+        footerPanel.add(commandBar);
 
         // Add components
-        this.add(scrollPane, BorderLayout.CENTER);
-        this.add(statusBar, BorderLayout.SOUTH);
+        this.add(editorScrollPane, BorderLayout.CENTER);
+        this.add(footerPanel, BorderLayout.SOUTH);
 
         // Window close handler
         this.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -218,6 +261,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 handleInsertMode(e);
                 break;
             case VISUAL:
+            case VISUAL_LINE:
                 handleVisualMode(e);
                 break;
             case REPLACE:
@@ -225,6 +269,9 @@ public class Texteditor extends JFrame implements KeyListener {
                 break;
             case COMMAND:
                 handleCommandMode(e);
+                break;
+            case SEARCH:
+                handleSearchMode(e);
                 break;
         }
         updateStatusBar();
@@ -259,12 +306,25 @@ public class Texteditor extends JFrame implements KeyListener {
             setMode(EditorMode.VISUAL);
             visualStartPos = writingArea.getCaretPosition();
             return;
+        } else if (c == 'V') {
+            setMode(EditorMode.VISUAL_LINE);
+            selectCurrentLine();
+            return;
         } else if (c == 'R') {
             setMode(EditorMode.REPLACE);
             return;
-        } else if (c == ':' || c == '/') {
+        } else if (c == ':') {
             setMode(EditorMode.COMMAND);
             commandBuffer = String.valueOf(c);
+            commandHistoryIndex = -1;
+            commandHistoryPrefix = commandBuffer;
+            updateSubstitutePreview();
+            return;
+        } else if (c == '/' || c == '?') {
+            setMode(EditorMode.SEARCH);
+            searchForward = c == '/';
+            commandBuffer = String.valueOf(c);
+            commandHistoryIndex = -1;
             return;
         }
 
@@ -358,6 +418,12 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (c == 'N') {
             pendingCount = "";
             showMessage(searchManager.prevMatch());
+        } else if (c == '*') {
+            pendingCount = "";
+            showMessage(searchWordUnderCursor(true));
+        } else if (c == '#') {
+            pendingCount = "";
+            showMessage(searchWordUnderCursor(false));
         }
 
         // Repeat last command
@@ -451,6 +517,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private void handleVisualMode(KeyEvent e) {
         char c = e.getKeyChar();
         int code = e.getKeyCode();
+        boolean lineMode = currentMode == EditorMode.VISUAL_LINE;
 
         if (code == KeyEvent.VK_ESCAPE) {
             setMode(EditorMode.NORMAL);
@@ -475,12 +542,16 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Update selection
         int newPos = writingArea.getCaretPosition();
-        if (visualStartPos < newPos) {
-            writingArea.setSelectionStart(visualStartPos);
-            writingArea.setSelectionEnd(newPos);
+        if (lineMode) {
+            selectLineRange(visualStartPos, newPos);
         } else {
-            writingArea.setSelectionStart(newPos);
-            writingArea.setSelectionEnd(visualStartPos);
+            if (visualStartPos < newPos) {
+                writingArea.setSelectionStart(visualStartPos);
+                writingArea.setSelectionEnd(newPos);
+            } else {
+                writingArea.setSelectionStart(newPos);
+                writingArea.setSelectionEnd(visualStartPos);
+            }
         }
 
         // Operations on selection
@@ -545,15 +616,91 @@ public class Texteditor extends JFrame implements KeyListener {
 
         if (code == KeyEvent.VK_ESCAPE) {
             commandBuffer = "";
+            clearSubstitutePreview();
             setMode(EditorMode.NORMAL);
             return;
         }
 
         if (code == KeyEvent.VK_ENTER) {
             String result = commandHandler.execute(commandBuffer);
-            showMessage(result);
+            addCommandHistory(commandBuffer);
+            if (!result.isEmpty()) {
+                showMessage(result);
+            }
+            commandBuffer = "";
+            clearSubstitutePreview();
+            setMode(EditorMode.NORMAL);
+            return;
+        }
+
+        if (code == KeyEvent.VK_UP) {
+            browseCommandHistory(-1);
+            updateSubstitutePreview();
+            return;
+        }
+
+        if (code == KeyEvent.VK_DOWN) {
+            browseCommandHistory(1);
+            updateSubstitutePreview();
+            return;
+        }
+
+        if (code == KeyEvent.VK_TAB) {
+            commandBuffer = completeCommand(commandBuffer);
+            updateSubstitutePreview();
+            return;
+        }
+
+        if (code == KeyEvent.VK_BACK_SPACE) {
+            if (commandBuffer.length() > 1) {
+                commandBuffer = commandBuffer.substring(0, commandBuffer.length() - 1);
+            } else {
+                commandBuffer = "";
+                clearSubstitutePreview();
+                setMode(EditorMode.NORMAL);
+            }
+            updateSubstitutePreview();
+            return;
+        }
+
+        // Append character to command buffer
+        if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
+            commandBuffer += c;
+            updateSubstitutePreview();
+        }
+    }
+
+    private void handleSearchMode(KeyEvent e) {
+        int code = e.getKeyCode();
+        char c = e.getKeyChar();
+
+        if (code == KeyEvent.VK_ESCAPE) {
             commandBuffer = "";
             setMode(EditorMode.NORMAL);
+            return;
+        }
+
+        if (code == KeyEvent.VK_ENTER) {
+            String pattern = commandBuffer.length() > 1 ? commandBuffer.substring(1) : "";
+            String result = searchForward ? searchManager.searchForward(pattern) : searchManager.searchBackward(pattern);
+            if (!result.isEmpty()) {
+                showMessage(result);
+            }
+            if (!pattern.isEmpty()) {
+                addCommandHistory(commandBuffer);
+            }
+            commandBuffer = "";
+            setMode(EditorMode.NORMAL);
+            return;
+        }
+
+        if (code == KeyEvent.VK_UP) {
+            browseCommandHistory(-1);
+            return;
+        }
+
+        if (code == KeyEvent.VK_DOWN) {
+            browseCommandHistory(1);
             return;
         }
 
@@ -567,7 +714,6 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        // Append character to command buffer
         if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
             commandBuffer += c;
         }
@@ -735,6 +881,276 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void selectCurrentLine() {
+        int caret = writingArea.getCaretPosition();
+        selectLineRange(caret, caret);
+        visualStartPos = writingArea.getSelectionStart();
+    }
+
+    private void selectLineRange(int anchorPosition, int currentPosition) {
+        try {
+            int anchorLine = writingArea.getLineOfOffset(anchorPosition);
+            int currentLine = writingArea.getLineOfOffset(currentPosition);
+            int startLine = Math.min(anchorLine, currentLine);
+            int endLine = Math.max(anchorLine, currentLine);
+            int selectionStart = writingArea.getLineStartOffset(startLine);
+            int selectionEnd = writingArea.getLineEndOffset(endLine);
+            writingArea.setSelectionStart(selectionStart);
+            writingArea.setSelectionEnd(selectionEnd);
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private String searchWordUnderCursor(boolean forward) {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        if (text.isEmpty() || caret >= text.length()) {
+            return "No word under cursor";
+        }
+
+        int start = caret;
+        int end = caret;
+        while (start > 0 && isWordCharacter(text.charAt(start - 1))) {
+            start--;
+        }
+        while (end < text.length() && isWordCharacter(text.charAt(end))) {
+            end++;
+        }
+        if (start == end) {
+            return "No word under cursor";
+        }
+
+        String word = text.substring(start, end);
+        return forward ? searchManager.searchForward(word) : searchManager.searchBackward(word);
+    }
+
+    private boolean isWordCharacter(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private void browseCommandHistory(int direction) {
+        if (commandHistory.isEmpty()) {
+            return;
+        }
+        if (commandHistoryIndex < 0) {
+            commandHistoryPrefix = commandBuffer;
+            commandHistoryIndex = commandHistory.size();
+        }
+
+        int nextIndex = commandHistoryIndex + direction;
+        nextIndex = Math.max(0, Math.min(nextIndex, commandHistory.size()));
+        commandHistoryIndex = nextIndex;
+
+        if (commandHistoryIndex >= commandHistory.size()) {
+            commandBuffer = commandHistoryPrefix;
+            return;
+        }
+
+        String candidate = commandHistory.get(commandHistoryIndex);
+        if (!commandHistoryPrefix.isEmpty() && !candidate.startsWith(commandHistoryPrefix.substring(0, 1))) {
+            return;
+        }
+        commandBuffer = candidate;
+    }
+
+    private void addCommandHistory(String entry) {
+        if (entry == null || entry.isEmpty()) {
+            return;
+        }
+        commandHistory.remove(entry);
+        commandHistory.add(entry);
+        while (commandHistory.size() > 100) {
+            commandHistory.remove(0);
+        }
+        commandHistoryIndex = -1;
+        commandHistoryPrefix = "";
+    }
+
+    private String completeCommand(String input) {
+        if (input == null || input.isEmpty() || !input.startsWith(":")) {
+            return input;
+        }
+
+        String withoutColon = input.substring(1);
+        if (withoutColon.startsWith("e ") || withoutColon.startsWith("w ")) {
+            return ":" + completePath(withoutColon.substring(0, 2), withoutColon.substring(2));
+        }
+
+        String[] knownCommands = {
+            "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
+            "ls", "buffers", "bd", "set", "help", "wc", "recent"
+        };
+
+        for (String command : knownCommands) {
+            if (command.startsWith(withoutColon)) {
+                return ":" + command;
+            }
+        }
+        return input;
+    }
+
+    private String completePath(String prefix, String partialPath) {
+        String trimmed = partialPath.trim();
+        File base = trimmed.isEmpty() ? new File(".") : new File(trimmed);
+        File directory = base.isDirectory() ? base : base.getParentFile();
+        String needle = base.isDirectory() ? "" : base.getName();
+        if (directory == null) {
+            directory = new File(".");
+        }
+        File[] matches = directory.listFiles((dir, name) -> name.startsWith(needle));
+        if (matches == null || matches.length == 0) {
+            return prefix + partialPath;
+        }
+        return prefix + matches[0].getPath();
+    }
+
+    private void updateCurrentLineHighlight() {
+        Highlighter highlighter = writingArea.getHighlighter();
+        if (currentLineHighlightTag != null) {
+            highlighter.removeHighlight(currentLineHighlightTag);
+            currentLineHighlightTag = null;
+        }
+
+        if (!configManager.getShowCurrentLine() || currentMode == EditorMode.VISUAL || currentMode == EditorMode.VISUAL_LINE) {
+            return;
+        }
+
+        try {
+            int caret = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(caret);
+            int start = writingArea.getLineStartOffset(line);
+            int end = writingArea.getLineEndOffset(line);
+            currentLineHighlightTag = highlighter.addHighlight(start, end, currentLinePainter);
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void refreshLineNumberPanel() {
+        lineNumberPanel.setMode(lineNumberMode);
+        lineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
+        if (lineNumberMode == LineNumberMode.NONE) {
+            editorScrollPane.setRowHeaderView(null);
+        } else {
+            editorScrollPane.setRowHeaderView(lineNumberPanel);
+        }
+        lineNumberPanel.repaint();
+        editorScrollPane.revalidate();
+        editorScrollPane.repaint();
+    }
+
+    private void updateSubstitutePreview() {
+        clearSubstitutePreview();
+        if (currentMode != EditorMode.COMMAND || commandBuffer == null || !commandBuffer.startsWith(":")) {
+            return;
+        }
+
+        String command = commandBuffer.substring(1);
+        SubstitutePreview preview = parseSubstitutePreview(command);
+        if (preview == null || preview.pattern.isEmpty()) {
+            return;
+        }
+
+        try {
+            int startOffset = writingArea.getLineStartOffset(Math.max(0, preview.startLine));
+            int endLine = Math.min(writingArea.getLineCount() - 1, preview.endLine);
+            int endOffset = writingArea.getLineEndOffset(endLine);
+            String text = writingArea.getText();
+            Highlighter highlighter = writingArea.getHighlighter();
+            int searchFrom = startOffset;
+            while (searchFrom <= endOffset - preview.pattern.length()) {
+                int match = text.indexOf(preview.pattern, searchFrom);
+                if (match < 0 || match >= endOffset) {
+                    break;
+                }
+                substitutePreviewTags.add(highlighter.addHighlight(match, match + preview.pattern.length(), substitutePreviewPainter));
+                searchFrom = match + Math.max(1, preview.pattern.length());
+            }
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void clearSubstitutePreview() {
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (Object tag : substitutePreviewTags) {
+            highlighter.removeHighlight(tag);
+        }
+        substitutePreviewTags.clear();
+    }
+
+    private SubstitutePreview parseSubstitutePreview(String command) {
+        String working = command;
+        int startLine = getCurrentCaretLine();
+        int endLine = startLine;
+
+        if (working.startsWith("%")) {
+            startLine = 0;
+            endLine = Math.max(0, writingArea.getLineCount() - 1);
+            working = working.substring(1);
+        } else {
+            int rangeEnd = findRangeCommandStart(working);
+            if (rangeEnd > 0) {
+                String rangePart = working.substring(0, rangeEnd);
+                String[] parts = rangePart.split(",", -1);
+                try {
+                    if (parts.length == 2) {
+                        startLine = Math.max(0, Integer.parseInt(parts[0]) - 1);
+                        endLine = Math.max(startLine, Integer.parseInt(parts[1]) - 1);
+                    } else if (parts.length == 1) {
+                        startLine = Math.max(0, Integer.parseInt(parts[0]) - 1);
+                        endLine = startLine;
+                    }
+                    working = working.substring(rangeEnd);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
+
+        if (!working.startsWith("s/")) {
+            return null;
+        }
+
+        String[] parts = working.substring(2).split("/", -1);
+        if (parts.length == 0) {
+            return null;
+        }
+        return new SubstitutePreview(parts[0], startLine, endLine);
+    }
+
+    private int findRangeCommandStart(String command) {
+        for (int i = 0; i < command.length(); i++) {
+            char c = command.charAt(i);
+            if (!Character.isDigit(c) && c != ',') {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private int getCurrentCaretLine() {
+        try {
+            return writingArea.getLineOfOffset(writingArea.getCaretPosition());
+        } catch (BadLocationException e) {
+            return 0;
+        }
+    }
+
+    private String resolveGitBranch() {
+        try {
+            File headFile = new File(".git/HEAD");
+            if (!headFile.exists()) {
+                return "";
+            }
+            String head = Files.readString(headFile.toPath(), StandardCharsets.UTF_8).trim();
+            if (head.startsWith("ref:")) {
+                int slash = head.lastIndexOf('/');
+                return slash >= 0 ? head.substring(slash + 1) : head;
+            }
+            return head.length() > 7 ? head.substring(0, 7) : head;
+        } catch (IOException e) {
+            return "";
+        }
+    }
+
     // Repeat last command
     private void repeatLastCommand() {
         if (lastCommand.isEmpty()) {
@@ -779,6 +1195,9 @@ public class Texteditor extends JFrame implements KeyListener {
         this.currentMode = mode;
         writingArea.setEditable(mode.isEditable());
         writingArea.setBackground(getModeBackground(mode));
+        if (mode != EditorMode.COMMAND) {
+            clearSubstitutePreview();
+        }
         updateStatusBar();
     }
 
@@ -787,10 +1206,12 @@ public class Texteditor extends JFrame implements KeyListener {
             case INSERT:
                 return configManager.getInsertColor();
             case VISUAL:
+            case VISUAL_LINE:
                 return configManager.getVisualColor();
             case REPLACE:
                 return configManager.getReplaceColor();
             case COMMAND:
+            case SEARCH:
                 return configManager.getCommandColor();
             case NORMAL:
             default:
@@ -800,51 +1221,59 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Status bar update
     private void updateStatusBar() {
+        FileBuffer buffer = getCurrentBuffer();
         StringBuilder status = new StringBuilder();
 
-        // Show command buffer if in command mode
-        if (currentMode == EditorMode.COMMAND && !commandBuffer.isEmpty()) {
-            status.append(commandBuffer).append(" ");
-        } else {
-            // File name
-            FileBuffer buffer = getCurrentBuffer();
-            if (buffer != null) {
-                status.append(buffer.getDisplayName());
-                if (buffer.isModified()) {
-                    status.append(" [+]");
-                }
-                status.append("  ");
+        if (buffer != null) {
+            status.append(buffer.getDisplayName());
+            if (buffer.isModified()) {
+                status.append(" [+]");
             }
+            status.append("  ");
+        }
 
-            // Cursor position
-            try {
-                int pos = writingArea.getCaretPosition();
-                int line = writingArea.getLineOfOffset(pos);
-                int col = pos - writingArea.getLineStartOffset(line);
-                status.append((line + 1)).append(":").append((col + 1)).append("  ");
-            } catch (BadLocationException e) {
-                status.append("1:1  ");
-            }
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            int col = pos - writingArea.getLineStartOffset(line);
+            status.append((line + 1)).append(":").append((col + 1)).append("  ");
+        } catch (BadLocationException e) {
+            status.append("1:1  ");
+        }
 
-            // Mode
-            status.append(currentMode.getDisplayName()).append("  ");
+        status.append(currentMode.getDisplayName()).append("  ");
 
-            // Encoding
-            if (buffer != null) {
-                status.append(buffer.getEncoding()).append("  ");
-            }
+        if (buffer != null) {
+            status.append(buffer.getFileType().getDisplayName()).append("  ");
+            status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
+        }
 
-            // Line count
-            int lineCount = writingArea.getLineCount();
-            status.append(lineCount).append(" line").append(lineCount != 1 ? "s" : "");
+        if (gitBranch != null && !gitBranch.isEmpty()) {
+            status.append("git:").append(gitBranch).append("  ");
+        }
+
+        int lineCount = writingArea.getLineCount();
+        status.append(lineCount).append(" line").append(lineCount != 1 ? "s" : "");
+        if (buffer != null && buffer.isLargeFile() && buffer.isShowingPreviewOnly()) {
+            status.append("  preview");
         }
 
         statusBar.setText(status.toString());
+
+        if ((currentMode == EditorMode.COMMAND || currentMode == EditorMode.SEARCH) && !commandBuffer.isEmpty()) {
+            commandBar.setText(commandBuffer);
+        } else if (lastMessage != null && !lastMessage.isEmpty()) {
+            commandBar.setText(lastMessage);
+        } else {
+            commandBar.setText("");
+        }
     }
 
     private void handleDocumentChange() {
         if (!suppressDocumentEvents) {
             markModified();
+            updateCurrentLineHighlight();
+            lineNumberPanel.repaint();
         }
     }
 
@@ -876,6 +1305,8 @@ public class Texteditor extends JFrame implements KeyListener {
         withSuppressedDocumentEvents(() -> writingArea.setText(buffer.getContent()));
         attachUndoManager(buffer.getUndoManager());
         writingArea.setCaretPosition(0);
+        updateCurrentLineHighlight();
+        refreshLineNumberPanel();
         updateStatusBar();
     }
 
@@ -891,18 +1322,27 @@ public class Texteditor extends JFrame implements KeyListener {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer != null) {
             buffer.setModified(true);
+            try {
+                buffer.createBackup();
+            } catch (IOException ignored) {
+            }
             updateStatusBar();
         }
     }
 
     // Show message in status bar
     public void showMessage(String message) {
-        statusBar.setText(message);
-
-        // Reset status bar after 3 seconds
-        Timer timer = new Timer(3000, e -> updateStatusBar());
-        timer.setRepeats(false);
-        timer.start();
+        lastMessage = message == null ? "" : message;
+        if (messageResetTimer != null) {
+            messageResetTimer.stop();
+        }
+        messageResetTimer = new Timer(3000, e -> {
+            lastMessage = "";
+            updateStatusBar();
+        });
+        messageResetTimer.setRepeats(false);
+        messageResetTimer.start();
+        updateStatusBar();
     }
 
     // File operations
@@ -928,7 +1368,7 @@ public class Texteditor extends JFrame implements KeyListener {
         builder.append(":help        view help\n");
         builder.append(":e <file>    open a file\n");
         builder.append(":recent      show recent files\n");
-        builder.append("Ctrl-p       file finder (planned from bitsy parity)\n\n");
+        builder.append(":ls          list open buffers\n\n");
         builder.append("note: this is a scratch buffer and can be edited.\n");
 
         FileBuffer landing = FileBuffer.createScratch("[landing]", builder.toString());
@@ -1096,22 +1536,32 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Search methods
     public String search(String pattern) {
-        return searchManager.search(pattern, false);
+        String result = searchManager.searchForward(pattern);
+        if (!configManager.getHighlightSearch()) {
+            searchManager.clearHighlights();
+        }
+        return result;
+    }
+
+    public String searchBackward(String pattern) {
+        String result = searchManager.searchBackward(pattern);
+        if (!configManager.getHighlightSearch()) {
+            searchManager.clearHighlights();
+        }
+        return result;
     }
 
     public String substitute(String pattern, String replacement, boolean wholeBuffer, boolean replaceAll) {
         if (wholeBuffer) {
-            // Search entire buffer
-            searchManager.search(pattern, false);
-            if (searchManager.getMatchCount() == 0) {
+            ReplacementResult result = replaceLiteral(writingArea.getText(), pattern, replacement, replaceAll);
+            if (result.matchCount == 0) {
                 return "Pattern not found: " + pattern;
             }
-
-            if (replaceAll) {
-                return searchManager.replaceAll(replacement);
-            } else {
-                return searchManager.replaceCurrent(replacement);
-            }
+            writingArea.setText(result.updatedText);
+            writingArea.setCaretPosition(Math.min(Math.max(0, result.firstMatchOffset), writingArea.getText().length()));
+            markModified();
+            searchManager.clearHighlights();
+            return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
         } else {
             return substituteCurrentLine(pattern, replacement, replaceAll);
         }
@@ -1125,7 +1575,7 @@ public class Texteditor extends JFrame implements KeyListener {
             int lineEnd = writingArea.getLineEndOffset(line);
             String lineText = writingArea.getText().substring(lineStart, lineEnd);
 
-            ReplacementResult result = replaceLiteralIgnoreCase(lineText, pattern, replacement, replaceAll);
+            ReplacementResult result = replaceLiteral(lineText, pattern, replacement, replaceAll);
             if (result.matchCount == 0) {
                 return "Pattern not found: " + pattern;
             }
@@ -1140,16 +1590,14 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private ReplacementResult replaceLiteralIgnoreCase(String text, String pattern, String replacement, boolean replaceAll) {
-        String lowerText = text.toLowerCase(Locale.ROOT);
-        String lowerPattern = pattern.toLowerCase(Locale.ROOT);
+    private ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {
         StringBuilder builder = new StringBuilder();
         int searchFrom = 0;
         int matchCount = 0;
         int firstMatchOffset = -1;
 
         while (searchFrom <= text.length()) {
-            int matchIndex = lowerText.indexOf(lowerPattern, searchFrom);
+            int matchIndex = text.indexOf(pattern, searchFrom);
             if (matchIndex < 0) {
                 break;
             }
@@ -1178,17 +1626,53 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Line number toggle
     public void toggleLineNumbers(boolean enabled) {
-        lineNumbersEnabled = enabled;
-        JScrollPane scrollPane = (JScrollPane) writingArea.getParent().getParent();
+        lineNumberMode = enabled ? LineNumberMode.ABSOLUTE : LineNumberMode.NONE;
+        configManager.setLineNumberMode(lineNumberMode);
+        refreshLineNumberPanel();
+    }
 
-        if (enabled) {
-            scrollPane.setRowHeaderView(lineNumberPanel);
-        } else {
-            scrollPane.setRowHeaderView(null);
+    public void setLineNumberMode(LineNumberMode mode) {
+        lineNumberMode = mode == null ? LineNumberMode.ABSOLUTE : mode;
+        configManager.setLineNumberMode(lineNumberMode);
+        refreshLineNumberPanel();
+    }
+
+    public String setLineNumberMode(String value) {
+        setLineNumberMode(LineNumberMode.fromConfigValue(value));
+        return "Line numbers set to " + lineNumberMode.toConfigValue();
+    }
+
+    public void setHighlightSearch(boolean enabled) {
+        configManager.set("highlight.search", String.valueOf(enabled));
+        if (!enabled) {
+            searchManager.clearHighlights();
         }
+        updateStatusBar();
+    }
 
-        scrollPane.revalidate();
-        scrollPane.repaint();
+    public void setAutoIndent(boolean enabled) {
+        configManager.set("auto.indent", String.valueOf(enabled));
+    }
+
+    public void setExpandTab(boolean enabled) {
+        configManager.set("expand.tab", String.valueOf(enabled));
+    }
+
+    public void setShowCurrentLine(boolean enabled) {
+        configManager.set("show.current.line", String.valueOf(enabled));
+        updateCurrentLineHighlight();
+        refreshLineNumberPanel();
+    }
+
+    public String setTabSizeFromCommand(String value) {
+        try {
+            int parsed = Math.max(1, Math.min(16, Integer.parseInt(value)));
+            configManager.set("tab.size", String.valueOf(parsed));
+            writingArea.setTabSize(parsed);
+            return "Tab size set to " + parsed;
+        } catch (NumberFormatException e) {
+            return "Invalid tab size: " + value;
+        }
     }
 
     // Go to line
@@ -1421,6 +1905,18 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private static class SubstitutePreview {
+        private final String pattern;
+        private final int startLine;
+        private final int endLine;
+
+        private SubstitutePreview(String pattern, int startLine, int endLine) {
+            this.pattern = pattern;
+            this.startLine = startLine;
+            this.endLine = endLine;
+        }
+    }
+
     private static class SpecialBufferReturnState {
         private final FileBuffer scratchBuffer;
         private final FileBuffer returnBuffer;
@@ -1441,24 +1937,40 @@ public class Texteditor extends JFrame implements KeyListener {
 
 // Line Number Panel for displaying line numbers
 class LineNumberPanel extends JPanel {
-    private JTextArea textArea;
+    private final JTextArea textArea;
+    private LineNumberMode mode;
+    private boolean highlightCurrentLine;
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
         setPreferredSize(new Dimension(40, Integer.MAX_VALUE));
-        setBackground(Color.LIGHT_GRAY);
+        setBackground(Color.decode("#161B22"));
+        this.mode = LineNumberMode.ABSOLUTE;
+        this.highlightCurrentLine = true;
+    }
+
+    public void setMode(LineNumberMode mode) {
+        this.mode = mode == null ? LineNumberMode.ABSOLUTE : mode;
+    }
+
+    public void setHighlightCurrentLine(boolean highlightCurrentLine) {
+        this.highlightCurrentLine = highlightCurrentLine;
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        g.setColor(Color.BLACK);
+        g.setColor(Color.decode("#8B949E"));
         g.setFont(textArea.getFont());
 
         FontMetrics fm = g.getFontMetrics();
-        int lineHeight = fm.getHeight();
         int lineCount = textArea.getLineCount();
+        int currentLine = 0;
+        try {
+            currentLine = textArea.getLineOfOffset(textArea.getCaretPosition());
+        } catch (BadLocationException ignored) {
+        }
 
         try {
             Rectangle visible = textArea.getVisibleRect();
@@ -1470,12 +1982,31 @@ class LineNumberPanel extends JPanel {
                 Point p = textArea.modelToView2D(lineStart).getBounds().getLocation();
                 int y = p.y + fm.getAscent();
 
-                String lineNum = String.valueOf(i + 1);
+                String lineNum = formatLineNumber(i, currentLine);
+                if (highlightCurrentLine && i == currentLine) {
+                    g.setColor(Color.decode("#FAF9F6"));
+                } else {
+                    g.setColor(Color.decode("#8B949E"));
+                }
                 int x = getWidth() - fm.stringWidth(lineNum) - 5;
                 g.drawString(lineNum, x, y);
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
+        }
+    }
+
+    private String formatLineNumber(int line, int currentLine) {
+        switch (mode) {
+            case NONE:
+                return "";
+            case RELATIVE:
+                return line == currentLine ? "0" : String.valueOf(Math.abs(line - currentLine));
+            case RELATIVE_ABSOLUTE:
+                return line == currentLine ? String.valueOf(line + 1) : String.valueOf(Math.abs(line - currentLine));
+            case ABSOLUTE:
+            default:
+                return String.valueOf(line + 1);
         }
     }
 }

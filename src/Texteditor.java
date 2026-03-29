@@ -45,6 +45,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private String lastMessage;
     private Timer messageResetTimer;
     private UndoManager undoManager;
+    private DocumentListener bufferDocumentListener;
     private String lastCommand;
     private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
     private String pendingCount;
@@ -188,14 +189,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Setup undo manager
         undoManager = new UndoManager();
-        writingArea.getDocument().addUndoableEditListener(undoManager);
 
         // Add document listener for modification tracking
-        writingArea.getDocument().addDocumentListener(new DocumentListener() {
+        bufferDocumentListener = new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { handleDocumentChange(); }
             public void removeUpdate(DocumentEvent e) { handleDocumentChange(); }
             public void changedUpdate(DocumentEvent e) { handleDocumentChange(); }
-        });
+        };
+        writingArea.getDocument().addDocumentListener(bufferDocumentListener);
 
         // Create line number panel
         lineNumberPanel = new LineNumberPanel(writingArea);
@@ -2317,24 +2318,24 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void detachUndoManager() {
-        if (undoManager != null) {
-            writingArea.getDocument().removeUndoableEditListener(undoManager);
+    private void detachActiveDocumentListener() {
+        if (bufferDocumentListener != null && writingArea.getDocument() != null) {
+            writingArea.getDocument().removeDocumentListener(bufferDocumentListener);
         }
     }
 
-    private void attachUndoManager(UndoManager newUndoManager) {
-        detachUndoManager();
-        undoManager = newUndoManager;
-        if (undoManager != null) {
-            writingArea.getDocument().addUndoableEditListener(undoManager);
+    private void attachActiveDocumentListener() {
+        if (bufferDocumentListener != null && writingArea.getDocument() != null) {
+            writingArea.getDocument().addDocumentListener(bufferDocumentListener);
         }
     }
 
     private void loadBufferIntoEditor(FileBuffer buffer) {
-        detachUndoManager();
-        withSuppressedDocumentEvents(() -> writingArea.setText(buffer.getContent()));
-        attachUndoManager(buffer.getUndoManager());
+        detachActiveDocumentListener();
+        searchManager.clearHighlights();
+        withSuppressedDocumentEvents(() -> writingArea.setDocument(buffer.getDocument()));
+        attachActiveDocumentListener();
+        undoManager = buffer.getUndoManager();
         writingArea.setCaretPosition(0);
         updateCurrentLineHighlight();
         applySyntaxHighlighting();

@@ -17,6 +17,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.PlainDocument;
 import javax.swing.undo.UndoManager;
 
 public class FileBuffer {
@@ -26,11 +28,11 @@ public class FileBuffer {
 
     private File file;
     private String scratchName;
-    private String content;
     private boolean modified;
     private String encodingName;
     private int lineCount;
     private final UndoManager undoManager;
+    private final PlainDocument document;
     private String lineEnding;
     private FileType fileType;
     private final Map<Character, Integer> marks;
@@ -49,6 +51,8 @@ public class FileBuffer {
 
     public FileBuffer(File file, ConfigManager configManager) throws IOException {
         this.undoManager = new UndoManager();
+        this.document = new PlainDocument();
+        this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
         this.file = file;
         this.scratch = false;
@@ -65,11 +69,12 @@ public class FileBuffer {
     // Constructor for new unsaved file
     public FileBuffer(String filename) {
         this.undoManager = new UndoManager();
+        this.document = new PlainDocument();
+        this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
         this.file = filename == null ? null : new File(filename);
         this.scratch = false;
         this.scratchName = filename == null || filename.isEmpty() ? "[No Name]" : filename;
-        this.content = "";
         this.modified = false;
         this.encodingName = StandardCharsets.UTF_8.name();
         this.lineEnding = System.lineSeparator().equals("\r\n") ? "\r\n" : "\n";
@@ -81,6 +86,7 @@ public class FileBuffer {
         this.showingPreviewOnly = false;
         this.lastKnownModifiedTime = 0L;
         this.fileSizeBytes = 0L;
+        setDocumentText("", false);
     }
 
     public static FileBuffer createScratch(String name, String content) {
@@ -139,14 +145,13 @@ public class FileBuffer {
                 previewBuilder.append("[shed large-file preview: remaining content hidden until save or reload]");
             }
             this.largeFileTail = buildTail(lines, previewLineCount);
-            this.content = previewBuilder.toString();
+            setDocumentText(previewBuilder.toString(), false);
         } else {
             this.showingPreviewOnly = false;
             this.largeFileTail = null;
-            this.content = normalized;
+            setDocumentText(normalized, false);
         }
 
-        this.modified = false;
         updateLineCount();
     }
 
@@ -278,14 +283,15 @@ public class FileBuffer {
 
     // Update content while explicitly controlling modification state
     public void setContent(String content, boolean modified) {
-        this.content = content == null ? "" : content;
-        this.modified = modified;
-        this.fileType = FileType.detect(file, getFullContent());
-        updateLineCount();
+        setDocumentText(content == null ? "" : content, modified);
     }
 
     public String getContent() {
-        return content == null ? "" : content;
+        try {
+            return document.getText(0, document.getLength());
+        } catch (BadLocationException e) {
+            return "";
+        }
     }
 
     public String getFullContent() {
@@ -297,6 +303,10 @@ public class FileBuffer {
 
     private void updateLineCount() {
         this.lineCount = countLines(getContent());
+    }
+
+    public PlainDocument getDocument() {
+        return document;
     }
 
     public String getDisplayName() {
@@ -412,13 +422,14 @@ public class FileBuffer {
     }
 
     public void expandLargeFilePreview() {
-        if (largeFile && largeFileTail != null && content != null && content.contains("[shed large-file preview:")) {
+        String content = getContent();
+        if (largeFile && largeFileTail != null && content.contains("[shed large-file preview:")) {
             int markerIndex = content.indexOf("[shed large-file preview:");
             String visibleContent = markerIndex > 0 ? content.substring(0, markerIndex) : "";
             if (visibleContent.endsWith("\n")) {
                 visibleContent = visibleContent.substring(0, visibleContent.length() - 1);
             }
-            this.content = visibleContent + (visibleContent.isEmpty() || largeFileTail.isEmpty() ? "" : "\n") + largeFileTail;
+            setDocumentText(visibleContent + (visibleContent.isEmpty() || largeFileTail.isEmpty() ? "" : "\n") + largeFileTail, modified);
             this.largeFileTail = null;
             this.showingPreviewOnly = false;
             updateLineCount();
@@ -444,6 +455,19 @@ public class FileBuffer {
 
     public File getBackupFile() {
         return backupFile;
+    }
+
+    private void setDocumentText(String text, boolean modified) {
+        try {
+            document.remove(0, document.getLength());
+            document.insertString(0, text == null ? "" : text, null);
+        } catch (BadLocationException e) {
+            throw new IllegalStateException("Unable to update buffer document", e);
+        }
+        undoManager.discardAllEdits();
+        this.modified = modified;
+        this.fileType = FileType.detect(file, getFullContent());
+        updateLineCount();
     }
 
     private static File buildBackupFile(File sourceFile) {

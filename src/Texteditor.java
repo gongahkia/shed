@@ -70,6 +70,12 @@ public class Texteditor extends JFrame implements KeyListener {
     private Highlighter.HighlightPainter syntaxKeywordPainter;
     private Highlighter.HighlightPainter syntaxStringPainter;
     private File lastPreviewedMarkdown;
+    private List<Integer> jumpList;
+    private int jumpIndex;
+    private List<Integer> changeList;
+    private int changeIndex;
+    private char lastFindChar;
+    private char lastFindType;
 
     // Visual mode state
     private int visualStartPos;
@@ -109,6 +115,12 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x2B, 0x4C, 0x7E));
         syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x5E, 0x3C, 0x4C));
         lastPreviewedMarkdown = null;
+        jumpList = new ArrayList<>();
+        jumpIndex = -1;
+        changeList = new ArrayList<>();
+        changeIndex = -1;
+        lastFindChar = '\0';
+        lastFindType = '\0';
         loadRecentFiles();
         lastMessage = "";
 
@@ -321,6 +333,31 @@ public class Texteditor extends JFrame implements KeyListener {
             lastInsertedText = "";
             setMode(EditorMode.INSERT);
             return;
+        } else if (c == 'a') {
+            moveRight();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+            return;
+        } else if (c == 'A') {
+            moveLineEnd();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+            return;
+        } else if (c == 'I') {
+            moveLineIndentStart();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+            return;
+        } else if (c == 'o') {
+            openLineBelow();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+            return;
+        } else if (c == 'O') {
+            openLineAbove();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+            return;
         } else if (c == 'v') {
             setMode(EditorMode.VISUAL);
             visualStartPos = writingArea.getCaretPosition();
@@ -382,6 +419,8 @@ public class Texteditor extends JFrame implements KeyListener {
             pendingCount = "";
             moveFileEnd();
         } else if (c == 'm' || c == '\'' || c == '`') {
+            pendingKey = c;
+        } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=') {
             pendingKey = c;
         }
 
@@ -447,12 +486,21 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (c == '#') {
             pendingCount = "";
             showMessage(searchWordUnderCursor(false));
+        } else if (c == ';') {
+            pendingCount = "";
+            showMessage(repeatFind(false));
+        } else if (c == ',') {
+            pendingCount = "";
+            showMessage(repeatFind(true));
         }
 
         // Repeat last command
         else if (c == '.') {
             pendingCount = "";
             repeatLastCommand();
+        } else if (c == 'J') {
+            pendingCount = "";
+            joinCurrentLine(true);
         }
 
         // Ctrl combinations
@@ -463,6 +511,12 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == 'n' || code == KeyEvent.VK_N) {
                 pendingCount = "";
                 showMessage(showLspCompletionStatus());
+            } else if (c == 'o' || code == KeyEvent.VK_O) {
+                pendingCount = "";
+                jumpBack();
+            } else if (c == 'i' || code == KeyEvent.VK_I) {
+                pendingCount = "";
+                jumpForward();
             } else if (c == 'd' || code == KeyEvent.VK_D) {
                 pendingCount = "";
                 scrollHalfPageDown();
@@ -489,6 +543,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 } else {
                     showMessage(gotoLine(Integer.parseInt(pendingCount)));
                 }
+            } else if (c == 'J') {
+                joinCurrentLine(false);
+            } else if (c == ';') {
+                changePrev();
+            } else if (c == ',') {
+                changeNext();
             }
             pendingKey = '\0';
             pendingCount = "";
@@ -540,6 +600,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (buffer != null) {
                 Integer offset = buffer.getMark(c);
                 if (offset != null) {
+                    recordJumpPosition();
                     if (pendingKey == '\'') {
                         try {
                             int line = writingArea.getLineOfOffset(Math.min(offset, writingArea.getText().length()));
@@ -553,6 +614,14 @@ public class Texteditor extends JFrame implements KeyListener {
                 } else {
                     showMessage("Mark not set: " + c);
                 }
+            }
+            pendingKey = '\0';
+        } else if (pendingKey == 'f' || pendingKey == 'F' || pendingKey == 't' || pendingKey == 'T') {
+            showMessage(findCharacter(pendingKey, c));
+            pendingKey = '\0';
+        } else if (pendingKey == '>' || pendingKey == '<' || pendingKey == '=') {
+            if (c == pendingKey) {
+                showMessage(applyLineOperator(pendingKey));
             }
             pendingKey = '\0';
         }
@@ -1339,6 +1408,233 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void moveLineIndentStart() {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int start = writingArea.getLineStartOffset(line);
+            int end = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText().substring(start, end);
+            int offset = 0;
+            while (offset < lineText.length() && Character.isWhitespace(lineText.charAt(offset)) && lineText.charAt(offset) != '\n') {
+                offset++;
+            }
+            writingArea.setCaretPosition(start + offset);
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void openLineBelow() {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String indent = configManager.getAutoIndent() ? currentLineIndentation() : "";
+            writingArea.insert("\n" + indent, lineEnd - 1);
+            writingArea.setCaretPosition(lineEnd + indent.length());
+            markModified();
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void openLineAbove() {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int lineStart = writingArea.getLineStartOffset(line);
+            String indent = configManager.getAutoIndent() ? currentLineIndentation() : "";
+            writingArea.insert(indent + "\n", lineStart);
+            writingArea.setCaretPosition(lineStart + indent.length());
+            markModified();
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void joinCurrentLine(boolean withSpace) {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            if (line >= writingArea.getLineCount() - 1) {
+                showMessage("Already on last line");
+                return;
+            }
+            int lineEnd = writingArea.getLineEndOffset(line);
+            int nextLineStart = writingArea.getLineStartOffset(line + 1);
+            int nextLineEnd = writingArea.getLineEndOffset(line + 1);
+            String nextLine = writingArea.getText().substring(nextLineStart, nextLineEnd).stripLeading();
+            writingArea.replaceRange(withSpace ? " " + nextLine : nextLine, lineEnd - 1, nextLineEnd);
+            markModified();
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private String applyLineOperator(char operator) {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int start = writingArea.getLineStartOffset(line);
+            int end = writingArea.getLineEndOffset(line);
+            String text = writingArea.getText().substring(start, end);
+            switch (operator) {
+                case '>':
+                    String indent = configManager.getExpandTab() ? " ".repeat(writingArea.getTabSize()) : "\t";
+                    writingArea.replaceRange(indent + text, start, end);
+                    break;
+                case '<':
+                    int removeCount = Math.min(writingArea.getTabSize(), leadingWhitespace(text));
+                    writingArea.replaceRange(text.substring(removeCount), start, end);
+                    break;
+                case '=':
+                    String previousIndent = line > 0 ? indentationForLine(line - 1) : "";
+                    writingArea.replaceRange(previousIndent + text.stripLeading(), start, end);
+                    break;
+                default:
+                    return "";
+            }
+            markModified();
+            return "Line updated";
+        } catch (BadLocationException e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private int leadingWhitespace(String text) {
+        int count = 0;
+        while (count < text.length() && Character.isWhitespace(text.charAt(count)) && text.charAt(count) != '\n') {
+            count++;
+        }
+        return count;
+    }
+
+    private String indentationForLine(int line) {
+        try {
+            int start = writingArea.getLineStartOffset(line);
+            int end = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText().substring(start, end);
+            int count = 0;
+            while (count < lineText.length() && Character.isWhitespace(lineText.charAt(count)) && lineText.charAt(count) != '\n') {
+                count++;
+            }
+            return lineText.substring(0, count);
+        } catch (BadLocationException e) {
+            return "";
+        }
+    }
+
+    private String findCharacter(char type, char target) {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        int result = -1;
+        switch (type) {
+            case 'f':
+                result = text.indexOf(target, Math.min(caret + 1, text.length()));
+                break;
+            case 'F':
+                result = text.lastIndexOf(target, Math.max(0, caret - 1));
+                break;
+            case 't':
+                result = text.indexOf(target, Math.min(caret + 1, text.length()));
+                if (result > caret) {
+                    result -= 1;
+                }
+                break;
+            case 'T':
+                result = text.lastIndexOf(target, Math.max(0, caret - 1));
+                if (result >= 0) {
+                    result += 1;
+                }
+                break;
+            default:
+                break;
+        }
+        if (result < 0 || result >= text.length()) {
+            return "Character not found: " + target;
+        }
+        writingArea.setCaretPosition(result);
+        lastFindType = type;
+        lastFindChar = target;
+        return "Moved to " + target;
+    }
+
+    private String repeatFind(boolean reverse) {
+        if (lastFindType == '\0' || lastFindChar == '\0') {
+            return "No previous find command";
+        }
+        char repeatType = lastFindType;
+        if (reverse) {
+            switch (lastFindType) {
+                case 'f':
+                    repeatType = 'F';
+                    break;
+                case 'F':
+                    repeatType = 'f';
+                    break;
+                case 't':
+                    repeatType = 'T';
+                    break;
+                case 'T':
+                    repeatType = 't';
+                    break;
+                default:
+                    break;
+            }
+        }
+        return findCharacter(repeatType, lastFindChar);
+    }
+
+    private void recordJumpPosition() {
+        int position = writingArea.getCaretPosition();
+        if (jumpList.isEmpty() || jumpList.get(jumpList.size() - 1) != position) {
+            if (jumpIndex >= 0 && jumpIndex < jumpList.size() - 1) {
+                jumpList = new ArrayList<>(jumpList.subList(0, jumpIndex + 1));
+            }
+            jumpList.add(position);
+            jumpIndex = jumpList.size() - 1;
+        }
+    }
+
+    private void jumpBack() {
+        if (jumpList.isEmpty() || jumpIndex <= 0) {
+            showMessage("At oldest jump");
+            return;
+        }
+        jumpIndex--;
+        writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
+    }
+
+    private void jumpForward() {
+        if (jumpList.isEmpty() || jumpIndex >= jumpList.size() - 1) {
+            showMessage("At newest jump");
+            return;
+        }
+        jumpIndex++;
+        writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
+    }
+
+    private void recordChangePosition() {
+        int position = writingArea.getCaretPosition();
+        if (changeList.isEmpty() || changeList.get(changeList.size() - 1) != position) {
+            changeList.add(position);
+            if (changeList.size() > 100) {
+                changeList.remove(0);
+            }
+            changeIndex = changeList.size() - 1;
+        }
+    }
+
+    private void changePrev() {
+        if (changeList.isEmpty() || changeIndex <= 0) {
+            showMessage("At oldest change");
+            return;
+        }
+        changeIndex--;
+        writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
+    }
+
+    private void changeNext() {
+        if (changeList.isEmpty() || changeIndex >= changeList.size() - 1) {
+            showMessage("At newest change");
+            return;
+        }
+        changeIndex++;
+        writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
+    }
+
     private void checkForExternalChanges() {
         if (reloadPromptActive) {
             return;
@@ -1996,6 +2292,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 buffer.createBackup();
             } catch (IOException ignored) {
             }
+            recordChangePosition();
             updateStatusBar();
         }
     }
@@ -2206,6 +2503,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Search methods
     public String search(String pattern) {
+        recordJumpPosition();
         String result = searchManager.searchForward(pattern);
         if (!configManager.getHighlightSearch()) {
             searchManager.clearHighlights();
@@ -2214,6 +2512,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String searchBackward(String pattern) {
+        recordJumpPosition();
         String result = searchManager.searchBackward(pattern);
         if (!configManager.getHighlightSearch()) {
             searchManager.clearHighlights();
@@ -2353,6 +2652,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 return "Invalid line number: " + lineNum;
             }
 
+            recordJumpPosition();
             int offset = writingArea.getLineStartOffset(lineNum - 1);
             writingArea.setCaretPosition(offset);
             return "Line " + lineNum;
@@ -2373,16 +2673,26 @@ public class Texteditor extends JFrame implements KeyListener {
                    "NORMAL MODE\n" +
                    "  h/j/k/l        Move left/down/up/right\n" +
                    "  w/b/e          Move by word\n" +
+                   "  f/F/t/T ; ,    Find/till-char and repeat\n" +
                    "  0/$            Line start/end\n" +
                    "  gg/G           File start/end\n" +
-                   "  i/v/R          Insert/visual/replace\n" +
+                   "  i/a/A/I/o/O    Insert variants\n" +
+                   "  v/V/R          Visual/visual-line/replace\n" +
                    "  yy/dd/cc       Yank/delete/change line\n" +
                    "  dw/cw          Delete/change word\n" +
                    "  D/C            Delete/change to end of line\n" +
+                   "  >>/<</==       Indent/dedent/auto-indent line\n" +
+                   "  J/gJ           Join lines with/without space\n" +
+                   "  m{a-z}         Set mark\n" +
+                   "  '{a-z}/`{a-z}  Jump to mark\n" +
+                   "  Ctrl-o/Ctrl-i  Jump back/forward\n" +
+                   "  g;/g,          Previous/next change\n" +
                    "  p/P            Paste after/before\n" +
                    "  u/Ctrl-r       Undo/redo\n" +
                    "  /pattern       Search forward\n" +
+                   "  ?pattern       Search backward\n" +
                    "  n/N            Next/previous match\n" +
+                   "  * / #          Search word under cursor\n" +
                    "  .              Repeat last command\n\n" +
                    "COMMANDS\n" +
                    "  :w [file]      Write current buffer\n" +
@@ -2393,9 +2703,19 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :ls            List buffers\n" +
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
+                   "  :Files         File finder\n" +
+                   "  :Buffers       Buffer finder\n" +
+                   "  :grep text     Grep finder\n" +
+                   "  :registers     Show registers\n" +
+                   "  :marks         Show marks\n" +
+                   "  :Goyo          Toggle zen mode\n" +
+                   "  :normal keys   Replay normal keys\n" +
+                   "  :!cmd          Run shell command\n" +
                    "  :set nu        Enable line numbers\n" +
                    "  :45            Go to line 45\n" +
+                   "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +
+                   "  :1,5s/a/b/g    Substitute a range\n" +
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
                    "note: this is a help buffer. use :q to return.\n";
         } else {

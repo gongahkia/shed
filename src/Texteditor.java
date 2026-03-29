@@ -91,6 +91,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private int macroPlaybackDepth;
     private Character pendingTextObjectOperator;
     private Character pendingTextObjectModifier;
+    private Character pendingSurroundAction;
+    private Character pendingSurroundOld;
+    private Character pendingSurroundTarget;
 
     // Visual mode state
     private int visualStartPos;
@@ -145,6 +148,9 @@ public class Texteditor extends JFrame implements KeyListener {
         macroPlaybackDepth = 0;
         pendingTextObjectOperator = null;
         pendingTextObjectModifier = null;
+        pendingSurroundAction = null;
+        pendingSurroundOld = null;
+        pendingSurroundTarget = null;
         loadRecentFiles();
         lastMessage = "";
 
@@ -411,6 +417,10 @@ public class Texteditor extends JFrame implements KeyListener {
             showMessage(applyTextObjectOperator(pendingTextObjectOperator, pendingTextObjectModifier, c));
             pendingTextObjectOperator = null;
             pendingTextObjectModifier = null;
+            return;
+        }
+        if (pendingSurroundAction != null) {
+            showMessage(handleSurroundPending(c));
             return;
         }
 
@@ -731,6 +741,10 @@ public class Texteditor extends JFrame implements KeyListener {
                 lastCommand = "yy";
                 storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
                 showMessage("Line yanked");
+            } else if (c == 's') {
+                pendingSurroundAction = 'y';
+                pendingKey = '\0';
+                return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'y';
                 pendingTextObjectModifier = c;
@@ -750,6 +764,10 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 markModified();
                 showMessage("Line deleted");
+            } else if (c == 's') {
+                pendingSurroundAction = 'd';
+                pendingKey = '\0';
+                return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'd';
                 pendingTextObjectModifier = c;
@@ -774,6 +792,10 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
+            } else if (c == 's') {
+                pendingSurroundAction = 'c';
+                pendingKey = '\0';
+                return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'c';
                 pendingTextObjectModifier = c;
@@ -2947,6 +2969,115 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private String handleSurroundPending(char c) {
+        if (pendingSurroundAction == 'c') {
+            if (pendingSurroundOld == null) {
+                pendingSurroundOld = c;
+                return "Awaiting new surround";
+            }
+            String result = surroundChange(pendingSurroundOld, c);
+            pendingSurroundAction = null;
+            pendingSurroundOld = null;
+            return result;
+        }
+
+        if (pendingSurroundAction == 'd') {
+            String result = surroundDelete(c);
+            pendingSurroundAction = null;
+            return result;
+        }
+
+        if (pendingSurroundAction == 'y') {
+            if (pendingSurroundTarget == null && isTextObjectKey(c)) {
+                pendingSurroundTarget = c;
+                return "Awaiting surround delimiter";
+            }
+            char target = pendingSurroundTarget == null ? 'w' : pendingSurroundTarget;
+            String result = surroundAdd(target, c);
+            pendingSurroundAction = null;
+            pendingSurroundTarget = null;
+            return result;
+        }
+
+        pendingSurroundAction = null;
+        pendingSurroundOld = null;
+        pendingSurroundTarget = null;
+        return "Unsupported surround";
+    }
+
+    private boolean isTextObjectKey(char c) {
+        return "wWps\"'`()[]{}<>".indexOf(c) >= 0;
+    }
+
+    private String surroundChange(char oldChar, char newChar) {
+        MotionRange range = resolveSurroundRange(oldChar);
+        SurroundPair newPair = surroundPair(newChar);
+        if (range == null || newPair == null) {
+            return "No matching surround found";
+        }
+        writingArea.replaceRange(String.valueOf(newPair.close), range.end - 1, range.end);
+        writingArea.replaceRange(String.valueOf(newPair.open), range.start, range.start + 1);
+        markModified();
+        return "Surround changed";
+    }
+
+    private String surroundDelete(char target) {
+        MotionRange range = resolveSurroundRange(target);
+        if (range == null) {
+            return "No matching surround found";
+        }
+        writingArea.replaceRange("", range.end - 1, range.end);
+        writingArea.replaceRange("", range.start, range.start + 1);
+        markModified();
+        return "Surround deleted";
+    }
+
+    private String surroundAdd(char targetObject, char surroundChar) {
+        MotionRange range = resolveTextObjectRange('i', targetObject);
+        SurroundPair pair = surroundPair(surroundChar);
+        if (range == null || pair == null) {
+            return "No valid surround target";
+        }
+        writingArea.insert(String.valueOf(pair.close), range.end);
+        writingArea.insert(String.valueOf(pair.open), range.start);
+        markModified();
+        return "Surround added";
+    }
+
+    private MotionRange resolveSurroundRange(char surround) {
+        if (surround == '"' || surround == '\'' || surround == '`') {
+            return resolveQuoteObject(true, surround);
+        }
+        SurroundPair pair = surroundPair(surround);
+        if (pair == null) {
+            return null;
+        }
+        return resolveBracketObject(true, pair.open, pair.close);
+    }
+
+    private SurroundPair surroundPair(char surround) {
+        switch (surround) {
+            case '(':
+            case ')':
+                return new SurroundPair('(', ')');
+            case '[':
+            case ']':
+                return new SurroundPair('[', ']');
+            case '{':
+            case '}':
+                return new SurroundPair('{', '}');
+            case '<':
+            case '>':
+                return new SurroundPair('<', '>');
+            case '"':
+            case '\'':
+            case '`':
+                return new SurroundPair(surround, surround);
+            default:
+                return null;
+        }
+    }
+
     private MotionRange resolveWordObject(boolean around, boolean bigWord) {
         String text = writingArea.getText();
         if (text.isEmpty()) {
@@ -4047,6 +4178,16 @@ public class Texteditor extends JFrame implements KeyListener {
             this.start = Math.max(0, start);
             this.end = Math.max(this.start, end);
             this.lineWise = lineWise;
+        }
+    }
+
+    private static class SurroundPair {
+        private final char open;
+        private final char close;
+
+        private SurroundPair(char open, char close) {
+            this.open = open;
+            this.close = close;
         }
     }
 

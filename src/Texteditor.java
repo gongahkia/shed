@@ -89,6 +89,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private Character lastMacroRegister;
     private List<NormalizedKeyStroke> macroBuffer;
     private int macroPlaybackDepth;
+    private Character pendingTextObjectOperator;
+    private Character pendingTextObjectModifier;
 
     // Visual mode state
     private int visualStartPos;
@@ -141,6 +143,8 @@ public class Texteditor extends JFrame implements KeyListener {
         lastMacroRegister = null;
         macroBuffer = new ArrayList<>();
         macroPlaybackDepth = 0;
+        pendingTextObjectOperator = null;
+        pendingTextObjectModifier = null;
         loadRecentFiles();
         lastMessage = "";
 
@@ -402,6 +406,13 @@ public class Texteditor extends JFrame implements KeyListener {
     private void handleNormalMode(KeyEvent e) {
         char c = e.getKeyChar();
         int code = e.getKeyCode();
+
+        if (pendingTextObjectOperator != null) {
+            showMessage(applyTextObjectOperator(pendingTextObjectOperator, pendingTextObjectModifier, c));
+            pendingTextObjectOperator = null;
+            pendingTextObjectModifier = null;
+            return;
+        }
 
         // Handle pending keys (multi-key commands)
         if (pendingKey != '\0') {
@@ -720,6 +731,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 lastCommand = "yy";
                 storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
                 showMessage("Line yanked");
+            } else if (c == 'i' || c == 'a') {
+                pendingTextObjectOperator = 'y';
+                pendingTextObjectModifier = c;
+                pendingKey = '\0';
+                return;
             } else if (c == 'g') {
                 pendingKey = 'Y';
                 return;
@@ -734,6 +750,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 markModified();
                 showMessage("Line deleted");
+            } else if (c == 'i' || c == 'a') {
+                pendingTextObjectOperator = 'd';
+                pendingTextObjectModifier = c;
+                pendingKey = '\0';
+                return;
             } else if (c == 'g') {
                 pendingKey = 'D';
                 return;
@@ -753,6 +774,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
+            } else if (c == 'i' || c == 'a') {
+                pendingTextObjectOperator = 'c';
+                pendingTextObjectModifier = c;
+                pendingKey = '\0';
+                return;
             } else if (c == 'g') {
                 pendingKey = 'C';
                 return;
@@ -2815,21 +2841,30 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private String applyMotionOperator(char operator, String motion) {
         MotionRange range = resolveMotionRange(motion);
+        return applyResolvedRange(operator, range, motion);
+    }
+
+    private String applyTextObjectOperator(char operator, char modifier, char objectKey) {
+        MotionRange range = resolveTextObjectRange(modifier, objectKey);
+        return applyResolvedRange(operator, range, String.valueOf(modifier) + objectKey);
+    }
+
+    private String applyResolvedRange(char operator, MotionRange range, String label) {
         if (range == null || range.start == range.end) {
-            return "Unsupported motion: " + motion;
+            return "Unsupported target: " + label;
         }
 
         String selected = writingArea.getText().substring(range.start, Math.min(range.end, writingArea.getText().length()));
         switch (operator) {
             case 'y':
                 storeYank(consumePendingRegister(), selected, range.lineWise);
-                lastCommand = "y" + motion;
+                lastCommand = "y" + label;
                 return "Yanked " + selected.length() + " characters";
             case 'd':
                 storeDelete(consumePendingRegister(), selected, range.lineWise);
                 writingArea.replaceRange("", range.start, range.end);
                 writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
-                lastCommand = "d" + motion;
+                lastCommand = "d" + label;
                 markModified();
                 return "Deleted " + selected.length() + " characters";
             case 'c':
@@ -2837,7 +2872,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 writingArea.replaceRange("", range.start, range.end);
                 writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
                 lastInsertedText = "";
-                lastCommand = "c" + motion;
+                lastCommand = "c" + label;
                 markModified();
                 setMode(EditorMode.INSERT);
                 return "Changed " + selected.length() + " characters";
@@ -2880,6 +2915,165 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException e) {
             return null;
         }
+    }
+
+    private MotionRange resolveTextObjectRange(char modifier, char objectKey) {
+        switch (objectKey) {
+            case 'w':
+            case 'W':
+                return resolveWordObject(modifier == 'a', objectKey == 'W');
+            case 'p':
+                return resolveParagraphObject(modifier == 'a');
+            case 's':
+                return resolveSentenceObject(modifier == 'a');
+            case '"':
+            case '\'':
+            case '`':
+                return resolveQuoteObject(modifier == 'a', objectKey);
+            case '(':
+            case ')':
+                return resolveBracketObject(modifier == 'a', '(', ')');
+            case '[':
+            case ']':
+                return resolveBracketObject(modifier == 'a', '[', ']');
+            case '{':
+            case '}':
+                return resolveBracketObject(modifier == 'a', '{', '}');
+            case '<':
+            case '>':
+                return resolveBracketObject(modifier == 'a', '<', '>');
+            default:
+                return null;
+        }
+    }
+
+    private MotionRange resolveWordObject(boolean around, boolean bigWord) {
+        String text = writingArea.getText();
+        if (text.isEmpty()) {
+            return null;
+        }
+        int caret = Math.min(writingArea.getCaretPosition(), text.length() - 1);
+        int start = caret;
+        int end = caret;
+        while (start > 0 && isMotionWordChar(text.charAt(start - 1), bigWord)) {
+            start--;
+        }
+        while (end < text.length() && isMotionWordChar(text.charAt(end), bigWord)) {
+            end++;
+        }
+        if (around) {
+            while (end < text.length() && Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+        }
+        return new MotionRange(start, end, false);
+    }
+
+    private MotionRange resolveParagraphObject(boolean around) {
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int startLine = line;
+            int endLine = line;
+            while (startLine > 0 && !lineText(startLine - 1).isBlank()) {
+                startLine--;
+            }
+            while (endLine < writingArea.getLineCount() - 1 && !lineText(endLine + 1).isBlank()) {
+                endLine++;
+            }
+            if (around) {
+                if (startLine > 0) {
+                    startLine--;
+                }
+                if (endLine < writingArea.getLineCount() - 1) {
+                    endLine++;
+                }
+            }
+            return new MotionRange(writingArea.getLineStartOffset(startLine), writingArea.getLineEndOffset(endLine), true);
+        } catch (BadLocationException e) {
+            return null;
+        }
+    }
+
+    private MotionRange resolveSentenceObject(boolean around) {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        int start = caret;
+        int end = caret;
+        while (start > 0) {
+            char c = text.charAt(start - 1);
+            if (c == '.' || c == '!' || c == '?') {
+                break;
+            }
+            start--;
+        }
+        while (start < text.length() && Character.isWhitespace(text.charAt(start))) {
+            start++;
+        }
+        while (end < text.length()) {
+            char c = text.charAt(end);
+            if (c == '.' || c == '!' || c == '?') {
+                end++;
+                break;
+            }
+            end++;
+        }
+        if (around) {
+            while (end < text.length() && Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+        }
+        return new MotionRange(start, end, false);
+    }
+
+    private MotionRange resolveQuoteObject(boolean around, char quote) {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        int start = text.lastIndexOf(quote, Math.max(0, caret - 1));
+        int end = text.indexOf(quote, caret);
+        if (start < 0 || end < 0 || start == end) {
+            return null;
+        }
+        return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
+    }
+
+    private MotionRange resolveBracketObject(boolean around, char open, char close) {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        int start = -1;
+        int depth = 0;
+        for (int i = Math.max(0, caret - 1); i >= 0; i--) {
+            char c = text.charAt(i);
+            if (c == close) {
+                depth++;
+            } else if (c == open) {
+                if (depth == 0) {
+                    start = i;
+                    break;
+                }
+                depth--;
+            }
+        }
+        if (start < 0) {
+            return null;
+        }
+        int end = -1;
+        depth = 0;
+        for (int i = start + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == open) {
+                depth++;
+            } else if (c == close) {
+                if (depth == 0) {
+                    end = i;
+                    break;
+                }
+                depth--;
+            }
+        }
+        if (end < 0) {
+            return null;
+        }
+        return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
     }
 
     private int previewMotionTarget(String motion) {

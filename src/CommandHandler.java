@@ -109,6 +109,15 @@ public class CommandHandler {
                 case "Buffers":
                 case "buf":
                     return editor.showBufferFinder();
+                case "split":
+                case "sp":
+                    return editor.splitWindow(false);
+                case "vsplit":
+                case "vsp":
+                    return editor.splitWindow(true);
+                case "close":
+                case "clo":
+                    return editor.closeActiveWindow();
                 case "grep":
                 case "Grep":
                 case "Rg":

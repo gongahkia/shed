@@ -138,7 +138,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Initialize managers that depend on UI
         clipboardManager = new ClipboardManager();
-        searchManager = new SearchManager(writingArea);
         commandHandler = new CommandHandler(this);
 
         // Open file from command line or landing page
@@ -296,8 +295,11 @@ public class Texteditor extends JFrame implements KeyListener {
         if (index < 0 || index == activePaneIndex) {
             return;
         }
+        detachActiveDocumentListener();
         activePaneIndex = index;
         bindActivePane(pane);
+        attachActiveDocumentListener();
+        currentBufferIndex = pane.getBuffer() == null ? -1 : buffers.indexOf(pane.getBuffer());
         updateCurrentLineHighlight();
         refreshLineNumberPanel();
         updateStatusBar();
@@ -579,7 +581,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Ctrl combinations
         else if (e.isControlDown()) {
-            if (c == 'p' || code == KeyEvent.VK_P) {
+            if (c == 'w' || code == KeyEvent.VK_W) {
+                pendingCount = "";
+                pendingKey = '\u0017';
+                return;
+            } else if (c == 'p' || code == KeyEvent.VK_P) {
                 pendingCount = "";
                 showMessage(showFileFinder());
             } else if (c == 'n' || code == KeyEvent.VK_N) {
@@ -696,6 +702,39 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (pendingKey == '>' || pendingKey == '<' || pendingKey == '=') {
             if (c == pendingKey) {
                 showMessage(applyLineOperator(pendingKey));
+            }
+            pendingKey = '\0';
+        } else if (pendingKey == '\u0017') {
+            switch (c) {
+                case 's':
+                    showMessage(splitWindow(false));
+                    break;
+                case 'v':
+                    showMessage(splitWindow(true));
+                    break;
+                case 'c':
+                    showMessage(closeActiveWindow());
+                    break;
+                case 'h':
+                    showMessage(focusWindowDirection(-1, 0));
+                    break;
+                case 'j':
+                    showMessage(focusWindowDirection(0, 1));
+                    break;
+                case 'k':
+                    showMessage(focusWindowDirection(0, -1));
+                    break;
+                case 'l':
+                    showMessage(focusWindowDirection(1, 0));
+                    break;
+                case 'w':
+                    showMessage(cycleWindowFocus());
+                    break;
+                case '=':
+                    showMessage(equalizeWindows());
+                    break;
+                default:
+                    break;
             }
             pendingKey = '\0';
         }
@@ -2407,23 +2446,45 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void loadBufferIntoEditor(FileBuffer buffer) {
-        detachActiveDocumentListener();
-        searchManager.clearHighlights();
-        withSuppressedDocumentEvents(() -> writingArea.setDocument(buffer.getDocument()));
-        attachActiveDocumentListener();
-        undoManager = buffer.getUndoManager();
-        writingArea.setCaretPosition(0);
-        updateCurrentLineHighlight();
-        applySyntaxHighlighting();
-        refreshLineNumberPanel();
-        maybePreviewMarkdown(buffer);
-        updateStatusBar();
+        loadBufferIntoPane(getActivePane(), buffer, 0);
+    }
+
+    private void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
+        if (pane == null || buffer == null) {
+            return;
+        }
+
+        boolean activePane = pane == getActivePane();
+        if (activePane) {
+            detachActiveDocumentListener();
+            if (searchManager != null) {
+                searchManager.clearHighlights();
+            }
+        }
+
+        pane.setBuffer(buffer);
+        withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
+        pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
+
+        if (activePane) {
+            bindActivePane(pane);
+            attachActiveDocumentListener();
+            undoManager = buffer.getUndoManager();
+            currentBufferIndex = buffers.indexOf(buffer);
+            updateCurrentLineHighlight();
+            applySyntaxHighlighting();
+            refreshLineNumberPanel();
+            maybePreviewMarkdown(buffer);
+            updateStatusBar();
+        } else {
+            pane.getLineNumberPanel().repaint();
+        }
     }
 
     private void persistCurrentBufferState() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer != null) {
-            buffer.setContent(writingArea.getText(), buffer.isModified());
+        EditorPane pane = getActivePane();
+        if (pane != null) {
+            pane.setBuffer(getCurrentBuffer());
         }
     }
 
@@ -2485,10 +2546,8 @@ public class Texteditor extends JFrame implements KeyListener {
         FileBuffer landing = FileBuffer.createScratch("[landing]", builder.toString());
         if (buffers.isEmpty()) {
             buffers.add(landing);
-            currentBufferIndex = 0;
         } else {
             buffers.set(0, landing);
-            currentBufferIndex = 0;
         }
         loadBufferIntoEditor(landing);
     }
@@ -2498,7 +2557,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
-            currentBufferIndex = buffers.indexOf(existing);
             loadBufferIntoEditor(existing);
             return;
         }
@@ -2512,10 +2570,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
         if (shouldReplaceSingleLandingBuffer()) {
             buffers.set(0, buffer);
-            currentBufferIndex = 0;
         } else {
             buffers.add(buffer);
-            currentBufferIndex = buffers.size() - 1;
         }
         loadBufferIntoEditor(buffer);
         addToRecentFiles(file.getAbsolutePath());
@@ -2526,6 +2582,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Buffer management methods (called by CommandHandler)
     public FileBuffer getCurrentBuffer() {
+        EditorPane activePane = getActivePane();
+        if (activePane != null && activePane.getBuffer() != null) {
+            return activePane.getBuffer();
+        }
         if (currentBufferIndex >= 0 && currentBufferIndex < buffers.size()) {
             return buffers.get(currentBufferIndex);
         }
@@ -2541,6 +2601,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return "No buffers open";
         }
 
+        currentBufferIndex = Math.max(0, buffers.indexOf(getCurrentBuffer()));
         int nextIndex = (currentBufferIndex + 1) % buffers.size();
         switchToBuffer(nextIndex);
         return "Buffer " + (currentBufferIndex + 1) + " of " + buffers.size();
@@ -2551,6 +2612,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return "No buffers open";
         }
 
+        currentBufferIndex = Math.max(0, buffers.indexOf(getCurrentBuffer()));
         int prevIndex = currentBufferIndex - 1;
         if (prevIndex < 0) {
             prevIndex = buffers.size() - 1;
@@ -2602,13 +2664,18 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Last buffer closed";
         }
 
-        buffers.remove(currentBufferIndex);
-
-        if (currentBufferIndex >= buffers.size()) {
-            currentBufferIndex = buffers.size() - 1;
+        currentBufferIndex = Math.max(0, buffers.indexOf(buffer));
+        buffers.remove(buffer);
+        if (buffers.isEmpty()) {
+            openLandingPage();
+            return "Buffer deleted";
         }
-
-        loadBufferIntoEditor(buffers.get(currentBufferIndex));
+        FileBuffer replacement = buffers.get(Math.min(currentBufferIndex, buffers.size() - 1));
+        for (EditorPane pane : editorPanes) {
+            if (pane.getBuffer() == buffer) {
+                loadBufferIntoPane(pane, replacement, 0);
+            }
+        }
         return "Buffer deleted";
     }
 
@@ -2620,8 +2687,128 @@ public class Texteditor extends JFrame implements KeyListener {
         persistCurrentBufferState();
 
         FileBuffer newBuffer = buffers.get(index);
-        currentBufferIndex = index;
         loadBufferIntoEditor(newBuffer);
+    }
+
+    public String splitWindow(boolean vertical) {
+        EditorPane activePane = getActivePane();
+        FileBuffer currentBuffer = getCurrentBuffer();
+        if (activePane == null || currentBuffer == null) {
+            return "No active window";
+        }
+
+        Dimension size = getSize();
+        EditorPane newPane = createEditorPane(size);
+        editorPanes.add(newPane);
+        WindowLayoutNode.Orientation orientation = vertical ? WindowLayoutNode.Orientation.HORIZONTAL : WindowLayoutNode.Orientation.VERTICAL;
+        if (windowLayoutRoot == null) {
+            windowLayoutRoot = WindowLayoutNode.leaf(activePane);
+        }
+        windowLayoutRoot.splitLeaf(activePane, newPane, orientation);
+        loadBufferIntoPane(newPane, currentBuffer, writingArea.getCaretPosition());
+        renderWindowLayout();
+        activateEditorPane(newPane);
+        newPane.getTextArea().requestFocusInWindow();
+        return vertical ? "Vertical split created" : "Horizontal split created";
+    }
+
+    public String closeActiveWindow() {
+        if (editorPanes.size() <= 1) {
+            return "Cannot close the only window";
+        }
+
+        EditorPane activePane = getActivePane();
+        if (activePane == null) {
+            return "No active window";
+        }
+
+        detachActiveDocumentListener();
+        editorPanes.remove(activePane);
+        windowLayoutRoot = windowLayoutRoot == null ? null : windowLayoutRoot.removeLeaf(activePane);
+        if (windowLayoutRoot == null) {
+            windowLayoutRoot = WindowLayoutNode.leaf(editorPanes.get(0));
+        }
+        renderWindowLayout();
+        activePaneIndex = 0;
+        bindActivePane(editorPanes.get(0));
+        attachActiveDocumentListener();
+        updateCurrentLineHighlight();
+        refreshLineNumberPanel();
+        updateStatusBar();
+        writingArea.requestFocusInWindow();
+        return "Window closed";
+    }
+
+    public String cycleWindowFocus() {
+        if (editorPanes.size() <= 1) {
+            return "Only one window";
+        }
+        int nextIndex = (activePaneIndex + 1) % editorPanes.size();
+        activateEditorPane(editorPanes.get(nextIndex));
+        writingArea.requestFocusInWindow();
+        return "Window focus changed";
+    }
+
+    public String equalizeWindows() {
+        if (windowLayoutRoot == null) {
+            return "No windows to equalize";
+        }
+        windowLayoutRoot.equalize();
+        renderWindowLayout();
+        return "Windows equalized";
+    }
+
+    public String focusWindowDirection(int dx, int dy) {
+        if (editorPanes.size() <= 1) {
+            return "Only one window";
+        }
+        EditorPane activePane = getActivePane();
+        if (activePane == null) {
+            return "No active window";
+        }
+
+        Rectangle activeBounds = paneBounds(activePane);
+        double activeCenterX = activeBounds.getCenterX();
+        double activeCenterY = activeBounds.getCenterY();
+        EditorPane bestPane = null;
+        double bestScore = Double.MAX_VALUE;
+
+        for (EditorPane pane : editorPanes) {
+            if (pane == activePane) {
+                continue;
+            }
+            Rectangle candidateBounds = paneBounds(pane);
+            double candidateCenterX = candidateBounds.getCenterX();
+            double candidateCenterY = candidateBounds.getCenterY();
+            double deltaX = candidateCenterX - activeCenterX;
+            double deltaY = candidateCenterY - activeCenterY;
+
+            if ((dx < 0 && deltaX >= 0) || (dx > 0 && deltaX <= 0) || (dy < 0 && deltaY >= 0) || (dy > 0 && deltaY <= 0)) {
+                continue;
+            }
+
+            double score = Math.hypot(deltaX, deltaY);
+            if (score < bestScore) {
+                bestScore = score;
+                bestPane = pane;
+            }
+        }
+
+        if (bestPane == null) {
+            return "No window in that direction";
+        }
+
+        activateEditorPane(bestPane);
+        writingArea.requestFocusInWindow();
+        return "Window focus changed";
+    }
+
+    private Rectangle paneBounds(EditorPane pane) {
+        return SwingUtilities.convertRectangle(
+            pane.getScrollPane().getParent(),
+            pane.getScrollPane().getBounds(),
+            editorHostPanel
+        );
     }
 
     private FileBuffer findBufferByPath(File file) {
@@ -2960,7 +3147,6 @@ public class Texteditor extends JFrame implements KeyListener {
         int returnCaretPosition = writingArea.getCaretPosition();
 
         buffers.add(scratchBuffer);
-        currentBufferIndex = buffers.size() - 1;
         if (returnable && returnBuffer != null) {
             specialBufferReturns.push(new SpecialBufferReturnState(scratchBuffer, returnBuffer, returnCaretPosition));
         }
@@ -2979,7 +3165,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         specialBufferReturns.pop();
-        buffers.remove(currentBufferIndex);
+        buffers.remove(current);
 
         int returnIndex = buffers.indexOf(state.returnBuffer);
         if (returnIndex < 0) {
@@ -2987,10 +3173,9 @@ public class Texteditor extends JFrame implements KeyListener {
                 openLandingPage();
                 return true;
             }
-            returnIndex = Math.max(0, currentBufferIndex - 1);
+            returnIndex = 0;
         }
 
-        currentBufferIndex = returnIndex;
         loadBufferIntoEditor(buffers.get(returnIndex));
         writingArea.setCaretPosition(Math.min(state.returnCaretPosition, writingArea.getText().length()));
         return true;

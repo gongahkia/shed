@@ -6,6 +6,7 @@ public class EditorPane {
     private final LineNumberPanel lineNumberPanel;
     private final JScrollPane scrollPane;
     private final SearchManager searchManager;
+    private FileBuffer buffer;
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
         this.textArea = textArea;
@@ -28,5 +29,13 @@ public class EditorPane {
 
     public SearchManager getSearchManager() {
         return searchManager;
+    }
+
+    public FileBuffer getBuffer() {
+        return buffer;
+    }
+
+    public void setBuffer(FileBuffer buffer) {
+        this.buffer = buffer;
     }
 }

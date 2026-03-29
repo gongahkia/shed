@@ -3884,27 +3884,19 @@ public class Texteditor extends JFrame implements KeyListener {
             return "No active window";
         }
 
+        WindowLayoutNode.Direction direction = toLayoutDirection(dx, dy);
+        List<EditorPane> candidates = windowLayoutRoot == null ? List.of() : windowLayoutRoot.findNeighborCandidates(activePane, direction);
+        if (candidates.isEmpty()) {
+            return "No window in that direction";
+        }
+
         Rectangle activeBounds = paneBounds(activePane);
-        double activeCenterX = activeBounds.getCenterX();
-        double activeCenterY = activeBounds.getCenterY();
         EditorPane bestPane = null;
         double bestScore = Double.MAX_VALUE;
 
-        for (EditorPane pane : editorPanes) {
-            if (pane == activePane) {
-                continue;
-            }
+        for (EditorPane pane : candidates) {
             Rectangle candidateBounds = paneBounds(pane);
-            double candidateCenterX = candidateBounds.getCenterX();
-            double candidateCenterY = candidateBounds.getCenterY();
-            double deltaX = candidateCenterX - activeCenterX;
-            double deltaY = candidateCenterY - activeCenterY;
-
-            if ((dx < 0 && deltaX >= 0) || (dx > 0 && deltaX <= 0) || (dy < 0 && deltaY >= 0) || (dy > 0 && deltaY <= 0)) {
-                continue;
-            }
-
-            double score = Math.hypot(deltaX, deltaY);
+            double score = directionalAlignmentScore(activeBounds, candidateBounds, direction);
             if (score < bestScore) {
                 bestScore = score;
                 bestPane = pane;
@@ -3918,6 +3910,47 @@ public class Texteditor extends JFrame implements KeyListener {
         activateEditorPane(bestPane);
         writingArea.requestFocusInWindow();
         return "Window focus changed";
+    }
+
+    private WindowLayoutNode.Direction toLayoutDirection(int dx, int dy) {
+        if (dx < 0) {
+            return WindowLayoutNode.Direction.LEFT;
+        }
+        if (dx > 0) {
+            return WindowLayoutNode.Direction.RIGHT;
+        }
+        if (dy < 0) {
+            return WindowLayoutNode.Direction.UP;
+        }
+        return WindowLayoutNode.Direction.DOWN;
+    }
+
+    private double directionalAlignmentScore(Rectangle activeBounds, Rectangle candidateBounds, WindowLayoutNode.Direction direction) {
+        double axisDistance;
+        double orthogonalDistance;
+        switch (direction) {
+            case LEFT:
+                axisDistance = activeBounds.getX() - candidateBounds.getMaxX();
+                orthogonalDistance = Math.abs(activeBounds.getCenterY() - candidateBounds.getCenterY());
+                break;
+            case RIGHT:
+                axisDistance = candidateBounds.getX() - activeBounds.getMaxX();
+                orthogonalDistance = Math.abs(activeBounds.getCenterY() - candidateBounds.getCenterY());
+                break;
+            case UP:
+                axisDistance = activeBounds.getY() - candidateBounds.getMaxY();
+                orthogonalDistance = Math.abs(activeBounds.getCenterX() - candidateBounds.getCenterX());
+                break;
+            case DOWN:
+            default:
+                axisDistance = candidateBounds.getY() - activeBounds.getMaxY();
+                orthogonalDistance = Math.abs(activeBounds.getCenterX() - candidateBounds.getCenterX());
+                break;
+        }
+        if (axisDistance < 0) {
+            axisDistance = 0;
+        }
+        return axisDistance * 1000.0 + orthogonalDistance;
     }
 
     private Rectangle paneBounds(EditorPane pane) {

@@ -1,5 +1,5 @@
 // Command Handler Class
-// Parses and executes ex-style commands (:w, :q, :e, etc.)
+// Parses and executes ex-style commands (:w, :q, :e, ranged :s/:d/:! etc.)
 
 import java.io.File;
 import java.io.IOException;
@@ -7,108 +7,130 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 public class CommandHandler {
-    private Texteditor editor;
-    private DateTimeFormatter timeFormat;
+    private final Texteditor editor;
+    private final DateTimeFormatter timeFormat;
 
     public CommandHandler(Texteditor editor) {
         this.editor = editor;
         this.timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy");
     }
 
-    // Main command execution method
     public String execute(String command) {
         if (command == null || command.isEmpty()) {
             return "No command entered";
         }
 
-        // Remove leading ':' if present
+        command = command.trim();
         if (command.startsWith(":")) {
             command = command.substring(1);
         }
 
-        // Remove leading '/' for search commands
-        boolean isSearch = command.startsWith("/");
-        if (isSearch) {
-            command = command.substring(1);
-            return editor.search(command);
+        if (command.startsWith("/")) {
+            return editor.search(command.substring(1));
         }
-
         if (command.startsWith("?")) {
             return editor.searchBackward(command.substring(1));
         }
 
-        if (command.equals("s") || command.equals("%s") ||
-            command.startsWith("s/") || command.startsWith("%s/")) {
-            return handleSubstitute(command);
-        }
-
-        // Parse command and arguments
-        String[] parts = command.trim().split("\\s+");
-        String cmd = parts[0];
-        boolean force = cmd.endsWith("!");
-        if (force) {
-            cmd = cmd.substring(0, cmd.length() - 1);
-        }
-
         try {
+            RangeParseResult range = parseRange(command);
+            String working = range.remaining.trim();
+
+            if (working.startsWith("!")) {
+                String shellCommand = working.substring(1).trim();
+                if (range.hasRange()) {
+                    return editor.filterRangeWithCommand(range.start, range.resolveEnd(editor), shellCommand);
+                }
+                return editor.runShellCommand(shellCommand);
+            }
+
+            if (working.startsWith("s/")) {
+                return handleSubstitute(working, range);
+            }
+
+            String cmd;
+            String args;
+            int firstSpace = working.indexOf(' ');
+            if (firstSpace >= 0) {
+                cmd = working.substring(0, firstSpace);
+                args = working.substring(firstSpace + 1).trim();
+            } else {
+                cmd = working;
+                args = "";
+            }
+
+            boolean force = cmd.endsWith("!");
+            if (force) {
+                cmd = cmd.substring(0, cmd.length() - 1);
+            }
+
             switch (cmd) {
                 case "w":
                 case "write":
-                    return handleWrite(parts.length > 1 ? parts[1] : null);
-
+                    return handleWrite(args.isEmpty() ? null : args);
                 case "q":
                 case "quit":
-                    return handleQuit(force);
-
+                    return editor.requestQuit(force);
                 case "wq":
                 case "x":
-                    return handleWriteQuit(parts.length > 1 ? parts[1] : null);
-
+                    return handleWriteQuit(args.isEmpty() ? null : args);
                 case "e":
                 case "edit":
-                    if (parts.length < 2) {
-                        return "Error: :e requires filename argument";
-                    }
-                    return handleEdit(parts[1]);
-
+                    return handleEdit(args);
                 case "bn":
                 case "bnext":
-                    return handleBufferNext();
-
+                    return editor.nextBuffer();
                 case "bp":
                 case "bprev":
-                    return handleBufferPrev();
-
+                    return editor.prevBuffer();
                 case "ls":
                 case "buffers":
-                    return handleListBuffers();
-
+                    return editor.listBuffers();
                 case "bd":
                 case "bdelete":
-                    return handleBufferDelete(force);
-
+                    return editor.deleteBuffer(force);
                 case "set":
-                    if (parts.length < 2) {
-                        return "Error: :set requires argument";
-                    }
-                    return handleSet(parts[1]);
-
+                    return handleSet(args);
                 case "help":
-                    String topic = parts.length > 1 ? parts[1] : "";
-                    return handleHelp(topic);
-
+                case "h":
+                    editor.showHelp(args);
+                    return "Showing help";
                 case "wc":
                 case "wordcount":
                     return handleWordCount();
-
                 case "recent":
-                    return handleRecent();
+                    return editor.showRecentFiles();
+                case "d":
+                case "delete":
+                    return handleDelete(range);
+                case "Files":
+                case "files":
+                    return editor.showFileFinder();
+                case "Buffers":
+                case "buf":
+                    return editor.showBufferFinder();
+                case "grep":
+                case "Grep":
+                case "Rg":
+                case "rg":
+                    return editor.showGrepFinder(args);
+                case "registers":
+                case "reg":
+                    return editor.showRegisters();
+                case "marks":
+                    return editor.showMarks();
+                case "Goyo":
+                case "Zen":
+                    return editor.toggleZenMode();
+                case "normal":
+                case "norm":
+                    return handleNormal(args, range);
+                case "":
+                    return "";
                 default:
-                    // Check if it's a line number
                     try {
-                        int lineNum = Integer.parseInt(cmd);
-                        return handleGotoLine(lineNum);
-                    } catch (NumberFormatException e) {
+                        return editor.gotoLine(Integer.parseInt(cmd));
+                    } catch (NumberFormatException ignored) {
                         return "Command not recognised: " + cmd;
                     }
             }
@@ -117,7 +139,6 @@ public class CommandHandler {
         }
     }
 
-    // :w - Write (save) current buffer
     private String handleWrite(String targetPath) {
         try {
             FileBuffer buffer = editor.getCurrentBuffer();
@@ -133,19 +154,12 @@ public class CommandHandler {
             }
 
             String timestamp = timeFormat.format(LocalDateTime.now());
-            return "\"" + buffer.getDisplayName() + "\" " +
-                   buffer.getLineCount() + "L written " + timestamp;
+            return "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;
         } catch (IOException e) {
             return "Error saving file: " + e.getMessage();
         }
     }
 
-    // :q - Quit current buffer
-    private String handleQuit(boolean force) {
-        return editor.requestQuit(force);
-    }
-
-    // :wq - Write and quit
     private String handleWriteQuit(String targetPath) {
         String writeResult = handleWrite(targetPath);
         if (writeResult.startsWith("Error")) {
@@ -155,138 +169,121 @@ public class CommandHandler {
         return "Saved and quitting";
     }
 
-    // :e filename - Edit file
     private String handleEdit(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return "Error: :e requires filename argument";
+        }
         try {
-            File file = new File(filename);
-            editor.openFile(file);
+            editor.openFile(new File(filename));
             return "Opened: " + filename;
-        } catch (Exception e) {
+        } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
         }
     }
 
-    // :bn - Next buffer
-    private String handleBufferNext() {
-        return editor.nextBuffer();
-    }
-
-    // :bp - Previous buffer
-    private String handleBufferPrev() {
-        return editor.prevBuffer();
-    }
-
-    // :ls - List buffers
-    private String handleListBuffers() {
-        return editor.listBuffers();
-    }
-
-    // :bd - Delete buffer
-    private String handleBufferDelete(boolean force) {
-        return editor.deleteBuffer(force);
-    }
-
-    // :set - Toggle settings
     private String handleSet(String option) {
+        if (option == null || option.isEmpty()) {
+            return "Error: :set requires argument";
+        }
+
         if (option.equals("nu") || option.equals("number")) {
             editor.toggleLineNumbers(true);
             return "Line numbers enabled";
-        } else if (option.equals("nonu") || option.equals("nonumber")) {
+        }
+        if (option.equals("nonu") || option.equals("nonumber")) {
             editor.toggleLineNumbers(false);
             return "Line numbers disabled";
-        } else if (option.equals("rnu") || option.equals("relativenumber")) {
+        }
+        if (option.equals("rnu") || option.equals("relativenumber")) {
             editor.setLineNumberMode(LineNumberMode.RELATIVE);
             return "Relative line numbers enabled";
-        } else if (option.equals("nornu") || option.equals("norelativenumber")) {
+        }
+        if (option.equals("nornu") || option.equals("norelativenumber")) {
             editor.setLineNumberMode(LineNumberMode.ABSOLUTE);
             return "Relative line numbers disabled";
-        } else if (option.equals("hls") || option.equals("hlsearch")) {
+        }
+        if (option.equals("hls") || option.equals("hlsearch")) {
             editor.setHighlightSearch(true);
             return "Search highlighting enabled";
-        } else if (option.equals("nohls") || option.equals("nohlsearch")) {
+        }
+        if (option.equals("nohls") || option.equals("nohlsearch")) {
             editor.setHighlightSearch(false);
             return "Search highlighting disabled";
-        } else if (option.equals("ai") || option.equals("autoindent")) {
+        }
+        if (option.equals("ai") || option.equals("autoindent")) {
             editor.setAutoIndent(true);
             return "Auto-indent enabled";
-        } else if (option.equals("noai") || option.equals("noautoindent")) {
+        }
+        if (option.equals("noai") || option.equals("noautoindent")) {
             editor.setAutoIndent(false);
             return "Auto-indent disabled";
-        } else if (option.equals("et") || option.equals("expandtab")) {
+        }
+        if (option.equals("et") || option.equals("expandtab")) {
             editor.setExpandTab(true);
             return "Expand tab enabled";
-        } else if (option.equals("noet") || option.equals("noexpandtab")) {
+        }
+        if (option.equals("noet") || option.equals("noexpandtab")) {
             editor.setExpandTab(false);
             return "Expand tab disabled";
-        } else if (option.equals("cul") || option.equals("cursorline")) {
+        }
+        if (option.equals("cul") || option.equals("cursorline")) {
             editor.setShowCurrentLine(true);
             return "Current line highlight enabled";
-        } else if (option.equals("nocul") || option.equals("nocursorline")) {
+        }
+        if (option.equals("nocul") || option.equals("nocursorline")) {
             editor.setShowCurrentLine(false);
             return "Current line highlight disabled";
-        } else if (option.startsWith("tabstop=") || option.startsWith("ts=")) {
-            String value = option.substring(option.indexOf('=') + 1);
-            return editor.setTabSizeFromCommand(value);
-        } else if (option.startsWith("line.numbers=")) {
-            return editor.setLineNumberMode(option.substring(option.indexOf('=') + 1));
-        } else {
-            return "Unknown option: " + option;
         }
+        if (option.startsWith("tabstop=") || option.startsWith("ts=")) {
+            return editor.setTabSizeFromCommand(option.substring(option.indexOf('=') + 1));
+        }
+        if (option.startsWith("line.numbers=")) {
+            return editor.setLineNumberMode(option.substring(option.indexOf('=') + 1));
+        }
+        return "Unknown option: " + option;
     }
 
-    // :help - Show help
-    private String handleHelp(String topic) {
-        editor.showHelp(topic);
-        return "Showing help";
-    }
-
-    // :wc - Word count
     private String handleWordCount() {
         String text = editor.getTextArea().getText();
         int lines = text.isEmpty() ? 0 : text.split("\n", -1).length;
-        int words = text.isEmpty() ? 0 : text.trim().split("\\s+").length;
+        int words = text.isBlank() ? 0 : text.trim().split("\\s+").length;
         int chars = text.length();
-
         return lines + " lines, " + words + " words, " + chars + " characters";
     }
 
-    // :recent - Show recent files
-    private String handleRecent() {
-        return editor.showRecentFiles();
+    private String handleDelete(RangeParseResult range) {
+        if (!range.hasRange()) {
+            int line = editor.getCurrentLineNumber();
+            return editor.deleteLineRange(line, line);
+        }
+        return editor.deleteLineRange(range.start, range.resolveEnd(editor));
     }
 
-    // :s/old/new or :%s/old/new/g - Substitute
-    private String handleSubstitute(String command) {
-        try {
-            SubstituteCommand parsed = parseSubstitute(command);
-            if (parsed == null) {
-                return "Error: Invalid substitute syntax";
-            }
+    private String handleNormal(String keys, RangeParseResult range) {
+        int currentLine = editor.getCurrentLineNumber();
+        int start = range.hasRange() ? range.start : currentLine;
+        int end = range.hasRange() ? range.resolveEnd(editor) : currentLine;
+        return editor.executeNormalKeys(keys, start, end);
+    }
 
-            return editor.substitute(
-                parsed.searchPattern,
-                parsed.replacement,
-                parsed.wholeBuffer,
-                parsed.replaceAll
-            );
-        } catch (Exception e) {
-            return "Error in substitute: " + e.getMessage();
+    private String handleSubstitute(String command, RangeParseResult range) {
+        SubstituteCommand parsed = parseSubstitute(command);
+        if (parsed == null) {
+            return "Error: Invalid substitute syntax";
         }
+
+        if (range.hasRange()) {
+            return editor.substituteRange(parsed.searchPattern, parsed.replacement, range.start, range.resolveEnd(editor), parsed.replaceAll);
+        }
+        return editor.substitute(parsed.searchPattern, parsed.replacement, false, parsed.replaceAll);
     }
 
     private SubstituteCommand parseSubstitute(String command) {
-        boolean wholeBuffer;
-        if (command.startsWith("%s/")) {
-            wholeBuffer = true;
-            command = command.substring(3);
-        } else if (command.startsWith("s/")) {
-            wholeBuffer = false;
-            command = command.substring(2);
-        } else {
+        if (!command.startsWith("s/")) {
             return null;
         }
 
-        String[] parts = command.split("/", -1);
+        String[] parts = command.substring(2).split("/", -1);
         if (parts.length < 2 || parts.length > 3) {
             return null;
         }
@@ -294,34 +291,86 @@ public class CommandHandler {
         String searchPattern = parts[0];
         String replacement = parts[1];
         String flags = parts.length == 3 ? parts[2] : "";
-
         if (searchPattern.isEmpty()) {
             return null;
         }
-
         if (!flags.isEmpty() && !"g".equals(flags)) {
             return null;
         }
+        return new SubstituteCommand(searchPattern, replacement, "g".equals(flags));
+    }
 
-        return new SubstituteCommand(searchPattern, replacement, wholeBuffer, "g".equals(flags));
+    private RangeParseResult parseRange(String input) {
+        if (input.startsWith("%")) {
+            return new RangeParseResult(1, Integer.MAX_VALUE, input.substring(1), true);
+        }
+
+        int index = 0;
+        while (index < input.length()) {
+            char c = input.charAt(index);
+            if (Character.isDigit(c) || c == ',') {
+                index++;
+            } else {
+                break;
+            }
+        }
+
+        if (index == 0 || index >= input.length()) {
+            return new RangeParseResult(0, 0, input, false);
+        }
+
+        String rangePart = input.substring(0, index);
+        String[] parts = rangePart.split(",", -1);
+        try {
+            if (parts.length == 1) {
+                int line = Integer.parseInt(parts[0]);
+                return new RangeParseResult(line, line, input.substring(index), true);
+            }
+            if (parts.length == 2) {
+                int start = Integer.parseInt(parts[0]);
+                int end = Integer.parseInt(parts[1]);
+                return new RangeParseResult(start, end, input.substring(index), true);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+
+        return new RangeParseResult(0, 0, input, false);
+    }
+
+    private static class RangeParseResult {
+        private final int start;
+        private final int end;
+        private final String remaining;
+        private final boolean present;
+
+        private RangeParseResult(int start, int end, String remaining, boolean present) {
+            this.start = start;
+            this.end = end;
+            this.remaining = remaining;
+            this.present = present;
+        }
+
+        private boolean hasRange() {
+            return present;
+        }
+
+        private int resolveEnd(Texteditor editor) {
+            if (end == Integer.MAX_VALUE) {
+                return editor.getTextArea().getLineCount();
+            }
+            return end;
+        }
     }
 
     private static class SubstituteCommand {
         private final String searchPattern;
         private final String replacement;
-        private final boolean wholeBuffer;
         private final boolean replaceAll;
 
-        private SubstituteCommand(String searchPattern, String replacement, boolean wholeBuffer, boolean replaceAll) {
+        private SubstituteCommand(String searchPattern, String replacement, boolean replaceAll) {
             this.searchPattern = searchPattern;
             this.replacement = replacement;
-            this.wholeBuffer = wholeBuffer;
             this.replaceAll = replaceAll;
         }
-    }
-
-    // :45 - Go to line number
-    private String handleGotoLine(int lineNum) {
-        return editor.gotoLine(lineNum);
     }
 }

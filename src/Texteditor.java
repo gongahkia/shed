@@ -105,15 +105,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.addKeyListener(this);
 
         // Load font
-        try {
-            Font customFont = Font.createFont(Font.TRUETYPE_FONT,
-                new File("assets/hackregfont.ttf")).deriveFont((float)configManager.getFontSize());
-            GraphicsEnvironment ge = GraphicsEnvironment.getLocalGraphicsEnvironment();
-            ge.registerFont(customFont);
-            writingArea.setFont(customFont);
-        } catch (Exception e) {
-            writingArea.setFont(new Font("Monospaced", Font.PLAIN, configManager.getFontSize()));
-        }
+        writingArea.setFont(resolveEditorFont());
 
         // Configure text area
         writingArea.setTabSize(configManager.getTabSize());
@@ -161,6 +153,47 @@ public class Texteditor extends JFrame implements KeyListener {
                 handleQuit(false);
             }
         });
+    }
+
+    private Font resolveEditorFont() {
+        int fontSize = configManager.getFontSize();
+        String configuredFamily = configManager.getFontFamily();
+        Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
+        if (configuredFont != null) {
+            return configuredFont;
+        }
+
+        Font bundledHackFont = loadBundledHackFont(fontSize);
+        if (bundledHackFont != null) {
+            return bundledHackFont;
+        }
+
+        return new Font("Monospaced", Font.PLAIN, fontSize);
+    }
+
+    private Font resolveInstalledFont(String family, int fontSize) {
+        if (family == null || family.trim().isEmpty()) {
+            return null;
+        }
+
+        GraphicsEnvironment graphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment();
+        for (String availableFamily : graphicsEnvironment.getAvailableFontFamilyNames()) {
+            if (availableFamily.equalsIgnoreCase(family.trim())) {
+                return new Font(availableFamily, Font.PLAIN, fontSize);
+            }
+        }
+
+        return null;
+    }
+
+    private Font loadBundledHackFont(int fontSize) {
+        try {
+            Font hackFont = Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"));
+            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(hackFont);
+            return hackFont.deriveFont((float) fontSize);
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     // Key event handling
@@ -734,8 +767,24 @@ public class Texteditor extends JFrame implements KeyListener {
     private void setMode(EditorMode mode) {
         this.currentMode = mode;
         writingArea.setEditable(mode.isEditable());
-        writingArea.setBackground(mode.getBackgroundColor());
+        writingArea.setBackground(getModeBackground(mode));
         updateStatusBar();
+    }
+
+    private Color getModeBackground(EditorMode mode) {
+        switch (mode) {
+            case INSERT:
+                return configManager.getInsertColor();
+            case VISUAL:
+                return configManager.getVisualColor();
+            case REPLACE:
+                return configManager.getReplaceColor();
+            case COMMAND:
+                return configManager.getCommandColor();
+            case NORMAL:
+            default:
+                return configManager.getNormalColor();
+        }
     }
 
     // Status bar update

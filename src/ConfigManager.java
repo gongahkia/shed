@@ -92,11 +92,28 @@ public class ConfigManager {
     // Get color setting
     public Color getColor(String mode) {
         String key = "color." + mode.toLowerCase();
-        String colorHex = config.getOrDefault(key, DEFAULT_COLOR_NORMAL);
+        String defaultColor = getDefaultColor(mode);
+        String colorHex = config.getOrDefault(key, defaultColor);
         try {
             return Color.decode(colorHex);
         } catch (NumberFormatException e) {
-            return Color.decode(DEFAULT_COLOR_NORMAL);
+            return Color.decode(defaultColor);
+        }
+    }
+
+    private String getDefaultColor(String mode) {
+        switch (mode.toLowerCase()) {
+            case "insert":
+                return DEFAULT_COLOR_INSERT;
+            case "command":
+                return DEFAULT_COLOR_COMMAND;
+            case "visual":
+                return DEFAULT_COLOR_VISUAL;
+            case "replace":
+                return DEFAULT_COLOR_REPLACE;
+            case "normal":
+            default:
+                return DEFAULT_COLOR_NORMAL;
         }
     }
 

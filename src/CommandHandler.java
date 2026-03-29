@@ -5,9 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import javax.swing.JTextArea;
 
 public class CommandHandler {
     private Texteditor editor;
@@ -34,6 +31,11 @@ public class CommandHandler {
         if (isSearch) {
             command = command.substring(1);
             return handleSearch(command);
+        }
+
+        if (command.equals("s") || command.equals("%s") ||
+            command.startsWith("s/") || command.startsWith("%s/")) {
+            return handleSubstitute(command);
         }
 
         // Parse command and arguments
@@ -97,13 +99,6 @@ public class CommandHandler {
 
                 case "recent":
                     return handleRecent();
-
-                case "s":
-                    if (command.contains("/")) {
-                        return handleSubstitute(command);
-                    }
-                    return "Error: Invalid substitute syntax. Use :s/old/new or :%s/old/new/g";
-
                 default:
                     // Check if it's a line number
                     try {
@@ -228,22 +223,65 @@ public class CommandHandler {
     // :s/old/new or :%s/old/new/g - Substitute
     private String handleSubstitute(String command) {
         try {
-            // Parse substitute command
-            Pattern pattern = Pattern.compile("^(%)?s/(.+?)/(.*)/(g)?$");
-            Matcher matcher = pattern.matcher(command);
-
-            if (!matcher.matches()) {
+            SubstituteCommand parsed = parseSubstitute(command);
+            if (parsed == null) {
                 return "Error: Invalid substitute syntax";
             }
 
-            boolean global = matcher.group(1) != null; // % prefix
-            String searchPattern = matcher.group(2);
-            String replacement = matcher.group(3);
-            boolean replaceAll = matcher.group(4) != null; // g flag
-
-            return editor.substitute(searchPattern, replacement, global, replaceAll);
+            return editor.substitute(
+                parsed.searchPattern,
+                parsed.replacement,
+                parsed.wholeBuffer,
+                parsed.replaceAll
+            );
         } catch (Exception e) {
             return "Error in substitute: " + e.getMessage();
+        }
+    }
+
+    private SubstituteCommand parseSubstitute(String command) {
+        boolean wholeBuffer;
+        if (command.startsWith("%s/")) {
+            wholeBuffer = true;
+            command = command.substring(3);
+        } else if (command.startsWith("s/")) {
+            wholeBuffer = false;
+            command = command.substring(2);
+        } else {
+            return null;
+        }
+
+        String[] parts = command.split("/", -1);
+        if (parts.length < 2 || parts.length > 3) {
+            return null;
+        }
+
+        String searchPattern = parts[0];
+        String replacement = parts[1];
+        String flags = parts.length == 3 ? parts[2] : "";
+
+        if (searchPattern.isEmpty()) {
+            return null;
+        }
+
+        if (!flags.isEmpty() && !"g".equals(flags)) {
+            return null;
+        }
+
+        return new SubstituteCommand(searchPattern, replacement, wholeBuffer, "g".equals(flags));
+    }
+
+    private static class SubstituteCommand {
+        private final String searchPattern;
+        private final String replacement;
+        private final boolean wholeBuffer;
+        private final boolean replaceAll;
+
+        private SubstituteCommand(String searchPattern, String replacement, boolean wholeBuffer, boolean replaceAll) {
+            this.searchPattern = searchPattern;
+            this.replacement = replacement;
+            this.wholeBuffer = wholeBuffer;
+            this.replaceAll = replaceAll;
         }
     }
 

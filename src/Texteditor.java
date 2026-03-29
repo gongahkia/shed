@@ -13,6 +13,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class Texteditor extends JFrame implements KeyListener {
 
@@ -975,10 +976,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return searchManager.search(pattern, false);
     }
 
-    public String substitute(String pattern, String replacement, boolean global, boolean replaceAll) {
-        if (global) {
+    public String substitute(String pattern, String replacement, boolean wholeBuffer, boolean replaceAll) {
+        if (wholeBuffer) {
             // Search entire buffer
-            String result = searchManager.search(pattern, false);
+            searchManager.search(pattern, false);
             if (searchManager.getMatchCount() == 0) {
                 return "Pattern not found: " + pattern;
             }
@@ -989,9 +990,67 @@ public class Texteditor extends JFrame implements KeyListener {
                 return searchManager.replaceCurrent(replacement);
             }
         } else {
-            // Current line only
-            return "Line-level substitute not yet implemented";
+            return substituteCurrentLine(pattern, replacement, replaceAll);
         }
+    }
+
+    private String substituteCurrentLine(String pattern, String replacement, boolean replaceAll) {
+        try {
+            int caretPosition = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(caretPosition);
+            int lineStart = writingArea.getLineStartOffset(line);
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText().substring(lineStart, lineEnd);
+
+            ReplacementResult result = replaceLiteralIgnoreCase(lineText, pattern, replacement, replaceAll);
+            if (result.matchCount == 0) {
+                return "Pattern not found: " + pattern;
+            }
+
+            writingArea.replaceRange(result.updatedText, lineStart, lineEnd);
+            writingArea.setCaretPosition(Math.min(lineStart + result.firstMatchOffset, writingArea.getText().length()));
+            searchManager.clearHighlights();
+
+            return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
+        } catch (BadLocationException e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private ReplacementResult replaceLiteralIgnoreCase(String text, String pattern, String replacement, boolean replaceAll) {
+        String lowerText = text.toLowerCase(Locale.ROOT);
+        String lowerPattern = pattern.toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder();
+        int searchFrom = 0;
+        int matchCount = 0;
+        int firstMatchOffset = -1;
+
+        while (searchFrom <= text.length()) {
+            int matchIndex = lowerText.indexOf(lowerPattern, searchFrom);
+            if (matchIndex < 0) {
+                break;
+            }
+
+            if (firstMatchOffset < 0) {
+                firstMatchOffset = matchIndex;
+            }
+
+            builder.append(text, searchFrom, matchIndex);
+            builder.append(replacement);
+            searchFrom = matchIndex + pattern.length();
+            matchCount++;
+
+            if (!replaceAll) {
+                break;
+            }
+        }
+
+        if (matchCount == 0) {
+            return new ReplacementResult(text, 0, -1);
+        }
+
+        builder.append(text.substring(searchFrom));
+        return new ReplacementResult(builder.toString(), matchCount, firstMatchOffset);
     }
 
     // Line number toggle
@@ -1152,6 +1211,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
     @Override
     public void keyReleased(KeyEvent e) {}
+
+    private static class ReplacementResult {
+        private final String updatedText;
+        private final int matchCount;
+        private final int firstMatchOffset;
+
+        private ReplacementResult(String updatedText, int matchCount, int firstMatchOffset) {
+            this.updatedText = updatedText;
+            this.matchCount = matchCount;
+            this.firstMatchOffset = firstMatchOffset;
+        }
+    }
 
     // Main method
     public static void main(String[] args) {

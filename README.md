@@ -1,7 +1,7 @@
 [![](https://img.shields.io/badge/shed_1.0-passing-dark_green)](https://github.com/gongahkia/shed/releases/tag/1.0)
 [![](https://img.shields.io/badge/shed_2.0-passing-green)](https://github.com/gongahkia/shed/releases/tag/2.0)
 
-# Shed - a SHit EDitor
+# `Shed` - a SHit EDitor
 
 Shed is a bare-bones, opinionated, modal text editor with extended Vim bindings, written in Java.
 

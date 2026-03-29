@@ -4,19 +4,100 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 
 public class LspClient {
-    private static final Pattern LABEL_PATTERN = Pattern.compile("\"label\"\\s*:\\s*\"((?:\\\\.|[^\"])*)\"");
+    public static class CompletionItem {
+        private final String label;
+        private final String detail;
+        private final Integer kind;
+
+        public CompletionItem(String label, String detail, Integer kind) {
+            this.label = label;
+            this.detail = detail;
+            this.kind = kind;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public String getDetail() {
+            return detail;
+        }
+
+        public Integer getKind() {
+            return kind;
+        }
+    }
+
+    public static class Location {
+        private final String uri;
+        private final int line;
+        private final int character;
+
+        public Location(String uri, int line, int character) {
+            this.uri = uri;
+            this.line = line;
+            this.character = character;
+        }
+
+        public String getUri() {
+            return uri;
+        }
+
+        public int getLine() {
+            return line;
+        }
+
+        public int getCharacter() {
+            return character;
+        }
+    }
+
+    public static class Diagnostic {
+        private final int line;
+        private final int character;
+        private final int severity;
+        private final String message;
+
+        public Diagnostic(int line, int character, int severity, String message) {
+            this.line = line;
+            this.character = character;
+            this.severity = severity;
+            this.message = message;
+        }
+
+        public int getLine() {
+            return line;
+        }
+
+        public int getCharacter() {
+            return character;
+        }
+
+        public int getSeverity() {
+            return severity;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+    }
 
     private final Process process;
     private final BufferedOutputStream stdin;
-    private final BlockingQueue<String> messages;
+    private final BlockingQueue<Map<String, Object>> messageQueue;
+    private final List<Map<String, Object>> deferredMessages;
+    private final Map<String, List<Diagnostic>> diagnostics;
     private int requestId;
+    private boolean initialized;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
         List<String> commandLine = new ArrayList<>();
@@ -33,60 +114,357 @@ public class LspClient {
         processBuilder.directory(rootPath.toFile());
         this.process = processBuilder.start();
         this.stdin = new BufferedOutputStream(process.getOutputStream());
-        this.messages = new LinkedBlockingQueue<>();
+        this.messageQueue = new LinkedBlockingQueue<>();
+        this.deferredMessages = new ArrayList<>();
+        this.diagnostics = new HashMap<>();
         this.requestId = 0;
+        this.initialized = false;
         startReaderThread();
         initialize(rootPath);
     }
 
     public boolean isAlive() {
-        return process.isAlive();
+        return initialized && process.isAlive();
     }
 
     public void didOpen(String uri, String languageId, String text) {
-        sendNotification("textDocument/didOpen",
-            "{\"textDocument\":{\"uri\":\"" + escape(uri) + "\",\"languageId\":\"" + escape(languageId) + "\",\"version\":1,\"text\":\"" + escape(text) + "\"}}");
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        textDocument.put("languageId", languageId);
+        textDocument.put("version", 1);
+        textDocument.put("text", text);
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        sendNotification("textDocument/didOpen", params);
     }
 
     public void didChange(String uri, int version, String text) {
-        sendNotification("textDocument/didChange",
-            "{\"textDocument\":{\"uri\":\"" + escape(uri) + "\",\"version\":" + version + "},\"contentChanges\":[{\"text\":\"" + escape(text) + "\"}]}");
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        textDocument.put("version", version);
+
+        Map<String, Object> change = new LinkedHashMap<>();
+        change.put("text", text);
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("contentChanges", List.of(change));
+        sendNotification("textDocument/didChange", params);
     }
 
     public void didSave(String uri) {
-        sendNotification("textDocument/didSave",
-            "{\"textDocument\":{\"uri\":\"" + escape(uri) + "\"}}");
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        sendNotification("textDocument/didSave", params);
     }
 
-    public List<String> completion(String uri, int line, int character) {
-        int id = nextRequestId();
-        sendRequest(id, "textDocument/completion",
-            "{\"textDocument\":{\"uri\":\"" + escape(uri) + "\"},\"position\":{\"line\":" + line + ",\"character\":" + character + "}}");
-        String response = waitForResponse(id, 2000L);
+    public List<CompletionItem> completion(String uri, int line, int character) {
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+
+        Map<String, Object> position = new LinkedHashMap<>();
+        position.put("line", line);
+        position.put("character", character);
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("position", position);
+
+        Map<String, Object> response = sendRequest("textDocument/completion", params, 2000L);
         if (response == null) {
             return List.of();
         }
-        return parseLabels(response);
+
+        Object result = response.get("result");
+        List<Object> items = MiniJson.asArray(result);
+        if (items == null) {
+            Map<String, Object> resultObject = MiniJson.asObject(result);
+            items = resultObject == null ? null : MiniJson.asArray(resultObject.get("items"));
+        }
+        if (items == null) {
+            return List.of();
+        }
+
+        List<CompletionItem> completions = new ArrayList<>();
+        for (Object item : items) {
+            Map<String, Object> itemObject = MiniJson.asObject(item);
+            if (itemObject == null) {
+                continue;
+            }
+            String label = MiniJson.asString(itemObject.get("label"));
+            if (label == null || label.isEmpty()) {
+                continue;
+            }
+            String detail = MiniJson.asString(itemObject.get("detail"));
+            Integer kind = MiniJson.asInt(itemObject.get("kind"));
+            completions.add(new CompletionItem(label, detail, kind));
+        }
+        return completions;
+    }
+
+    public String hover(String uri, int line, int character) {
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/hover", uri, line, character, 2000L);
+        if (response == null) {
+            return null;
+        }
+        Map<String, Object> result = MiniJson.asObject(response.get("result"));
+        if (result == null) {
+            return null;
+        }
+        Object contents = result.get("contents");
+        String simple = MiniJson.asString(contents);
+        if (simple != null) {
+            return simple;
+        }
+        Map<String, Object> contentObject = MiniJson.asObject(contents);
+        if (contentObject != null) {
+            return MiniJson.asString(contentObject.get("value"));
+        }
+        List<Object> contentList = MiniJson.asArray(contents);
+        if (contentList == null) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        for (Object item : contentList) {
+            String part = MiniJson.asString(item);
+            if (part != null) {
+                parts.add(part);
+                continue;
+            }
+            Map<String, Object> itemObject = MiniJson.asObject(item);
+            if (itemObject != null) {
+                String value = MiniJson.asString(itemObject.get("value"));
+                if (value != null) {
+                    parts.add(value);
+                }
+            }
+        }
+        return parts.isEmpty() ? null : String.join("\n", parts);
+    }
+
+    public Location definition(String uri, int line, int character) {
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/definition", uri, line, character, 2000L);
+        if (response == null) {
+            return null;
+        }
+        Object result = response.get("result");
+        Map<String, Object> location = MiniJson.asObject(result);
+        if (location == null) {
+            List<Object> locations = MiniJson.asArray(result);
+            if (locations == null || locations.isEmpty()) {
+                return null;
+            }
+            location = MiniJson.asObject(locations.get(0));
+        }
+        if (location == null) {
+            return null;
+        }
+        return parseLocation(location);
+    }
+
+    public List<Diagnostic> getDiagnostics(String uri) {
+        drainNotifications();
+        List<Diagnostic> entries = diagnostics.get(uri);
+        return entries == null ? List.of() : new ArrayList<>(entries);
+    }
+
+    public void drainNotifications() {
+        while (true) {
+            Map<String, Object> message = messageQueue.poll();
+            if (message == null) {
+                return;
+            }
+            if (message.containsKey("method")) {
+                handleNotification(message);
+            } else {
+                synchronized (deferredMessages) {
+                    deferredMessages.add(message);
+                }
+            }
+        }
     }
 
     public void stop() {
         try {
-            int id = nextRequestId();
-            sendRequest(id, "shutdown", "null");
-            sendNotification("exit", "null");
+            sendRequest("shutdown", null, 1000L);
+            sendNotification("exit", null);
         } catch (Exception ignored) {
         }
         process.destroy();
     }
 
     private void initialize(Path rootPath) throws IOException {
+        Map<String, Object> capabilities = new LinkedHashMap<>();
+
+        Map<String, Object> completionItem = new LinkedHashMap<>();
+        completionItem.put("snippetSupport", Boolean.FALSE);
+        Map<String, Object> completion = new LinkedHashMap<>();
+        completion.put("completionItem", completionItem);
+        Map<String, Object> hover = new LinkedHashMap<>();
+        hover.put("contentFormat", List.of("plaintext"));
+        Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
+        diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
+
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("completion", completion);
+        textDocument.put("hover", hover);
+        textDocument.put("definition", new LinkedHashMap<>());
+        textDocument.put("publishDiagnostics", diagnosticsCapability);
+        capabilities.put("textDocument", textDocument);
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("processId", ProcessHandle.current().pid());
+        params.put("rootUri", rootPath.toAbsolutePath().toUri().toString());
+        params.put("capabilities", capabilities);
+
+        Map<String, Object> response = sendRequest("initialize", params, 5000L);
+        if (response == null) {
+            throw new IOException("LSP initialize timed out");
+        }
+        sendNotification("initialized", new LinkedHashMap<>());
+        initialized = true;
+    }
+
+    private Map<String, Object> sendTextDocumentPositionRequest(String method, String uri, int line, int character, long timeoutMs) {
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> position = new LinkedHashMap<>();
+        position.put("line", line);
+        position.put("character", character);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("position", position);
+        return sendRequest(method, params, timeoutMs);
+    }
+
+    private Map<String, Object> sendRequest(String method, Object params, long timeoutMs) {
         int id = nextRequestId();
-        sendRequest(id, "initialize",
-            "{\"processId\":" + ProcessHandle.current().pid()
-                + ",\"rootUri\":\"file://" + escape(rootPath.toAbsolutePath().toString()) + "\""
-                + ",\"capabilities\":{\"textDocument\":{\"completion\":{\"completionItem\":{\"snippetSupport\":false}}}}}");
-        waitForResponse(id, 5000L);
-        sendNotification("initialized", "{}");
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("jsonrpc", "2.0");
+        request.put("id", id);
+        request.put("method", method);
+        request.put("params", params);
+        writeMessage(request);
+        return waitForResponse(id, timeoutMs);
+    }
+
+    private void sendNotification(String method, Object params) {
+        Map<String, Object> notification = new LinkedHashMap<>();
+        notification.put("jsonrpc", "2.0");
+        notification.put("method", method);
+        notification.put("params", params);
+        writeMessage(notification);
+    }
+
+    private void writeMessage(Map<String, Object> body) {
+        try {
+            byte[] payload = MiniJson.stringify(body).getBytes(StandardCharsets.UTF_8);
+            stdin.write(("Content-Length: " + payload.length + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
+            stdin.write(payload);
+            stdin.flush();
+        } catch (IOException ignored) {
+        }
+    }
+
+    private Map<String, Object> waitForResponse(int id, long timeoutMs) {
+        Map<String, Object> deferred = removeDeferredResponse(id);
+        if (deferred != null) {
+            return deferred;
+        }
+
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        while (System.currentTimeMillis() < deadline) {
+            long remaining = Math.max(1L, deadline - System.currentTimeMillis());
+            Map<String, Object> message;
+            try {
+                message = messageQueue.poll(remaining, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return null;
+            }
+            if (message == null) {
+                continue;
+            }
+            Integer responseId = MiniJson.asInt(message.get("id"));
+            if (responseId != null && responseId == id) {
+                return message;
+            }
+            if (message.containsKey("method")) {
+                handleNotification(message);
+            } else {
+                synchronized (deferredMessages) {
+                    deferredMessages.add(message);
+                }
+            }
+        }
+        return null;
+    }
+
+    private Map<String, Object> removeDeferredResponse(int id) {
+        synchronized (deferredMessages) {
+            for (int i = 0; i < deferredMessages.size(); i++) {
+                Map<String, Object> candidate = deferredMessages.get(i);
+                Integer responseId = MiniJson.asInt(candidate.get("id"));
+                if (responseId != null && responseId == id) {
+                    return deferredMessages.remove(i);
+                }
+            }
+        }
+        return null;
+    }
+
+    private void handleNotification(Map<String, Object> message) {
+        String method = MiniJson.asString(message.get("method"));
+        if (!"textDocument/publishDiagnostics".equals(method)) {
+            return;
+        }
+        Map<String, Object> params = MiniJson.asObject(message.get("params"));
+        if (params == null) {
+            return;
+        }
+        String uri = MiniJson.asString(params.get("uri"));
+        List<Object> diagnosticObjects = MiniJson.asArray(params.get("diagnostics"));
+        if (uri == null || diagnosticObjects == null) {
+            return;
+        }
+        List<Diagnostic> parsed = new ArrayList<>();
+        for (Object diagnosticObject : diagnosticObjects) {
+            Map<String, Object> entry = MiniJson.asObject(diagnosticObject);
+            if (entry == null) {
+                continue;
+            }
+            Map<String, Object> range = MiniJson.asObject(entry.get("range"));
+            Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
+            int line = start == null || MiniJson.asInt(start.get("line")) == null ? 0 : MiniJson.asInt(start.get("line"));
+            int character = start == null || MiniJson.asInt(start.get("character")) == null ? 0 : MiniJson.asInt(start.get("character"));
+            int severity = MiniJson.asInt(entry.get("severity")) == null ? 0 : MiniJson.asInt(entry.get("severity"));
+            String messageText = MiniJson.asString(entry.get("message"));
+            parsed.add(new Diagnostic(line, character, severity, messageText == null ? "" : messageText));
+        }
+        diagnostics.put(uri, parsed);
+    }
+
+    private Location parseLocation(Map<String, Object> location) {
+        String uri = MiniJson.asString(location.get("uri"));
+        Map<String, Object> range = MiniJson.asObject(location.get("range"));
+        Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
+        if (uri == null || start == null) {
+            return null;
+        }
+        Integer line = MiniJson.asInt(start.get("line"));
+        Integer character = MiniJson.asInt(start.get("character"));
+        if (line == null || character == null) {
+            return null;
+        }
+        return new Location(uri, line, character);
+    }
+
+    private synchronized int nextRequestId() {
+        requestId += 1;
+        return requestId;
     }
 
     private void startReaderThread() {
@@ -101,7 +479,11 @@ public class LspClient {
                     if (body.length != contentLength) {
                         return;
                     }
-                    messages.offer(new String(body, StandardCharsets.UTF_8));
+                    Object parsed = MiniJson.parse(new String(body, StandardCharsets.UTF_8));
+                    Map<String, Object> message = MiniJson.asObject(parsed);
+                    if (message != null) {
+                        messageQueue.offer(message);
+                    }
                 }
             } catch (IOException ignored) {
             }
@@ -125,80 +507,10 @@ public class LspClient {
             return -1;
         }
         for (String line : headers.toString().split("\r\n")) {
-            if (line.toLowerCase().startsWith("content-length:")) {
-                return Integer.parseInt(line.substring("content-length:".length()).trim());
+            if (line.regionMatches(true, 0, "Content-Length:", 0, "Content-Length:".length())) {
+                return Integer.parseInt(line.substring("Content-Length:".length()).trim());
             }
         }
         return -1;
-    }
-
-    private synchronized int nextRequestId() {
-        requestId += 1;
-        return requestId;
-    }
-
-    private void sendRequest(int id, String method, String params) {
-        writeMessage("{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"method\":\"" + method + "\",\"params\":" + params + "}");
-    }
-
-    private void sendNotification(String method, String params) {
-        writeMessage("{\"jsonrpc\":\"2.0\",\"method\":\"" + method + "\",\"params\":" + params + "}");
-    }
-
-    private synchronized void writeMessage(String body) {
-        try {
-            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
-            stdin.write(("Content-Length: " + payload.length + "\r\n\r\n").getBytes(StandardCharsets.UTF_8));
-            stdin.write(payload);
-            stdin.flush();
-        } catch (IOException ignored) {
-        }
-    }
-
-    private String waitForResponse(int id, long timeoutMs) {
-        long deadline = System.currentTimeMillis() + timeoutMs;
-        while (System.currentTimeMillis() < deadline) {
-            String message = messages.poll();
-            if (message == null) {
-                try {
-                    Thread.sleep(10L);
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                    return null;
-                }
-                continue;
-            }
-            if (message.contains("\"id\":" + id)) {
-                return message;
-            }
-        }
-        return null;
-    }
-
-    private List<String> parseLabels(String response) {
-        List<String> labels = new ArrayList<>();
-        Matcher matcher = LABEL_PATTERN.matcher(response);
-        while (matcher.find()) {
-            labels.add(unescape(matcher.group(1)));
-        }
-        return labels;
-    }
-
-    private static String escape(String value) {
-        return value
-            .replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\r", "\\r")
-            .replace("\n", "\\n")
-            .replace("\t", "\\t");
-    }
-
-    private static String unescape(String value) {
-        return value
-            .replace("\\n", "\n")
-            .replace("\\r", "\r")
-            .replace("\\t", "\t")
-            .replace("\\\"", "\"")
-            .replace("\\\\", "\\");
     }
 }

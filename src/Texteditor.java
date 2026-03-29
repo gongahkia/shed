@@ -17,7 +17,9 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Texteditor extends JFrame implements KeyListener {
     private static final long serialVersionUID = 1L;
@@ -94,6 +96,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private Character pendingSurroundAction;
     private Character pendingSurroundOld;
     private Character pendingSurroundTarget;
+    private Map<String, LspClient> lspClients;
+    private Map<String, Integer> lspDocumentVersions;
 
     // Visual mode state
     private int visualStartPos;
@@ -151,6 +155,8 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingSurroundAction = null;
         pendingSurroundOld = null;
         pendingSurroundTarget = null;
+        lspClients = new HashMap<>();
+        lspDocumentVersions = new HashMap<>();
         loadRecentFiles();
         lastMessage = "";
 
@@ -2673,16 +2679,35 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showLspCompletionStatus() {
+        FileBuffer buffer = getCurrentBuffer();
         String prefix = currentCompletionPrefix();
-        if (prefix.isEmpty()) {
-            return "No completion prefix";
+        List<String> completions = new ArrayList<>();
+        LspClient client = resolveLspClient(buffer);
+        if (buffer != null && client != null && buffer.hasFilePath()) {
+            String uri = bufferUri(buffer);
+            try {
+                int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+                completions = client.completion(uri, line, column);
+            } catch (BadLocationException ignored) {
+            }
         }
 
-        List<String> completions = collectBufferCompletions(prefix);
+        if (completions.isEmpty()) {
+            if (prefix.isEmpty()) {
+                return "No completion prefix";
+            }
+            completions = collectBufferCompletions(prefix);
+        }
         if (completions.isEmpty()) {
             return "No completions";
         }
-        return "Completions: " + String.join(", ", completions);
+        String selection = showPaletteDialog("Completions", completions);
+        if (selection == null || selection.isEmpty()) {
+            return "Completion cancelled";
+        }
+        applyCompletion(prefix, selection);
+        return "Inserted completion";
     }
 
     private String currentCompletionPrefix() {
@@ -2732,6 +2757,160 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         if (candidate.startsWith(prefix)) {
             unique.add(candidate);
+        }
+    }
+
+    private void applyCompletion(String prefix, String completion) {
+        int caret = writingArea.getCaretPosition();
+        int start = Math.max(0, caret - (prefix == null ? 0 : prefix.length()));
+        writingArea.replaceRange(completion, start, caret);
+        writingArea.setCaretPosition(start + completion.length());
+        markModified();
+    }
+
+    private LspClient resolveLspClient(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return null;
+        }
+        String extension = bufferExtension(buffer);
+        if (extension.isEmpty()) {
+            return null;
+        }
+
+        LspClient existing = lspClients.get(extension);
+        if (existing != null && existing.isAlive()) {
+            return existing;
+        }
+
+        String command = configManager.getLspCommand(extension);
+        String[] args = configManager.getLspArgs(extension);
+        if (command == null || command.isBlank()) {
+            String[] builtin = builtinLspCommand(extension);
+            if (builtin == null) {
+                return null;
+            }
+            command = builtin[0];
+            args = java.util.Arrays.copyOfRange(builtin, 1, builtin.length);
+        }
+
+        try {
+            LspClient client = new LspClient(command, args, new File(".").toPath());
+            lspClients.put(extension, client);
+            return client;
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    private void syncLspOpen(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return;
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return;
+        }
+        String uri = bufferUri(buffer);
+        if (lspDocumentVersions.containsKey(uri)) {
+            return;
+        }
+        client.didOpen(uri, languageId(buffer), buffer.getFullContent());
+        lspDocumentVersions.put(uri, 1);
+    }
+
+    private void syncLspChange(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return;
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return;
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        int version = lspDocumentVersions.getOrDefault(uri, 1) + 1;
+        lspDocumentVersions.put(uri, version);
+        client.didChange(uri, version, buffer.getFullContent());
+    }
+
+    public void notifyCurrentBufferSaved() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return;
+        }
+        syncLspOpen(buffer);
+        LspClient client = resolveLspClient(buffer);
+        if (client != null) {
+            client.didSave(bufferUri(buffer));
+        }
+    }
+
+    private String bufferUri(FileBuffer buffer) {
+        return "file://" + new File(buffer.getFilePath()).getAbsolutePath();
+    }
+
+    private String languageId(FileBuffer buffer) {
+        switch (buffer.getFileType()) {
+            case RUST:
+                return "rust";
+            case PYTHON:
+                return "python";
+            case JAVASCRIPT:
+                return "javascript";
+            case TYPESCRIPT:
+                return "typescript";
+            case GO:
+                return "go";
+            case C:
+            case CPP:
+                return "c";
+            case JAVA:
+                return "java";
+            case HTML:
+                return "html";
+            case CSS:
+                return "css";
+            case JSON:
+                return "json";
+            case MARKDOWN:
+                return "markdown";
+            default:
+                return "text";
+        }
+    }
+
+    private String bufferExtension(FileBuffer buffer) {
+        String path = buffer.getFilePath();
+        if (path == null) {
+            return "";
+        }
+        int dot = path.lastIndexOf('.');
+        if (dot < 0 || dot >= path.length() - 1) {
+            return "";
+        }
+        return path.substring(dot + 1).toLowerCase();
+    }
+
+    private String[] builtinLspCommand(String extension) {
+        switch (extension) {
+            case "rs":
+                return new String[] {"rust-analyzer"};
+            case "py":
+                return new String[] {"pyright-langserver", "--stdio"};
+            case "js":
+            case "jsx":
+            case "ts":
+            case "tsx":
+                return new String[] {"typescript-language-server", "--stdio"};
+            case "go":
+                return new String[] {"gopls"};
+            case "c":
+            case "cpp":
+            case "h":
+            case "hpp":
+                return new String[] {"clangd"};
+            default:
+                return null;
         }
     }
 
@@ -3402,6 +3581,7 @@ public class Texteditor extends JFrame implements KeyListener {
             applySyntaxHighlighting();
             refreshLineNumberPanel();
             maybePreviewMarkdown(buffer);
+            syncLspOpen(buffer);
             updateStatusBar();
         } else {
             pane.getLineNumberPanel().repaint();
@@ -3425,6 +3605,7 @@ public class Texteditor extends JFrame implements KeyListener {
             } catch (IOException ignored) {
             }
             recordChangePosition();
+            syncLspChange(buffer);
             updateStatusBar();
         }
     }

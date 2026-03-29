@@ -23,6 +23,14 @@ public class ConfigManager {
     private static final int DEFAULT_FONT_SIZE = 16;
     private static final int DEFAULT_TAB_SIZE = 4;
     private static final boolean DEFAULT_LINE_NUMBERS = false;
+    private static final boolean DEFAULT_SHOW_CURRENT_LINE = true;
+    private static final boolean DEFAULT_EXPAND_TAB = true;
+    private static final boolean DEFAULT_AUTO_INDENT = true;
+    private static final boolean DEFAULT_HIGHLIGHT_SEARCH = true;
+    private static final int DEFAULT_ZEN_MODE_WIDTH = 80;
+    private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
+    private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
+    private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
 
     public ConfigManager() {
         this.config = new HashMap<>();
@@ -53,6 +61,14 @@ public class ConfigManager {
         config.put("font.size", String.valueOf(DEFAULT_FONT_SIZE));
         config.put("tab.size", String.valueOf(DEFAULT_TAB_SIZE));
         config.put("line.numbers", String.valueOf(DEFAULT_LINE_NUMBERS));
+        config.put("show.current.line", String.valueOf(DEFAULT_SHOW_CURRENT_LINE));
+        config.put("expand.tab", String.valueOf(DEFAULT_EXPAND_TAB));
+        config.put("auto.indent", String.valueOf(DEFAULT_AUTO_INDENT));
+        config.put("highlight.search", String.valueOf(DEFAULT_HIGHLIGHT_SEARCH));
+        config.put("zen.mode.width", String.valueOf(DEFAULT_ZEN_MODE_WIDTH));
+        config.put("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB));
+        config.put("large.file.line.threshold", String.valueOf(DEFAULT_LARGE_FILE_LINE_THRESHOLD));
+        config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
     }
 
     // Load configuration from file
@@ -169,6 +185,58 @@ public class ConfigManager {
     public boolean getLineNumbers() {
         String value = config.getOrDefault("line.numbers", String.valueOf(DEFAULT_LINE_NUMBERS));
         return Boolean.parseBoolean(value);
+    }
+
+    public boolean getShowCurrentLine() {
+        return getBoolean("show.current.line", DEFAULT_SHOW_CURRENT_LINE);
+    }
+
+    public boolean getExpandTab() {
+        return getBoolean("expand.tab", DEFAULT_EXPAND_TAB);
+    }
+
+    public boolean getAutoIndent() {
+        return getBoolean("auto.indent", DEFAULT_AUTO_INDENT);
+    }
+
+    public boolean getHighlightSearch() {
+        return getBoolean("highlight.search", DEFAULT_HIGHLIGHT_SEARCH);
+    }
+
+    public int getZenModeWidth() {
+        return getInt("zen.mode.width", DEFAULT_ZEN_MODE_WIDTH);
+    }
+
+    public long getLargeFileThresholdMb() {
+        try {
+            return Long.parseLong(config.getOrDefault("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB)));
+        } catch (NumberFormatException e) {
+            return DEFAULT_LARGE_FILE_THRESHOLD_MB;
+        }
+    }
+
+    public int getLargeFileLineThreshold() {
+        return getInt("large.file.line.threshold", DEFAULT_LARGE_FILE_LINE_THRESHOLD);
+    }
+
+    public int getLargeFilePreviewLines() {
+        return getInt("large.file.preview.lines", DEFAULT_LARGE_FILE_PREVIEW_LINES);
+    }
+
+    public void set(String key, String value) {
+        config.put(key, value);
+    }
+
+    private boolean getBoolean(String key, boolean defaultValue) {
+        return Boolean.parseBoolean(config.getOrDefault(key, String.valueOf(defaultValue)));
+    }
+
+    private int getInt(String key, int defaultValue) {
+        try {
+            return Integer.parseInt(config.getOrDefault(key, String.valueOf(defaultValue)));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     // Get any config value by key

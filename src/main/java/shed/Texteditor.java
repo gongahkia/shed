@@ -17,6 +17,8 @@ import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
@@ -2169,6 +2171,10 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("cfirst");
         knownCommands.add("clast");
         knownCommands.add("cc");
+        knownCommands.add("lsp");
+        knownCommands.add("definition");
+        knownCommands.add("hover");
+        knownCommands.add("references");
         knownCommands.add("registers");
         knownCommands.add("marks");
         knownCommands.add("zen");
@@ -4311,6 +4317,279 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         applyCompletion(prefix, selection);
         return fallbackReason == null ? "Inserted completion" : "Inserted completion (local fallback; LSP unavailable: " + fallbackReason + ")";
+    }
+
+    public String handleLspCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "help".equals(trimmed)) {
+            return "Usage: :lsp completion|definition|hover|references|rename <newName>|codeaction";
+        }
+        int split = trimmed.indexOf(' ');
+        String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
+        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        switch (subcommand) {
+            case "completion":
+            case "complete":
+            case "comp":
+                return showLspCompletionStatus();
+            case "definition":
+            case "def":
+                return lspGoToDefinition();
+            case "hover":
+                return lspHover();
+            case "references":
+            case "refs":
+                return lspReferences();
+            case "rename":
+                return lspRename(args);
+            case "codeaction":
+            case "codeactions":
+            case "actions":
+            case "ca":
+                return lspCodeActions();
+            default:
+                return "Unknown :lsp subcommand: " + subcommand;
+        }
+    }
+
+    public String lspGoToDefinition() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "LSP definition requires a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+            LspClient.Location location = client.definition(uri, line, column);
+            if (location == null) {
+                return "No definition found";
+            }
+            return openLspLocation(location, "definition");
+        } catch (BadLocationException e) {
+            return "LSP definition failed: " + e.getMessage();
+        }
+    }
+
+    public String lspHover() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "LSP hover requires a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+            String hoverText = client.hover(uri, line, column);
+            if (hoverText == null || hoverText.isBlank()) {
+                return "No hover information";
+            }
+            showScratchBuffer("[lsp hover]", hoverText.strip() + "\n");
+            return "Showing hover";
+        } catch (BadLocationException e) {
+            return "LSP hover failed: " + e.getMessage();
+        }
+    }
+
+    public String lspReferences() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "LSP references requires a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+            List<LspClient.Location> locations = client.references(uri, line, column, true);
+            if (locations.isEmpty()) {
+                return "No references found";
+            }
+            List<QuickfixService.Entry> entries = new ArrayList<>();
+            for (LspClient.Location location : locations) {
+                String path = filePathFromUri(location.getUri());
+                if (path == null || path.isBlank()) {
+                    continue;
+                }
+                entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1, "reference", "lsp"));
+            }
+            if (entries.isEmpty()) {
+                return "No file references found";
+            }
+            updateQuickfixEntries("lsp references", entries);
+            return openQuickfixList();
+        } catch (BadLocationException e) {
+            return "LSP references failed: " + e.getMessage();
+        }
+    }
+
+    public String lspRename(String newName) {
+        if (newName == null || newName.isBlank()) {
+            return "Usage: :lsp rename <newName>";
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "LSP rename requires a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+            List<LspClient.TextEdit> edits = client.rename(uri, line, column, newName.trim());
+            if (edits.isEmpty()) {
+                return "No rename edits returned";
+            }
+            int applied = applyCurrentBufferTextEdits(uri, edits);
+            if (applied <= 0) {
+                return "Rename produced edits outside current buffer";
+            }
+            markModified();
+            return "Applied " + applied + " rename edit" + (applied == 1 ? "" : "s");
+        } catch (BadLocationException e) {
+            return "LSP rename failed: " + e.getMessage();
+        }
+    }
+
+    public String lspCodeActions() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "LSP code actions require a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+            List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
+            List<LspClient.Diagnostic> scoped = new ArrayList<>();
+            for (LspClient.Diagnostic diagnostic : diagnostics) {
+                if (diagnostic.getLine() == line) {
+                    scoped.add(diagnostic);
+                }
+            }
+            List<LspClient.CodeAction> actions = client.codeActions(uri, line, column, scoped);
+            if (actions.isEmpty()) {
+                return "No code actions";
+            }
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < actions.size(); i++) {
+                LspClient.CodeAction action = actions.get(i);
+                builder.append(i + 1).append(". ").append(action.getTitle());
+                if (!action.getKind().isBlank()) {
+                    builder.append(" (").append(action.getKind()).append(")");
+                }
+                if (action.isPreferred()) {
+                    builder.append(" [preferred]");
+                }
+                if (i < actions.size() - 1) {
+                    builder.append("\n");
+                }
+            }
+            showScratchBuffer("[lsp code actions]", builder.toString());
+            return "Showing code actions";
+        } catch (BadLocationException e) {
+            return "LSP code actions failed: " + e.getMessage();
+        }
+    }
+
+    private String openLspLocation(LspClient.Location location, String label) {
+        String targetPath = filePathFromUri(location.getUri());
+        if (targetPath == null || targetPath.isBlank()) {
+            return "LSP " + label + " target has unsupported URI";
+        }
+        try {
+            File targetFile = new File(targetPath);
+            if (!targetFile.exists()) {
+                return "LSP " + label + " target missing: " + targetPath;
+            }
+            openFile(targetFile);
+            String lineResult = gotoLine(location.getLine() + 1);
+            if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {
+                return lineResult;
+            }
+            int lineStart = writingArea.getLineStartOffset(Math.max(0, location.getLine()));
+            int target = Math.min(lineStart + Math.max(0, location.getCharacter()), writingArea.getText().length());
+            writingArea.setCaretPosition(target);
+            return "Opened " + label + " location";
+        } catch (Exception e) {
+            return "LSP " + label + " open failed: " + e.getMessage();
+        }
+    }
+
+    private int applyCurrentBufferTextEdits(String currentUri, List<LspClient.TextEdit> edits) {
+        if (edits == null || edits.isEmpty() || currentUri == null) {
+            return 0;
+        }
+        List<LspClient.TextEdit> matching = new ArrayList<>();
+        for (LspClient.TextEdit edit : edits) {
+            if (edit != null && currentUri.equals(edit.getUri())) {
+                matching.add(edit);
+            }
+        }
+        if (matching.isEmpty()) {
+            return 0;
+        }
+
+        matching.sort((left, right) -> {
+            if (left.getStartLine() != right.getStartLine()) {
+                return Integer.compare(right.getStartLine(), left.getStartLine());
+            }
+            return Integer.compare(right.getStartCharacter(), left.getStartCharacter());
+        });
+
+        int applied = 0;
+        for (LspClient.TextEdit edit : matching) {
+            try {
+                int startLine = Math.max(0, Math.min(edit.getStartLine(), writingArea.getLineCount() - 1));
+                int endLine = Math.max(0, Math.min(edit.getEndLine(), writingArea.getLineCount() - 1));
+                int startOffset = writingArea.getLineStartOffset(startLine) + Math.max(0, edit.getStartCharacter());
+                int endOffset = writingArea.getLineStartOffset(endLine) + Math.max(0, edit.getEndCharacter());
+                int textLength = writingArea.getText().length();
+                startOffset = Math.max(0, Math.min(startOffset, textLength));
+                endOffset = Math.max(startOffset, Math.min(endOffset, textLength));
+                writingArea.replaceRange(edit.getNewText(), startOffset, endOffset);
+                applied++;
+            } catch (BadLocationException ignored) {
+            }
+        }
+        return applied;
+    }
+
+    private String filePathFromUri(String uri) {
+        if (uri == null || uri.isBlank()) {
+            return null;
+        }
+        if (!uri.startsWith("file:")) {
+            return null;
+        }
+        try {
+            return new File(new URI(uri)).getAbsolutePath();
+        } catch (URISyntaxException e) {
+            return uri.substring("file://".length());
+        }
     }
 
     private String currentCompletionPrefix() {

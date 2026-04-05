@@ -121,6 +121,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Character pendingSurroundAction;
     private Character pendingSurroundOld;
     private Character pendingSurroundTarget;
+    private boolean insertNormalOneShot;
     private Map<String, LspClient> lspClients;
     private Map<String, Integer> lspDocumentVersions;
     private Map<String, String> lspErrors;
@@ -193,6 +194,7 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingSurroundAction = null;
         pendingSurroundOld = null;
         pendingSurroundTarget = null;
+        insertNormalOneShot = false;
         lspClients = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
@@ -512,6 +514,11 @@ public class Texteditor extends JFrame implements KeyListener {
         modeEngine.dispatch(this, editorState, e);
         if (previousMode != EditorMode.INSERT && editorState.mode == EditorMode.INSERT && isPrintableKey(e)) {
             suppressNextTypedChar = true;
+        }
+        // Ctrl+o one-shot: return to insert after one normal command completes
+        if (insertNormalOneShot && editorState.mode == EditorMode.NORMAL && editorState.pendingKey == '\0') {
+            insertNormalOneShot = false;
+            setMode(EditorMode.INSERT);
         }
         updateStatusBar();
     }
@@ -867,6 +874,7 @@ public class Texteditor extends JFrame implements KeyListener {
             updateSubstitutePreview();
             return;
         } else if (c == '/' || c == '?') {
+            editorState.searchStartPos = writingArea.getCaretPosition();
             setMode(EditorMode.SEARCH);
             editorState.searchForward = c == '/';
             editorState.commandBuffer = String.valueOf(c);
@@ -1120,6 +1128,21 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == 'u' || code == KeyEvent.VK_U) {
                 editorState.pendingCount = "";
                 scrollHalfPageUp();
+            } else if (c == 'f' || code == KeyEvent.VK_F) {
+                editorState.pendingCount = "";
+                scrollFullPageDown();
+            } else if (c == 'b' || code == KeyEvent.VK_B) {
+                editorState.pendingCount = "";
+                scrollFullPageUp();
+            } else if (c == 'e' || code == KeyEvent.VK_E) {
+                editorState.pendingCount = "";
+                scrollLineDown();
+            } else if (c == 'y' || code == KeyEvent.VK_Y) {
+                editorState.pendingCount = "";
+                scrollLineUp();
+            } else if (c == 'g' || code == KeyEvent.VK_G) {
+                editorState.pendingCount = "";
+                showMessage(showFileInfo());
             }
         }
 
@@ -1220,6 +1243,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 changePrev();
             } else if (c == ',') {
                 changeNext();
+            } else if (c == 'c') {
+                editorState.pendingKey = '\u0007';
+                return;
+            } else if (c == 'f') {
+                showMessage(goToFileUnderCursor());
             } else if (c == 'v') {
                 if (editorState.lastVisualStart >= 0 && editorState.lastVisualEnd >= 0
                         && editorState.lastVisualStart <= writingArea.getText().length()
@@ -1467,13 +1495,36 @@ public class Texteditor extends JFrame implements KeyListener {
                 scrollCurrentLineTo('b');
             }
             editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == '\u0007') {
+            // gc pending state: gcc = comment current line(s), gc{motion} = comment motion range
+            if (c == 'c') {
+                int count = consumePendingCount();
+                try {
+                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
+                    toggleCommentLineRange(line, endLine);
+                } catch (BadLocationException ignored) {}
+            } else {
+                MotionRange range = resolveMotionRange(String.valueOf(c));
+                if (range != null) {
+                    try {
+                        int startLine = writingArea.getLineOfOffset(range.start);
+                        int endLine = writingArea.getLineOfOffset(range.end > range.start ? range.end - 1 : range.end);
+                        toggleCommentLineRange(startLine, endLine);
+                    } catch (BadLocationException ignored) {}
+                }
+            }
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
         }
 
     }
 
     // Insert mode key handling
     void handleInsertMode(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
+        int code = e.getKeyCode();
+
+        if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
             registerManager.updateLastInserted(lastInsertedText);
             setMode(EditorMode.NORMAL);
             // Move cursor back one position (Vim behavior)
@@ -1482,6 +1533,23 @@ public class Texteditor extends JFrame implements KeyListener {
                 writingArea.setCaretPosition(pos - 1);
             }
             return;
+        }
+
+        if (e.isControlDown()) {
+            if (code == KeyEvent.VK_W || e.getKeyChar() == 'w') {
+                // Ctrl+w: delete word backward
+                deleteWordBackwardInsert();
+                return;
+            } else if (code == KeyEvent.VK_U || e.getKeyChar() == 'u') {
+                // Ctrl+u: delete to start of line
+                deleteToLineStartInsert();
+                return;
+            } else if (code == KeyEvent.VK_O || e.getKeyChar() == 'o') {
+                // Ctrl+o: execute one normal mode command then return to insert
+                insertNormalOneShot = true;
+                setMode(EditorMode.NORMAL);
+                return;
+            }
         }
 
         if (!e.isControlDown() && !e.isAltDown()) {
@@ -1737,6 +1805,20 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private void toggleCommentSelection() {
         try {
+            int selStart = writingArea.getSelectionStart();
+            int selEnd = writingArea.getSelectionEnd();
+            int startLine = writingArea.getLineOfOffset(selStart);
+            int endLine = writingArea.getLineOfOffset(selEnd);
+            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
+                endLine--;
+            }
+            toggleCommentLineRange(startLine, endLine);
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void toggleCommentLineRange(int startLine, int endLine) {
+        try {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer == null) return;
             String[] prefixes = lineCommentPrefixesFor(buffer.getFileType());
@@ -1745,18 +1827,8 @@ public class Texteditor extends JFrame implements KeyListener {
                 return;
             }
             String prefix = prefixes[0];
-
-            int selStart = writingArea.getSelectionStart();
-            int selEnd = writingArea.getSelectionEnd();
-            int startLine = writingArea.getLineOfOffset(selStart);
-            int endLine = writingArea.getLineOfOffset(selEnd);
-            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
-                endLine--;
-            }
-
             String text = writingArea.getText();
 
-            // Check if all non-blank lines are commented
             boolean allCommented = true;
             for (int i = startLine; i <= endLine; i++) {
                 int ls = writingArea.getLineStartOffset(i);
@@ -1773,7 +1845,6 @@ public class Texteditor extends JFrame implements KeyListener {
             StringBuilder sb = new StringBuilder();
 
             if (allCommented) {
-                // Uncomment: remove first prefix occurrence and one trailing space
                 for (int i = startLine; i <= endLine; i++) {
                     int ls = writingArea.getLineStartOffset(i);
                     int le = writingArea.getLineEndOffset(i);
@@ -1789,7 +1860,6 @@ public class Texteditor extends JFrame implements KeyListener {
                     }
                 }
             } else {
-                // Comment: find min indentation, insert prefix there
                 int minIndent = Integer.MAX_VALUE;
                 for (int i = startLine; i <= endLine; i++) {
                     int ls = writingArea.getLineStartOffset(i);
@@ -1919,6 +1989,11 @@ public class Texteditor extends JFrame implements KeyListener {
         char c = e.getKeyChar();
 
         if (code == KeyEvent.VK_ESCAPE) {
+            // Restore cursor to pre-search position
+            if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
+                writingArea.setCaretPosition(editorState.searchStartPos);
+            }
+            searchManager.clearHighlights();
             editorState.commandBuffer = "";
             setMode(EditorMode.NORMAL);
             return;
@@ -1953,13 +2028,35 @@ public class Texteditor extends JFrame implements KeyListener {
                 editorState.commandBuffer = editorState.commandBuffer.substring(0, editorState.commandBuffer.length() - 1);
             } else {
                 editorState.commandBuffer = "";
+                if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
+                    writingArea.setCaretPosition(editorState.searchStartPos);
+                }
+                searchManager.clearHighlights();
                 setMode(EditorMode.NORMAL);
             }
+            incrementalSearchPreview();
             return;
         }
 
         if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
             editorState.commandBuffer += c;
+            incrementalSearchPreview();
+        }
+    }
+
+    private void incrementalSearchPreview() {
+        String pattern = editorState.commandBuffer.length() > 1 ? editorState.commandBuffer.substring(1) : "";
+        if (pattern.isEmpty()) {
+            searchManager.clearHighlights();
+            if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
+                writingArea.setCaretPosition(editorState.searchStartPos);
+            }
+            return;
+        }
+        if (editorState.searchForward) {
+            searchManager.searchForward(pattern);
+        } else {
+            searchManager.searchBackward(pattern);
         }
     }
 
@@ -2370,8 +2467,6 @@ public class Texteditor extends JFrame implements KeyListener {
             Rectangle visible = writingArea.getVisibleRect();
             Point current = new Point(visible.x, visible.y + visible.height / 2);
             writingArea.scrollRectToVisible(new Rectangle(current.x, current.y, visible.width, visible.height));
-
-            // Move cursor down as well
             int pos = writingArea.viewToModel2D(current);
             writingArea.setCaretPosition(pos);
         } catch (Exception e) {
@@ -2384,12 +2479,99 @@ public class Texteditor extends JFrame implements KeyListener {
             Rectangle visible = writingArea.getVisibleRect();
             Point current = new Point(visible.x, Math.max(0, visible.y - visible.height / 2));
             writingArea.scrollRectToVisible(new Rectangle(current.x, current.y, visible.width, visible.height));
-
-            // Move cursor up as well
             int pos = writingArea.viewToModel2D(current);
             writingArea.setCaretPosition(pos);
         } catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    private void scrollFullPageDown() {
+        try {
+            Rectangle visible = writingArea.getVisibleRect();
+            Point target = new Point(visible.x, visible.y + visible.height);
+            writingArea.scrollRectToVisible(new Rectangle(target.x, target.y, visible.width, visible.height));
+            int pos = writingArea.viewToModel2D(target);
+            writingArea.setCaretPosition(pos);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void scrollFullPageUp() {
+        try {
+            Rectangle visible = writingArea.getVisibleRect();
+            Point target = new Point(visible.x, Math.max(0, visible.y - visible.height));
+            writingArea.scrollRectToVisible(new Rectangle(target.x, target.y, visible.width, visible.height));
+            int pos = writingArea.viewToModel2D(target);
+            writingArea.setCaretPosition(pos);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void scrollLineDown() {
+        try {
+            Rectangle visible = writingArea.getVisibleRect();
+            int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
+            writingArea.scrollRectToVisible(new Rectangle(visible.x, visible.y + lineHeight, visible.width, visible.height));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void scrollLineUp() {
+        try {
+            Rectangle visible = writingArea.getVisibleRect();
+            int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
+            writingArea.scrollRectToVisible(new Rectangle(visible.x, Math.max(0, visible.y - lineHeight), visible.width, visible.height));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String showFileInfo() {
+        try {
+            FileBuffer buffer = getCurrentBuffer();
+            String name = buffer != null ? buffer.getDisplayName() : "[No file]";
+            int totalLines = writingArea.getLineCount();
+            int currentLine = writingArea.getLineOfOffset(writingArea.getCaretPosition()) + 1;
+            int percent = totalLines > 0 ? (currentLine * 100) / totalLines : 0;
+            return "\"" + name + "\" " + totalLines + " lines --" + percent + "%--";
+        } catch (Exception e) {
+            return "Error getting file info";
+        }
+    }
+
+    private String goToFileUnderCursor() {
+        try {
+            String text = writingArea.getText();
+            int pos = writingArea.getCaretPosition();
+            // Expand from cursor to find a file-path-like string
+            int start = pos;
+            int end = pos;
+            while (start > 0 && !Character.isWhitespace(text.charAt(start - 1)) && text.charAt(start - 1) != '"' && text.charAt(start - 1) != '\'' && text.charAt(start - 1) != '<') {
+                start--;
+            }
+            while (end < text.length() && !Character.isWhitespace(text.charAt(end)) && text.charAt(end) != '"' && text.charAt(end) != '\'' && text.charAt(end) != '>') {
+                end++;
+            }
+            if (start == end) return "No file path under cursor";
+            String path = text.substring(start, end);
+
+            File file = new File(path);
+            if (!file.isAbsolute()) {
+                FileBuffer buffer = getCurrentBuffer();
+                File baseDir = buffer != null && buffer.getFile() != null ? buffer.getFile().getParentFile() : new File(".");
+                file = new File(baseDir, path);
+            }
+            if (file.exists() && file.isFile()) {
+                openFile(file);
+                return "Opened " + file.getName();
+            }
+            return "File not found: " + path;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
         }
     }
 
@@ -3092,6 +3274,33 @@ public class Texteditor extends JFrame implements KeyListener {
             return detached.stdout.strip();
         }
         return branchName;
+    }
+
+    private void deleteWordBackwardInsert() {
+        try {
+            String text = writingArea.getText();
+            int pos = writingArea.getCaretPosition();
+            if (pos <= 0) return;
+            int start = pos - 1;
+            // Skip whitespace
+            while (start > 0 && Character.isWhitespace(text.charAt(start)) && text.charAt(start) != '\n') start--;
+            if (start > 0 && text.charAt(start) != '\n') {
+                int cls = vimCharClass(text.charAt(start));
+                while (start > 0 && vimCharClass(text.charAt(start - 1)) == cls) start--;
+            }
+            writingArea.replaceRange("", start, pos);
+        } catch (Exception ignored) {}
+    }
+
+    private void deleteToLineStartInsert() {
+        try {
+            String text = writingArea.getText();
+            int pos = writingArea.getCaretPosition();
+            int lineStart = text.lastIndexOf('\n', pos - 1) + 1;
+            if (pos > lineStart) {
+                writingArea.replaceRange("", lineStart, pos);
+            }
+        } catch (Exception ignored) {}
     }
 
     private String currentLineIndentation() {
@@ -7961,6 +8170,42 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
 
+        closeEditor();
+        return "Quitting";
+    }
+
+    public String clearSearchHighlights() {
+        searchManager.clearHighlights();
+        return "Search highlights cleared";
+    }
+
+    public String writeAll() {
+        int saved = 0;
+        for (FileBuffer buffer : buffers) {
+            if (buffer.isModified() && buffer.getFile() != null) {
+                try {
+                    buffer.save();
+                    saved++;
+                } catch (Exception e) {
+                    return "Error saving " + buffer.getDisplayName() + ": " + e.getMessage();
+                }
+            }
+        }
+        return saved + " file(s) written";
+    }
+
+    public String quitAll(boolean force) {
+        if (!force) {
+            for (FileBuffer buffer : buffers) {
+                if (hasUnsavedChanges(buffer)) {
+                    int result = confirmDiscardChanges("There are unsaved changes. Quit anyway?");
+                    if (result != JOptionPane.YES_OPTION) {
+                        return "Quit cancelled";
+                    }
+                    break;
+                }
+            }
+        }
         closeEditor();
         return "Quitting";
     }

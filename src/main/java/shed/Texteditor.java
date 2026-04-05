@@ -28,6 +28,8 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Texteditor extends JFrame implements KeyListener {
     private static final long serialVersionUID = 1L;
@@ -54,6 +56,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private LspService lspService;
     private SyntaxHighlightService syntaxHighlightService;
     private AsyncJobService asyncJobService;
+    private QuickfixService quickfixService;
 
     // Buffer management
     private List<FileBuffer> buffers;
@@ -117,10 +120,12 @@ public class Texteditor extends JFrame implements KeyListener {
     private EditorPane treePane;
     private FileBuffer treeBuffer;
     private Map<FileBuffer, List<String>> treeLineTargets;
+    private FileBuffer quickfixBuffer;
     private int keymapReplayDepth;
 
     // Constants
     private static final String VERSION = "2.0";
+    private static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
 
     // Constructor
     public Texteditor(String[] args) {
@@ -132,6 +137,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspService = new LspService();
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService();
+        quickfixService = new QuickfixService();
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -186,6 +192,7 @@ public class Texteditor extends JFrame implements KeyListener {
         treePane = null;
         treeBuffer = null;
         treeLineTargets = new HashMap<>();
+        quickfixBuffer = null;
         loadRecentFiles();
         lastMessage = "";
 
@@ -778,6 +785,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
         if (!editorState.pendingCount.isEmpty() && !supportsCountPrefix(e)) {
             editorState.pendingCount = "";
+        }
+
+        if (isQuickfixBufferActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
+            editorState.pendingCount = "";
+            showMessage(openQuickfixSelection());
+            return;
         }
 
         if (isTreePaneActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
@@ -2149,6 +2162,13 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("git");
         knownCommands.add("buf");
         knownCommands.add("grep");
+        knownCommands.add("copen");
+        knownCommands.add("cclose");
+        knownCommands.add("cnext");
+        knownCommands.add("cprev");
+        knownCommands.add("cfirst");
+        knownCommands.add("clast");
+        knownCommands.add("cc");
         knownCommands.add("registers");
         knownCommands.add("marks");
         knownCommands.add("zen");
@@ -3147,6 +3167,163 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    public String openQuickfixList() {
+        if (!quickfixService.hasEntries()) {
+            return "Quickfix is empty";
+        }
+        String content = quickfixService.render();
+        if (content.isBlank()) {
+            return "Quickfix is empty";
+        }
+
+        if (quickfixBuffer != null && buffers.contains(quickfixBuffer)) {
+            quickfixBuffer.setContent(content, false);
+            loadBufferIntoEditor(quickfixBuffer);
+            writingArea.setCaretPosition(Math.min(Math.max(0, quickfixService.currentIndex()), Math.max(0, writingArea.getDocument().getLength() - 1)));
+            return "Quickfix updated";
+        }
+
+        persistCurrentBufferState();
+        FileBuffer returnBuffer = getCurrentBuffer();
+        int returnCaretPosition = writingArea.getCaretPosition();
+        quickfixBuffer = FileBuffer.createScratch("[quickfix]", content);
+        buffers.add(quickfixBuffer);
+        if (returnBuffer != null) {
+            specialBufferReturns.push(new SpecialBufferReturnState(quickfixBuffer, returnBuffer, returnCaretPosition));
+        }
+        loadBufferIntoEditor(quickfixBuffer);
+        return "Quickfix opened";
+    }
+
+    public String quickfixNext() {
+        return jumpToQuickfixEntry(quickfixService.next());
+    }
+
+    public String quickfixPrev() {
+        return jumpToQuickfixEntry(quickfixService.previous());
+    }
+
+    public String quickfixFirst() {
+        return jumpToQuickfixEntry(quickfixService.first());
+    }
+
+    public String quickfixLast() {
+        return jumpToQuickfixEntry(quickfixService.last());
+    }
+
+    public String quickfixCurrent(String argument) {
+        if (argument == null || argument.isBlank()) {
+            return jumpToQuickfixEntry(quickfixService.current());
+        }
+        try {
+            int index = Integer.parseInt(argument.trim());
+            QuickfixService.Entry selected = quickfixService.select(index);
+            if (selected == null) {
+                return "Quickfix index out of range: " + index;
+            }
+            return jumpToQuickfixEntry(selected);
+        } catch (NumberFormatException e) {
+            return "Usage: :cc [index]";
+        }
+    }
+
+    public String closeQuickfixList() {
+        if (quickfixBuffer == null || !buffers.contains(quickfixBuffer)) {
+            return "Quickfix not open";
+        }
+        if (getCurrentBuffer() == quickfixBuffer) {
+            return requestQuit(true);
+        }
+        buffers.remove(quickfixBuffer);
+        quickfixBuffer = null;
+        return "Quickfix closed";
+    }
+
+    private boolean isQuickfixBufferActive() {
+        FileBuffer current = getCurrentBuffer();
+        return current != null && current == quickfixBuffer;
+    }
+
+    private String openQuickfixSelection() {
+        if (!isQuickfixBufferActive()) {
+            return "Quickfix buffer not active";
+        }
+        int index = getCurrentCaretLine() + 1;
+        QuickfixService.Entry entry = quickfixService.atLine(index);
+        if (entry == null) {
+            return "No quickfix entry on this line";
+        }
+        return jumpToQuickfixEntry(entry);
+    }
+
+    private String jumpToQuickfixEntry(QuickfixService.Entry entry) {
+        if (entry == null) {
+            return "Quickfix is empty";
+        }
+
+        if (entry.getFilePath() != null && !entry.getFilePath().isBlank()) {
+            try {
+                openFile(new File(entry.getFilePath()));
+            } catch (IOException e) {
+                return "Quickfix open failed: " + e.getMessage();
+            }
+        }
+
+        String lineResult = gotoLine(entry.getLine());
+        if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {
+            return lineResult;
+        }
+        try {
+            int lineStart = writingArea.getLineStartOffset(Math.max(0, entry.getLine() - 1));
+            int target = Math.min(lineStart + Math.max(0, entry.getColumn() - 1), writingArea.getText().length());
+            writingArea.setCaretPosition(target);
+        } catch (BadLocationException ignored) {
+        }
+        return "Quickfix " + (quickfixService.currentIndex() + 1) + "/" + quickfixService.size();
+    }
+
+    private void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return;
+        }
+        quickfixService.setEntries(title, entries);
+        if (quickfixBuffer != null && buffers.contains(quickfixBuffer)) {
+            quickfixBuffer.setContent(quickfixService.render(), false);
+            if (getCurrentBuffer() == quickfixBuffer) {
+                loadBufferIntoEditor(quickfixBuffer);
+            }
+        }
+    }
+
+    private List<QuickfixService.Entry> parseQuickfixEntries(String output, String defaultSource) {
+        List<QuickfixService.Entry> entries = new ArrayList<>();
+        if (output == null || output.isBlank()) {
+            return entries;
+        }
+        String source = defaultSource == null ? "" : defaultSource;
+        for (String line : output.split("\n")) {
+            Matcher matcher = QUICKFIX_PATTERN.matcher(line);
+            if (!matcher.matches()) {
+                continue;
+            }
+            String path = matcher.group(1).trim();
+            int lineNumber;
+            int columnNumber = 1;
+            try {
+                lineNumber = Integer.parseInt(matcher.group(2));
+                String col = matcher.group(3);
+                if (col != null && !col.isBlank()) {
+                    columnNumber = Integer.parseInt(col);
+                }
+            } catch (NumberFormatException ignored) {
+                continue;
+            }
+            String message = matcher.group(4) == null ? "" : matcher.group(4).trim();
+            entries.add(new QuickfixService.Entry(path, lineNumber, columnNumber, message, source));
+        }
+        return entries;
+    }
+
     private CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
         ProcessBuilder builder = new ProcessBuilder("zsh", "-lc", command);
         builder.directory(new File("."));
@@ -3185,12 +3362,18 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         String output = result.stdout == null ? "" : result.stdout.stripTrailing();
+        List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "shell");
+        if (!parsedEntries.isEmpty()) {
+            updateQuickfixEntries("shell job " + jobId, parsedEntries);
+        }
         if (result.exitCode != 0) {
             if (output.isEmpty()) {
                 showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
             } else {
                 showScratchBuffer("[shell job " + jobId + "]", output + "\n");
-                showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
+                showMessage(parsedEntries.isEmpty()
+                    ? "Shell job " + jobId + " failed (exit " + result.exitCode + ")"
+                    : "Shell job " + jobId + " failed (exit " + result.exitCode + ", quickfix updated)");
             }
             return;
         }
@@ -3204,7 +3387,9 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         showScratchBuffer("[shell job " + jobId + "]", output + "\n");
-        showMessage("Shell job " + jobId + " complete");
+        showMessage(parsedEntries.isEmpty()
+            ? "Shell job " + jobId + " complete"
+            : "Shell job " + jobId + " complete (quickfix updated)");
     }
 
     private void handleFilterJobCompletion(
@@ -3831,6 +4016,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String showGrepFinder(String pattern) {
         List<String> candidates = grepFiles(pattern);
+        updateQuickfixEntries("grep " + (pattern == null ? "" : pattern), parseQuickfixEntries(String.join("\n", candidates), "grep"));
         String selection = showPaletteDialog("Grep", candidates);
         if (selection == null || selection.isEmpty()) {
             return "Grep cancelled";
@@ -5185,6 +5371,9 @@ public class Texteditor extends JFrame implements KeyListener {
                 treeBuffer = null;
             }
         }
+        if (buffer == quickfixBuffer) {
+            quickfixBuffer = null;
+        }
         buffers.remove(buffer);
         if (buffers.isEmpty()) {
             openLandingPage();
@@ -5248,6 +5437,9 @@ public class Texteditor extends JFrame implements KeyListener {
         FileBuffer closingBuffer = paneToClose.getBuffer();
         if (paneToClose == treePane) {
             treePane = null;
+        }
+        if (paneToClose.getBuffer() == quickfixBuffer) {
+            quickfixBuffer = null;
         }
         if (isTreeBuffer(closingBuffer)) {
             treeLineTargets.remove(closingBuffer);
@@ -5813,6 +6005,9 @@ public class Texteditor extends JFrame implements KeyListener {
 
         specialBufferReturns.pop();
         buffers.remove(current);
+        if (current == quickfixBuffer) {
+            quickfixBuffer = null;
+        }
 
         int returnIndex = buffers.indexOf(state.returnBuffer);
         if (returnIndex < 0) {

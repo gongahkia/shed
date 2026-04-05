@@ -53,6 +53,9 @@ public class HelpService {
                    "  :tree [path]   File tree in scratch buffer\n" +
                    "  :buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
+                   "  :copen         Open quickfix list\n" +
+                   "  :cnext/:cprev  Next/previous quickfix entry\n" +
+                   "  :cc [n]        Jump to quickfix entry\n" +
                    "  :git ...       Git status/diff/log/add/commit\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +

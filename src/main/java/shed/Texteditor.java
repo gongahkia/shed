@@ -132,6 +132,20 @@ public class Texteditor extends JFrame implements KeyListener {
     private FileBuffer quickfixBuffer;
     private int keymapReplayDepth;
 
+    // Markdown / orgmode features
+    private MarkdownService markdownService;
+    private FuzzyMatchService fuzzyMatchService;
+    private SnippetService snippetService;
+    private BracketColorService bracketColorService;
+    private FileWatcherService fileWatcherService;
+    private Map<Integer, Boolean> foldedLines; // headingLine -> folded
+    private String foldedContent; // stores hidden content per fold
+    private Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
+    private int concealLevel; // 0=show all, 1=conceal some, 2=full conceal
+    private List<Object> bracketHighlightTags;
+    private List<Object> markdownHighlightTags;
+    private boolean bracketColorEnabled;
+
     // Constants
     private static final String VERSION = "2.0";
     private static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
@@ -204,6 +218,17 @@ public class Texteditor extends JFrame implements KeyListener {
         treeRoot = null;
         treeLineTargets = new HashMap<>();
         quickfixBuffer = null;
+        markdownService = new MarkdownService();
+        fuzzyMatchService = new FuzzyMatchService();
+        snippetService = new SnippetService();
+        bracketColorService = new BracketColorService();
+        fileWatcherService = new FileWatcherService();
+        foldedLines = new HashMap<>();
+        foldHiddenContent = new HashMap<>();
+        concealLevel = 0;
+        bracketHighlightTags = new ArrayList<>();
+        markdownHighlightTags = new ArrayList<>();
+        bracketColorEnabled = false;
         loadRecentFiles();
         lastMessage = "";
 
@@ -245,6 +270,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
         externalChangeTimer.start();
+        fileWatcherService.start();
     }
 
     // Initialize UI components
@@ -956,6 +982,10 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingKey = c;
         } else if (c == 'z') {
             editorState.pendingKey = 'z';
+        } else if (c == ']') {
+            editorState.pendingKey = ']';
+        } else if (c == '[') {
+            editorState.pendingKey = '[';
         } else if (c == '{') {
             repeatAction(consumePendingCount(), this::moveParagraphBackward);
         } else if (c == '}') {
@@ -1148,6 +1178,19 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == 'g' || code == KeyEvent.VK_G) {
                 editorState.pendingCount = "";
                 showMessage(showFileInfo());
+            }
+        }
+
+        // TAB: markdown fold cycling on heading lines
+        else if (code == KeyEvent.VK_TAB) {
+            editorState.pendingCount = "";
+            FileBuffer buf = getCurrentBuffer();
+            if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
+                if (e.isShiftDown()) {
+                    showMessage(globalFoldCycle());
+                } else {
+                    showMessage(toggleFoldAtCursor());
+                }
             }
         }
 
@@ -1451,7 +1494,17 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingKey = '\0';
         } else if (editorState.pendingKey == '>' || editorState.pendingKey == '<' || editorState.pendingKey == '=') {
             if (c == editorState.pendingKey) {
-                showMessage(applyLineOperator(editorState.pendingKey));
+                FileBuffer buf = getCurrentBuffer();
+                if (buf != null && buf.getFileType() == FileType.MARKDOWN && (editorState.pendingKey == '>' || editorState.pendingKey == '<')) {
+                    showMessage(markdownHeadingShift(editorState.pendingKey == '>'));
+                } else {
+                    showMessage(applyLineOperator(editorState.pendingKey));
+                }
+            } else if (c == 'r' && (editorState.pendingKey == '>' || editorState.pendingKey == '<')) {
+                FileBuffer buf = getCurrentBuffer();
+                if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
+                    showMessage(markdownSubtreeShift(editorState.pendingKey == '>'));
+                }
             }
             editorState.pendingKey = '\0';
         } else if (editorState.pendingKey == 'D' || editorState.pendingKey == 'C' || editorState.pendingKey == 'Y') {
@@ -1498,8 +1551,30 @@ public class Texteditor extends JFrame implements KeyListener {
                 scrollCurrentLineTo('z');
             } else if (c == 'b') {
                 scrollCurrentLineTo('b');
+            } else if (c == 'a') {
+                showMessage(toggleFoldAtCursor());
+            } else if (c == 'M') {
+                showMessage(foldAll());
+            } else if (c == 'R') {
+                showMessage(unfoldAll());
             }
             editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == ']') {
+            if (c == ']') {
+                showMessage(navigateHeading(true));
+            } else if (c >= '1' && c <= '6') {
+                showMessage(navigateHeadingAtLevel(true, c - '0'));
+            }
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
+        } else if (editorState.pendingKey == '[') {
+            if (c == '[') {
+                showMessage(navigateHeading(false));
+            } else if (c >= '1' && c <= '6') {
+                showMessage(navigateHeadingAtLevel(false, c - '0'));
+            }
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
         } else if (editorState.pendingKey == '\u0007') {
             // gc pending state: gcc = comment current line(s), gc{motion} = comment motion range
             if (c == 'c') {
@@ -1554,19 +1629,39 @@ public class Texteditor extends JFrame implements KeyListener {
                 insertNormalOneShot = true;
                 setMode(EditorMode.NORMAL);
                 return;
+            } else if (code == KeyEvent.VK_J || e.getKeyChar() == 'j') {
+                // Ctrl+j: snippet expand
+                showMessage(expandSnippetAtCursor());
+                return;
             }
         }
 
         if (!e.isControlDown() && !e.isAltDown()) {
             char c = e.getKeyChar();
-            if (c == '\t' && configManager.getExpandTab()) {
+            FileBuffer currentBuf = getCurrentBuffer();
+            boolean isMarkdown = currentBuf != null && currentBuf.getFileType() == FileType.MARKDOWN;
+            if (c == '\t' && isMarkdown && isOnTableLine()) {
+                // TAB in markdown table: move to next cell
+                showMessage(markdownTableNextCell(e.isShiftDown()));
+                e.consume();
+                return;
+            } else if (c == '\t' && configManager.getExpandTab()) {
                 writingArea.replaceSelection(" ".repeat(writingArea.getTabSize()));
                 lastInsertedText += " ".repeat(writingArea.getTabSize());
                 e.consume();
-            } else if (c == '\n' && configManager.getAutoIndent()) {
-                String indent = currentLineIndentation();
-                SwingUtilities.invokeLater(() -> writingArea.insert(indent, writingArea.getCaretPosition()));
-                lastInsertedText += "\n" + indent;
+            } else if (c == '\n') {
+                if (isMarkdown) {
+                    String continued = handleMarkdownEnter();
+                    if (continued != null) {
+                        e.consume();
+                        return;
+                    }
+                }
+                if (configManager.getAutoIndent()) {
+                    String indent = currentLineIndentation();
+                    SwingUtilities.invokeLater(() -> writingArea.insert(indent, writingArea.getCaretPosition()));
+                    lastInsertedText += "\n" + indent;
+                }
             } else if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
                 lastInsertedText += c;
             }
@@ -3664,6 +3759,718 @@ public class Texteditor extends JFrame implements KeyListener {
             .replace("<", "&lt;")
             .replace(">", "&gt;");
     }
+
+    // ========== Markdown / Orgmode features ==========
+
+    private String[] getCurrentLines() {
+        return writingArea.getText().split("\n", -1);
+    }
+
+    private int getCurrentCaretLine() {
+        try {
+            return writingArea.getLineOfOffset(writingArea.getCaretPosition());
+        } catch (BadLocationException e) {
+            return 0;
+        }
+    }
+
+    // --- Heading folding ---
+
+    private String toggleFoldAtCursor() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) {
+            return "";
+        }
+        int line = getCurrentCaretLine();
+        String[] lines = getCurrentLines();
+        if (line < 0 || line >= lines.length) return "";
+        if (!markdownService.isHeading(lines[line])) {
+            return "Not on a heading line";
+        }
+        MarkdownService.FoldRange range = markdownService.computeFoldRange(lines, line);
+        if (range == null) {
+            return "Nothing to fold";
+        }
+        Boolean folded = foldedLines.get(line);
+        if (folded != null && folded) {
+            return unfoldHeading(line, lines);
+        } else {
+            return foldHeading(line, range, lines);
+        }
+    }
+
+    private String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {
+        try {
+            int foldCount = range.endLine - range.startLine;
+            int startOffset = writingArea.getLineStartOffset(range.startLine + 1);
+            int endOffset = writingArea.getLineEndOffset(range.endLine);
+            String hidden = writingArea.getText().substring(startOffset, endOffset);
+            foldHiddenContent.put(headingLine, hidden);
+            foldedLines.put(headingLine, true);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange("", startOffset, endOffset);
+            // Append fold indicator to heading line
+            int headingEnd = writingArea.getLineEndOffset(headingLine);
+            String indicator = " ... (" + foldCount + " lines)";
+            writingArea.insert(indicator, headingEnd - 1);
+            suppressDocumentEvents = false;
+            return "Folded " + foldCount + " lines";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Fold error: " + e.getMessage();
+        }
+    }
+
+    private String unfoldHeading(int headingLine, String[] lines) {
+        String hidden = foldHiddenContent.get(headingLine);
+        if (hidden == null) return "Nothing to unfold";
+        try {
+            // Remove fold indicator from heading line
+            String headingText = lines[headingLine];
+            int indicatorIdx = headingText.indexOf(" ... (");
+            if (indicatorIdx > 0) {
+                int headingStart = writingArea.getLineStartOffset(headingLine);
+                int headingEnd = writingArea.getLineEndOffset(headingLine);
+                String cleanHeading = headingText.substring(0, indicatorIdx);
+                suppressDocumentEvents = true;
+                writingArea.replaceRange(cleanHeading + "\n" + hidden, headingStart, headingEnd);
+                suppressDocumentEvents = false;
+            } else {
+                int afterHeading = writingArea.getLineEndOffset(headingLine);
+                suppressDocumentEvents = true;
+                writingArea.insert(hidden, afterHeading);
+                suppressDocumentEvents = false;
+            }
+            foldedLines.put(headingLine, false);
+            foldHiddenContent.remove(headingLine);
+            return "Unfolded";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Unfold error: " + e.getMessage();
+        }
+    }
+
+    private String foldAll() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
+        String[] lines = getCurrentLines();
+        List<MarkdownService.FoldRange> ranges = markdownService.computeAllFoldRanges(lines);
+        int count = 0;
+        // Fold from bottom to top to preserve line numbers
+        for (int i = ranges.size() - 1; i >= 0; i--) {
+            MarkdownService.FoldRange range = ranges.get(i);
+            if (!Boolean.TRUE.equals(foldedLines.get(range.startLine))) {
+                lines = getCurrentLines();
+                foldHeading(range.startLine, range, lines);
+                count++;
+            }
+        }
+        return count > 0 ? "Folded " + count + " sections" : "Nothing to fold";
+    }
+
+    private String unfoldAll() {
+        if (foldHiddenContent.isEmpty()) return "Nothing to unfold";
+        // Unfold from bottom to top
+        List<Integer> foldedHeadings = new ArrayList<>(foldedLines.keySet());
+        foldedHeadings.sort(Collections.reverseOrder());
+        int count = 0;
+        for (int heading : foldedHeadings) {
+            if (Boolean.TRUE.equals(foldedLines.get(heading))) {
+                String[] lines = getCurrentLines();
+                if (heading < lines.length) {
+                    unfoldHeading(heading, lines);
+                    count++;
+                }
+            }
+        }
+        foldedLines.clear();
+        foldHiddenContent.clear();
+        return count > 0 ? "Unfolded " + count + " sections" : "Nothing to unfold";
+    }
+
+    private String globalFoldCycle() {
+        boolean anyFolded = foldedLines.values().stream().anyMatch(v -> v);
+        if (anyFolded) {
+            return unfoldAll();
+        } else {
+            return foldAll();
+        }
+    }
+
+    // --- Heading navigation ---
+
+    private String navigateHeading(boolean forward) {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
+        String[] lines = getCurrentLines();
+        int currentLine = getCurrentCaretLine();
+        int target = forward ? markdownService.nextHeading(lines, currentLine) : markdownService.prevHeading(lines, currentLine);
+        if (target < 0) {
+            return forward ? "No next heading" : "No previous heading";
+        }
+        recordJumpPosition();
+        return gotoLine(target + 1);
+    }
+
+    private String navigateHeadingAtLevel(boolean forward, int level) {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
+        String[] lines = getCurrentLines();
+        int currentLine = getCurrentCaretLine();
+        int target = forward ? markdownService.nextHeadingAtLevel(lines, currentLine, level) : markdownService.prevHeadingAtLevel(lines, currentLine, level);
+        if (target < 0) {
+            return "No " + (forward ? "next" : "previous") + " h" + level + " heading";
+        }
+        recordJumpPosition();
+        return gotoLine(target + 1);
+    }
+
+    public String showTableOfContents() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        String toc = markdownService.generateToc(lines);
+        FileBuffer tocBuffer = FileBuffer.createScratch("[TOC]", toc);
+        buffers.add(tocBuffer);
+        loadBufferIntoEditor(tocBuffer);
+        return "Table of contents";
+    }
+
+    public String showOutline() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        String toc = markdownService.generateToc(lines);
+        // Open in a split
+        String splitResult = splitWindow(true);
+        FileBuffer tocBuffer = FileBuffer.createScratch("[Outline]", toc);
+        buffers.add(tocBuffer);
+        loadBufferIntoEditor(tocBuffer);
+        return "Outline opened";
+    }
+
+    // --- Heading promotion/demotion ---
+
+    private String markdownHeadingShift(boolean demote) {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= lines.length) return "";
+        if (!markdownService.isHeading(lines[line])) {
+            return applyLineOperator(demote ? '>' : '<');
+        }
+        String newLine = demote ? markdownService.demoteHeading(lines[line]) : markdownService.promoteHeading(lines[line]);
+        if (newLine.equals(lines[line])) {
+            return demote ? "Already at h6" : "Already at h1";
+        }
+        try {
+            int startOffset = writingArea.getLineStartOffset(line);
+            int endOffset = writingArea.getLineEndOffset(line);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(newLine + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return demote ? "Demoted heading" : "Promoted heading";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String markdownSubtreeShift(boolean demote) {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= lines.length || !markdownService.isHeading(lines[line])) {
+            return "Not on a heading line";
+        }
+        String[] newLines = demote ? markdownService.demoteSubtree(lines, line) : markdownService.promoteSubtree(lines, line);
+        MarkdownService.FoldRange range = markdownService.computeFoldRange(lines, line);
+        int start = line;
+        int end = range != null ? range.endLine : line;
+        try {
+            int startOffset = writingArea.getLineStartOffset(start);
+            int endOffset = writingArea.getLineEndOffset(end);
+            StringBuilder replacement = new StringBuilder();
+            for (int i = start; i <= end; i++) {
+                if (i > start) replacement.append("\n");
+                replacement.append(newLines[i]);
+            }
+            replacement.append("\n");
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(replacement.toString(), startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return demote ? "Demoted subtree" : "Promoted subtree";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    // --- Table editing ---
+
+    private boolean isOnTableLine() {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        return line >= 0 && line < lines.length && markdownService.isTableRow(lines[line]);
+    }
+
+    private String markdownTableNextCell(boolean reverse) {
+        try {
+            int line = getCurrentCaretLine();
+            String[] lines = getCurrentLines();
+            if (line < 0 || line >= lines.length) return "";
+            String currentLine = lines[line];
+            int lineStart = writingArea.getLineStartOffset(line);
+            int posInLine = writingArea.getCaretPosition() - lineStart;
+
+            if (reverse) {
+                int offset = markdownService.prevCellOffset(currentLine, posInLine);
+                writingArea.setCaretPosition(lineStart + offset);
+                return "";
+            }
+
+            int nextOffset = markdownService.nextCellOffset(currentLine, posInLine + 1);
+            if (nextOffset <= posInLine + 1 || nextOffset >= currentLine.length() - 1) {
+                // Move to next row or create new row
+                int tableStart = markdownService.tableStartLine(lines, line);
+                int tableEnd = markdownService.tableEndLine(lines, line);
+                if (line >= tableEnd) {
+                    // Create new row
+                    String[] cells = markdownService.parseCells(currentLine);
+                    int[] widths = new int[cells.length];
+                    for (int c = 0; c < cells.length; c++) widths[c] = Math.max(3, cells[c].length());
+                    String newRow = markdownService.newTableRow(cells.length, widths);
+                    int endOfLine = writingArea.getLineEndOffset(line);
+                    suppressDocumentEvents = true;
+                    writingArea.insert("\n" + newRow, endOfLine - 1);
+                    suppressDocumentEvents = false;
+                    markModified();
+                    // Move to first cell of new row
+                    int newLineStart = writingArea.getLineStartOffset(line + 1);
+                    String newLineText = lines.length > line + 1 ? newRow : writingArea.getText().split("\n", -1)[line + 1];
+                    int firstCell = markdownService.nextCellOffset(newLineText, 0);
+                    writingArea.setCaretPosition(newLineStart + firstCell);
+                } else {
+                    // Skip separator lines
+                    int nextLine = line + 1;
+                    while (nextLine <= tableEnd && markdownService.isTableSeparator(lines[nextLine])) {
+                        nextLine++;
+                    }
+                    if (nextLine <= tableEnd) {
+                        int nextLineStart = writingArea.getLineStartOffset(nextLine);
+                        int firstCell = markdownService.nextCellOffset(lines[nextLine], 0);
+                        writingArea.setCaretPosition(nextLineStart + firstCell);
+                    }
+                }
+            } else {
+                writingArea.setCaretPosition(lineStart + nextOffset);
+            }
+            return "";
+        } catch (BadLocationException e) {
+            return "Table navigation error";
+        }
+    }
+
+    public String alignMarkdownTable() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
+        int start = markdownService.tableStartLine(lines, line);
+        int end = markdownService.tableEndLine(lines, line);
+        String aligned = markdownService.alignTable(lines, start, end);
+        try {
+            int startOffset = writingArea.getLineStartOffset(start);
+            int endOffset = writingArea.getLineEndOffset(end);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(aligned + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return "Table aligned";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error aligning table: " + e.getMessage();
+        }
+    }
+
+    public String sortMarkdownTable(String args) {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
+        int col = 0;
+        boolean ascending = true;
+        if (args != null && !args.isEmpty()) {
+            String[] parts = args.trim().split("\\s+");
+            try {
+                col = Integer.parseInt(parts[0]) - 1;
+            } catch (NumberFormatException ignored) {}
+            if (parts.length > 1 && parts[1].equalsIgnoreCase("desc")) ascending = false;
+        }
+        int start = markdownService.tableStartLine(lines, line);
+        int end = markdownService.tableEndLine(lines, line);
+        String sorted = markdownService.sortTable(lines, start, end, col, ascending);
+        try {
+            int startOffset = writingArea.getLineStartOffset(start);
+            int endOffset = writingArea.getLineEndOffset(end);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(sorted + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return "Table sorted by column " + (col + 1);
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error sorting table: " + e.getMessage();
+        }
+    }
+
+    public String insertTableColumn(String args) {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
+        int start = markdownService.tableStartLine(lines, line);
+        int end = markdownService.tableEndLine(lines, line);
+        int lineStart = 0;
+        try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
+        int col = markdownService.cellColumn(lines[line], writingArea.getCaretPosition() - lineStart);
+        String result = markdownService.insertColumn(lines, start, end, col);
+        try {
+            int startOffset = writingArea.getLineStartOffset(start);
+            int endOffset = writingArea.getLineEndOffset(end);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(result + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return "Column inserted";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error inserting column: " + e.getMessage();
+        }
+    }
+
+    public String deleteTableColumn(String args) {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
+        int start = markdownService.tableStartLine(lines, line);
+        int end = markdownService.tableEndLine(lines, line);
+        int col = 0;
+        if (args != null && !args.isEmpty()) {
+            try { col = Integer.parseInt(args.trim()) - 1; } catch (NumberFormatException ignored) {}
+        } else {
+            int lineStart = 0;
+            try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
+            col = markdownService.cellColumn(lines[line], writingArea.getCaretPosition() - lineStart);
+        }
+        String result = markdownService.deleteColumn(lines, start, end, col);
+        try {
+            int startOffset = writingArea.getLineStartOffset(start);
+            int endOffset = writingArea.getLineEndOffset(end);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(result + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return "Column deleted";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error deleting column: " + e.getMessage();
+        }
+    }
+
+    public String insertTableTemplate(String args) {
+        int cols = 3, rows = 2;
+        if (args != null && !args.isEmpty()) {
+            String[] parts = args.trim().split("[xX]");
+            try {
+                if (parts.length >= 1) cols = Integer.parseInt(parts[0].trim());
+                if (parts.length >= 2) rows = Integer.parseInt(parts[1].trim());
+            } catch (NumberFormatException ignored) {}
+        }
+        String template = markdownService.createTableTemplate(cols, rows);
+        writingArea.insert(template, writingArea.getCaretPosition());
+        markModified();
+        return "Table inserted (" + cols + "x" + rows + ")";
+    }
+
+    // --- Checkbox toggling ---
+
+    public String toggleCheckbox() {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= lines.length) return "";
+        if (!markdownService.isCheckbox(lines[line])) return "Not a checkbox line";
+        String toggled = markdownService.toggleCheckbox(lines[line]);
+        try {
+            int startOffset = writingArea.getLineStartOffset(line);
+            int endOffset = writingArea.getLineEndOffset(line);
+            suppressDocumentEvents = true;
+            writingArea.replaceRange(toggled + "\n", startOffset, endOffset);
+            suppressDocumentEvents = false;
+            markModified();
+            return toggled.contains("[x]") ? "Checked" : "Unchecked";
+        } catch (BadLocationException e) {
+            suppressDocumentEvents = false;
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    // --- Smart list continuation ---
+
+    private String handleMarkdownEnter() {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= lines.length) return null;
+        String currentLine = lines[line];
+
+        if (markdownService.isEmptyListItem(currentLine)) {
+            // Remove the empty list prefix
+            try {
+                int startOffset = writingArea.getLineStartOffset(line);
+                int endOffset = writingArea.getLineEndOffset(line);
+                suppressDocumentEvents = true;
+                writingArea.replaceRange("\n", startOffset, endOffset);
+                suppressDocumentEvents = false;
+                lastInsertedText += "\n";
+                return "";
+            } catch (BadLocationException e) {
+                suppressDocumentEvents = false;
+                return null;
+            }
+        }
+
+        String continuation = markdownService.listContinuation(currentLine);
+        if (continuation != null) {
+            SwingUtilities.invokeLater(() -> {
+                writingArea.insert(continuation, writingArea.getCaretPosition());
+            });
+            lastInsertedText += "\n" + continuation;
+            return "";
+        }
+        return null;
+    }
+
+    // --- Link helpers ---
+
+    public String insertLink() {
+        String template = markdownService.insertLinkTemplate();
+        writingArea.insert(template, writingArea.getCaretPosition());
+        markModified();
+        return "Link template inserted";
+    }
+
+    public String insertImage() {
+        String template = markdownService.insertImageTemplate();
+        writingArea.insert(template, writingArea.getCaretPosition());
+        markModified();
+        return "Image template inserted";
+    }
+
+    public String goToMarkdownLink() {
+        String[] lines = getCurrentLines();
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= lines.length) return "No link found";
+        int lineStart = 0;
+        try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
+        int posInLine = writingArea.getCaretPosition() - lineStart;
+        String url = markdownService.extractLinkUrl(lines[line], posInLine);
+        if (url == null) return goToFileUnderCursor();
+        if (url.startsWith("http://") || url.startsWith("https://")) {
+            try {
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().browse(new URI(url));
+                    return "Opened: " + url;
+                }
+            } catch (Exception e) {
+                return "Error opening URL: " + e.getMessage();
+            }
+        }
+        // Treat as relative file path
+        FileBuffer buf = getCurrentBuffer();
+        File base = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");
+        File target = new File(base, url);
+        if (target.exists()) {
+            try {
+                openFile(target);
+                return "Opened: " + target.getName();
+            } catch (IOException e) {
+                return "Error opening file: " + e.getMessage();
+            }
+        }
+        return "File not found: " + url;
+    }
+
+    // --- Concealment ---
+
+    public String setConcealLevel(int level) {
+        this.concealLevel = Math.max(0, Math.min(2, level));
+        applySyntaxHighlighting();
+        return "Conceal level: " + concealLevel;
+    }
+
+    // --- Snippet expansion ---
+
+    private String expandSnippetAtCursor() {
+        FileBuffer buf = getCurrentBuffer();
+        if (buf == null) return "No buffer";
+        FileType ft = buf.getFileType();
+        int pos = writingArea.getCaretPosition();
+        String text = writingArea.getText();
+
+        // Find the word before cursor
+        int wordStart = pos;
+        while (wordStart > 0 && !Character.isWhitespace(text.charAt(wordStart - 1))) {
+            wordStart--;
+        }
+        if (wordStart == pos) return "No trigger word";
+        String trigger = text.substring(wordStart, pos);
+        SnippetService.Snippet snippet = snippetService.findExact(ft, trigger);
+        if (snippet == null) return "No snippet: " + trigger;
+        String expanded = snippetService.expand(snippet);
+        int cursorOffset = snippetService.cursorOffset(snippet);
+        suppressDocumentEvents = true;
+        writingArea.replaceRange(expanded, wordStart, pos);
+        suppressDocumentEvents = false;
+        if (cursorOffset >= 0) {
+            writingArea.setCaretPosition(Math.min(wordStart + cursorOffset, writingArea.getText().length()));
+        }
+        markModified();
+        return "Expanded: " + trigger;
+    }
+
+    public String listSnippets() {
+        FileBuffer buf = getCurrentBuffer();
+        FileType ft = buf != null ? buf.getFileType() : null;
+        String listing = snippetService.listSnippets(ft);
+        FileBuffer snippetBuf = FileBuffer.createScratch("[Snippets]", listing);
+        buffers.add(snippetBuf);
+        loadBufferIntoEditor(snippetBuf);
+        return "Showing snippets";
+    }
+
+    // --- Bracket pair colorization ---
+
+    public String toggleBracketColors() {
+        bracketColorEnabled = !bracketColorEnabled;
+        applyBracketHighlighting();
+        return bracketColorEnabled ? "Bracket colors enabled" : "Bracket colors disabled";
+    }
+
+    private void applyBracketHighlighting() {
+        clearBracketHighlighting();
+        if (!bracketColorEnabled) return;
+        String text = writingArea.getText();
+        if (text.isEmpty()) return;
+        List<BracketColorService.ColoredBracket> brackets = bracketColorService.computeBracketColors(text);
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (BracketColorService.ColoredBracket bracket : brackets) {
+            try {
+                Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(bracket.color());
+                bracketHighlightTags.add(highlighter.addHighlight(bracket.offset, bracket.offset + 1, painter));
+            } catch (BadLocationException ignored) {}
+        }
+    }
+
+    private void clearBracketHighlighting() {
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (Object tag : bracketHighlightTags) {
+            highlighter.removeHighlight(tag);
+        }
+        bracketHighlightTags.clear();
+    }
+
+    // --- File watcher integration ---
+
+    public void registerFileWatch(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null || buffer.isScratch()) return;
+        fileWatcherService.watch(buffer.getFile(), file -> {
+            SwingUtilities.invokeLater(() -> {
+                if (!reloadPromptActive && buffer.getFile() != null && buffer.getFile().equals(file)) {
+                    checkForExternalChanges();
+                }
+            });
+        });
+    }
+
+    // --- Fuzzy command completion ---
+
+    public List<String> fuzzyCompleteCommand(String prefix) {
+        List<String> allCommands = getAllCommandNames();
+        return fuzzyMatchService.matchStrings(prefix, allCommands, 10);
+    }
+
+    private List<String> getAllCommandNames() {
+        List<String> commands = new ArrayList<>();
+        commands.add("w"); commands.add("write"); commands.add("q"); commands.add("quit");
+        commands.add("wq"); commands.add("x"); commands.add("e"); commands.add("edit");
+        commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
+        commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
+        commands.add("log"); commands.add("session"); commands.add("jobs"); commands.add("jobcancel");
+        commands.add("drop"); commands.add("help"); commands.add("wc"); commands.add("recent");
+        commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder");
+        commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
+        commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
+        commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
+        commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev");
+        commands.add("registers"); commands.add("marks"); commands.add("zen"); commands.add("normal");
+        commands.add("reload"); commands.add("source"); commands.add("noh"); commands.add("split");
+        commands.add("vsplit"); commands.add("close"); commands.add("themes");
+        // New markdown commands
+        commands.add("toc"); commands.add("outline"); commands.add("toggle");
+        commands.add("table"); commands.add("link"); commands.add("img");
+        commands.add("snippets"); commands.add("bracketcolor");
+        commands.add("term"); commands.add("terminal");
+        commands.addAll(configManager.getConfiguredCommandAliases());
+        return commands;
+    }
+
+    // --- Integrated terminal ---
+
+    public String openTerminal() {
+        try {
+            String shell = System.getenv("SHELL");
+            if (shell == null || shell.isEmpty()) shell = "/bin/bash";
+            ProcessBuilder pb = new ProcessBuilder(shell);
+            pb.redirectErrorStream(true);
+            FileBuffer buf = getCurrentBuffer();
+            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
+                pb.directory(buf.getFile().getParentFile());
+            }
+            Process process = pb.start();
+
+            FileBuffer termBuffer = FileBuffer.createScratch("[Terminal]", "");
+            buffers.add(termBuffer);
+            String splitResult = splitWindow(false);
+            loadBufferIntoEditor(termBuffer);
+
+            Thread reader = new Thread(() -> {
+                try {
+                    byte[] buf2 = new byte[4096];
+                    int n;
+                    while ((n = process.getInputStream().read(buf2)) != -1) {
+                        String chunk = new String(buf2, 0, n, StandardCharsets.UTF_8);
+                        SwingUtilities.invokeLater(() -> {
+                            writingArea.append(chunk);
+                            writingArea.setCaretPosition(writingArea.getText().length());
+                        });
+                    }
+                } catch (IOException ignored) {}
+            }, "shed-terminal-reader");
+            reader.setDaemon(true);
+            reader.start();
+
+            return "Terminal opened";
+        } catch (IOException e) {
+            return "Error opening terminal: " + e.getMessage();
+        }
+    }
+
+    // ========== End of Markdown / Orgmode features ==========
 
     public String deleteLineRange(int startLine, int endLine) {
         try {

@@ -1698,6 +1698,9 @@ public class Texteditor extends JFrame implements KeyListener {
                     showMessage(expandSnippetAtCursor());
                 }
                 return;
+            } else if (code == KeyEvent.VK_N || e.getKeyChar() == 'n') {
+                showInlineCompletion();
+                return;
             }
         }
 
@@ -3633,6 +3636,39 @@ public class Texteditor extends JFrame implements KeyListener {
             return detached.stdout.strip();
         }
         return branchName;
+    }
+
+    private void showInlineCompletion() {
+        try {
+            String prefix = currentCompletionPrefix();
+            if (prefix == null || prefix.length() < 2) return;
+            List<String> completions = collectBufferCompletions(prefix);
+            if (completions.isEmpty()) return;
+
+            Rectangle2D caretRect = writingArea.modelToView2D(writingArea.getCaretPosition());
+            if (caretRect == null) return;
+
+            javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
+            popup.setFocusable(false);
+            int maxItems = Math.min(completions.size(), 10);
+            for (int i = 0; i < maxItems; i++) {
+                String item = completions.get(i);
+                javax.swing.JMenuItem mi = new javax.swing.JMenuItem(item);
+                mi.addActionListener(ev -> {
+                    applyCompletion(prefix, item);
+                    markModified();
+                });
+                popup.add(mi);
+            }
+            int px = (int) caretRect.getX();
+            int py = (int) (caretRect.getY() + caretRect.getHeight());
+            popup.show(writingArea, px, py);
+
+            // Auto-accept first item on Tab, dismiss on Escape
+            if (popup.getComponentCount() > 0) {
+                popup.getSelectionModel().setSelectedIndex(0);
+            }
+        } catch (BadLocationException ignored) {}
     }
 
     private void deleteWordBackwardInsert() {

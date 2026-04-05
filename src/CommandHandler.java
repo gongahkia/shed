@@ -66,8 +66,9 @@ public class CommandHandler {
                 cmd = cmd.substring(0, cmd.length() - 1);
             }
             String normalizedCmd = cmd.toLowerCase(Locale.ROOT);
+            String resolvedCmd = editor.resolveCommandAlias(normalizedCmd);
 
-            switch (normalizedCmd) {
+            switch (resolvedCmd) {
                 case "w":
                 case "write":
                     return handleWrite(args.isEmpty() ? null : args);
@@ -149,11 +150,14 @@ public class CommandHandler {
                 case "normal":
                 case "norm":
                     return handleNormal(args, range);
+                case "reload":
+                case "source":
+                    return editor.reloadConfigFromDisk();
                 case "":
                     return "";
                 default:
                     try {
-                        return editor.gotoLine(Integer.parseInt(normalizedCmd));
+                        return editor.gotoLine(Integer.parseInt(resolvedCmd));
                     } catch (NumberFormatException ignored) {
                         return "Command not recognised: " + cmd;
                     }
@@ -177,9 +181,14 @@ public class CommandHandler {
                 buffer.save();
             }
             editor.notifyCurrentBufferSaved();
+            String reloadResult = editor.reloadConfigIfSettingsBuffer(buffer);
 
             String timestamp = timeFormat.format(LocalDateTime.now());
-            return "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;
+            String base = "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;
+            if (reloadResult != null && !reloadResult.isEmpty()) {
+                return base + " (" + reloadResult + ")";
+            }
+            return base;
         } catch (IOException e) {
             return "Error saving file: " + e.getMessage();
         }
@@ -279,6 +288,12 @@ public class CommandHandler {
         }
         if (option.startsWith("colorscheme ")) {
             return editor.setThemeFromCommand(option.substring("colorscheme ".length()).trim());
+        }
+        int separator = option.indexOf('=');
+        if (separator > 0) {
+            String key = option.substring(0, separator).trim();
+            String value = option.substring(separator + 1).trim();
+            return editor.setConfigOption(key, value);
         }
         return "Unknown option: " + option;
     }

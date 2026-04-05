@@ -6,11 +6,14 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.awt.Color;
 
 public class ConfigManager {
@@ -408,6 +411,12 @@ public class ConfigManager {
         config.put(key, value);
     }
 
+    public void reload() {
+        config.clear();
+        loadDefaults();
+        loadConfig();
+    }
+
     private boolean getBoolean(String key, boolean defaultValue) {
         return Boolean.parseBoolean(config.getOrDefault(key, String.valueOf(defaultValue)));
     }
@@ -442,6 +451,52 @@ public class ConfigManager {
         return raw.trim().split("\\s+");
     }
 
+    public String resolveCommandAlias(String command) {
+        if (command == null || command.isBlank()) {
+            return "";
+        }
+        String resolved = command.trim().toLowerCase(Locale.ROOT);
+        Set<String> seen = new HashSet<>();
+        while (seen.add(resolved)) {
+            String aliased = config.get("command.alias." + resolved);
+            if (aliased == null || aliased.isBlank()) {
+                break;
+            }
+            String normalized = aliased.trim().toLowerCase(Locale.ROOT);
+            int separator = normalized.indexOf(' ');
+            resolved = separator >= 0 ? normalized.substring(0, separator) : normalized;
+        }
+        return resolved;
+    }
+
+    public List<String> getConfiguredCommandAliases() {
+        List<String> aliases = new ArrayList<>();
+        String prefix = "command.alias.";
+        for (String key : config.keySet()) {
+            if (key.startsWith(prefix) && key.length() > prefix.length()) {
+                aliases.add(key.substring(prefix.length()));
+            }
+        }
+        Collections.sort(aliases);
+        return aliases;
+    }
+
+    public String getKeybinding(String mode, String keySpec) {
+        if (keySpec == null || keySpec.isEmpty()) {
+            return null;
+        }
+        String normalizedMode = mode == null ? "normal" : mode.toLowerCase(Locale.ROOT);
+        String modeSpecific = config.get("keybind." + normalizedMode + "." + keySpec);
+        if (modeSpecific != null) {
+            return modeSpecific.trim();
+        }
+        String global = config.get("keybind.global." + keySpec);
+        if (global != null) {
+            return global.trim();
+        }
+        return null;
+    }
+
     // Get config file path
     public String getConfigPath() {
         return configPath;
@@ -466,6 +521,17 @@ public class ConfigManager {
             + "auto.indent=" + DEFAULT_AUTO_INDENT + "\n"
             + "highlight.search=" + DEFAULT_HIGHLIGHT_SEARCH + "\n"
             + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n\n"
+            + "# Command aliases (left side is what you type after :, right side is built-in command)\n"
+            + "# command.alias.ww=w\n"
+            + "# command.alias.qq=q\n\n"
+            + "# Keybindings\n"
+            + "# keybind.<mode>.<lhs>=<rhs>\n"
+            + "# modes: normal, insert, visual, visual_line, replace, command, search, global\n"
+            + "# tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n"
+            + "# examples\n"
+            + "# keybind.normal.H=^\n"
+            + "# keybind.normal.L=$\n"
+            + "# keybind.insert.<c-s>=<esc>:w<enter>\n\n"
             + "# LSP examples\n"
             + "# lsp.py.command=pyright-langserver\n"
             + "# lsp.py.args=--stdio\n";

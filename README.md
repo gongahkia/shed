@@ -395,6 +395,120 @@ session.autoload=default
 session.dir=/Users/you/.shed_sessions
 ```
 
+### Markdown / Orgmode Features
+
+Shed provides orgmode-inspired editing for markdown (`.md`) files.
+
+#### Heading Folding
+
+| Key-binds | Function |
+| :---: | :---: |
+| `TAB` (on heading) | Toggle fold/unfold heading section |
+| `S-TAB` | Cycle global fold state (fold all / unfold all) |
+| `za` | Toggle fold at cursor |
+| `zM` | Fold all headings |
+| `zR` | Unfold all headings |
+
+#### Heading Navigation
+
+| Key-binds | Function |
+| :---: | :---: |
+| `]]` | Jump to next heading |
+| `[[` | Jump to previous heading |
+| `]1`..`]6` | Jump to next heading at level N |
+| `[1`..`[6` | Jump to previous heading at level N |
+| `gO` | Open outline/TOC in split |
+| `:toc` | Open table of contents buffer |
+
+#### Heading Promotion/Demotion
+
+| Key-binds | Function |
+| :---: | :---: |
+| `>>` (on heading) | Demote heading (add `#`) |
+| `<<` (on heading) | Promote heading (remove `#`) |
+| `>r` (on heading) | Demote entire subtree |
+| `<r` (on heading) | Promote entire subtree |
+
+#### Table Editing
+
+| Key-binds / Commands | Function |
+| :---: | :---: |
+| `TAB` (in table, Insert mode) | Move to next cell |
+| `S-TAB` (in table, Insert mode) | Move to previous cell |
+| `Enter` (last column) | Create new table row |
+| `:table` | Insert 3x2 table template |
+| `:table NxM` | Insert NxM table template |
+| `:table align` | Auto-align table columns |
+| `:table sort N` | Sort table by column N |
+| `:table sort N desc` | Sort table by column N descending |
+| `:table insert-col` | Insert column after cursor |
+| `:table delete-col` | Delete column at cursor |
+
+#### Checkboxes
+
+| Key-binds | Function |
+| :---: | :---: |
+| `:toggle` | Toggle `- [ ]` / `- [x]` checkbox |
+
+#### Smart List Continuation
+
+In insert mode, pressing `Enter` on a list item auto-continues the list:
+* `- item` → `- ` on next line
+* `1. item` → `2. ` on next line
+* `- [ ] task` → `- [ ] ` on next line
+* Empty list item on Enter → exits the list
+
+#### Links
+
+| Commands | Function |
+| :---: | :---: |
+| `:link` | Insert `[text](url)` template |
+| `:img` | Insert `![alt](path)` template |
+| `gf` (on link) | Open linked file or markdown link target |
+| `gx` (on URL) | Open URL in browser |
+
+#### Concealment
+
+```console
+:set conceallevel=0   # Show all markup
+:set conceallevel=1   # Partial conceal
+:set conceallevel=2   # Full conceal (hide markers)
+```
+
+### Snippets
+
+Expand code snippets with `Ctrl-j` in insert mode. Built-in snippets for Java, Python, JavaScript, TypeScript, Rust, Go, C/C++, Markdown, and HTML.
+
+```console
+:snippets          # List available snippets for current file type
+```
+
+Example: type `main` then press `Ctrl-j` in a Java file to expand to `public static void main(String[] args) { }`.
+
+### Bracket Pair Colorization
+
+```console
+:bracketcolor      # Toggle bracket pair colorization
+:set bracketcolor  # Same
+```
+
+Nested `()`, `{}`, `[]` are colored with distinct colors to aid readability.
+
+### Fuzzy Command Completion
+
+TAB completion in command mode now uses fuzzy matching. Type a partial or approximate command name and press TAB to find the best match.
+
+### Integrated Terminal
+
+```console
+:term              # Open a terminal split
+:terminal          # Same
+```
+
+### File Auto-Reload
+
+Files are now monitored via `java.nio.file.WatchService` for external changes, providing faster and more reliable reload prompts than polling.
+
 ### CI
 
 CI now executes the full Maven test suite (`mvn test`) before packaging.

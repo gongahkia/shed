@@ -5136,18 +5136,47 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showFileFinder() {
-        File selection = chooseWithNavigator(JFileChooser.FILES_ONLY, null, "Open File");
-        if (selection == null) {
-            return "File finder cancelled";
+        FileBuffer buf = getCurrentBuffer();
+        File baseDir = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");
+        if (baseDir == null) baseDir = new File(".");
+        // Walk up to find project root (has .git or is CWD)
+        File projectRoot = baseDir;
+        File probe = baseDir;
+        for (int i = 0; i < 20 && probe != null; i++) {
+            if (new File(probe, ".git").exists()) { projectRoot = probe; break; }
+            probe = probe.getParentFile();
         }
-        if (!selection.isFile()) {
-            return "Not a file: " + selection.getPath();
+        List<String> files = new ArrayList<>();
+        collectProjectFiles(projectRoot, projectRoot.getAbsolutePath(), files, 5000);
+        if (files.isEmpty()) {
+            return "No files found";
         }
+        String selected = showPaletteDialog("Find File", files);
+        if (selected == null) return "File finder cancelled";
         try {
-            openFile(selection);
-            return "Opened: " + selection.getAbsolutePath();
+            openFile(new File(projectRoot, selected));
+            return "Opened: " + selected;
         } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
+        }
+    }
+
+    private void collectProjectFiles(File dir, String rootPath, List<String> result, int limit) {
+        if (result.size() >= limit || dir == null || !dir.isDirectory()) return;
+        File[] children = dir.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (result.size() >= limit) return;
+            if (child.getName().startsWith(".") || "node_modules".equals(child.getName())
+                    || "target".equals(child.getName()) || "build".equals(child.getName())
+                    || "__pycache__".equals(child.getName()) || ".git".equals(child.getName())) continue;
+            if (child.isFile()) {
+                String rel = child.getAbsolutePath().substring(rootPath.length());
+                if (rel.startsWith(File.separator)) rel = rel.substring(1);
+                result.add(rel);
+            } else if (child.isDirectory()) {
+                collectProjectFiles(child, rootPath, result, limit);
+            }
         }
     }
 

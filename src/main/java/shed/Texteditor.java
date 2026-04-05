@@ -2859,12 +2859,39 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("normal");
         knownCommands.add("reload");
         knownCommands.add("source");
+        knownCommands.add("noh");
+        knownCommands.add("nohlsearch");
+        knownCommands.add("wa");
+        knownCommands.add("qa");
+        knownCommands.add("wqa");
+        knownCommands.add("split");
+        knownCommands.add("vsplit");
+        knownCommands.add("close");
+        knownCommands.add("themes");
+        // Markdown / orgmode commands
+        knownCommands.add("toc");
+        knownCommands.add("outline");
+        knownCommands.add("toggle");
+        knownCommands.add("table");
+        knownCommands.add("link");
+        knownCommands.add("img");
+        knownCommands.add("snippets");
+        knownCommands.add("bracketcolor");
+        knownCommands.add("term");
+        knownCommands.add("terminal");
+        knownCommands.add("conceal");
         knownCommands.addAll(configManager.getConfiguredCommandAliases());
 
+        // Exact prefix match first
         for (String command : knownCommands) {
             if (command.startsWith(lowered)) {
                 return ":" + command;
             }
+        }
+        // Fuzzy match fallback
+        List<String> fuzzy = fuzzyMatchService.matchStrings(lowered, knownCommands, 1);
+        if (!fuzzy.isEmpty()) {
+            return ":" + fuzzy.get(0);
         }
         return input;
     }
@@ -2987,6 +3014,7 @@ public class Texteditor extends JFrame implements KeyListener {
             highlightJavaAnnotations(highlighter, text, masked);
         }
         highlightKeywords(highlighter, text, syntaxKeywordsFor(fileType), masked);
+        applyBracketHighlighting();
     }
 
     private void clearSyntaxHighlighting() {
@@ -2995,6 +3023,7 @@ public class Texteditor extends JFrame implements KeyListener {
             highlighter.removeHighlight(tag);
         }
         syntaxHighlightTags.clear();
+        clearBracketHighlighting();
     }
 
     private String[] syntaxKeywordsFor(FileType fileType) {

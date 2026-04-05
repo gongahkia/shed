@@ -113,6 +113,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private EditorPane treePane;
     private FileBuffer treeBuffer;
     private Map<FileBuffer, List<String>> treeLineTargets;
+    private int keymapReplayDepth;
 
     // Visual mode state
     private int visualStartPos;
@@ -178,6 +179,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspClients = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
+        keymapReplayDepth = 0;
         treePane = null;
         treeBuffer = null;
         treeLineTargets = new HashMap<>();
@@ -475,6 +477,10 @@ public class Texteditor extends JFrame implements KeyListener {
         if (currentMode == EditorMode.NORMAL && recordingRegister != null && !(pendingKey == '\0' && e.getKeyChar() == 'q')) {
             macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
         }
+        if (applyConfiguredKeybinding(e)) {
+            updateStatusBar();
+            return;
+        }
         switch (currentMode) {
             case NORMAL:
                 handleNormalMode(e);
@@ -500,6 +506,263 @@ public class Texteditor extends JFrame implements KeyListener {
             suppressNextTypedChar = true;
         }
         updateStatusBar();
+    }
+
+    private boolean applyConfiguredKeybinding(KeyEvent e) {
+        if (currentMode == null || keymapReplayDepth > 32) {
+            return false;
+        }
+        String keySpec = keySpecFromEvent(e);
+        if (keySpec == null || keySpec.isEmpty()) {
+            return false;
+        }
+        String mapping = configManager.getKeybinding(modeKey(currentMode), keySpec);
+        if (mapping == null) {
+            return false;
+        }
+        if (mapping.isEmpty() || mapping.equalsIgnoreCase("nop") || mapping.equalsIgnoreCase("<nop>")) {
+            return true;
+        }
+
+        List<String> replayTokens = parseKeySequence(mapping);
+        if (replayTokens.isEmpty()) {
+            return true;
+        }
+
+        keymapReplayDepth++;
+        try {
+            for (String token : replayTokens) {
+                KeyEvent replay = keyEventFromToken(token);
+                if (replay != null) {
+                    keyPressed(replay);
+                }
+            }
+        } finally {
+            keymapReplayDepth--;
+        }
+        return true;
+    }
+
+    private String modeKey(EditorMode mode) {
+        if (mode == null) {
+            return "normal";
+        }
+        switch (mode) {
+            case NORMAL:
+                return "normal";
+            case INSERT:
+                return "insert";
+            case VISUAL:
+                return "visual";
+            case VISUAL_LINE:
+                return "visual_line";
+            case REPLACE:
+                return "replace";
+            case COMMAND:
+                return "command";
+            case SEARCH:
+                return "search";
+            default:
+                return "normal";
+        }
+    }
+
+    private String keySpecFromEvent(KeyEvent e) {
+        if (e == null) {
+            return null;
+        }
+        int code = e.getKeyCode();
+        if (code == KeyEvent.VK_ESCAPE) {
+            return "<esc>";
+        }
+        if (code == KeyEvent.VK_ENTER) {
+            return "<enter>";
+        }
+        if (code == KeyEvent.VK_TAB) {
+            return "<tab>";
+        }
+        if (code == KeyEvent.VK_SPACE) {
+            return "<space>";
+        }
+        if (code == KeyEvent.VK_BACK_SPACE) {
+            return "<bs>";
+        }
+        if (code == KeyEvent.VK_DELETE) {
+            return "<del>";
+        }
+        if (code == KeyEvent.VK_UP) {
+            return "<up>";
+        }
+        if (code == KeyEvent.VK_DOWN) {
+            return "<down>";
+        }
+        if (code == KeyEvent.VK_LEFT) {
+            return "<left>";
+        }
+        if (code == KeyEvent.VK_RIGHT) {
+            return "<right>";
+        }
+        char c = e.getKeyChar();
+        if (e.isControlDown()) {
+            String ctrlTarget = ctrlTarget(code, c);
+            if (ctrlTarget != null) {
+                return "<c-" + ctrlTarget + ">";
+            }
+        }
+        if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
+            return String.valueOf(c);
+        }
+        return null;
+    }
+
+    private String ctrlTarget(int keyCode, char keyChar) {
+        if (keyCode == KeyEvent.VK_ESCAPE) {
+            return "esc";
+        }
+        if (keyCode == KeyEvent.VK_ENTER) {
+            return "enter";
+        }
+        if (keyCode == KeyEvent.VK_TAB) {
+            return "tab";
+        }
+        if (keyCode == KeyEvent.VK_UP) {
+            return "up";
+        }
+        if (keyCode == KeyEvent.VK_DOWN) {
+            return "down";
+        }
+        if (keyCode == KeyEvent.VK_LEFT) {
+            return "left";
+        }
+        if (keyCode == KeyEvent.VK_RIGHT) {
+            return "right";
+        }
+        if (keyCode == KeyEvent.VK_BACK_SPACE) {
+            return "bs";
+        }
+        if (keyCode == KeyEvent.VK_DELETE) {
+            return "del";
+        }
+        if (keyChar != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(keyChar)) {
+            return String.valueOf(Character.toLowerCase(keyChar));
+        }
+        return null;
+    }
+
+    private List<String> parseKeySequence(String mapping) {
+        List<String> tokens = new ArrayList<>();
+        if (mapping == null || mapping.isEmpty()) {
+            return tokens;
+        }
+        int index = 0;
+        while (index < mapping.length()) {
+            char c = mapping.charAt(index);
+            if (Character.isWhitespace(c)) {
+                index++;
+                continue;
+            }
+            if (c == '<') {
+                int close = mapping.indexOf('>', index + 1);
+                if (close > index + 1) {
+                    tokens.add(mapping.substring(index, close + 1));
+                    index = close + 1;
+                    continue;
+                }
+            }
+            tokens.add(String.valueOf(c));
+            index++;
+        }
+        return tokens;
+    }
+
+    private KeyEvent keyEventFromToken(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        if (token.length() == 1) {
+            char c = token.charAt(0);
+            int code = KeyEvent.getExtendedKeyCodeForChar(c);
+            if (code == KeyEvent.VK_UNDEFINED) {
+                code = 0;
+            }
+            return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, 0, code, c);
+        }
+        if (!(token.startsWith("<") && token.endsWith(">"))) {
+            return null;
+        }
+
+        String inner = token.substring(1, token.length() - 1).trim().toLowerCase();
+        if (inner.isEmpty()) {
+            return null;
+        }
+
+        if (inner.startsWith("c-") && inner.length() > 2) {
+            KeyStrokeSpec ctrlSpec = keyStrokeSpec(inner.substring(2));
+            if (ctrlSpec == null) {
+                return null;
+            }
+            return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, KeyEvent.CTRL_DOWN_MASK, ctrlSpec.keyCode, ctrlSpec.keyChar);
+        }
+
+        KeyStrokeSpec spec = keyStrokeSpec(inner);
+        if (spec == null) {
+            return null;
+        }
+        return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, 0, spec.keyCode, spec.keyChar);
+    }
+
+    private KeyStrokeSpec keyStrokeSpec(String token) {
+        if (token == null || token.isEmpty()) {
+            return null;
+        }
+        switch (token) {
+            case "esc":
+                return new KeyStrokeSpec(KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
+            case "enter":
+            case "cr":
+                return new KeyStrokeSpec(KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED);
+            case "tab":
+                return new KeyStrokeSpec(KeyEvent.VK_TAB, '\t');
+            case "space":
+                return new KeyStrokeSpec(KeyEvent.VK_SPACE, ' ');
+            case "bs":
+            case "backspace":
+                return new KeyStrokeSpec(KeyEvent.VK_BACK_SPACE, KeyEvent.CHAR_UNDEFINED);
+            case "del":
+            case "delete":
+                return new KeyStrokeSpec(KeyEvent.VK_DELETE, KeyEvent.CHAR_UNDEFINED);
+            case "up":
+                return new KeyStrokeSpec(KeyEvent.VK_UP, KeyEvent.CHAR_UNDEFINED);
+            case "down":
+                return new KeyStrokeSpec(KeyEvent.VK_DOWN, KeyEvent.CHAR_UNDEFINED);
+            case "left":
+                return new KeyStrokeSpec(KeyEvent.VK_LEFT, KeyEvent.CHAR_UNDEFINED);
+            case "right":
+                return new KeyStrokeSpec(KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED);
+            case "lt":
+                return new KeyStrokeSpec(KeyEvent.VK_UNDEFINED, '<');
+            default:
+                if (token.length() == 1) {
+                    char c = token.charAt(0);
+                    int code = KeyEvent.getExtendedKeyCodeForChar(c);
+                    if (code == KeyEvent.VK_UNDEFINED) {
+                        code = 0;
+                    }
+                    return new KeyStrokeSpec(code, c);
+                }
+                return null;
+        }
+    }
+
+    private static final class KeyStrokeSpec {
+        private final int keyCode;
+        private final char keyChar;
+
+        private KeyStrokeSpec(int keyCode, char keyChar) {
+            this.keyCode = keyCode;
+            this.keyChar = keyChar;
+        }
     }
 
     // Normal mode key handling
@@ -1868,11 +2131,45 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         String lowered = withoutColon.toLowerCase();
 
-        String[] knownCommands = {
-            "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
-            "ls", "buffers", "bd", "set", "settings", "config", "log", "commandlog", "help", "wc", "recent", "d", "delete",
-            "files", "folder", "folders", "tree", "git", "buf", "grep", "registers", "marks", "goyo", "normal"
-        };
+        List<String> knownCommands = new ArrayList<>();
+        knownCommands.add("w");
+        knownCommands.add("write");
+        knownCommands.add("q");
+        knownCommands.add("quit");
+        knownCommands.add("q!");
+        knownCommands.add("wq");
+        knownCommands.add("x");
+        knownCommands.add("e");
+        knownCommands.add("edit");
+        knownCommands.add("bn");
+        knownCommands.add("bp");
+        knownCommands.add("ls");
+        knownCommands.add("buffers");
+        knownCommands.add("bd");
+        knownCommands.add("set");
+        knownCommands.add("settings");
+        knownCommands.add("config");
+        knownCommands.add("log");
+        knownCommands.add("commandlog");
+        knownCommands.add("help");
+        knownCommands.add("wc");
+        knownCommands.add("recent");
+        knownCommands.add("d");
+        knownCommands.add("delete");
+        knownCommands.add("files");
+        knownCommands.add("folder");
+        knownCommands.add("folders");
+        knownCommands.add("tree");
+        knownCommands.add("git");
+        knownCommands.add("buf");
+        knownCommands.add("grep");
+        knownCommands.add("registers");
+        knownCommands.add("marks");
+        knownCommands.add("goyo");
+        knownCommands.add("normal");
+        knownCommands.add("reload");
+        knownCommands.add("source");
+        knownCommands.addAll(configManager.getConfiguredCommandAliases());
 
         for (String command : knownCommands) {
             if (command.startsWith(lowered)) {

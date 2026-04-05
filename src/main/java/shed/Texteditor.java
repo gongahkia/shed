@@ -123,6 +123,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Character pendingSurroundOld;
     private Character pendingSurroundTarget;
     private boolean insertNormalOneShot;
+    private final List<Integer> extraCursors = new ArrayList<>();
     private Map<String, LspClient> lspClients;
     private Map<String, Integer> lspDocumentVersions;
     private Map<String, String> lspErrors;
@@ -1249,6 +1250,7 @@ public class Texteditor extends JFrame implements KeyListener {
         else if (code == KeyEvent.VK_ESCAPE) {
             editorState.pendingCount = "";
             editorState.pendingKey = '\0';
+            clearExtraCursors();
             showMessage("Already in normal mode");
         }
     }
@@ -1732,6 +1734,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 }
             } else if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
                 lastInsertedText += c;
+                applyMultiCursorInsert(c);
             }
         }
     }
@@ -1743,9 +1746,16 @@ public class Texteditor extends JFrame implements KeyListener {
         boolean lineMode = editorState.mode == EditorMode.VISUAL_LINE;
 
         if (code == KeyEvent.VK_ESCAPE) {
+            clearExtraCursors();
             setMode(EditorMode.NORMAL);
             writingArea.setSelectionStart(writingArea.getCaretPosition());
             writingArea.setSelectionEnd(writingArea.getCaretPosition());
+            return;
+        }
+
+        // Ctrl+d: add cursor at next match of selection
+        if (e.isControlDown() && (code == KeyEvent.VK_D || c == 'd')) {
+            addCursorAtNextMatch();
             return;
         }
 
@@ -3669,6 +3679,54 @@ public class Texteditor extends JFrame implements KeyListener {
                 popup.getSelectionModel().setSelectedIndex(0);
             }
         } catch (BadLocationException ignored) {}
+    }
+
+    private void addCursorAtNextMatch() {
+        String text = writingArea.getText();
+        String selected = writingArea.getSelectedText();
+        if (selected == null || selected.isEmpty()) {
+            // Get word under cursor
+            int pos = writingArea.getCaretPosition();
+            int start = pos, end = pos;
+            while (start > 0 && Character.isLetterOrDigit(text.charAt(start - 1))) start--;
+            while (end < text.length() && Character.isLetterOrDigit(text.charAt(end))) end++;
+            if (start == end) return;
+            selected = text.substring(start, end);
+        }
+        // Find next occurrence after last cursor
+        int searchFrom = writingArea.getCaretPosition();
+        for (int ec : extraCursors) {
+            searchFrom = Math.max(searchFrom, ec);
+        }
+        int nextIdx = text.indexOf(selected, searchFrom + 1);
+        if (nextIdx < 0) nextIdx = text.indexOf(selected); // wrap around
+        if (nextIdx >= 0 && !extraCursors.contains(nextIdx)) {
+            extraCursors.add(nextIdx);
+            showMessage("Added cursor (" + extraCursors.size() + " extra)");
+        }
+    }
+
+    private void applyMultiCursorInsert(char c) {
+        if (extraCursors.isEmpty()) return;
+        // Sort cursors descending so insertions don't shift earlier positions
+        List<Integer> sorted = new ArrayList<>(extraCursors);
+        sorted.sort(Collections.reverseOrder());
+        String s = String.valueOf(c);
+        for (int pos : sorted) {
+            if (pos >= 0 && pos <= writingArea.getText().length()) {
+                writingArea.insert(s, pos);
+            }
+        }
+        // Shift all cursors forward by 1
+        for (int i = 0; i < extraCursors.size(); i++) {
+            extraCursors.set(i, extraCursors.get(i) + 1);
+        }
+    }
+
+    private void clearExtraCursors() {
+        if (!extraCursors.isEmpty()) {
+            extraCursors.clear();
+        }
     }
 
     private void deleteWordBackwardInsert() {

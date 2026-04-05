@@ -258,10 +258,9 @@ $ sudo apt install jdk-20_linux-x64_bin.rpm
 1. In your terminal, run the following commands.
 
 ```console
-$ git clone https://github.com/gongahkia/shed && cd shed/src
-$ javac *.java
-$ jar cfm ../build/Shed.jar ../build/Manifest.txt *.class
-$ java -jar ../build/Shed.jar
+$ git clone https://github.com/gongahkia/shed && cd shed
+$ mvn -q -DskipTests package
+$ java -jar target/shed-2.0.0.jar
 ```
 
 > Note that the instructions above assume JDK 17 or JDK 20 have already been downloaded and added to PATH.
@@ -271,8 +270,8 @@ $ java -jar ../build/Shed.jar
 Run Shed from the command line:
 
 ```console
-$ java -jar Shed.jar                 # Opens file chooser dialog
-$ java -jar Shed.jar filename.txt    # Opens specific file
+$ java -jar target/shed-2.0.0.jar                 # Opens file chooser dialog
+$ java -jar target/shed-2.0.0.jar filename.txt    # Opens specific file
 ```
 
 ## Themes

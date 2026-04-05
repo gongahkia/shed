@@ -1,3 +1,5 @@
+package shed;
+
 // Editor Mode Enum
 // Defines the valid modes for Shed and their properties
 

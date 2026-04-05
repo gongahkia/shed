@@ -24,4 +24,4 @@ jobs:
           java-version: '21'
 
       - name: Compile sources
-        run: javac -Xlint:all -d /tmp/shed-build src/*.java
+        run: mvn -B -q -DskipTests compile

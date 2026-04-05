@@ -1,3 +1,5 @@
+package shed;
+
 // Command Handler Class
 // Parses and executes ex-style commands (:w, :q, :e, ranged :s/:d/:! etc.)
 

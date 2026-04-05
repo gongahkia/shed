@@ -1,3 +1,5 @@
+package shed;
+
 // Clipboard Manager Class
 // Handles yank, delete, and paste operations with both internal and system clipboard
 

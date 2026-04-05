@@ -1,3 +1,5 @@
+package shed;
+
 import java.awt.Component;
 import java.awt.event.KeyEvent;
 import java.util.Objects;

@@ -1,3 +1,5 @@
+package shed;
+
 // Search Manager Class
 // Handles literal search operations and persistent match highlighting
 

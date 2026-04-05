@@ -1,3 +1,5 @@
+package shed;
+
 // Line Number Mode Enum
 // Supports bitsy-style absolute, relative, and hybrid gutters
 

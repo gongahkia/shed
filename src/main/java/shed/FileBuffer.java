@@ -1,3 +1,5 @@
+package shed;
+
 // File Buffer Class
 // Manages individual file state including scratch buffers, file metadata, and persistence
 

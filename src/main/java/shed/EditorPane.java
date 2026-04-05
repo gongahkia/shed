@@ -1,3 +1,5 @@
+package shed;
+
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 

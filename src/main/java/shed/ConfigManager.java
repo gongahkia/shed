@@ -1,3 +1,5 @@
+package shed;
+
 // Config Manager Class
 // Loads and manages user configuration from ~/.shedrc
 

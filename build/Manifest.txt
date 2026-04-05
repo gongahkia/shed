@@ -1,1 +1,1 @@
-Main-class: Texteditor
+Main-class: shed.Texteditor

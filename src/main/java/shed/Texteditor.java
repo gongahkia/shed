@@ -1,3 +1,5 @@
+package shed;
+
 // SHit EDitor (Shed) Version 2.0 <Refactored Build>
 
 import javax.swing.*;

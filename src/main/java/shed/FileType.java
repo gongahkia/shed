@@ -1,3 +1,5 @@
+package shed;
+
 // File Type Enum
 // Detects a simple user-facing file type label for status and syntax support
 

@@ -5500,6 +5500,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return configManager.getThemeId();
     }
 
+    public String resolveCommandAlias(String command) {
+        return configManager.resolveCommandAlias(command);
+    }
+
     public String setThemeFromCommand(String value) {
         String appliedTheme = configManager.setTheme(value);
         if (appliedTheme == null) {
@@ -5507,6 +5511,62 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         applyThemeColors();
         return "Theme set to " + appliedTheme;
+    }
+
+    public String setConfigOption(String key, String value) {
+        if (key == null || key.isEmpty()) {
+            return "Error: Missing config key";
+        }
+        configManager.set(key, value == null ? "" : value);
+        applyRuntimeConfigFromSettings();
+        return "Set " + key;
+    }
+
+    public String reloadConfigFromDisk() {
+        configManager.reload();
+        applyRuntimeConfigFromSettings();
+        return "Settings reloaded";
+    }
+
+    public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null) {
+            return null;
+        }
+        if (!isSettingsFile(buffer.getFile())) {
+            return null;
+        }
+        return reloadConfigFromDisk();
+    }
+
+    private boolean isSettingsFile(File file) {
+        if (file == null) {
+            return false;
+        }
+        try {
+            File settings = new File(configManager.getConfigPath());
+            return file.getCanonicalFile().equals(settings.getCanonicalFile());
+        } catch (IOException e) {
+            return file.getAbsolutePath().equals(new File(configManager.getConfigPath()).getAbsolutePath());
+        }
+    }
+
+    private void applyRuntimeConfigFromSettings() {
+        lineNumberMode = configManager.getLineNumberMode();
+        Font editorFont = resolveEditorFont();
+        int tabSize = Math.max(1, configManager.getTabSize());
+        for (EditorPane pane : editorPanes) {
+            JTextArea area = pane.getTextArea();
+            area.setFont(editorFont);
+            area.setTabSize(tabSize);
+            pane.getScrollPane().getVerticalScrollBar().setUnitIncrement(Math.max(16, area.getFontMetrics(area.getFont()).getHeight()));
+        }
+        if (!configManager.getHighlightSearch() && searchManager != null) {
+            searchManager.clearHighlights();
+        }
+        applyThemeColors();
+        refreshLineNumberPanel();
+        updateCurrentLineHighlight();
+        updateStatusBar();
     }
 
     public String showThemes() {
@@ -5653,15 +5713,22 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
                    "  :goyo          Toggle zen mode\n" +
+                   "  :reload        Reload ~/.shedrc now\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command\n" +
                    "  :set nu        Enable line numbers\n" +
-                   "  :set theme=x   Switch color theme\n" +
+                    "  :set theme=x   Switch color theme\n" +
+                   "  :set k=v       Set any config key in-memory\n" +
                    "  :45            Go to line 45\n" +
                    "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +
                    "  :1,5s/a/b/g    Substitute a range\n" +
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
+                   "SETTINGS KEYS\n" +
+                   "  command.alias.<name>=<builtin>\n" +
+                   "  keybind.<mode>.<lhs>=<rhs>\n" +
+                   "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
+                   "  tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n\n" +
                    "note: this is a help buffer. use :q to return.\n";
         }
 
@@ -5719,6 +5786,21 @@ public class Texteditor extends JFrame implements KeyListener {
                     + ":tree opens/updates a left side tree pane.\n"
                     + ":tree <path> uses a specific root path.\n"
                     + "Use j/k to move and Enter or o to open the file in the other pane.\n";
+            case "keybind":
+            case "keybinding":
+            case "keybindings":
+                return "Help: keybindings\n\n"
+                    + "Define in ~/.shedrc as keybind.<mode>.<lhs>=<rhs>.\n"
+                    + "LHS/RHS accept raw characters and tokens like <esc>, <enter>, <c-w>.\n"
+                    + "Use mode global for mappings active in every mode.\n"
+                    + "Use value <nop> to disable a key.\n";
+            case "commands":
+            case "alias":
+            case "aliases":
+                return "Help: command aliases\n\n"
+                    + "Define in ~/.shedrc as command.alias.<newname>=<builtin>.\n"
+                    + "Example: command.alias.ww=w and command.alias.qq=q.\n"
+                    + "Aliases are used by command execution and command completion.\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"

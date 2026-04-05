@@ -1,6 +1,72 @@
 package shed;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.regex.Pattern;
+
 public class SyntaxHighlightService {
+
+    public static class SyntaxRule {
+        public final Pattern pattern;
+        public final String scope; // "type", "function", "annotation", "constant", "number"
+        public SyntaxRule(String regex, String scope) {
+            this.pattern = Pattern.compile(regex);
+            this.scope = scope;
+        }
+    }
+
+    public List<SyntaxRule> scopeRulesFor(FileType fileType) {
+        List<SyntaxRule> rules = new ArrayList<>();
+        switch (fileType) {
+            case JAVA:
+                rules.add(new SyntaxRule("@\\w+", "annotation"));
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9]*\\b", "type"));
+                rules.add(new SyntaxRule("\\b[a-z_][a-zA-Z0-9_]*\\s*(?=\\()", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*[lLfFdD]?\\b", "number"));
+                break;
+            case PYTHON:
+                rules.add(new SyntaxRule("@\\w+", "annotation"));
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9]*\\b", "type"));
+                rules.add(new SyntaxRule("\\bdef\\s+(\\w+)", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*\\b", "number"));
+                break;
+            case JAVASCRIPT:
+            case TYPESCRIPT:
+                rules.add(new SyntaxRule("@\\w+", "annotation"));
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9]*\\b", "type"));
+                rules.add(new SyntaxRule("\\b[a-z_$][a-zA-Z0-9_$]*\\s*(?=\\()", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*\\b", "number"));
+                break;
+            case RUST:
+                rules.add(new SyntaxRule("#\\[\\w+[^]]*\\]", "annotation"));
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9]*\\b", "type"));
+                rules.add(new SyntaxRule("\\bfn\\s+(\\w+)", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*[uif]?\\d*\\b", "number"));
+                break;
+            case GO:
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9]*\\b", "type"));
+                rules.add(new SyntaxRule("\\bfunc\\s+(\\w+)", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*\\b", "number"));
+                break;
+            case C:
+            case CPP:
+                rules.add(new SyntaxRule("\\b[A-Z][a-zA-Z0-9_]*\\b", "type"));
+                rules.add(new SyntaxRule("\\b[a-z_][a-zA-Z0-9_]*\\s*(?=\\()", "function"));
+                rules.add(new SyntaxRule("\\b[A-Z_]{2,}\\b", "constant"));
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.xXbBeEpP]*[uUlLfF]*\\b", "number"));
+                break;
+            default:
+                rules.add(new SyntaxRule("\\b\\d+[\\d_.]*\\b", "number"));
+                break;
+        }
+        return rules;
+    }
+
     public String[] keywordsFor(FileType fileType) {
         switch (fileType) {
             case JAVA:
@@ -31,9 +97,7 @@ public class SyntaxHighlightService {
     }
 
     public boolean isStringDelimiter(FileType fileType, char c) {
-        if (c == '"' || c == '\'') {
-            return true;
-        }
+        if (c == '"' || c == '\'') return true;
         return (fileType == FileType.JAVASCRIPT || fileType == FileType.TYPESCRIPT || fileType == FileType.MARKDOWN) && c == '`';
     }
 

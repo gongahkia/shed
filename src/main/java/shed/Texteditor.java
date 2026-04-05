@@ -1640,8 +1640,13 @@ public class Texteditor extends JFrame implements KeyListener {
                 setMode(EditorMode.NORMAL);
                 return;
             } else if (code == KeyEvent.VK_J || e.getKeyChar() == 'j') {
-                // Ctrl+j: snippet expand
-                showMessage(expandSnippetAtCursor());
+                // Ctrl+j: snippet expand (or code fence language complete in markdown)
+                FileBuffer buf = getCurrentBuffer();
+                if (buf != null && buf.getFileType() == FileType.MARKDOWN && isOnCodeFenceLine()) {
+                    showMessage(completeCodeFenceLanguage());
+                } else {
+                    showMessage(expandSnippetAtCursor());
+                }
                 return;
             }
         }
@@ -4376,6 +4381,40 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // --- Snippet expansion ---
+
+    private boolean isOnCodeFenceLine() {
+        try {
+            int line = getCurrentCaretLine();
+            int lineStart = writingArea.getLineStartOffset(line);
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText(lineStart, lineEnd - lineStart).trim();
+            return lineText.startsWith("```");
+        } catch (BadLocationException e) {
+            return false;
+        }
+    }
+
+    private String completeCodeFenceLanguage() {
+        try {
+            int line = getCurrentCaretLine();
+            int lineStart = writingArea.getLineStartOffset(line);
+            int lineEnd = writingArea.getLineEndOffset(line);
+            String lineText = writingArea.getText(lineStart, lineEnd - lineStart).trim();
+            if (!lineText.startsWith("```")) return "Not a code fence line";
+            String prefix = lineText.substring(3).trim();
+            String[] matches = markdownService.filterCodeFenceLanguages(prefix);
+            if (matches.length == 0) return "No matching language";
+            String chosen = matches[0];
+            // Replace the line with the completed fence
+            suppressDocumentEvents = true;
+            writingArea.replaceRange("```" + chosen + "\n", lineStart, lineEnd);
+            suppressDocumentEvents = false;
+            markModified();
+            return "Language: " + chosen;
+        } catch (BadLocationException e) {
+            return "Error: " + e.getMessage();
+        }
+    }
 
     private String expandSnippetAtCursor() {
         FileBuffer buf = getCurrentBuffer();

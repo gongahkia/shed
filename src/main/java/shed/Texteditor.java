@@ -9424,6 +9424,49 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Quitting";
     }
 
+    public String showUndoHistory() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Undo History\n");
+        sb.append("=".repeat(40)).append("\n\n");
+        // UndoManager doesn't expose its edit list, but we can show state
+        int canUndo = 0;
+        int canRedo = 0;
+        javax.swing.undo.UndoManager um = undoManager;
+        // Count available undos by trying to get presentation names
+        try {
+            while (um.canUndo()) {
+                canUndo++;
+                um.undo();
+            }
+            // Redo them all back
+            int redone = 0;
+            while (um.canRedo() && redone < canUndo) {
+                um.redo();
+                redone++;
+            }
+            // Count remaining redos
+            javax.swing.undo.UndoManager probe = um;
+            while (probe.canRedo()) {
+                canRedo++;
+                probe.redo();
+            }
+            // Undo back to current position
+            for (int i = 0; i < canRedo; i++) {
+                probe.undo();
+            }
+        } catch (Exception ignored) {
+            sb.append("(unable to inspect undo state)\n");
+        }
+        sb.append("Position: ").append(canUndo).append(" edits deep\n");
+        sb.append("Can undo: ").append(canUndo).append(" steps\n");
+        sb.append("Can redo: ").append(canRedo).append(" steps\n");
+        sb.append("Total edits: ").append(canUndo + canRedo).append("\n\n");
+        sb.append("  u     = undo one step\n");
+        sb.append("  Ctrl+r = redo one step\n");
+        showScratchBuffer("[Undo History]", sb.toString());
+        return "Showing undo history";
+    }
+
     public String clearSearchHighlights() {
         searchManager.clearHighlights();
         return "Search highlights cleared";

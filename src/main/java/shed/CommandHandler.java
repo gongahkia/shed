@@ -151,6 +151,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
         registerCommand((args, range, force) -> editor.clearSearchHighlights(), "noh", "nohlsearch");
         registerCommand((args, range, force) -> editor.showCommandPalette(), "palette", "commands");
+        registerCommand((args, range, force) -> editor.showUndoHistory(), "undolist", "undotree");
         registerCommand((args, range, force) -> editor.writeAll(), "wa", "wall");
         registerCommand((args, range, force) -> editor.quitAll(force), "qa", "qall");
         registerCommand((args, range, force) -> { String r = editor.writeAll(); if (r.startsWith("Error")) return r; return editor.quitAll(force); }, "wqa", "wqall", "xa", "xall");

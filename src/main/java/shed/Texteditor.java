@@ -2175,6 +2175,11 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("definition");
         knownCommands.add("hover");
         knownCommands.add("references");
+        knownCommands.add("diagnostics");
+        knownCommands.add("diag");
+        knownCommands.add("ldiag");
+        knownCommands.add("dnext");
+        knownCommands.add("dprev");
         knownCommands.add("registers");
         knownCommands.add("marks");
         knownCommands.add("zen");
@@ -4347,6 +4352,9 @@ public class Texteditor extends JFrame implements KeyListener {
             case "actions":
             case "ca":
                 return lspCodeActions();
+            case "diagnostics":
+            case "diag":
+                return showDiagnostics();
             default:
                 return "Unknown :lsp subcommand: " + subcommand;
         }
@@ -4512,6 +4520,129 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Showing code actions";
         } catch (BadLocationException e) {
             return "LSP code actions failed: " + e.getMessage();
+        }
+    }
+
+    public String showDiagnostics() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "Diagnostics require a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(bufferUri(buffer));
+        if (diagnostics.isEmpty()) {
+            return "No diagnostics";
+        }
+        List<QuickfixService.Entry> entries = diagnosticsToQuickfixEntries(buffer.getFilePath(), diagnostics);
+        if (entries.isEmpty()) {
+            return "No diagnostics";
+        }
+        updateQuickfixEntries("diagnostics", entries);
+        return openQuickfixList();
+    }
+
+    public String diagnosticsNext() {
+        return jumpDiagnostic(true);
+    }
+
+    public String diagnosticsPrev() {
+        return jumpDiagnostic(false);
+    }
+
+    private String jumpDiagnostic(boolean forward) {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "Diagnostics require a file-backed buffer";
+        }
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) {
+            return "LSP unavailable";
+        }
+        syncLspOpen(buffer);
+        List<LspClient.Diagnostic> diagnostics = new ArrayList<>(client.getDiagnostics(bufferUri(buffer)));
+        if (diagnostics.isEmpty()) {
+            return "No diagnostics";
+        }
+        diagnostics.sort((left, right) -> {
+            if (left.getLine() != right.getLine()) {
+                return Integer.compare(left.getLine(), right.getLine());
+            }
+            return Integer.compare(left.getCharacter(), right.getCharacter());
+        });
+        int caretLine = getCurrentCaretLine();
+        LspClient.Diagnostic selected = null;
+        if (forward) {
+            for (LspClient.Diagnostic diagnostic : diagnostics) {
+                if (diagnostic.getLine() > caretLine) {
+                    selected = diagnostic;
+                    break;
+                }
+            }
+            if (selected == null) {
+                selected = diagnostics.get(0);
+            }
+        } else {
+            for (int i = diagnostics.size() - 1; i >= 0; i--) {
+                LspClient.Diagnostic diagnostic = diagnostics.get(i);
+                if (diagnostic.getLine() < caretLine) {
+                    selected = diagnostic;
+                    break;
+                }
+            }
+            if (selected == null) {
+                selected = diagnostics.get(diagnostics.size() - 1);
+            }
+        }
+        if (selected == null) {
+            return "No diagnostics";
+        }
+        try {
+            int line = Math.max(0, Math.min(selected.getLine(), writingArea.getLineCount() - 1));
+            int start = writingArea.getLineStartOffset(line);
+            int target = Math.min(start + Math.max(0, selected.getCharacter()), writingArea.getText().length());
+            writingArea.setCaretPosition(target);
+            return diagnosticSeverityLabel(selected.getSeverity()) + ": " + selected.getMessage();
+        } catch (BadLocationException e) {
+            return "Diagnostic jump failed: " + e.getMessage();
+        }
+    }
+
+    private List<QuickfixService.Entry> diagnosticsToQuickfixEntries(String filePath, List<LspClient.Diagnostic> diagnostics) {
+        List<QuickfixService.Entry> entries = new ArrayList<>();
+        if (filePath == null || diagnostics == null) {
+            return entries;
+        }
+        for (LspClient.Diagnostic diagnostic : diagnostics) {
+            if (diagnostic == null) {
+                continue;
+            }
+            entries.add(new QuickfixService.Entry(
+                filePath,
+                diagnostic.getLine() + 1,
+                diagnostic.getCharacter() + 1,
+                diagnostic.getMessage(),
+                "diag-" + diagnosticSeverityLabel(diagnostic.getSeverity()).toLowerCase()
+            ));
+        }
+        return entries;
+    }
+
+    private String diagnosticSeverityLabel(int severity) {
+        switch (severity) {
+            case 1:
+                return "Error";
+            case 2:
+                return "Warning";
+            case 3:
+                return "Info";
+            case 4:
+                return "Hint";
+            default:
+                return "Diag";
         }
     }
 
@@ -5386,9 +5517,46 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         List<LspClient.Diagnostic> diagnosticEntries = client.getDiagnostics(bufferUri(buffer));
-        if (!diagnosticEntries.isEmpty()) {
-            status.append("diag:").append(diagnosticEntries.size()).append("  ");
+        if (diagnosticEntries.isEmpty()) {
+            return;
         }
+        int errors = 0;
+        int warnings = 0;
+        int infos = 0;
+        for (LspClient.Diagnostic diagnostic : diagnosticEntries) {
+            if (diagnostic == null) {
+                continue;
+            }
+            switch (diagnostic.getSeverity()) {
+                case 1:
+                    errors++;
+                    break;
+                case 2:
+                    warnings++;
+                    break;
+                case 3:
+                case 4:
+                default:
+                    infos++;
+                    break;
+            }
+        }
+        status.append("diag:");
+        if (errors > 0) {
+            status.append("E").append(errors);
+        }
+        if (warnings > 0) {
+            if (errors > 0) {
+                status.append("/");
+            }
+            status.append("W").append(warnings);
+        }
+        if (errors == 0 && warnings == 0) {
+            status.append(diagnosticEntries.size());
+        } else if (infos > 0) {
+            status.append("+").append(infos);
+        }
+        status.append("  ");
     }
 
     private void handleDocumentChange() {

@@ -57,6 +57,8 @@ public class HelpService {
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
                    "  :lsp ...       LSP commands (def/hover/refs/rename/actions)\n" +
+                   "  :diagnostics   Push diagnostics into quickfix\n" +
+                   "  :dnext/:dprev  Jump next/prev diagnostic\n" +
                    "  :git ...       Git status/diff/log/add/commit\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
@@ -128,6 +130,7 @@ public class HelpService {
                     + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
                     + "If no server is available, Shed falls back to local buffer-word completion.\n"
                     + "Use :lsp definition|hover|references|rename <name>|codeaction for navigation/actions.\n"
+                    + "Use :diagnostics to send LSP diagnostics to quickfix and :dnext/:dprev to jump.\n"
                     + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
             case "git":
                 return "Help: git\n\n"

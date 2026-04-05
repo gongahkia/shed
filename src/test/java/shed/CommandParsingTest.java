@@ -51,6 +51,21 @@ public class CommandParsingTest {
         assertEquals("switch", handler.lastCall);
         assertEquals("feat-x", handler.lastArgs);
         assertEquals("ok-switch", switchResult);
+
+        String unstageResult = service.handle("unstage src/main", new File("."), handler);
+        assertEquals("unstage", handler.lastCall);
+        assertEquals("src/main", handler.lastArgs);
+        assertEquals("ok-unstage", unstageResult);
+
+        String checkoutResult = service.handle("co main", new File("."), handler);
+        assertEquals("checkout", handler.lastCall);
+        assertEquals("main", handler.lastArgs);
+        assertEquals("ok-checkout", checkoutResult);
+
+        String amendResult = service.handle("amend --no-edit", new File("."), handler);
+        assertEquals("amend", handler.lastCall);
+        assertEquals("--no-edit", handler.lastArgs);
+        assertEquals("ok-amend", amendResult);
     }
 
     private static class RecordingHandler implements GitService.Handler {

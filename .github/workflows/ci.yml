@@ -23,5 +23,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Compile sources
-        run: mvn -B -q -DskipTests compile
+      - name: Run tests
+        run: mvn -B -q test
+
+      - name: Build jar
+        run: mvn -B -q -DskipTests package

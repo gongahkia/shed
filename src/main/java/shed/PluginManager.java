@@ -1,7 +1,7 @@
 package shed;
 
 // Plugin Manager Class
-// Loads ~/.shed/plugins/*.shed files and registers commands, keybindings, event hooks
+// Loads ~/.shed/plugins/*.shed and *.lua files, registers commands, keybindings, event hooks
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,19 +17,24 @@ import java.util.stream.Stream;
 
 public class PluginManager {
     private final ConfigManager configManager;
+    private final Texteditor editor;
     private final List<PluginInfo> plugins;
     private final Map<String, List<String>> eventHooks; // event -> list of commands
+    private LuaEngine luaEngine;
 
-    public PluginManager(ConfigManager configManager) {
+    public PluginManager(ConfigManager configManager, Texteditor editor) {
         this.configManager = configManager;
+        this.editor = editor;
         this.plugins = new ArrayList<>();
         this.eventHooks = new LinkedHashMap<>();
+        this.luaEngine = new LuaEngine(editor);
         loadPlugins();
     }
 
     public void reload() {
         plugins.clear();
         eventHooks.clear();
+        luaEngine.reset();
         loadPlugins();
     }
 
@@ -39,14 +44,23 @@ public class PluginManager {
             return;
         }
         try (Stream<Path> files = Files.list(pluginDir.toPath())) {
-            files.filter(p -> p.toString().endsWith(".shed"))
+            files.filter(p -> {
+                     String name = p.toString();
+                     return name.endsWith(".shed") || name.endsWith(".lua");
+                 })
                  .sorted()
-                 .forEach(p -> loadPlugin(p.toFile()));
+                 .forEach(p -> {
+                     if (p.toString().endsWith(".lua")) {
+                         luaEngine.loadScript(p.toFile());
+                     } else {
+                         loadShedPlugin(p.toFile());
+                     }
+                 });
         } catch (IOException ignored) {
         }
     }
 
-    private void loadPlugin(File file) {
+    private void loadShedPlugin(File file) {
         PluginInfo info = new PluginInfo(file.getName());
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
@@ -55,7 +69,7 @@ public class PluginManager {
                 if (!line.startsWith("# @")) {
                     continue;
                 }
-                String directive = line.substring(3).trim(); // strip "# @"
+                String directive = line.substring(3).trim();
                 int sep = directive.indexOf(' ');
                 if (sep < 0) {
                     continue;
@@ -80,7 +94,6 @@ public class PluginManager {
                         break;
                     }
                     case "bind": {
-                        // format: <mode> <lhs>=<rhs>
                         int space = value.indexOf(' ');
                         if (space > 0) {
                             String mode = value.substring(0, space).trim().toLowerCase();
@@ -115,6 +128,18 @@ public class PluginManager {
         plugins.add(info);
     }
 
+    public void fireEvent(String event) {
+        // fire declarative .shed hooks
+        List<String> cmds = eventHooks.get(event);
+        if (cmds != null) {
+            for (String cmd : cmds) {
+                editor.executeCommand(cmd);
+            }
+        }
+        // fire Lua callbacks
+        luaEngine.fireEvent(event);
+    }
+
     public List<String> getEventCommands(String event) {
         return eventHooks.getOrDefault(event, List.of());
     }
@@ -123,10 +148,15 @@ public class PluginManager {
         return plugins;
     }
 
+    public LuaEngine getLuaEngine() {
+        return luaEngine;
+    }
+
     public String getPluginListText() {
-        if (plugins.isEmpty()) {
+        List<LuaEngine.LuaPluginInfo> luaScripts = luaEngine.getLoadedScripts();
+        if (plugins.isEmpty() && luaScripts.isEmpty()) {
             return "No plugins loaded.\n\n"
-                + "Place .shed files in ~/.shed/plugins/ to install plugins.\n"
+                + "Place .shed or .lua files in ~/.shed/plugins/ to install plugins.\n"
                 + "Use :help plugins for format details.\n";
         }
         StringBuilder sb = new StringBuilder();
@@ -147,6 +177,13 @@ public class PluginManager {
             }
             if (!p.bindings.isEmpty()) {
                 sb.append("    bindings: ").append(String.join(", ", p.bindings)).append("\n");
+            }
+            sb.append("\n");
+        }
+        for (LuaEngine.LuaPluginInfo lp : luaScripts) {
+            sb.append("  ").append(lp.file).append("  [lua]");
+            if (!lp.loaded) {
+                sb.append("  ERROR: ").append(lp.error);
             }
             sb.append("\n");
         }
@@ -171,7 +208,7 @@ public class PluginManager {
         String name;
         String description;
         final Map<String, String> commands;
-        final Map<String, String> events; // event -> command
+        final Map<String, String> events;
         final List<String> bindings;
         PluginInfo(String file) {
             this.file = file;

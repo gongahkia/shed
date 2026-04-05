@@ -244,7 +244,7 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();
         bracketColorEnabled = false;
-        pluginManager = new PluginManager(configManager);
+        pluginManager = new PluginManager(configManager, this);
         loadRecentFiles();
         lastMessage = "";
 
@@ -9548,9 +9548,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private void firePluginEvent(String event) {
         if (pluginManager == null) return;
-        for (String cmd : pluginManager.getEventCommands(event)) {
-            commandHandler.execute(cmd);
-        }
+        pluginManager.fireEvent(event);
     }
 
     public String reloadPlugins() {
@@ -9562,6 +9560,14 @@ public class Texteditor extends JFrame implements KeyListener {
     public String showPluginList() {
         showScratchBuffer("[plugins]", pluginManager.getPluginListText());
         return "Showing plugins";
+    }
+
+    public String executeCommand(String cmd) {
+        return commandHandler.execute(cmd);
+    }
+
+    public String getModeName() {
+        return editorState.mode == null ? "normal" : editorState.mode.getDisplayName().toLowerCase();
     }
 
     public String runUserCommand(String name, String shellCmd) {

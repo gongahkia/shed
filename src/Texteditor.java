@@ -4,12 +4,15 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
+import javax.swing.text.JTextComponent;
 import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.KeyListener;
 import java.awt.event.KeyEvent;
+import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -59,6 +62,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private String pendingCount;
     private Character pendingRegister;
     private boolean suppressDocumentEvents;
+    private boolean suppressNextTypedChar;
     private boolean closingDown;
     private List<String> recentFiles;
     private File recentFilesStore;
@@ -121,6 +125,7 @@ public class Texteditor extends JFrame implements KeyListener {
         visualStartPos = -1;
         lastCommand = "";
         suppressDocumentEvents = false;
+        suppressNextTypedChar = false;
         closingDown = false;
         recentFiles = new ArrayList<>();
         recentFilesStore = new File(System.getProperty("user.home"), ".shed_recent");
@@ -132,14 +137,14 @@ public class Texteditor extends JFrame implements KeyListener {
         searchForward = true;
         gitBranch = resolveGitBranch();
         substitutePreviewTags = new ArrayList<>();
-        currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x2A, 0x32, 0x3B));
-        substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x6D, 0x59, 0x3A));
+        currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
+        substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
         zenModeEnabled = false;
         lastInsertedText = "";
         reloadPromptActive = false;
         syntaxHighlightTags = new ArrayList<>();
-        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x2B, 0x4C, 0x7E));
-        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x5E, 0x3C, 0x4C));
+        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
+        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
         lastPreviewedMarkdown = null;
         jumpList = new ArrayList<>();
         jumpIndex = -1;
@@ -164,11 +169,15 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Initialize UI
         initializeUI();
+        applyThemeColors();
 
         // Initialize managers that depend on UI
         clipboardManager = new ClipboardManager();
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
+
+        // Set initial mode before loading any buffer
+        setMode(EditorMode.NORMAL);
 
         // Open file from command line or landing page
         if (args.length > 0) {
@@ -182,8 +191,6 @@ public class Texteditor extends JFrame implements KeyListener {
             openLandingPage();
         }
 
-        // Set initial mode
-        setMode(EditorMode.NORMAL);
         updateStatusBar();
 
         this.setVisible(true);
@@ -217,18 +224,18 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Create footer
         statusBar = new JLabel();
-        statusBar.setBackground(Color.decode("#1D242B"));
+        statusBar.setBackground(configManager.getStatusBarBackground());
         statusBar.setOpaque(true);
         statusBar.setPreferredSize(new Dimension(screenSize.width / 2, 30));
         statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        statusBar.setForeground(Color.decode("#FAF9F6"));
+        statusBar.setForeground(configManager.getStatusBarForeground());
 
         commandBar = new JLabel();
-        commandBar.setBackground(Color.decode("#12181F"));
+        commandBar.setBackground(configManager.getCommandBarBackground());
         commandBar.setOpaque(true);
         commandBar.setPreferredSize(new Dimension(screenSize.width / 2, 28));
         commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-        commandBar.setForeground(Color.decode("#C9D1D9"));
+        commandBar.setForeground(configManager.getCommandBarForeground());
 
         JPanel footerPanel = new JPanel(new GridLayout(2, 1));
         footerPanel.add(statusBar);
@@ -249,22 +256,24 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private EditorPane createEditorPane(Dimension screenSize) {
         JTextArea textArea = new JTextArea();
-        textArea.setPreferredSize(new Dimension(screenSize.width / 2, screenSize.height - 130));
         textArea.addKeyListener(this);
         textArea.setFont(resolveEditorFont());
         textArea.setTabSize(configManager.getTabSize());
+        textArea.setCaret(new BlockCaret());
         textArea.getCaret().setBlinkRate(0);
-        textArea.setCaretColor(Color.decode("#02862a"));
-        textArea.setForeground(Color.decode("#FAF9F6"));
+        textArea.setCaretColor(configManager.getCaretColor());
+        textArea.setForeground(configManager.getEditorForeground());
         textArea.setEditable(false);
-        textArea.setSelectionColor(new Color(0x4E, 0x5D, 0x6C));
-        textArea.setSelectedTextColor(Color.decode("#FAF9F6"));
+        textArea.setSelectionColor(configManager.getSelectionColor());
+        textArea.setSelectedTextColor(configManager.getSelectionTextColor());
 
         LineNumberPanel paneLineNumberPanel = new LineNumberPanel(textArea);
         paneLineNumberPanel.setMode(lineNumberMode);
         paneLineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
 
         JScrollPane paneScrollPane = new JScrollPane(textArea);
+        paneScrollPane.setWheelScrollingEnabled(true);
+        paneScrollPane.getVerticalScrollBar().setUnitIncrement(Math.max(16, textArea.getFontMetrics(textArea.getFont()).getHeight()));
         if (lineNumberMode != LineNumberMode.NONE) {
             paneScrollPane.setRowHeaderView(paneLineNumberPanel);
         }
@@ -275,6 +284,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (paneRef[0] != null && paneRef[0] != getActivePane()) {
                 activateEditorPane(paneRef[0]);
             }
+            ensureCaretVisible(textArea);
             updateCurrentLineHighlight();
             if (lineNumberPanel != null) {
                 lineNumberPanel.repaint();
@@ -301,6 +311,61 @@ public class Texteditor extends JFrame implements KeyListener {
         EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
         paneRef[0] = pane;
         return pane;
+    }
+
+    private static final class BlockCaret extends DefaultCaret {
+        private static final long serialVersionUID = 1L;
+
+        @Override
+        public void paint(Graphics g) {
+            JTextComponent component = getComponent();
+            if (component == null || !isVisible()) {
+                return;
+            }
+            try {
+                Rectangle2D modelBounds = component.modelToView2D(getDot());
+                if (modelBounds == null) {
+                    return;
+                }
+                Rectangle bounds = modelBounds.getBounds();
+                int caretWidth = Math.max(1, blockWidth(component, getDot()));
+                g.setXORMode(component.getBackground());
+                g.fillRect(bounds.x, bounds.y, caretWidth, bounds.height);
+                g.setPaintMode();
+            } catch (BadLocationException ignored) {
+            }
+        }
+
+        @Override
+        protected synchronized void damage(Rectangle r) {
+            if (r == null) {
+                return;
+            }
+            JTextComponent component = getComponent();
+            x = r.x;
+            y = r.y;
+            height = r.height;
+            width = component == null ? Math.max(1, r.width) : Math.max(1, blockWidth(component, getDot()));
+            repaint();
+        }
+
+        private int blockWidth(JTextComponent component, int dot) {
+            try {
+                int length = component.getDocument().getLength();
+                if (dot < length) {
+                    Rectangle2D current = component.modelToView2D(dot);
+                    Rectangle2D next = component.modelToView2D(dot + 1);
+                    if (current != null && next != null) {
+                        int width = (int) Math.round(next.getX() - current.getX());
+                        if (width > 0) {
+                            return width;
+                        }
+                    }
+                }
+            } catch (BadLocationException ignored) {
+            }
+            return Math.max(1, component.getFontMetrics(component.getFont()).charWidth('W'));
+        }
     }
 
     private void bindActivePane(EditorPane pane) {
@@ -389,6 +454,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
+        EditorMode previousMode = currentMode;
         if (currentMode == EditorMode.NORMAL && recordingRegister != null && !(pendingKey == '\0' && e.getKeyChar() == 'q')) {
             macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
         }
@@ -412,6 +478,9 @@ public class Texteditor extends JFrame implements KeyListener {
             case SEARCH:
                 handleSearchMode(e);
                 break;
+        }
+        if (previousMode != EditorMode.INSERT && currentMode == EditorMode.INSERT && isPrintableKey(e)) {
+            suppressNextTypedChar = true;
         }
         updateStatusBar();
     }
@@ -1612,10 +1681,37 @@ public class Texteditor extends JFrame implements KeyListener {
             int endLine = Math.max(anchorLine, currentLine);
             int selectionStart = writingArea.getLineStartOffset(startLine);
             int selectionEnd = writingArea.getLineEndOffset(endLine);
-            writingArea.setSelectionStart(selectionStart);
-            writingArea.setSelectionEnd(selectionEnd);
+            if (currentLine >= anchorLine) {
+                writingArea.setCaretPosition(selectionStart);
+                writingArea.moveCaretPosition(selectionEnd);
+            } else {
+                writingArea.setCaretPosition(selectionEnd);
+                writingArea.moveCaretPosition(selectionStart);
+            }
         } catch (BadLocationException ignored) {
         }
+    }
+
+    private void ensureCaretVisible(JTextArea area) {
+        if (area == null) {
+            return;
+        }
+        try {
+            Rectangle2D bounds = area.modelToView2D(area.getCaretPosition());
+            if (bounds != null) {
+                area.scrollRectToVisible(bounds.getBounds());
+            }
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private boolean isPrintableKey(KeyEvent e) {
+        char c = e.getKeyChar();
+        return c != KeyEvent.CHAR_UNDEFINED
+            && !Character.isISOControl(c)
+            && !e.isControlDown()
+            && !e.isAltDown()
+            && !e.isMetaDown();
     }
 
     private String searchWordUnderCursor(boolean forward) {
@@ -1747,6 +1843,11 @@ public class Texteditor extends JFrame implements KeyListener {
         for (EditorPane pane : editorPanes) {
             pane.getLineNumberPanel().setMode(lineNumberMode);
             pane.getLineNumberPanel().setHighlightCurrentLine(configManager.getShowCurrentLine());
+            pane.getLineNumberPanel().setColors(
+                configManager.getLineNumberBackground(),
+                configManager.getLineNumberForeground(),
+                configManager.getLineNumberActiveForeground()
+            );
             if (lineNumberMode == LineNumberMode.NONE) {
                 pane.getScrollPane().setRowHeaderView(null);
             } else {
@@ -1756,6 +1857,41 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         editorHostPanel.revalidate();
         editorHostPanel.repaint();
+    }
+
+    private void applyThemeColors() {
+        Color editorForeground = configManager.getEditorForeground();
+        Color caretColor = configManager.getCaretColor();
+        Color selectionColor = configManager.getSelectionColor();
+        Color selectionTextColor = configManager.getSelectionTextColor();
+
+        currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
+        substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
+        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
+        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
+
+        statusBar.setBackground(configManager.getStatusBarBackground());
+        statusBar.setForeground(configManager.getStatusBarForeground());
+        commandBar.setBackground(configManager.getCommandBarBackground());
+        commandBar.setForeground(configManager.getCommandBarForeground());
+
+        for (EditorPane pane : editorPanes) {
+            JTextArea area = pane.getTextArea();
+            area.setForeground(editorForeground);
+            area.setCaretColor(caretColor);
+            area.setSelectionColor(selectionColor);
+            area.setSelectedTextColor(selectionTextColor);
+        }
+
+        if (currentMode != null) {
+            writingArea.setBackground(getModeBackground(currentMode));
+        }
+
+        refreshLineNumberPanel();
+        updateCurrentLineHighlight();
+        applySyntaxHighlighting();
+        updateSubstitutePreview();
+        updateStatusBar();
     }
 
     private void applySyntaxHighlighting() {
@@ -4148,6 +4284,24 @@ public class Texteditor extends JFrame implements KeyListener {
         refreshLineNumberPanel();
     }
 
+    public String getCurrentThemeName() {
+        return configManager.getThemeId();
+    }
+
+    public String setThemeFromCommand(String value) {
+        String appliedTheme = configManager.setTheme(value);
+        if (appliedTheme == null) {
+            return "Unknown theme: " + value;
+        }
+        applyThemeColors();
+        return "Theme set to " + appliedTheme;
+    }
+
+    public String showThemes() {
+        showScratchBuffer("[themes]", configManager.getThemeListText());
+        return "Showing themes";
+    }
+
     public String setTabSizeFromCommand(String value) {
         try {
             int parsed = Math.max(1, Math.min(16, Integer.parseInt(value)));
@@ -4235,10 +4389,12 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  Ctrl-w h/j/k/l Move window focus\n" +
                    "  :registers     Show registers\n" +
                    "  :marks         Show marks\n" +
+                   "  :themes        Show built-in themes\n" +
                    "  :Goyo          Toggle zen mode\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command\n" +
                    "  :set nu        Enable line numbers\n" +
+                   "  :set theme=x   Switch color theme\n" +
                    "  :45            Go to line 45\n" +
                    "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +
@@ -4453,7 +4609,16 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     @Override
-    public void keyTyped(KeyEvent e) {}
+    public void keyTyped(KeyEvent e) {
+        if (suppressNextTypedChar) {
+            suppressNextTypedChar = false;
+            e.consume();
+            return;
+        }
+        if (currentMode != EditorMode.INSERT) {
+            e.consume();
+        }
+    }
 
     @Override
     public void keyReleased(KeyEvent e) {}

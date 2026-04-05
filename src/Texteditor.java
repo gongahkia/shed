@@ -1858,7 +1858,7 @@ public class Texteditor extends JFrame implements KeyListener {
         String[] knownCommands = {
             "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
             "ls", "buffers", "bd", "set", "settings", "config", "log", "commandlog", "help", "wc", "recent", "d", "delete",
-            "Files", "Buffers", "grep", "registers", "marks", "Goyo", "normal"
+            "Files", "folder", "folders", "tree", "git", "Buffers", "grep", "registers", "marks", "Goyo", "normal"
         };
 
         for (String command : knownCommands) {
@@ -2845,18 +2845,73 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showFileFinder() {
-        List<String> candidates = new ArrayList<>();
-        collectFiles(new File("."), candidates);
-        String selection = showPaletteDialog("Files", candidates);
-        if (selection == null || selection.isEmpty()) {
+        File selection = chooseWithNavigator(JFileChooser.FILES_ONLY, null, "Open File");
+        if (selection == null) {
             return "File finder cancelled";
         }
+        if (!selection.isFile()) {
+            return "Not a file: " + selection.getPath();
+        }
         try {
-            openFile(new File(selection));
-            return "Opened: " + selection;
+            openFile(selection);
+            return "Opened: " + selection.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening file: " + e.getMessage();
         }
+    }
+
+    public String showFolderFinder() {
+        File selection = chooseWithNavigator(JFileChooser.DIRECTORIES_ONLY, null, "Select Folder");
+        if (selection == null) {
+            return "Folder finder cancelled";
+        }
+        if (!selection.isDirectory()) {
+            return "Not a folder: " + selection.getPath();
+        }
+        return showFileFinderFromFolder(selection);
+    }
+
+    private String showFileFinderFromFolder(File folder) {
+        File selection = chooseWithNavigator(JFileChooser.FILES_ONLY, folder, "Open File in " + folder.getPath());
+        if (selection == null) {
+            return "Folder selected: " + folder.getPath();
+        }
+        if (!selection.isFile()) {
+            return "Not a file: " + selection.getPath();
+        }
+
+        try {
+            openFile(selection);
+            return "Opened: " + selection.getAbsolutePath();
+        } catch (IOException e) {
+            return "Error opening file: " + e.getMessage();
+        }
+    }
+
+    private File chooseWithNavigator(int selectionMode, File startDirectory, String title) {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setFileSelectionMode(selectionMode);
+        chooser.setDialogTitle(title);
+        chooser.setCurrentDirectory(resolveNavigatorStartDirectory(startDirectory));
+        int result = chooser.showOpenDialog(this);
+        if (result != JFileChooser.APPROVE_OPTION) {
+            return null;
+        }
+        return chooser.getSelectedFile();
+    }
+
+    private File resolveNavigatorStartDirectory(File preferred) {
+        if (preferred != null && preferred.exists()) {
+            return preferred;
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer != null && buffer.hasFilePath()) {
+            File parent = new File(buffer.getFilePath()).getParentFile();
+            if (parent != null && parent.exists()) {
+                return parent;
+            }
+        }
+        return new File(System.getProperty("user.home"));
     }
 
     public String showBufferFinder() {
@@ -4752,6 +4807,7 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :settings      Open user settings file\n" +
                    "  :log           Open command log file\n" +
                    "  :Files         File finder\n" +
+                   "  :folder        Folder finder\n" +
                    "  :Buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
                    "  :split/:vsplit Split the active window\n" +

@@ -39,6 +39,7 @@ public class FileBuffer {
     private FileType fileType;
     private final Map<Character, Integer> marks;
     private long lastKnownModifiedTime;
+    private String savedContent;
     private boolean scratch;
     private boolean largeFile;
     private String largeFileTail;
@@ -243,6 +244,7 @@ public class FileBuffer {
         Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
 
         this.modified = false;
+        this.savedContent = textToWrite;
         this.lastKnownModifiedTime = file.lastModified();
         removeBackup();
         this.fileSizeBytes = bytes.length;
@@ -286,6 +288,9 @@ public class FileBuffer {
     // Update content while explicitly controlling modification state
     public void setContent(String content, boolean modified) {
         setDocumentText(content == null ? "" : content, modified);
+        if (!modified) {
+            this.savedContent = content;
+        }
     }
 
     public String getContent() {
@@ -294,6 +299,10 @@ public class FileBuffer {
         } catch (BadLocationException e) {
             return "";
         }
+    }
+
+    public String getSavedContent() {
+        return savedContent;
     }
 
     public String getFullContent() {

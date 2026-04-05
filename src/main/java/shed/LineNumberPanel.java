@@ -6,6 +6,8 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.HashSet;
+import java.util.Set;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
 import javax.swing.text.BadLocationException;
@@ -17,6 +19,9 @@ class LineNumberPanel extends JPanel {
     private boolean highlightCurrentLine;
     private Color lineNumberColor;
     private Color currentLineNumberColor;
+    private Set<Integer> addedLines = new HashSet<>();
+    private Set<Integer> modifiedLines = new HashSet<>();
+    private Set<Integer> deletedAfterLines = new HashSet<>();
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
@@ -81,10 +86,47 @@ class LineNumberPanel extends JPanel {
                 }
                 int x = getWidth() - fm.stringWidth(lineNum) - 5;
                 g.drawString(lineNum, x, y);
+
+                // Diff gutter marker
+                int markerX = 1;
+                int markerW = 3;
+                int lineH = fm.getHeight();
+                if (addedLines.contains(i)) {
+                    g.setColor(new Color(0x3FB950));
+                    g.fillRect(markerX, p.y, markerW, lineH);
+                } else if (modifiedLines.contains(i)) {
+                    g.setColor(new Color(0x58A6FF));
+                    g.fillRect(markerX, p.y, markerW, lineH);
+                } else if (deletedAfterLines.contains(i)) {
+                    g.setColor(new Color(0xF85149));
+                    g.fillRect(markerX, p.y + lineH - 2, markerW + 2, 2);
+                }
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
+    }
+
+    public void updateDiffMarkers(String savedContent, String currentContent) {
+        addedLines.clear();
+        modifiedLines.clear();
+        deletedAfterLines.clear();
+        if (savedContent == null || currentContent == null) return;
+        String[] savedLines = savedContent.split("\n", -1);
+        String[] currentLines = currentContent.split("\n", -1);
+        int maxLen = Math.max(savedLines.length, currentLines.length);
+        for (int i = 0; i < maxLen; i++) {
+            if (i >= savedLines.length) {
+                addedLines.add(i);
+            } else if (i >= currentLines.length) {
+                if (currentLines.length > 0) {
+                    deletedAfterLines.add(currentLines.length - 1);
+                }
+            } else if (!savedLines[i].equals(currentLines[i])) {
+                modifiedLines.add(i);
+            }
+        }
+        repaint();
     }
 
     private String formatLineNumber(int line, int currentLine) {

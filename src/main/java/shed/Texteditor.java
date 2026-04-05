@@ -8111,7 +8111,14 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             recordChangePosition();
             syncLspChange(buffer);
+            updateDiffGutter(buffer);
             updateStatusBar();
+        }
+    }
+
+    private void updateDiffGutter(FileBuffer buffer) {
+        if (lineNumberPanel != null && buffer != null) {
+            lineNumberPanel.updateDiffMarkers(buffer.getSavedContent(), writingArea.getText());
         }
     }
 

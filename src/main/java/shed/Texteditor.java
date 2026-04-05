@@ -335,12 +335,48 @@ public class Texteditor extends JFrame implements KeyListener {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
+                FontMetrics fm = g.getFontMetrics(getFont());
+                int charW = fm.charWidth(' ');
+                int lineH = fm.getHeight();
+                int insetLeft = getInsets().left;
+
+                // Column ruler
                 int rulerCol = configManager.getRulerColumn();
                 if (rulerCol > 0) {
-                    FontMetrics fm = g.getFontMetrics(getFont());
-                    int x = fm.charWidth(' ') * rulerCol + getInsets().left;
+                    int x = charW * rulerCol + insetLeft;
                     g.setColor(new Color(255, 255, 255, 30));
                     g.drawLine(x, 0, x, getHeight());
+                }
+
+                // Indent guides
+                int tabSize = getTabSize();
+                if (tabSize > 0) {
+                    g.setColor(new Color(255, 255, 255, 15));
+                    Rectangle clip = g.getClipBounds();
+                    int startY = clip != null ? clip.y : 0;
+                    int endY = clip != null ? clip.y + clip.height : getHeight();
+                    String text = getText();
+                    try {
+                        int startLine = getLineOfOffset(viewToModel2D(new Point(0, startY)));
+                        int endLine = Math.min(getLineCount() - 1, getLineOfOffset(viewToModel2D(new Point(0, endY))));
+                        for (int line = startLine; line <= endLine; line++) {
+                            int ls = getLineStartOffset(line);
+                            int le = getLineEndOffset(line);
+                            String lineText = text.substring(ls, Math.min(le, text.length()));
+                            int indent = 0;
+                            for (int j = 0; j < lineText.length() && (lineText.charAt(j) == ' ' || lineText.charAt(j) == '\t'); j++) {
+                                indent += lineText.charAt(j) == '\t' ? tabSize : 1;
+                            }
+                            Rectangle2D r = modelToView2D(ls);
+                            if (r == null) continue;
+                            int y1 = (int) r.getY();
+                            int y2 = y1 + lineH;
+                            for (int col = tabSize; col < indent; col += tabSize) {
+                                int x = charW * col + insetLeft;
+                                g.drawLine(x, y1, x, y2);
+                            }
+                        }
+                    } catch (Exception ignored) {}
                 }
             }
         };

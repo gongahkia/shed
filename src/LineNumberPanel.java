@@ -13,11 +13,15 @@ class LineNumberPanel extends JPanel {
     private final JTextArea textArea;
     private LineNumberMode mode;
     private boolean highlightCurrentLine;
+    private Color lineNumberColor;
+    private Color currentLineNumberColor;
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
         setPreferredSize(new Dimension(40, Integer.MAX_VALUE));
         setBackground(Color.decode("#161B22"));
+        this.lineNumberColor = Color.decode("#8B949E");
+        this.currentLineNumberColor = Color.decode("#FAF9F6");
         this.mode = LineNumberMode.ABSOLUTE;
         this.highlightCurrentLine = true;
     }
@@ -30,11 +34,23 @@ class LineNumberPanel extends JPanel {
         this.highlightCurrentLine = highlightCurrentLine;
     }
 
+    public void setColors(Color background, Color lineNumberColor, Color currentLineNumberColor) {
+        if (background != null) {
+            setBackground(background);
+        }
+        if (lineNumberColor != null) {
+            this.lineNumberColor = lineNumberColor;
+        }
+        if (currentLineNumberColor != null) {
+            this.currentLineNumberColor = currentLineNumberColor;
+        }
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-        g.setColor(Color.decode("#8B949E"));
+        g.setColor(lineNumberColor);
         g.setFont(textArea.getFont());
 
         FontMetrics fm = g.getFontMetrics();
@@ -57,9 +73,9 @@ class LineNumberPanel extends JPanel {
 
                 String lineNum = formatLineNumber(i, currentLine);
                 if (highlightCurrentLine && i == currentLine) {
-                    g.setColor(Color.decode("#FAF9F6"));
+                    g.setColor(currentLineNumberColor);
                 } else {
-                    g.setColor(Color.decode("#8B949E"));
+                    g.setColor(lineNumberColor);
                 }
                 int x = getWidth() - fm.stringWidth(lineNum) - 5;
                 g.drawString(lineNum, x, y);

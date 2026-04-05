@@ -46,6 +46,7 @@ public class HelpService {
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :log           Open command log file\n" +
+                   "  :session ...   Session save/load/list\n" +
                    "  :jobs          Show async job list\n" +
                    "  :jobcancel id  Cancel async job\n" +
                    "  :files         File finder\n" +
@@ -153,6 +154,14 @@ public class HelpService {
                     + ":tree reveal sets tree root to the current file's directory.\n"
                     + ":tree new/mkdir/rename/rm perform file operations from command mode.\n"
                     + "Use j/k to move and Enter or o to open the file in the other pane.\n";
+            case "session":
+            case "sessions":
+                return "Help: sessions\n\n"
+                    + ":session save [name] stores open file-backed buffers.\n"
+                    + ":session load [name] restores a saved session.\n"
+                    + ":session load! [name] restores even when buffers are modified.\n"
+                    + ":session list lists all saved sessions.\n"
+                    + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shedrc.\n";
             case "keybind":
             case "keybinding":
             case "keybindings":

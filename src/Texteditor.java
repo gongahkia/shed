@@ -169,15 +169,14 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Initialize UI
         initializeUI();
+        // Set initial mode before any status rendering hooks
+        setMode(EditorMode.NORMAL);
         applyThemeColors();
 
         // Initialize managers that depend on UI
         clipboardManager = new ClipboardManager();
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
-
-        // Set initial mode before loading any buffer
-        setMode(EditorMode.NORMAL);
 
         // Open file from command line or landing page
         if (args.length > 0) {
@@ -3702,7 +3701,8 @@ public class Texteditor extends JFrame implements KeyListener {
             status.append("1:1  ");
         }
 
-        status.append(currentMode.getDisplayName()).append("  ");
+        EditorMode modeForStatus = currentMode == null ? EditorMode.NORMAL : currentMode;
+        status.append(modeForStatus.getDisplayName()).append("  ");
 
         if (buffer != null) {
             status.append(buffer.getFileType().getDisplayName()).append("  ");

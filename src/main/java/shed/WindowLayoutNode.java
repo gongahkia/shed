@@ -148,6 +148,28 @@ public class WindowLayoutNode {
         }
     }
 
+    public boolean adjustRatio(EditorPane target, double delta) {
+        if (isLeaf()) return false;
+        // try deeper splits first (innermost split containing target)
+        if (first != null && !first.isLeaf() && first.adjustRatio(target, delta)) return true;
+        if (second != null && !second.isLeaf() && second.adjustRatio(target, delta)) return true;
+        // if no deeper split handled it, adjust this one
+        List<EditorPane> firstLeaves = new ArrayList<>();
+        List<EditorPane> secondLeaves = new ArrayList<>();
+        if (first != null) first.collectLeaves(firstLeaves);
+        if (second != null) second.collectLeaves(secondLeaves);
+        boolean inFirst = firstLeaves.contains(target);
+        boolean inSecond = secondLeaves.contains(target);
+        if (inFirst || inSecond) {
+            double newRatio = ratio + delta;
+            if (newRatio >= 0.05 && newRatio <= 0.95) {
+                ratio = newRatio;
+                return true;
+            }
+        }
+        return false;
+    }
+
     public List<EditorPane> findNeighborCandidates(EditorPane target, Direction direction) {
         List<PathStep> path = new ArrayList<>();
         if (!buildPath(target, path)) {

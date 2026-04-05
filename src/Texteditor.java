@@ -1854,15 +1854,16 @@ public class Texteditor extends JFrame implements KeyListener {
         if (withoutColon.startsWith("e ") || withoutColon.startsWith("w ")) {
             return ":" + completePath(withoutColon.substring(0, 2), withoutColon.substring(2));
         }
+        String lowered = withoutColon.toLowerCase();
 
         String[] knownCommands = {
             "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
             "ls", "buffers", "bd", "set", "settings", "config", "log", "commandlog", "help", "wc", "recent", "d", "delete",
-            "Files", "folder", "folders", "tree", "git", "Buffers", "grep", "registers", "marks", "Goyo", "normal"
+            "files", "folder", "folders", "tree", "git", "buf", "grep", "registers", "marks", "goyo", "normal"
         };
 
         for (String command : knownCommands) {
-            if (command.startsWith(withoutColon)) {
+            if (command.startsWith(lowered)) {
                 return ":" + command;
             }
         }
@@ -5115,10 +5116,10 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :log           Open command log file\n" +
-                   "  :Files         File finder\n" +
+                   "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   File tree in scratch buffer\n" +
-                   "  :Buffers       Buffer finder\n" +
+                   "  :buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
                    "  :git ...       Git status/diff/log/add/commit\n" +
                    "  :split/:vsplit Split the active window\n" +
@@ -5127,7 +5128,7 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :registers     Show registers\n" +
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
-                   "  :Goyo          Toggle zen mode\n" +
+                   "  :goyo          Toggle zen mode\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command\n" +
                    "  :set nu        Enable line numbers\n" +

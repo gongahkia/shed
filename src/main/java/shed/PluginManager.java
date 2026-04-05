@@ -21,6 +21,8 @@ public class PluginManager {
     private final List<PluginInfo> plugins;
     private final Map<String, List<String>> eventHooks; // event -> list of commands
     private LuaEngine luaEngine;
+    private int eventDepth;
+    private static final int MAX_EVENT_DEPTH = 3;
 
     public PluginManager(ConfigManager configManager, Texteditor editor) {
         this.configManager = configManager;
@@ -129,15 +131,19 @@ public class PluginManager {
     }
 
     public void fireEvent(String event) {
-        // fire declarative .shed hooks
-        List<String> cmds = eventHooks.get(event);
-        if (cmds != null) {
-            for (String cmd : cmds) {
-                editor.executeCommand(cmd);
+        if (eventDepth >= MAX_EVENT_DEPTH) return; // prevent infinite recursion
+        eventDepth++;
+        try {
+            List<String> cmds = eventHooks.get(event);
+            if (cmds != null) {
+                for (String cmd : cmds) {
+                    editor.executeCommand(cmd);
+                }
             }
+            luaEngine.fireEvent(event);
+        } finally {
+            eventDepth--;
         }
-        // fire Lua callbacks
-        luaEngine.fireEvent(event);
     }
 
     public List<String> getEventCommands(String event) {
@@ -187,6 +193,148 @@ public class PluginManager {
             }
             sb.append("\n");
         }
+        return sb.toString();
+    }
+
+    public String getPluginsDirectoryPath() {
+        return configManager.getPluginsDirectoryPath();
+    }
+
+    public String disablePlugin(String name) {
+        File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        File target = findPluginFile(pluginDir, name);
+        if (target == null) return "Plugin not found: " + name;
+        File disabled = new File(target.getAbsolutePath() + ".disabled");
+        if (!target.renameTo(disabled)) return "Failed to disable: " + name;
+        reload();
+        return "Disabled plugin: " + name;
+    }
+
+    public String enablePlugin(String name) {
+        File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        File disabled = findDisabledFile(pluginDir, name);
+        if (disabled == null) return "No disabled plugin found: " + name;
+        String enabledName = disabled.getName().replaceFirst("\\.disabled$", "");
+        File enabled = new File(disabled.getParent(), enabledName);
+        if (!disabled.renameTo(enabled)) return "Failed to enable: " + name;
+        reload();
+        return "Enabled plugin: " + name;
+    }
+
+    public String getPluginInfoText(String name) {
+        for (PluginInfo p : plugins) {
+            if (p.name.equalsIgnoreCase(name) || p.file.equalsIgnoreCase(name)
+                || p.file.replace(".shed", "").equalsIgnoreCase(name)
+                || p.file.replace(".lua", "").equalsIgnoreCase(name)) {
+                return formatPluginInfo(p);
+            }
+        }
+        for (LuaEngine.LuaPluginInfo lp : luaEngine.getLoadedScripts()) {
+            if (lp.file.equalsIgnoreCase(name) || lp.file.replace(".lua", "").equalsIgnoreCase(name)) {
+                return formatLuaPluginInfo(lp);
+            }
+        }
+        return "Plugin not found: " + name;
+    }
+
+    public File createPluginFile(String name) throws IOException {
+        File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        if (!pluginDir.exists()) pluginDir.mkdirs();
+        boolean isLua = name.endsWith(".lua");
+        String fileName = name.contains(".") ? name : name + ".shed";
+        File file = new File(pluginDir, fileName);
+        if (file.exists()) return file; // open existing
+        if (isLua || fileName.endsWith(".lua")) {
+            Files.writeString(file.toPath(),
+                "-- " + name.replace(".lua", "") + " plugin\n"
+                + "-- shed.* API: get_line, set_line, line_count, get_text,\n"
+                + "-- file_path, file_name, is_modified, cursor_line, cursor_col,\n"
+                + "-- command, message, shell, config_get, config_set, mode, on\n\n"
+                + "shed.on(\"BufOpen\", function()\n"
+                + "  -- your code here\n"
+                + "end)\n");
+        } else {
+            Files.writeString(file.toPath(),
+                "# @name " + name.replace(".shed", "") + "\n"
+                + "# @description\n"
+                + "# @command example=!echo hello\n"
+                + "# @event BufOpen=:example\n"
+                + "# @bind normal gx=:example\n");
+        }
+        return file;
+    }
+
+    public List<String> listDisabledPlugins() {
+        List<String> disabled = new ArrayList<>();
+        File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        if (!pluginDir.isDirectory()) return disabled;
+        File[] files = pluginDir.listFiles();
+        if (files == null) return disabled;
+        for (File f : files) {
+            if (f.getName().endsWith(".disabled")) {
+                disabled.add(f.getName());
+            }
+        }
+        java.util.Collections.sort(disabled);
+        return disabled;
+    }
+
+    private File findPluginFile(File dir, String name) {
+        if (!dir.isDirectory()) return null;
+        File[] files = dir.listFiles();
+        if (files == null) return null;
+        for (File f : files) {
+            String fn = f.getName();
+            if (fn.equals(name) || fn.equals(name + ".shed") || fn.equals(name + ".lua")) return f;
+            String base = fn.endsWith(".shed") ? fn.replace(".shed", "") : fn.endsWith(".lua") ? fn.replace(".lua", "") : fn;
+            if (base.equalsIgnoreCase(name)) return f;
+        }
+        return null;
+    }
+
+    private File findDisabledFile(File dir, String name) {
+        if (!dir.isDirectory()) return null;
+        File[] files = dir.listFiles();
+        if (files == null) return null;
+        for (File f : files) {
+            String fn = f.getName();
+            if (!fn.endsWith(".disabled")) continue;
+            if (fn.equals(name + ".disabled") || fn.equals(name + ".shed.disabled")
+                || fn.equals(name + ".lua.disabled")) return f;
+            String base = fn.replace(".shed.disabled", "").replace(".lua.disabled", "").replace(".disabled", "");
+            if (base.equalsIgnoreCase(name)) return f;
+        }
+        return null;
+    }
+
+    private String formatPluginInfo(PluginInfo p) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Plugin: ").append(p.name).append("\n");
+        sb.append("File: ").append(p.file).append("\n");
+        if (!p.description.isEmpty()) sb.append("Description: ").append(p.description).append("\n");
+        sb.append("\n");
+        if (!p.commands.isEmpty()) {
+            sb.append("Commands:\n");
+            p.commands.forEach((k, v) -> sb.append("  :").append(k).append(" -> ").append(v).append("\n"));
+            sb.append("\n");
+        }
+        if (!p.events.isEmpty()) {
+            sb.append("Events:\n");
+            p.events.forEach((ev, cmd) -> sb.append("  ").append(ev).append(" -> :").append(cmd).append("\n"));
+            sb.append("\n");
+        }
+        if (!p.bindings.isEmpty()) {
+            sb.append("Bindings:\n");
+            p.bindings.forEach(b -> sb.append("  ").append(b).append("\n"));
+        }
+        return sb.toString();
+    }
+
+    private String formatLuaPluginInfo(LuaEngine.LuaPluginInfo lp) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Plugin: ").append(lp.file).append("  [lua]\n");
+        sb.append("Status: ").append(lp.loaded ? "loaded" : "error").append("\n");
+        if (lp.error != null) sb.append("Error: ").append(lp.error).append("\n");
         return sb.toString();
     }
 

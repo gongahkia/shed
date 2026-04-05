@@ -403,13 +403,21 @@ public class CommandHandler {
     }
 
     private String handlePlugin(String args) {
-        if (args != null && !args.isEmpty()) {
-            String sub = args.trim().toLowerCase(Locale.ROOT);
-            if (sub.equals("reload")) {
-                return editor.reloadPlugins();
-            }
+        if (args == null || args.isEmpty()) return editor.showPluginList();
+        String trimmed = args.trim();
+        int space = trimmed.indexOf(' ');
+        String sub = (space < 0 ? trimmed : trimmed.substring(0, space)).toLowerCase(Locale.ROOT);
+        String subArgs = space < 0 ? "" : trimmed.substring(space + 1).trim();
+        switch (sub) {
+            case "list": return editor.showPluginList();
+            case "reload": return editor.reloadPlugins();
+            case "enable": return subArgs.isEmpty() ? "Usage: :plugin enable <name>" : editor.enablePlugin(subArgs);
+            case "disable": return subArgs.isEmpty() ? "Usage: :plugin disable <name>" : editor.disablePlugin(subArgs);
+            case "info": return subArgs.isEmpty() ? "Usage: :plugin info <name>" : editor.showPluginInfo(subArgs);
+            case "path": return editor.showPluginPath();
+            case "new": return subArgs.isEmpty() ? "Usage: :plugin new <name>" : editor.createAndOpenPlugin(subArgs);
+            default: return "Unknown :plugin subcommand: " + sub;
         }
-        return editor.showPluginList();
     }
 
     private String handleNormal(String keys, RangeParseResult range) {

@@ -66,6 +66,9 @@ public class HelpService {
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +
                    "  :lsp ...       LSP commands (def/hover/refs/rename/actions)\n" +
+                   "  :lsp status    Show running LSP servers\n" +
+                   "  :lsp servers   List all configured + builtin LSP servers\n" +
+                   "  :lsp restart   Restart LSP server for current extension\n" +
                    "  :diagnostics   Push diagnostics into quickfix\n" +
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
                    "  :git ...       Git status/diff/log/add/commit\n" +
@@ -90,6 +93,8 @@ public class HelpService {
                    "PLUGINS\n" +
                    "  :plugin           List loaded plugins\n" +
                    "  :plugin reload    Reload plugins from ~/.shed/plugins/\n" +
+                   "  :plugin enable/disable <name>  Toggle plugins\n" +
+                   "  :plugin new <name> Create + open plugin template\n" +
                    "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
                    "  command.alias.<name>=<builtin>\n" +
@@ -139,12 +144,26 @@ public class HelpService {
                     + "Examples: cs\"', ds), ysw].\n";
             case "lsp":
             case "completion":
-                return "Help: completion\n\n"
-                    + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
-                    + "If no server is available, Shed falls back to local buffer-word completion.\n"
-                    + "Use :lsp definition|hover|references|rename <name>|codeaction [index] for navigation/actions.\n"
-                    + "Use :diagnostics to send LSP diagnostics to quickfix and :dnext/:dprev to jump.\n"
-                    + "Configure overrides in ~/.shed/shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
+                return "Help: LSP\n\n"
+                    + "USAGE\n"
+                    + "  Ctrl-n           trigger completion (falls back to buffer words)\n"
+                    + "  :lsp definition  go to definition\n"
+                    + "  :lsp hover       show hover info\n"
+                    + "  :lsp references  find references\n"
+                    + "  :lsp rename X    rename symbol to X\n"
+                    + "  :lsp codeaction  list/apply code actions\n"
+                    + "  :diagnostics     push diagnostics to quickfix\n"
+                    + "  :dnext/:dprev    jump through diagnostics\n\n"
+                    + "MANAGEMENT\n"
+                    + "  :lsp status      show running servers and errors\n"
+                    + "  :lsp servers     list configured (shedrc) + builtin servers\n"
+                    + "  :lsp restart [ext] restart server (default: current buffer ext)\n"
+                    + "  :lsp stop [ext]  stop a server\n"
+                    + "  :lsp log         show LSP error log\n\n"
+                    + "CONFIGURATION\n"
+                    + "  lsp.<ext>.command=<binary>   server command in ~/.shed/shedrc\n"
+                    + "  lsp.<ext>.args=<flags>       server arguments\n"
+                    + "  Builtin servers: rs py js jsx ts tsx go c cpp h hpp\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"
@@ -233,7 +252,12 @@ public class HelpService {
                     + "    end)\n\n"
                     + "COMMANDS\n"
                     + "  :plugin           list loaded plugins\n"
-                    + "  :plugin reload    reload all plugins from disk\n";
+                    + "  :plugin reload    reload all plugins from disk\n"
+                    + "  :plugin info X    show details for plugin X\n"
+                    + "  :plugin enable X  enable a disabled plugin\n"
+                    + "  :plugin disable X disable a plugin (renames to .disabled)\n"
+                    + "  :plugin new X     create and open a new plugin template\n"
+                    + "  :plugin path      show plugins directory + disabled list\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"

@@ -978,18 +978,67 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (c == 'c') {
             editorState.pendingKey = 'c';
         } else if (c == 'x') {
+            int count = consumePendingCount();
+            StringBuilder deleted = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                String d = clipboardManager.deleteChar(writingArea);
+                if (d.isEmpty()) break;
+                deleted.append(d);
+            }
+            if (deleted.length() > 0) {
+                storeDelete(consumePendingRegister(), deleted.toString(), false);
+                markModified();
+            }
+        } else if (c == 'X') {
+            int count = consumePendingCount();
+            StringBuilder deleted = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                int pos = writingArea.getCaretPosition();
+                if (pos <= 0) break;
+                String text = writingArea.getText();
+                deleted.insert(0, text.charAt(pos - 1));
+                writingArea.replaceRange("", pos - 1, pos);
+            }
+            if (deleted.length() > 0) {
+                storeDelete(consumePendingRegister(), deleted.toString(), false);
+                markModified();
+            }
+        } else if (c == 's') {
+            int count = consumePendingCount();
+            StringBuilder deleted = new StringBuilder();
+            for (int i = 0; i < count; i++) {
+                String d = clipboardManager.deleteChar(writingArea);
+                if (d.isEmpty()) break;
+                deleted.append(d);
+            }
+            if (deleted.length() > 0) {
+                storeDelete(consumePendingRegister(), deleted.toString(), false);
+                markModified();
+            }
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
+        } else if (c == 'S') {
             editorState.pendingCount = "";
-            storeDelete(consumePendingRegister(), clipboardManager.deleteChar(writingArea), false);
+            lastCommand = "S";
+            storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
             markModified();
+            lastInsertedText = "";
+            setMode(EditorMode.INSERT);
         } else if (c == 'Y') {
             editorState.pendingCount = "";
             showMessage(yankToEndOfLine());
         } else if (c == 'p') {
+            int count = consumePendingCount();
+            for (int i = 0; i < count; i++) {
+                pasteFromRegister(false);
+            }
             editorState.pendingCount = "";
-            showMessage(pasteFromRegister(false));
         } else if (c == 'P') {
+            int count = consumePendingCount();
+            for (int i = 0; i < count; i++) {
+                pasteFromRegister(true);
+            }
             editorState.pendingCount = "";
-            showMessage(pasteFromRegister(true));
         } else if (c == 'D') {
             editorState.pendingCount = "";
             lastCommand = "D";
@@ -1119,6 +1168,24 @@ public class Texteditor extends JFrame implements KeyListener {
             case 'N':
             case ';':
             case ',':
+            case 'd':
+            case 'y':
+            case 'c':
+            case 'x':
+            case 'X':
+            case 's':
+            case 'S':
+            case 'p':
+            case 'P':
+            case 'D':
+            case 'C':
+            case 'Y':
+            case 'J':
+            case 'f':
+            case 'F':
+            case 't':
+            case 'T':
+            case 'r':
                 return true;
             default:
                 return false;
@@ -1158,9 +1225,20 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingCount = "";
         } else if (editorState.pendingKey == 'y') {
             if (c == 'y') {
+                int count = consumePendingCount();
                 lastCommand = "yy";
-                storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
-                showMessage("Line yanked");
+                try {
+                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                    int startOffset = writingArea.getLineStartOffset(line);
+                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
+                    int endOffset = writingArea.getLineEndOffset(endLine);
+                    String yanked = writingArea.getText(startOffset, endOffset - startOffset);
+                    clipboardManager.yankSelection(yanked);
+                    storeYank(consumePendingRegister(), yanked, true);
+                    showMessage(count > 1 ? count + " lines yanked" : "Line yanked");
+                } catch (BadLocationException ex) {
+                    showMessage("Line yanked");
+                }
             } else if (c == 's') {
                 pendingSurroundAction = 'y';
                 editorState.pendingKey = '\0';
@@ -1180,10 +1258,22 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingCount = "";
         } else if (editorState.pendingKey == 'd') {
             if (c == 'd') {
+                int count = consumePendingCount();
                 lastCommand = "dd";
-                storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
-                markModified();
-                showMessage("Line deleted");
+                try {
+                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                    int startOffset = writingArea.getLineStartOffset(line);
+                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
+                    int endOffset = writingArea.getLineEndOffset(endLine);
+                    String deleted = writingArea.getText(startOffset, endOffset - startOffset);
+                    storeDelete(consumePendingRegister(), deleted, true);
+                    writingArea.replaceRange("", startOffset, endOffset);
+                    writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
+                    markModified();
+                    showMessage(count > 1 ? count + " lines deleted" : "Line deleted");
+                } catch (BadLocationException ex) {
+                    showMessage("Line deleted");
+                }
             } else if (c == 's') {
                 pendingSurroundAction = 'd';
                 editorState.pendingKey = '\0';
@@ -1197,10 +1287,19 @@ public class Texteditor extends JFrame implements KeyListener {
                 editorState.pendingKey = 'D';
                 return;
             } else if (c == 'w') {
+                int count = consumePendingCount();
                 lastCommand = "dw";
-                storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
-                markModified();
-                showMessage("Word deleted");
+                StringBuilder deleted = new StringBuilder();
+                for (int i = 0; i < count; i++) {
+                    String d = clipboardManager.deleteWord(writingArea);
+                    if (d.isEmpty()) break;
+                    deleted.append(d);
+                }
+                if (deleted.length() > 0) {
+                    storeDelete(consumePendingRegister(), deleted.toString(), false);
+                    markModified();
+                }
+                showMessage(count > 1 ? count + " words deleted" : "Word deleted");
             } else {
                 showMessage(applyMotionOperator('d', String.valueOf(c)));
             }
@@ -1208,8 +1307,19 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingCount = "";
         } else if (editorState.pendingKey == 'c') {
             if (c == 'c') {
+                int count = consumePendingCount();
                 lastCommand = "cc";
-                storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
+                try {
+                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                    int startOffset = writingArea.getLineStartOffset(line);
+                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
+                    int endOffset = writingArea.getLineEndOffset(endLine);
+                    String deleted = writingArea.getText(startOffset, endOffset - startOffset);
+                    storeDelete(consumePendingRegister(), deleted, true);
+                    writingArea.replaceRange("", startOffset, endOffset);
+                    writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
+                    markModified();
+                } catch (BadLocationException ex) {}
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
             } else if (c == 's') {
@@ -1225,8 +1335,18 @@ public class Texteditor extends JFrame implements KeyListener {
                 editorState.pendingKey = 'C';
                 return;
             } else if (c == 'w') {
+                int count = consumePendingCount();
                 lastCommand = "cw";
-                storeDelete(consumePendingRegister(), clipboardManager.deleteWord(writingArea), false);
+                StringBuilder deleted = new StringBuilder();
+                for (int i = 0; i < count; i++) {
+                    String d = clipboardManager.deleteWord(writingArea);
+                    if (d.isEmpty()) break;
+                    deleted.append(d);
+                }
+                if (deleted.length() > 0) {
+                    storeDelete(consumePendingRegister(), deleted.toString(), false);
+                    markModified();
+                }
                 lastInsertedText = "";
                 setMode(EditorMode.INSERT);
             } else {
@@ -1380,6 +1500,16 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
+        // Handle pending g prefix (gc = toggle comment)
+        if (editorState.pendingKey == 'g') {
+            editorState.pendingKey = '\0';
+            if (c == 'c') {
+                toggleCommentSelection();
+            }
+            setMode(EditorMode.NORMAL);
+            return;
+        }
+
         // Update selection as cursor moves
         if (lineMode) {
             normalizeVisualLineCaretForMotion();
@@ -1411,7 +1541,10 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         // Operations on selection
-        if (c == 'y') {
+        if (c == 'g') {
+            editorState.pendingKey = 'g';
+            return;
+        } else if (c == 'y') {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
                 clipboardManager.yankSelection(selected);
@@ -1447,6 +1580,97 @@ public class Texteditor extends JFrame implements KeyListener {
         int caret = writingArea.getCaretPosition();
         if (selectionEnd > selectionStart && caret == selectionEnd && caret > 0) {
             writingArea.setCaretPosition(Math.max(selectionStart, caret - 1));
+        }
+    }
+
+    private void toggleCommentSelection() {
+        try {
+            FileBuffer buffer = getCurrentBuffer();
+            if (buffer == null) return;
+            String[] prefixes = lineCommentPrefixesFor(buffer.getFileType());
+            if (prefixes.length == 0) {
+                showMessage("No comment syntax for this file type");
+                return;
+            }
+            String prefix = prefixes[0];
+
+            int selStart = writingArea.getSelectionStart();
+            int selEnd = writingArea.getSelectionEnd();
+            int startLine = writingArea.getLineOfOffset(selStart);
+            int endLine = writingArea.getLineOfOffset(selEnd);
+            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
+                endLine--;
+            }
+
+            String text = writingArea.getText();
+
+            // Check if all non-blank lines are commented
+            boolean allCommented = true;
+            for (int i = startLine; i <= endLine; i++) {
+                int ls = writingArea.getLineStartOffset(i);
+                int le = writingArea.getLineEndOffset(i);
+                String trimmed = text.substring(ls, le).stripLeading();
+                if (!trimmed.isEmpty() && !trimmed.startsWith(prefix)) {
+                    allCommented = false;
+                    break;
+                }
+            }
+
+            int replaceStart = writingArea.getLineStartOffset(startLine);
+            int replaceEnd = writingArea.getLineEndOffset(endLine);
+            StringBuilder sb = new StringBuilder();
+
+            if (allCommented) {
+                // Uncomment: remove first prefix occurrence and one trailing space
+                for (int i = startLine; i <= endLine; i++) {
+                    int ls = writingArea.getLineStartOffset(i);
+                    int le = writingArea.getLineEndOffset(i);
+                    String line = text.substring(ls, le);
+                    int idx = line.indexOf(prefix);
+                    if (idx >= 0) {
+                        int afterPrefix = idx + prefix.length();
+                        boolean hasSpace = afterPrefix < line.length() && line.charAt(afterPrefix) == ' ';
+                        sb.append(line, 0, idx);
+                        sb.append(line.substring(hasSpace ? afterPrefix + 1 : afterPrefix));
+                    } else {
+                        sb.append(line);
+                    }
+                }
+            } else {
+                // Comment: find min indentation, insert prefix there
+                int minIndent = Integer.MAX_VALUE;
+                for (int i = startLine; i <= endLine; i++) {
+                    int ls = writingArea.getLineStartOffset(i);
+                    int le = writingArea.getLineEndOffset(i);
+                    String line = text.substring(ls, le).stripTrailing();
+                    if (line.isEmpty()) continue;
+                    int indent = 0;
+                    for (char ch : line.toCharArray()) {
+                        if (ch == ' ' || ch == '\t') indent++;
+                        else break;
+                    }
+                    minIndent = Math.min(minIndent, indent);
+                }
+                if (minIndent == Integer.MAX_VALUE) minIndent = 0;
+
+                for (int i = startLine; i <= endLine; i++) {
+                    int ls = writingArea.getLineStartOffset(i);
+                    int le = writingArea.getLineEndOffset(i);
+                    String line = text.substring(ls, le);
+                    if (line.stripTrailing().isEmpty()) {
+                        sb.append(line);
+                    } else {
+                        sb.append(line, 0, minIndent);
+                        sb.append(prefix).append(' ');
+                        sb.append(line.substring(minIndent));
+                    }
+                }
+            }
+
+            writingArea.replaceRange(sb.toString(), replaceStart, replaceEnd);
+            markModified();
+            showMessage(allCommented ? "Uncommented" : "Commented");
+        } catch (BadLocationException ignored) {
         }
     }
 
@@ -1587,6 +1811,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private static int vimCharClass(char c) {
+        if (Character.isLetterOrDigit(c) || c == '_') return 1;
+        if (Character.isWhitespace(c)) return 0;
+        return 2;
+    }
+
     // Movement methods
     private void moveUp() {
         try {
@@ -1638,34 +1868,28 @@ public class Texteditor extends JFrame implements KeyListener {
     private void moveWordForward() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
+        int len = text.length();
+        if (pos >= len) return;
 
-        // Skip current word
-        while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
-            pos++;
+        int cls = vimCharClass(text.charAt(pos));
+        if (cls > 0) {
+            while (pos < len && vimCharClass(text.charAt(pos)) == cls) pos++;
         }
-        // Skip whitespace
-        while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-            pos++;
-        }
+        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
 
-        writingArea.setCaretPosition(Math.min(pos, text.length()));
+        writingArea.setCaretPosition(Math.min(pos, len));
     }
 
     private void moveWordBackward() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
+        if (pos <= 0) return;
 
-        if (pos > 0) {
-            pos--;
-            // Skip whitespace
-            while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
-                pos--;
-            }
-            // Skip word
-            while (pos > 0 && !Character.isWhitespace(text.charAt(pos))) {
-                pos--;
-            }
-            if (pos > 0) pos++;
+        pos--;
+        while (pos > 0 && Character.isWhitespace(text.charAt(pos))) pos--;
+        if (pos >= 0) {
+            int cls = vimCharClass(text.charAt(pos));
+            while (pos > 0 && vimCharClass(text.charAt(pos - 1)) == cls) pos--;
         }
 
         writingArea.setCaretPosition(pos);
@@ -1674,21 +1898,17 @@ public class Texteditor extends JFrame implements KeyListener {
     private void moveWordEnd() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
+        int len = text.length();
+        if (pos >= len - 1) return;
 
-        if (pos < text.length()) {
-            pos++;
-            // Skip whitespace
-            while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-                pos++;
-            }
-            // Move to end of word
-            while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
-                pos++;
-            }
-            if (pos > 0) pos--;
+        pos++;
+        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
+        if (pos < len) {
+            int cls = vimCharClass(text.charAt(pos));
+            while (pos + 1 < len && vimCharClass(text.charAt(pos + 1)) == cls) pos++;
         }
 
-        writingArea.setCaretPosition(Math.min(pos, text.length()));
+        writingArea.setCaretPosition(Math.min(pos, len));
     }
 
     private void moveWordForwardBig() {
@@ -2854,24 +3074,30 @@ public class Texteditor extends JFrame implements KeyListener {
     private String findCharacter(char type, char target) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
+        int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
+        int lineEnd = text.indexOf('\n', caret);
+        if (lineEnd < 0) lineEnd = text.length();
+
         int result = -1;
         switch (type) {
             case 'f':
-                result = text.indexOf(target, Math.min(caret + 1, text.length()));
+                for (int i = caret + 1; i < lineEnd; i++) {
+                    if (text.charAt(i) == target) { result = i; break; }
+                }
                 break;
             case 'F':
-                result = text.lastIndexOf(target, Math.max(0, caret - 1));
+                for (int i = caret - 1; i >= lineStart; i--) {
+                    if (text.charAt(i) == target) { result = i; break; }
+                }
                 break;
             case 't':
-                result = text.indexOf(target, Math.min(caret + 1, text.length()));
-                if (result > caret) {
-                    result -= 1;
+                for (int i = caret + 1; i < lineEnd; i++) {
+                    if (text.charAt(i) == target) { result = i - 1; break; }
                 }
                 break;
             case 'T':
-                result = text.lastIndexOf(target, Math.max(0, caret - 1));
-                if (result >= 0) {
-                    result += 1;
+                for (int i = caret - 1; i >= lineStart; i--) {
+                    if (text.charAt(i) == target) { result = i + 1; break; }
                 }
                 break;
             default:

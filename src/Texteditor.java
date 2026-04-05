@@ -513,7 +513,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        if (!pendingCount.isEmpty() && c != 'g') {
+        if (!pendingCount.isEmpty() && !supportsCountPrefix(e)) {
             pendingCount = "";
         }
 
@@ -779,6 +779,49 @@ public class Texteditor extends JFrame implements KeyListener {
             pendingCount = "";
             pendingKey = '\0';
             showMessage("Already in normal mode");
+        }
+    }
+
+    private boolean supportsCountPrefix(KeyEvent e) {
+        int code = e.getKeyCode();
+        char c = e.getKeyChar();
+
+        if (e.isControlDown()) {
+            return c == 'd' || c == 'u' || code == KeyEvent.VK_D || code == KeyEvent.VK_U;
+        }
+
+        if (code == KeyEvent.VK_UP || code == KeyEvent.VK_DOWN || code == KeyEvent.VK_LEFT || code == KeyEvent.VK_RIGHT) {
+            return true;
+        }
+
+        switch (c) {
+            case 'h':
+            case 'j':
+            case 'k':
+            case 'l':
+            case 'w':
+            case 'b':
+            case 'e':
+            case 'W':
+            case 'B':
+            case 'E':
+            case '0':
+            case '^':
+            case '$':
+            case 'g':
+            case 'G':
+            case '{':
+            case '}':
+            case '(':
+            case ')':
+            case '%':
+            case 'n':
+            case 'N':
+            case ';':
+            case ',':
+                return true;
+            default:
+                return false;
         }
     }
 

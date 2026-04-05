@@ -92,6 +92,10 @@ public class CommandHandler {
                     return editor.deleteBuffer(force);
                 case "set":
                     return handleSet(args);
+                case "settings":
+                case "config":
+                case "shedrc":
+                    return editor.openSettingsBuffer();
                 case "help":
                 case "h":
                     editor.showHelp(args);

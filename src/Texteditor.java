@@ -84,6 +84,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private List<Object> syntaxHighlightTags;
     private Highlighter.HighlightPainter syntaxKeywordPainter;
     private Highlighter.HighlightPainter syntaxStringPainter;
+    private Highlighter.HighlightPainter syntaxCommentPainter;
+    private Highlighter.HighlightPainter syntaxNumberPainter;
     private File lastPreviewedMarkdown;
     private List<Integer> jumpList;
     private int jumpIndex;
@@ -145,6 +147,8 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxHighlightTags = new ArrayList<>();
         syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
         syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
+        syntaxCommentPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxCommentColor());
+        syntaxNumberPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxNumberColor());
         lastPreviewedMarkdown = null;
         jumpList = new ArrayList<>();
         jumpIndex = -1;
@@ -1080,7 +1084,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         // Update selection as cursor moves
-        int currentPos = writingArea.getCaretPosition();
+        if (lineMode) {
+            normalizeVisualLineCaretForMotion();
+        }
 
         // Navigation (same as normal mode)
         if (code == KeyEvent.VK_UP || c == 'k') moveUp();
@@ -1135,6 +1141,15 @@ public class Texteditor extends JFrame implements KeyListener {
                 markModified();
             }
             setMode(EditorMode.INSERT);
+        }
+    }
+
+    private void normalizeVisualLineCaretForMotion() {
+        int selectionStart = writingArea.getSelectionStart();
+        int selectionEnd = writingArea.getSelectionEnd();
+        int caret = writingArea.getCaretPosition();
+        if (selectionEnd > selectionStart && caret == selectionEnd && caret > 0) {
+            writingArea.setCaretPosition(Math.max(selectionStart, caret - 1));
         }
     }
 
@@ -1833,7 +1848,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         String[] knownCommands = {
             "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
-            "ls", "buffers", "bd", "set", "help", "wc", "recent", "d", "delete",
+            "ls", "buffers", "bd", "set", "settings", "config", "help", "wc", "recent", "d", "delete",
             "Files", "Buffers", "grep", "registers", "marks", "Goyo", "normal"
         };
 
@@ -1911,6 +1926,8 @@ public class Texteditor extends JFrame implements KeyListener {
         substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
         syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
         syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
+        syntaxCommentPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxCommentColor());
+        syntaxNumberPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxNumberColor());
 
         statusBar.setBackground(configManager.getStatusBarBackground());
         statusBar.setForeground(configManager.getStatusBarForeground());
@@ -1949,38 +1966,14 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        String[] keywords = syntaxKeywordsFor(buffer.getFileType());
         Highlighter highlighter = writingArea.getHighlighter();
-        for (String keyword : keywords) {
-            int index = 0;
-            while (index <= text.length() - keyword.length()) {
-                int match = text.indexOf(keyword, index);
-                if (match < 0) {
-                    break;
-                }
-                if (isWordBoundary(text, match - 1) && isWordBoundary(text, match + keyword.length())) {
-                    try {
-                        syntaxHighlightTags.add(highlighter.addHighlight(match, match + keyword.length(), syntaxKeywordPainter));
-                    } catch (BadLocationException ignored) {
-                    }
-                }
-                index = match + keyword.length();
-            }
-        }
+        boolean[] masked = new boolean[text.length()];
+        FileType fileType = buffer.getFileType();
 
-        int stringStart = -1;
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (stringStart < 0 && (c == '"' || c == '\'')) {
-                stringStart = i;
-            } else if (stringStart >= 0 && (c == '"' || c == '\'')) {
-                try {
-                    syntaxHighlightTags.add(highlighter.addHighlight(stringStart, i + 1, syntaxStringPainter));
-                } catch (BadLocationException ignored) {
-                }
-                stringStart = -1;
-            }
-        }
+        highlightComments(highlighter, text, fileType, masked);
+        highlightStrings(highlighter, text, fileType, masked);
+        highlightNumbers(highlighter, text, masked);
+        highlightKeywords(highlighter, text, syntaxKeywordsFor(fileType), masked);
     }
 
     private void clearSyntaxHighlighting() {
@@ -1994,38 +1987,288 @@ public class Texteditor extends JFrame implements KeyListener {
     private String[] syntaxKeywordsFor(FileType fileType) {
         switch (fileType) {
             case JAVA:
-                return new String[] {"class", "public", "private", "protected", "static", "void", "new", "return", "if", "else", "try", "catch"};
+                return new String[] {"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "native", "new", "null", "package", "private", "protected", "public", "record", "return", "sealed", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "var", "void", "volatile", "while", "true", "false"};
             case JAVASCRIPT:
             case TYPESCRIPT:
-                return new String[] {"function", "const", "let", "var", "return", "if", "else", "class", "import", "export"};
+                return new String[] {"as", "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "from", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "private", "protected", "public", "readonly", "return", "static", "super", "switch", "this", "throw", "true", "try", "type", "typeof", "undefined", "var", "void", "while", "yield"};
             case PYTHON:
-                return new String[] {"def", "class", "return", "if", "elif", "else", "import", "from", "for", "while", "try", "except"};
+                return new String[] {"and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "None", "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield"};
             case RUST:
-                return new String[] {"fn", "let", "mut", "impl", "struct", "enum", "match", "pub", "use", "mod", "return"};
+                return new String[] {"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "Self", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while"};
             case GO:
-                return new String[] {"func", "package", "import", "return", "if", "else", "struct", "interface", "type"};
+                return new String[] {"break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct", "switch", "type", "var"};
             case C:
             case CPP:
-                return new String[] {"int", "char", "void", "return", "if", "else", "struct", "class", "include"};
+                return new String[] {"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char", "class", "const", "constexpr", "continue", "default", "delete", "do", "double", "else", "enum", "extern", "false", "float", "for", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "nullptr", "operator", "private", "protected", "public", "register", "return", "short", "signed", "sizeof", "static", "struct", "switch", "template", "this", "throw", "true", "try", "typedef", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "while", "#include", "#define"};
             case HTML:
-                return new String[] {"<html", "<body", "<div", "<span", "<script", "<style", "<head", "<section"};
+                return new String[] {"<!DOCTYPE", "<html", "<head", "<body", "<main", "<section", "<article", "<aside", "<nav", "<header", "<footer", "<div", "<span", "<p", "<a", "<img", "<button", "<input", "<label", "<form", "<ul", "<ol", "<li", "<table", "<tr", "<td", "<th", "<script", "<style", "class", "id", "href", "src"};
             case CSS:
-                return new String[] {"display", "position", "color", "background", "padding", "margin", "flex", "grid"};
+                return new String[] {"display", "position", "color", "background", "background-color", "padding", "margin", "width", "height", "max-width", "min-width", "font-family", "font-size", "font-weight", "line-height", "text-align", "border", "border-radius", "box-shadow", "opacity", "flex", "flex-direction", "justify-content", "align-items", "grid", "grid-template-columns", "gap", "overflow", "z-index", "absolute", "relative", "fixed", "sticky"};
             case JSON:
                 return new String[] {"true", "false", "null"};
             case MARKDOWN:
-                return new String[] {"# ", "## ", "### ", "- ", "* "};
+                return new String[] {"# ", "## ", "### ", "#### ", "##### ", "###### ", "- ", "* ", "> ", "```"};
             default:
                 return new String[0];
         }
     }
 
-    private boolean isWordBoundary(String text, int index) {
-        if (index < 0 || index >= text.length()) {
+    private void highlightKeywords(Highlighter highlighter, String text, String[] keywords, boolean[] masked) {
+        if (keywords == null || keywords.length == 0) {
+            return;
+        }
+        for (String keyword : keywords) {
+            if (keyword == null || keyword.isEmpty()) {
+                continue;
+            }
+            int index = 0;
+            while (index <= text.length() - keyword.length()) {
+                int match = text.indexOf(keyword, index);
+                if (match < 0) {
+                    break;
+                }
+                int end = match + keyword.length();
+                if (isKeywordMatch(text, match, keyword, masked)) {
+                    addSyntaxHighlight(highlighter, match, end, syntaxKeywordPainter, masked);
+                }
+                index = match + Math.max(1, keyword.length());
+            }
+        }
+    }
+
+    private boolean isKeywordMatch(String text, int start, String keyword, boolean[] masked) {
+        int end = start + keyword.length();
+        if (start < 0 || end > text.length() || isMasked(masked, start, end)) {
+            return false;
+        }
+        boolean needsLeftBoundary = isIdentifierChar(keyword.charAt(0));
+        boolean needsRightBoundary = isIdentifierChar(keyword.charAt(keyword.length() - 1));
+        if (needsLeftBoundary && start > 0 && isIdentifierChar(text.charAt(start - 1))) {
+            return false;
+        }
+        if (needsRightBoundary && end < text.length() && isIdentifierChar(text.charAt(end))) {
+            return false;
+        }
+        return true;
+    }
+
+    private void highlightComments(Highlighter highlighter, String text, FileType fileType, boolean[] masked) {
+        String[] linePrefixes = lineCommentPrefixesFor(fileType);
+        String[][] blockPairs = blockCommentPairsFor(fileType);
+        int i = 0;
+        while (i < text.length()) {
+            if (masked[i]) {
+                i++;
+                continue;
+            }
+
+            boolean matched = false;
+            for (String prefix : linePrefixes) {
+                if (matchesAt(text, i, prefix)) {
+                    int end = i + prefix.length();
+                    while (end < text.length() && text.charAt(end) != '\n') {
+                        end++;
+                    }
+                    addSyntaxHighlight(highlighter, i, end, syntaxCommentPainter, masked);
+                    i = Math.max(i + 1, end);
+                    matched = true;
+                    break;
+                }
+            }
+            if (matched) {
+                continue;
+            }
+
+            for (String[] pair : blockPairs) {
+                String open = pair[0];
+                String close = pair[1];
+                if (!matchesAt(text, i, open)) {
+                    continue;
+                }
+                int closeIndex = text.indexOf(close, i + open.length());
+                int end = closeIndex < 0 ? text.length() : closeIndex + close.length();
+                addSyntaxHighlight(highlighter, i, end, syntaxCommentPainter, masked);
+                i = Math.max(i + 1, end);
+                matched = true;
+                break;
+            }
+            if (!matched) {
+                i++;
+            }
+        }
+    }
+
+    private void highlightStrings(Highlighter highlighter, String text, FileType fileType, boolean[] masked) {
+        int i = 0;
+        while (i < text.length()) {
+            if (masked[i]) {
+                i++;
+                continue;
+            }
+
+            if (fileType == FileType.PYTHON && (matchesAt(text, i, "\"\"\"") || matchesAt(text, i, "'''"))) {
+                String delimiter = matchesAt(text, i, "\"\"\"") ? "\"\"\"" : "'''";
+                int closeIndex = text.indexOf(delimiter, i + delimiter.length());
+                int end = closeIndex < 0 ? text.length() : closeIndex + delimiter.length();
+                addSyntaxHighlight(highlighter, i, end, syntaxStringPainter, masked);
+                i = Math.max(i + 1, end);
+                continue;
+            }
+
+            char c = text.charAt(i);
+            if (!isStringDelimiter(fileType, c)) {
+                i++;
+                continue;
+            }
+
+            boolean multiline = c == '`';
+            int end = i + 1;
+            boolean escaped = false;
+            while (end < text.length()) {
+                char current = text.charAt(end);
+                if (!multiline && current == '\n') {
+                    break;
+                }
+                if (!escaped && current == c) {
+                    end++;
+                    break;
+                }
+                if (current == '\\' && !escaped) {
+                    escaped = true;
+                } else {
+                    escaped = false;
+                }
+                end++;
+            }
+            addSyntaxHighlight(highlighter, i, Math.max(i + 1, end), syntaxStringPainter, masked);
+            i = Math.max(i + 1, end);
+        }
+    }
+
+    private void highlightNumbers(Highlighter highlighter, String text, boolean[] masked) {
+        int i = 0;
+        while (i < text.length()) {
+            if (masked[i]) {
+                i++;
+                continue;
+            }
+            if (!Character.isDigit(text.charAt(i)) || (i > 0 && isIdentifierChar(text.charAt(i - 1)))) {
+                i++;
+                continue;
+            }
+
+            int start = i;
+            int end = i + 1;
+            while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
+                end++;
+            }
+            if (end + 1 < text.length() && text.charAt(end) == '.' && Character.isDigit(text.charAt(end + 1))) {
+                end++;
+                while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
+                    end++;
+                }
+            }
+            if (end < text.length() && (text.charAt(end) == 'e' || text.charAt(end) == 'E')) {
+                int exponent = end + 1;
+                if (exponent < text.length() && (text.charAt(exponent) == '+' || text.charAt(exponent) == '-')) {
+                    exponent++;
+                }
+                if (exponent < text.length() && Character.isDigit(text.charAt(exponent))) {
+                    end = exponent + 1;
+                    while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
+                        end++;
+                    }
+                }
+            }
+            if (end >= text.length() || !isIdentifierChar(text.charAt(end))) {
+                addSyntaxHighlight(highlighter, start, end, syntaxNumberPainter, masked);
+            }
+            i = Math.max(i + 1, end);
+        }
+    }
+
+    private void addSyntaxHighlight(Highlighter highlighter, int start, int end, Highlighter.HighlightPainter painter, boolean[] masked) {
+        if (start < 0 || end <= start || start >= masked.length) {
+            return;
+        }
+        int safeEnd = Math.min(end, masked.length);
+        if (isMasked(masked, start, safeEnd)) {
+            return;
+        }
+        try {
+            syntaxHighlightTags.add(highlighter.addHighlight(start, safeEnd, painter));
+            markMasked(masked, start, safeEnd);
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private boolean isMasked(boolean[] masked, int start, int end) {
+        for (int i = start; i < end && i < masked.length; i++) {
+            if (masked[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void markMasked(boolean[] masked, int start, int end) {
+        for (int i = Math.max(0, start); i < end && i < masked.length; i++) {
+            masked[i] = true;
+        }
+    }
+
+    private boolean matchesAt(String text, int index, String token) {
+        if (token == null || token.isEmpty() || index < 0 || index + token.length() > text.length()) {
+            return false;
+        }
+        return text.regionMatches(index, token, 0, token.length());
+    }
+
+    private boolean isIdentifierChar(char c) {
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private boolean isStringDelimiter(FileType fileType, char c) {
+        if (c == '"' || c == '\'') {
             return true;
         }
-        char c = text.charAt(index);
-        return !Character.isLetterOrDigit(c) && c != '_';
+        return (fileType == FileType.JAVASCRIPT || fileType == FileType.TYPESCRIPT || fileType == FileType.MARKDOWN) && c == '`';
+    }
+
+    private String[] lineCommentPrefixesFor(FileType fileType) {
+        switch (fileType) {
+            case JAVA:
+            case JAVASCRIPT:
+            case TYPESCRIPT:
+            case C:
+            case CPP:
+            case GO:
+            case RUST:
+                return new String[] {"//"};
+            case PYTHON:
+                return new String[] {"#"};
+            default:
+                return new String[0];
+        }
+    }
+
+    private String[][] blockCommentPairsFor(FileType fileType) {
+        switch (fileType) {
+            case JAVA:
+            case JAVASCRIPT:
+            case TYPESCRIPT:
+            case C:
+            case CPP:
+            case GO:
+            case RUST:
+            case CSS:
+                return new String[][] {{"/*", "*/"}};
+            case HTML:
+            case MARKDOWN:
+                return new String[][] {{"<!--", "-->"}};
+            default:
+                return new String[0][0];
+        }
     }
 
     private void updateSubstitutePreview() {
@@ -4345,6 +4588,16 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing themes";
     }
 
+    public String openSettingsBuffer() {
+        File settingsFile = new File(configManager.getConfigPath());
+        try {
+            openFile(settingsFile);
+            return "Opened settings: " + settingsFile.getAbsolutePath();
+        } catch (IOException e) {
+            return "Error opening settings: " + e.getMessage();
+        }
+    }
+
     public String setTabSizeFromCommand(String value) {
         try {
             int parsed = Math.max(1, Math.min(16, Integer.parseInt(value)));
@@ -4424,6 +4677,7 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :ls            List buffers\n" +
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
+                   "  :settings      Open user settings file\n" +
                    "  :Files         File finder\n" +
                    "  :Buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +

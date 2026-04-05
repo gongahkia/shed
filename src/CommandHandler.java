@@ -129,6 +129,9 @@ public class CommandHandler {
                     return editor.showRegisters();
                 case "marks":
                     return editor.showMarks();
+                case "themes":
+                case "Theme":
+                    return editor.showThemes();
                 case "Goyo":
                 case "Zen":
                     return editor.toggleZenMode();
@@ -250,6 +253,21 @@ public class CommandHandler {
         }
         if (option.startsWith("line.numbers=")) {
             return editor.setLineNumberMode(option.substring(option.indexOf('=') + 1));
+        }
+        if (option.equals("theme")) {
+            return "Current theme: " + editor.getCurrentThemeName();
+        }
+        if (option.startsWith("theme=")) {
+            return editor.setThemeFromCommand(option.substring(option.indexOf('=') + 1).trim());
+        }
+        if (option.startsWith("colorscheme=")) {
+            return editor.setThemeFromCommand(option.substring(option.indexOf('=') + 1).trim());
+        }
+        if (option.startsWith("theme ")) {
+            return editor.setThemeFromCommand(option.substring("theme ".length()).trim());
+        }
+        if (option.startsWith("colorscheme ")) {
+            return editor.setThemeFromCommand(option.substring("colorscheme ".length()).trim());
         }
         return "Unknown option: " + option;
     }

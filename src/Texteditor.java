@@ -2378,20 +2378,22 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String resolveGitBranch() {
-        try {
-            File headFile = new File(".git/HEAD");
-            if (!headFile.exists()) {
-                return "";
-            }
-            String head = Files.readString(headFile.toPath(), StandardCharsets.UTF_8).trim();
-            if (head.startsWith("ref:")) {
-                int slash = head.lastIndexOf('/');
-                return slash >= 0 ? head.substring(slash + 1) : head;
-            }
-            return head.length() > 7 ? head.substring(0, 7) : head;
-        } catch (IOException e) {
+        CommandResult branch = runCommand(new File("."), List.of("git", "rev-parse", "--abbrev-ref", "HEAD"));
+        if (branch.exitCode != 0) {
             return "";
         }
+        String branchName = branch.stdout.strip();
+        if (branchName.isEmpty()) {
+            return "";
+        }
+        if ("HEAD".equals(branchName)) {
+            CommandResult detached = runCommand(new File("."), List.of("git", "rev-parse", "--short", "HEAD"));
+            if (detached.exitCode != 0) {
+                return "";
+            }
+            return detached.stdout.strip();
+        }
+        return branchName;
     }
 
     private String currentLineIndentation() {
@@ -2912,6 +2914,313 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
         return new File(System.getProperty("user.home"));
+    }
+
+    public String showFileTree(String pathArgument) {
+        String target = pathArgument == null ? "" : pathArgument.trim();
+        File root = target.isEmpty() ? new File(".") : new File(target);
+        if (!root.exists()) {
+            return "Path not found: " + root.getPath();
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("File tree\n\n");
+        builder.append(root.getAbsolutePath()).append("\n");
+        int[] rendered = new int[] {0};
+        if (root.isDirectory()) {
+            File[] children = listTreeChildren(root);
+            if (children.length == 0) {
+                builder.append("(empty)\n");
+            } else {
+                for (int i = 0; i < children.length; i++) {
+                    appendTreeEntry(builder, children[i], "", i == children.length - 1, rendered, 1200);
+                }
+            }
+        } else {
+            builder.append("\\-- ").append(root.getName()).append("\n");
+        }
+
+        if (rendered[0] >= 1200) {
+            builder.append("\n... output truncated (1200 entries)");
+        }
+
+        String titleSuffix = root.getName().isEmpty() ? root.getAbsolutePath() : root.getName();
+        showScratchBuffer("[tree " + titleSuffix + "]", builder.toString());
+        return "Showing file tree";
+    }
+
+    private void appendTreeEntry(StringBuilder builder, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
+        if (rendered[0] >= maxEntries) {
+            return;
+        }
+        builder.append(prefix).append(last ? "\\-- " : "|-- ");
+        builder.append(entry.getName());
+        if (entry.isDirectory()) {
+            builder.append("/");
+        }
+        builder.append("\n");
+        rendered[0]++;
+
+        if (!entry.isDirectory()) {
+            return;
+        }
+
+        File[] children = listTreeChildren(entry);
+        String childPrefix = prefix + (last ? "    " : "|   ");
+        for (int i = 0; i < children.length; i++) {
+            appendTreeEntry(builder, children[i], childPrefix, i == children.length - 1, rendered, maxEntries);
+            if (rendered[0] >= maxEntries) {
+                return;
+            }
+        }
+    }
+
+    private File[] listTreeChildren(File directory) {
+        File[] children = directory.listFiles(file -> !shouldSkipHiddenPath(file));
+        if (children == null || children.length == 0) {
+            return new File[0];
+        }
+        java.util.Arrays.sort(children, (left, right) -> {
+            if (left.isDirectory() != right.isDirectory()) {
+                return left.isDirectory() ? -1 : 1;
+            }
+            return left.getName().compareToIgnoreCase(right.getName());
+        });
+        return children;
+    }
+
+    public String handleGitCommand(String argument) {
+        File gitRoot = resolveGitRoot();
+        if (gitRoot == null) {
+            return "Not inside a git repository";
+        }
+
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty()) {
+            return showGitStatus(gitRoot);
+        }
+
+        int split = trimmed.indexOf(' ');
+        String subcommand = split < 0 ? trimmed : trimmed.substring(0, split).trim();
+        String rest = split < 0 ? "" : trimmed.substring(split + 1).trim();
+
+        switch (subcommand) {
+            case "status":
+            case "st":
+                return showGitStatus(gitRoot);
+            case "diff":
+                return showGitDiff(gitRoot, rest);
+            case "log":
+                return showGitLog(gitRoot, rest);
+            case "branch":
+            case "branches":
+                return showGitBranches(gitRoot);
+            case "add":
+                return runGitAdd(gitRoot, rest);
+            case "restore":
+            case "unstage":
+                return runGitRestoreStaged(gitRoot, rest);
+            case "commit":
+                return runGitCommit(gitRoot, rest);
+            case "help":
+                return showGitHelp();
+            default:
+                return "Unknown git command: " + subcommand + " (use :git help)";
+        }
+    }
+
+    private File resolveGitRoot() {
+        CommandResult result = runCommand(new File("."), List.of("git", "rev-parse", "--show-toplevel"));
+        if (result.exitCode != 0) {
+            return null;
+        }
+        String path = result.stdout.strip();
+        if (path.isEmpty()) {
+            return null;
+        }
+        File root = new File(path);
+        return root.exists() ? root : null;
+    }
+
+    private String showGitStatus(File gitRoot) {
+        CommandResult result = runCommand(gitRoot, List.of("git", "status", "--short", "--branch"));
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "(clean working tree)";
+        }
+        showScratchBuffer("[git status]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        return "Showing git status";
+    }
+
+    private String showGitDiff(File gitRoot, String args) {
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("diff");
+        command.addAll(splitWhitespaceArgs(args));
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "(no diff)";
+        }
+        showScratchBuffer("[git diff]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        return "Showing git diff";
+    }
+
+    private String showGitLog(File gitRoot, String args) {
+        int count = 20;
+        if (args != null && !args.isBlank()) {
+            try {
+                count = Math.max(1, Math.min(200, Integer.parseInt(args.trim())));
+            } catch (NumberFormatException e) {
+                return "Usage: :git log [count]";
+            }
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("log");
+        command.add("--oneline");
+        command.add("--decorate");
+        command.add("--graph");
+        command.add("-n");
+        command.add(String.valueOf(count));
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "(no commits)";
+        }
+        showScratchBuffer("[git log]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        return "Showing git log";
+    }
+
+    private String showGitBranches(File gitRoot) {
+        CommandResult result = runCommand(gitRoot, List.of("git", "branch", "--all", "--verbose"));
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "(no branches)";
+        }
+        showScratchBuffer("[git branch]", "repo: " + gitRoot.getAbsolutePath() + "\n\n" + body + "\n");
+        return "Showing git branches";
+    }
+
+    private String runGitAdd(File gitRoot, String args) {
+        List<String> pathSpecs = splitWhitespaceArgs(args);
+        if (pathSpecs.isEmpty()) {
+            return "Usage: :git add <pathspec...>";
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("add");
+        command.add("--");
+        command.addAll(pathSpecs);
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        return "git add complete";
+    }
+
+    private String runGitRestoreStaged(File gitRoot, String args) {
+        List<String> pathSpecs = splitWhitespaceArgs(args);
+        if (pathSpecs.isEmpty()) {
+            return "Usage: :git restore <pathspec...>";
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("restore");
+        command.add("--staged");
+        command.add("--");
+        command.addAll(pathSpecs);
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        return "git restore --staged complete";
+    }
+
+    private String runGitCommit(File gitRoot, String message) {
+        if (message == null || message.isBlank()) {
+            return "Usage: :git commit <message>";
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("commit");
+        command.add("-m");
+        command.add(message.trim());
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "commit created";
+        }
+        showScratchBuffer("[git commit]", body + "\n");
+        return "Commit complete";
+    }
+
+    private String showGitHelp() {
+        showScratchBuffer("[git help]",
+            "Git commands\n\n"
+                + ":git                  Show status\n"
+                + ":git status|st        Show status\n"
+                + ":git diff [args]      Show diff\n"
+                + ":git log [count]      Show compact history\n"
+                + ":git branch           Show branch list\n"
+                + ":git add <paths...>   Stage paths\n"
+                + ":git restore <paths>  Unstage paths\n"
+                + ":git commit <msg>     Commit staged changes\n");
+        return "Showing git help";
+    }
+
+    private List<String> splitWhitespaceArgs(String args) {
+        List<String> tokens = new ArrayList<>();
+        if (args == null || args.isBlank()) {
+            return tokens;
+        }
+        String[] parts = args.trim().split("\\s+");
+        for (String part : parts) {
+            if (!part.isEmpty()) {
+                tokens.add(part);
+            }
+        }
+        return tokens;
+    }
+
+    private CommandResult runCommand(File workingDirectory, List<String> command) {
+        try {
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(workingDirectory == null ? new File(".") : workingDirectory);
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int exitCode = process.waitFor();
+            return new CommandResult(exitCode, stdout, "");
+        } catch (Exception e) {
+            return new CommandResult(-1, "", e.getMessage());
+        }
+    }
+
+    private String gitError(CommandResult result) {
+        String message = result.stderr == null ? "" : result.stderr.strip();
+        if (message.isEmpty()) {
+            message = result.stdout == null ? "" : result.stdout.strip();
+        }
+        if (message.isEmpty()) {
+            message = "git command failed (exit " + result.exitCode + ")";
+        }
+        return "Git error: " + message;
     }
 
     public String showBufferFinder() {
@@ -4808,8 +5117,10 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :log           Open command log file\n" +
                    "  :Files         File finder\n" +
                    "  :folder        Folder finder\n" +
+                   "  :tree [path]   File tree in scratch buffer\n" +
                    "  :Buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
+                   "  :git ...       Git status/diff/log/add/commit\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +
@@ -4873,6 +5184,15 @@ public class Texteditor extends JFrame implements KeyListener {
                     + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
                     + "If no server is available, Shed falls back to local buffer-word completion.\n"
                     + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
+            case "git":
+                return "Help: git\n\n"
+                    + ":git shows status.\n"
+                    + ":git diff [args], :git log [count], :git branch show repository state.\n"
+                    + ":git add <paths...>, :git restore <paths...>, :git commit <message> modify staging/commits.\n";
+            case "tree":
+                return "Help: tree\n\n"
+                    + ":tree shows a file tree for the current directory.\n"
+                    + ":tree <path> shows a file tree for a specific path.\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"
@@ -5118,6 +5438,18 @@ public class Texteditor extends JFrame implements KeyListener {
             this.scratchBuffer = scratchBuffer;
             this.returnBuffer = returnBuffer;
             this.returnCaretPosition = returnCaretPosition;
+        }
+    }
+
+    private static class CommandResult {
+        private final int exitCode;
+        private final String stdout;
+        private final String stderr;
+
+        private CommandResult(int exitCode, String stdout, String stderr) {
+            this.exitCode = exitCode;
+            this.stdout = stdout == null ? "" : stdout;
+            this.stderr = stderr == null ? "" : stderr;
         }
     }
 

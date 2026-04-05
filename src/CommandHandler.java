@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 public class CommandHandler {
     private final Texteditor editor;
@@ -64,8 +65,9 @@ public class CommandHandler {
             if (force) {
                 cmd = cmd.substring(0, cmd.length() - 1);
             }
+            String normalizedCmd = cmd.toLowerCase(Locale.ROOT);
 
-            switch (cmd) {
+            switch (normalizedCmd) {
                 case "w":
                 case "write":
                     return handleWrite(args.isEmpty() ? null : args);
@@ -102,7 +104,6 @@ public class CommandHandler {
                 case "tree":
                     return editor.showFileTree(args);
                 case "git":
-                case "Git":
                     return editor.handleGitCommand(args);
                 case "help":
                 case "h":
@@ -116,14 +117,12 @@ public class CommandHandler {
                 case "d":
                 case "delete":
                     return handleDelete(range);
-                case "Files":
                 case "files":
                     return editor.showFileFinder();
                 case "folder":
                 case "folders":
-                case "Folder":
                     return editor.showFolderFinder();
-                case "Buffers":
+                case "buffers":
                 case "buf":
                     return editor.showBufferFinder();
                 case "split":
@@ -136,8 +135,6 @@ public class CommandHandler {
                 case "clo":
                     return editor.closeActiveWindow();
                 case "grep":
-                case "Grep":
-                case "Rg":
                 case "rg":
                     return editor.showGrepFinder(args);
                 case "registers":
@@ -146,10 +143,9 @@ public class CommandHandler {
                 case "marks":
                     return editor.showMarks();
                 case "themes":
-                case "Theme":
                     return editor.showThemes();
-                case "Goyo":
-                case "Zen":
+                case "goyo":
+                case "zen":
                     return editor.toggleZenMode();
                 case "normal":
                 case "norm":
@@ -158,7 +154,7 @@ public class CommandHandler {
                     return "";
                 default:
                     try {
-                        return editor.gotoLine(Integer.parseInt(cmd));
+                        return editor.gotoLine(Integer.parseInt(normalizedCmd));
                     } catch (NumberFormatException ignored) {
                         return "Command not recognised: " + cmd;
                     }

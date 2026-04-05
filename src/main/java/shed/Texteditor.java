@@ -10,6 +10,9 @@ import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultHighlighter;
 import javax.swing.text.Highlighter;
 import javax.swing.text.JTextComponent;
+import javax.swing.text.Segment;
+import javax.swing.text.TabExpander;
+import javax.swing.text.Utilities;
 import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.KeyListener;
@@ -24,11 +27,13 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -102,10 +107,11 @@ public class Texteditor extends JFrame implements KeyListener {
     private Timer externalChangeTimer;
     private boolean reloadPromptActive;
     private List<Object> syntaxHighlightTags;
-    private Highlighter.HighlightPainter syntaxKeywordPainter;
-    private Highlighter.HighlightPainter syntaxStringPainter;
-    private Highlighter.HighlightPainter syntaxCommentPainter;
-    private Highlighter.HighlightPainter syntaxNumberPainter;
+    private List<SyntaxSpan> syntaxForegroundSpans;
+    private Color syntaxKeywordColor;
+    private Color syntaxStringColor;
+    private Color syntaxCommentColor;
+    private Color syntaxNumberColor;
     private File lastPreviewedMarkdown;
     private List<Integer> jumpList;
     private int jumpIndex;
@@ -175,8 +181,12 @@ public class Texteditor extends JFrame implements KeyListener {
         suppressNextTypedChar = false;
         closingDown = false;
         recentFiles = new ArrayList<>();
-        recentFilesStore = new File(System.getProperty("user.home"), ".shed_recent");
-        commandLogStore = new File(System.getProperty("user.home"), ".shed_log");
+        File shedDirectory = new File(configManager.getShedDirectoryPath());
+        if (!shedDirectory.exists()) {
+            shedDirectory.mkdirs();
+        }
+        recentFilesStore = new File(shedDirectory, "recent");
+        commandLogStore = new File(shedDirectory, "command.log");
         specialBufferReturns = new ArrayDeque<>();
         commandHistory = new ArrayList<>();
         commandHistoryIndex = -1;
@@ -191,10 +201,11 @@ public class Texteditor extends JFrame implements KeyListener {
         lastInsertedText = "";
         reloadPromptActive = false;
         syntaxHighlightTags = new ArrayList<>();
-        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
-        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
-        syntaxCommentPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxCommentColor());
-        syntaxNumberPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxNumberColor());
+        syntaxForegroundSpans = new ArrayList<>();
+        syntaxKeywordColor = configManager.getSyntaxKeywordColor();
+        syntaxStringColor = configManager.getSyntaxStringColor();
+        syntaxCommentColor = configManager.getSyntaxCommentColor();
+        syntaxNumberColor = configManager.getSyntaxNumberColor();
         lastPreviewedMarkdown = null;
         jumpList = new ArrayList<>();
         jumpIndex = -1;
@@ -379,6 +390,7 @@ public class Texteditor extends JFrame implements KeyListener {
                         }
                     } catch (Exception ignored) {}
                 }
+                paintSyntaxForegroundOverlay(g, this);
             }
         };
         textArea.addKeyListener(this);
@@ -2968,6 +2980,8 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("normal");
         knownCommands.add("reload");
         knownCommands.add("source");
+        knownCommands.add("clean");
+        knownCommands.add("shedclean");
         knownCommands.add("noh");
         knownCommands.add("nohlsearch");
         knownCommands.add("wa");
@@ -3181,10 +3195,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
         currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
         substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
-        syntaxKeywordPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxKeywordColor());
-        syntaxStringPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxStringColor());
-        syntaxCommentPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxCommentColor());
-        syntaxNumberPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSyntaxNumberColor());
+        syntaxKeywordColor = configManager.getSyntaxKeywordColor();
+        syntaxStringColor = configManager.getSyntaxStringColor();
+        syntaxCommentColor = configManager.getSyntaxCommentColor();
+        syntaxNumberColor = configManager.getSyntaxNumberColor();
 
         statusBar.setBackground(configManager.getStatusBarBackground());
         statusBar.setForeground(configManager.getStatusBarForeground());
@@ -3224,21 +3238,22 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        Highlighter highlighter = writingArea.getHighlighter();
         boolean[] masked = new boolean[text.length()];
         FileType fileType = buffer.getFileType();
 
-        highlightComments(highlighter, text, fileType, masked);
-        highlightStrings(highlighter, text, fileType, masked);
-        highlightNumbers(highlighter, text, masked);
+        highlightComments(text, fileType, masked);
+        highlightStrings(text, fileType, masked);
+        highlightNumbers(text, masked);
         if (fileType == FileType.JAVA) {
-            highlightJavaAnnotations(highlighter, text, masked);
+            highlightJavaAnnotations(text, masked);
         }
-        highlightKeywords(highlighter, text, syntaxKeywordsFor(fileType), masked);
+        highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
         if (configManager.getShowWhitespace()) {
+            Highlighter highlighter = writingArea.getHighlighter();
             highlightTrailingWhitespace(highlighter, text);
         }
         applyBracketHighlighting();
+        writingArea.repaint();
     }
 
     private void clearSyntaxHighlighting() {
@@ -3247,6 +3262,7 @@ public class Texteditor extends JFrame implements KeyListener {
             highlighter.removeHighlight(tag);
         }
         syntaxHighlightTags.clear();
+        syntaxForegroundSpans.clear();
         clearBracketHighlighting();
     }
 
@@ -3254,7 +3270,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return syntaxHighlightService.keywordsFor(fileType);
     }
 
-    private void highlightJavaAnnotations(Highlighter highlighter, String text, boolean[] masked) {
+    private void highlightJavaAnnotations(String text, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i] || text.charAt(i) != '@') {
@@ -3271,7 +3287,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 end++;
             }
             if (end > start + 1) {
-                addSyntaxHighlight(highlighter, start, end, syntaxKeywordPainter, masked);
+                addSyntaxHighlight(start, end, syntaxKeywordColor, masked);
                 i = end;
             } else {
                 i++;
@@ -3279,7 +3295,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightKeywords(Highlighter highlighter, String text, String[] keywords, boolean[] masked) {
+    private void highlightKeywords(String text, String[] keywords, boolean[] masked) {
         if (keywords == null || keywords.length == 0) {
             return;
         }
@@ -3295,7 +3311,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 }
                 int end = match + keyword.length();
                 if (isKeywordMatch(text, match, keyword, masked)) {
-                    addSyntaxHighlight(highlighter, match, end, syntaxKeywordPainter, masked);
+                    addSyntaxHighlight(match, end, syntaxKeywordColor, masked);
                 }
                 index = match + Math.max(1, keyword.length());
             }
@@ -3318,7 +3334,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private void highlightComments(Highlighter highlighter, String text, FileType fileType, boolean[] masked) {
+    private void highlightComments(String text, FileType fileType, boolean[] masked) {
         String[] linePrefixes = lineCommentPrefixesFor(fileType);
         String[][] blockPairs = blockCommentPairsFor(fileType);
         int i = 0;
@@ -3335,7 +3351,7 @@ public class Texteditor extends JFrame implements KeyListener {
                     while (end < text.length() && text.charAt(end) != '\n') {
                         end++;
                     }
-                    addSyntaxHighlight(highlighter, i, end, syntaxCommentPainter, masked);
+                    addSyntaxHighlight(i, end, syntaxCommentColor, masked);
                     i = Math.max(i + 1, end);
                     matched = true;
                     break;
@@ -3353,7 +3369,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 }
                 int closeIndex = text.indexOf(close, i + open.length());
                 int end = closeIndex < 0 ? text.length() : closeIndex + close.length();
-                addSyntaxHighlight(highlighter, i, end, syntaxCommentPainter, masked);
+                addSyntaxHighlight(i, end, syntaxCommentColor, masked);
                 i = Math.max(i + 1, end);
                 matched = true;
                 break;
@@ -3364,7 +3380,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightStrings(Highlighter highlighter, String text, FileType fileType, boolean[] masked) {
+    private void highlightStrings(String text, FileType fileType, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i]) {
@@ -3375,7 +3391,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (fileType == FileType.JAVA && matchesAt(text, i, "\"\"\"")) {
                 int closeIndex = text.indexOf("\"\"\"", i + 3);
                 int end = closeIndex < 0 ? text.length() : closeIndex + 3;
-                addSyntaxHighlight(highlighter, i, end, syntaxStringPainter, masked);
+                addSyntaxHighlight(i, end, syntaxStringColor, masked);
                 i = Math.max(i + 1, end);
                 continue;
             }
@@ -3384,7 +3400,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 String delimiter = matchesAt(text, i, "\"\"\"") ? "\"\"\"" : "'''";
                 int closeIndex = text.indexOf(delimiter, i + delimiter.length());
                 int end = closeIndex < 0 ? text.length() : closeIndex + delimiter.length();
-                addSyntaxHighlight(highlighter, i, end, syntaxStringPainter, masked);
+                addSyntaxHighlight(i, end, syntaxStringColor, masked);
                 i = Math.max(i + 1, end);
                 continue;
             }
@@ -3414,7 +3430,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 }
                 end++;
             }
-            addSyntaxHighlight(highlighter, i, Math.max(i + 1, end), syntaxStringPainter, masked);
+            addSyntaxHighlight(i, Math.max(i + 1, end), syntaxStringColor, masked);
             i = Math.max(i + 1, end);
         }
     }
@@ -3438,7 +3454,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightNumbers(Highlighter highlighter, String text, boolean[] masked) {
+    private void highlightNumbers(String text, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i]) {
@@ -3474,13 +3490,13 @@ public class Texteditor extends JFrame implements KeyListener {
                 }
             }
             if (end >= text.length() || !isIdentifierChar(text.charAt(end))) {
-                addSyntaxHighlight(highlighter, start, end, syntaxNumberPainter, masked);
+                addSyntaxHighlight(start, end, syntaxNumberColor, masked);
             }
             i = Math.max(i + 1, end);
         }
     }
 
-    private void addSyntaxHighlight(Highlighter highlighter, int start, int end, Highlighter.HighlightPainter painter, boolean[] masked) {
+    private void addSyntaxHighlight(int start, int end, Color color, boolean[] masked) {
         if (start < 0 || end <= start || start >= masked.length) {
             return;
         }
@@ -3488,11 +3504,8 @@ public class Texteditor extends JFrame implements KeyListener {
         if (isMasked(masked, start, safeEnd)) {
             return;
         }
-        try {
-            syntaxHighlightTags.add(highlighter.addHighlight(start, safeEnd, painter));
-            markMasked(masked, start, safeEnd);
-        } catch (BadLocationException ignored) {
-        }
+        syntaxForegroundSpans.add(new SyntaxSpan(start, safeEnd, color));
+        markMasked(masked, start, safeEnd);
     }
 
     private boolean isMasked(boolean[] masked, int start, int end) {
@@ -4797,7 +4810,8 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev");
         commands.add("registers"); commands.add("marks"); commands.add("zen"); commands.add("normal");
-        commands.add("reload"); commands.add("source"); commands.add("noh"); commands.add("split");
+        commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
+        commands.add("noh"); commands.add("split");
         commands.add("vsplit"); commands.add("close"); commands.add("themes");
         // New markdown commands
         commands.add("toc"); commands.add("outline"); commands.add("toggle");
@@ -8845,10 +8859,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String openCommandLogBuffer() {
         try {
-            File parent = commandLogStore.getParentFile();
-            if (parent != null && !parent.exists()) {
-                Files.createDirectories(parent.toPath());
-            }
+            ensureStoreDirectory(commandLogStore);
             if (!commandLogStore.exists()) {
                 Files.write(commandLogStore.toPath(),
                     new byte[0],
@@ -8858,6 +8869,34 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Opened command log: " + commandLogStore.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening command log: " + e.getMessage();
+        }
+    }
+
+    public String cleanShedDataFiles() {
+        Path root = new File(configManager.getShedDirectoryPath()).toPath();
+        if (!Files.exists(root)) {
+            return "No Shed data found: " + root.toAbsolutePath();
+        }
+        int deleted = 0;
+        try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+            List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
+            for (Path path : paths) {
+                if (path.equals(root)) {
+                    continue;
+                }
+                if (Files.deleteIfExists(path)) {
+                    deleted++;
+                }
+            }
+            Files.createDirectories(root);
+            recentFiles.clear();
+            commandHistory.clear();
+            commandHistoryIndex = -1;
+            commandHistoryPrefix = "";
+            reloadConfigFromDisk();
+            return "Cleaned Shed data: " + deleted + " path(s)";
+        } catch (IOException e) {
+            return "Shed clean failed: " + e.getMessage();
         }
     }
 
@@ -9651,6 +9690,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private void saveRecentFiles() {
         try {
+            ensureStoreDirectory(recentFilesStore);
             Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
         } catch (IOException ignored) {
         }
@@ -9662,11 +9702,110 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         String line = commandLogTimeFormat.format(LocalDateTime.now()) + " " + entry.strip() + "\n";
         try {
+            ensureStoreDirectory(commandLogStore);
             Files.write(commandLogStore.toPath(),
                 line.getBytes(StandardCharsets.UTF_8),
                 StandardOpenOption.CREATE,
                 StandardOpenOption.APPEND);
         } catch (IOException ignored) {
+        }
+    }
+
+    private void ensureStoreDirectory(File store) throws IOException {
+        if (store == null) {
+            return;
+        }
+        File parent = store.getParentFile();
+        if (parent != null && !parent.exists()) {
+            Files.createDirectories(parent.toPath());
+        }
+    }
+
+    private void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
+        if (area == null || area != writingArea || syntaxForegroundSpans.isEmpty()) {
+            return;
+        }
+        int docLength = area.getDocument().getLength();
+        if (docLength <= 0) {
+            return;
+        }
+        int visibleStart = 0;
+        int visibleEnd = docLength;
+        Rectangle clip = g.getClipBounds();
+        if (clip != null) {
+            int start = area.viewToModel2D(new Point(clip.x, clip.y));
+            int end = area.viewToModel2D(new Point(clip.x + clip.width, clip.y + clip.height));
+            if (start < 0) {
+                start = 0;
+            }
+            if (end < start) {
+                end = start;
+            }
+            visibleStart = Math.min(start, docLength);
+            visibleEnd = Math.min(docLength, end + 1);
+        }
+
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setFont(area.getFont());
+        FontMetrics metrics = area.getFontMetrics(area.getFont());
+        int ascent = metrics.getAscent();
+        int tabPixels = Math.max(1, area.getTabSize() * metrics.charWidth(' '));
+        TabExpander tabExpander = (x, tabOffset) -> ((int) x / tabPixels + 1) * tabPixels;
+
+        for (SyntaxSpan span : syntaxForegroundSpans) {
+            if (span.end <= visibleStart || span.start >= visibleEnd) {
+                continue;
+            }
+            int spanStart = Math.max(span.start, visibleStart);
+            int spanEnd = Math.min(span.end, visibleEnd);
+            if (spanEnd <= spanStart) {
+                continue;
+            }
+            try {
+                int startLine = area.getLineOfOffset(spanStart);
+                int endLine = area.getLineOfOffset(Math.max(spanStart, spanEnd - 1));
+                for (int line = startLine; line <= endLine; line++) {
+                    int lineStart = area.getLineStartOffset(line);
+                    int lineEnd = area.getLineEndOffset(line);
+                    int segmentStart = Math.max(spanStart, lineStart);
+                    int segmentEnd = Math.min(spanEnd, lineEnd);
+                    while (segmentEnd > segmentStart) {
+                        char tail = area.getText(segmentEnd - 1, 1).charAt(0);
+                        if (tail == '\n' || tail == '\r') {
+                            segmentEnd--;
+                        } else {
+                            break;
+                        }
+                    }
+                    if (segmentEnd <= segmentStart) {
+                        continue;
+                    }
+                    Rectangle2D rect = area.modelToView2D(segmentStart);
+                    if (rect == null) {
+                        continue;
+                    }
+                    String text = area.getText(segmentStart, segmentEnd - segmentStart);
+                    Segment segment = new Segment(text.toCharArray(), 0, text.length());
+                    int x = (int) Math.round(rect.getX());
+                    int y = (int) Math.round(rect.getY()) + ascent;
+                    g2.setColor(span.color);
+                    Utilities.drawTabbedText(segment, x, y, (Graphics) g2, tabExpander, segmentStart);
+                }
+            } catch (BadLocationException ignored) {
+            }
+        }
+        g2.dispose();
+    }
+
+    private static final class SyntaxSpan {
+        private final int start;
+        private final int end;
+        private final Color color;
+
+        private SyntaxSpan(int start, int end, Color color) {
+            this.start = start;
+            this.end = end;
+            this.color = color;
         }
     }
 

@@ -87,7 +87,7 @@ public class CommandHandler {
                 return action.execute(args, range, force);
             }
 
-            // Check user-defined commands from .shedrc
+            // Check user-defined commands from ~/.shed/shedrc
             Map<String, String> userCommands = editor.getConfigManager().getUserCommands();
             if (userCommands.containsKey(resolvedCmd)) {
                 String shellCmd = userCommands.get(resolvedCmd);
@@ -157,6 +157,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
+        registerCommand((args, range, force) -> editor.cleanShedDataFiles(), "clean", "shedclean");
         registerCommand((args, range, force) -> editor.clearSearchHighlights(), "noh", "nohlsearch");
         registerCommand((args, range, force) -> editor.showCommandPalette(), "palette", "commands");
         registerCommand((args, range, force) -> editor.showUndoHistory(), "undolist", "undotree");

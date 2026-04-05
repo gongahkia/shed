@@ -47,6 +47,7 @@ public class HelpService {
                    "  :settings      Open user settings file\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
+                   "  :clean         Remove Shed data files\n" +
                    "  :jobs          Show async job list\n" +
                    "  :jobcancel id  Cancel async job\n" +
                    "  :drop cmd      Run async command with current file path\n" +
@@ -75,7 +76,7 @@ public class HelpService {
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
                    "  :zen           Toggle zen mode\n" +
-                   "  :reload        Reload ~/.shedrc now\n" +
+                   "  :reload        Reload ~/.shed/shedrc now\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +
@@ -139,7 +140,7 @@ public class HelpService {
                     + "If no server is available, Shed falls back to local buffer-word completion.\n"
                     + "Use :lsp definition|hover|references|rename <name>|codeaction [index] for navigation/actions.\n"
                     + "Use :diagnostics to send LSP diagnostics to quickfix and :dnext/:dprev to jump.\n"
-                    + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
+                    + "Configure overrides in ~/.shed/shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"
@@ -162,12 +163,12 @@ public class HelpService {
                     + ":session load [name] restores a saved session.\n"
                     + ":session load! [name] restores even when buffers are modified.\n"
                     + ":session list lists all saved sessions.\n"
-                    + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shedrc.\n";
+                    + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/shedrc.\n";
             case "keybind":
             case "keybinding":
             case "keybindings":
                 return "Help: keybindings\n\n"
-                    + "Define in ~/.shedrc as keybind.<mode>.<lhs>=<rhs>.\n"
+                    + "Define in ~/.shed/shedrc as keybind.<mode>.<lhs>=<rhs>.\n"
                     + "LHS/RHS accept raw characters and tokens like <esc>, <enter>, <c-w>.\n"
                     + "Use mode global for mappings active in every mode.\n"
                     + "Use value <nop> to disable a key.\n";
@@ -175,7 +176,7 @@ public class HelpService {
             case "alias":
             case "aliases":
                 return "Help: command aliases\n\n"
-                    + "Define in ~/.shedrc as command.alias.<newname>=<builtin>.\n"
+                    + "Define in ~/.shed/shedrc as command.alias.<newname>=<builtin>.\n"
                     + "Example: command.alias.ww=w and command.alias.qq=q.\n"
                     + "Aliases are used by command execution and command completion.\n";
             default:

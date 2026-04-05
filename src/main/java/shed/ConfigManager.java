@@ -1,12 +1,14 @@
 package shed;
 
 // Config Manager Class
-// Loads and manages user configuration from ~/.shedrc
+// Loads and manages user configuration from ~/.shed/shedrc
 
 import java.io.File;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -20,6 +22,7 @@ import java.awt.Color;
 
 public class ConfigManager {
     private final Map<String, String> config;
+    private final String shedDirectoryPath;
     private String configPath;
 
     // Default configuration values
@@ -46,6 +49,11 @@ public class ConfigManager {
     private static final int DEFAULT_PROCESS_TIMEOUT_MS = 15000;
     private static final int DEFAULT_PROCESS_OUTPUT_MAX_BYTES = 1024 * 1024;
     private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
+    private static final String SHED_DIRECTORY_NAME = ".shed";
+    private static final String SHED_CONFIG_NAME = "shedrc";
+    private static final String SHED_SESSIONS_NAME = "sessions";
+    private static final String LEGACY_CONFIG_NAME = ".shedrc";
+    private static final String LEGACY_CONFIG_ALT_RELATIVE = ".config/shed/shedrc";
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
@@ -100,17 +108,10 @@ public class ConfigManager {
 
     public ConfigManager() {
         this.config = new HashMap<>();
-        this.configPath = System.getProperty("user.home") + "/.shedrc";
-
-        // Try alternate config location
-        File configFile = new File(configPath);
-        if (!configFile.exists()) {
-            String altPath = System.getProperty("user.home") + "/.config/shed/shedrc";
-            File altFile = new File(altPath);
-            if (altFile.exists()) {
-                this.configPath = altPath;
-            }
-        }
+        String home = System.getProperty("user.home");
+        this.shedDirectoryPath = home + "/" + SHED_DIRECTORY_NAME;
+        this.configPath = shedDirectoryPath + "/" + SHED_CONFIG_NAME;
+        migrateLegacyConfigIfNeeded();
 
         loadDefaults();
         loadConfig();
@@ -130,7 +131,7 @@ public class ConfigManager {
         config.put("zen.mode.width", String.valueOf(DEFAULT_ZEN_MODE_WIDTH));
         config.put("session.restore.on.start", String.valueOf(DEFAULT_SESSION_RESTORE_ON_START));
         config.put("session.autoload", DEFAULT_SESSION_AUTOLOAD);
-        config.put("session.dir", System.getProperty("user.home") + "/.shed_sessions");
+        config.put("session.dir", defaultSessionDirectoryPath());
         config.put("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB));
         config.put("large.file.line.threshold", String.valueOf(DEFAULT_LARGE_FILE_LINE_THRESHOLD));
         config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
@@ -425,7 +426,7 @@ public class ConfigManager {
     public String getSessionDirectory() {
         String configured = config.get("session.dir");
         if (configured == null || configured.isBlank()) {
-            return System.getProperty("user.home") + "/.shed_sessions";
+            return defaultSessionDirectoryPath();
         }
         return configured.trim();
     }
@@ -564,6 +565,10 @@ public class ConfigManager {
         return configPath;
     }
 
+    public String getShedDirectoryPath() {
+        return shedDirectoryPath;
+    }
+
     // Check if config file exists
     public boolean configExists() {
         return new File(configPath).exists();
@@ -571,7 +576,7 @@ public class ConfigManager {
 
     public String defaultConfigTemplate() {
         return "# Shed config\n"
-            + "# Generated because ~/.shedrc was missing or empty.\n"
+            + "# Generated because ~/.shed/shedrc was missing or empty.\n"
             + "# Remove or change any key; unspecified keys use built-in defaults.\n\n"
             + "theme=" + DEFAULT_THEME + "\n"
             + "font.family=" + DEFAULT_FONT_FAMILY + "\n"
@@ -585,7 +590,7 @@ public class ConfigManager {
             + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n\n"
             + "session.restore.on.start=" + DEFAULT_SESSION_RESTORE_ON_START + "\n"
             + "session.autoload=" + DEFAULT_SESSION_AUTOLOAD + "\n"
-            + "session.dir=" + System.getProperty("user.home") + "/.shed_sessions\n\n"
+            + "session.dir=" + defaultSessionDirectoryPath() + "\n\n"
             + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
             + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
             + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
@@ -603,6 +608,42 @@ public class ConfigManager {
             + "# LSP examples\n"
             + "# lsp.py.command=pyright-langserver\n"
             + "# lsp.py.args=--stdio\n";
+    }
+
+    private String defaultSessionDirectoryPath() {
+        return shedDirectoryPath + "/" + SHED_SESSIONS_NAME;
+    }
+
+    private void migrateLegacyConfigIfNeeded() {
+        File currentConfig = new File(configPath);
+        if (currentConfig.exists()) {
+            return;
+        }
+        File legacy = resolveLegacyConfigFile();
+        if (legacy == null) {
+            return;
+        }
+        try {
+            File parent = currentConfig.getParentFile();
+            if (parent != null && !parent.exists()) {
+                Files.createDirectories(parent.toPath());
+            }
+            Files.copy(legacy.toPath(), currentConfig.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private File resolveLegacyConfigFile() {
+        String home = System.getProperty("user.home");
+        File legacy = new File(home, LEGACY_CONFIG_NAME);
+        if (legacy.exists()) {
+            return legacy;
+        }
+        File legacyAlt = new File(home + "/" + LEGACY_CONFIG_ALT_RELATIVE);
+        if (legacyAlt.exists()) {
+            return legacyAlt;
+        }
+        return null;
     }
 
     private Color getUiColor(String key, Color fallback) {

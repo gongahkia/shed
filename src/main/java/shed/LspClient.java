@@ -93,6 +93,72 @@ public class LspClient {
         }
     }
 
+    public static class TextEdit {
+        private final String uri;
+        private final int startLine;
+        private final int startCharacter;
+        private final int endLine;
+        private final int endCharacter;
+        private final String newText;
+
+        public TextEdit(String uri, int startLine, int startCharacter, int endLine, int endCharacter, String newText) {
+            this.uri = uri;
+            this.startLine = startLine;
+            this.startCharacter = startCharacter;
+            this.endLine = endLine;
+            this.endCharacter = endCharacter;
+            this.newText = newText == null ? "" : newText;
+        }
+
+        public String getUri() {
+            return uri;
+        }
+
+        public int getStartLine() {
+            return startLine;
+        }
+
+        public int getStartCharacter() {
+            return startCharacter;
+        }
+
+        public int getEndLine() {
+            return endLine;
+        }
+
+        public int getEndCharacter() {
+            return endCharacter;
+        }
+
+        public String getNewText() {
+            return newText;
+        }
+    }
+
+    public static class CodeAction {
+        private final String title;
+        private final String kind;
+        private final boolean preferred;
+
+        public CodeAction(String title, String kind, boolean preferred) {
+            this.title = title == null ? "" : title;
+            this.kind = kind == null ? "" : kind;
+            this.preferred = preferred;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public String getKind() {
+            return kind;
+        }
+
+        public boolean isPreferred() {
+            return preferred;
+        }
+    }
+
     private final Process process;
     private final BufferedOutputStream stdin;
     private final BlockingQueue<Map<String, Object>> messageQueue;
@@ -265,6 +331,166 @@ public class LspClient {
             return null;
         }
         return parseLocation(location);
+    }
+
+    public List<Location> references(String uri, int line, int character, boolean includeDeclaration) {
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> position = new LinkedHashMap<>();
+        position.put("line", line);
+        position.put("character", character);
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("includeDeclaration", includeDeclaration);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("position", position);
+        params.put("context", context);
+
+        Map<String, Object> response = sendRequest("textDocument/references", params, 2500L);
+        if (response == null) {
+            return List.of();
+        }
+        List<Object> result = MiniJson.asArray(response.get("result"));
+        if (result == null) {
+            return List.of();
+        }
+        List<Location> locations = new ArrayList<>();
+        for (Object item : result) {
+            Map<String, Object> candidate = MiniJson.asObject(item);
+            if (candidate == null) {
+                continue;
+            }
+            Location parsed = parseLocation(candidate);
+            if (parsed != null) {
+                locations.add(parsed);
+            }
+        }
+        return locations;
+    }
+
+    public List<TextEdit> rename(String uri, int line, int character, String newName) {
+        if (newName == null || newName.isBlank()) {
+            return List.of();
+        }
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> position = new LinkedHashMap<>();
+        position.put("line", line);
+        position.put("character", character);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("position", position);
+        params.put("newName", newName);
+
+        Map<String, Object> response = sendRequest("textDocument/rename", params, 3000L);
+        if (response == null) {
+            return List.of();
+        }
+        Map<String, Object> result = MiniJson.asObject(response.get("result"));
+        if (result == null) {
+            return List.of();
+        }
+        List<TextEdit> edits = new ArrayList<>();
+        Map<String, Object> changes = MiniJson.asObject(result.get("changes"));
+        if (changes != null) {
+            for (Map.Entry<String, Object> entry : changes.entrySet()) {
+                List<Object> editArray = MiniJson.asArray(entry.getValue());
+                if (editArray == null) {
+                    continue;
+                }
+                edits.addAll(parseTextEdits(entry.getKey(), editArray));
+            }
+        }
+
+        List<Object> documentChanges = MiniJson.asArray(result.get("documentChanges"));
+        if (documentChanges != null) {
+            for (Object item : documentChanges) {
+                Map<String, Object> change = MiniJson.asObject(item);
+                if (change == null) {
+                    continue;
+                }
+                Map<String, Object> textDocumentObject = MiniJson.asObject(change.get("textDocument"));
+                String changeUri = textDocumentObject == null ? null : MiniJson.asString(textDocumentObject.get("uri"));
+                if (changeUri == null) {
+                    continue;
+                }
+                List<Object> editArray = MiniJson.asArray(change.get("edits"));
+                if (editArray == null) {
+                    continue;
+                }
+                edits.addAll(parseTextEdits(changeUri, editArray));
+            }
+        }
+        return edits;
+    }
+
+    public List<CodeAction> codeActions(String uri, int line, int character, List<Diagnostic> diagnosticsAtCursor) {
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> start = new LinkedHashMap<>();
+        start.put("line", line);
+        start.put("character", character);
+        Map<String, Object> end = new LinkedHashMap<>();
+        end.put("line", line);
+        end.put("character", character + 1);
+        Map<String, Object> range = new LinkedHashMap<>();
+        range.put("start", start);
+        range.put("end", end);
+
+        List<Map<String, Object>> diagnostics = new ArrayList<>();
+        if (diagnosticsAtCursor != null) {
+            for (Diagnostic diagnostic : diagnosticsAtCursor) {
+                if (diagnostic == null) {
+                    continue;
+                }
+                Map<String, Object> diagnosticRangeStart = new LinkedHashMap<>();
+                diagnosticRangeStart.put("line", diagnostic.getLine());
+                diagnosticRangeStart.put("character", diagnostic.getCharacter());
+                Map<String, Object> diagnosticRangeEnd = new LinkedHashMap<>();
+                diagnosticRangeEnd.put("line", diagnostic.getLine());
+                diagnosticRangeEnd.put("character", diagnostic.getCharacter() + 1);
+                Map<String, Object> diagnosticRange = new LinkedHashMap<>();
+                diagnosticRange.put("start", diagnosticRangeStart);
+                diagnosticRange.put("end", diagnosticRangeEnd);
+                Map<String, Object> diagnosticEntry = new LinkedHashMap<>();
+                diagnosticEntry.put("range", diagnosticRange);
+                diagnosticEntry.put("severity", diagnostic.getSeverity());
+                diagnosticEntry.put("message", diagnostic.getMessage());
+                diagnostics.add(diagnosticEntry);
+            }
+        }
+
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("diagnostics", diagnostics);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        params.put("range", range);
+        params.put("context", context);
+
+        Map<String, Object> response = sendRequest("textDocument/codeAction", params, 2500L);
+        if (response == null) {
+            return List.of();
+        }
+        List<Object> result = MiniJson.asArray(response.get("result"));
+        if (result == null) {
+            return List.of();
+        }
+
+        List<CodeAction> actions = new ArrayList<>();
+        for (Object item : result) {
+            Map<String, Object> actionObject = MiniJson.asObject(item);
+            if (actionObject == null) {
+                continue;
+            }
+            String title = MiniJson.asString(actionObject.get("title"));
+            if (title == null || title.isBlank()) {
+                continue;
+            }
+            String kind = MiniJson.asString(actionObject.get("kind"));
+            boolean preferred = Boolean.TRUE.equals(actionObject.get("isPreferred"));
+            actions.add(new CodeAction(title, kind, preferred));
+        }
+        return actions;
     }
 
     public List<Diagnostic> getDiagnostics(String uri) {
@@ -452,6 +678,15 @@ public class LspClient {
     private Location parseLocation(Map<String, Object> location) {
         String uri = MiniJson.asString(location.get("uri"));
         Map<String, Object> range = MiniJson.asObject(location.get("range"));
+        if (uri == null) {
+            uri = MiniJson.asString(location.get("targetUri"));
+            if (range == null) {
+                range = MiniJson.asObject(location.get("targetSelectionRange"));
+                if (range == null) {
+                    range = MiniJson.asObject(location.get("targetRange"));
+                }
+            }
+        }
         Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
         if (uri == null || start == null) {
             return null;
@@ -462,6 +697,32 @@ public class LspClient {
             return null;
         }
         return new Location(uri, line, character);
+    }
+
+    private List<TextEdit> parseTextEdits(String uri, List<Object> editObjects) {
+        if (uri == null || editObjects == null || editObjects.isEmpty()) {
+            return List.of();
+        }
+        List<TextEdit> edits = new ArrayList<>();
+        for (Object item : editObjects) {
+            Map<String, Object> edit = MiniJson.asObject(item);
+            if (edit == null) {
+                continue;
+            }
+            Map<String, Object> range = MiniJson.asObject(edit.get("range"));
+            Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
+            Map<String, Object> end = range == null ? null : MiniJson.asObject(range.get("end"));
+            Integer startLine = start == null ? null : MiniJson.asInt(start.get("line"));
+            Integer startCharacter = start == null ? null : MiniJson.asInt(start.get("character"));
+            Integer endLine = end == null ? null : MiniJson.asInt(end.get("line"));
+            Integer endCharacter = end == null ? null : MiniJson.asInt(end.get("character"));
+            if (startLine == null || startCharacter == null || endLine == null || endCharacter == null) {
+                continue;
+            }
+            String newText = MiniJson.asString(edit.get("newText"));
+            edits.add(new TextEdit(uri, startLine, startCharacter, endLine, endCharacter, newText));
+        }
+        return edits;
     }
 
     private synchronized int nextRequestId() {

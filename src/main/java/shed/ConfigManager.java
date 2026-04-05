@@ -49,6 +49,10 @@ public class ConfigManager {
     private static final int DEFAULT_PROCESS_TIMEOUT_MS = 15000;
     private static final int DEFAULT_PROCESS_OUTPUT_MAX_BYTES = 1024 * 1024;
     private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
+    private static final int DEFAULT_SCROLLOFF = 0;
+    private static final boolean DEFAULT_AUTO_PAIRS = true;
+    private static final int DEFAULT_TEXTWIDTH = 0;
+    private static final boolean DEFAULT_MINIMAP = false;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "shedrc";
     private static final String SHED_SESSIONS_NAME = "sessions";
@@ -139,6 +143,10 @@ public class ConfigManager {
         config.put("process.timeout.ms", String.valueOf(DEFAULT_PROCESS_TIMEOUT_MS));
         config.put("process.output.max.bytes", String.valueOf(DEFAULT_PROCESS_OUTPUT_MAX_BYTES));
         config.put("shell.command.max.length", String.valueOf(DEFAULT_SHELL_COMMAND_MAX_LENGTH));
+        config.put("scrolloff", String.valueOf(DEFAULT_SCROLLOFF));
+        config.put("auto.pairs", String.valueOf(DEFAULT_AUTO_PAIRS));
+        config.put("textwidth", String.valueOf(DEFAULT_TEXTWIDTH));
+        config.put("minimap", String.valueOf(DEFAULT_MINIMAP));
     }
 
     // Load configuration from file
@@ -193,6 +201,7 @@ public class ConfigManager {
                 return theme.command;
             case "visual":
             case "visual_line":
+            case "visual_block":
                 return theme.visual;
             case "replace":
                 return theme.replace;
@@ -304,6 +313,22 @@ public class ConfigManager {
         return getUiColor("ui.syntax.comment", blend(theme.foreground, theme.normal, 0.52));
     }
 
+    public Color getSyntaxTypeColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.type", blend(theme.accent, theme.foreground, 0.35));
+    }
+    public Color getSyntaxFunctionColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.function", blend(theme.accent, theme.stringAccent, 0.55));
+    }
+    public Color getSyntaxConstantColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.constant", blend(theme.stringAccent, theme.foreground, 0.40));
+    }
+    public Color getSyntaxAnnotationColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.annotation", blend(theme.accent, theme.foreground, 0.50));
+    }
     public Color getSyntaxNumberColor() {
         ThemePalette theme = activeTheme();
         return getUiColor("ui.syntax.number", blend(theme.accent, theme.stringAccent, 0.42));
@@ -459,6 +484,18 @@ public class ConfigManager {
     public int getShellCommandMaxLength() {
         return getInt("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
     }
+    public int getScrolloff() {
+        return getInt("scrolloff", DEFAULT_SCROLLOFF);
+    }
+    public boolean getAutoPairs() {
+        return getBoolean("auto.pairs", DEFAULT_AUTO_PAIRS);
+    }
+    public int getTextWidth() {
+        return getInt("textwidth", DEFAULT_TEXTWIDTH);
+    }
+    public boolean getMinimap() {
+        return getBoolean("minimap", DEFAULT_MINIMAP);
+    }
 
     public void set(String key, String value) {
         config.put(key, value);
@@ -608,7 +645,8 @@ public class ConfigManager {
             + "expand.tab=" + DEFAULT_EXPAND_TAB + "\n"
             + "auto.indent=" + DEFAULT_AUTO_INDENT + "\n"
             + "highlight.search=" + DEFAULT_HIGHLIGHT_SEARCH + "\n"
-            + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n\n"
+            + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n"
+            + "scrolloff=" + DEFAULT_SCROLLOFF + "\n\n"
             + "session.restore.on.start=" + DEFAULT_SESSION_RESTORE_ON_START + "\n"
             + "session.autoload=" + DEFAULT_SESSION_AUTOLOAD + "\n"
             + "session.dir=" + defaultSessionDirectoryPath() + "\n\n"

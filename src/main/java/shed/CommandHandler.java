@@ -59,6 +59,9 @@ public class CommandHandler {
             if (working.startsWith("s/")) {
                 return handleSubstitute(working, range);
             }
+            if (working.startsWith("g/") || working.startsWith("v/")) {
+                return handleGlobal(working);
+            }
 
             String cmd;
             String args;
@@ -155,6 +158,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");
         registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
+        registerCommand((args, range, force) -> editor.toggleMinimap(), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
         registerCommand((args, range, force) -> editor.cleanShedDataFiles(), "clean", "shedclean");
@@ -344,6 +348,20 @@ public class CommandHandler {
         if (option.equals("bracketcolor") || option.equals("bracketcolors")) {
             return editor.toggleBracketColors();
         }
+        if (option.equals("autopairs")) {
+            editor.setConfigOption("auto.pairs", "true");
+            return "Auto-pairs enabled";
+        }
+        if (option.equals("noautopairs")) {
+            editor.setConfigOption("auto.pairs", "false");
+            return "Auto-pairs disabled";
+        }
+        if (option.startsWith("textwidth=") || option.startsWith("tw=")) {
+            return editor.setConfigOption("textwidth", option.substring(option.indexOf('=') + 1).trim());
+        }
+        if (option.startsWith("scrolloff=") || option.startsWith("so=")) {
+            return editor.setConfigOption("scrolloff", option.substring(option.indexOf('=') + 1).trim());
+        }
         int separator = option.indexOf('=');
         if (separator > 0) {
             String key = option.substring(0, separator).trim();
@@ -425,6 +443,39 @@ public class CommandHandler {
         int start = range.hasRange() ? range.start : currentLine;
         int end = range.hasRange() ? range.resolveEnd(editor) : currentLine;
         return editor.executeNormalKeys(keys, start, end);
+    }
+
+    private String handleGlobal(String command) {
+        boolean invert = command.startsWith("v/");
+        String rest = command.substring(2); // skip "g/" or "v/"
+        int slashIdx = rest.indexOf('/');
+        if (slashIdx < 0) return "Error: :g/pattern/command syntax required";
+        String pattern = rest.substring(0, slashIdx);
+        String subCommand = rest.substring(slashIdx + 1).trim();
+        if (pattern.isEmpty()) return "Error: empty pattern";
+        if (subCommand.isEmpty()) return "Error: empty command";
+        java.util.regex.Pattern compiled;
+        try { compiled = java.util.regex.Pattern.compile(pattern); }
+        catch (java.util.regex.PatternSyntaxException e) { return "Error: invalid regex: " + e.getMessage(); }
+        javax.swing.JTextArea area = editor.getTextArea();
+        // collect matching line numbers first, then execute bottom-to-top
+        String text = area.getText();
+        String[] lines = text.split("\n", -1);
+        List<Integer> matchingLines = new java.util.ArrayList<>();
+        for (int i = 0; i < lines.length; i++) {
+            boolean matches = compiled.matcher(lines[i]).find();
+            if (matches != invert) matchingLines.add(i);
+        }
+        int matchCount = matchingLines.size();
+        // execute bottom-to-top so deletions don't shift unprocessed lines
+        for (int idx = matchingLines.size() - 1; idx >= 0; idx--) {
+            int lineNum = matchingLines.get(idx);
+            // re-check bounds since prior commands may have changed line count
+            if (lineNum >= area.getLineCount()) continue;
+            editor.gotoLine(lineNum + 1);
+            execute(":" + subCommand);
+        }
+        return matchCount + " line" + (matchCount == 1 ? "" : "s") + " matched";
     }
 
     private String handleSubstitute(String command, RangeParseResult range) {

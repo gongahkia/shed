@@ -106,6 +106,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleSet(args), "set");
         registerCommand((args, range, force) -> editor.openSettingsBuffer(), "settings", "config", "shedrc");
         registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
+        registerCommand((args, range, force) -> editor.showJobs(), "jobs");
+        registerCommand((args, range, force) -> editor.cancelJob(args), "jobcancel", "jobkill");
         registerCommand((args, range, force) -> editor.showFileTree(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
         registerCommand((args, range, force) -> {

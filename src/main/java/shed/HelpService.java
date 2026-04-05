@@ -46,6 +46,8 @@ public class HelpService {
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :log           Open command log file\n" +
+                   "  :jobs          Show async job list\n" +
+                   "  :jobcancel id  Cancel async job\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   File tree in scratch buffer\n" +
@@ -61,7 +63,7 @@ public class HelpService {
                    "  :zen           Toggle zen mode\n" +
                    "  :reload        Reload ~/.shedrc now\n" +
                    "  :normal keys   Replay normal keys\n" +
-                   "  :!cmd          Run shell command\n" +
+                   "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +
                    "  :set theme=x   Switch color theme\n" +
                    "  :set k=v       Set any config key in-memory\n" +

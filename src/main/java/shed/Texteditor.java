@@ -53,6 +53,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private TreeService treeService;
     private LspService lspService;
     private SyntaxHighlightService syntaxHighlightService;
+    private AsyncJobService asyncJobService;
 
     // Buffer management
     private List<FileBuffer> buffers;
@@ -130,6 +131,7 @@ public class Texteditor extends JFrame implements KeyListener {
         treeService = new TreeService();
         lspService = new LspService();
         syntaxHighlightService = new SyntaxHighlightService();
+        asyncJobService = new AsyncJobService();
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -2132,6 +2134,9 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("config");
         knownCommands.add("log");
         knownCommands.add("commandlog");
+        knownCommands.add("jobs");
+        knownCommands.add("jobcancel");
+        knownCommands.add("jobkill");
         knownCommands.add("help");
         knownCommands.add("wc");
         knownCommands.add("recent");
@@ -3065,56 +3070,195 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String runShellCommand(String command) {
-        try {
-            ProcessBuilder builder = new ProcessBuilder("zsh", "-lc", command);
-            builder.directory(new File("."));
-            Process process = builder.start();
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exitCode = process.waitFor();
-            String output = stdout.isEmpty() ? stderr : stdout + (stderr.isEmpty() ? "" : "\n" + stderr);
-            output = output.stripTrailing();
-            if (output.isEmpty()) {
-                return "Shell command exited " + exitCode;
-            }
-            if (output.lines().count() <= 1) {
-                return output;
-            }
-            showScratchBuffer("[shell output]", output);
-            return ":q to return to previous buffer";
-        } catch (Exception e) {
-            return "Shell error: " + e.getMessage();
+        String trimmed = command == null ? "" : command.trim();
+        if (trimmed.isEmpty()) {
+            return "Error: :! requires command";
         }
+        int jobId = asyncJobService.submit(
+            "shell: " + trimmed,
+            token -> runShellProcess(trimmed, null, token),
+            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
+        );
+        return "Shell job " + jobId + " started";
     }
 
     public String filterRangeWithCommand(int startLine, int endLine, String command) {
+        String trimmed = command == null ? "" : command.trim();
+        if (trimmed.isEmpty()) {
+            return "Error: :! requires command";
+        }
         try {
             int safeStart = Math.max(1, Math.min(startLine, writingArea.getLineCount()));
             int safeEnd = Math.max(safeStart, Math.min(endLine, writingArea.getLineCount()));
             int startOffset = writingArea.getLineStartOffset(safeStart - 1);
             int endOffset = writingArea.getLineEndOffset(safeEnd - 1);
             String input = writingArea.getText().substring(startOffset, endOffset);
+            FileBuffer targetBuffer = getCurrentBuffer();
 
-            ProcessBuilder builder = new ProcessBuilder("zsh", "-lc", command);
-            builder.directory(new File("."));
-            Process process = builder.start();
-            process.getOutputStream().write(input.getBytes(StandardCharsets.UTF_8));
-            process.getOutputStream().close();
-
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                return stderr.isEmpty() ? "Shell command failed" : stderr.strip();
-            }
-
-            writingArea.replaceRange(stdout, startOffset, endOffset);
-            writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
-            markModified();
-            return (safeEnd - safeStart + 1) + " line filter applied";
-        } catch (Exception e) {
-            return "Shell error: " + e.getMessage();
+            int jobId = asyncJobService.submit(
+                "filter " + safeStart + "," + safeEnd + ": " + trimmed,
+                token -> runShellProcess(trimmed, input, token),
+                (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
+                    handleFilterJobCompletion(snapshot, result, error, targetBuffer, startOffset, endOffset, input, safeStart, safeEnd))
+            );
+            return "Filter job " + jobId + " started";
+        } catch (BadLocationException e) {
+            return "Error: " + e.getMessage();
         }
+    }
+
+    public String showJobs() {
+        List<AsyncJobService.JobSnapshot> jobs = asyncJobService.list();
+        if (jobs.isEmpty()) {
+            return "No jobs";
+        }
+        StringBuilder builder = new StringBuilder();
+        builder.append("Jobs\n\n");
+        for (AsyncJobService.JobSnapshot job : jobs) {
+            builder.append(job.getId())
+                .append("  ")
+                .append(job.getStatus().name().toLowerCase())
+                .append("  ")
+                .append(job.getDescription());
+            Long finished = job.getFinishedAtMillis();
+            if (finished != null) {
+                long duration = Math.max(0L, finished - job.getStartedAtMillis());
+                builder.append("  (").append(duration).append(" ms)");
+            }
+            if (job.getErrorMessage() != null && !job.getErrorMessage().isBlank()) {
+                builder.append("  ").append(job.getErrorMessage().strip());
+            }
+            builder.append("\n");
+        }
+        showScratchBuffer("[jobs]", builder.toString());
+        return "Showing jobs";
+    }
+
+    public String cancelJob(String jobIdArgument) {
+        if (jobIdArgument == null || jobIdArgument.isBlank()) {
+            return "Usage: :jobcancel <id>";
+        }
+        try {
+            int jobId = Integer.parseInt(jobIdArgument.trim());
+            boolean cancelled = asyncJobService.cancel(jobId);
+            return cancelled ? "Cancellation sent for job " + jobId : "Job not running: " + jobId;
+        } catch (NumberFormatException e) {
+            return "Invalid job id: " + jobIdArgument;
+        }
+    }
+
+    private CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
+        ProcessBuilder builder = new ProcessBuilder("zsh", "-lc", command);
+        builder.directory(new File("."));
+        builder.redirectErrorStream(true);
+        Process process = builder.start();
+        token.onCancel(() -> {
+            if (process.isAlive()) {
+                process.destroyForcibly();
+            }
+        });
+        if (input != null) {
+            process.getOutputStream().write(input.getBytes(StandardCharsets.UTF_8));
+        }
+        process.getOutputStream().close();
+        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        int exitCode = process.waitFor();
+        if (token.isCancelled() || Thread.currentThread().isInterrupted()) {
+            throw new InterruptedException("cancelled");
+        }
+        return new CommandResult(exitCode, output, "");
+    }
+
+    private void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        if (closingDown) {
+            return;
+        }
+        int jobId = snapshot == null ? -1 : snapshot.getId();
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            showMessage("Shell job " + jobId + " cancelled");
+            return;
+        }
+        if (error != null || result == null) {
+            String message = error == null ? "unknown error" : error.getMessage();
+            showMessage("Shell job " + jobId + " failed: " + (message == null ? "" : message));
+            return;
+        }
+
+        String output = result.stdout == null ? "" : result.stdout.stripTrailing();
+        if (result.exitCode != 0) {
+            if (output.isEmpty()) {
+                showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
+            } else {
+                showScratchBuffer("[shell job " + jobId + "]", output + "\n");
+                showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
+            }
+            return;
+        }
+
+        if (output.isEmpty()) {
+            showMessage("Shell job " + jobId + " exited 0");
+            return;
+        }
+        if (output.lines().count() <= 1) {
+            showMessage(output);
+            return;
+        }
+        showScratchBuffer("[shell job " + jobId + "]", output + "\n");
+        showMessage("Shell job " + jobId + " complete");
+    }
+
+    private void handleFilterJobCompletion(
+        AsyncJobService.JobSnapshot snapshot,
+        CommandResult result,
+        Exception error,
+        FileBuffer targetBuffer,
+        int startOffset,
+        int endOffset,
+        String originalInput,
+        int startLine,
+        int endLine
+    ) {
+        if (closingDown) {
+            return;
+        }
+        int jobId = snapshot == null ? -1 : snapshot.getId();
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            showMessage("Filter job " + jobId + " cancelled");
+            return;
+        }
+        if (error != null || result == null) {
+            String message = error == null ? "unknown error" : error.getMessage();
+            showMessage("Filter job " + jobId + " failed: " + (message == null ? "" : message));
+            return;
+        }
+        if (result.exitCode != 0) {
+            String output = result.stdout == null ? "" : result.stdout.strip();
+            if (output.isEmpty()) {
+                showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
+            } else {
+                showScratchBuffer("[filter job " + jobId + "]", output + "\n");
+                showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
+            }
+            return;
+        }
+        if (targetBuffer == null || getCurrentBuffer() != targetBuffer) {
+            showMessage("Filter job " + jobId + " complete (target buffer not active)");
+            return;
+        }
+        String text = writingArea.getText();
+        if (startOffset < 0 || endOffset > text.length() || startOffset > endOffset) {
+            showMessage("Filter job " + jobId + " skipped (buffer changed)");
+            return;
+        }
+        String currentSlice = text.substring(startOffset, endOffset);
+        if (!currentSlice.equals(originalInput)) {
+            showMessage("Filter job " + jobId + " skipped (range changed)");
+            return;
+        }
+        writingArea.replaceRange(result.stdout == null ? "" : result.stdout, startOffset, endOffset);
+        writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
+        markModified();
+        showMessage((endLine - startLine + 1) + " line filter applied");
     }
 
     public String showFileFinder() {
@@ -5721,6 +5865,9 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         closingDown = true;
+        if (asyncJobService != null) {
+            asyncJobService.shutdownNow();
+        }
         dispose();
         System.exit(0);
     }

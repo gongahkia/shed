@@ -70,6 +70,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private SyntaxHighlightService syntaxHighlightService;
     private AsyncJobService asyncJobService;
     private QuickfixService quickfixService;
+    private PluginManager pluginManager;
 
     // Buffer management
     private List<FileBuffer> buffers;
@@ -243,6 +244,7 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();
         bracketColorEnabled = false;
+        pluginManager = new PluginManager(configManager);
         loadRecentFiles();
         lastMessage = "";
 
@@ -6607,6 +6609,16 @@ public class Texteditor extends JFrame implements KeyListener {
         return getCurrentCaretLine() + 1;
     }
 
+    private String getWordAtCaret() {
+        String text = writingArea.getText();
+        int caret = writingArea.getCaretPosition();
+        if (text.isEmpty() || caret >= text.length()) return "";
+        int start = caret, end = caret;
+        while (start > 0 && isWordCharacter(text.charAt(start - 1))) start--;
+        while (end < text.length() && isWordCharacter(text.charAt(end))) end++;
+        return start == end ? "" : text.substring(start, end);
+    }
+
     public String showLspCompletionStatus() {
         FileBuffer buffer = getCurrentBuffer();
         String prefix = currentCompletionPrefix();
@@ -7387,6 +7399,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (client != null) {
             client.didSave(bufferUri(buffer));
         }
+        firePluginEvent("BufWrite");
     }
 
     private void pollLspNotifications(FileBuffer buffer) {
@@ -8006,6 +8019,9 @@ public class Texteditor extends JFrame implements KeyListener {
             clearSubstitutePreview();
         }
         updateStatusBar();
+        if (oldMode != mode) {
+            firePluginEvent("ModeChange");
+        }
     }
 
     private Color getModeBackground(EditorMode mode) {
@@ -8304,6 +8320,7 @@ public class Texteditor extends JFrame implements KeyListener {
         loadBufferIntoEditor(buffer);
         addToRecentFiles(file.getAbsolutePath());
         registerFileWatch(buffer);
+        firePluginEvent("BufOpen");
         if (buffer.isShowingPreviewOnly()) {
             showMessage("Large-file preview loaded");
         }
@@ -9525,11 +9542,40 @@ public class Texteditor extends JFrame implements KeyListener {
         return configManager;
     }
 
+    public PluginManager getPluginManager() {
+        return pluginManager;
+    }
+
+    private void firePluginEvent(String event) {
+        if (pluginManager == null) return;
+        for (String cmd : pluginManager.getEventCommands(event)) {
+            commandHandler.execute(cmd);
+        }
+    }
+
+    public String reloadPlugins() {
+        pluginManager.reload();
+        int count = pluginManager.getPlugins().size();
+        return "Reloaded " + count + " plugin(s)";
+    }
+
+    public String showPluginList() {
+        showScratchBuffer("[plugins]", pluginManager.getPluginListText());
+        return "Showing plugins";
+    }
+
     public String runUserCommand(String name, String shellCmd) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("bash", "-c", shellCmd);
-            pb.redirectErrorStream(true);
             FileBuffer buf = getCurrentBuffer();
+            String filePath = (buf != null && buf.hasFilePath()) ? buf.getFilePath() : "";
+            int line = getCurrentLineNumber();
+            int col = 0;
+            try { col = writingArea.getCaretPosition() - writingArea.getLineStartOffset(getCurrentCaretLine()); } catch (BadLocationException ignored) {}
+            String word = getWordAtCaret();
+            String selection = writingArea.getSelectedText();
+            String interpolated = PluginManager.interpolate(shellCmd, filePath, line, col, word, selection);
+            ProcessBuilder pb = new ProcessBuilder("bash", "-c", interpolated);
+            pb.redirectErrorStream(true);
             if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
                 pb.directory(buf.getFile().getParentFile());
             }

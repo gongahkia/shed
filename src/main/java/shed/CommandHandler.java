@@ -176,6 +176,9 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.toggleBracketColors(), "bracketcolor", "bracketcolors");
         registerCommand((args, range, force) -> editor.openTerminal(), "term", "terminal");
         registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");
+
+        // Plugin commands
+        registerCommand((args, range, force) -> handlePlugin(args), "plugin", "plugins");
     }
 
     private void registerCommand(CommandAction action, String... names) {
@@ -397,6 +400,16 @@ public class CommandHandler {
         } catch (NumberFormatException e) {
             return "Invalid conceal level: " + args;
         }
+    }
+
+    private String handlePlugin(String args) {
+        if (args != null && !args.isEmpty()) {
+            String sub = args.trim().toLowerCase(Locale.ROOT);
+            if (sub.equals("reload")) {
+                return editor.reloadPlugins();
+            }
+        }
+        return editor.showPluginList();
     }
 
     private String handleNormal(String keys, RangeParseResult range) {

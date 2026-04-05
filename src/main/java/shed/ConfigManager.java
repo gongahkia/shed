@@ -52,6 +52,7 @@ public class ConfigManager {
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "shedrc";
     private static final String SHED_SESSIONS_NAME = "sessions";
+    private static final String SHED_PLUGINS_NAME = "plugins";
     private static final String LEGACY_CONFIG_NAME = ".shedrc";
     private static final String LEGACY_CONFIG_ALT_RELATIVE = ".config/shed/shedrc";
 
@@ -569,6 +570,10 @@ public class ConfigManager {
         return shedDirectoryPath;
     }
 
+    public String getPluginsDirectoryPath() {
+        return shedDirectoryPath + "/" + SHED_PLUGINS_NAME;
+    }
+
     // Check if config file exists
     public boolean configExists() {
         return new File(configPath).exists();
@@ -594,6 +599,10 @@ public class ConfigManager {
             + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
             + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
             + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
+            + "# Plugins\n"
+            + "# Place .shed files in ~/.shed/plugins/ to load plugins.\n"
+            + "# Use :help plugins for the plugin file format.\n"
+            + "# Use :plugin to list loaded plugins, :plugin reload to reload.\n\n"
             + "# Command aliases (left side is what you type after :, right side is built-in command)\n"
             + "# command.alias.ww=w\n"
             + "# command.alias.qq=q\n\n"

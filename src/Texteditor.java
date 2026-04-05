@@ -409,6 +409,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         renderedLayoutComponent = windowLayoutRoot == null ? new JPanel() : windowLayoutRoot.render();
         editorHostPanel.add(renderedLayoutComponent, BorderLayout.CENTER);
+        updateZenModeLayout();
         editorHostPanel.revalidate();
         editorHostPanel.repaint();
     }
@@ -1945,6 +1946,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (currentMode != null) {
             writingArea.setBackground(getModeBackground(currentMode));
         }
+        updateZenModeLayout();
 
         refreshLineNumberPanel();
         updateCurrentLineHighlight();
@@ -3064,16 +3066,42 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void updateZenModeLayout() {
+        Color editorBackground = getModeBackground(currentMode == null ? EditorMode.NORMAL : currentMode);
+        Color marginBackground = zenModeEnabled ? fadedMarginColor(editorBackground) : editorBackground;
+        editorHostPanel.setBackground(marginBackground);
+        editorHostPanel.setOpaque(true);
+
         for (EditorPane pane : editorPanes) {
+            JScrollPane scrollPane = pane.getScrollPane();
+            JTextArea area = pane.getTextArea();
+            area.setBackground(editorBackground);
+            scrollPane.setOpaque(true);
+            scrollPane.getViewport().setOpaque(true);
+            scrollPane.setBackground(marginBackground);
+            scrollPane.getViewport().setBackground(editorBackground);
             if (!zenModeEnabled) {
-                pane.getScrollPane().setBorder(null);
+                scrollPane.setBorder(null);
                 continue;
             }
             int width = getWidth();
-            int desired = configManager.getZenModeWidth() * Math.max(8, pane.getTextArea().getFontMetrics(pane.getTextArea().getFont()).charWidth('M'));
+            int desired = configManager.getZenModeWidth() * Math.max(8, area.getFontMetrics(area.getFont()).charWidth('M'));
             int horizontalPadding = Math.max(12, (width - desired) / 2);
-            pane.getScrollPane().setBorder(BorderFactory.createEmptyBorder(0, horizontalPadding, 0, horizontalPadding));
+            scrollPane.setBorder(BorderFactory.createEmptyBorder(0, horizontalPadding, 0, horizontalPadding));
         }
+        editorHostPanel.revalidate();
+        editorHostPanel.repaint();
+    }
+
+    private Color fadedMarginColor(Color base) {
+        return blendColor(base, configManager.getEditorForeground(), 0.12);
+    }
+
+    private Color blendColor(Color base, Color overlay, double ratio) {
+        double clamped = Math.max(0.0, Math.min(1.0, ratio));
+        int r = (int) Math.round(base.getRed() * (1.0 - clamped) + overlay.getRed() * clamped);
+        int g = (int) Math.round(base.getGreen() * (1.0 - clamped) + overlay.getGreen() * clamped);
+        int b = (int) Math.round(base.getBlue() * (1.0 - clamped) + overlay.getBlue() * clamped);
+        return new Color(r, g, b);
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -3897,6 +3925,7 @@ public class Texteditor extends JFrame implements KeyListener {
         this.currentMode = mode;
         writingArea.setEditable(mode.isEditable());
         writingArea.setBackground(getModeBackground(mode));
+        updateZenModeLayout();
         if (mode != EditorMode.COMMAND) {
             clearSubstitutePreview();
         }

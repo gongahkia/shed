@@ -545,6 +545,22 @@ public class ConfigManager {
         return commands;
     }
 
+    public Map<String, String> getConfiguredLspServers() {
+        Map<String, String> servers = new java.util.LinkedHashMap<>();
+        String prefix = "lsp.";
+        String suffix = ".command";
+        for (String key : config.keySet()) {
+            if (key.startsWith(prefix) && key.endsWith(suffix) && key.length() > prefix.length() + suffix.length()) {
+                String ext = key.substring(prefix.length(), key.length() - suffix.length());
+                String cmd = config.get(key);
+                String[] args = getLspArgs(ext);
+                String full = cmd + (args.length > 0 ? " " + String.join(" ", args) : "");
+                servers.put(ext, full);
+            }
+        }
+        return servers;
+    }
+
     public String getKeybinding(String mode, String keySpec) {
         if (keySpec == null || keySpec.isEmpty()) {
             return null;

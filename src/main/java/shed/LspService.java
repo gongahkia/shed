@@ -31,6 +31,10 @@ public class LspService {
         }
     }
 
+    public java.util.List<String> getBuiltinExtensions() {
+        return java.util.List.of("rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cpp", "h", "hpp");
+    }
+
     public String[] builtinCommand(String extension) {
         switch (extension) {
             case "rs":

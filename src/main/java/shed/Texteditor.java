@@ -244,7 +244,6 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();
         bracketColorEnabled = false;
-        pluginManager = new PluginManager(configManager, this);
         loadRecentFiles();
         lastMessage = "";
 
@@ -258,6 +257,7 @@ public class Texteditor extends JFrame implements KeyListener {
         clipboardManager = new ClipboardManager();
         registerManager = new RegisterManager();
         commandHandler = new CommandHandler(this);
+        pluginManager = new PluginManager(configManager, this);
 
         // Open file from command line or landing page
         if (args.length > 0) {
@@ -6691,9 +6691,119 @@ public class Texteditor extends JFrame implements KeyListener {
             case "diagnostics":
             case "diag":
                 return showDiagnostics();
+            case "status":
+                return lspStatus();
+            case "restart":
+                return lspRestart(args);
+            case "stop":
+                return lspStop(args);
+            case "servers":
+                return lspServers();
+            case "log":
+                return lspLog();
             default:
                 return "Unknown :lsp subcommand: " + subcommand;
         }
+    }
+
+    public String lspStatus() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("LSP Server Status\n");
+        sb.append("=".repeat(40)).append("\n\n");
+        if (lspClients.isEmpty() && lspErrors.isEmpty()) {
+            sb.append("No LSP servers active.\n");
+            sb.append("Open a file with a configured language to start a server.\n");
+        }
+        for (Map.Entry<String, LspClient> entry : lspClients.entrySet()) {
+            String ext = entry.getKey();
+            LspClient client = entry.getValue();
+            sb.append("  .").append(ext).append("  ");
+            sb.append(client.isAlive() ? "running" : "stopped");
+            sb.append("\n");
+        }
+        if (!lspErrors.isEmpty()) {
+            sb.append("\nErrors:\n");
+            for (Map.Entry<String, String> entry : lspErrors.entrySet()) {
+                String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
+                sb.append("  ").append(ext).append(": ").append(entry.getValue()).append("\n");
+            }
+        }
+        showScratchBuffer("[lsp status]", sb.toString());
+        return "Showing LSP status";
+    }
+
+    public String lspRestart(String ext) {
+        String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
+        if (extension.isEmpty()) return "No extension specified and no file open";
+        LspClient existing = lspClients.remove(extension);
+        if (existing != null) existing.stop();
+        lspErrors.remove(extension);
+        // remove document versions for this extension so didOpen fires again
+        lspDocumentVersions.entrySet().removeIf(e -> {
+            String uri = e.getKey();
+            int dot = uri.lastIndexOf('.');
+            return dot >= 0 && uri.substring(dot + 1).equalsIgnoreCase(extension);
+        });
+        FileBuffer buf = getCurrentBuffer();
+        if (buf != null && bufferExtension(buf).equals(extension)) {
+            LspClient client = resolveLspClient(buf);
+            if (client != null) return "Restarted LSP for ." + extension;
+            return "Failed to restart LSP for ." + extension;
+        }
+        return "Stopped LSP for ." + extension + " (will restart on next use)";
+    }
+
+    public String lspStop(String ext) {
+        String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
+        if (extension.isEmpty()) return "No extension specified and no file open";
+        LspClient existing = lspClients.remove(extension);
+        if (existing == null) return "No LSP server running for ." + extension;
+        existing.stop();
+        lspErrors.remove(extension);
+        return "Stopped LSP for ." + extension;
+    }
+
+    public String lspServers() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("LSP Servers\n");
+        sb.append("=".repeat(40)).append("\n\n");
+        Map<String, String> configured = configManager.getConfiguredLspServers();
+        sb.append("Configured (shedrc):\n");
+        if (configured.isEmpty()) {
+            sb.append("  (none)\n");
+        } else {
+            for (Map.Entry<String, String> entry : configured.entrySet()) {
+                sb.append("  .").append(entry.getKey()).append(" -> ").append(entry.getValue()).append("\n");
+            }
+        }
+        sb.append("\nBuiltin:\n");
+        for (String ext : lspService.getBuiltinExtensions()) {
+            if (configured.containsKey(ext)) continue;
+            String[] cmd = lspService.builtinCommand(ext);
+            if (cmd != null) {
+                sb.append("  .").append(ext).append(" -> ").append(String.join(" ", cmd)).append("\n");
+            }
+        }
+        showScratchBuffer("[lsp servers]", sb.toString());
+        return "Showing LSP servers";
+    }
+
+    public String lspLog() {
+        if (lspErrors.isEmpty()) return "No LSP errors";
+        StringBuilder sb = new StringBuilder();
+        sb.append("LSP Error Log\n");
+        sb.append("=".repeat(40)).append("\n\n");
+        for (Map.Entry<String, String> entry : lspErrors.entrySet()) {
+            String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
+            sb.append(ext).append(": ").append(entry.getValue()).append("\n");
+        }
+        showScratchBuffer("[lsp log]", sb.toString());
+        return "Showing LSP log";
+    }
+
+    private String currentBufferExtension() {
+        FileBuffer buf = getCurrentBuffer();
+        return buf == null ? "" : bufferExtension(buf);
     }
 
     public String lspGoToDefinition() {
@@ -9562,7 +9672,46 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing plugins";
     }
 
+    public String enablePlugin(String name) {
+        return pluginManager.enablePlugin(name);
+    }
+
+    public String disablePlugin(String name) {
+        return pluginManager.disablePlugin(name);
+    }
+
+    public String showPluginInfo(String name) {
+        String text = pluginManager.getPluginInfoText(name);
+        showScratchBuffer("[plugin " + name + "]", text);
+        return "Showing plugin info";
+    }
+
+    public String showPluginPath() {
+        String path = pluginManager.getPluginsDirectoryPath();
+        List<String> disabled = pluginManager.listDisabledPlugins();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Plugin directory: ").append(path).append("\n\n");
+        if (!disabled.isEmpty()) {
+            sb.append("Disabled plugins:\n");
+            for (String d : disabled) sb.append("  ").append(d).append("\n");
+        }
+        showScratchBuffer("[plugin path]", sb.toString());
+        return path;
+    }
+
+    public String createAndOpenPlugin(String name) {
+        try {
+            File file = pluginManager.createPluginFile(name);
+            openFile(file);
+            pluginManager.reload();
+            return "Opened plugin: " + file.getName();
+        } catch (IOException e) {
+            return "Error creating plugin: " + e.getMessage();
+        }
+    }
+
     public String executeCommand(String cmd) {
+        if (commandHandler == null) return "";
         return commandHandler.execute(cmd);
     }
 

@@ -275,6 +275,24 @@ $ java -jar Shed.jar                 # Opens file chooser dialog
 $ java -jar Shed.jar filename.txt    # Opens specific file
 ```
 
+## Themes
+
+Configure in `~/.shedrc`:
+
+```ini
+theme=one-dark-pro
+```
+
+Switch in editor:
+
+```console
+:themes
+:set theme=gruvbox-dark
+```
+
+Built-in themes (ordered list):
+`one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`.
+
 ## Fonts
 
 * Hack Nerd Font: https://www.nerdfonts.com/font-downloads

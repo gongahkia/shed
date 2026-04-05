@@ -87,6 +87,14 @@ public class CommandHandler {
                 return action.execute(args, range, force);
             }
 
+            // Check user-defined commands from .shedrc
+            Map<String, String> userCommands = editor.getConfigManager().getUserCommands();
+            if (userCommands.containsKey(resolvedCmd)) {
+                String shellCmd = userCommands.get(resolvedCmd);
+                if (args != null && !args.isEmpty()) shellCmd += " " + args;
+                return editor.runUserCommand(resolvedCmd, shellCmd);
+            }
+
             try {
                 return editor.gotoLine(Integer.parseInt(resolvedCmd));
             } catch (NumberFormatException ignored) {

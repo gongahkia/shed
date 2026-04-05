@@ -331,7 +331,19 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private EditorPane createEditorPane(Dimension screenSize) {
-        JTextArea textArea = new JTextArea();
+        JTextArea textArea = new JTextArea() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                int rulerCol = configManager.getRulerColumn();
+                if (rulerCol > 0) {
+                    FontMetrics fm = g.getFontMetrics(getFont());
+                    int x = fm.charWidth(' ') * rulerCol + getInsets().left;
+                    g.setColor(new Color(255, 255, 255, 30));
+                    g.drawLine(x, 0, x, getHeight());
+                }
+            }
+        };
         textArea.addKeyListener(this);
         textArea.setFont(resolveEditorFont());
         textArea.setTabSize(configManager.getTabSize());

@@ -404,6 +404,10 @@ public class ConfigManager {
         return getInt("zen.mode.width", DEFAULT_ZEN_MODE_WIDTH);
     }
 
+    public int getRulerColumn() {
+        return getInt("ruler.column", 0);
+    }
+
     public boolean getSessionRestoreOnStart() {
         return getBoolean("session.restore.on.start", DEFAULT_SESSION_RESTORE_ON_START);
     }

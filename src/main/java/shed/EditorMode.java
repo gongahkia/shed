@@ -10,6 +10,7 @@ public enum EditorMode {
     INSERT("insert mode", "#354F60", true),
     VISUAL("visual mode", "#2E8B57", false),
     VISUAL_LINE("visual line mode", "#2E8B57", false),
+    VISUAL_BLOCK("visual block mode", "#2E6B47", false),
     REPLACE("replace mode", "#8B4513", true),
     COMMAND("command mode", "#FFC501", false),
     SEARCH("search mode", "#FFC501", false);

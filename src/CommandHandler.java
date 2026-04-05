@@ -87,7 +87,6 @@ public class CommandHandler {
                 case "bprev":
                     return editor.prevBuffer();
                 case "ls":
-                case "buffers":
                     return editor.listBuffers();
                 case "bd":
                 case "bdelete":

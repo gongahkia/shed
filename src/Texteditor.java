@@ -4807,6 +4807,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         currentBufferIndex = Math.max(0, buffers.indexOf(buffer));
+        if (isTreeBuffer(buffer)) {
+            treeLineTargets.remove(buffer);
+            if (buffer == treeBuffer) {
+                treeBuffer = null;
+            }
+        }
         buffers.remove(buffer);
         if (buffers.isEmpty()) {
             openLandingPage();
@@ -4862,6 +4868,23 @@ public class Texteditor extends JFrame implements KeyListener {
         EditorPane activePane = getActivePane();
         if (activePane == null) {
             return "No active window";
+        }
+        FileBuffer closingBuffer = activePane.getBuffer();
+        if (activePane == treePane) {
+            treePane = null;
+            if (isTreeBuffer(closingBuffer)) {
+                treeLineTargets.remove(closingBuffer);
+                buffers.remove(closingBuffer);
+                if (closingBuffer == treeBuffer) {
+                    treeBuffer = null;
+                }
+            }
+        } else if (isTreeBuffer(closingBuffer)) {
+            treeLineTargets.remove(closingBuffer);
+            buffers.remove(closingBuffer);
+            if (closingBuffer == treeBuffer) {
+                treeBuffer = null;
+            }
         }
 
         detachActiveDocumentListener();

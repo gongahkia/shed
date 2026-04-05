@@ -96,6 +96,9 @@ public class CommandHandler {
                 case "config":
                 case "shedrc":
                     return editor.openSettingsBuffer();
+                case "log":
+                case "commandlog":
+                    return editor.openCommandLogBuffer();
                 case "help":
                 case "h":
                     editor.showHelp(args);

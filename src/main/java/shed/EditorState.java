@@ -11,6 +11,7 @@ public class EditorState {
     public int lastVisualStart;
     public int lastVisualEnd;
     public EditorMode lastVisualMode;
+    public int searchStartPos;
 
     public EditorState() {
         mode = EditorMode.NORMAL;
@@ -23,5 +24,6 @@ public class EditorState {
         lastVisualStart = -1;
         lastVisualEnd = -1;
         lastVisualMode = null;
+        searchStartPos = -1;
     }
 }

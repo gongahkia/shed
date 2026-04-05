@@ -8,6 +8,9 @@ public class EditorState {
     public Character pendingRegister;
     public int visualStartPos;
     public boolean searchForward;
+    public int lastVisualStart;
+    public int lastVisualEnd;
+    public EditorMode lastVisualMode;
 
     public EditorState() {
         mode = EditorMode.NORMAL;
@@ -17,5 +20,8 @@ public class EditorState {
         pendingRegister = null;
         visualStartPos = -1;
         searchForward = true;
+        lastVisualStart = -1;
+        lastVisualEnd = -1;
+        lastVisualMode = null;
     }
 }

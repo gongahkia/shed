@@ -1220,6 +1220,19 @@ public class Texteditor extends JFrame implements KeyListener {
                 changePrev();
             } else if (c == ',') {
                 changeNext();
+            } else if (c == 'v') {
+                if (editorState.lastVisualStart >= 0 && editorState.lastVisualEnd >= 0
+                        && editorState.lastVisualStart <= writingArea.getText().length()
+                        && editorState.lastVisualEnd <= writingArea.getText().length()) {
+                    EditorMode vm = editorState.lastVisualMode != null ? editorState.lastVisualMode : EditorMode.VISUAL;
+                    editorState.visualStartPos = editorState.lastVisualStart;
+                    setMode(vm);
+                    writingArea.setSelectionStart(editorState.lastVisualStart);
+                    writingArea.setSelectionEnd(editorState.lastVisualEnd);
+                    writingArea.setCaretPosition(editorState.lastVisualEnd);
+                } else {
+                    showMessage("No previous visual selection");
+                }
             }
             editorState.pendingKey = '\0';
             editorState.pendingCount = "";
@@ -1500,12 +1513,17 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
-        // Handle pending g prefix (gc = toggle comment)
+        // Handle pending keys
         if (editorState.pendingKey == 'g') {
             editorState.pendingKey = '\0';
             if (c == 'c') {
                 toggleCommentSelection();
             }
+            setMode(EditorMode.NORMAL);
+            return;
+        } else if (editorState.pendingKey == 'S') {
+            editorState.pendingKey = '\0';
+            surroundVisualSelection(c);
             setMode(EditorMode.NORMAL);
             return;
         }
@@ -1544,6 +1562,9 @@ public class Texteditor extends JFrame implements KeyListener {
         if (c == 'g') {
             editorState.pendingKey = 'g';
             return;
+        } else if (c == 'S') {
+            editorState.pendingKey = 'S';
+            return;
         } else if (c == 'y') {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
@@ -1552,7 +1573,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Selection yanked");
             }
             setMode(EditorMode.NORMAL);
-        } else if (c == 'd') {
+        } else if (c == 'd' || c == 'x') {
             String selected = writingArea.getSelectedText();
             if (selected != null) {
                 clipboardManager.yankSelection(selected);
@@ -1571,6 +1592,66 @@ public class Texteditor extends JFrame implements KeyListener {
                 markModified();
             }
             setMode(EditorMode.INSERT);
+        } else if (c == '>' || c == '<' || c == '=') {
+            applyVisualLineOperator(c);
+            setMode(EditorMode.NORMAL);
+        } else if (c == '~') {
+            String selected = writingArea.getSelectedText();
+            if (selected != null) {
+                StringBuilder toggled = new StringBuilder(selected.length());
+                for (char ch : selected.toCharArray()) {
+                    toggled.append(Character.isUpperCase(ch) ? Character.toLowerCase(ch) : Character.toUpperCase(ch));
+                }
+                writingArea.replaceSelection(toggled.toString());
+                markModified();
+            }
+            setMode(EditorMode.NORMAL);
+        } else if (c == 'U') {
+            String selected = writingArea.getSelectedText();
+            if (selected != null) {
+                writingArea.replaceSelection(selected.toUpperCase());
+                markModified();
+            }
+            setMode(EditorMode.NORMAL);
+        } else if (c == 'u') {
+            String selected = writingArea.getSelectedText();
+            if (selected != null) {
+                writingArea.replaceSelection(selected.toLowerCase());
+                markModified();
+            }
+            setMode(EditorMode.NORMAL);
+        } else if (c == 'J') {
+            joinVisualSelection();
+            setMode(EditorMode.NORMAL);
+        } else if (c == 'p' || c == 'P') {
+            String selected = writingArea.getSelectedText();
+            RegisterContent content = registerManager.get(consumePendingRegister());
+            if (selected != null && content != null && !content.getText().isEmpty()) {
+                storeDelete(null, selected, lineMode);
+                writingArea.replaceSelection(content.getText());
+                markModified();
+                showMessage("Pasted over selection");
+            }
+            setMode(EditorMode.NORMAL);
+        } else if (c == 'o') {
+            int selStart = writingArea.getSelectionStart();
+            int selEnd = writingArea.getSelectionEnd();
+            int caret = writingArea.getCaretPosition();
+            if (caret == selStart) {
+                editorState.visualStartPos = selStart;
+                writingArea.setCaretPosition(selEnd);
+            } else {
+                editorState.visualStartPos = selEnd;
+                writingArea.setCaretPosition(selStart);
+            }
+            // Re-apply selection after swap
+            int swappedPos = writingArea.getCaretPosition();
+            if (lineMode) {
+                selectLineRange(editorState.visualStartPos, swappedPos);
+            } else {
+                writingArea.setSelectionStart(Math.min(editorState.visualStartPos, swappedPos));
+                writingArea.setSelectionEnd(Math.max(editorState.visualStartPos, swappedPos));
+            }
         }
     }
 
@@ -1581,6 +1662,77 @@ public class Texteditor extends JFrame implements KeyListener {
         if (selectionEnd > selectionStart && caret == selectionEnd && caret > 0) {
             writingArea.setCaretPosition(Math.max(selectionStart, caret - 1));
         }
+    }
+
+    private void applyVisualLineOperator(char operator) {
+        try {
+            int selStart = writingArea.getSelectionStart();
+            int selEnd = writingArea.getSelectionEnd();
+            int startLine = writingArea.getLineOfOffset(selStart);
+            int endLine = writingArea.getLineOfOffset(selEnd);
+            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
+                endLine--;
+            }
+            String indent = configManager.getExpandTab() ? " ".repeat(writingArea.getTabSize()) : "\t";
+            String text = writingArea.getText();
+            int replaceStart = writingArea.getLineStartOffset(startLine);
+            int replaceEnd = writingArea.getLineEndOffset(endLine);
+            StringBuilder sb = new StringBuilder();
+            for (int i = startLine; i <= endLine; i++) {
+                int ls = writingArea.getLineStartOffset(i);
+                int le = writingArea.getLineEndOffset(i);
+                String line = text.substring(ls, le);
+                switch (operator) {
+                    case '>':
+                        sb.append(indent).append(line);
+                        break;
+                    case '<':
+                        int removeCount = Math.min(writingArea.getTabSize(), leadingWhitespace(line));
+                        sb.append(line.substring(removeCount));
+                        break;
+                    case '=':
+                        String prevIndent = i > 0 ? indentationForLine(i - 1) : "";
+                        sb.append(prevIndent).append(line.stripLeading());
+                        break;
+                }
+            }
+            writingArea.replaceRange(sb.toString(), replaceStart, replaceEnd);
+            markModified();
+            showMessage("Selection " + (operator == '>' ? "indented" : operator == '<' ? "dedented" : "auto-indented"));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void joinVisualSelection() {
+        try {
+            int selStart = writingArea.getSelectionStart();
+            int selEnd = writingArea.getSelectionEnd();
+            int startLine = writingArea.getLineOfOffset(selStart);
+            int endLine = writingArea.getLineOfOffset(selEnd);
+            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
+                endLine--;
+            }
+            int joins = endLine - startLine;
+            for (int i = 0; i < joins; i++) {
+                joinCurrentLine(true);
+            }
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void surroundVisualSelection(char surroundChar) {
+        SurroundPair pair = surroundPair(surroundChar);
+        if (pair == null) {
+            showMessage("Unknown surround: " + surroundChar);
+            return;
+        }
+        int selStart = writingArea.getSelectionStart();
+        int selEnd = writingArea.getSelectionEnd();
+        if (selStart == selEnd) return;
+        writingArea.insert(String.valueOf(pair.close), selEnd);
+        writingArea.insert(String.valueOf(pair.open), selStart);
+        markModified();
+        showMessage("Surround added");
     }
 
     private void toggleCommentSelection() {
@@ -6328,6 +6480,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Mode management
     private void setMode(EditorMode mode) {
+        EditorMode oldMode = this.editorState.mode;
+        if ((oldMode == EditorMode.VISUAL || oldMode == EditorMode.VISUAL_LINE) && mode != EditorMode.VISUAL && mode != EditorMode.VISUAL_LINE) {
+            editorState.lastVisualStart = writingArea.getSelectionStart();
+            editorState.lastVisualEnd = writingArea.getSelectionEnd();
+            editorState.lastVisualMode = oldMode;
+        }
         this.editorState.mode = mode;
         writingArea.setEditable(mode.isEditable());
         writingArea.setBackground(getModeBackground(mode));

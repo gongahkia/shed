@@ -3263,6 +3263,10 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showFileTree(String pathArgument) {
+        if (treePane != null && editorPanes.contains(treePane)) {
+            return closeTreePane();
+        }
+
         String target = pathArgument == null ? "" : pathArgument.trim();
         File root = target.isEmpty() ? new File(".") : new File(target);
         if (!root.exists()) {
@@ -3307,6 +3311,17 @@ public class Texteditor extends JFrame implements KeyListener {
         activateEditorPane(pane);
         pane.getTextArea().requestFocusInWindow();
         return "Tree pane opened";
+    }
+
+    private String closeTreePane() {
+        if (treePane == null || !editorPanes.contains(treePane)) {
+            return "Tree pane already closed";
+        }
+        String result = closePane(treePane);
+        if ("Window closed".equals(result)) {
+            return "Tree pane closed";
+        }
+        return result;
     }
 
     private void appendTreeEntry(StringBuilder builder, List<String> lineTargets, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
@@ -5195,25 +5210,23 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String closeActiveWindow() {
+        return closePane(getActivePane());
+    }
+
+    private String closePane(EditorPane paneToClose) {
         if (editorPanes.size() <= 1) {
             return "Cannot close the only window";
         }
-
-        EditorPane activePane = getActivePane();
-        if (activePane == null) {
+        if (paneToClose == null) {
             return "No active window";
         }
-        FileBuffer closingBuffer = activePane.getBuffer();
-        if (activePane == treePane) {
+
+        EditorPane previouslyActive = getActivePane();
+        FileBuffer closingBuffer = paneToClose.getBuffer();
+        if (paneToClose == treePane) {
             treePane = null;
-            if (isTreeBuffer(closingBuffer)) {
-                treeLineTargets.remove(closingBuffer);
-                buffers.remove(closingBuffer);
-                if (closingBuffer == treeBuffer) {
-                    treeBuffer = null;
-                }
-            }
-        } else if (isTreeBuffer(closingBuffer)) {
+        }
+        if (isTreeBuffer(closingBuffer)) {
             treeLineTargets.remove(closingBuffer);
             buffers.remove(closingBuffer);
             if (closingBuffer == treeBuffer) {
@@ -5222,19 +5235,29 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         detachActiveDocumentListener();
-        editorPanes.remove(activePane);
-        windowLayoutRoot = windowLayoutRoot == null ? null : windowLayoutRoot.removeLeaf(activePane);
-        if (windowLayoutRoot == null) {
+        editorPanes.remove(paneToClose);
+        windowLayoutRoot = windowLayoutRoot == null ? null : windowLayoutRoot.removeLeaf(paneToClose);
+        if (windowLayoutRoot == null && !editorPanes.isEmpty()) {
             windowLayoutRoot = WindowLayoutNode.leaf(editorPanes.get(0));
         }
         renderWindowLayout();
-        activePaneIndex = 0;
-        bindActivePane(editorPanes.get(0));
-        attachActiveDocumentListener();
-        updateCurrentLineHighlight();
-        refreshLineNumberPanel();
-        updateStatusBar();
-        writingArea.requestFocusInWindow();
+
+        EditorPane nextActive = null;
+        if (previouslyActive != null && previouslyActive != paneToClose && editorPanes.contains(previouslyActive)) {
+            nextActive = previouslyActive;
+        } else if (!editorPanes.isEmpty()) {
+            nextActive = editorPanes.get(0);
+        }
+
+        if (nextActive != null) {
+            activePaneIndex = Math.max(0, editorPanes.indexOf(nextActive));
+            bindActivePane(nextActive);
+            attachActiveDocumentListener();
+            updateCurrentLineHighlight();
+            refreshLineNumberPanel();
+            updateStatusBar();
+            writingArea.requestFocusInWindow();
+        }
         return "Window closed";
     }
 
@@ -5783,8 +5806,8 @@ public class Texteditor extends JFrame implements KeyListener {
                     + ":git add <paths...>, :git restore <paths...>, :git commit <message> modify staging/commits.\n";
             case "tree":
                 return "Help: tree\n\n"
-                    + ":tree opens/updates a left side tree pane.\n"
-                    + ":tree <path> uses a specific root path.\n"
+                    + ":tree toggles the left side tree pane open/closed.\n"
+                    + ":tree <path> uses a specific root path when opening.\n"
                     + "Use j/k to move and Enter or o to open the file in the other pane.\n";
             case "keybind":
             case "keybinding":

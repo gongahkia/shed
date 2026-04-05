@@ -202,6 +202,7 @@ public class PluginManager {
 
     public String disablePlugin(String name) {
         File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        if (findDisabledFile(pluginDir, name) != null) return "Already disabled: " + name;
         File target = findPluginFile(pluginDir, name);
         if (target == null) return "Plugin not found: " + name;
         File disabled = new File(target.getAbsolutePath() + ".disabled");
@@ -212,6 +213,7 @@ public class PluginManager {
 
     public String enablePlugin(String name) {
         File pluginDir = new File(configManager.getPluginsDirectoryPath());
+        if (findPluginFile(pluginDir, name) != null) return "Already enabled: " + name;
         File disabled = findDisabledFile(pluginDir, name);
         if (disabled == null) return "No disabled plugin found: " + name;
         String enabledName = disabled.getName().replaceFirst("\\.disabled$", "");

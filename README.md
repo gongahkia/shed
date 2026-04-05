@@ -295,3 +295,106 @@ Built-in themes (ordered list):
 ## Fonts
 
 * Hack Nerd Font: https://www.nerdfonts.com/font-downloads
+
+## Advanced Features (2.x)
+
+### Quickfix + Diagnostics
+
+Use quickfix as a shared navigation list for grep, shell output, and LSP diagnostics/references.
+
+```console
+:copen
+:cnext
+:cprev
+:cc 3
+:diagnostics
+:dnext
+:dprev
+```
+
+### LSP Commands
+
+LSP completion is available via `Ctrl-n`. Additional LSP flows are available in command mode:
+
+```console
+:lsp definition
+:lsp hover
+:lsp references
+:lsp rename NewSymbolName
+:lsp codeaction
+```
+
+### Tree Actions
+
+`:`-commands for file-tree workflows:
+
+```console
+:tree
+:tree /absolute/or/relative/path
+:tree refresh
+:tree reveal
+:tree new src/NewFile.java
+:tree mkdir src/new_folder
+:tree rename old/path new/path
+:tree rm old/path
+:tree rm! old/non_empty_directory
+```
+
+### Git Ergonomics
+
+Extended `:git` subcommands:
+
+```console
+:git status
+:git add src/main/java/shed/Texteditor.java
+:git stage src/test/java/shed
+:git unstage src/test/java/shed
+:git checkout main
+:git switch feature-branch
+:git commit "message"
+:git amend --no-edit
+:git amend "updated message"
+```
+
+### Sessions
+
+Save and restore editor sessions:
+
+```console
+:session save
+:session save worktree_a
+:session load worktree_a
+:session load! worktree_a
+:session list
+```
+
+### Async Shell + Drop Runner
+
+`Shed` now runs shell/filter flows asynchronously and exposes job controls.
+
+```console
+:!rg TODO src
+:1,20!sort
+:drop javac %
+:jobs
+:jobcancel 3
+```
+
+`%` in `:drop` is replaced with current file path. If `%` is omitted, current file path is appended.
+
+### Runtime Hardening Settings
+
+Set these in `~/.shedrc`:
+
+```ini
+process.timeout.ms=15000
+process.output.max.bytes=1048576
+shell.command.max.length=4096
+session.restore.on.start=false
+session.autoload=default
+session.dir=/Users/you/.shed_sessions
+```
+
+### CI
+
+CI now executes the full Maven test suite (`mvn test`) before packaging.

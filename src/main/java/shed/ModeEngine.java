@@ -17,6 +17,7 @@ public class ModeEngine {
                 break;
             case VISUAL:
             case VISUAL_LINE:
+            case VISUAL_BLOCK:
                 editor.handleVisualMode(e);
                 break;
             case REPLACE:

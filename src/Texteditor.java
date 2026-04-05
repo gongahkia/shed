@@ -3171,6 +3171,7 @@ public class Texteditor extends JFrame implements KeyListener {
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed : trimmed.substring(0, split).trim();
         String rest = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        subcommand = subcommand.toLowerCase(java.util.Locale.ROOT);
 
         switch (subcommand) {
             case "status":
@@ -5382,8 +5383,9 @@ public class Texteditor extends JFrame implements KeyListener {
                     + ":git add <paths...>, :git restore <paths...>, :git commit <message> modify staging/commits.\n";
             case "tree":
                 return "Help: tree\n\n"
-                    + ":tree shows a file tree for the current directory.\n"
-                    + ":tree <path> shows a file tree for a specific path.\n";
+                    + ":tree opens/updates a left side tree pane.\n"
+                    + ":tree <path> uses a specific root path.\n"
+                    + "Use j/k to move and Enter or o to open the file in the other pane.\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"

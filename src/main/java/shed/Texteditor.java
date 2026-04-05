@@ -17,6 +17,9 @@ import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.concurrent.TimeUnit;
 
 public class Texteditor extends JFrame implements KeyListener {
     private static final long serialVersionUID = 1L;
@@ -2166,6 +2170,7 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("jobs");
         knownCommands.add("jobcancel");
         knownCommands.add("jobkill");
+        knownCommands.add("drop");
         knownCommands.add("help");
         knownCommands.add("wc");
         knownCommands.add("recent");
@@ -3119,6 +3124,10 @@ public class Texteditor extends JFrame implements KeyListener {
         if (trimmed.isEmpty()) {
             return "Error: :! requires command";
         }
+        String validationError = validateShellCommand(trimmed);
+        if (validationError != null) {
+            return validationError;
+        }
         int jobId = asyncJobService.submit(
             "shell: " + trimmed,
             token -> runShellProcess(trimmed, null, token),
@@ -3127,10 +3136,38 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Shell job " + jobId + " started";
     }
 
+    public String runDropCommand(String command) {
+        String trimmed = command == null ? "" : command.trim();
+        if (trimmed.isEmpty()) {
+            return "Usage: :drop <command>";
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "Drop runner requires a file-backed buffer";
+        }
+        String filePath = buffer.getFilePath();
+        String quotedPath = "'" + filePath.replace("'", "'\"'\"'") + "'";
+        String expanded = trimmed.contains("%") ? trimmed.replace("%", quotedPath) : trimmed + " " + quotedPath;
+        String validationError = validateShellCommand(expanded);
+        if (validationError != null) {
+            return validationError;
+        }
+        int jobId = asyncJobService.submit(
+            "drop: " + expanded,
+            token -> runShellProcess(expanded, null, token),
+            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
+        );
+        return "Drop job " + jobId + " started";
+    }
+
     public String filterRangeWithCommand(int startLine, int endLine, String command) {
         String trimmed = command == null ? "" : command.trim();
         if (trimmed.isEmpty()) {
             return "Error: :! requires command";
+        }
+        String validationError = validateShellCommand(trimmed);
+        if (validationError != null) {
+            return validationError;
         }
         try {
             int safeStart = Math.max(1, Math.min(startLine, writingArea.getLineCount()));
@@ -3349,26 +3386,122 @@ public class Texteditor extends JFrame implements KeyListener {
         return entries;
     }
 
+    private String validateShellCommand(String command) {
+        if (command == null || command.isBlank()) {
+            return "Error: command is empty";
+        }
+        if (command.indexOf('\0') >= 0) {
+            return "Error: command contains invalid null byte";
+        }
+        if (command.length() > configManager.getShellCommandMaxLength()) {
+            return "Error: command length exceeds shell.command.max.length";
+        }
+        return null;
+    }
+
     private CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
-        ProcessBuilder builder = new ProcessBuilder("zsh", "-lc", command);
-        builder.directory(new File("."));
-        builder.redirectErrorStream(true);
-        Process process = builder.start();
-        token.onCancel(() -> {
-            if (process.isAlive()) {
+        return runExternalCommand(
+            List.of("zsh", "-lc", command),
+            new File("."),
+            input,
+            token,
+            configManager.getProcessTimeoutMs(),
+            configManager.getProcessOutputMaxBytes(),
+            true
+        );
+    }
+
+    private CommandResult runExternalCommand(
+        List<String> command,
+        File workingDirectory,
+        String input,
+        AsyncJobService.JobToken token,
+        int timeoutMs,
+        int outputLimitBytes,
+        boolean redirectErrorStream
+    ) {
+        Process process = null;
+        try {
+            ProcessBuilder builder = new ProcessBuilder(command);
+            builder.directory(workingDirectory == null ? new File(".") : workingDirectory);
+            builder.redirectErrorStream(redirectErrorStream);
+            process = builder.start();
+            Process runningProcess = process;
+            if (token != null) {
+                token.onCancel(() -> {
+                    if (runningProcess.isAlive()) {
+                        runningProcess.destroyForcibly();
+                    }
+                });
+            }
+
+            if (input != null) {
+                try (OutputStream stdin = process.getOutputStream()) {
+                    stdin.write(input.getBytes(StandardCharsets.UTF_8));
+                }
+            } else {
+                process.getOutputStream().close();
+            }
+
+            ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
+            boolean[] truncated = new boolean[] {false};
+            Thread outputReader = new Thread(() -> readInputStreamCapped(runningProcess.getInputStream(), outputBuffer, outputLimitBytes, truncated), "shed-process-reader");
+            outputReader.setDaemon(true);
+            outputReader.start();
+
+            boolean finished = runningProcess.waitFor(Math.max(500, timeoutMs), TimeUnit.MILLISECONDS);
+            if (!finished) {
+                runningProcess.destroyForcibly();
+                outputReader.join(500);
+                return new CommandResult(-1, "", "Process timed out after " + timeoutMs + "ms");
+            }
+            outputReader.join(1000);
+            if (token != null && token.isCancelled()) {
+                return new CommandResult(-1, "", "Process cancelled");
+            }
+            String output = outputBuffer.toString(StandardCharsets.UTF_8);
+            if (truncated[0]) {
+                output = output + "\n[shed: output truncated]";
+            }
+            return new CommandResult(runningProcess.exitValue(), output, "");
+        } catch (InterruptedException e) {
+            if (process != null && process.isAlive()) {
                 process.destroyForcibly();
             }
-        });
-        if (input != null) {
-            process.getOutputStream().write(input.getBytes(StandardCharsets.UTF_8));
+            Thread.currentThread().interrupt();
+            return new CommandResult(-1, "", "Process interrupted");
+        } catch (Exception e) {
+            if (process != null && process.isAlive()) {
+                process.destroyForcibly();
+            }
+            return new CommandResult(-1, "", e.getMessage());
         }
-        process.getOutputStream().close();
-        String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-        int exitCode = process.waitFor();
-        if (token.isCancelled() || Thread.currentThread().isInterrupted()) {
-            throw new InterruptedException("cancelled");
+    }
+
+    private void readInputStreamCapped(InputStream stream, ByteArrayOutputStream out, int maxBytes, boolean[] truncated) {
+        byte[] buffer = new byte[8192];
+        int total = 0;
+        int limit = Math.max(1024, maxBytes);
+        try (InputStream input = stream) {
+            while (true) {
+                int read = input.read(buffer);
+                if (read < 0) {
+                    break;
+                }
+                int remaining = limit - total;
+                if (remaining <= 0) {
+                    truncated[0] = true;
+                    continue;
+                }
+                int toWrite = Math.min(read, remaining);
+                out.write(buffer, 0, toWrite);
+                total += toWrite;
+                if (toWrite < read) {
+                    truncated[0] = true;
+                }
+            }
+        } catch (IOException ignored) {
         }
-        return new CommandResult(exitCode, output, "");
     }
 
     private void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
@@ -4239,17 +4372,15 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private CommandResult runCommand(File workingDirectory, List<String> command) {
-        try {
-            ProcessBuilder builder = new ProcessBuilder(command);
-            builder.directory(workingDirectory == null ? new File(".") : workingDirectory);
-            builder.redirectErrorStream(true);
-            Process process = builder.start();
-            String stdout = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exitCode = process.waitFor();
-            return new CommandResult(exitCode, stdout, "");
-        } catch (Exception e) {
-            return new CommandResult(-1, "", e.getMessage());
-        }
+        return runExternalCommand(
+            command,
+            workingDirectory,
+            null,
+            null,
+            configManager.getProcessTimeoutMs(),
+            configManager.getProcessOutputMaxBytes(),
+            true
+        );
     }
 
     private String gitError(CommandResult result) {

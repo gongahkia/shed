@@ -41,6 +41,7 @@ public class ConfigManagerTest {
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
         assertEquals("default", config.getSessionAutoloadName());
+        assertEquals(15000, config.getProcessTimeoutMs());
     }
 
     @Test
@@ -54,7 +55,8 @@ public class ConfigManagerTest {
                 + "highlight.search=false\n"
                 + "command.alias.ww=w\n"
                 + "session.restore.on.start=true\n"
-                + "session.autoload=work\n");
+                + "session.autoload=work\n"
+                + "process.timeout.ms=5000\n");
 
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
@@ -65,5 +67,6 @@ public class ConfigManagerTest {
         assertEquals("w", config.resolveCommandAlias("ww"));
         assertTrue(config.getSessionRestoreOnStart());
         assertEquals("work", config.getSessionAutoloadName());
+        assertEquals(5000, config.getProcessTimeoutMs());
     }
 }

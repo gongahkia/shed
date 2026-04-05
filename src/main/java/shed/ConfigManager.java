@@ -43,6 +43,9 @@ public class ConfigManager {
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
+    private static final int DEFAULT_PROCESS_TIMEOUT_MS = 15000;
+    private static final int DEFAULT_PROCESS_OUTPUT_MAX_BYTES = 1024 * 1024;
+    private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
@@ -131,6 +134,9 @@ public class ConfigManager {
         config.put("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB));
         config.put("large.file.line.threshold", String.valueOf(DEFAULT_LARGE_FILE_LINE_THRESHOLD));
         config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
+        config.put("process.timeout.ms", String.valueOf(DEFAULT_PROCESS_TIMEOUT_MS));
+        config.put("process.output.max.bytes", String.valueOf(DEFAULT_PROCESS_OUTPUT_MAX_BYTES));
+        config.put("shell.command.max.length", String.valueOf(DEFAULT_SHELL_COMMAND_MAX_LENGTH));
     }
 
     // Load configuration from file
@@ -432,6 +438,18 @@ public class ConfigManager {
         return getInt("large.file.preview.lines", DEFAULT_LARGE_FILE_PREVIEW_LINES);
     }
 
+    public int getProcessTimeoutMs() {
+        return getInt("process.timeout.ms", DEFAULT_PROCESS_TIMEOUT_MS);
+    }
+
+    public int getProcessOutputMaxBytes() {
+        return getInt("process.output.max.bytes", DEFAULT_PROCESS_OUTPUT_MAX_BYTES);
+    }
+
+    public int getShellCommandMaxLength() {
+        return getInt("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
+    }
+
     public void set(String key, String value) {
         config.put(key, value);
     }
@@ -549,6 +567,9 @@ public class ConfigManager {
             + "session.restore.on.start=" + DEFAULT_SESSION_RESTORE_ON_START + "\n"
             + "session.autoload=" + DEFAULT_SESSION_AUTOLOAD + "\n"
             + "session.dir=" + System.getProperty("user.home") + "/.shed_sessions\n\n"
+            + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
+            + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
+            + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
             + "# Command aliases (left side is what you type after :, right side is built-in command)\n"
             + "# command.alias.ww=w\n"
             + "# command.alias.qq=q\n\n"

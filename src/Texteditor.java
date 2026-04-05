@@ -17,6 +17,9 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -66,10 +69,12 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean closingDown;
     private List<String> recentFiles;
     private File recentFilesStore;
+    private File commandLogStore;
     private Deque<SpecialBufferReturnState> specialBufferReturns;
     private List<String> commandHistory;
     private int commandHistoryIndex;
     private String commandHistoryPrefix;
+    private DateTimeFormatter commandLogTimeFormat;
     private LineNumberMode lineNumberMode;
     private boolean searchForward;
     private String gitBranch;
@@ -131,10 +136,12 @@ public class Texteditor extends JFrame implements KeyListener {
         closingDown = false;
         recentFiles = new ArrayList<>();
         recentFilesStore = new File(System.getProperty("user.home"), ".shed_recent");
+        commandLogStore = new File(System.getProperty("user.home"), ".shed_log");
         specialBufferReturns = new ArrayDeque<>();
         commandHistory = new ArrayList<>();
         commandHistoryIndex = -1;
         commandHistoryPrefix = "";
+        commandLogTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         lineNumberMode = configManager.getLineNumberMode();
         searchForward = true;
         gitBranch = resolveGitBranch();
@@ -1828,6 +1835,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (entry == null || entry.isEmpty()) {
             return;
         }
+        appendCommandLog(entry);
         commandHistory.remove(entry);
         commandHistory.add(entry);
         while (commandHistory.size() > 100) {
@@ -1849,7 +1857,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         String[] knownCommands = {
             "w", "write", "q", "quit", "q!", "wq", "x", "e", "edit", "bn", "bp",
-            "ls", "buffers", "bd", "set", "settings", "config", "help", "wc", "recent", "d", "delete",
+            "ls", "buffers", "bd", "set", "settings", "config", "log", "commandlog", "help", "wc", "recent", "d", "delete",
             "Files", "Buffers", "grep", "registers", "marks", "Goyo", "normal"
         };
 
@@ -4620,10 +4628,45 @@ public class Texteditor extends JFrame implements KeyListener {
     public String openSettingsBuffer() {
         File settingsFile = new File(configManager.getConfigPath());
         try {
+            ensureSettingsFileSeeded(settingsFile);
             openFile(settingsFile);
             return "Opened settings: " + settingsFile.getAbsolutePath();
         } catch (IOException e) {
             return "Error opening settings: " + e.getMessage();
+        }
+    }
+
+    public String openCommandLogBuffer() {
+        try {
+            File parent = commandLogStore.getParentFile();
+            if (parent != null && !parent.exists()) {
+                Files.createDirectories(parent.toPath());
+            }
+            if (!commandLogStore.exists()) {
+                Files.write(commandLogStore.toPath(),
+                    new byte[0],
+                    StandardOpenOption.CREATE);
+            }
+            openFile(commandLogStore);
+            return "Opened command log: " + commandLogStore.getAbsolutePath();
+        } catch (IOException e) {
+            return "Error opening command log: " + e.getMessage();
+        }
+    }
+
+    private void ensureSettingsFileSeeded(File settingsFile) throws IOException {
+        if (settingsFile == null) {
+            return;
+        }
+        File parent = settingsFile.getParentFile();
+        if (parent != null && !parent.exists()) {
+            Files.createDirectories(parent.toPath());
+        }
+        if (!settingsFile.exists() || settingsFile.length() == 0L) {
+            Files.write(settingsFile.toPath(),
+                configManager.defaultConfigTemplate().getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
         }
     }
 
@@ -4707,6 +4750,7 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
+                   "  :log           Open command log file\n" +
                    "  :Files         File finder\n" +
                    "  :Buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
@@ -4917,6 +4961,20 @@ public class Texteditor extends JFrame implements KeyListener {
     private void saveRecentFiles() {
         try {
             Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void appendCommandLog(String entry) {
+        if (entry == null || entry.isBlank()) {
+            return;
+        }
+        String line = commandLogTimeFormat.format(LocalDateTime.now()) + " " + entry.strip() + "\n";
+        try {
+            Files.write(commandLogStore.toPath(),
+                line.getBytes(StandardCharsets.UTF_8),
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND);
         } catch (IOException ignored) {
         }
     }

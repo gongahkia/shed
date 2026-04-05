@@ -452,6 +452,25 @@ public class ConfigManager {
         return new File(configPath).exists();
     }
 
+    public String defaultConfigTemplate() {
+        return "# Shed config\n"
+            + "# Generated because ~/.shedrc was missing or empty.\n"
+            + "# Remove or change any key; unspecified keys use built-in defaults.\n\n"
+            + "theme=" + DEFAULT_THEME + "\n"
+            + "font.family=" + DEFAULT_FONT_FAMILY + "\n"
+            + "font.size=" + DEFAULT_FONT_SIZE + "\n"
+            + "tab.size=" + DEFAULT_TAB_SIZE + "\n"
+            + "line.numbers=" + DEFAULT_LINE_NUMBER_MODE.toConfigValue() + "\n"
+            + "show.current.line=" + DEFAULT_SHOW_CURRENT_LINE + "\n"
+            + "expand.tab=" + DEFAULT_EXPAND_TAB + "\n"
+            + "auto.indent=" + DEFAULT_AUTO_INDENT + "\n"
+            + "highlight.search=" + DEFAULT_HIGHLIGHT_SEARCH + "\n"
+            + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n\n"
+            + "# LSP examples\n"
+            + "# lsp.py.command=pyright-langserver\n"
+            + "# lsp.py.args=--stdio\n";
+    }
+
     private Color getUiColor(String key, Color fallback) {
         String value = config.get(key);
         if (value == null || value.isBlank()) {

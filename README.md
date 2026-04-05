@@ -510,6 +510,56 @@ TAB completion in command mode now uses fuzzy matching. Type a partial or approx
 
 Files are now monitored via `java.nio.file.WatchService` for external changes, providing faster and more reliable reload prompts than polling.
 
+### Plugins
+
+Shed supports modular plugins in two formats: **declarative** (`.shed`) and **scripted** (`.lua` via embedded LuaJ). Place files in `~/.shed/plugins/` to install.
+
+```console
+:plugin new myplugin        # create + open a .shed plugin template
+:plugin new myplugin.lua    # create a Lua plugin instead
+:plugin                     # list loaded plugins
+:plugin disable myplugin    # disable without deleting
+:plugin enable myplugin     # re-enable
+:plugin reload              # reload all plugins
+:help plugins               # full authoring guide
+```
+
+Declarative example (`~/.shed/plugins/fmt.shed`):
+
+```
+# @name fmt
+# @description auto-format on save
+# @command fmt=!prettier --write %file
+# @event BufWrite=:fmt
+# @bind normal gf=:fmt
+```
+
+Lua example (`~/.shed/plugins/trim-whitespace.lua`):
+
+```lua
+shed.on("BufWrite", function()
+  for i = 1, shed.line_count() do
+    local line = shed.get_line(i)
+    local trimmed = line:gsub("%s+$", "")
+    if trimmed ~= line then
+      shed.set_line(i, trimmed)
+    end
+  end
+end)
+```
+
+See [`PLUGINS.md`](PLUGINS.md) for the full authoring guide and API reference. Example plugins are in [`examples/plugins/`](examples/plugins/).
+
+### LSP Management
+
+```console
+:lsp status              # show running servers and errors
+:lsp servers             # list all configured + builtin servers
+:lsp restart [ext]       # restart server (defaults to current file ext)
+:lsp stop [ext]          # stop a server
+:lsp log                 # show error log
+```
+
 ### CI
 
 CI now executes the full Maven test suite (`mvn test`) before packaging.

@@ -1,0 +1,5 @@
+# @name fmt
+# @description auto-format current file on save
+# @command fmt=!prettier --write %file
+# @event BufWrite=:fmt
+# @bind normal gf=:fmt

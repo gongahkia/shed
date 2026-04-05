@@ -47,8 +47,9 @@ public class ConfigManagerTest {
     @Test
     void parsesConfigOverrides() throws IOException {
         Path home = tempDir.resolve("home-custom");
-        Files.createDirectories(home);
-        Path configPath = home.resolve(".shedrc");
+        Path shedDir = home.resolve(".shed");
+        Files.createDirectories(shedDir);
+        Path configPath = shedDir.resolve("shedrc");
         Files.writeString(configPath,
             "tab.size=8\n"
                 + "line.numbers=relative\n"
@@ -68,5 +69,19 @@ public class ConfigManagerTest {
         assertTrue(config.getSessionRestoreOnStart());
         assertEquals("work", config.getSessionAutoloadName());
         assertEquals(5000, config.getProcessTimeoutMs());
+    }
+
+    @Test
+    void migratesLegacyRootConfigIntoShedDirectory() throws IOException {
+        Path home = tempDir.resolve("home-legacy");
+        Files.createDirectories(home);
+        Files.writeString(home.resolve(".shedrc"), "tab.size=6\n");
+
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals(6, config.getTabSize());
+        assertTrue(Files.exists(home.resolve(".shed/shedrc")));
+        assertEquals(home.resolve(".shed/shedrc").toString(), config.getConfigPath());
     }
 }

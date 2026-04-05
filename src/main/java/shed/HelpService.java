@@ -49,6 +49,7 @@ public class HelpService {
                    "  :session ...   Session save/load/list\n" +
                    "  :jobs          Show async job list\n" +
                    "  :jobcancel id  Cancel async job\n" +
+                   "  :drop cmd      Run async command with current file path\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   Toggle/open file tree pane\n" +

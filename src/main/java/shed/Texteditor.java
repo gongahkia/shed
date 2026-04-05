@@ -503,6 +503,10 @@ public class Texteditor extends JFrame implements KeyListener {
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
+        // Ctrl+[ as Escape alternative
+        if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_OPEN_BRACKET) {
+            e = new KeyEvent(e.getComponent(), e.getID(), e.getWhen(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
+        }
         EditorMode previousMode = editorState.mode;
         if (editorState.mode == EditorMode.NORMAL && recordingRegister != null && !(editorState.pendingKey == '\0' && e.getKeyChar() == 'q')) {
             macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));

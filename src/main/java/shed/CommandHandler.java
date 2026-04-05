@@ -124,6 +124,13 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp");
         registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
+        registerCommand((args, range, force) -> editor.openQuickfixList(), "copen");
+        registerCommand((args, range, force) -> editor.closeQuickfixList(), "cclose");
+        registerCommand((args, range, force) -> editor.quickfixNext(), "cnext", "cn");
+        registerCommand((args, range, force) -> editor.quickfixPrev(), "cprev", "cp");
+        registerCommand((args, range, force) -> editor.quickfixFirst(), "cfirst");
+        registerCommand((args, range, force) -> editor.quickfixLast(), "clast");
+        registerCommand((args, range, force) -> editor.quickfixCurrent(args), "cc");
         registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");

@@ -29,11 +29,17 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class LuaEngine {
     private final Texteditor editor;
     private final List<LuaPluginInfo> loadedScripts;
     private final Map<String, List<LuaFunction>> eventCallbacks;
+    private static final long LOAD_TIMEOUT_MS = 5000;
 
     public LuaEngine(Texteditor editor) {
         this.editor = editor;
@@ -48,18 +54,27 @@ public class LuaEngine {
 
     public void loadScript(File file) {
         LuaPluginInfo info = new LuaPluginInfo(file.getName());
+        Globals globals = createSandbox();
+        LuaTable shed = buildShedApi();
+        globals.set("shed", shed);
+        ExecutorService exec = Executors.newSingleThreadExecutor();
         try {
-            Globals globals = createSandbox();
-            LuaTable shed = buildShedApi();
-            globals.set("shed", shed);
-            globals.loadfile(file.getAbsolutePath()).call();
+            LuaValue chunk = globals.loadfile(file.getAbsolutePath());
+            Future<?> future = exec.submit(() -> chunk.call());
+            future.get(LOAD_TIMEOUT_MS, TimeUnit.MILLISECONDS);
             info.loaded = true;
-        } catch (LuaError e) {
-            info.error = e.getMessage();
-            System.err.println("Lua plugin error [" + file.getName() + "]: " + e.getMessage());
+        } catch (TimeoutException e) {
+            info.error = "timed out after " + LOAD_TIMEOUT_MS + "ms";
+            System.err.println("Lua plugin timeout [" + file.getName() + "]: script took too long to load");
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            info.error = cause.getMessage();
+            System.err.println("Lua plugin error [" + file.getName() + "]: " + cause.getMessage());
         } catch (Exception e) {
             info.error = e.getMessage();
             System.err.println("Lua plugin error [" + file.getName() + "]: " + e.getMessage());
+        } finally {
+            exec.shutdownNow();
         }
         loadedScripts.add(info);
     }
@@ -69,8 +84,10 @@ public class LuaEngine {
         if (callbacks == null) return;
         for (LuaFunction fn : callbacks) {
             try {
-                fn.call(LuaValue.valueOf(event));
+                fn.call(LuaValue.valueOf(event)); // runs on EDT, no timeout (matches Vim autocmd behavior)
             } catch (LuaError e) {
+                editor.showMessage("Plugin error: " + e.getMessage());
+            } catch (Exception e) {
                 editor.showMessage("Plugin error: " + e.getMessage());
             }
         }
@@ -218,9 +235,12 @@ public class LuaEngine {
     private class Command extends OneArgFunction {
         public LuaValue call(LuaValue arg) {
             String cmd = arg.checkjstring();
-            // delegate to CommandHandler via Texteditor
-            String result = editor.executeCommand(cmd);
-            return LuaValue.valueOf(result == null ? "" : result);
+            try {
+                String result = editor.executeCommand(cmd);
+                return LuaValue.valueOf(result == null ? "" : result);
+            } catch (Exception e) {
+                return LuaValue.valueOf("Error: " + e.getMessage());
+            }
         }
     }
 

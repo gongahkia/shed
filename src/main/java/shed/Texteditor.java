@@ -9482,6 +9482,34 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Quitting";
     }
 
+    public ConfigManager getConfigManager() {
+        return configManager;
+    }
+
+    public String runUserCommand(String name, String shellCmd) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("bash", "-c", shellCmd);
+            pb.redirectErrorStream(true);
+            FileBuffer buf = getCurrentBuffer();
+            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
+                pb.directory(buf.getFile().getParentFile());
+            }
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes());
+            if (!p.waitFor(configManager.getProcessTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                p.destroyForcibly();
+                return "User command timed out: " + name;
+            }
+            if (output.isEmpty()) {
+                return ":" + name + " completed (exit " + p.exitValue() + ")";
+            }
+            showScratchBuffer("[" + name + "]", output);
+            return ":" + name + " completed";
+        } catch (Exception e) {
+            return "Error running user command: " + e.getMessage();
+        }
+    }
+
     public String showUndoHistory() {
         StringBuilder sb = new StringBuilder();
         sb.append("Undo History\n");

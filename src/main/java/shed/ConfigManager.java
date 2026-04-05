@@ -532,6 +532,17 @@ public class ConfigManager {
         return aliases;
     }
 
+    public Map<String, String> getUserCommands() {
+        Map<String, String> commands = new java.util.LinkedHashMap<>();
+        String prefix = "command.user.";
+        for (String key : config.keySet()) {
+            if (key.startsWith(prefix) && key.length() > prefix.length()) {
+                commands.put(key.substring(prefix.length()), config.get(key));
+            }
+        }
+        return commands;
+    }
+
     public String getKeybinding(String mode, String keySpec) {
         if (keySpec == null || keySpec.isEmpty()) {
             return null;

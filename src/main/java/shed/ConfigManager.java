@@ -38,6 +38,8 @@ public class ConfigManager {
     private static final boolean DEFAULT_AUTO_INDENT = true;
     private static final boolean DEFAULT_HIGHLIGHT_SEARCH = true;
     private static final int DEFAULT_ZEN_MODE_WIDTH = 80;
+    private static final boolean DEFAULT_SESSION_RESTORE_ON_START = false;
+    private static final String DEFAULT_SESSION_AUTOLOAD = "default";
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
@@ -123,6 +125,9 @@ public class ConfigManager {
         config.put("auto.indent", String.valueOf(DEFAULT_AUTO_INDENT));
         config.put("highlight.search", String.valueOf(DEFAULT_HIGHLIGHT_SEARCH));
         config.put("zen.mode.width", String.valueOf(DEFAULT_ZEN_MODE_WIDTH));
+        config.put("session.restore.on.start", String.valueOf(DEFAULT_SESSION_RESTORE_ON_START));
+        config.put("session.autoload", DEFAULT_SESSION_AUTOLOAD);
+        config.put("session.dir", System.getProperty("user.home") + "/.shed_sessions");
         config.put("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB));
         config.put("large.file.line.threshold", String.valueOf(DEFAULT_LARGE_FILE_LINE_THRESHOLD));
         config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
@@ -393,6 +398,24 @@ public class ConfigManager {
         return getInt("zen.mode.width", DEFAULT_ZEN_MODE_WIDTH);
     }
 
+    public boolean getSessionRestoreOnStart() {
+        return getBoolean("session.restore.on.start", DEFAULT_SESSION_RESTORE_ON_START);
+    }
+
+    public String getSessionAutoloadName() {
+        String configured = config.getOrDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
+        String trimmed = configured == null ? "" : configured.trim();
+        return trimmed.isEmpty() ? DEFAULT_SESSION_AUTOLOAD : trimmed;
+    }
+
+    public String getSessionDirectory() {
+        String configured = config.get("session.dir");
+        if (configured == null || configured.isBlank()) {
+            return System.getProperty("user.home") + "/.shed_sessions";
+        }
+        return configured.trim();
+    }
+
     public long getLargeFileThresholdMb() {
         try {
             return Long.parseLong(config.getOrDefault("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB)));
@@ -523,6 +546,9 @@ public class ConfigManager {
             + "auto.indent=" + DEFAULT_AUTO_INDENT + "\n"
             + "highlight.search=" + DEFAULT_HIGHLIGHT_SEARCH + "\n"
             + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n\n"
+            + "session.restore.on.start=" + DEFAULT_SESSION_RESTORE_ON_START + "\n"
+            + "session.autoload=" + DEFAULT_SESSION_AUTOLOAD + "\n"
+            + "session.dir=" + System.getProperty("user.home") + "/.shed_sessions\n\n"
             + "# Command aliases (left side is what you type after :, right side is built-in command)\n"
             + "# command.alias.ww=w\n"
             + "# command.alias.qq=q\n\n"

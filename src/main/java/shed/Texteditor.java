@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -220,7 +221,16 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Error opening file: " + e.getMessage());
             }
         } else {
-            openLandingPage();
+            if (configManager.getSessionRestoreOnStart()) {
+                String restored = loadSession(configManager.getSessionAutoloadName(), true);
+                if (!restored.startsWith("Restored session")) {
+                    openLandingPage();
+                } else {
+                    showMessage(restored);
+                }
+            } else {
+                openLandingPage();
+            }
         }
 
         updateStatusBar();
@@ -2151,6 +2161,8 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("config");
         knownCommands.add("log");
         knownCommands.add("commandlog");
+        knownCommands.add("session");
+        knownCommands.add("sessions");
         knownCommands.add("jobs");
         knownCommands.add("jobcancel");
         knownCommands.add("jobkill");
@@ -6533,6 +6545,224 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (IOException e) {
             return "Error opening command log: " + e.getMessage();
         }
+    }
+
+    public String handleSessionCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty()) {
+            return "Usage: :session save [name] | load[!] [name] | list";
+        }
+        int split = trimmed.indexOf(' ');
+        String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
+        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        switch (subcommand) {
+            case "save":
+                return saveSession(args);
+            case "load":
+                return loadSession(args, false);
+            case "load!":
+                return loadSession(args, true);
+            case "list":
+                return listSessions();
+            default:
+                return "Usage: :session save [name] | load[!] [name] | list";
+        }
+    }
+
+    private String saveSession(String nameArgument) {
+        File sessionFile = resolveSessionFile(nameArgument);
+        File sessionDir = sessionFile.getParentFile();
+        if (sessionDir != null && !sessionDir.exists()) {
+            sessionDir.mkdirs();
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("cwd", new File(".").getAbsolutePath());
+        List<Map<String, Object>> files = new ArrayList<>();
+        for (FileBuffer buffer : buffers) {
+            if (buffer == null || !buffer.hasFilePath()) {
+                continue;
+            }
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("path", buffer.getFilePath());
+            files.add(entry);
+        }
+        payload.put("files", files);
+        FileBuffer current = getCurrentBuffer();
+        if (current != null && current.hasFilePath()) {
+            payload.put("activePath", current.getFilePath());
+            payload.put("activeCaret", writingArea.getCaretPosition());
+        }
+        if (treeRoot != null) {
+            payload.put("treeRoot", treeRoot.getAbsolutePath());
+        }
+        payload.put("savedAt", commandLogTimeFormat.format(LocalDateTime.now()));
+        try {
+            Files.writeString(sessionFile.toPath(),
+                MiniJson.stringify(payload),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING);
+            return "Session saved: " + sessionFile.getAbsolutePath();
+        } catch (IOException e) {
+            return "Session save failed: " + e.getMessage();
+        }
+    }
+
+    private String loadSession(String nameArgument, boolean force) {
+        File sessionFile = resolveSessionFile(nameArgument);
+        if (!sessionFile.exists()) {
+            return "Session not found: " + sessionFile.getAbsolutePath();
+        }
+        if (!force && hasUnsavedChangesInAnyBuffer()) {
+            return "Unsaved buffers exist (use :session load! <name>)";
+        }
+
+        try {
+            String json = Files.readString(sessionFile.toPath(), StandardCharsets.UTF_8);
+            Map<String, Object> payload = MiniJson.asObject(MiniJson.parse(json));
+            if (payload == null) {
+                return "Session file is invalid";
+            }
+            List<String> filePaths = extractSessionFilePaths(payload.get("files"));
+            String activePath = MiniJson.asString(payload.get("activePath"));
+            Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
+            String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
+
+            specialBufferReturns.clear();
+            treeLineTargets.clear();
+            treeBuffer = null;
+            treePane = null;
+            quickfixBuffer = null;
+            buffers.clear();
+
+            for (String filePath : filePaths) {
+                if (filePath == null || filePath.isBlank()) {
+                    continue;
+                }
+                File file = new File(filePath);
+                if (!file.exists() || !file.isFile()) {
+                    continue;
+                }
+                try {
+                    buffers.add(new FileBuffer(file, configManager));
+                } catch (IOException ignored) {
+                }
+            }
+
+            if (buffers.isEmpty()) {
+                openLandingPage();
+                return "Session loaded (no existing files)";
+            }
+
+            FileBuffer primary = buffers.get(0);
+            for (EditorPane pane : editorPanes) {
+                loadBufferIntoPane(pane, primary, 0);
+            }
+
+            FileBuffer target = primary;
+            if (activePath != null && !activePath.isBlank()) {
+                FileBuffer maybe = findBufferByPath(new File(activePath));
+                if (maybe != null) {
+                    target = maybe;
+                }
+            }
+            loadBufferIntoEditor(target);
+            if (activeCaret != null) {
+                writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
+            }
+            if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
+                File root = new File(savedTreeRoot);
+                treeRoot = root.exists() ? root : null;
+            } else {
+                treeRoot = null;
+            }
+            return "Restored session: " + sessionFile.getAbsolutePath();
+        } catch (IOException e) {
+            return "Session load failed: " + e.getMessage();
+        }
+    }
+
+    private List<String> extractSessionFilePaths(Object filesObject) {
+        List<String> paths = new ArrayList<>();
+        List<Object> files = MiniJson.asArray(filesObject);
+        if (files == null) {
+            return paths;
+        }
+        for (Object item : files) {
+            String direct = MiniJson.asString(item);
+            if (direct != null) {
+                paths.add(direct);
+                continue;
+            }
+            Map<String, Object> object = MiniJson.asObject(item);
+            if (object == null) {
+                continue;
+            }
+            String path = MiniJson.asString(object.get("path"));
+            if (path != null) {
+                paths.add(path);
+            }
+        }
+        return paths;
+    }
+
+    private String listSessions() {
+        File dir = new File(configManager.getSessionDirectory());
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "No sessions";
+        }
+        File[] files = dir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
+        if (files == null || files.length == 0) {
+            return "No sessions";
+        }
+        java.util.Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+        StringBuilder builder = new StringBuilder();
+        builder.append("Sessions\n\n");
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".json")) {
+                name = name.substring(0, name.length() - ".json".length());
+            }
+            builder.append(name).append("  ").append(file.getAbsolutePath()).append("\n");
+        }
+        showScratchBuffer("[sessions]", builder.toString().stripTrailing() + "\n");
+        return "Showing sessions";
+    }
+
+    private File resolveSessionFile(String nameArgument) {
+        String rawName = nameArgument == null || nameArgument.isBlank()
+            ? configManager.getSessionAutoloadName()
+            : nameArgument.trim();
+        String safeName = sanitizeSessionName(rawName);
+        File dir = new File(configManager.getSessionDirectory());
+        return new File(dir, safeName + ".json");
+    }
+
+    private String sanitizeSessionName(String rawName) {
+        if (rawName == null || rawName.isBlank()) {
+            return "default";
+        }
+        StringBuilder builder = new StringBuilder(rawName.length());
+        for (int i = 0; i < rawName.length(); i++) {
+            char c = rawName.charAt(i);
+            if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '.') {
+                builder.append(c);
+            } else {
+                builder.append('_');
+            }
+        }
+        String sanitized = builder.toString().trim();
+        return sanitized.isEmpty() ? "default" : sanitized;
+    }
+
+    private boolean hasUnsavedChangesInAnyBuffer() {
+        for (FileBuffer buffer : buffers) {
+            if (buffer != null && buffer.isModified()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void ensureSettingsFileSeeded(File settingsFile) throws IOException {

@@ -39,6 +39,8 @@ public class ConfigManagerTest {
         assertEquals(4, config.getTabSize());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
+        assertFalse(config.getSessionRestoreOnStart());
+        assertEquals("default", config.getSessionAutoloadName());
     }
 
     @Test
@@ -50,7 +52,9 @@ public class ConfigManagerTest {
             "tab.size=8\n"
                 + "line.numbers=relative\n"
                 + "highlight.search=false\n"
-                + "command.alias.ww=w\n");
+                + "command.alias.ww=w\n"
+                + "session.restore.on.start=true\n"
+                + "session.autoload=work\n");
 
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
@@ -59,5 +63,7 @@ public class ConfigManagerTest {
         assertEquals(LineNumberMode.RELATIVE, config.getLineNumberMode());
         assertFalse(config.getHighlightSearch());
         assertEquals("w", config.resolveCommandAlias("ww"));
+        assertTrue(config.getSessionRestoreOnStart());
+        assertEquals("work", config.getSessionAutoloadName());
     }
 }

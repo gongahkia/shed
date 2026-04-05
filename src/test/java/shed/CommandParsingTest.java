@@ -37,6 +37,22 @@ public class CommandParsingTest {
         assertTrue(result.startsWith("Unknown git command: wat"));
     }
 
+    @Test
+    void routesStageAndSwitchCommands() {
+        GitService service = new GitService();
+        RecordingHandler handler = new RecordingHandler();
+
+        String stageResult = service.handle("stage src/main", new File("."), handler);
+        assertEquals("stage", handler.lastCall);
+        assertEquals("src/main", handler.lastArgs);
+        assertEquals("ok-stage", stageResult);
+
+        String switchResult = service.handle("switch feat-x", new File("."), handler);
+        assertEquals("switch", handler.lastCall);
+        assertEquals("feat-x", handler.lastArgs);
+        assertEquals("ok-switch", switchResult);
+    }
+
     private static class RecordingHandler implements GitService.Handler {
         private String lastCall;
         private String lastArgs = "";
@@ -75,6 +91,13 @@ public class CommandParsingTest {
         }
 
         @Override
+        public String stage(File root, String args) {
+            lastCall = "stage";
+            lastArgs = args == null ? "" : args;
+            return "ok-stage";
+        }
+
+        @Override
         public String restore(File root, String args) {
             lastCall = "restore";
             lastArgs = args == null ? "" : args;
@@ -82,10 +105,38 @@ public class CommandParsingTest {
         }
 
         @Override
+        public String unstage(File root, String args) {
+            lastCall = "unstage";
+            lastArgs = args == null ? "" : args;
+            return "ok-unstage";
+        }
+
+        @Override
         public String commit(File root, String args) {
             lastCall = "commit";
             lastArgs = args == null ? "" : args;
             return "ok-commit";
+        }
+
+        @Override
+        public String amend(File root, String args) {
+            lastCall = "amend";
+            lastArgs = args == null ? "" : args;
+            return "ok-amend";
+        }
+
+        @Override
+        public String checkout(File root, String args) {
+            lastCall = "checkout";
+            lastArgs = args == null ? "" : args;
+            return "ok-checkout";
+        }
+
+        @Override
+        public String switchBranch(File root, String args) {
+            lastCall = "switch";
+            lastArgs = args == null ? "" : args;
+            return "ok-switch";
         }
 
         @Override

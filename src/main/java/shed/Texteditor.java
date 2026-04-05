@@ -1296,7 +1296,16 @@ public class Texteditor extends JFrame implements KeyListener {
                 editorState.pendingKey = '\u0007';
                 return;
             } else if (c == 'f') {
-                showMessage(goToFileUnderCursor());
+                FileBuffer buf = getCurrentBuffer();
+                if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
+                    showMessage(goToMarkdownLink());
+                } else {
+                    showMessage(goToFileUnderCursor());
+                }
+            } else if (c == 'x') {
+                showMessage(openBrowserUrl());
+            } else if (c == 'O') {
+                showMessage(showOutline());
             } else if (c == 'v') {
                 if (editorState.lastVisualStart >= 0 && editorState.lastVisualEnd >= 0
                         && editorState.lastVisualStart <= writingArea.getText().length()
@@ -2671,6 +2680,37 @@ public class Texteditor extends JFrame implements KeyListener {
                 return "Opened " + file.getName();
             }
             return "File not found: " + path;
+        } catch (Exception e) {
+            return "Error: " + e.getMessage();
+        }
+    }
+
+    private String openBrowserUrl() {
+        try {
+            String text = writingArea.getText();
+            int pos = writingArea.getCaretPosition();
+            int start = pos;
+            int end = pos;
+            while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) start--;
+            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
+            if (start == end) return "No URL under cursor";
+            String url = text.substring(start, end);
+            // Strip surrounding markdown link syntax
+            if (url.startsWith("[")) {
+                int urlStart = url.indexOf("](");
+                int urlEnd = url.indexOf(")", urlStart);
+                if (urlStart >= 0 && urlEnd > urlStart) {
+                    url = url.substring(urlStart + 2, urlEnd);
+                }
+            }
+            if (url.startsWith("http://") || url.startsWith("https://")) {
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().browse(new URI(url));
+                    return "Opened: " + url;
+                }
+                return "Desktop not supported";
+            }
+            return "Not a URL: " + url;
         } catch (Exception e) {
             return "Error: " + e.getMessage();
         }
@@ -7857,6 +7897,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         loadBufferIntoEditor(buffer);
         addToRecentFiles(file.getAbsolutePath());
+        registerFileWatch(buffer);
         if (buffer.isShowingPreviewOnly()) {
             showMessage("Large-file preview loaded");
         }

@@ -8,7 +8,7 @@ Shed is a bare-bones, opinionated, modal text editor with extended Vim bindings,
 ## Features
 
 * Open source, MIT LICENSE
-* Highly customisable using Java Swing components and config file `~/.shedrc`
+* Highly customisable using Java Swing components and config file `~/.shed/shedrc`
 * Stable, crash-proof
 * 32KB executable
 * Respects your privacy, no telemetry whatsoever
@@ -276,7 +276,7 @@ $ java -jar target/shed-2.0.0.jar filename.txt    # Opens specific file
 
 ## Themes
 
-Configure in `~/.shedrc`:
+Configure in `~/.shed/shedrc`:
 
 ```ini
 theme=one-dark-pro
@@ -366,6 +366,7 @@ Save and restore editor sessions:
 :session load worktree_a
 :session load! worktree_a
 :session list
+:clean
 ```
 
 ### Async Shell + Drop Runner
@@ -384,7 +385,7 @@ Save and restore editor sessions:
 
 ### Runtime Hardening Settings
 
-Set these in `~/.shedrc`:
+Set these in `~/.shed/shedrc`:
 
 ```ini
 process.timeout.ms=15000
@@ -392,7 +393,7 @@ process.output.max.bytes=1048576
 shell.command.max.length=4096
 session.restore.on.start=false
 session.autoload=default
-session.dir=/Users/you/.shed_sessions
+session.dir=/Users/you/.shed/sessions
 ```
 
 ### Markdown / Orgmode Features

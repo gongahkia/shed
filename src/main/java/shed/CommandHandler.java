@@ -150,6 +150,18 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.writeAll(), "wa", "wall");
         registerCommand((args, range, force) -> editor.quitAll(force), "qa", "qall");
         registerCommand((args, range, force) -> { String r = editor.writeAll(); if (r.startsWith("Error")) return r; return editor.quitAll(force); }, "wqa", "wqall", "xa", "xall");
+
+        // Markdown / orgmode commands
+        registerCommand((args, range, force) -> editor.showTableOfContents(), "toc");
+        registerCommand((args, range, force) -> editor.showOutline(), "outline");
+        registerCommand((args, range, force) -> editor.toggleCheckbox(), "toggle", "checkbox");
+        registerCommand((args, range, force) -> handleTableCommand(args), "table");
+        registerCommand((args, range, force) -> editor.insertLink(), "link");
+        registerCommand((args, range, force) -> editor.insertImage(), "img", "image");
+        registerCommand((args, range, force) -> editor.listSnippets(), "snippets", "snippet");
+        registerCommand((args, range, force) -> editor.toggleBracketColors(), "bracketcolor", "bracketcolors");
+        registerCommand((args, range, force) -> editor.openTerminal(), "term", "terminal");
+        registerCommand((args, range, force) -> handleConceal(args), "conceal", "conceallevel");
     }
 
     private void registerCommand(CommandAction action, String... names) {
@@ -305,6 +317,39 @@ public class CommandHandler {
             return editor.deleteLineRange(line, line);
         }
         return editor.deleteLineRange(range.start, range.resolveEnd(editor));
+    }
+
+    private String handleTableCommand(String args) {
+        if (args == null || args.isEmpty()) {
+            return editor.insertTableTemplate("3x2");
+        }
+        String sub = args.trim().toLowerCase(Locale.ROOT);
+        if (sub.startsWith("align")) {
+            return editor.alignMarkdownTable();
+        } else if (sub.startsWith("sort")) {
+            String sortArgs = args.trim().length() > 4 ? args.trim().substring(4).trim() : "";
+            return editor.sortMarkdownTable(sortArgs);
+        } else if (sub.startsWith("insert-col") || sub.startsWith("insertcol") || sub.startsWith("addcol")) {
+            return editor.insertTableColumn(args.contains(" ") ? args.substring(args.indexOf(' ') + 1).trim() : "");
+        } else if (sub.startsWith("delete-col") || sub.startsWith("deletecol") || sub.startsWith("delcol")) {
+            return editor.deleteTableColumn(args.contains(" ") ? args.substring(args.indexOf(' ') + 1).trim() : "");
+        } else if (sub.matches("\\d+[xX]\\d+")) {
+            return editor.insertTableTemplate(sub);
+        } else {
+            return "Unknown table subcommand: " + args + " (try: align, sort, insert-col, delete-col, NxM)";
+        }
+    }
+
+    private String handleConceal(String args) {
+        if (args == null || args.isEmpty()) {
+            return "Usage: :conceal 0|1|2";
+        }
+        try {
+            int level = Integer.parseInt(args.trim());
+            return editor.setConcealLevel(level);
+        } catch (NumberFormatException e) {
+            return "Invalid conceal level: " + args;
+        }
     }
 
     private String handleNormal(String keys, RangeParseResult range) {

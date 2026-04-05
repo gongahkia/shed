@@ -33,7 +33,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private static final long serialVersionUID = 1L;
 
     // Core components
-    private EditorMode currentMode;
+    private EditorState editorState;
+    private ModeEngine modeEngine;
     private JTextArea writingArea;
     private JLabel statusBar;
     private JLabel commandBar;
@@ -57,15 +58,11 @@ public class Texteditor extends JFrame implements KeyListener {
     private Component renderedLayoutComponent;
 
     // State variables
-    private String commandBuffer;
     private String lastMessage;
     private Timer messageResetTimer;
     private UndoManager undoManager;
     private DocumentListener bufferDocumentListener;
     private String lastCommand;
-    private char pendingKey; // For multi-key commands like 'gg', 'dd', etc.
-    private String pendingCount;
-    private Character pendingRegister;
     private boolean suppressDocumentEvents;
     private boolean suppressNextTypedChar;
     private boolean closingDown;
@@ -78,7 +75,6 @@ public class Texteditor extends JFrame implements KeyListener {
     private String commandHistoryPrefix;
     private DateTimeFormatter commandLogTimeFormat;
     private LineNumberMode lineNumberMode;
-    private boolean searchForward;
     private String gitBranch;
     private Object currentLineHighlightTag;
     private List<Object> substitutePreviewTags;
@@ -117,9 +113,6 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<FileBuffer, List<String>> treeLineTargets;
     private int keymapReplayDepth;
 
-    // Visual mode state
-    private int visualStartPos;
-
     // Constants
     private static final String VERSION = "2.0";
 
@@ -127,15 +120,12 @@ public class Texteditor extends JFrame implements KeyListener {
     public Texteditor(String[] args) {
         // Initialize managers
         configManager = new ConfigManager();
+        editorState = new EditorState();
+        modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
         currentBufferIndex = -1;
         editorPanes = new ArrayList<>();
         activePaneIndex = -1;
-        commandBuffer = "";
-        pendingKey = '\0';
-        pendingCount = "";
-        pendingRegister = null;
-        visualStartPos = -1;
         lastCommand = "";
         suppressDocumentEvents = false;
         suppressNextTypedChar = false;
@@ -149,7 +139,6 @@ public class Texteditor extends JFrame implements KeyListener {
         commandHistoryPrefix = "";
         commandLogTimeFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
         lineNumberMode = configManager.getLineNumberMode();
-        searchForward = true;
         gitBranch = resolveGitBranch();
         substitutePreviewTags = new ArrayList<>();
         currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
@@ -475,50 +464,30 @@ public class Texteditor extends JFrame implements KeyListener {
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
-        EditorMode previousMode = currentMode;
-        if (currentMode == EditorMode.NORMAL && recordingRegister != null && !(pendingKey == '\0' && e.getKeyChar() == 'q')) {
+        EditorMode previousMode = editorState.mode;
+        if (editorState.mode == EditorMode.NORMAL && recordingRegister != null && !(editorState.pendingKey == '\0' && e.getKeyChar() == 'q')) {
             macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
         }
         if (applyConfiguredKeybinding(e)) {
             updateStatusBar();
             return;
         }
-        switch (currentMode) {
-            case NORMAL:
-                handleNormalMode(e);
-                break;
-            case INSERT:
-                handleInsertMode(e);
-                break;
-            case VISUAL:
-            case VISUAL_LINE:
-                handleVisualMode(e);
-                break;
-            case REPLACE:
-                handleReplaceMode(e);
-                break;
-            case COMMAND:
-                handleCommandMode(e);
-                break;
-            case SEARCH:
-                handleSearchMode(e);
-                break;
-        }
-        if (previousMode != EditorMode.INSERT && currentMode == EditorMode.INSERT && isPrintableKey(e)) {
+        modeEngine.dispatch(this, editorState, e);
+        if (previousMode != EditorMode.INSERT && editorState.mode == EditorMode.INSERT && isPrintableKey(e)) {
             suppressNextTypedChar = true;
         }
         updateStatusBar();
     }
 
     private boolean applyConfiguredKeybinding(KeyEvent e) {
-        if (currentMode == null || keymapReplayDepth > 32) {
+        if (editorState.mode == null || keymapReplayDepth > 32) {
             return false;
         }
         String keySpec = keySpecFromEvent(e);
         if (keySpec == null || keySpec.isEmpty()) {
             return false;
         }
-        String mapping = configManager.getKeybinding(modeKey(currentMode), keySpec);
+        String mapping = configManager.getKeybinding(modeKey(editorState.mode), keySpec);
         if (mapping == null) {
             return false;
         }
@@ -768,7 +737,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Normal mode key handling
-    private void handleNormalMode(KeyEvent e) {
+    void handleNormalMode(KeyEvent e) {
         char c = e.getKeyChar();
         int code = e.getKeyCode();
 
@@ -784,23 +753,23 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         // Handle pending keys (multi-key commands)
-        if (pendingKey != '\0') {
+        if (editorState.pendingKey != '\0') {
             handlePendingKey(c, code);
             return;
         }
 
         // Accumulate numeric prefix for COUNTgg without breaking 0 line-start
-        if (Character.isDigit(c) && (!pendingCount.isEmpty() || c != '0')) {
-            pendingCount += c;
+        if (Character.isDigit(c) && (!editorState.pendingCount.isEmpty() || c != '0')) {
+            editorState.pendingCount += c;
             return;
         }
 
-        if (!pendingCount.isEmpty() && !supportsCountPrefix(e)) {
-            pendingCount = "";
+        if (!editorState.pendingCount.isEmpty() && !supportsCountPrefix(e)) {
+            editorState.pendingCount = "";
         }
 
         if (isTreePaneActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(openTreeSelection());
             return;
         }
@@ -837,7 +806,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         } else if (c == 'v') {
             setMode(EditorMode.VISUAL);
-            visualStartPos = writingArea.getCaretPosition();
+            editorState.visualStartPos = writingArea.getCaretPosition();
             return;
         } else if (c == 'V') {
             setMode(EditorMode.VISUAL_LINE);
@@ -849,15 +818,15 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         } else if (c == ':') {
             setMode(EditorMode.COMMAND);
-            commandBuffer = String.valueOf(c);
+            editorState.commandBuffer = String.valueOf(c);
             commandHistoryIndex = -1;
-            commandHistoryPrefix = commandBuffer;
+            commandHistoryPrefix = editorState.commandBuffer;
             updateSubstitutePreview();
             return;
         } else if (c == '/' || c == '?') {
             setMode(EditorMode.SEARCH);
-            searchForward = c == '/';
-            commandBuffer = String.valueOf(c);
+            editorState.searchForward = c == '/';
+            editorState.commandBuffer = String.valueOf(c);
             commandHistoryIndex = -1;
             return;
         }
@@ -891,18 +860,18 @@ public class Texteditor extends JFrame implements KeyListener {
         // Line movements
         else if (c == '0') {
             moveLineStart();
-            pendingCount = "";
+            editorState.pendingCount = "";
         } else if (c == '^') {
             moveLineFirstNonBlank();
-            pendingCount = "";
+            editorState.pendingCount = "";
         } else if (c == '$') {
             moveLineEnd();
-            pendingCount = "";
+            editorState.pendingCount = "";
         }
 
         // File movements
         else if (c == 'g') {
-            pendingKey = 'g';
+            editorState.pendingKey = 'g';
         } else if (c == 'G') {
             int count = consumePendingCount();
             if (count > 1) {
@@ -918,20 +887,20 @@ public class Texteditor extends JFrame implements KeyListener {
                 recordingRegister = null;
                 macroBuffer = new ArrayList<>();
             } else {
-                pendingKey = 'q';
+                editorState.pendingKey = 'q';
             }
             return;
         } else if (c == '@') {
-            pendingKey = '@';
+            editorState.pendingKey = '@';
             return;
         } else if (c == '"') {
-            pendingKey = '"';
+            editorState.pendingKey = '"';
         } else if (c == 'm' || c == '\'' || c == '`') {
-            pendingKey = c;
+            editorState.pendingKey = c;
         } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=' || c == 'r') {
-            pendingKey = c;
+            editorState.pendingKey = c;
         } else if (c == 'z') {
-            pendingKey = 'z';
+            editorState.pendingKey = 'z';
         } else if (c == '{') {
             repeatAction(consumePendingCount(), this::moveParagraphBackward);
         } else if (c == '}') {
@@ -949,42 +918,42 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         } else if (c == 'H') {
             moveToScreenPosition('H');
-            pendingCount = "";
+            editorState.pendingCount = "";
         } else if (c == 'M') {
             moveToScreenPosition('M');
-            pendingCount = "";
+            editorState.pendingCount = "";
         } else if (c == 'L') {
             moveToScreenPosition('L');
-            pendingCount = "";
+            editorState.pendingCount = "";
         }
 
         // Clipboard operations
         else if (c == 'y') {
-            pendingKey = 'y';
+            editorState.pendingKey = 'y';
         } else if (c == 'd') {
-            pendingKey = 'd';
+            editorState.pendingKey = 'd';
         } else if (c == 'c') {
-            pendingKey = 'c';
+            editorState.pendingKey = 'c';
         } else if (c == 'x') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             storeDelete(consumePendingRegister(), clipboardManager.deleteChar(writingArea), false);
             markModified();
         } else if (c == 'Y') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(yankToEndOfLine());
         } else if (c == 'p') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(pasteFromRegister(false));
         } else if (c == 'P') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(pasteFromRegister(true));
         } else if (c == 'D') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             lastCommand = "D";
             storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
             markModified();
         } else if (c == 'C') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             lastCommand = "C";
             storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
             markModified();
@@ -994,12 +963,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Undo/Redo
         else if (c == 'u') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             if (undoManager.canUndo()) {
                 undoManager.undo();
             }
         } else if (e.isControlDown() && c == 'r') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             if (undoManager.canRedo()) {
                 undoManager.redo();
             }
@@ -1007,65 +976,65 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Search navigation
         else if (c == 'n') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(searchManager.nextMatch());
         } else if (c == 'N') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(searchManager.prevMatch());
         } else if (c == '*') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(searchWordUnderCursor(true));
         } else if (c == '#') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(searchWordUnderCursor(false));
         } else if (c == ';') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(repeatFind(false));
         } else if (c == ',') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             showMessage(repeatFind(true));
         }
 
         // Repeat last command
         else if (c == '.') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             repeatLastCommand();
         } else if (c == 'J') {
-            pendingCount = "";
+            editorState.pendingCount = "";
             joinCurrentLine(true);
         }
 
         // Ctrl combinations
         else if (e.isControlDown()) {
             if (c == 'w' || code == KeyEvent.VK_W) {
-                pendingCount = "";
-                pendingKey = '\u0017';
+                editorState.pendingCount = "";
+                editorState.pendingKey = '\u0017';
                 return;
             } else if (c == 'p' || code == KeyEvent.VK_P) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 showMessage(showFileFinder());
             } else if (c == 'n' || code == KeyEvent.VK_N) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 showMessage(showLspCompletionStatus());
             } else if (c == 'o' || code == KeyEvent.VK_O) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 jumpBack();
             } else if (c == 'i' || code == KeyEvent.VK_I) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 jumpForward();
             } else if (c == 'd' || code == KeyEvent.VK_D) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 scrollHalfPageDown();
             } else if (c == 'u' || code == KeyEvent.VK_U) {
-                pendingCount = "";
+                editorState.pendingCount = "";
                 scrollHalfPageUp();
             }
         }
 
         // Escape (no-op in normal mode, but clear any messages)
         else if (code == KeyEvent.VK_ESCAPE) {
-            pendingCount = "";
-            pendingKey = '\0';
+            editorState.pendingCount = "";
+            editorState.pendingKey = '\0';
             showMessage("Already in normal mode");
         }
     }
@@ -1115,12 +1084,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Handle pending multi-key commands
     private void handlePendingKey(char c, int code) {
-        if (pendingKey == 'g') {
+        if (editorState.pendingKey == 'g') {
             if (c == 'g') {
-                if (pendingCount.isEmpty()) {
+                if (editorState.pendingCount.isEmpty()) {
                     moveFileStart();
                 } else {
-                    showMessage(gotoLine(Integer.parseInt(pendingCount)));
+                    showMessage(gotoLine(Integer.parseInt(editorState.pendingCount)));
                 }
             } else if (c == 'e') {
                 repeatAction(consumePendingCount(), this::moveWordEndBackward);
@@ -1128,13 +1097,13 @@ public class Texteditor extends JFrame implements KeyListener {
                 repeatAction(consumePendingCount(), this::moveWordEndBackwardBig);
             } else if (c == '0') {
                 moveLineStart();
-                pendingCount = "";
+                editorState.pendingCount = "";
             } else if (c == '$') {
                 moveLineEnd();
-                pendingCount = "";
+                editorState.pendingCount = "";
             } else if (c == '_') {
                 moveLineLastNonBlank();
-                pendingCount = "";
+                editorState.pendingCount = "";
             } else if (c == 'J') {
                 joinCurrentLine(false);
             } else if (c == ';') {
@@ -1142,31 +1111,31 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == ',') {
                 changeNext();
             }
-            pendingKey = '\0';
-            pendingCount = "";
-        } else if (pendingKey == 'y') {
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
+        } else if (editorState.pendingKey == 'y') {
             if (c == 'y') {
                 lastCommand = "yy";
                 storeYank(consumePendingRegister(), clipboardManager.yankLine(writingArea), true);
                 showMessage("Line yanked");
             } else if (c == 's') {
                 pendingSurroundAction = 'y';
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'y';
                 pendingTextObjectModifier = c;
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'g') {
-                pendingKey = 'Y';
+                editorState.pendingKey = 'Y';
                 return;
             } else {
                 showMessage(applyMotionOperator('y', String.valueOf(c)));
             }
-            pendingKey = '\0';
-            pendingCount = "";
-        } else if (pendingKey == 'd') {
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
+        } else if (editorState.pendingKey == 'd') {
             if (c == 'd') {
                 lastCommand = "dd";
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
@@ -1174,15 +1143,15 @@ public class Texteditor extends JFrame implements KeyListener {
                 showMessage("Line deleted");
             } else if (c == 's') {
                 pendingSurroundAction = 'd';
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'd';
                 pendingTextObjectModifier = c;
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'g') {
-                pendingKey = 'D';
+                editorState.pendingKey = 'D';
                 return;
             } else if (c == 'w') {
                 lastCommand = "dw";
@@ -1192,9 +1161,9 @@ public class Texteditor extends JFrame implements KeyListener {
             } else {
                 showMessage(applyMotionOperator('d', String.valueOf(c)));
             }
-            pendingKey = '\0';
-            pendingCount = "";
-        } else if (pendingKey == 'c') {
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
+        } else if (editorState.pendingKey == 'c') {
             if (c == 'c') {
                 lastCommand = "cc";
                 storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
@@ -1202,15 +1171,15 @@ public class Texteditor extends JFrame implements KeyListener {
                 setMode(EditorMode.INSERT);
             } else if (c == 's') {
                 pendingSurroundAction = 'c';
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'i' || c == 'a') {
                 pendingTextObjectOperator = 'c';
                 pendingTextObjectModifier = c;
-                pendingKey = '\0';
+                editorState.pendingKey = '\0';
                 return;
             } else if (c == 'g') {
-                pendingKey = 'C';
+                editorState.pendingKey = 'C';
                 return;
             } else if (c == 'w') {
                 lastCommand = "cw";
@@ -1220,37 +1189,37 @@ public class Texteditor extends JFrame implements KeyListener {
             } else {
                 showMessage(applyMotionOperator('c', String.valueOf(c)));
             }
-            pendingKey = '\0';
-            pendingCount = "";
-        } else if (pendingKey == 'q') {
+            editorState.pendingKey = '\0';
+            editorState.pendingCount = "";
+        } else if (editorState.pendingKey == 'q') {
             recordingRegister = c;
             macroBuffer = new ArrayList<>();
-            pendingKey = '\0';
+            editorState.pendingKey = '\0';
             showMessage("recording @" + c);
-        } else if (pendingKey == '@') {
+        } else if (editorState.pendingKey == '@') {
             if (c == '@') {
                 showMessage(playMacro(lastMacroRegister));
             } else {
                 showMessage(playMacro(c));
             }
-            pendingKey = '\0';
-        } else if (pendingKey == '"') {
-            pendingRegister = c;
-            pendingKey = '\0';
-        } else if (pendingKey == 'm') {
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == '"') {
+            editorState.pendingRegister = c;
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == 'm') {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer != null) {
                 buffer.setMark(c, writingArea.getCaretPosition());
                 showMessage("Mark set: " + c);
             }
-            pendingKey = '\0';
-        } else if (pendingKey == '\'' || pendingKey == '`') {
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == '\'' || editorState.pendingKey == '`') {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer != null) {
                 Integer offset = buffer.getMark(c);
                 if (offset != null) {
                     recordJumpPosition();
-                    if (pendingKey == '\'') {
+                    if (editorState.pendingKey == '\'') {
                         try {
                             int line = writingArea.getLineOfOffset(Math.min(offset, writingArea.getText().length()));
                             writingArea.setCaretPosition(writingArea.getLineStartOffset(line));
@@ -1264,23 +1233,23 @@ public class Texteditor extends JFrame implements KeyListener {
                     showMessage("Mark not set: " + c);
                 }
             }
-            pendingKey = '\0';
-        } else if (pendingKey == 'f' || pendingKey == 'F' || pendingKey == 't' || pendingKey == 'T') {
-            showMessage(findCharacter(pendingKey, c));
-            pendingKey = '\0';
-        } else if (pendingKey == 'r') {
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == 'f' || editorState.pendingKey == 'F' || editorState.pendingKey == 't' || editorState.pendingKey == 'T') {
+            showMessage(findCharacter(editorState.pendingKey, c));
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == 'r') {
             showMessage(replaceCharacter(c));
-            pendingKey = '\0';
-        } else if (pendingKey == '>' || pendingKey == '<' || pendingKey == '=') {
-            if (c == pendingKey) {
-                showMessage(applyLineOperator(pendingKey));
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == '>' || editorState.pendingKey == '<' || editorState.pendingKey == '=') {
+            if (c == editorState.pendingKey) {
+                showMessage(applyLineOperator(editorState.pendingKey));
             }
-            pendingKey = '\0';
-        } else if (pendingKey == 'D' || pendingKey == 'C' || pendingKey == 'Y') {
-            char operator = pendingKey == 'D' ? 'd' : pendingKey == 'C' ? 'c' : 'y';
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == 'D' || editorState.pendingKey == 'C' || editorState.pendingKey == 'Y') {
+            char operator = editorState.pendingKey == 'D' ? 'd' : editorState.pendingKey == 'C' ? 'c' : 'y';
             showMessage(applyMotionOperator(operator, "g" + c));
-            pendingKey = '\0';
-        } else if (pendingKey == '\u0017') {
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == '\u0017') {
             switch (c) {
                 case 's':
                     showMessage(splitWindow(false));
@@ -1312,8 +1281,8 @@ public class Texteditor extends JFrame implements KeyListener {
                 default:
                     break;
             }
-            pendingKey = '\0';
-        } else if (pendingKey == 'z') {
+            editorState.pendingKey = '\0';
+        } else if (editorState.pendingKey == 'z') {
             if (c == 't') {
                 scrollCurrentLineTo('t');
             } else if (c == 'z') {
@@ -1321,13 +1290,13 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == 'b') {
                 scrollCurrentLineTo('b');
             }
-            pendingKey = '\0';
+            editorState.pendingKey = '\0';
         }
 
     }
 
     // Insert mode key handling
-    private void handleInsertMode(KeyEvent e) {
+    void handleInsertMode(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
             registerManager.updateLastInserted(lastInsertedText);
             setMode(EditorMode.NORMAL);
@@ -1356,10 +1325,10 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Visual mode key handling
-    private void handleVisualMode(KeyEvent e) {
+    void handleVisualMode(KeyEvent e) {
         char c = e.getKeyChar();
         int code = e.getKeyCode();
-        boolean lineMode = currentMode == EditorMode.VISUAL_LINE;
+        boolean lineMode = editorState.mode == EditorMode.VISUAL_LINE;
 
         if (code == KeyEvent.VK_ESCAPE) {
             setMode(EditorMode.NORMAL);
@@ -1387,14 +1356,14 @@ public class Texteditor extends JFrame implements KeyListener {
         // Update selection
         int newPos = writingArea.getCaretPosition();
         if (lineMode) {
-            selectLineRange(visualStartPos, newPos);
+            selectLineRange(editorState.visualStartPos, newPos);
         } else {
-            if (visualStartPos < newPos) {
-                writingArea.setSelectionStart(visualStartPos);
+            if (editorState.visualStartPos < newPos) {
+                writingArea.setSelectionStart(editorState.visualStartPos);
                 writingArea.setSelectionEnd(newPos);
             } else {
                 writingArea.setSelectionStart(newPos);
-                writingArea.setSelectionEnd(visualStartPos);
+                writingArea.setSelectionEnd(editorState.visualStartPos);
             }
         }
 
@@ -1439,7 +1408,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Replace mode key handling
-    private void handleReplaceMode(KeyEvent e) {
+    void handleReplaceMode(KeyEvent e) {
         if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
             setMode(EditorMode.NORMAL);
             return;
@@ -1466,24 +1435,24 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Command mode key handling
-    private void handleCommandMode(KeyEvent e) {
+    void handleCommandMode(KeyEvent e) {
         int code = e.getKeyCode();
         char c = e.getKeyChar();
 
         if (code == KeyEvent.VK_ESCAPE) {
-            commandBuffer = "";
+            editorState.commandBuffer = "";
             clearSubstitutePreview();
             setMode(EditorMode.NORMAL);
             return;
         }
 
         if (code == KeyEvent.VK_ENTER) {
-            String result = commandHandler.execute(commandBuffer);
-            addCommandHistory(commandBuffer);
+            String result = commandHandler.execute(editorState.commandBuffer);
+            addCommandHistory(editorState.commandBuffer);
             if (!result.isEmpty()) {
                 showMessage(result);
             }
-            commandBuffer = "";
+            editorState.commandBuffer = "";
             clearSubstitutePreview();
             setMode(EditorMode.NORMAL);
             return;
@@ -1502,16 +1471,16 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         if (code == KeyEvent.VK_TAB) {
-            commandBuffer = completeCommand(commandBuffer);
+            editorState.commandBuffer = completeCommand(editorState.commandBuffer);
             updateSubstitutePreview();
             return;
         }
 
         if (code == KeyEvent.VK_BACK_SPACE) {
-            if (commandBuffer.length() > 1) {
-                commandBuffer = commandBuffer.substring(0, commandBuffer.length() - 1);
+            if (editorState.commandBuffer.length() > 1) {
+                editorState.commandBuffer = editorState.commandBuffer.substring(0, editorState.commandBuffer.length() - 1);
             } else {
-                commandBuffer = "";
+                editorState.commandBuffer = "";
                 clearSubstitutePreview();
                 setMode(EditorMode.NORMAL);
             }
@@ -1521,31 +1490,31 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Append character to command buffer
         if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
-            commandBuffer += c;
+            editorState.commandBuffer += c;
             updateSubstitutePreview();
         }
     }
 
-    private void handleSearchMode(KeyEvent e) {
+    void handleSearchMode(KeyEvent e) {
         int code = e.getKeyCode();
         char c = e.getKeyChar();
 
         if (code == KeyEvent.VK_ESCAPE) {
-            commandBuffer = "";
+            editorState.commandBuffer = "";
             setMode(EditorMode.NORMAL);
             return;
         }
 
         if (code == KeyEvent.VK_ENTER) {
-            String pattern = commandBuffer.length() > 1 ? commandBuffer.substring(1) : "";
-            String result = searchForward ? searchManager.searchForward(pattern) : searchManager.searchBackward(pattern);
+            String pattern = editorState.commandBuffer.length() > 1 ? editorState.commandBuffer.substring(1) : "";
+            String result = editorState.searchForward ? searchManager.searchForward(pattern) : searchManager.searchBackward(pattern);
             if (!result.isEmpty()) {
                 showMessage(result);
             }
             if (!pattern.isEmpty()) {
-                addCommandHistory(commandBuffer);
+                addCommandHistory(editorState.commandBuffer);
             }
-            commandBuffer = "";
+            editorState.commandBuffer = "";
             setMode(EditorMode.NORMAL);
             return;
         }
@@ -1561,17 +1530,17 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         if (code == KeyEvent.VK_BACK_SPACE) {
-            if (commandBuffer.length() > 1) {
-                commandBuffer = commandBuffer.substring(0, commandBuffer.length() - 1);
+            if (editorState.commandBuffer.length() > 1) {
+                editorState.commandBuffer = editorState.commandBuffer.substring(0, editorState.commandBuffer.length() - 1);
             } else {
-                commandBuffer = "";
+                editorState.commandBuffer = "";
                 setMode(EditorMode.NORMAL);
             }
             return;
         }
 
         if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
-            commandBuffer += c;
+            editorState.commandBuffer += c;
         }
     }
 
@@ -2012,7 +1981,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private void selectCurrentLine() {
         int caret = writingArea.getCaretPosition();
         selectLineRange(caret, caret);
-        visualStartPos = writingArea.getSelectionStart();
+        editorState.visualStartPos = writingArea.getSelectionStart();
     }
 
     private void selectLineRange(int anchorPosition, int currentPosition) {
@@ -2088,7 +2057,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         if (commandHistoryIndex < 0) {
-            commandHistoryPrefix = commandBuffer;
+            commandHistoryPrefix = editorState.commandBuffer;
             commandHistoryIndex = commandHistory.size();
         }
 
@@ -2097,7 +2066,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commandHistoryIndex = nextIndex;
 
         if (commandHistoryIndex >= commandHistory.size()) {
-            commandBuffer = commandHistoryPrefix;
+            editorState.commandBuffer = commandHistoryPrefix;
             return;
         }
 
@@ -2105,7 +2074,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!commandHistoryPrefix.isEmpty() && !candidate.startsWith(commandHistoryPrefix.substring(0, 1))) {
             return;
         }
-        commandBuffer = candidate;
+        editorState.commandBuffer = candidate;
     }
 
     private void addCommandHistory(String entry) {
@@ -2203,7 +2172,7 @@ public class Texteditor extends JFrame implements KeyListener {
             currentLineHighlightTag = null;
         }
 
-        if (!configManager.getShowCurrentLine() || currentMode == EditorMode.VISUAL || currentMode == EditorMode.VISUAL_LINE) {
+        if (!configManager.getShowCurrentLine() || editorState.mode == EditorMode.VISUAL || editorState.mode == EditorMode.VISUAL_LINE) {
             return;
         }
 
@@ -2263,8 +2232,8 @@ public class Texteditor extends JFrame implements KeyListener {
             area.setSelectedTextColor(selectionTextColor);
         }
 
-        if (currentMode != null) {
-            writingArea.setBackground(getModeBackground(currentMode));
+        if (editorState.mode != null) {
+            writingArea.setBackground(getModeBackground(editorState.mode));
         }
         updateZenModeLayout();
 
@@ -2631,11 +2600,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private void updateSubstitutePreview() {
         clearSubstitutePreview();
-        if (currentMode != EditorMode.COMMAND || commandBuffer == null || !commandBuffer.startsWith(":")) {
+        if (editorState.mode != EditorMode.COMMAND || editorState.commandBuffer == null || !editorState.commandBuffer.startsWith(":")) {
             return;
         }
 
-        String command = commandBuffer.substring(1);
+        String command = editorState.commandBuffer.substring(1);
         SubstitutePreview preview = parseSubstitutePreview(command);
         if (preview == null || preview.pattern.isEmpty()) {
             return;
@@ -3957,7 +3926,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void updateZenModeLayout() {
-        Color editorBackground = getModeBackground(currentMode == null ? EditorMode.NORMAL : currentMode);
+        Color editorBackground = getModeBackground(editorState.mode == null ? EditorMode.NORMAL : editorState.mode);
         Color marginBackground = zenModeEnabled ? fadedMarginColor(editorBackground) : editorBackground;
         editorHostPanel.setBackground(marginBackground);
         editorHostPanel.setOpaque(true);
@@ -4324,11 +4293,11 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private int consumePendingCount() {
-        if (pendingCount == null || pendingCount.isEmpty()) {
+        if (editorState.pendingCount == null || editorState.pendingCount.isEmpty()) {
             return 1;
         }
-        int count = Integer.parseInt(pendingCount);
-        pendingCount = "";
+        int count = Integer.parseInt(editorState.pendingCount);
+        editorState.pendingCount = "";
         return Math.max(1, count);
     }
 
@@ -4339,8 +4308,8 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private Character consumePendingRegister() {
-        Character register = pendingRegister;
-        pendingRegister = null;
+        Character register = editorState.pendingRegister;
+        editorState.pendingRegister = null;
         return register;
     }
 
@@ -4813,7 +4782,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Mode management
     private void setMode(EditorMode mode) {
-        this.currentMode = mode;
+        this.editorState.mode = mode;
         writingArea.setEditable(mode.isEditable());
         writingArea.setBackground(getModeBackground(mode));
         updateZenModeLayout();
@@ -4864,7 +4833,7 @@ public class Texteditor extends JFrame implements KeyListener {
             status.append("1:1  ");
         }
 
-        EditorMode modeForStatus = currentMode == null ? EditorMode.NORMAL : currentMode;
+        EditorMode modeForStatus = editorState.mode == null ? EditorMode.NORMAL : editorState.mode;
         status.append(modeForStatus.getDisplayName()).append("  ");
 
         if (buffer != null) {
@@ -4885,8 +4854,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
         statusBar.setText(status.toString());
 
-        if ((currentMode == EditorMode.COMMAND || currentMode == EditorMode.SEARCH) && !commandBuffer.isEmpty()) {
-            commandBar.setText(commandBuffer);
+        if ((editorState.mode == EditorMode.COMMAND || editorState.mode == EditorMode.SEARCH) && !editorState.commandBuffer.isEmpty()) {
+            commandBar.setText(editorState.commandBuffer);
         } else if (lastMessage != null && !lastMessage.isEmpty()) {
             commandBar.setText(lastMessage);
         } else {
@@ -6008,7 +5977,7 @@ public class Texteditor extends JFrame implements KeyListener {
             e.consume();
             return;
         }
-        if (currentMode != EditorMode.INSERT) {
+        if (editorState.mode != EditorMode.INSERT) {
             e.consume();
         }
     }

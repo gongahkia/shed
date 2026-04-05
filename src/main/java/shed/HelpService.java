@@ -137,7 +137,7 @@ public class HelpService {
                 return "Help: completion\n\n"
                     + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
                     + "If no server is available, Shed falls back to local buffer-word completion.\n"
-                    + "Use :lsp definition|hover|references|rename <name>|codeaction for navigation/actions.\n"
+                    + "Use :lsp definition|hover|references|rename <name>|codeaction [index] for navigation/actions.\n"
                     + "Use :diagnostics to send LSP diagnostics to quickfix and :dnext/:dprev to jump.\n"
                     + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
             case "git":

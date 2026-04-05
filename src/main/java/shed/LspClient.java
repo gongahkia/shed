@@ -139,11 +139,17 @@ public class LspClient {
         private final String title;
         private final String kind;
         private final boolean preferred;
+        private final List<TextEdit> edits;
+        private final String commandId;
+        private final Object commandArguments;
 
-        public CodeAction(String title, String kind, boolean preferred) {
+        public CodeAction(String title, String kind, boolean preferred, List<TextEdit> edits, String commandId, Object commandArguments) {
             this.title = title == null ? "" : title;
             this.kind = kind == null ? "" : kind;
             this.preferred = preferred;
+            this.edits = edits == null ? List.of() : new ArrayList<>(edits);
+            this.commandId = commandId == null ? "" : commandId;
+            this.commandArguments = commandArguments;
         }
 
         public String getTitle() {
@@ -156,6 +162,18 @@ public class LspClient {
 
         public boolean isPreferred() {
             return preferred;
+        }
+
+        public List<TextEdit> getEdits() {
+            return new ArrayList<>(edits);
+        }
+
+        public String getCommandId() {
+            return commandId;
+        }
+
+        public Object getCommandArguments() {
+            return commandArguments;
         }
     }
 
@@ -390,38 +408,7 @@ public class LspClient {
         if (result == null) {
             return List.of();
         }
-        List<TextEdit> edits = new ArrayList<>();
-        Map<String, Object> changes = MiniJson.asObject(result.get("changes"));
-        if (changes != null) {
-            for (Map.Entry<String, Object> entry : changes.entrySet()) {
-                List<Object> editArray = MiniJson.asArray(entry.getValue());
-                if (editArray == null) {
-                    continue;
-                }
-                edits.addAll(parseTextEdits(entry.getKey(), editArray));
-            }
-        }
-
-        List<Object> documentChanges = MiniJson.asArray(result.get("documentChanges"));
-        if (documentChanges != null) {
-            for (Object item : documentChanges) {
-                Map<String, Object> change = MiniJson.asObject(item);
-                if (change == null) {
-                    continue;
-                }
-                Map<String, Object> textDocumentObject = MiniJson.asObject(change.get("textDocument"));
-                String changeUri = textDocumentObject == null ? null : MiniJson.asString(textDocumentObject.get("uri"));
-                if (changeUri == null) {
-                    continue;
-                }
-                List<Object> editArray = MiniJson.asArray(change.get("edits"));
-                if (editArray == null) {
-                    continue;
-                }
-                edits.addAll(parseTextEdits(changeUri, editArray));
-            }
-        }
-        return edits;
+        return parseWorkspaceEdits(result);
     }
 
     public List<CodeAction> codeActions(String uri, int line, int character, List<Diagnostic> diagnosticsAtCursor) {
@@ -488,9 +475,45 @@ public class LspClient {
             }
             String kind = MiniJson.asString(actionObject.get("kind"));
             boolean preferred = Boolean.TRUE.equals(actionObject.get("isPreferred"));
-            actions.add(new CodeAction(title, kind, preferred));
+            List<TextEdit> edits = parseWorkspaceEdits(MiniJson.asObject(actionObject.get("edit")));
+            String commandId = "";
+            Object commandArguments = null;
+
+            Map<String, Object> nestedCommand = MiniJson.asObject(actionObject.get("command"));
+            if (nestedCommand != null) {
+                String nestedCommandId = MiniJson.asString(nestedCommand.get("command"));
+                if (nestedCommandId != null) {
+                    commandId = nestedCommandId;
+                    commandArguments = nestedCommand.get("arguments");
+                }
+            } else {
+                String directCommandId = MiniJson.asString(actionObject.get("command"));
+                if (directCommandId != null) {
+                    commandId = directCommandId;
+                    commandArguments = actionObject.get("arguments");
+                }
+            }
+
+            actions.add(new CodeAction(title, kind, preferred, edits, commandId, commandArguments));
         }
         return actions;
+    }
+
+    public boolean executeCommand(String commandId, Object arguments) {
+        if (commandId == null || commandId.isBlank()) {
+            return false;
+        }
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("command", commandId);
+        if (arguments == null) {
+            params.put("arguments", List.of());
+        } else if (arguments instanceof List) {
+            params.put("arguments", arguments);
+        } else {
+            params.put("arguments", List.of(arguments));
+        }
+        Map<String, Object> response = sendRequest("workspace/executeCommand", params, 4000L);
+        return response != null && response.get("error") == null;
     }
 
     public List<Diagnostic> getDiagnostics(String uri) {
@@ -721,6 +744,45 @@ public class LspClient {
             }
             String newText = MiniJson.asString(edit.get("newText"));
             edits.add(new TextEdit(uri, startLine, startCharacter, endLine, endCharacter, newText));
+        }
+        return edits;
+    }
+
+    private List<TextEdit> parseWorkspaceEdits(Map<String, Object> workspaceEdit) {
+        if (workspaceEdit == null) {
+            return List.of();
+        }
+        List<TextEdit> edits = new ArrayList<>();
+
+        Map<String, Object> changes = MiniJson.asObject(workspaceEdit.get("changes"));
+        if (changes != null) {
+            for (Map.Entry<String, Object> entry : changes.entrySet()) {
+                List<Object> editArray = MiniJson.asArray(entry.getValue());
+                if (editArray == null) {
+                    continue;
+                }
+                edits.addAll(parseTextEdits(entry.getKey(), editArray));
+            }
+        }
+
+        List<Object> documentChanges = MiniJson.asArray(workspaceEdit.get("documentChanges"));
+        if (documentChanges != null) {
+            for (Object item : documentChanges) {
+                Map<String, Object> change = MiniJson.asObject(item);
+                if (change == null) {
+                    continue;
+                }
+                Map<String, Object> textDocumentObject = MiniJson.asObject(change.get("textDocument"));
+                String changeUri = textDocumentObject == null ? null : MiniJson.asString(textDocumentObject.get("uri"));
+                if (changeUri == null) {
+                    continue;
+                }
+                List<Object> editArray = MiniJson.asArray(change.get("edits"));
+                if (editArray == null) {
+                    continue;
+                }
+                edits.addAll(parseTextEdits(changeUri, editArray));
+            }
         }
         return edits;
     }

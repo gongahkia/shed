@@ -3296,9 +3296,40 @@ public class Texteditor extends JFrame implements KeyListener {
         if (getCurrentBuffer() == quickfixBuffer) {
             return requestQuit(true);
         }
+        FileBuffer replacement = null;
+        for (FileBuffer candidate : buffers) {
+            if (candidate != null && candidate != quickfixBuffer) {
+                replacement = candidate;
+                break;
+            }
+        }
+        if (replacement == null) {
+            openLandingPage();
+            replacement = getCurrentBuffer();
+        }
+        for (EditorPane pane : editorPanes) {
+            if (pane != null && pane.getBuffer() == quickfixBuffer) {
+                loadBufferIntoPane(pane, replacement, 0);
+            }
+        }
+        pruneSpecialBufferReturns(quickfixBuffer);
         buffers.remove(quickfixBuffer);
         quickfixBuffer = null;
         return "Quickfix closed";
+    }
+
+    private void pruneSpecialBufferReturns(FileBuffer scratchBuffer) {
+        if (scratchBuffer == null || specialBufferReturns.isEmpty()) {
+            return;
+        }
+        Deque<SpecialBufferReturnState> rebuilt = new ArrayDeque<>();
+        for (SpecialBufferReturnState state : specialBufferReturns) {
+            if (state == null || state.scratchBuffer == scratchBuffer) {
+                continue;
+            }
+            rebuilt.addLast(state);
+        }
+        specialBufferReturns = rebuilt;
     }
 
     private boolean isQuickfixBufferActive() {
@@ -3763,12 +3794,12 @@ public class Texteditor extends JFrame implements KeyListener {
         if (argument == null || argument.isBlank()) {
             return "Usage: :tree rename <from> <to>";
         }
-        String[] parts = argument.trim().split("\\s+", 2);
-        if (parts.length < 2) {
+        List<String> parts = parseQuotedArguments(argument);
+        if (parts.size() < 2) {
             return "Usage: :tree rename <from> <to>";
         }
-        File from = treeService.resolveActionPath(parts[0], treeRoot);
-        File to = treeService.resolveActionPath(parts[1], treeRoot);
+        File from = treeService.resolveActionPath(parts.get(0), treeRoot);
+        File to = treeService.resolveActionPath(parts.get(1), treeRoot);
         if (from == null || to == null) {
             return "Usage: :tree rename <from> <to>";
         }
@@ -4371,6 +4402,55 @@ public class Texteditor extends JFrame implements KeyListener {
         return tokens;
     }
 
+    private List<String> parseQuotedArguments(String raw) {
+        List<String> tokens = new ArrayList<>();
+        if (raw == null || raw.isBlank()) {
+            return tokens;
+        }
+        StringBuilder current = new StringBuilder();
+        boolean escaped = false;
+        char quote = '\0';
+        for (int i = 0; i < raw.length(); i++) {
+            char c = raw.charAt(i);
+            if (escaped) {
+                current.append(c);
+                escaped = false;
+                continue;
+            }
+            if (c == '\\') {
+                escaped = true;
+                continue;
+            }
+            if (quote != '\0') {
+                if (c == quote) {
+                    quote = '\0';
+                } else {
+                    current.append(c);
+                }
+                continue;
+            }
+            if (c == '\'' || c == '"') {
+                quote = c;
+                continue;
+            }
+            if (Character.isWhitespace(c)) {
+                if (!current.isEmpty()) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                }
+                continue;
+            }
+            current.append(c);
+        }
+        if (escaped) {
+            current.append('\\');
+        }
+        if (!current.isEmpty()) {
+            tokens.add(current.toString());
+        }
+        return tokens;
+    }
+
     private CommandResult runCommand(File workingDirectory, List<String> command) {
         return runExternalCommand(
             command,
@@ -4717,7 +4797,7 @@ public class Texteditor extends JFrame implements KeyListener {
     public String handleLspCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|hover|references|rename <newName>|codeaction";
+            return "Usage: :lsp completion|definition|hover|references|rename <newName>|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -4741,7 +4821,7 @@ public class Texteditor extends JFrame implements KeyListener {
             case "codeactions":
             case "actions":
             case "ca":
-                return lspCodeActions();
+                return lspCodeActions(args);
             case "diagnostics":
             case "diag":
                 return showDiagnostics();
@@ -4856,18 +4936,29 @@ public class Texteditor extends JFrame implements KeyListener {
             if (edits.isEmpty()) {
                 return "No rename edits returned";
             }
-            int applied = applyCurrentBufferTextEdits(uri, edits);
-            if (applied <= 0) {
-                return "Rename produced edits outside current buffer";
+            WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(edits);
+            if (applyResult.appliedEditCount <= 0) {
+                return "Rename returned no applicable edits";
             }
-            markModified();
-            return "Applied " + applied + " rename edit" + (applied == 1 ? "" : "s");
+            StringBuilder message = new StringBuilder();
+            message.append("Applied ")
+                .append(applyResult.appliedEditCount)
+                .append(" rename edit")
+                .append(applyResult.appliedEditCount == 1 ? "" : "s")
+                .append(" across ")
+                .append(applyResult.touchedFiles)
+                .append(" file")
+                .append(applyResult.touchedFiles == 1 ? "" : "s");
+            if (applyResult.failedFiles > 0) {
+                message.append(" (").append(applyResult.failedFiles).append(" file failures)");
+            }
+            return message.toString();
         } catch (BadLocationException e) {
             return "LSP rename failed: " + e.getMessage();
         }
     }
 
-    public String lspCodeActions() {
+    public String lspCodeActions(String selectionArgument) {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) {
             return "LSP code actions require a file-backed buffer";
@@ -4881,17 +4972,48 @@ public class Texteditor extends JFrame implements KeyListener {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
-            List<LspClient.Diagnostic> scoped = new ArrayList<>();
-            for (LspClient.Diagnostic diagnostic : diagnostics) {
-                if (diagnostic.getLine() == line) {
-                    scoped.add(diagnostic);
-                }
-            }
-            List<LspClient.CodeAction> actions = client.codeActions(uri, line, column, scoped);
+            List<LspClient.CodeAction> actions = collectCursorCodeActions(client, uri, line, column);
             if (actions.isEmpty()) {
                 return "No code actions";
             }
+
+            int requestedIndex = parseOneBasedIndex(selectionArgument);
+            if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) {
+                return "Usage: :lsp codeaction [index]";
+            }
+            if (requestedIndex > 0) {
+                if (requestedIndex > actions.size()) {
+                    return "Code action index out of range: " + requestedIndex;
+                }
+                LspClient.CodeAction action = actions.get(requestedIndex - 1);
+                WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(action.getEdits());
+                boolean executed = false;
+                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
+                    executed = client.executeCommand(action.getCommandId(), action.getCommandArguments());
+                }
+                if (applyResult.appliedEditCount == 0 && !executed) {
+                    return "Code action produced no local edit and no executable command";
+                }
+                StringBuilder message = new StringBuilder();
+                message.append("Applied code action ").append(requestedIndex).append(": ").append(action.getTitle());
+                if (applyResult.appliedEditCount > 0) {
+                    message.append(" (")
+                        .append(applyResult.appliedEditCount)
+                        .append(" edit")
+                        .append(applyResult.appliedEditCount == 1 ? "" : "s")
+                        .append(")");
+                }
+                if (executed) {
+                    message.append(" [command executed]");
+                } else if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
+                    message.append(" [command failed]");
+                }
+                if (applyResult.failedFiles > 0) {
+                    message.append(" [").append(applyResult.failedFiles).append(" file failures]");
+                }
+                return message.toString();
+            }
+
             StringBuilder builder = new StringBuilder();
             for (int i = 0; i < actions.size(); i++) {
                 LspClient.CodeAction action = actions.get(i);
@@ -4902,14 +5024,42 @@ public class Texteditor extends JFrame implements KeyListener {
                 if (action.isPreferred()) {
                     builder.append(" [preferred]");
                 }
+                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
+                    builder.append(" [command]");
+                }
+                if (!action.getEdits().isEmpty()) {
+                    builder.append(" [edit]");
+                }
                 if (i < actions.size() - 1) {
                     builder.append("\n");
                 }
             }
-            showScratchBuffer("[lsp code actions]", builder.toString());
-            return "Showing code actions";
+            showScratchBuffer("[lsp code actions]", builder.toString() + "\n\nRun :lsp codeaction <index> to apply.");
+            return "Showing code actions (use :lsp codeaction <index>)";
         } catch (BadLocationException e) {
             return "LSP code actions failed: " + e.getMessage();
+        }
+    }
+
+    private List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {
+        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
+        List<LspClient.Diagnostic> scoped = new ArrayList<>();
+        for (LspClient.Diagnostic diagnostic : diagnostics) {
+            if (diagnostic.getLine() == line) {
+                scoped.add(diagnostic);
+            }
+        }
+        return client.codeActions(uri, line, column, scoped);
+    }
+
+    private int parseOneBasedIndex(String value) {
+        if (value == null || value.isBlank()) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return -1;
         }
     }
 
@@ -5060,43 +5210,175 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private int applyCurrentBufferTextEdits(String currentUri, List<LspClient.TextEdit> edits) {
-        if (edits == null || edits.isEmpty() || currentUri == null) {
-            return 0;
+    private WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
+        WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
+        if (edits == null || edits.isEmpty()) {
+            return result;
         }
-        List<LspClient.TextEdit> matching = new ArrayList<>();
+        Map<String, List<LspClient.TextEdit>> groupedByUri = new HashMap<>();
         for (LspClient.TextEdit edit : edits) {
-            if (edit != null && currentUri.equals(edit.getUri())) {
-                matching.add(edit);
+            if (edit == null || edit.getUri() == null || edit.getUri().isBlank()) {
+                continue;
+            }
+            groupedByUri.computeIfAbsent(edit.getUri(), key -> new ArrayList<>()).add(edit);
+        }
+        if (groupedByUri.isEmpty()) {
+            return result;
+        }
+
+        FileBuffer current = getCurrentBuffer();
+        String currentPath = current == null ? null : current.getFilePath();
+
+        for (Map.Entry<String, List<LspClient.TextEdit>> entry : groupedByUri.entrySet()) {
+            String path = filePathFromUri(entry.getKey());
+            if (path == null || path.isBlank()) {
+                result.failedFiles++;
+                continue;
+            }
+
+            FileBuffer targetBuffer = findBufferByPath(new File(path));
+            if (targetBuffer != null) {
+                int applied = applyTextEditsToBuffer(targetBuffer, entry.getValue());
+                if (applied > 0) {
+                    result.appliedEditCount += applied;
+                    result.touchedFiles++;
+                } else {
+                    result.failedFiles++;
+                }
+                continue;
+            }
+
+            if (currentPath != null && currentPath.equals(path)) {
+                int applied = applyTextEditsToCurrentArea(entry.getValue());
+                if (applied > 0) {
+                    result.appliedEditCount += applied;
+                    result.touchedFiles++;
+                } else {
+                    result.failedFiles++;
+                }
+                continue;
+            }
+
+            int applied = applyTextEditsToFile(path, entry.getValue());
+            if (applied > 0) {
+                result.appliedEditCount += applied;
+                result.touchedFiles++;
+            } else {
+                result.failedFiles++;
             }
         }
-        if (matching.isEmpty()) {
+        return result;
+    }
+
+    private int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
+        List<ResolvedTextEdit> resolved = resolveTextEdits(writingArea.getText(), edits);
+        if (resolved.isEmpty()) {
             return 0;
         }
+        for (ResolvedTextEdit edit : resolved) {
+            writingArea.replaceRange(edit.newText, edit.startOffset, edit.endOffset);
+        }
+        markModified();
+        return resolved.size();
+    }
 
-        matching.sort((left, right) -> {
-            if (left.getStartLine() != right.getStartLine()) {
-                return Integer.compare(right.getStartLine(), left.getStartLine());
+    private int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
+        if (buffer == null) {
+            return 0;
+        }
+        String currentText = buffer == getCurrentBuffer() ? writingArea.getText() : buffer.getContent();
+        List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
+        if (resolved.isEmpty()) {
+            return 0;
+        }
+        String updated = applyResolvedTextEdits(currentText, resolved);
+        if (buffer == getCurrentBuffer()) {
+            writingArea.setText(updated);
+            markModified();
+        } else {
+            buffer.setContent(updated, true);
+        }
+        return resolved.size();
+    }
+
+    private int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
+        try {
+            File file = new File(filePath);
+            if (!file.exists() || !file.isFile()) {
+                return 0;
             }
-            return Integer.compare(right.getStartCharacter(), left.getStartCharacter());
-        });
+            String currentText = Files.readString(file.toPath(), StandardCharsets.UTF_8);
+            List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
+            if (resolved.isEmpty()) {
+                return 0;
+            }
+            String updated = applyResolvedTextEdits(currentText, resolved);
+            Files.writeString(file.toPath(), updated, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
+            return resolved.size();
+        } catch (IOException e) {
+            return 0;
+        }
+    }
 
-        int applied = 0;
-        for (LspClient.TextEdit edit : matching) {
-            try {
-                int startLine = Math.max(0, Math.min(edit.getStartLine(), writingArea.getLineCount() - 1));
-                int endLine = Math.max(0, Math.min(edit.getEndLine(), writingArea.getLineCount() - 1));
-                int startOffset = writingArea.getLineStartOffset(startLine) + Math.max(0, edit.getStartCharacter());
-                int endOffset = writingArea.getLineStartOffset(endLine) + Math.max(0, edit.getEndCharacter());
-                int textLength = writingArea.getText().length();
-                startOffset = Math.max(0, Math.min(startOffset, textLength));
-                endOffset = Math.max(startOffset, Math.min(endOffset, textLength));
-                writingArea.replaceRange(edit.getNewText(), startOffset, endOffset);
-                applied++;
-            } catch (BadLocationException ignored) {
+    private String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {
+        StringBuilder builder = new StringBuilder(text == null ? "" : text);
+        for (ResolvedTextEdit edit : resolvedEdits) {
+            int safeStart = Math.max(0, Math.min(edit.startOffset, builder.length()));
+            int safeEnd = Math.max(safeStart, Math.min(edit.endOffset, builder.length()));
+            builder.replace(safeStart, safeEnd, edit.newText);
+        }
+        return builder.toString();
+    }
+
+    private List<ResolvedTextEdit> resolveTextEdits(String text, List<LspClient.TextEdit> edits) {
+        List<ResolvedTextEdit> resolved = new ArrayList<>();
+        if (edits == null || edits.isEmpty()) {
+            return resolved;
+        }
+        String source = text == null ? "" : text;
+        List<Integer> lineStarts = lineStartOffsets(source);
+        for (LspClient.TextEdit edit : edits) {
+            if (edit == null) {
+                continue;
+            }
+            int startOffset = offsetForLineCharacter(source, lineStarts, edit.getStartLine(), edit.getStartCharacter());
+            int endOffset = offsetForLineCharacter(source, lineStarts, edit.getEndLine(), edit.getEndCharacter());
+            if (endOffset < startOffset) {
+                int swap = startOffset;
+                startOffset = endOffset;
+                endOffset = swap;
+            }
+            resolved.add(new ResolvedTextEdit(startOffset, endOffset, edit.getNewText()));
+        }
+        resolved.sort((left, right) -> {
+            if (left.startOffset != right.startOffset) {
+                return Integer.compare(right.startOffset, left.startOffset);
+            }
+            return Integer.compare(right.endOffset, left.endOffset);
+        });
+        return resolved;
+    }
+
+    private List<Integer> lineStartOffsets(String text) {
+        List<Integer> starts = new ArrayList<>();
+        starts.add(0);
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                starts.add(i + 1);
             }
         }
-        return applied;
+        return starts;
+    }
+
+    private int offsetForLineCharacter(String text, List<Integer> lineStarts, int line, int character) {
+        if (lineStarts == null || lineStarts.isEmpty()) {
+            return 0;
+        }
+        int safeLine = Math.max(0, Math.min(line, lineStarts.size() - 1));
+        int lineStart = lineStarts.get(safeLine);
+        int lineEnd = safeLine + 1 < lineStarts.size() ? lineStarts.get(safeLine + 1) - 1 : text.length();
+        int safeCharacter = Math.max(0, character);
+        return Math.max(0, Math.min(lineStart + safeCharacter, lineEnd));
     }
 
     private String filePathFromUri(String uri) {
@@ -6708,20 +6990,20 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("version", 2);
         payload.put("cwd", new File(".").getAbsolutePath());
-        List<Map<String, Object>> files = new ArrayList<>();
-        for (FileBuffer buffer : buffers) {
-            if (buffer == null || !buffer.hasFilePath()) {
-                continue;
-            }
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("path", buffer.getFilePath());
-            files.add(entry);
-        }
-        payload.put("files", files);
+        Map<FileBuffer, String> bufferIds = new HashMap<>();
+        List<Map<String, Object>> serializedBuffers = serializeSessionBuffers(bufferIds);
+        payload.put("buffers", serializedBuffers);
+        payload.put("panes", serializeSessionPanes(bufferIds));
+        payload.put("layout", serializeWindowLayout(windowLayoutRoot));
+        payload.put("activePaneIndex", activePaneIndex);
         FileBuffer current = getCurrentBuffer();
-        if (current != null && current.hasFilePath()) {
-            payload.put("activePath", current.getFilePath());
+        if (current != null) {
+            String activeBufferId = bufferIds.get(current);
+            if (activeBufferId != null) {
+                payload.put("activeBufferId", activeBufferId);
+            }
             payload.put("activeCaret", writingArea.getCaretPosition());
         }
         if (treeRoot != null) {
@@ -6755,63 +7037,333 @@ public class Texteditor extends JFrame implements KeyListener {
             if (payload == null) {
                 return "Session file is invalid";
             }
-            List<String> filePaths = extractSessionFilePaths(payload.get("files"));
-            String activePath = MiniJson.asString(payload.get("activePath"));
-            Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
-            String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
-
-            specialBufferReturns.clear();
-            treeLineTargets.clear();
-            treeBuffer = null;
-            treePane = null;
-            quickfixBuffer = null;
-            buffers.clear();
-
-            for (String filePath : filePaths) {
-                if (filePath == null || filePath.isBlank()) {
-                    continue;
-                }
-                File file = new File(filePath);
-                if (!file.exists() || !file.isFile()) {
-                    continue;
-                }
-                try {
-                    buffers.add(new FileBuffer(file, configManager));
-                } catch (IOException ignored) {
-                }
+            if (restoreSessionV2(payload)) {
+                return "Restored session: " + sessionFile.getAbsolutePath();
             }
-
-            if (buffers.isEmpty()) {
-                openLandingPage();
-                return "Session loaded (no existing files)";
+            if (restoreLegacySession(payload)) {
+                return "Restored legacy session: " + sessionFile.getAbsolutePath();
             }
-
-            FileBuffer primary = buffers.get(0);
-            for (EditorPane pane : editorPanes) {
-                loadBufferIntoPane(pane, primary, 0);
-            }
-
-            FileBuffer target = primary;
-            if (activePath != null && !activePath.isBlank()) {
-                FileBuffer maybe = findBufferByPath(new File(activePath));
-                if (maybe != null) {
-                    target = maybe;
-                }
-            }
-            loadBufferIntoEditor(target);
-            if (activeCaret != null) {
-                writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
-            }
-            if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
-                File root = new File(savedTreeRoot);
-                treeRoot = root.exists() ? root : null;
-            } else {
-                treeRoot = null;
-            }
-            return "Restored session: " + sessionFile.getAbsolutePath();
+            openLandingPage();
+            return "Session loaded (no existing files)";
         } catch (IOException e) {
             return "Session load failed: " + e.getMessage();
         }
+    }
+
+    private boolean restoreSessionV2(Map<String, Object> payload) {
+        Map<String, FileBuffer> idToBuffer = new HashMap<>();
+        List<FileBuffer> restoredBuffers = deserializeSessionBuffers(payload.get("buffers"), idToBuffer);
+        if (restoredBuffers.isEmpty()) {
+            return false;
+        }
+
+        specialBufferReturns.clear();
+        treeLineTargets.clear();
+        treeBuffer = null;
+        treePane = null;
+        quickfixBuffer = null;
+        buffers.clear();
+        buffers.addAll(restoredBuffers);
+
+        List<Object> paneObjects = MiniJson.asArray(payload.get("panes"));
+        int paneCount = paneObjects == null || paneObjects.isEmpty() ? 1 : paneObjects.size();
+        Map<String, Object> layoutObject = MiniJson.asObject(payload.get("layout"));
+        resetEditorPanesForSession(paneCount, layoutObject);
+        if (editorPanes.isEmpty()) {
+            return false;
+        }
+
+        FileBuffer defaultBuffer = buffers.get(0);
+        for (int i = 0; i < editorPanes.size(); i++) {
+            EditorPane pane = editorPanes.get(i);
+            FileBuffer paneBuffer = defaultBuffer;
+            int caret = 0;
+            if (paneObjects != null && i < paneObjects.size()) {
+                Map<String, Object> paneState = MiniJson.asObject(paneObjects.get(i));
+                if (paneState != null) {
+                    String bufferId = MiniJson.asString(paneState.get("bufferId"));
+                    Integer paneCaret = MiniJson.asInt(paneState.get("caret"));
+                    if (bufferId != null && idToBuffer.containsKey(bufferId)) {
+                        paneBuffer = idToBuffer.get(bufferId);
+                    }
+                    if (paneCaret != null) {
+                        caret = Math.max(0, paneCaret);
+                    }
+                }
+            }
+            loadBufferIntoPane(pane, paneBuffer, caret);
+        }
+
+        Integer activePane = MiniJson.asInt(payload.get("activePaneIndex"));
+        int activeIndex = activePane == null ? 0 : Math.max(0, Math.min(activePane, editorPanes.size() - 1));
+        activateEditorPane(editorPanes.get(activeIndex));
+
+        String activeBufferId = MiniJson.asString(payload.get("activeBufferId"));
+        if (activeBufferId != null && idToBuffer.containsKey(activeBufferId)) {
+            loadBufferIntoEditor(idToBuffer.get(activeBufferId));
+        }
+        Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
+        if (activeCaret != null) {
+            writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
+        }
+
+        String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
+        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
+            File root = new File(savedTreeRoot);
+            treeRoot = root.exists() ? root : null;
+        } else {
+            treeRoot = null;
+        }
+        return true;
+    }
+
+    private boolean restoreLegacySession(Map<String, Object> payload) {
+        List<String> filePaths = extractSessionFilePaths(payload.get("files"));
+        if (filePaths.isEmpty()) {
+            return false;
+        }
+        String activePath = MiniJson.asString(payload.get("activePath"));
+        Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
+        String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
+
+        specialBufferReturns.clear();
+        treeLineTargets.clear();
+        treeBuffer = null;
+        treePane = null;
+        quickfixBuffer = null;
+        buffers.clear();
+
+        for (String filePath : filePaths) {
+            if (filePath == null || filePath.isBlank()) {
+                continue;
+            }
+            File file = new File(filePath);
+            if (!file.exists() || !file.isFile()) {
+                continue;
+            }
+            try {
+                buffers.add(new FileBuffer(file, configManager));
+            } catch (IOException ignored) {
+            }
+        }
+        if (buffers.isEmpty()) {
+            return false;
+        }
+
+        resetEditorPanesForSession(1, null);
+        FileBuffer primary = buffers.get(0);
+        loadBufferIntoPane(editorPanes.get(0), primary, 0);
+        FileBuffer target = primary;
+        if (activePath != null && !activePath.isBlank()) {
+            FileBuffer maybe = findBufferByPath(new File(activePath));
+            if (maybe != null) {
+                target = maybe;
+            }
+        }
+        loadBufferIntoEditor(target);
+        if (activeCaret != null) {
+            writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
+        }
+        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
+            File root = new File(savedTreeRoot);
+            treeRoot = root.exists() ? root : null;
+        } else {
+            treeRoot = null;
+        }
+        return true;
+    }
+
+    private List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {
+        List<Map<String, Object>> entries = new ArrayList<>();
+        int scratchIndex = 1;
+        for (FileBuffer buffer : buffers) {
+            if (buffer == null) {
+                continue;
+            }
+            String id;
+            if (buffer.hasFilePath()) {
+                id = "file:" + buffer.getFilePath();
+            } else {
+                id = "scratch:" + scratchIndex++;
+            }
+            bufferIds.put(buffer, id);
+
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", id);
+            if (buffer.hasFilePath()) {
+                entry.put("type", "file");
+                entry.put("path", buffer.getFilePath());
+                entry.put("modified", buffer.isModified());
+                if (buffer.isModified()) {
+                    entry.put("content", buffer.getContent());
+                }
+            } else {
+                entry.put("type", "scratch");
+                entry.put("name", buffer.getDisplayName());
+                entry.put("content", buffer.getContent());
+                entry.put("modified", buffer.isModified());
+            }
+            entries.add(entry);
+        }
+        return entries;
+    }
+
+    private List<Map<String, Object>> serializeSessionPanes(Map<FileBuffer, String> bufferIds) {
+        List<Map<String, Object>> panes = new ArrayList<>();
+        for (EditorPane pane : editorPanes) {
+            if (pane == null) {
+                continue;
+            }
+            Map<String, Object> state = new LinkedHashMap<>();
+            String bufferId = bufferIds.get(pane.getBuffer());
+            if (bufferId != null) {
+                state.put("bufferId", bufferId);
+            }
+            state.put("caret", pane.getTextArea().getCaretPosition());
+            panes.add(state);
+        }
+        return panes;
+    }
+
+    private List<FileBuffer> deserializeSessionBuffers(Object bufferObject, Map<String, FileBuffer> idToBuffer) {
+        List<FileBuffer> restored = new ArrayList<>();
+        List<Object> items = MiniJson.asArray(bufferObject);
+        if (items == null) {
+            return restored;
+        }
+        for (Object item : items) {
+            Map<String, Object> entry = MiniJson.asObject(item);
+            if (entry == null) {
+                continue;
+            }
+            String id = MiniJson.asString(entry.get("id"));
+            String type = MiniJson.asString(entry.get("type"));
+            boolean modified = Boolean.TRUE.equals(entry.get("modified"));
+            FileBuffer restoredBuffer = null;
+            try {
+                if ("file".equals(type)) {
+                    String path = MiniJson.asString(entry.get("path"));
+                    if (path == null || path.isBlank()) {
+                        continue;
+                    }
+                    File file = new File(path);
+                    if (file.exists() && file.isFile()) {
+                        restoredBuffer = new FileBuffer(file, configManager);
+                    } else {
+                        String content = MiniJson.asString(entry.get("content"));
+                        if (content != null) {
+                            restoredBuffer = new FileBuffer(path);
+                            restoredBuffer.setContent(content, true);
+                        }
+                    }
+                    if (restoredBuffer != null && modified) {
+                        String content = MiniJson.asString(entry.get("content"));
+                        if (content != null) {
+                            restoredBuffer.setContent(content, true);
+                        } else {
+                            restoredBuffer.setModified(true);
+                        }
+                    }
+                } else if ("scratch".equals(type)) {
+                    String name = MiniJson.asString(entry.get("name"));
+                    String content = MiniJson.asString(entry.get("content"));
+                    restoredBuffer = FileBuffer.createScratch(name == null ? "[scratch]" : name, content == null ? "" : content);
+                    restoredBuffer.setModified(modified);
+                }
+            } catch (IOException ignored) {
+            }
+
+            if (restoredBuffer != null) {
+                restored.add(restoredBuffer);
+                if (id != null && !id.isBlank()) {
+                    idToBuffer.put(id, restoredBuffer);
+                }
+            }
+        }
+        return restored;
+    }
+
+    private Map<String, Object> serializeWindowLayout(WindowLayoutNode node) {
+        if (node == null) {
+            return null;
+        }
+        Map<String, Object> serialized = new LinkedHashMap<>();
+        if (node.isLeaf()) {
+            serialized.put("type", "leaf");
+            serialized.put("paneIndex", editorPanes.indexOf(node.getPane()));
+            return serialized;
+        }
+        serialized.put("type", "split");
+        WindowLayoutNode.Orientation orientation = node.getOrientation();
+        serialized.put("orientation", orientation == WindowLayoutNode.Orientation.HORIZONTAL ? "horizontal" : "vertical");
+        serialized.put("ratio", node.getRatio());
+        serialized.put("first", serializeWindowLayout(node.getFirst()));
+        serialized.put("second", serializeWindowLayout(node.getSecond()));
+        return serialized;
+    }
+
+    private WindowLayoutNode deserializeWindowLayout(Map<String, Object> layout, List<EditorPane> panes) {
+        if (layout == null || panes == null || panes.isEmpty()) {
+            return null;
+        }
+        String type = MiniJson.asString(layout.get("type"));
+        if ("leaf".equals(type)) {
+            Integer paneIndex = MiniJson.asInt(layout.get("paneIndex"));
+            if (paneIndex == null || paneIndex < 0 || paneIndex >= panes.size()) {
+                return WindowLayoutNode.leaf(panes.get(0));
+            }
+            return WindowLayoutNode.leaf(panes.get(paneIndex));
+        }
+        if ("split".equals(type)) {
+            String orientationRaw = MiniJson.asString(layout.get("orientation"));
+            WindowLayoutNode.Orientation orientation = "vertical".equalsIgnoreCase(orientationRaw)
+                ? WindowLayoutNode.Orientation.VERTICAL
+                : WindowLayoutNode.Orientation.HORIZONTAL;
+            double ratio = 0.5;
+            Object ratioObject = layout.get("ratio");
+            if (ratioObject instanceof Number) {
+                ratio = ((Number) ratioObject).doubleValue();
+            }
+            WindowLayoutNode first = deserializeWindowLayout(MiniJson.asObject(layout.get("first")), panes);
+            WindowLayoutNode second = deserializeWindowLayout(MiniJson.asObject(layout.get("second")), panes);
+            if (first == null || second == null) {
+                return null;
+            }
+            return WindowLayoutNode.split(orientation, ratio, first, second);
+        }
+        return null;
+    }
+
+    private void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
+        detachActiveDocumentListener();
+        editorPanes.clear();
+        int totalPanes = Math.max(1, paneCount);
+        Dimension size = getSize();
+        for (int i = 0; i < totalPanes; i++) {
+            editorPanes.add(createEditorPane(size));
+        }
+        activePaneIndex = 0;
+        bindActivePane(editorPanes.get(0));
+        WindowLayoutNode restoredLayout = deserializeWindowLayout(layoutObject, editorPanes);
+        if (restoredLayout == null) {
+            restoredLayout = defaultLayoutForPanes(editorPanes);
+        }
+        windowLayoutRoot = restoredLayout;
+        renderWindowLayout();
+        attachActiveDocumentListener();
+    }
+
+    private WindowLayoutNode defaultLayoutForPanes(List<EditorPane> panes) {
+        if (panes == null || panes.isEmpty()) {
+            return null;
+        }
+        WindowLayoutNode root = WindowLayoutNode.leaf(panes.get(0));
+        EditorPane splitTarget = panes.get(0);
+        for (int i = 1; i < panes.size(); i++) {
+            root.splitLeaf(splitTarget, panes.get(i), WindowLayoutNode.Orientation.HORIZONTAL);
+            splitTarget = panes.get(i);
+        }
+        return root;
     }
 
     private List<String> extractSessionFilePaths(Object filesObject) {
@@ -7184,6 +7736,30 @@ public class Texteditor extends JFrame implements KeyListener {
         private SurroundPair(char open, char close) {
             this.open = open;
             this.close = close;
+        }
+    }
+
+    private static class ResolvedTextEdit {
+        private final int startOffset;
+        private final int endOffset;
+        private final String newText;
+
+        private ResolvedTextEdit(int startOffset, int endOffset, String newText) {
+            this.startOffset = Math.max(0, startOffset);
+            this.endOffset = Math.max(this.startOffset, endOffset);
+            this.newText = newText == null ? "" : newText;
+        }
+    }
+
+    private static class WorkspaceEditApplyResult {
+        private int appliedEditCount;
+        private int touchedFiles;
+        private int failedFiles;
+
+        private WorkspaceEditApplyResult() {
+            this.appliedEditCount = 0;
+            this.touchedFiles = 0;
+            this.failedFiles = 0;
         }
     }
 

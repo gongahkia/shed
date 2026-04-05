@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Stream;
 
 public class TreeService {
@@ -81,18 +82,19 @@ public class TreeService {
         if (target == null || !target.exists()) {
             return 0;
         }
+        int deleted = 0;
         try (Stream<java.nio.file.Path> stream = Files.walk(target.toPath())) {
-            return stream
-                .sorted(Comparator.reverseOrder())
-                .mapToInt(path -> {
-                    try {
-                        Files.deleteIfExists(path);
-                        return 1;
-                    } catch (IOException e) {
-                        return 0;
+            List<java.nio.file.Path> paths = stream.sorted(Comparator.reverseOrder()).toList();
+            for (java.nio.file.Path path : paths) {
+                try {
+                    if (Files.deleteIfExists(path)) {
+                        deleted++;
                     }
-                })
-                .sum();
+                } catch (IOException e) {
+                    throw new IOException("failed to delete " + path + ": " + e.getMessage(), e);
+                }
+            }
         }
+        return deleted;
     }
 }

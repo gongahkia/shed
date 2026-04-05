@@ -1996,6 +1996,9 @@ public class Texteditor extends JFrame implements KeyListener {
         highlightComments(highlighter, text, fileType, masked);
         highlightStrings(highlighter, text, fileType, masked);
         highlightNumbers(highlighter, text, masked);
+        if (fileType == FileType.JAVA) {
+            highlightJavaAnnotations(highlighter, text, masked);
+        }
         highlightKeywords(highlighter, text, syntaxKeywordsFor(fileType), masked);
     }
 
@@ -2010,7 +2013,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private String[] syntaxKeywordsFor(FileType fileType) {
         switch (fileType) {
             case JAVA:
-                return new String[] {"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "native", "new", "null", "package", "private", "protected", "public", "record", "return", "sealed", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "transient", "try", "var", "void", "volatile", "while", "true", "false"};
+                return new String[] {"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "exports", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "module", "native", "new", "non-sealed", "null", "open", "opens", "package", "permits", "private", "protected", "provides", "public", "record", "requires", "return", "sealed", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "to", "transient", "transitive", "true", "try", "uses", "var", "void", "volatile", "when", "while", "with", "yield", "false"};
             case JAVASCRIPT:
             case TYPESCRIPT:
                 return new String[] {"as", "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "from", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "private", "protected", "public", "readonly", "return", "static", "super", "switch", "this", "throw", "true", "try", "type", "typeof", "undefined", "var", "void", "while", "yield"};
@@ -2033,6 +2036,31 @@ public class Texteditor extends JFrame implements KeyListener {
                 return new String[] {"# ", "## ", "### ", "#### ", "##### ", "###### ", "- ", "* ", "> ", "```"};
             default:
                 return new String[0];
+        }
+    }
+
+    private void highlightJavaAnnotations(Highlighter highlighter, String text, boolean[] masked) {
+        int i = 0;
+        while (i < text.length()) {
+            if (masked[i] || text.charAt(i) != '@') {
+                i++;
+                continue;
+            }
+            int start = i;
+            int end = i + 1;
+            while (end < text.length()) {
+                char c = text.charAt(end);
+                if (!isIdentifierChar(c) && c != '.') {
+                    break;
+                }
+                end++;
+            }
+            if (end > start + 1) {
+                addSyntaxHighlight(highlighter, start, end, syntaxKeywordPainter, masked);
+                i = end;
+            } else {
+                i++;
+            }
         }
     }
 
@@ -2126,6 +2154,14 @@ public class Texteditor extends JFrame implements KeyListener {
         while (i < text.length()) {
             if (masked[i]) {
                 i++;
+                continue;
+            }
+
+            if (fileType == FileType.JAVA && matchesAt(text, i, "\"\"\"")) {
+                int closeIndex = text.indexOf("\"\"\"", i + 3);
+                int end = closeIndex < 0 ? text.length() : closeIndex + 3;
+                addSyntaxHighlight(highlighter, i, end, syntaxStringPainter, masked);
+                i = Math.max(i + 1, end);
                 continue;
             }
 

@@ -294,6 +294,17 @@ public class CommandHandler {
         if (option.startsWith("colorscheme ")) {
             return editor.setThemeFromCommand(option.substring("colorscheme ".length()).trim());
         }
+        if (option.startsWith("conceallevel=")) {
+            try {
+                int level = Integer.parseInt(option.substring("conceallevel=".length()).trim());
+                return editor.setConcealLevel(level);
+            } catch (NumberFormatException e) {
+                return "Invalid conceal level";
+            }
+        }
+        if (option.equals("bracketcolor") || option.equals("bracketcolors")) {
+            return editor.toggleBracketColors();
+        }
         int separator = option.indexOf('=');
         if (separator > 0) {
             String key = option.substring(0, separator).trim();

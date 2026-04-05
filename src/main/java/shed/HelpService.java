@@ -50,7 +50,13 @@ public class HelpService {
                    "  :jobcancel id  Cancel async job\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
-                   "  :tree [path]   File tree in scratch buffer\n" +
+                   "  :tree [path]   Toggle/open file tree pane\n" +
+                   "  :tree refresh  Refresh tree pane from root\n" +
+                   "  :tree reveal   Reveal current file in tree root\n" +
+                   "  :tree new p    Create file at path p\n" +
+                   "  :tree mkdir p  Create directory at path p\n" +
+                   "  :tree rename a b Rename path a -> b\n" +
+                   "  :tree rm p     Delete file/empty directory\n" +
                    "  :buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
                    "  :copen         Open quickfix list\n" +
@@ -141,6 +147,9 @@ public class HelpService {
                 return "Help: tree\n\n"
                     + ":tree toggles the left side tree pane open/closed.\n"
                     + ":tree <path> uses a specific root path when opening.\n"
+                    + ":tree refresh reloads the current tree root.\n"
+                    + ":tree reveal sets tree root to the current file's directory.\n"
+                    + ":tree new/mkdir/rename/rm perform file operations from command mode.\n"
                     + "Use j/k to move and Enter or o to open the file in the other pane.\n";
             case "keybind":
             case "keybinding":

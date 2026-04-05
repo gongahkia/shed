@@ -6075,6 +6075,18 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Git error: " + message;
     }
 
+    public String showCommandPalette() {
+        List<String> commands = commandHandler.getCommandNames();
+        List<String> candidates = new ArrayList<>();
+        for (String cmd : commands) {
+            candidates.add(":" + cmd);
+        }
+        String selected = showPaletteDialog("Command Palette", candidates);
+        if (selected == null || selected.isEmpty()) return "Command palette cancelled";
+        String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
+        return commandHandler.execute(cmd);
+    }
+
     public String showBufferFinder() {
         List<String> candidates = new ArrayList<>();
         for (int i = 0; i < buffers.size(); i++) {

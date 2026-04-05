@@ -144,6 +144,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
     private int concealLevel; // 0=show all, 1=conceal some, 2=full conceal
     private List<Object> bracketHighlightTags;
+    private final List<Object> matchBracketTags = new ArrayList<>();
     private List<Object> markdownHighlightTags;
     private boolean bracketColorEnabled;
 
@@ -361,6 +362,7 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             ensureCaretVisible(textArea);
             updateCurrentLineHighlight();
+            updateMatchingBracketHighlight();
             if (lineNumberPanel != null) {
                 lineNumberPanel.repaint();
             }
@@ -2976,6 +2978,64 @@ public class Texteditor extends JFrame implements KeyListener {
             currentLineHighlightTag = highlighter.addHighlight(start, end, currentLinePainter);
         } catch (BadLocationException ignored) {
         }
+    }
+
+    private void updateMatchingBracketHighlight() {
+        Highlighter highlighter = writingArea.getHighlighter();
+        for (Object tag : matchBracketTags) {
+            highlighter.removeHighlight(tag);
+        }
+        matchBracketTags.clear();
+
+        try {
+            String text = writingArea.getText();
+            int caret = writingArea.getCaretPosition();
+            if (text.isEmpty()) return;
+
+            // Check char at caret and before caret
+            int bracketPos = -1;
+            if (caret < text.length() && isBracketChar(text.charAt(caret))) {
+                bracketPos = caret;
+            } else if (caret > 0 && isBracketChar(text.charAt(caret - 1))) {
+                bracketPos = caret - 1;
+            }
+            if (bracketPos < 0) return;
+
+            char bracket = text.charAt(bracketPos);
+            int matchPos = findMatchingBracketPos(text, bracketPos, bracket);
+            if (matchPos < 0) return;
+
+            Highlighter.HighlightPainter matchPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x44FFFFFF, true));
+            matchBracketTags.add(highlighter.addHighlight(bracketPos, bracketPos + 1, matchPainter));
+            matchBracketTags.add(highlighter.addHighlight(matchPos, matchPos + 1, matchPainter));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private boolean isBracketChar(char c) {
+        return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+    }
+
+    private int findMatchingBracketPos(String text, int pos, char bracket) {
+        char match;
+        int direction;
+        switch (bracket) {
+            case '(': match = ')'; direction = 1; break;
+            case ')': match = '('; direction = -1; break;
+            case '[': match = ']'; direction = 1; break;
+            case ']': match = '['; direction = -1; break;
+            case '{': match = '}'; direction = 1; break;
+            case '}': match = '{'; direction = -1; break;
+            default: return -1;
+        }
+        int depth = 0;
+        for (int i = pos; i >= 0 && i < text.length(); i += direction) {
+            char c = text.charAt(i);
+            if (c == bracket) depth++;
+            else if (c == match) depth--;
+            if (depth == 0) return i;
+        }
+        return -1;
     }
 
     private void refreshLineNumberPanel() {

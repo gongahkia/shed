@@ -60,6 +60,10 @@ public class WindowLayoutNode {
         return orientation;
     }
 
+    public double getRatio() {
+        return ratio;
+    }
+
     public Component render() {
         if (isLeaf()) {
             return pane.getScrollPane();

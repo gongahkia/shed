@@ -8319,7 +8319,6 @@ public class Texteditor extends JFrame implements KeyListener {
             updateCurrentLineHighlight();
             applySyntaxHighlighting();
             refreshLineNumberPanel();
-            maybePreviewMarkdown(buffer);
             syncLspOpen(buffer);
             updateStatusBar();
         } else {

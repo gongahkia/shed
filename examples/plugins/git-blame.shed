@@ -1,0 +1,4 @@
+# @name git-blame
+# @description show git blame for current line
+# @command git-blame=!git blame -L %line,%line %file
+# @bind normal gb=:git-blame

@@ -110,6 +110,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<String, LspClient> lspClients;
     private Map<String, Integer> lspDocumentVersions;
     private Map<String, String> lspErrors;
+    private EditorPane treePane;
+    private FileBuffer treeBuffer;
+    private Map<FileBuffer, List<String>> treeLineTargets;
 
     // Visual mode state
     private int visualStartPos;
@@ -175,6 +178,9 @@ public class Texteditor extends JFrame implements KeyListener {
         lspClients = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
+        treePane = null;
+        treeBuffer = null;
+        treeLineTargets = new HashMap<>();
         loadRecentFiles();
         lastMessage = "";
 
@@ -526,6 +532,12 @@ public class Texteditor extends JFrame implements KeyListener {
 
         if (!pendingCount.isEmpty() && !supportsCountPrefix(e)) {
             pendingCount = "";
+        }
+
+        if (isTreePaneActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
+            pendingCount = "";
+            showMessage(openTreeSelection());
+            return;
         }
 
         // Mode switches
@@ -2925,41 +2937,56 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         StringBuilder builder = new StringBuilder();
-        builder.append("File tree\n\n");
-        builder.append(root.getAbsolutePath()).append("\n");
+        List<String> lineTargets = new ArrayList<>();
+        appendTreeLine(builder, lineTargets, "File tree", null);
+        appendTreeLine(builder, lineTargets, "", null);
+        appendTreeLine(builder, lineTargets, root.getAbsolutePath(), root.isFile() ? root.getAbsolutePath() : null);
         int[] rendered = new int[] {0};
         if (root.isDirectory()) {
             File[] children = listTreeChildren(root);
             if (children.length == 0) {
-                builder.append("(empty)\n");
+                appendTreeLine(builder, lineTargets, "(empty)", null);
             } else {
                 for (int i = 0; i < children.length; i++) {
-                    appendTreeEntry(builder, children[i], "", i == children.length - 1, rendered, 1200);
+                    appendTreeEntry(builder, lineTargets, children[i], "", i == children.length - 1, rendered, 1200);
                 }
             }
         } else {
-            builder.append("\\-- ").append(root.getName()).append("\n");
+            appendTreeLine(builder, lineTargets, "\\-- " + root.getName(), root.getAbsolutePath());
         }
 
         if (rendered[0] >= 1200) {
-            builder.append("\n... output truncated (1200 entries)");
+            appendTreeLine(builder, lineTargets, "", null);
+            appendTreeLine(builder, lineTargets, "... output truncated (1200 entries)", null);
         }
 
-        String titleSuffix = root.getName().isEmpty() ? root.getAbsolutePath() : root.getName();
-        showScratchBuffer("[tree " + titleSuffix + "]", builder.toString());
-        return "Showing file tree";
+        String titleSuffix = treeTitleSuffix(root);
+        FileBuffer tree = createOrReplaceTreeBuffer(titleSuffix, builder.toString(), lineTargets);
+        EditorPane contentPane = resolveTreeContentPaneForTreeCommand();
+        if (contentPane == null) {
+            return "No active window";
+        }
+        EditorPane pane = ensureTreePane(contentPane);
+        if (pane == null) {
+            return "Unable to open tree pane";
+        }
+        loadBufferIntoPane(pane, tree, 0);
+        activateEditorPane(pane);
+        pane.getTextArea().requestFocusInWindow();
+        return "Tree pane opened";
     }
 
-    private void appendTreeEntry(StringBuilder builder, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
+    private void appendTreeEntry(StringBuilder builder, List<String> lineTargets, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
         if (rendered[0] >= maxEntries) {
             return;
         }
-        builder.append(prefix).append(last ? "\\-- " : "|-- ");
-        builder.append(entry.getName());
+        StringBuilder lineBuilder = new StringBuilder();
+        lineBuilder.append(prefix).append(last ? "\\-- " : "|-- ");
+        lineBuilder.append(entry.getName());
         if (entry.isDirectory()) {
-            builder.append("/");
+            lineBuilder.append("/");
         }
-        builder.append("\n");
+        appendTreeLine(builder, lineTargets, lineBuilder.toString(), entry.isFile() ? entry.getAbsolutePath() : null);
         rendered[0]++;
 
         if (!entry.isDirectory()) {
@@ -2969,11 +2996,16 @@ public class Texteditor extends JFrame implements KeyListener {
         File[] children = listTreeChildren(entry);
         String childPrefix = prefix + (last ? "    " : "|   ");
         for (int i = 0; i < children.length; i++) {
-            appendTreeEntry(builder, children[i], childPrefix, i == children.length - 1, rendered, maxEntries);
+            appendTreeEntry(builder, lineTargets, children[i], childPrefix, i == children.length - 1, rendered, maxEntries);
             if (rendered[0] >= maxEntries) {
                 return;
             }
         }
+    }
+
+    private void appendTreeLine(StringBuilder builder, List<String> lineTargets, String text, String targetPath) {
+        builder.append(text).append("\n");
+        lineTargets.add(targetPath);
     }
 
     private File[] listTreeChildren(File directory) {
@@ -2988,6 +3020,141 @@ public class Texteditor extends JFrame implements KeyListener {
             return left.getName().compareToIgnoreCase(right.getName());
         });
         return children;
+    }
+
+    private String treeTitleSuffix(File root) {
+        String name = root.getName();
+        if (name == null || name.isEmpty()) {
+            return root.getAbsolutePath();
+        }
+        return name;
+    }
+
+    private FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
+        FileBuffer replacement = FileBuffer.createScratch("[tree " + titleSuffix + "]", content);
+        if (treeBuffer != null) {
+            int index = buffers.indexOf(treeBuffer);
+            if (index >= 0) {
+                buffers.set(index, replacement);
+            } else {
+                buffers.add(replacement);
+            }
+            treeLineTargets.remove(treeBuffer);
+        } else {
+            buffers.add(replacement);
+        }
+        treeBuffer = replacement;
+        treeLineTargets.put(replacement, lineTargets);
+        return replacement;
+    }
+
+    private EditorPane resolveTreeContentPaneForTreeCommand() {
+        EditorPane active = getActivePane();
+        if (treePane != null && editorPanes.contains(treePane)) {
+            if (active != null && active != treePane) {
+                return active;
+            }
+            for (EditorPane pane : editorPanes) {
+                if (pane != treePane) {
+                    return pane;
+                }
+            }
+        }
+        return active;
+    }
+
+    private EditorPane ensureTreePane(EditorPane contentPane) {
+        if (treePane != null && editorPanes.contains(treePane)) {
+            return treePane;
+        }
+        if (contentPane == null) {
+            return null;
+        }
+
+        Dimension size = getSize();
+        EditorPane newPane = createEditorPane(size);
+        editorPanes.add(newPane);
+        if (windowLayoutRoot == null) {
+            windowLayoutRoot = WindowLayoutNode.leaf(contentPane);
+        }
+        boolean split = windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, 0.24);
+        if (!split) {
+            windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL);
+        }
+        renderWindowLayout();
+        treePane = newPane;
+        return newPane;
+    }
+
+    private boolean isTreePaneActive() {
+        EditorPane active = getActivePane();
+        return active != null && active == treePane && isTreeBuffer(getCurrentBuffer());
+    }
+
+    private boolean isTreeBuffer(FileBuffer buffer) {
+        return buffer != null && treeLineTargets.containsKey(buffer);
+    }
+
+    private String openTreeSelection() {
+        FileBuffer current = getCurrentBuffer();
+        if (!isTreeBuffer(current)) {
+            return "Tree pane not active";
+        }
+
+        List<String> targets = treeLineTargets.get(current);
+        if (targets == null || targets.isEmpty()) {
+            return "No file on this line";
+        }
+
+        int line = getCurrentCaretLine();
+        if (line < 0 || line >= targets.size()) {
+            return "No file on this line";
+        }
+        String path = targets.get(line);
+        if (path == null || path.isBlank()) {
+            return "No file on this line";
+        }
+
+        File file = new File(path);
+        if (!file.exists() || !file.isFile()) {
+            return "File not found: " + path;
+        }
+
+        EditorPane contentPane = resolveTreeContentPaneForOpen();
+        if (contentPane == null) {
+            return "No content pane available";
+        }
+
+        try {
+            FileBuffer existing = findBufferByPath(file);
+            FileBuffer targetBuffer = existing != null ? existing : new FileBuffer(file, configManager);
+            if (existing == null) {
+                if (shouldReplaceSingleLandingBuffer()) {
+                    buffers.set(0, targetBuffer);
+                } else {
+                    buffers.add(targetBuffer);
+                }
+            }
+
+            loadBufferIntoPane(contentPane, targetBuffer, 0);
+            activateEditorPane(contentPane);
+            contentPane.getTextArea().requestFocusInWindow();
+            addToRecentFiles(file.getAbsolutePath());
+            return "Opened: " + file.getAbsolutePath();
+        } catch (IOException e) {
+            return "Error opening file: " + e.getMessage();
+        }
+    }
+
+    private EditorPane resolveTreeContentPaneForOpen() {
+        if (treePane != null && editorPanes.contains(treePane)) {
+            for (EditorPane pane : editorPanes) {
+                if (pane != treePane) {
+                    return pane;
+                }
+            }
+        }
+        return getActivePane();
     }
 
     public String handleGitCommand(String argument) {

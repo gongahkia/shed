@@ -71,6 +71,10 @@ public class WindowLayoutNode {
     }
 
     public boolean splitLeaf(EditorPane target, EditorPane newPane, Orientation newOrientation) {
+        return splitLeaf(target, newPane, newOrientation, false, 0.5);
+    }
+
+    public boolean splitLeaf(EditorPane target, EditorPane newPane, Orientation newOrientation, boolean newPaneFirst, double newRatio) {
         if (isLeaf()) {
             if (pane != target) {
                 return false;
@@ -78,14 +82,19 @@ public class WindowLayoutNode {
             EditorPane originalPane = pane;
             pane = null;
             orientation = newOrientation;
-            ratio = 0.5;
-            first = WindowLayoutNode.leaf(originalPane);
-            second = WindowLayoutNode.leaf(newPane);
+            ratio = Math.max(0.05, Math.min(0.95, newRatio));
+            if (newPaneFirst) {
+                first = WindowLayoutNode.leaf(newPane);
+                second = WindowLayoutNode.leaf(originalPane);
+            } else {
+                first = WindowLayoutNode.leaf(originalPane);
+                second = WindowLayoutNode.leaf(newPane);
+            }
             return true;
         }
 
-        return (first != null && first.splitLeaf(target, newPane, newOrientation))
-            || (second != null && second.splitLeaf(target, newPane, newOrientation));
+        return (first != null && first.splitLeaf(target, newPane, newOrientation, newPaneFirst, newRatio))
+            || (second != null && second.splitLeaf(target, newPane, newOrientation, newPaneFirst, newRatio));
     }
 
     public WindowLayoutNode removeLeaf(EditorPane target) {

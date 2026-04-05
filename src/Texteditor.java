@@ -2165,7 +2165,7 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("grep");
         knownCommands.add("registers");
         knownCommands.add("marks");
-        knownCommands.add("goyo");
+        knownCommands.add("zen");
         knownCommands.add("normal");
         knownCommands.add("reload");
         knownCommands.add("source");
@@ -5735,7 +5735,7 @@ public class Texteditor extends JFrame implements KeyListener {
                    "  :registers     Show registers\n" +
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
-                   "  :goyo          Toggle zen mode\n" +
+                   "  :zen           Toggle zen mode\n" +
                    "  :reload        Reload ~/.shedrc now\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command\n" +

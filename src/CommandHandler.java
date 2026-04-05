@@ -144,7 +144,6 @@ public class CommandHandler {
                     return editor.showMarks();
                 case "themes":
                     return editor.showThemes();
-                case "goyo":
                 case "zen":
                     return editor.toggleZenMode();
                 case "normal":

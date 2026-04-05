@@ -6096,11 +6096,16 @@ public class Texteditor extends JFrame implements KeyListener {
             public void changedUpdate(DocumentEvent e) { refilter(); }
 
             private void refilter() {
-                String query = filterField.getText().toLowerCase();
+                String query = filterField.getText();
                 model.clear();
-                for (String candidate : candidates) {
-                    if (query.isEmpty() || candidate.toLowerCase().contains(query)) {
+                if (query.isEmpty()) {
+                    for (String candidate : candidates) {
                         model.addElement(candidate);
+                    }
+                } else {
+                    List<String> matches = fuzzyMatchService.matchStrings(query, candidates, 0);
+                    for (String match : matches) {
+                        model.addElement(match);
                     }
                 }
                 if (!model.isEmpty()) {
@@ -6122,6 +6127,22 @@ public class Texteditor extends JFrame implements KeyListener {
         filterField.addActionListener(e -> {
             selection[0] = list.getSelectedValue();
             dialog.dispose();
+        });
+        filterField.addKeyListener(new java.awt.event.KeyAdapter() {
+            @Override
+            public void keyPressed(java.awt.event.KeyEvent e) {
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
+                    dialog.dispose();
+                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) {
+                    int idx = list.getSelectedIndex();
+                    if (idx < model.getSize() - 1) list.setSelectedIndex(idx + 1);
+                    e.consume();
+                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) {
+                    int idx = list.getSelectedIndex();
+                    if (idx > 0) list.setSelectedIndex(idx - 1);
+                    e.consume();
+                }
+            }
         });
 
         dialog.add(filterField, BorderLayout.NORTH);

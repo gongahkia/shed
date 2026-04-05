@@ -99,6 +99,11 @@ public class CommandHandler {
                 case "log":
                 case "commandlog":
                     return editor.openCommandLogBuffer();
+                case "tree":
+                    return editor.showFileTree(args);
+                case "git":
+                case "Git":
+                    return editor.handleGitCommand(args);
                 case "help":
                 case "h":
                     editor.showHelp(args);
@@ -114,6 +119,10 @@ public class CommandHandler {
                 case "Files":
                 case "files":
                     return editor.showFileFinder();
+                case "folder":
+                case "folders":
+                case "Folder":
+                    return editor.showFolderFinder();
                 case "Buffers":
                 case "buf":
                     return editor.showBufferFinder();

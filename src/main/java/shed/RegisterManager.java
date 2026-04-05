@@ -14,6 +14,7 @@ public class RegisterManager {
     private RegisterContent unnamedRegister;
     private RegisterContent lastYankRegister;
     private RegisterContent lastDeleteRegister;
+    private final RegisterContent[] numberedRegisters;
     private String currentFilename;
     private String lastCommand;
     private String lastInserted;
@@ -24,6 +25,7 @@ public class RegisterManager {
         this.unnamedRegister = RegisterContent.characterWise("");
         this.lastYankRegister = RegisterContent.characterWise("");
         this.lastDeleteRegister = RegisterContent.characterWise("");
+        this.numberedRegisters = new RegisterContent[9];
         this.currentFilename = "";
         this.lastCommand = "";
         this.lastInserted = "";
@@ -43,6 +45,11 @@ public class RegisterManager {
             return;
         }
         lastDeleteRegister = content;
+        // Shift numbered registers: "1→"2→...→"9, new delete into "1
+        if (content.isLineWise()) {
+            System.arraycopy(numberedRegisters, 0, numberedRegisters, 1, 8);
+            numberedRegisters[0] = content;
+        }
         set(register, content);
     }
 
@@ -64,6 +71,9 @@ public class RegisterManager {
             case '+':
             case '*':
                 return RegisterContent.characterWise(readSystemClipboard());
+            case '1': case '2': case '3': case '4': case '5':
+            case '6': case '7': case '8': case '9':
+                return numberedRegisters[register - '1'];
             default:
                 return namedRegisters.get(register);
         }
@@ -89,6 +99,9 @@ public class RegisterManager {
         List<String> lines = new ArrayList<>();
         appendLine(lines, '"', unnamedRegister);
         appendLine(lines, '0', lastYankRegister);
+        for (int i = 0; i < 9; i++) {
+            appendLine(lines, (char) ('1' + i), numberedRegisters[i]);
+        }
         appendLine(lines, '%', RegisterContent.characterWise(currentFilename));
         appendLine(lines, ':', RegisterContent.characterWise(lastCommand));
         appendLine(lines, '.', RegisterContent.characterWise(lastInserted));

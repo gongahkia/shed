@@ -6,7 +6,9 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
 import java.awt.Rectangle;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import javax.swing.JPanel;
 import javax.swing.JTextArea;
@@ -22,15 +24,29 @@ class LineNumberPanel extends JPanel {
     private Set<Integer> addedLines = new HashSet<>();
     private Set<Integer> modifiedLines = new HashSet<>();
     private Set<Integer> deletedAfterLines = new HashSet<>();
+    private Map<Integer, Integer> diagnosticSeverityByLine = new HashMap<>(); // line -> min severity (1=error, 2=warn, 3=info, 4=hint)
+    private Set<Integer> gitAddedLines = new HashSet<>();
+    private Set<Integer> gitModifiedLines = new HashSet<>();
+    private Set<Integer> gitDeletedAfterLines = new HashSet<>();
 
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
-        setPreferredSize(new Dimension(40, Integer.MAX_VALUE));
+        setPreferredSize(new Dimension(50, Integer.MAX_VALUE));
         setBackground(Color.decode("#161B22"));
         this.lineNumberColor = Color.decode("#8B949E");
         this.currentLineNumberColor = Color.decode("#FAF9F6");
         this.mode = LineNumberMode.ABSOLUTE;
         this.highlightCurrentLine = true;
+    }
+    public void updatePreferredWidth() {
+        FontMetrics fm = getFontMetrics(getFont() != null ? getFont() : textArea.getFont());
+        int digits = Math.max(3, String.valueOf(textArea.getLineCount()).length());
+        int charW = fm.charWidth('0');
+        int newWidth = 12 + (digits * charW) + 12; // margins + gutter markers
+        if (getPreferredSize().width != newWidth) {
+            setPreferredSize(new Dimension(newWidth, Integer.MAX_VALUE));
+            revalidate();
+        }
     }
 
     public void setMode(LineNumberMode mode) {
@@ -56,7 +72,7 @@ class LineNumberPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-
+        updatePreferredWidth();
         g.setColor(lineNumberColor);
         g.setFont(textArea.getFont());
 
@@ -101,6 +117,33 @@ class LineNumberPanel extends JPanel {
                     g.setColor(new Color(0xF85149));
                     g.fillRect(markerX, p.y + lineH - 2, markerW + 2, 2);
                 }
+                // git gutter (right of diff gutter)
+                int gitX = markerX + markerW + 1;
+                if (gitAddedLines.contains(i)) {
+                    g.setColor(new Color(0x3FB950));
+                    g.fillRect(gitX, p.y, 2, lineH);
+                } else if (gitModifiedLines.contains(i)) {
+                    g.setColor(new Color(0x58A6FF));
+                    g.fillRect(gitX, p.y, 2, lineH);
+                } else if (gitDeletedAfterLines.contains(i)) {
+                    g.setColor(new Color(0xF85149));
+                    g.fillRect(gitX, p.y + lineH - 2, 4, 2);
+                }
+                // diagnostic severity icon
+                Integer severity = diagnosticSeverityByLine.get(i);
+                if (severity != null) {
+                    Color dc;
+                    switch (severity) {
+                        case 1: dc = new Color(0xFF, 0x44, 0x44); break;
+                        case 2: dc = new Color(0xFF, 0xCC, 0x00); break;
+                        case 3: dc = new Color(0x55, 0x99, 0xFF); break;
+                        default: dc = new Color(0x99, 0x99, 0x99); break;
+                    }
+                    g.setColor(dc);
+                    int dotSize = Math.max(4, lineH / 3);
+                    int dotY = p.y + (lineH - dotSize) / 2;
+                    g.fillOval(getWidth() - dotSize - 2, dotY, dotSize, dotSize);
+                }
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
@@ -126,6 +169,22 @@ class LineNumberPanel extends JPanel {
                 modifiedLines.add(i);
             }
         }
+        repaint();
+    }
+
+    public void updateDiagnosticMarkers(Map<Integer, Integer> severityByLine) {
+        diagnosticSeverityByLine.clear();
+        if (severityByLine != null) diagnosticSeverityByLine.putAll(severityByLine);
+        repaint();
+    }
+
+    public void updateGitDiffMarkers(Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
+        gitAddedLines.clear();
+        gitModifiedLines.clear();
+        gitDeletedAfterLines.clear();
+        if (added != null) gitAddedLines.addAll(added);
+        if (modified != null) gitModifiedLines.addAll(modified);
+        if (deletedAfter != null) gitDeletedAfterLines.addAll(deletedAfter);
         repaint();
     }
 

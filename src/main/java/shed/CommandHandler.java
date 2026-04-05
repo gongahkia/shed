@@ -7,7 +7,10 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -147,6 +150,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
         registerCommand((args, range, force) -> editor.clearSearchHighlights(), "noh", "nohlsearch");
+        registerCommand((args, range, force) -> editor.showCommandPalette(), "palette", "commands");
         registerCommand((args, range, force) -> editor.writeAll(), "wa", "wall");
         registerCommand((args, range, force) -> editor.quitAll(force), "qa", "qall");
         registerCommand((args, range, force) -> { String r = editor.writeAll(); if (r.startsWith("Error")) return r; return editor.quitAll(force); }, "wqa", "wqall", "xa", "xall");
@@ -170,6 +174,12 @@ public class CommandHandler {
                 commandRegistry.put(name, action);
             }
         }
+    }
+
+    public List<String> getCommandNames() {
+        List<String> names = new ArrayList<>(commandRegistry.keySet());
+        Collections.sort(names);
+        return names;
     }
 
     private String handleWrite(String targetPath) {

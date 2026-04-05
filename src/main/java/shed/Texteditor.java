@@ -3132,6 +3132,9 @@ public class Texteditor extends JFrame implements KeyListener {
             highlightJavaAnnotations(highlighter, text, masked);
         }
         highlightKeywords(highlighter, text, syntaxKeywordsFor(fileType), masked);
+        if (configManager.getShowWhitespace()) {
+            highlightTrailingWhitespace(highlighter, text);
+        }
         applyBracketHighlighting();
     }
 
@@ -3310,6 +3313,25 @@ public class Texteditor extends JFrame implements KeyListener {
             }
             addSyntaxHighlight(highlighter, i, Math.max(i + 1, end), syntaxStringPainter, masked);
             i = Math.max(i + 1, end);
+        }
+    }
+
+    private void highlightTrailingWhitespace(Highlighter highlighter, String text) {
+        Highlighter.HighlightPainter trailingPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
+        int lineStart = 0;
+        for (int i = 0; i <= text.length(); i++) {
+            if (i == text.length() || text.charAt(i) == '\n') {
+                int trailStart = i;
+                while (trailStart > lineStart && (text.charAt(trailStart - 1) == ' ' || text.charAt(trailStart - 1) == '\t')) {
+                    trailStart--;
+                }
+                if (trailStart < i) {
+                    try {
+                        syntaxHighlightTags.add(highlighter.addHighlight(trailStart, i, trailingPainter));
+                    } catch (BadLocationException ignored) {}
+                }
+                lineStart = i + 1;
+            }
         }
     }
 
@@ -8518,6 +8540,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void setAutoIndent(boolean enabled) {
         configManager.set("auto.indent", String.valueOf(enabled));
+    }
+
+    public void setWrap(boolean enabled) {
+        writingArea.setLineWrap(enabled);
+        writingArea.setWrapStyleWord(enabled);
     }
 
     public void setExpandTab(boolean enabled) {

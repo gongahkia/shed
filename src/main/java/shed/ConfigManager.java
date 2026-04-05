@@ -408,6 +408,10 @@ public class ConfigManager {
         return getInt("ruler.column", 0);
     }
 
+    public boolean getShowWhitespace() {
+        return getBoolean("list", false);
+    }
+
     public boolean getSessionRestoreOnStart() {
         return getBoolean("session.restore.on.start", DEFAULT_SESSION_RESTORE_ON_START);
     }

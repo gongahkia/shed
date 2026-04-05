@@ -251,6 +251,22 @@ public class CommandHandler {
             editor.setLineNumberMode(LineNumberMode.ABSOLUTE);
             return "Relative line numbers disabled";
         }
+        if (option.equals("list")) {
+            editor.setConfigOption("list", "true");
+            return "Whitespace visualization enabled";
+        }
+        if (option.equals("nolist")) {
+            editor.setConfigOption("list", "false");
+            return "Whitespace visualization disabled";
+        }
+        if (option.equals("wrap")) {
+            editor.setWrap(true);
+            return "Line wrapping enabled";
+        }
+        if (option.equals("nowrap")) {
+            editor.setWrap(false);
+            return "Line wrapping disabled";
+        }
         if (option.equals("hls") || option.equals("hlsearch")) {
             editor.setHighlightSearch(true);
             return "Search highlighting enabled";

@@ -37,9 +37,11 @@ import java.util.Comparator;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.TimeUnit;
@@ -147,6 +149,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private SnippetService snippetService;
     private BracketColorService bracketColorService;
     private FileWatcherService fileWatcherService;
+    private SubstituteService substituteService;
+    private List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
+    private javax.swing.Timer diagnosticRefreshTimer;
     private Map<Integer, Boolean> foldedLines; // headingLine -> folded
     private String foldedContent; // stores hidden content per fold
     private Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
@@ -238,6 +243,7 @@ public class Texteditor extends JFrame implements KeyListener {
         snippetService = new SnippetService();
         bracketColorService = new BracketColorService();
         fileWatcherService = new FileWatcherService();
+        substituteService = new SubstituteService();
         foldedLines = new HashMap<>();
         foldHiddenContent = new HashMap<>();
         concealLevel = 0;
@@ -393,6 +399,10 @@ public class Texteditor extends JFrame implements KeyListener {
                     } catch (Exception ignored) {}
                 }
                 paintSyntaxForegroundOverlay(g, this);
+                paintDiagnosticOverlay(g, this);
+                paintVisualBlockOverlay(g, this);
+                if (getLineWrap()) paintWrapIndicators(g, this);
+                paintColorPreviews(g, this);
             }
         };
         textArea.addKeyListener(this);
@@ -416,7 +426,6 @@ public class Texteditor extends JFrame implements KeyListener {
         if (lineNumberMode != LineNumberMode.NONE) {
             paneScrollPane.setRowHeaderView(paneLineNumberPanel);
         }
-
         SearchManager paneSearchManager = new SearchManager(textArea);
         final EditorPane[] paneRef = new EditorPane[1];
         textArea.addCaretListener(e -> {
@@ -429,6 +438,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (lineNumberPanel != null) {
                 lineNumberPanel.repaint();
             }
+            dismissCompletionPopup();
             updateStatusBar();
         });
         textArea.addFocusListener(new java.awt.event.FocusAdapter() {
@@ -1225,7 +1235,11 @@ public class Texteditor extends JFrame implements KeyListener {
                 jumpForward();
             } else if (c == 'd' || code == KeyEvent.VK_D) {
                 editorState.pendingCount = "";
-                scrollHalfPageDown();
+                if (e.isShiftDown()) {
+                    addCursorAtNextMatch();
+                } else {
+                    scrollHalfPageDown();
+                }
             } else if (c == 'u' || code == KeyEvent.VK_U) {
                 editorState.pendingCount = "";
                 scrollHalfPageUp();
@@ -1244,6 +1258,10 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (c == 'g' || code == KeyEvent.VK_G) {
                 editorState.pendingCount = "";
                 showMessage(showFileInfo());
+            } else if (c == 'v' || code == KeyEvent.VK_V) {
+                editorState.pendingCount = "";
+                enterVisualBlockMode();
+                return;
             }
         }
 
@@ -1260,6 +1278,16 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
 
+        // Alt combinations for multi-cursor
+        else if (e.isAltDown()) {
+            if (code == KeyEvent.VK_J) {
+                if (e.isShiftDown()) addCursorAbove();
+                else addCursorBelow();
+            } else if (code == KeyEvent.VK_K) {
+                if (e.isShiftDown()) addCursorBelow();
+                else addCursorAbove();
+            }
+        }
         // Escape (no-op in normal mode, but clear any messages)
         else if (code == KeyEvent.VK_ESCAPE) {
             editorState.pendingCount = "";
@@ -1339,6 +1367,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 } else {
                     showMessage(gotoLine(Integer.parseInt(editorState.pendingCount)));
                 }
+            } else if (c == 'q') {
+                showMessage(formatParagraph());
+            } else if (c == 'j') {
+                moveDisplayLineDown();
+            } else if (c == 'k') {
+                moveDisplayLineUp();
             } else if (c == 'e') {
                 repeatAction(consumePendingCount(), this::moveWordEndBackward);
             } else if (c == 'E') {
@@ -1616,6 +1650,18 @@ public class Texteditor extends JFrame implements KeyListener {
                 case '=':
                     showMessage(equalizeWindows());
                     break;
+                case '+':
+                    showMessage(resizeActiveWindow(0.05));
+                    break;
+                case '-':
+                    showMessage(resizeActiveWindow(-0.05));
+                    break;
+                case '>':
+                    showMessage(resizeActiveWindow(0.05));
+                    break;
+                case '<':
+                    showMessage(resizeActiveWindow(-0.05));
+                    break;
                 default:
                     break;
             }
@@ -1679,8 +1725,19 @@ public class Texteditor extends JFrame implements KeyListener {
     // Insert mode key handling
     void handleInsertMode(KeyEvent e) {
         int code = e.getKeyCode();
-
+        if (isCompletionPopupVisible()) {
+            if (code == KeyEvent.VK_DOWN || (e.isControlDown() && code == KeyEvent.VK_N)) {
+                completionPopupNavigate(1); e.consume(); return;
+            } else if (code == KeyEvent.VK_UP || (e.isControlDown() && code == KeyEvent.VK_P)) {
+                completionPopupNavigate(-1); e.consume(); return;
+            } else if (code == KeyEvent.VK_TAB || code == KeyEvent.VK_ENTER) {
+                completionPopupAccept(); e.consume(); return;
+            } else if (code == KeyEvent.VK_ESCAPE) {
+                dismissCompletionPopup(); e.consume(); return;
+            }
+        }
         if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
+            dismissCompletionPopup();
             registerManager.updateLastInserted(lastInsertedText);
             setMode(EditorMode.NORMAL);
             // Move cursor back one position (Vim behavior)
@@ -1691,6 +1748,21 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
 
+        if (code == KeyEvent.VK_BACK_SPACE && !extraCursors.isEmpty()) {
+            applyMultiCursorBackspace();
+        }
+        if (code == KeyEvent.VK_BACK_SPACE && configManager.getAutoPairs()) {
+            String text = writingArea.getText();
+            int pos = writingArea.getCaretPosition();
+            if (pos > 0 && pos < text.length()) {
+                char before = text.charAt(pos - 1);
+                char after = text.charAt(pos);
+                Character expected = autoPairCloser(before);
+                if (expected != null && expected == after) {
+                    writingArea.replaceRange("", pos, pos + 1); // delete closing char
+                }
+            }
+        }
         if (e.isControlDown()) {
             if (code == KeyEvent.VK_W || e.getKeyChar() == 'w') {
                 // Ctrl+w: delete word backward
@@ -1747,6 +1819,29 @@ public class Texteditor extends JFrame implements KeyListener {
                     lastInsertedText += "\n" + indent;
                 }
             } else if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
+                if (configManager.getAutoPairs()) {
+                    Character closer = autoPairCloser(c);
+                    if (closer != null) {
+                        // auto-insert closing pair after the char is processed
+                        final char cl = closer;
+                        SwingUtilities.invokeLater(() -> {
+                            int p = writingArea.getCaretPosition();
+                            writingArea.insert(String.valueOf(cl), p);
+                            writingArea.setCaretPosition(p);
+                        });
+                    } else if (isClosingPairChar(c)) {
+                        // skip over if next char matches
+                        String text = writingArea.getText();
+                        int p = writingArea.getCaretPosition();
+                        if (p < text.length() && text.charAt(p) == c) {
+                            writingArea.setCaretPosition(p + 1);
+                            suppressNextTypedChar = true;
+                            e.consume();
+                            lastInsertedText += c;
+                            return;
+                        }
+                    }
+                }
                 lastInsertedText += c;
                 applyMultiCursorInsert(c);
             }
@@ -1806,7 +1901,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Update selection
         int newPos = writingArea.getCaretPosition();
-        if (lineMode) {
+        boolean blockMode = editorState.mode == EditorMode.VISUAL_BLOCK;
+        if (blockMode) {
+            // block selection is virtual; don't use JTextArea selection
+            writingArea.repaint();
+        } else if (lineMode) {
             selectLineRange(editorState.visualStartPos, newPos);
         } else {
             if (editorState.visualStartPos < newPos) {
@@ -1826,32 +1925,26 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.pendingKey = 'S';
             return;
         } else if (c == 'y') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                clipboardManager.yankSelection(selected);
-                storeYank(consumePendingRegister(), selected, lineMode);
-                showMessage("Selection yanked");
+            if (blockMode) { yankVisualBlock(); setMode(EditorMode.NORMAL); }
+            else {
+                String selected = writingArea.getSelectedText();
+                if (selected != null) { clipboardManager.yankSelection(selected); storeYank(consumePendingRegister(), selected, lineMode); showMessage("Selection yanked"); }
+                setMode(EditorMode.NORMAL);
             }
-            setMode(EditorMode.NORMAL);
         } else if (c == 'd' || c == 'x') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                clipboardManager.yankSelection(selected);
-                storeDelete(consumePendingRegister(), selected, lineMode);
-                writingArea.replaceSelection("");
-                markModified();
-                showMessage("Selection deleted");
+            if (blockMode) { deleteVisualBlock(); setMode(EditorMode.NORMAL); }
+            else {
+                String selected = writingArea.getSelectedText();
+                if (selected != null) { clipboardManager.yankSelection(selected); storeDelete(consumePendingRegister(), selected, lineMode); writingArea.replaceSelection(""); markModified(); showMessage("Selection deleted"); }
+                setMode(EditorMode.NORMAL);
             }
-            setMode(EditorMode.NORMAL);
         } else if (c == 'c') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                clipboardManager.yankSelection(selected);
-                storeDelete(consumePendingRegister(), selected, lineMode);
-                writingArea.replaceSelection("");
-                markModified();
+            if (blockMode) { deleteVisualBlock(); setMode(EditorMode.INSERT); }
+            else {
+                String selected = writingArea.getSelectedText();
+                if (selected != null) { clipboardManager.yankSelection(selected); storeDelete(consumePendingRegister(), selected, lineMode); writingArea.replaceSelection(""); markModified(); }
+                setMode(EditorMode.INSERT);
             }
-            setMode(EditorMode.INSERT);
         } else if (c == '>' || c == '<' || c == '=') {
             applyVisualLineOperator(c);
             setMode(EditorMode.NORMAL);
@@ -2824,12 +2917,18 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void ensureCaretVisible(JTextArea area) {
-        if (area == null) {
-            return;
-        }
+        if (area == null) return;
         try {
             Rectangle2D bounds = area.modelToView2D(area.getCaretPosition());
-            if (bounds != null) {
+            if (bounds == null) return;
+            int scrolloff = configManager.getScrolloff();
+            if (scrolloff > 0) {
+                int lineHeight = area.getFontMetrics(area.getFont()).getHeight();
+                Rectangle expanded = bounds.getBounds();
+                expanded.y -= scrolloff * lineHeight;
+                expanded.height += 2 * scrolloff * lineHeight;
+                area.scrollRectToVisible(expanded);
+            } else {
                 area.scrollRectToVisible(bounds.getBounds());
             }
         } catch (BadLocationException ignored) {
@@ -3249,6 +3348,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (fileType == FileType.JAVA) {
             highlightJavaAnnotations(text, masked);
         }
+        highlightScopeRules(text, fileType, masked);
         highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
         if (configManager.getShowWhitespace()) {
             Highlighter highlighter = writingArea.getHighlighter();
@@ -3456,6 +3556,28 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void highlightScopeRules(String text, FileType fileType, boolean[] masked) {
+        List<SyntaxHighlightService.SyntaxRule> rules = syntaxHighlightService.scopeRulesFor(fileType);
+        for (SyntaxHighlightService.SyntaxRule rule : rules) {
+            java.util.regex.Matcher m = rule.pattern.matcher(text);
+            while (m.find()) {
+                int start = m.start();
+                int end = m.end();
+                if (start < masked.length && masked[start]) continue;
+                Color color;
+                switch (rule.scope) {
+                    case "type": color = configManager.getSyntaxTypeColor(); break;
+                    case "function": color = configManager.getSyntaxFunctionColor(); break;
+                    case "constant": color = configManager.getSyntaxConstantColor(); break;
+                    case "annotation": color = configManager.getSyntaxAnnotationColor(); break;
+                    case "number": color = configManager.getSyntaxNumberColor(); break;
+                    default: continue;
+                }
+                syntaxForegroundSpans.add(new SyntaxSpan(start, Math.min(end, text.length()), color));
+            }
+        }
+    }
+
     private void highlightNumbers(String text, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
@@ -3565,15 +3687,24 @@ public class Texteditor extends JFrame implements KeyListener {
             int endLine = Math.min(writingArea.getLineCount() - 1, preview.endLine);
             int endOffset = writingArea.getLineEndOffset(endLine);
             String text = writingArea.getText();
+            String region = text.substring(startOffset, endOffset);
             Highlighter highlighter = writingArea.getHighlighter();
-            int searchFrom = startOffset;
-            while (searchFrom <= endOffset - preview.pattern.length()) {
-                int match = text.indexOf(preview.pattern, searchFrom);
-                if (match < 0 || match >= endOffset) {
-                    break;
+            try {
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile(preview.pattern).matcher(region);
+                while (m.find()) {
+                    int ms = startOffset + m.start();
+                    int me = startOffset + m.end();
+                    if (me > endOffset) break;
+                    substitutePreviewTags.add(highlighter.addHighlight(ms, me, substitutePreviewPainter));
                 }
-                substitutePreviewTags.add(highlighter.addHighlight(match, match + preview.pattern.length(), substitutePreviewPainter));
-                searchFrom = match + Math.max(1, preview.pattern.length());
+            } catch (java.util.regex.PatternSyntaxException e) {
+                int searchFrom = startOffset;
+                while (searchFrom <= endOffset - preview.pattern.length()) {
+                    int match = text.indexOf(preview.pattern, searchFrom);
+                    if (match < 0 || match >= endOffset) break;
+                    substitutePreviewTags.add(highlighter.addHighlight(match, match + preview.pattern.length(), substitutePreviewPainter));
+                    searchFrom = match + Math.max(1, preview.pattern.length());
+                }
             }
         } catch (BadLocationException ignored) {
         }
@@ -3663,37 +3794,88 @@ public class Texteditor extends JFrame implements KeyListener {
         return branchName;
     }
 
+    private javax.swing.JWindow completionPopup;
+    private javax.swing.JList<String> completionList;
+    private javax.swing.DefaultListModel<String> completionModel;
+    private String completionPrefix;
     private void showInlineCompletion() {
         try {
             String prefix = currentCompletionPrefix();
-            if (prefix == null || prefix.length() < 2) return;
-            List<String> completions = collectBufferCompletions(prefix);
-            if (completions.isEmpty()) return;
-
+            if (prefix == null || prefix.length() < 2) { dismissCompletionPopup(); return; }
+            List<String> completions = gatherCompletions(prefix);
+            if (completions.isEmpty()) { dismissCompletionPopup(); return; }
+            completionPrefix = prefix;
+            if (completionPopup == null) {
+                completionModel = new javax.swing.DefaultListModel<>();
+                completionList = new javax.swing.JList<>(completionModel);
+                completionList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
+                completionList.setFocusable(false);
+                completionList.setFont(writingArea.getFont().deriveFont((float) writingArea.getFont().getSize()));
+                completionList.setBackground(configManager.getCommandBarBackground());
+                completionList.setForeground(configManager.getCommandBarForeground());
+                completionList.setSelectionBackground(configManager.getSelectionColor());
+                completionList.setSelectionForeground(configManager.getSelectionTextColor());
+                completionPopup = new javax.swing.JWindow(this);
+                javax.swing.JScrollPane sp = new javax.swing.JScrollPane(completionList);
+                sp.setBorder(javax.swing.BorderFactory.createLineBorder(configManager.getCaretColor()));
+                completionPopup.add(sp);
+                completionPopup.setFocusableWindowState(false);
+            }
+            completionModel.clear();
+            int max = Math.min(completions.size(), 12);
+            for (int i = 0; i < max; i++) completionModel.addElement(completions.get(i));
+            completionList.setSelectedIndex(0);
             Rectangle2D caretRect = writingArea.modelToView2D(writingArea.getCaretPosition());
             if (caretRect == null) return;
-
-            javax.swing.JPopupMenu popup = new javax.swing.JPopupMenu();
-            popup.setFocusable(false);
-            int maxItems = Math.min(completions.size(), 10);
-            for (int i = 0; i < maxItems; i++) {
-                String item = completions.get(i);
-                javax.swing.JMenuItem mi = new javax.swing.JMenuItem(item);
-                mi.addActionListener(ev -> {
-                    applyCompletion(prefix, item);
-                    markModified();
-                });
-                popup.add(mi);
-            }
-            int px = (int) caretRect.getX();
-            int py = (int) (caretRect.getY() + caretRect.getHeight());
-            popup.show(writingArea, px, py);
-
-            // Auto-accept first item on Tab, dismiss on Escape
-            if (popup.getComponentCount() > 0) {
-                popup.getSelectionModel().setSelectedIndex(0);
-            }
-        } catch (BadLocationException ignored) {}
+            if (!writingArea.isShowing()) return;
+            java.awt.Point loc = writingArea.getLocationOnScreen();
+            int px = loc.x + (int) caretRect.getX();
+            int py = loc.y + (int) (caretRect.getY() + caretRect.getHeight());
+            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
+            completionPopup.setLocation(px, py);
+            completionPopup.setSize(300, Math.min(max * lineH + 4, 240));
+            completionPopup.setVisible(true);
+        } catch (Exception ignored) { dismissCompletionPopup(); }
+    }
+    private void dismissCompletionPopup() {
+        if (completionPopup != null && completionPopup.isVisible()) completionPopup.setVisible(false);
+    }
+    boolean isCompletionPopupVisible() {
+        return completionPopup != null && completionPopup.isVisible();
+    }
+    void completionPopupNavigate(int direction) {
+        if (completionList == null || completionModel.isEmpty()) return;
+        int idx = completionList.getSelectedIndex() + direction;
+        if (idx < 0) idx = completionModel.size() - 1;
+        if (idx >= completionModel.size()) idx = 0;
+        completionList.setSelectedIndex(idx);
+        completionList.ensureIndexIsVisible(idx);
+    }
+    void completionPopupAccept() {
+        if (completionList == null) return;
+        String selected = completionList.getSelectedValue();
+        dismissCompletionPopup();
+        if (selected != null && completionPrefix != null) {
+            applyCompletion(completionPrefix, selected);
+            markModified();
+        }
+    }
+    private List<String> gatherCompletions(String prefix) {
+        List<String> completions = new ArrayList<>();
+        FileBuffer buffer = getCurrentBuffer();
+        LspClient client = resolveLspClient(buffer);
+        if (buffer != null && client != null && buffer.hasFilePath()) {
+            String uri = bufferUri(buffer);
+            try {
+                int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
+                int col = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
+                for (LspClient.CompletionItem item : client.completion(uri, line, col)) {
+                    if (item.getLabel() != null && !item.getLabel().isEmpty()) completions.add(item.getLabel());
+                }
+            } catch (BadLocationException ignored) {}
+        }
+        if (completions.isEmpty()) completions = collectBufferCompletions(prefix);
+        return completions;
     }
 
     private void addCursorAtNextMatch() {
@@ -3721,6 +3903,164 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private String formatParagraph() {
+        int tw = configManager.getTextWidth();
+        if (tw <= 0) return "textwidth not set (use :set tw=80)";
+        try {
+            int caretPos = writingArea.getCaretPosition();
+            int startLine = writingArea.getLineOfOffset(caretPos);
+            int endLine = startLine;
+            String text = writingArea.getText();
+            // expand to paragraph boundaries (blank lines)
+            while (startLine > 0) {
+                int ls = writingArea.getLineStartOffset(startLine - 1);
+                int le = writingArea.getLineEndOffset(startLine - 1);
+                if (text.substring(ls, le).trim().isEmpty()) break;
+                startLine--;
+            }
+            while (endLine < writingArea.getLineCount() - 1) {
+                int ls = writingArea.getLineStartOffset(endLine + 1);
+                int le = writingArea.getLineEndOffset(endLine + 1);
+                if (text.substring(ls, le).trim().isEmpty()) break;
+                endLine++;
+            }
+            int startOff = writingArea.getLineStartOffset(startLine);
+            int endOff = writingArea.getLineEndOffset(endLine);
+            String paraRaw = text.substring(startOff, endOff);
+            // preserve leading indent from first line
+            String indent = "";
+            for (int i2 = 0; i2 < paraRaw.length(); i2++) {
+                char ic = paraRaw.charAt(i2);
+                if (ic == ' ' || ic == '\t') indent += ic;
+                else break;
+            }
+            String paragraph = paraRaw.trim();
+            String[] words = paragraph.split("\\s+");
+            StringBuilder formatted = new StringBuilder();
+            int col = indent.length();
+            formatted.append(indent);
+            for (String word : words) {
+                if (col > 0 && col + 1 + word.length() > tw) {
+                    formatted.append("\n").append(indent);
+                    col = indent.length();
+                }
+                if (col > indent.length()) { formatted.append(" "); col++; }
+                formatted.append(word);
+                col += word.length();
+            }
+            formatted.append("\n");
+            writingArea.replaceRange(formatted.toString(), startOff, endOff);
+            markModified();
+            return "Formatted paragraph to " + tw + " columns";
+        } catch (BadLocationException e) { return "Error: " + e.getMessage(); }
+    }
+    private void moveDisplayLineDown() {
+        try {
+            Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
+            if (r == null) return;
+            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
+            int newY = (int) r.getY() + lineH;
+            int newPos = writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(r.getX(), newY));
+            if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
+        } catch (BadLocationException ignored) {}
+    }
+    private void moveDisplayLineUp() {
+        try {
+            Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
+            if (r == null) return;
+            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
+            int newY = (int) r.getY() - lineH;
+            if (newY < 0) return;
+            int newPos = writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(r.getX(), newY));
+            if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
+        } catch (BadLocationException ignored) {}
+    }
+    private void enterVisualBlockMode() {
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            int col = pos - writingArea.getLineStartOffset(line);
+            editorState.visualBlockStartLine = line;
+            editorState.visualBlockStartCol = col;
+            editorState.visualStartPos = pos;
+            setMode(EditorMode.VISUAL_BLOCK);
+        } catch (BadLocationException ignored) {}
+    }
+
+    private int[] getVisualBlockBounds() {
+        if (editorState.visualBlockStartLine < 0 || editorState.visualBlockStartCol < 0) return null;
+        try {
+            int caretPos = writingArea.getCaretPosition();
+            int curLine = writingArea.getLineOfOffset(caretPos);
+            int curCol = caretPos - writingArea.getLineStartOffset(curLine);
+            int startLine = Math.min(editorState.visualBlockStartLine, curLine);
+            int endLine = Math.max(editorState.visualBlockStartLine, curLine);
+            int startCol = Math.min(editorState.visualBlockStartCol, curCol);
+            int endCol = Math.max(editorState.visualBlockStartCol, curCol);
+            return new int[]{startLine, endLine, startCol, endCol};
+        } catch (BadLocationException ignored) { return null; }
+    }
+
+    private void deleteVisualBlock() {
+        int[] bounds = getVisualBlockBounds();
+        if (bounds == null) return;
+        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
+        try {
+            StringBuilder yanked = new StringBuilder();
+            for (int line = endLine; line >= startLine; line--) {
+                int ls = writingArea.getLineStartOffset(line);
+                int le = writingArea.getLineEndOffset(line);
+                String lineText = writingArea.getText().substring(ls, le);
+                int sc = Math.min(startCol, lineText.length());
+                int ec = Math.min(endCol + 1, lineText.length());
+                if (sc < ec) {
+                    if (line < endLine) yanked.insert(0, "\n");
+                    yanked.insert(0, lineText.substring(sc, ec));
+                    writingArea.replaceRange("", ls + sc, ls + ec);
+                }
+            }
+            clipboardManager.yankSelection(yanked.toString());
+            storeDelete(consumePendingRegister(), yanked.toString(), false);
+            markModified();
+            showMessage("Block deleted");
+        } catch (BadLocationException ignored) {}
+    }
+
+    private void yankVisualBlock() {
+        int[] bounds = getVisualBlockBounds();
+        if (bounds == null) return;
+        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
+        try {
+            StringBuilder yanked = new StringBuilder();
+            for (int line = startLine; line <= endLine; line++) {
+                int ls = writingArea.getLineStartOffset(line);
+                int le = writingArea.getLineEndOffset(line);
+                String lineText = writingArea.getText().substring(ls, le);
+                int sc = Math.min(startCol, lineText.length());
+                int ec = Math.min(endCol + 1, lineText.length());
+                if (line > startLine) yanked.append("\n");
+                if (sc < ec) yanked.append(lineText, sc, ec);
+            }
+            clipboardManager.yankSelection(yanked.toString());
+            storeYank(consumePendingRegister(), yanked.toString(), false);
+            showMessage("Block yanked");
+        } catch (BadLocationException ignored) {}
+    }
+
+    private static Character autoPairCloser(char c) {
+        switch (c) {
+            case '(': return ')';
+            case '[': return ']';
+            case '{': return '}';
+            case '"': return '"';
+            case '\'': return '\'';
+            case '`': return '`';
+            default: return null;
+        }
+    }
+    private static boolean isClosingPairChar(char c) {
+        return c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' || c == '`';
+    }
     private void applyMultiCursorInsert(char c) {
         if (extraCursors.isEmpty()) return;
         // Sort cursors descending so insertions don't shift earlier positions
@@ -3738,6 +4078,59 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private void applyMultiCursorBackspace() {
+        if (extraCursors.isEmpty()) return;
+        List<Integer> sorted = new ArrayList<>(extraCursors);
+        sorted.sort(Collections.reverseOrder());
+        for (int pos : sorted) {
+            if (pos > 0 && pos <= writingArea.getText().length()) {
+                writingArea.replaceRange("", pos - 1, pos);
+            }
+        }
+        for (int i = 0; i < extraCursors.size(); i++) {
+            extraCursors.set(i, Math.max(0, extraCursors.get(i) - 1));
+        }
+    }
+    private void applyMultiCursorDelete() {
+        if (extraCursors.isEmpty()) return;
+        List<Integer> sorted = new ArrayList<>(extraCursors);
+        sorted.sort(Collections.reverseOrder());
+        for (int pos : sorted) {
+            if (pos >= 0 && pos < writingArea.getText().length()) {
+                writingArea.replaceRange("", pos, pos + 1);
+            }
+        }
+    }
+    private void addCursorAbove() {
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            if (line <= 0) return;
+            int col = pos - writingArea.getLineStartOffset(line);
+            int prevLineStart = writingArea.getLineStartOffset(line - 1);
+            int prevLineEnd = writingArea.getLineEndOffset(line - 1);
+            int newPos = Math.min(prevLineStart + col, prevLineEnd - 1);
+            if (!extraCursors.contains(newPos)) {
+                extraCursors.add(newPos);
+                showMessage("Added cursor above (" + extraCursors.size() + " extra)");
+            }
+        } catch (BadLocationException ignored) {}
+    }
+    private void addCursorBelow() {
+        try {
+            int pos = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(pos);
+            if (line >= writingArea.getLineCount() - 1) return;
+            int col = pos - writingArea.getLineStartOffset(line);
+            int nextLineStart = writingArea.getLineStartOffset(line + 1);
+            int nextLineEnd = writingArea.getLineEndOffset(line + 1);
+            int newPos = Math.min(nextLineStart + col, nextLineEnd - 1);
+            if (!extraCursors.contains(newPos)) {
+                extraCursors.add(newPos);
+                showMessage("Added cursor below (" + extraCursors.size() + " extra)");
+            }
+        } catch (BadLocationException ignored) {}
+    }
     private void clearExtraCursors() {
         if (!extraCursors.isEmpty()) {
             extraCursors.clear();
@@ -6023,6 +6416,72 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git diff";
     }
 
+    private File cachedGitRoot;
+    private boolean cachedGitRootResolved;
+    void refreshGitGutter() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) return;
+        String filePath = buffer.getFilePath();
+        // run git diff on background thread to avoid blocking EDT
+        new Thread(() -> {
+            if (!cachedGitRootResolved) { cachedGitRoot = resolveGitRoot(); cachedGitRootResolved = true; }
+            File gitRoot = cachedGitRoot;
+            if (gitRoot == null) return;
+            CommandResult result = runCommand(gitRoot, List.of("git", "diff", "HEAD", "--unified=0", "--", filePath));
+            Set<Integer> added = new HashSet<>();
+            Set<Integer> modified = new HashSet<>();
+            Set<Integer> deletedAfter = new HashSet<>();
+            if (result.exitCode == 0 && result.stdout != null) {
+                parseUnifiedDiffForGutter(result.stdout, added, modified, deletedAfter);
+            }
+            SwingUtilities.invokeLater(() -> {
+                EditorPane pane = getActivePane();
+                if (pane != null && pane.getLineNumberPanel() != null) {
+                    pane.getLineNumberPanel().updateGitDiffMarkers(added, modified, deletedAfter);
+                }
+            });
+        }, "shed-git-gutter").start();
+    }
+
+    private void parseUnifiedDiffForGutter(String diff, Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
+        // parse @@ -oldStart[,oldCount] +newStart[,newCount] @@ lines
+        for (String line : diff.split("\n")) {
+            if (!line.startsWith("@@")) continue;
+            int plusIdx = line.indexOf('+', 3);
+            if (plusIdx < 0) continue;
+            int spaceAfter = line.indexOf(' ', plusIdx);
+            if (spaceAfter < 0) spaceAfter = line.indexOf('@', plusIdx + 1);
+            if (spaceAfter < 0) continue;
+            String newRange = line.substring(plusIdx + 1, spaceAfter);
+            String[] parts = newRange.split(",");
+            int newStart, newCount;
+            try {
+                newStart = Integer.parseInt(parts[0]);
+                newCount = parts.length > 1 ? Integer.parseInt(parts[1]) : 1;
+            } catch (NumberFormatException e) { continue; }
+            // determine old count
+            int minusIdx = line.indexOf('-', 3);
+            int oldCount = 0;
+            if (minusIdx >= 0) {
+                int minusEnd = line.indexOf(' ', minusIdx);
+                if (minusEnd < 0) minusEnd = plusIdx;
+                String oldRange = line.substring(minusIdx + 1, minusEnd);
+                String[] oldParts = oldRange.split(",");
+                try { oldCount = oldParts.length > 1 ? Integer.parseInt(oldParts[1]) : 1; } catch (NumberFormatException e) { continue; }
+            }
+            if (newCount == 0 && oldCount > 0) {
+                // pure deletion
+                deletedAfter.add(Math.max(0, newStart - 1));
+            } else if (oldCount == 0 && newCount > 0) {
+                // pure addition
+                for (int i = 0; i < newCount; i++) added.add(newStart - 1 + i);
+            } else {
+                // modification
+                for (int i = 0; i < newCount; i++) modified.add(newStart - 1 + i);
+            }
+        }
+    }
+
     private String showGitLog(File gitRoot, String args) {
         int count = 20;
         if (args != null && !args.isBlank()) {
@@ -6412,77 +6871,65 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String showPaletteDialog(String title, List<String> candidates) {
+        // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(this, title, true);
-        dialog.setLayout(new BorderLayout(8, 8));
+        dialog.setUndecorated(true);
+        dialog.getRootPane().setBorder(javax.swing.BorderFactory.createLineBorder(configManager.getCaretColor(), 1));
+        dialog.setLayout(new BorderLayout(4, 4));
+        dialog.getContentPane().setBackground(configManager.getCommandBarBackground());
         JTextField filterField = new JTextField();
+        filterField.setFont(writingArea.getFont());
+        filterField.setBackground(configManager.getCommandBarBackground());
+        filterField.setForeground(configManager.getCommandBarForeground());
+        filterField.setCaretColor(configManager.getCaretColor());
+        filterField.setBorder(javax.swing.BorderFactory.createCompoundBorder(
+            javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, configManager.getCaretColor()),
+            javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8)));
         DefaultListModel<String> model = new DefaultListModel<>();
-        for (String candidate : candidates) {
-            model.addElement(candidate);
-        }
+        for (String candidate : candidates) model.addElement(candidate);
         JList<String> list = new JList<>(model);
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        if (!model.isEmpty()) {
-            list.setSelectedIndex(0);
-        }
-
+        list.setFont(writingArea.getFont());
+        list.setBackground(configManager.getCommandBarBackground());
+        list.setForeground(configManager.getCommandBarForeground());
+        list.setSelectionBackground(configManager.getSelectionColor());
+        list.setSelectionForeground(configManager.getSelectionTextColor());
+        if (!model.isEmpty()) list.setSelectedIndex(0);
+        JLabel titleLabel = new JLabel(" " + title);
+        titleLabel.setForeground(configManager.getCaretColor());
+        titleLabel.setFont(writingArea.getFont().deriveFont(java.awt.Font.BOLD));
+        titleLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 6, 2, 6));
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { refilter(); }
             public void removeUpdate(DocumentEvent e) { refilter(); }
             public void changedUpdate(DocumentEvent e) { refilter(); }
-
             private void refilter() {
                 String query = filterField.getText();
                 model.clear();
-                if (query.isEmpty()) {
-                    for (String candidate : candidates) {
-                        model.addElement(candidate);
-                    }
-                } else {
-                    List<String> matches = fuzzyMatchService.matchStrings(query, candidates, 0);
-                    for (String match : matches) {
-                        model.addElement(match);
-                    }
-                }
-                if (!model.isEmpty()) {
-                    list.setSelectedIndex(0);
-                }
+                if (query.isEmpty()) { for (String c2 : candidates) model.addElement(c2); }
+                else { for (String m : fuzzyMatchService.matchStrings(query, candidates, 0)) model.addElement(m); }
+                if (!model.isEmpty()) list.setSelectedIndex(0);
             }
         });
-
         final String[] selection = new String[1];
         list.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mouseClicked(java.awt.event.MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    selection[0] = list.getSelectedValue();
-                    dialog.dispose();
-                }
-            }
+            public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) { selection[0] = list.getSelectedValue(); dialog.dispose(); } }
         });
-        filterField.addActionListener(e -> {
-            selection[0] = list.getSelectedValue();
-            dialog.dispose();
-        });
+        filterField.addActionListener(e -> { selection[0] = list.getSelectedValue(); dialog.dispose(); });
         filterField.addKeyListener(new java.awt.event.KeyAdapter() {
-            @Override
             public void keyPressed(java.awt.event.KeyEvent e) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) {
-                    dialog.dispose();
-                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) {
-                    int idx = list.getSelectedIndex();
-                    if (idx < model.getSize() - 1) list.setSelectedIndex(idx + 1);
-                    e.consume();
-                } else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) {
-                    int idx = list.getSelectedIndex();
-                    if (idx > 0) list.setSelectedIndex(idx - 1);
-                    e.consume();
-                }
+                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) dialog.dispose();
+                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) { int idx = list.getSelectedIndex(); if (idx < model.getSize() - 1) list.setSelectedIndex(idx + 1); e.consume(); }
+                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) { int idx = list.getSelectedIndex(); if (idx > 0) list.setSelectedIndex(idx - 1); e.consume(); }
             }
         });
-
-        dialog.add(filterField, BorderLayout.NORTH);
-        dialog.add(new JScrollPane(list), BorderLayout.CENTER);
-        dialog.setSize(720, 420);
+        dialog.add(titleLabel, BorderLayout.NORTH);
+        dialog.add(filterField, BorderLayout.CENTER);
+        JScrollPane sp = new JScrollPane(list);
+        sp.setPreferredSize(new Dimension(600, 320));
+        sp.setBorder(null);
+        dialog.add(sp, BorderLayout.SOUTH);
+        dialog.setSize(620, 400);
         dialog.setLocationRelativeTo(this);
         dialog.setVisible(true);
         return selection[0];
@@ -6537,6 +6984,44 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException e) {
             return "1:1";
         }
+    }
+
+    private MinimapPanel activeMinimapPanel;
+    public String toggleMinimap() {
+        EditorPane pane = getActivePane();
+        if (pane == null) return "No active pane";
+        JScrollPane sp = pane.getScrollPane();
+        if (activeMinimapPanel != null && activeMinimapPanel.getParent() != null) {
+            activeMinimapPanel.getParent().remove(activeMinimapPanel);
+            activeMinimapPanel = null;
+            sp.revalidate();
+            sp.repaint();
+            return "Minimap hidden";
+        }
+        activeMinimapPanel = new MinimapPanel(pane.getTextArea());
+        activeMinimapPanel.setColors(configManager.getLineNumberBackground(), configManager.getEditorForeground());
+        java.awt.Container parent = sp.getParent();
+        if (parent instanceof JPanel) {
+            ((JPanel) parent).add(activeMinimapPanel, BorderLayout.EAST);
+        } else {
+            // wrap the scroll pane
+            JPanel wrapper = new JPanel(new BorderLayout());
+            if (parent != null) {
+                int idx = -1;
+                Object constraints = null;
+                for (int i = 0; i < parent.getComponentCount(); i++) {
+                    if (parent.getComponent(i) == sp) { idx = i; break; }
+                }
+                if (idx >= 0) parent.remove(idx);
+                wrapper.add(sp, BorderLayout.CENTER);
+                wrapper.add(activeMinimapPanel, BorderLayout.EAST);
+                if (idx >= 0) parent.add(wrapper, idx);
+            }
+        }
+        sp.getViewport().addChangeListener(e -> { if (activeMinimapPanel != null) activeMinimapPanel.repaint(); });
+        sp.revalidate();
+        sp.repaint();
+        return "Minimap shown";
     }
 
     public String toggleZenMode() {
@@ -7497,6 +7982,15 @@ public class Texteditor extends JFrame implements KeyListener {
         int version = lspDocumentVersions.getOrDefault(uri, 1) + 1;
         lspDocumentVersions.put(uri, version);
         client.didChange(uri, version, buffer.getFullContent());
+        scheduleDiagnosticRefresh();
+    }
+
+    private void scheduleDiagnosticRefresh() {
+        if (diagnosticRefreshTimer == null) {
+            diagnosticRefreshTimer = new javax.swing.Timer(500, ev -> refreshDiagnosticRanges());
+            diagnosticRefreshTimer.setRepeats(false);
+        }
+        diagnosticRefreshTimer.restart();
     }
 
     public void notifyCurrentBufferSaved() {
@@ -7510,6 +8004,7 @@ public class Texteditor extends JFrame implements KeyListener {
             client.didSave(bufferUri(buffer));
         }
         firePluginEvent("BufWrite");
+        refreshGitGutter();
     }
 
     private void pollLspNotifications(FileBuffer buffer) {
@@ -8430,6 +8925,7 @@ public class Texteditor extends JFrame implements KeyListener {
         addToRecentFiles(file.getAbsolutePath());
         registerFileWatch(buffer);
         firePluginEvent("BufOpen");
+        refreshGitGutter();
         if (buffer.isShowingPreviewOnly()) {
             showMessage("Large-file preview loaded");
         }
@@ -8641,6 +9137,17 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Window focus changed";
     }
 
+    public String resizeActiveWindow(double delta) {
+        if (windowLayoutRoot == null || windowLayoutRoot.isLeaf()) return "Only one window";
+        EditorPane activePane = getActivePane();
+        if (activePane == null) return "No active window";
+        if (windowLayoutRoot.adjustRatio(activePane, delta)) {
+            renderWindowLayout();
+            return "Window resized";
+        }
+        return "Cannot resize further";
+    }
+
     public String equalizeWindows() {
         if (windowLayoutRoot == null) {
             return "No windows to equalize";
@@ -8816,37 +9323,8 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {
-        StringBuilder builder = new StringBuilder();
-        int searchFrom = 0;
-        int matchCount = 0;
-        int firstMatchOffset = -1;
-
-        while (searchFrom <= text.length()) {
-            int matchIndex = text.indexOf(pattern, searchFrom);
-            if (matchIndex < 0) {
-                break;
-            }
-
-            if (firstMatchOffset < 0) {
-                firstMatchOffset = matchIndex;
-            }
-
-            builder.append(text, searchFrom, matchIndex);
-            builder.append(replacement);
-            searchFrom = matchIndex + pattern.length();
-            matchCount++;
-
-            if (!replaceAll) {
-                break;
-            }
-        }
-
-        if (matchCount == 0) {
-            return new ReplacementResult(text, 0, -1);
-        }
-
-        builder.append(text.substring(searchFrom));
-        return new ReplacementResult(builder.toString(), matchCount, firstMatchOffset);
+        SubstituteService.Result r = substituteService.replaceRegex(text, pattern, replacement, replaceAll);
+        return new ReplacementResult(r.getUpdatedText(), r.getMatchCount(), r.getFirstMatchOffset());
     }
 
     // Line number toggle
@@ -9919,6 +10397,160 @@ public class Texteditor extends JFrame implements KeyListener {
         if (parent != null && !parent.exists()) {
             Files.createDirectories(parent.toPath());
         }
+    }
+
+    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\b");
+    private void paintColorPreviews(Graphics g, JTextArea area) {
+        String text = area.getText();
+        if (text.isEmpty()) return;
+        FontMetrics fm = g.getFontMetrics(area.getFont());
+        Rectangle clip = g.getClipBounds();
+        java.util.regex.Matcher m = HEX_COLOR_PATTERN.matcher(text);
+        while (m.find()) {
+            try {
+                Rectangle2D r = area.modelToView2D(m.end());
+                if (r == null) continue;
+                if (clip != null && ((int) r.getY() < clip.y - 20 || (int) r.getY() > clip.y + clip.height + 20)) continue;
+                String hex = m.group();
+                if (hex.length() == 4) { // expand #RGB to #RRGGBB
+                    hex = "#" + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2) + hex.charAt(3) + hex.charAt(3);
+                }
+                Color c = Color.decode(hex);
+                int size = fm.getHeight() - 4;
+                int x = (int) r.getX() + 2;
+                int y = (int) r.getY() + 2;
+                g.setColor(c);
+                g.fillRect(x, y, size, size);
+                g.setColor(new Color(255, 255, 255, 80));
+                g.drawRect(x, y, size, size);
+            } catch (Exception ignored) {}
+        }
+    }
+    private void paintWrapIndicators(Graphics g, JTextArea area) {
+        FontMetrics fm = g.getFontMetrics(area.getFont());
+        int lineH = fm.getHeight();
+        g.setColor(new Color(255, 255, 255, 40));
+        Rectangle clip = g.getClipBounds();
+        int startY = clip != null ? clip.y : 0;
+        int endY = clip != null ? clip.y + clip.height : area.getHeight();
+        try {
+            int startLine = area.getLineOfOffset(area.viewToModel2D(new Point(0, startY)));
+            int endLine = Math.min(area.getLineCount() - 1, area.getLineOfOffset(area.viewToModel2D(new Point(0, endY))));
+            for (int line = startLine; line <= endLine; line++) {
+                int ls = area.getLineStartOffset(line);
+                int le = area.getLineEndOffset(line);
+                Rectangle2D rStart = area.modelToView2D(ls);
+                Rectangle2D rEnd = area.modelToView2D(Math.max(ls, le - 1));
+                if (rStart == null || rEnd == null) continue;
+                if ((int) rEnd.getY() > (int) rStart.getY()) {
+                    // wrapped line: draw arrow at right edge for each wrapped row
+                    int rows = ((int) rEnd.getY() - (int) rStart.getY()) / lineH;
+                    int rightX = area.getWidth() - 10;
+                    for (int r = 0; r < rows; r++) {
+                        int y = (int) rStart.getY() + (r + 1) * lineH - lineH / 2;
+                        g.drawString("\u21B5", rightX, y); // ↵
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void paintVisualBlockOverlay(Graphics g, JTextArea area) {
+        if (editorState.mode != EditorMode.VISUAL_BLOCK || area != writingArea) return;
+        int[] bounds = getVisualBlockBounds();
+        if (bounds == null) return;
+        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
+        Graphics2D g2 = (Graphics2D) g;
+        Color sel = configManager.getSelectionColor();
+        g2.setColor(new Color(sel.getRed(), sel.getGreen(), sel.getBlue(), 100));
+        FontMetrics fm = g2.getFontMetrics(area.getFont());
+        int charW = fm.charWidth(' ');
+        try {
+            for (int line = startLine; line <= endLine && line < area.getLineCount(); line++) {
+                int ls = area.getLineStartOffset(line);
+                Rectangle2D r = area.modelToView2D(ls);
+                if (r == null) continue;
+                int x1 = (int) r.getX() + startCol * charW;
+                int x2 = (int) r.getX() + (endCol + 1) * charW;
+                g2.fillRect(x1, (int) r.getY(), x2 - x1, fm.getHeight());
+            }
+        } catch (BadLocationException ignored) {}
+    }
+
+    private void paintDiagnosticOverlay(Graphics g, JTextArea area) {
+        if (area == null || diagnosticRanges.isEmpty()) return;
+        Graphics2D g2 = (Graphics2D) g;
+        FontMetrics fm = g2.getFontMetrics(area.getFont());
+        int ascent = fm.getAscent();
+        int descent = fm.getDescent();
+        int docLen = area.getDocument().getLength();
+        for (int[] dr : diagnosticRanges) {
+            int start = dr[0], end = dr[1], severity = dr[2];
+            if (start >= docLen || end > docLen || start >= end) continue;
+            Color c;
+            switch (severity) {
+                case 1: c = new Color(0xFF, 0x44, 0x44, 0xCC); break; // error
+                case 2: c = new Color(0xFF, 0xCC, 0x00, 0xCC); break; // warning
+                case 3: c = new Color(0x55, 0x99, 0xFF, 0xCC); break; // info
+                default: c = new Color(0x99, 0x99, 0x99, 0xCC); break; // hint
+            }
+            g2.setColor(c);
+            try {
+                Rectangle2D r1 = area.modelToView2D(start);
+                Rectangle2D r2 = area.modelToView2D(end);
+                if (r1 == null || r2 == null) continue;
+                int y = (int) (r1.getY() + ascent + descent);
+                int x1 = (int) r1.getX();
+                int x2 = (int) r2.getX();
+                if ((int) r1.getY() != (int) r2.getY()) {
+                    // multiline: just underline first line to EOL
+                    x2 = area.getWidth();
+                }
+                // draw wavy underline
+                for (int x = x1; x < x2; x += 4) {
+                    int amp = (x / 4 % 2 == 0) ? 0 : 2;
+                    int nextAmp = ((x + 4) / 4 % 2 == 0) ? 0 : 2;
+                    g2.drawLine(x, y + amp, Math.min(x + 4, x2), y + nextAmp);
+                }
+            } catch (BadLocationException ignored) {}
+        }
+    }
+
+    void refreshDiagnosticRanges() {
+        diagnosticRanges.clear();
+        EditorPane diagPane = getActivePane();
+        if (diagPane != null && diagPane.getLineNumberPanel() != null) diagPane.getLineNumberPanel().updateDiagnosticMarkers(null);
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) { writingArea.repaint(); return; }
+        LspClient client = lspClients.get(bufferExtension(buffer));
+        if (client == null || !client.isAlive()) { writingArea.repaint(); return; }
+        String uri = bufferUri(buffer);
+        List<LspClient.Diagnostic> diags = client.getDiagnostics(uri);
+        if (diags == null || diags.isEmpty()) { writingArea.repaint(); return; }
+        try {
+            for (LspClient.Diagnostic d : diags) {
+                int line = d.getLine();
+                if (line >= writingArea.getLineCount()) continue;
+                int lineStart = writingArea.getLineStartOffset(line);
+                int lineEnd = writingArea.getLineEndOffset(line);
+                int startOff = Math.min(lineStart + d.getCharacter(), lineEnd);
+                int endOff = Math.min(startOff + 1, lineEnd); // at least 1 char wide
+                // try to expand to end of token
+                String text = writingArea.getText();
+                while (endOff < lineEnd && endOff < text.length() && !Character.isWhitespace(text.charAt(endOff))) endOff++;
+                diagnosticRanges.add(new int[]{startOff, endOff, d.getSeverity()});
+            }
+        } catch (BadLocationException ignored) {}
+        // update gutter diagnostic markers
+        java.util.HashMap<Integer, Integer> severityByLine = new java.util.HashMap<>();
+        for (LspClient.Diagnostic d : diags) {
+            int line = d.getLine();
+            Integer existing = severityByLine.get(line);
+            if (existing == null || d.getSeverity() < existing) severityByLine.put(line, d.getSeverity());
+        }
+        EditorPane pane = getActivePane();
+        if (pane != null && pane.getLineNumberPanel() != null) pane.getLineNumberPanel().updateDiagnosticMarkers(severityByLine);
+        writingArea.repaint();
     }
 
     private void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {

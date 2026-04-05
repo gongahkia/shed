@@ -28,6 +28,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -3793,14 +3794,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private String[] getCurrentLines() {
         return writingArea.getText().split("\n", -1);
-    }
-
-    private int getCurrentCaretLine() {
-        try {
-            return writingArea.getLineOfOffset(writingArea.getCaretPosition());
-        } catch (BadLocationException e) {
-            return 0;
-        }
     }
 
     // --- Heading folding ---

@@ -998,6 +998,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 deleted.append(d);
             }
             if (deleted.length() > 0) {
+                lastCommand = "x";
                 storeDelete(consumePendingRegister(), deleted.toString(), false);
                 markModified();
             }
@@ -6173,34 +6174,70 @@ public class Texteditor extends JFrame implements KeyListener {
 
         switch (lastCommand) {
             case "dd":
-                clipboardManager.deleteLine(writingArea);
+                storeDelete(null, clipboardManager.deleteLine(writingArea), true);
                 markModified();
                 break;
             case "yy":
-                clipboardManager.yankLine(writingArea);
+                storeYank(null, clipboardManager.yankLine(writingArea), true);
                 break;
             case "dw":
-                clipboardManager.deleteWord(writingArea);
+                storeDelete(null, clipboardManager.deleteWord(writingArea), false);
                 markModified();
                 break;
-            case "cc":
-                clipboardManager.deleteLine(writingArea);
-                setMode(EditorMode.INSERT);
-                break;
             case "cw":
-                clipboardManager.deleteWord(writingArea);
-                setMode(EditorMode.INSERT);
+                storeDelete(null, clipboardManager.deleteWord(writingArea), false);
+                markModified();
+                insertLastText();
+                break;
+            case "cc":
+            case "S":
+                storeDelete(null, clipboardManager.deleteLine(writingArea), true);
+                markModified();
+                insertLastText();
                 break;
             case "D":
-                clipboardManager.deleteToEndOfLine(writingArea);
+                storeDelete(null, clipboardManager.deleteToEndOfLine(writingArea), false);
                 markModified();
                 break;
             case "C":
-                clipboardManager.deleteToEndOfLine(writingArea);
-                setMode(EditorMode.INSERT);
+                storeDelete(null, clipboardManager.deleteToEndOfLine(writingArea), false);
+                markModified();
+                insertLastText();
                 break;
+            case "x":
+                storeDelete(null, clipboardManager.deleteChar(writingArea), false);
+                markModified();
+                break;
+            default:
+                // Handle operator+motion (d$, y}, etc.) and operator+textobject (diw, ca(, etc.)
+                if (lastCommand.length() >= 2) {
+                    char op = lastCommand.charAt(0);
+                    String target = lastCommand.substring(1);
+                    if (op == 'd' || op == 'y' || op == 'c') {
+                        if (target.length() == 2 && (target.charAt(0) == 'i' || target.charAt(0) == 'a')) {
+                            showMessage(applyTextObjectOperator(op, target.charAt(0), target.charAt(1)));
+                        } else {
+                            showMessage(applyMotionOperator(op, target));
+                        }
+                        if (op == 'c') {
+                            insertLastText();
+                        }
+                        break;
+                    }
+                }
+                showMessage("Repeated: " + lastCommand);
+                return;
         }
         showMessage("Repeated: " + lastCommand);
+    }
+
+    private void insertLastText() {
+        if (lastInsertedText != null && !lastInsertedText.isEmpty()) {
+            int pos = writingArea.getCaretPosition();
+            writingArea.insert(lastInsertedText, pos);
+            writingArea.setCaretPosition(pos + lastInsertedText.length());
+            markModified();
+        }
     }
 
     private int consumePendingCount() {

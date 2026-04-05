@@ -2992,6 +2992,34 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private String getGitBlameForCurrentLine(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null || buffer.isModified()) return null;
+        try {
+            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition()) + 1;
+            File file = buffer.getFile();
+            ProcessBuilder pb = new ProcessBuilder("git", "blame", "-L", line + "," + line, "--porcelain", file.getName());
+            pb.directory(file.getParentFile());
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            String output = new String(p.getInputStream().readAllBytes());
+            if (!p.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                p.destroyForcibly();
+                return null;
+            }
+            if (p.exitValue() != 0) return null;
+            String author = null;
+            String summary = null;
+            for (String l : output.split("\n")) {
+                if (l.startsWith("author ")) author = l.substring(7);
+                else if (l.startsWith("summary ")) summary = l.substring(8);
+            }
+            if (author != null && summary != null) {
+                return author + ": " + summary;
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+
     private String findCurrentScope() {
         try {
             String text = writingArea.getText();
@@ -7908,7 +7936,8 @@ public class Texteditor extends JFrame implements KeyListener {
         } else if (lastMessage != null && !lastMessage.isEmpty()) {
             commandBar.setText(lastMessage);
         } else {
-            commandBar.setText("");
+            String blame = getGitBlameForCurrentLine(buffer);
+            commandBar.setText(blame != null ? blame : "");
         }
     }
 

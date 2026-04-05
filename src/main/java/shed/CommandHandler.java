@@ -7,15 +7,20 @@ import java.io.File;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 
 public class CommandHandler {
     private final Texteditor editor;
     private final DateTimeFormatter timeFormat;
+    private final Map<String, CommandAction> commandRegistry;
 
     public CommandHandler(Texteditor editor) {
         this.editor = editor;
         this.timeFormat = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM/yyyy");
+        this.commandRegistry = new HashMap<>();
+        registerCommands();
     }
 
     public String execute(String command) {
@@ -70,101 +75,66 @@ public class CommandHandler {
             String normalizedCmd = cmd.toLowerCase(Locale.ROOT);
             String resolvedCmd = editor.resolveCommandAlias(normalizedCmd);
 
-            switch (resolvedCmd) {
-                case "w":
-                case "write":
-                    return handleWrite(args.isEmpty() ? null : args);
-                case "q":
-                case "quit":
-                    return editor.requestQuit(force);
-                case "wq":
-                case "x":
-                    return handleWriteQuit(args.isEmpty() ? null : args);
-                case "e":
-                case "edit":
-                    return handleEdit(args);
-                case "bn":
-                case "bnext":
-                    return editor.nextBuffer();
-                case "bp":
-                case "bprev":
-                    return editor.prevBuffer();
-                case "ls":
-                    return editor.listBuffers();
-                case "bd":
-                case "bdelete":
-                    return editor.deleteBuffer(force);
-                case "set":
-                    return handleSet(args);
-                case "settings":
-                case "config":
-                case "shedrc":
-                    return editor.openSettingsBuffer();
-                case "log":
-                case "commandlog":
-                    return editor.openCommandLogBuffer();
-                case "tree":
-                    return editor.showFileTree(args);
-                case "git":
-                    return editor.handleGitCommand(args);
-                case "help":
-                case "h":
-                    editor.showHelp(args);
-                    return "Showing help";
-                case "wc":
-                case "wordcount":
-                    return handleWordCount();
-                case "recent":
-                    return editor.showRecentFiles();
-                case "d":
-                case "delete":
-                    return handleDelete(range);
-                case "files":
-                    return editor.showFileFinder();
-                case "folder":
-                case "folders":
-                    return editor.showFolderFinder();
-                case "buffers":
-                case "buf":
-                    return editor.showBufferFinder();
-                case "split":
-                case "sp":
-                    return editor.splitWindow(false);
-                case "vsplit":
-                case "vsp":
-                    return editor.splitWindow(true);
-                case "close":
-                case "clo":
-                    return editor.closeActiveWindow();
-                case "grep":
-                case "rg":
-                    return editor.showGrepFinder(args);
-                case "registers":
-                case "reg":
-                    return editor.showRegisters();
-                case "marks":
-                    return editor.showMarks();
-                case "themes":
-                    return editor.showThemes();
-                case "zen":
-                    return editor.toggleZenMode();
-                case "normal":
-                case "norm":
-                    return handleNormal(args, range);
-                case "reload":
-                case "source":
-                    return editor.reloadConfigFromDisk();
-                case "":
-                    return "";
-                default:
-                    try {
-                        return editor.gotoLine(Integer.parseInt(resolvedCmd));
-                    } catch (NumberFormatException ignored) {
-                        return "Command not recognised: " + cmd;
-                    }
+            if (resolvedCmd.isEmpty()) {
+                return "";
+            }
+
+            CommandAction action = commandRegistry.get(resolvedCmd);
+            if (action != null) {
+                return action.execute(args, range, force);
+            }
+
+            try {
+                return editor.gotoLine(Integer.parseInt(resolvedCmd));
+            } catch (NumberFormatException ignored) {
+                return "Command not recognised: " + cmd;
             }
         } catch (Exception e) {
             return "Error: " + e.getMessage();
+        }
+    }
+
+    private void registerCommands() {
+        registerCommand((args, range, force) -> handleWrite(args.isEmpty() ? null : args), "w", "write");
+        registerCommand((args, range, force) -> editor.requestQuit(force), "q", "quit");
+        registerCommand((args, range, force) -> handleWriteQuit(args.isEmpty() ? null : args), "wq", "x");
+        registerCommand((args, range, force) -> handleEdit(args), "e", "edit");
+        registerCommand((args, range, force) -> editor.nextBuffer(), "bn", "bnext");
+        registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
+        registerCommand((args, range, force) -> editor.listBuffers(), "ls");
+        registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
+        registerCommand((args, range, force) -> handleSet(args), "set");
+        registerCommand((args, range, force) -> editor.openSettingsBuffer(), "settings", "config", "shedrc");
+        registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
+        registerCommand((args, range, force) -> editor.showFileTree(args), "tree");
+        registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
+        registerCommand((args, range, force) -> {
+            editor.showHelp(args);
+            return "Showing help";
+        }, "help", "h");
+        registerCommand((args, range, force) -> handleWordCount(), "wc", "wordcount");
+        registerCommand((args, range, force) -> editor.showRecentFiles(), "recent");
+        registerCommand((args, range, force) -> handleDelete(range), "d", "delete");
+        registerCommand((args, range, force) -> editor.showFileFinder(), "files");
+        registerCommand((args, range, force) -> editor.showFolderFinder(), "folder", "folders");
+        registerCommand((args, range, force) -> editor.showBufferFinder(), "buffers", "buf");
+        registerCommand((args, range, force) -> editor.splitWindow(false), "split", "sp");
+        registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp");
+        registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
+        registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
+        registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
+        registerCommand((args, range, force) -> editor.showMarks(), "marks");
+        registerCommand((args, range, force) -> editor.showThemes(), "themes");
+        registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
+        registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
+        registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");
+    }
+
+    private void registerCommand(CommandAction action, String... names) {
+        for (String name : names) {
+            if (name != null && !name.isEmpty()) {
+                commandRegistry.put(name, action);
+            }
         }
     }
 
@@ -428,5 +398,10 @@ public class CommandHandler {
             this.replacement = replacement;
             this.replaceAll = replaceAll;
         }
+    }
+
+    @FunctionalInterface
+    private interface CommandAction {
+        String execute(String args, RangeParseResult range, boolean force);
     }
 }

@@ -135,6 +135,9 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.lspGoToDefinition(), "definition");
         registerCommand((args, range, force) -> editor.lspHover(), "hover");
         registerCommand((args, range, force) -> editor.lspReferences(), "references");
+        registerCommand((args, range, force) -> editor.showDiagnostics(), "diagnostics", "diag", "ldiag");
+        registerCommand((args, range, force) -> editor.diagnosticsNext(), "dnext", "dn");
+        registerCommand((args, range, force) -> editor.diagnosticsPrev(), "dprev", "dp");
         registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");

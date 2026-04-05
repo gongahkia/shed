@@ -87,6 +87,10 @@ public class HelpService {
                    "  :s/a/b         Substitute current line\n" +
                    "  :1,5s/a/b/g    Substitute a range\n" +
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
+                   "PLUGINS\n" +
+                   "  :plugin           List loaded plugins\n" +
+                   "  :plugin reload    Reload plugins from ~/.shed/plugins/\n" +
+                   "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
                    "  command.alias.<name>=<builtin>\n" +
                    "  keybind.<mode>.<lhs>=<rhs>\n" +
@@ -179,6 +183,35 @@ public class HelpService {
                     + "Define in ~/.shed/shedrc as command.alias.<newname>=<builtin>.\n"
                     + "Example: command.alias.ww=w and command.alias.qq=q.\n"
                     + "Aliases are used by command execution and command completion.\n";
+            case "plugin":
+            case "plugins":
+                return "Help: plugins\n\n"
+                    + "Shed loads .shed plugin files from ~/.shed/plugins/ at startup.\n"
+                    + "Each file declares directives as comment lines starting with # @.\n\n"
+                    + "DIRECTIVES\n"
+                    + "  # @name <plugin-name>\n"
+                    + "  # @description <one-line summary>\n"
+                    + "  # @command <name>=<shell command>\n"
+                    + "  # @bind <mode> <lhs>=<rhs>\n"
+                    + "  # @event <event>=:<command>\n\n"
+                    + "INTERPOLATION VARIABLES (expanded in shell commands)\n"
+                    + "  %file       current buffer file path\n"
+                    + "  %line       current line number (1-based)\n"
+                    + "  %col        current column (0-based)\n"
+                    + "  %word       word under cursor\n"
+                    + "  %selection  visual selection text\n\n"
+                    + "EVENTS\n"
+                    + "  BufOpen     fired after a file is opened\n"
+                    + "  BufWrite    fired after a buffer is saved\n"
+                    + "  ModeChange  fired when editor mode changes\n\n"
+                    + "EXAMPLE PLUGIN (~/.shed/plugins/fmt.shed)\n"
+                    + "  # @name fmt\n"
+                    + "  # @description auto-format on save\n"
+                    + "  # @command fmt=!prettier --write %file\n"
+                    + "  # @event BufWrite=:fmt\n\n"
+                    + "COMMANDS\n"
+                    + "  :plugin           list loaded plugins\n"
+                    + "  :plugin reload     reload all plugins from disk\n";
             default:
                 return "Shed help: " + topic + "\n\n"
                     + "No dedicated topic entry exists yet for this help topic.\n"

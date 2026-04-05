@@ -48,6 +48,11 @@ public class Texteditor extends JFrame implements KeyListener {
     private SearchManager searchManager;
     private CommandHandler commandHandler;
     private ConfigManager configManager;
+    private HelpService helpService;
+    private GitService gitService;
+    private TreeService treeService;
+    private LspService lspService;
+    private SyntaxHighlightService syntaxHighlightService;
 
     // Buffer management
     private List<FileBuffer> buffers;
@@ -120,6 +125,11 @@ public class Texteditor extends JFrame implements KeyListener {
     public Texteditor(String[] args) {
         // Initialize managers
         configManager = new ConfigManager();
+        helpService = new HelpService();
+        gitService = new GitService();
+        treeService = new TreeService();
+        lspService = new LspService();
+        syntaxHighlightService = new SyntaxHighlightService();
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -2279,32 +2289,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String[] syntaxKeywordsFor(FileType fileType) {
-        switch (fileType) {
-            case JAVA:
-                return new String[] {"abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class", "const", "continue", "default", "do", "double", "else", "enum", "exports", "extends", "final", "finally", "float", "for", "if", "implements", "import", "instanceof", "int", "interface", "long", "module", "native", "new", "non-sealed", "null", "open", "opens", "package", "permits", "private", "protected", "provides", "public", "record", "requires", "return", "sealed", "short", "static", "strictfp", "super", "switch", "synchronized", "this", "throw", "throws", "to", "transient", "transitive", "true", "try", "uses", "var", "void", "volatile", "when", "while", "with", "yield", "false"};
-            case JAVASCRIPT:
-            case TYPESCRIPT:
-                return new String[] {"as", "async", "await", "break", "case", "catch", "class", "const", "continue", "debugger", "default", "delete", "do", "else", "enum", "export", "extends", "false", "finally", "for", "from", "function", "if", "implements", "import", "in", "instanceof", "interface", "let", "new", "null", "private", "protected", "public", "readonly", "return", "static", "super", "switch", "this", "throw", "true", "try", "type", "typeof", "undefined", "var", "void", "while", "yield"};
-            case PYTHON:
-                return new String[] {"and", "as", "assert", "async", "await", "break", "class", "continue", "def", "del", "elif", "else", "except", "False", "finally", "for", "from", "global", "if", "import", "in", "is", "lambda", "None", "nonlocal", "not", "or", "pass", "raise", "return", "True", "try", "while", "with", "yield"};
-            case RUST:
-                return new String[] {"as", "async", "await", "break", "const", "continue", "crate", "dyn", "else", "enum", "extern", "false", "fn", "for", "if", "impl", "in", "let", "loop", "match", "mod", "move", "mut", "pub", "ref", "return", "Self", "self", "static", "struct", "super", "trait", "true", "type", "unsafe", "use", "where", "while"};
-            case GO:
-                return new String[] {"break", "case", "chan", "const", "continue", "default", "defer", "else", "fallthrough", "for", "func", "go", "goto", "if", "import", "interface", "map", "package", "range", "return", "select", "struct", "switch", "type", "var"};
-            case C:
-            case CPP:
-                return new String[] {"alignas", "alignof", "asm", "auto", "bool", "break", "case", "catch", "char", "class", "const", "constexpr", "continue", "default", "delete", "do", "double", "else", "enum", "extern", "false", "float", "for", "goto", "if", "inline", "int", "long", "mutable", "namespace", "new", "nullptr", "operator", "private", "protected", "public", "register", "return", "short", "signed", "sizeof", "static", "struct", "switch", "template", "this", "throw", "true", "try", "typedef", "typename", "union", "unsigned", "using", "virtual", "void", "volatile", "while", "#include", "#define"};
-            case HTML:
-                return new String[] {"<!DOCTYPE", "<html", "<head", "<body", "<main", "<section", "<article", "<aside", "<nav", "<header", "<footer", "<div", "<span", "<p", "<a", "<img", "<button", "<input", "<label", "<form", "<ul", "<ol", "<li", "<table", "<tr", "<td", "<th", "<script", "<style", "class", "id", "href", "src"};
-            case CSS:
-                return new String[] {"display", "position", "color", "background", "background-color", "padding", "margin", "width", "height", "max-width", "min-width", "font-family", "font-size", "font-weight", "line-height", "text-align", "border", "border-radius", "box-shadow", "opacity", "flex", "flex-direction", "justify-content", "align-items", "grid", "grid-template-columns", "gap", "overflow", "z-index", "absolute", "relative", "fixed", "sticky"};
-            case JSON:
-                return new String[] {"true", "false", "null"};
-            case MARKDOWN:
-                return new String[] {"# ", "## ", "### ", "#### ", "##### ", "###### ", "- ", "* ", "> ", "```"};
-            default:
-                return new String[0];
-        }
+        return syntaxHighlightService.keywordsFor(fileType);
     }
 
     private void highlightJavaAnnotations(Highlighter highlighter, String text, boolean[] masked) {
@@ -2556,46 +2541,15 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private boolean isStringDelimiter(FileType fileType, char c) {
-        if (c == '"' || c == '\'') {
-            return true;
-        }
-        return (fileType == FileType.JAVASCRIPT || fileType == FileType.TYPESCRIPT || fileType == FileType.MARKDOWN) && c == '`';
+        return syntaxHighlightService.isStringDelimiter(fileType, c);
     }
 
     private String[] lineCommentPrefixesFor(FileType fileType) {
-        switch (fileType) {
-            case JAVA:
-            case JAVASCRIPT:
-            case TYPESCRIPT:
-            case C:
-            case CPP:
-            case GO:
-            case RUST:
-                return new String[] {"//"};
-            case PYTHON:
-                return new String[] {"#"};
-            default:
-                return new String[0];
-        }
+        return syntaxHighlightService.lineCommentPrefixesFor(fileType);
     }
 
     private String[][] blockCommentPairsFor(FileType fileType) {
-        switch (fileType) {
-            case JAVA:
-            case JAVASCRIPT:
-            case TYPESCRIPT:
-            case C:
-            case CPP:
-            case GO:
-            case RUST:
-            case CSS:
-                return new String[][] {{"/*", "*/"}};
-            case HTML:
-            case MARKDOWN:
-                return new String[][] {{"<!--", "-->"}};
-            default:
-                return new String[0][0];
-        }
+        return syntaxHighlightService.blockCommentPairsFor(fileType);
     }
 
     private void updateSubstitutePreview() {
@@ -3238,8 +3192,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return closeTreePane();
         }
 
-        String target = pathArgument == null ? "" : pathArgument.trim();
-        File root = target.isEmpty() ? new File(".") : new File(target);
+        File root = treeService.resolveRoot(pathArgument);
         if (!root.exists()) {
             return "Path not found: " + root.getPath();
         }
@@ -3342,11 +3295,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String treeTitleSuffix(File root) {
-        String name = root.getName();
-        if (name == null || name.isEmpty()) {
-            return root.getAbsolutePath();
-        }
-        return name;
+        return treeService.titleSuffix(root);
     }
 
     private FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
@@ -3478,43 +3427,47 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleGitCommand(String argument) {
         File gitRoot = resolveGitRoot();
-        if (gitRoot == null) {
-            return "Not inside a git repository";
-        }
+        return gitService.handle(argument, gitRoot, new GitService.Handler() {
+            @Override
+            public String status(File root) {
+                return showGitStatus(root);
+            }
 
-        String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty()) {
-            return showGitStatus(gitRoot);
-        }
+            @Override
+            public String diff(File root, String args) {
+                return showGitDiff(root, args);
+            }
 
-        int split = trimmed.indexOf(' ');
-        String subcommand = split < 0 ? trimmed : trimmed.substring(0, split).trim();
-        String rest = split < 0 ? "" : trimmed.substring(split + 1).trim();
-        subcommand = subcommand.toLowerCase(java.util.Locale.ROOT);
+            @Override
+            public String log(File root, String args) {
+                return showGitLog(root, args);
+            }
 
-        switch (subcommand) {
-            case "status":
-            case "st":
-                return showGitStatus(gitRoot);
-            case "diff":
-                return showGitDiff(gitRoot, rest);
-            case "log":
-                return showGitLog(gitRoot, rest);
-            case "branch":
-            case "branches":
-                return showGitBranches(gitRoot);
-            case "add":
-                return runGitAdd(gitRoot, rest);
-            case "restore":
-            case "unstage":
-                return runGitRestoreStaged(gitRoot, rest);
-            case "commit":
-                return runGitCommit(gitRoot, rest);
-            case "help":
+            @Override
+            public String branches(File root) {
+                return showGitBranches(root);
+            }
+
+            @Override
+            public String add(File root, String args) {
+                return runGitAdd(root, args);
+            }
+
+            @Override
+            public String restore(File root, String args) {
+                return runGitRestoreStaged(root, args);
+            }
+
+            @Override
+            public String commit(File root, String args) {
+                return runGitCommit(root, args);
+            }
+
+            @Override
+            public String help() {
                 return showGitHelp();
-            default:
-                return "Unknown git command: " + subcommand + " (use :git help)";
-        }
+            }
+        });
     }
 
     private File resolveGitRoot() {
@@ -4189,33 +4142,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String languageId(FileBuffer buffer) {
-        switch (buffer.getFileType()) {
-            case RUST:
-                return "rust";
-            case PYTHON:
-                return "python";
-            case JAVASCRIPT:
-                return "javascript";
-            case TYPESCRIPT:
-                return "typescript";
-            case GO:
-                return "go";
-            case C:
-            case CPP:
-                return "c";
-            case JAVA:
-                return "java";
-            case HTML:
-                return "html";
-            case CSS:
-                return "css";
-            case JSON:
-                return "json";
-            case MARKDOWN:
-                return "markdown";
-            default:
-                return "text";
-        }
+        return lspService.languageId(buffer.getFileType());
     }
 
     private String bufferExtension(FileBuffer buffer) {
@@ -4231,26 +4158,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String[] builtinLspCommand(String extension) {
-        switch (extension) {
-            case "rs":
-                return new String[] {"rust-analyzer"};
-            case "py":
-                return new String[] {"pyright-langserver", "--stdio"};
-            case "js":
-            case "jsx":
-            case "ts":
-            case "tsx":
-                return new String[] {"typescript-language-server", "--stdio"};
-            case "go":
-                return new String[] {"gopls"};
-            case "c":
-            case "cpp":
-            case "h":
-            case "hpp":
-                return new String[] {"clangd"};
-            default:
-                return null;
-        }
+        return lspService.builtinCommand(extension);
     }
 
     // Repeat last command
@@ -5650,156 +5558,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private String getHelpText(String topic) {
-        String normalizedTopic = topic == null ? "" : topic.trim().toLowerCase();
-        if (normalizedTopic.isEmpty()) {
-            return "Shed v" + VERSION + "\n\n" +
-                   "NORMAL MODE\n" +
-                   "  h/j/k/l        Move left/down/up/right\n" +
-                   "  w/b/e          Move by word\n" +
-                   "  W/B/E ge/gE    WORD and backward-end motions\n" +
-                   "  f/F/t/T ; ,    Find/till-char and repeat\n" +
-                   "  0/^/$ g0/g$ g_ Line start/indent/end variants\n" +
-                   "  gg/G 50%       File start/end and percent jump\n" +
-                   "  { } ( ) H M L  Paragraph, sentence, screen motions\n" +
-                   "  zt/zz/zb       Scroll current line to top/center/bottom\n" +
-                   "  i/a/A/I/o/O    Insert variants\n" +
-                   "  v/V/R          Visual/visual-line/replace\n" +
-                   "  yy/dd/cc       Yank/delete/change line\n" +
-                   "  dw/cw diw ci\"  Motion and text-object operators\n" +
-                   "  D/C/Y r{char}  End-of-line yank/delete/change and replace-char\n" +
-                   "  >>/<</==       Indent/dedent/auto-indent line\n" +
-                   "  J/gJ           Join lines with/without space\n" +
-                   "  cs/ds/ys       Surround change/delete/add\n" +
-                   "  q{a-z} @a @@   Macro record and playback\n" +
-                   "  m{a-z}         Set mark\n" +
-                   "  '{a-z}/`{a-z}  Jump to mark\n" +
-                   "  Ctrl-o/Ctrl-i  Jump back/forward\n" +
-                   "  g;/g,          Previous/next change\n" +
-                   "  \"ap \"+p      Register-targeted edit and paste\n" +
-                   "  p/P            Paste after/before\n" +
-                   "  u/Ctrl-r       Undo/redo\n" +
-                   "  /pattern       Search forward\n" +
-                   "  ?pattern       Search backward\n" +
-                   "  n/N            Next/previous match\n" +
-                   "  * / #          Search word under cursor\n" +
-                   "  .              Repeat last command\n\n" +
-                   "COMMANDS\n" +
-                   "  :w [file]      Write current buffer\n" +
-                   "  :q / :q!       Quit buffer/editor\n" +
-                   "  :wq / :x       Write and quit\n" +
-                   "  :e file        Edit file\n" +
-                   "  :bn / :bp      Next/previous buffer\n" +
-                   "  :ls            List buffers\n" +
-                   "  :bd            Delete buffer\n" +
-                   "  :recent        Show recent files\n" +
-                   "  :settings      Open user settings file\n" +
-                   "  :log           Open command log file\n" +
-                   "  :files         File finder\n" +
-                   "  :folder        Folder finder\n" +
-                   "  :tree [path]   File tree in scratch buffer\n" +
-                   "  :buffers       Buffer finder\n" +
-                   "  :grep text     Grep finder\n" +
-                   "  :git ...       Git status/diff/log/add/commit\n" +
-                   "  :split/:vsplit Split the active window\n" +
-                   "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
-                   "  Ctrl-w h/j/k/l Move window focus\n" +
-                   "  :registers     Show registers\n" +
-                   "  :marks         Show marks\n" +
-                   "  :themes        Show built-in themes\n" +
-                   "  :zen           Toggle zen mode\n" +
-                   "  :reload        Reload ~/.shedrc now\n" +
-                   "  :normal keys   Replay normal keys\n" +
-                   "  :!cmd          Run shell command\n" +
-                   "  :set nu        Enable line numbers\n" +
-                    "  :set theme=x   Switch color theme\n" +
-                   "  :set k=v       Set any config key in-memory\n" +
-                   "  :45            Go to line 45\n" +
-                   "  :1,5d          Delete a line range\n" +
-                   "  :s/a/b         Substitute current line\n" +
-                   "  :1,5s/a/b/g    Substitute a range\n" +
-                   "  :%s/a/b/g      Substitute whole buffer\n\n" +
-                   "SETTINGS KEYS\n" +
-                   "  command.alias.<name>=<builtin>\n" +
-                   "  keybind.<mode>.<lhs>=<rhs>\n" +
-                   "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
-                   "  tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n\n" +
-                   "note: this is a help buffer. use :q to return.\n";
-        }
-
-        switch (normalizedTopic) {
-            case "windows":
-            case "split":
-            case "vsplit":
-                return "Help: windows\n\n"
-                    + ":split / :sp creates a horizontal split.\n"
-                    + ":vsplit / :vsp creates a vertical split.\n"
-                    + ":close closes the active split when more than one window exists.\n"
-                    + "Ctrl-w s/v/c mirrors the split commands.\n"
-                    + "Ctrl-w h/j/k/l changes window focus.\n"
-                    + "Ctrl-w w cycles focus and Ctrl-w = equalizes split ratios.\n";
-            case "registers":
-            case "reg":
-                return "Help: registers\n\n"
-                    + "Use \"{register} before yank/delete/change/paste.\n"
-                    + "Supported special registers: \", 0, %, :, ., +, *, _.\n"
-                    + "Named registers a-z and A-Z are also supported.\n"
-                    + ":registers opens a scratch buffer with current register contents.\n";
-            case "macros":
-            case "macro":
-                return "Help: macros\n\n"
-                    + "q{register} starts recording into a named register.\n"
-                    + "q stops recording.\n"
-                    + "@{register} replays a macro and @@ replays the last executed macro.\n"
-                    + "Macro playback is recursion-limited to avoid runaway loops.\n";
-            case "textobjects":
-            case "text-objects":
-            case "objects":
-                return "Help: text objects\n\n"
-                    + "Supported forms include iw/aw, iW/aW, ip/ap, is/as,\n"
-                    + "quoted objects for \", ', ` and bracket objects for () [] {} <>.\n"
-                    + "Use them with d/c/y, for example diw, ci\", ya(, or dap.\n";
-            case "surround":
-                return "Help: surround\n\n"
-                    + "cs{old}{new} changes an existing surround pair.\n"
-                    + "ds{char} removes a surround pair.\n"
-                    + "ys{object}{char} adds a surround around a supported text object.\n"
-                    + "Examples: cs\"', ds), ysw].\n";
-            case "lsp":
-            case "completion":
-                return "Help: completion\n\n"
-                    + "Ctrl-n requests completion from an external language server for file-backed buffers.\n"
-                    + "If no server is available, Shed falls back to local buffer-word completion.\n"
-                    + "Configure overrides in ~/.shedrc using lsp.<ext>.command and lsp.<ext>.args.\n";
-            case "git":
-                return "Help: git\n\n"
-                    + ":git shows status.\n"
-                    + ":git diff [args], :git log [count], :git branch show repository state.\n"
-                    + ":git add <paths...>, :git restore <paths...>, :git commit <message> modify staging/commits.\n";
-            case "tree":
-                return "Help: tree\n\n"
-                    + ":tree toggles the left side tree pane open/closed.\n"
-                    + ":tree <path> uses a specific root path when opening.\n"
-                    + "Use j/k to move and Enter or o to open the file in the other pane.\n";
-            case "keybind":
-            case "keybinding":
-            case "keybindings":
-                return "Help: keybindings\n\n"
-                    + "Define in ~/.shedrc as keybind.<mode>.<lhs>=<rhs>.\n"
-                    + "LHS/RHS accept raw characters and tokens like <esc>, <enter>, <c-w>.\n"
-                    + "Use mode global for mappings active in every mode.\n"
-                    + "Use value <nop> to disable a key.\n";
-            case "commands":
-            case "alias":
-            case "aliases":
-                return "Help: command aliases\n\n"
-                    + "Define in ~/.shedrc as command.alias.<newname>=<builtin>.\n"
-                    + "Example: command.alias.ww=w and command.alias.qq=q.\n"
-                    + "Aliases are used by command execution and command completion.\n";
-            default:
-                return "Shed help: " + topic + "\n\n"
-                    + "No dedicated topic entry exists yet for this help topic.\n"
-                    + "Use :help for the full command reference.\n";
-        }
+        return helpService.getHelpText(topic, VERSION);
     }
 
     // Recent files management

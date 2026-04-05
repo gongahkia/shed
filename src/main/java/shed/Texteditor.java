@@ -2992,6 +2992,32 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private String findCurrentScope() {
+        try {
+            String text = writingArea.getText();
+            int caret = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(caret);
+            // Search backward from current line for a function/class/method definition
+            for (int i = line; i >= Math.max(0, line - 200); i--) {
+                int ls = writingArea.getLineStartOffset(i);
+                int le = writingArea.getLineEndOffset(i);
+                String lineText = text.substring(ls, le).trim();
+                // Match common patterns: function/def/fn/func/class/impl/pub fn/public/private/protected
+                if (lineText.matches("^(public|private|protected|static|async|export|default)?\\s*(class|interface|enum|struct|impl|trait)\\s+\\w+.*")
+                        || lineText.matches("^(public|private|protected|static|abstract|final)?\\s*(\\w+\\s+)*\\w+\\s*\\([^)]*\\).*\\{?\\s*$")
+                        || lineText.matches("^(def|fn|func|function|sub|proc|method)\\s+\\w+.*")
+                        || lineText.matches("^(pub\\s+)?(fn|async fn)\\s+\\w+.*")
+                        || lineText.matches("^(const|let|var)\\s+\\w+\\s*=\\s*(function|\\([^)]*\\)\\s*=>).*")) {
+                    // Extract just the name portion
+                    String name = lineText.replaceAll("[{(].*", "").replaceAll("\\s*->.*", "").trim();
+                    if (name.length() > 50) name = name.substring(0, 50) + "...";
+                    return name;
+                }
+            }
+        } catch (BadLocationException ignored) {}
+        return null;
+    }
+
     private void updateMatchingBracketHighlight() {
         Highlighter highlighter = writingArea.getHighlighter();
         for (Object tag : matchBracketTags) {
@@ -7849,6 +7875,11 @@ public class Texteditor extends JFrame implements KeyListener {
             status.append((line + 1)).append(":").append((col + 1)).append("  ");
         } catch (BadLocationException e) {
             status.append("1:1  ");
+        }
+
+        String scope = findCurrentScope();
+        if (scope != null) {
+            status.append(scope).append("  ");
         }
 
         EditorMode modeForStatus = editorState.mode == null ? EditorMode.NORMAL : editorState.mode;

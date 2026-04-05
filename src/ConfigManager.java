@@ -281,6 +281,16 @@ public class ConfigManager {
         return getUiColor("ui.syntax.string", activeTheme().stringAccent);
     }
 
+    public Color getSyntaxCommentColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.comment", blend(theme.foreground, theme.normal, 0.52));
+    }
+
+    public Color getSyntaxNumberColor() {
+        ThemePalette theme = activeTheme();
+        return getUiColor("ui.syntax.number", blend(theme.accent, theme.stringAccent, 0.42));
+    }
+
     public String getThemeId() {
         ThemePalette theme = activeTheme();
         return theme == null ? DEFAULT_THEME : theme.id;

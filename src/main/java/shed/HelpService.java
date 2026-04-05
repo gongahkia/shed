@@ -142,7 +142,9 @@ public class HelpService {
                 return "Help: git\n\n"
                     + ":git shows status.\n"
                     + ":git diff [args], :git log [count], :git branch show repository state.\n"
-                    + ":git add <paths...>, :git restore <paths...>, :git commit <message> modify staging/commits.\n";
+                    + ":git add|stage <paths...>, :git restore|unstage <paths...> modify staging.\n"
+                    + ":git checkout <arg>, :git switch <branch> move HEAD.\n"
+                    + ":git commit <message>, :git amend <message|--no-edit> create/update commits.\n";
             case "tree":
                 return "Help: tree\n\n"
                     + ":tree toggles the left side tree pane open/closed.\n"

@@ -10,8 +10,13 @@ public class GitService {
         String log(File root, String args);
         String branches(File root);
         String add(File root, String args);
+        String stage(File root, String args);
         String restore(File root, String args);
+        String unstage(File root, String args);
         String commit(File root, String args);
+        String amend(File root, String args);
+        String checkout(File root, String args);
+        String switchBranch(File root, String args);
         String help();
     }
 
@@ -42,11 +47,22 @@ public class GitService {
                 return handler.branches(root);
             case "add":
                 return handler.add(root, rest);
+            case "stage":
+                return handler.stage(root, rest);
             case "restore":
-            case "unstage":
                 return handler.restore(root, rest);
+            case "unstage":
+                return handler.unstage(root, rest);
             case "commit":
                 return handler.commit(root, rest);
+            case "amend":
+                return handler.amend(root, rest);
+            case "checkout":
+            case "co":
+                return handler.checkout(root, rest);
+            case "switch":
+            case "sw":
+                return handler.switchBranch(root, rest);
             case "help":
                 return handler.help();
             default:

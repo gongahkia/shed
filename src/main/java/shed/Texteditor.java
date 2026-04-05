@@ -3940,13 +3940,38 @@ public class Texteditor extends JFrame implements KeyListener {
             }
 
             @Override
+            public String stage(File root, String args) {
+                return runGitAdd(root, args);
+            }
+
+            @Override
             public String restore(File root, String args) {
+                return runGitRestoreStaged(root, args);
+            }
+
+            @Override
+            public String unstage(File root, String args) {
                 return runGitRestoreStaged(root, args);
             }
 
             @Override
             public String commit(File root, String args) {
                 return runGitCommit(root, args);
+            }
+
+            @Override
+            public String amend(File root, String args) {
+                return runGitAmend(root, args);
+            }
+
+            @Override
+            public String checkout(File root, String args) {
+                return runGitCheckout(root, args);
+            }
+
+            @Override
+            public String switchBranch(File root, String args) {
+                return runGitSwitch(root, args);
             }
 
             @Override
@@ -4097,6 +4122,79 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Commit complete";
     }
 
+    private String runGitAmend(File gitRoot, String argument) {
+        if (!gitHeadExists(gitRoot)) {
+            return "Git error: cannot amend before first commit";
+        }
+        String trimmed = argument == null ? "" : argument.trim();
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("commit");
+        command.add("--amend");
+        if (trimmed.isEmpty()) {
+            return "Usage: :git amend <message> or :git amend --no-edit";
+        }
+        if ("--no-edit".equals(trimmed)) {
+            command.add("--no-edit");
+        } else {
+            command.add("-m");
+            command.add(trimmed);
+        }
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String body = result.stdout.strip();
+        if (body.isEmpty()) {
+            body = "commit amended";
+        }
+        showScratchBuffer("[git amend]", body + "\n");
+        return "Amend complete";
+    }
+
+    private boolean gitHeadExists(File gitRoot) {
+        CommandResult result = runCommand(gitRoot, List.of("git", "rev-parse", "--verify", "HEAD"));
+        return result.exitCode == 0;
+    }
+
+    private String runGitCheckout(File gitRoot, String argument) {
+        if (argument == null || argument.isBlank()) {
+            return "Usage: :git checkout <branch|path>";
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("checkout");
+        command.addAll(splitWhitespaceArgs(argument));
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String output = result.stdout.strip();
+        if (!output.isEmpty()) {
+            showScratchBuffer("[git checkout]", output + "\n");
+        }
+        return "Checkout complete";
+    }
+
+    private String runGitSwitch(File gitRoot, String argument) {
+        if (argument == null || argument.isBlank()) {
+            return "Usage: :git switch <branch>";
+        }
+        List<String> command = new ArrayList<>();
+        command.add("git");
+        command.add("switch");
+        command.addAll(splitWhitespaceArgs(argument));
+        CommandResult result = runCommand(gitRoot, command);
+        if (result.exitCode != 0) {
+            return gitError(result);
+        }
+        String output = result.stdout.strip();
+        if (!output.isEmpty()) {
+            showScratchBuffer("[git switch]", output + "\n");
+        }
+        return "Switch complete";
+    }
+
     private String showGitHelp() {
         showScratchBuffer("[git help]",
             "Git commands\n\n"
@@ -4105,9 +4203,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"
-                + ":git add <paths...>   Stage paths\n"
-                + ":git restore <paths>  Unstage paths\n"
-                + ":git commit <msg>     Commit staged changes\n");
+                + ":git add|stage <paths...> Stage paths\n"
+                + ":git restore|unstage <paths> Unstage paths\n"
+                + ":git commit <msg>     Commit staged changes\n"
+                + ":git amend <msg>      Amend last commit message/content\n"
+                + ":git checkout <arg>   Checkout branch/path\n"
+                + ":git switch <branch>  Switch branch\n");
         return "Showing git help";
     }
 

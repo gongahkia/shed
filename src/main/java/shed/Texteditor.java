@@ -121,6 +121,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<String, String> lspErrors;
     private EditorPane treePane;
     private FileBuffer treeBuffer;
+    private File treeRoot;
     private Map<FileBuffer, List<String>> treeLineTargets;
     private FileBuffer quickfixBuffer;
     private int keymapReplayDepth;
@@ -193,6 +194,7 @@ public class Texteditor extends JFrame implements KeyListener {
         keymapReplayDepth = 0;
         treePane = null;
         treeBuffer = null;
+        treeRoot = null;
         treeLineTargets = new HashMap<>();
         quickfixBuffer = null;
         loadRecentFiles();
@@ -3527,15 +3529,159 @@ public class Texteditor extends JFrame implements KeyListener {
         return new File(System.getProperty("user.home"));
     }
 
+    public String handleTreeCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty()) {
+            return showFileTree("");
+        }
+
+        int split = trimmed.indexOf(' ');
+        String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
+        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        switch (subcommand) {
+            case "refresh":
+                if (treeRoot == null) {
+                    return showFileTree("");
+                }
+                return showFileTree(treeRoot.getAbsolutePath());
+            case "reveal":
+                return revealCurrentInTree();
+            case "new":
+                return treeCreateFile(args);
+            case "mkdir":
+                return treeCreateDirectory(args);
+            case "rename":
+                return treeRename(args);
+            case "rm":
+            case "delete":
+                return treeDelete(args, false);
+            case "rm!":
+            case "delete!":
+                return treeDelete(args, true);
+            default:
+                return showFileTree(trimmed);
+        }
+    }
+
+    private String revealCurrentInTree() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return "Current buffer is not file-backed";
+        }
+        File root = treeService.revealRootForPath(new File(buffer.getFilePath()));
+        if (root == null || !root.exists()) {
+            return "Cannot reveal current buffer";
+        }
+        return showFileTree(root.getAbsolutePath());
+    }
+
+    private String treeCreateFile(String pathArgument) {
+        File target = treeService.resolveActionPath(pathArgument, treeRoot);
+        if (target == null) {
+            return "Usage: :tree new <path>";
+        }
+        try {
+            boolean existed = target.exists();
+            treeService.createFile(target);
+            if (treeRoot == null) {
+                treeRoot = treeService.revealRootForPath(target);
+            }
+            if (treePane != null && editorPanes.contains(treePane) && treeRoot != null) {
+                showFileTree(treeRoot.getAbsolutePath());
+            }
+            return existed ? "File exists: " + target.getAbsolutePath() : "Created file: " + target.getAbsolutePath();
+        } catch (IOException e) {
+            return "Tree new failed: " + e.getMessage();
+        }
+    }
+
+    private String treeCreateDirectory(String pathArgument) {
+        File target = treeService.resolveActionPath(pathArgument, treeRoot);
+        if (target == null) {
+            return "Usage: :tree mkdir <path>";
+        }
+        try {
+            treeService.createDirectory(target);
+            if (treeRoot == null) {
+                treeRoot = target;
+            }
+            if (treePane != null && editorPanes.contains(treePane) && treeRoot != null) {
+                showFileTree(treeRoot.getAbsolutePath());
+            }
+            return "Created directory: " + target.getAbsolutePath();
+        } catch (IOException e) {
+            return "Tree mkdir failed: " + e.getMessage();
+        }
+    }
+
+    private String treeRename(String argument) {
+        if (argument == null || argument.isBlank()) {
+            return "Usage: :tree rename <from> <to>";
+        }
+        String[] parts = argument.trim().split("\\s+", 2);
+        if (parts.length < 2) {
+            return "Usage: :tree rename <from> <to>";
+        }
+        File from = treeService.resolveActionPath(parts[0], treeRoot);
+        File to = treeService.resolveActionPath(parts[1], treeRoot);
+        if (from == null || to == null) {
+            return "Usage: :tree rename <from> <to>";
+        }
+        if (!from.exists()) {
+            return "Path not found: " + from.getAbsolutePath();
+        }
+        try {
+            treeService.rename(from, to);
+            if (treeRoot != null && treePane != null && editorPanes.contains(treePane)) {
+                showFileTree(treeRoot.getAbsolutePath());
+            }
+            return "Renamed: " + from.getAbsolutePath() + " -> " + to.getAbsolutePath();
+        } catch (IOException e) {
+            return "Tree rename failed: " + e.getMessage();
+        }
+    }
+
+    private String treeDelete(String argument, boolean force) {
+        File target = treeService.resolveActionPath(argument, treeRoot);
+        if (target == null) {
+            return "Usage: :tree rm <path>";
+        }
+        if (!target.exists()) {
+            return "Path not found: " + target.getAbsolutePath();
+        }
+        if (!force && target.isDirectory()) {
+            File[] children = target.listFiles();
+            if (children != null && children.length > 0) {
+                return "Directory not empty (use :tree rm! <path>)";
+            }
+        }
+        try {
+            int removed = treeService.deleteRecursively(target);
+            if (treeRoot != null && treePane != null && editorPanes.contains(treePane)) {
+                showFileTree(treeRoot.getAbsolutePath());
+            }
+            return "Deleted " + removed + " path(s)";
+        } catch (IOException e) {
+            return "Tree delete failed: " + e.getMessage();
+        }
+    }
+
     public String showFileTree(String pathArgument) {
-        if (treePane != null && editorPanes.contains(treePane)) {
+        String trimmed = pathArgument == null ? "" : pathArgument.trim();
+        if (trimmed.isEmpty() && treePane != null && editorPanes.contains(treePane)) {
             return closeTreePane();
         }
 
-        File root = treeService.resolveRoot(pathArgument);
+        File root;
+        if (trimmed.isEmpty()) {
+            root = treeRoot != null ? treeRoot : treeService.resolveRoot("");
+        } else {
+            root = treeService.resolveRoot(trimmed);
+        }
         if (!root.exists()) {
             return "Path not found: " + root.getPath();
         }
+        treeRoot = root.getAbsoluteFile();
 
         StringBuilder builder = new StringBuilder();
         List<String> lineTargets = new ArrayList<>();

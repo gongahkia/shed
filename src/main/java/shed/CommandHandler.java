@@ -211,14 +211,16 @@ public class CommandHandler {
                 return "Error: No file open";
             }
 
-            buffer.setContent(editor.getTextArea().getText());
+            String previousContent = buffer.getContent();
+            String updatedContent = editor.getTextArea().getText();
+            buffer.setContent(updatedContent);
             if (targetPath != null && !targetPath.isEmpty()) {
                 buffer.saveAs(new File(targetPath));
             } else {
                 buffer.save();
             }
             editor.notifyCurrentBufferSaved();
-            String reloadResult = editor.reloadConfigIfSettingsBuffer(buffer);
+            String reloadResult = editor.reloadConfigIfSettingsBuffer(buffer, previousContent, updatedContent);
 
             String timestamp = timeFormat.format(LocalDateTime.now());
             String base = "\"" + buffer.getDisplayName() + "\" " + buffer.getLineCount() + "L written " + timestamp;

@@ -45,6 +45,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -11996,13 +11997,25 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {
+        return reloadConfigIfSettingsBuffer(buffer, null, null);
+    }
+
+    public String reloadConfigIfSettingsBuffer(FileBuffer buffer, String previousContent, String updatedContent) {
         if (buffer == null || buffer.getFile() == null) {
             return null;
         }
         if (!isSettingsFile(buffer.getFile())) {
             return null;
         }
-        return reloadConfigFromDisk();
+        boolean canDetectThemeChange = previousContent != null && updatedContent != null;
+        boolean themeChangedInFile = canDetectThemeChange && didConfigKeyChange(previousContent, updatedContent, "theme");
+        String activeThemeBeforeReload = configManager.getThemeId();
+        configManager.reload();
+        if (canDetectThemeChange && !themeChangedInFile) {
+            configManager.setTheme(activeThemeBeforeReload);
+        }
+        applyRuntimeConfigFromSettings();
+        return "Settings reloaded";
     }
 
     private boolean isSettingsFile(File file) {
@@ -12015,6 +12028,36 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (IOException e) {
             return file.getAbsolutePath().equals(new File(configManager.getConfigPath()).getAbsolutePath());
         }
+    }
+
+    private boolean didConfigKeyChange(String previousContent, String updatedContent, String key) {
+        String previousValue = extractConfigValue(previousContent, key);
+        String updatedValue = extractConfigValue(updatedContent, key);
+        return !Objects.equals(previousValue, updatedValue);
+    }
+
+    private String extractConfigValue(String content, String key) {
+        if (content == null || key == null || key.isBlank()) {
+            return null;
+        }
+        String normalizedKey = key.trim();
+        String[] lines = content.split("\\R");
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int separator = trimmed.indexOf('=');
+            if (separator <= 0) {
+                continue;
+            }
+            String parsedKey = trimmed.substring(0, separator).trim();
+            if (!parsedKey.equalsIgnoreCase(normalizedKey)) {
+                continue;
+            }
+            return trimmed.substring(separator + 1).trim();
+        }
+        return null;
     }
 
     private void applyRuntimeConfigFromSettings() {

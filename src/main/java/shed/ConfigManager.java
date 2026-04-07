@@ -53,6 +53,16 @@ public class ConfigManager {
     private static final boolean DEFAULT_AUTO_PAIRS = true;
     private static final int DEFAULT_TEXTWIDTH = 0;
     private static final boolean DEFAULT_MINIMAP = false;
+    private static final boolean DEFAULT_DRAMATIC_UI = false;
+    private static final boolean DEFAULT_DRAMATIC_IDENTITY = true;
+    private static final boolean DEFAULT_DRAMATIC_MODE_TRANSITIONS = true;
+    private static final boolean DEFAULT_DRAMATIC_COMMAND_PALETTE = true;
+    private static final boolean DEFAULT_DRAMATIC_EDITING_FEEDBACK = true;
+    private static final boolean DEFAULT_DRAMATIC_PANEL_ANIMATIONS = true;
+    private static final boolean DEFAULT_DRAMATIC_SOUND = false;
+    private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION = false;
+    private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
+    private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "shedrc";
     private static final String SHED_SESSIONS_NAME = "sessions";
@@ -147,6 +157,16 @@ public class ConfigManager {
         config.put("auto.pairs", String.valueOf(DEFAULT_AUTO_PAIRS));
         config.put("textwidth", String.valueOf(DEFAULT_TEXTWIDTH));
         config.put("minimap", String.valueOf(DEFAULT_MINIMAP));
+        config.put("ui.dramatic", String.valueOf(DEFAULT_DRAMATIC_UI));
+        config.put("ui.dramatic.identity", String.valueOf(DEFAULT_DRAMATIC_IDENTITY));
+        config.put("ui.dramatic.mode.transitions", String.valueOf(DEFAULT_DRAMATIC_MODE_TRANSITIONS));
+        config.put("ui.dramatic.command.palette", String.valueOf(DEFAULT_DRAMATIC_COMMAND_PALETTE));
+        config.put("ui.dramatic.editing.feedback", String.valueOf(DEFAULT_DRAMATIC_EDITING_FEEDBACK));
+        config.put("ui.dramatic.panel.animations", String.valueOf(DEFAULT_DRAMATIC_PANEL_ANIMATIONS));
+        config.put("ui.dramatic.sound", String.valueOf(DEFAULT_DRAMATIC_SOUND));
+        config.put("ui.dramatic.reduced.motion", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION));
+        config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
+        config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
     }
 
     // Load configuration from file
@@ -497,6 +517,46 @@ public class ConfigManager {
         return getBoolean("minimap", DEFAULT_MINIMAP);
     }
 
+    public boolean getDramaticUiEnabled() {
+        return getBoolean("ui.dramatic", DEFAULT_DRAMATIC_UI);
+    }
+
+    public boolean getDramaticIdentityEnabled() {
+        return getBoolean("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
+    }
+
+    public boolean getDramaticModeTransitionsEnabled() {
+        return getBoolean("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
+    }
+
+    public boolean getDramaticCommandPaletteEnabled() {
+        return getBoolean("ui.dramatic.command.palette", DEFAULT_DRAMATIC_COMMAND_PALETTE);
+    }
+
+    public boolean getDramaticEditingFeedbackEnabled() {
+        return getBoolean("ui.dramatic.editing.feedback", DEFAULT_DRAMATIC_EDITING_FEEDBACK);
+    }
+
+    public boolean getDramaticPanelAnimationsEnabled() {
+        return getBoolean("ui.dramatic.panel.animations", DEFAULT_DRAMATIC_PANEL_ANIMATIONS);
+    }
+
+    public boolean getDramaticSoundEnabled() {
+        return getBoolean("ui.dramatic.sound", DEFAULT_DRAMATIC_SOUND);
+    }
+
+    public boolean getDramaticReducedMotionEnabled() {
+        return getBoolean("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION);
+    }
+
+    public int getDramaticAnimationMs() {
+        return getInt("ui.dramatic.animation.ms", DEFAULT_DRAMATIC_ANIMATION_MS);
+    }
+
+    public int getDramaticMinimapWidth() {
+        return Math.max(40, getInt("ui.dramatic.minimap.width", DEFAULT_DRAMATIC_MINIMAP_WIDTH));
+    }
+
     public void set(String key, String value) {
         config.put(key, value);
     }
@@ -653,6 +713,17 @@ public class ConfigManager {
             + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
             + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
             + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
+            + "# Dramatic UI (theater mode)\n"
+            + "ui.dramatic=" + DEFAULT_DRAMATIC_UI + "\n"
+            + "ui.dramatic.identity=" + DEFAULT_DRAMATIC_IDENTITY + "\n"
+            + "ui.dramatic.mode.transitions=" + DEFAULT_DRAMATIC_MODE_TRANSITIONS + "\n"
+            + "ui.dramatic.command.palette=" + DEFAULT_DRAMATIC_COMMAND_PALETTE + "\n"
+            + "ui.dramatic.editing.feedback=" + DEFAULT_DRAMATIC_EDITING_FEEDBACK + "\n"
+            + "ui.dramatic.panel.animations=" + DEFAULT_DRAMATIC_PANEL_ANIMATIONS + "\n"
+            + "ui.dramatic.sound=" + DEFAULT_DRAMATIC_SOUND + "\n"
+            + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
+            + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
+            + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
             + "# Plugins\n"
             + "# Place .shed or .lua files in ~/.shed/plugins/ to load plugins.\n"
             + "# .shed files: declarative (# @command, # @bind, # @event directives)\n"

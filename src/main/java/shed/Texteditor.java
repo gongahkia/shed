@@ -160,6 +160,23 @@ public class Texteditor extends JFrame implements KeyListener {
     private final List<Object> matchBracketTags = new ArrayList<>();
     private List<Object> markdownHighlightTags;
     private boolean bracketColorEnabled;
+    // Dramatic UI runtime settings
+    private boolean dramaticUiEnabled;
+    private boolean dramaticIdentityEnabled;
+    private boolean dramaticModeTransitionsEnabled;
+    private boolean dramaticCommandPaletteEnabled;
+    private boolean dramaticEditingFeedbackEnabled;
+    private boolean dramaticPanelAnimationsEnabled;
+    private boolean dramaticSoundEnabled;
+    private boolean dramaticReducedMotionEnabled;
+    private int dramaticAnimationMs;
+    private int dramaticMinimapWidth;
+    private Timer modeTransitionTimer;
+    private Timer feedbackPulseTimer;
+    private Object feedbackPulseTag;
+    private Timer hostTintTimer;
+    private Timer splitAnimationTimer;
+    private Timer minimapWidthTimer;
 
     // Constants
     private static final String VERSION = "2.0";
@@ -250,6 +267,23 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketHighlightTags = new ArrayList<>();
         markdownHighlightTags = new ArrayList<>();
         bracketColorEnabled = false;
+        dramaticUiEnabled = false;
+        dramaticIdentityEnabled = false;
+        dramaticModeTransitionsEnabled = false;
+        dramaticCommandPaletteEnabled = false;
+        dramaticEditingFeedbackEnabled = false;
+        dramaticPanelAnimationsEnabled = false;
+        dramaticSoundEnabled = false;
+        dramaticReducedMotionEnabled = false;
+        dramaticAnimationMs = 220;
+        dramaticMinimapWidth = 84;
+        modeTransitionTimer = null;
+        feedbackPulseTimer = null;
+        feedbackPulseTag = null;
+        hostTintTimer = null;
+        splitAnimationTimer = null;
+        minimapWidthTimer = null;
+        refreshDramaticSettings();
         loadRecentFiles();
         lastMessage = "";
 
@@ -1188,16 +1222,32 @@ public class Texteditor extends JFrame implements KeyListener {
         // Search navigation
         else if (c == 'n') {
             editorState.pendingCount = "";
-            showMessage(searchManager.nextMatch());
+            String result = searchManager.nextMatch();
+            showMessage(result);
+            if (result.startsWith("Match")) {
+                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+            }
         } else if (c == 'N') {
             editorState.pendingCount = "";
-            showMessage(searchManager.prevMatch());
+            String result = searchManager.prevMatch();
+            showMessage(result);
+            if (result.startsWith("Match")) {
+                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+            }
         } else if (c == '*') {
             editorState.pendingCount = "";
-            showMessage(searchWordUnderCursor(true));
+            String result = searchWordUnderCursor(true);
+            showMessage(result);
+            if (result.startsWith("Match")) {
+                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+            }
         } else if (c == '#') {
             editorState.pendingCount = "";
-            showMessage(searchWordUnderCursor(false));
+            String result = searchWordUnderCursor(false);
+            showMessage(result);
+            if (result.startsWith("Match")) {
+                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+            }
         } else if (c == ';') {
             editorState.pendingCount = "";
             showMessage(repeatFind(false));
@@ -2054,6 +2104,9 @@ public class Texteditor extends JFrame implements KeyListener {
             showMessage("Selection " + (operator == '>' ? "indented" : operator == '<' ? "dedented" : "auto-indented"));
         } catch (BadLocationException ignored) {
         }
+        if (!substitutePreviewTags.isEmpty()) {
+            pulseCaretLine(configManager.getSubstitutePreviewColor());
+        }
     }
 
     private void joinVisualSelection() {
@@ -2289,6 +2342,9 @@ public class Texteditor extends JFrame implements KeyListener {
             String result = editorState.searchForward ? searchManager.searchForward(pattern) : searchManager.searchBackward(pattern);
             if (!result.isEmpty()) {
                 showMessage(result);
+                if (result.startsWith("Match")) {
+                    pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+                }
             }
             if (!pattern.isEmpty()) {
                 addCommandHistory(editorState.commandBuffer);
@@ -3305,6 +3361,7 @@ public class Texteditor extends JFrame implements KeyListener {
         statusBar.setForeground(configManager.getStatusBarForeground());
         commandBar.setBackground(configManager.getCommandBarBackground());
         commandBar.setForeground(configManager.getCommandBarForeground());
+        applyDramaticFooterStyling();
 
         for (EditorPane pane : editorPanes) {
             JTextArea area = pane.getTextArea();
@@ -5429,6 +5486,7 @@ public class Texteditor extends JFrame implements KeyListener {
             quickfixBuffer.setContent(content, false);
             loadBufferIntoEditor(quickfixBuffer);
             writingArea.setCaretPosition(Math.min(Math.max(0, quickfixService.currentIndex()), Math.max(0, writingArea.getDocument().getLength() - 1)));
+            animateEditorHostTint(configManager.getCommandColor());
             return "Quickfix updated";
         }
 
@@ -5441,6 +5499,7 @@ public class Texteditor extends JFrame implements KeyListener {
             specialBufferReturns.push(new SpecialBufferReturnState(quickfixBuffer, returnBuffer, returnCaretPosition));
         }
         loadBufferIntoEditor(quickfixBuffer);
+        animateEditorHostTint(configManager.getCommandColor());
         return "Quickfix opened";
     }
 
@@ -5502,6 +5561,7 @@ public class Texteditor extends JFrame implements KeyListener {
         pruneSpecialBufferReturns(quickfixBuffer);
         buffers.remove(quickfixBuffer);
         quickfixBuffer = null;
+        animateEditorHostTint(configManager.getCommandColor());
         return "Quickfix closed";
     }
 
@@ -5559,6 +5619,8 @@ public class Texteditor extends JFrame implements KeyListener {
             writingArea.setCaretPosition(target);
         } catch (BadLocationException ignored) {
         }
+        pulseCaretLine(blendColor(configManager.getCommandColor(), configManager.getCaretColor(), 0.35));
+        playCue(CueType.NAVIGATE);
         return "Quickfix " + (quickfixService.currentIndex() + 1) + "/" + quickfixService.size();
     }
 
@@ -6121,6 +6183,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         String result = closePane(treePane);
         if ("Window closed".equals(result)) {
+            animateEditorHostTint(configManager.getCommandColor());
             return "Tree pane closed";
         }
         return result;
@@ -6223,11 +6286,15 @@ public class Texteditor extends JFrame implements KeyListener {
         if (windowLayoutRoot == null) {
             windowLayoutRoot = WindowLayoutNode.leaf(contentPane);
         }
-        boolean split = windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, 0.24);
+        double treeTargetRatio = 0.24;
+        double treeStartRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.08 : treeTargetRatio;
+        boolean split = windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL, true, treeStartRatio);
         if (!split) {
             windowLayoutRoot.splitLeaf(contentPane, newPane, WindowLayoutNode.Orientation.HORIZONTAL);
         }
         renderWindowLayout();
+        animateSplitForPane(newPane, treeStartRatio, treeTargetRatio);
+        animateEditorHostTint(configManager.getVisualColor());
         treePane = newPane;
         return newPane;
     }
@@ -6762,7 +6829,7 @@ public class Texteditor extends JFrame implements KeyListener {
         for (String cmd : commands) {
             candidates.add(":" + cmd);
         }
-        String selected = showPaletteDialog("Command Palette", candidates);
+        String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
         if (selected == null || selected.isEmpty()) return "Command palette cancelled";
         String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
         return commandHandler.execute(cmd);
@@ -6773,7 +6840,7 @@ public class Texteditor extends JFrame implements KeyListener {
         for (int i = 0; i < buffers.size(); i++) {
             candidates.add((i + 1) + ": " + buffers.get(i).getDisplayName());
         }
-        String selection = showPaletteDialog("Buffers", candidates);
+        String selection = showPaletteDialog("Buffers", candidates, value -> "Switch to " + value);
         if (selection == null || selection.isEmpty()) {
             return "Buffer finder cancelled";
         }
@@ -6792,7 +6859,7 @@ public class Texteditor extends JFrame implements KeyListener {
     public String showGrepFinder(String pattern) {
         List<String> candidates = grepFiles(pattern);
         updateQuickfixEntries("grep " + (pattern == null ? "" : pattern), parseQuickfixEntries(String.join("\n", candidates), "grep"));
-        String selection = showPaletteDialog("Grep", candidates);
+        String selection = showPaletteDialog("Grep", candidates, this::describeGrepCandidate);
         if (selection == null || selection.isEmpty()) {
             return "Grep cancelled";
         }
@@ -6870,12 +6937,106 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    private interface PalettePreviewProvider {
+        String preview(String selection);
+    }
+
+    private String describeCommandPaletteCandidate(String selection) {
+        if (selection == null || selection.isBlank()) {
+            return "Type to fuzzy-filter commands, then press Enter.";
+        }
+        String cmd = selection.startsWith(":") ? selection.substring(1) : selection;
+        int split = cmd.indexOf(' ');
+        String base = split >= 0 ? cmd.substring(0, split) : cmd;
+        switch (base) {
+            case "w":
+                return "Write current buffer to disk.";
+            case "q":
+                return "Quit current buffer/editor.";
+            case "e":
+                return "Open file into a buffer.";
+            case "split":
+            case "vsplit":
+                return "Create a new editor pane split.";
+            case "tree":
+                return "Open tree pane and perform file operations.";
+            case "copen":
+            case "cnext":
+            case "cprev":
+            case "cc":
+                return "Navigate quickfix entries.";
+            case "lsp":
+            case "diagnostics":
+            case "dnext":
+            case "dprev":
+                return "Language server and diagnostics workflows.";
+            case "plugin":
+                return "Manage .shed/.lua plugins.";
+            case "session":
+                return "Save/load named workspace sessions.";
+            case "term":
+            case "terminal":
+                return "Open an integrated shell split.";
+            case "themes":
+                return "Show and switch built-in themes.";
+            default:
+                return "Run command :" + base;
+        }
+    }
+
+    private String describeGrepCandidate(String selection) {
+        if (selection == null || selection.isBlank()) {
+            return "No match selected.";
+        }
+        String[] parts = selection.split(":", 3);
+        if (parts.length >= 3) {
+            return "Open " + parts[0] + " line " + parts[1] + "\n" + parts[2];
+        }
+        return selection;
+    }
+
     private String showPaletteDialog(String title, List<String> candidates) {
+        return showPaletteDialog(title, candidates, null);
+    }
+
+    private void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
+        if (!dramaticCommandPaletteEnabled || !dramaticMotionAllowed()) {
+            return;
+        }
+        int steps = Math.max(5, Math.min(12, dramaticAnimationMs / 20));
+        int startWidth = Math.max(420, (int) Math.round(targetSize.width * 0.88));
+        int startHeight = Math.max(260, (int) Math.round(targetSize.height * 0.88));
+        Point target = dialog.getLocation();
+        int dx = (targetSize.width - startWidth) / 2;
+        int dy = 18;
+        dialog.setSize(startWidth, startHeight);
+        dialog.setLocation(target.x + dx, target.y + dy);
+        Timer timer = new Timer(animationDelayForSteps(steps), null);
+        final int[] tick = new int[] {0};
+        timer.addActionListener(ev -> {
+            double t = easeOut((double) tick[0] / steps);
+            int width = (int) Math.round(startWidth + (targetSize.width - startWidth) * t);
+            int height = (int) Math.round(startHeight + (targetSize.height - startHeight) * t);
+            int x = target.x + (targetSize.width - width) / 2;
+            int y = target.y + (int) Math.round(dy * (1.0 - t));
+            dialog.setSize(width, height);
+            dialog.setLocation(x, y);
+            tick[0]++;
+            if (tick[0] > steps) {
+                timer.stop();
+                dialog.setSize(targetSize);
+                dialog.setLocation(target);
+            }
+        });
+        timer.start();
+    }
+
+    private String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(this, title, true);
         dialog.setUndecorated(true);
         dialog.getRootPane().setBorder(javax.swing.BorderFactory.createLineBorder(configManager.getCaretColor(), 1));
-        dialog.setLayout(new BorderLayout(4, 4));
+        dialog.setLayout(new BorderLayout(6, 6));
         dialog.getContentPane().setBackground(configManager.getCommandBarBackground());
         JTextField filterField = new JTextField();
         filterField.setFont(writingArea.getFont());
@@ -6899,6 +7060,30 @@ public class Texteditor extends JFrame implements KeyListener {
         titleLabel.setForeground(configManager.getCaretColor());
         titleLabel.setFont(writingArea.getFont().deriveFont(java.awt.Font.BOLD));
         titleLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 6, 2, 6));
+        JTextArea previewArea = new JTextArea();
+        previewArea.setEditable(false);
+        previewArea.setLineWrap(true);
+        previewArea.setWrapStyleWord(true);
+        previewArea.setFocusable(false);
+        previewArea.setPreferredSize(new Dimension(260, 320));
+        previewArea.setFont(writingArea.getFont().deriveFont(Math.max(11f, writingArea.getFont().getSize2D() - 1f)));
+        previewArea.setBackground(configManager.getStatusBarBackground());
+        previewArea.setForeground(configManager.getStatusBarForeground());
+        previewArea.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, blendColor(configManager.getCaretColor(), configManager.getCommandBarBackground(), 0.45)),
+            BorderFactory.createEmptyBorder(6, 8, 6, 8)
+        ));
+        previewArea.setVisible(previewProvider != null && dramaticCommandPaletteEnabled);
+        final Runnable syncPreview = () -> {
+            String value = list.getSelectedValue();
+            if (previewProvider == null) {
+                previewArea.setText(value == null ? "" : value);
+                return;
+            }
+            String preview = previewProvider.preview(value);
+            previewArea.setText(preview == null ? "" : preview);
+            previewArea.setCaretPosition(0);
+        };
         filterField.getDocument().addDocumentListener(new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { refilter(); }
             public void removeUpdate(DocumentEvent e) { refilter(); }
@@ -6909,6 +7094,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 if (query.isEmpty()) { for (String c2 : candidates) model.addElement(c2); }
                 else { for (String m : fuzzyMatchService.matchStrings(query, candidates, 0)) model.addElement(m); }
                 if (!model.isEmpty()) list.setSelectedIndex(0);
+                syncPreview.run();
+            }
+        });
+        list.addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                syncPreview.run();
             }
         });
         final String[] selection = new String[1];
@@ -6929,8 +7120,13 @@ public class Texteditor extends JFrame implements KeyListener {
         sp.setPreferredSize(new Dimension(600, 320));
         sp.setBorder(null);
         dialog.add(sp, BorderLayout.SOUTH);
-        dialog.setSize(620, 400);
+        dialog.add(previewArea, BorderLayout.EAST);
+        syncPreview.run();
+        Dimension targetSize = dramaticCommandPaletteEnabled ? new Dimension(720, 420) : new Dimension(620, 400);
+        dialog.setSize(targetSize);
         dialog.setLocationRelativeTo(this);
+        animatePaletteDialogOpen(dialog, targetSize);
+        playCue(CueType.SUCCESS);
         dialog.setVisible(true);
         return selection[0];
     }
@@ -6992,14 +7188,28 @@ public class Texteditor extends JFrame implements KeyListener {
         if (pane == null) return "No active pane";
         JScrollPane sp = pane.getScrollPane();
         if (activeMinimapPanel != null && activeMinimapPanel.getParent() != null) {
-            activeMinimapPanel.getParent().remove(activeMinimapPanel);
-            activeMinimapPanel = null;
-            sp.revalidate();
-            sp.repaint();
+            MinimapPanel panelToRemove = activeMinimapPanel;
+            java.awt.Container parent = panelToRemove.getParent();
+            Runnable removePanel = () -> {
+                if (parent != null) {
+                    parent.remove(panelToRemove);
+                    parent.revalidate();
+                    parent.repaint();
+                }
+                if (activeMinimapPanel == panelToRemove) {
+                    activeMinimapPanel = null;
+                }
+                sp.revalidate();
+                sp.repaint();
+            };
+            animateMinimapWidth(panelToRemove, panelToRemove.getPixelWidth(), 0, removePanel);
+            animateEditorHostTint(configManager.getCommandColor());
             return "Minimap hidden";
         }
         activeMinimapPanel = new MinimapPanel(pane.getTextArea());
         activeMinimapPanel.setColors(configManager.getLineNumberBackground(), configManager.getEditorForeground());
+        int initialWidth = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0 : dramaticMinimapWidth;
+        activeMinimapPanel.setPixelWidth(initialWidth);
         java.awt.Container parent = sp.getParent();
         if (parent instanceof JPanel) {
             ((JPanel) parent).add(activeMinimapPanel, BorderLayout.EAST);
@@ -7008,7 +7218,6 @@ public class Texteditor extends JFrame implements KeyListener {
             JPanel wrapper = new JPanel(new BorderLayout());
             if (parent != null) {
                 int idx = -1;
-                Object constraints = null;
                 for (int i = 0; i < parent.getComponentCount(); i++) {
                     if (parent.getComponent(i) == sp) { idx = i; break; }
                 }
@@ -7021,6 +7230,8 @@ public class Texteditor extends JFrame implements KeyListener {
         sp.getViewport().addChangeListener(e -> { if (activeMinimapPanel != null) activeMinimapPanel.repaint(); });
         sp.revalidate();
         sp.repaint();
+        animateMinimapWidth(activeMinimapPanel, initialWidth, dramaticMinimapWidth, null);
+        animateEditorHostTint(configManager.getVisualColor());
         return "Minimap shown";
     }
 
@@ -7067,6 +7278,312 @@ public class Texteditor extends JFrame implements KeyListener {
         int g = (int) Math.round(base.getGreen() * (1.0 - clamped) + overlay.getGreen() * clamped);
         int b = (int) Math.round(base.getBlue() * (1.0 - clamped) + overlay.getBlue() * clamped);
         return new Color(r, g, b);
+    }
+
+    private void refreshDramaticSettings() {
+        boolean wasEnabled = dramaticUiEnabled;
+        dramaticUiEnabled = configManager.getDramaticUiEnabled();
+        dramaticIdentityEnabled = dramaticUiEnabled && configManager.getDramaticIdentityEnabled();
+        dramaticModeTransitionsEnabled = dramaticUiEnabled && configManager.getDramaticModeTransitionsEnabled();
+        dramaticCommandPaletteEnabled = dramaticUiEnabled && configManager.getDramaticCommandPaletteEnabled();
+        dramaticEditingFeedbackEnabled = dramaticUiEnabled && configManager.getDramaticEditingFeedbackEnabled();
+        dramaticPanelAnimationsEnabled = dramaticUiEnabled && configManager.getDramaticPanelAnimationsEnabled();
+        dramaticSoundEnabled = dramaticUiEnabled && configManager.getDramaticSoundEnabled();
+        dramaticReducedMotionEnabled = configManager.getDramaticReducedMotionEnabled();
+        dramaticAnimationMs = Math.max(80, configManager.getDramaticAnimationMs());
+        dramaticMinimapWidth = Math.max(40, configManager.getDramaticMinimapWidth());
+        if (wasEnabled && !dramaticUiEnabled) {
+            if (modeTransitionTimer != null) modeTransitionTimer.stop();
+            if (feedbackPulseTimer != null) feedbackPulseTimer.stop();
+            if (hostTintTimer != null) hostTintTimer.stop();
+            if (splitAnimationTimer != null) splitAnimationTimer.stop();
+            if (minimapWidthTimer != null) minimapWidthTimer.stop();
+            modeTransitionTimer = null;
+            feedbackPulseTimer = null;
+            hostTintTimer = null;
+            splitAnimationTimer = null;
+            minimapWidthTimer = null;
+            clearFeedbackPulse();
+        }
+    }
+
+    private boolean dramaticMotionAllowed() {
+        return dramaticUiEnabled && !dramaticReducedMotionEnabled && dramaticAnimationMs > 0;
+    }
+
+    private int animationDelayForSteps(int steps) {
+        return Math.max(12, dramaticAnimationMs / Math.max(1, steps));
+    }
+
+    private double easeOut(double t) {
+        double clamped = Math.max(0.0, Math.min(1.0, t));
+        double inverse = 1.0 - clamped;
+        return 1.0 - inverse * inverse * inverse;
+    }
+
+    private void applyDramaticFooterStyling() {
+        if (statusBar == null || commandBar == null || editorState == null) {
+            return;
+        }
+        Color baseStatus = configManager.getStatusBarBackground();
+        Color baseCommand = configManager.getCommandBarBackground();
+        Color modeAccent = getModeBackground(editorState.mode == null ? EditorMode.NORMAL : editorState.mode);
+
+        if (dramaticIdentityEnabled) {
+            Color statusBg = blendColor(baseStatus, modeAccent, 0.20);
+            Color commandBg = blendColor(baseCommand, modeAccent, 0.15);
+            statusBar.setBackground(statusBg);
+            commandBar.setBackground(commandBg);
+            statusBar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 4, 0, 0, modeAccent),
+                BorderFactory.createEmptyBorder(5, 8, 5, 10)
+            ));
+            commandBar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, blendColor(modeAccent, configManager.getEditorForeground(), 0.45)),
+                BorderFactory.createEmptyBorder(4, 10, 4, 10)
+            ));
+            if (writingArea != null) {
+                Font baseFont = writingArea.getFont();
+                statusBar.setFont(baseFont.deriveFont(Font.BOLD, baseFont.getSize2D() + 1.0f));
+                commandBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
+            }
+            return;
+        }
+
+        statusBar.setBackground(baseStatus);
+        commandBar.setBackground(baseCommand);
+        statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
+        if (writingArea != null) {
+            Font baseFont = writingArea.getFont();
+            statusBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
+            commandBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
+        }
+    }
+
+    private void animateModeTransition(EditorMode fromMode, EditorMode toMode) {
+        if (!dramaticModeTransitionsEnabled) {
+            return;
+        }
+        if (fromMode == toMode || writingArea == null) {
+            return;
+        }
+        playCue(CueType.MODE_CHANGE);
+        Color fromColor = getModeBackground(fromMode == null ? toMode : fromMode);
+        Color toColor = getModeBackground(toMode);
+        if (!dramaticMotionAllowed()) {
+            writingArea.setBackground(toColor);
+            applyDramaticFooterStyling();
+            return;
+        }
+
+        if (modeTransitionTimer != null) {
+            modeTransitionTimer.stop();
+        }
+
+        int steps = Math.max(6, Math.min(20, dramaticAnimationMs / 14));
+        final int[] tick = new int[] {0};
+        modeTransitionTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            double t = easeOut((double) tick[0] / steps);
+            Color blended = blendColor(fromColor, toColor, t);
+            writingArea.setBackground(blended);
+            if (editorHostPanel != null) {
+                editorHostPanel.setBackground(zenModeEnabled ? fadedMarginColor(blended) : blended);
+                editorHostPanel.repaint();
+            }
+            tick[0]++;
+            if (tick[0] > steps) {
+                modeTransitionTimer.stop();
+                modeTransitionTimer = null;
+                updateZenModeLayout();
+                applyDramaticFooterStyling();
+            }
+        });
+        modeTransitionTimer.start();
+    }
+
+    private void clearFeedbackPulse() {
+        if (feedbackPulseTag != null && writingArea != null) {
+            writingArea.getHighlighter().removeHighlight(feedbackPulseTag);
+            feedbackPulseTag = null;
+        }
+    }
+
+    private void pulseCaretLine(Color color) {
+        if (!dramaticEditingFeedbackEnabled || writingArea == null) {
+            return;
+        }
+        if (feedbackPulseTimer != null) {
+            feedbackPulseTimer.stop();
+        }
+        clearFeedbackPulse();
+
+        int line;
+        int start;
+        int end;
+        try {
+            line = Math.max(0, writingArea.getLineOfOffset(writingArea.getCaretPosition()));
+            start = writingArea.getLineStartOffset(line);
+            end = writingArea.getLineEndOffset(line);
+        } catch (BadLocationException e) {
+            return;
+        }
+
+        if (!dramaticMotionAllowed()) {
+            try {
+                feedbackPulseTag = writingArea.getHighlighter().addHighlight(start, end, new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), 80)));
+            } catch (BadLocationException ignored) {
+                return;
+            }
+            Timer cleanup = new Timer(140, ev -> {
+                clearFeedbackPulse();
+                ((Timer) ev.getSource()).stop();
+            });
+            cleanup.setRepeats(false);
+            cleanup.start();
+            return;
+        }
+
+        int steps = Math.max(5, Math.min(14, dramaticAnimationMs / 18));
+        final int[] tick = new int[] {0};
+        feedbackPulseTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            clearFeedbackPulse();
+            double progress = (double) tick[0] / steps;
+            int alpha = (int) Math.round(130 * (1.0 - progress));
+            alpha = Math.max(0, Math.min(255, alpha));
+            try {
+                feedbackPulseTag = writingArea.getHighlighter().addHighlight(
+                    start,
+                    end,
+                    new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha))
+                );
+            } catch (BadLocationException ignored) {
+            }
+            tick[0]++;
+            if (tick[0] > steps) {
+                feedbackPulseTimer.stop();
+                feedbackPulseTimer = null;
+                clearFeedbackPulse();
+            }
+        });
+        feedbackPulseTimer.start();
+    }
+
+    private void animateEditorHostTint(Color tint) {
+        if (!dramaticPanelAnimationsEnabled || editorHostPanel == null || tint == null) {
+            return;
+        }
+        if (hostTintTimer != null) {
+            hostTintTimer.stop();
+        }
+        if (!dramaticMotionAllowed()) {
+            editorHostPanel.setBackground(blendColor(editorHostPanel.getBackground(), tint, 0.20));
+            editorHostPanel.repaint();
+            return;
+        }
+
+        final Color base = editorHostPanel.getBackground();
+        int steps = Math.max(6, Math.min(20, dramaticAnimationMs / 14));
+        final int[] tick = new int[] {0};
+        hostTintTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            double progress = (double) tick[0] / steps;
+            double ratio = 0.30 * (1.0 - progress);
+            editorHostPanel.setBackground(blendColor(base, tint, ratio));
+            editorHostPanel.repaint();
+            tick[0]++;
+            if (tick[0] > steps) {
+                hostTintTimer.stop();
+                hostTintTimer = null;
+                updateZenModeLayout();
+            }
+        });
+        hostTintTimer.start();
+    }
+
+    private void animateSplitForPane(EditorPane pane, double startRatio, double targetRatio) {
+        if (!dramaticPanelAnimationsEnabled || pane == null || windowLayoutRoot == null) {
+            return;
+        }
+        if (!dramaticMotionAllowed()) {
+            return;
+        }
+        if (splitAnimationTimer != null) {
+            splitAnimationTimer.stop();
+        }
+
+        int steps = Math.max(5, Math.min(16, dramaticAnimationMs / 16));
+        final int[] tick = new int[] {0};
+        final double delta = (targetRatio - startRatio) / Math.max(1, steps);
+        splitAnimationTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            boolean changed = windowLayoutRoot.adjustRatio(pane, delta);
+            if (changed) {
+                renderWindowLayout();
+            }
+            tick[0]++;
+            if (tick[0] > steps || !changed) {
+                splitAnimationTimer.stop();
+                splitAnimationTimer = null;
+            }
+        });
+        splitAnimationTimer.start();
+    }
+
+    private void animateMinimapWidth(MinimapPanel panel, int fromWidth, int toWidth, Runnable onFinish) {
+        if (panel == null) {
+            if (onFinish != null) {
+                onFinish.run();
+            }
+            return;
+        }
+        if (minimapWidthTimer != null) {
+            minimapWidthTimer.stop();
+        }
+        if (!dramaticPanelAnimationsEnabled || !dramaticMotionAllowed()) {
+            panel.setPixelWidth(toWidth);
+            if (onFinish != null) {
+                onFinish.run();
+            }
+            return;
+        }
+        int steps = Math.max(5, Math.min(14, dramaticAnimationMs / 18));
+        final int[] tick = new int[] {0};
+        minimapWidthTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            double t = easeOut((double) tick[0] / steps);
+            int width = (int) Math.round(fromWidth + (toWidth - fromWidth) * t);
+            panel.setPixelWidth(width);
+            tick[0]++;
+            if (tick[0] > steps) {
+                minimapWidthTimer.stop();
+                minimapWidthTimer = null;
+                panel.setPixelWidth(toWidth);
+                if (onFinish != null) {
+                    onFinish.run();
+                }
+            }
+        });
+        minimapWidthTimer.start();
+    }
+
+    private enum CueType {
+        MODE_CHANGE,
+        NAVIGATE,
+        SUCCESS,
+        ERROR
+    }
+
+    private void playCue(CueType cueType) {
+        if (!dramaticSoundEnabled) {
+            return;
+        }
+        Toolkit.getDefaultToolkit().beep();
+        if (cueType == CueType.ERROR) {
+            Timer repeat = new Timer(90, ev -> {
+                Toolkit.getDefaultToolkit().beep();
+                ((Timer) ev.getSource()).stop();
+            });
+            repeat.setRepeats(false);
+            repeat.start();
+        }
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -7606,6 +8123,8 @@ public class Texteditor extends JFrame implements KeyListener {
             int start = writingArea.getLineStartOffset(line);
             int target = Math.min(start + Math.max(0, selected.getCharacter()), writingArea.getText().length());
             writingArea.setCaretPosition(target);
+            pulseCaretLine(blendColor(configManager.getVisualColor(), configManager.getCaretColor(), 0.35));
+            playCue(CueType.NAVIGATE);
             return diagnosticSeverityLabel(selected.getSeverity()) + ": " + selected.getMessage();
         } catch (BadLocationException e) {
             return "Diagnostic jump failed: " + e.getMessage();
@@ -8625,6 +9144,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         updateStatusBar();
         if (oldMode != mode) {
+            animateModeTransition(oldMode, mode);
             firePluginEvent("ModeChange");
         }
     }
@@ -8704,6 +9224,7 @@ public class Texteditor extends JFrame implements KeyListener {
             String blame = getGitBlameForCurrentLine(buffer);
             commandBar.setText(blame != null ? blame : "");
         }
+        applyDramaticFooterStyling();
     }
 
     private void appendLspStatus(StringBuilder status, FileBuffer buffer) {
@@ -8853,6 +9374,14 @@ public class Texteditor extends JFrame implements KeyListener {
     // Show message in status bar
     public void showMessage(String message) {
         lastMessage = message == null ? "" : message;
+        if (!lastMessage.isEmpty()) {
+            String normalized = lastMessage.toLowerCase();
+            if (normalized.startsWith("error") || normalized.startsWith("invalid") || normalized.contains(" failed")) {
+                playCue(CueType.ERROR);
+            } else if (normalized.contains("opened") || normalized.contains("saved") || normalized.contains("loaded")) {
+                playCue(CueType.SUCCESS);
+            }
+        }
         if (messageResetTimer != null) {
             messageResetTimer.stop();
         }
@@ -9064,10 +9593,13 @@ public class Texteditor extends JFrame implements KeyListener {
         if (windowLayoutRoot == null) {
             windowLayoutRoot = WindowLayoutNode.leaf(activePane);
         }
-        windowLayoutRoot.splitLeaf(activePane, newPane, orientation);
+        double startRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.12 : 0.5;
+        windowLayoutRoot.splitLeaf(activePane, newPane, orientation, false, startRatio);
         loadBufferIntoPane(newPane, currentBuffer, writingArea.getCaretPosition());
         renderWindowLayout();
+        animateSplitForPane(newPane, startRatio, 0.5);
         activateEditorPane(newPane);
+        animateEditorHostTint(configManager.getCommandColor());
         newPane.getTextArea().requestFocusInWindow();
         return vertical ? "Vertical split created" : "Horizontal split created";
     }
@@ -9271,6 +9803,9 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!configManager.getHighlightSearch()) {
             searchManager.clearHighlights();
         }
+        if (result.startsWith("Match")) {
+            pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
+        }
         return result;
     }
 
@@ -9279,6 +9814,9 @@ public class Texteditor extends JFrame implements KeyListener {
         String result = searchManager.searchBackward(pattern);
         if (!configManager.getHighlightSearch()) {
             searchManager.clearHighlights();
+        }
+        if (result.startsWith("Match")) {
+            pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
         }
         return result;
     }
@@ -9293,6 +9831,7 @@ public class Texteditor extends JFrame implements KeyListener {
             writingArea.setCaretPosition(Math.min(Math.max(0, result.firstMatchOffset), writingArea.getText().length()));
             markModified();
             searchManager.clearHighlights();
+            pulseCaretLine(configManager.getSubstitutePreviewColor());
             return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
         } else {
             return substituteCurrentLine(pattern, replacement, replaceAll);
@@ -9315,6 +9854,7 @@ public class Texteditor extends JFrame implements KeyListener {
             writingArea.replaceRange(result.updatedText, lineStart, lineEnd);
             writingArea.setCaretPosition(Math.min(lineStart + result.firstMatchOffset, writingArea.getText().length()));
             searchManager.clearHighlights();
+            pulseCaretLine(configManager.getSubstitutePreviewColor());
 
             return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
         } catch (BadLocationException e) {
@@ -9427,6 +9967,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void applyRuntimeConfigFromSettings() {
+        refreshDramaticSettings();
         lineNumberMode = configManager.getLineNumberMode();
         Font editorFont = resolveEditorFont();
         int tabSize = Math.max(1, configManager.getTabSize());
@@ -9442,6 +9983,9 @@ public class Texteditor extends JFrame implements KeyListener {
         applyThemeColors();
         refreshLineNumberPanel();
         updateCurrentLineHighlight();
+        if (activeMinimapPanel != null) {
+            activeMinimapPanel.setPixelWidth(dramaticMinimapWidth);
+        }
         updateStatusBar();
     }
 

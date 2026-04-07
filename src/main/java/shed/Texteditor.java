@@ -4551,34 +4551,94 @@ public class Texteditor extends JFrame implements KeyListener {
         if (reloadPromptActive) {
             return;
         }
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath() || buffer.isModified()) {
-            return;
+        int autoReloaded = 0;
+        for (FileBuffer buffer : buffers) {
+            if (buffer == null || !buffer.hasFilePath() || !buffer.hasExternalChanges()) {
+                continue;
+            }
+            if (!buffer.isModified()) {
+                try {
+                    int caret = 0;
+                    if (buffer == getCurrentBuffer()) {
+                        caret = writingArea.getCaretPosition();
+                    }
+                    buffer.load(configManager);
+                    if (buffer == getCurrentBuffer()) {
+                        loadBufferIntoEditor(buffer);
+                        writingArea.setCaretPosition(Math.min(caret, writingArea.getText().length()));
+                    }
+                    autoReloaded++;
+                } catch (IOException e) {
+                    showMessage("Reload failed: " + e.getMessage());
+                }
+                continue;
+            }
+            promptExternalConflictForModifiedBuffer(buffer);
         }
-        if (!buffer.hasExternalChanges()) {
-            return;
+        if (autoReloaded > 0) {
+            showMessage("Auto-reloaded " + autoReloaded + " externally changed buffer" + (autoReloaded == 1 ? "" : "s"));
         }
+    }
 
+    private void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null) {
+            return;
+        }
         reloadPromptActive = true;
-        int result = JOptionPane.showConfirmDialog(
+        String[] options = {"Keep Mine", "Reload Theirs", "View Both"};
+        int result = JOptionPane.showOptionDialog(
             this,
-            "File changed on disk. Reload it?",
-            "External Change",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
+            "File changed on disk while modified in editor:\n"
+                + buffer.getDisplayName()
+                + "\nChoose how to resolve this conflict.",
+            "External Change Conflict",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.WARNING_MESSAGE,
+            null,
+            options,
+            options[0]
         );
         reloadPromptActive = false;
 
-        if (result == JOptionPane.YES_OPTION) {
+        if (result == 1) {
             try {
+                int caret = buffer == getCurrentBuffer() ? writingArea.getCaretPosition() : 0;
                 buffer.load(configManager);
-                loadBufferIntoEditor(buffer);
+                if (buffer == getCurrentBuffer()) {
+                    loadBufferIntoEditor(buffer);
+                    writingArea.setCaretPosition(Math.min(caret, writingArea.getText().length()));
+                }
                 showMessage("Reloaded from disk");
             } catch (IOException e) {
                 showMessage("Reload failed: " + e.getMessage());
             }
-        } else {
+            return;
+        }
+        if (result == 2) {
+            showExternalConflictPreview(buffer);
             buffer.refreshExternalTimestamp();
+            return;
+        }
+        buffer.refreshExternalTimestamp();
+    }
+
+    private void showExternalConflictPreview(FileBuffer buffer) {
+        if (buffer == null || buffer.getFile() == null) {
+            return;
+        }
+        try {
+            String disk = Files.readString(buffer.getFile().toPath(), StandardCharsets.UTF_8);
+            StringBuilder preview = new StringBuilder();
+            preview.append("External Conflict Preview\n");
+            preview.append("File: ").append(buffer.getFilePath()).append("\n\n");
+            preview.append("===== YOUR BUFFER =====\n");
+            preview.append(buffer.getContent()).append("\n");
+            preview.append("===== DISK VERSION =====\n");
+            preview.append(disk).append("\n");
+            preview.append("Tip: copy needed parts, then save.\n");
+            showScratchBuffer("[external conflict] " + buffer.getDisplayName(), preview.toString());
+        } catch (IOException e) {
+            showMessage("Conflict preview failed: " + e.getMessage());
         }
     }
 

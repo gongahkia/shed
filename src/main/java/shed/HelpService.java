@@ -45,6 +45,7 @@ public class HelpService {
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
+                   "  :config save   Persist current runtime config to ~/.shed/shedrc\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
                    "  :clean         Remove Shed data files\n" +
@@ -86,6 +87,7 @@ public class HelpService {
                    "  :set nu        Enable line numbers\n" +
                    "  :set theme=x   Switch color theme\n" +
                    "  :set k=v       Set any config key in-memory\n" +
+                   "  :set! k=v      Set and persist key to ~/.shed/shedrc\n" +
                    "  :45            Go to line 45\n" +
                    "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +

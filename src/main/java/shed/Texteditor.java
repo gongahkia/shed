@@ -150,6 +150,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<FileBuffer, List<String>> treeLineTargets;
     private FileBuffer quickfixBuffer;
     private int keymapReplayDepth;
+    private List<RegisterContent> yankRing;
 
     // Markdown / orgmode features
     private MarkdownService markdownService;
@@ -278,6 +279,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
         keymapReplayDepth = 0;
+        yankRing = new ArrayList<>();
         treePane = null;
         treeBuffer = null;
         treeRoot = null;
@@ -3267,6 +3269,9 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("dprev");
         knownCommands.add("registers");
         knownCommands.add("marks");
+        knownCommands.add("yankring");
+        knownCommands.add("pastepicker");
+        knownCommands.add("yr");
         knownCommands.add("zen");
         knownCommands.add("theater");
         knownCommands.add("normal");
@@ -5625,7 +5630,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev");
-        commands.add("registers"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
+        commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
         commands.add("noh"); commands.add("split");
         commands.add("vsplit"); commands.add("close"); commands.add("themes");
@@ -7472,6 +7477,10 @@ public class Texteditor extends JFrame implements KeyListener {
             case "registers":
             case "reg":
                 return "Show register contents.";
+            case "yankring":
+            case "pastepicker":
+            case "yr":
+                return "Pick from yank/delete history and paste.";
             case "marks":
                 return "Show mark list for active buffer.";
             case "themes":
@@ -9394,11 +9403,58 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private void storeYank(Character register, String text, boolean lineWise) {
-        registerManager.setYank(register, lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text));
+        RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
+        registerManager.setYank(register, content);
+        addToYankRing(content);
     }
 
     private void storeDelete(Character register, String text, boolean lineWise) {
-        registerManager.setDelete(register, lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text));
+        RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
+        registerManager.setDelete(register, content);
+        addToYankRing(content);
+    }
+
+    private void addToYankRing(RegisterContent content) {
+        if (content == null || content.isMacro()) {
+            return;
+        }
+        String text = content.getText();
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        yankRing.removeIf(existing -> existing != null
+            && !existing.isMacro()
+            && existing.isLineWise() == content.isLineWise()
+            && text.equals(existing.getText()));
+        yankRing.add(0, content);
+        while (yankRing.size() > 80) {
+            yankRing.remove(yankRing.size() - 1);
+        }
+    }
+
+    public String showYankRingPicker() {
+        if (yankRing.isEmpty()) {
+            return "Yank ring empty";
+        }
+        List<String> candidates = new ArrayList<>();
+        for (int i = 0; i < yankRing.size(); i++) {
+            RegisterContent content = yankRing.get(i);
+            String kind = content.isLineWise() ? "[L]" : "[C]";
+            candidates.add(String.format("%02d %s %s", i + 1, kind, safePreviewText(content.getText(), 100)));
+        }
+        String selected = showPaletteDialog("Yank Ring", candidates,
+            value -> value == null ? "" : "Enter to paste selected ring entry");
+        if (selected == null || selected.isBlank()) {
+            return "Yank ring cancelled";
+        }
+        int index = candidates.indexOf(selected);
+        if (index < 0 || index >= yankRing.size()) {
+            return "Invalid yank ring selection";
+        }
+        RegisterContent content = yankRing.get(index);
+        clipboardManager.pasteContent(writingArea, content.getText(), content.isLineWise(), false);
+        markModified();
+        return "Pasted yank ring item " + (index + 1);
     }
 
     private String pasteFromRegister(boolean before) {

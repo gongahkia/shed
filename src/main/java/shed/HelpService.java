@@ -78,6 +78,7 @@ public class HelpService {
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +
                    "  :registers     Show registers\n" +
+                   "  :yankring      Pick from yank/delete history and paste\n" +
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
                    "  :theater X     Dramatic UI preset (off/subtle/full)\n" +

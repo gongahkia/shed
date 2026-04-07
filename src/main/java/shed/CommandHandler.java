@@ -156,6 +156,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.diagnosticsNext(), "dnext", "dn");
         registerCommand((args, range, force) -> editor.diagnosticsPrev(), "dprev", "dp");
         registerCommand((args, range, force) -> editor.showRegisters(), "registers", "reg");
+        registerCommand((args, range, force) -> editor.showYankRingPicker(), "yankring", "pastepicker", "yr");
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");
         registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");

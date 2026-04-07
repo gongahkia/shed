@@ -104,6 +104,7 @@ public class HelpService {
                    "  project.config.allow.unsafe=false limits local overrides to UI/editor keys\n" +
                    "  tree.delete.protect.critical=true blocks deleting /, home, and cwd via :tree rm\n" +
                    "  ui.whichkey.hints=true shows prefix-key hints (g/z/Ctrl-w/...)\n" +
+                   "  first-open trust prompts gate local .shedrc.local/.shed plugins per project\n" +
                    "  command.alias.<name>=<builtin>\n" +
                    "  keybind.<mode>.<lhs>=<rhs>\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +

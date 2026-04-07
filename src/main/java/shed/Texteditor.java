@@ -99,6 +99,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private File recentFilesStore;
     private File commandLogStore;
     private File recoveryStoreDir;
+    private File trustedProjectsStore;
+    private Set<String> trustedProjectRoots;
     private Deque<SpecialBufferReturnState> specialBufferReturns;
     private List<String> commandHistory;
     private int commandHistoryIndex;
@@ -232,6 +234,8 @@ public class Texteditor extends JFrame implements KeyListener {
         recentFilesStore = new File(shedDirectory, "recent");
         commandLogStore = new File(shedDirectory, "command.log");
         recoveryStoreDir = new File(shedDirectory, "recovery");
+        trustedProjectsStore = new File(shedDirectory, "trusted-projects");
+        trustedProjectRoots = new HashSet<>();
         specialBufferReturns = new ArrayDeque<>();
         commandHistory = new ArrayList<>();
         commandHistoryIndex = -1;
@@ -323,6 +327,7 @@ public class Texteditor extends JFrame implements KeyListener {
         paneJumpFlashOriginalBorder = null;
         refreshDramaticSettings();
         loadRecentFiles();
+        loadTrustedProjectRoots();
         lastMessage = "";
 
         // Initialize UI
@@ -10227,9 +10232,19 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void openFile(File file) throws IOException {
         persistCurrentBufferState();
-        String projectConfigMessage = configManager.applyProjectConfigForFile(file);
-        if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
-            applyRuntimeConfigFromSettings();
+        boolean trustedForLocalExecution = ensureProjectTrustForFile(file);
+        String projectConfigMessage = "";
+        if (trustedForLocalExecution) {
+            projectConfigMessage = configManager.applyProjectConfigForFile(file);
+            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
+                applyRuntimeConfigFromSettings();
+            }
+        } else {
+            projectConfigMessage = "Project local config/plugins blocked (untrusted project)";
+            String cleared = configManager.applyProjectConfigForFile(null);
+            if (cleared != null && !cleared.isEmpty()) {
+                applyRuntimeConfigFromSettings();
+            }
         }
 
         FileBuffer existing = findBufferByPath(file);
@@ -11806,6 +11821,114 @@ public class Texteditor extends JFrame implements KeyListener {
             Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
         } catch (IOException ignored) {
         }
+    }
+
+    private void loadTrustedProjectRoots() {
+        trustedProjectRoots.clear();
+        if (trustedProjectsStore == null || !trustedProjectsStore.exists()) {
+            return;
+        }
+        try {
+            for (String line : Files.readAllLines(trustedProjectsStore.toPath(), StandardCharsets.UTF_8)) {
+                String normalized = line == null ? "" : line.trim();
+                if (!normalized.isEmpty()) {
+                    trustedProjectRoots.add(normalized);
+                }
+            }
+        } catch (IOException ignored) {
+        }
+    }
+
+    private void saveTrustedProjectRoots() {
+        if (trustedProjectsStore == null) {
+            return;
+        }
+        try {
+            ensureStoreDirectory(trustedProjectsStore);
+            List<String> roots = new ArrayList<>(trustedProjectRoots);
+            Collections.sort(roots);
+            Files.write(
+                trustedProjectsStore.toPath(),
+                roots,
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            );
+        } catch (IOException ignored) {
+        }
+    }
+
+    private boolean ensureProjectTrustForFile(File file) {
+        File projectRoot = detectProjectTrustRoot(file);
+        if (projectRoot == null) {
+            return true;
+        }
+        String canonicalRoot;
+        try {
+            canonicalRoot = projectRoot.getCanonicalPath();
+        } catch (IOException e) {
+            canonicalRoot = projectRoot.getAbsolutePath();
+        }
+        if (trustedProjectRoots.contains(canonicalRoot)) {
+            return true;
+        }
+        if (!hasProjectLocalExecutionSurface(projectRoot)) {
+            return true;
+        }
+
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            "This project contains local execution surfaces (.shedrc.local and/or .shed/plugins).\n"
+                + "Trust this project root for local config/plugin behavior?\n"
+                + canonicalRoot,
+            "Project Trust",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+        if (result == JOptionPane.YES_OPTION) {
+            trustedProjectRoots.add(canonicalRoot);
+            saveTrustedProjectRoots();
+            return true;
+        }
+        return false;
+    }
+
+    private File detectProjectTrustRoot(File file) {
+        if (file == null) {
+            return null;
+        }
+        File cursor = file.isDirectory() ? file : file.getParentFile();
+        File firstConfigRoot = null;
+        while (cursor != null) {
+            File gitDir = new File(cursor, ".git");
+            if (gitDir.exists()) {
+                return cursor;
+            }
+            File localConfig = new File(cursor, ".shedrc.local");
+            if (localConfig.isFile() && firstConfigRoot == null) {
+                firstConfigRoot = cursor;
+            }
+            cursor = cursor.getParentFile();
+        }
+        return firstConfigRoot;
+    }
+
+    private boolean hasProjectLocalExecutionSurface(File projectRoot) {
+        if (projectRoot == null || !projectRoot.isDirectory()) {
+            return false;
+        }
+        File localConfig = new File(projectRoot, ".shedrc.local");
+        if (localConfig.isFile()) {
+            return true;
+        }
+        File pluginDir = new File(projectRoot, ".shed/plugins");
+        if (!pluginDir.isDirectory()) {
+            return false;
+        }
+        File[] pluginFiles = pluginDir.listFiles(file -> file.isFile()
+            && (file.getName().endsWith(".shed") || file.getName().endsWith(".lua")));
+        return pluginFiles != null && pluginFiles.length > 0;
     }
 
     private void appendCommandLog(String entry) {

@@ -2298,6 +2298,12 @@ public class Texteditor extends JFrame implements KeyListener {
         int code = e.getKeyCode();
         char c = e.getKeyChar();
 
+        if (e.isControlDown() && (code == KeyEvent.VK_R || c == 'r')) {
+            openCommandHistorySearch();
+            updateSubstitutePreview();
+            return;
+        }
+
         if (code == KeyEvent.VK_ESCAPE) {
             editorState.commandBuffer = "";
             clearSubstitutePreview();
@@ -2352,6 +2358,33 @@ public class Texteditor extends JFrame implements KeyListener {
             editorState.commandBuffer += c;
             updateSubstitutePreview();
         }
+    }
+
+    private void openCommandHistorySearch() {
+        if (commandHistory.isEmpty()) {
+            showMessage("No command history");
+            return;
+        }
+        List<String> candidates = new ArrayList<>();
+        for (int i = commandHistory.size() - 1; i >= 0; i--) {
+            String entry = commandHistory.get(i);
+            if (entry != null && !entry.isBlank()) {
+                candidates.add(entry);
+            }
+        }
+        if (candidates.isEmpty()) {
+            showMessage("No command history");
+            return;
+        }
+        String selected = showPaletteDialog("Command History", candidates,
+            value -> value == null ? "" : "Recall history entry into : prompt");
+        if (selected == null || selected.isBlank()) {
+            showMessage("History search cancelled");
+            return;
+        }
+        editorState.commandBuffer = selected;
+        commandHistoryIndex = -1;
+        commandHistoryPrefix = editorState.commandBuffer;
     }
 
     void handleSearchMode(KeyEvent e) {

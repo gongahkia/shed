@@ -21,6 +21,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.awt.Color;
+import java.awt.Toolkit;
 
 public class ConfigManager {
     private final Map<String, String> config;
@@ -68,6 +69,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_DRAMATIC_PANEL_ANIMATIONS = true;
     private static final boolean DEFAULT_DRAMATIC_SOUND = false;
     private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION = false;
+    private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC = true;
     private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
     private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
     private static final String SHED_DIRECTORY_NAME = ".shed";
@@ -177,6 +179,7 @@ public class ConfigManager {
         config.put("ui.dramatic.panel.animations", String.valueOf(DEFAULT_DRAMATIC_PANEL_ANIMATIONS));
         config.put("ui.dramatic.sound", String.valueOf(DEFAULT_DRAMATIC_SOUND));
         config.put("ui.dramatic.reduced.motion", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION));
+        config.put("ui.dramatic.reduced.motion.sync", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC));
         config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
         config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
         defaultConfig.clear();
@@ -562,7 +565,13 @@ public class ConfigManager {
     }
 
     public boolean getDramaticReducedMotionEnabled() {
-        return getBoolean("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION);
+        if (getBoolean("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION)) {
+            return true;
+        }
+        if (getBoolean("ui.dramatic.reduced.motion.sync", DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC)) {
+            return detectSystemReducedMotionPreference();
+        }
+        return false;
     }
 
     public int getDramaticAnimationMs() {
@@ -817,6 +826,7 @@ public class ConfigManager {
             + "ui.dramatic.panel.animations=" + DEFAULT_DRAMATIC_PANEL_ANIMATIONS + "\n"
             + "ui.dramatic.sound=" + DEFAULT_DRAMATIC_SOUND + "\n"
             + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
+            + "ui.dramatic.reduced.motion.sync=" + DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
             + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
             + "# Per-project override file support\n"
@@ -954,6 +964,51 @@ public class ConfigManager {
             StandardOpenOption.TRUNCATE_EXISTING,
             StandardOpenOption.WRITE
         );
+    }
+
+    private boolean detectSystemReducedMotionPreference() {
+        String envOverride = normalizedTruth(System.getenv("PREFER_REDUCED_MOTION"));
+        if (envOverride != null) {
+            return Boolean.parseBoolean(envOverride);
+        }
+        String propOverride = normalizedTruth(System.getProperty("prefers.reduced.motion"));
+        if (propOverride != null) {
+            return Boolean.parseBoolean(propOverride);
+        }
+        try {
+            Toolkit toolkit = Toolkit.getDefaultToolkit();
+            Object awtPreference = toolkit.getDesktopProperty("awt.prefersReducedMotion");
+            if (awtPreference instanceof Boolean) {
+                return (Boolean) awtPreference;
+            }
+            Object gnomeAnimations = toolkit.getDesktopProperty("gnome.Net/EnableAnimations");
+            if (gnomeAnimations instanceof Boolean) {
+                return !((Boolean) gnomeAnimations);
+            }
+            Object kdeAnimations = toolkit.getDesktopProperty("kde.kdecoration.animationEnabled");
+            if (kdeAnimations instanceof Boolean) {
+                return !((Boolean) kdeAnimations);
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    private String normalizedTruth(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String normalized = raw.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return null;
+        }
+        if ("1".equals(normalized) || "true".equals(normalized) || "yes".equals(normalized) || "on".equals(normalized)) {
+            return "true";
+        }
+        if ("0".equals(normalized) || "false".equals(normalized) || "no".equals(normalized) || "off".equals(normalized)) {
+            return "false";
+        }
+        return null;
     }
 
     private Color getUiColor(String key, Color fallback) {

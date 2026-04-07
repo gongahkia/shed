@@ -409,6 +409,7 @@ ui.dramatic.editing.feedback=true
 ui.dramatic.panel.animations=true
 ui.dramatic.sound=false
 ui.dramatic.reduced.motion=false
+ui.dramatic.reduced.motion.sync=true
 ui.dramatic.animation.ms=220
 ui.dramatic.minimap.width=84
 ```

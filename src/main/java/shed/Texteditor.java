@@ -41,6 +41,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -3134,6 +3135,7 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("registers");
         knownCommands.add("marks");
         knownCommands.add("zen");
+        knownCommands.add("theater");
         knownCommands.add("normal");
         knownCommands.add("reload");
         knownCommands.add("source");
@@ -5261,7 +5263,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
         commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev");
-        commands.add("registers"); commands.add("marks"); commands.add("zen"); commands.add("normal");
+        commands.add("registers"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
         commands.add("noh"); commands.add("split");
         commands.add("vsplit"); commands.add("close"); commands.add("themes");
@@ -9936,6 +9938,49 @@ public class Texteditor extends JFrame implements KeyListener {
         configManager.set(key, value == null ? "" : value);
         applyRuntimeConfigFromSettings();
         return "Set " + key;
+    }
+
+    public String applyTheaterPreset(String presetArgument) {
+        String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);
+        if (preset.isEmpty()) {
+            return "Usage: :theater off|subtle|full";
+        }
+
+        if ("off".equals(preset)) {
+            configManager.set("ui.dramatic", "false");
+            applyRuntimeConfigFromSettings();
+            return "Theater preset applied: off";
+        }
+
+        if ("subtle".equals(preset)) {
+            configManager.set("ui.dramatic", "true");
+            configManager.set("ui.dramatic.identity", "true");
+            configManager.set("ui.dramatic.mode.transitions", "true");
+            configManager.set("ui.dramatic.command.palette", "true");
+            configManager.set("ui.dramatic.editing.feedback", "true");
+            configManager.set("ui.dramatic.panel.animations", "false");
+            configManager.set("ui.dramatic.sound", "false");
+            configManager.set("ui.dramatic.reduced.motion", "false");
+            configManager.set("ui.dramatic.animation.ms", "140");
+            applyRuntimeConfigFromSettings();
+            return "Theater preset applied: subtle";
+        }
+
+        if ("full".equals(preset)) {
+            configManager.set("ui.dramatic", "true");
+            configManager.set("ui.dramatic.identity", "true");
+            configManager.set("ui.dramatic.mode.transitions", "true");
+            configManager.set("ui.dramatic.command.palette", "true");
+            configManager.set("ui.dramatic.editing.feedback", "true");
+            configManager.set("ui.dramatic.panel.animations", "true");
+            configManager.set("ui.dramatic.sound", "true");
+            configManager.set("ui.dramatic.reduced.motion", "false");
+            configManager.set("ui.dramatic.animation.ms", "240");
+            applyRuntimeConfigFromSettings();
+            return "Theater preset applied: full";
+        }
+
+        return "Unknown theater preset: " + preset + " (expected off|subtle|full)";
     }
 
     public String reloadConfigFromDisk() {

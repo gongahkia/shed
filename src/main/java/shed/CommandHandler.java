@@ -158,6 +158,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.showMarks(), "marks");
         registerCommand((args, range, force) -> editor.showThemes(), "themes");
         registerCommand((args, range, force) -> editor.toggleZenMode(), "zen");
+        registerCommand((args, range, force) -> editor.applyTheaterPreset(args), "theater");
         registerCommand((args, range, force) -> editor.toggleMinimap(), "minimap");
         registerCommand((args, range, force) -> handleNormal(args, range), "normal", "norm");
         registerCommand((args, range, force) -> editor.reloadConfigFromDisk(), "reload", "source");

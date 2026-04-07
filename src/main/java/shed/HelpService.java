@@ -78,6 +78,7 @@ public class HelpService {
                    "  :registers     Show registers\n" +
                    "  :marks         Show marks\n" +
                    "  :themes        Show built-in themes\n" +
+                   "  :theater X     Dramatic UI preset (off/subtle/full)\n" +
                    "  :zen           Toggle zen mode\n" +
                    "  :reload        Reload ~/.shed/shedrc now\n" +
                    "  :normal keys   Replay normal keys\n" +

@@ -169,6 +169,12 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean dramaticEditingFeedbackEnabled;
     private boolean dramaticPanelAnimationsEnabled;
     private boolean dramaticSoundEnabled;
+    private String dramaticSoundPack;
+    private int dramaticSoundVolume;
+    private boolean dramaticSoundModeCueEnabled;
+    private boolean dramaticSoundNavigateCueEnabled;
+    private boolean dramaticSoundSuccessCueEnabled;
+    private boolean dramaticSoundErrorCueEnabled;
     private boolean dramaticReducedMotionEnabled;
     private int dramaticAnimationMs;
     private int dramaticMinimapWidth;
@@ -275,6 +281,12 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticEditingFeedbackEnabled = false;
         dramaticPanelAnimationsEnabled = false;
         dramaticSoundEnabled = false;
+        dramaticSoundPack = "default";
+        dramaticSoundVolume = 75;
+        dramaticSoundModeCueEnabled = true;
+        dramaticSoundNavigateCueEnabled = true;
+        dramaticSoundSuccessCueEnabled = true;
+        dramaticSoundErrorCueEnabled = true;
         dramaticReducedMotionEnabled = false;
         dramaticAnimationMs = 220;
         dramaticMinimapWidth = 84;
@@ -7291,6 +7303,12 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticEditingFeedbackEnabled = dramaticUiEnabled && configManager.getDramaticEditingFeedbackEnabled();
         dramaticPanelAnimationsEnabled = dramaticUiEnabled && configManager.getDramaticPanelAnimationsEnabled();
         dramaticSoundEnabled = dramaticUiEnabled && configManager.getDramaticSoundEnabled();
+        dramaticSoundPack = configManager.getDramaticSoundPack();
+        dramaticSoundVolume = configManager.getDramaticSoundVolume();
+        dramaticSoundModeCueEnabled = configManager.getDramaticSoundModeCueEnabled();
+        dramaticSoundNavigateCueEnabled = configManager.getDramaticSoundNavigateCueEnabled();
+        dramaticSoundSuccessCueEnabled = configManager.getDramaticSoundSuccessCueEnabled();
+        dramaticSoundErrorCueEnabled = configManager.getDramaticSoundErrorCueEnabled();
         dramaticReducedMotionEnabled = configManager.getDramaticReducedMotionEnabled();
         dramaticAnimationMs = Math.max(80, configManager.getDramaticAnimationMs());
         dramaticMinimapWidth = Math.max(40, configManager.getDramaticMinimapWidth());
@@ -7577,15 +7595,77 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!dramaticSoundEnabled) {
             return;
         }
-        Toolkit.getDefaultToolkit().beep();
-        if (cueType == CueType.ERROR) {
-            Timer repeat = new Timer(90, ev -> {
+        if (dramaticSoundVolume <= 0) {
+            return;
+        }
+        if (cueType == CueType.MODE_CHANGE && !dramaticSoundModeCueEnabled) {
+            return;
+        }
+        if (cueType == CueType.NAVIGATE && !dramaticSoundNavigateCueEnabled) {
+            return;
+        }
+        if (cueType == CueType.SUCCESS && !dramaticSoundSuccessCueEnabled) {
+            return;
+        }
+        if (cueType == CueType.ERROR && !dramaticSoundErrorCueEnabled) {
+            return;
+        }
+
+        int[] pattern = cuePattern(cueType);
+        for (int delay : pattern) {
+            Timer beep = new Timer(Math.max(0, delay), ev -> {
                 Toolkit.getDefaultToolkit().beep();
                 ((Timer) ev.getSource()).stop();
             });
-            repeat.setRepeats(false);
-            repeat.start();
+            beep.setRepeats(false);
+            beep.start();
         }
+    }
+
+    private int[] cuePattern(CueType cueType) {
+        String pack = dramaticSoundPack == null ? "default" : dramaticSoundPack;
+        int[] base;
+        switch (pack) {
+            case "soft":
+                switch (cueType) {
+                    case MODE_CHANGE: base = new int[] {0}; break;
+                    case NAVIGATE: base = new int[] {0}; break;
+                    case SUCCESS: base = new int[] {0, 80}; break;
+                    case ERROR: base = new int[] {0, 120}; break;
+                    default: base = new int[] {0}; break;
+                }
+                break;
+            case "cinema":
+            case "dramatic":
+                switch (cueType) {
+                    case MODE_CHANGE: base = new int[] {0, 35}; break;
+                    case NAVIGATE: base = new int[] {0, 45}; break;
+                    case SUCCESS: base = new int[] {0, 60, 120}; break;
+                    case ERROR: base = new int[] {0, 60, 120, 180}; break;
+                    default: base = new int[] {0}; break;
+                }
+                break;
+            default:
+                switch (cueType) {
+                    case MODE_CHANGE: base = new int[] {0}; break;
+                    case NAVIGATE: base = new int[] {0}; break;
+                    case SUCCESS: base = new int[] {0, 70}; break;
+                    case ERROR: base = new int[] {0, 90, 180}; break;
+                    default: base = new int[] {0}; break;
+                }
+                break;
+        }
+        int maxBeeps;
+        if (dramaticSoundVolume >= 80) {
+            maxBeeps = base.length;
+        } else if (dramaticSoundVolume >= 50) {
+            maxBeeps = Math.max(1, base.length - 1);
+        } else {
+            maxBeeps = 1;
+        }
+        int[] limited = new int[maxBeeps];
+        System.arraycopy(base, 0, limited, 0, maxBeeps);
+        return limited;
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -9991,6 +10071,8 @@ public class Texteditor extends JFrame implements KeyListener {
             configManager.set("ui.dramatic.editing.feedback", "true");
             configManager.set("ui.dramatic.panel.animations", "false");
             configManager.set("ui.dramatic.sound", "false");
+            configManager.set("ui.dramatic.sound.pack", "soft");
+            configManager.set("ui.dramatic.sound.volume", "40");
             configManager.set("ui.dramatic.reduced.motion", "false");
             configManager.set("ui.dramatic.animation.ms", "140");
             applyRuntimeConfigFromSettings();
@@ -10005,6 +10087,8 @@ public class Texteditor extends JFrame implements KeyListener {
             configManager.set("ui.dramatic.editing.feedback", "true");
             configManager.set("ui.dramatic.panel.animations", "true");
             configManager.set("ui.dramatic.sound", "true");
+            configManager.set("ui.dramatic.sound.pack", "cinema");
+            configManager.set("ui.dramatic.sound.volume", "85");
             configManager.set("ui.dramatic.reduced.motion", "false");
             configManager.set("ui.dramatic.animation.ms", "240");
             applyRuntimeConfigFromSettings();

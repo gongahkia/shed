@@ -68,6 +68,12 @@ public class ConfigManager {
     private static final boolean DEFAULT_DRAMATIC_EDITING_FEEDBACK = true;
     private static final boolean DEFAULT_DRAMATIC_PANEL_ANIMATIONS = true;
     private static final boolean DEFAULT_DRAMATIC_SOUND = false;
+    private static final String DEFAULT_DRAMATIC_SOUND_PACK = "default";
+    private static final int DEFAULT_DRAMATIC_SOUND_VOLUME = 75;
+    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_MODE = true;
+    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE = true;
+    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS = true;
+    private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_ERROR = true;
     private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION = false;
     private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC = true;
     private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
@@ -178,6 +184,12 @@ public class ConfigManager {
         config.put("ui.dramatic.editing.feedback", String.valueOf(DEFAULT_DRAMATIC_EDITING_FEEDBACK));
         config.put("ui.dramatic.panel.animations", String.valueOf(DEFAULT_DRAMATIC_PANEL_ANIMATIONS));
         config.put("ui.dramatic.sound", String.valueOf(DEFAULT_DRAMATIC_SOUND));
+        config.put("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
+        config.put("ui.dramatic.sound.volume", String.valueOf(DEFAULT_DRAMATIC_SOUND_VOLUME));
+        config.put("ui.dramatic.sound.cue.mode", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_MODE));
+        config.put("ui.dramatic.sound.cue.navigate", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE));
+        config.put("ui.dramatic.sound.cue.success", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS));
+        config.put("ui.dramatic.sound.cue.error", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_ERROR));
         config.put("ui.dramatic.reduced.motion", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION));
         config.put("ui.dramatic.reduced.motion.sync", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC));
         config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
@@ -564,6 +576,34 @@ public class ConfigManager {
         return getBoolean("ui.dramatic.sound", DEFAULT_DRAMATIC_SOUND);
     }
 
+    public String getDramaticSoundPack() {
+        String pack = config.getOrDefault("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
+        if (pack == null || pack.isBlank()) {
+            return DEFAULT_DRAMATIC_SOUND_PACK;
+        }
+        return pack.trim().toLowerCase(Locale.ROOT);
+    }
+
+    public int getDramaticSoundVolume() {
+        return Math.max(0, Math.min(100, getInt("ui.dramatic.sound.volume", DEFAULT_DRAMATIC_SOUND_VOLUME)));
+    }
+
+    public boolean getDramaticSoundModeCueEnabled() {
+        return getBoolean("ui.dramatic.sound.cue.mode", DEFAULT_DRAMATIC_SOUND_CUE_MODE);
+    }
+
+    public boolean getDramaticSoundNavigateCueEnabled() {
+        return getBoolean("ui.dramatic.sound.cue.navigate", DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE);
+    }
+
+    public boolean getDramaticSoundSuccessCueEnabled() {
+        return getBoolean("ui.dramatic.sound.cue.success", DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS);
+    }
+
+    public boolean getDramaticSoundErrorCueEnabled() {
+        return getBoolean("ui.dramatic.sound.cue.error", DEFAULT_DRAMATIC_SOUND_CUE_ERROR);
+    }
+
     public boolean getDramaticReducedMotionEnabled() {
         if (getBoolean("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION)) {
             return true;
@@ -825,6 +865,12 @@ public class ConfigManager {
             + "ui.dramatic.editing.feedback=" + DEFAULT_DRAMATIC_EDITING_FEEDBACK + "\n"
             + "ui.dramatic.panel.animations=" + DEFAULT_DRAMATIC_PANEL_ANIMATIONS + "\n"
             + "ui.dramatic.sound=" + DEFAULT_DRAMATIC_SOUND + "\n"
+            + "ui.dramatic.sound.pack=" + DEFAULT_DRAMATIC_SOUND_PACK + "\n"
+            + "ui.dramatic.sound.volume=" + DEFAULT_DRAMATIC_SOUND_VOLUME + "\n"
+            + "ui.dramatic.sound.cue.mode=" + DEFAULT_DRAMATIC_SOUND_CUE_MODE + "\n"
+            + "ui.dramatic.sound.cue.navigate=" + DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE + "\n"
+            + "ui.dramatic.sound.cue.success=" + DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS + "\n"
+            + "ui.dramatic.sound.cue.error=" + DEFAULT_DRAMATIC_SOUND_CUE_ERROR + "\n"
             + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
             + "ui.dramatic.reduced.motion.sync=" + DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"

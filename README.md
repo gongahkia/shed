@@ -396,6 +396,25 @@ session.autoload=default
 session.dir=/Users/you/.shed/sessions
 ```
 
+### Theater Mode (Dramatic UI)
+
+Enable cinematic UI effects and tune each category independently:
+
+```ini
+ui.dramatic=true
+ui.dramatic.identity=true
+ui.dramatic.mode.transitions=true
+ui.dramatic.command.palette=true
+ui.dramatic.editing.feedback=true
+ui.dramatic.panel.animations=true
+ui.dramatic.sound=false
+ui.dramatic.reduced.motion=false
+ui.dramatic.animation.ms=220
+ui.dramatic.minimap.width=84
+```
+
+All settings can be toggled at runtime via `:set key=value` (for example `:set ui.dramatic=false`).
+
 ### Markdown / Orgmode Features
 
 Shed provides orgmode-inspired editing for markdown (`.md`) files.

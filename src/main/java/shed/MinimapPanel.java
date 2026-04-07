@@ -36,6 +36,17 @@ class MinimapPanel extends JPanel {
         if (text != null) textColor = new Color(text.getRed(), text.getGreen(), text.getBlue(), 40);
     }
 
+    public void setPixelWidth(int width) {
+        pixelWidth = Math.max(0, width);
+        setPreferredSize(new Dimension(pixelWidth, Integer.MAX_VALUE));
+        revalidate();
+        repaint();
+    }
+
+    public int getPixelWidth() {
+        return pixelWidth;
+    }
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);

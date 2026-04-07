@@ -98,6 +98,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private List<String> recentFiles;
     private File recentFilesStore;
     private File commandLogStore;
+    private File recoveryStoreDir;
     private Deque<SpecialBufferReturnState> specialBufferReturns;
     private List<String> commandHistory;
     private int commandHistoryIndex;
@@ -112,6 +113,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean zenModeEnabled;
     private String lastInsertedText;
     private Timer externalChangeTimer;
+    private Timer recoverySnapshotTimer;
     private boolean reloadPromptActive;
     private List<Object> syntaxHighlightTags;
     private List<SyntaxSpan> syntaxForegroundSpans;
@@ -228,6 +230,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         recentFilesStore = new File(shedDirectory, "recent");
         commandLogStore = new File(shedDirectory, "command.log");
+        recoveryStoreDir = new File(shedDirectory, "recovery");
         specialBufferReturns = new ArrayDeque<>();
         commandHistory = new ArrayList<>();
         commandHistoryIndex = -1;
@@ -241,6 +244,7 @@ public class Texteditor extends JFrame implements KeyListener {
         zenModeEnabled = false;
         lastInsertedText = "";
         reloadPromptActive = false;
+        recoverySnapshotTimer = null;
         syntaxHighlightTags = new ArrayList<>();
         syntaxForegroundSpans = new ArrayList<>();
         syntaxKeywordColor = configManager.getSyntaxKeywordColor();
@@ -358,6 +362,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
         externalChangeTimer.start();
+        startRecoverySnapshotTimer();
+        promptRecoveryRestoreIfAvailable();
         fileWatcherService.start();
     }
 
@@ -4573,6 +4579,175 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         } else {
             buffer.refreshExternalTimestamp();
+        }
+    }
+
+    private void startRecoverySnapshotTimer() {
+        if (recoverySnapshotTimer != null) {
+            recoverySnapshotTimer.stop();
+        }
+        recoverySnapshotTimer = new Timer(5000, e -> persistRecoverySnapshotsSafely());
+        recoverySnapshotTimer.setRepeats(true);
+        recoverySnapshotTimer.start();
+    }
+
+    private void persistRecoverySnapshotsSafely() {
+        try {
+            persistRecoverySnapshots();
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void persistRecoverySnapshots() throws IOException {
+        if (recoveryStoreDir == null) {
+            return;
+        }
+        if (!recoveryStoreDir.exists()) {
+            Files.createDirectories(recoveryStoreDir.toPath());
+        }
+
+        Set<String> activeSnapshotFiles = new HashSet<>();
+        int scratchIndex = 1;
+        for (FileBuffer buffer : buffers) {
+            if (buffer == null || !buffer.isModified() || buffer == treeBuffer || buffer == quickfixBuffer) {
+                continue;
+            }
+            String snapshotId = buffer.hasFilePath()
+                ? "file-" + Integer.toHexString(buffer.getFilePath().hashCode())
+                : "scratch-" + (scratchIndex++);
+            String snapshotFileName = snapshotId + ".json";
+            activeSnapshotFiles.add(snapshotFileName);
+
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("id", snapshotId);
+            payload.put("name", buffer.getDisplayName());
+            payload.put("path", buffer.hasFilePath() ? buffer.getFilePath() : null);
+            payload.put("modified", true);
+            payload.put("content", buffer.getContent());
+            payload.put("savedAt", commandLogTimeFormat.format(LocalDateTime.now()));
+
+            Files.writeString(
+                new File(recoveryStoreDir, snapshotFileName).toPath(),
+                MiniJson.stringify(payload),
+                StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE
+            );
+        }
+
+        File[] existing = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
+        if (existing == null) {
+            return;
+        }
+        for (File file : existing) {
+            if (!activeSnapshotFiles.contains(file.getName())) {
+                Files.deleteIfExists(file.toPath());
+            }
+        }
+    }
+
+    private void clearRecoverySnapshots() {
+        if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
+            return;
+        }
+        File[] snapshots = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
+        if (snapshots == null) {
+            return;
+        }
+        for (File snapshot : snapshots) {
+            try {
+                Files.deleteIfExists(snapshot.toPath());
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private void promptRecoveryRestoreIfAvailable() {
+        if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
+            return;
+        }
+        File[] snapshots = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
+        if (snapshots == null || snapshots.length == 0) {
+            return;
+        }
+        java.util.Arrays.sort(snapshots, Comparator.comparing(File::getName));
+        int result = JOptionPane.showConfirmDialog(
+            this,
+            snapshots.length + " crash-recovery snapshot(s) were found. Restore now?",
+            "Crash Recovery",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        );
+        if (result != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        int restored = 0;
+        FileBuffer lastRestored = null;
+        for (File snapshot : snapshots) {
+            FileBuffer restoredBuffer = restoreRecoverySnapshot(snapshot);
+            if (restoredBuffer != null) {
+                restored++;
+                lastRestored = restoredBuffer;
+            }
+            try {
+                Files.deleteIfExists(snapshot.toPath());
+            } catch (IOException ignored) {
+            }
+        }
+        if (lastRestored != null) {
+            loadBufferIntoEditor(lastRestored);
+        }
+        if (restored > 0) {
+            showMessage("Recovered " + restored + " buffer" + (restored == 1 ? "" : "s") + " from crash snapshots");
+        }
+    }
+
+    private FileBuffer restoreRecoverySnapshot(File snapshotFile) {
+        if (snapshotFile == null || !snapshotFile.isFile()) {
+            return null;
+        }
+        try {
+            String json = Files.readString(snapshotFile.toPath(), StandardCharsets.UTF_8);
+            Map<String, Object> payload = MiniJson.asObject(MiniJson.parse(json));
+            if (payload == null) {
+                return null;
+            }
+            String content = MiniJson.asString(payload.get("content"));
+            String path = MiniJson.asString(payload.get("path"));
+            String name = MiniJson.asString(payload.get("name"));
+            String restoredContent = content == null ? "" : content;
+
+            if (path != null && !path.isBlank()) {
+                File file = new File(path);
+                FileBuffer existing = findBufferByPath(file);
+                if (existing == null) {
+                    FileBuffer buffer = file.exists() ? new FileBuffer(file, configManager) : new FileBuffer(file.getAbsolutePath());
+                    if (shouldReplaceSingleLandingBuffer()) {
+                        buffers.set(0, buffer);
+                    } else {
+                        buffers.add(buffer);
+                    }
+                    registerFileWatch(buffer);
+                    addToRecentFiles(file.getAbsolutePath());
+                    existing = buffer;
+                }
+                existing.setContent(restoredContent, true);
+                return existing;
+            }
+
+            String scratchName = name == null || name.isBlank() ? "[Recovered Scratch]" : "[Recovered] " + name;
+            FileBuffer scratch = FileBuffer.createScratch(scratchName, restoredContent);
+            scratch.setModified(true);
+            if (shouldReplaceSingleLandingBuffer()) {
+                buffers.set(0, scratch);
+            } else {
+                buffers.add(scratch);
+            }
+            return scratch;
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -9866,6 +10041,7 @@ public class Texteditor extends JFrame implements KeyListener {
             syncLspChange(buffer);
             updateDiffGutter(buffer);
             updateStatusBar();
+            persistRecoverySnapshotsSafely();
         }
     }
 
@@ -11788,6 +11964,10 @@ public class Texteditor extends JFrame implements KeyListener {
             return;
         }
         closingDown = true;
+        if (recoverySnapshotTimer != null) {
+            recoverySnapshotTimer.stop();
+        }
+        clearRecoverySnapshots();
         if (asyncJobService != null) {
             asyncJobService.shutdownNow();
         }

@@ -106,6 +106,18 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void supportsAdditionalBuiltInThemes() {
+        Path home = tempDir.resolve("home-theme-extended");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals("vesper", config.setTheme("vesper"));
+        assertEquals("vesper", config.getThemeId());
+        assertEquals("nightfox", config.setTheme("nightfox"));
+        assertEquals("nightfox", config.getThemeId());
+    }
+
+    @Test
     void getConfiguredLspServersReturnsEmpty() {
         Path home = tempDir.resolve("home-nolsp");
         System.setProperty("user.home", home.toString());

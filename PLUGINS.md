@@ -1,6 +1,8 @@
-# Writing Plugins for Shed
+# `Shed` Plugins
 
-Shed supports two plugin formats: **declarative** (`.shed`) and **scripted** (`.lua`). Place plugin files in `~/.shed/plugins/` — they are loaded automatically on startup.
+Place plugin files in `~/.shed/plugins/`. They are loaded automatically on startup. Shed currently supports two plugin formats
+1. **declarative** (`.shed`) 
+2. **scripted** (`.lua`). 
 
 ## Quick Start
 
@@ -224,7 +226,7 @@ shed.on("BufWrite", function()
 end)
 ```
 
-## Tips
+## Notes
 
 - Plugin files are loaded in alphabetical order. Prefix with numbers (`01-`, `02-`) to control load order.
 - Use `:plugin disable <name>` to temporarily turn off a plugin without deleting it.

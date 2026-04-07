@@ -137,4 +137,52 @@ public class PluginManagerTest {
         String content = Files.readString(file);
         assertTrue(content.contains("shed.on"));
     }
+
+    @Test
+    void packageInstallUpdateRemoveFlowWorks() throws IOException {
+        Path home = tempDir.resolve("home-packages");
+        Path sourceDir = tempDir.resolve("plugin-source");
+        Files.createDirectories(sourceDir);
+        Path source = sourceDir.resolve("demo.shed");
+        Files.writeString(source, "# @name demo\n# @command hello=!echo v1\n");
+
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+
+        String installed = manager.installPackage("demo 1.0 \"" + source.toString() + "\" --pin");
+        assertTrue(installed.contains("Installed plugin package"));
+        assertTrue(Files.exists(home.resolve(".shed/plugins/demo.shed")));
+        assertTrue(manager.getPackageListText().contains("demo @ 1.0"));
+
+        String skipped = manager.updatePackage("demo");
+        assertTrue(skipped.contains("skipped"));
+
+        assertTrue(manager.setPackagePinned("demo", false).contains("Unpinned"));
+        Files.writeString(source, "# @name demo\n# @command hello=!echo v2\n");
+        String updated = manager.updatePackage("demo");
+        assertTrue(updated.contains("Updated 1 package"));
+        String installedContent = Files.readString(home.resolve(".shed/plugins/demo.shed"));
+        assertTrue(installedContent.contains("v2"));
+
+        String removed = manager.removePackage("demo");
+        assertTrue(removed.contains("Removed plugin package"));
+        assertFalse(Files.exists(home.resolve(".shed/plugins/demo.shed")));
+    }
+
+    @Test
+    void packageInstallRejectsChecksumMismatch() throws IOException {
+        Path home = tempDir.resolve("home-packages-checksum");
+        Path sourceDir = tempDir.resolve("plugin-source-checksum");
+        Files.createDirectories(sourceDir);
+        Path source = sourceDir.resolve("bad.shed");
+        Files.writeString(source, "# @name bad\n");
+
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+
+        String result = manager.installPackage("bad 1.0 \"" + source.toString() + "\" --checksum=deadbeef");
+        assertTrue(result.contains("checksum mismatch"));
+    }
 }

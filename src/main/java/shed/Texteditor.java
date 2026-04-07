@@ -7794,7 +7794,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 return "Clear search highlights.";
             case "plugin":
             case "plugins":
-                return "Manage .shed/.lua plugins.";
+                return "Manage plugins and package install/update/pin flows.";
             case "palette":
             case "commands":
                 return "Open command palette.";
@@ -12119,6 +12119,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing plugins";
     }
 
+    public String showPluginPackages() {
+        showScratchBuffer("[plugin packages]", pluginManager.getPackageListText());
+        return "Showing plugin packages";
+    }
+
     public String enablePlugin(String name) {
         return pluginManager.enablePlugin(name);
     }
@@ -12155,6 +12160,26 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (IOException e) {
             return "Error creating plugin: " + e.getMessage();
         }
+    }
+
+    public String installPluginPackage(String args) {
+        return pluginManager.installPackage(args);
+    }
+
+    public String updatePluginPackage(String args) {
+        return pluginManager.updatePackage(args);
+    }
+
+    public String removePluginPackage(String name) {
+        return pluginManager.removePackage(name);
+    }
+
+    public String pinPluginPackage(String name) {
+        return pluginManager.setPackagePinned(name, true);
+    }
+
+    public String unpinPluginPackage(String name) {
+        return pluginManager.setPackagePinned(name, false);
     }
 
     public String executeCommand(String cmd) {

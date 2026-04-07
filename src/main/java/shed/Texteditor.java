@@ -5706,6 +5706,9 @@ public class Texteditor extends JFrame implements KeyListener {
         if (command.indexOf('\0') >= 0) {
             return "Error: command contains invalid null byte";
         }
+        if (command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
+            return "Error: command must be a single line";
+        }
         if (command.length() > configManager.getShellCommandMaxLength()) {
             return "Error: command length exceeds shell.command.max.length";
         }
@@ -11262,21 +11265,34 @@ public class Texteditor extends JFrame implements KeyListener {
             String word = getWordAtCaret();
             String selection = writingArea.getSelectedText();
             String interpolated = PluginManager.interpolate(shellCmd, filePath, line, col, word, selection);
-            ProcessBuilder pb = new ProcessBuilder("bash", "-c", interpolated);
-            pb.redirectErrorStream(true);
-            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
-                pb.directory(buf.getFile().getParentFile());
+            String validationError = validateShellCommand(interpolated);
+            if (validationError != null) {
+                return validationError;
             }
-            Process p = pb.start();
-            String output = new String(p.getInputStream().readAllBytes());
-            if (!p.waitFor(configManager.getProcessTimeoutMs(), java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                p.destroyForcibly();
-                return "User command timed out: " + name;
+            File workingDirectory = new File(".");
+            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
+                workingDirectory = buf.getFile().getParentFile();
+            }
+            CommandResult result = runExternalCommand(
+                List.of("bash", "-lc", interpolated),
+                workingDirectory,
+                null,
+                null,
+                configManager.getProcessTimeoutMs(),
+                configManager.getProcessOutputMaxBytes(),
+                true
+            );
+            String output = result.stdout == null ? "" : result.stdout.stripTrailing();
+            if (result.exitCode != 0) {
+                if (!output.isEmpty()) {
+                    showScratchBuffer("[" + name + "]", output + "\n");
+                }
+                return ":" + name + " failed (exit " + result.exitCode + ")";
             }
             if (output.isEmpty()) {
-                return ":" + name + " completed (exit " + p.exitValue() + ")";
+                return ":" + name + " completed";
             }
-            showScratchBuffer("[" + name + "]", output);
+            showScratchBuffer("[" + name + "]", output + "\n");
             return ":" + name + " completed";
         } catch (Exception e) {
             return "Error running user command: " + e.getMessage();

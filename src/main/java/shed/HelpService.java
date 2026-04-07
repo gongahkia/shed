@@ -53,6 +53,7 @@ public class HelpService {
                    "  :jobs          Show async job list\n" +
                    "  :jobcancel id  Cancel async job\n" +
                    "  :drop cmd      Run async command with current file path\n" +
+                   "  :task ...      Run/save project tasks with quickfix integration\n" +
                    "  :files         File finder\n" +
                    "  :folder        Folder finder\n" +
                    "  :tree [path]   Toggle/open file tree pane\n" +
@@ -190,6 +191,16 @@ public class HelpService {
                     + ":symbols <query> fuzzy-filters before opening the picker.\n"
                     + "Selecting an entry jumps to its line.\n"
                     + "Current-symbol breadcrumbs are shown in the status bar.\n";
+            case "task":
+            case "tasks":
+                return "Help: tasks\n\n"
+                    + "Tasks are saved per project in .shedtasks as name=command lines.\n"
+                    + ":task list shows saved tasks.\n"
+                    + ":task add <name> <command> saves a task.\n"
+                    + ":task remove <name> removes a task.\n"
+                    + ":task <name> or :task run <name> executes a task asynchronously.\n"
+                    + "Output is parsed into quickfix when lines match file:line:col:message.\n"
+                    + "Built-in fallback names are supported: :task test and :task build.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"

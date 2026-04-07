@@ -144,6 +144,26 @@ public class ConfigManager {
             "#002B36", "#073642", "#0A4958", "#114B5F", "#4A3946", "#839496", "#268BD2", "#859900");
         registerTheme("noctis", "Noctis",
             "#1B1F2B", "#22283A", "#2A3246", "#313B53", "#4A3F5A", "#C5CDD9", "#82AAFF", "#ECC48D");
+        registerTheme("oxocarbon-dark", "Oxocarbon Dark",
+            "#161616", "#1E1E1E", "#262626", "#2E2E2E", "#3A2E3A", "#DDE1E6", "#78A9FF", "#42BE65");
+        registerTheme("vesper", "Vesper",
+            "#101010", "#161616", "#1E1E1E", "#262626", "#39293A", "#D5D5D5", "#A1BDFC", "#99FFE4");
+        registerTheme("sonokai", "Sonokai",
+            "#2C2E34", "#33353B", "#3B3E48", "#454751", "#583B4D", "#E2E2E3", "#7FBBB3", "#B0E57C");
+        registerTheme("doom-one", "Doom One",
+            "#282C34", "#313640", "#3A3F4B", "#434852", "#5A3D4D", "#BBC2CF", "#51AFEF", "#98BE65");
+        registerTheme("horizon", "Horizon",
+            "#1C1E26", "#232530", "#2B2E3B", "#333748", "#4D3A4C", "#E0E0E0", "#E95678", "#09F7A0");
+        registerTheme("papercolor-dark", "PaperColor Dark",
+            "#1C1C1C", "#262626", "#303030", "#3A3A3A", "#4D3A42", "#D0D0D0", "#5FAFD7", "#87AF87");
+        registerTheme("xcode-dark", "Xcode Dark",
+            "#1F1F24", "#27272E", "#30303A", "#3A3A47", "#4C3A45", "#F8F8F2", "#9CDCFE", "#A6E22E");
+        registerTheme("dimmed-monokai", "Dimmed Monokai",
+            "#1E1E1E", "#252525", "#2C2C2C", "#333333", "#4A3843", "#B9BCBF", "#5E9CD3", "#93C763");
+        registerTheme("fleet-dark", "Fleet Dark",
+            "#1F2430", "#252B39", "#2D3444", "#353D50", "#4A3B4F", "#CDD3DE", "#7CC4FF", "#B8E36A");
+        registerTheme("nightfox", "Nightfox",
+            "#192330", "#1F2A38", "#263445", "#2E3D52", "#4A3E57", "#CDCECF", "#719CD6", "#81B29A");
     }
 
     public ConfigManager() {

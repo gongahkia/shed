@@ -9433,10 +9433,17 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void openFile(File file) throws IOException {
         persistCurrentBufferState();
+        String projectConfigMessage = configManager.applyProjectConfigForFile(file);
+        if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
+            applyRuntimeConfigFromSettings();
+        }
 
         FileBuffer existing = findBufferByPath(file);
         if (existing != null) {
             loadBufferIntoEditor(existing);
+            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
+                showMessage(projectConfigMessage);
+            }
             return;
         }
 
@@ -9459,6 +9466,8 @@ public class Texteditor extends JFrame implements KeyListener {
         refreshGitGutter();
         if (buffer.isShowingPreviewOnly()) {
             showMessage("Large-file preview loaded");
+        } else if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
+            showMessage(projectConfigMessage);
         }
     }
 

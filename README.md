@@ -417,6 +417,11 @@ All settings can be toggled at runtime via `:set key=value` (for example `:set u
 Use `:theater off`, `:theater subtle`, or `:theater full` for one-shot presets.
 Use `:set! key=value` to persist a single setting, or `:config save` to write all current runtime settings.
 
+### Per-Project Overrides
+
+Shed auto-loads `.shedrc.local` from the current file's project tree (nearest parent directory).
+Use this for repo-specific settings without changing global `~/.shed/shedrc`.
+
 ### Markdown / Orgmode Features
 
 Shed provides orgmode-inspired editing for markdown (`.md`) files.

@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -81,6 +83,10 @@ public class ConfigManager {
     private static final int DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD = 20000;
     private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
     private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
+    private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
+    private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
+    private static final boolean DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE = true;
+    private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "shedrc";
     private static final String SHED_SESSIONS_NAME = "sessions";
@@ -200,6 +206,10 @@ public class ConfigManager {
         config.put("ui.dramatic.performance.line.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
         config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
         config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
+        config.put("project.config.enabled", String.valueOf(DEFAULT_PROJECT_CONFIG_ENABLED));
+        config.put("project.config.allow.unsafe", String.valueOf(DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE));
+        config.put("project.config.require.trusted.file", String.valueOf(DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE));
+        config.put("tree.delete.protect.critical", String.valueOf(DEFAULT_TREE_DELETE_PROTECT_CRITICAL));
         defaultConfig.clear();
         defaultConfig.putAll(config);
     }
@@ -640,14 +650,57 @@ public class ConfigManager {
         return Math.max(1000, getInt("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
     }
 
+    public boolean getProjectConfigEnabled() {
+        return getBoolean("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
+    }
+
+    public boolean getProjectConfigAllowUnsafe() {
+        return getBoolean("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
+    }
+
+    public boolean getProjectConfigRequireTrustedFile() {
+        return getBoolean("project.config.require.trusted.file", DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE);
+    }
+
+    public boolean getTreeDeleteProtectCritical() {
+        return getBoolean("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
+    }
+
+    public boolean isProjectConfigKeyAllowed(String key) {
+        if (key == null || key.isBlank()) {
+            return false;
+        }
+        if (getProjectConfigAllowUnsafe()) {
+            return true;
+        }
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("theme")
+            || normalized.equals("tab.size")
+            || normalized.equals("line.numbers")
+            || normalized.equals("show.current.line")
+            || normalized.equals("expand.tab")
+            || normalized.equals("auto.indent")
+            || normalized.equals("highlight.search")
+            || normalized.equals("scrolloff")
+            || normalized.equals("textwidth")
+            || normalized.equals("list")
+            || normalized.equals("conceallevel")
+            || normalized.equals("ruler.column")
+            || normalized.equals("minimap")
+            || normalized.startsWith("ui.")
+            || normalized.startsWith("color.")
+            || normalized.startsWith("font.");
+    }
+
     public void set(String key, String value) {
         config.put(key, value);
     }
 
     public void setAndPersist(String key, String value) throws IOException {
-        String normalized = value == null ? "" : value;
-        config.put(key, normalized);
-        persistedConfig.put(key, normalized);
+        String normalizedKey = normalizePersistedKey(key);
+        String normalizedValue = normalizePersistedValue(value == null ? "" : value);
+        config.put(normalizedKey, normalizedValue);
+        persistedConfig.put(normalizedKey, normalizedValue);
         writeConfigFile();
     }
 
@@ -660,9 +713,17 @@ public class ConfigManager {
             if (value == null) {
                 continue;
             }
-            String defaultValue = defaultConfig.get(key);
-            if (defaultValue == null || !defaultValue.equals(value)) {
-                persistedConfig.put(key, value);
+            String normalizedKey;
+            String normalizedValue;
+            try {
+                normalizedKey = normalizePersistedKey(key);
+                normalizedValue = normalizePersistedValue(value);
+            } catch (IOException ignored) {
+                continue;
+            }
+            String defaultValue = defaultConfig.get(normalizedKey);
+            if (defaultValue == null || !defaultValue.equals(normalizedValue)) {
+                persistedConfig.put(normalizedKey, normalizedValue);
             }
         }
         writeConfigFile();
@@ -679,6 +740,17 @@ public class ConfigManager {
     }
 
     public String applyProjectConfigForFile(File file) {
+        if (!getProjectConfigEnabled()) {
+            if (activeProjectConfigFile == null) {
+                return "";
+            }
+            restoreProjectOverrides();
+            projectConfig.clear();
+            projectPreviousValues.clear();
+            activeProjectConfigFile = null;
+            return "Project config disabled";
+        }
+
         File localConfig = findProjectConfig(file);
         try {
             if (localConfig != null) {
@@ -704,13 +776,26 @@ public class ConfigManager {
             return "Project config cleared";
         }
 
+        if (getProjectConfigRequireTrustedFile() && !isTrustedProjectConfigFile(localConfig)) {
+            return "Project config blocked (untrusted file): " + localConfig.getAbsolutePath();
+        }
+
         try {
             Map<String, String> parsed = parseConfigFile(localConfig);
+            Map<String, String> allowed = new LinkedHashMap<>();
+            int skipped = 0;
+            for (Map.Entry<String, String> entry : parsed.entrySet()) {
+                if (isProjectConfigKeyAllowed(entry.getKey())) {
+                    allowed.put(entry.getKey(), entry.getValue());
+                } else {
+                    skipped++;
+                }
+            }
             if (parsed.isEmpty()) {
                 activeProjectConfigFile = localConfig;
                 return "Project config loaded: " + localConfig.getAbsolutePath() + " (no overrides)";
             }
-            for (Map.Entry<String, String> entry : parsed.entrySet()) {
+            for (Map.Entry<String, String> entry : allowed.entrySet()) {
                 String key = entry.getKey();
                 if (!projectPreviousValues.containsKey(key)) {
                     projectPreviousValues.put(key, config.get(key));
@@ -719,6 +804,13 @@ public class ConfigManager {
                 config.put(key, entry.getValue());
             }
             activeProjectConfigFile = localConfig;
+            if (allowed.isEmpty()) {
+                return "Project config loaded: " + localConfig.getAbsolutePath() + " (all overrides blocked)";
+            }
+            if (skipped > 0) {
+                return "Project config loaded: " + localConfig.getAbsolutePath()
+                    + " (" + skipped + " key" + (skipped == 1 ? "" : "s") + " blocked)";
+            }
             return "Project config loaded: " + localConfig.getAbsolutePath();
         } catch (IOException e) {
             return "Project config load failed: " + e.getMessage();
@@ -904,9 +996,15 @@ public class ConfigManager {
             + "ui.dramatic.performance.line.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
             + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
+            + "project.config.enabled=" + DEFAULT_PROJECT_CONFIG_ENABLED + "\n"
+            + "project.config.allow.unsafe=" + DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE + "\n"
+            + "project.config.require.trusted.file=" + DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE + "\n"
+            + "tree.delete.protect.critical=" + DEFAULT_TREE_DELETE_PROTECT_CRITICAL + "\n\n"
             + "# Per-project override file support\n"
             + "# Place .shedrc.local at a repo root (or parent folder).\n"
-            + "# It is auto-applied when opening files under that folder.\n\n"
+            + "# It is auto-applied when opening files under that folder.\n"
+            + "# By default, only UI/editor keys are applied from .shedrc.local.\n"
+            + "# Set project.config.allow.unsafe=true to allow all keys.\n\n"
             + "# Plugins\n"
             + "# Place .shed or .lua files in ~/.shed/plugins/ to load plugins.\n"
             + "# .shed files: declarative (# @command, # @bind, # @event directives)\n"
@@ -1006,10 +1104,73 @@ public class ConfigManager {
             String key = trimmed.substring(0, separator).trim();
             String value = trimmed.substring(separator + 1).trim();
             if (!key.isEmpty()) {
-                parsed.put(key, value);
+                String normalizedKey;
+                String normalizedValue;
+                try {
+                    normalizedKey = normalizePersistedKey(key);
+                    normalizedValue = normalizePersistedValue(value);
+                } catch (IOException ignored) {
+                    continue;
+                }
+                parsed.put(normalizedKey, normalizedValue);
             }
         }
         return parsed;
+    }
+
+    private String normalizePersistedKey(String rawKey) throws IOException {
+        String key = rawKey == null ? "" : rawKey.trim();
+        if (key.isEmpty()) {
+            throw new IOException("config key required");
+        }
+        if (key.indexOf('\0') >= 0 || key.indexOf('\n') >= 0 || key.indexOf('\r') >= 0 || key.indexOf('=') >= 0) {
+            throw new IOException("invalid config key: " + key);
+        }
+        return key;
+    }
+
+    private String normalizePersistedValue(String rawValue) throws IOException {
+        String value = rawValue == null ? "" : rawValue;
+        if (value.indexOf('\0') >= 0) {
+            throw new IOException("config value contains null byte");
+        }
+        return value.replace('\r', ' ').replace('\n', ' ');
+    }
+
+    private boolean isTrustedProjectConfigFile(File file) {
+        if (file == null || !file.isFile()) {
+            return false;
+        }
+        java.nio.file.Path path = file.toPath();
+        String expectedUser = System.getProperty("user.name");
+        try {
+            UserPrincipal owner = Files.getOwner(path);
+            if (owner != null && expectedUser != null && !expectedUser.isBlank()) {
+                if (!matchesLocalUsername(owner.getName(), expectedUser)) {
+                    return false;
+                }
+            }
+        } catch (IOException | UnsupportedOperationException | SecurityException ignored) {
+        }
+        try {
+            java.util.Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(path);
+            if (permissions.contains(PosixFilePermission.OTHERS_WRITE)) {
+                return false;
+            }
+        } catch (IOException | UnsupportedOperationException | SecurityException ignored) {
+        }
+        return true;
+    }
+
+    private boolean matchesLocalUsername(String ownerName, String expectedUser) {
+        if (ownerName == null || expectedUser == null) {
+            return false;
+        }
+        String normalizedOwner = ownerName.trim().toLowerCase(Locale.ROOT);
+        String normalizedExpected = expectedUser.trim().toLowerCase(Locale.ROOT);
+        return normalizedOwner.equals(normalizedExpected)
+            || normalizedOwner.endsWith("\\" + normalizedExpected)
+            || normalizedOwner.endsWith("/" + normalizedExpected);
     }
 
     private void writeConfigFile() throws IOException {

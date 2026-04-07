@@ -209,6 +209,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // Constants
     private static final String VERSION = "2.0";
     private static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
+    private static final Pattern HEX_COLOR_VALUE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$");
     private static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
 
     // Constructor
@@ -11413,6 +11414,40 @@ public class Texteditor extends JFrame implements KeyListener {
         return configManager.getThemeId();
     }
 
+    public List<String> getThemeIdsForPlugins() {
+        return configManager.getThemeIds();
+    }
+
+    public Map<String, String> getActiveThemePaletteHex() {
+        Map<String, String> palette = new LinkedHashMap<>();
+        palette.put("theme", configManager.getThemeId());
+        palette.put("color.normal", colorToHex(configManager.getNormalColor()));
+        palette.put("color.insert", colorToHex(configManager.getInsertColor()));
+        palette.put("color.command", colorToHex(configManager.getCommandColor()));
+        palette.put("color.visual", colorToHex(configManager.getVisualColor()));
+        palette.put("color.replace", colorToHex(configManager.getReplaceColor()));
+        palette.put("ui.foreground", colorToHex(configManager.getEditorForeground()));
+        palette.put("ui.caret", colorToHex(configManager.getCaretColor()));
+        palette.put("ui.selection", colorToHex(configManager.getSelectionColor()));
+        palette.put("ui.selection.text", colorToHex(configManager.getSelectionTextColor()));
+        palette.put("ui.status.background", colorToHex(configManager.getStatusBarBackground()));
+        palette.put("ui.status.foreground", colorToHex(configManager.getStatusBarForeground()));
+        palette.put("ui.command.background", colorToHex(configManager.getCommandBarBackground()));
+        palette.put("ui.command.foreground", colorToHex(configManager.getCommandBarForeground()));
+        palette.put("ui.linenumber.background", colorToHex(configManager.getLineNumberBackground()));
+        palette.put("ui.linenumber.foreground", colorToHex(configManager.getLineNumberForeground()));
+        palette.put("ui.currentline", colorToHex(configManager.getCurrentLineHighlightColor()));
+        palette.put("ui.syntax.keyword", colorToHex(configManager.getSyntaxKeywordColor()));
+        palette.put("ui.syntax.string", colorToHex(configManager.getSyntaxStringColor()));
+        palette.put("ui.syntax.comment", colorToHex(configManager.getSyntaxCommentColor()));
+        palette.put("ui.syntax.type", colorToHex(configManager.getSyntaxTypeColor()));
+        palette.put("ui.syntax.function", colorToHex(configManager.getSyntaxFunctionColor()));
+        palette.put("ui.syntax.constant", colorToHex(configManager.getSyntaxConstantColor()));
+        palette.put("ui.syntax.annotation", colorToHex(configManager.getSyntaxAnnotationColor()));
+        palette.put("ui.syntax.number", colorToHex(configManager.getSyntaxNumberColor()));
+        return palette;
+    }
+
     public String resolveCommandAlias(String command) {
         return configManager.resolveCommandAlias(command);
     }
@@ -11423,7 +11458,110 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Unknown theme: " + value;
         }
         applyThemeColors();
+        firePluginEvent("ThemeChange");
         return "Theme set to " + appliedTheme;
+    }
+
+    public String applyThemeFromPlugin(String value, boolean persist) {
+        String appliedTheme = configManager.setTheme(value);
+        if (appliedTheme == null) {
+            return "Unknown theme: " + value;
+        }
+        if (persist) {
+            try {
+                configManager.setAndPersist("theme", appliedTheme);
+            } catch (IOException e) {
+                return "Error saving theme: " + e.getMessage();
+            }
+        }
+        applyThemeColors();
+        firePluginEvent("ThemeChange");
+        return persist ? "Theme set and saved to " + appliedTheme : "Theme set to " + appliedTheme;
+    }
+
+    public String applyPaletteOverridesFromPlugin(Map<String, String> overrides, boolean persist) {
+        if (overrides == null || overrides.isEmpty()) {
+            return "No palette overrides";
+        }
+        int applied = 0;
+        for (Map.Entry<String, String> entry : overrides.entrySet()) {
+            String mappedKey = mapPaletteAliasToConfigKey(entry.getKey());
+            String value = entry.getValue() == null ? "" : entry.getValue().trim();
+            if (mappedKey == null || value.isEmpty()) {
+                continue;
+            }
+            if (!HEX_COLOR_VALUE_PATTERN.matcher(value).matches()) {
+                continue;
+            }
+            configManager.set(mappedKey, value);
+            applied++;
+        }
+        if (applied == 0) {
+            return "No valid palette keys/colors";
+        }
+        applyRuntimeConfigFromSettings();
+        if (persist) {
+            try {
+                configManager.persistCurrentConfig();
+            } catch (IOException e) {
+                return "Applied " + applied + " palette key(s), but failed to save: " + e.getMessage();
+            }
+        }
+        firePluginEvent("ThemeChange");
+        return (persist ? "Applied and saved " : "Applied ") + applied + " palette key" + (applied == 1 ? "" : "s");
+    }
+
+    private String mapPaletteAliasToConfigKey(String rawKey) {
+        if (rawKey == null || rawKey.isBlank()) {
+            return null;
+        }
+        String key = rawKey.trim().toLowerCase(Locale.ROOT);
+        switch (key) {
+            case "normal": return "color.normal";
+            case "insert": return "color.insert";
+            case "command": return "color.command";
+            case "visual": return "color.visual";
+            case "replace": return "color.replace";
+            case "foreground": return "ui.foreground";
+            case "caret": return "ui.caret";
+            case "selection": return "ui.selection";
+            case "selection_text":
+            case "selectiontext": return "ui.selection.text";
+            case "status_bg":
+            case "statusbar_bg": return "ui.status.background";
+            case "status_fg":
+            case "statusbar_fg": return "ui.status.foreground";
+            case "command_bg":
+            case "commandbar_bg": return "ui.command.background";
+            case "command_fg":
+            case "commandbar_fg": return "ui.command.foreground";
+            case "line_number_bg":
+            case "linenumber_bg": return "ui.linenumber.background";
+            case "line_number_fg":
+            case "linenumber_fg": return "ui.linenumber.foreground";
+            case "current_line":
+            case "currentline": return "ui.currentline";
+            case "syntax_keyword": return "ui.syntax.keyword";
+            case "syntax_string": return "ui.syntax.string";
+            case "syntax_comment": return "ui.syntax.comment";
+            case "syntax_type": return "ui.syntax.type";
+            case "syntax_function": return "ui.syntax.function";
+            case "syntax_constant": return "ui.syntax.constant";
+            case "syntax_annotation": return "ui.syntax.annotation";
+            case "syntax_number": return "ui.syntax.number";
+            default:
+                if (key.startsWith("color.") || key.startsWith("ui.")) {
+                    return key;
+                }
+                return null;
+        }
+    }
+
+    private String colorToHex(Color color) {
+        if (color == null) {
+            return "#000000";
+        }
+        return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
     }
 
     public String setConfigOption(String key, String value) {
@@ -11432,6 +11570,9 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         configManager.set(key, value == null ? "" : value);
         applyRuntimeConfigFromSettings();
+        if (isThemeRelatedConfigKey(key)) {
+            firePluginEvent("ThemeChange");
+        }
         return "Set " + key;
     }
 
@@ -11442,10 +11583,23 @@ public class Texteditor extends JFrame implements KeyListener {
         try {
             configManager.setAndPersist(key, value == null ? "" : value);
             applyRuntimeConfigFromSettings();
+            if (isThemeRelatedConfigKey(key)) {
+                firePluginEvent("ThemeChange");
+            }
             return "Set and saved " + key;
         } catch (IOException e) {
             return "Error saving config: " + e.getMessage();
         }
+    }
+
+    private boolean isThemeRelatedConfigKey(String key) {
+        if (key == null) {
+            return false;
+        }
+        String normalized = key.trim().toLowerCase(Locale.ROOT);
+        return normalized.equals("theme")
+            || normalized.startsWith("color.")
+            || normalized.startsWith("ui.");
     }
 
     public String saveConfigToDisk() {

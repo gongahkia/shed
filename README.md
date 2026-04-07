@@ -586,6 +586,14 @@ shed.on("BufWrite", function()
 end)
 ```
 
+Theme-aware Lua APIs are also available:
+
+```lua
+shed.theme()                         -- current theme id
+shed.theme_set("nightfox", true)    -- apply + persist theme
+shed.palette_set({ command_bg = "#1F3A5F" }) -- runtime palette override
+```
+
 See [`PLUGINS.md`](PLUGINS.md) for the full authoring guide and API reference. Example plugins are in [`examples/plugins/`](examples/plugins/).
 
 ### LSP Management

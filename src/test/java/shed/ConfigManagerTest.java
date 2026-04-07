@@ -259,4 +259,67 @@ public class ConfigManagerTest {
         assertEquals("default", config.getDramaticSoundPack());
         assertNull(config.getActiveProjectConfigPath());
     }
+
+    @Test
+    void projectLocalConfigBlocksUnsafeKeysByDefault() throws IOException {
+        Path home = tempDir.resolve("home-project-local-safe");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        Path project = tempDir.resolve("project-safe");
+        Files.createDirectories(project.resolve("src"));
+        Files.writeString(project.resolve(".shedrc.local"),
+            "ui.dramatic=true\n"
+                + "command.user.pwn=echo hacked\n"
+                + "keybind.normal.q=:q!\n");
+        File file = project.resolve("src/Main.java").toFile();
+        Files.writeString(file.toPath(), "class Main {}\n");
+
+        String loaded = config.applyProjectConfigForFile(file);
+        assertTrue(loaded.contains("blocked"));
+        assertTrue(config.getDramaticUiEnabled());
+        assertTrue(config.getUserCommands().isEmpty());
+        assertNull(config.getKeybinding("normal", "q"));
+    }
+
+    @Test
+    void projectLocalConfigAllowsUnsafeKeysWhenEnabled() throws IOException {
+        Path home = tempDir.resolve("home-project-local-unsafe");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        config.set("project.config.allow.unsafe", "true");
+
+        Path project = tempDir.resolve("project-unsafe");
+        Files.createDirectories(project.resolve("src"));
+        Files.writeString(project.resolve(".shedrc.local"),
+            "command.user.local=echo ok\n"
+                + "keybind.normal.q=:q!\n");
+        File file = project.resolve("src/Main.java").toFile();
+        Files.writeString(file.toPath(), "class Main {}\n");
+
+        String loaded = config.applyProjectConfigForFile(file);
+        assertTrue(loaded.contains("Project config loaded"));
+        assertEquals("echo ok", config.getUserCommands().get("local"));
+        assertEquals(":q!", config.getKeybinding("normal", "q"));
+    }
+
+    @Test
+    void projectLocalConfigCanBeDisabledAtRuntime() throws IOException {
+        Path home = tempDir.resolve("home-project-local-disabled");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        Path project = tempDir.resolve("project-disabled");
+        Files.createDirectories(project.resolve("src"));
+        Files.writeString(project.resolve(".shedrc.local"), "ui.dramatic=true\n");
+        File file = project.resolve("src/Main.java").toFile();
+        Files.writeString(file.toPath(), "class Main {}\n");
+
+        assertTrue(config.applyProjectConfigForFile(file).contains("Project config loaded"));
+        assertTrue(config.getDramaticUiEnabled());
+
+        config.set("project.config.enabled", "false");
+        assertTrue(config.applyProjectConfigForFile(file).contains("Project config disabled"));
+        assertFalse(config.getDramaticUiEnabled());
+    }
 }

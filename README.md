@@ -312,6 +312,8 @@ Use quickfix as a shared navigation list for grep, shell output, and LSP diagnos
 :dprev
 ```
 
+When cursoring inside quickfix or on a diagnosed line, the command bar shows an inline peek message before you jump.
+
 ### LSP Commands
 
 LSP completion is available via `Ctrl-n`. Additional LSP flows are available in command mode:

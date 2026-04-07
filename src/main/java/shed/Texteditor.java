@@ -160,6 +160,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private SnippetService snippetService;
     private BracketColorService bracketColorService;
     private SymbolService symbolService;
+    private TaskService taskService;
     private FileWatcherService fileWatcherService;
     private SubstituteService substituteService;
     private List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
@@ -295,6 +296,7 @@ public class Texteditor extends JFrame implements KeyListener {
         snippetService = new SnippetService();
         bracketColorService = new BracketColorService();
         symbolService = new SymbolService();
+        taskService = new TaskService();
         fileWatcherService = new FileWatcherService();
         substituteService = new SubstituteService();
         foldedLines = new HashMap<>();
@@ -3245,6 +3247,7 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("jobcancel");
         knownCommands.add("jobkill");
         knownCommands.add("drop");
+        knownCommands.add("task");
         knownCommands.add("help");
         knownCommands.add("wc");
         knownCommands.add("recent");
@@ -5663,7 +5666,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
         commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
         commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
-        commands.add("drop"); commands.add("help"); commands.add("wc"); commands.add("recent");
+        commands.add("drop"); commands.add("task"); commands.add("help"); commands.add("wc"); commands.add("recent");
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
@@ -5810,6 +5813,251 @@ public class Texteditor extends JFrame implements KeyListener {
             (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
         );
         return "Drop job " + jobId + " started";
+    }
+
+    public String handleTaskCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        File projectRoot = resolveTaskProjectRoot();
+        Map<String, String> tasks = taskService.loadTasks(projectRoot);
+        if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
+            return showProjectTasks(projectRoot, tasks);
+        }
+        List<String> args = parseQuotedArguments(trimmed);
+        if (args.isEmpty()) {
+            return showProjectTasks(projectRoot, tasks);
+        }
+
+        String sub = args.get(0).toLowerCase(Locale.ROOT);
+        switch (sub) {
+            case "list":
+                return showProjectTasks(projectRoot, tasks);
+            case "add":
+                if (args.size() < 3) {
+                    return "Usage: :task add <name> <command>";
+                }
+                StringBuilder commandBuilder = new StringBuilder();
+                for (int i = 2; i < args.size(); i++) {
+                    if (i > 2) {
+                        commandBuilder.append(" ");
+                    }
+                    commandBuilder.append(args.get(i));
+                }
+                return saveProjectTask(projectRoot, args.get(1), commandBuilder.toString());
+            case "remove":
+            case "rm":
+            case "delete":
+                if (args.size() < 2) {
+                    return "Usage: :task remove <name>";
+                }
+                return removeProjectTask(projectRoot, args.get(1));
+            case "run":
+                if (args.size() < 2) {
+                    return "Usage: :task run <name>";
+                }
+                return runNamedTask(args.get(1), projectRoot, tasks);
+            default:
+                return runNamedTask(args.get(0), projectRoot, tasks);
+        }
+    }
+
+    private File resolveTaskProjectRoot() {
+        FileBuffer buffer = getCurrentBuffer();
+        File start = null;
+        if (buffer != null && buffer.hasFilePath()) {
+            start = new File(buffer.getFilePath());
+        } else {
+            start = new File(".");
+        }
+        File root = detectTaskProjectRoot(start);
+        if (root == null) {
+            root = new File(".");
+        }
+        try {
+            return root.getCanonicalFile();
+        } catch (IOException e) {
+            return root.getAbsoluteFile();
+        }
+    }
+
+    private File detectTaskProjectRoot(File file) {
+        if (file == null) {
+            return null;
+        }
+        File cursor = file.isDirectory() ? file : file.getParentFile();
+        File fallback = cursor;
+        while (cursor != null) {
+            if (new File(cursor, ".shedtasks").isFile()) {
+                return cursor;
+            }
+            if (new File(cursor, ".git").exists()) {
+                return cursor;
+            }
+            fallback = cursor;
+            cursor = cursor.getParentFile();
+        }
+        return fallback;
+    }
+
+    private String showProjectTasks(File projectRoot, Map<String, String> tasks) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Project tasks\n\n");
+        sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
+        sb.append("file: ").append(taskService.taskFile(projectRoot).getAbsolutePath()).append("\n\n");
+        if (tasks.isEmpty()) {
+            sb.append("No saved tasks.\n");
+            sb.append("Use :task add <name> <command>\n");
+            sb.append("Example: :task add test \"mvn -q test\"\n");
+        } else {
+            List<String> names = new ArrayList<>(tasks.keySet());
+            Collections.sort(names);
+            for (String name : names) {
+                sb.append("  ").append(name).append(" = ").append(tasks.get(name)).append("\n");
+            }
+        }
+        showScratchBuffer("[tasks]", sb.toString());
+        return "Showing tasks";
+    }
+
+    private String saveProjectTask(File projectRoot, String name, String command) {
+        String normalizedName = name == null ? "" : name.trim();
+        String normalizedCommand = command == null ? "" : command.trim();
+        if (normalizedName.isEmpty()) {
+            return "Task name required";
+        }
+        if (normalizedCommand.isEmpty()) {
+            return "Task command required";
+        }
+        Map<String, String> tasks = taskService.loadTasks(projectRoot);
+        tasks.put(normalizedName, normalizedCommand);
+        try {
+            taskService.saveTasks(projectRoot, tasks);
+            return "Saved task '" + normalizedName + "'";
+        } catch (IOException e) {
+            return "Task save failed: " + e.getMessage();
+        }
+    }
+
+    private String removeProjectTask(File projectRoot, String name) {
+        String normalizedName = name == null ? "" : name.trim();
+        if (normalizedName.isEmpty()) {
+            return "Task name required";
+        }
+        Map<String, String> tasks = taskService.loadTasks(projectRoot);
+        if (!tasks.containsKey(normalizedName)) {
+            return "Task not found: " + normalizedName;
+        }
+        tasks.remove(normalizedName);
+        try {
+            taskService.saveTasks(projectRoot, tasks);
+            return "Removed task '" + normalizedName + "'";
+        } catch (IOException e) {
+            return "Task remove failed: " + e.getMessage();
+        }
+    }
+
+    private String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {
+        String normalizedName = taskName == null ? "" : taskName.trim();
+        if (normalizedName.isEmpty()) {
+            return "Task name required";
+        }
+        String taskCommand = tasks.get(normalizedName);
+        if (taskCommand == null || taskCommand.isBlank()) {
+            taskCommand = inferBuiltInTaskCommand(normalizedName, projectRoot);
+        }
+        if (taskCommand == null || taskCommand.isBlank()) {
+            return "Task not found: " + normalizedName + " (use :task list or :task add)";
+        }
+        String validationError = validateShellCommand(taskCommand);
+        if (validationError != null) {
+            return validationError;
+        }
+        final String commandToRun = taskCommand;
+        int jobId = asyncJobService.submit(
+            "task " + normalizedName + ": " + commandToRun,
+            token -> runExternalCommand(
+                List.of("zsh", "-lc", commandToRun),
+                projectRoot,
+                null,
+                token,
+                configManager.getProcessTimeoutMs(),
+                configManager.getProcessOutputMaxBytes(),
+                true
+            ),
+            (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
+                handleTaskJobCompletion(normalizedName, snapshot, result, error))
+        );
+        return "Task job " + jobId + " started (" + normalizedName + ")";
+    }
+
+    private String inferBuiltInTaskCommand(String taskName, File projectRoot) {
+        String normalized = taskName == null ? "" : taskName.trim().toLowerCase(Locale.ROOT);
+        if ("test".equals(normalized)) {
+            if (new File(projectRoot, "pom.xml").isFile()) {
+                return "mvn -q test";
+            }
+            if (new File(projectRoot, "package.json").isFile()) {
+                return "npm test";
+            }
+            if (new File(projectRoot, "Makefile").isFile()) {
+                return "make test";
+            }
+        }
+        if ("build".equals(normalized)) {
+            if (new File(projectRoot, "pom.xml").isFile()) {
+                return "mvn -q -DskipTests package";
+            }
+            if (new File(projectRoot, "package.json").isFile()) {
+                return "npm run build";
+            }
+            if (new File(projectRoot, "Makefile").isFile()) {
+                return "make build";
+            }
+        }
+        return null;
+    }
+
+    private void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        if (closingDown) {
+            return;
+        }
+        int jobId = snapshot == null ? -1 : snapshot.getId();
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            showMessage("Task job " + jobId + " cancelled");
+            return;
+        }
+        if (error != null || result == null) {
+            String message = error == null ? "unknown error" : error.getMessage();
+            showMessage("Task job " + jobId + " failed: " + (message == null ? "" : message));
+            return;
+        }
+        String output = result.stdout == null ? "" : result.stdout.stripTrailing();
+        List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "task:" + taskName);
+        if (!parsedEntries.isEmpty()) {
+            updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
+        }
+
+        if (result.exitCode != 0) {
+            if (!output.isEmpty()) {
+                showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+            }
+            showMessage(parsedEntries.isEmpty()
+                ? "Task '" + taskName + "' failed (exit " + result.exitCode + ")"
+                : "Task '" + taskName + "' failed (exit " + result.exitCode + ", quickfix updated)");
+            return;
+        }
+
+        if (output.isEmpty()) {
+            showMessage("Task '" + taskName + "' complete");
+            return;
+        }
+        if (output.lines().count() <= 1) {
+            showMessage(output);
+            return;
+        }
+        showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
+        showMessage(parsedEntries.isEmpty()
+            ? "Task '" + taskName + "' complete"
+            : "Task '" + taskName + "' complete (quickfix updated)");
     }
 
     public String filterRangeWithCommand(int startLine, int endLine, String command) {
@@ -7694,6 +7942,8 @@ public class Texteditor extends JFrame implements KeyListener {
                 return "Cancel async job by id.";
             case "drop":
                 return "Run async command against current file path.";
+            case "task":
+                return "Run project tasks (:task test/build) with quickfix integration.";
             case "help":
             case "h":
                 return "Open help text (topic optional).";

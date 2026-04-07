@@ -609,3 +609,13 @@ See [`PLUGINS.md`](PLUGINS.md) for the full authoring guide and API reference. E
 ### CI
 
 CI now executes the full Maven test suite (`mvn test`) before packaging.
+
+### Local pre-push test gate
+
+To block local pushes when tests fail:
+
+```console
+./scripts/setup-git-hooks.sh
+```
+
+This sets `core.hooksPath` to `.githooks` and runs `mvn -q test` on every `git push`.

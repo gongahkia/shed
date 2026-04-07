@@ -9360,15 +9360,85 @@ public class Texteditor extends JFrame implements KeyListener {
 
         statusBar.setText(status.toString());
 
+        String inlinePeek = inlinePeekMessage(buffer);
         if ((editorState.mode == EditorMode.COMMAND || editorState.mode == EditorMode.SEARCH) && !editorState.commandBuffer.isEmpty()) {
             commandBar.setText(editorState.commandBuffer);
         } else if (lastMessage != null && !lastMessage.isEmpty()) {
             commandBar.setText(lastMessage);
+        } else if (inlinePeek != null) {
+            commandBar.setText(inlinePeek);
         } else {
             String blame = getGitBlameForCurrentLine(buffer);
             commandBar.setText(blame != null ? blame : "");
         }
         applyDramaticFooterStyling();
+    }
+
+    private String inlinePeekMessage(FileBuffer buffer) {
+        String quickfixPeek = quickfixInlinePeek();
+        if (quickfixPeek != null) {
+            return quickfixPeek;
+        }
+        String diagnosticPeek = diagnosticInlinePeek(buffer);
+        if (diagnosticPeek != null) {
+            return diagnosticPeek;
+        }
+        return null;
+    }
+
+    private String quickfixInlinePeek() {
+        if (!isQuickfixBufferActive()) {
+            return null;
+        }
+        int line = getCurrentCaretLine() + 1;
+        QuickfixService.Entry entry = quickfixService.atLine(line);
+        if (entry == null) {
+            return "quickfix: no entry on current line";
+        }
+        String source = entry.getSource() == null || entry.getSource().isBlank() ? "qf" : entry.getSource();
+        String fileName = entry.getFilePath() == null ? "" : new File(entry.getFilePath()).getName();
+        String location = fileName.isEmpty() ? "" : fileName + ":" + entry.getLine() + ":" + entry.getColumn() + " ";
+        return ("peek [" + source + "] " + location + safePreviewText(entry.getMessage(), 120)).trim();
+    }
+
+    private String diagnosticInlinePeek(FileBuffer buffer) {
+        if (buffer == null || !buffer.hasFilePath()) {
+            return null;
+        }
+        LspClient client = existingLspClient(buffer);
+        if (client == null) {
+            return null;
+        }
+        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(bufferUri(buffer));
+        if (diagnostics == null || diagnostics.isEmpty()) {
+            return null;
+        }
+        int caretLine = getCurrentCaretLine();
+        LspClient.Diagnostic best = null;
+        for (LspClient.Diagnostic diagnostic : diagnostics) {
+            if (diagnostic == null || diagnostic.getLine() != caretLine) {
+                continue;
+            }
+            if (best == null || diagnostic.getSeverity() < best.getSeverity()) {
+                best = diagnostic;
+            }
+        }
+        if (best == null) {
+            return null;
+        }
+        String severity = diagnosticSeverityLabel(best.getSeverity()).toLowerCase(Locale.ROOT);
+        return "peek [diag " + severity + "] " + safePreviewText(best.getMessage(), 120);
+    }
+
+    private String safePreviewText(String text, int maxLength) {
+        if (text == null) {
+            return "";
+        }
+        String normalized = text.replace('\n', ' ').trim();
+        if (normalized.length() <= maxLength) {
+            return normalized;
+        }
+        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
     private void appendLspStatus(StringBuilder status, FileBuffer buffer) {

@@ -153,6 +153,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private FileBuffer quickfixBuffer;
     private int keymapReplayDepth;
     private List<RegisterContent> yankRing;
+    private Map<FileBuffer, TerminalSession> terminalSessions;
+    private int terminalBufferCounter;
 
     // Markdown / orgmode features
     private MarkdownService markdownService;
@@ -287,6 +289,8 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingLspRenameTarget = null;
         keymapReplayDepth = 0;
         yankRing = new ArrayList<>();
+        terminalSessions = new HashMap<>();
+        terminalBufferCounter = 1;
         treePane = null;
         treeBuffer = null;
         treeRoot = null;
@@ -1895,6 +1899,11 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (code == KeyEvent.VK_ESCAPE) {
                 dismissCompletionPopup(); e.consume(); return;
             }
+        }
+        TerminalSession terminalSession = getActiveTerminalSession();
+        if (terminalSession != null && handleTerminalInsertMode(terminalSession, e)) {
+            e.consume();
+            return;
         }
         if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
             dismissCompletionPopup();
@@ -5689,41 +5698,361 @@ public class Texteditor extends JFrame implements KeyListener {
     // --- Integrated terminal ---
 
     public String openTerminal() {
-        try {
-            String shell = System.getenv("SHELL");
-            if (shell == null || shell.isEmpty()) shell = "/bin/bash";
-            ProcessBuilder pb = new ProcessBuilder(shell);
-            pb.redirectErrorStream(true);
-            FileBuffer buf = getCurrentBuffer();
-            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
-                pb.directory(buf.getFile().getParentFile());
+        File startDirectory = resolveTerminalStartDirectory();
+        String title = "[Terminal " + (terminalBufferCounter++) + "]";
+        String banner = "Shed terminal (line mode)\n"
+            + "Enter runs command, Ctrl+C cancels running command.\n"
+            + "Built-ins: cd, pwd, clear.\n\n";
+        FileBuffer termBuffer = FileBuffer.createScratch(title, banner);
+        buffers.add(termBuffer);
+        splitWindow(false);
+        loadBufferIntoEditor(termBuffer);
+
+        TerminalSession session = new TerminalSession(termBuffer, startDirectory);
+        terminalSessions.put(termBuffer, session);
+        appendTerminalPrompt(session);
+        setMode(EditorMode.INSERT);
+        writingArea.setCaretPosition(writingArea.getText().length());
+        return "Terminal opened (insert mode)";
+    }
+
+    private File resolveTerminalStartDirectory() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer != null && buffer.getFile() != null && buffer.getFile().getParentFile() != null) {
+            return buffer.getFile().getParentFile();
+        }
+        return new File(".");
+    }
+
+    private TerminalSession getActiveTerminalSession() {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null) {
+            return null;
+        }
+        return terminalSessions.get(buffer);
+    }
+
+    private boolean handleTerminalInsertMode(TerminalSession session, KeyEvent e) {
+        if (session == null || writingArea == null) {
+            return false;
+        }
+        int code = e.getKeyCode();
+        char c = e.getKeyChar();
+
+        if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
+            return false;
+        }
+
+        enforceTerminalInputBoundary(session);
+
+        if (session.runningJobId >= 0) {
+            if (e.isControlDown() && (code == KeyEvent.VK_C || c == 'c')) {
+                asyncJobService.cancel(session.runningJobId);
+                showMessage("Terminal command cancelled");
+                return true;
             }
-            Process process = pb.start();
+            if (code == KeyEvent.VK_ENTER || (!e.isControlDown() && !e.isAltDown() && c != KeyEvent.CHAR_UNDEFINED)) {
+                showMessage("Terminal command running (Ctrl+C to cancel)");
+                return true;
+            }
+            return true;
+        }
 
-            FileBuffer termBuffer = FileBuffer.createScratch("[Terminal]", "");
-            buffers.add(termBuffer);
-            String splitResult = splitWindow(false);
-            loadBufferIntoEditor(termBuffer);
+        if (e.isControlDown() && (code == KeyEvent.VK_C || c == 'c')) {
+            appendTerminalText(session, "^C\n");
+            appendTerminalPrompt(session);
+            return true;
+        }
 
-            Thread reader = new Thread(() -> {
-                try {
-                    byte[] buf2 = new byte[4096];
-                    int n;
-                    while ((n = process.getInputStream().read(buf2)) != -1) {
-                        String chunk = new String(buf2, 0, n, StandardCharsets.UTF_8);
-                        SwingUtilities.invokeLater(() -> {
-                            writingArea.append(chunk);
-                            writingArea.setCaretPosition(writingArea.getText().length());
-                        });
-                    }
-                } catch (IOException ignored) {}
-            }, "shed-terminal-reader");
-            reader.setDaemon(true);
-            reader.start();
+        if (code == KeyEvent.VK_ENTER) {
+            executeTerminalLine(session);
+            return true;
+        }
+        if (code == KeyEvent.VK_UP) {
+            terminalHistoryPrevious(session);
+            return true;
+        }
+        if (code == KeyEvent.VK_DOWN) {
+            terminalHistoryNext(session);
+            return true;
+        }
+        if (code == KeyEvent.VK_HOME) {
+            writingArea.setCaretPosition(session.promptOffset);
+            return true;
+        }
+        if (code == KeyEvent.VK_END) {
+            writingArea.setCaretPosition(writingArea.getText().length());
+            return true;
+        }
+        if (code == KeyEvent.VK_LEFT) {
+            int caret = writingArea.getCaretPosition();
+            if (caret > session.promptOffset) {
+                writingArea.setCaretPosition(caret - 1);
+            }
+            return true;
+        }
+        if (code == KeyEvent.VK_RIGHT) {
+            int caret = writingArea.getCaretPosition();
+            if (caret < writingArea.getText().length()) {
+                writingArea.setCaretPosition(caret + 1);
+            }
+            return true;
+        }
+        if (code == KeyEvent.VK_BACK_SPACE) {
+            int caret = writingArea.getCaretPosition();
+            if (caret > session.promptOffset) {
+                withSuppressedDocumentEvents(() -> writingArea.replaceRange("", caret - 1, caret));
+                session.buffer.setModified(false);
+            }
+            return true;
+        }
+        if (code == KeyEvent.VK_DELETE) {
+            int caret = writingArea.getCaretPosition();
+            if (caret >= session.promptOffset && caret < writingArea.getText().length()) {
+                withSuppressedDocumentEvents(() -> writingArea.replaceRange("", caret, caret + 1));
+                session.buffer.setModified(false);
+            }
+            return true;
+        }
+        if (code == KeyEvent.VK_TAB) {
+            insertTerminalInputText(session, "    ");
+            return true;
+        }
 
-            return "Terminal opened";
-        } catch (IOException e) {
-            return "Error opening terminal: " + e.getMessage();
+        if (!e.isControlDown() && !e.isAltDown() && c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
+            insertTerminalInputText(session, String.valueOf(c));
+            return true;
+        }
+        return true;
+    }
+
+    private void enforceTerminalInputBoundary(TerminalSession session) {
+        int caret = writingArea.getCaretPosition();
+        if (caret < session.promptOffset) {
+            writingArea.setCaretPosition(writingArea.getText().length());
+        }
+    }
+
+    private void insertTerminalInputText(TerminalSession session, String text) {
+        enforceTerminalInputBoundary(session);
+        int caret = writingArea.getCaretPosition();
+        withSuppressedDocumentEvents(() -> writingArea.insert(text, caret));
+        session.buffer.setModified(false);
+        session.historyIndex = session.history.size();
+        session.historyDraft = currentTerminalInput(session);
+    }
+
+    private void executeTerminalLine(TerminalSession session) {
+        enforceTerminalInputBoundary(session);
+        String command = currentTerminalInput(session);
+        appendTerminalText(session, "\n");
+        String trimmed = command.trim();
+        if (!trimmed.isEmpty()) {
+            if (session.history.isEmpty() || !trimmed.equals(session.history.get(session.history.size() - 1))) {
+                session.history.add(trimmed);
+            }
+        }
+        session.historyIndex = session.history.size();
+        session.historyDraft = "";
+
+        if (trimmed.isEmpty()) {
+            appendTerminalPrompt(session);
+            return;
+        }
+
+        String builtinResult = handleTerminalBuiltin(session, command);
+        if (builtinResult != null) {
+            if (!builtinResult.isEmpty()) {
+                appendTerminalText(session, builtinResult + (builtinResult.endsWith("\n") ? "" : "\n"));
+            }
+            appendTerminalPrompt(session);
+            return;
+        }
+
+        String validationError = validateShellCommand(command);
+        if (validationError != null) {
+            appendTerminalText(session, validationError + "\n");
+            appendTerminalPrompt(session);
+            return;
+        }
+
+        int jobId = asyncJobService.submit(
+            "terminal: " + command,
+            token -> runExternalCommand(
+                List.of("zsh", "-lc", command),
+                session.workingDirectory,
+                null,
+                token,
+                configManager.getProcessTimeoutMs(),
+                configManager.getProcessOutputMaxBytes(),
+                true
+            ),
+            (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
+                handleTerminalCommandCompletion(session, command, snapshot, result, error))
+        );
+        session.runningJobId = jobId;
+    }
+
+    private String handleTerminalBuiltin(TerminalSession session, String rawCommand) {
+        List<String> args = parseQuotedArguments(rawCommand);
+        if (args.isEmpty()) {
+            return "";
+        }
+        String head = args.get(0).toLowerCase(Locale.ROOT);
+        if ("clear".equals(head) || "cls".equals(head)) {
+            session.buffer.setContent("", false);
+            if (getCurrentBuffer() == session.buffer) {
+                writingArea.setCaretPosition(0);
+            }
+            return "";
+        }
+        if ("pwd".equals(head)) {
+            return session.workingDirectory.getAbsolutePath();
+        }
+        if ("cd".equals(head)) {
+            String target = args.size() >= 2 ? args.get(1) : System.getProperty("user.home");
+            if (target == null || target.isBlank()) {
+                target = ".";
+            }
+            File destination = new File(target);
+            if (!destination.isAbsolute()) {
+                destination = new File(session.workingDirectory, target);
+            }
+            try {
+                destination = destination.getCanonicalFile();
+            } catch (IOException ignored) {
+                destination = destination.getAbsoluteFile();
+            }
+            if (!destination.exists()) {
+                return "cd: no such file or directory: " + target;
+            }
+            if (!destination.isDirectory()) {
+                return "cd: not a directory: " + target;
+            }
+            session.workingDirectory = destination;
+            return "";
+        }
+        return null;
+    }
+
+    private void handleTerminalCommandCompletion(
+        TerminalSession session,
+        String command,
+        AsyncJobService.JobSnapshot snapshot,
+        CommandResult result,
+        Exception error
+    ) {
+        if (session == null || !terminalSessions.containsKey(session.buffer)) {
+            return;
+        }
+        int finishedId = snapshot == null ? -1 : snapshot.getId();
+        if (session.runningJobId == finishedId || snapshot == null) {
+            session.runningJobId = -1;
+        }
+
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+            appendTerminalText(session, "^C\n");
+            appendTerminalPrompt(session);
+            return;
+        }
+        if (error != null || result == null) {
+            String message = error == null ? "unknown error" : error.getMessage();
+            appendTerminalText(session, "error: " + (message == null ? "" : message) + "\n");
+            appendTerminalPrompt(session);
+            return;
+        }
+
+        String output = result.stdout == null ? "" : result.stdout;
+        if (!output.isEmpty()) {
+            appendTerminalText(session, output.endsWith("\n") ? output : output + "\n");
+            List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "terminal");
+            if (!parsedEntries.isEmpty()) {
+                updateQuickfixEntries("terminal: " + command, parsedEntries);
+            }
+        }
+        if (result.exitCode != 0) {
+            appendTerminalText(session, "[exit " + result.exitCode + "]\n");
+        }
+        appendTerminalPrompt(session);
+    }
+
+    private void terminalHistoryPrevious(TerminalSession session) {
+        if (session.history.isEmpty()) {
+            return;
+        }
+        if (session.historyIndex == session.history.size()) {
+            session.historyDraft = currentTerminalInput(session);
+        }
+        if (session.historyIndex > 0) {
+            session.historyIndex--;
+        } else {
+            session.historyIndex = 0;
+        }
+        replaceTerminalInput(session, session.history.get(session.historyIndex));
+    }
+
+    private void terminalHistoryNext(TerminalSession session) {
+        if (session.history.isEmpty()) {
+            return;
+        }
+        if (session.historyIndex < session.history.size() - 1) {
+            session.historyIndex++;
+            replaceTerminalInput(session, session.history.get(session.historyIndex));
+            return;
+        }
+        session.historyIndex = session.history.size();
+        replaceTerminalInput(session, session.historyDraft == null ? "" : session.historyDraft);
+    }
+
+    private void replaceTerminalInput(TerminalSession session, String input) {
+        String safeInput = input == null ? "" : input;
+        String current = writingArea.getText();
+        int start = Math.max(0, Math.min(session.promptOffset, current.length()));
+        withSuppressedDocumentEvents(() -> writingArea.replaceRange(safeInput, start, current.length()));
+        session.buffer.setModified(false);
+        writingArea.setCaretPosition(writingArea.getText().length());
+    }
+
+    private String currentTerminalInput(TerminalSession session) {
+        String text = writingArea.getText();
+        int start = Math.max(0, Math.min(session.promptOffset, text.length()));
+        return text.substring(start);
+    }
+
+    private void appendTerminalPrompt(TerminalSession session) {
+        String prompt = terminalPrompt(session);
+        appendTerminalText(session, prompt);
+        session.promptOffset = session.buffer.getContent().length();
+        if (getCurrentBuffer() == session.buffer) {
+            writingArea.setCaretPosition(writingArea.getText().length());
+        }
+    }
+
+    private String terminalPrompt(TerminalSession session) {
+        String dir = session.workingDirectory == null ? "." : session.workingDirectory.getAbsolutePath();
+        return dir + " $ ";
+    }
+
+    private void appendTerminalText(TerminalSession session, String text) {
+        if (session == null || text == null || text.isEmpty()) {
+            return;
+        }
+        FileBuffer buffer = session.buffer;
+        String current = buffer.getContent();
+        buffer.setContent(current + text, false);
+        if (getCurrentBuffer() == buffer) {
+            writingArea.setCaretPosition(writingArea.getText().length());
+        }
+    }
+
+    private void closeTerminalSession(FileBuffer buffer) {
+        if (buffer == null) {
+            return;
+        }
+        TerminalSession session = terminalSessions.remove(buffer);
+        if (session != null && session.runningJobId >= 0) {
+            asyncJobService.cancel(session.runningJobId);
+            session.runningJobId = -1;
         }
     }
 
@@ -11035,6 +11364,7 @@ public class Texteditor extends JFrame implements KeyListener {
                     return "Buffer close cancelled";
                 }
             }
+            closeTerminalSession(buffer);
             closeEditor();
             return "Last buffer closed";
         }
@@ -11049,6 +11379,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (buffer == quickfixBuffer) {
             quickfixBuffer = null;
         }
+        closeTerminalSession(buffer);
         buffers.remove(buffer);
         if (buffers.isEmpty()) {
             openLandingPage();
@@ -13188,6 +13519,10 @@ public class Texteditor extends JFrame implements KeyListener {
             e.consume();
             return;
         }
+        if (editorState.mode == EditorMode.INSERT && getActiveTerminalSession() != null) {
+            e.consume();
+            return;
+        }
         if (editorState.mode != EditorMode.INSERT) {
             e.consume();
         }
@@ -13275,6 +13610,35 @@ public class Texteditor extends JFrame implements KeyListener {
             this.scratchBuffer = scratchBuffer;
             this.returnBuffer = returnBuffer;
             this.returnCaretPosition = returnCaretPosition;
+        }
+    }
+
+    private static class TerminalSession {
+        private final FileBuffer buffer;
+        private File workingDirectory;
+        private final List<String> history;
+        private int historyIndex;
+        private String historyDraft;
+        private int promptOffset;
+        private int runningJobId;
+
+        private TerminalSession(FileBuffer buffer, File workingDirectory) {
+            this.buffer = buffer;
+            this.workingDirectory = normalizeWorkingDirectory(workingDirectory);
+            this.history = new ArrayList<>();
+            this.historyIndex = 0;
+            this.historyDraft = "";
+            this.promptOffset = 0;
+            this.runningJobId = -1;
+        }
+
+        private static File normalizeWorkingDirectory(File directory) {
+            File candidate = directory == null ? new File(".") : directory;
+            try {
+                return candidate.getCanonicalFile();
+            } catch (IOException ignored) {
+                return candidate.getAbsoluteFile();
+            }
         }
     }
 

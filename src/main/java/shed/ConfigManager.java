@@ -83,6 +83,7 @@ public class ConfigManager {
     private static final int DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD = 20000;
     private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
     private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
+    private static final boolean DEFAULT_UI_WHICHKEY_HINTS = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
     private static final boolean DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE = true;
@@ -206,6 +207,7 @@ public class ConfigManager {
         config.put("ui.dramatic.performance.line.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
         config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
         config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
+        config.put("ui.whichkey.hints", String.valueOf(DEFAULT_UI_WHICHKEY_HINTS));
         config.put("project.config.enabled", String.valueOf(DEFAULT_PROJECT_CONFIG_ENABLED));
         config.put("project.config.allow.unsafe", String.valueOf(DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE));
         config.put("project.config.require.trusted.file", String.valueOf(DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE));
@@ -650,6 +652,10 @@ public class ConfigManager {
         return Math.max(1000, getInt("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
     }
 
+    public boolean getWhichKeyHintsEnabled() {
+        return getBoolean("ui.whichkey.hints", DEFAULT_UI_WHICHKEY_HINTS);
+    }
+
     public boolean getProjectConfigEnabled() {
         return getBoolean("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
     }
@@ -995,7 +1001,8 @@ public class ConfigManager {
             + "ui.dramatic.performance.cpu.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD + "\n"
             + "ui.dramatic.performance.line.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
-            + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
+            + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n"
+            + "ui.whichkey.hints=" + DEFAULT_UI_WHICHKEY_HINTS + "\n\n"
             + "project.config.enabled=" + DEFAULT_PROJECT_CONFIG_ENABLED + "\n"
             + "project.config.allow.unsafe=" + DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE + "\n"
             + "project.config.require.trusted.file=" + DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE + "\n"

@@ -184,6 +184,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean dramaticPerformanceGuardrailsEnabled;
     private double dramaticPerformanceCpuThreshold;
     private int dramaticPerformanceLineThreshold;
+    private boolean whichKeyHintsEnabled;
     private double cachedProcessCpuLoad;
     private long cachedProcessCpuLoadAtMillis;
     private int dramaticAnimationMs;
@@ -306,6 +307,7 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticPerformanceGuardrailsEnabled = true;
         dramaticPerformanceCpuThreshold = 0.80;
         dramaticPerformanceLineThreshold = 20000;
+        whichKeyHintsEnabled = true;
         cachedProcessCpuLoad = -1.0;
         cachedProcessCpuLoadAtMillis = 0L;
         dramaticAnimationMs = 220;
@@ -1100,7 +1102,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // File movements
         else if (c == 'g') {
-            editorState.pendingKey = 'g';
+            setPendingKeyWithHint('g');
         } else if (c == 'G') {
             int count = consumePendingCount();
             if (count > 1) {
@@ -1116,24 +1118,24 @@ public class Texteditor extends JFrame implements KeyListener {
                 recordingRegister = null;
                 macroBuffer = new ArrayList<>();
             } else {
-                editorState.pendingKey = 'q';
+                setPendingKeyWithHint('q');
             }
             return;
         } else if (c == '@') {
-            editorState.pendingKey = '@';
+            setPendingKeyWithHint('@');
             return;
         } else if (c == '"') {
-            editorState.pendingKey = '"';
+            setPendingKeyWithHint('"');
         } else if (c == 'm' || c == '\'' || c == '`') {
-            editorState.pendingKey = c;
+            setPendingKeyWithHint(c);
         } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=' || c == 'r') {
-            editorState.pendingKey = c;
+            setPendingKeyWithHint(c);
         } else if (c == 'z') {
-            editorState.pendingKey = 'z';
+            setPendingKeyWithHint('z');
         } else if (c == ']') {
-            editorState.pendingKey = ']';
+            setPendingKeyWithHint(']');
         } else if (c == '[') {
-            editorState.pendingKey = '[';
+            setPendingKeyWithHint('[');
         } else if (c == '{') {
             repeatAction(consumePendingCount(), this::moveParagraphBackward);
         } else if (c == '}') {
@@ -1162,11 +1164,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
         // Clipboard operations
         else if (c == 'y') {
-            editorState.pendingKey = 'y';
+            setPendingKeyWithHint('y');
         } else if (c == 'd') {
-            editorState.pendingKey = 'd';
+            setPendingKeyWithHint('d');
         } else if (c == 'c') {
-            editorState.pendingKey = 'c';
+            setPendingKeyWithHint('c');
         } else if (c == 'x') {
             int count = consumePendingCount();
             StringBuilder deleted = new StringBuilder();
@@ -1307,7 +1309,7 @@ public class Texteditor extends JFrame implements KeyListener {
         else if (e.isControlDown()) {
             if (c == 'w' || code == KeyEvent.VK_W) {
                 editorState.pendingCount = "";
-                editorState.pendingKey = '\u0017';
+                setPendingKeyWithHint('\u0017');
                 return;
             } else if (c == 'p' || code == KeyEvent.VK_P) {
                 editorState.pendingCount = "";
@@ -1443,6 +1445,59 @@ public class Texteditor extends JFrame implements KeyListener {
                 return true;
             default:
                 return false;
+        }
+    }
+
+    private void setPendingKeyWithHint(char pendingKey) {
+        editorState.pendingKey = pendingKey;
+        showWhichKeyHint(pendingKey);
+    }
+
+    private void showWhichKeyHint(char pendingKey) {
+        if (!whichKeyHintsEnabled) {
+            return;
+        }
+        String hint = whichKeyHintText(pendingKey);
+        if (hint != null && !hint.isBlank()) {
+            showMessage(hint);
+        }
+    }
+
+    private String whichKeyHintText(char pendingKey) {
+        switch (pendingKey) {
+            case 'g':
+                return "g: gg top, gq format, gf file, gx url, g; prev change, g, next change";
+            case 'z':
+                return "z: zt top, zz center, zb bottom, za toggle fold, zM fold all, zR unfold all";
+            case '\u0017':
+                return "Ctrl-w: h/j/k/l move, s/v split, c close, w cycle, = equalize, +/- resize";
+            case 'd':
+                return "d: dd line, dw word, d{motion}, ds surround";
+            case 'y':
+                return "y: yy line, yw word, y{motion}, ys surround";
+            case 'c':
+                return "c: cc line, cw word, c{motion}, cs surround";
+            case 'f':
+            case 'F':
+            case 't':
+            case 'T':
+                return pendingKey + ": enter target character";
+            case 'r':
+                return "r: replace character under cursor";
+            case '"':
+                return "\": choose register";
+            case 'q':
+                return "q: choose register to start macro recording";
+            case '@':
+                return "@: choose register to replay macro";
+            case '>':
+            case '<':
+                return pendingKey + ": repeat for line op, or use with motion";
+            case '[':
+            case ']':
+                return pendingKey + ": heading navigation";
+            default:
+                return null;
         }
     }
 
@@ -7796,6 +7851,7 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticPerformanceLineThreshold = configManager.getDramaticPerformanceLineThreshold();
         dramaticAnimationMs = Math.max(80, configManager.getDramaticAnimationMs());
         dramaticMinimapWidth = Math.max(40, configManager.getDramaticMinimapWidth());
+        whichKeyHintsEnabled = configManager.getWhichKeyHintsEnabled();
         if (wasEnabled && !dramaticUiEnabled) {
             if (modeTransitionTimer != null) modeTransitionTimer.stop();
             if (feedbackPulseTimer != null) feedbackPulseTimer.stop();

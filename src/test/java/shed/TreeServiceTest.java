@@ -2,9 +2,13 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -37,5 +41,36 @@ public class TreeServiceTest {
         int deleted = service.deleteRecursively(root);
         assertTrue(deleted >= 2);
         assertFalse(root.exists());
+    }
+
+    @Test
+    void resolveActionPathHandlesBlankAndAbsolutePaths() {
+        TreeService service = new TreeService();
+        File root = tempDir.resolve("workspace-abs").toFile();
+        File absolute = tempDir.resolve("workspace-abs/notes.txt").toFile().getAbsoluteFile();
+
+        assertNull(service.resolveActionPath("   ", root));
+        assertEquals(absolute.getAbsolutePath(), service.resolveActionPath(absolute.getAbsolutePath(), root).getAbsolutePath());
+    }
+
+    @Test
+    void revealRootAndDeleteMissingPathBehaveAsExpected() throws IOException {
+        TreeService service = new TreeService();
+        Path root = tempDir.resolve("reveal-root");
+        Files.createDirectories(root.resolve("src"));
+        Path file = root.resolve("src/Main.java");
+        Files.writeString(file, "class Main {}\n");
+
+        assertEquals(root.resolve("src").toFile().getAbsolutePath(), service.revealRootForPath(file.toFile()).getAbsolutePath());
+        assertEquals(root.resolve("src").toFile().getAbsolutePath(), service.revealRootForPath(root.resolve("src").toFile()).getAbsolutePath());
+        assertEquals(0, service.deleteRecursively(tempDir.resolve("does-not-exist").toFile()));
+    }
+
+    @Test
+    void createOperationsRequireNonNullPaths() {
+        TreeService service = new TreeService();
+
+        assertThrows(IOException.class, () -> service.createFile(null));
+        assertThrows(IOException.class, () -> service.createDirectory(null));
     }
 }

@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,50 @@ public class CommandParsingTest {
         assertEquals("amend", handler.lastCall);
         assertEquals("--no-edit", handler.lastArgs);
         assertEquals("ok-amend", amendResult);
+    }
+
+    @Test
+    void routesStatusByDefaultAndAlias() {
+        GitService service = new GitService();
+        RecordingHandler handler = new RecordingHandler();
+
+        String emptyResult = service.handle("   ", new File("."), handler);
+        assertEquals("status", handler.lastCall);
+        assertEquals("ok-status", emptyResult);
+
+        String aliasResult = service.handle("st", new File("."), handler);
+        assertEquals("status", handler.lastCall);
+        assertEquals("ok-status", aliasResult);
+    }
+
+    @Test
+    void routesRestoreHelpAndShortSwitchAlias() {
+        GitService service = new GitService();
+        RecordingHandler handler = new RecordingHandler();
+
+        String restoreResult = service.handle("restore src/main", new File("."), handler);
+        assertEquals("restore", handler.lastCall);
+        assertEquals("src/main", handler.lastArgs);
+        assertEquals("ok-restore", restoreResult);
+
+        String shortSwitchResult = service.handle("sw feat-y", new File("."), handler);
+        assertEquals("switch", handler.lastCall);
+        assertEquals("feat-y", handler.lastArgs);
+        assertEquals("ok-switch", shortSwitchResult);
+
+        String helpResult = service.handle("help", new File("."), handler);
+        assertEquals("help", handler.lastCall);
+        assertEquals("ok-help", helpResult);
+    }
+
+    @Test
+    void returnsNotInsideRepositoryWhenRootMissing() {
+        GitService service = new GitService();
+        RecordingHandler handler = new RecordingHandler();
+
+        String result = service.handle("status", null, handler);
+        assertEquals("Not inside a git repository", result);
+        assertNull(handler.lastCall);
     }
 
     private static class RecordingHandler implements GitService.Handler {

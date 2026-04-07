@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
 import java.io.IOException;
@@ -118,6 +119,17 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void unknownThemeDoesNotOverrideCurrentTheme() {
+        Path home = tempDir.resolve("home-theme-unknown");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals("vesper", config.setTheme("vesper"));
+        assertNull(config.setTheme("not-a-real-theme"));
+        assertEquals("vesper", config.getThemeId());
+    }
+
+    @Test
     void getConfiguredLspServersReturnsEmpty() {
         Path home = tempDir.resolve("home-nolsp");
         System.setProperty("user.home", home.toString());
@@ -227,6 +239,28 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void setAndPersistRejectsInvalidKeysAndValues() {
+        Path home = tempDir.resolve("home-persist-invalid");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertThrows(IOException.class, () -> config.setAndPersist("bad=key", "value"));
+        assertThrows(IOException.class, () -> config.setAndPersist("ui.test", "bad\0value"));
+    }
+
+    @Test
+    void setAndPersistNormalizesMultilineValues() throws IOException {
+        Path home = tempDir.resolve("home-persist-multiline");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("command.user.sample", "echo one\ntwo\rthree");
+
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("command.user.sample=echo one two three"));
+    }
+
+    @Test
     void persistCurrentConfigWritesRuntimeOverrides() throws IOException {
         Path home = tempDir.resolve("home-persist-runtime");
         System.setProperty("user.home", home.toString());
@@ -242,6 +276,48 @@ public class ConfigManagerTest {
         assertTrue(file.contains("ui.dramatic=true"));
         assertTrue(file.contains("ui.dramatic.sound=true"));
         assertTrue(file.contains("ui.dramatic.sound.volume=88"));
+    }
+
+    @Test
+    void persistCurrentConfigSkipsInvalidRuntimeKeys() throws IOException {
+        Path home = tempDir.resolve("home-persist-invalid-runtime-key");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("ui.dramatic", "true");
+        config.set("bad\nkey", "boom");
+        int persisted = config.persistCurrentConfig();
+
+        assertTrue(persisted >= 1);
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("ui.dramatic=true"));
+        assertFalse(file.contains("bad"));
+    }
+
+    @Test
+    void persistCurrentConfigWithoutOverridesWritesNoRuntimeKeys() throws IOException {
+        Path home = tempDir.resolve("home-persist-default-only");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        int persisted = config.persistCurrentConfig();
+        assertEquals(0, persisted);
+
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertFalse(file.contains("theme="));
+        assertFalse(file.contains("tab.size="));
+    }
+
+    @Test
+    void blankSessionAutoloadFallsBackToDefault() throws IOException {
+        Path home = tempDir.resolve("home-session-autoload-blank");
+        Path shedDir = home.resolve(".shed");
+        Files.createDirectories(shedDir);
+        Files.writeString(shedDir.resolve("shedrc"), "session.autoload=   \n");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals("default", config.getSessionAutoloadName());
     }
 
     @Test

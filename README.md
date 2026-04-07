@@ -418,6 +418,9 @@ ui.dramatic.sound.cue.success=true
 ui.dramatic.sound.cue.error=true
 ui.dramatic.reduced.motion=false
 ui.dramatic.reduced.motion.sync=true
+ui.dramatic.performance.guardrails=true
+ui.dramatic.performance.cpu.threshold=0.80
+ui.dramatic.performance.line.threshold=20000
 ui.dramatic.animation.ms=220
 ui.dramatic.minimap.width=84
 ```

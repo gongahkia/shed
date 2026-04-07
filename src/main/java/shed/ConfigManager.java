@@ -76,6 +76,9 @@ public class ConfigManager {
     private static final boolean DEFAULT_DRAMATIC_SOUND_CUE_ERROR = true;
     private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION = false;
     private static final boolean DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC = true;
+    private static final boolean DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS = true;
+    private static final double DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD = 0.80;
+    private static final int DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD = 20000;
     private static final int DEFAULT_DRAMATIC_ANIMATION_MS = 220;
     private static final int DEFAULT_DRAMATIC_MINIMAP_WIDTH = 84;
     private static final String SHED_DIRECTORY_NAME = ".shed";
@@ -192,6 +195,9 @@ public class ConfigManager {
         config.put("ui.dramatic.sound.cue.error", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_ERROR));
         config.put("ui.dramatic.reduced.motion", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION));
         config.put("ui.dramatic.reduced.motion.sync", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC));
+        config.put("ui.dramatic.performance.guardrails", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS));
+        config.put("ui.dramatic.performance.cpu.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD));
+        config.put("ui.dramatic.performance.line.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
         config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
         config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
         defaultConfig.clear();
@@ -622,6 +628,18 @@ public class ConfigManager {
         return Math.max(40, getInt("ui.dramatic.minimap.width", DEFAULT_DRAMATIC_MINIMAP_WIDTH));
     }
 
+    public boolean getDramaticPerformanceGuardrailsEnabled() {
+        return getBoolean("ui.dramatic.performance.guardrails", DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS);
+    }
+
+    public double getDramaticPerformanceCpuThreshold() {
+        return getDouble("ui.dramatic.performance.cpu.threshold", DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD);
+    }
+
+    public int getDramaticPerformanceLineThreshold() {
+        return Math.max(1000, getInt("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
+    }
+
     public void set(String key, String value) {
         config.put(key, value);
     }
@@ -718,6 +736,14 @@ public class ConfigManager {
     private int getInt(String key, int defaultValue) {
         try {
             return Integer.parseInt(config.getOrDefault(key, String.valueOf(defaultValue)));
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
+    }
+
+    private double getDouble(String key, double defaultValue) {
+        try {
+            return Double.parseDouble(config.getOrDefault(key, String.valueOf(defaultValue)));
         } catch (NumberFormatException e) {
             return defaultValue;
         }
@@ -873,6 +899,9 @@ public class ConfigManager {
             + "ui.dramatic.sound.cue.error=" + DEFAULT_DRAMATIC_SOUND_CUE_ERROR + "\n"
             + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
             + "ui.dramatic.reduced.motion.sync=" + DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC + "\n"
+            + "ui.dramatic.performance.guardrails=" + DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS + "\n"
+            + "ui.dramatic.performance.cpu.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD + "\n"
+            + "ui.dramatic.performance.line.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
             + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
             + "# Per-project override file support\n"

@@ -30,6 +30,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.lang.management.ManagementFactory;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -177,6 +179,11 @@ public class Texteditor extends JFrame implements KeyListener {
     private boolean dramaticSoundSuccessCueEnabled;
     private boolean dramaticSoundErrorCueEnabled;
     private boolean dramaticReducedMotionEnabled;
+    private boolean dramaticPerformanceGuardrailsEnabled;
+    private double dramaticPerformanceCpuThreshold;
+    private int dramaticPerformanceLineThreshold;
+    private double cachedProcessCpuLoad;
+    private long cachedProcessCpuLoadAtMillis;
     private int dramaticAnimationMs;
     private int dramaticMinimapWidth;
     private Timer modeTransitionTimer;
@@ -292,6 +299,11 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticSoundSuccessCueEnabled = true;
         dramaticSoundErrorCueEnabled = true;
         dramaticReducedMotionEnabled = false;
+        dramaticPerformanceGuardrailsEnabled = true;
+        dramaticPerformanceCpuThreshold = 0.80;
+        dramaticPerformanceLineThreshold = 20000;
+        cachedProcessCpuLoad = -1.0;
+        cachedProcessCpuLoadAtMillis = 0L;
         dramaticAnimationMs = 220;
         dramaticMinimapWidth = 84;
         modeTransitionTimer = null;
@@ -7471,6 +7483,9 @@ public class Texteditor extends JFrame implements KeyListener {
         dramaticSoundSuccessCueEnabled = configManager.getDramaticSoundSuccessCueEnabled();
         dramaticSoundErrorCueEnabled = configManager.getDramaticSoundErrorCueEnabled();
         dramaticReducedMotionEnabled = configManager.getDramaticReducedMotionEnabled();
+        dramaticPerformanceGuardrailsEnabled = configManager.getDramaticPerformanceGuardrailsEnabled();
+        dramaticPerformanceCpuThreshold = Math.max(0.1, Math.min(1.0, configManager.getDramaticPerformanceCpuThreshold()));
+        dramaticPerformanceLineThreshold = configManager.getDramaticPerformanceLineThreshold();
         dramaticAnimationMs = Math.max(80, configManager.getDramaticAnimationMs());
         dramaticMinimapWidth = Math.max(40, configManager.getDramaticMinimapWidth());
         if (wasEnabled && !dramaticUiEnabled) {
@@ -7489,7 +7504,52 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     private boolean dramaticMotionAllowed() {
-        return dramaticUiEnabled && !dramaticReducedMotionEnabled && dramaticAnimationMs > 0;
+        return dramaticUiEnabled
+            && !dramaticReducedMotionEnabled
+            && dramaticAnimationMs > 0
+            && !isDramaticPerformanceThrottled();
+    }
+
+    private boolean isDramaticPerformanceThrottled() {
+        if (!dramaticPerformanceGuardrailsEnabled) {
+            return false;
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer != null && buffer.isLargeFile()) {
+            return true;
+        }
+        if (writingArea != null && writingArea.getLineCount() >= dramaticPerformanceLineThreshold) {
+            return true;
+        }
+        double cpuLoad = cachedProcessCpuLoad();
+        return cpuLoad >= 0.0 && cpuLoad >= dramaticPerformanceCpuThreshold;
+    }
+
+    private double cachedProcessCpuLoad() {
+        long now = System.currentTimeMillis();
+        if (now - cachedProcessCpuLoadAtMillis < 1200) {
+            return cachedProcessCpuLoad;
+        }
+        cachedProcessCpuLoadAtMillis = now;
+        cachedProcessCpuLoad = readProcessCpuLoad();
+        return cachedProcessCpuLoad;
+    }
+
+    private double readProcessCpuLoad() {
+        try {
+            Object osBean = ManagementFactory.getOperatingSystemMXBean();
+            Method method = osBean.getClass().getMethod("getProcessCpuLoad");
+            method.setAccessible(true);
+            Object value = method.invoke(osBean);
+            if (value instanceof Number) {
+                double load = ((Number) value).doubleValue();
+                if (load >= 0.0 && load <= 1.0) {
+                    return load;
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return -1.0;
     }
 
     private int animationDelayForSteps(int steps) {
@@ -9495,6 +9555,9 @@ public class Texteditor extends JFrame implements KeyListener {
 
         EditorMode modeForStatus = editorState.mode == null ? EditorMode.NORMAL : editorState.mode;
         status.append(modeForStatus.getDisplayName()).append("  ");
+        if (dramaticUiEnabled && isDramaticPerformanceThrottled()) {
+            status.append("dramatic:throttled").append("  ");
+        }
 
         if (buffer != null) {
             status.append(buffer.getFileType().getDisplayName()).append("  ");

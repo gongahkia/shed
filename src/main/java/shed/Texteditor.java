@@ -6968,38 +6968,192 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         String cmd = selection.startsWith(":") ? selection.substring(1) : selection;
         int split = cmd.indexOf(' ');
-        String base = split >= 0 ? cmd.substring(0, split) : cmd;
+        String base = (split >= 0 ? cmd.substring(0, split) : cmd).toLowerCase(Locale.ROOT);
         switch (base) {
             case "w":
+            case "write":
                 return "Write current buffer to disk.";
             case "q":
+            case "quit":
+            case "q!":
                 return "Quit current buffer/editor.";
+            case "wq":
+            case "x":
+                return "Write buffer, then quit.";
             case "e":
+            case "edit":
                 return "Open file into a buffer.";
+            case "bn":
+            case "bnext":
+                return "Switch to next buffer.";
+            case "bp":
+            case "bprev":
+                return "Switch to previous buffer.";
+            case "ls":
+                return "List open buffers.";
+            case "buffers":
+            case "buf":
+                return "Open buffer picker.";
+            case "bd":
+            case "bdelete":
+                return "Delete current buffer.";
+            case "set":
+                return "Set runtime option (use :set! key=value to persist).";
+            case "settings":
+            case "shedrc":
+                return "Open global settings file.";
+            case "config":
+                return "Open settings or persist with :config save.";
+            case "log":
+            case "commandlog":
+                return "Open command log scratch buffer.";
+            case "session":
+            case "sessions":
+                return "Save/load/list named sessions.";
+            case "jobs":
+                return "Show async job list.";
+            case "jobcancel":
+            case "jobkill":
+                return "Cancel async job by id.";
+            case "drop":
+                return "Run async command against current file path.";
+            case "help":
+            case "h":
+                return "Open help text (topic optional).";
+            case "wc":
+            case "wordcount":
+                return "Show line/word/character counts.";
+            case "recent":
+                return "Show recent files scratch buffer.";
+            case "d":
+            case "delete":
+                return "Delete current line or a range.";
+            case "files":
+                return "Open project file finder.";
+            case "folder":
+            case "folders":
+                return "Pick folder, then open file picker.";
             case "split":
+            case "sp":
+                return "Create horizontal split.";
             case "vsplit":
-                return "Create a new editor pane split.";
+            case "vsp":
+                return "Create vertical split.";
+            case "close":
+            case "clo":
+                return "Close active split/window.";
             case "tree":
                 return "Open tree pane and perform file operations.";
+            case "git":
+                return "Run integrated git subcommands.";
+            case "grep":
+            case "rg":
+                return "Search project text and populate quickfix.";
             case "copen":
+                return "Open quickfix list.";
+            case "cclose":
+                return "Close quickfix list.";
             case "cnext":
+            case "cn":
+                return "Jump to next quickfix entry.";
             case "cprev":
+            case "cp":
+                return "Jump to previous quickfix entry.";
+            case "cfirst":
+                return "Jump to first quickfix entry.";
+            case "clast":
+                return "Jump to last quickfix entry.";
             case "cc":
-                return "Navigate quickfix entries.";
+                return "Jump to selected quickfix entry.";
             case "lsp":
+                return "Run LSP actions and server management.";
+            case "definition":
+                return "Jump to symbol definition.";
+            case "hover":
+                return "Show hover docs in scratch buffer.";
+            case "references":
+                return "Find references and open quickfix.";
             case "diagnostics":
+            case "diag":
+            case "ldiag":
+                return "Push diagnostics into quickfix.";
             case "dnext":
+            case "dn":
+                return "Jump to next diagnostic.";
             case "dprev":
-                return "Language server and diagnostics workflows.";
+            case "dp":
+                return "Jump to previous diagnostic.";
+            case "registers":
+            case "reg":
+                return "Show register contents.";
+            case "marks":
+                return "Show mark list for active buffer.";
+            case "themes":
+                return "Show and switch built-in themes.";
+            case "theater":
+                return "Apply dramatic UI preset: off/subtle/full.";
+            case "zen":
+                return "Toggle centered zen layout.";
+            case "minimap":
+                return "Toggle minimap side panel.";
+            case "normal":
+            case "norm":
+                return "Execute normal-mode keys on current/ranged lines.";
+            case "reload":
+            case "source":
+                return "Reload ~/.shed/shedrc from disk.";
+            case "clean":
+            case "shedclean":
+                return "Remove Shed metadata files.";
+            case "noh":
+            case "nohlsearch":
+                return "Clear search highlights.";
             case "plugin":
+            case "plugins":
                 return "Manage .shed/.lua plugins.";
-            case "session":
-                return "Save/load named workspace sessions.";
+            case "palette":
+            case "commands":
+                return "Open command palette.";
+            case "undolist":
+            case "undotree":
+                return "Show undo history.";
+            case "wa":
+            case "wall":
+                return "Write all modified buffers.";
+            case "qa":
+            case "qall":
+                return "Quit all buffers/windows.";
+            case "wqa":
+            case "wqall":
+            case "xa":
+            case "xall":
+                return "Write all buffers, then quit all.";
+            case "toc":
+                return "Open markdown table of contents.";
+            case "outline":
+                return "Open markdown outline split.";
+            case "toggle":
+            case "checkbox":
+                return "Toggle markdown checkbox under cursor.";
+            case "table":
+                return "Insert/align/sort/edit markdown table.";
+            case "link":
+                return "Insert markdown link template.";
+            case "img":
+            case "image":
+                return "Insert markdown image template.";
+            case "snippets":
+            case "snippet":
+                return "List snippets for current file type.";
+            case "bracketcolor":
+            case "bracketcolors":
+                return "Toggle bracket pair colorization.";
             case "term":
             case "terminal":
                 return "Open an integrated shell split.";
-            case "themes":
-                return "Show and switch built-in themes.";
+            case "conceal":
+            case "conceallevel":
+                return "Set markdown conceal level (0/1/2).";
             default:
                 return "Run command :" + base;
         }

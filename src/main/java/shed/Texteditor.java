@@ -144,6 +144,8 @@ public class Texteditor extends JFrame implements KeyListener {
     private Map<String, LspClient> lspClients;
     private Map<String, Integer> lspDocumentVersions;
     private Map<String, String> lspErrors;
+    private List<LspClient.TextEdit> pendingLspRenameEdits;
+    private String pendingLspRenameTarget;
     private EditorPane treePane;
     private FileBuffer treeBuffer;
     private File treeRoot;
@@ -278,6 +280,8 @@ public class Texteditor extends JFrame implements KeyListener {
         lspClients = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
+        pendingLspRenameEdits = null;
+        pendingLspRenameTarget = null;
         keymapReplayDepth = 0;
         yankRing = new ArrayList<>();
         treePane = null;
@@ -8407,7 +8411,7 @@ public class Texteditor extends JFrame implements KeyListener {
     public String handleLspCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|hover|references|rename <newName>|codeaction [index]";
+            return "Usage: :lsp completion|definition|hover|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -8427,6 +8431,12 @@ public class Texteditor extends JFrame implements KeyListener {
                 return lspReferences();
             case "rename":
                 return lspRename(args);
+            case "renameapply":
+            case "rename!":
+                return lspRenameApply();
+            case "renamecancel":
+            case "renameclear":
+                return lspRenameCancel();
             case "codeaction":
             case "codeactions":
             case "actions":
@@ -8656,26 +8666,93 @@ public class Texteditor extends JFrame implements KeyListener {
             if (edits.isEmpty()) {
                 return "No rename edits returned";
             }
-            WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(edits);
-            if (applyResult.appliedEditCount <= 0) {
-                return "Rename returned no applicable edits";
-            }
-            StringBuilder message = new StringBuilder();
-            message.append("Applied ")
-                .append(applyResult.appliedEditCount)
-                .append(" rename edit")
-                .append(applyResult.appliedEditCount == 1 ? "" : "s")
-                .append(" across ")
-                .append(applyResult.touchedFiles)
-                .append(" file")
-                .append(applyResult.touchedFiles == 1 ? "" : "s");
-            if (applyResult.failedFiles > 0) {
-                message.append(" (").append(applyResult.failedFiles).append(" file failures)");
-            }
-            return message.toString();
+            pendingLspRenameEdits = new ArrayList<>(edits);
+            pendingLspRenameTarget = newName.trim();
+            showScratchBuffer("[lsp rename preview]", buildLspRenamePreview(pendingLspRenameTarget, pendingLspRenameEdits));
+            return "Prepared rename preview (" + edits.size() + " edit" + (edits.size() == 1 ? "" : "s") + "). Run :lsp renameapply to confirm.";
         } catch (BadLocationException e) {
             return "LSP rename failed: " + e.getMessage();
         }
+    }
+
+    public String lspRenameApply() {
+        if (pendingLspRenameEdits == null || pendingLspRenameEdits.isEmpty()) {
+            return "No pending rename preview (run :lsp rename <newName> first)";
+        }
+        WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(pendingLspRenameEdits);
+        if (applyResult.appliedEditCount <= 0) {
+            pendingLspRenameEdits = null;
+            pendingLspRenameTarget = null;
+            return "Pending rename had no applicable edits";
+        }
+        StringBuilder message = new StringBuilder();
+        message.append("Applied ")
+            .append(applyResult.appliedEditCount)
+            .append(" rename edit")
+            .append(applyResult.appliedEditCount == 1 ? "" : "s")
+            .append(" across ")
+            .append(applyResult.touchedFiles)
+            .append(" file")
+            .append(applyResult.touchedFiles == 1 ? "" : "s");
+        if (applyResult.failedFiles > 0) {
+            message.append(" (").append(applyResult.failedFiles).append(" file failures)");
+        }
+        pendingLspRenameEdits = null;
+        pendingLspRenameTarget = null;
+        return message.toString();
+    }
+
+    public String lspRenameCancel() {
+        pendingLspRenameEdits = null;
+        pendingLspRenameTarget = null;
+        return "Cleared pending rename preview";
+    }
+
+    private String buildLspRenamePreview(String targetName, List<LspClient.TextEdit> edits) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("LSP Rename Preview\n");
+        builder.append("=".repeat(40)).append("\n\n");
+        builder.append("Target name: ").append(targetName == null ? "" : targetName).append("\n");
+        builder.append("Total edits: ").append(edits == null ? 0 : edits.size()).append("\n\n");
+        if (edits == null || edits.isEmpty()) {
+            builder.append("(no edits)\n");
+            return builder.toString();
+        }
+        Map<String, List<LspClient.TextEdit>> byFile = new LinkedHashMap<>();
+        for (LspClient.TextEdit edit : edits) {
+            String path = filePathFromUri(edit.getUri());
+            if (path == null || path.isBlank()) {
+                path = edit.getUri();
+            }
+            byFile.computeIfAbsent(path, key -> new ArrayList<>()).add(edit);
+        }
+        for (Map.Entry<String, List<LspClient.TextEdit>> entry : byFile.entrySet()) {
+            builder.append(entry.getKey()).append("\n");
+            List<LspClient.TextEdit> fileEdits = entry.getValue();
+            fileEdits.sort((a, b) -> {
+                if (a.getStartLine() != b.getStartLine()) {
+                    return Integer.compare(a.getStartLine(), b.getStartLine());
+                }
+                return Integer.compare(a.getStartCharacter(), b.getStartCharacter());
+            });
+            int limit = Math.min(8, fileEdits.size());
+            for (int i = 0; i < limit; i++) {
+                LspClient.TextEdit edit = fileEdits.get(i);
+                builder.append("  - ")
+                    .append(edit.getStartLine() + 1)
+                    .append(":")
+                    .append(edit.getStartCharacter() + 1)
+                    .append(" -> ")
+                    .append(safePreviewText(edit.getNewText(), 60))
+                    .append("\n");
+            }
+            if (fileEdits.size() > limit) {
+                builder.append("  ... ").append(fileEdits.size() - limit).append(" more edits\n");
+            }
+            builder.append("\n");
+        }
+        builder.append("Run :lsp renameapply to apply, or :lsp renamecancel to discard.\n");
+        return builder.toString();
     }
 
     public String lspCodeActions(String selectionArgument) {

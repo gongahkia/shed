@@ -48,6 +48,7 @@ public class HelpService {
                    "  :config save   Persist current runtime config to ~/.shed/shedrc\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
+                   "  :workspace ... Workspace profile save/load/list\n" +
                    "  :clean         Remove Shed data files\n" +
                    "  :jobs          Show async job list\n" +
                    "  :jobcancel id  Cancel async job\n" +
@@ -195,6 +196,7 @@ public class HelpService {
                     + ":session load [name] restores a saved session.\n"
                     + ":session load! [name] restores even when buffers are modified.\n"
                     + ":session list lists all saved sessions.\n"
+                    + ":workspace save/load/list is similar, with project-profile naming + UI settings.\n"
                     + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/shedrc.\n";
             case "keybind":
             case "keybinding":

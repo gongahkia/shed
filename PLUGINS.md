@@ -21,6 +21,11 @@ Shed supports two plugin formats: **declarative** (`.shed`) and **scripted** (`.
 | `:plugin reload` | Reload all plugins from disk |
 | `:plugin path` | Show plugin directory and disabled plugins |
 | `:plugin new <name>` | Create template and open for editing |
+| `:plugin packages` | Show managed plugin package metadata |
+| `:plugin install <name> <version> <source> [--checksum=sha256] [--pin]` | Install package-managed plugin |
+| `:plugin update [name]` | Reinstall package(s), skipping pinned |
+| `:plugin remove <name>` | Remove package + plugin file |
+| `:plugin pin/unpin <name>` | Toggle version pinning |
 
 ## Declarative Plugins (`.shed`)
 
@@ -113,7 +118,18 @@ shed.shell(cmd)         -- run shell command, return stdout as string
 
 ```lua
 shed.config_get(key)    -- get a shedrc config value (nil if not set)
-shed.config_set(key, v) -- set a config value at runtime
+shed.config_set(key, v[, persist]) -- set config, optionally persist to ~/.shed/shedrc
+```
+
+#### Theme
+
+```lua
+shed.theme()               -- current theme id
+shed.themes()              -- array-style list of available theme ids
+shed.theme_set(name[,persist]) -- apply theme, optional persist
+shed.palette_get()         -- table of active palette keys -> hex colors
+shed.palette_set(tbl[,persist]) -- apply color/ui overrides from table
+shed.theater(preset)       -- apply dramatic preset: off/subtle/full
 ```
 
 #### Mode
@@ -136,12 +152,26 @@ shed.on(event, fn)      -- register a callback for an editor event
 | `BufOpen` | A file is opened |
 | `BufWrite` | A buffer is saved |
 | `ModeChange` | The editor mode changes |
+| `ThemeChange` | Theme/palette updates are applied |
 
 ### Example: Save Notification
 
 ```lua
 shed.on("BufWrite", function()
   shed.message("saved: " .. shed.file_name())
+end)
+```
+
+### Example: Theme-aware Mode Accent
+
+```lua
+shed.on("ModeChange", function()
+  local mode = shed.mode()
+  if mode == "insert" then
+    shed.palette_set({ command_bg = "#1F3A5F" })
+  elseif mode == "normal" then
+    shed.palette_set({ command_bg = "#2B2F3A" })
+  end
 end)
 ```
 

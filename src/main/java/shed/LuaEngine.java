@@ -128,6 +128,12 @@ public class LuaEngine {
         shed.set("shell", new Shell());
         shed.set("config_get", new ConfigGet());
         shed.set("config_set", new ConfigSet());
+        shed.set("theme", new ThemeGet());
+        shed.set("themes", new Themes());
+        shed.set("theme_set", new ThemeSet());
+        shed.set("palette_get", new PaletteGet());
+        shed.set("palette_set", new PaletteSet());
+        shed.set("theater", new Theater());
         shed.set("mode", new Mode());
         shed.set("on", new On());
         return shed;
@@ -285,10 +291,95 @@ public class LuaEngine {
         }
     }
 
-    private class ConfigSet extends TwoArgFunction {
-        public LuaValue call(LuaValue arg1, LuaValue arg2) {
-            editor.getConfigManager().set(arg1.checkjstring(), arg2.checkjstring());
-            return LuaValue.NIL;
+    private class ConfigSet extends VarArgFunction {
+        public Varargs invoke(Varargs args) {
+            String key = args.arg(1).checkjstring();
+            String value = args.arg(2).checkjstring();
+            boolean persist = args.narg() >= 3 && args.arg(3).toboolean();
+            String result = persist
+                ? editor.setConfigOptionPersistent(key, value)
+                : editor.setConfigOption(key, value);
+            return LuaValue.valueOf(result == null ? "" : result);
+        }
+    }
+
+    // -- theme API --
+
+    private class ThemeGet extends ZeroArgFunction {
+        public LuaValue call() {
+            return LuaValue.valueOf(editor.getCurrentThemeName());
+        }
+    }
+
+    private class Themes extends ZeroArgFunction {
+        public LuaValue call() {
+            LuaTable table = new LuaTable();
+            List<String> themes = editor.getThemeIdsForPlugins();
+            for (int i = 0; i < themes.size(); i++) {
+                table.set(i + 1, LuaValue.valueOf(themes.get(i)));
+            }
+            return table;
+        }
+    }
+
+    private class ThemeSet extends VarArgFunction {
+        public Varargs invoke(Varargs args) {
+            String theme = args.arg(1).optjstring("");
+            boolean persist = args.narg() >= 2 && args.arg(2).toboolean();
+            if (theme == null || theme.isBlank()) {
+                return LuaValue.valueOf("Usage: shed.theme_set(name [, persist])");
+            }
+            String result = editor.applyThemeFromPlugin(theme, persist);
+            return LuaValue.valueOf(result == null ? "" : result);
+        }
+    }
+
+    private class PaletteGet extends ZeroArgFunction {
+        public LuaValue call() {
+            LuaTable table = new LuaTable();
+            Map<String, String> palette = editor.getActiveThemePaletteHex();
+            for (Map.Entry<String, String> entry : palette.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null) {
+                    continue;
+                }
+                table.set(entry.getKey(), LuaValue.valueOf(entry.getValue()));
+            }
+            return table;
+        }
+    }
+
+    private class PaletteSet extends VarArgFunction {
+        public Varargs invoke(Varargs args) {
+            LuaValue value = args.arg(1);
+            if (!(value instanceof LuaTable)) {
+                return LuaValue.valueOf("Usage: shed.palette_set({ key='#RRGGBB', ... } [, persist])");
+            }
+            boolean persist = args.narg() >= 2 && args.arg(2).toboolean();
+            LuaTable table = (LuaTable) value;
+            Map<String, String> overrides = new LinkedHashMap<>();
+            LuaValue key = LuaValue.NIL;
+            while (true) {
+                Varargs next = table.next(key);
+                key = next.arg1();
+                if (key.isnil()) {
+                    break;
+                }
+                LuaValue val = next.arg(2);
+                if (!val.isstring()) {
+                    continue;
+                }
+                overrides.put(key.tojstring(), val.tojstring());
+            }
+            String result = editor.applyPaletteOverridesFromPlugin(overrides, persist);
+            return LuaValue.valueOf(result == null ? "" : result);
+        }
+    }
+
+    private class Theater extends OneArgFunction {
+        public LuaValue call(LuaValue arg) {
+            String preset = arg.optjstring("");
+            String result = editor.applyTheaterPreset(preset);
+            return LuaValue.valueOf(result == null ? "" : result);
         }
     }
 

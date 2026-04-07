@@ -414,6 +414,7 @@ ui.dramatic.minimap.width=84
 ```
 
 All settings can be toggled at runtime via `:set key=value` (for example `:set ui.dramatic=false`).
+Use `:theater off`, `:theater subtle`, or `:theater full` for one-shot presets.
 
 ### Markdown / Orgmode Features
 

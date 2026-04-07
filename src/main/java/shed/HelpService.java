@@ -73,6 +73,7 @@ public class HelpService {
                    "  :lsp restart   Restart LSP server for current extension\n" +
                    "  :diagnostics   Push diagnostics into quickfix\n" +
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
+                   "  :symbols [q]   Symbol picker (class/function/heading)\n" +
                    "  :git ...       Git status/diff/log/add/commit\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
@@ -176,6 +177,14 @@ public class HelpService {
                     + "  lsp.<ext>.command=<binary>   server command in ~/.shed/shedrc\n"
                     + "  lsp.<ext>.args=<flags>       server arguments\n"
                     + "  Builtin servers: rs py js jsx ts tsx go c cpp h hpp\n";
+            case "symbols":
+            case "symbol":
+            case "sym":
+                return "Help: symbols\n\n"
+                    + ":symbols opens a quick picker of classes/functions/headings in the current buffer.\n"
+                    + ":symbols <query> fuzzy-filters before opening the picker.\n"
+                    + "Selecting an entry jumps to its line.\n"
+                    + "Current-symbol breadcrumbs are shown in the status bar.\n";
             case "git":
                 return "Help: git\n\n"
                     + ":git shows status.\n"

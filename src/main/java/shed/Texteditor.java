@@ -159,6 +159,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private FuzzyMatchService fuzzyMatchService;
     private SnippetService snippetService;
     private BracketColorService bracketColorService;
+    private SymbolService symbolService;
     private FileWatcherService fileWatcherService;
     private SubstituteService substituteService;
     private List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
@@ -293,6 +294,7 @@ public class Texteditor extends JFrame implements KeyListener {
         fuzzyMatchService = new FuzzyMatchService();
         snippetService = new SnippetService();
         bracketColorService = new BracketColorService();
+        symbolService = new SymbolService();
         fileWatcherService = new FileWatcherService();
         substituteService = new SubstituteService();
         foldedLines = new HashMap<>();
@@ -3271,6 +3273,8 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("ldiag");
         knownCommands.add("dnext");
         knownCommands.add("dprev");
+        knownCommands.add("symbols");
+        knownCommands.add("sym");
         knownCommands.add("registers");
         knownCommands.add("marks");
         knownCommands.add("yankring");
@@ -3384,7 +3388,38 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private String findCurrentScope() {
+    private String findCurrentBreadcrumb() {
+        try {
+            FileBuffer buffer = getCurrentBuffer();
+            if (buffer == null) {
+                return null;
+            }
+            int caret = writingArea.getCaretPosition();
+            int line = writingArea.getLineOfOffset(caret) + 1;
+            List<SymbolService.Symbol> symbols = symbolService.collectSymbols(writingArea.getText(), buffer.getFileType());
+            if (!symbols.isEmpty()) {
+                List<SymbolService.Symbol> trail = symbolService.breadcrumbTrail(symbols, line);
+                if (!trail.isEmpty()) {
+                    StringBuilder breadcrumb = new StringBuilder();
+                    for (int i = 0; i < trail.size(); i++) {
+                        if (i > 0) {
+                            breadcrumb.append(" > ");
+                        }
+                        breadcrumb.append(trail.get(i).getName());
+                    }
+                    String value = breadcrumb.toString();
+                    if (value.length() > 88) {
+                        return "..." + value.substring(value.length() - 85);
+                    }
+                    return value;
+                }
+            }
+        } catch (BadLocationException ignored) {
+        }
+        return findCurrentScopeHeuristic();
+    }
+
+    private String findCurrentScopeHeuristic() {
         try {
             String text = writingArea.getText();
             int caret = writingArea.getCaretPosition();
@@ -5633,7 +5668,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
-        commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev");
+        commands.add("diagnostics"); commands.add("diag"); commands.add("dnext"); commands.add("dprev"); commands.add("symbols"); commands.add("sym");
         commands.add("registers"); commands.add("yankring"); commands.add("marks"); commands.add("zen"); commands.add("theater"); commands.add("normal");
         commands.add("reload"); commands.add("source"); commands.add("clean"); commands.add("shedclean");
         commands.add("noh"); commands.add("split");
@@ -7455,6 +7490,88 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    public String showSymbols(String argument) {
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null) {
+            return "No buffer";
+        }
+        List<SymbolService.Symbol> symbols = symbolService.collectSymbols(writingArea.getText(), buffer.getFileType());
+        if (symbols.isEmpty()) {
+            return "No symbols found";
+        }
+        String query = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
+        List<SymbolService.Symbol> filtered = new ArrayList<>();
+        for (SymbolService.Symbol symbol : symbols) {
+            if (query.isEmpty()) {
+                filtered.add(symbol);
+                continue;
+            }
+            String haystack = (symbol.getName() + " " + symbol.getKind()).toLowerCase(Locale.ROOT);
+            if (haystack.contains(query)) {
+                filtered.add(symbol);
+            }
+        }
+        if (filtered.isEmpty()) {
+            return "No symbols matched: " + query;
+        }
+
+        Map<String, SymbolService.Symbol> candidateMap = new LinkedHashMap<>();
+        for (SymbolService.Symbol symbol : filtered) {
+            String candidate = formatSymbolCandidate(symbol);
+            if (candidateMap.containsKey(candidate)) {
+                candidate = candidate + "  [#" + symbol.getLine() + "]";
+            }
+            candidateMap.put(candidate, symbol);
+        }
+        List<String> candidates = new ArrayList<>(candidateMap.keySet());
+        String selection = showPaletteDialog("Symbols", candidates, value -> describeSymbolCandidate(value, candidateMap, symbols));
+        if (selection == null || selection.isEmpty()) {
+            return "Symbols cancelled";
+        }
+        SymbolService.Symbol selected = candidateMap.get(selection);
+        if (selected == null) {
+            return "Invalid symbol selection";
+        }
+        return gotoLine(selected.getLine());
+    }
+
+    private String formatSymbolCandidate(SymbolService.Symbol symbol) {
+        StringBuilder indent = new StringBuilder();
+        for (int i = 1; i < symbol.getLevel(); i++) {
+            indent.append("  ");
+        }
+        return String.format("%4d  %-8s  %s%s",
+            symbol.getLine(),
+            symbol.getKind(),
+            indent,
+            symbol.getName());
+    }
+
+    private String describeSymbolCandidate(
+        String selection,
+        Map<String, SymbolService.Symbol> candidateMap,
+        List<SymbolService.Symbol> allSymbols
+    ) {
+        if (selection == null || selection.isBlank()) {
+            return "Select a symbol to jump.";
+        }
+        SymbolService.Symbol symbol = candidateMap.get(selection);
+        if (symbol == null) {
+            return selection;
+        }
+        List<SymbolService.Symbol> trail = symbolService.breadcrumbTrail(allSymbols, symbol.getLine());
+        StringBuilder breadcrumb = new StringBuilder();
+        for (int i = 0; i < trail.size(); i++) {
+            if (i > 0) {
+                breadcrumb.append(" > ");
+            }
+            breadcrumb.append(trail.get(i).getName());
+        }
+        return "Line " + symbol.getLine()
+            + " [" + symbol.getKind() + "]\n"
+            + (breadcrumb.length() == 0 ? symbol.getName() : breadcrumb.toString());
+    }
+
     private void collectFiles(File directory, List<String> results) {
         if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
             return;
@@ -7643,6 +7760,9 @@ public class Texteditor extends JFrame implements KeyListener {
             case "dprev":
             case "dp":
                 return "Jump to previous diagnostic.";
+            case "symbols":
+            case "sym":
+                return "Open symbol picker and jump by class/function/heading.";
             case "registers":
             case "reg":
                 return "Show register contents.";
@@ -10221,9 +10341,9 @@ public class Texteditor extends JFrame implements KeyListener {
             status.append("1:1  ");
         }
 
-        String scope = findCurrentScope();
-        if (scope != null) {
-            status.append(scope).append("  ");
+        String breadcrumb = findCurrentBreadcrumb();
+        if (breadcrumb != null && !breadcrumb.isBlank()) {
+            status.append(breadcrumb).append("  ");
         }
 
         EditorMode modeForStatus = editorState.mode == null ? EditorMode.NORMAL : editorState.mode;

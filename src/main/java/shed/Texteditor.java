@@ -6785,6 +6785,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleGitCommand(String argument) {
         File gitRoot = resolveGitRoot();
+        String trimmed = argument == null ? "" : argument.trim();
+        if (gitRoot != null && trimmed.toLowerCase(Locale.ROOT).startsWith("hunk")) {
+            String rest = trimmed.length() <= 4 ? "" : trimmed.substring(4).trim();
+            return runGitHunkCommand(gitRoot, rest);
+        }
         return gitService.handle(argument, gitRoot, new GitService.Handler() {
             @Override
             public String status(File root) {
@@ -7133,6 +7138,165 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Switch complete";
     }
 
+    private String runGitHunkCommand(File gitRoot, String argument) {
+        List<String> args = splitWhitespaceArgs(argument);
+        if (args.isEmpty()) {
+            return "Usage: :git hunk stage|unstage|revert [line]";
+        }
+        String action = args.get(0).toLowerCase(Locale.ROOT);
+        int line = getCurrentLineNumber();
+        if (args.size() >= 2) {
+            try {
+                line = Math.max(1, Integer.parseInt(args.get(1)));
+            } catch (NumberFormatException e) {
+                return "Invalid line for :git hunk: " + args.get(1);
+            }
+        }
+        FileBuffer buffer = getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) {
+            return ":git hunk requires a file-backed buffer";
+        }
+        String relativePath = relativizeAgainstGitRoot(gitRoot, new File(buffer.getFilePath()));
+        if (relativePath == null || relativePath.isBlank()) {
+            return "Current file is outside git root";
+        }
+
+        boolean useCached = "unstage".equals(action);
+        CommandResult diff = runCommand(gitRoot, useCached
+            ? List.of("git", "diff", "--cached", "-U0", "--", relativePath)
+            : List.of("git", "diff", "-U0", "--", relativePath));
+        if (diff.exitCode != 0) {
+            return gitError(diff);
+        }
+        if (diff.stdout == null || diff.stdout.isBlank()) {
+            return "No matching diff hunks";
+        }
+
+        String selectedPatch = selectGitHunkPatch(diff.stdout, line);
+        if (selectedPatch == null || selectedPatch.isBlank()) {
+            return "No hunk found for line " + line;
+        }
+
+        List<String> applyCommand = new ArrayList<>();
+        applyCommand.add("git");
+        applyCommand.add("apply");
+        if ("stage".equals(action)) {
+            applyCommand.add("--cached");
+        } else if ("unstage".equals(action)) {
+            applyCommand.add("-R");
+            applyCommand.add("--cached");
+        } else if ("revert".equals(action) || "discard".equals(action)) {
+            applyCommand.add("-R");
+        } else {
+            return "Usage: :git hunk stage|unstage|revert [line]";
+        }
+        applyCommand.add("--unidiff-zero");
+        applyCommand.add("-");
+
+        CommandResult applied = runExternalCommand(
+            applyCommand,
+            gitRoot,
+            selectedPatch,
+            null,
+            configManager.getProcessTimeoutMs(),
+            configManager.getProcessOutputMaxBytes(),
+            true
+        );
+        if (applied.exitCode != 0) {
+            return gitError(applied);
+        }
+
+        if ("revert".equals(action) || "discard".equals(action)) {
+            try {
+                buffer.load(configManager);
+                if (buffer == getCurrentBuffer()) {
+                    loadBufferIntoEditor(buffer);
+                    writingArea.setCaretPosition(Math.min(writingArea.getCaretPosition(), writingArea.getText().length()));
+                }
+            } catch (IOException ignored) {
+            }
+        }
+        refreshGitGutter();
+        return "git hunk " + action + " complete (line " + line + ")";
+    }
+
+    private String selectGitHunkPatch(String diff, int line) {
+        if (diff == null || diff.isBlank()) {
+            return null;
+        }
+        String[] lines = diff.split("\n", -1);
+        List<String> header = new ArrayList<>();
+        int cursor = 0;
+        while (cursor < lines.length && !lines[cursor].startsWith("@@")) {
+            header.add(lines[cursor]);
+            cursor++;
+        }
+        if (cursor >= lines.length) {
+            return null;
+        }
+
+        while (cursor < lines.length) {
+            int hunkStart = cursor;
+            String marker = lines[cursor];
+            cursor++;
+            while (cursor < lines.length && !lines[cursor].startsWith("@@")) {
+                cursor++;
+            }
+            int hunkEnd = cursor;
+
+            if (gitHunkContainsLine(marker, line)) {
+                StringBuilder patch = new StringBuilder();
+                for (String headerLine : header) {
+                    patch.append(headerLine).append("\n");
+                }
+                for (int i = hunkStart; i < hunkEnd; i++) {
+                    patch.append(lines[i]).append("\n");
+                }
+                return patch.toString();
+            }
+        }
+        return null;
+    }
+
+    private boolean gitHunkContainsLine(String marker, int line) {
+        if (marker == null || !marker.startsWith("@@")) {
+            return false;
+        }
+        Matcher matcher = Pattern.compile("@@ -\\d+(?:,(\\d+))? \\+(\\d+)(?:,(\\d+))? @@").matcher(marker);
+        if (!matcher.find()) {
+            return false;
+        }
+        int newStart;
+        int newCount;
+        try {
+            newStart = Integer.parseInt(matcher.group(2));
+            String countRaw = matcher.group(3);
+            newCount = countRaw == null || countRaw.isBlank() ? 1 : Integer.parseInt(countRaw);
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        if (newCount == 0) {
+            return line == newStart || line == Math.max(1, newStart - 1);
+        }
+        return line >= newStart && line < (newStart + newCount);
+    }
+
+    private String relativizeAgainstGitRoot(File gitRoot, File file) {
+        if (gitRoot == null || file == null) {
+            return null;
+        }
+        try {
+            Path rootPath = gitRoot.getCanonicalFile().toPath();
+            Path filePath = file.getCanonicalFile().toPath();
+            if (!filePath.startsWith(rootPath)) {
+                return null;
+            }
+            return rootPath.relativize(filePath).toString();
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
     private String showGitHelp() {
         showScratchBuffer("[git help]",
             "Git commands\n\n"
@@ -7143,6 +7307,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 + ":git branch           Show branch list\n"
                 + ":git add|stage <paths...> Stage paths\n"
                 + ":git restore|unstage <paths> Unstage paths\n"
+                + ":git hunk stage|unstage|revert [line] Hunk action at current/line\n"
                 + ":git commit <msg>     Commit staged changes\n"
                 + ":git amend <msg>      Amend last commit message/content\n"
                 + ":git checkout <arg>   Checkout branch/path\n"

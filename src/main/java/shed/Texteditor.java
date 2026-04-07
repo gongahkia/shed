@@ -13,6 +13,7 @@ import javax.swing.text.JTextComponent;
 import javax.swing.text.Segment;
 import javax.swing.text.TabExpander;
 import javax.swing.text.Utilities;
+import javax.swing.border.Border;
 import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.event.KeyListener;
@@ -184,6 +185,9 @@ public class Texteditor extends JFrame implements KeyListener {
     private Timer hostTintTimer;
     private Timer splitAnimationTimer;
     private Timer minimapWidthTimer;
+    private Timer paneJumpFlashTimer;
+    private EditorPane paneJumpFlashTarget;
+    private Border paneJumpFlashOriginalBorder;
 
     // Constants
     private static final String VERSION = "2.0";
@@ -296,6 +300,9 @@ public class Texteditor extends JFrame implements KeyListener {
         hostTintTimer = null;
         splitAnimationTimer = null;
         minimapWidthTimer = null;
+        paneJumpFlashTimer = null;
+        paneJumpFlashTarget = null;
+        paneJumpFlashOriginalBorder = null;
         refreshDramaticSettings();
         loadRecentFiles();
         lastMessage = "";
@@ -7584,6 +7591,61 @@ public class Texteditor extends JFrame implements KeyListener {
         minimapWidthTimer.start();
     }
 
+    private void clearPaneJumpFlash() {
+        if (paneJumpFlashTarget != null && paneJumpFlashTarget.getScrollPane() != null) {
+            paneJumpFlashTarget.getScrollPane().setBorder(paneJumpFlashOriginalBorder);
+            paneJumpFlashTarget.getScrollPane().revalidate();
+            paneJumpFlashTarget.getScrollPane().repaint();
+        }
+        paneJumpFlashTarget = null;
+        paneJumpFlashOriginalBorder = null;
+    }
+
+    private void flashPaneJump(EditorPane pane) {
+        if (!dramaticPanelAnimationsEnabled || pane == null || pane.getScrollPane() == null) {
+            return;
+        }
+        if (paneJumpFlashTimer != null) {
+            paneJumpFlashTimer.stop();
+            paneJumpFlashTimer = null;
+        }
+        clearPaneJumpFlash();
+
+        JScrollPane scrollPane = pane.getScrollPane();
+        paneJumpFlashTarget = pane;
+        paneJumpFlashOriginalBorder = scrollPane.getBorder();
+        Color accent = blendColor(configManager.getCaretColor(), configManager.getSelectionColor(), 0.35);
+        animateEditorHostTint(accent);
+
+        if (!dramaticMotionAllowed()) {
+            scrollPane.setBorder(BorderFactory.createLineBorder(accent, 2));
+            paneJumpFlashTimer = new Timer(120, ev -> {
+                clearPaneJumpFlash();
+                paneJumpFlashTimer.stop();
+                paneJumpFlashTimer = null;
+            });
+            paneJumpFlashTimer.setRepeats(false);
+            paneJumpFlashTimer.start();
+            return;
+        }
+
+        int steps = Math.max(4, Math.min(12, dramaticAnimationMs / 20));
+        final int[] tick = new int[] {0};
+        paneJumpFlashTimer = new Timer(animationDelayForSteps(steps), ev -> {
+            double t = (double) tick[0] / steps;
+            int alpha = (int) Math.round((1.0 - t) * 180);
+            alpha = Math.max(0, Math.min(255, alpha));
+            scrollPane.setBorder(BorderFactory.createLineBorder(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha), 2));
+            tick[0]++;
+            if (tick[0] > steps) {
+                paneJumpFlashTimer.stop();
+                paneJumpFlashTimer = null;
+                clearPaneJumpFlash();
+            }
+        });
+        paneJumpFlashTimer.start();
+    }
+
     private enum CueType {
         MODE_CHANGE,
         NAVIGATE,
@@ -9690,6 +9752,7 @@ public class Texteditor extends JFrame implements KeyListener {
         renderWindowLayout();
         animateSplitForPane(newPane, startRatio, 0.5);
         activateEditorPane(newPane);
+        flashPaneJump(newPane);
         animateEditorHostTint(configManager.getCommandColor());
         newPane.getTextArea().requestFocusInWindow();
         return vertical ? "Vertical split created" : "Horizontal split created";
@@ -9756,6 +9819,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         int nextIndex = (activePaneIndex + 1) % editorPanes.size();
         activateEditorPane(editorPanes.get(nextIndex));
+        flashPaneJump(getActivePane());
         writingArea.requestFocusInWindow();
         return "Window focus changed";
     }
@@ -9813,6 +9877,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
 
         activateEditorPane(bestPane);
+        flashPaneJump(bestPane);
         writingArea.requestFocusInWindow();
         return "Window focus changed";
     }

@@ -453,12 +453,28 @@ public class CommandHandler {
         String subArgs = space < 0 ? "" : trimmed.substring(space + 1).trim();
         switch (sub) {
             case "list": return editor.showPluginList();
+            case "packages":
+            case "pkg":
+                return editor.showPluginPackages();
             case "reload": return editor.reloadPlugins();
             case "enable": return subArgs.isEmpty() ? "Usage: :plugin enable <name>" : editor.enablePlugin(subArgs);
             case "disable": return subArgs.isEmpty() ? "Usage: :plugin disable <name>" : editor.disablePlugin(subArgs);
             case "info": return subArgs.isEmpty() ? "Usage: :plugin info <name>" : editor.showPluginInfo(subArgs);
             case "path": return editor.showPluginPath();
             case "new": return subArgs.isEmpty() ? "Usage: :plugin new <name>" : editor.createAndOpenPlugin(subArgs);
+            case "install":
+                return subArgs.isEmpty()
+                    ? "Usage: :plugin install <name> <version> <source> [--checksum=<sha256>] [--pin]"
+                    : editor.installPluginPackage(subArgs);
+            case "update":
+                return editor.updatePluginPackage(subArgs);
+            case "remove":
+            case "uninstall":
+                return subArgs.isEmpty() ? "Usage: :plugin remove <name>" : editor.removePluginPackage(subArgs);
+            case "pin":
+                return subArgs.isEmpty() ? "Usage: :plugin pin <name>" : editor.pinPluginPackage(subArgs);
+            case "unpin":
+                return subArgs.isEmpty() ? "Usage: :plugin unpin <name>" : editor.unpinPluginPackage(subArgs);
             default: return "Unknown :plugin subcommand: " + sub;
         }
     }

@@ -98,8 +98,13 @@ public class HelpService {
                    "  :%s/a/b/g      Substitute whole buffer\n\n" +
                    "PLUGINS\n" +
                    "  :plugin           List loaded plugins\n" +
+                   "  :plugin packages  List managed plugin packages\n" +
                    "  :plugin reload    Reload plugins from ~/.shed/plugins/\n" +
                    "  :plugin enable/disable <name>  Toggle plugins\n" +
+                   "  :plugin install <name> <version> <source> [--checksum=sha256] [--pin]\n" +
+                   "  :plugin update [name]  Update managed package(s), skip pinned\n" +
+                   "  :plugin remove <name>  Remove managed package + plugin file\n" +
+                   "  :plugin pin/unpin <name>  Toggle package pinning\n" +
                    "  :plugin new <name> Create + open plugin template\n" +
                    "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
@@ -275,10 +280,15 @@ public class HelpService {
                     + "    end)\n\n"
                     + "COMMANDS\n"
                     + "  :plugin           list loaded plugins\n"
+                    + "  :plugin packages  list managed package metadata\n"
                     + "  :plugin reload    reload all plugins from disk\n"
                     + "  :plugin info X    show details for plugin X\n"
                     + "  :plugin enable X  enable a disabled plugin\n"
                     + "  :plugin disable X disable a plugin (renames to .disabled)\n"
+                    + "  :plugin install <name> <version> <source> [--checksum=sha256] [--pin]\n"
+                    + "  :plugin update [name]  update package(s), skip pinned\n"
+                    + "  :plugin remove <name>  remove managed package\n"
+                    + "  :plugin pin/unpin <name>  toggle version pinning\n"
                     + "  :plugin new X     create and open a new plugin template\n"
                     + "  :plugin path      show plugins directory + disabled list\n";
             default:

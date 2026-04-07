@@ -9940,6 +9940,28 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Set " + key;
     }
 
+    public String setConfigOptionPersistent(String key, String value) {
+        if (key == null || key.isEmpty()) {
+            return "Error: Missing config key";
+        }
+        try {
+            configManager.setAndPersist(key, value == null ? "" : value);
+            applyRuntimeConfigFromSettings();
+            return "Set and saved " + key;
+        } catch (IOException e) {
+            return "Error saving config: " + e.getMessage();
+        }
+    }
+
+    public String saveConfigToDisk() {
+        try {
+            int persisted = configManager.persistCurrentConfig();
+            return "Saved config (" + persisted + " key" + (persisted == 1 ? "" : "s") + ")";
+        } catch (IOException e) {
+            return "Error saving config: " + e.getMessage();
+        }
+    }
+
     public String applyTheaterPreset(String presetArgument) {
         String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);
         if (preset.isEmpty()) {

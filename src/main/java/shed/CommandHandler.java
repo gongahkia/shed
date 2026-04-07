@@ -117,8 +117,8 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.prevBuffer(), "bp", "bprev");
         registerCommand((args, range, force) -> editor.listBuffers(), "ls");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
-        registerCommand((args, range, force) -> handleSet(args), "set");
-        registerCommand((args, range, force) -> editor.openSettingsBuffer(), "settings", "config", "shedrc");
+        registerCommand((args, range, force) -> handleSet(args, force), "set");
+        registerCommand((args, range, force) -> handleConfig(args), "settings", "config", "shedrc");
         registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.showJobs(), "jobs");
@@ -248,9 +248,19 @@ public class CommandHandler {
         }
     }
 
-    private String handleSet(String option) {
+    private String handleSet(String option, boolean persist) {
         if (option == null || option.isEmpty()) {
             return "Error: :set requires argument";
+        }
+
+        if (persist) {
+            int separator = option.indexOf('=');
+            if (separator <= 0) {
+                return "Persistent set requires key=value (example: :set! ui.dramatic=true)";
+            }
+            String key = option.substring(0, separator).trim();
+            String value = option.substring(separator + 1).trim();
+            return editor.setConfigOptionPersistent(key, value);
         }
 
         if (option.equals("nu") || option.equals("number")) {
@@ -370,6 +380,17 @@ public class CommandHandler {
             return editor.setConfigOption(key, value);
         }
         return "Unknown option: " + option;
+    }
+
+    private String handleConfig(String args) {
+        if (args == null || args.isBlank()) {
+            return editor.openSettingsBuffer();
+        }
+        String trimmed = args.trim().toLowerCase(Locale.ROOT);
+        if ("save".equals(trimmed) || "write".equals(trimmed)) {
+            return editor.saveConfigToDisk();
+        }
+        return "Usage: :config [save]";
     }
 
     private String handleWordCount() {

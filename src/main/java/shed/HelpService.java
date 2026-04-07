@@ -101,6 +101,8 @@ public class HelpService {
                    "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
                    "  project override file: .shedrc.local (nearest parent)\n" +
+                   "  project.config.allow.unsafe=false limits local overrides to UI/editor keys\n" +
+                   "  tree.delete.protect.critical=true blocks deleting /, home, and cwd via :tree rm\n" +
                    "  command.alias.<name>=<builtin>\n" +
                    "  keybind.<mode>.<lhs>=<rhs>\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
@@ -182,6 +184,7 @@ public class HelpService {
                     + ":tree refresh reloads the current tree root.\n"
                     + ":tree reveal sets tree root to the current file's directory.\n"
                     + ":tree new/mkdir/rename/rm perform file operations from command mode.\n"
+                    + "tree.delete.protect.critical blocks deleting root/home/cwd unless disabled.\n"
                     + "Use j/k to move and Enter or o to open the file in the other pane.\n";
             case "session":
             case "sessions":

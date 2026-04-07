@@ -6139,6 +6139,10 @@ public class Texteditor extends JFrame implements KeyListener {
         if (!target.exists()) {
             return "Path not found: " + target.getAbsolutePath();
         }
+        String guardError = validateTreeDeleteTarget(target);
+        if (guardError != null) {
+            return guardError;
+        }
         if (!force && target.isDirectory()) {
             File[] children = target.listFiles();
             if (children != null && children.length > 0) {
@@ -6154,6 +6158,39 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (IOException e) {
             return "Tree delete failed: " + e.getMessage();
         }
+    }
+
+    private String validateTreeDeleteTarget(File target) {
+        if (target == null || !configManager.getTreeDeleteProtectCritical()) {
+            return null;
+        }
+        try {
+            File canonicalTarget = target.getCanonicalFile();
+            java.nio.file.Path targetPath = canonicalTarget.toPath();
+            java.nio.file.Path root = targetPath.getRoot();
+            if (root != null && root.equals(targetPath)) {
+                return "Refusing to delete filesystem root: " + canonicalTarget.getAbsolutePath()
+                    + " (set tree.delete.protect.critical=false to override)";
+            }
+
+            String home = System.getProperty("user.home");
+            if (home != null && !home.isBlank()) {
+                File homeDir = new File(home).getCanonicalFile();
+                if (homeDir.toPath().equals(targetPath)) {
+                    return "Refusing to delete home directory: " + canonicalTarget.getAbsolutePath()
+                        + " (set tree.delete.protect.critical=false to override)";
+                }
+            }
+
+            File cwd = new File(".").getCanonicalFile();
+            if (cwd.toPath().equals(targetPath)) {
+                return "Refusing to delete current working directory: " + canonicalTarget.getAbsolutePath()
+                    + " (set tree.delete.protect.critical=false to override)";
+            }
+        } catch (IOException ignored) {
+            return null;
+        }
+        return null;
     }
 
     public String showFileTree(String pathArgument) {

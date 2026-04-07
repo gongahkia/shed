@@ -100,6 +100,7 @@ public class HelpService {
                    "  :plugin new <name> Create + open plugin template\n" +
                    "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
+                   "  project override file: .shedrc.local (nearest parent)\n" +
                    "  command.alias.<name>=<builtin>\n" +
                    "  keybind.<mode>.<lhs>=<rhs>\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +

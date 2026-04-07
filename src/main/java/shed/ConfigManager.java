@@ -26,6 +26,9 @@ public class ConfigManager {
     private final Map<String, String> config;
     private final Map<String, String> defaultConfig;
     private final Map<String, String> persistedConfig;
+    private final Map<String, String> projectConfig;
+    private final Map<String, String> projectPreviousValues;
+    private File activeProjectConfigFile;
     private final String shedDirectoryPath;
     private String configPath;
 
@@ -129,6 +132,9 @@ public class ConfigManager {
         this.config = new HashMap<>();
         this.defaultConfig = new HashMap<>();
         this.persistedConfig = new HashMap<>();
+        this.projectConfig = new HashMap<>();
+        this.projectPreviousValues = new HashMap<>();
+        this.activeProjectConfigFile = null;
         String home = System.getProperty("user.home");
         this.shedDirectoryPath = home + "/" + SHED_DIRECTORY_NAME;
         this.configPath = shedDirectoryPath + "/" + SHED_CONFIG_NAME;
@@ -598,8 +604,62 @@ public class ConfigManager {
 
     public void reload() {
         config.clear();
+        projectConfig.clear();
+        projectPreviousValues.clear();
+        activeProjectConfigFile = null;
         loadDefaults();
         loadConfig();
+    }
+
+    public String applyProjectConfigForFile(File file) {
+        File localConfig = findProjectConfig(file);
+        try {
+            if (localConfig != null) {
+                localConfig = localConfig.getCanonicalFile();
+            }
+        } catch (IOException ignored) {
+            if (localConfig != null) {
+                localConfig = localConfig.getAbsoluteFile();
+            }
+        }
+
+        if ((activeProjectConfigFile == null && localConfig == null)
+                || (activeProjectConfigFile != null && activeProjectConfigFile.equals(localConfig))) {
+            return "";
+        }
+
+        restoreProjectOverrides();
+        projectConfig.clear();
+        projectPreviousValues.clear();
+        activeProjectConfigFile = null;
+
+        if (localConfig == null) {
+            return "Project config cleared";
+        }
+
+        try {
+            Map<String, String> parsed = parseConfigFile(localConfig);
+            if (parsed.isEmpty()) {
+                activeProjectConfigFile = localConfig;
+                return "Project config loaded: " + localConfig.getAbsolutePath() + " (no overrides)";
+            }
+            for (Map.Entry<String, String> entry : parsed.entrySet()) {
+                String key = entry.getKey();
+                if (!projectPreviousValues.containsKey(key)) {
+                    projectPreviousValues.put(key, config.get(key));
+                }
+                projectConfig.put(key, entry.getValue());
+                config.put(key, entry.getValue());
+            }
+            activeProjectConfigFile = localConfig;
+            return "Project config loaded: " + localConfig.getAbsolutePath();
+        } catch (IOException e) {
+            return "Project config load failed: " + e.getMessage();
+        }
+    }
+
+    public String getActiveProjectConfigPath() {
+        return activeProjectConfigFile == null ? null : activeProjectConfigFile.getAbsolutePath();
     }
 
     private boolean getBoolean(String key, boolean defaultValue) {
@@ -759,6 +819,9 @@ public class ConfigManager {
             + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
             + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
             + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n\n"
+            + "# Per-project override file support\n"
+            + "# Place .shedrc.local at a repo root (or parent folder).\n"
+            + "# It is auto-applied when opening files under that folder.\n\n"
             + "# Plugins\n"
             + "# Place .shed or .lua files in ~/.shed/plugins/ to load plugins.\n"
             + "# .shed files: declarative (# @command, # @bind, # @event directives)\n"
@@ -814,6 +877,54 @@ public class ConfigManager {
             return legacyAlt;
         }
         return null;
+    }
+
+    private void restoreProjectOverrides() {
+        for (Map.Entry<String, String> entry : projectPreviousValues.entrySet()) {
+            String key = entry.getKey();
+            String previous = entry.getValue();
+            if (previous == null) {
+                config.remove(key);
+            } else {
+                config.put(key, previous);
+            }
+        }
+    }
+
+    private File findProjectConfig(File file) {
+        if (file == null) {
+            return null;
+        }
+        File cursor = file.isDirectory() ? file : file.getParentFile();
+        while (cursor != null) {
+            File candidate = new File(cursor, ".shedrc.local");
+            if (candidate.isFile()) {
+                return candidate;
+            }
+            cursor = cursor.getParentFile();
+        }
+        return null;
+    }
+
+    private Map<String, String> parseConfigFile(File file) throws IOException {
+        Map<String, String> parsed = new LinkedHashMap<>();
+        List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
+        for (String line : lines) {
+            String trimmed = line == null ? "" : line.trim();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
+                continue;
+            }
+            int separator = trimmed.indexOf('=');
+            if (separator <= 0) {
+                continue;
+            }
+            String key = trimmed.substring(0, separator).trim();
+            String value = trimmed.substring(separator + 1).trim();
+            if (!key.isEmpty()) {
+                parsed.put(key, value);
+            }
+        }
+        return parsed;
     }
 
     private void writeConfigFile() throws IOException {

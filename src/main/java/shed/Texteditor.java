@@ -204,6 +204,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // Constants
     private static final String VERSION = "2.0";
     private static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
+    private static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
 
     // Constructor
     public Texteditor(String[] args) {
@@ -3230,6 +3231,8 @@ public class Texteditor extends JFrame implements KeyListener {
         knownCommands.add("commandlog");
         knownCommands.add("session");
         knownCommands.add("sessions");
+        knownCommands.add("workspace");
+        knownCommands.add("ws");
         knownCommands.add("jobs");
         knownCommands.add("jobcancel");
         knownCommands.add("jobkill");
@@ -5615,7 +5618,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("wq"); commands.add("x"); commands.add("e"); commands.add("edit");
         commands.add("bn"); commands.add("bp"); commands.add("ls"); commands.add("buffers");
         commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
-        commands.add("log"); commands.add("session"); commands.add("jobs"); commands.add("jobcancel");
+        commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
         commands.add("drop"); commands.add("help"); commands.add("wc"); commands.add("recent");
         commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
@@ -7390,6 +7393,9 @@ public class Texteditor extends JFrame implements KeyListener {
             case "session":
             case "sessions":
                 return "Save/load/list named sessions.";
+            case "workspace":
+            case "ws":
+                return "Save/load/list workspace profiles (layout + UI settings).";
             case "jobs":
                 return "Show async job list.";
             case "jobcancel":
@@ -10962,6 +10968,30 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
+    public String handleWorkspaceProfileCommand(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty()) {
+            return "Usage: :workspace save [name] | load[!] [name] | list";
+        }
+        int split = trimmed.indexOf(' ');
+        String subcommand = split < 0 ? trimmed.toLowerCase(Locale.ROOT) : trimmed.substring(0, split).toLowerCase(Locale.ROOT);
+        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        String profileName = args.isBlank() ? defaultWorkspaceProfileName() : sanitizeSessionName(args);
+        String sessionName = WORKSPACE_PROFILE_PREFIX + profileName;
+        switch (subcommand) {
+            case "save":
+                return saveSession(sessionName);
+            case "load":
+                return loadSession(sessionName, false);
+            case "load!":
+                return loadSession(sessionName, true);
+            case "list":
+                return listWorkspaceProfiles();
+            default:
+                return "Usage: :workspace save [name] | load[!] [name] | list";
+        }
+    }
+
     private String saveSession(String nameArgument) {
         File sessionFile = resolveSessionFile(nameArgument);
         File sessionDir = sessionFile.getParentFile();
@@ -10989,6 +11019,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (treeRoot != null) {
             payload.put("treeRoot", treeRoot.getAbsolutePath());
         }
+        payload.put("uiSettings", captureSessionUiSettings());
         payload.put("savedAt", commandLogTimeFormat.format(LocalDateTime.now()));
         try {
             Files.writeString(sessionFile.toPath(),
@@ -11094,6 +11125,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } else {
             treeRoot = null;
         }
+        applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
         return true;
     }
 
@@ -11151,6 +11183,48 @@ public class Texteditor extends JFrame implements KeyListener {
             treeRoot = null;
         }
         return true;
+    }
+
+    private Map<String, Object> captureSessionUiSettings() {
+        Map<String, Object> settings = new LinkedHashMap<>();
+        String[] keys = {
+            "theme",
+            "ui.dramatic",
+            "ui.dramatic.identity",
+            "ui.dramatic.mode.transitions",
+            "ui.dramatic.command.palette",
+            "ui.dramatic.editing.feedback",
+            "ui.dramatic.panel.animations",
+            "ui.dramatic.sound",
+            "ui.dramatic.sound.pack",
+            "ui.dramatic.sound.volume",
+            "ui.dramatic.reduced.motion",
+            "ui.dramatic.animation.ms",
+            "minimap",
+            "ui.whichkey.hints"
+        };
+        for (String key : keys) {
+            String value = configManager.get(key);
+            if (value != null) {
+                settings.put(key, value);
+            }
+        }
+        return settings;
+    }
+
+    private void applySessionUiSettings(Map<String, Object> settings) {
+        if (settings == null || settings.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : settings.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            Object value = entry.getValue();
+            configManager.set(key, value == null ? "" : String.valueOf(value));
+        }
+        applyRuntimeConfigFromSettings();
     }
 
     private List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {
@@ -11391,6 +11465,48 @@ public class Texteditor extends JFrame implements KeyListener {
         }
         showScratchBuffer("[sessions]", builder.toString().stripTrailing() + "\n");
         return "Showing sessions";
+    }
+
+    private String listWorkspaceProfiles() {
+        File dir = new File(configManager.getSessionDirectory());
+        if (!dir.exists() || !dir.isDirectory()) {
+            return "No workspace profiles";
+        }
+        File[] files = dir.listFiles(file -> file.isFile()
+            && file.getName().startsWith(WORKSPACE_PROFILE_PREFIX)
+            && file.getName().endsWith(".json"));
+        if (files == null || files.length == 0) {
+            return "No workspace profiles";
+        }
+        java.util.Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
+        StringBuilder builder = new StringBuilder();
+        builder.append("Workspace Profiles\n\n");
+        for (File file : files) {
+            String name = file.getName();
+            if (name.endsWith(".json")) {
+                name = name.substring(0, name.length() - ".json".length());
+            }
+            if (name.startsWith(WORKSPACE_PROFILE_PREFIX)) {
+                name = name.substring(WORKSPACE_PROFILE_PREFIX.length());
+            }
+            builder.append(name).append("  ").append(file.getAbsolutePath()).append("\n");
+        }
+        showScratchBuffer("[workspace profiles]", builder.toString().stripTrailing() + "\n");
+        return "Showing workspace profiles";
+    }
+
+    private String defaultWorkspaceProfileName() {
+        FileBuffer current = getCurrentBuffer();
+        if (current != null && current.hasFilePath()) {
+            File root = detectProjectTrustRoot(new File(current.getFilePath()));
+            if (root != null) {
+                String name = root.getName();
+                if (name != null && !name.isBlank()) {
+                    return sanitizeSessionName(name);
+                }
+            }
+        }
+        return "default";
     }
 
     private File resolveSessionFile(String nameArgument) {

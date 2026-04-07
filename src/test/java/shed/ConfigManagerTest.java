@@ -4,7 +4,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,16 +21,23 @@ public class ConfigManagerTest {
     Path tempDir;
 
     private String originalHome;
+    private String originalReducedMotionProperty;
 
     @BeforeEach
     void saveHome() {
         originalHome = System.getProperty("user.home");
+        originalReducedMotionProperty = System.getProperty("prefers.reduced.motion");
     }
 
     @AfterEach
     void restoreHome() {
         if (originalHome != null) {
             System.setProperty("user.home", originalHome);
+        }
+        if (originalReducedMotionProperty == null) {
+            System.clearProperty("prefers.reduced.motion");
+        } else {
+            System.setProperty("prefers.reduced.motion", originalReducedMotionProperty);
         }
     }
 
@@ -138,5 +147,116 @@ public class ConfigManagerTest {
         assertEquals(2, cmds.size());
         assertEquals("make -j4", cmds.get("build"));
         assertEquals("./test.sh", cmds.get("test"));
+    }
+
+    @Test
+    void dramaticDefaultsAndRuntimeTogglePathsWork() {
+        Path home = tempDir.resolve("home-dramatic-defaults");
+        System.setProperty("user.home", home.toString());
+        System.clearProperty("prefers.reduced.motion");
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.getDramaticUiEnabled());
+        assertEquals("default", config.getDramaticSoundPack());
+        assertEquals(75, config.getDramaticSoundVolume());
+        assertTrue(config.getDramaticPerformanceGuardrailsEnabled());
+
+        config.set("ui.dramatic", "true");
+        config.set("ui.dramatic.sound", "true");
+        config.set("ui.dramatic.sound.pack", "cinema");
+        config.set("ui.dramatic.sound.volume", "90");
+        config.set("ui.dramatic.performance.cpu.threshold", "0.65");
+
+        assertTrue(config.getDramaticUiEnabled());
+        assertTrue(config.getDramaticSoundEnabled());
+        assertEquals("cinema", config.getDramaticSoundPack());
+        assertEquals(90, config.getDramaticSoundVolume());
+        assertEquals(0.65, config.getDramaticPerformanceCpuThreshold(), 0.0001);
+    }
+
+    @Test
+    void dramaticOverridesAndReducedMotionSyncAreParsed() throws IOException {
+        Path home = tempDir.resolve("home-dramatic-override");
+        Path shedDir = home.resolve(".shed");
+        Files.createDirectories(shedDir);
+        Files.writeString(shedDir.resolve("shedrc"),
+            "ui.dramatic=true\n"
+            + "ui.dramatic.sound=true\n"
+            + "ui.dramatic.sound.pack=soft\n"
+            + "ui.dramatic.sound.volume=40\n"
+            + "ui.dramatic.reduced.motion=false\n"
+            + "ui.dramatic.reduced.motion.sync=true\n"
+            + "ui.dramatic.performance.guardrails=true\n"
+            + "ui.dramatic.performance.line.threshold=30000\n");
+        System.setProperty("user.home", home.toString());
+        System.setProperty("prefers.reduced.motion", "true");
+
+        ConfigManager config = new ConfigManager();
+        assertTrue(config.getDramaticUiEnabled());
+        assertTrue(config.getDramaticSoundEnabled());
+        assertEquals("soft", config.getDramaticSoundPack());
+        assertEquals(40, config.getDramaticSoundVolume());
+        assertTrue(config.getDramaticReducedMotionEnabled());
+        assertEquals(30000, config.getDramaticPerformanceLineThreshold());
+    }
+
+    @Test
+    void setAndPersistWritesConfigFile() throws IOException {
+        Path home = tempDir.resolve("home-persist-single");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("ui.dramatic", "true");
+        config.setAndPersist("ui.dramatic.sound.pack", "cinema");
+
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("ui.dramatic=true"));
+        assertTrue(file.contains("ui.dramatic.sound.pack=cinema"));
+    }
+
+    @Test
+    void persistCurrentConfigWritesRuntimeOverrides() throws IOException {
+        Path home = tempDir.resolve("home-persist-runtime");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("ui.dramatic", "true");
+        config.set("ui.dramatic.sound", "true");
+        config.set("ui.dramatic.sound.volume", "88");
+        int persisted = config.persistCurrentConfig();
+
+        assertTrue(persisted >= 3);
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("ui.dramatic=true"));
+        assertTrue(file.contains("ui.dramatic.sound=true"));
+        assertTrue(file.contains("ui.dramatic.sound.volume=88"));
+    }
+
+    @Test
+    void projectLocalConfigLoadsAndClearsOnFileSwitch() throws IOException {
+        Path home = tempDir.resolve("home-project-local");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        Path projectA = tempDir.resolve("project-a");
+        Path projectB = tempDir.resolve("project-b");
+        Files.createDirectories(projectA.resolve("src"));
+        Files.createDirectories(projectB.resolve("src"));
+        Files.writeString(projectA.resolve(".shedrc.local"), "ui.dramatic=true\nui.dramatic.sound.pack=cinema\n");
+
+        File fileA = projectA.resolve("src/App.java").toFile();
+        Files.writeString(fileA.toPath(), "class App {}\n");
+        File fileB = projectB.resolve("src/Other.java").toFile();
+        Files.writeString(fileB.toPath(), "class Other {}\n");
+
+        String loaded = config.applyProjectConfigForFile(fileA);
+        assertTrue(loaded.contains("Project config loaded"));
+        assertEquals("cinema", config.getDramaticSoundPack());
+        assertNotNull(config.getActiveProjectConfigPath());
+
+        String cleared = config.applyProjectConfigForFile(fileB);
+        assertTrue(cleared.contains("Project config cleared"));
+        assertEquals("default", config.getDramaticSoundPack());
+        assertNull(config.getActiveProjectConfigPath());
     }
 }

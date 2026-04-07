@@ -19,9 +19,10 @@ Shed is a bare-bones, opinionated, modal text editor with extended Vim bindings,
 * Line numbers and word count
 * 5 editor modes: Normal, Insert, Visual, Replace, Command
 
-As per custom, here is a video of ***Shed*** editing its own source code.
+## Video of `Shed` editing its own source code
 
-https://user-images.githubusercontent.com/117062305/226877220-1900ca35-50b4-4623-a008-e86f8c9cace0.mp4
+<video width="630" height="300" src="https://github.com/user-attachments/assets/6f939653-e8ad-4346-8c46-95f1ed521b27">
+
 
 ## Key-bindings
 

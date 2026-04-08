@@ -11,10 +11,10 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 * Written entirely with Java Swing
 * No telemetry whatsoever
 * Sensible defaults out-of-the-box
-* First-class [Vim Bindings](./KEYBINDS.md)
-* Highly customisable via [`~/.shed/shedrc`](./CONFIG.md)
-* Rich [Command](./COMMANDS.md) Palette
-* Extensible [Plugin](./PLUGINS.md) System
+* First-class [Vim Bindings](./docs/KEYBINDS.md)
+* Highly customisable via [`~/.shed/shedrc`](./docs/CONFIG.md)
+* Rich [Command](./docs/COMMANDS.md) Palette
+* Extensible [Plugin](./docs/PLUGINS.md) System
 
 ## Video of `Shed` editing its own source code
 

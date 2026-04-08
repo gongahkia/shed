@@ -7,17 +7,14 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 
 ## Features
 
-* Open source, MIT LICENSE
-* Highly customisable using Java Swing components and config file `~/.shed/shedrc`
-* Stable, crash-proof
-* Java-only with a tiny 32KB executable
-* Respects your privacy, no telemetry whatsoever
-* Extended VIM bindings 
-* Multiple file editing with buffer management
-* Search and replace with visual highlighting
-* Undo/redo with per-buffer history
-* Line numbers and word count
-* 5 editor modes: Normal, Insert, Visual, Replace, Command
+* Tiny 32KB executable
+* Written entirely with Java Swing
+* No telemetry whatsoever
+* Sensible defaults out-of-the-box
+* First-class [Vim Bindings](./KEYBINDS.md)
+* Highly customisable via [`~/.shed/shedrc`](./CONFIG.md)
+* Rich [Command](./COMMANDS.md) Palette
+* Extensible [Plugin](./PLUGINS.md) System
 
 ## Video of `Shed` editing its own source code
 
@@ -25,21 +22,49 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
   <video width="85%" src="https://github.com/user-attachments/assets/6f939653-e8ad-4346-8c46-95f1ed521b27"></video>
 </div>
 
-## [Key-bindings](./KEYBINDS.md)
+## Stack
 
-## [Plugins](./PLUGINS.md)
+* *Scripting*:
+* *Package*:
 
-## [Commands](./COMMANDS.md)
+## Usage
 
-## Installation
+> ![IMPORTANT]  
+> Please use either [JDK 17](https://www.oracle.com/java/technologies/downloads/#java17) or [JDK 20](https://www.oracle.com/java/technologies/downloads/#java20) as the specified JDK version for either of these instructions.
 
-### Pre-requisites
+Note you can either choose to run the precompiled [`Shed.jar`](build/Shed.jar) file or build Shed yourself. 
 
-The Java Runtime Environment (JRE) or Java Development Kit (JDK) is required to run the `.jar` file. It can be downloaded [here](https://www.oracle.com/java/technologies/downloads/).
+### Running the precompiled [`Shed.jar`](build/Shed.jar) file
 
-> Please use either JDK 17 or JDK 20 as the specified JDK version.
+1. First install the [Java Runtime Environment (JRE)](https://www.oracle.com/java/technologies/downloads/) or [Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/) to enable running the `.jar` file. 
+2. Then follow the relevant instructions for your respective operating system.
 
-## Windows
+#### Linux
+
+1. Download the Java Development Kit (JDK) [Linux distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-linux).
+2. Assuming the JDK file has been downloaded to the *Downloads* directory, run the following commands in your terminal.
+
+```console
+$ cd Downloads
+$ sudo apt install jdk-20_linux-x64_bin.rpm # debain
+$ sudo dnf install jdk-20_linux-x64_bin.rpm` # fedora
+```
+
+3. Download the [`Shed.jar`](build/Shed.jar) file.q
+4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it. 
+
+#### OSX
+
+1. Download the [MacOS distribution of the Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/#jdk20-mac).
+2. Follow the JDK installer to install JDK to your machine.
+3. Download the [`Shed.jar`](build/Shed.jar) file.
+4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
+
+<p align="center">
+  <img src="https://www.codejava.net/images/articles/javase/install-jdk-17/oracle_jdk_17_installer_macos.png" width="60%"/>
+</p>
+
+#### Windows
 
 1. Download the Java Development Kit (JDK) [Windows distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-windows).
 2. Follow the set-up instructions to install JDK to your machine.
@@ -47,53 +72,22 @@ The Java Runtime Environment (JRE) or Java Development Kit (JDK) is required to 
 4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
 
 <p align="center">
-  <img src="https://phoenixnap.com/kb/wp-content/uploads/2021/12/java-installation-wizard-complete.png" />
+  <img src="https://phoenixnap.com/kb/wp-content/uploads/2021/12/java-installation-wizard-complete.png" width="60%"/>
 </p>
 
-## Linux
+### Building `Shed` yourself
 
-1. Download the Java Development Kit (JDK) [Linux distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-linux).
-2. Assuming the JDK file has been downloaded to the *Downloads* directory, run the following commands in your terminal.
-
-```console
-$ cd Downloads
-$ sudo apt install jdk-20_linux-x64_bin.rpm 
-```
-
-> Note that the instructions above assume a Debian-based distro. Run the relevant commands for your distro.  
-> *(eg. Fedora-based distros would run `sudo dnf install jdk-20_linux-x64_bin.rpm`)*
-
-3. Download the [`Shed.jar`](build/Shed.jar) file.
-4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it. 
-
-## MacOS
-
-1. Download the Java Development Kit (JDK) [MacOS distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-mac).
-2. Follow the JDK installer to install JDK to your machine.
-3. Download the [`Shed.jar`](build/Shed.jar) file.
-4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
-
-<p align="center">
-  <img src="https://www.codejava.net/images/articles/javase/install-jdk-17/oracle_jdk_17_installer_macos.png" />
-</p>
-
-## Build Shed yourself
-
-1. In your terminal, run the following commands.
+1. First run the below commands to install `Shed` locally on your machine.
 
 ```console
 $ git clone https://github.com/gongahkia/shed && cd shed
-$ mvn -q -DskipTests package
-$ java -jar target/shed-2.0.0.jar
 ```
 
-> Note that the instructions above assume JDK 17 or JDK 20 have already been downloaded and added to PATH.
-
-## Usage
-
-Run Shed from the command line:
+2. Then run the below commands to build and run `Shed`.
 
 ```console
-$ java -jar target/shed-2.0.0.jar                 # Opens file chooser dialog
-$ java -jar target/shed-2.0.0.jar filename.txt    # Opens specific file
+$ mvn -q -DskipTests package
+$ java -jar target/shed-2.0.0.jar
+$ java -jar target/shed-2.0.0.jar # opens file chooser dialog
+$ java -jar target/shed-2.0.0.jar filename.txt # opens specific file
 ```

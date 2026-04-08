@@ -5,16 +5,20 @@
 
 Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [opinionated](https://dictionary.cambridge.org/dictionary/english/opinionated), [modal text editor](https://carlosbecker.com/posts/ed/) with native [Vim](https://www.vim.org/) bindings.
 
+<div align="center">
+    <img src="./assets/logo/shed.png" width="20%">
+</div>
+
 ## Features
 
-* Tiny 32KB executable
-* Written entirely with Java Swing
-* No telemetry whatsoever
+* Tiny ~1MB executable
+* Written entirely in Java with Java Swing
 * Sensible defaults out-of-the-box
 * First-class [Vim Bindings](./docs/KEYBINDS.md)
 * Highly customisable via [`~/.shed/shedrc`](./docs/CONFIG.md)
 * Rich [Command](./docs/COMMANDS.md) Palette
 * Extensible [Plugin](./docs/PLUGINS.md) System
+* No telemetry whatsoever
 
 ## Video of `Shed` editing its own source code
 
@@ -24,8 +28,9 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 
 ## Stack
 
-* *Scripting*:
-* *Package*:
+* *Scripting*: [Java 20](https://www.oracle.com/java/technologies/downloads/#java20), [Java Swing](https://docs.oracle.com/en/java/javase/20/docs/api/java.desktop/javax/swing/package-summary.html)
+* *Build*: [Maven](https://maven.apache.org/download.cgi)
+* *Test*: [JUnit 5](https://junit.org/junit5/)
 
 ## Usage
 

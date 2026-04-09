@@ -35,7 +35,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 
 ## Usage
 
-> ![IMPORTANT]  
+> [!IMPORTANT]
 > Please use either [JDK 17](https://www.oracle.com/java/technologies/downloads/#java17) or [JDK 20](https://www.oracle.com/java/technologies/downloads/#java20) as the specified JDK version for either of these instructions.
 
 Note you can either choose to run the precompiled [`Shed.jar`](build/Shed.jar) file or build Shed yourself. 

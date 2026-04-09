@@ -1,5 +1,6 @@
 [![](https://img.shields.io/badge/shed_1.0-passing-dark_green)](https://github.com/gongahkia/shed/releases/tag/1.0)
 [![](https://img.shields.io/badge/shed_2.0-passing-green)](https://github.com/gongahkia/shed/releases/tag/2.0)
+![](https://github.com/gongahkia/shed/actions/workflows/ci.yml/badge.svg)
 
 # `Shed` - a SHit EDitor
 

@@ -1,4 +1,4 @@
-name: CI
+name: Shed CI/CD on push
 
 on:
   push:

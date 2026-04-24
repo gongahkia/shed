@@ -24,7 +24,7 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 ## Video of `Shed` editing its own source code
 
 <div align="center">
-  <video width="85%" src="https://github.com/user-attachments/assets/6f939653-e8ad-4346-8c46-95f1ed521b27"></video>
+  <video width="85%" src="https://github.com/user-attachments/assets/6f939653-e8ad-4346-8c46-95f1ed521b27" controls muted playsinline preload="metadata"></video>
 </div>
 
 ## Stack

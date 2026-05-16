@@ -1,0 +1,1305 @@
+import Foundation
+import Combine
+import Network
+import OSLog
+import CryptoKit
+
+private let log = Logger(subsystem: "dev.claudeusage", category: "PollingService")
+
+class PollingService: ObservableObject {
+    enum PollSkipReason: String, CaseIterable {
+        case networkUnavailable = "network_unavailable"
+        case noActiveAccounts = "no_active_accounts"
+        case circuitBreakerOpen = "circuit_breaker_open"
+        case providerRetryAfter = "provider_retry_after"
+        case recoveryPollCooldown = "recovery_poll_cooldown"
+
+        var label: String {
+            switch self {
+            case .networkUnavailable: return "network"
+            case .noActiveAccounts: return "no-active"
+            case .circuitBreakerOpen: return "circuit"
+            case .providerRetryAfter: return "retry-after"
+            case .recoveryPollCooldown: return "recovery-cooldown"
+            }
+        }
+    }
+
+    static let shared = PollingService()
+    static var anthropicClientFactory: (String) -> AnthropicAPIClient = { apiKey in
+        AnthropicAPIClient(apiKey: apiKey)
+    }
+    static var claudeAIClientFactory: (String) -> ClaudeAIClient = { sessionToken in
+        ClaudeAIClient(sessionToken: sessionToken)
+    }
+    @MainActor @Published var lastPollDate: Date?
+    @MainActor @Published var isPolling: Bool = false
+    @MainActor @Published var lastFetchError: String?
+    @MainActor @Published var lastPollSuccessCount: Int = 0
+    @MainActor @Published var lastPollFailureCount: Int = 0
+    @MainActor @Published var pollDurationP50Ms: Int = 0
+    @MainActor @Published var pollDurationP90Ms: Int = 0
+    @MainActor @Published private(set) var pollSkipCountsByReason: [String: Int] = [:]
+    @MainActor @Published private(set) var burnRateUSDPerHourByAccount: [UUID: Double] = [:]
+    @MainActor @Published private(set) var burnRateThresholdUSDPerHourByAccount: [UUID: Double] = [:]
+
+    private var timer: Timer?
+    private var currentTask: Task<Void, Never>?
+    @MainActor private var currentPollToken: UUID?
+    private let maxConcurrencyUpperCap = 6
+    private let pathMonitor = NWPathMonitor()
+    @MainActor private var networkAvailable = true
+    @MainActor private var pendingLogRefresh = false
+    @MainActor private var logChangeDebounceTask: Task<Void, Never>?
+    @MainActor private var fetchErrorsByAccount: [UUID: String] = [:]
+    @MainActor private var fetchErrorUpdatedAtByAccount: [UUID: Date] = [:]
+    @MainActor private var consecutiveFetchFailuresByAccount: [UUID: Int] = [:]
+    @MainActor private var recentFetchOutcomesByAccount: [UUID: [Bool]] = [:]
+    @MainActor private var circuitBreakerFailureCountByAccount: [UUID: Int] = [:]
+    @MainActor private var circuitBreakerOpenUntilByAccount: [UUID: Date] = [:]
+    @MainActor private var lastClaudeAISessionExpiredNoticeAtByAccount: [UUID: Date] = [:]
+    private let failureDisableThreshold = 5
+    private let healthWindowSize = 20
+    private let circuitBreakerThreshold = 3
+    private let circuitBreakerDurationSeconds: TimeInterval = 300
+    private let claudeAISessionExpiredNoticeCooldownSeconds: TimeInterval = 900
+    @MainActor private var nextPollCycleID: Int = 1
+    @MainActor private var lastNetworkRecoveryPollAt: Date?
+    @MainActor private var pollDurationSamplesSeconds: [Double] = []
+    private let pollDurationSamplesKey = "pollDurationSamplesSeconds"
+    private let pollDurationMaxSamples = 200
+    private let pollSkipCountsByReasonKey = "pollSkipCountsByReason"
+    @MainActor private var pollSkipCountsLoaded = false
+    @MainActor private var lastPolledAtByAccount: [UUID: Date] = [:]
+    @MainActor private var lastLocalLogEventAt: Date?
+    private let quietLocalPollMultiplier = 3
+    private let quietLocalPollMinSeconds: TimeInterval = 180
+    private let localActivityBurstWindowSeconds: TimeInterval = 120
+
+    private init() {
+        pathMonitor.pathUpdateHandler = { path in
+            let available = path.status == .satisfied
+            Task { @MainActor in
+                let service = PollingService.shared
+                let wasAvailable = service.networkAvailable
+                service.networkAvailable = available
+                if available && !wasAvailable {
+                    await service.triggerImmediateRecoveryPollIfNeeded()
+                }
+            }
+            if !available {
+                ErrorLogger.shared.log("Network unavailable, skipping polls until reconnect", level: "WARN")
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "dev.claudeusage.netmon"))
+    }
+
+    @MainActor
+    func start(config: Config) {
+        stop()
+        let activeTypes = Set(config.accounts.filter(\.isActive).map(\.type))
+        let minInterval: Int
+        if activeTypes.isEmpty {
+            minInterval = config.pollIntervalSeconds
+        } else {
+            minInterval = activeTypes.map { config.providerPolling.interval(for: $0) }.min() ?? config.pollIntervalSeconds
+        }
+        let interval = TimeInterval(max(60, minInterval))
+        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { _ in
+            Task { await PollingService.shared.pollOnce() }
+        }
+        Task { await pollOnce() } // fire immediately
+    }
+
+    @MainActor
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+        currentTask?.cancel()
+        currentTask = nil
+        currentPollToken = nil
+        pendingLogRefresh = false
+        logChangeDebounceTask?.cancel()
+        logChangeDebounceTask = nil
+    }
+
+    @MainActor
+    func forceRefresh() {
+        currentTask?.cancel()
+        Task { await pollOnce() }
+    }
+
+    @MainActor
+    func requestFollowUpRefresh() {
+        if currentTask != nil || isPolling {
+            pendingLogRefresh = true
+            return
+        }
+        forceRefresh()
+    }
+
+    func handleClaudeCodeLogsChanged() async {
+        let pollInProgress = await MainActor.run {
+            self.lastLocalLogEventAt = Date()
+            return self.currentTask != nil || self.isPolling
+        }
+        if pollInProgress {
+            await MainActor.run { self.pendingLogRefresh = true }
+            return
+        }
+        await scheduleDebouncedLogRefresh()
+    }
+
+    func pollOnce() async {
+        await MainActor.run {
+            self.loadPollSkipCountsIfNeeded()
+        }
+        let token = UUID()
+        let cycleID = await MainActor.run { () -> Int in
+            defer { self.nextPollCycleID += 1 }
+            return self.nextPollCycleID
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.runPollCycle(cycleID: cycleID)
+        }
+        await MainActor.run {
+            self.currentTask = task
+            self.currentPollToken = token
+        }
+        await task.value
+        await MainActor.run {
+            if self.currentPollToken == token {
+                self.currentTask = nil
+                self.currentPollToken = nil
+            }
+        }
+    }
+
+    private func runPollCycle(cycleID: Int) async {
+        await loadPollDurationSamplesIfNeeded()
+        let cycleStartedAt = Date()
+        guard !Task.isCancelled else { return }
+        let available = await MainActor.run { self.networkAvailable }
+        guard available else {
+            log.warning("[poll_cycle=\(cycleID)] Network unavailable, skipping poll")
+            ErrorLogger.shared.log("Network unavailable, skipping poll", level: "WARN")
+            await recordPollSkip(.networkUnavailable)
+            return
+        }
+        var config = ConfigManager.shared.load()
+        let activeAccounts = Account.activeAccounts(in: config)
+        log.info("[poll_cycle=\(cycleID)] Poll started: \(activeAccounts.count) active accounts")
+        await MainActor.run { self.isPolling = true }
+        defer {
+            Task {
+                await self.recordPollDuration(seconds: Date().timeIntervalSince(cycleStartedAt))
+            }
+            Task { @MainActor in
+                self.isPolling = false
+                log.info("[poll_cycle=\(cycleID)] Poll completed")
+            }
+        }
+
+        guard !activeAccounts.isEmpty else {
+            await recordPollSkip(.noActiveAccounts)
+            return
+        }
+        let accountsToPoll = await selectAccountsForPolling(
+            activeAccounts,
+            pollIntervalSeconds: config.pollIntervalSeconds,
+            providerPolling: config.providerPolling
+        )
+        let fetchConfig = config
+        let updatedIds = await PollingOrchestrator.pollAccounts(
+            accountsToPoll,
+            maxConcurrencyUpperCap: maxConcurrencyUpperCap,
+            fetchAccount: { [self] account in
+                guard !Task.isCancelled else { return nil }
+                await self.fetchAndStore(account: account, config: fetchConfig)
+                let hasError = await MainActor.run {
+                    self.fetchErrorsByAccount[account.id] != nil
+                }
+                return hasError ? nil : account.id
+            },
+            jitterNanos: { [self] account, activeAccountCount in
+                self.accountPollJitterNanos(accountId: account.id, activeAccountCount: activeAccountCount)
+            }
+        )
+        let successCount = updatedIds.count
+        let failures = max(0, accountsToPoll.count - successCount)
+        let hasSuccessfulUpdates = successCount > 0
+        await MainActor.run {
+            self.lastPollSuccessCount = successCount
+            self.lastPollFailureCount = failures
+            if hasSuccessfulUpdates {
+                self.lastPollDate = Date()
+            }
+        }
+
+        // compute forecasts
+        for account in activeAccounts {
+            guard !Task.isCancelled else { return }
+            let history = await CacheManager.shared.historyAsync(forAccount: account.id, days: 1)
+            if let forecast = ForecastEngine.compute(history: history) {
+                await CacheManager.shared.saveForecastAsync(forecast)
+            }
+        }
+
+        // generate model hints for popover
+        await generateAndPersistModelHints(config: config, accounts: activeAccounts)
+
+        // iCloud sync if enabled
+        if config.iCloudSync.enabled {
+            await iCloudSyncManager.shared.syncNow()
+        }
+
+        // threshold notifications
+        guard !Task.isCancelled else { return }
+        await checkThresholds(config: config, accounts: activeAccounts)
+        await checkBurnRateAlerts(config: config, accounts: activeAccounts)
+
+        // automation evaluation
+        let matchedAutomations = await evaluateAutomations(config: config, accounts: activeAccounts)
+        if !matchedAutomations.isEmpty {
+            log.info("Automation evaluation matched \(matchedAutomations.count) rule(s)")
+            await fireMatchedAutomations(matches: matchedAutomations, config: &config)
+        }
+
+        // daily digest check
+        guard !Task.isCancelled else { return }
+        await checkDailyDigest(config: config, accounts: activeAccounts)
+
+        NotificationCenter.default.post(
+            name: .usageDidUpdate,
+            object: nil,
+            userInfo: ["accountIds": updatedIds]
+        )
+        if await consumePendingLogRefresh() {
+            await scheduleDebouncedLogRefresh()
+        }
+    }
+
+    internal func fetchAndStore(account: Account, config: Config) async {
+        guard !Task.isCancelled else { return }
+        let accountID = account.id.uuidString
+        let providerType = account.type.rawValue
+        func withProviderContext(_ message: String) -> String {
+            "[account_id=\(accountID)] [provider_type=\(providerType)] \(message)"
+        }
+        if await isCircuitBreakerOpen(for: account.id, accountType: account.type) {
+            let msg = "Circuit breaker open for account \(account.id.uuidString); skipping fetch until cooldown expires"
+            ErrorLogger.shared.log(withProviderContext(msg), level: "WARN")
+            await recordPollSkip(.circuitBreakerOpen)
+            await setFetchError(msg, for: account.id, accountType: account.type)
+            return
+        }
+        switch account.type {
+        case .claudeCode, .codex, .gemini:
+            if let snap = ProviderFetchers.localSnapshot(for: account) {
+                await appendSnapshotIfChanged(snap, accountType: account.type)
+            }
+            await clearFetchError(for: account.id)
+        case .openAIOrg:
+            let rawCredential: String
+            do {
+                rawCredential = try KeychainManager.retrieve(service: AppConstants.keychainService, account: account.id.uuidString)
+            } catch {
+                let msg = "No OpenAI admin key for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            guard let adminKey = ProviderCredentialCodec.openAIAdminKey(from: rawCredential) else {
+                let msg = "Invalid OpenAI credential payload for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            do {
+                let client = OpenAIOrgUsageClient(adminAPIKey: adminKey)
+                let snap = try await client.fetchCurrentSnapshot(accountId: account.id)
+                await appendSnapshotIfChanged(snap, accountType: account.type)
+                await clearFetchError(for: account.id)
+            } catch APIError.invalidKey {
+                let msg = "Invalid OpenAI admin key for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.rateLimited(let retryAfter) {
+                let wait = max(1, retryAfter ?? 60)
+                let msg = "OpenAI usage API rate-limited for account \(account.id.uuidString); retry after \(wait)s"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.networkError(let underlying) {
+                let msg = "OpenAI usage API network error for account \(account.id.uuidString): \(underlying.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch {
+                let msg = "OpenAI usage API unexpected error for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            }
+        case .windsurfEnterprise:
+            let rawCredential: String
+            do {
+                rawCredential = try KeychainManager.retrieve(service: AppConstants.keychainService, account: account.id.uuidString)
+            } catch {
+                let msg = "No Windsurf service key for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            guard let payload = ProviderCredentialCodec.windsurf(from: rawCredential) else {
+                let msg = "Invalid Windsurf credential payload for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            do {
+                let client = WindsurfEnterpriseClient(serviceKey: payload.serviceKey, groupName: payload.groupName)
+                let snap = try await client.fetchCurrentSnapshot(accountId: account.id)
+                await appendSnapshotIfChanged(snap, accountType: account.type)
+                await clearFetchError(for: account.id)
+            } catch APIError.invalidKey {
+                let msg = "Invalid Windsurf service key for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.rateLimited(let retryAfter) {
+                let wait = max(1, retryAfter ?? 60)
+                let msg = "Windsurf API rate-limited for account \(account.id.uuidString); retry after \(wait)s"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.networkError(let underlying) {
+                let msg = "Windsurf API network error for account \(account.id.uuidString): \(underlying.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch {
+                let msg = "Windsurf API unexpected error for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            }
+        case .githubCopilot:
+            let rawCredential: String
+            do {
+                rawCredential = try KeychainManager.retrieve(service: AppConstants.keychainService, account: account.id.uuidString)
+            } catch {
+                let msg = "No GitHub token for Copilot account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            guard let payload = ProviderCredentialCodec.copilot(from: rawCredential) else {
+                let msg = "Invalid GitHub Copilot credential payload for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            do {
+                let client = GitHubCopilotMetricsClient(token: payload.token, organization: payload.organization)
+                let snap = try await client.fetchCurrentSnapshot(accountId: account.id)
+                await appendSnapshotIfChanged(snap, accountType: account.type)
+                await clearFetchError(for: account.id)
+            } catch APIError.invalidKey {
+                let msg = "Invalid GitHub token/permissions for Copilot account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.rateLimited(let retryAfter) {
+                let wait = max(1, retryAfter ?? 60)
+                let msg = "GitHub Copilot metrics API rate-limited for account \(account.id.uuidString); retry after \(wait)s"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.networkError(let underlying) {
+                let msg = "GitHub Copilot metrics API network error for account \(account.id.uuidString): \(underlying.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch {
+                let msg = "GitHub Copilot metrics API unexpected error for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            }
+        case .anthropicAPI:
+            let key: String
+            do {
+                key = try KeychainManager.retrieve(service: AppConstants.keychainService, account: account.id.uuidString)
+            } catch {
+                let msg = "Keychain failure for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            if let retryAfter = await CacheManager.shared.loadAnthropicRetryAfterAsync(forAccount: account.id), retryAfter > Date() {
+                let seconds = Int(retryAfter.timeIntervalSinceNow.rounded(.up))
+                let msg = "Rate limited for account \(account.id.uuidString); deferred for \(max(1, seconds))s"
+                log.warning("\(msg, privacy: .public)")
+                await recordPollSkip(.providerRetryAfter)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            do {
+                // Anthropic Usage API remains the canonical billing source for anthropicAPI accounts.
+                let result = try await fetchAnthropicCanonicalSnapshots(accountId: account.id, apiKey: key)
+                let snapshots = result.snapshots
+                await CacheManager.shared.upsertAnthropicSnapshotsAsync(snapshots, forAccount: account.id)
+                if let cursor = result.cursor {
+                    await CacheManager.shared.saveAnthropicCursorAsync(cursor, forAccount: account.id)
+                }
+                await CacheManager.shared.clearAnthropicRetryAfterAsync(forAccount: account.id)
+                await clearFetchError(for: account.id)
+            } catch APIError.invalidKey {
+                let msg = "Invalid API key for account \(account.id.uuidString)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.rateLimited(let retryAfter) {
+                let retryDate = Self.retryAfterDate(fromSeconds: retryAfter)
+                let retrySeconds = Int(retryDate.timeIntervalSinceNow.rounded(.up))
+                await CacheManager.shared.saveAnthropicRetryAfterAsync(retryDate, forAccount: account.id)
+                let msg = "Rate limited for account \(account.id.uuidString); retry after \(max(1, retrySeconds))s"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch APIError.networkError(let underlying) {
+                let msg = "Network error for account \(account.id.uuidString): \(underlying.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            } catch {
+                let msg = "Unexpected error for account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg), file: #file, line: #line)
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+            }
+        case .claudeAI:
+            let token: String
+            do {
+                token = try KeychainManager.retrieve(service: AppConstants.keychainSessionTokenService, account: account.id.uuidString)
+            } catch {
+                let msg = "No session token for claudeAI account \(account.id.uuidString): \(error.localizedDescription)"
+                ErrorLogger.shared.log(withProviderContext(msg))
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                return
+            }
+            let aiClient = Self.claudeAIClientFactory(token)
+            switch await aiClient.fetchUsageResult() {
+            case .success(let usage):
+                let now = Date()
+                let status = ClaudeAIStatus(
+                    accountId: account.id,
+                    messagesRemaining: usage.messagesRemaining,
+                    messagesUsed: usage.messagesUsed,
+                    resetAt: usage.resetAt,
+                    lastUpdated: now,
+                    lastSuccessfulSyncAt: now,
+                    lastErrorMessage: nil,
+                    sessionHealth: .healthy
+                )
+                await ClaudeAIStatusStore.shared.save(status)
+                await ClaudeAIQuotaHistoryStore.shared.append(
+                    ClaudeAIQuotaHistoryEntry(
+                        accountId: account.id,
+                        timestamp: now,
+                        messagesRemaining: usage.messagesRemaining,
+                        messagesUsed: usage.messagesUsed,
+                        resetAt: usage.resetAt,
+                        sessionHealth: .healthy
+                    )
+                )
+                NotificationManager.shared.checkClaudeAILowQuota(
+                    account: account,
+                    status: status,
+                    config: config.claudeAI
+                )
+                let snap = UsageSnapshot(
+                    accountId: account.id,
+                    timestamp: status.lastUpdated,
+                    inputTokens: usage.messagesUsed,
+                    outputTokens: 0,
+                    cacheCreationTokens: 0,
+                    cacheReadTokens: 0,
+                    totalCostUSD: 0,
+                    modelBreakdown: [ModelUsage(modelId: "claude-ai-web", inputTokens: usage.messagesRemaining, outputTokens: 0, costUSD: 0)],
+                    costConfidence: .estimated
+                )
+                await appendSnapshotIfChanged(snap, accountType: account.type)
+                await clearFetchError(for: account.id)
+            case .failure(let error):
+                let existingStatus = await ClaudeAIStatusStore.shared.status(for: account.id)
+                let now = Date()
+                let sessionHealth: ClaudeAISessionHealth
+                switch error {
+                case .unauthorized, .forbidden:
+                    sessionHealth = .reauthRequired
+                case .invalidResponse, .networkError:
+                    sessionHealth = .temporaryFailure
+                }
+                let msg = "claudeAI fetchUsage failed for account \(account.id.uuidString): \(describeClaudeAIError(error)) — using cached snapshot"
+                ErrorLogger.shared.log(withProviderContext(msg), level: "WARN")
+                await setFetchError(msg, for: account.id, accountType: account.type)
+                await registerCircuitBreakerFailure(for: account.id, accountType: account.type)
+                let fallbackStatus = ClaudeAIStatus(
+                    accountId: account.id,
+                    messagesRemaining: existingStatus?.messagesRemaining ?? 0,
+                    messagesUsed: existingStatus?.messagesUsed ?? 0,
+                    resetAt: existingStatus?.resetAt,
+                    lastUpdated: now,
+                    lastSuccessfulSyncAt: existingStatus?.lastSuccessfulSyncAt,
+                    lastErrorMessage: describeClaudeAIError(error),
+                    sessionHealth: sessionHealth
+                )
+                await ClaudeAIStatusStore.shared.save(fallbackStatus)
+                await ClaudeAIQuotaHistoryStore.shared.append(
+                    ClaudeAIQuotaHistoryEntry(
+                        accountId: account.id,
+                        timestamp: now,
+                        messagesRemaining: fallbackStatus.messagesRemaining,
+                        messagesUsed: fallbackStatus.messagesUsed,
+                        resetAt: fallbackStatus.resetAt,
+                        sessionHealth: sessionHealth
+                    )
+                )
+                if var staleSnapshot = await CacheManager.shared.latestAsync(forAccount: account.id) {
+                    staleSnapshot.timestamp = now
+                    staleSnapshot.isStale = true
+                    await appendSnapshotIfChanged(staleSnapshot, accountType: account.type)
+                }
+                if sessionHealth == .reauthRequired,
+                   await shouldEmitClaudeAISessionExpiredNotification(for: account.id) {
+                    NotificationCenter.default.post(name: .claudeAISessionExpired, object: account.id)
+                }
+            }
+        }
+    }
+
+    private func checkDailyDigest(config: Config, accounts: [Account]) async {
+        guard config.webhook.enabled, config.webhook.events.contains("daily_digest") else { return }
+        let key = "lastDailyDigestDate"
+        let cal = Calendar.current
+        if let prev = UserDefaults.standard.object(forKey: key) as? Date,
+           cal.isDateInToday(prev) { return }
+        UserDefaults.standard.set(Date(), forKey: key)
+        let ws = WebhookService()
+        for account in accounts {
+            let agg = await CacheManager.shared.todayAggregateAsync(forAccount: account.id)
+            let snap = UsageSnapshot(
+                accountId: account.id,
+                timestamp: Date(),
+                inputTokens: agg.totalInputTokens,
+                outputTokens: agg.totalOutputTokens,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0,
+                totalCostUSD: agg.totalCostUSD,
+                modelBreakdown: [],
+                costConfidence: Self.isBillingGradeAccountType(account.type) ? .billingGrade : .estimated
+            )
+            Task {
+                do {
+                    try await ws.send(event: .dailyDigest, snapshot: snap, config: config.webhook)
+                } catch {
+                    ErrorLogger.shared.log("Daily digest webhook failed for account \(account.id.uuidString): \(error.localizedDescription)", file: #file, line: #line)
+                }
+            }
+        }
+    }
+
+    private func checkThresholds(config: Config, accounts: [Account]) async {
+        for account in accounts {
+            guard let limit = account.costLimitUSD else { continue }
+            let agg = await CacheManager.shared.todayAggregateAsync(forAccount: account.id)
+            let snapshot = UsageSnapshot(
+                accountId: account.id,
+                timestamp: Date(),
+                inputTokens: agg.totalInputTokens,
+                outputTokens: agg.totalOutputTokens,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0,
+                totalCostUSD: agg.totalCostUSD,
+                modelBreakdown: [],
+                costConfidence: Self.isBillingGradeAccountType(account.type) ? .billingGrade : .estimated
+            )
+            NotificationManager.shared.checkThreshold(
+                snapshot: snapshot,
+                account: account,
+                limitUSD: limit,
+                webhookConfig: config.webhook
+            )
+        }
+    }
+
+    private func checkBurnRateAlerts(config: Config, accounts: [Account]) async {
+        guard config.burnRate.enabled else { return }
+        let now = Date()
+        var burnRates: [UUID: Double] = [:]
+        var thresholds: [UUID: Double] = [:]
+        for account in accounts {
+            let threshold = config.burnRate.perAccountUSDPerHourThreshold[account.id.uuidString]
+                ?? config.burnRate.defaultUSDPerHourThreshold
+            thresholds[account.id] = threshold
+            guard threshold > 0 else { continue }
+            let history = await CacheManager.shared.historyAsync(forAccount: account.id, days: 1)
+            guard let burnRate = burnRateFromRecentNormalizedSnapshots(history, now: now) else { continue }
+            burnRates[account.id] = burnRate
+            guard burnRate > threshold else { continue }
+            let burnText = String(format: "%.2f", burnRate)
+            let thresholdText = String(format: "%.2f", threshold)
+            ErrorLogger.shared.log(
+                "Burn-rate alert for account \(account.id.uuidString): \(burnText) USD/h exceeds threshold \(thresholdText) USD/h",
+                level: "WARN"
+            )
+            NotificationManager.shared.checkBurnRate(
+                account: account,
+                burnRateUSDPerHour: burnRate,
+                thresholdUSDPerHour: threshold,
+                cooldownSeconds: config.burnRate.alertCooldownSeconds,
+                webhookConfig: config.webhook,
+                now: now
+            )
+        }
+        let burnRatesSnapshot = burnRates
+        let thresholdsSnapshot = thresholds
+        await MainActor.run {
+            self.burnRateUSDPerHourByAccount = burnRatesSnapshot
+            self.burnRateThresholdUSDPerHourByAccount = thresholdsSnapshot
+        }
+    }
+
+    private func evaluateAutomations(config: Config, accounts: [Account]) async -> [(AutomationRule, UsageSnapshot)] {
+        var matched: [(AutomationRule, UsageSnapshot)] = []
+        for account in accounts {
+            let agg = await CacheManager.shared.todayAggregateAsync(forAccount: account.id)
+            let snapshot = UsageSnapshot(
+                accountId: account.id,
+                timestamp: Date(),
+                inputTokens: agg.totalInputTokens,
+                outputTokens: agg.totalOutputTokens,
+                cacheCreationTokens: 0,
+                cacheReadTokens: 0,
+                totalCostUSD: agg.totalCostUSD,
+                modelBreakdown: [],
+                costConfidence: Self.isBillingGradeAccountType(account.type) ? .billingGrade : .estimated
+            )
+            let triggered = AutomationEngine.evaluate(rules: config.automations, snapshot: snapshot)
+            for rule in triggered where Self.isAutomationOffCooldown(rule, pollIntervalSeconds: config.pollIntervalSeconds) {
+                matched.append((rule, snapshot))
+            }
+        }
+        return matched
+    }
+
+    private func fireMatchedAutomations(matches: [(AutomationRule, UsageSnapshot)], config: inout Config) async {
+        var didMutateConfig = false
+        for (rule, snapshot) in matches {
+            let fired = await AutomationEngine.fire(rule: rule, snapshot: snapshot, cooldownSeconds: config.pollIntervalSeconds)
+            guard fired else { continue }
+            if let idx = config.automations.firstIndex(where: { $0.id == rule.id }) {
+                config.automations[idx].lastFiredAt = Date()
+                AutomationCooldownStore.shared.setLastFiredAt(Date(), ruleID: rule.id)
+                didMutateConfig = true
+            }
+        }
+        if didMutateConfig {
+            if case .failure(let error) = ConfigManager.shared.save(config) {
+                ErrorLogger.shared.log("Failed to persist automation fire state: \(error)")
+            }
+        }
+    }
+
+    static func isAutomationOffCooldown(_ rule: AutomationRule, pollIntervalSeconds: Int, now: Date = Date()) -> Bool {
+        let persistedLastFiredAt = AutomationCooldownStore.shared.lastFiredAt(ruleID: rule.id)
+        guard let lastFiredAt = rule.lastFiredAt ?? persistedLastFiredAt else { return true }
+        let cooldown = max(1, pollIntervalSeconds)
+        return now.timeIntervalSince(lastFiredAt) >= TimeInterval(cooldown)
+    }
+
+    private static func isBillingGradeAccountType(_ type: AccountType) -> Bool {
+        type == .anthropicAPI || type == .openAIOrg
+    }
+
+    private func fetchAnthropicCanonicalSnapshots(accountId: UUID, apiKey: String) async throws -> (snapshots: [UsageSnapshot], cursor: AnthropicIngestionCursor?) {
+        let client = Self.anthropicClientFactory(apiKey)
+        let end = Date()
+        let storedCursor = await CacheManager.shared.loadAnthropicCursorAsync(forAccount: accountId)
+        let start = Self.anthropicStartDate(cursor: storedCursor, now: end)
+        let response = try await fetchAnthropicUsageChunked(
+            client: client,
+            accountId: accountId,
+            startDate: start,
+            endDate: end
+        )
+        return (client.convertToSnapshots(response, accountId: accountId), client.cursor(from: response))
+    }
+
+    static func anthropicStartDate(cursor: AnthropicIngestionCursor?, now: Date = Date()) -> Date {
+        let fallback = Calendar.current.date(byAdding: .day, value: -1, to: now) ?? now
+        guard let raw = cursor?.lastStartTime else { return fallback }
+        guard let ts = SharedDateFormatters.iso8601InternetDateTime.date(from: raw)
+            ?? SharedDateFormatters.iso8601InternetDateTimeFractional.date(from: raw) else { return fallback }
+        return Calendar.current.startOfDay(for: ts)
+    }
+
+    internal func generateAndPersistModelHints(config: Config, accounts: [Account]) async {
+        let hints: [ModelHint]
+        if config.modelOptimizer.enabled {
+            var computed: [ModelHint] = []
+            for account in accounts {
+                guard let latest = await CacheManager.shared.latestAsync(forAccount: account.id) else { continue }
+                if let hint = ModelOptimizerAnalyzer.analyze(
+                    breakdown: latest.modelBreakdown,
+                    accountId: account.id,
+                    config: config.modelOptimizer
+                ) {
+                    computed.append(hint)
+                }
+            }
+            hints = computed
+        } else {
+            hints = []
+        }
+        let url = AppConstants.sharedContainerURL.appendingPathComponent("model_hints.json")
+        do {
+            try FileManager.default.createDirectory(
+                at: AppConstants.sharedContainerURL,
+                withIntermediateDirectories: true
+            )
+            let enc = JSONEncoder()
+            enc.dateEncodingStrategy = .iso8601
+            let data = try enc.encode(hints)
+            if let existing = try? Data(contentsOf: url),
+               modelHintsPayloadHash(existing) == modelHintsPayloadHash(data) {
+                return
+            }
+            try AtomicFileWriter.write(data, to: url)
+        } catch {
+            ErrorLogger.shared.log("Failed to persist model hints: \(error.localizedDescription)")
+        }
+    }
+
+    private func modelHintsPayloadHash(_ data: Data) -> String {
+        let digest = SHA256.hash(data: data)
+        return digest.map { String(format: "%02x", $0) }.joined()
+    }
+
+    private func burnRateFromRecentNormalizedSnapshots(_ snapshots: [UsageSnapshot], now: Date = Date()) -> Double? {
+        let normalized = normalizedBurnRateSnapshots(from: snapshots)
+        let cutoff = now.addingTimeInterval(-6 * 3600)
+        let recent = normalized.filter { $0.timestamp >= cutoff }.sorted { $0.timestamp < $1.timestamp }
+        guard recent.count >= 2 else { return nil }
+        guard let first = recent.first, let last = recent.last else { return nil }
+        let elapsedHours = last.timestamp.timeIntervalSince(first.timestamp) / 3600.0
+        guard elapsedHours > 0 else { return nil }
+        let totalCost = recent.reduce(0) { $0 + max(0, $1.totalCostUSD) }
+        return totalCost / elapsedHours
+    }
+
+    private func normalizedBurnRateSnapshots(from snapshots: [UsageSnapshot]) -> [UsageSnapshot] {
+        let sorted = snapshots.sorted { $0.timestamp < $1.timestamp }
+        var normalized: [UsageSnapshot] = []
+        var previousCumulativeCost: Double?
+        for snapshot in sorted {
+            if isCumulativeSnapshot(snapshot) {
+                let currentCost = max(0, snapshot.totalCostUSD)
+                let deltaCost: Double
+                if let previous = previousCumulativeCost {
+                    deltaCost = currentCost >= previous ? (currentCost - previous) : currentCost
+                } else {
+                    deltaCost = currentCost
+                }
+                previousCumulativeCost = currentCost
+                guard deltaCost > 0 else { continue }
+                var deltaSnapshot = snapshot
+                deltaSnapshot.totalCostUSD = deltaCost
+                normalized.append(deltaSnapshot)
+            } else {
+                guard snapshot.totalCostUSD > 0 else { continue }
+                normalized.append(snapshot)
+            }
+        }
+        return normalized
+    }
+
+    private func isCumulativeSnapshot(_ snapshot: UsageSnapshot) -> Bool {
+        let model = snapshot.modelBreakdown.first?.modelId ?? ""
+        let cumulativeModels: Set<String> = [
+            "claude-code-local",
+            "claude-ai-web",
+            "codex-local",
+            "gemini-local",
+            "openai-org",
+            "windsurf-enterprise",
+            "copilot-metrics",
+        ]
+        return cumulativeModels.contains(model)
+    }
+
+    private func fetchAnthropicUsageWithRetry(
+        client: AnthropicAPIClient,
+        accountId: UUID,
+        startDate: Date,
+        endDate: Date,
+        maxAttempts: Int = 4
+    ) async throws -> AnthropicUsageResponse {
+        precondition(maxAttempts >= 1)
+        var attempt = 0
+        while true {
+            try Task.checkCancellation()
+            do {
+                return try await client.fetchUsage(startDate: startDate, endDate: endDate)
+            } catch APIError.rateLimited(let retryAfter) where attempt < maxAttempts - 1 {
+                let delay = Self.jitteredBackoffDelayNanos(attempt: attempt, retryAfterSeconds: retryAfter)
+                log.warning("Anthropic rate-limited for \(accountId.uuidString), retrying in \(Double(delay) / 1_000_000_000, format: .fixed(precision: 2))s")
+                try await Task.sleep(nanoseconds: delay)
+                attempt += 1
+            } catch APIError.serverError(let code) where (500...599).contains(code) && attempt < maxAttempts - 1 {
+                let delay = Self.jitteredBackoffDelayNanos(attempt: attempt, retryAfterSeconds: nil)
+                log.warning("Anthropic 5xx (\(code)) for \(accountId.uuidString), retrying in \(Double(delay) / 1_000_000_000, format: .fixed(precision: 2))s")
+                try await Task.sleep(nanoseconds: delay)
+                attempt += 1
+            } catch {
+                throw error
+            }
+        }
+    }
+
+    private func fetchAnthropicUsageChunked(
+        client: AnthropicAPIClient,
+        accountId: UUID,
+        startDate: Date,
+        endDate: Date
+    ) async throws -> AnthropicUsageResponse {
+        let maxChunkDays = 7
+        let calendar = Calendar.current
+        var chunkStart = startDate
+        var mergedData: [AnthropicUsagePeriod] = []
+        while chunkStart < endDate {
+            let next = calendar.date(byAdding: .day, value: maxChunkDays, to: chunkStart) ?? endDate
+            let chunkEnd = min(next, endDate)
+            let response = try await fetchAnthropicUsageWithRetry(
+                client: client,
+                accountId: accountId,
+                startDate: chunkStart,
+                endDate: chunkEnd
+            )
+            mergedData.append(contentsOf: response.data)
+            if chunkEnd >= endDate { break }
+            chunkStart = chunkEnd
+            try Task.checkCancellation()
+        }
+        return AnthropicUsageResponse(
+            data: mergedData,
+            has_more: false,
+            first_id: mergedData.first?.start_time,
+            last_id: mergedData.last?.start_time
+        )
+    }
+
+    private static func jitteredBackoffDelayNanos(attempt: Int, retryAfterSeconds: Int?) -> UInt64 {
+        RetryPolicy.delayNanos(
+            attempt: attempt,
+            retryAfterSeconds: retryAfterSeconds,
+            baseDelayNanos: 1_000_000_000,
+            maxExponent: 5,
+            jitterFraction: 0.35
+        )
+    }
+
+    private static func retryAfterDate(fromSeconds retryAfterSeconds: Int?) -> Date {
+        let fallbackSeconds = 60
+        let raw = retryAfterSeconds ?? fallbackSeconds
+        let clamped = max(1, min(raw, 3600))
+        return Date().addingTimeInterval(TimeInterval(clamped))
+    }
+
+    private func scheduleDebouncedLogRefresh(delayNanos: UInt64 = 400_000_000) async {
+        await MainActor.run {
+            self.logChangeDebounceTask?.cancel()
+            self.logChangeDebounceTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: delayNanos)
+                guard !Task.isCancelled, let self else { return }
+                await self.pollOnce()
+                await MainActor.run { self.logChangeDebounceTask = nil }
+            }
+        }
+    }
+
+    private func consumePendingLogRefresh() async -> Bool {
+        await MainActor.run {
+            let pending = self.pendingLogRefresh
+            self.pendingLogRefresh = false
+            return pending
+        }
+    }
+
+    private func loadPollDurationSamplesIfNeeded() async {
+        await MainActor.run {
+            guard self.pollDurationSamplesSeconds.isEmpty else { return }
+            let stored = UserDefaults.standard.array(forKey: self.pollDurationSamplesKey) as? [Double] ?? []
+            self.pollDurationSamplesSeconds = stored
+            self.recomputePollDurationPercentiles()
+        }
+    }
+
+    @MainActor
+    private func loadPollSkipCountsIfNeeded() {
+        guard !pollSkipCountsLoaded else { return }
+        let raw = UserDefaults.standard.dictionary(forKey: pollSkipCountsByReasonKey) ?? [:]
+        pollSkipCountsByReason = raw.reduce(into: [:]) { partialResult, entry in
+            if let value = entry.value as? Int {
+                partialResult[entry.key] = value
+            } else if let number = entry.value as? NSNumber {
+                partialResult[entry.key] = number.intValue
+            }
+        }
+        pollSkipCountsLoaded = true
+    }
+
+    private func recordPollSkip(_ reason: PollSkipReason) async {
+        await MainActor.run {
+            self.loadPollSkipCountsIfNeeded()
+            self.pollSkipCountsByReason[reason.rawValue, default: 0] += 1
+            UserDefaults.standard.set(self.pollSkipCountsByReason, forKey: self.pollSkipCountsByReasonKey)
+        }
+    }
+
+    @MainActor
+    func pollSkipTotalsOrdered() -> [(PollSkipReason, Int)] {
+        loadPollSkipCountsIfNeeded()
+        return PollSkipReason.allCases.map { reason in
+            (reason, pollSkipCountsByReason[reason.rawValue, default: 0])
+        }
+    }
+
+    private func recordPollDuration(seconds: Double) async {
+        await MainActor.run {
+            self.pollDurationSamplesSeconds.append(max(0, seconds))
+            if self.pollDurationSamplesSeconds.count > self.pollDurationMaxSamples {
+                self.pollDurationSamplesSeconds.removeFirst(self.pollDurationSamplesSeconds.count - self.pollDurationMaxSamples)
+            }
+            UserDefaults.standard.set(self.pollDurationSamplesSeconds, forKey: self.pollDurationSamplesKey)
+            self.recomputePollDurationPercentiles()
+        }
+    }
+
+    @MainActor
+    private func recomputePollDurationPercentiles() {
+        guard !pollDurationSamplesSeconds.isEmpty else {
+            pollDurationP50Ms = 0
+            pollDurationP90Ms = 0
+            return
+        }
+        let sorted = pollDurationSamplesSeconds.sorted()
+        let p50 = percentile(sortedValues: sorted, percentile: 0.50)
+        let p90 = percentile(sortedValues: sorted, percentile: 0.90)
+        pollDurationP50Ms = Int((p50 * 1000).rounded())
+        pollDurationP90Ms = Int((p90 * 1000).rounded())
+    }
+
+    private func percentile(sortedValues: [Double], percentile: Double) -> Double {
+        guard !sortedValues.isEmpty else { return 0 }
+        let clamped = min(max(percentile, 0), 1)
+        let index = Int((Double(sortedValues.count - 1) * clamped).rounded())
+        return sortedValues[index]
+    }
+
+    private func appendSnapshotIfChanged(_ snapshot: UsageSnapshot, accountType: AccountType) async {
+        guard shouldShortCircuitUnchangedCumulativeWrites(for: accountType) else {
+            await CacheManager.shared.appendAsync(snapshot)
+            return
+        }
+        guard !(await isUnchangedCumulativeSnapshot(snapshot)) else { return }
+        await CacheManager.shared.appendAsync(snapshot)
+    }
+
+    private func shouldShortCircuitUnchangedCumulativeWrites(for accountType: AccountType) -> Bool {
+        switch accountType {
+        case .claudeCode, .codex, .gemini, .openAIOrg, .windsurfEnterprise, .githubCopilot, .claudeAI:
+            return true
+        case .anthropicAPI:
+            return false
+        }
+    }
+
+    private func isUnchangedCumulativeSnapshot(_ snapshot: UsageSnapshot) async -> Bool {
+        guard let latest = await CacheManager.shared.latestAsync(forAccount: snapshot.accountId) else {
+            return false
+        }
+        guard Calendar.current.isDate(latest.timestamp, inSameDayAs: snapshot.timestamp) else {
+            return false
+        }
+        return latest.inputTokens == snapshot.inputTokens
+            && latest.outputTokens == snapshot.outputTokens
+            && latest.cacheCreationTokens == snapshot.cacheCreationTokens
+            && latest.cacheReadTokens == snapshot.cacheReadTokens
+            && abs(latest.totalCostUSD - snapshot.totalCostUSD) < 0.000_001
+    }
+
+    private func accountPollJitterNanos(accountId: UUID, activeAccountCount: Int) -> UInt64 {
+        guard activeAccountCount > 1 else { return 0 }
+        let hash = accountId.uuidString.utf8.reduce(UInt64(0)) { ($0 &* 33) &+ UInt64($1) }
+        let jitterMillis = hash % 350
+        return jitterMillis * 1_000_000
+    }
+
+    private static func isLocalLogProvider(_ accountType: AccountType) -> Bool {
+        switch accountType {
+        case .claudeCode, .codex, .gemini:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func localQuietPollCadenceSeconds(basePollIntervalSeconds: Int) -> TimeInterval {
+        max(
+            TimeInterval(basePollIntervalSeconds * quietLocalPollMultiplier),
+            quietLocalPollMinSeconds
+        )
+    }
+
+    private func selectAccountsForPolling(_ activeAccounts: [Account], pollIntervalSeconds: Int, providerPolling: ProviderPollingConfig, now: Date = Date()) async -> [Account] {
+        await MainActor.run {
+            let activeIds = Set(activeAccounts.map(\.id))
+            self.lastPolledAtByAccount = self.lastPolledAtByAccount.filter { activeIds.contains($0.key) }
+
+            let hasRecentLocalActivity = self.lastLocalLogEventAt.map {
+                now.timeIntervalSince($0) <= self.localActivityBurstWindowSeconds
+            } ?? false
+
+            var selected: [Account] = []
+            selected.reserveCapacity(activeAccounts.count)
+
+            for account in activeAccounts {
+                let providerInterval = providerPolling.interval(for: account.type)
+                if Self.isLocalLogProvider(account.type) {
+                    let quietCadence = self.localQuietPollCadenceSeconds(basePollIntervalSeconds: providerInterval)
+                    if hasRecentLocalActivity {
+                        self.lastPolledAtByAccount[account.id] = now
+                        selected.append(account)
+                        continue
+                    }
+                    if let lastPolled = self.lastPolledAtByAccount[account.id],
+                       now.timeIntervalSince(lastPolled) < quietCadence {
+                        continue
+                    }
+                } else {
+                    if let lastPolled = self.lastPolledAtByAccount[account.id],
+                       now.timeIntervalSince(lastPolled) < TimeInterval(providerInterval) {
+                        continue
+                    }
+                }
+                self.lastPolledAtByAccount[account.id] = now
+                selected.append(account)
+            }
+            return selected
+        }
+    }
+
+    private func setFetchError(_ message: String, for accountId: UUID, accountType: AccountType? = nil) async {
+        await recordFetchOutcome(success: false, for: accountId)
+        if let accountType {
+            await markSnapshotStaleIfTTLAllows(accountId: accountId, accountType: accountType)
+        }
+        let shouldDisable = await MainActor.run {
+            let newFailureCount = (self.consecutiveFetchFailuresByAccount[accountId] ?? 0) + 1
+            self.consecutiveFetchFailuresByAccount[accountId] = newFailureCount
+            self.fetchErrorsByAccount[accountId] = message
+            self.fetchErrorUpdatedAtByAccount[accountId] = Date()
+            self.refreshLastFetchErrorSummary()
+            return newFailureCount >= self.failureDisableThreshold
+        }
+        if shouldDisable {
+            await disableAccountAfterRepeatedFailures(accountId: accountId)
+        }
+    }
+
+    private func staleTTLSeconds(for accountType: AccountType) -> TimeInterval {
+        switch accountType {
+        case .anthropicAPI, .openAIOrg, .windsurfEnterprise, .githubCopilot:
+            return 900
+        case .claudeAI:
+            return 300
+        case .claudeCode, .codex, .gemini:
+            return 120
+        }
+    }
+
+    private func markSnapshotStaleIfTTLAllows(accountId: UUID, accountType: AccountType) async {
+        guard var latest = await CacheManager.shared.latestAsync(forAccount: accountId) else { return }
+        let ttl = staleTTLSeconds(for: accountType)
+        let age = Date().timeIntervalSince(latest.timestamp)
+        if latest.isStale && age < ttl { return }
+        latest.isStale = true
+        latest.timestamp = Date()
+        await CacheManager.shared.appendAsync(latest)
+    }
+
+    private func clearFetchError(for accountId: UUID) async {
+        await recordFetchOutcome(success: true, for: accountId)
+        await CacheManager.shared.saveLastSuccessAsync(Date(), forAccount: accountId)
+        await MainActor.run {
+            self.fetchErrorsByAccount.removeValue(forKey: accountId)
+            self.fetchErrorUpdatedAtByAccount.removeValue(forKey: accountId)
+            self.consecutiveFetchFailuresByAccount.removeValue(forKey: accountId)
+            self.circuitBreakerFailureCountByAccount.removeValue(forKey: accountId)
+            self.circuitBreakerOpenUntilByAccount.removeValue(forKey: accountId)
+            self.refreshLastFetchErrorSummary()
+        }
+    }
+
+    private func recordFetchOutcome(success: Bool, for accountId: UUID) async {
+        await MainActor.run {
+            var outcomes = self.recentFetchOutcomesByAccount[accountId] ?? []
+            outcomes.append(success)
+            if outcomes.count > self.healthWindowSize {
+                outcomes.removeFirst(outcomes.count - self.healthWindowSize)
+            }
+            self.recentFetchOutcomesByAccount[accountId] = outcomes
+        }
+    }
+
+    @MainActor
+    func providerHealthScore(for accountId: UUID) -> Double? {
+        guard let outcomes = recentFetchOutcomesByAccount[accountId], !outcomes.isEmpty else { return nil }
+        let successCount = outcomes.filter { $0 }.count
+        return Double(successCount) / Double(outcomes.count)
+    }
+
+    @MainActor
+    func fetchErrorMessage(for accountId: UUID) -> String? {
+        fetchErrorsByAccount[accountId]
+    }
+
+    @MainActor
+    func fetchErrorUpdatedAt(for accountId: UUID) -> Date? {
+        fetchErrorUpdatedAtByAccount[accountId]
+    }
+
+    private func isCircuitBreakerOpen(for accountId: UUID, accountType: AccountType) async -> Bool {
+        guard isCircuitBreakerEnabled(for: accountType) else { return false }
+        return await MainActor.run {
+            guard let until = self.circuitBreakerOpenUntilByAccount[accountId] else { return false }
+            if until <= Date() {
+                self.circuitBreakerOpenUntilByAccount.removeValue(forKey: accountId)
+                self.circuitBreakerFailureCountByAccount.removeValue(forKey: accountId)
+                return false
+            }
+            return true
+        }
+    }
+
+    private func registerCircuitBreakerFailure(for accountId: UUID, accountType: AccountType) async {
+        guard isCircuitBreakerEnabled(for: accountType) else { return }
+        let opened = await MainActor.run {
+            let next = (self.circuitBreakerFailureCountByAccount[accountId] ?? 0) + 1
+            self.circuitBreakerFailureCountByAccount[accountId] = next
+            if next >= self.circuitBreakerThreshold {
+                let jitter = Double.random(in: 0...0.3) * self.circuitBreakerDurationSeconds // up to 30% jitter
+                self.circuitBreakerOpenUntilByAccount[accountId] = Date().addingTimeInterval(self.circuitBreakerDurationSeconds + jitter)
+                self.circuitBreakerFailureCountByAccount[accountId] = 0
+                return true
+            }
+            return false
+        }
+        if opened {
+            ErrorLogger.shared.log(
+                "Opened circuit breaker for account \(accountId.uuidString) after \(circuitBreakerThreshold) failures",
+                level: "WARN"
+            )
+        }
+    }
+
+    private func isCircuitBreakerEnabled(for accountType: AccountType) -> Bool {
+        switch accountType {
+        case .anthropicAPI, .openAIOrg, .windsurfEnterprise, .githubCopilot, .claudeAI:
+            return true
+        default:
+            return false
+        }
+    }
+
+    @MainActor
+    private func triggerImmediateRecoveryPollIfNeeded() async {
+        let now = Date()
+        if let last = lastNetworkRecoveryPollAt, now.timeIntervalSince(last) < 10 {
+            await recordPollSkip(.recoveryPollCooldown)
+            return
+        }
+        lastNetworkRecoveryPollAt = now
+        Task { await self.pollOnce() }
+    }
+
+    private func shouldEmitClaudeAISessionExpiredNotification(for accountId: UUID) async -> Bool {
+        await MainActor.run {
+            let now = Date()
+            if let previous = self.lastClaudeAISessionExpiredNoticeAtByAccount[accountId],
+               now.timeIntervalSince(previous) < self.claudeAISessionExpiredNoticeCooldownSeconds {
+                return false
+            }
+            self.lastClaudeAISessionExpiredNoticeAtByAccount[accountId] = now
+            return true
+        }
+    }
+
+    private func disableAccountAfterRepeatedFailures(accountId: UUID) async {
+        var config = ConfigManager.shared.load()
+        guard let index = config.accounts.firstIndex(where: { $0.id == accountId && $0.isActive }) else { return }
+        config.accounts[index].isActive = false
+        if case .failure(let error) = ConfigManager.shared.save(config) {
+            ErrorLogger.shared.log("Failed to persist auto-disabled account state: \(error)")
+            return
+        }
+        let message = "Auto-disabled account \(accountId.uuidString) after \(failureDisableThreshold) consecutive fetch failures; re-enable manually in Settings."
+        ErrorLogger.shared.log(message, level: "WARN")
+        await MainActor.run {
+            self.fetchErrorsByAccount[accountId] = message
+            self.fetchErrorUpdatedAtByAccount[accountId] = Date()
+            self.refreshLastFetchErrorSummary()
+        }
+    }
+
+    @MainActor
+    private func refreshLastFetchErrorSummary() {
+        guard let latestAccountId = fetchErrorUpdatedAtByAccount.max(by: { $0.value < $1.value })?.key else {
+            lastFetchError = nil
+            return
+        }
+        lastFetchError = fetchErrorsByAccount[latestAccountId]
+    }
+
+    private func describeClaudeAIError(_ error: ClaudeAIError) -> String {
+        switch error {
+        case .unauthorized:
+            return "session unauthorized"
+        case .forbidden:
+            return "session forbidden"
+        case .invalidResponse:
+            return "invalid response"
+        case .networkError(let underlying):
+            return "network error: \(underlying.localizedDescription)"
+        }
+    }
+}
+
+extension Notification.Name {
+    static let usageDidUpdate = Notification.Name("UsageDidUpdate")
+    static let claudeAISessionExpired = Notification.Name("ClaudeAISessionExpired")
+}

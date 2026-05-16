@@ -2,55 +2,42 @@
 import PackageDescription
 
 let package = Package(
-    name: "Onibi",
-    platforms: [
-        .macOS(.v14)
-    ],
+    name: "SageBar",
+    platforms: [.macOS(.v13)],
     products: [
-        .library(name: "OnibiCore", targets: ["OnibiCore"]),
-        .executable(name: "Onibi", targets: ["Onibi"]),
-        .executable(name: "OnibiSessionProxy", targets: ["OnibiSessionProxy"])
+        .executable(name: "SageBar", targets: ["SageBar"]),
+        .executable(name: "SageBarWidget", targets: ["SageBarWidget"]),
     ],
     dependencies: [
+        .package(url: "https://github.com/LebJe/TOMLKit.git", from: "0.5.0"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.0.0"),
     ],
     targets: [
-        .target(
-            name: "OnibiCore",
-            dependencies: [],
-            path: "OnibiCore"
-        ),
         .executableTarget(
-            name: "Onibi",
-            dependencies: ["OnibiCore"],
-            path: "Onibi",
-            exclude: [
-                "Info.plist",
-                "Assets.xcassets",
-                "Onibi.entitlements"
+            name: "SageBar",
+            dependencies: [
+                "TOMLKit",
+                .product(name: "Sparkle", package: "Sparkle"),
             ],
+            path: "Sources/ClaudeUsage",
+            exclude: ["Resources/Info.plist"],
             resources: [
-                .copy("Resources/OnibiWeb")
+                .process("Resources"),
+                .copy("Scriptable/ClaudeUsage.sdef"),
             ]
         ),
         .executableTarget(
-            name: "OnibiSessionProxy",
-            dependencies: ["OnibiCore"],
-            path: "OnibiSessionProxy"
+            name: "SageBarWidget",
+            path: "Sources/SageBarWidget",
+            exclude: ["Info.plist"]
         ),
         .testTarget(
-            name: "OnibiTests",
-            dependencies: ["Onibi", "OnibiCore"],
-            path: "OnibiTests"
+            name: "SageBarTests",
+            dependencies: [
+                "SageBar",
+                "TOMLKit",
+            ],
+            path: "Tests/ClaudeUsageTests"
         ),
-        .testTarget(
-            name: "OnibiCoreTests",
-            dependencies: ["OnibiCore"],
-            path: "OnibiCoreTests"
-        ),
-        .testTarget(
-            name: "OnibiSessionProxyTests",
-            dependencies: ["OnibiSessionProxy", "OnibiCore"],
-            path: "OnibiSessionProxyTests"
-        )
     ]
 )

@@ -1,209 +1,177 @@
-name: Onibi CI/CD and .DMG release on push
+name: Sage Bar CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
 
 jobs:
   build-and-test:
-    name: Build and Test
-    runs-on: macos-14
     strategy:
       matrix:
-        xcode-version: ["15.0", "15.4"]
-
+        os: [macos-14]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
         with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: OnibiWeb/package-lock.json
+          fetch-depth: 0
 
-      - name: Install Web Dependencies
-        run: npm --prefix OnibiWeb ci
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
 
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - name: Cache Homebrew downloads
+        uses: actions/cache@v4
         with:
-          xcode-version: ${{ matrix.xcode-version }}
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-${{ matrix.os }}-homebrew-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.os }}-homebrew-
 
-      - name: Show Swift version
-        run: swift --version
+      - name: Cache SwiftPM artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            .build
+            ~/.swiftpm/cache
+            ~/.swiftpm/configuration
+          key: ${{ runner.os }}-${{ matrix.os }}-swiftpm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.os }}-swiftpm-
 
       - name: Install SwiftLint
         run: brew install swiftlint
 
-      - name: Run SwiftLint
-        run: swiftlint lint --strict --reporter github-actions-logging
+      - name: Lint changed Swift files
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Build Debug
-        run: swift build -c debug
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
 
-      - name: Run Tests
+          SWIFT_FILES=()
+          while IFS= read -r file; do
+            SWIFT_FILES+=("$file")
+          done < <(./scripts/changed_swift_files.sh "$BASE_SHA" HEAD)
+          if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
+            echo "No changed Swift files to lint."
+            exit 0
+          fi
+
+          LINT_OUTPUT="$(mktemp)"
+          swiftlint lint --strict --quiet --reporter json "${SWIFT_FILES[@]}" > "$LINT_OUTPUT" || true
+          python3 scripts/filter_changed_swift_diagnostics.py \
+            swiftlint-json \
+            --base "$BASE_SHA" \
+            --head HEAD < "$LINT_OUTPUT"
+
+      - name: Install swift-format
+        run: brew install swift-format
+
+      - name: swift-format lint changed Swift files
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE_SHA="${{ github.event.before }}"
+          fi
+
+          SWIFT_FILES=()
+          while IFS= read -r file; do
+            SWIFT_FILES+=("$file")
+          done < <(./scripts/changed_swift_files.sh "$BASE_SHA" HEAD)
+          if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
+            echo "No changed Swift files to format-check."
+            exit 0
+          fi
+
+          FORMAT_OUTPUT="$(mktemp)"
+          swift-format lint "${SWIFT_FILES[@]}" > "$FORMAT_OUTPUT" 2>&1 || true
+          python3 scripts/filter_changed_swift_diagnostics.py \
+            swift-format \
+            --base "$BASE_SHA" \
+            --head HEAD < "$FORMAT_OUTPUT"
+
+      - name: Fail on unstructured try? call-sites
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          CURRENT=$(rg -n "try\\?" Sources/ClaudeUsage --no-heading || true)
+          if [ -z "$CURRENT" ]; then
+            exit 0
+          fi
+
+          CURRENT_LINES=$(printf '%s\n' "$CURRENT" | cut -d: -f1-2 | sort -t: -k1,1 -k2,2n | uniq)
+          ALLOWLIST=$(grep -vE '^\s*(#|$)' .ci/tryq_allowlist.txt | sort -t: -k1,1 -k2,2n | uniq || true)
+          NEW_LINES=$(grep -Fvx -f <(printf '%s\n' "$ALLOWLIST") <(printf '%s\n' "$CURRENT_LINES") || true)
+
+          if [ -z "$NEW_LINES" ]; then
+            exit 0
+          fi
+
+          echo "Detected non-allowlisted try? call-sites:"
+          echo "$NEW_LINES"
+
+          VIOLATIONS=""
+          while IFS=: read -r file line; do
+            [ -z "$file" ] && continue
+            start=$((line - 3))
+            if [ "$start" -lt 1 ]; then start=1; fi
+            end=$((line + 3))
+
+            if ! sed -n "${start},${end}p" "$file" | rg -q "ErrorLogger\\.shared\\.logStructured\\("; then
+              VIOLATIONS+="${file}:${line}\n"
+            fi
+          done <<< "$NEW_LINES"
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "New try? call-sites are missing structured logging context:"
+            printf "%b" "$VIOLATIONS"
+            echo "Add ErrorLogger.shared.logStructured(...) near the try? or add an explicit allowlist entry."
+            exit 1
+          fi
+
+      - name: Validate prices.json
+        run: python3 -c "import json,sys; json.load(open('Sources/ClaudeUsage/Resources/prices.json'))"
+
+      - name: Build app product (release)
+        run: swift build --product SageBar -c release
+
+      - name: Gate Config/Polling compile diagnostics
+        shell: bash
+        run: |
+          set -o pipefail
+          LOG_FILE="$(mktemp)"
+          swift build --product SageBar 2>&1 | tee "$LOG_FILE"
+          if rg -n "Sources/ClaudeUsage/Config/Config.swift:.*(warning|error):|Sources/ClaudeUsage/Services/PollingService.swift:.*(warning|error):" "$LOG_FILE"; then
+            echo "Compile diagnostics found in Config.swift or PollingService.swift."
+            exit 1
+          fi
+
+      - name: Build debug app
+        run: swift build
+
+      - name: Bundle app smoke test
+        if: matrix.os == 'macos-14'
+        run: |
+          ./scripts/bundle_app.sh \
+            --binary .build/debug/SageBar \
+            --resources-bundle .build/debug/SageBar_SageBar.bundle \
+            --sparkle-framework .build/debug/Sparkle.framework \
+            --output "Sage Bar.app" \
+            --codesign-identity -
+          ./scripts/verify_app_bundle.sh --app "Sage Bar.app" --skip-spctl --smoke-launch --launch-wait 8
+
+      - name: Test
         run: swift test
 
-      - name: Run Web Tests
-        run: npm --prefix OnibiWeb test
-
-      - name: Verify Bundled Web Assets Are Synced
-        run: ./scripts/check_web_assets_synced.sh
-
-      - name: Build Release
-        run: swift build -c release
-
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Onibi-${{ matrix.xcode-version }}-${{ github.sha }}
-          path: .build/release/Onibi
-          retention-days: 7
-
-  release:
-    name: Create Release
-    runs-on: macos-14
-    needs: build-and-test
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: npm
-          cache-dependency-path: OnibiWeb/package-lock.json
-
-      - name: Install Web Dependencies
-        run: npm --prefix OnibiWeb ci
-
-      - name: Verify Bundled Web Assets Are Synced
-        run: ./scripts/check_web_assets_synced.sh
-
-      - name: Setup Xcode
-        uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: "15.0"
-
-      - name: Build Release
-        run: swift build -c release
-
-      - name: Create App Bundle
-        run: |
-          # Create app bundle structure
-          mkdir -p Onibi.app/Contents/MacOS
-          mkdir -p Onibi.app/Contents/Resources
-
-          # Copy executable
-          cp .build/release/Onibi Onibi.app/Contents/MacOS/
-
-          # Create Info.plist
-          cat > Onibi.app/Contents/Info.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>CFBundleExecutable</key>
-              <string>Onibi</string>
-              <key>CFBundleIdentifier</key>
-              <string>com.onibi.app</string>
-              <key>CFBundleName</key>
-              <string>Onibi</string>
-              <key>CFBundlePackageType</key>
-              <string>APPL</string>
-              <key>CFBundleShortVersionString</key>
-              <string>1.0.0</string>
-              <key>CFBundleVersion</key>
-              <string>1</string>
-              <key>LSMinimumSystemVersion</key>
-              <string>14.0</string>
-              <key>LSUIElement</key>
-              <true/>
-              <key>NSHighResolutionCapable</key>
-              <true/>
-              <key>NSPrincipalClass</key>
-              <string>NSApplication</string>
-          </dict>
-          </plist>
-          EOF
-
-          # Copy icon if exists
-          if [ -f "asset/icon.icns" ]; then
-            cp asset/icon.icns Onibi.app/Contents/Resources/AppIcon.icns
-          fi
-
-      - name: Create DMG
-        run: |
-          mkdir -p dmg-contents
-          cp -R Onibi.app dmg-contents/
-          hdiutil create -volname "Onibi" -srcfolder dmg-contents -ov -format UDZO Onibi-unsigned.dmg
-
-      - name: Code Sign and Prepare DMG
-        env:
-          DEVELOPER_ID_CERTIFICATE: ${{ secrets.DEVELOPER_ID_CERTIFICATE }}
-          DEVELOPER_ID_CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
-        run: |
-          if [ -n "$DEVELOPER_ID_CERTIFICATE" ]; then
-            echo "Signing DMG with Developer ID certificate..."
-            # Import Developer ID certificate
-            echo "$DEVELOPER_ID_CERTIFICATE" | base64 --decode > certificate.p12
-            security create-keychain -p actions build.keychain
-            security default-keychain -s build.keychain
-            security unlock-keychain -p actions build.keychain
-            security import certificate.p12 -k build.keychain -P "$DEVELOPER_ID_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-            security set-key-partition-list -S apple-tool:,apple: -s -k actions build.keychain
-            
-            # Sign the DMG for Gatekeeper compatibility
-            codesign --force --sign "Developer ID Application" --timestamp Onibi-unsigned.dmg
-            mv Onibi-unsigned.dmg Onibi.dmg
-            
-            # Verify signature
-            codesign --verify --verbose Onibi.dmg
-            
-            # Clean up
-            security delete-keychain build.keychain
-            rm certificate.p12
-          else
-            echo "No Developer ID certificate configured, using unsigned DMG..."
-            mv Onibi-unsigned.dmg Onibi.dmg
-          fi
-
-      - name: Notarize DMG
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-        run: |
-          if [ -n "$APPLE_ID" ] && [ -n "$APPLE_ID_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "Submitting DMG for notarization..."
-            xcrun notarytool submit Onibi.dmg \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_ID_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait
-            
-            # Staple the notarization ticket to the DMG
-            echo "Stapling notarization ticket..."
-            xcrun stapler staple Onibi.dmg
-            
-            # Verify stapling
-            echo "Verifying stapled notarization..."
-            xcrun stapler validate Onibi.dmg
-          else
-            echo "Notarization credentials not configured, skipping notarization..."
-          fi
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: Onibi.dmg
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Test (Thread Sanitizer)
+        if: matrix.os == 'macos-14'
+        run: swift test --sanitize=thread

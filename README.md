@@ -1,13 +1,12 @@
-[![](https://img.shields.io/badge/onibi_1.0.0-passing-light_green)](https://github.com/gongahkia/onibi/releases/tag/1.0.0)
-[![](https://img.shields.io/badge/onibi_2.0.0-passing-green)](https://github.com/gongahkia/onibi/releases/tag/2.0.0)
-![](https://github.com/gongahkia/onibi/actions/workflows/ci.yml/badge.svg)
+[![](https://img.shields.io/badge/sage_bar_v1.0.0-passing-green)](https://github.com/gongahkia/sage-bar/releases/tag/1.0.0)
+![](https://github.com/gongahkia/sage-bar/actions/workflows/ci.yml/badge.svg)
 
-# `Onibi`
+# `Sage Bar`
 
-[macOS menubar app](#macos-menubar-app) to [monitor](#architecture) your [Ghostty](https://ghostty.org/) sessions with a companion web app.
+MacOS [menu bar](https://support.apple.com/en-sg/guide/mac-help/mchlp1446/mac) app for tracking [AI token usage and spend](https://blogs.nvidia.com/blog/ai-tokens-explained/) across [providers](#support).
 
 <div align="center">
-    <img src="./asset/logo/onibi.png" width="25%">
+    <img src="./asset/logo/wizard.png">
 </div>
 
 ## Why?
@@ -16,152 +15,63 @@
 
 ## Stack
 
-* *Scripting*: [Swift](https://www.swift.org/), [SwiftUI](https://developer.apple.com/xcode/swiftui/), [AppKit](https://developer.apple.com/documentation/appkit), [Combine](https://developer.apple.com/documentation/combine), [macOS Notification Center](https://developer.apple.com/documentation/usernotifications), [FSEvents](https://developer.apple.com/documentation/coreservices/file_system_events)
-* *Logging*: [os.log](https://developer.apple.com/documentation/os/logging)
-* *Build*: [SPM](https://www.swift.org/documentation/package-manager/), [Xcode 15](https://developer.apple.com/xcode/)
-* *CI/CD*: [GitHub Actions](https://github.com/features/actions), [SwiftLint](https://github.com/realm/SwiftLint)
-
-## What `Onibi` can do *([currently](https://github.com/gongahkia/onibi/issues))*
-
-* **Command tracking**: Detects command sessions with exit codes
-* **AI response detection**: Pattern-matches Claude Code, Codex, Gemini CLI and other AI assistant output
-* **Task completion alerts**: Notifies on build, test and workflow completions 
-* **Ghostty IPC**: Detects running Ghostty instances, reads config 
-* **Session management**: Tracks multiple Ghostty terminal sessions 
-* **Log rotation**: Automatic truncation and rotation of log files 
-* **Native notifications**: macOS Notification Center with actionable buttons 
-* **False positive reduction**: Confidence scoring and deduplication 
-* **Theme sync**: Syncs popover theme colors from Ghostty config 
+* *Script*: [Swift](https://www.swift.org/), [Swift Package Manager](https://docs.swift.org/package-manager/)
+* *UI*: [SwiftUI](https://developer.apple.com/swiftui/), [Apple AppKit](https://developer.apple.com/documentation/appkit), [NSStatusItem](https://developer.apple.com/documentation/appkit/nsstatusitem), [NSPopover](https://developer.apple.com/documentation/appkit/nspopover)
+* *Configuration*: [TOMLKit](https://github.com/LebJe/TOMLKit)
+* *Package*: [Sparkle](https://sparkle-project.org/), [Homebrew](https://brew.sh/)
+* *CI/CD*: [GitHub Actions](https://github.com/features/actions)
 
 ## Screenshots
 
-### macOS menubar app
-
 <div align="center">
-    <img src="./asset/reference/2.png" width="30%">
-    <img src="./asset/reference/12.png" width="30%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/3.png" width="32%">
-    <img src="./asset/reference/4.png" width="32%">
-    <img src="./asset/reference/5.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/6.png" width="32%">
-    <img src="./asset/reference/7.png" width="32%">
-    <img src="./asset/reference/8.png" width="32%">
-</div>
-
-<div align="center">
-    <img src="./asset/reference/11.png" width="32%">
-    <img src="./asset/reference/9.png" width="32%">
-    <img src="./asset/reference/10.png" width="32%">
+    <img src="./asset/reference/1.png" width="40%">
+    <img src="./asset/reference/2.png" width="59%">
 </div>
 
 ## Usage
 
-1. Clone the repo and build from source.
+Below are instructions for locally downloading and using `Sage Bar`.
+
+1. First run the below to [install](./docs/INSTALL.md) `Sage Bar`'s source code.'
 
 ```console
-$ git clone https://github.com/gongahkia/onibi && cd onibi
-$ swift build
-$ swift test
-$ ./.build/debug/Onibi
+$ git clone https://github.com/gongahkia/sage-bar && cd sage-bar
 ```
 
-If you are changing the web remote-control UI, rebuild and bundle the web assets before building/running the host:
+2. Alternatively download `Sage Bar`'s latest release from [GitHub Releases](https://github.com/gongahkia/sage-bar/releases).
+
+3. Optionally execute the below commands to invoke `Sage Bar`'s core build functionality. 
 
 ```console
-$ ./scripts/sync_web_assets.sh
-```
+$ swift run SageBar # run immediately
+$ make run # alternative run command
 
-2. Or open in [Xcode](https://developer.apple.com/xcode/).
+$ swift build # build the app
+$ swift test # run the test suite
+$ make bundle # create a local .app bundle
 
-Open the package directly in Xcode and choose a run target from the package schemes.
-
-3. Install shell hooks for your terminal.
-
-Install automatically from CLI:
-
-```console
-$ ./scripts/install_shell_hooks.sh --shell zsh
-```
-
-Install with remote-control bootstrap + logging hooks:
-
-```console
-$ ./scripts/install_shell_hooks.sh --shell zsh --remote-control
-```
-
-Or with `make`:
-
-```console
-$ make install-hooks
-$ make install-hooks-remote
-```
-
-You can also install/update hooks in-app at `Settings -> General -> Shell Integration`.
-
-Manual fallback for `~/.zshrc`:
-
-```zsh
-# onibi integration
-_onibi_preexec() {
-    echo "$(date -Iseconds)|CMD_START|$$|$1" >> ~/.config/onibi/terminal.log
-}
-_onibi_precmd() {
-    local exit_code=$?
-    echo "$(date -Iseconds)|CMD_END|$$|$exit_code" >> ~/.config/onibi/terminal.log
-}
-autoload -Uz add-zsh-hook
-add-zsh-hook preexec _onibi_preexec
-add-zsh-hook precmd _onibi_precmd
-```
-
-## Deployment (mobile web UI)
-
-The web UI is a React+Vite SPA (`OnibiWeb/`). It connects to a gateway (`MobileGatewayService`) that the macOS app exposes over HTTP + WebSocket. Three deployment modes:
-
-| Mode | Reachable from | HTTPS | Stable URL | Setup |
-| --- | --- | --- | --- | --- |
-| **LAN** | Same Wi-Fi | ❌ | IP-dependent | Zero |
-| **Cloudflare Quick Tunnel** | Anywhere | ✅ | ❌ (rotates) | One-click in-app (`brew install cloudflared`) |
-| **Tailscale Funnel** | Anywhere | ✅ | ✅ | One-time tailnet ACL setup |
-
-Full setup and trade-offs: [docs/deployment-modes.md](./docs/deployment-modes.md). Per-mode deep-dives: [LAN](./docs/deployment-lan.md), [tunnel](./docs/deployment-tunnel.md).
-
-All three share the same pairing flow: enable the gateway in Settings → Mobile Access, rotate a token, and paste the Base URL + token on the phone (or scan the QR / import the `onibi://` deep link).
-
-Relevant settings (Onibi → Settings → Mobile Access):
-
-- **Network Binding** — Loopback / LAN / All interfaces. Default Loopback is safest.
-- **Tunnel (optional) → Public URL** — paste your `cloudflared` / `ngrok` / Tailscale URL here. It will be included in the pairing QR.
-- **Pairing** — rotate tokens, show QR, copy deep link.
-
-Security and troubleshooting:
-
-- [docs/security.md](./docs/security.md) — threat model, auth caveats, hardening tips.
-- [docs/troubleshooting.md](./docs/troubleshooting.md) — common errors, log channels, debug drawer.
-
-Smoke test the remote-control path from terminal:
-
-```console
-$ export ONIBI_PAIRING_TOKEN='<token>'
-$ make smoke-mobile-access
+$ make verify-bundle # smoke-test the bundled app locally
+$ make archive-release #create a release-style local archive
 ```
 
 ## Architecture
 
-<div align="center">
-    <img src="./asset/reference/architecture.png">
-</div>
+![](./asset/reference/architecture.png)
 
-## Reference
+## Support
 
-The name `Onibi` is in reference to the Japanese word [*鬼火*](https://en.wikipedia.org/wiki/Onibi), meaning *demon fire* or *ghost light*.
+`Sage Bar` currently supports the following [local](#local-providers) and [remote](#remote-providers) AI providers.
 
-<div align="center">
-    <img src="./asset/logo/onibi.jpg" width="70%">
-</div>
+### Remote providers
+
+* [Anthropic API](https://docs.anthropic.com/en/api/data-usage-cost-api)
+* [OpenAI organization usage](https://help.openai.com/en/articles/10478918-api-usage-dashboard)
+* [GitHub Copilot organization metrics](https://docs.github.com/en/rest/copilot/copilot-usage)
+* [Windsurf Enterprise analytics](https://docs.windsurf.com/plugins/accounts/api-reference/analytics-api-introduction)
+* [Claude AI session-based usage](https://www.anthropic.com/claude)
+
+### Local providers
+
+* [Claude Code local session logs](https://docs.anthropic.com/en/docs/claude-code/overview)
+* [Codex local session logs](https://developers.openai.com/codex/)
+* [Gemini CLI local session logs](https://github.com/google-gemini/gemini-cli)

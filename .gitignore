@@ -1,76 +1,11 @@
-# Xcode
-*.xcodeproj/*
-!*.xcodeproj/project.pbxproj
-!*.xcodeproj/xcshareddata/
-!*.xcworkspace/contents.xcworkspacedata
-/*.gcno
-**/xcshareddata/WorkspaceSettings.xcsettings
-
-# Build generated
-build/
-DerivedData/
-dist/
-
-# Various settings
-*.pbxuser
-!default.pbxuser
-*.mode1v3
-!default.mode1v3
-*.mode2v3
-!default.mode2v3
-*.perspectivev3
-!default.perspectivev3
-xcuserdata/
-
-# Other
-*.moved-aside
-*.xcuserstate
-*.xcscmblueprint
-
-# Swift Package Manager
 .build/
-Packages/
-Package.pins
 Package.resolved
-*.xcodeproj
-.swiftpm/
-
-# CocoaPods
-Pods/
-*.xcworkspace
-
-# Carthage
-Carthage/Build/
-
-# Accio
-Dependencies/
-.accio/
-
-# fastlane
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/screenshots/**/*.png
-fastlane/test_output
-
-# Code Injection
-iOSInjectionProject/
-
-# macOS
-.DS_Store
-.AppleDouble
-.LSOverride
-._*
-
-*.log
-
-# OnibiWeb
-OnibiWeb/node_modules/
-OnibiWeb/dist/
-OnibiWeb/*.tsbuildinfo
-OnibiWeb/vite.config.js
-OnibiWeb/vite.config.d.ts
-
-CLAUDE.md
-AGENTS.md
-
-.codex
+ClaudeUsage-universal
+claude-usage-universal
+claude-usage-arm64
+claude-usage-x86_64
+ClaudeUsage-*.dmg
+sparkle_tools.zip
+sparkle_bin/
+docs/appcast.xml
+Sage Bar.app/

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE dictionary SYSTEM "file://localhost/System/Library/DTDs/sdef.dtd">
+<dictionary title="Sage Bar Suite">
+    <suite name="Sage Bar Suite" code="CLUH" description="Sage Bar usage data access">
+        <class name="usage record" code="CUSR" description="Daily usage record" plural="usage records">
+            <property name="account name" code="acnm" type="text" access="r" description="Account name"/>
+            <property name="input tokens" code="intf" type="integer" access="r" description="Input tokens today"/>
+            <property name="output tokens" code="outf" type="integer" access="r" description="Output tokens today"/>
+            <property name="cost usd" code="cosd" type="real" access="r" description="Cost today in USD"/>
+            <property name="last updated" code="lupd" type="date" access="r" description="Last update timestamp"/>
+        </class>
+        <command name="get today usage" code="CLUHgtus" description="Get today's usage for all active accounts">
+            <cocoa class="GetTodayUsageScriptCommand"/>
+            <result type="usage record" description="List of usage records"/>
+        </command>
+        <command name="get forecast" code="CLUHgfct" description="Get spend forecast">
+            <cocoa class="GetForecastScriptCommand"/>
+            <parameter name="account" code="acct" type="text" optional="yes" description="Account UUID or display name"/>
+            <result type="text" description="Forecast summary"/>
+        </command>
+        <command name="refresh" code="CLUHrefr" description="Force refresh usage data">
+            <cocoa class="RefreshScriptCommand"/>
+        </command>
+        <command name="get current usage" code="CLUHgcus" description="Get current usage for the active account">
+            <cocoa class="GetCurrentUsageScriptCommand"/>
+            <parameter name="account" code="acct" type="text" optional="yes" description="Account UUID or display name"/>
+            <result type="record" description="Record with accountName (text), totalInputTokens (integer), totalOutputTokens (integer), totalCostUSD (real)"/>
+        </command>
+        <command name="trigger poll" code="CLUHtpol" description="Trigger an immediate poll for all active accounts">
+            <cocoa class="TriggerPollScriptCommand"/>
+            <result type="boolean" description="True if poll completed without error"/>
+        </command>
+        <command name="get usage summary" code="CLUHgsum" description="Get a shareable usage summary">
+            <cocoa class="GetUsageSummaryScriptCommand"/>
+            <parameter name="account" code="acct" type="text" optional="yes" description="Account UUID or display name"/>
+            <result type="text" description="Formatted usage summary"/>
+        </command>
+        <command name="get diagnostics snapshot" code="CLUHgdia" description="Get runtime diagnostics as JSON">
+            <cocoa class="GetDiagnosticsSnapshotScriptCommand"/>
+            <result type="text" description="Machine-readable diagnostics JSON payload"/>
+        </command>
+    </suite>
+</dictionary>

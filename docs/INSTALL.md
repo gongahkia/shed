@@ -1,113 +1,86 @@
-# Install and troubleshoot Shed
+# Install Sage Bar
 
-This document covers the artifacts produced by the platform packaging scripts and the portable Java archive.
+This guide covers the supported ways to install, update, run, and fully reset Sage Bar on macOS.
 
-| Target | Artifact | Runtime policy | Verification |
-| :--- | :--- | :--- | :--- |
-| macOS arm64 | `Shed-<version>-macos-arm64.dmg` | Bundled Java 21 runtime | `shasum -a 256 -c Shed-<version>-macos-arm64.dmg.sha256` |
-| Windows x64 | `Shed-<version>-windows-x64.msi` | Bundled Java 21 runtime | `Get-FileHash` against the supplied `.msi.sha256` value |
-| Debian-family Linux x64 | `Shed-<version>-linux-x64.deb` | Bundled Java 21 runtime | `sha256sum -c Shed-<version>-linux-x64.deb.sha256` |
-| Java archive | `shed-<version>.jar` | Install a Java 21 runtime separately | Inspect the release source and CI artifact provenance |
+## Preferred: Install the Release App
 
-Each platform packaging script validates its bundled runtime and main JAR. CI builds and tests the portable JAR on Linux, Windows, and macOS. RPM, Linux arm64, macOS x64, and Windows arm64 installers are not produced.
+1. Open [GitHub Releases](https://github.com/gongahkia/sage-bar/releases).
+2. Download the latest `Sage-Bar-vX.Y.Z.zip`.
+3. Unzip the archive.
+4. Move `Sage Bar.app` into `/Applications`.
+5. Open `Sage Bar.app`.
 
-## Verify before installation
+If Gatekeeper warns on first launch:
+- Control-click `Sage Bar.app`.
+- Choose `Open`.
+- Confirm once.
 
-Get the installer and its checksum file from the same identified release. A checksum detects a changed installer only if its expected value is obtained independently and has not been changed with it. Current development artifacts are not publicly signed; see [release verification](RELEASE_VERIFICATION.md) before treating an artifact as a public release.
+## Run From Source
 
-```console
-$ shasum -a 256 -c Shed-<version>-macos-arm64.dmg.sha256
-$ sha256sum -c Shed-<version>-linux-x64.deb.sha256
+From the repository root:
+
+```bash
+swift run SageBar
 ```
 
-```powershell
-PS> $expected = (Get-Content .\Shed-<version>-windows-x64.msi.sha256).Split()[0]
-PS> (Get-FileHash -Algorithm SHA256 .\Shed-<version>-windows-x64.msi).Hash.ToLower() -eq $expected
+For a local app bundle:
+
+```bash
+make bundle
+open "Sage Bar.app"
 ```
 
-If a release provides an aggregate `SHA256SUMS` file, verify it with:
+For a bundle smoke test:
 
-```console
-$ sha256sum -c SHA256SUMS
+```bash
+make verify-bundle
 ```
 
-## macOS arm64
+## Update an Existing Install
 
-After the checksum passes, open the DMG and copy `Shed.app` to Applications. The DMG includes a Java 21 runtime; do not install a separate JRE for this installer. Current development builds are ad-hoc signed and not notarized, so macOS may show trust warnings. Do not bypass a warning without independently confirming the artifact origin and checksum.
+Release app update:
+1. Quit Sage Bar.
+2. Download the latest release zip.
+3. Replace the existing `Sage Bar.app` in `/Applications`.
+4. Re-open the app.
 
-For local packaging, use a macOS arm64 host with JDK 21:
+Local development update:
+1. Pull the latest source.
+2. Re-run `make bundle`.
+3. Replace the old local `Sage Bar.app`.
 
-```console
-$ bash scripts/package-macos.sh
+## Remove Sage Bar Completely
+
+Delete the app:
+
+```bash
+rm -rf "/Applications/Sage Bar.app"
 ```
 
-See [macOS packaging](MACOS_PACKAGING.md) for exact local output and public signing/notarization gaps.
+Remove config, cache, and logs kept under compatibility paths:
 
-## Windows x64
-
-After the checksum comparison returns `True`, run the MSI from Explorer or:
-
-```powershell
-PS> Start-Process msiexec.exe -ArgumentList @('/i', '.\Shed-<version>-windows-x64.msi') -Wait
+```bash
+rm -rf ~/.config/claude-usage
+rm -rf ~/.claude-usage
+rm -rf ~/Library/Group\ Containers/group.dev.claudeusage
+rm -f ~/Library/Preferences/dev.claudeusage.ClaudeUsage.plist
 ```
 
-The MSI includes Java 21. Current development builds are `NotSigned`; SmartScreen or other Windows trust warnings are expected. Stop and verify provenance rather than treating an unsigned artifact as publisher-authenticated.
+Optional: remove stored credentials from Keychain Access:
+- `claude-usage`
+- `claude-usage-session-token`
 
-For local packaging, use Windows x64 with JDK 21 and the WiX tooling required by `jpackage`:
+## Where Sage Bar Stores Data
 
-```powershell
-PS> .\scripts\package-windows.ps1
-```
+- Config: `~/.config/claude-usage`
+- Logs and local app data: `~/.claude-usage`
+- Shared app-group container: `~/Library/Group Containers/group.dev.claudeusage`
+- Preferences plist: `~/Library/Preferences/dev.claudeusage.ClaudeUsage.plist`
 
-See [Windows packaging](WINDOWS_PACKAGING.md) for the exact local outputs and Authenticode boundary.
+These paths remain on the legacy namespace for compatibility with existing installs.
 
-## Debian-family Linux x64
+## Install Notes
 
-After the checksum passes, install the DEB with the system package manager:
-
-```console
-$ sudo apt install ./Shed-<version>-linux-x64.deb
-```
-
-The DEB includes Java 21. It is not an RPM and has no configured Debian repository or detached-package signature. Use the published checksum and approved source for provenance.
-
-For local packaging, use Linux x64 with JDK 21, `dpkg-deb`, and `fakeroot`:
-
-```console
-$ bash scripts/package-linux.sh
-```
-
-See [Linux packaging](LINUX_PACKAGING.md) for the exact local outputs and signing boundary.
-
-## Java archive and source build
-
-The JAR needs a Java 21 runtime. Build from source with JDK 21:
-
-```console
-$ mvn -B -q -DskipTests package
-$ java -jar target/shed-2.0.0.jar [path ...]
-```
-
-`make run` and the `shed` launcher look for Java 21 through `JAVA`, `JAVA_HOME`, the system Java command, macOS `java_home`, and `~/.local/share/shed-tools/jdk-21`. Make targets use Maven from `MVN`, `PATH`, or `~/.local/share/shed-tools/maven/bin/mvn`. An explicit `JAVA` or `JAVA_HOME` must point to Java 21. The user-local locations are optional; install JDK 21 and Maven normally if you prefer.
-
-For a source-checkout launcher, run `make install`; it writes `shed` to `~/.local/bin` and the JAR to `~/.local/lib/shed`. Ensure `~/.local/bin` is on `PATH`, then use `shed .` for the current folder or `shed <relative-or-absolute-path>...` for files and folders. `make run .` provides the same current-folder behavior without installation. Existing directories become workspace folders and open their file tree; relative paths resolve from the terminal's current directory.
-
-The native installers are the supported way to avoid a separate runtime. The source build requires the Maven/JDK toolchain and is not a replacement for public package signing.
-
-## Updates, privacy, diagnostics, and recovery
-
-Update metadata checks are disabled by default. `:update status` is local-only; `:update consent` must be confirmed before a configured signed metadata check can run; `:update disable` revokes consent. Shed never downloads, installs, or replaces itself, so a failed check leaves the running application unchanged. See [Update Checks](UPDATES.md) and the [network boundary](NETWORK_PRIVACY.md).
-
-For unexpected application or background-job failures, run `:perf diagnostics` and inspect the local-only `~/.shed/shed-diagnostics.jsonl` file. Configuration parse or validation errors retain a safe/last-known-good state and are shown with `:config status`; correct the file and run `:reload`. See [local diagnostics](DIAGNOSTICS.md) and [configuration](CONFIG.md).
-
-## Troubleshooting
-
-| Symptom | Action |
-| :--- | :--- |
-| Checksum fails | Stop. Delete the downloaded installer, obtain it again from an approved source, and compare against an independently obtained checksum. |
-| macOS or Windows shows an unsigned/untrusted warning | Current development artifacts have no public trust chain. Verify source and checksum; do not treat the warning as resolved by bypassing it. |
-| Linux package manager rejects the DEB | Confirm an x64 Debian-family system and run `sudo apt install ./<file>.deb`; RPM distributions are not a produced target. |
-| JAR does not start | Confirm `java -version` reports Java 21, then run `java -jar shed-<version>.jar` from a terminal to retain the error output. |
-| Local package command reports a missing tool | Use the platform prerequisites stated above; the packager intentionally fails before producing an incomplete installer. |
-| `:update check` says no request sent | Consent, HTTPS endpoint, Base64 Ed25519 key, packaged version, and supported platform must all be available; see [Update Checks](UPDATES.md). |
-| Application/UI job failed | Run `:perf diagnostics`, preserve the local log, and use the referenced remediation document. |
+- Direct download of `Sage Bar.app` is the primary install path.
+- Homebrew is secondary and may lag behind the direct release artifact.
+- The bundled app includes Sparkle for update distribution and verification.

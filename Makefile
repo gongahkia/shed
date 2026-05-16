@@ -1,26 +1,40 @@
-.PHONY: build test web-sync check-web-sync smoke-mobile-access install-hooks install-hooks-remote uninstall-hooks
+.PHONY: build build-release test clean run bundle bundle-release verify-bundle archive-release
 
 build:
 	swift build
 
+build-release:
+	swift build -c release
+
 test:
 	swift test
-	npm --prefix OnibiWeb test
 
-web-sync:
-	./scripts/sync_web_assets.sh
+clean:
+	rm -rf .build/ "Sage Bar.app" "Sage-Bar-local.zip"
 
-check-web-sync:
-	./scripts/check_web_assets_synced.sh
+run:
+	swift run SageBar
 
-smoke-mobile-access:
-	./scripts/smoke_mobile_access.sh
+bundle: build
+	@./scripts/bundle_app.sh \
+		--binary .build/debug/SageBar \
+		--resources-bundle .build/debug/SageBar_SageBar.bundle \
+		--sparkle-framework .build/debug/Sparkle.framework \
+		--widget-binary .build/debug/SageBarWidget \
+		--output "Sage Bar.app" \
+		--codesign-identity -
 
-install-hooks:
-	./scripts/install_shell_hooks.sh --shell zsh
+bundle-release: build-release
+	@./scripts/bundle_app.sh \
+		--binary .build/release/SageBar \
+		--resources-bundle .build/release/SageBar_SageBar.bundle \
+		--sparkle-framework .build/release/Sparkle.framework \
+		--widget-binary .build/release/SageBarWidget \
+		--output "Sage Bar.app" \
+		--codesign-identity -
 
-install-hooks-remote:
-	./scripts/install_shell_hooks.sh --shell zsh --remote-control
+verify-bundle: bundle
+	@./scripts/verify_app_bundle.sh --app "Sage Bar.app" --skip-spctl --smoke-launch
 
-uninstall-hooks:
-	./scripts/install_shell_hooks.sh --shell zsh --uninstall
+archive-release: bundle-release
+	@ditto -c -k --sequesterRsrc --keepParent "Sage Bar.app" "Sage-Bar-local.zip"

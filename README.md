@@ -1,77 +1,37 @@
-[![](https://img.shields.io/badge/sage_bar_v1.0.0-passing-green)](https://github.com/gongahkia/sage-bar/releases/tag/1.0.0)
-![](https://github.com/gongahkia/sage-bar/actions/workflows/ci.yml/badge.svg)
+# Onibi
 
-# `Sage Bar`
+[![CI](https://github.com/gongahkia/onibi/actions/workflows/ci.yml/badge.svg?branch=v1.5)](https://github.com/gongahkia/onibi/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-MacOS [menu bar](https://support.apple.com/en-sg/guide/mac-help/mchlp1446/mac) app for tracking [AI token usage and spend](https://blogs.nvidia.com/blog/ai-tokens-explained/) across [providers](#support).
+Onibi -- cross-platform cockpit for local AI coding agents, with a phone in your pocket.
 
-<div align="center">
-    <img src="./asset/logo/wizard.png">
-</div>
+Status: 🚧 v1.5 in development.
 
-## Why?
+Track progress in the repo-root `PHASE-XX-PLAN-27-MAY.md` files.
 
-[Here](https://x.com/mitchellh/status/1748397293232128333).
+v1.5 rebuilds Onibi as a Tauri desktop app backed by Rust and a system webview, plus a mobile PWA for approval inboxes and live terminal mirror.
 
-## Stack
+The architecture target is desktop-first control with phone-side review: local agents pause, Onibi surfaces context, and the phone becomes the second screen for approve, deny, and edit flows. The final diagram lands in [PHASE-07-PLAN-27-MAY.md](PHASE-07-PLAN-27-MAY.md).
 
-* *Script*: [Swift](https://www.swift.org/), [Swift Package Manager](https://docs.swift.org/package-manager/)
-* *UI*: [SwiftUI](https://developer.apple.com/swiftui/), [Apple AppKit](https://developer.apple.com/documentation/appkit), [NSStatusItem](https://developer.apple.com/documentation/appkit/nsstatusitem), [NSPopover](https://developer.apple.com/documentation/appkit/nspopover)
-* *Configuration*: [TOMLKit](https://github.com/LebJe/TOMLKit)
-* *Package*: [Sparkle](https://sparkle-project.org/), [Homebrew](https://brew.sh/)
-* *CI/CD*: [GitHub Actions](https://github.com/features/actions)
+Onibi is not the coding agent.
 
-## Screenshots
+It is the harness around local agents.
 
-<div align="center">
-    <img src="./asset/reference/1.png" width="40%">
-    <img src="./asset/reference/2.png" width="59%">
-</div>
+Differentiation:
 
-## Usage
+- vs cmux: cross-platform desktop plus mobile second-screen.
+- vs Aider/Codex/Claude Code: Onibi orchestrates and reviews; it does not replace them.
+- vs hosted relays: local-first, self-hosted transports are first-class.
 
-Below are instructions for locally downloading and using `Sage Bar`.
+Roadmap:
 
-1. First run the below to [install](./docs/INSTALL.md) `Sage Bar`'s source code.'
+- [PHASE-00](PHASE-00-PLAN-27-MAY.md): foundation and demolition.
+- [PHASE-01](PHASE-01-PLAN-27-MAY.md): PTY core and xterm.
+- [PHASE-02](PHASE-02-PLAN-27-MAY.md): agent surfaces.
+- [PHASE-03](PHASE-03-PLAN-27-MAY.md): protocol spec.
+- [PHASE-04](PHASE-04-PLAN-27-MAY.md): mobile PWA.
+- [PHASE-05](PHASE-05-PLAN-27-MAY.md): transports.
+- [PHASE-06](PHASE-06-PLAN-27-MAY.md): packaging.
+- [PHASE-07](PHASE-07-PLAN-27-MAY.md): launch polish.
 
-```console
-$ git clone https://github.com/gongahkia/sage-bar && cd sage-bar
-```
-
-2. Alternatively download `Sage Bar`'s latest release from [GitHub Releases](https://github.com/gongahkia/sage-bar/releases).
-
-3. Optionally execute the below commands to invoke `Sage Bar`'s core build functionality. 
-
-```console
-$ swift run SageBar # run immediately
-$ make run # alternative run command
-
-$ swift build # build the app
-$ swift test # run the test suite
-$ make bundle # create a local .app bundle
-
-$ make verify-bundle # smoke-test the bundled app locally
-$ make archive-release #create a release-style local archive
-```
-
-## Architecture
-
-![](./asset/reference/architecture.png)
-
-## Support
-
-`Sage Bar` currently supports the following [local](#local-providers) and [remote](#remote-providers) AI providers.
-
-### Remote providers
-
-* [Anthropic API](https://docs.anthropic.com/en/api/data-usage-cost-api)
-* [OpenAI organization usage](https://help.openai.com/en/articles/10478918-api-usage-dashboard)
-* [GitHub Copilot organization metrics](https://docs.github.com/en/rest/copilot/copilot-usage)
-* [Windsurf Enterprise analytics](https://docs.windsurf.com/plugins/accounts/api-reference/analytics-api-introduction)
-* [Claude AI session-based usage](https://www.anthropic.com/claude)
-
-### Local providers
-
-* [Claude Code local session logs](https://docs.anthropic.com/en/docs/claude-code/overview)
-* [Codex local session logs](https://developers.openai.com/codex/)
-* [Gemini CLI local session logs](https://github.com/google-gemini/gemini-cli)
+License: Apache-2.0.

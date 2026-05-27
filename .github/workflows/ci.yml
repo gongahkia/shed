@@ -1,177 +1,110 @@
-name: Sage Bar CI
+name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
-    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  build-and-test:
-    strategy:
-      matrix:
-        os: [macos-14]
+  rust:
+    name: rust (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
     steps:
       - uses: actions/checkout@v4
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          fetch-depth: 0
-
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Cache Homebrew downloads
-        uses: actions/cache@v4
+          components: clippy,rustfmt
+      - uses: Swatinem/rust-cache@v2
         with:
-          path: ~/Library/Caches/Homebrew
-          key: ${{ runner.os }}-${{ matrix.os }}-homebrew-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.os }}-homebrew-
+          workspaces: app/src-tauri -> target
+      - name: cargo fmt
+        working-directory: app/src-tauri
+        run: cargo fmt --check
+      - name: cargo clippy
+        working-directory: app/src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: cargo test
+        working-directory: app/src-tauri
+        run: cargo test --workspace
 
-      - name: Cache SwiftPM artifacts
-        uses: actions/cache@v4
+  app-frontend:
+    name: app frontend (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
         with:
-          path: |
-            .build
-            ~/.swiftpm/cache
-            ~/.swiftpm/configuration
-          key: ${{ runner.os }}-${{ matrix.os }}-swiftpm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.os }}-swiftpm-
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter onibi-app typecheck
+      - run: pnpm --filter onibi-app test
 
-      - name: Install SwiftLint
-        run: brew install swiftlint
+  mobile:
+    name: mobile (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter onibi-mobile typecheck
+      - run: pnpm --filter onibi-mobile test
 
-      - name: Lint changed Swift files
-        shell: bash
+  tauri-build-smoke:
+    name: tauri build smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, ubuntu-22.04]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux Tauri dependencies
+        if: runner.os == 'Linux'
         run: |
-          set -euo pipefail
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-          fi
-
-          SWIFT_FILES=()
-          while IFS= read -r file; do
-            SWIFT_FILES+=("$file")
-          done < <(./scripts/changed_swift_files.sh "$BASE_SHA" HEAD)
-          if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
-            echo "No changed Swift files to lint."
-            exit 0
-          fi
-
-          LINT_OUTPUT="$(mktemp)"
-          swiftlint lint --strict --quiet --reporter json "${SWIFT_FILES[@]}" > "$LINT_OUTPUT" || true
-          python3 scripts/filter_changed_swift_diagnostics.py \
-            swiftlint-json \
-            --base "$BASE_SHA" \
-            --head HEAD < "$LINT_OUTPUT"
-
-      - name: Install swift-format
-        run: brew install swift-format
-
-      - name: swift-format lint changed Swift files
-        run: |
-          set -euo pipefail
-
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          else
-            BASE_SHA="${{ github.event.before }}"
-          fi
-
-          SWIFT_FILES=()
-          while IFS= read -r file; do
-            SWIFT_FILES+=("$file")
-          done < <(./scripts/changed_swift_files.sh "$BASE_SHA" HEAD)
-          if [[ ${#SWIFT_FILES[@]} -eq 0 ]]; then
-            echo "No changed Swift files to format-check."
-            exit 0
-          fi
-
-          FORMAT_OUTPUT="$(mktemp)"
-          swift-format lint "${SWIFT_FILES[@]}" > "$FORMAT_OUTPUT" 2>&1 || true
-          python3 scripts/filter_changed_swift_diagnostics.py \
-            swift-format \
-            --base "$BASE_SHA" \
-            --head HEAD < "$FORMAT_OUTPUT"
-
-      - name: Fail on unstructured try? call-sites
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          CURRENT=$(rg -n "try\\?" Sources/ClaudeUsage --no-heading || true)
-          if [ -z "$CURRENT" ]; then
-            exit 0
-          fi
-
-          CURRENT_LINES=$(printf '%s\n' "$CURRENT" | cut -d: -f1-2 | sort -t: -k1,1 -k2,2n | uniq)
-          ALLOWLIST=$(grep -vE '^\s*(#|$)' .ci/tryq_allowlist.txt | sort -t: -k1,1 -k2,2n | uniq || true)
-          NEW_LINES=$(grep -Fvx -f <(printf '%s\n' "$ALLOWLIST") <(printf '%s\n' "$CURRENT_LINES") || true)
-
-          if [ -z "$NEW_LINES" ]; then
-            exit 0
-          fi
-
-          echo "Detected non-allowlisted try? call-sites:"
-          echo "$NEW_LINES"
-
-          VIOLATIONS=""
-          while IFS=: read -r file line; do
-            [ -z "$file" ] && continue
-            start=$((line - 3))
-            if [ "$start" -lt 1 ]; then start=1; fi
-            end=$((line + 3))
-
-            if ! sed -n "${start},${end}p" "$file" | rg -q "ErrorLogger\\.shared\\.logStructured\\("; then
-              VIOLATIONS+="${file}:${line}\n"
-            fi
-          done <<< "$NEW_LINES"
-
-          if [ -n "$VIOLATIONS" ]; then
-            echo "New try? call-sites are missing structured logging context:"
-            printf "%b" "$VIOLATIONS"
-            echo "Add ErrorLogger.shared.logStructured(...) near the try? or add an explicit allowlist entry."
-            exit 1
-          fi
-
-      - name: Validate prices.json
-        run: python3 -c "import json,sys; json.load(open('Sources/ClaudeUsage/Resources/prices.json'))"
-
-      - name: Build app product (release)
-        run: swift build --product SageBar -c release
-
-      - name: Gate Config/Polling compile diagnostics
-        shell: bash
-        run: |
-          set -o pipefail
-          LOG_FILE="$(mktemp)"
-          swift build --product SageBar 2>&1 | tee "$LOG_FILE"
-          if rg -n "Sources/ClaudeUsage/Config/Config.swift:.*(warning|error):|Sources/ClaudeUsage/Services/PollingService.swift:.*(warning|error):" "$LOG_FILE"; then
-            echo "Compile diagnostics found in Config.swift or PollingService.swift."
-            exit 1
-          fi
-
-      - name: Build debug app
-        run: swift build
-
-      - name: Bundle app smoke test
-        if: matrix.os == 'macos-14'
-        run: |
-          ./scripts/bundle_app.sh \
-            --binary .build/debug/SageBar \
-            --resources-bundle .build/debug/SageBar_SageBar.bundle \
-            --sparkle-framework .build/debug/Sparkle.framework \
-            --output "Sage Bar.app" \
-            --codesign-identity -
-          ./scripts/verify_app_bundle.sh --app "Sage Bar.app" --skip-spctl --smoke-launch --launch-wait 8
-
-      - name: Test
-        run: swift test
-
-      - name: Test (Thread Sanitizer)
-        if: matrix.os == 'macos-14'
-        run: swift test --sanitize=thread
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri -> target
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter onibi-app tauri build --debug

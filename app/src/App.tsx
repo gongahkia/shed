@@ -5,6 +5,8 @@ import {
   Separator as PanelResizeHandle,
 } from "react-resizable-panels";
 import { AgentTabBar } from "./components/AgentTabBar";
+import { ApprovalModal } from "./components/ApprovalModal";
+import { CommandPalette } from "./components/CommandPalette";
 import { FileTree } from "./components/FileTree";
 import { MainPane } from "./components/MainPane";
 import {
@@ -34,13 +36,17 @@ function App() {
       </Panel>
     );
     return (
-      <main className="app-shell" data-tab-orientation="horizontal">
-        <PanelGroup orientation="vertical">
-          {settings.tabBarPosition === "bottom" ? content : tabs}
-          <PanelResizeHandle className="panel-resize-handle" />
-          {settings.tabBarPosition === "bottom" ? tabs : content}
-        </PanelGroup>
-      </main>
+      <>
+        <main className="app-shell" data-tab-orientation="horizontal">
+          <PanelGroup orientation="vertical">
+            {settings.tabBarPosition === "bottom" ? content : tabs}
+            <PanelResizeHandle className="panel-resize-handle" />
+            {settings.tabBarPosition === "bottom" ? tabs : content}
+          </PanelGroup>
+        </main>
+        <ApprovalModal />
+        <CommandPalette />
+      </>
     );
   }
 
@@ -51,13 +57,17 @@ function App() {
   );
 
   return (
-    <main className="app-shell" data-tab-orientation="vertical">
-      <PanelGroup orientation="horizontal">
-        {settings.tabBarPosition === "right" ? content : tabs}
-        <PanelResizeHandle className="panel-resize-handle" />
-        {settings.tabBarPosition === "right" ? tabs : content}
-      </PanelGroup>
-    </main>
+    <>
+      <main className="app-shell" data-tab-orientation="vertical">
+        <PanelGroup orientation="horizontal">
+          {settings.tabBarPosition === "right" ? content : tabs}
+          <PanelResizeHandle className="panel-resize-handle" />
+          {settings.tabBarPosition === "right" ? tabs : content}
+        </PanelGroup>
+      </main>
+      <ApprovalModal />
+      <CommandPalette />
+    </>
   );
 }
 

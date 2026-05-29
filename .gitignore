@@ -37,12 +37,46 @@ xcuserdata/
 # Swift Package Manager
 .build/
 Package.resolved
-ClaudeUsage-universal
-claude-usage-universal
-claude-usage-arm64
-claude-usage-x86_64
-ClaudeUsage-*.dmg
-sparkle_tools.zip
-sparkle_bin/
-docs/appcast.xml
-Sage Bar.app/
+*.xcodeproj
+.swiftpm/
+
+# CocoaPods
+Pods/
+*.xcworkspace
+
+# Carthage
+Carthage/Build/
+
+# Accio
+Dependencies/
+.accio/
+
+# fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code Injection
+iOSInjectionProject/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+*.log
+
+# OnibiWeb
+OnibiWeb/node_modules/
+OnibiWeb/dist/
+OnibiWeb/*.tsbuildinfo
+OnibiWeb/vite.config.js
+OnibiWeb/vite.config.d.ts
+
+CLAUDE.md
+AGENTS.md
+
+.codex
+.playwright-cli

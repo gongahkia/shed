@@ -84,6 +84,10 @@ public class Texteditor extends JFrame implements KeyListener {
     TerminalController terminalController;
     MarkdownController markdownController;
     PaneBufferController paneBufferController;
+    SessionConfigController sessionConfigController;
+    DramaticUiController dramaticUiController;
+    SyntaxUiController syntaxUiController;
+    EditActionController editActionController;
 
     // Buffer management
     List<FileBuffer> buffers;
@@ -315,6 +319,7 @@ public class Texteditor extends JFrame implements KeyListener {
         bracketColorService = new BracketColorService();
         markdownController = new MarkdownController(this);
         paneBufferController = new PaneBufferController(this);
+        sessionConfigController = new SessionConfigController(this);
         symbolService = new SymbolService();
         taskService = new TaskService();
         fileWatcherService = new FileWatcherService();
@@ -356,10 +361,14 @@ public class Texteditor extends JFrame implements KeyListener {
         paneJumpFlashTimer = null;
         paneJumpFlashTarget = null;
         paneJumpFlashOriginalBorder = null;
+        dramaticUiController = new DramaticUiController(this);
         refreshDramaticSettings();
         loadRecentFiles();
         loadTrustedProjectRoots();
         lastMessage = "";
+
+        syntaxUiController = new SyntaxUiController(this);
+        editActionController = new EditActionController(this);
 
         // Initialize UI
         initializeUI();
@@ -2134,179 +2143,27 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void normalizeVisualLineCaretForMotion() {
-        int selectionStart = writingArea.getSelectionStart();
-        int selectionEnd = writingArea.getSelectionEnd();
-        int caret = writingArea.getCaretPosition();
-        if (selectionEnd > selectionStart && caret == selectionEnd && caret > 0) {
-            writingArea.setCaretPosition(Math.max(selectionStart, caret - 1));
-        }
+        editActionController.normalizeVisualLineCaretForMotion();
     }
 
     void applyVisualLineOperator(char operator) {
-        try {
-            int selStart = writingArea.getSelectionStart();
-            int selEnd = writingArea.getSelectionEnd();
-            int startLine = writingArea.getLineOfOffset(selStart);
-            int endLine = writingArea.getLineOfOffset(selEnd);
-            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
-                endLine--;
-            }
-            String indent = configManager.getExpandTab() ? " ".repeat(writingArea.getTabSize()) : "\t";
-            String text = writingArea.getText();
-            int replaceStart = writingArea.getLineStartOffset(startLine);
-            int replaceEnd = writingArea.getLineEndOffset(endLine);
-            StringBuilder sb = new StringBuilder();
-            for (int i = startLine; i <= endLine; i++) {
-                int ls = writingArea.getLineStartOffset(i);
-                int le = writingArea.getLineEndOffset(i);
-                String line = text.substring(ls, le);
-                switch (operator) {
-                    case '>':
-                        sb.append(indent).append(line);
-                        break;
-                    case '<':
-                        int removeCount = Math.min(writingArea.getTabSize(), leadingWhitespace(line));
-                        sb.append(line.substring(removeCount));
-                        break;
-                    case '=':
-                        String prevIndent = i > 0 ? indentationForLine(i - 1) : "";
-                        sb.append(prevIndent).append(line.stripLeading());
-                        break;
-                }
-            }
-            writingArea.replaceRange(sb.toString(), replaceStart, replaceEnd);
-            markModified();
-            showMessage("Selection " + (operator == '>' ? "indented" : operator == '<' ? "dedented" : "auto-indented"));
-        } catch (BadLocationException ignored) {
-        }
-        if (!substitutePreviewTags.isEmpty()) {
-            pulseCaretLine(configManager.getSubstitutePreviewColor());
-        }
+        editActionController.applyVisualLineOperator(operator);
     }
 
     void joinVisualSelection() {
-        try {
-            int selStart = writingArea.getSelectionStart();
-            int selEnd = writingArea.getSelectionEnd();
-            int startLine = writingArea.getLineOfOffset(selStart);
-            int endLine = writingArea.getLineOfOffset(selEnd);
-            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
-                endLine--;
-            }
-            int joins = endLine - startLine;
-            for (int i = 0; i < joins; i++) {
-                joinCurrentLine(true);
-            }
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.joinVisualSelection();
     }
 
     void surroundVisualSelection(char surroundChar) {
-        SurroundPair pair = surroundPair(surroundChar);
-        if (pair == null) {
-            showMessage("Unknown surround: " + surroundChar);
-            return;
-        }
-        int selStart = writingArea.getSelectionStart();
-        int selEnd = writingArea.getSelectionEnd();
-        if (selStart == selEnd) return;
-        writingArea.insert(String.valueOf(pair.close), selEnd);
-        writingArea.insert(String.valueOf(pair.open), selStart);
-        markModified();
-        showMessage("Surround added");
+        editActionController.surroundVisualSelection(surroundChar);
     }
 
     void toggleCommentSelection() {
-        try {
-            int selStart = writingArea.getSelectionStart();
-            int selEnd = writingArea.getSelectionEnd();
-            int startLine = writingArea.getLineOfOffset(selStart);
-            int endLine = writingArea.getLineOfOffset(selEnd);
-            if (selEnd == writingArea.getLineStartOffset(endLine) && endLine > startLine) {
-                endLine--;
-            }
-            toggleCommentLineRange(startLine, endLine);
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.toggleCommentSelection();
     }
 
     void toggleCommentLineRange(int startLine, int endLine) {
-        try {
-            FileBuffer buffer = getCurrentBuffer();
-            if (buffer == null) return;
-            String[] prefixes = lineCommentPrefixesFor(buffer.getFileType());
-            if (prefixes.length == 0) {
-                showMessage("No comment syntax for this file type");
-                return;
-            }
-            String prefix = prefixes[0];
-            String text = writingArea.getText();
-
-            boolean allCommented = true;
-            for (int i = startLine; i <= endLine; i++) {
-                int ls = writingArea.getLineStartOffset(i);
-                int le = writingArea.getLineEndOffset(i);
-                String trimmed = text.substring(ls, le).stripLeading();
-                if (!trimmed.isEmpty() && !trimmed.startsWith(prefix)) {
-                    allCommented = false;
-                    break;
-                }
-            }
-
-            int replaceStart = writingArea.getLineStartOffset(startLine);
-            int replaceEnd = writingArea.getLineEndOffset(endLine);
-            StringBuilder sb = new StringBuilder();
-
-            if (allCommented) {
-                for (int i = startLine; i <= endLine; i++) {
-                    int ls = writingArea.getLineStartOffset(i);
-                    int le = writingArea.getLineEndOffset(i);
-                    String line = text.substring(ls, le);
-                    int idx = line.indexOf(prefix);
-                    if (idx >= 0) {
-                        int afterPrefix = idx + prefix.length();
-                        boolean hasSpace = afterPrefix < line.length() && line.charAt(afterPrefix) == ' ';
-                        sb.append(line, 0, idx);
-                        sb.append(line.substring(hasSpace ? afterPrefix + 1 : afterPrefix));
-                    } else {
-                        sb.append(line);
-                    }
-                }
-            } else {
-                int minIndent = Integer.MAX_VALUE;
-                for (int i = startLine; i <= endLine; i++) {
-                    int ls = writingArea.getLineStartOffset(i);
-                    int le = writingArea.getLineEndOffset(i);
-                    String line = text.substring(ls, le).stripTrailing();
-                    if (line.isEmpty()) continue;
-                    int indent = 0;
-                    for (char ch : line.toCharArray()) {
-                        if (ch == ' ' || ch == '\t') indent++;
-                        else break;
-                    }
-                    minIndent = Math.min(minIndent, indent);
-                }
-                if (minIndent == Integer.MAX_VALUE) minIndent = 0;
-
-                for (int i = startLine; i <= endLine; i++) {
-                    int ls = writingArea.getLineStartOffset(i);
-                    int le = writingArea.getLineEndOffset(i);
-                    String line = text.substring(ls, le);
-                    if (line.stripTrailing().isEmpty()) {
-                        sb.append(line);
-                    } else {
-                        sb.append(line, 0, minIndent);
-                        sb.append(prefix).append(' ');
-                        sb.append(line.substring(minIndent));
-                    }
-                }
-            }
-
-            writingArea.replaceRange(sb.toString(), replaceStart, replaceEnd);
-            markModified();
-            showMessage(allCommented ? "Uncommented" : "Commented");
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.toggleCommentLineRange(startLine, endLine);
     }
 
     // Replace mode key handling
@@ -2517,622 +2374,179 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Movement methods
     void moveUp() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            if (line > 0) {
-                int prevLineStart = writingArea.getLineStartOffset(line - 1);
-                int prevLineEnd = writingArea.getLineEndOffset(line - 1);
-                int col = pos - writingArea.getLineStartOffset(line);
-                int newPos = Math.min(prevLineStart + col, prevLineEnd - 1);
-                writingArea.setCaretPosition(newPos);
-            }
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
+        editActionController.moveUp();
     }
 
     void moveDown() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int totalLines = writingArea.getLineCount();
-            if (line < totalLines - 1) {
-                int nextLineStart = writingArea.getLineStartOffset(line + 1);
-                int nextLineEnd = writingArea.getLineEndOffset(line + 1);
-                int col = pos - writingArea.getLineStartOffset(line);
-                int newPos = Math.min(nextLineStart + col, nextLineEnd - 1);
-                writingArea.setCaretPosition(newPos);
-            }
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
+        editActionController.moveDown();
     }
 
     void moveLeft() {
-        int pos = writingArea.getCaretPosition();
-        if (pos > 0) {
-            writingArea.setCaretPosition(pos - 1);
-        }
+        editActionController.moveLeft();
     }
 
     void moveRight() {
-        int pos = writingArea.getCaretPosition();
-        if (pos < writingArea.getText().length()) {
-            writingArea.setCaretPosition(pos + 1);
-        }
+        editActionController.moveRight();
     }
 
     void moveWordForward() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        int len = text.length();
-        if (pos >= len) return;
-
-        int cls = vimCharClass(text.charAt(pos));
-        if (cls > 0) {
-            while (pos < len && vimCharClass(text.charAt(pos)) == cls) pos++;
-        }
-        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
-
-        writingArea.setCaretPosition(Math.min(pos, len));
+        editActionController.moveWordForward();
     }
 
     void moveWordBackward() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        if (pos <= 0) return;
-
-        pos--;
-        while (pos > 0 && Character.isWhitespace(text.charAt(pos))) pos--;
-        if (pos >= 0) {
-            int cls = vimCharClass(text.charAt(pos));
-            while (pos > 0 && vimCharClass(text.charAt(pos - 1)) == cls) pos--;
-        }
-
-        writingArea.setCaretPosition(pos);
+        editActionController.moveWordBackward();
     }
 
     void moveWordEnd() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        int len = text.length();
-        if (pos >= len - 1) return;
-
-        pos++;
-        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
-        if (pos < len) {
-            int cls = vimCharClass(text.charAt(pos));
-            while (pos + 1 < len && vimCharClass(text.charAt(pos + 1)) == cls) pos++;
-        }
-
-        writingArea.setCaretPosition(Math.min(pos, len));
+        editActionController.moveWordEnd();
     }
 
     void moveWordForwardBig() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
-            pos++;
-        }
-        while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-            pos++;
-        }
-        writingArea.setCaretPosition(Math.min(pos, text.length()));
+        editActionController.moveWordForwardBig();
     }
 
     void moveWordBackwardBig() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        if (pos > 0) {
-            pos--;
-            while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
-                pos--;
-            }
-            while (pos > 0 && !Character.isWhitespace(text.charAt(pos - 1))) {
-                pos--;
-            }
-        }
-        writingArea.setCaretPosition(pos);
+        editActionController.moveWordBackwardBig();
     }
 
     void moveWordEndBig() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        if (pos < text.length()) {
-            while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-                pos++;
-            }
-            while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
-                pos++;
-            }
-            if (pos > 0) {
-                pos--;
-            }
-        }
-        writingArea.setCaretPosition(Math.min(pos, text.length()));
+        editActionController.moveWordEndBig();
     }
 
     void moveWordEndBackward() {
-        moveWordEndBackwardInternal(false);
+        editActionController.moveWordEndBackward();
     }
 
     void moveWordEndBackwardBig() {
-        moveWordEndBackwardInternal(true);
+        editActionController.moveWordEndBackwardBig();
     }
 
     void moveWordEndBackwardInternal(boolean bigWord) {
-        String text = writingArea.getText();
-        int pos = Math.max(0, writingArea.getCaretPosition() - 1);
-        while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
-            pos--;
-        }
-        while (pos > 0 && isMotionWordChar(text.charAt(pos - 1), bigWord)) {
-            pos--;
-        }
-        if (pos < text.length()) {
-            while (pos < text.length() - 1 && isMotionWordChar(text.charAt(pos + 1), bigWord)) {
-                pos++;
-            }
-        }
-        writingArea.setCaretPosition(Math.max(0, pos));
+        editActionController.moveWordEndBackwardInternal(bigWord);
     }
 
     boolean isMotionWordChar(char c, boolean bigWord) {
-        return bigWord ? !Character.isWhitespace(c) : isWordCharacter(c);
+        return editActionController.isMotionWordChar(c, bigWord);
     }
 
     void moveLineStart() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int lineStart = writingArea.getLineStartOffset(line);
-            writingArea.setCaretPosition(lineStart);
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
+        editActionController.moveLineStart();
     }
 
     void moveLineEnd() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            writingArea.setCaretPosition(Math.max(lineEnd - 1, 0));
-        } catch (BadLocationException e) {
-            e.printStackTrace();
-        }
+        editActionController.moveLineEnd();
     }
 
     void moveLineFirstNonBlank() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int lineStart = writingArea.getLineStartOffset(line);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(lineStart, lineEnd);
-            int offset = 0;
-            while (offset < lineText.length() && Character.isWhitespace(lineText.charAt(offset)) && lineText.charAt(offset) != '\n') {
-                offset++;
-            }
-            writingArea.setCaretPosition(Math.min(lineStart + offset, writingArea.getText().length()));
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.moveLineFirstNonBlank();
     }
 
     void moveLineLastNonBlank() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int lineStart = writingArea.getLineStartOffset(line);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(lineStart, lineEnd);
-            int offset = lineText.length() - 1;
-            while (offset > 0 && Character.isWhitespace(lineText.charAt(offset))) {
-                offset--;
-            }
-            writingArea.setCaretPosition(Math.min(lineStart + offset, Math.max(lineStart, writingArea.getText().length())));
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.moveLineLastNonBlank();
     }
 
     void moveFileStart() {
-        writingArea.setCaretPosition(0);
+        editActionController.moveFileStart();
     }
 
     void moveFileEnd() {
-        writingArea.setCaretPosition(writingArea.getText().length());
+        editActionController.moveFileEnd();
     }
 
     void moveParagraphForward() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            for (int i = line + 1; i < writingArea.getLineCount(); i++) {
-                if (lineText(i).isBlank()) {
-                    int targetLine = Math.min(i + 1, writingArea.getLineCount() - 1);
-                    writingArea.setCaretPosition(writingArea.getLineStartOffset(targetLine));
-                    return;
-                }
-            }
-            moveFileEnd();
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.moveParagraphForward();
     }
 
     void moveParagraphBackward() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            for (int i = Math.max(0, line - 1); i >= 0; i--) {
-                if (lineText(i).isBlank()) {
-                    int targetLine = Math.max(0, i - 1);
-                    writingArea.setCaretPosition(writingArea.getLineStartOffset(targetLine));
-                    return;
-                }
-            }
-            moveFileStart();
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.moveParagraphBackward();
     }
 
     void moveSentenceForward() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        while (pos < text.length()) {
-            char c = text.charAt(pos);
-            if (c == '.' || c == '!' || c == '?') {
-                pos++;
-                while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-                    pos++;
-                }
-                writingArea.setCaretPosition(Math.min(pos, text.length()));
-                return;
-            }
-            pos++;
-        }
-        moveFileEnd();
+        editActionController.moveSentenceForward();
     }
 
     void moveSentenceBackward() {
-        String text = writingArea.getText();
-        int pos = Math.max(0, writingArea.getCaretPosition() - 1);
-        while (pos > 0) {
-            char c = text.charAt(pos);
-            if (c == '.' || c == '!' || c == '?') {
-                pos++;
-                while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
-                    pos++;
-                }
-                writingArea.setCaretPosition(Math.min(pos, text.length()));
-                return;
-            }
-            pos--;
-        }
-        moveFileStart();
+        editActionController.moveSentenceBackward();
     }
 
     void moveMatchingBracket() {
-        String text = writingArea.getText();
-        int pos = writingArea.getCaretPosition();
-        if (text.isEmpty() || pos < 0 || pos >= text.length()) {
-            return;
-        }
-        char current = text.charAt(pos);
-        String opens = "([{<";
-        String closes = ")]}>";
-        int openIndex = opens.indexOf(current);
-        int closeIndex = closes.indexOf(current);
-        if (openIndex >= 0) {
-            char close = closes.charAt(openIndex);
-            int depth = 0;
-            for (int i = pos; i < text.length(); i++) {
-                char c = text.charAt(i);
-                if (c == current) {
-                    depth++;
-                } else if (c == close) {
-                    depth--;
-                    if (depth == 0) {
-                        writingArea.setCaretPosition(i);
-                        return;
-                    }
-                }
-            }
-        } else if (closeIndex >= 0) {
-            char open = opens.charAt(closeIndex);
-            int depth = 0;
-            for (int i = pos; i >= 0; i--) {
-                char c = text.charAt(i);
-                if (c == current) {
-                    depth++;
-                } else if (c == open) {
-                    depth--;
-                    if (depth == 0) {
-                        writingArea.setCaretPosition(i);
-                        return;
-                    }
-                }
-            }
-        }
+        editActionController.moveMatchingBracket();
     }
 
     void moveToFilePercent(int percent) {
-        int clamped = Math.max(0, Math.min(100, percent));
-        String text = writingArea.getText();
-        int target = (int) Math.round((text.length() * clamped) / 100.0);
-        writingArea.setCaretPosition(Math.min(target, text.length()));
+        editActionController.moveToFilePercent(percent);
     }
 
     void moveToScreenPosition(char position) {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            int y;
-            switch (position) {
-                case 'H':
-                    y = visible.y;
-                    break;
-                case 'L':
-                    y = visible.y + visible.height;
-                    break;
-                case 'M':
-                default:
-                    y = visible.y + (visible.height / 2);
-                    break;
-            }
-            int offset = writingArea.viewToModel2D(new Point(0, y));
-            writingArea.setCaretPosition(Math.min(offset, writingArea.getText().length()));
-        } catch (Exception ignored) {
-        }
+        editActionController.moveToScreenPosition(position);
     }
 
     void scrollCurrentLineTo(char anchor) {
-        try {
-            Rectangle lineBounds = writingArea.modelToView2D(writingArea.getCaretPosition()).getBounds();
-            Rectangle visible = writingArea.getVisibleRect();
-            int targetY = visible.y;
-            switch (anchor) {
-                case 'b':
-                    targetY = Math.max(0, lineBounds.y - visible.height + lineBounds.height);
-                    break;
-                case 'z':
-                    targetY = Math.max(0, lineBounds.y - (visible.height / 2));
-                    break;
-                case 't':
-                default:
-                    targetY = Math.max(0, lineBounds.y);
-                    break;
-            }
-            writingArea.scrollRectToVisible(new Rectangle(visible.x, targetY, visible.width, visible.height));
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.scrollCurrentLineTo(anchor);
     }
 
     String lineText(int line) throws BadLocationException {
-        int start = writingArea.getLineStartOffset(line);
-        int end = writingArea.getLineEndOffset(line);
-        return writingArea.getText().substring(start, end);
+        return editActionController.lineText(line);
     }
 
     void scrollHalfPageDown() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            Point current = new Point(visible.x, visible.y + visible.height / 2);
-            writingArea.scrollRectToVisible(new Rectangle(current.x, current.y, visible.width, visible.height));
-            int pos = writingArea.viewToModel2D(current);
-            writingArea.setCaretPosition(pos);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollHalfPageDown();
     }
 
     void scrollHalfPageUp() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            Point current = new Point(visible.x, Math.max(0, visible.y - visible.height / 2));
-            writingArea.scrollRectToVisible(new Rectangle(current.x, current.y, visible.width, visible.height));
-            int pos = writingArea.viewToModel2D(current);
-            writingArea.setCaretPosition(pos);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollHalfPageUp();
     }
 
     void scrollFullPageDown() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            Point target = new Point(visible.x, visible.y + visible.height);
-            writingArea.scrollRectToVisible(new Rectangle(target.x, target.y, visible.width, visible.height));
-            int pos = writingArea.viewToModel2D(target);
-            writingArea.setCaretPosition(pos);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollFullPageDown();
     }
 
     void scrollFullPageUp() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            Point target = new Point(visible.x, Math.max(0, visible.y - visible.height));
-            writingArea.scrollRectToVisible(new Rectangle(target.x, target.y, visible.width, visible.height));
-            int pos = writingArea.viewToModel2D(target);
-            writingArea.setCaretPosition(pos);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollFullPageUp();
     }
 
     void scrollLineDown() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
-            writingArea.scrollRectToVisible(new Rectangle(visible.x, visible.y + lineHeight, visible.width, visible.height));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollLineDown();
     }
 
     void scrollLineUp() {
-        try {
-            Rectangle visible = writingArea.getVisibleRect();
-            int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
-            writingArea.scrollRectToVisible(new Rectangle(visible.x, Math.max(0, visible.y - lineHeight), visible.width, visible.height));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        editActionController.scrollLineUp();
     }
 
     String showFileInfo() {
-        try {
-            FileBuffer buffer = getCurrentBuffer();
-            String name = buffer != null ? buffer.getDisplayName() : "[No file]";
-            int totalLines = writingArea.getLineCount();
-            int currentLine = writingArea.getLineOfOffset(writingArea.getCaretPosition()) + 1;
-            int percent = totalLines > 0 ? (currentLine * 100) / totalLines : 0;
-            return "\"" + name + "\" " + totalLines + " lines --" + percent + "%--";
-        } catch (Exception e) {
-            return "Error getting file info";
-        }
+        return editActionController.showFileInfo();
     }
 
     String goToFileUnderCursor() {
-        try {
-            String text = writingArea.getText();
-            int pos = writingArea.getCaretPosition();
-            // Expand from cursor to find a file-path-like string
-            int start = pos;
-            int end = pos;
-            while (start > 0 && !Character.isWhitespace(text.charAt(start - 1)) && text.charAt(start - 1) != '"' && text.charAt(start - 1) != '\'' && text.charAt(start - 1) != '<') {
-                start--;
-            }
-            while (end < text.length() && !Character.isWhitespace(text.charAt(end)) && text.charAt(end) != '"' && text.charAt(end) != '\'' && text.charAt(end) != '>') {
-                end++;
-            }
-            if (start == end) return "No file path under cursor";
-            String path = text.substring(start, end);
-
-            File file = new File(path);
-            if (!file.isAbsolute()) {
-                FileBuffer buffer = getCurrentBuffer();
-                File baseDir = buffer != null && buffer.getFile() != null ? buffer.getFile().getParentFile() : new File(".");
-                file = new File(baseDir, path);
-            }
-            if (file.exists() && file.isFile()) {
-                openFile(file);
-                return "Opened " + file.getName();
-            }
-            return "File not found: " + path;
-        } catch (Exception e) {
-            return "Error: " + e.getMessage();
-        }
+        return editActionController.goToFileUnderCursor();
     }
 
     String openBrowserUrl() {
-        try {
-            String text = writingArea.getText();
-            int pos = writingArea.getCaretPosition();
-            int start = pos;
-            int end = pos;
-            while (start > 0 && !Character.isWhitespace(text.charAt(start - 1))) start--;
-            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) end++;
-            if (start == end) return "No URL under cursor";
-            String url = text.substring(start, end);
-            // Strip surrounding markdown link syntax
-            if (url.startsWith("[")) {
-                int urlStart = url.indexOf("](");
-                int urlEnd = url.indexOf(")", urlStart);
-                if (urlStart >= 0 && urlEnd > urlStart) {
-                    url = url.substring(urlStart + 2, urlEnd);
-                }
-            }
-            if (url.startsWith("http://") || url.startsWith("https://")) {
-                if (java.awt.Desktop.isDesktopSupported()) {
-                    java.awt.Desktop.getDesktop().browse(new URI(url));
-                    return "Opened: " + url;
-                }
-                return "Desktop not supported";
-            }
-            return "Not a URL: " + url;
-        } catch (Exception e) {
-            return "Error: " + e.getMessage();
-        }
+        return editActionController.openBrowserUrl();
     }
 
     void selectCurrentLine() {
-        int caret = writingArea.getCaretPosition();
-        selectLineRange(caret, caret);
-        editorState.visualStartPos = writingArea.getSelectionStart();
+        editActionController.selectCurrentLine();
     }
 
     void selectLineRange(int anchorPosition, int currentPosition) {
-        try {
-            int anchorLine = writingArea.getLineOfOffset(anchorPosition);
-            int currentLine = writingArea.getLineOfOffset(currentPosition);
-            int startLine = Math.min(anchorLine, currentLine);
-            int endLine = Math.max(anchorLine, currentLine);
-            int selectionStart = writingArea.getLineStartOffset(startLine);
-            int selectionEnd = writingArea.getLineEndOffset(endLine);
-            if (currentLine >= anchorLine) {
-                writingArea.setCaretPosition(selectionStart);
-                writingArea.moveCaretPosition(selectionEnd);
-            } else {
-                writingArea.setCaretPosition(selectionEnd);
-                writingArea.moveCaretPosition(selectionStart);
-            }
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.selectLineRange(anchorPosition, currentPosition);
     }
 
     void ensureCaretVisible(JTextArea area) {
-        if (area == null) return;
-        try {
-            Rectangle2D bounds = area.modelToView2D(area.getCaretPosition());
-            if (bounds == null) return;
-            int scrolloff = configManager.getScrolloff();
-            if (scrolloff > 0) {
-                int lineHeight = area.getFontMetrics(area.getFont()).getHeight();
-                Rectangle expanded = bounds.getBounds();
-                expanded.y -= scrolloff * lineHeight;
-                expanded.height += 2 * scrolloff * lineHeight;
-                area.scrollRectToVisible(expanded);
-            } else {
-                area.scrollRectToVisible(bounds.getBounds());
-            }
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.ensureCaretVisible(area);
     }
 
     boolean isPrintableKey(KeyEvent e) {
-        char c = e.getKeyChar();
-        return c != KeyEvent.CHAR_UNDEFINED
-            && !Character.isISOControl(c)
-            && !e.isControlDown()
-            && !e.isAltDown()
-            && !e.isMetaDown();
+        return editActionController.isPrintableKey(e);
     }
 
     String searchWordUnderCursor(boolean forward) {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        if (text.isEmpty() || caret >= text.length()) {
-            return "No word under cursor";
-        }
-
-        int start = caret;
-        int end = caret;
-        while (start > 0 && isWordCharacter(text.charAt(start - 1))) {
-            start--;
-        }
-        while (end < text.length() && isWordCharacter(text.charAt(end))) {
-            end++;
-        }
-        if (start == end) {
-            return "No word under cursor";
-        }
-
-        String word = text.substring(start, end);
-        return forward ? searchManager.searchForward(word) : searchManager.searchBackward(word);
+        return editActionController.searchWordUnderCursor(forward);
     }
 
     boolean isWordCharacter(char c) {
-        return Character.isLetterOrDigit(c) || c == '_';
+        return editActionController.isWordCharacter(c);
     }
 
     void browseCommandHistory(int direction) {
@@ -3309,675 +2723,135 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void updateCurrentLineHighlight() {
-        Highlighter highlighter = writingArea.getHighlighter();
-        if (currentLineHighlightTag != null) {
-            highlighter.removeHighlight(currentLineHighlightTag);
-            currentLineHighlightTag = null;
-        }
-
-        if (!configManager.getShowCurrentLine() || editorState.mode == EditorMode.VISUAL || editorState.mode == EditorMode.VISUAL_LINE) {
-            return;
-        }
-
-        try {
-            int caret = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(caret);
-            int start = writingArea.getLineStartOffset(line);
-            int end = writingArea.getLineEndOffset(line);
-            currentLineHighlightTag = highlighter.addHighlight(start, end, currentLinePainter);
-        } catch (BadLocationException ignored) {
-        }
+        syntaxUiController.updateCurrentLineHighlight();
     }
 
     String getGitBlameForCurrentLine(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || buffer.isModified()) return null;
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition()) + 1;
-            File file = buffer.getFile();
-            ProcessBuilder pb = new ProcessBuilder("git", "blame", "-L", line + "," + line, "--porcelain", file.getName());
-            pb.directory(file.getParentFile());
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            String output = new String(p.getInputStream().readAllBytes());
-            if (!p.waitFor(500, java.util.concurrent.TimeUnit.MILLISECONDS)) {
-                p.destroyForcibly();
-                return null;
-            }
-            if (p.exitValue() != 0) return null;
-            String author = null;
-            String summary = null;
-            for (String l : output.split("\n")) {
-                if (l.startsWith("author ")) author = l.substring(7);
-                else if (l.startsWith("summary ")) summary = l.substring(8);
-            }
-            if (author != null && summary != null) {
-                return author + ": " + summary;
-            }
-        } catch (Exception ignored) {}
-        return null;
+        return syntaxUiController.getGitBlameForCurrentLine(buffer);
     }
 
     String findCurrentBreadcrumb() {
-        try {
-            FileBuffer buffer = getCurrentBuffer();
-            if (buffer == null) {
-                return null;
-            }
-            int caret = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(caret) + 1;
-            List<SymbolService.Symbol> symbols = symbolService.collectSymbols(writingArea.getText(), buffer.getFileType());
-            if (!symbols.isEmpty()) {
-                List<SymbolService.Symbol> trail = symbolService.breadcrumbTrail(symbols, line);
-                if (!trail.isEmpty()) {
-                    StringBuilder breadcrumb = new StringBuilder();
-                    for (int i = 0; i < trail.size(); i++) {
-                        if (i > 0) {
-                            breadcrumb.append(" > ");
-                        }
-                        breadcrumb.append(trail.get(i).getName());
-                    }
-                    String value = breadcrumb.toString();
-                    if (value.length() > 88) {
-                        return "..." + value.substring(value.length() - 85);
-                    }
-                    return value;
-                }
-            }
-        } catch (BadLocationException ignored) {
-        }
-        return findCurrentScopeHeuristic();
+        return syntaxUiController.findCurrentBreadcrumb();
     }
 
     String findCurrentScopeHeuristic() {
-        try {
-            String text = writingArea.getText();
-            int caret = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(caret);
-            // Search backward from current line for a function/class/method definition
-            for (int i = line; i >= Math.max(0, line - 200); i--) {
-                int ls = writingArea.getLineStartOffset(i);
-                int le = writingArea.getLineEndOffset(i);
-                String lineText = text.substring(ls, le).trim();
-                // Match common patterns: function/def/fn/func/class/impl/pub fn/public/private/protected
-                if (lineText.matches("^(public|private|protected|static|async|export|default)?\\s*(class|interface|enum|struct|impl|trait)\\s+\\w+.*")
-                        || lineText.matches("^(public|private|protected|static|abstract|final)?\\s*(\\w+\\s+)*\\w+\\s*\\([^)]*\\).*\\{?\\s*$")
-                        || lineText.matches("^(def|fn|func|function|sub|proc|method)\\s+\\w+.*")
-                        || lineText.matches("^(pub\\s+)?(fn|async fn)\\s+\\w+.*")
-                        || lineText.matches("^(const|let|var)\\s+\\w+\\s*=\\s*(function|\\([^)]*\\)\\s*=>).*")) {
-                    // Extract just the name portion
-                    String name = lineText.replaceAll("[{(].*", "").replaceAll("\\s*->.*", "").trim();
-                    if (name.length() > 50) name = name.substring(0, 50) + "...";
-                    return name;
-                }
-            }
-        } catch (BadLocationException ignored) {}
-        return null;
+        return syntaxUiController.findCurrentScopeHeuristic();
     }
 
     void updateMatchingBracketHighlight() {
-        Highlighter highlighter = writingArea.getHighlighter();
-        for (Object tag : matchBracketTags) {
-            highlighter.removeHighlight(tag);
-        }
-        matchBracketTags.clear();
-
-        try {
-            String text = writingArea.getText();
-            int caret = writingArea.getCaretPosition();
-            if (text.isEmpty()) return;
-
-            // Check char at caret and before caret
-            int bracketPos = -1;
-            if (caret < text.length() && isBracketChar(text.charAt(caret))) {
-                bracketPos = caret;
-            } else if (caret > 0 && isBracketChar(text.charAt(caret - 1))) {
-                bracketPos = caret - 1;
-            }
-            if (bracketPos < 0) return;
-
-            char bracket = text.charAt(bracketPos);
-            int matchPos = findMatchingBracketPos(text, bracketPos, bracket);
-            if (matchPos < 0) return;
-
-            Highlighter.HighlightPainter matchPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x44FFFFFF, true));
-            matchBracketTags.add(highlighter.addHighlight(bracketPos, bracketPos + 1, matchPainter));
-            matchBracketTags.add(highlighter.addHighlight(matchPos, matchPos + 1, matchPainter));
-        } catch (BadLocationException ignored) {
-        }
+        syntaxUiController.updateMatchingBracketHighlight();
     }
 
     boolean isBracketChar(char c) {
-        return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
+        return syntaxUiController.isBracketChar(c);
     }
 
     int findMatchingBracketPos(String text, int pos, char bracket) {
-        char match;
-        int direction;
-        switch (bracket) {
-            case '(': match = ')'; direction = 1; break;
-            case ')': match = '('; direction = -1; break;
-            case '[': match = ']'; direction = 1; break;
-            case ']': match = '['; direction = -1; break;
-            case '{': match = '}'; direction = 1; break;
-            case '}': match = '{'; direction = -1; break;
-            default: return -1;
-        }
-        int depth = 0;
-        for (int i = pos; i >= 0 && i < text.length(); i += direction) {
-            char c = text.charAt(i);
-            if (c == bracket) depth++;
-            else if (c == match) depth--;
-            if (depth == 0) return i;
-        }
-        return -1;
+        return syntaxUiController.findMatchingBracketPos(text, pos, bracket);
     }
 
     void refreshLineNumberPanel() {
-        for (EditorPane pane : editorPanes) {
-            pane.getLineNumberPanel().setMode(lineNumberMode);
-            pane.getLineNumberPanel().setHighlightCurrentLine(configManager.getShowCurrentLine());
-            pane.getLineNumberPanel().setColors(
-                configManager.getLineNumberBackground(),
-                configManager.getLineNumberForeground(),
-                configManager.getLineNumberActiveForeground()
-            );
-            if (lineNumberMode == LineNumberMode.NONE) {
-                pane.getScrollPane().setRowHeaderView(null);
-            } else {
-                pane.getScrollPane().setRowHeaderView(pane.getLineNumberPanel());
-            }
-            pane.getLineNumberPanel().repaint();
-        }
-        editorHostPanel.revalidate();
-        editorHostPanel.repaint();
+        syntaxUiController.refreshLineNumberPanel();
     }
 
     void applyThemeColors() {
-        Color editorForeground = configManager.getEditorForeground();
-        Color caretColor = configManager.getCaretColor();
-        Color selectionColor = configManager.getSelectionColor();
-        Color selectionTextColor = configManager.getSelectionTextColor();
-
-        currentLinePainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getCurrentLineHighlightColor());
-        substitutePreviewPainter = new DefaultHighlighter.DefaultHighlightPainter(configManager.getSubstitutePreviewColor());
-        syntaxKeywordColor = configManager.getSyntaxKeywordColor();
-        syntaxStringColor = configManager.getSyntaxStringColor();
-        syntaxCommentColor = configManager.getSyntaxCommentColor();
-        syntaxNumberColor = configManager.getSyntaxNumberColor();
-
-        statusBar.setBackground(configManager.getStatusBarBackground());
-        statusBar.setForeground(configManager.getStatusBarForeground());
-        commandBar.setBackground(configManager.getCommandBarBackground());
-        commandBar.setForeground(configManager.getCommandBarForeground());
-        applyDramaticFooterStyling();
-
-        for (EditorPane pane : editorPanes) {
-            JTextArea area = pane.getTextArea();
-            area.setForeground(editorForeground);
-            area.setCaretColor(caretColor);
-            area.setSelectionColor(selectionColor);
-            area.setSelectedTextColor(selectionTextColor);
-        }
-
-        if (editorState.mode != null) {
-            writingArea.setBackground(getModeBackground(editorState.mode));
-        }
-        updateZenModeLayout();
-
-        refreshLineNumberPanel();
-        updateCurrentLineHighlight();
-        applySyntaxHighlighting();
-        updateSubstitutePreview();
-        updateStatusBar();
+        syntaxUiController.applyThemeColors();
     }
 
     void applySyntaxHighlighting() {
-        clearSyntaxHighlighting();
-
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null) {
-            return;
-        }
-
-        String text = writingArea.getText();
-        if (text.isEmpty()) {
-            return;
-        }
-
-        boolean[] masked = new boolean[text.length()];
-        FileType fileType = buffer.getFileType();
-
-        highlightComments(text, fileType, masked);
-        highlightStrings(text, fileType, masked);
-        highlightNumbers(text, masked);
-        if (fileType == FileType.JAVA) {
-            highlightJavaAnnotations(text, masked);
-        }
-        highlightScopeRules(text, fileType, masked);
-        highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
-        if (configManager.getShowWhitespace()) {
-            Highlighter highlighter = writingArea.getHighlighter();
-            highlightTrailingWhitespace(highlighter, text);
-        }
-        applyBracketHighlighting();
-        writingArea.repaint();
+        syntaxUiController.applySyntaxHighlighting();
     }
 
     void clearSyntaxHighlighting() {
-        Highlighter highlighter = writingArea.getHighlighter();
-        for (Object tag : syntaxHighlightTags) {
-            highlighter.removeHighlight(tag);
-        }
-        syntaxHighlightTags.clear();
-        syntaxForegroundSpans.clear();
-        clearBracketHighlighting();
+        syntaxUiController.clearSyntaxHighlighting();
     }
 
     String[] syntaxKeywordsFor(FileType fileType) {
-        return syntaxHighlightService.keywordsFor(fileType);
+        return syntaxUiController.syntaxKeywordsFor(fileType);
     }
 
     void highlightJavaAnnotations(String text, boolean[] masked) {
-        int i = 0;
-        while (i < text.length()) {
-            if (masked[i] || text.charAt(i) != '@') {
-                i++;
-                continue;
-            }
-            int start = i;
-            int end = i + 1;
-            while (end < text.length()) {
-                char c = text.charAt(end);
-                if (!isIdentifierChar(c) && c != '.') {
-                    break;
-                }
-                end++;
-            }
-            if (end > start + 1) {
-                addSyntaxHighlight(start, end, syntaxKeywordColor, masked);
-                i = end;
-            } else {
-                i++;
-            }
-        }
+        syntaxUiController.highlightJavaAnnotations(text, masked);
     }
 
     void highlightKeywords(String text, String[] keywords, boolean[] masked) {
-        if (keywords == null || keywords.length == 0) {
-            return;
-        }
-        for (String keyword : keywords) {
-            if (keyword == null || keyword.isEmpty()) {
-                continue;
-            }
-            int index = 0;
-            while (index <= text.length() - keyword.length()) {
-                int match = text.indexOf(keyword, index);
-                if (match < 0) {
-                    break;
-                }
-                int end = match + keyword.length();
-                if (isKeywordMatch(text, match, keyword, masked)) {
-                    addSyntaxHighlight(match, end, syntaxKeywordColor, masked);
-                }
-                index = match + Math.max(1, keyword.length());
-            }
-        }
+        syntaxUiController.highlightKeywords(text, keywords, masked);
     }
 
     boolean isKeywordMatch(String text, int start, String keyword, boolean[] masked) {
-        int end = start + keyword.length();
-        if (start < 0 || end > text.length() || isMasked(masked, start, end)) {
-            return false;
-        }
-        boolean needsLeftBoundary = isIdentifierChar(keyword.charAt(0));
-        boolean needsRightBoundary = isIdentifierChar(keyword.charAt(keyword.length() - 1));
-        if (needsLeftBoundary && start > 0 && isIdentifierChar(text.charAt(start - 1))) {
-            return false;
-        }
-        if (needsRightBoundary && end < text.length() && isIdentifierChar(text.charAt(end))) {
-            return false;
-        }
-        return true;
+        return syntaxUiController.isKeywordMatch(text, start, keyword, masked);
     }
 
     void highlightComments(String text, FileType fileType, boolean[] masked) {
-        String[] linePrefixes = lineCommentPrefixesFor(fileType);
-        String[][] blockPairs = blockCommentPairsFor(fileType);
-        int i = 0;
-        while (i < text.length()) {
-            if (masked[i]) {
-                i++;
-                continue;
-            }
-
-            boolean matched = false;
-            for (String prefix : linePrefixes) {
-                if (matchesAt(text, i, prefix)) {
-                    int end = i + prefix.length();
-                    while (end < text.length() && text.charAt(end) != '\n') {
-                        end++;
-                    }
-                    addSyntaxHighlight(i, end, syntaxCommentColor, masked);
-                    i = Math.max(i + 1, end);
-                    matched = true;
-                    break;
-                }
-            }
-            if (matched) {
-                continue;
-            }
-
-            for (String[] pair : blockPairs) {
-                String open = pair[0];
-                String close = pair[1];
-                if (!matchesAt(text, i, open)) {
-                    continue;
-                }
-                int closeIndex = text.indexOf(close, i + open.length());
-                int end = closeIndex < 0 ? text.length() : closeIndex + close.length();
-                addSyntaxHighlight(i, end, syntaxCommentColor, masked);
-                i = Math.max(i + 1, end);
-                matched = true;
-                break;
-            }
-            if (!matched) {
-                i++;
-            }
-        }
+        syntaxUiController.highlightComments(text, fileType, masked);
     }
 
     void highlightStrings(String text, FileType fileType, boolean[] masked) {
-        int i = 0;
-        while (i < text.length()) {
-            if (masked[i]) {
-                i++;
-                continue;
-            }
-
-            if (fileType == FileType.JAVA && matchesAt(text, i, "\"\"\"")) {
-                int closeIndex = text.indexOf("\"\"\"", i + 3);
-                int end = closeIndex < 0 ? text.length() : closeIndex + 3;
-                addSyntaxHighlight(i, end, syntaxStringColor, masked);
-                i = Math.max(i + 1, end);
-                continue;
-            }
-
-            if (fileType == FileType.PYTHON && (matchesAt(text, i, "\"\"\"") || matchesAt(text, i, "'''"))) {
-                String delimiter = matchesAt(text, i, "\"\"\"") ? "\"\"\"" : "'''";
-                int closeIndex = text.indexOf(delimiter, i + delimiter.length());
-                int end = closeIndex < 0 ? text.length() : closeIndex + delimiter.length();
-                addSyntaxHighlight(i, end, syntaxStringColor, masked);
-                i = Math.max(i + 1, end);
-                continue;
-            }
-
-            char c = text.charAt(i);
-            if (!isStringDelimiter(fileType, c)) {
-                i++;
-                continue;
-            }
-
-            boolean multiline = c == '`';
-            int end = i + 1;
-            boolean escaped = false;
-            while (end < text.length()) {
-                char current = text.charAt(end);
-                if (!multiline && current == '\n') {
-                    break;
-                }
-                if (!escaped && current == c) {
-                    end++;
-                    break;
-                }
-                if (current == '\\' && !escaped) {
-                    escaped = true;
-                } else {
-                    escaped = false;
-                }
-                end++;
-            }
-            addSyntaxHighlight(i, Math.max(i + 1, end), syntaxStringColor, masked);
-            i = Math.max(i + 1, end);
-        }
+        syntaxUiController.highlightStrings(text, fileType, masked);
     }
 
     void highlightTrailingWhitespace(Highlighter highlighter, String text) {
-        Highlighter.HighlightPainter trailingPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
-        int lineStart = 0;
-        for (int i = 0; i <= text.length(); i++) {
-            if (i == text.length() || text.charAt(i) == '\n') {
-                int trailStart = i;
-                while (trailStart > lineStart && (text.charAt(trailStart - 1) == ' ' || text.charAt(trailStart - 1) == '\t')) {
-                    trailStart--;
-                }
-                if (trailStart < i) {
-                    try {
-                        syntaxHighlightTags.add(highlighter.addHighlight(trailStart, i, trailingPainter));
-                    } catch (BadLocationException ignored) {}
-                }
-                lineStart = i + 1;
-            }
-        }
+        syntaxUiController.highlightTrailingWhitespace(highlighter, text);
     }
 
     void highlightScopeRules(String text, FileType fileType, boolean[] masked) {
-        List<SyntaxHighlightService.SyntaxRule> rules = syntaxHighlightService.scopeRulesFor(fileType);
-        for (SyntaxHighlightService.SyntaxRule rule : rules) {
-            java.util.regex.Matcher m = rule.pattern.matcher(text);
-            while (m.find()) {
-                int start = m.start();
-                int end = m.end();
-                if (start < masked.length && masked[start]) continue;
-                Color color;
-                switch (rule.scope) {
-                    case "type": color = configManager.getSyntaxTypeColor(); break;
-                    case "function": color = configManager.getSyntaxFunctionColor(); break;
-                    case "constant": color = configManager.getSyntaxConstantColor(); break;
-                    case "annotation": color = configManager.getSyntaxAnnotationColor(); break;
-                    case "number": color = configManager.getSyntaxNumberColor(); break;
-                    default: continue;
-                }
-                syntaxForegroundSpans.add(new SyntaxSpan(start, Math.min(end, text.length()), color));
-            }
-        }
+        syntaxUiController.highlightScopeRules(text, fileType, masked);
     }
 
     void highlightNumbers(String text, boolean[] masked) {
-        int i = 0;
-        while (i < text.length()) {
-            if (masked[i]) {
-                i++;
-                continue;
-            }
-            if (!Character.isDigit(text.charAt(i)) || (i > 0 && isIdentifierChar(text.charAt(i - 1)))) {
-                i++;
-                continue;
-            }
-
-            int start = i;
-            int end = i + 1;
-            while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
-                end++;
-            }
-            if (end + 1 < text.length() && text.charAt(end) == '.' && Character.isDigit(text.charAt(end + 1))) {
-                end++;
-                while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
-                    end++;
-                }
-            }
-            if (end < text.length() && (text.charAt(end) == 'e' || text.charAt(end) == 'E')) {
-                int exponent = end + 1;
-                if (exponent < text.length() && (text.charAt(exponent) == '+' || text.charAt(exponent) == '-')) {
-                    exponent++;
-                }
-                if (exponent < text.length() && Character.isDigit(text.charAt(exponent))) {
-                    end = exponent + 1;
-                    while (end < text.length() && (Character.isDigit(text.charAt(end)) || text.charAt(end) == '_')) {
-                        end++;
-                    }
-                }
-            }
-            if (end >= text.length() || !isIdentifierChar(text.charAt(end))) {
-                addSyntaxHighlight(start, end, syntaxNumberColor, masked);
-            }
-            i = Math.max(i + 1, end);
-        }
+        syntaxUiController.highlightNumbers(text, masked);
     }
 
     void addSyntaxHighlight(int start, int end, Color color, boolean[] masked) {
-        if (start < 0 || end <= start || start >= masked.length) {
-            return;
-        }
-        int safeEnd = Math.min(end, masked.length);
-        if (isMasked(masked, start, safeEnd)) {
-            return;
-        }
-        syntaxForegroundSpans.add(new SyntaxSpan(start, safeEnd, color));
-        markMasked(masked, start, safeEnd);
+        syntaxUiController.addSyntaxHighlight(start, end, color, masked);
     }
 
     boolean isMasked(boolean[] masked, int start, int end) {
-        for (int i = start; i < end && i < masked.length; i++) {
-            if (masked[i]) {
-                return true;
-            }
-        }
-        return false;
+        return syntaxUiController.isMasked(masked, start, end);
     }
 
     void markMasked(boolean[] masked, int start, int end) {
-        for (int i = Math.max(0, start); i < end && i < masked.length; i++) {
-            masked[i] = true;
-        }
+        syntaxUiController.markMasked(masked, start, end);
     }
 
     boolean matchesAt(String text, int index, String token) {
-        if (token == null || token.isEmpty() || index < 0 || index + token.length() > text.length()) {
-            return false;
-        }
-        return text.regionMatches(index, token, 0, token.length());
+        return syntaxUiController.matchesAt(text, index, token);
     }
 
     boolean isIdentifierChar(char c) {
-        return Character.isLetterOrDigit(c) || c == '_';
+        return syntaxUiController.isIdentifierChar(c);
     }
 
     boolean isStringDelimiter(FileType fileType, char c) {
-        return syntaxHighlightService.isStringDelimiter(fileType, c);
+        return syntaxUiController.isStringDelimiter(fileType, c);
     }
 
     String[] lineCommentPrefixesFor(FileType fileType) {
-        return syntaxHighlightService.lineCommentPrefixesFor(fileType);
+        return syntaxUiController.lineCommentPrefixesFor(fileType);
     }
 
     String[][] blockCommentPairsFor(FileType fileType) {
-        return syntaxHighlightService.blockCommentPairsFor(fileType);
+        return syntaxUiController.blockCommentPairsFor(fileType);
     }
 
     void updateSubstitutePreview() {
-        clearSubstitutePreview();
-        if (editorState.mode != EditorMode.COMMAND || editorState.commandBuffer == null || !editorState.commandBuffer.startsWith(":")) {
-            return;
-        }
-
-        String command = editorState.commandBuffer.substring(1);
-        SubstitutePreview preview = parseSubstitutePreview(command);
-        if (preview == null || preview.pattern.isEmpty()) {
-            return;
-        }
-
-        try {
-            int startOffset = writingArea.getLineStartOffset(Math.max(0, preview.startLine));
-            int endLine = Math.min(writingArea.getLineCount() - 1, preview.endLine);
-            int endOffset = writingArea.getLineEndOffset(endLine);
-            String text = writingArea.getText();
-            String region = text.substring(startOffset, endOffset);
-            Highlighter highlighter = writingArea.getHighlighter();
-            try {
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile(preview.pattern).matcher(region);
-                while (m.find()) {
-                    int ms = startOffset + m.start();
-                    int me = startOffset + m.end();
-                    if (me > endOffset) break;
-                    substitutePreviewTags.add(highlighter.addHighlight(ms, me, substitutePreviewPainter));
-                }
-            } catch (java.util.regex.PatternSyntaxException e) {
-                int searchFrom = startOffset;
-                while (searchFrom <= endOffset - preview.pattern.length()) {
-                    int match = text.indexOf(preview.pattern, searchFrom);
-                    if (match < 0 || match >= endOffset) break;
-                    substitutePreviewTags.add(highlighter.addHighlight(match, match + preview.pattern.length(), substitutePreviewPainter));
-                    searchFrom = match + Math.max(1, preview.pattern.length());
-                }
-            }
-        } catch (BadLocationException ignored) {
-        }
+        syntaxUiController.updateSubstitutePreview();
     }
 
     void clearSubstitutePreview() {
-        Highlighter highlighter = writingArea.getHighlighter();
-        for (Object tag : substitutePreviewTags) {
-            highlighter.removeHighlight(tag);
-        }
-        substitutePreviewTags.clear();
+        syntaxUiController.clearSubstitutePreview();
     }
 
     SubstitutePreview parseSubstitutePreview(String command) {
-        String working = command;
-        int startLine = getCurrentCaretLine();
-        int endLine = startLine;
-
-        if (working.startsWith("%")) {
-            startLine = 0;
-            endLine = Math.max(0, writingArea.getLineCount() - 1);
-            working = working.substring(1);
-        } else {
-            int rangeEnd = findRangeCommandStart(working);
-            if (rangeEnd > 0) {
-                String rangePart = working.substring(0, rangeEnd);
-                String[] parts = rangePart.split(",", -1);
-                try {
-                    if (parts.length == 2) {
-                        startLine = Math.max(0, Integer.parseInt(parts[0]) - 1);
-                        endLine = Math.max(startLine, Integer.parseInt(parts[1]) - 1);
-                    } else if (parts.length == 1) {
-                        startLine = Math.max(0, Integer.parseInt(parts[0]) - 1);
-                        endLine = startLine;
-                    }
-                    working = working.substring(rangeEnd);
-                } catch (NumberFormatException ignored) {
-                }
-            }
-        }
-
-        if (!working.startsWith("s/")) {
-            return null;
-        }
-
-        String[] parts = working.substring(2).split("/", -1);
-        if (parts.length == 0) {
-            return null;
-        }
-        return new SubstitutePreview(parts[0], startLine, endLine);
+        return syntaxUiController.parseSubstitutePreview(command);
     }
 
     int findRangeCommandStart(String command) {
-        for (int i = 0; i < command.length(); i++) {
-            char c = command.charAt(i);
-            if (!Character.isDigit(c) && c != ',') {
-                return i;
-            }
-        }
-        return -1;
+        return syntaxUiController.findRangeCommandStart(command);
     }
 
     int getCurrentCaretLine() {
-        try {
-            return writingArea.getLineOfOffset(writingArea.getCaretPosition());
-        } catch (BadLocationException e) {
-            return 0;
-        }
+        return syntaxUiController.getCurrentCaretLine();
     }
 
     String resolveGitBranch() {
@@ -4084,172 +2958,32 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void addCursorAtNextMatch() {
-        String text = writingArea.getText();
-        String selected = writingArea.getSelectedText();
-        if (selected == null || selected.isEmpty()) {
-            // Get word under cursor
-            int pos = writingArea.getCaretPosition();
-            int start = pos, end = pos;
-            while (start > 0 && Character.isLetterOrDigit(text.charAt(start - 1))) start--;
-            while (end < text.length() && Character.isLetterOrDigit(text.charAt(end))) end++;
-            if (start == end) return;
-            selected = text.substring(start, end);
-        }
-        // Find next occurrence after last cursor
-        int searchFrom = writingArea.getCaretPosition();
-        for (int ec : extraCursors) {
-            searchFrom = Math.max(searchFrom, ec);
-        }
-        int nextIdx = text.indexOf(selected, searchFrom + 1);
-        if (nextIdx < 0) nextIdx = text.indexOf(selected); // wrap around
-        if (nextIdx >= 0 && !extraCursors.contains(nextIdx)) {
-            extraCursors.add(nextIdx);
-            showMessage("Added cursor (" + extraCursors.size() + " extra)");
-        }
+        editActionController.addCursorAtNextMatch();
     }
 
     String formatParagraph() {
-        int tw = configManager.getTextWidth();
-        if (tw <= 0) return "textwidth not set (use :set tw=80)";
-        try {
-            int caretPos = writingArea.getCaretPosition();
-            int startLine = writingArea.getLineOfOffset(caretPos);
-            int endLine = startLine;
-            String text = writingArea.getText();
-            // expand to paragraph boundaries (blank lines)
-            while (startLine > 0) {
-                int ls = writingArea.getLineStartOffset(startLine - 1);
-                int le = writingArea.getLineEndOffset(startLine - 1);
-                if (text.substring(ls, le).trim().isEmpty()) break;
-                startLine--;
-            }
-            while (endLine < writingArea.getLineCount() - 1) {
-                int ls = writingArea.getLineStartOffset(endLine + 1);
-                int le = writingArea.getLineEndOffset(endLine + 1);
-                if (text.substring(ls, le).trim().isEmpty()) break;
-                endLine++;
-            }
-            int startOff = writingArea.getLineStartOffset(startLine);
-            int endOff = writingArea.getLineEndOffset(endLine);
-            String paraRaw = text.substring(startOff, endOff);
-            // preserve leading indent from first line
-            String indent = "";
-            for (int i2 = 0; i2 < paraRaw.length(); i2++) {
-                char ic = paraRaw.charAt(i2);
-                if (ic == ' ' || ic == '\t') indent += ic;
-                else break;
-            }
-            String paragraph = paraRaw.trim();
-            String[] words = paragraph.split("\\s+");
-            StringBuilder formatted = new StringBuilder();
-            int col = indent.length();
-            formatted.append(indent);
-            for (String word : words) {
-                if (col > 0 && col + 1 + word.length() > tw) {
-                    formatted.append("\n").append(indent);
-                    col = indent.length();
-                }
-                if (col > indent.length()) { formatted.append(" "); col++; }
-                formatted.append(word);
-                col += word.length();
-            }
-            formatted.append("\n");
-            writingArea.replaceRange(formatted.toString(), startOff, endOff);
-            markModified();
-            return "Formatted paragraph to " + tw + " columns";
-        } catch (BadLocationException e) { return "Error: " + e.getMessage(); }
+        return editActionController.formatParagraph();
     }
     void moveDisplayLineDown() {
-        try {
-            Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
-            if (r == null) return;
-            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
-            int newY = (int) r.getY() + lineH;
-            int newPos = writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(r.getX(), newY));
-            if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
-        } catch (BadLocationException ignored) {}
+        editActionController.moveDisplayLineDown();
     }
     void moveDisplayLineUp() {
-        try {
-            Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
-            if (r == null) return;
-            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
-            int newY = (int) r.getY() - lineH;
-            if (newY < 0) return;
-            int newPos = writingArea.viewToModel2D(new java.awt.geom.Point2D.Double(r.getX(), newY));
-            if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
-        } catch (BadLocationException ignored) {}
+        editActionController.moveDisplayLineUp();
     }
     void enterVisualBlockMode() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int col = pos - writingArea.getLineStartOffset(line);
-            editorState.visualBlockStartLine = line;
-            editorState.visualBlockStartCol = col;
-            editorState.visualStartPos = pos;
-            setMode(EditorMode.VISUAL_BLOCK);
-        } catch (BadLocationException ignored) {}
+        editActionController.enterVisualBlockMode();
     }
 
     int[] getVisualBlockBounds() {
-        if (editorState.visualBlockStartLine < 0 || editorState.visualBlockStartCol < 0) return null;
-        try {
-            int caretPos = writingArea.getCaretPosition();
-            int curLine = writingArea.getLineOfOffset(caretPos);
-            int curCol = caretPos - writingArea.getLineStartOffset(curLine);
-            int startLine = Math.min(editorState.visualBlockStartLine, curLine);
-            int endLine = Math.max(editorState.visualBlockStartLine, curLine);
-            int startCol = Math.min(editorState.visualBlockStartCol, curCol);
-            int endCol = Math.max(editorState.visualBlockStartCol, curCol);
-            return new int[]{startLine, endLine, startCol, endCol};
-        } catch (BadLocationException ignored) { return null; }
+        return editActionController.getVisualBlockBounds();
     }
 
     void deleteVisualBlock() {
-        int[] bounds = getVisualBlockBounds();
-        if (bounds == null) return;
-        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
-        try {
-            StringBuilder yanked = new StringBuilder();
-            for (int line = endLine; line >= startLine; line--) {
-                int ls = writingArea.getLineStartOffset(line);
-                int le = writingArea.getLineEndOffset(line);
-                String lineText = writingArea.getText().substring(ls, le);
-                int sc = Math.min(startCol, lineText.length());
-                int ec = Math.min(endCol + 1, lineText.length());
-                if (sc < ec) {
-                    if (line < endLine) yanked.insert(0, "\n");
-                    yanked.insert(0, lineText.substring(sc, ec));
-                    writingArea.replaceRange("", ls + sc, ls + ec);
-                }
-            }
-            clipboardManager.yankSelection(yanked.toString());
-            storeDelete(consumePendingRegister(), yanked.toString(), false);
-            markModified();
-            showMessage("Block deleted");
-        } catch (BadLocationException ignored) {}
+        editActionController.deleteVisualBlock();
     }
 
     void yankVisualBlock() {
-        int[] bounds = getVisualBlockBounds();
-        if (bounds == null) return;
-        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
-        try {
-            StringBuilder yanked = new StringBuilder();
-            for (int line = startLine; line <= endLine; line++) {
-                int ls = writingArea.getLineStartOffset(line);
-                int le = writingArea.getLineEndOffset(line);
-                String lineText = writingArea.getText().substring(ls, le);
-                int sc = Math.min(startCol, lineText.length());
-                int ec = Math.min(endCol + 1, lineText.length());
-                if (line > startLine) yanked.append("\n");
-                if (sc < ec) yanked.append(lineText, sc, ec);
-            }
-            clipboardManager.yankSelection(yanked.toString());
-            storeYank(consumePendingRegister(), yanked.toString(), false);
-            showMessage("Block yanked");
-        } catch (BadLocationException ignored) {}
+        editActionController.yankVisualBlock();
     }
 
     static Character autoPairCloser(char c) {
@@ -4267,360 +3001,95 @@ public class Texteditor extends JFrame implements KeyListener {
         return c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' || c == '`';
     }
     void applyMultiCursorInsert(char c) {
-        if (extraCursors.isEmpty()) return;
-        // Sort cursors descending so insertions don't shift earlier positions
-        List<Integer> sorted = new ArrayList<>(extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        String s = String.valueOf(c);
-        for (int pos : sorted) {
-            if (pos >= 0 && pos <= writingArea.getText().length()) {
-                writingArea.insert(s, pos);
-            }
-        }
-        // Shift all cursors forward by 1
-        for (int i = 0; i < extraCursors.size(); i++) {
-            extraCursors.set(i, extraCursors.get(i) + 1);
-        }
+        editActionController.applyMultiCursorInsert(c);
     }
 
     void applyMultiCursorBackspace() {
-        if (extraCursors.isEmpty()) return;
-        List<Integer> sorted = new ArrayList<>(extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        for (int pos : sorted) {
-            if (pos > 0 && pos <= writingArea.getText().length()) {
-                writingArea.replaceRange("", pos - 1, pos);
-            }
-        }
-        for (int i = 0; i < extraCursors.size(); i++) {
-            extraCursors.set(i, Math.max(0, extraCursors.get(i) - 1));
-        }
+        editActionController.applyMultiCursorBackspace();
     }
     void applyMultiCursorDelete() {
-        if (extraCursors.isEmpty()) return;
-        List<Integer> sorted = new ArrayList<>(extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        for (int pos : sorted) {
-            if (pos >= 0 && pos < writingArea.getText().length()) {
-                writingArea.replaceRange("", pos, pos + 1);
-            }
-        }
+        editActionController.applyMultiCursorDelete();
     }
     void addCursorAbove() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            if (line <= 0) return;
-            int col = pos - writingArea.getLineStartOffset(line);
-            int prevLineStart = writingArea.getLineStartOffset(line - 1);
-            int prevLineEnd = writingArea.getLineEndOffset(line - 1);
-            int newPos = Math.min(prevLineStart + col, prevLineEnd - 1);
-            if (!extraCursors.contains(newPos)) {
-                extraCursors.add(newPos);
-                showMessage("Added cursor above (" + extraCursors.size() + " extra)");
-            }
-        } catch (BadLocationException ignored) {}
+        editActionController.addCursorAbove();
     }
     void addCursorBelow() {
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            if (line >= writingArea.getLineCount() - 1) return;
-            int col = pos - writingArea.getLineStartOffset(line);
-            int nextLineStart = writingArea.getLineStartOffset(line + 1);
-            int nextLineEnd = writingArea.getLineEndOffset(line + 1);
-            int newPos = Math.min(nextLineStart + col, nextLineEnd - 1);
-            if (!extraCursors.contains(newPos)) {
-                extraCursors.add(newPos);
-                showMessage("Added cursor below (" + extraCursors.size() + " extra)");
-            }
-        } catch (BadLocationException ignored) {}
+        editActionController.addCursorBelow();
     }
     void clearExtraCursors() {
-        if (!extraCursors.isEmpty()) {
-            extraCursors.clear();
-        }
+        editActionController.clearExtraCursors();
     }
 
     void deleteWordBackwardInsert() {
-        try {
-            String text = writingArea.getText();
-            int pos = writingArea.getCaretPosition();
-            if (pos <= 0) return;
-            int start = pos - 1;
-            // Skip whitespace
-            while (start > 0 && Character.isWhitespace(text.charAt(start)) && text.charAt(start) != '\n') start--;
-            if (start > 0 && text.charAt(start) != '\n') {
-                int cls = vimCharClass(text.charAt(start));
-                while (start > 0 && vimCharClass(text.charAt(start - 1)) == cls) start--;
-            }
-            writingArea.replaceRange("", start, pos);
-        } catch (Exception ignored) {}
+        editActionController.deleteWordBackwardInsert();
     }
 
     void deleteToLineStartInsert() {
-        try {
-            String text = writingArea.getText();
-            int pos = writingArea.getCaretPosition();
-            int lineStart = text.lastIndexOf('\n', pos - 1) + 1;
-            if (pos > lineStart) {
-                writingArea.replaceRange("", lineStart, pos);
-            }
-        } catch (Exception ignored) {}
+        editActionController.deleteToLineStartInsert();
     }
 
     String currentLineIndentation() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int start = writingArea.getLineStartOffset(line);
-            int end = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(start, end);
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < lineText.length(); i++) {
-                char c = lineText.charAt(i);
-                if (c == ' ' || c == '\t') {
-                    builder.append(c);
-                } else {
-                    break;
-                }
-            }
-            return builder.toString();
-        } catch (BadLocationException e) {
-            return "";
-        }
+        return editActionController.currentLineIndentation();
     }
 
     void moveLineIndentStart() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int start = writingArea.getLineStartOffset(line);
-            int end = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(start, end);
-            int offset = 0;
-            while (offset < lineText.length() && Character.isWhitespace(lineText.charAt(offset)) && lineText.charAt(offset) != '\n') {
-                offset++;
-            }
-            writingArea.setCaretPosition(start + offset);
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.moveLineIndentStart();
     }
 
     void openLineBelow() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String indent = configManager.getAutoIndent() ? currentLineIndentation() : "";
-            writingArea.insert("\n" + indent, lineEnd - 1);
-            writingArea.setCaretPosition(lineEnd + indent.length());
-            markModified();
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.openLineBelow();
     }
 
     void openLineAbove() {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int lineStart = writingArea.getLineStartOffset(line);
-            String indent = configManager.getAutoIndent() ? currentLineIndentation() : "";
-            writingArea.insert(indent + "\n", lineStart);
-            writingArea.setCaretPosition(lineStart + indent.length());
-            markModified();
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.openLineAbove();
     }
 
     void joinCurrentLine(boolean withSpace) {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            if (line >= writingArea.getLineCount() - 1) {
-                showMessage("Already on last line");
-                return;
-            }
-            int lineEnd = writingArea.getLineEndOffset(line);
-            int nextLineStart = writingArea.getLineStartOffset(line + 1);
-            int nextLineEnd = writingArea.getLineEndOffset(line + 1);
-            String nextLine = writingArea.getText().substring(nextLineStart, nextLineEnd).stripLeading();
-            writingArea.replaceRange(withSpace ? " " + nextLine : nextLine, lineEnd - 1, nextLineEnd);
-            markModified();
-        } catch (BadLocationException ignored) {
-        }
+        editActionController.joinCurrentLine(withSpace);
     }
 
     String applyLineOperator(char operator) {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int start = writingArea.getLineStartOffset(line);
-            int end = writingArea.getLineEndOffset(line);
-            String text = writingArea.getText().substring(start, end);
-            switch (operator) {
-                case '>':
-                    String indent = configManager.getExpandTab() ? " ".repeat(writingArea.getTabSize()) : "\t";
-                    writingArea.replaceRange(indent + text, start, end);
-                    break;
-                case '<':
-                    int removeCount = Math.min(writingArea.getTabSize(), leadingWhitespace(text));
-                    writingArea.replaceRange(text.substring(removeCount), start, end);
-                    break;
-                case '=':
-                    String previousIndent = line > 0 ? indentationForLine(line - 1) : "";
-                    writingArea.replaceRange(previousIndent + text.stripLeading(), start, end);
-                    break;
-                default:
-                    return "";
-            }
-            markModified();
-            return "Line updated";
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return editActionController.applyLineOperator(operator);
     }
 
     int leadingWhitespace(String text) {
-        int count = 0;
-        while (count < text.length() && Character.isWhitespace(text.charAt(count)) && text.charAt(count) != '\n') {
-            count++;
-        }
-        return count;
+        return editActionController.leadingWhitespace(text);
     }
 
     String indentationForLine(int line) {
-        try {
-            int start = writingArea.getLineStartOffset(line);
-            int end = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(start, end);
-            int count = 0;
-            while (count < lineText.length() && Character.isWhitespace(lineText.charAt(count)) && lineText.charAt(count) != '\n') {
-                count++;
-            }
-            return lineText.substring(0, count);
-        } catch (BadLocationException e) {
-            return "";
-        }
+        return editActionController.indentationForLine(line);
     }
 
     String findCharacter(char type, char target) {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
-        int lineEnd = text.indexOf('\n', caret);
-        if (lineEnd < 0) lineEnd = text.length();
-
-        int result = -1;
-        switch (type) {
-            case 'f':
-                for (int i = caret + 1; i < lineEnd; i++) {
-                    if (text.charAt(i) == target) { result = i; break; }
-                }
-                break;
-            case 'F':
-                for (int i = caret - 1; i >= lineStart; i--) {
-                    if (text.charAt(i) == target) { result = i; break; }
-                }
-                break;
-            case 't':
-                for (int i = caret + 1; i < lineEnd; i++) {
-                    if (text.charAt(i) == target) { result = i - 1; break; }
-                }
-                break;
-            case 'T':
-                for (int i = caret - 1; i >= lineStart; i--) {
-                    if (text.charAt(i) == target) { result = i + 1; break; }
-                }
-                break;
-            default:
-                break;
-        }
-        if (result < 0 || result >= text.length()) {
-            return "Character not found: " + target;
-        }
-        writingArea.setCaretPosition(result);
-        lastFindType = type;
-        lastFindChar = target;
-        return "Moved to " + target;
+        return editActionController.findCharacter(type, target);
     }
 
     String repeatFind(boolean reverse) {
-        if (lastFindType == '\0' || lastFindChar == '\0') {
-            return "No previous find command";
-        }
-        char repeatType = lastFindType;
-        if (reverse) {
-            switch (lastFindType) {
-                case 'f':
-                    repeatType = 'F';
-                    break;
-                case 'F':
-                    repeatType = 'f';
-                    break;
-                case 't':
-                    repeatType = 'T';
-                    break;
-                case 'T':
-                    repeatType = 't';
-                    break;
-                default:
-                    break;
-            }
-        }
-        return findCharacter(repeatType, lastFindChar);
+        return editActionController.repeatFind(reverse);
     }
 
     void recordJumpPosition() {
-        int position = writingArea.getCaretPosition();
-        if (jumpList.isEmpty() || jumpList.get(jumpList.size() - 1) != position) {
-            if (jumpIndex >= 0 && jumpIndex < jumpList.size() - 1) {
-                jumpList = new ArrayList<>(jumpList.subList(0, jumpIndex + 1));
-            }
-            jumpList.add(position);
-            jumpIndex = jumpList.size() - 1;
-        }
+        editActionController.recordJumpPosition();
     }
 
     void jumpBack() {
-        if (jumpList.isEmpty() || jumpIndex <= 0) {
-            showMessage("At oldest jump");
-            return;
-        }
-        jumpIndex--;
-        writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
+        editActionController.jumpBack();
     }
 
     void jumpForward() {
-        if (jumpList.isEmpty() || jumpIndex >= jumpList.size() - 1) {
-            showMessage("At newest jump");
-            return;
-        }
-        jumpIndex++;
-        writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
+        editActionController.jumpForward();
     }
 
     void recordChangePosition() {
-        int position = writingArea.getCaretPosition();
-        if (changeList.isEmpty() || changeList.get(changeList.size() - 1) != position) {
-            changeList.add(position);
-            if (changeList.size() > 100) {
-                changeList.remove(0);
-            }
-            changeIndex = changeList.size() - 1;
-        }
+        editActionController.recordChangePosition();
     }
 
     void changePrev() {
-        if (changeList.isEmpty() || changeIndex <= 0) {
-            showMessage("At oldest change");
-            return;
-        }
-        changeIndex--;
-        writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
+        editActionController.changePrev();
     }
 
     void changeNext() {
-        if (changeList.isEmpty() || changeIndex >= changeList.size() - 1) {
-            showMessage("At newest change");
-            return;
-        }
-        changeIndex++;
-        writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
+        editActionController.changeNext();
     }
 
     void checkForExternalChanges() {
@@ -6124,571 +4593,95 @@ public class Texteditor extends JFrame implements KeyListener {
 
     MinimapPanel activeMinimapPanel;
     public String toggleMinimap() {
-        EditorPane pane = getActivePane();
-        if (pane == null) return "No active pane";
-        JScrollPane sp = pane.getScrollPane();
-        if (activeMinimapPanel != null && activeMinimapPanel.getParent() != null) {
-            MinimapPanel panelToRemove = activeMinimapPanel;
-            java.awt.Container parent = panelToRemove.getParent();
-            Runnable removePanel = () -> {
-                if (parent != null) {
-                    parent.remove(panelToRemove);
-                    parent.revalidate();
-                    parent.repaint();
-                }
-                if (activeMinimapPanel == panelToRemove) {
-                    activeMinimapPanel = null;
-                }
-                sp.revalidate();
-                sp.repaint();
-            };
-            animateMinimapWidth(panelToRemove, panelToRemove.getPixelWidth(), 0, removePanel);
-            animateEditorHostTint(configManager.getCommandColor());
-            return "Minimap hidden";
-        }
-        activeMinimapPanel = new MinimapPanel(pane.getTextArea());
-        activeMinimapPanel.setColors(configManager.getLineNumberBackground(), configManager.getEditorForeground());
-        int initialWidth = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0 : dramaticMinimapWidth;
-        activeMinimapPanel.setPixelWidth(initialWidth);
-        java.awt.Container parent = sp.getParent();
-        if (parent instanceof JPanel) {
-            ((JPanel) parent).add(activeMinimapPanel, BorderLayout.EAST);
-        } else {
-            // wrap the scroll pane
-            JPanel wrapper = new JPanel(new BorderLayout());
-            if (parent != null) {
-                int idx = -1;
-                for (int i = 0; i < parent.getComponentCount(); i++) {
-                    if (parent.getComponent(i) == sp) { idx = i; break; }
-                }
-                if (idx >= 0) parent.remove(idx);
-                wrapper.add(sp, BorderLayout.CENTER);
-                wrapper.add(activeMinimapPanel, BorderLayout.EAST);
-                if (idx >= 0) parent.add(wrapper, idx);
-            }
-        }
-        sp.getViewport().addChangeListener(e -> { if (activeMinimapPanel != null) activeMinimapPanel.repaint(); });
-        sp.revalidate();
-        sp.repaint();
-        animateMinimapWidth(activeMinimapPanel, initialWidth, dramaticMinimapWidth, null);
-        animateEditorHostTint(configManager.getVisualColor());
-        return "Minimap shown";
+        return dramaticUiController.toggleMinimap();
     }
 
     public String toggleZenMode() {
-        zenModeEnabled = !zenModeEnabled;
-        updateZenModeLayout();
-        return zenModeEnabled ? "Zen mode enabled" : "Zen mode disabled";
+        return dramaticUiController.toggleZenMode();
     }
 
     void updateZenModeLayout() {
-        Color editorBackground = getModeBackground(editorState.mode == null ? EditorMode.NORMAL : editorState.mode);
-        Color marginBackground = zenModeEnabled ? fadedMarginColor(editorBackground) : editorBackground;
-        editorHostPanel.setBackground(marginBackground);
-        editorHostPanel.setOpaque(true);
-
-        for (EditorPane pane : editorPanes) {
-            JScrollPane scrollPane = pane.getScrollPane();
-            JTextArea area = pane.getTextArea();
-            area.setBackground(editorBackground);
-            scrollPane.setOpaque(true);
-            scrollPane.getViewport().setOpaque(true);
-            scrollPane.setBackground(marginBackground);
-            scrollPane.getViewport().setBackground(editorBackground);
-            if (!zenModeEnabled) {
-                scrollPane.setBorder(null);
-                continue;
-            }
-            int width = getWidth();
-            int desired = configManager.getZenModeWidth() * Math.max(8, area.getFontMetrics(area.getFont()).charWidth('M'));
-            int horizontalPadding = Math.max(12, (width - desired) / 2);
-            scrollPane.setBorder(BorderFactory.createEmptyBorder(0, horizontalPadding, 0, horizontalPadding));
-        }
-        editorHostPanel.revalidate();
-        editorHostPanel.repaint();
+        dramaticUiController.updateZenModeLayout();
     }
 
     Color fadedMarginColor(Color base) {
-        return blendColor(base, configManager.getEditorForeground(), 0.12);
+        return dramaticUiController.fadedMarginColor(base);
     }
 
     Color blendColor(Color base, Color overlay, double ratio) {
-        double clamped = Math.max(0.0, Math.min(1.0, ratio));
-        int r = (int) Math.round(base.getRed() * (1.0 - clamped) + overlay.getRed() * clamped);
-        int g = (int) Math.round(base.getGreen() * (1.0 - clamped) + overlay.getGreen() * clamped);
-        int b = (int) Math.round(base.getBlue() * (1.0 - clamped) + overlay.getBlue() * clamped);
-        return new Color(r, g, b);
+        return dramaticUiController.blendColor(base, overlay, ratio);
     }
 
     void refreshDramaticSettings() {
-        boolean wasEnabled = dramaticUiEnabled;
-        dramaticUiEnabled = configManager.getDramaticUiEnabled();
-        dramaticIdentityEnabled = dramaticUiEnabled && configManager.getDramaticIdentityEnabled();
-        dramaticModeTransitionsEnabled = dramaticUiEnabled && configManager.getDramaticModeTransitionsEnabled();
-        dramaticCommandPaletteEnabled = dramaticUiEnabled && configManager.getDramaticCommandPaletteEnabled();
-        dramaticEditingFeedbackEnabled = dramaticUiEnabled && configManager.getDramaticEditingFeedbackEnabled();
-        dramaticPanelAnimationsEnabled = dramaticUiEnabled && configManager.getDramaticPanelAnimationsEnabled();
-        dramaticSoundEnabled = dramaticUiEnabled && configManager.getDramaticSoundEnabled();
-        dramaticSoundPack = configManager.getDramaticSoundPack();
-        dramaticSoundVolume = configManager.getDramaticSoundVolume();
-        dramaticSoundModeCueEnabled = configManager.getDramaticSoundModeCueEnabled();
-        dramaticSoundNavigateCueEnabled = configManager.getDramaticSoundNavigateCueEnabled();
-        dramaticSoundSuccessCueEnabled = configManager.getDramaticSoundSuccessCueEnabled();
-        dramaticSoundErrorCueEnabled = configManager.getDramaticSoundErrorCueEnabled();
-        dramaticReducedMotionEnabled = configManager.getDramaticReducedMotionEnabled();
-        dramaticPerformanceGuardrailsEnabled = configManager.getDramaticPerformanceGuardrailsEnabled();
-        dramaticPerformanceCpuThreshold = Math.max(0.1, Math.min(1.0, configManager.getDramaticPerformanceCpuThreshold()));
-        dramaticPerformanceLineThreshold = configManager.getDramaticPerformanceLineThreshold();
-        dramaticAnimationMs = Math.max(80, configManager.getDramaticAnimationMs());
-        dramaticMinimapWidth = Math.max(40, configManager.getDramaticMinimapWidth());
-        whichKeyHintsEnabled = configManager.getWhichKeyHintsEnabled();
-        if (wasEnabled && !dramaticUiEnabled) {
-            if (modeTransitionTimer != null) modeTransitionTimer.stop();
-            if (feedbackPulseTimer != null) feedbackPulseTimer.stop();
-            if (hostTintTimer != null) hostTintTimer.stop();
-            if (splitAnimationTimer != null) splitAnimationTimer.stop();
-            if (minimapWidthTimer != null) minimapWidthTimer.stop();
-            modeTransitionTimer = null;
-            feedbackPulseTimer = null;
-            hostTintTimer = null;
-            splitAnimationTimer = null;
-            minimapWidthTimer = null;
-            clearFeedbackPulse();
-        }
+        dramaticUiController.refreshDramaticSettings();
     }
 
     boolean dramaticMotionAllowed() {
-        return dramaticUiEnabled
-            && !dramaticReducedMotionEnabled
-            && dramaticAnimationMs > 0
-            && !isDramaticPerformanceThrottled();
+        return dramaticUiController.dramaticMotionAllowed();
     }
 
     boolean isDramaticPerformanceThrottled() {
-        if (!dramaticPerformanceGuardrailsEnabled) {
-            return false;
-        }
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer != null && buffer.isLargeFile()) {
-            return true;
-        }
-        if (writingArea != null && writingArea.getLineCount() >= dramaticPerformanceLineThreshold) {
-            return true;
-        }
-        double cpuLoad = cachedProcessCpuLoad();
-        return cpuLoad >= 0.0 && cpuLoad >= dramaticPerformanceCpuThreshold;
+        return dramaticUiController.isDramaticPerformanceThrottled();
     }
 
     double cachedProcessCpuLoad() {
-        long now = System.currentTimeMillis();
-        if (now - cachedProcessCpuLoadAtMillis < 1200) {
-            return cachedProcessCpuLoad;
-        }
-        cachedProcessCpuLoadAtMillis = now;
-        cachedProcessCpuLoad = readProcessCpuLoad();
-        return cachedProcessCpuLoad;
+        return dramaticUiController.cachedProcessCpuLoad();
     }
 
     double readProcessCpuLoad() {
-        try {
-            Object osBean = ManagementFactory.getOperatingSystemMXBean();
-            Method method = osBean.getClass().getMethod("getProcessCpuLoad");
-            method.setAccessible(true);
-            Object value = method.invoke(osBean);
-            if (value instanceof Number) {
-                double load = ((Number) value).doubleValue();
-                if (load >= 0.0 && load <= 1.0) {
-                    return load;
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return -1.0;
+        return dramaticUiController.readProcessCpuLoad();
     }
 
     int animationDelayForSteps(int steps) {
-        return Math.max(12, dramaticAnimationMs / Math.max(1, steps));
+        return dramaticUiController.animationDelayForSteps(steps);
     }
 
     double easeOut(double t) {
-        double clamped = Math.max(0.0, Math.min(1.0, t));
-        double inverse = 1.0 - clamped;
-        return 1.0 - inverse * inverse * inverse;
+        return dramaticUiController.easeOut(t);
     }
 
     void applyDramaticFooterStyling() {
-        if (statusBar == null || commandBar == null || editorState == null) {
-            return;
-        }
-        Color baseStatus = configManager.getStatusBarBackground();
-        Color baseCommand = configManager.getCommandBarBackground();
-        Color modeAccent = getModeBackground(editorState.mode == null ? EditorMode.NORMAL : editorState.mode);
-
-        if (dramaticIdentityEnabled) {
-            Color statusBg = blendColor(baseStatus, modeAccent, 0.20);
-            Color commandBg = blendColor(baseCommand, modeAccent, 0.15);
-            statusBar.setBackground(statusBg);
-            commandBar.setBackground(commandBg);
-            statusBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 4, 0, 0, modeAccent),
-                BorderFactory.createEmptyBorder(5, 8, 5, 10)
-            ));
-            commandBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, blendColor(modeAccent, configManager.getEditorForeground(), 0.45)),
-                BorderFactory.createEmptyBorder(4, 10, 4, 10)
-            ));
-            if (writingArea != null) {
-                Font baseFont = writingArea.getFont();
-                statusBar.setFont(baseFont.deriveFont(Font.BOLD, baseFont.getSize2D() + 1.0f));
-                commandBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
-            }
-            return;
-        }
-
-        statusBar.setBackground(baseStatus);
-        commandBar.setBackground(baseCommand);
-        statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-        if (writingArea != null) {
-            Font baseFont = writingArea.getFont();
-            statusBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
-            commandBar.setFont(baseFont.deriveFont(Font.PLAIN, baseFont.getSize2D()));
-        }
+        dramaticUiController.applyDramaticFooterStyling();
     }
 
     void animateModeTransition(EditorMode fromMode, EditorMode toMode) {
-        if (!dramaticModeTransitionsEnabled) {
-            return;
-        }
-        if (fromMode == toMode || writingArea == null) {
-            return;
-        }
-        playCue(CueType.MODE_CHANGE);
-        Color fromColor = getModeBackground(fromMode == null ? toMode : fromMode);
-        Color toColor = getModeBackground(toMode);
-        if (!dramaticMotionAllowed()) {
-            writingArea.setBackground(toColor);
-            applyDramaticFooterStyling();
-            return;
-        }
-
-        if (modeTransitionTimer != null) {
-            modeTransitionTimer.stop();
-        }
-
-        int steps = Math.max(6, Math.min(20, dramaticAnimationMs / 14));
-        final int[] tick = new int[] {0};
-        modeTransitionTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = easeOut((double) tick[0] / steps);
-            Color blended = blendColor(fromColor, toColor, t);
-            writingArea.setBackground(blended);
-            if (editorHostPanel != null) {
-                editorHostPanel.setBackground(zenModeEnabled ? fadedMarginColor(blended) : blended);
-                editorHostPanel.repaint();
-            }
-            tick[0]++;
-            if (tick[0] > steps) {
-                modeTransitionTimer.stop();
-                modeTransitionTimer = null;
-                updateZenModeLayout();
-                applyDramaticFooterStyling();
-            }
-        });
-        modeTransitionTimer.start();
+        dramaticUiController.animateModeTransition(fromMode, toMode);
     }
 
     void clearFeedbackPulse() {
-        if (feedbackPulseTag != null && writingArea != null) {
-            writingArea.getHighlighter().removeHighlight(feedbackPulseTag);
-            feedbackPulseTag = null;
-        }
+        dramaticUiController.clearFeedbackPulse();
     }
 
     void pulseCaretLine(Color color) {
-        if (!dramaticEditingFeedbackEnabled || writingArea == null) {
-            return;
-        }
-        if (feedbackPulseTimer != null) {
-            feedbackPulseTimer.stop();
-        }
-        clearFeedbackPulse();
-
-        int line;
-        int start;
-        int end;
-        try {
-            line = Math.max(0, writingArea.getLineOfOffset(writingArea.getCaretPosition()));
-            start = writingArea.getLineStartOffset(line);
-            end = writingArea.getLineEndOffset(line);
-        } catch (BadLocationException e) {
-            return;
-        }
-
-        if (!dramaticMotionAllowed()) {
-            try {
-                feedbackPulseTag = writingArea.getHighlighter().addHighlight(start, end, new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), 80)));
-            } catch (BadLocationException ignored) {
-                return;
-            }
-            Timer cleanup = new Timer(140, ev -> {
-                clearFeedbackPulse();
-                ((Timer) ev.getSource()).stop();
-            });
-            cleanup.setRepeats(false);
-            cleanup.start();
-            return;
-        }
-
-        int steps = Math.max(5, Math.min(14, dramaticAnimationMs / 18));
-        final int[] tick = new int[] {0};
-        feedbackPulseTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            clearFeedbackPulse();
-            double progress = (double) tick[0] / steps;
-            int alpha = (int) Math.round(130 * (1.0 - progress));
-            alpha = Math.max(0, Math.min(255, alpha));
-            try {
-                feedbackPulseTag = writingArea.getHighlighter().addHighlight(
-                    start,
-                    end,
-                    new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha))
-                );
-            } catch (BadLocationException ignored) {
-            }
-            tick[0]++;
-            if (tick[0] > steps) {
-                feedbackPulseTimer.stop();
-                feedbackPulseTimer = null;
-                clearFeedbackPulse();
-            }
-        });
-        feedbackPulseTimer.start();
+        dramaticUiController.pulseCaretLine(color);
     }
 
     void animateEditorHostTint(Color tint) {
-        if (!dramaticPanelAnimationsEnabled || editorHostPanel == null || tint == null) {
-            return;
-        }
-        if (hostTintTimer != null) {
-            hostTintTimer.stop();
-        }
-        if (!dramaticMotionAllowed()) {
-            editorHostPanel.setBackground(blendColor(editorHostPanel.getBackground(), tint, 0.20));
-            editorHostPanel.repaint();
-            return;
-        }
-
-        final Color base = editorHostPanel.getBackground();
-        int steps = Math.max(6, Math.min(20, dramaticAnimationMs / 14));
-        final int[] tick = new int[] {0};
-        hostTintTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double progress = (double) tick[0] / steps;
-            double ratio = 0.30 * (1.0 - progress);
-            editorHostPanel.setBackground(blendColor(base, tint, ratio));
-            editorHostPanel.repaint();
-            tick[0]++;
-            if (tick[0] > steps) {
-                hostTintTimer.stop();
-                hostTintTimer = null;
-                updateZenModeLayout();
-            }
-        });
-        hostTintTimer.start();
+        dramaticUiController.animateEditorHostTint(tint);
     }
 
     void animateSplitForPane(EditorPane pane, double startRatio, double targetRatio) {
-        if (!dramaticPanelAnimationsEnabled || pane == null || windowLayoutRoot == null) {
-            return;
-        }
-        if (!dramaticMotionAllowed()) {
-            return;
-        }
-        if (splitAnimationTimer != null) {
-            splitAnimationTimer.stop();
-        }
-
-        int steps = Math.max(5, Math.min(16, dramaticAnimationMs / 16));
-        final int[] tick = new int[] {0};
-        final double delta = (targetRatio - startRatio) / Math.max(1, steps);
-        splitAnimationTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            boolean changed = windowLayoutRoot.adjustRatio(pane, delta);
-            if (changed) {
-                renderWindowLayout();
-            }
-            tick[0]++;
-            if (tick[0] > steps || !changed) {
-                splitAnimationTimer.stop();
-                splitAnimationTimer = null;
-            }
-        });
-        splitAnimationTimer.start();
+        dramaticUiController.animateSplitForPane(pane, startRatio, targetRatio);
     }
 
     void animateMinimapWidth(MinimapPanel panel, int fromWidth, int toWidth, Runnable onFinish) {
-        if (panel == null) {
-            if (onFinish != null) {
-                onFinish.run();
-            }
-            return;
-        }
-        if (minimapWidthTimer != null) {
-            minimapWidthTimer.stop();
-        }
-        if (!dramaticPanelAnimationsEnabled || !dramaticMotionAllowed()) {
-            panel.setPixelWidth(toWidth);
-            if (onFinish != null) {
-                onFinish.run();
-            }
-            return;
-        }
-        int steps = Math.max(5, Math.min(14, dramaticAnimationMs / 18));
-        final int[] tick = new int[] {0};
-        minimapWidthTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = easeOut((double) tick[0] / steps);
-            int width = (int) Math.round(fromWidth + (toWidth - fromWidth) * t);
-            panel.setPixelWidth(width);
-            tick[0]++;
-            if (tick[0] > steps) {
-                minimapWidthTimer.stop();
-                minimapWidthTimer = null;
-                panel.setPixelWidth(toWidth);
-                if (onFinish != null) {
-                    onFinish.run();
-                }
-            }
-        });
-        minimapWidthTimer.start();
+        dramaticUiController.animateMinimapWidth(panel, fromWidth, toWidth, onFinish);
     }
 
     void clearPaneJumpFlash() {
-        if (paneJumpFlashTarget != null && paneJumpFlashTarget.getScrollPane() != null) {
-            paneJumpFlashTarget.getScrollPane().setBorder(paneJumpFlashOriginalBorder);
-            paneJumpFlashTarget.getScrollPane().revalidate();
-            paneJumpFlashTarget.getScrollPane().repaint();
-        }
-        paneJumpFlashTarget = null;
-        paneJumpFlashOriginalBorder = null;
+        dramaticUiController.clearPaneJumpFlash();
     }
 
     void flashPaneJump(EditorPane pane) {
-        if (!dramaticPanelAnimationsEnabled || pane == null || pane.getScrollPane() == null) {
-            return;
-        }
-        if (paneJumpFlashTimer != null) {
-            paneJumpFlashTimer.stop();
-            paneJumpFlashTimer = null;
-        }
-        clearPaneJumpFlash();
-
-        JScrollPane scrollPane = pane.getScrollPane();
-        paneJumpFlashTarget = pane;
-        paneJumpFlashOriginalBorder = scrollPane.getBorder();
-        Color accent = blendColor(configManager.getCaretColor(), configManager.getSelectionColor(), 0.35);
-        animateEditorHostTint(accent);
-
-        if (!dramaticMotionAllowed()) {
-            scrollPane.setBorder(BorderFactory.createLineBorder(accent, 2));
-            paneJumpFlashTimer = new Timer(120, ev -> {
-                clearPaneJumpFlash();
-                paneJumpFlashTimer.stop();
-                paneJumpFlashTimer = null;
-            });
-            paneJumpFlashTimer.setRepeats(false);
-            paneJumpFlashTimer.start();
-            return;
-        }
-
-        int steps = Math.max(4, Math.min(12, dramaticAnimationMs / 20));
-        final int[] tick = new int[] {0};
-        paneJumpFlashTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = (double) tick[0] / steps;
-            int alpha = (int) Math.round((1.0 - t) * 180);
-            alpha = Math.max(0, Math.min(255, alpha));
-            scrollPane.setBorder(BorderFactory.createLineBorder(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha), 2));
-            tick[0]++;
-            if (tick[0] > steps) {
-                paneJumpFlashTimer.stop();
-                paneJumpFlashTimer = null;
-                clearPaneJumpFlash();
-            }
-        });
-        paneJumpFlashTimer.start();
+        dramaticUiController.flashPaneJump(pane);
     }
 
     void playCue(CueType cueType) {
-        if (!dramaticSoundEnabled) {
-            return;
-        }
-        if (dramaticSoundVolume <= 0) {
-            return;
-        }
-        if (cueType == CueType.MODE_CHANGE && !dramaticSoundModeCueEnabled) {
-            return;
-        }
-        if (cueType == CueType.NAVIGATE && !dramaticSoundNavigateCueEnabled) {
-            return;
-        }
-        if (cueType == CueType.SUCCESS && !dramaticSoundSuccessCueEnabled) {
-            return;
-        }
-        if (cueType == CueType.ERROR && !dramaticSoundErrorCueEnabled) {
-            return;
-        }
-
-        int[] pattern = cuePattern(cueType);
-        for (int delay : pattern) {
-            Timer beep = new Timer(Math.max(0, delay), ev -> {
-                Toolkit.getDefaultToolkit().beep();
-                ((Timer) ev.getSource()).stop();
-            });
-            beep.setRepeats(false);
-            beep.start();
-        }
+        dramaticUiController.playCue(cueType);
     }
 
     int[] cuePattern(CueType cueType) {
-        String pack = dramaticSoundPack == null ? "default" : dramaticSoundPack;
-        int[] base;
-        switch (pack) {
-            case "soft":
-                switch (cueType) {
-                    case MODE_CHANGE: base = new int[] {0}; break;
-                    case NAVIGATE: base = new int[] {0}; break;
-                    case SUCCESS: base = new int[] {0, 80}; break;
-                    case ERROR: base = new int[] {0, 120}; break;
-                    default: base = new int[] {0}; break;
-                }
-                break;
-            case "cinema":
-            case "dramatic":
-                switch (cueType) {
-                    case MODE_CHANGE: base = new int[] {0, 35}; break;
-                    case NAVIGATE: base = new int[] {0, 45}; break;
-                    case SUCCESS: base = new int[] {0, 60, 120}; break;
-                    case ERROR: base = new int[] {0, 60, 120, 180}; break;
-                    default: base = new int[] {0}; break;
-                }
-                break;
-            default:
-                switch (cueType) {
-                    case MODE_CHANGE: base = new int[] {0}; break;
-                    case NAVIGATE: base = new int[] {0}; break;
-                    case SUCCESS: base = new int[] {0, 70}; break;
-                    case ERROR: base = new int[] {0, 90, 180}; break;
-                    default: base = new int[] {0}; break;
-                }
-                break;
-        }
-        int maxBeeps;
-        if (dramaticSoundVolume >= 80) {
-            maxBeeps = base.length;
-        } else if (dramaticSoundVolume >= 50) {
-            maxBeeps = Math.max(1, base.length - 1);
-        } else {
-            maxBeeps = 1;
-        }
-        int[] limited = new int[maxBeeps];
-        System.arraycopy(base, 0, limited, 0, maxBeeps);
-        return limited;
+        return dramaticUiController.cuePattern(cueType);
     }
 
     public String executeNormalKeys(String keys, int startLine, int endLine) {
@@ -6983,547 +4976,123 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void insertLastText() {
-        if (lastInsertedText != null && !lastInsertedText.isEmpty()) {
-            int pos = writingArea.getCaretPosition();
-            writingArea.insert(lastInsertedText, pos);
-            writingArea.setCaretPosition(pos + lastInsertedText.length());
-            markModified();
-        }
+        editActionController.insertLastText();
     }
 
     int consumePendingCount() {
-        if (editorState.pendingCount == null || editorState.pendingCount.isEmpty()) {
-            return 1;
-        }
-        int count = Integer.parseInt(editorState.pendingCount);
-        editorState.pendingCount = "";
-        return Math.max(1, count);
+        return editActionController.consumePendingCount();
     }
 
     void repeatAction(int count, Runnable action) {
-        for (int i = 0; i < Math.max(1, count); i++) {
-            action.run();
-        }
+        editActionController.repeatAction(count, action);
     }
 
     Character consumePendingRegister() {
-        Character register = editorState.pendingRegister;
-        editorState.pendingRegister = null;
-        return register;
+        return editActionController.consumePendingRegister();
     }
 
     void storeYank(Character register, String text, boolean lineWise) {
-        RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
-        registerManager.setYank(register, content);
-        addToYankRing(content);
+        editActionController.storeYank(register, text, lineWise);
     }
 
     void storeDelete(Character register, String text, boolean lineWise) {
-        RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
-        registerManager.setDelete(register, content);
-        addToYankRing(content);
+        editActionController.storeDelete(register, text, lineWise);
     }
 
     void addToYankRing(RegisterContent content) {
-        if (content == null || content.isMacro()) {
-            return;
-        }
-        String text = content.getText();
-        if (text == null || text.isEmpty()) {
-            return;
-        }
-        yankRing.removeIf(existing -> existing != null
-            && !existing.isMacro()
-            && existing.isLineWise() == content.isLineWise()
-            && text.equals(existing.getText()));
-        yankRing.add(0, content);
-        while (yankRing.size() > 80) {
-            yankRing.remove(yankRing.size() - 1);
-        }
+        editActionController.addToYankRing(content);
     }
 
     public String showYankRingPicker() {
-        if (yankRing.isEmpty()) {
-            return "Yank ring empty";
-        }
-        List<String> candidates = new ArrayList<>();
-        for (int i = 0; i < yankRing.size(); i++) {
-            RegisterContent content = yankRing.get(i);
-            String kind = content.isLineWise() ? "[L]" : "[C]";
-            candidates.add(String.format("%02d %s %s", i + 1, kind, safePreviewText(content.getText(), 100)));
-        }
-        String selected = showPaletteDialog("Yank Ring", candidates,
-            value -> value == null ? "" : "Enter to paste selected ring entry");
-        if (selected == null || selected.isBlank()) {
-            return "Yank ring cancelled";
-        }
-        int index = candidates.indexOf(selected);
-        if (index < 0 || index >= yankRing.size()) {
-            return "Invalid yank ring selection";
-        }
-        RegisterContent content = yankRing.get(index);
-        clipboardManager.pasteContent(writingArea, content.getText(), content.isLineWise(), false);
-        markModified();
-        return "Pasted yank ring item " + (index + 1);
+        return editActionController.showYankRingPicker();
     }
 
     String pasteFromRegister(boolean before) {
-        RegisterContent content = registerManager.get(consumePendingRegister());
-        if (content == null || content.getText().isEmpty()) {
-            return "Register empty";
-        }
-        clipboardManager.pasteContent(writingArea, content.getText(), content.isLineWise(), before);
-        markModified();
-        return "Pasted";
+        return editActionController.pasteFromRegister(before);
     }
 
     String playMacro(Character register) {
-        if (register == null) {
-            return "No previously executed macro";
-        }
-        RegisterContent content = registerManager.get(register);
-        if (content == null || !content.isMacro()) {
-            return "Register @" + register + " is empty or not a macro";
-        }
-        if (macroPlaybackDepth >= 20) {
-            return "Macro recursion limit reached";
-        }
-
-        macroPlaybackDepth++;
-        try {
-            lastMacroRegister = register;
-            for (NormalizedKeyStroke keyStroke : content.getMacroKeys()) {
-                keyPressed(keyStroke.toKeyEvent(writingArea));
-            }
-        } finally {
-            macroPlaybackDepth--;
-        }
-        return "Executed macro @" + register;
+        return editActionController.playMacro(register);
     }
 
     String yankToEndOfLine() {
-        try {
-            int start = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(start);
-            int end = writingArea.getLineEndOffset(line);
-            String text = writingArea.getText().substring(start, end);
-            storeYank(consumePendingRegister(), text, false);
-            return "Yanked " + text.length() + " characters";
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return editActionController.yankToEndOfLine();
     }
 
     String replaceCharacter(char replacement) {
-        int caret = writingArea.getCaretPosition();
-        String text = writingArea.getText();
-        if (caret >= text.length()) {
-            return "No character to replace";
-        }
-        writingArea.replaceRange(String.valueOf(replacement), caret, caret + 1);
-        markModified();
-        return "Replaced character";
+        return editActionController.replaceCharacter(replacement);
     }
 
     String applyMotionOperator(char operator, String motion) {
-        MotionRange range = resolveMotionRange(motion);
-        return applyResolvedRange(operator, range, motion);
+        return editActionController.applyMotionOperator(operator, motion);
     }
 
     String applyTextObjectOperator(char operator, char modifier, char objectKey) {
-        MotionRange range = resolveTextObjectRange(modifier, objectKey);
-        return applyResolvedRange(operator, range, String.valueOf(modifier) + objectKey);
+        return editActionController.applyTextObjectOperator(operator, modifier, objectKey);
     }
 
     String applyResolvedRange(char operator, MotionRange range, String label) {
-        if (range == null || range.start == range.end) {
-            return "Unsupported target: " + label;
-        }
-
-        String selected = writingArea.getText().substring(range.start, Math.min(range.end, writingArea.getText().length()));
-        switch (operator) {
-            case 'y':
-                storeYank(consumePendingRegister(), selected, range.lineWise);
-                lastCommand = "y" + label;
-                return "Yanked " + selected.length() + " characters";
-            case 'd':
-                storeDelete(consumePendingRegister(), selected, range.lineWise);
-                writingArea.replaceRange("", range.start, range.end);
-                writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
-                lastCommand = "d" + label;
-                markModified();
-                return "Deleted " + selected.length() + " characters";
-            case 'c':
-                storeDelete(consumePendingRegister(), selected, range.lineWise);
-                writingArea.replaceRange("", range.start, range.end);
-                writingArea.setCaretPosition(Math.min(range.start, writingArea.getText().length()));
-                lastInsertedText = "";
-                lastCommand = "c" + label;
-                markModified();
-                setMode(EditorMode.INSERT);
-                return "Changed " + selected.length() + " characters";
-            default:
-                return "Unsupported operator";
-        }
+        return editActionController.applyResolvedRange(operator, range, label);
     }
 
     MotionRange resolveMotionRange(String motion) {
-        try {
-            int original = writingArea.getCaretPosition();
-            if ("gg".equals(motion) || "G".equals(motion)) {
-                int originalLine = writingArea.getLineOfOffset(original);
-                if ("gg".equals(motion)) {
-                    moveFileStart();
-                } else {
-                    moveFileEnd();
-                }
-                int targetLine = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                writingArea.setCaretPosition(original);
-                int startLine = Math.min(originalLine, targetLine);
-                int endLine = Math.max(originalLine, targetLine);
-                int start = writingArea.getLineStartOffset(startLine);
-                int end = writingArea.getLineEndOffset(endLine);
-                return new MotionRange(start, end, true);
-            }
-
-            int target = previewMotionTarget(motion);
-            if (target < 0) {
-                return null;
-            }
-
-            boolean inclusive = "e".equals(motion) || "E".equals(motion) || "ge".equals(motion) || "gE".equals(motion) || "$".equals(motion) || "g$".equals(motion) || "l".equals(motion);
-            int start = Math.min(original, target);
-            int end = Math.max(original, target);
-            if (inclusive) {
-                end = Math.min(end + 1, writingArea.getText().length());
-            }
-            return new MotionRange(start, end, false);
-        } catch (BadLocationException e) {
-            return null;
-        }
+        return editActionController.resolveMotionRange(motion);
     }
 
     MotionRange resolveTextObjectRange(char modifier, char objectKey) {
-        switch (objectKey) {
-            case 'w':
-            case 'W':
-                return resolveWordObject(modifier == 'a', objectKey == 'W');
-            case 'p':
-                return resolveParagraphObject(modifier == 'a');
-            case 's':
-                return resolveSentenceObject(modifier == 'a');
-            case '"':
-            case '\'':
-            case '`':
-                return resolveQuoteObject(modifier == 'a', objectKey);
-            case '(':
-            case ')':
-                return resolveBracketObject(modifier == 'a', '(', ')');
-            case '[':
-            case ']':
-                return resolveBracketObject(modifier == 'a', '[', ']');
-            case '{':
-            case '}':
-                return resolveBracketObject(modifier == 'a', '{', '}');
-            case '<':
-            case '>':
-                return resolveBracketObject(modifier == 'a', '<', '>');
-            default:
-                return null;
-        }
+        return editActionController.resolveTextObjectRange(modifier, objectKey);
     }
 
     String handleSurroundPending(char c) {
-        if (pendingSurroundAction == 'c') {
-            if (pendingSurroundOld == null) {
-                pendingSurroundOld = c;
-                return "Awaiting new surround";
-            }
-            String result = surroundChange(pendingSurroundOld, c);
-            pendingSurroundAction = null;
-            pendingSurroundOld = null;
-            return result;
-        }
-
-        if (pendingSurroundAction == 'd') {
-            String result = surroundDelete(c);
-            pendingSurroundAction = null;
-            return result;
-        }
-
-        if (pendingSurroundAction == 'y') {
-            if (pendingSurroundTarget == null && isTextObjectKey(c)) {
-                pendingSurroundTarget = c;
-                return "Awaiting surround delimiter";
-            }
-            char target = pendingSurroundTarget == null ? 'w' : pendingSurroundTarget;
-            String result = surroundAdd(target, c);
-            pendingSurroundAction = null;
-            pendingSurroundTarget = null;
-            return result;
-        }
-
-        pendingSurroundAction = null;
-        pendingSurroundOld = null;
-        pendingSurroundTarget = null;
-        return "Unsupported surround";
+        return editActionController.handleSurroundPending(c);
     }
 
     boolean isTextObjectKey(char c) {
-        return "wWps\"'`()[]{}<>".indexOf(c) >= 0;
+        return editActionController.isTextObjectKey(c);
     }
 
     String surroundChange(char oldChar, char newChar) {
-        MotionRange range = resolveSurroundRange(oldChar);
-        SurroundPair newPair = surroundPair(newChar);
-        if (range == null || newPair == null) {
-            return "No matching surround found";
-        }
-        writingArea.replaceRange(String.valueOf(newPair.close), range.end - 1, range.end);
-        writingArea.replaceRange(String.valueOf(newPair.open), range.start, range.start + 1);
-        markModified();
-        return "Surround changed";
+        return editActionController.surroundChange(oldChar, newChar);
     }
 
     String surroundDelete(char target) {
-        MotionRange range = resolveSurroundRange(target);
-        if (range == null) {
-            return "No matching surround found";
-        }
-        writingArea.replaceRange("", range.end - 1, range.end);
-        writingArea.replaceRange("", range.start, range.start + 1);
-        markModified();
-        return "Surround deleted";
+        return editActionController.surroundDelete(target);
     }
 
     String surroundAdd(char targetObject, char surroundChar) {
-        MotionRange range = resolveTextObjectRange('i', targetObject);
-        SurroundPair pair = surroundPair(surroundChar);
-        if (range == null || pair == null) {
-            return "No valid surround target";
-        }
-        writingArea.insert(String.valueOf(pair.close), range.end);
-        writingArea.insert(String.valueOf(pair.open), range.start);
-        markModified();
-        return "Surround added";
+        return editActionController.surroundAdd(targetObject, surroundChar);
     }
 
     MotionRange resolveSurroundRange(char surround) {
-        if (surround == '"' || surround == '\'' || surround == '`') {
-            return resolveQuoteObject(true, surround);
-        }
-        SurroundPair pair = surroundPair(surround);
-        if (pair == null) {
-            return null;
-        }
-        return resolveBracketObject(true, pair.open, pair.close);
+        return editActionController.resolveSurroundRange(surround);
     }
 
     SurroundPair surroundPair(char surround) {
-        switch (surround) {
-            case '(':
-            case ')':
-                return new SurroundPair('(', ')');
-            case '[':
-            case ']':
-                return new SurroundPair('[', ']');
-            case '{':
-            case '}':
-                return new SurroundPair('{', '}');
-            case '<':
-            case '>':
-                return new SurroundPair('<', '>');
-            case '"':
-            case '\'':
-            case '`':
-                return new SurroundPair(surround, surround);
-            default:
-                return null;
-        }
+        return editActionController.surroundPair(surround);
     }
 
     MotionRange resolveWordObject(boolean around, boolean bigWord) {
-        String text = writingArea.getText();
-        if (text.isEmpty()) {
-            return null;
-        }
-        int caret = Math.min(writingArea.getCaretPosition(), text.length() - 1);
-        int start = caret;
-        int end = caret;
-        while (start > 0 && isMotionWordChar(text.charAt(start - 1), bigWord)) {
-            start--;
-        }
-        while (end < text.length() && isMotionWordChar(text.charAt(end), bigWord)) {
-            end++;
-        }
-        if (around) {
-            while (end < text.length() && Character.isWhitespace(text.charAt(end))) {
-                end++;
-            }
-        }
-        return new MotionRange(start, end, false);
+        return editActionController.resolveWordObject(around, bigWord);
     }
 
     MotionRange resolveParagraphObject(boolean around) {
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int startLine = line;
-            int endLine = line;
-            while (startLine > 0 && !lineText(startLine - 1).isBlank()) {
-                startLine--;
-            }
-            while (endLine < writingArea.getLineCount() - 1 && !lineText(endLine + 1).isBlank()) {
-                endLine++;
-            }
-            if (around) {
-                if (startLine > 0) {
-                    startLine--;
-                }
-                if (endLine < writingArea.getLineCount() - 1) {
-                    endLine++;
-                }
-            }
-            return new MotionRange(writingArea.getLineStartOffset(startLine), writingArea.getLineEndOffset(endLine), true);
-        } catch (BadLocationException e) {
-            return null;
-        }
+        return editActionController.resolveParagraphObject(around);
     }
 
     MotionRange resolveSentenceObject(boolean around) {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        int start = caret;
-        int end = caret;
-        while (start > 0) {
-            char c = text.charAt(start - 1);
-            if (c == '.' || c == '!' || c == '?') {
-                break;
-            }
-            start--;
-        }
-        while (start < text.length() && Character.isWhitespace(text.charAt(start))) {
-            start++;
-        }
-        while (end < text.length()) {
-            char c = text.charAt(end);
-            if (c == '.' || c == '!' || c == '?') {
-                end++;
-                break;
-            }
-            end++;
-        }
-        if (around) {
-            while (end < text.length() && Character.isWhitespace(text.charAt(end))) {
-                end++;
-            }
-        }
-        return new MotionRange(start, end, false);
+        return editActionController.resolveSentenceObject(around);
     }
 
     MotionRange resolveQuoteObject(boolean around, char quote) {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        int start = text.lastIndexOf(quote, Math.max(0, caret - 1));
-        int end = text.indexOf(quote, caret);
-        if (start < 0 || end < 0 || start == end) {
-            return null;
-        }
-        return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
+        return editActionController.resolveQuoteObject(around, quote);
     }
 
     MotionRange resolveBracketObject(boolean around, char open, char close) {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        int start = -1;
-        int depth = 0;
-        for (int i = Math.max(0, caret - 1); i >= 0; i--) {
-            char c = text.charAt(i);
-            if (c == close) {
-                depth++;
-            } else if (c == open) {
-                if (depth == 0) {
-                    start = i;
-                    break;
-                }
-                depth--;
-            }
-        }
-        if (start < 0) {
-            return null;
-        }
-        int end = -1;
-        depth = 0;
-        for (int i = start + 1; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == open) {
-                depth++;
-            } else if (c == close) {
-                if (depth == 0) {
-                    end = i;
-                    break;
-                }
-                depth--;
-            }
-        }
-        if (end < 0) {
-            return null;
-        }
-        return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
+        return editActionController.resolveBracketObject(around, open, close);
     }
 
     int previewMotionTarget(String motion) {
-        int original = writingArea.getCaretPosition();
-        switch (motion) {
-            case "h":
-                moveLeft();
-                break;
-            case "l":
-                moveRight();
-                break;
-            case "w":
-                moveWordForward();
-                break;
-            case "b":
-                moveWordBackward();
-                break;
-            case "e":
-                moveWordEnd();
-                break;
-            case "W":
-                moveWordForwardBig();
-                break;
-            case "B":
-                moveWordBackwardBig();
-                break;
-            case "E":
-                moveWordEndBig();
-                break;
-            case "0":
-            case "g0":
-                moveLineStart();
-                break;
-            case "^":
-                moveLineFirstNonBlank();
-                break;
-            case "$":
-            case "g$":
-                moveLineEnd();
-                break;
-            case "g_":
-                moveLineLastNonBlank();
-                break;
-            case "ge":
-                moveWordEndBackward();
-                break;
-            case "gE":
-                moveWordEndBackwardBig();
-                break;
-            default:
-                return -1;
-        }
-        int target = writingArea.getCaretPosition();
-        writingArea.setCaretPosition(original);
-        return target;
+        return editActionController.previewMotionTarget(motion);
     }
 
     // Mode management
@@ -7970,1598 +5539,415 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Line number toggle
     public void toggleLineNumbers(boolean enabled) {
-        lineNumberMode = enabled ? LineNumberMode.ABSOLUTE : LineNumberMode.NONE;
-        configManager.setLineNumberMode(lineNumberMode);
-        refreshLineNumberPanel();
+        sessionConfigController.toggleLineNumbers(enabled);
     }
 
     public void setLineNumberMode(LineNumberMode mode) {
-        lineNumberMode = mode == null ? LineNumberMode.ABSOLUTE : mode;
-        configManager.setLineNumberMode(lineNumberMode);
-        refreshLineNumberPanel();
+        sessionConfigController.setLineNumberMode(mode);
     }
 
     public String setLineNumberMode(String value) {
-        setLineNumberMode(LineNumberMode.fromConfigValue(value));
-        return "Line numbers set to " + lineNumberMode.toConfigValue();
+        return sessionConfigController.setLineNumberMode(value);
     }
 
     public void setHighlightSearch(boolean enabled) {
-        configManager.set("highlight.search", String.valueOf(enabled));
-        if (!enabled) {
-            searchManager.clearHighlights();
-        }
-        updateStatusBar();
+        sessionConfigController.setHighlightSearch(enabled);
     }
 
     public void setAutoIndent(boolean enabled) {
-        configManager.set("auto.indent", String.valueOf(enabled));
+        sessionConfigController.setAutoIndent(enabled);
     }
 
     public void setWrap(boolean enabled) {
-        writingArea.setLineWrap(enabled);
-        writingArea.setWrapStyleWord(enabled);
+        sessionConfigController.setWrap(enabled);
     }
 
     public void setExpandTab(boolean enabled) {
-        configManager.set("expand.tab", String.valueOf(enabled));
+        sessionConfigController.setExpandTab(enabled);
     }
 
     public void setShowCurrentLine(boolean enabled) {
-        configManager.set("show.current.line", String.valueOf(enabled));
-        updateCurrentLineHighlight();
-        refreshLineNumberPanel();
+        sessionConfigController.setShowCurrentLine(enabled);
     }
 
     public String getCurrentThemeName() {
-        return configManager.getThemeId();
+        return sessionConfigController.getCurrentThemeName();
     }
 
     public List<String> getThemeIdsForPlugins() {
-        return configManager.getThemeIds();
+        return sessionConfigController.getThemeIdsForPlugins();
     }
 
     public Map<String, String> getActiveThemePaletteHex() {
-        Map<String, String> palette = new LinkedHashMap<>();
-        palette.put("theme", configManager.getThemeId());
-        palette.put("color.normal", colorToHex(configManager.getNormalColor()));
-        palette.put("color.insert", colorToHex(configManager.getInsertColor()));
-        palette.put("color.command", colorToHex(configManager.getCommandColor()));
-        palette.put("color.visual", colorToHex(configManager.getVisualColor()));
-        palette.put("color.replace", colorToHex(configManager.getReplaceColor()));
-        palette.put("ui.foreground", colorToHex(configManager.getEditorForeground()));
-        palette.put("ui.caret", colorToHex(configManager.getCaretColor()));
-        palette.put("ui.selection", colorToHex(configManager.getSelectionColor()));
-        palette.put("ui.selection.text", colorToHex(configManager.getSelectionTextColor()));
-        palette.put("ui.status.background", colorToHex(configManager.getStatusBarBackground()));
-        palette.put("ui.status.foreground", colorToHex(configManager.getStatusBarForeground()));
-        palette.put("ui.command.background", colorToHex(configManager.getCommandBarBackground()));
-        palette.put("ui.command.foreground", colorToHex(configManager.getCommandBarForeground()));
-        palette.put("ui.linenumber.background", colorToHex(configManager.getLineNumberBackground()));
-        palette.put("ui.linenumber.foreground", colorToHex(configManager.getLineNumberForeground()));
-        palette.put("ui.currentline", colorToHex(configManager.getCurrentLineHighlightColor()));
-        palette.put("ui.syntax.keyword", colorToHex(configManager.getSyntaxKeywordColor()));
-        palette.put("ui.syntax.string", colorToHex(configManager.getSyntaxStringColor()));
-        palette.put("ui.syntax.comment", colorToHex(configManager.getSyntaxCommentColor()));
-        palette.put("ui.syntax.type", colorToHex(configManager.getSyntaxTypeColor()));
-        palette.put("ui.syntax.function", colorToHex(configManager.getSyntaxFunctionColor()));
-        palette.put("ui.syntax.constant", colorToHex(configManager.getSyntaxConstantColor()));
-        palette.put("ui.syntax.annotation", colorToHex(configManager.getSyntaxAnnotationColor()));
-        palette.put("ui.syntax.number", colorToHex(configManager.getSyntaxNumberColor()));
-        return palette;
+        return sessionConfigController.getActiveThemePaletteHex();
     }
 
     public String resolveCommandAlias(String command) {
-        return configManager.resolveCommandAlias(command);
+        return sessionConfigController.resolveCommandAlias(command);
     }
 
     public String setThemeFromCommand(String value) {
-        String appliedTheme = configManager.setTheme(value);
-        if (appliedTheme == null) {
-            return "Unknown theme: " + value;
-        }
-        applyThemeColors();
-        firePluginEvent("ThemeChange");
-        return "Theme set to " + appliedTheme;
+        return sessionConfigController.setThemeFromCommand(value);
     }
 
     public String applyThemeFromPlugin(String value, boolean persist) {
-        String appliedTheme = configManager.setTheme(value);
-        if (appliedTheme == null) {
-            return "Unknown theme: " + value;
-        }
-        if (persist) {
-            try {
-                configManager.setAndPersist("theme", appliedTheme);
-            } catch (IOException e) {
-                return "Error saving theme: " + e.getMessage();
-            }
-        }
-        applyThemeColors();
-        firePluginEvent("ThemeChange");
-        return persist ? "Theme set and saved to " + appliedTheme : "Theme set to " + appliedTheme;
+        return sessionConfigController.applyThemeFromPlugin(value, persist);
     }
 
     public String applyPaletteOverridesFromPlugin(Map<String, String> overrides, boolean persist) {
-        if (overrides == null || overrides.isEmpty()) {
-            return "No palette overrides";
-        }
-        int applied = 0;
-        for (Map.Entry<String, String> entry : overrides.entrySet()) {
-            String mappedKey = mapPaletteAliasToConfigKey(entry.getKey());
-            String value = entry.getValue() == null ? "" : entry.getValue().trim();
-            if (mappedKey == null || value.isEmpty()) {
-                continue;
-            }
-            if (!HEX_COLOR_VALUE_PATTERN.matcher(value).matches()) {
-                continue;
-            }
-            configManager.set(mappedKey, value);
-            applied++;
-        }
-        if (applied == 0) {
-            return "No valid palette keys/colors";
-        }
-        applyRuntimeConfigFromSettings();
-        if (persist) {
-            try {
-                configManager.persistCurrentConfig();
-            } catch (IOException e) {
-                return "Applied " + applied + " palette key(s), but failed to save: " + e.getMessage();
-            }
-        }
-        firePluginEvent("ThemeChange");
-        return (persist ? "Applied and saved " : "Applied ") + applied + " palette key" + (applied == 1 ? "" : "s");
+        return sessionConfigController.applyPaletteOverridesFromPlugin(overrides, persist);
     }
 
     String mapPaletteAliasToConfigKey(String rawKey) {
-        if (rawKey == null || rawKey.isBlank()) {
-            return null;
-        }
-        String key = rawKey.trim().toLowerCase(Locale.ROOT);
-        switch (key) {
-            case "normal": return "color.normal";
-            case "insert": return "color.insert";
-            case "command": return "color.command";
-            case "visual": return "color.visual";
-            case "replace": return "color.replace";
-            case "foreground": return "ui.foreground";
-            case "caret": return "ui.caret";
-            case "selection": return "ui.selection";
-            case "selection_text":
-            case "selectiontext": return "ui.selection.text";
-            case "status_bg":
-            case "statusbar_bg": return "ui.status.background";
-            case "status_fg":
-            case "statusbar_fg": return "ui.status.foreground";
-            case "command_bg":
-            case "commandbar_bg": return "ui.command.background";
-            case "command_fg":
-            case "commandbar_fg": return "ui.command.foreground";
-            case "line_number_bg":
-            case "linenumber_bg": return "ui.linenumber.background";
-            case "line_number_fg":
-            case "linenumber_fg": return "ui.linenumber.foreground";
-            case "current_line":
-            case "currentline": return "ui.currentline";
-            case "syntax_keyword": return "ui.syntax.keyword";
-            case "syntax_string": return "ui.syntax.string";
-            case "syntax_comment": return "ui.syntax.comment";
-            case "syntax_type": return "ui.syntax.type";
-            case "syntax_function": return "ui.syntax.function";
-            case "syntax_constant": return "ui.syntax.constant";
-            case "syntax_annotation": return "ui.syntax.annotation";
-            case "syntax_number": return "ui.syntax.number";
-            default:
-                if (key.startsWith("color.") || key.startsWith("ui.")) {
-                    return key;
-                }
-                return null;
-        }
+        return sessionConfigController.mapPaletteAliasToConfigKey(rawKey);
     }
 
     String colorToHex(Color color) {
-        if (color == null) {
-            return "#000000";
-        }
-        return String.format("#%02X%02X%02X", color.getRed(), color.getGreen(), color.getBlue());
+        return sessionConfigController.colorToHex(color);
     }
 
     public String setConfigOption(String key, String value) {
-        if (key == null || key.isEmpty()) {
-            return "Error: Missing config key";
-        }
-        configManager.set(key, value == null ? "" : value);
-        applyRuntimeConfigFromSettings();
-        if (isThemeRelatedConfigKey(key)) {
-            firePluginEvent("ThemeChange");
-        }
-        return "Set " + key;
+        return sessionConfigController.setConfigOption(key, value);
     }
 
     public String setConfigOptionPersistent(String key, String value) {
-        if (key == null || key.isEmpty()) {
-            return "Error: Missing config key";
-        }
-        try {
-            configManager.setAndPersist(key, value == null ? "" : value);
-            applyRuntimeConfigFromSettings();
-            if (isThemeRelatedConfigKey(key)) {
-                firePluginEvent("ThemeChange");
-            }
-            return "Set and saved " + key;
-        } catch (IOException e) {
-            return "Error saving config: " + e.getMessage();
-        }
+        return sessionConfigController.setConfigOptionPersistent(key, value);
     }
 
     boolean isThemeRelatedConfigKey(String key) {
-        if (key == null) {
-            return false;
-        }
-        String normalized = key.trim().toLowerCase(Locale.ROOT);
-        return normalized.equals("theme")
-            || normalized.startsWith("color.")
-            || normalized.startsWith("ui.");
+        return sessionConfigController.isThemeRelatedConfigKey(key);
     }
 
     public String saveConfigToDisk() {
-        try {
-            int persisted = configManager.persistCurrentConfig();
-            return "Saved config (" + persisted + " key" + (persisted == 1 ? "" : "s") + ")";
-        } catch (IOException e) {
-            return "Error saving config: " + e.getMessage();
-        }
+        return sessionConfigController.saveConfigToDisk();
     }
 
     public String applyTheaterPreset(String presetArgument) {
-        String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);
-        if (preset.isEmpty()) {
-            return "Usage: :theater off|subtle|full";
-        }
-
-        if ("off".equals(preset)) {
-            configManager.set("ui.dramatic", "false");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: off";
-        }
-
-        if ("subtle".equals(preset)) {
-            configManager.set("ui.dramatic", "true");
-            configManager.set("ui.dramatic.identity", "true");
-            configManager.set("ui.dramatic.mode.transitions", "true");
-            configManager.set("ui.dramatic.command.palette", "true");
-            configManager.set("ui.dramatic.editing.feedback", "true");
-            configManager.set("ui.dramatic.panel.animations", "false");
-            configManager.set("ui.dramatic.sound", "false");
-            configManager.set("ui.dramatic.sound.pack", "soft");
-            configManager.set("ui.dramatic.sound.volume", "40");
-            configManager.set("ui.dramatic.reduced.motion", "false");
-            configManager.set("ui.dramatic.animation.ms", "140");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: subtle";
-        }
-
-        if ("full".equals(preset)) {
-            configManager.set("ui.dramatic", "true");
-            configManager.set("ui.dramatic.identity", "true");
-            configManager.set("ui.dramatic.mode.transitions", "true");
-            configManager.set("ui.dramatic.command.palette", "true");
-            configManager.set("ui.dramatic.editing.feedback", "true");
-            configManager.set("ui.dramatic.panel.animations", "true");
-            configManager.set("ui.dramatic.sound", "true");
-            configManager.set("ui.dramatic.sound.pack", "cinema");
-            configManager.set("ui.dramatic.sound.volume", "85");
-            configManager.set("ui.dramatic.reduced.motion", "false");
-            configManager.set("ui.dramatic.animation.ms", "240");
-            applyRuntimeConfigFromSettings();
-            return "Theater preset applied: full";
-        }
-
-        return "Unknown theater preset: " + preset + " (expected off|subtle|full)";
+        return sessionConfigController.applyTheaterPreset(presetArgument);
     }
 
     public String reloadConfigFromDisk() {
-        configManager.reload();
-        applyRuntimeConfigFromSettings();
-        return "Settings reloaded";
+        return sessionConfigController.reloadConfigFromDisk();
     }
 
     public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {
-        return reloadConfigIfSettingsBuffer(buffer, null, null);
+        return sessionConfigController.reloadConfigIfSettingsBuffer(buffer);
     }
 
     public String reloadConfigIfSettingsBuffer(FileBuffer buffer, String previousContent, String updatedContent) {
-        if (buffer == null || buffer.getFile() == null) {
-            return null;
-        }
-        if (!isSettingsFile(buffer.getFile())) {
-            return null;
-        }
-        boolean canDetectThemeChange = previousContent != null && updatedContent != null;
-        boolean themeChangedInFile = canDetectThemeChange && didConfigKeyChange(previousContent, updatedContent, "theme");
-        String activeThemeBeforeReload = configManager.getThemeId();
-        configManager.reload();
-        if (canDetectThemeChange && !themeChangedInFile) {
-            configManager.setTheme(activeThemeBeforeReload);
-        }
-        applyRuntimeConfigFromSettings();
-        return "Settings reloaded";
+        return sessionConfigController.reloadConfigIfSettingsBuffer(buffer, previousContent, updatedContent);
     }
 
     boolean isSettingsFile(File file) {
-        if (file == null) {
-            return false;
-        }
-        try {
-            File settings = new File(configManager.getConfigPath());
-            return file.getCanonicalFile().equals(settings.getCanonicalFile());
-        } catch (IOException e) {
-            return file.getAbsolutePath().equals(new File(configManager.getConfigPath()).getAbsolutePath());
-        }
+        return sessionConfigController.isSettingsFile(file);
     }
 
     boolean didConfigKeyChange(String previousContent, String updatedContent, String key) {
-        String previousValue = extractConfigValue(previousContent, key);
-        String updatedValue = extractConfigValue(updatedContent, key);
-        return !Objects.equals(previousValue, updatedValue);
+        return sessionConfigController.didConfigKeyChange(previousContent, updatedContent, key);
     }
 
     String extractConfigValue(String content, String key) {
-        if (content == null || key == null || key.isBlank()) {
-            return null;
-        }
-        String normalizedKey = key.trim();
-        String[] lines = content.split("\\R");
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                continue;
-            }
-            int separator = trimmed.indexOf('=');
-            if (separator <= 0) {
-                continue;
-            }
-            String parsedKey = trimmed.substring(0, separator).trim();
-            if (!parsedKey.equalsIgnoreCase(normalizedKey)) {
-                continue;
-            }
-            return trimmed.substring(separator + 1).trim();
-        }
-        return null;
+        return sessionConfigController.extractConfigValue(content, key);
     }
 
     void applyRuntimeConfigFromSettings() {
-        refreshDramaticSettings();
-        lineNumberMode = configManager.getLineNumberMode();
-        Font editorFont = resolveEditorFont();
-        int tabSize = Math.max(1, configManager.getTabSize());
-        for (EditorPane pane : editorPanes) {
-            JTextArea area = pane.getTextArea();
-            area.setFont(editorFont);
-            area.setTabSize(tabSize);
-            pane.getScrollPane().getVerticalScrollBar().setUnitIncrement(Math.max(16, area.getFontMetrics(area.getFont()).getHeight()));
-        }
-        if (!configManager.getHighlightSearch() && searchManager != null) {
-            searchManager.clearHighlights();
-        }
-        applyThemeColors();
-        refreshLineNumberPanel();
-        updateCurrentLineHighlight();
-        if (activeMinimapPanel != null) {
-            activeMinimapPanel.setPixelWidth(dramaticMinimapWidth);
-        }
-        updateStatusBar();
+        sessionConfigController.applyRuntimeConfigFromSettings();
     }
 
     public String showThemes() {
-        showScratchBuffer("[themes]", configManager.getThemeListText());
-        return "Showing themes";
+        return sessionConfigController.showThemes();
     }
 
     public String openSettingsBuffer() {
-        File settingsFile = new File(configManager.getConfigPath());
-        try {
-            ensureSettingsFileSeeded(settingsFile);
-            openFile(settingsFile);
-            return "Opened settings: " + settingsFile.getAbsolutePath();
-        } catch (IOException e) {
-            return "Error opening settings: " + e.getMessage();
-        }
+        return sessionConfigController.openSettingsBuffer();
     }
 
     public String openCommandLogBuffer() {
-        try {
-            ensureStoreDirectory(commandLogStore);
-            if (!commandLogStore.exists()) {
-                Files.write(commandLogStore.toPath(),
-                    new byte[0],
-                    StandardOpenOption.CREATE);
-            }
-            openFile(commandLogStore);
-            return "Opened command log: " + commandLogStore.getAbsolutePath();
-        } catch (IOException e) {
-            return "Error opening command log: " + e.getMessage();
-        }
+        return sessionConfigController.openCommandLogBuffer();
     }
 
     public String cleanShedDataFiles() {
-        Path root = new File(configManager.getShedDirectoryPath()).toPath();
-        if (!Files.exists(root)) {
-            return "No Shed data found: " + root.toAbsolutePath();
-        }
-        int deleted = 0;
-        try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
-            List<Path> paths = walk.sorted(Comparator.reverseOrder()).toList();
-            for (Path path : paths) {
-                if (path.equals(root)) {
-                    continue;
-                }
-                if (Files.deleteIfExists(path)) {
-                    deleted++;
-                }
-            }
-            Files.createDirectories(root);
-            recentFiles.clear();
-            commandHistory.clear();
-            commandHistoryIndex = -1;
-            commandHistoryPrefix = "";
-            reloadConfigFromDisk();
-            return "Cleaned Shed data: " + deleted + " path(s)";
-        } catch (IOException e) {
-            return "Shed clean failed: " + e.getMessage();
-        }
+        return sessionConfigController.cleanShedDataFiles();
     }
 
     public String handleSessionCommand(String argument) {
-        String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty()) {
-            return "Usage: :session save [name] | load[!] [name] | list";
-        }
-        int split = trimmed.indexOf(' ');
-        String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
-        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
-        switch (subcommand) {
-            case "save":
-                return saveSession(args);
-            case "load":
-                return loadSession(args, false);
-            case "load!":
-                return loadSession(args, true);
-            case "list":
-                return listSessions();
-            default:
-                return "Usage: :session save [name] | load[!] [name] | list";
-        }
+        return sessionConfigController.handleSessionCommand(argument);
     }
 
     public String handleWorkspaceProfileCommand(String argument) {
-        String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty()) {
-            return "Usage: :workspace save [name] | load[!] [name] | list";
-        }
-        int split = trimmed.indexOf(' ');
-        String subcommand = split < 0 ? trimmed.toLowerCase(Locale.ROOT) : trimmed.substring(0, split).toLowerCase(Locale.ROOT);
-        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
-        String profileName = args.isBlank() ? defaultWorkspaceProfileName() : sanitizeSessionName(args);
-        String sessionName = WORKSPACE_PROFILE_PREFIX + profileName;
-        switch (subcommand) {
-            case "save":
-                return saveSession(sessionName);
-            case "load":
-                return loadSession(sessionName, false);
-            case "load!":
-                return loadSession(sessionName, true);
-            case "list":
-                return listWorkspaceProfiles();
-            default:
-                return "Usage: :workspace save [name] | load[!] [name] | list";
-        }
+        return sessionConfigController.handleWorkspaceProfileCommand(argument);
     }
 
     String saveSession(String nameArgument) {
-        File sessionFile = resolveSessionFile(nameArgument);
-        File sessionDir = sessionFile.getParentFile();
-        if (sessionDir != null && !sessionDir.exists()) {
-            sessionDir.mkdirs();
-        }
-
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("version", 2);
-        payload.put("cwd", new File(".").getAbsolutePath());
-        Map<FileBuffer, String> bufferIds = new HashMap<>();
-        List<Map<String, Object>> serializedBuffers = serializeSessionBuffers(bufferIds);
-        payload.put("buffers", serializedBuffers);
-        payload.put("panes", serializeSessionPanes(bufferIds));
-        payload.put("layout", serializeWindowLayout(windowLayoutRoot));
-        payload.put("activePaneIndex", activePaneIndex);
-        FileBuffer current = getCurrentBuffer();
-        if (current != null) {
-            String activeBufferId = bufferIds.get(current);
-            if (activeBufferId != null) {
-                payload.put("activeBufferId", activeBufferId);
-            }
-            payload.put("activeCaret", writingArea.getCaretPosition());
-        }
-        if (treeRoot != null) {
-            payload.put("treeRoot", treeRoot.getAbsolutePath());
-        }
-        payload.put("uiSettings", captureSessionUiSettings());
-        payload.put("savedAt", commandLogTimeFormat.format(LocalDateTime.now()));
-        try {
-            Files.writeString(sessionFile.toPath(),
-                MiniJson.stringify(payload),
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING);
-            return "Session saved: " + sessionFile.getAbsolutePath();
-        } catch (IOException e) {
-            return "Session save failed: " + e.getMessage();
-        }
+        return sessionConfigController.saveSession(nameArgument);
     }
 
     String loadSession(String nameArgument, boolean force) {
-        File sessionFile = resolveSessionFile(nameArgument);
-        if (!sessionFile.exists()) {
-            return "Session not found: " + sessionFile.getAbsolutePath();
-        }
-        if (!force && hasUnsavedChangesInAnyBuffer()) {
-            return "Unsaved buffers exist (use :session load! <name>)";
-        }
-
-        try {
-            String json = Files.readString(sessionFile.toPath(), StandardCharsets.UTF_8);
-            Map<String, Object> payload = MiniJson.asObject(MiniJson.parse(json));
-            if (payload == null) {
-                return "Session file is invalid";
-            }
-            if (restoreSessionV2(payload)) {
-                return "Restored session: " + sessionFile.getAbsolutePath();
-            }
-            if (restoreLegacySession(payload)) {
-                return "Restored legacy session: " + sessionFile.getAbsolutePath();
-            }
-            openLandingPage();
-            return "Session loaded (no existing files)";
-        } catch (IOException e) {
-            return "Session load failed: " + e.getMessage();
-        }
+        return sessionConfigController.loadSession(nameArgument, force);
     }
 
     boolean restoreSessionV2(Map<String, Object> payload) {
-        Map<String, FileBuffer> idToBuffer = new HashMap<>();
-        List<FileBuffer> restoredBuffers = deserializeSessionBuffers(payload.get("buffers"), idToBuffer);
-        if (restoredBuffers.isEmpty()) {
-            return false;
-        }
-
-        specialBufferReturns.clear();
-        treeLineTargets.clear();
-        treeBuffer = null;
-        treePane = null;
-        quickfixBuffer = null;
-        buffers.clear();
-        buffers.addAll(restoredBuffers);
-
-        List<Object> paneObjects = MiniJson.asArray(payload.get("panes"));
-        int paneCount = paneObjects == null || paneObjects.isEmpty() ? 1 : paneObjects.size();
-        Map<String, Object> layoutObject = MiniJson.asObject(payload.get("layout"));
-        resetEditorPanesForSession(paneCount, layoutObject);
-        if (editorPanes.isEmpty()) {
-            return false;
-        }
-
-        FileBuffer defaultBuffer = buffers.get(0);
-        for (int i = 0; i < editorPanes.size(); i++) {
-            EditorPane pane = editorPanes.get(i);
-            FileBuffer paneBuffer = defaultBuffer;
-            int caret = 0;
-            if (paneObjects != null && i < paneObjects.size()) {
-                Map<String, Object> paneState = MiniJson.asObject(paneObjects.get(i));
-                if (paneState != null) {
-                    String bufferId = MiniJson.asString(paneState.get("bufferId"));
-                    Integer paneCaret = MiniJson.asInt(paneState.get("caret"));
-                    if (bufferId != null && idToBuffer.containsKey(bufferId)) {
-                        paneBuffer = idToBuffer.get(bufferId);
-                    }
-                    if (paneCaret != null) {
-                        caret = Math.max(0, paneCaret);
-                    }
-                }
-            }
-            loadBufferIntoPane(pane, paneBuffer, caret);
-        }
-
-        Integer activePane = MiniJson.asInt(payload.get("activePaneIndex"));
-        int activeIndex = activePane == null ? 0 : Math.max(0, Math.min(activePane, editorPanes.size() - 1));
-        activateEditorPane(editorPanes.get(activeIndex));
-
-        String activeBufferId = MiniJson.asString(payload.get("activeBufferId"));
-        if (activeBufferId != null && idToBuffer.containsKey(activeBufferId)) {
-            loadBufferIntoEditor(idToBuffer.get(activeBufferId));
-        }
-        Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
-        if (activeCaret != null) {
-            writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
-        }
-
-        String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
-        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
-            File root = new File(savedTreeRoot);
-            treeRoot = root.exists() ? root : null;
-        } else {
-            treeRoot = null;
-        }
-        applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
-        return true;
+        return sessionConfigController.restoreSessionV2(payload);
     }
 
     boolean restoreLegacySession(Map<String, Object> payload) {
-        List<String> filePaths = extractSessionFilePaths(payload.get("files"));
-        if (filePaths.isEmpty()) {
-            return false;
-        }
-        String activePath = MiniJson.asString(payload.get("activePath"));
-        Integer activeCaret = MiniJson.asInt(payload.get("activeCaret"));
-        String savedTreeRoot = MiniJson.asString(payload.get("treeRoot"));
-
-        specialBufferReturns.clear();
-        treeLineTargets.clear();
-        treeBuffer = null;
-        treePane = null;
-        quickfixBuffer = null;
-        buffers.clear();
-
-        for (String filePath : filePaths) {
-            if (filePath == null || filePath.isBlank()) {
-                continue;
-            }
-            File file = new File(filePath);
-            if (!file.exists() || !file.isFile()) {
-                continue;
-            }
-            try {
-                buffers.add(new FileBuffer(file, configManager));
-            } catch (IOException ignored) {
-            }
-        }
-        if (buffers.isEmpty()) {
-            return false;
-        }
-
-        resetEditorPanesForSession(1, null);
-        FileBuffer primary = buffers.get(0);
-        loadBufferIntoPane(editorPanes.get(0), primary, 0);
-        FileBuffer target = primary;
-        if (activePath != null && !activePath.isBlank()) {
-            FileBuffer maybe = findBufferByPath(new File(activePath));
-            if (maybe != null) {
-                target = maybe;
-            }
-        }
-        loadBufferIntoEditor(target);
-        if (activeCaret != null) {
-            writingArea.setCaretPosition(Math.min(Math.max(0, activeCaret), writingArea.getText().length()));
-        }
-        if (savedTreeRoot != null && !savedTreeRoot.isBlank()) {
-            File root = new File(savedTreeRoot);
-            treeRoot = root.exists() ? root : null;
-        } else {
-            treeRoot = null;
-        }
-        return true;
+        return sessionConfigController.restoreLegacySession(payload);
     }
 
     Map<String, Object> captureSessionUiSettings() {
-        Map<String, Object> settings = new LinkedHashMap<>();
-        String[] keys = {
-            "theme",
-            "ui.dramatic",
-            "ui.dramatic.identity",
-            "ui.dramatic.mode.transitions",
-            "ui.dramatic.command.palette",
-            "ui.dramatic.editing.feedback",
-            "ui.dramatic.panel.animations",
-            "ui.dramatic.sound",
-            "ui.dramatic.sound.pack",
-            "ui.dramatic.sound.volume",
-            "ui.dramatic.reduced.motion",
-            "ui.dramatic.animation.ms",
-            "minimap",
-            "ui.whichkey.hints"
-        };
-        for (String key : keys) {
-            String value = configManager.get(key);
-            if (value != null) {
-                settings.put(key, value);
-            }
-        }
-        return settings;
+        return sessionConfigController.captureSessionUiSettings();
     }
 
     void applySessionUiSettings(Map<String, Object> settings) {
-        if (settings == null || settings.isEmpty()) {
-            return;
-        }
-        for (Map.Entry<String, Object> entry : settings.entrySet()) {
-            String key = entry.getKey();
-            if (key == null || key.isBlank()) {
-                continue;
-            }
-            Object value = entry.getValue();
-            configManager.set(key, value == null ? "" : String.valueOf(value));
-        }
-        applyRuntimeConfigFromSettings();
+        sessionConfigController.applySessionUiSettings(settings);
     }
 
     List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {
-        List<Map<String, Object>> entries = new ArrayList<>();
-        int scratchIndex = 1;
-        for (FileBuffer buffer : buffers) {
-            if (buffer == null) {
-                continue;
-            }
-            String id;
-            if (buffer.hasFilePath()) {
-                id = "file:" + buffer.getFilePath();
-            } else {
-                id = "scratch:" + scratchIndex++;
-            }
-            bufferIds.put(buffer, id);
-
-            Map<String, Object> entry = new LinkedHashMap<>();
-            entry.put("id", id);
-            if (buffer.hasFilePath()) {
-                entry.put("type", "file");
-                entry.put("path", buffer.getFilePath());
-                entry.put("modified", buffer.isModified());
-                if (buffer.isModified()) {
-                    entry.put("content", buffer.getContent());
-                }
-            } else {
-                entry.put("type", "scratch");
-                entry.put("name", buffer.getDisplayName());
-                entry.put("content", buffer.getContent());
-                entry.put("modified", buffer.isModified());
-            }
-            entries.add(entry);
-        }
-        return entries;
+        return sessionConfigController.serializeSessionBuffers(bufferIds);
     }
 
     List<Map<String, Object>> serializeSessionPanes(Map<FileBuffer, String> bufferIds) {
-        List<Map<String, Object>> panes = new ArrayList<>();
-        for (EditorPane pane : editorPanes) {
-            if (pane == null) {
-                continue;
-            }
-            Map<String, Object> state = new LinkedHashMap<>();
-            String bufferId = bufferIds.get(pane.getBuffer());
-            if (bufferId != null) {
-                state.put("bufferId", bufferId);
-            }
-            state.put("caret", pane.getTextArea().getCaretPosition());
-            panes.add(state);
-        }
-        return panes;
+        return sessionConfigController.serializeSessionPanes(bufferIds);
     }
 
     List<FileBuffer> deserializeSessionBuffers(Object bufferObject, Map<String, FileBuffer> idToBuffer) {
-        List<FileBuffer> restored = new ArrayList<>();
-        List<Object> items = MiniJson.asArray(bufferObject);
-        if (items == null) {
-            return restored;
-        }
-        for (Object item : items) {
-            Map<String, Object> entry = MiniJson.asObject(item);
-            if (entry == null) {
-                continue;
-            }
-            String id = MiniJson.asString(entry.get("id"));
-            String type = MiniJson.asString(entry.get("type"));
-            boolean modified = Boolean.TRUE.equals(entry.get("modified"));
-            FileBuffer restoredBuffer = null;
-            try {
-                if ("file".equals(type)) {
-                    String path = MiniJson.asString(entry.get("path"));
-                    if (path == null || path.isBlank()) {
-                        continue;
-                    }
-                    File file = new File(path);
-                    if (file.exists() && file.isFile()) {
-                        restoredBuffer = new FileBuffer(file, configManager);
-                    } else {
-                        String content = MiniJson.asString(entry.get("content"));
-                        if (content != null) {
-                            restoredBuffer = new FileBuffer(path);
-                            restoredBuffer.setContent(content, true);
-                        }
-                    }
-                    if (restoredBuffer != null && modified) {
-                        String content = MiniJson.asString(entry.get("content"));
-                        if (content != null) {
-                            restoredBuffer.setContent(content, true);
-                        } else {
-                            restoredBuffer.setModified(true);
-                        }
-                    }
-                } else if ("scratch".equals(type)) {
-                    String name = MiniJson.asString(entry.get("name"));
-                    String content = MiniJson.asString(entry.get("content"));
-                    restoredBuffer = FileBuffer.createScratch(name == null ? "[scratch]" : name, content == null ? "" : content);
-                    restoredBuffer.setModified(modified);
-                }
-            } catch (IOException ignored) {
-            }
-
-            if (restoredBuffer != null) {
-                restored.add(restoredBuffer);
-                if (id != null && !id.isBlank()) {
-                    idToBuffer.put(id, restoredBuffer);
-                }
-            }
-        }
-        return restored;
+        return sessionConfigController.deserializeSessionBuffers(bufferObject, idToBuffer);
     }
 
     Map<String, Object> serializeWindowLayout(WindowLayoutNode node) {
-        if (node == null) {
-            return null;
-        }
-        Map<String, Object> serialized = new LinkedHashMap<>();
-        if (node.isLeaf()) {
-            serialized.put("type", "leaf");
-            serialized.put("paneIndex", editorPanes.indexOf(node.getPane()));
-            return serialized;
-        }
-        serialized.put("type", "split");
-        WindowLayoutNode.Orientation orientation = node.getOrientation();
-        serialized.put("orientation", orientation == WindowLayoutNode.Orientation.HORIZONTAL ? "horizontal" : "vertical");
-        serialized.put("ratio", node.getRatio());
-        serialized.put("first", serializeWindowLayout(node.getFirst()));
-        serialized.put("second", serializeWindowLayout(node.getSecond()));
-        return serialized;
+        return sessionConfigController.serializeWindowLayout(node);
     }
 
     WindowLayoutNode deserializeWindowLayout(Map<String, Object> layout, List<EditorPane> panes) {
-        if (layout == null || panes == null || panes.isEmpty()) {
-            return null;
-        }
-        String type = MiniJson.asString(layout.get("type"));
-        if ("leaf".equals(type)) {
-            Integer paneIndex = MiniJson.asInt(layout.get("paneIndex"));
-            if (paneIndex == null || paneIndex < 0 || paneIndex >= panes.size()) {
-                return WindowLayoutNode.leaf(panes.get(0));
-            }
-            return WindowLayoutNode.leaf(panes.get(paneIndex));
-        }
-        if ("split".equals(type)) {
-            String orientationRaw = MiniJson.asString(layout.get("orientation"));
-            WindowLayoutNode.Orientation orientation = "vertical".equalsIgnoreCase(orientationRaw)
-                ? WindowLayoutNode.Orientation.VERTICAL
-                : WindowLayoutNode.Orientation.HORIZONTAL;
-            double ratio = 0.5;
-            Object ratioObject = layout.get("ratio");
-            if (ratioObject instanceof Number) {
-                ratio = ((Number) ratioObject).doubleValue();
-            }
-            WindowLayoutNode first = deserializeWindowLayout(MiniJson.asObject(layout.get("first")), panes);
-            WindowLayoutNode second = deserializeWindowLayout(MiniJson.asObject(layout.get("second")), panes);
-            if (first == null || second == null) {
-                return null;
-            }
-            return WindowLayoutNode.split(orientation, ratio, first, second);
-        }
-        return null;
+        return sessionConfigController.deserializeWindowLayout(layout, panes);
     }
 
     void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
-        detachActiveDocumentListener();
-        editorPanes.clear();
-        int totalPanes = Math.max(1, paneCount);
-        Dimension size = getSize();
-        for (int i = 0; i < totalPanes; i++) {
-            editorPanes.add(createEditorPane(size));
-        }
-        activePaneIndex = 0;
-        bindActivePane(editorPanes.get(0));
-        WindowLayoutNode restoredLayout = deserializeWindowLayout(layoutObject, editorPanes);
-        if (restoredLayout == null) {
-            restoredLayout = defaultLayoutForPanes(editorPanes);
-        }
-        windowLayoutRoot = restoredLayout;
-        renderWindowLayout();
-        attachActiveDocumentListener();
+        sessionConfigController.resetEditorPanesForSession(paneCount, layoutObject);
     }
 
     WindowLayoutNode defaultLayoutForPanes(List<EditorPane> panes) {
-        if (panes == null || panes.isEmpty()) {
-            return null;
-        }
-        WindowLayoutNode root = WindowLayoutNode.leaf(panes.get(0));
-        EditorPane splitTarget = panes.get(0);
-        for (int i = 1; i < panes.size(); i++) {
-            root.splitLeaf(splitTarget, panes.get(i), WindowLayoutNode.Orientation.HORIZONTAL);
-            splitTarget = panes.get(i);
-        }
-        return root;
+        return sessionConfigController.defaultLayoutForPanes(panes);
     }
 
     List<String> extractSessionFilePaths(Object filesObject) {
-        List<String> paths = new ArrayList<>();
-        List<Object> files = MiniJson.asArray(filesObject);
-        if (files == null) {
-            return paths;
-        }
-        for (Object item : files) {
-            String direct = MiniJson.asString(item);
-            if (direct != null) {
-                paths.add(direct);
-                continue;
-            }
-            Map<String, Object> object = MiniJson.asObject(item);
-            if (object == null) {
-                continue;
-            }
-            String path = MiniJson.asString(object.get("path"));
-            if (path != null) {
-                paths.add(path);
-            }
-        }
-        return paths;
+        return sessionConfigController.extractSessionFilePaths(filesObject);
     }
 
     String listSessions() {
-        File dir = new File(configManager.getSessionDirectory());
-        if (!dir.exists() || !dir.isDirectory()) {
-            return "No sessions";
-        }
-        File[] files = dir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (files == null || files.length == 0) {
-            return "No sessions";
-        }
-        java.util.Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
-        StringBuilder builder = new StringBuilder();
-        builder.append("Sessions\n\n");
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                name = name.substring(0, name.length() - ".json".length());
-            }
-            builder.append(name).append("  ").append(file.getAbsolutePath()).append("\n");
-        }
-        showScratchBuffer("[sessions]", builder.toString().stripTrailing() + "\n");
-        return "Showing sessions";
+        return sessionConfigController.listSessions();
     }
 
     String listWorkspaceProfiles() {
-        File dir = new File(configManager.getSessionDirectory());
-        if (!dir.exists() || !dir.isDirectory()) {
-            return "No workspace profiles";
-        }
-        File[] files = dir.listFiles(file -> file.isFile()
-            && file.getName().startsWith(WORKSPACE_PROFILE_PREFIX)
-            && file.getName().endsWith(".json"));
-        if (files == null || files.length == 0) {
-            return "No workspace profiles";
-        }
-        java.util.Arrays.sort(files, (left, right) -> left.getName().compareToIgnoreCase(right.getName()));
-        StringBuilder builder = new StringBuilder();
-        builder.append("Workspace Profiles\n\n");
-        for (File file : files) {
-            String name = file.getName();
-            if (name.endsWith(".json")) {
-                name = name.substring(0, name.length() - ".json".length());
-            }
-            if (name.startsWith(WORKSPACE_PROFILE_PREFIX)) {
-                name = name.substring(WORKSPACE_PROFILE_PREFIX.length());
-            }
-            builder.append(name).append("  ").append(file.getAbsolutePath()).append("\n");
-        }
-        showScratchBuffer("[workspace profiles]", builder.toString().stripTrailing() + "\n");
-        return "Showing workspace profiles";
+        return sessionConfigController.listWorkspaceProfiles();
     }
 
     String defaultWorkspaceProfileName() {
-        FileBuffer current = getCurrentBuffer();
-        if (current != null && current.hasFilePath()) {
-            File root = detectProjectTrustRoot(new File(current.getFilePath()));
-            if (root != null) {
-                String name = root.getName();
-                if (name != null && !name.isBlank()) {
-                    return sanitizeSessionName(name);
-                }
-            }
-        }
-        return "default";
+        return sessionConfigController.defaultWorkspaceProfileName();
     }
 
     File resolveSessionFile(String nameArgument) {
-        String rawName = nameArgument == null || nameArgument.isBlank()
-            ? configManager.getSessionAutoloadName()
-            : nameArgument.trim();
-        String safeName = sanitizeSessionName(rawName);
-        File dir = new File(configManager.getSessionDirectory());
-        return new File(dir, safeName + ".json");
+        return sessionConfigController.resolveSessionFile(nameArgument);
     }
 
     String sanitizeSessionName(String rawName) {
-        if (rawName == null || rawName.isBlank()) {
-            return "default";
-        }
-        StringBuilder builder = new StringBuilder(rawName.length());
-        for (int i = 0; i < rawName.length(); i++) {
-            char c = rawName.charAt(i);
-            if (Character.isLetterOrDigit(c) || c == '-' || c == '_' || c == '.') {
-                builder.append(c);
-            } else {
-                builder.append('_');
-            }
-        }
-        String sanitized = builder.toString().trim();
-        return sanitized.isEmpty() ? "default" : sanitized;
+        return sessionConfigController.sanitizeSessionName(rawName);
     }
 
     boolean hasUnsavedChangesInAnyBuffer() {
-        for (FileBuffer buffer : buffers) {
-            if (buffer != null && buffer.isModified()) {
-                return true;
-            }
-        }
-        return false;
+        return sessionConfigController.hasUnsavedChangesInAnyBuffer();
     }
 
     void ensureSettingsFileSeeded(File settingsFile) throws IOException {
-        if (settingsFile == null) {
-            return;
-        }
-        File parent = settingsFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-            Files.createDirectories(parent.toPath());
-        }
-        if (!settingsFile.exists() || settingsFile.length() == 0L) {
-            Files.write(settingsFile.toPath(),
-                configManager.defaultConfigTemplate().getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING);
-        }
+        sessionConfigController.ensureSettingsFileSeeded(settingsFile);
     }
 
     public String setTabSizeFromCommand(String value) {
-        try {
-            int parsed = Math.max(1, Math.min(16, Integer.parseInt(value)));
-            configManager.set("tab.size", String.valueOf(parsed));
-            for (EditorPane pane : editorPanes) {
-                pane.getTextArea().setTabSize(parsed);
-            }
-            return "Tab size set to " + parsed;
-        } catch (NumberFormatException e) {
-            return "Invalid tab size: " + value;
-        }
+        return sessionConfigController.setTabSizeFromCommand(value);
     }
 
     // Go to line
     public String gotoLine(int lineNum) {
-        try {
-            int totalLines = writingArea.getLineCount();
-            if (lineNum < 1 || lineNum > totalLines) {
-                return "Invalid line number: " + lineNum;
-            }
-
-            recordJumpPosition();
-            int offset = writingArea.getLineStartOffset(lineNum - 1);
-            writingArea.setCaretPosition(offset);
-            return "Line " + lineNum;
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return sessionConfigController.gotoLine(lineNum);
     }
 
     // Help system
     public void showHelp(String topic) {
-        String helpText = getHelpText(topic);
-        openScratchBuffer(topic == null || topic.isEmpty() ? "[help]" : "[help " + topic + "]", helpText, true);
+        sessionConfigController.showHelp(topic);
     }
 
     String getHelpText(String topic) {
-        return helpService.getHelpText(topic, VERSION);
+        return sessionConfigController.getHelpText(topic);
     }
 
     // Recent files management
     void addToRecentFiles(String filepath) {
-        if (filepath == null || filepath.isEmpty()) {
-            return;
-        }
-
-        recentFiles.remove(filepath);
-        recentFiles.add(0, filepath);
-        while (recentFiles.size() > 50) {
-            recentFiles.remove(recentFiles.size() - 1);
-        }
-        saveRecentFiles();
+        sessionConfigController.addToRecentFiles(filepath);
     }
 
     public String showRecentFiles() {
-        if (recentFiles.isEmpty()) {
-            return "No recent files";
-        }
-
-        StringBuilder builder = new StringBuilder();
-        builder.append("Recent files\n\n");
-        for (int i = 0; i < recentFiles.size(); i++) {
-            builder.append(i + 1).append(". ").append(recentFiles.get(i)).append("\n");
-        }
-        builder.append("\nuse :e <path> to reopen a file.");
-        openScratchBuffer("[recent files]", builder.toString(), true);
-        return "Showing recent files";
+        return sessionConfigController.showRecentFiles();
     }
 
     void showBufferListDialog(String list) {
-        JTextArea textArea = new JTextArea(list);
-        textArea.setEditable(false);
-        textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-
-        JScrollPane scrollPane = new JScrollPane(textArea);
-        scrollPane.setPreferredSize(new Dimension(400, 200));
-
-        JOptionPane.showMessageDialog(this, scrollPane, "Buffer List", JOptionPane.INFORMATION_MESSAGE);
+        sessionConfigController.showBufferListDialog(list);
     }
 
     // Quit handling
     void handleQuit(boolean force) {
-        String message = requestQuit(force);
-        if (!"Quitting".equals(message)) {
-            showMessage(message);
-        }
+        sessionConfigController.handleQuit(force);
     }
 
     boolean hasUnsavedChanges(FileBuffer buffer) {
-        return buffer != null && buffer.isModified();
+        return sessionConfigController.hasUnsavedChanges(buffer);
     }
 
     int confirmDiscardChanges(String prompt) {
-        return JOptionPane.showConfirmDialog(this,
-            prompt,
-            "Unsaved Changes",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE);
+        return sessionConfigController.confirmDiscardChanges(prompt);
     }
 
     public String requestQuit(boolean force) {
-        if (closeReturnableScratchBuffer()) {
-            return "Returned from scratch buffer";
-        }
-
-        FileBuffer buffer = getCurrentBuffer();
-        if (!force && hasUnsavedChanges(buffer)) {
-            int result = confirmDiscardChanges("File has unsaved changes. Quit anyway?");
-            if (result != JOptionPane.YES_OPTION) {
-                return "Quit cancelled";
-            }
-        }
-
-        closeEditor();
-        return "Quitting";
+        return sessionConfigController.requestQuit(force);
     }
 
     public ConfigManager getConfigManager() {
-        return configManager;
+        return sessionConfigController.getConfigManager();
     }
 
     public PluginManager getPluginManager() {
-        return pluginManager;
+        return sessionConfigController.getPluginManager();
     }
 
     void firePluginEvent(String event) {
-        if (pluginManager == null) return;
-        pluginManager.fireEvent(event);
+        sessionConfigController.firePluginEvent(event);
     }
 
     public String reloadPlugins() {
-        pluginManager.reload();
-        int count = pluginManager.getPlugins().size();
-        return "Reloaded " + count + " plugin(s)";
+        return sessionConfigController.reloadPlugins();
     }
 
     public String showPluginList() {
-        showScratchBuffer("[plugins]", pluginManager.getPluginListText());
-        return "Showing plugins";
+        return sessionConfigController.showPluginList();
     }
 
     public String showPluginPackages() {
-        showScratchBuffer("[plugin packages]", pluginManager.getPackageListText());
-        return "Showing plugin packages";
+        return sessionConfigController.showPluginPackages();
     }
 
     public String enablePlugin(String name) {
-        return pluginManager.enablePlugin(name);
+        return sessionConfigController.enablePlugin(name);
     }
 
     public String disablePlugin(String name) {
-        return pluginManager.disablePlugin(name);
+        return sessionConfigController.disablePlugin(name);
     }
 
     public String showPluginInfo(String name) {
-        String text = pluginManager.getPluginInfoText(name);
-        showScratchBuffer("[plugin " + name + "]", text);
-        return "Showing plugin info";
+        return sessionConfigController.showPluginInfo(name);
     }
 
     public String showPluginPath() {
-        String path = pluginManager.getPluginsDirectoryPath();
-        List<String> disabled = pluginManager.listDisabledPlugins();
-        StringBuilder sb = new StringBuilder();
-        sb.append("Plugin directory: ").append(path).append("\n\n");
-        if (!disabled.isEmpty()) {
-            sb.append("Disabled plugins:\n");
-            for (String d : disabled) sb.append("  ").append(d).append("\n");
-        }
-        showScratchBuffer("[plugin path]", sb.toString());
-        return path;
+        return sessionConfigController.showPluginPath();
     }
 
     public String createAndOpenPlugin(String name) {
-        try {
-            File file = pluginManager.createPluginFile(name);
-            openFile(file);
-            pluginManager.reload();
-            return "Opened plugin: " + file.getName();
-        } catch (IOException e) {
-            return "Error creating plugin: " + e.getMessage();
-        }
+        return sessionConfigController.createAndOpenPlugin(name);
     }
 
     public String installPluginPackage(String args) {
-        return pluginManager.installPackage(args);
+        return sessionConfigController.installPluginPackage(args);
     }
 
     public String updatePluginPackage(String args) {
-        return pluginManager.updatePackage(args);
+        return sessionConfigController.updatePluginPackage(args);
     }
 
     public String removePluginPackage(String name) {
-        return pluginManager.removePackage(name);
+        return sessionConfigController.removePluginPackage(name);
     }
 
     public String pinPluginPackage(String name) {
-        return pluginManager.setPackagePinned(name, true);
+        return sessionConfigController.pinPluginPackage(name);
     }
 
     public String unpinPluginPackage(String name) {
-        return pluginManager.setPackagePinned(name, false);
+        return sessionConfigController.unpinPluginPackage(name);
     }
 
     public String executeCommand(String cmd) {
-        if (commandHandler == null) return "";
-        return commandHandler.execute(cmd);
+        return sessionConfigController.executeCommand(cmd);
     }
 
     public String getModeName() {
-        return editorState.mode == null ? "normal" : editorState.mode.getDisplayName().toLowerCase();
+        return sessionConfigController.getModeName();
     }
 
     public String runUserCommand(String name, String shellCmd) {
-        try {
-            FileBuffer buf = getCurrentBuffer();
-            String filePath = (buf != null && buf.hasFilePath()) ? buf.getFilePath() : "";
-            int line = getCurrentLineNumber();
-            int col = 0;
-            try { col = writingArea.getCaretPosition() - writingArea.getLineStartOffset(getCurrentCaretLine()); } catch (BadLocationException ignored) {}
-            String word = getWordAtCaret();
-            String selection = writingArea.getSelectedText();
-            String interpolated = PluginManager.interpolate(shellCmd, filePath, line, col, word, selection);
-            String validationError = validateShellCommand(interpolated);
-            if (validationError != null) {
-                return validationError;
-            }
-            File workingDirectory = new File(".");
-            if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
-                workingDirectory = buf.getFile().getParentFile();
-            }
-            CommandResult result = runExternalCommand(
-                ShellCommand.forCommand(interpolated),
-                workingDirectory,
-                null,
-                null,
-                configManager.getProcessTimeoutMs(),
-                configManager.getProcessOutputMaxBytes(),
-                true
-            );
-            String output = result.stdout == null ? "" : result.stdout.stripTrailing();
-            if (result.exitCode != 0) {
-                if (!output.isEmpty()) {
-                    showScratchBuffer("[" + name + "]", output + "\n");
-                }
-                return ":" + name + " failed (exit " + result.exitCode + ")";
-            }
-            if (output.isEmpty()) {
-                return ":" + name + " completed";
-            }
-            showScratchBuffer("[" + name + "]", output + "\n");
-            return ":" + name + " completed";
-        } catch (Exception e) {
-            return "Error running user command: " + e.getMessage();
-        }
+        return sessionConfigController.runUserCommand(name, shellCmd);
     }
 
     public String showUndoHistory() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Undo History\n");
-        sb.append("=".repeat(40)).append("\n\n");
-        // UndoManager doesn't expose its edit list, but we can show state
-        int canUndo = 0;
-        int canRedo = 0;
-        javax.swing.undo.UndoManager um = undoManager;
-        // Count available undos by trying to get presentation names
-        try {
-            while (um.canUndo()) {
-                canUndo++;
-                um.undo();
-            }
-            // Redo them all back
-            int redone = 0;
-            while (um.canRedo() && redone < canUndo) {
-                um.redo();
-                redone++;
-            }
-            // Count remaining redos
-            javax.swing.undo.UndoManager probe = um;
-            while (probe.canRedo()) {
-                canRedo++;
-                probe.redo();
-            }
-            // Undo back to current position
-            for (int i = 0; i < canRedo; i++) {
-                probe.undo();
-            }
-        } catch (Exception ignored) {
-            sb.append("(unable to inspect undo state)\n");
-        }
-        sb.append("Position: ").append(canUndo).append(" edits deep\n");
-        sb.append("Can undo: ").append(canUndo).append(" steps\n");
-        sb.append("Can redo: ").append(canRedo).append(" steps\n");
-        sb.append("Total edits: ").append(canUndo + canRedo).append("\n\n");
-        sb.append("  u     = undo one step\n");
-        sb.append("  Ctrl+r = redo one step\n");
-        showScratchBuffer("[Undo History]", sb.toString());
-        return "Showing undo history";
+        return sessionConfigController.showUndoHistory();
     }
 
     public String clearSearchHighlights() {
-        searchManager.clearHighlights();
-        return "Search highlights cleared";
+        return sessionConfigController.clearSearchHighlights();
     }
 
     public String writeAll() {
-        int saved = 0;
-        for (FileBuffer buffer : buffers) {
-            if (buffer.isModified() && buffer.getFile() != null) {
-                try {
-                    buffer.save();
-                    saved++;
-                } catch (Exception e) {
-                    return "Error saving " + buffer.getDisplayName() + ": " + e.getMessage();
-                }
-            }
-        }
-        return saved + " file(s) written";
+        return sessionConfigController.writeAll();
     }
 
     public String quitAll(boolean force) {
-        if (!force) {
-            for (FileBuffer buffer : buffers) {
-                if (hasUnsavedChanges(buffer)) {
-                    int result = confirmDiscardChanges("There are unsaved changes. Quit anyway?");
-                    if (result != JOptionPane.YES_OPTION) {
-                        return "Quit cancelled";
-                    }
-                    break;
-                }
-            }
-        }
-        closeEditor();
-        return "Quitting";
+        return sessionConfigController.quitAll(force);
     }
 
     public void showScratchBuffer(String title, String content) {
-        openScratchBuffer(title, content, true);
+        sessionConfigController.showScratchBuffer(title, content);
     }
 
     void openScratchBuffer(String title, String content, boolean returnable) {
-        persistCurrentBufferState();
-
-        FileBuffer scratchBuffer = FileBuffer.createScratch(title, content);
-        FileBuffer returnBuffer = getCurrentBuffer();
-        int returnCaretPosition = writingArea.getCaretPosition();
-
-        buffers.add(scratchBuffer);
-        if (returnable && returnBuffer != null) {
-            specialBufferReturns.push(new SpecialBufferReturnState(scratchBuffer, returnBuffer, returnCaretPosition));
-        }
-        loadBufferIntoEditor(scratchBuffer);
+        sessionConfigController.openScratchBuffer(title, content, returnable);
     }
 
     boolean closeReturnableScratchBuffer() {
-        FileBuffer current = getCurrentBuffer();
-        if (current == null || specialBufferReturns.isEmpty()) {
-            return false;
-        }
-
-        SpecialBufferReturnState state = specialBufferReturns.peek();
-        if (state.scratchBuffer != current) {
-            return false;
-        }
-
-        specialBufferReturns.pop();
-        buffers.remove(current);
-        if (current == quickfixBuffer) {
-            quickfixBuffer = null;
-        }
-
-        int returnIndex = buffers.indexOf(state.returnBuffer);
-        if (returnIndex < 0) {
-            if (buffers.isEmpty()) {
-                openLandingPage();
-                return true;
-            }
-            returnIndex = 0;
-        }
-
-        loadBufferIntoEditor(buffers.get(returnIndex));
-        writingArea.setCaretPosition(Math.min(state.returnCaretPosition, writingArea.getText().length()));
-        return true;
+        return sessionConfigController.closeReturnableScratchBuffer();
     }
 
     void loadRecentFiles() {
-        recentFiles.clear();
-        if (!recentFilesStore.exists()) {
-            return;
-        }
-        try {
-            recentFiles.addAll(Files.readAllLines(recentFilesStore.toPath(), StandardCharsets.UTF_8));
-        } catch (IOException ignored) {
-        }
+        sessionConfigController.loadRecentFiles();
     }
 
     void saveRecentFiles() {
-        try {
-            ensureStoreDirectory(recentFilesStore);
-            Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
-        } catch (IOException ignored) {
-        }
+        sessionConfigController.saveRecentFiles();
     }
 
     void loadTrustedProjectRoots() {
-        trustedProjectRoots.clear();
-        if (trustedProjectsStore == null || !trustedProjectsStore.exists()) {
-            return;
-        }
-        try {
-            for (String line : Files.readAllLines(trustedProjectsStore.toPath(), StandardCharsets.UTF_8)) {
-                String normalized = line == null ? "" : line.trim();
-                if (!normalized.isEmpty()) {
-                    trustedProjectRoots.add(normalized);
-                }
-            }
-        } catch (IOException ignored) {
-        }
+        sessionConfigController.loadTrustedProjectRoots();
     }
 
     void saveTrustedProjectRoots() {
-        if (trustedProjectsStore == null) {
-            return;
-        }
-        try {
-            ensureStoreDirectory(trustedProjectsStore);
-            List<String> roots = new ArrayList<>(trustedProjectRoots);
-            Collections.sort(roots);
-            Files.write(
-                trustedProjectsStore.toPath(),
-                roots,
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE
-            );
-        } catch (IOException ignored) {
-        }
+        sessionConfigController.saveTrustedProjectRoots();
     }
 
     boolean ensureProjectTrustForFile(File file) {
-        File projectRoot = detectProjectTrustRoot(file);
-        if (projectRoot == null) {
-            return true;
-        }
-        String canonicalRoot;
-        try {
-            canonicalRoot = projectRoot.getCanonicalPath();
-        } catch (IOException e) {
-            canonicalRoot = projectRoot.getAbsolutePath();
-        }
-        if (trustedProjectRoots.contains(canonicalRoot)) {
-            return true;
-        }
-        if (!hasProjectLocalExecutionSurface(projectRoot)) {
-            return true;
-        }
-
-        int result = JOptionPane.showConfirmDialog(
-            this,
-            "This project contains local execution surfaces (.shedrc.local and/or .shed/plugins).\n"
-                + "Trust this project root for local config/plugin behavior?\n"
-                + canonicalRoot,
-            "Project Trust",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        );
-        if (result == JOptionPane.YES_OPTION) {
-            trustedProjectRoots.add(canonicalRoot);
-            saveTrustedProjectRoots();
-            return true;
-        }
-        return false;
+        return sessionConfigController.ensureProjectTrustForFile(file);
     }
 
     File detectProjectTrustRoot(File file) {
-        if (file == null) {
-            return null;
-        }
-        File cursor = file.isDirectory() ? file : file.getParentFile();
-        File firstConfigRoot = null;
-        while (cursor != null) {
-            File gitDir = new File(cursor, ".git");
-            if (gitDir.exists()) {
-                return cursor;
-            }
-            File localConfig = new File(cursor, ".shedrc.local");
-            if (localConfig.isFile() && firstConfigRoot == null) {
-                firstConfigRoot = cursor;
-            }
-            cursor = cursor.getParentFile();
-        }
-        return firstConfigRoot;
+        return sessionConfigController.detectProjectTrustRoot(file);
     }
 
     boolean hasProjectLocalExecutionSurface(File projectRoot) {
-        if (projectRoot == null || !projectRoot.isDirectory()) {
-            return false;
-        }
-        File localConfig = new File(projectRoot, ".shedrc.local");
-        if (localConfig.isFile()) {
-            return true;
-        }
-        File pluginDir = new File(projectRoot, ".shed/plugins");
-        if (!pluginDir.isDirectory()) {
-            return false;
-        }
-        File[] pluginFiles = pluginDir.listFiles(file -> file.isFile()
-            && (file.getName().endsWith(".shed") || file.getName().endsWith(".lua")));
-        return pluginFiles != null && pluginFiles.length > 0;
+        return sessionConfigController.hasProjectLocalExecutionSurface(projectRoot);
     }
 
     void appendCommandLog(String entry) {
-        if (entry == null || entry.isBlank()) {
-            return;
-        }
-        String line = commandLogTimeFormat.format(LocalDateTime.now()) + " " + entry.strip() + "\n";
-        try {
-            ensureStoreDirectory(commandLogStore);
-            Files.write(commandLogStore.toPath(),
-                line.getBytes(StandardCharsets.UTF_8),
-                StandardOpenOption.CREATE,
-                StandardOpenOption.APPEND);
-        } catch (IOException ignored) {
-        }
+        sessionConfigController.appendCommandLog(entry);
     }
 
     void ensureStoreDirectory(File store) throws IOException {
-        if (store == null) {
-            return;
-        }
-        File parent = store.getParentFile();
-        if (parent != null && !parent.exists()) {
-            Files.createDirectories(parent.toPath());
-        }
+        sessionConfigController.ensureStoreDirectory(store);
     }
 
     static final Pattern HEX_COLOR_PATTERN = Pattern.compile("#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\b");

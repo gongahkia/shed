@@ -5711,7 +5711,7 @@ public class Texteditor extends JFrame implements KeyListener {
         String title = "[Terminal " + (terminalBufferCounter++) + "]";
         PtyTerminalPane terminalPane;
         try {
-            terminalPane = PtyTerminalPane.open(startDirectory, configManager);
+            terminalPane = PtyTerminalPane.open(startDirectory, configManager, resolveEditorFont());
         } catch (IOException e) {
             return "Terminal failed: " + e.getMessage();
         }
@@ -5736,6 +5736,7 @@ public class Texteditor extends JFrame implements KeyListener {
         double startRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.12 : 0.5;
         windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, startRatio);
         ptyTerminalPanes.put(termBuffer, terminalPane);
+        terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(termBuffer)));
         renderWindowLayout();
         animateSplitForPane(terminalEditorPane, startRatio, 0.5);
         activateEditorPane(terminalEditorPane);
@@ -6086,6 +6087,43 @@ public class Texteditor extends JFrame implements KeyListener {
             asyncJobService.cancel(session.runningJobId);
             session.runningJobId = -1;
         }
+    }
+
+    private void closeExitedTerminal(FileBuffer buffer) {
+        if (buffer == null || !ptyTerminalPanes.containsKey(buffer)) {
+            return;
+        }
+        List<EditorPane> panes = new ArrayList<>();
+        for (EditorPane pane : editorPanes) {
+            if (pane.getBuffer() == buffer) {
+                panes.add(pane);
+            }
+        }
+        if (panes.isEmpty()) {
+            closeTerminalSession(buffer);
+            buffers.remove(buffer);
+            return;
+        }
+        for (EditorPane pane : panes) {
+            if (!editorPanes.contains(pane)) {
+                continue;
+            }
+            if (editorPanes.size() > 1) {
+                closePane(pane);
+                continue;
+            }
+            closeTerminalSession(buffer);
+            buffers.remove(buffer);
+            FileBuffer replacement = buffers.isEmpty() ? null : buffers.get(0);
+            if (replacement == null) {
+                openLandingPage();
+            } else {
+                loadBufferIntoPane(pane, replacement, 0);
+            }
+        }
+        buffers.remove(buffer);
+        currentBufferIndex = buffers.isEmpty() ? -1 : Math.min(Math.max(0, currentBufferIndex), buffers.size() - 1);
+        showMessage("Terminal exited");
     }
 
     private void installTerminalActivationListeners(EditorPane pane, Component component) {

@@ -79,6 +79,11 @@ public class Texteditor extends JFrame implements KeyListener {
     QuickfixService quickfixService;
     PluginManager pluginManager;
     TreeGitController treeGitController;
+    LspController lspController;
+    JobQuickfixController jobQuickfixController;
+    TerminalController terminalController;
+    MarkdownController markdownController;
+    PaneBufferController paneBufferController;
 
     // Buffer management
     List<FileBuffer> buffers;
@@ -226,9 +231,11 @@ public class Texteditor extends JFrame implements KeyListener {
         treeService = new TreeService();
         treeGitController = new TreeGitController(this);
         lspService = new LspService();
+        lspController = new LspController(this);
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService();
         quickfixService = new QuickfixService();
+        jobQuickfixController = new JobQuickfixController(this);
         editorState = new EditorState();
         modeEngine = new ModeEngine();
         buffers = new ArrayList<>();
@@ -296,6 +303,7 @@ public class Texteditor extends JFrame implements KeyListener {
         terminalSessions = new HashMap<>();
         ptyTerminalPanes = new HashMap<>();
         terminalBufferCounter = 1;
+        terminalController = new TerminalController(this);
         treePane = null;
         treeBuffer = null;
         treeRoot = null;
@@ -305,6 +313,8 @@ public class Texteditor extends JFrame implements KeyListener {
         fuzzyMatchService = new FuzzyMatchService();
         snippetService = new SnippetService();
         bracketColorService = new BracketColorService();
+        markdownController = new MarkdownController(this);
+        paneBufferController = new PaneBufferController(this);
         symbolService = new SymbolService();
         taskService = new TaskService();
         fileWatcherService = new FileWatcherService();
@@ -4878,721 +4888,169 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void maybePreviewMarkdown(FileBuffer buffer) {
-        if (buffer == null || buffer.getFileType() != FileType.MARKDOWN || buffer.getFile() == null) {
-            return;
-        }
-        if (buffer.getFile().equals(lastPreviewedMarkdown)) {
-            return;
-        }
-        lastPreviewedMarkdown = buffer.getFile();
-        try {
-            File previewFile = File.createTempFile("shed-markdown-", ".html");
-            previewFile.deleteOnExit();
-            String html = renderMarkdownPreview(buffer.getFullContent(), buffer.getDisplayName());
-            Files.writeString(previewFile.toPath(), html, StandardCharsets.UTF_8);
-            if (Desktop.isDesktopSupported()) {
-                Desktop.getDesktop().browse(previewFile.toURI());
-            }
-        } catch (IOException ignored) {
-        }
+        markdownController.maybePreviewMarkdown(buffer);
     }
 
     String renderMarkdownPreview(String markdown, String title) {
-        StringBuilder html = new StringBuilder();
-        html.append("<!doctype html><html><head><meta charset=\"utf-8\">");
-        html.append("<title>").append(title).append("</title>");
-        html.append("<style>body{font-family:Georgia,serif;max-width:880px;margin:40px auto;padding:0 24px;line-height:1.6;background:#faf7ef;color:#1f2933;}pre{background:#111827;color:#f9fafb;padding:16px;overflow:auto;}code{background:#e5e7eb;padding:2px 4px;}h1,h2,h3{line-height:1.2;}blockquote{border-left:4px solid #cbd5e1;padding-left:12px;color:#475569;}</style>");
-        html.append("</head><body>");
-        boolean inCode = false;
-        for (String line : markdown.split("\n", -1)) {
-            String escaped = escapeHtml(line);
-            if (line.startsWith("```")) {
-                html.append(inCode ? "</pre>" : "<pre>");
-                inCode = !inCode;
-                continue;
-            }
-            if (inCode) {
-                html.append(escaped).append("\n");
-                continue;
-            }
-            if (line.startsWith("### ")) {
-                html.append("<h3>").append(escapeHtml(line.substring(4))).append("</h3>");
-            } else if (line.startsWith("## ")) {
-                html.append("<h2>").append(escapeHtml(line.substring(3))).append("</h2>");
-            } else if (line.startsWith("# ")) {
-                html.append("<h1>").append(escapeHtml(line.substring(2))).append("</h1>");
-            } else if (line.startsWith("> ")) {
-                html.append("<blockquote>").append(escapeHtml(line.substring(2))).append("</blockquote>");
-            } else if (line.startsWith("- ") || line.startsWith("* ")) {
-                html.append("<p>&bull; ").append(escapeHtml(line.substring(2))).append("</p>");
-            } else if (line.isBlank()) {
-                html.append("<br/>");
-            } else {
-                html.append("<p>").append(escaped).append("</p>");
-            }
-        }
-        if (inCode) {
-            html.append("</pre>");
-        }
-        html.append("</body></html>");
-        return html.toString();
+        return markdownController.renderMarkdownPreview(markdown, title);
     }
 
     String escapeHtml(String value) {
-        return value
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;");
+        return markdownController.escapeHtml(value);
     }
 
     // ========== Markdown / Orgmode features ==========
 
     String[] getCurrentLines() {
-        return writingArea.getText().split("\n", -1);
+        return markdownController.getCurrentLines();
     }
 
     // --- Heading folding ---
 
     String toggleFoldAtCursor() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) {
-            return "";
-        }
-        int line = getCurrentCaretLine();
-        String[] lines = getCurrentLines();
-        if (line < 0 || line >= lines.length) return "";
-        if (!markdownService.isHeading(lines[line])) {
-            return "Not on a heading line";
-        }
-        MarkdownService.FoldRange range = markdownService.computeFoldRange(lines, line);
-        if (range == null) {
-            return "Nothing to fold";
-        }
-        Boolean folded = foldedLines.get(line);
-        if (folded != null && folded) {
-            return unfoldHeading(line, lines);
-        } else {
-            return foldHeading(line, range, lines);
-        }
+        return markdownController.toggleFoldAtCursor();
     }
 
     String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {
-        try {
-            int foldCount = range.endLine - range.startLine;
-            int startOffset = writingArea.getLineStartOffset(range.startLine + 1);
-            int endOffset = writingArea.getLineEndOffset(range.endLine);
-            String hidden = writingArea.getText().substring(startOffset, endOffset);
-            foldHiddenContent.put(headingLine, hidden);
-            foldedLines.put(headingLine, true);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange("", startOffset, endOffset);
-            // Append fold indicator to heading line
-            int headingEnd = writingArea.getLineEndOffset(headingLine);
-            String indicator = " ... (" + foldCount + " lines)";
-            writingArea.insert(indicator, headingEnd - 1);
-            suppressDocumentEvents = false;
-            return "Folded " + foldCount + " lines";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Fold error: " + e.getMessage();
-        }
+        return markdownController.foldHeading(headingLine, range, lines);
     }
 
     String unfoldHeading(int headingLine, String[] lines) {
-        String hidden = foldHiddenContent.get(headingLine);
-        if (hidden == null) return "Nothing to unfold";
-        try {
-            // Remove fold indicator from heading line
-            String headingText = lines[headingLine];
-            int indicatorIdx = headingText.indexOf(" ... (");
-            if (indicatorIdx > 0) {
-                int headingStart = writingArea.getLineStartOffset(headingLine);
-                int headingEnd = writingArea.getLineEndOffset(headingLine);
-                String cleanHeading = headingText.substring(0, indicatorIdx);
-                suppressDocumentEvents = true;
-                writingArea.replaceRange(cleanHeading + "\n" + hidden, headingStart, headingEnd);
-                suppressDocumentEvents = false;
-            } else {
-                int afterHeading = writingArea.getLineEndOffset(headingLine);
-                suppressDocumentEvents = true;
-                writingArea.insert(hidden, afterHeading);
-                suppressDocumentEvents = false;
-            }
-            foldedLines.put(headingLine, false);
-            foldHiddenContent.remove(headingLine);
-            return "Unfolded";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Unfold error: " + e.getMessage();
-        }
+        return markdownController.unfoldHeading(headingLine, lines);
     }
 
     String foldAll() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
-        String[] lines = getCurrentLines();
-        List<MarkdownService.FoldRange> ranges = markdownService.computeAllFoldRanges(lines);
-        int count = 0;
-        // Fold from bottom to top to preserve line numbers
-        for (int i = ranges.size() - 1; i >= 0; i--) {
-            MarkdownService.FoldRange range = ranges.get(i);
-            if (!Boolean.TRUE.equals(foldedLines.get(range.startLine))) {
-                lines = getCurrentLines();
-                foldHeading(range.startLine, range, lines);
-                count++;
-            }
-        }
-        return count > 0 ? "Folded " + count + " sections" : "Nothing to fold";
+        return markdownController.foldAll();
     }
 
     String unfoldAll() {
-        if (foldHiddenContent.isEmpty()) return "Nothing to unfold";
-        // Unfold from bottom to top
-        List<Integer> foldedHeadings = new ArrayList<>(foldedLines.keySet());
-        foldedHeadings.sort(Collections.reverseOrder());
-        int count = 0;
-        for (int heading : foldedHeadings) {
-            if (Boolean.TRUE.equals(foldedLines.get(heading))) {
-                String[] lines = getCurrentLines();
-                if (heading < lines.length) {
-                    unfoldHeading(heading, lines);
-                    count++;
-                }
-            }
-        }
-        foldedLines.clear();
-        foldHiddenContent.clear();
-        return count > 0 ? "Unfolded " + count + " sections" : "Nothing to unfold";
+        return markdownController.unfoldAll();
     }
 
     String globalFoldCycle() {
-        boolean anyFolded = foldedLines.values().stream().anyMatch(v -> v);
-        if (anyFolded) {
-            return unfoldAll();
-        } else {
-            return foldAll();
-        }
+        return markdownController.globalFoldCycle();
     }
 
     // --- Heading navigation ---
 
     String navigateHeading(boolean forward) {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
-        String[] lines = getCurrentLines();
-        int currentLine = getCurrentCaretLine();
-        int target = forward ? markdownService.nextHeading(lines, currentLine) : markdownService.prevHeading(lines, currentLine);
-        if (target < 0) {
-            return forward ? "No next heading" : "No previous heading";
-        }
-        recordJumpPosition();
-        return gotoLine(target + 1);
+        return markdownController.navigateHeading(forward);
     }
 
     String navigateHeadingAtLevel(boolean forward, int level) {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
-        String[] lines = getCurrentLines();
-        int currentLine = getCurrentCaretLine();
-        int target = forward ? markdownService.nextHeadingAtLevel(lines, currentLine, level) : markdownService.prevHeadingAtLevel(lines, currentLine, level);
-        if (target < 0) {
-            return "No " + (forward ? "next" : "previous") + " h" + level + " heading";
-        }
-        recordJumpPosition();
-        return gotoLine(target + 1);
+        return markdownController.navigateHeadingAtLevel(forward, level);
     }
 
     public String showTableOfContents() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        String toc = markdownService.generateToc(lines);
-        FileBuffer tocBuffer = FileBuffer.createScratch("[TOC]", toc);
-        buffers.add(tocBuffer);
-        loadBufferIntoEditor(tocBuffer);
-        return "Table of contents";
+        return markdownController.showTableOfContents();
     }
 
     public String showOutline() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        String toc = markdownService.generateToc(lines);
-        // Open in a split
-        String splitResult = splitWindow(true);
-        FileBuffer tocBuffer = FileBuffer.createScratch("[Outline]", toc);
-        buffers.add(tocBuffer);
-        loadBufferIntoEditor(tocBuffer);
-        return "Outline opened";
+        return markdownController.showOutline();
     }
 
     // --- Heading promotion/demotion ---
 
     String markdownHeadingShift(boolean demote) {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return "";
-        if (!markdownService.isHeading(lines[line])) {
-            return applyLineOperator(demote ? '>' : '<');
-        }
-        String newLine = demote ? markdownService.demoteHeading(lines[line]) : markdownService.promoteHeading(lines[line]);
-        if (newLine.equals(lines[line])) {
-            return demote ? "Already at h6" : "Already at h1";
-        }
-        try {
-            int startOffset = writingArea.getLineStartOffset(line);
-            int endOffset = writingArea.getLineEndOffset(line);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(newLine + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return demote ? "Demoted heading" : "Promoted heading";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+        return markdownController.markdownHeadingShift(demote);
     }
 
     String markdownSubtreeShift(boolean demote) {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (line < 0 || line >= lines.length || !markdownService.isHeading(lines[line])) {
-            return "Not on a heading line";
-        }
-        String[] newLines = demote ? markdownService.demoteSubtree(lines, line) : markdownService.promoteSubtree(lines, line);
-        MarkdownService.FoldRange range = markdownService.computeFoldRange(lines, line);
-        int start = line;
-        int end = range != null ? range.endLine : line;
-        try {
-            int startOffset = writingArea.getLineStartOffset(start);
-            int endOffset = writingArea.getLineEndOffset(end);
-            StringBuilder replacement = new StringBuilder();
-            for (int i = start; i <= end; i++) {
-                if (i > start) replacement.append("\n");
-                replacement.append(newLines[i]);
-            }
-            replacement.append("\n");
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(replacement.toString(), startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return demote ? "Demoted subtree" : "Promoted subtree";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+        return markdownController.markdownSubtreeShift(demote);
     }
 
     // --- Table editing ---
 
     boolean isOnTableLine() {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        return line >= 0 && line < lines.length && markdownService.isTableRow(lines[line]);
+        return markdownController.isOnTableLine();
     }
 
     String markdownTableNextCell(boolean reverse) {
-        try {
-            int line = getCurrentCaretLine();
-            String[] lines = getCurrentLines();
-            if (line < 0 || line >= lines.length) return "";
-            String currentLine = lines[line];
-            int lineStart = writingArea.getLineStartOffset(line);
-            int posInLine = writingArea.getCaretPosition() - lineStart;
-
-            if (reverse) {
-                int offset = markdownService.prevCellOffset(currentLine, posInLine);
-                writingArea.setCaretPosition(lineStart + offset);
-                return "";
-            }
-
-            int nextOffset = markdownService.nextCellOffset(currentLine, posInLine + 1);
-            if (nextOffset <= posInLine + 1 || nextOffset >= currentLine.length() - 1) {
-                // Move to next row or create new row
-                int tableStart = markdownService.tableStartLine(lines, line);
-                int tableEnd = markdownService.tableEndLine(lines, line);
-                if (line >= tableEnd) {
-                    // Create new row
-                    String[] cells = markdownService.parseCells(currentLine);
-                    int[] widths = new int[cells.length];
-                    for (int c = 0; c < cells.length; c++) widths[c] = Math.max(3, cells[c].length());
-                    String newRow = markdownService.newTableRow(cells.length, widths);
-                    int endOfLine = writingArea.getLineEndOffset(line);
-                    suppressDocumentEvents = true;
-                    writingArea.insert("\n" + newRow, endOfLine - 1);
-                    suppressDocumentEvents = false;
-                    markModified();
-                    // Move to first cell of new row
-                    int newLineStart = writingArea.getLineStartOffset(line + 1);
-                    String newLineText = lines.length > line + 1 ? newRow : writingArea.getText().split("\n", -1)[line + 1];
-                    int firstCell = markdownService.nextCellOffset(newLineText, 0);
-                    writingArea.setCaretPosition(newLineStart + firstCell);
-                } else {
-                    // Skip separator lines
-                    int nextLine = line + 1;
-                    while (nextLine <= tableEnd && markdownService.isTableSeparator(lines[nextLine])) {
-                        nextLine++;
-                    }
-                    if (nextLine <= tableEnd) {
-                        int nextLineStart = writingArea.getLineStartOffset(nextLine);
-                        int firstCell = markdownService.nextCellOffset(lines[nextLine], 0);
-                        writingArea.setCaretPosition(nextLineStart + firstCell);
-                    }
-                }
-            } else {
-                writingArea.setCaretPosition(lineStart + nextOffset);
-            }
-            return "";
-        } catch (BadLocationException e) {
-            return "Table navigation error";
-        }
+        return markdownController.markdownTableNextCell(reverse);
     }
 
     public String alignMarkdownTable() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = markdownService.tableStartLine(lines, line);
-        int end = markdownService.tableEndLine(lines, line);
-        String aligned = markdownService.alignTable(lines, start, end);
-        try {
-            int startOffset = writingArea.getLineStartOffset(start);
-            int endOffset = writingArea.getLineEndOffset(end);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(aligned + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return "Table aligned";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error aligning table: " + e.getMessage();
-        }
+        return markdownController.alignMarkdownTable();
     }
 
     public String sortMarkdownTable(String args) {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int col = 0;
-        boolean ascending = true;
-        if (args != null && !args.isEmpty()) {
-            String[] parts = args.trim().split("\\s+");
-            try {
-                col = Integer.parseInt(parts[0]) - 1;
-            } catch (NumberFormatException ignored) {}
-            if (parts.length > 1 && parts[1].equalsIgnoreCase("desc")) ascending = false;
-        }
-        int start = markdownService.tableStartLine(lines, line);
-        int end = markdownService.tableEndLine(lines, line);
-        String sorted = markdownService.sortTable(lines, start, end, col, ascending);
-        try {
-            int startOffset = writingArea.getLineStartOffset(start);
-            int endOffset = writingArea.getLineEndOffset(end);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(sorted + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return "Table sorted by column " + (col + 1);
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error sorting table: " + e.getMessage();
-        }
+        return markdownController.sortMarkdownTable(args);
     }
 
     public String insertTableColumn(String args) {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = markdownService.tableStartLine(lines, line);
-        int end = markdownService.tableEndLine(lines, line);
-        int lineStart = 0;
-        try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
-        int col = markdownService.cellColumn(lines[line], writingArea.getCaretPosition() - lineStart);
-        String result = markdownService.insertColumn(lines, start, end, col);
-        try {
-            int startOffset = writingArea.getLineStartOffset(start);
-            int endOffset = writingArea.getLineEndOffset(end);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(result + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return "Column inserted";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error inserting column: " + e.getMessage();
-        }
+        return markdownController.insertTableColumn(args);
     }
 
     public String deleteTableColumn(String args) {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "Not a markdown file";
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (!markdownService.isInsideTable(lines, line)) return "Not inside a table";
-        int start = markdownService.tableStartLine(lines, line);
-        int end = markdownService.tableEndLine(lines, line);
-        int col = 0;
-        if (args != null && !args.isEmpty()) {
-            try { col = Integer.parseInt(args.trim()) - 1; } catch (NumberFormatException ignored) {}
-        } else {
-            int lineStart = 0;
-            try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
-            col = markdownService.cellColumn(lines[line], writingArea.getCaretPosition() - lineStart);
-        }
-        String result = markdownService.deleteColumn(lines, start, end, col);
-        try {
-            int startOffset = writingArea.getLineStartOffset(start);
-            int endOffset = writingArea.getLineEndOffset(end);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(result + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return "Column deleted";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error deleting column: " + e.getMessage();
-        }
+        return markdownController.deleteTableColumn(args);
     }
 
     public String insertTableTemplate(String args) {
-        int cols = 3, rows = 2;
-        if (args != null && !args.isEmpty()) {
-            String[] parts = args.trim().split("[xX]");
-            try {
-                if (parts.length >= 1) cols = Integer.parseInt(parts[0].trim());
-                if (parts.length >= 2) rows = Integer.parseInt(parts[1].trim());
-            } catch (NumberFormatException ignored) {}
-        }
-        String template = markdownService.createTableTemplate(cols, rows);
-        writingArea.insert(template, writingArea.getCaretPosition());
-        markModified();
-        return "Table inserted (" + cols + "x" + rows + ")";
+        return markdownController.insertTableTemplate(args);
     }
 
     // --- Checkbox toggling ---
 
     public String toggleCheckbox() {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return "";
-        if (!markdownService.isCheckbox(lines[line])) return "Not a checkbox line";
-        String toggled = markdownService.toggleCheckbox(lines[line]);
-        try {
-            int startOffset = writingArea.getLineStartOffset(line);
-            int endOffset = writingArea.getLineEndOffset(line);
-            suppressDocumentEvents = true;
-            writingArea.replaceRange(toggled + "\n", startOffset, endOffset);
-            suppressDocumentEvents = false;
-            markModified();
-            return toggled.contains("[x]") ? "Checked" : "Unchecked";
-        } catch (BadLocationException e) {
-            suppressDocumentEvents = false;
-            return "Error: " + e.getMessage();
-        }
+        return markdownController.toggleCheckbox();
     }
 
     // --- Smart list continuation ---
 
     String handleMarkdownEnter() {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return null;
-        String currentLine = lines[line];
-
-        if (markdownService.isEmptyListItem(currentLine)) {
-            // Remove the empty list prefix
-            try {
-                int startOffset = writingArea.getLineStartOffset(line);
-                int endOffset = writingArea.getLineEndOffset(line);
-                suppressDocumentEvents = true;
-                writingArea.replaceRange("\n", startOffset, endOffset);
-                suppressDocumentEvents = false;
-                lastInsertedText += "\n";
-                return "";
-            } catch (BadLocationException e) {
-                suppressDocumentEvents = false;
-                return null;
-            }
-        }
-
-        String continuation = markdownService.listContinuation(currentLine);
-        if (continuation != null) {
-            SwingUtilities.invokeLater(() -> {
-                writingArea.insert(continuation, writingArea.getCaretPosition());
-            });
-            lastInsertedText += "\n" + continuation;
-            return "";
-        }
-        return null;
+        return markdownController.handleMarkdownEnter();
     }
 
     // --- Link helpers ---
 
     public String insertLink() {
-        String template = markdownService.insertLinkTemplate();
-        writingArea.insert(template, writingArea.getCaretPosition());
-        markModified();
-        return "Link template inserted";
+        return markdownController.insertLink();
     }
 
     public String insertImage() {
-        String template = markdownService.insertImageTemplate();
-        writingArea.insert(template, writingArea.getCaretPosition());
-        markModified();
-        return "Image template inserted";
+        return markdownController.insertImage();
     }
 
     public String goToMarkdownLink() {
-        String[] lines = getCurrentLines();
-        int line = getCurrentCaretLine();
-        if (line < 0 || line >= lines.length) return "No link found";
-        int lineStart = 0;
-        try { lineStart = writingArea.getLineStartOffset(line); } catch (BadLocationException ignored) {}
-        int posInLine = writingArea.getCaretPosition() - lineStart;
-        String url = markdownService.extractLinkUrl(lines[line], posInLine);
-        if (url == null) return goToFileUnderCursor();
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            try {
-                if (java.awt.Desktop.isDesktopSupported()) {
-                    java.awt.Desktop.getDesktop().browse(new URI(url));
-                    return "Opened: " + url;
-                }
-            } catch (Exception e) {
-                return "Error opening URL: " + e.getMessage();
-            }
-        }
-        // Treat as relative file path
-        FileBuffer buf = getCurrentBuffer();
-        File base = buf != null && buf.getFile() != null ? buf.getFile().getParentFile() : new File(".");
-        File target = new File(base, url);
-        if (target.exists()) {
-            try {
-                openFile(target);
-                return "Opened: " + target.getName();
-            } catch (IOException e) {
-                return "Error opening file: " + e.getMessage();
-            }
-        }
-        return "File not found: " + url;
+        return markdownController.goToMarkdownLink();
     }
 
     // --- Concealment ---
 
     public String setConcealLevel(int level) {
-        this.concealLevel = Math.max(0, Math.min(2, level));
-        applySyntaxHighlighting();
-        return "Conceal level: " + concealLevel;
+        return markdownController.setConcealLevel(level);
     }
 
     // --- Snippet expansion ---
 
     boolean isOnCodeFenceLine() {
-        try {
-            int line = getCurrentCaretLine();
-            int lineStart = writingArea.getLineStartOffset(line);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText(lineStart, lineEnd - lineStart).trim();
-            return lineText.startsWith("```");
-        } catch (BadLocationException e) {
-            return false;
-        }
+        return markdownController.isOnCodeFenceLine();
     }
 
     String completeCodeFenceLanguage() {
-        try {
-            int line = getCurrentCaretLine();
-            int lineStart = writingArea.getLineStartOffset(line);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText(lineStart, lineEnd - lineStart).trim();
-            if (!lineText.startsWith("```")) return "Not a code fence line";
-            String prefix = lineText.substring(3).trim();
-            String[] matches = markdownService.filterCodeFenceLanguages(prefix);
-            if (matches.length == 0) return "No matching language";
-            String chosen = matches[0];
-            // Replace the line with the completed fence
-            suppressDocumentEvents = true;
-            writingArea.replaceRange("```" + chosen + "\n", lineStart, lineEnd);
-            suppressDocumentEvents = false;
-            markModified();
-            return "Language: " + chosen;
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return markdownController.completeCodeFenceLanguage();
     }
 
     String expandSnippetAtCursor() {
-        FileBuffer buf = getCurrentBuffer();
-        if (buf == null) return "No buffer";
-        FileType ft = buf.getFileType();
-        int pos = writingArea.getCaretPosition();
-        String text = writingArea.getText();
-
-        // Find the word before cursor
-        int wordStart = pos;
-        while (wordStart > 0 && !Character.isWhitespace(text.charAt(wordStart - 1))) {
-            wordStart--;
-        }
-        if (wordStart == pos) return "No trigger word";
-        String trigger = text.substring(wordStart, pos);
-        SnippetService.Snippet snippet = snippetService.findExact(ft, trigger);
-        if (snippet == null) return "No snippet: " + trigger;
-        String expanded = snippetService.expand(snippet);
-        int cursorOffset = snippetService.cursorOffset(snippet);
-        suppressDocumentEvents = true;
-        writingArea.replaceRange(expanded, wordStart, pos);
-        suppressDocumentEvents = false;
-        if (cursorOffset >= 0) {
-            writingArea.setCaretPosition(Math.min(wordStart + cursorOffset, writingArea.getText().length()));
-        }
-        markModified();
-        return "Expanded: " + trigger;
+        return markdownController.expandSnippetAtCursor();
     }
 
     public String listSnippets() {
-        FileBuffer buf = getCurrentBuffer();
-        FileType ft = buf != null ? buf.getFileType() : null;
-        String listing = snippetService.listSnippets(ft);
-        FileBuffer snippetBuf = FileBuffer.createScratch("[Snippets]", listing);
-        buffers.add(snippetBuf);
-        loadBufferIntoEditor(snippetBuf);
-        return "Showing snippets";
+        return markdownController.listSnippets();
     }
 
     // --- Bracket pair colorization ---
 
     public String toggleBracketColors() {
-        bracketColorEnabled = !bracketColorEnabled;
-        applyBracketHighlighting();
-        return bracketColorEnabled ? "Bracket colors enabled" : "Bracket colors disabled";
+        return markdownController.toggleBracketColors();
     }
 
     void applyBracketHighlighting() {
-        clearBracketHighlighting();
-        if (!bracketColorEnabled) return;
-        String text = writingArea.getText();
-        if (text.isEmpty()) return;
-        List<BracketColorService.ColoredBracket> brackets = bracketColorService.computeBracketColors(text);
-        Highlighter highlighter = writingArea.getHighlighter();
-        for (BracketColorService.ColoredBracket bracket : brackets) {
-            try {
-                Highlighter.HighlightPainter painter = new DefaultHighlighter.DefaultHighlightPainter(bracket.color());
-                bracketHighlightTags.add(highlighter.addHighlight(bracket.offset, bracket.offset + 1, painter));
-            } catch (BadLocationException ignored) {}
-        }
+        markdownController.applyBracketHighlighting();
     }
 
     void clearBracketHighlighting() {
-        Highlighter highlighter = writingArea.getHighlighter();
-        for (Object tag : bracketHighlightTags) {
-            highlighter.removeHighlight(tag);
-        }
-        bracketHighlightTags.clear();
+        markdownController.clearBracketHighlighting();
     }
 
     // --- File watcher integration ---
@@ -5644,1263 +5102,221 @@ public class Texteditor extends JFrame implements KeyListener {
     // --- Integrated terminal ---
 
     public String openTerminal() {
-        File startDirectory = resolveTerminalStartDirectory();
-        String title = "[Terminal " + (terminalBufferCounter++) + "]";
-        PtyTerminalPane terminalPane;
-        try {
-            terminalPane = PtyTerminalPane.open(startDirectory, configManager, resolveEditorFont());
-        } catch (IOException e) {
-            return "Terminal failed: " + e.getMessage();
-        }
-
-        FileBuffer termBuffer = FileBuffer.createScratch(title, "");
-        buffers.add(termBuffer);
-
-        EditorPane activePane = getActivePane();
-        if (activePane == null) {
-            terminalPane.close();
-            return "No active window";
-        }
-        Dimension size = getSize();
-        EditorPane terminalEditorPane = createEditorPane(size);
-        terminalEditorPane.setBuffer(termBuffer);
-        terminalEditorPane.setTerminalPane(terminalPane);
-        installTerminalActivationListeners(terminalEditorPane, terminalPane.getComponent());
-        editorPanes.add(terminalEditorPane);
-        if (windowLayoutRoot == null) {
-            windowLayoutRoot = WindowLayoutNode.leaf(activePane);
-        }
-        double startRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.12 : 0.5;
-        windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, startRatio);
-        ptyTerminalPanes.put(termBuffer, terminalPane);
-        terminalPane.onExit(() -> SwingUtilities.invokeLater(() -> closeExitedTerminal(termBuffer)));
-        renderWindowLayout();
-        animateSplitForPane(terminalEditorPane, startRatio, 0.5);
-        activateEditorPane(terminalEditorPane);
-        setMode(EditorMode.INSERT);
-        terminalPane.requestFocusInWindow();
-        return "Terminal opened";
+        return terminalController.openTerminal();
     }
 
     File resolveTerminalStartDirectory() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer != null && buffer.getFile() != null && buffer.getFile().getParentFile() != null) {
-            return buffer.getFile().getParentFile();
-        }
-        return new File(".");
+        return terminalController.resolveTerminalStartDirectory();
     }
 
     TerminalSession getActiveTerminalSession() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null) {
-            return null;
-        }
-        return terminalSessions.get(buffer);
+        return terminalController.getActiveTerminalSession();
     }
 
     boolean handleTerminalInsertMode(TerminalSession session, KeyEvent e) {
-        if (session == null || writingArea == null) {
-            return false;
-        }
-        int code = e.getKeyCode();
-        char c = e.getKeyChar();
-
-        if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
-            return false;
-        }
-
-        enforceTerminalInputBoundary(session);
-
-        if (session.runningJobId >= 0) {
-            if (e.isControlDown() && (code == KeyEvent.VK_C || c == 'c')) {
-                asyncJobService.cancel(session.runningJobId);
-                showMessage("Terminal command cancelled");
-                return true;
-            }
-            if (code == KeyEvent.VK_ENTER || (!e.isControlDown() && !e.isAltDown() && c != KeyEvent.CHAR_UNDEFINED)) {
-                showMessage("Terminal command running (Ctrl+C to cancel)");
-                return true;
-            }
-            return true;
-        }
-
-        if (e.isControlDown() && (code == KeyEvent.VK_C || c == 'c')) {
-            appendTerminalText(session, "^C\n");
-            appendTerminalPrompt(session);
-            return true;
-        }
-
-        if (code == KeyEvent.VK_ENTER) {
-            executeTerminalLine(session);
-            return true;
-        }
-        if (code == KeyEvent.VK_UP) {
-            terminalHistoryPrevious(session);
-            return true;
-        }
-        if (code == KeyEvent.VK_DOWN) {
-            terminalHistoryNext(session);
-            return true;
-        }
-        if (code == KeyEvent.VK_HOME) {
-            writingArea.setCaretPosition(session.promptOffset);
-            return true;
-        }
-        if (code == KeyEvent.VK_END) {
-            writingArea.setCaretPosition(writingArea.getText().length());
-            return true;
-        }
-        if (code == KeyEvent.VK_LEFT) {
-            int caret = writingArea.getCaretPosition();
-            if (caret > session.promptOffset) {
-                writingArea.setCaretPosition(caret - 1);
-            }
-            return true;
-        }
-        if (code == KeyEvent.VK_RIGHT) {
-            int caret = writingArea.getCaretPosition();
-            if (caret < writingArea.getText().length()) {
-                writingArea.setCaretPosition(caret + 1);
-            }
-            return true;
-        }
-        if (code == KeyEvent.VK_BACK_SPACE) {
-            int caret = writingArea.getCaretPosition();
-            if (caret > session.promptOffset) {
-                withSuppressedDocumentEvents(() -> writingArea.replaceRange("", caret - 1, caret));
-                session.buffer.setModified(false);
-            }
-            return true;
-        }
-        if (code == KeyEvent.VK_DELETE) {
-            int caret = writingArea.getCaretPosition();
-            if (caret >= session.promptOffset && caret < writingArea.getText().length()) {
-                withSuppressedDocumentEvents(() -> writingArea.replaceRange("", caret, caret + 1));
-                session.buffer.setModified(false);
-            }
-            return true;
-        }
-        if (code == KeyEvent.VK_TAB) {
-            insertTerminalInputText(session, "    ");
-            return true;
-        }
-
-        if (!e.isControlDown() && !e.isAltDown() && c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
-            insertTerminalInputText(session, String.valueOf(c));
-            return true;
-        }
-        return true;
+        return terminalController.handleTerminalInsertMode(session, e);
     }
 
     void enforceTerminalInputBoundary(TerminalSession session) {
-        int caret = writingArea.getCaretPosition();
-        if (caret < session.promptOffset) {
-            writingArea.setCaretPosition(writingArea.getText().length());
-        }
+        terminalController.enforceTerminalInputBoundary(session);
     }
 
     void insertTerminalInputText(TerminalSession session, String text) {
-        enforceTerminalInputBoundary(session);
-        int caret = writingArea.getCaretPosition();
-        withSuppressedDocumentEvents(() -> writingArea.insert(text, caret));
-        session.buffer.setModified(false);
-        session.historyIndex = session.history.size();
-        session.historyDraft = currentTerminalInput(session);
+        terminalController.insertTerminalInputText(session, text);
     }
 
     void executeTerminalLine(TerminalSession session) {
-        enforceTerminalInputBoundary(session);
-        String command = currentTerminalInput(session);
-        appendTerminalText(session, "\n");
-        String trimmed = command.trim();
-        if (!trimmed.isEmpty()) {
-            if (session.history.isEmpty() || !trimmed.equals(session.history.get(session.history.size() - 1))) {
-                session.history.add(trimmed);
-            }
-        }
-        session.historyIndex = session.history.size();
-        session.historyDraft = "";
-
-        if (trimmed.isEmpty()) {
-            appendTerminalPrompt(session);
-            return;
-        }
-
-        String builtinResult = handleTerminalBuiltin(session, command);
-        if (builtinResult != null) {
-            if (!builtinResult.isEmpty()) {
-                appendTerminalText(session, builtinResult + (builtinResult.endsWith("\n") ? "" : "\n"));
-            }
-            appendTerminalPrompt(session);
-            return;
-        }
-
-        String validationError = validateShellCommand(command);
-        if (validationError != null) {
-            appendTerminalText(session, validationError + "\n");
-            appendTerminalPrompt(session);
-            return;
-        }
-
-        int jobId = asyncJobService.submit(
-            "terminal: " + command,
-            token -> runExternalCommand(
-                ShellCommand.forCommand(command),
-                session.workingDirectory,
-                null,
-                token,
-                configManager.getProcessTimeoutMs(),
-                configManager.getProcessOutputMaxBytes(),
-                true
-            ),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
-                handleTerminalCommandCompletion(session, command, snapshot, result, error))
-        );
-        session.runningJobId = jobId;
+        terminalController.executeTerminalLine(session);
     }
 
     String handleTerminalBuiltin(TerminalSession session, String rawCommand) {
-        List<String> args = parseQuotedArguments(rawCommand);
-        if (args.isEmpty()) {
-            return "";
-        }
-        String head = args.get(0).toLowerCase(Locale.ROOT);
-        if ("clear".equals(head) || "cls".equals(head)) {
-            session.buffer.setContent("", false);
-            if (getCurrentBuffer() == session.buffer) {
-                writingArea.setCaretPosition(0);
-            }
-            return "";
-        }
-        if ("pwd".equals(head)) {
-            return session.workingDirectory.getAbsolutePath();
-        }
-        if ("cd".equals(head)) {
-            String target = args.size() >= 2 ? args.get(1) : System.getProperty("user.home");
-            if (target == null || target.isBlank()) {
-                target = ".";
-            }
-            File destination = new File(target);
-            if (!destination.isAbsolute()) {
-                destination = new File(session.workingDirectory, target);
-            }
-            try {
-                destination = destination.getCanonicalFile();
-            } catch (IOException ignored) {
-                destination = destination.getAbsoluteFile();
-            }
-            if (!destination.exists()) {
-                return "cd: no such file or directory: " + target;
-            }
-            if (!destination.isDirectory()) {
-                return "cd: not a directory: " + target;
-            }
-            session.workingDirectory = destination;
-            return "";
-        }
-        return null;
+        return terminalController.handleTerminalBuiltin(session, rawCommand);
     }
 
-    void handleTerminalCommandCompletion(
-        TerminalSession session,
-        String command,
-        AsyncJobService.JobSnapshot snapshot,
-        CommandResult result,
-        Exception error
-    ) {
-        if (session == null || !terminalSessions.containsKey(session.buffer)) {
-            return;
-        }
-        int finishedId = snapshot == null ? -1 : snapshot.getId();
-        if (session.runningJobId == finishedId || snapshot == null) {
-            session.runningJobId = -1;
-        }
-
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
-            appendTerminalText(session, "^C\n");
-            appendTerminalPrompt(session);
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            appendTerminalText(session, "error: " + (message == null ? "" : message) + "\n");
-            appendTerminalPrompt(session);
-            return;
-        }
-
-        String output = result.stdout == null ? "" : result.stdout;
-        if (!output.isEmpty()) {
-            appendTerminalText(session, output.endsWith("\n") ? output : output + "\n");
-            List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "terminal");
-            if (!parsedEntries.isEmpty()) {
-                updateQuickfixEntries("terminal: " + command, parsedEntries);
-            }
-        }
-        if (result.exitCode != 0) {
-            appendTerminalText(session, "[exit " + result.exitCode + "]\n");
-        }
-        appendTerminalPrompt(session);
+    void handleTerminalCommandCompletion( TerminalSession session, String command, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error ) {
+        terminalController.handleTerminalCommandCompletion(session, command, snapshot, result, error);
     }
 
     void terminalHistoryPrevious(TerminalSession session) {
-        if (session.history.isEmpty()) {
-            return;
-        }
-        if (session.historyIndex == session.history.size()) {
-            session.historyDraft = currentTerminalInput(session);
-        }
-        if (session.historyIndex > 0) {
-            session.historyIndex--;
-        } else {
-            session.historyIndex = 0;
-        }
-        replaceTerminalInput(session, session.history.get(session.historyIndex));
+        terminalController.terminalHistoryPrevious(session);
     }
 
     void terminalHistoryNext(TerminalSession session) {
-        if (session.history.isEmpty()) {
-            return;
-        }
-        if (session.historyIndex < session.history.size() - 1) {
-            session.historyIndex++;
-            replaceTerminalInput(session, session.history.get(session.historyIndex));
-            return;
-        }
-        session.historyIndex = session.history.size();
-        replaceTerminalInput(session, session.historyDraft == null ? "" : session.historyDraft);
+        terminalController.terminalHistoryNext(session);
     }
 
     void replaceTerminalInput(TerminalSession session, String input) {
-        String safeInput = input == null ? "" : input;
-        String current = writingArea.getText();
-        int start = Math.max(0, Math.min(session.promptOffset, current.length()));
-        withSuppressedDocumentEvents(() -> writingArea.replaceRange(safeInput, start, current.length()));
-        session.buffer.setModified(false);
-        writingArea.setCaretPosition(writingArea.getText().length());
+        terminalController.replaceTerminalInput(session, input);
     }
 
     String currentTerminalInput(TerminalSession session) {
-        String text = writingArea.getText();
-        int start = Math.max(0, Math.min(session.promptOffset, text.length()));
-        return text.substring(start);
+        return terminalController.currentTerminalInput(session);
     }
 
     void appendTerminalPrompt(TerminalSession session) {
-        String prompt = terminalPrompt(session);
-        appendTerminalText(session, prompt);
-        session.promptOffset = session.buffer.getContent().length();
-        if (getCurrentBuffer() == session.buffer) {
-            writingArea.setCaretPosition(writingArea.getText().length());
-        }
+        terminalController.appendTerminalPrompt(session);
     }
 
     String terminalPrompt(TerminalSession session) {
-        String dir = session.workingDirectory == null ? "." : session.workingDirectory.getAbsolutePath();
-        return dir + " $ ";
+        return terminalController.terminalPrompt(session);
     }
 
     void appendTerminalText(TerminalSession session, String text) {
-        if (session == null || text == null || text.isEmpty()) {
-            return;
-        }
-        FileBuffer buffer = session.buffer;
-        String current = buffer.getContent();
-        buffer.setContent(current + text, false);
-        if (getCurrentBuffer() == buffer) {
-            writingArea.setCaretPosition(writingArea.getText().length());
-        }
+        terminalController.appendTerminalText(session, text);
     }
 
     void closeTerminalSession(FileBuffer buffer) {
-        if (buffer == null) {
-            return;
-        }
-        PtyTerminalPane terminalPane = ptyTerminalPanes.remove(buffer);
-        if (terminalPane != null) {
-            terminalPane.close();
-        }
-        TerminalSession session = terminalSessions.remove(buffer);
-        if (session != null && session.runningJobId >= 0) {
-            asyncJobService.cancel(session.runningJobId);
-            session.runningJobId = -1;
-        }
+        terminalController.closeTerminalSession(buffer);
     }
 
     void closeExitedTerminal(FileBuffer buffer) {
-        if (buffer == null || !ptyTerminalPanes.containsKey(buffer)) {
-            return;
-        }
-        List<EditorPane> panes = new ArrayList<>();
-        for (EditorPane pane : editorPanes) {
-            if (pane.getBuffer() == buffer) {
-                panes.add(pane);
-            }
-        }
-        if (panes.isEmpty()) {
-            closeTerminalSession(buffer);
-            buffers.remove(buffer);
-            return;
-        }
-        for (EditorPane pane : panes) {
-            if (!editorPanes.contains(pane)) {
-                continue;
-            }
-            if (editorPanes.size() > 1) {
-                closePane(pane);
-                continue;
-            }
-            closeTerminalSession(buffer);
-            buffers.remove(buffer);
-            FileBuffer replacement = buffers.isEmpty() ? null : buffers.get(0);
-            if (replacement == null) {
-                openLandingPage();
-            } else {
-                loadBufferIntoPane(pane, replacement, 0);
-            }
-        }
-        buffers.remove(buffer);
-        currentBufferIndex = buffers.isEmpty() ? -1 : Math.min(Math.max(0, currentBufferIndex), buffers.size() - 1);
-        showMessage("Terminal exited");
+        terminalController.closeExitedTerminal(buffer);
     }
 
     void installTerminalActivationListeners(EditorPane pane, Component component) {
-        if (pane == null || component == null) {
-            return;
-        }
-        component.addFocusListener(new java.awt.event.FocusAdapter() {
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                activateEditorPane(pane);
-            }
-        });
-        component.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mousePressed(java.awt.event.MouseEvent e) {
-                activateEditorPane(pane);
-            }
-        });
-        if (component instanceof Container) {
-            for (Component child : ((Container) component).getComponents()) {
-                installTerminalActivationListeners(pane, child);
-            }
-        }
+        terminalController.installTerminalActivationListeners(pane, component);
     }
 
     // ========== End of Markdown / Orgmode features ==========
 
     public String deleteLineRange(int startLine, int endLine) {
-        try {
-            int safeStart = Math.max(1, startLine);
-            int safeEnd = Math.max(safeStart, endLine);
-            int maxLines = writingArea.getLineCount();
-            if (safeStart > maxLines) {
-                return "Invalid range";
-            }
-            safeEnd = Math.min(safeEnd, maxLines);
-
-            int startOffset = writingArea.getLineStartOffset(safeStart - 1);
-            int endOffset = writingArea.getLineEndOffset(safeEnd - 1);
-            if (endOffset < writingArea.getText().length()) {
-                endOffset = Math.min(endOffset + 1, writingArea.getText().length());
-            }
-            writingArea.replaceRange("", startOffset, endOffset);
-            writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
-            markModified();
-            int deleted = safeEnd - safeStart + 1;
-            return deleted + " line" + (deleted == 1 ? "" : "s") + " deleted";
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return jobQuickfixController.deleteLineRange(startLine, endLine);
     }
 
     public String substituteRange(String pattern, String replacement, int startLine, int endLine, boolean replaceAll) {
-        try {
-            int maxLines = writingArea.getLineCount();
-            int safeStart = Math.max(1, Math.min(startLine, maxLines));
-            int safeEnd = Math.max(safeStart, Math.min(endLine, maxLines));
-            int startOffset = writingArea.getLineStartOffset(safeStart - 1);
-            int endOffset = writingArea.getLineEndOffset(safeEnd - 1);
-            String rangeText = writingArea.getText().substring(startOffset, endOffset);
-            ReplacementResult result = replaceLiteral(rangeText, pattern, replacement, replaceAll);
-            if (result.matchCount == 0) {
-                return "Pattern not found: " + pattern;
-            }
-            writingArea.replaceRange(result.updatedText, startOffset, endOffset);
-            writingArea.setCaretPosition(Math.min(startOffset + Math.max(0, result.firstMatchOffset), writingArea.getText().length()));
-            markModified();
-            return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return jobQuickfixController.substituteRange(pattern, replacement, startLine, endLine, replaceAll);
     }
 
     public String runShellCommand(String command) {
-        String trimmed = command == null ? "" : command.trim();
-        if (trimmed.isEmpty()) {
-            return "Error: :! requires command";
-        }
-        String validationError = validateShellCommand(trimmed);
-        if (validationError != null) {
-            return validationError;
-        }
-        int jobId = asyncJobService.submit(
-            "shell: " + trimmed,
-            token -> runShellProcess(trimmed, null, token),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
-        );
-        return "Shell job " + jobId + " started";
+        return jobQuickfixController.runShellCommand(command);
     }
 
     public String runDropCommand(String command) {
-        String trimmed = command == null ? "" : command.trim();
-        if (trimmed.isEmpty()) {
-            return "Usage: :drop <command>";
-        }
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "Drop runner requires a file-backed buffer";
-        }
-        String filePath = buffer.getFilePath();
-        String quotedPath = "'" + filePath.replace("'", "'\"'\"'") + "'";
-        String expanded = trimmed.contains("%") ? trimmed.replace("%", quotedPath) : trimmed + " " + quotedPath;
-        String validationError = validateShellCommand(expanded);
-        if (validationError != null) {
-            return validationError;
-        }
-        int jobId = asyncJobService.submit(
-            "drop: " + expanded,
-            token -> runShellProcess(expanded, null, token),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
-        );
-        return "Drop job " + jobId + " started";
+        return jobQuickfixController.runDropCommand(command);
     }
 
     public String handleTaskCommand(String argument) {
-        String trimmed = argument == null ? "" : argument.trim();
-        File projectRoot = resolveTaskProjectRoot();
-        Map<String, String> tasks = taskService.loadTasks(projectRoot);
-        if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
-            return showProjectTasks(projectRoot, tasks);
-        }
-        List<String> args = parseQuotedArguments(trimmed);
-        if (args.isEmpty()) {
-            return showProjectTasks(projectRoot, tasks);
-        }
-
-        String sub = args.get(0).toLowerCase(Locale.ROOT);
-        switch (sub) {
-            case "list":
-                return showProjectTasks(projectRoot, tasks);
-            case "add":
-                if (args.size() < 3) {
-                    return "Usage: :task add <name> <command>";
-                }
-                StringBuilder commandBuilder = new StringBuilder();
-                for (int i = 2; i < args.size(); i++) {
-                    if (i > 2) {
-                        commandBuilder.append(" ");
-                    }
-                    commandBuilder.append(args.get(i));
-                }
-                return saveProjectTask(projectRoot, args.get(1), commandBuilder.toString());
-            case "remove":
-            case "rm":
-            case "delete":
-                if (args.size() < 2) {
-                    return "Usage: :task remove <name>";
-                }
-                return removeProjectTask(projectRoot, args.get(1));
-            case "run":
-                if (args.size() < 2) {
-                    return "Usage: :task run <name>";
-                }
-                return runNamedTask(args.get(1), projectRoot, tasks);
-            default:
-                return runNamedTask(args.get(0), projectRoot, tasks);
-        }
+        return jobQuickfixController.handleTaskCommand(argument);
     }
 
     File resolveTaskProjectRoot() {
-        FileBuffer buffer = getCurrentBuffer();
-        File start = null;
-        if (buffer != null && buffer.hasFilePath()) {
-            start = new File(buffer.getFilePath());
-        } else {
-            start = new File(".");
-        }
-        File root = detectTaskProjectRoot(start);
-        if (root == null) {
-            root = new File(".");
-        }
-        try {
-            return root.getCanonicalFile();
-        } catch (IOException e) {
-            return root.getAbsoluteFile();
-        }
+        return jobQuickfixController.resolveTaskProjectRoot();
     }
 
     File detectTaskProjectRoot(File file) {
-        if (file == null) {
-            return null;
-        }
-        File cursor = file.isDirectory() ? file : file.getParentFile();
-        File fallback = cursor;
-        while (cursor != null) {
-            if (new File(cursor, ".shedtasks").isFile()) {
-                return cursor;
-            }
-            if (new File(cursor, ".git").exists()) {
-                return cursor;
-            }
-            fallback = cursor;
-            cursor = cursor.getParentFile();
-        }
-        return fallback;
+        return jobQuickfixController.detectTaskProjectRoot(file);
     }
 
     String showProjectTasks(File projectRoot, Map<String, String> tasks) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Project tasks\n\n");
-        sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
-        sb.append("file: ").append(taskService.taskFile(projectRoot).getAbsolutePath()).append("\n\n");
-        if (tasks.isEmpty()) {
-            sb.append("No saved tasks.\n");
-            sb.append("Use :task add <name> <command>\n");
-            sb.append("Example: :task add test \"mvn -q test\"\n");
-        } else {
-            List<String> names = new ArrayList<>(tasks.keySet());
-            Collections.sort(names);
-            for (String name : names) {
-                sb.append("  ").append(name).append(" = ").append(tasks.get(name)).append("\n");
-            }
-        }
-        showScratchBuffer("[tasks]", sb.toString());
-        return "Showing tasks";
+        return jobQuickfixController.showProjectTasks(projectRoot, tasks);
     }
 
     String saveProjectTask(File projectRoot, String name, String command) {
-        String normalizedName = name == null ? "" : name.trim();
-        String normalizedCommand = command == null ? "" : command.trim();
-        if (normalizedName.isEmpty()) {
-            return "Task name required";
-        }
-        if (normalizedCommand.isEmpty()) {
-            return "Task command required";
-        }
-        Map<String, String> tasks = taskService.loadTasks(projectRoot);
-        tasks.put(normalizedName, normalizedCommand);
-        try {
-            taskService.saveTasks(projectRoot, tasks);
-            return "Saved task '" + normalizedName + "'";
-        } catch (IOException e) {
-            return "Task save failed: " + e.getMessage();
-        }
+        return jobQuickfixController.saveProjectTask(projectRoot, name, command);
     }
 
     String removeProjectTask(File projectRoot, String name) {
-        String normalizedName = name == null ? "" : name.trim();
-        if (normalizedName.isEmpty()) {
-            return "Task name required";
-        }
-        Map<String, String> tasks = taskService.loadTasks(projectRoot);
-        if (!tasks.containsKey(normalizedName)) {
-            return "Task not found: " + normalizedName;
-        }
-        tasks.remove(normalizedName);
-        try {
-            taskService.saveTasks(projectRoot, tasks);
-            return "Removed task '" + normalizedName + "'";
-        } catch (IOException e) {
-            return "Task remove failed: " + e.getMessage();
-        }
+        return jobQuickfixController.removeProjectTask(projectRoot, name);
     }
 
     String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {
-        String normalizedName = taskName == null ? "" : taskName.trim();
-        if (normalizedName.isEmpty()) {
-            return "Task name required";
-        }
-        String taskCommand = tasks.get(normalizedName);
-        if (taskCommand == null || taskCommand.isBlank()) {
-            taskCommand = inferBuiltInTaskCommand(normalizedName, projectRoot);
-        }
-        if (taskCommand == null || taskCommand.isBlank()) {
-            return "Task not found: " + normalizedName + " (use :task list or :task add)";
-        }
-        String validationError = validateShellCommand(taskCommand);
-        if (validationError != null) {
-            return validationError;
-        }
-        final String commandToRun = taskCommand;
-        int jobId = asyncJobService.submit(
-            "task " + normalizedName + ": " + commandToRun,
-            token -> runExternalCommand(
-                ShellCommand.forCommand(commandToRun),
-                projectRoot,
-                null,
-                token,
-                configManager.getProcessTimeoutMs(),
-                configManager.getProcessOutputMaxBytes(),
-                true
-            ),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
-                handleTaskJobCompletion(normalizedName, snapshot, result, error))
-        );
-        return "Task job " + jobId + " started (" + normalizedName + ")";
+        return jobQuickfixController.runNamedTask(taskName, projectRoot, tasks);
     }
 
     String inferBuiltInTaskCommand(String taskName, File projectRoot) {
-        String normalized = taskName == null ? "" : taskName.trim().toLowerCase(Locale.ROOT);
-        if ("test".equals(normalized)) {
-            if (new File(projectRoot, "pom.xml").isFile()) {
-                return "mvn -q test";
-            }
-            if (new File(projectRoot, "package.json").isFile()) {
-                return "npm test";
-            }
-            if (new File(projectRoot, "Makefile").isFile()) {
-                return "make test";
-            }
-        }
-        if ("build".equals(normalized)) {
-            if (new File(projectRoot, "pom.xml").isFile()) {
-                return "mvn -q -DskipTests package";
-            }
-            if (new File(projectRoot, "package.json").isFile()) {
-                return "npm run build";
-            }
-            if (new File(projectRoot, "Makefile").isFile()) {
-                return "make build";
-            }
-        }
-        return null;
+        return jobQuickfixController.inferBuiltInTaskCommand(taskName, projectRoot);
     }
 
     void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
-        if (closingDown) {
-            return;
-        }
-        int jobId = snapshot == null ? -1 : snapshot.getId();
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
-            showMessage("Task job " + jobId + " cancelled");
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            showMessage("Task job " + jobId + " failed: " + (message == null ? "" : message));
-            return;
-        }
-        String output = result.stdout == null ? "" : result.stdout.stripTrailing();
-        List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "task:" + taskName);
-        if (!parsedEntries.isEmpty()) {
-            updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
-        }
-
-        if (result.exitCode != 0) {
-            if (!output.isEmpty()) {
-                showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
-            }
-            showMessage(parsedEntries.isEmpty()
-                ? "Task '" + taskName + "' failed (exit " + result.exitCode + ")"
-                : "Task '" + taskName + "' failed (exit " + result.exitCode + ", quickfix updated)");
-            return;
-        }
-
-        if (output.isEmpty()) {
-            showMessage("Task '" + taskName + "' complete");
-            return;
-        }
-        if (output.lines().count() <= 1) {
-            showMessage(output);
-            return;
-        }
-        showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
-        showMessage(parsedEntries.isEmpty()
-            ? "Task '" + taskName + "' complete"
-            : "Task '" + taskName + "' complete (quickfix updated)");
+        jobQuickfixController.handleTaskJobCompletion(taskName, snapshot, result, error);
     }
 
     public String filterRangeWithCommand(int startLine, int endLine, String command) {
-        String trimmed = command == null ? "" : command.trim();
-        if (trimmed.isEmpty()) {
-            return "Error: :! requires command";
-        }
-        String validationError = validateShellCommand(trimmed);
-        if (validationError != null) {
-            return validationError;
-        }
-        try {
-            int safeStart = Math.max(1, Math.min(startLine, writingArea.getLineCount()));
-            int safeEnd = Math.max(safeStart, Math.min(endLine, writingArea.getLineCount()));
-            int startOffset = writingArea.getLineStartOffset(safeStart - 1);
-            int endOffset = writingArea.getLineEndOffset(safeEnd - 1);
-            String input = writingArea.getText().substring(startOffset, endOffset);
-            FileBuffer targetBuffer = getCurrentBuffer();
-
-            int jobId = asyncJobService.submit(
-                "filter " + safeStart + "," + safeEnd + ": " + trimmed,
-                token -> runShellProcess(trimmed, input, token),
-                (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
-                    handleFilterJobCompletion(snapshot, result, error, targetBuffer, startOffset, endOffset, input, safeStart, safeEnd))
-            );
-            return "Filter job " + jobId + " started";
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return jobQuickfixController.filterRangeWithCommand(startLine, endLine, command);
     }
 
     public String showJobs() {
-        List<AsyncJobService.JobSnapshot> jobs = asyncJobService.list();
-        if (jobs.isEmpty()) {
-            return "No jobs";
-        }
-        StringBuilder builder = new StringBuilder();
-        builder.append("Jobs\n\n");
-        for (AsyncJobService.JobSnapshot job : jobs) {
-            builder.append(job.getId())
-                .append("  ")
-                .append(job.getStatus().name().toLowerCase())
-                .append("  ")
-                .append(job.getDescription());
-            Long finished = job.getFinishedAtMillis();
-            if (finished != null) {
-                long duration = Math.max(0L, finished - job.getStartedAtMillis());
-                builder.append("  (").append(duration).append(" ms)");
-            }
-            if (job.getErrorMessage() != null && !job.getErrorMessage().isBlank()) {
-                builder.append("  ").append(job.getErrorMessage().strip());
-            }
-            builder.append("\n");
-        }
-        showScratchBuffer("[jobs]", builder.toString());
-        return "Showing jobs";
+        return jobQuickfixController.showJobs();
     }
 
     public String cancelJob(String jobIdArgument) {
-        if (jobIdArgument == null || jobIdArgument.isBlank()) {
-            return "Usage: :jobcancel <id>";
-        }
-        try {
-            int jobId = Integer.parseInt(jobIdArgument.trim());
-            boolean cancelled = asyncJobService.cancel(jobId);
-            return cancelled ? "Cancellation sent for job " + jobId : "Job not running: " + jobId;
-        } catch (NumberFormatException e) {
-            return "Invalid job id: " + jobIdArgument;
-        }
+        return jobQuickfixController.cancelJob(jobIdArgument);
     }
 
     public String openQuickfixList() {
-        if (!quickfixService.hasEntries()) {
-            return "Quickfix is empty";
-        }
-        String content = quickfixService.render();
-        if (content.isBlank()) {
-            return "Quickfix is empty";
-        }
-
-        if (quickfixBuffer != null && buffers.contains(quickfixBuffer)) {
-            quickfixBuffer.setContent(content, false);
-            loadBufferIntoEditor(quickfixBuffer);
-            writingArea.setCaretPosition(Math.min(Math.max(0, quickfixService.currentIndex()), Math.max(0, writingArea.getDocument().getLength() - 1)));
-            animateEditorHostTint(configManager.getCommandColor());
-            return "Quickfix updated";
-        }
-
-        persistCurrentBufferState();
-        FileBuffer returnBuffer = getCurrentBuffer();
-        int returnCaretPosition = writingArea.getCaretPosition();
-        quickfixBuffer = FileBuffer.createScratch("[quickfix]", content);
-        buffers.add(quickfixBuffer);
-        if (returnBuffer != null) {
-            specialBufferReturns.push(new SpecialBufferReturnState(quickfixBuffer, returnBuffer, returnCaretPosition));
-        }
-        loadBufferIntoEditor(quickfixBuffer);
-        animateEditorHostTint(configManager.getCommandColor());
-        return "Quickfix opened";
+        return jobQuickfixController.openQuickfixList();
     }
 
     public String quickfixNext() {
-        return jumpToQuickfixEntry(quickfixService.next());
+        return jobQuickfixController.quickfixNext();
     }
 
     public String quickfixPrev() {
-        return jumpToQuickfixEntry(quickfixService.previous());
+        return jobQuickfixController.quickfixPrev();
     }
 
     public String quickfixFirst() {
-        return jumpToQuickfixEntry(quickfixService.first());
+        return jobQuickfixController.quickfixFirst();
     }
 
     public String quickfixLast() {
-        return jumpToQuickfixEntry(quickfixService.last());
+        return jobQuickfixController.quickfixLast();
     }
 
     public String quickfixCurrent(String argument) {
-        if (argument == null || argument.isBlank()) {
-            return jumpToQuickfixEntry(quickfixService.current());
-        }
-        try {
-            int index = Integer.parseInt(argument.trim());
-            QuickfixService.Entry selected = quickfixService.select(index);
-            if (selected == null) {
-                return "Quickfix index out of range: " + index;
-            }
-            return jumpToQuickfixEntry(selected);
-        } catch (NumberFormatException e) {
-            return "Usage: :cc [index]";
-        }
+        return jobQuickfixController.quickfixCurrent(argument);
     }
 
     public String closeQuickfixList() {
-        if (quickfixBuffer == null || !buffers.contains(quickfixBuffer)) {
-            return "Quickfix not open";
-        }
-        if (getCurrentBuffer() == quickfixBuffer) {
-            return requestQuit(true);
-        }
-        FileBuffer replacement = null;
-        for (FileBuffer candidate : buffers) {
-            if (candidate != null && candidate != quickfixBuffer) {
-                replacement = candidate;
-                break;
-            }
-        }
-        if (replacement == null) {
-            openLandingPage();
-            replacement = getCurrentBuffer();
-        }
-        for (EditorPane pane : editorPanes) {
-            if (pane != null && pane.getBuffer() == quickfixBuffer) {
-                loadBufferIntoPane(pane, replacement, 0);
-            }
-        }
-        pruneSpecialBufferReturns(quickfixBuffer);
-        buffers.remove(quickfixBuffer);
-        quickfixBuffer = null;
-        animateEditorHostTint(configManager.getCommandColor());
-        return "Quickfix closed";
+        return jobQuickfixController.closeQuickfixList();
     }
 
     void pruneSpecialBufferReturns(FileBuffer scratchBuffer) {
-        if (scratchBuffer == null || specialBufferReturns.isEmpty()) {
-            return;
-        }
-        Deque<SpecialBufferReturnState> rebuilt = new ArrayDeque<>();
-        for (SpecialBufferReturnState state : specialBufferReturns) {
-            if (state == null || state.scratchBuffer == scratchBuffer) {
-                continue;
-            }
-            rebuilt.addLast(state);
-        }
-        specialBufferReturns = rebuilt;
+        jobQuickfixController.pruneSpecialBufferReturns(scratchBuffer);
     }
 
     boolean isQuickfixBufferActive() {
-        FileBuffer current = getCurrentBuffer();
-        return current != null && current == quickfixBuffer;
+        return jobQuickfixController.isQuickfixBufferActive();
     }
 
     String openQuickfixSelection() {
-        if (!isQuickfixBufferActive()) {
-            return "Quickfix buffer not active";
-        }
-        int index = getCurrentCaretLine() + 1;
-        QuickfixService.Entry entry = quickfixService.atLine(index);
-        if (entry == null) {
-            return "No quickfix entry on this line";
-        }
-        return jumpToQuickfixEntry(entry);
+        return jobQuickfixController.openQuickfixSelection();
     }
 
     String jumpToQuickfixEntry(QuickfixService.Entry entry) {
-        if (entry == null) {
-            return "Quickfix is empty";
-        }
-
-        if (entry.getFilePath() != null && !entry.getFilePath().isBlank()) {
-            try {
-                openFile(new File(entry.getFilePath()));
-            } catch (IOException e) {
-                return "Quickfix open failed: " + e.getMessage();
-            }
-        }
-
-        String lineResult = gotoLine(entry.getLine());
-        if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {
-            return lineResult;
-        }
-        try {
-            int lineStart = writingArea.getLineStartOffset(Math.max(0, entry.getLine() - 1));
-            int target = Math.min(lineStart + Math.max(0, entry.getColumn() - 1), writingArea.getText().length());
-            writingArea.setCaretPosition(target);
-        } catch (BadLocationException ignored) {
-        }
-        pulseCaretLine(blendColor(configManager.getCommandColor(), configManager.getCaretColor(), 0.35));
-        playCue(CueType.NAVIGATE);
-        return "Quickfix " + (quickfixService.currentIndex() + 1) + "/" + quickfixService.size();
+        return jobQuickfixController.jumpToQuickfixEntry(entry);
     }
 
     void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {
-        if (entries == null || entries.isEmpty()) {
-            return;
-        }
-        quickfixService.setEntries(title, entries);
-        if (quickfixBuffer != null && buffers.contains(quickfixBuffer)) {
-            quickfixBuffer.setContent(quickfixService.render(), false);
-            if (getCurrentBuffer() == quickfixBuffer) {
-                loadBufferIntoEditor(quickfixBuffer);
-            }
-        }
+        jobQuickfixController.updateQuickfixEntries(title, entries);
     }
 
     List<QuickfixService.Entry> parseQuickfixEntries(String output, String defaultSource) {
-        List<QuickfixService.Entry> entries = new ArrayList<>();
-        if (output == null || output.isBlank()) {
-            return entries;
-        }
-        String source = defaultSource == null ? "" : defaultSource;
-        for (String line : output.split("\n")) {
-            Matcher matcher = QUICKFIX_PATTERN.matcher(line);
-            if (!matcher.matches()) {
-                continue;
-            }
-            String path = matcher.group(1).trim();
-            int lineNumber;
-            int columnNumber = 1;
-            try {
-                lineNumber = Integer.parseInt(matcher.group(2));
-                String col = matcher.group(3);
-                if (col != null && !col.isBlank()) {
-                    columnNumber = Integer.parseInt(col);
-                }
-            } catch (NumberFormatException ignored) {
-                continue;
-            }
-            String message = matcher.group(4) == null ? "" : matcher.group(4).trim();
-            entries.add(new QuickfixService.Entry(path, lineNumber, columnNumber, message, source));
-        }
-        return entries;
+        return jobQuickfixController.parseQuickfixEntries(output, defaultSource);
     }
 
     String validateShellCommand(String command) {
-        if (command == null || command.isBlank()) {
-            return "Error: command is empty";
-        }
-        if (command.indexOf('\0') >= 0) {
-            return "Error: command contains invalid null byte";
-        }
-        if (command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
-            return "Error: command must be a single line";
-        }
-        if (command.length() > configManager.getShellCommandMaxLength()) {
-            return "Error: command length exceeds shell.command.max.length";
-        }
-        return null;
+        return jobQuickfixController.validateShellCommand(command);
     }
 
     CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
-        return runExternalCommand(
-            ShellCommand.forCommand(command),
-            new File("."),
-            input,
-            token,
-            configManager.getProcessTimeoutMs(),
-            configManager.getProcessOutputMaxBytes(),
-            true
-        );
+        return jobQuickfixController.runShellProcess(command, input, token);
     }
 
-    CommandResult runExternalCommand(
-        List<String> command,
-        File workingDirectory,
-        String input,
-        AsyncJobService.JobToken token,
-        int timeoutMs,
-        int outputLimitBytes,
-        boolean redirectErrorStream
-    ) {
-        Process process = null;
-        try {
-            ProcessBuilder builder = new ProcessBuilder(command);
-            builder.directory(workingDirectory == null ? new File(".") : workingDirectory);
-            builder.redirectErrorStream(redirectErrorStream);
-            process = builder.start();
-            Process runningProcess = process;
-            if (token != null) {
-                token.onCancel(() -> {
-                    if (runningProcess.isAlive()) {
-                        runningProcess.destroyForcibly();
-                    }
-                });
-            }
-
-            if (input != null) {
-                try (OutputStream stdin = process.getOutputStream()) {
-                    stdin.write(input.getBytes(StandardCharsets.UTF_8));
-                }
-            } else {
-                process.getOutputStream().close();
-            }
-
-            ByteArrayOutputStream outputBuffer = new ByteArrayOutputStream();
-            boolean[] truncated = new boolean[] {false};
-            Thread outputReader = new Thread(() -> readInputStreamCapped(runningProcess.getInputStream(), outputBuffer, outputLimitBytes, truncated), "shed-process-reader");
-            outputReader.setDaemon(true);
-            outputReader.start();
-
-            boolean finished = runningProcess.waitFor(Math.max(500, timeoutMs), TimeUnit.MILLISECONDS);
-            if (!finished) {
-                runningProcess.destroyForcibly();
-                outputReader.join(500);
-                return new CommandResult(-1, "", "Process timed out after " + timeoutMs + "ms");
-            }
-            outputReader.join(1000);
-            if (token != null && token.isCancelled()) {
-                return new CommandResult(-1, "", "Process cancelled");
-            }
-            String output = outputBuffer.toString(StandardCharsets.UTF_8);
-            if (truncated[0]) {
-                output = output + "\n[shed: output truncated]";
-            }
-            return new CommandResult(runningProcess.exitValue(), output, "");
-        } catch (InterruptedException e) {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-            }
-            Thread.currentThread().interrupt();
-            return new CommandResult(-1, "", "Process interrupted");
-        } catch (Exception e) {
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
-            }
-            return new CommandResult(-1, "", e.getMessage());
-        }
+    CommandResult runExternalCommand( List<String> command, File workingDirectory, String input, AsyncJobService.JobToken token, int timeoutMs, int outputLimitBytes, boolean redirectErrorStream ) {
+        return jobQuickfixController.runExternalCommand(command, workingDirectory, input, token, timeoutMs, outputLimitBytes, redirectErrorStream);
     }
 
     void readInputStreamCapped(InputStream stream, ByteArrayOutputStream out, int maxBytes, boolean[] truncated) {
-        byte[] buffer = new byte[8192];
-        int total = 0;
-        int limit = Math.max(1024, maxBytes);
-        try (InputStream input = stream) {
-            while (true) {
-                int read = input.read(buffer);
-                if (read < 0) {
-                    break;
-                }
-                int remaining = limit - total;
-                if (remaining <= 0) {
-                    truncated[0] = true;
-                    continue;
-                }
-                int toWrite = Math.min(read, remaining);
-                out.write(buffer, 0, toWrite);
-                total += toWrite;
-                if (toWrite < read) {
-                    truncated[0] = true;
-                }
-            }
-        } catch (IOException ignored) {
-        }
+        jobQuickfixController.readInputStreamCapped(stream, out, maxBytes, truncated);
     }
 
     void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
-        if (closingDown) {
-            return;
-        }
-        int jobId = snapshot == null ? -1 : snapshot.getId();
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
-            showMessage("Shell job " + jobId + " cancelled");
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            showMessage("Shell job " + jobId + " failed: " + (message == null ? "" : message));
-            return;
-        }
-
-        String output = result.stdout == null ? "" : result.stdout.stripTrailing();
-        List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "shell");
-        if (!parsedEntries.isEmpty()) {
-            updateQuickfixEntries("shell job " + jobId, parsedEntries);
-        }
-        if (result.exitCode != 0) {
-            if (output.isEmpty()) {
-                showMessage("Shell job " + jobId + " failed (exit " + result.exitCode + ")");
-            } else {
-                showScratchBuffer("[shell job " + jobId + "]", output + "\n");
-                showMessage(parsedEntries.isEmpty()
-                    ? "Shell job " + jobId + " failed (exit " + result.exitCode + ")"
-                    : "Shell job " + jobId + " failed (exit " + result.exitCode + ", quickfix updated)");
-            }
-            return;
-        }
-
-        if (output.isEmpty()) {
-            showMessage("Shell job " + jobId + " exited 0");
-            return;
-        }
-        if (output.lines().count() <= 1) {
-            showMessage(output);
-            return;
-        }
-        showScratchBuffer("[shell job " + jobId + "]", output + "\n");
-        showMessage(parsedEntries.isEmpty()
-            ? "Shell job " + jobId + " complete"
-            : "Shell job " + jobId + " complete (quickfix updated)");
+        jobQuickfixController.handleShellJobCompletion(snapshot, result, error);
     }
 
-    void handleFilterJobCompletion(
-        AsyncJobService.JobSnapshot snapshot,
-        CommandResult result,
-        Exception error,
-        FileBuffer targetBuffer,
-        int startOffset,
-        int endOffset,
-        String originalInput,
-        int startLine,
-        int endLine
-    ) {
-        if (closingDown) {
-            return;
-        }
-        int jobId = snapshot == null ? -1 : snapshot.getId();
-        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
-            showMessage("Filter job " + jobId + " cancelled");
-            return;
-        }
-        if (error != null || result == null) {
-            String message = error == null ? "unknown error" : error.getMessage();
-            showMessage("Filter job " + jobId + " failed: " + (message == null ? "" : message));
-            return;
-        }
-        if (result.exitCode != 0) {
-            String output = result.stdout == null ? "" : result.stdout.strip();
-            if (output.isEmpty()) {
-                showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
-            } else {
-                showScratchBuffer("[filter job " + jobId + "]", output + "\n");
-                showMessage("Filter job " + jobId + " failed (exit " + result.exitCode + ")");
-            }
-            return;
-        }
-        if (targetBuffer == null || getCurrentBuffer() != targetBuffer) {
-            showMessage("Filter job " + jobId + " complete (target buffer not active)");
-            return;
-        }
-        String text = writingArea.getText();
-        if (startOffset < 0 || endOffset > text.length() || startOffset > endOffset) {
-            showMessage("Filter job " + jobId + " skipped (buffer changed)");
-            return;
-        }
-        String currentSlice = text.substring(startOffset, endOffset);
-        if (!currentSlice.equals(originalInput)) {
-            showMessage("Filter job " + jobId + " skipped (range changed)");
-            return;
-        }
-        writingArea.replaceRange(result.stdout == null ? "" : result.stdout, startOffset, endOffset);
-        writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
-        markModified();
-        showMessage((endLine - startLine + 1) + " line filter applied");
+    void handleFilterJobCompletion( AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error, FileBuffer targetBuffer, int startOffset, int endOffset, String originalInput, int startLine, int endLine ) {
+        jobQuickfixController.handleFilterJobCompletion(snapshot, result, error, targetBuffer, startOffset, endOffset, originalInput, startLine, endLine);
     }
 
     public String showFileFinder() {
@@ -8301,1029 +6717,203 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     String getWordAtCaret() {
-        String text = writingArea.getText();
-        int caret = writingArea.getCaretPosition();
-        if (text.isEmpty() || caret >= text.length()) return "";
-        int start = caret, end = caret;
-        while (start > 0 && isWordCharacter(text.charAt(start - 1))) start--;
-        while (end < text.length() && isWordCharacter(text.charAt(end))) end++;
-        return start == end ? "" : text.substring(start, end);
+        return lspController.getWordAtCaret();
     }
 
     public String showLspCompletionStatus() {
-        FileBuffer buffer = getCurrentBuffer();
-        String prefix = currentCompletionPrefix();
-        List<String> completions = new ArrayList<>();
-        LspClient client = resolveLspClient(buffer);
-        String fallbackReason = null;
-        if (buffer != null && client != null && buffer.hasFilePath()) {
-            String uri = bufferUri(buffer);
-            try {
-                int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-                List<LspClient.CompletionItem> items = client.completion(uri, line, column);
-                for (LspClient.CompletionItem item : items) {
-                    if (item.getLabel() != null && !item.getLabel().isEmpty()) {
-                        completions.add(item.getLabel());
-                    }
-                }
-            } catch (BadLocationException ignored) {
-            }
-        } else if (buffer != null) {
-            String extension = bufferExtension(buffer);
-            fallbackReason = lspErrors.get(extension);
-        }
-
-        if (completions.isEmpty()) {
-            if (prefix.isEmpty()) {
-                return fallbackReason == null ? "No completion prefix" : "LSP unavailable: " + fallbackReason;
-            }
-            completions = collectBufferCompletions(prefix);
-        }
-        if (completions.isEmpty()) {
-            return fallbackReason == null ? "No completions" : "LSP unavailable: " + fallbackReason + "; no local completions";
-        }
-        String selection = showPaletteDialog("Completions", completions);
-        if (selection == null || selection.isEmpty()) {
-            return "Completion cancelled";
-        }
-        applyCompletion(prefix, selection);
-        return fallbackReason == null ? "Inserted completion" : "Inserted completion (local fallback; LSP unavailable: " + fallbackReason + ")";
+        return lspController.showLspCompletionStatus();
     }
 
     public String handleLspCommand(String argument) {
-        String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|hover|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
-        }
-        int split = trimmed.indexOf(' ');
-        String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
-        String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
-        switch (subcommand) {
-            case "completion":
-            case "complete":
-            case "comp":
-                return showLspCompletionStatus();
-            case "definition":
-            case "def":
-                return lspGoToDefinition();
-            case "hover":
-                return lspHover();
-            case "references":
-            case "refs":
-                return lspReferences();
-            case "rename":
-                return lspRename(args);
-            case "renameapply":
-            case "rename!":
-                return lspRenameApply();
-            case "renamecancel":
-            case "renameclear":
-                return lspRenameCancel();
-            case "codeaction":
-            case "codeactions":
-            case "actions":
-            case "ca":
-                return lspCodeActions(args);
-            case "diagnostics":
-            case "diag":
-                return showDiagnostics();
-            case "status":
-                return lspStatus();
-            case "restart":
-                return lspRestart(args);
-            case "stop":
-                return lspStop(args);
-            case "servers":
-                return lspServers();
-            case "log":
-                return lspLog();
-            default:
-                return "Unknown :lsp subcommand: " + subcommand;
-        }
+        return lspController.handleLspCommand(argument);
     }
 
     public String lspStatus() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("LSP Server Status\n");
-        sb.append("=".repeat(40)).append("\n\n");
-        if (lspClients.isEmpty() && lspErrors.isEmpty()) {
-            sb.append("No LSP servers active.\n");
-            sb.append("Open a file with a configured language to start a server.\n");
-        }
-        for (Map.Entry<String, LspClient> entry : lspClients.entrySet()) {
-            String ext = entry.getKey();
-            LspClient client = entry.getValue();
-            sb.append("  .").append(ext).append("  ");
-            sb.append(client.isAlive() ? "running" : "stopped");
-            sb.append("\n");
-        }
-        if (!lspErrors.isEmpty()) {
-            sb.append("\nErrors:\n");
-            for (Map.Entry<String, String> entry : lspErrors.entrySet()) {
-                String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
-                sb.append("  ").append(ext).append(": ").append(entry.getValue()).append("\n");
-            }
-        }
-        showScratchBuffer("[lsp status]", sb.toString());
-        return "Showing LSP status";
+        return lspController.lspStatus();
     }
 
     public String lspRestart(String ext) {
-        String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
-        if (extension.isEmpty()) return "No extension specified and no file open";
-        LspClient existing = lspClients.remove(extension);
-        if (existing != null) existing.stop();
-        lspErrors.remove(extension);
-        // remove document versions for this extension so didOpen fires again
-        lspDocumentVersions.entrySet().removeIf(e -> {
-            String uri = e.getKey();
-            int dot = uri.lastIndexOf('.');
-            return dot >= 0 && uri.substring(dot + 1).equalsIgnoreCase(extension);
-        });
-        FileBuffer buf = getCurrentBuffer();
-        if (buf != null && bufferExtension(buf).equals(extension)) {
-            LspClient client = resolveLspClient(buf);
-            if (client != null) return "Restarted LSP for ." + extension;
-            return "Failed to restart LSP for ." + extension;
-        }
-        return "Stopped LSP for ." + extension + " (will restart on next use)";
+        return lspController.lspRestart(ext);
     }
 
     public String lspStop(String ext) {
-        String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
-        if (extension.isEmpty()) return "No extension specified and no file open";
-        LspClient existing = lspClients.remove(extension);
-        if (existing == null) return "No LSP server running for ." + extension;
-        existing.stop();
-        lspErrors.remove(extension);
-        return "Stopped LSP for ." + extension;
+        return lspController.lspStop(ext);
     }
 
     public String lspServers() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("LSP Servers\n");
-        sb.append("=".repeat(40)).append("\n\n");
-        Map<String, String> configured = configManager.getConfiguredLspServers();
-        sb.append("Configured (shedrc):\n");
-        if (configured.isEmpty()) {
-            sb.append("  (none)\n");
-        } else {
-            for (Map.Entry<String, String> entry : configured.entrySet()) {
-                sb.append("  .").append(entry.getKey()).append(" -> ").append(entry.getValue()).append("\n");
-            }
-        }
-        sb.append("\nBuiltin:\n");
-        for (String ext : lspService.getBuiltinExtensions()) {
-            if (configured.containsKey(ext)) continue;
-            String[] cmd = lspService.builtinCommand(ext);
-            if (cmd != null) {
-                sb.append("  .").append(ext).append(" -> ").append(String.join(" ", cmd)).append("\n");
-            }
-        }
-        showScratchBuffer("[lsp servers]", sb.toString());
-        return "Showing LSP servers";
+        return lspController.lspServers();
     }
 
     public String lspLog() {
-        if (lspErrors.isEmpty()) return "No LSP errors";
-        StringBuilder sb = new StringBuilder();
-        sb.append("LSP Error Log\n");
-        sb.append("=".repeat(40)).append("\n\n");
-        for (Map.Entry<String, String> entry : lspErrors.entrySet()) {
-            String ext = entry.getKey().isEmpty() ? "(no ext)" : "." + entry.getKey();
-            sb.append(ext).append(": ").append(entry.getValue()).append("\n");
-        }
-        showScratchBuffer("[lsp log]", sb.toString());
-        return "Showing LSP log";
+        return lspController.lspLog();
     }
 
     String currentBufferExtension() {
-        FileBuffer buf = getCurrentBuffer();
-        return buf == null ? "" : bufferExtension(buf);
+        return lspController.currentBufferExtension();
     }
 
     public String lspGoToDefinition() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "LSP definition requires a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            LspClient.Location location = client.definition(uri, line, column);
-            if (location == null) {
-                return "No definition found";
-            }
-            return openLspLocation(location, "definition");
-        } catch (BadLocationException e) {
-            return "LSP definition failed: " + e.getMessage();
-        }
+        return lspController.lspGoToDefinition();
     }
 
     public String lspHover() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "LSP hover requires a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            String hoverText = client.hover(uri, line, column);
-            if (hoverText == null || hoverText.isBlank()) {
-                return "No hover information";
-            }
-            showScratchBuffer("[lsp hover]", hoverText.strip() + "\n");
-            return "Showing hover";
-        } catch (BadLocationException e) {
-            return "LSP hover failed: " + e.getMessage();
-        }
+        return lspController.lspHover();
     }
 
     public String lspReferences() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "LSP references requires a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            List<LspClient.Location> locations = client.references(uri, line, column, true);
-            if (locations.isEmpty()) {
-                return "No references found";
-            }
-            List<QuickfixService.Entry> entries = new ArrayList<>();
-            for (LspClient.Location location : locations) {
-                String path = filePathFromUri(location.getUri());
-                if (path == null || path.isBlank()) {
-                    continue;
-                }
-                entries.add(new QuickfixService.Entry(path, location.getLine() + 1, location.getCharacter() + 1, "reference", "lsp"));
-            }
-            if (entries.isEmpty()) {
-                return "No file references found";
-            }
-            updateQuickfixEntries("lsp references", entries);
-            return openQuickfixList();
-        } catch (BadLocationException e) {
-            return "LSP references failed: " + e.getMessage();
-        }
+        return lspController.lspReferences();
     }
 
     public String lspRename(String newName) {
-        if (newName == null || newName.isBlank()) {
-            return "Usage: :lsp rename <newName>";
-        }
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "LSP rename requires a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            List<LspClient.TextEdit> edits = client.rename(uri, line, column, newName.trim());
-            if (edits.isEmpty()) {
-                return "No rename edits returned";
-            }
-            pendingLspRenameEdits = new ArrayList<>(edits);
-            pendingLspRenameTarget = newName.trim();
-            showScratchBuffer("[lsp rename preview]", buildLspRenamePreview(pendingLspRenameTarget, pendingLspRenameEdits));
-            return "Prepared rename preview (" + edits.size() + " edit" + (edits.size() == 1 ? "" : "s") + "). Run :lsp renameapply to confirm.";
-        } catch (BadLocationException e) {
-            return "LSP rename failed: " + e.getMessage();
-        }
+        return lspController.lspRename(newName);
     }
 
     public String lspRenameApply() {
-        if (pendingLspRenameEdits == null || pendingLspRenameEdits.isEmpty()) {
-            return "No pending rename preview (run :lsp rename <newName> first)";
-        }
-        WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(pendingLspRenameEdits);
-        if (applyResult.appliedEditCount <= 0) {
-            pendingLspRenameEdits = null;
-            pendingLspRenameTarget = null;
-            return "Pending rename had no applicable edits";
-        }
-        StringBuilder message = new StringBuilder();
-        message.append("Applied ")
-            .append(applyResult.appliedEditCount)
-            .append(" rename edit")
-            .append(applyResult.appliedEditCount == 1 ? "" : "s")
-            .append(" across ")
-            .append(applyResult.touchedFiles)
-            .append(" file")
-            .append(applyResult.touchedFiles == 1 ? "" : "s");
-        if (applyResult.failedFiles > 0) {
-            message.append(" (").append(applyResult.failedFiles).append(" file failures)");
-        }
-        pendingLspRenameEdits = null;
-        pendingLspRenameTarget = null;
-        return message.toString();
+        return lspController.lspRenameApply();
     }
 
     public String lspRenameCancel() {
-        pendingLspRenameEdits = null;
-        pendingLspRenameTarget = null;
-        return "Cleared pending rename preview";
+        return lspController.lspRenameCancel();
     }
 
     String buildLspRenamePreview(String targetName, List<LspClient.TextEdit> edits) {
-        StringBuilder builder = new StringBuilder();
-        builder.append("LSP Rename Preview\n");
-        builder.append("=".repeat(40)).append("\n\n");
-        builder.append("Target name: ").append(targetName == null ? "" : targetName).append("\n");
-        builder.append("Total edits: ").append(edits == null ? 0 : edits.size()).append("\n\n");
-        if (edits == null || edits.isEmpty()) {
-            builder.append("(no edits)\n");
-            return builder.toString();
-        }
-        Map<String, List<LspClient.TextEdit>> byFile = new LinkedHashMap<>();
-        for (LspClient.TextEdit edit : edits) {
-            String path = filePathFromUri(edit.getUri());
-            if (path == null || path.isBlank()) {
-                path = edit.getUri();
-            }
-            byFile.computeIfAbsent(path, key -> new ArrayList<>()).add(edit);
-        }
-        for (Map.Entry<String, List<LspClient.TextEdit>> entry : byFile.entrySet()) {
-            builder.append(entry.getKey()).append("\n");
-            List<LspClient.TextEdit> fileEdits = entry.getValue();
-            fileEdits.sort((a, b) -> {
-                if (a.getStartLine() != b.getStartLine()) {
-                    return Integer.compare(a.getStartLine(), b.getStartLine());
-                }
-                return Integer.compare(a.getStartCharacter(), b.getStartCharacter());
-            });
-            int limit = Math.min(8, fileEdits.size());
-            for (int i = 0; i < limit; i++) {
-                LspClient.TextEdit edit = fileEdits.get(i);
-                builder.append("  - ")
-                    .append(edit.getStartLine() + 1)
-                    .append(":")
-                    .append(edit.getStartCharacter() + 1)
-                    .append(" -> ")
-                    .append(safePreviewText(edit.getNewText(), 60))
-                    .append("\n");
-            }
-            if (fileEdits.size() > limit) {
-                builder.append("  ... ").append(fileEdits.size() - limit).append(" more edits\n");
-            }
-            builder.append("\n");
-        }
-        builder.append("Run :lsp renameapply to apply, or :lsp renamecancel to discard.\n");
-        return builder.toString();
+        return lspController.buildLspRenamePreview(targetName, edits);
     }
 
     public String lspCodeActions(String selectionArgument) {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "LSP code actions require a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        try {
-            int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-            int column = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-            List<LspClient.CodeAction> actions = collectCursorCodeActions(client, uri, line, column);
-            if (actions.isEmpty()) {
-                return "No code actions";
-            }
-
-            int requestedIndex = parseOneBasedIndex(selectionArgument);
-            if (selectionArgument != null && !selectionArgument.isBlank() && requestedIndex < 1) {
-                return "Usage: :lsp codeaction [index]";
-            }
-            if (requestedIndex > 0) {
-                if (requestedIndex > actions.size()) {
-                    return "Code action index out of range: " + requestedIndex;
-                }
-                LspClient.CodeAction action = actions.get(requestedIndex - 1);
-                WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(action.getEdits());
-                boolean executed = false;
-                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    executed = client.executeCommand(action.getCommandId(), action.getCommandArguments());
-                }
-                if (applyResult.appliedEditCount == 0 && !executed) {
-                    return "Code action produced no local edit and no executable command";
-                }
-                StringBuilder message = new StringBuilder();
-                message.append("Applied code action ").append(requestedIndex).append(": ").append(action.getTitle());
-                if (applyResult.appliedEditCount > 0) {
-                    message.append(" (")
-                        .append(applyResult.appliedEditCount)
-                        .append(" edit")
-                        .append(applyResult.appliedEditCount == 1 ? "" : "s")
-                        .append(")");
-                }
-                if (executed) {
-                    message.append(" [command executed]");
-                } else if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    message.append(" [command failed]");
-                }
-                if (applyResult.failedFiles > 0) {
-                    message.append(" [").append(applyResult.failedFiles).append(" file failures]");
-                }
-                return message.toString();
-            }
-
-            StringBuilder builder = new StringBuilder();
-            for (int i = 0; i < actions.size(); i++) {
-                LspClient.CodeAction action = actions.get(i);
-                builder.append(i + 1).append(". ").append(action.getTitle());
-                if (!action.getKind().isBlank()) {
-                    builder.append(" (").append(action.getKind()).append(")");
-                }
-                if (action.isPreferred()) {
-                    builder.append(" [preferred]");
-                }
-                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    builder.append(" [command]");
-                }
-                if (!action.getEdits().isEmpty()) {
-                    builder.append(" [edit]");
-                }
-                if (i < actions.size() - 1) {
-                    builder.append("\n");
-                }
-            }
-            showScratchBuffer("[lsp code actions]", builder.toString() + "\n\nRun :lsp codeaction <index> to apply.");
-            return "Showing code actions (use :lsp codeaction <index>)";
-        } catch (BadLocationException e) {
-            return "LSP code actions failed: " + e.getMessage();
-        }
+        return lspController.lspCodeActions(selectionArgument);
     }
 
     List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {
-        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
-        List<LspClient.Diagnostic> scoped = new ArrayList<>();
-        for (LspClient.Diagnostic diagnostic : diagnostics) {
-            if (diagnostic.getLine() == line) {
-                scoped.add(diagnostic);
-            }
-        }
-        return client.codeActions(uri, line, column, scoped);
+        return lspController.collectCursorCodeActions(client, uri, line, column);
     }
 
     int parseOneBasedIndex(String value) {
-        if (value == null || value.isBlank()) {
-            return -1;
-        }
-        try {
-            return Integer.parseInt(value.trim());
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+        return lspController.parseOneBasedIndex(value);
     }
 
     public String showDiagnostics() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "Diagnostics require a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(bufferUri(buffer));
-        if (diagnostics.isEmpty()) {
-            return "No diagnostics";
-        }
-        List<QuickfixService.Entry> entries = diagnosticsToQuickfixEntries(buffer.getFilePath(), diagnostics);
-        if (entries.isEmpty()) {
-            return "No diagnostics";
-        }
-        updateQuickfixEntries("diagnostics", entries);
-        return openQuickfixList();
+        return lspController.showDiagnostics();
     }
 
     public String diagnosticsNext() {
-        return jumpDiagnostic(true);
+        return lspController.diagnosticsNext();
     }
 
     public String diagnosticsPrev() {
-        return jumpDiagnostic(false);
+        return lspController.diagnosticsPrev();
     }
 
     String jumpDiagnostic(boolean forward) {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return "Diagnostics require a file-backed buffer";
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return "LSP unavailable";
-        }
-        syncLspOpen(buffer);
-        List<LspClient.Diagnostic> diagnostics = new ArrayList<>(client.getDiagnostics(bufferUri(buffer)));
-        if (diagnostics.isEmpty()) {
-            return "No diagnostics";
-        }
-        diagnostics.sort((left, right) -> {
-            if (left.getLine() != right.getLine()) {
-                return Integer.compare(left.getLine(), right.getLine());
-            }
-            return Integer.compare(left.getCharacter(), right.getCharacter());
-        });
-        int caretLine = getCurrentCaretLine();
-        LspClient.Diagnostic selected = null;
-        if (forward) {
-            for (LspClient.Diagnostic diagnostic : diagnostics) {
-                if (diagnostic.getLine() > caretLine) {
-                    selected = diagnostic;
-                    break;
-                }
-            }
-            if (selected == null) {
-                selected = diagnostics.get(0);
-            }
-        } else {
-            for (int i = diagnostics.size() - 1; i >= 0; i--) {
-                LspClient.Diagnostic diagnostic = diagnostics.get(i);
-                if (diagnostic.getLine() < caretLine) {
-                    selected = diagnostic;
-                    break;
-                }
-            }
-            if (selected == null) {
-                selected = diagnostics.get(diagnostics.size() - 1);
-            }
-        }
-        if (selected == null) {
-            return "No diagnostics";
-        }
-        try {
-            int line = Math.max(0, Math.min(selected.getLine(), writingArea.getLineCount() - 1));
-            int start = writingArea.getLineStartOffset(line);
-            int target = Math.min(start + Math.max(0, selected.getCharacter()), writingArea.getText().length());
-            writingArea.setCaretPosition(target);
-            pulseCaretLine(blendColor(configManager.getVisualColor(), configManager.getCaretColor(), 0.35));
-            playCue(CueType.NAVIGATE);
-            return diagnosticSeverityLabel(selected.getSeverity()) + ": " + selected.getMessage();
-        } catch (BadLocationException e) {
-            return "Diagnostic jump failed: " + e.getMessage();
-        }
+        return lspController.jumpDiagnostic(forward);
     }
 
     List<QuickfixService.Entry> diagnosticsToQuickfixEntries(String filePath, List<LspClient.Diagnostic> diagnostics) {
-        List<QuickfixService.Entry> entries = new ArrayList<>();
-        if (filePath == null || diagnostics == null) {
-            return entries;
-        }
-        for (LspClient.Diagnostic diagnostic : diagnostics) {
-            if (diagnostic == null) {
-                continue;
-            }
-            entries.add(new QuickfixService.Entry(
-                filePath,
-                diagnostic.getLine() + 1,
-                diagnostic.getCharacter() + 1,
-                diagnostic.getMessage(),
-                "diag-" + diagnosticSeverityLabel(diagnostic.getSeverity()).toLowerCase()
-            ));
-        }
-        return entries;
+        return lspController.diagnosticsToQuickfixEntries(filePath, diagnostics);
     }
 
     String diagnosticSeverityLabel(int severity) {
-        switch (severity) {
-            case 1:
-                return "Error";
-            case 2:
-                return "Warning";
-            case 3:
-                return "Info";
-            case 4:
-                return "Hint";
-            default:
-                return "Diag";
-        }
+        return lspController.diagnosticSeverityLabel(severity);
     }
 
     String openLspLocation(LspClient.Location location, String label) {
-        String targetPath = filePathFromUri(location.getUri());
-        if (targetPath == null || targetPath.isBlank()) {
-            return "LSP " + label + " target has unsupported URI";
-        }
-        try {
-            File targetFile = new File(targetPath);
-            if (!targetFile.exists()) {
-                return "LSP " + label + " target missing: " + targetPath;
-            }
-            openFile(targetFile);
-            String lineResult = gotoLine(location.getLine() + 1);
-            if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {
-                return lineResult;
-            }
-            int lineStart = writingArea.getLineStartOffset(Math.max(0, location.getLine()));
-            int target = Math.min(lineStart + Math.max(0, location.getCharacter()), writingArea.getText().length());
-            writingArea.setCaretPosition(target);
-            return "Opened " + label + " location";
-        } catch (Exception e) {
-            return "LSP " + label + " open failed: " + e.getMessage();
-        }
+        return lspController.openLspLocation(location, label);
     }
 
     WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
-        WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
-        if (edits == null || edits.isEmpty()) {
-            return result;
-        }
-        Map<String, List<LspClient.TextEdit>> groupedByUri = new HashMap<>();
-        for (LspClient.TextEdit edit : edits) {
-            if (edit == null || edit.getUri() == null || edit.getUri().isBlank()) {
-                continue;
-            }
-            groupedByUri.computeIfAbsent(edit.getUri(), key -> new ArrayList<>()).add(edit);
-        }
-        if (groupedByUri.isEmpty()) {
-            return result;
-        }
-
-        FileBuffer current = getCurrentBuffer();
-        String currentPath = current == null ? null : current.getFilePath();
-
-        for (Map.Entry<String, List<LspClient.TextEdit>> entry : groupedByUri.entrySet()) {
-            String path = filePathFromUri(entry.getKey());
-            if (path == null || path.isBlank()) {
-                result.failedFiles++;
-                continue;
-            }
-
-            FileBuffer targetBuffer = findBufferByPath(new File(path));
-            if (targetBuffer != null) {
-                int applied = applyTextEditsToBuffer(targetBuffer, entry.getValue());
-                if (applied > 0) {
-                    result.appliedEditCount += applied;
-                    result.touchedFiles++;
-                } else {
-                    result.failedFiles++;
-                }
-                continue;
-            }
-
-            if (currentPath != null && currentPath.equals(path)) {
-                int applied = applyTextEditsToCurrentArea(entry.getValue());
-                if (applied > 0) {
-                    result.appliedEditCount += applied;
-                    result.touchedFiles++;
-                } else {
-                    result.failedFiles++;
-                }
-                continue;
-            }
-
-            int applied = applyTextEditsToFile(path, entry.getValue());
-            if (applied > 0) {
-                result.appliedEditCount += applied;
-                result.touchedFiles++;
-            } else {
-                result.failedFiles++;
-            }
-        }
-        return result;
+        return lspController.applyWorkspaceTextEdits(edits);
     }
 
     int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
-        List<ResolvedTextEdit> resolved = resolveTextEdits(writingArea.getText(), edits);
-        if (resolved.isEmpty()) {
-            return 0;
-        }
-        for (ResolvedTextEdit edit : resolved) {
-            writingArea.replaceRange(edit.newText, edit.startOffset, edit.endOffset);
-        }
-        markModified();
-        return resolved.size();
+        return lspController.applyTextEditsToCurrentArea(edits);
     }
 
     int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
-        if (buffer == null) {
-            return 0;
-        }
-        String currentText = buffer == getCurrentBuffer() ? writingArea.getText() : buffer.getContent();
-        List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
-        if (resolved.isEmpty()) {
-            return 0;
-        }
-        String updated = applyResolvedTextEdits(currentText, resolved);
-        if (buffer == getCurrentBuffer()) {
-            writingArea.setText(updated);
-            markModified();
-        } else {
-            buffer.setContent(updated, true);
-        }
-        return resolved.size();
+        return lspController.applyTextEditsToBuffer(buffer, edits);
     }
 
     int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
-        try {
-            File file = new File(filePath);
-            if (!file.exists() || !file.isFile()) {
-                return 0;
-            }
-            String currentText = Files.readString(file.toPath(), StandardCharsets.UTF_8);
-            List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, edits);
-            if (resolved.isEmpty()) {
-                return 0;
-            }
-            String updated = applyResolvedTextEdits(currentText, resolved);
-            Files.writeString(file.toPath(), updated, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
-            return resolved.size();
-        } catch (IOException e) {
-            return 0;
-        }
+        return lspController.applyTextEditsToFile(filePath, edits);
     }
 
     String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {
-        StringBuilder builder = new StringBuilder(text == null ? "" : text);
-        for (ResolvedTextEdit edit : resolvedEdits) {
-            int safeStart = Math.max(0, Math.min(edit.startOffset, builder.length()));
-            int safeEnd = Math.max(safeStart, Math.min(edit.endOffset, builder.length()));
-            builder.replace(safeStart, safeEnd, edit.newText);
-        }
-        return builder.toString();
+        return lspController.applyResolvedTextEdits(text, resolvedEdits);
     }
 
     List<ResolvedTextEdit> resolveTextEdits(String text, List<LspClient.TextEdit> edits) {
-        List<ResolvedTextEdit> resolved = new ArrayList<>();
-        if (edits == null || edits.isEmpty()) {
-            return resolved;
-        }
-        String source = text == null ? "" : text;
-        List<Integer> lineStarts = lineStartOffsets(source);
-        for (LspClient.TextEdit edit : edits) {
-            if (edit == null) {
-                continue;
-            }
-            int startOffset = offsetForLineCharacter(source, lineStarts, edit.getStartLine(), edit.getStartCharacter());
-            int endOffset = offsetForLineCharacter(source, lineStarts, edit.getEndLine(), edit.getEndCharacter());
-            if (endOffset < startOffset) {
-                int swap = startOffset;
-                startOffset = endOffset;
-                endOffset = swap;
-            }
-            resolved.add(new ResolvedTextEdit(startOffset, endOffset, edit.getNewText()));
-        }
-        resolved.sort((left, right) -> {
-            if (left.startOffset != right.startOffset) {
-                return Integer.compare(right.startOffset, left.startOffset);
-            }
-            return Integer.compare(right.endOffset, left.endOffset);
-        });
-        return resolved;
+        return lspController.resolveTextEdits(text, edits);
     }
 
     List<Integer> lineStartOffsets(String text) {
-        List<Integer> starts = new ArrayList<>();
-        starts.add(0);
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) == '\n') {
-                starts.add(i + 1);
-            }
-        }
-        return starts;
+        return lspController.lineStartOffsets(text);
     }
 
     int offsetForLineCharacter(String text, List<Integer> lineStarts, int line, int character) {
-        if (lineStarts == null || lineStarts.isEmpty()) {
-            return 0;
-        }
-        int safeLine = Math.max(0, Math.min(line, lineStarts.size() - 1));
-        int lineStart = lineStarts.get(safeLine);
-        int lineEnd = safeLine + 1 < lineStarts.size() ? lineStarts.get(safeLine + 1) - 1 : text.length();
-        int safeCharacter = Math.max(0, character);
-        return Math.max(0, Math.min(lineStart + safeCharacter, lineEnd));
+        return lspController.offsetForLineCharacter(text, lineStarts, line, character);
     }
 
     String filePathFromUri(String uri) {
-        if (uri == null || uri.isBlank()) {
-            return null;
-        }
-        if (!uri.startsWith("file:")) {
-            return null;
-        }
-        try {
-            return new File(new URI(uri)).getAbsolutePath();
-        } catch (URISyntaxException e) {
-            return uri.substring("file://".length());
-        }
+        return lspController.filePathFromUri(uri);
     }
 
     String currentCompletionPrefix() {
-        String text = writingArea.getText();
-        int caret = Math.min(writingArea.getCaretPosition(), text.length());
-        int start = caret;
-        while (start > 0 && isWordCharacter(text.charAt(start - 1))) {
-            start--;
-        }
-        return text.substring(start, caret);
+        return lspController.currentCompletionPrefix();
     }
 
     List<String> collectBufferCompletions(String prefix) {
-        List<String> matches = new ArrayList<>();
-        if (prefix == null || prefix.isEmpty()) {
-            return matches;
-        }
-
-        java.util.LinkedHashSet<String> unique = new java.util.LinkedHashSet<>();
-        StringBuilder word = new StringBuilder();
-        String text = writingArea.getText();
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (isWordCharacter(c)) {
-                word.append(c);
-            } else if (!word.isEmpty()) {
-                addCompletionCandidate(prefix, unique, word.toString());
-                word.setLength(0);
-            }
-        }
-        if (!word.isEmpty()) {
-            addCompletionCandidate(prefix, unique, word.toString());
-        }
-
-        for (String candidate : unique) {
-            matches.add(candidate);
-            if (matches.size() >= 10) {
-                break;
-            }
-        }
-        return matches;
+        return lspController.collectBufferCompletions(prefix);
     }
 
     void addCompletionCandidate(String prefix, java.util.LinkedHashSet<String> unique, String candidate) {
-        if (candidate.length() <= prefix.length()) {
-            return;
-        }
-        if (candidate.startsWith(prefix)) {
-            unique.add(candidate);
-        }
+        lspController.addCompletionCandidate(prefix, unique, candidate);
     }
 
     void applyCompletion(String prefix, String completion) {
-        int caret = writingArea.getCaretPosition();
-        int start = Math.max(0, caret - (prefix == null ? 0 : prefix.length()));
-        writingArea.replaceRange(completion, start, caret);
-        writingArea.setCaretPosition(start + completion.length());
-        markModified();
+        lspController.applyCompletion(prefix, completion);
     }
 
     LspClient resolveLspClient(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
-            return null;
-        }
-        String extension = bufferExtension(buffer);
-        if (extension.isEmpty()) {
-            lspErrors.put("", "file has no recognized extension");
-            return null;
-        }
-
-        LspClient existing = lspClients.get(extension);
-        if (existing != null && existing.isAlive()) {
-            lspErrors.remove(extension);
-            return existing;
-        }
-
-        String command = configManager.getLspCommand(extension);
-        String[] args = configManager.getLspArgs(extension);
-        if (command == null || command.isBlank()) {
-            String[] builtin = builtinLspCommand(extension);
-            if (builtin == null) {
-                lspErrors.put(extension, "no server configured for ." + extension);
-                return null;
-            }
-            command = builtin[0];
-            args = java.util.Arrays.copyOfRange(builtin, 1, builtin.length);
-        }
-
-        try {
-            LspClient client = new LspClient(command, args, new File(".").toPath());
-            lspClients.put(extension, client);
-            lspErrors.remove(extension);
-            return client;
-        } catch (IOException e) {
-            lspErrors.put(extension, e.getMessage());
-            return null;
-        }
+        return lspController.resolveLspClient(buffer);
     }
 
     void syncLspOpen(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
-            return;
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return;
-        }
-        String uri = bufferUri(buffer);
-        if (lspDocumentVersions.containsKey(uri)) {
-            return;
-        }
-        client.didOpen(uri, languageId(buffer), buffer.getFullContent());
-        lspDocumentVersions.put(uri, 1);
+        lspController.syncLspOpen(buffer);
     }
 
     void syncLspChange(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
-            return;
-        }
-        LspClient client = resolveLspClient(buffer);
-        if (client == null) {
-            return;
-        }
-        syncLspOpen(buffer);
-        String uri = bufferUri(buffer);
-        int version = lspDocumentVersions.getOrDefault(uri, 1) + 1;
-        lspDocumentVersions.put(uri, version);
-        client.didChange(uri, version, buffer.getFullContent());
-        scheduleDiagnosticRefresh();
+        lspController.syncLspChange(buffer);
     }
 
     void scheduleDiagnosticRefresh() {
-        if (diagnosticRefreshTimer == null) {
-            diagnosticRefreshTimer = new javax.swing.Timer(500, ev -> refreshDiagnosticRanges());
-            diagnosticRefreshTimer.setRepeats(false);
-        }
-        diagnosticRefreshTimer.restart();
+        lspController.scheduleDiagnosticRefresh();
     }
 
     public void notifyCurrentBufferSaved() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
-            return;
-        }
-        syncLspOpen(buffer);
-        LspClient client = resolveLspClient(buffer);
-        if (client != null) {
-            client.didSave(bufferUri(buffer));
-        }
-        firePluginEvent("BufWrite");
-        refreshGitGutter();
+        lspController.notifyCurrentBufferSaved();
     }
 
     void pollLspNotifications(FileBuffer buffer) {
-        LspClient client = existingLspClient(buffer);
-        if (client != null) {
-            client.drainNotifications();
-        }
+        lspController.pollLspNotifications(buffer);
     }
 
     LspClient existingLspClient(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
-            return null;
-        }
-        return lspClients.get(bufferExtension(buffer));
+        return lspController.existingLspClient(buffer);
     }
 
     String bufferUri(FileBuffer buffer) {
-        return "file://" + new File(buffer.getFilePath()).getAbsolutePath();
+        return lspController.bufferUri(buffer);
     }
 
     String languageId(FileBuffer buffer) {
-        return lspService.languageId(buffer.getFileType());
+        return lspController.languageId(buffer);
     }
 
     String bufferExtension(FileBuffer buffer) {
-        String path = buffer.getFilePath();
-        if (path == null) {
-            return "";
-        }
-        int dot = path.lastIndexOf('.');
-        if (dot < 0 || dot >= path.length() - 1) {
-            return "";
-        }
-        return path.substring(dot + 1).toLowerCase();
+        return lspController.bufferExtension(buffer);
     }
 
     String[] builtinLspCommand(String extension) {
-        return lspService.builtinCommand(extension);
+        return lspController.builtinLspCommand(extension);
     }
 
     // Repeat last command
@@ -10158,111 +7748,40 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void handleDocumentChange() {
-        if (!suppressDocumentEvents) {
-            markModified();
-            updateCurrentLineHighlight();
-            applySyntaxHighlighting();
-            lineNumberPanel.repaint();
-        }
+        paneBufferController.handleDocumentChange();
     }
 
     void withSuppressedDocumentEvents(Runnable action) {
-        suppressDocumentEvents = true;
-        try {
-            action.run();
-        } finally {
-            suppressDocumentEvents = false;
-        }
+        paneBufferController.withSuppressedDocumentEvents(action);
     }
 
     void detachActiveDocumentListener() {
-        if (bufferDocumentListener != null && writingArea.getDocument() != null) {
-            writingArea.getDocument().removeDocumentListener(bufferDocumentListener);
-        }
+        paneBufferController.detachActiveDocumentListener();
     }
 
     void attachActiveDocumentListener() {
-        if (bufferDocumentListener != null && writingArea.getDocument() != null) {
-            writingArea.getDocument().addDocumentListener(bufferDocumentListener);
-        }
+        paneBufferController.attachActiveDocumentListener();
     }
 
     void loadBufferIntoEditor(FileBuffer buffer) {
-        loadBufferIntoPane(getActivePane(), buffer, 0);
+        paneBufferController.loadBufferIntoEditor(buffer);
     }
 
     void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
-        if (pane == null || buffer == null) {
-            return;
-        }
-
-        boolean activePane = pane == getActivePane();
-        if (activePane) {
-            detachActiveDocumentListener();
-            if (searchManager != null) {
-                searchManager.clearHighlights();
-            }
-        }
-
-        boolean replacedTerminalPane = pane.getTerminalPane() != null;
-        if (replacedTerminalPane) {
-            FileBuffer previousBuffer = pane.getBuffer();
-            if (previousBuffer != null) {
-                ptyTerminalPanes.remove(previousBuffer);
-            }
-            pane.closeTerminalPane();
-        }
-        pane.setBuffer(buffer);
-        withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
-        pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
-        if (replacedTerminalPane) {
-            renderWindowLayout();
-        }
-
-        if (activePane) {
-            bindActivePane(pane);
-            attachActiveDocumentListener();
-            undoManager = buffer.getUndoManager();
-            currentBufferIndex = buffers.indexOf(buffer);
-            registerManager.updateFilename(buffer.getFilePath());
-            updateCurrentLineHighlight();
-            applySyntaxHighlighting();
-            refreshLineNumberPanel();
-            syncLspOpen(buffer);
-            updateStatusBar();
-        } else {
-            pane.getLineNumberPanel().repaint();
-        }
+        paneBufferController.loadBufferIntoPane(pane, buffer, caretPosition);
     }
 
     void persistCurrentBufferState() {
-        EditorPane pane = getActivePane();
-        if (pane != null) {
-            pane.setBuffer(getCurrentBuffer());
-        }
+        paneBufferController.persistCurrentBufferState();
     }
 
     // Mark buffer as modified
     void markModified() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer != null) {
-            buffer.setModified(true);
-            try {
-                buffer.createBackup();
-            } catch (IOException ignored) {
-            }
-            recordChangePosition();
-            syncLspChange(buffer);
-            updateDiffGutter(buffer);
-            updateStatusBar();
-            persistRecoverySnapshotsSafely();
-        }
+        paneBufferController.markModified();
     }
 
     void updateDiffGutter(FileBuffer buffer) {
-        if (lineNumberPanel != null && buffer != null) {
-            lineNumberPanel.updateDiffMarkers(buffer.getSavedContent(), writingArea.getText());
-        }
+        paneBufferController.updateDiffGutter(buffer);
     }
 
     // Show message in status bar
@@ -10290,430 +7809,92 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // File operations
     void openFileChooser() {
-        JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
-        int result = fileChooser.showOpenDialog(this);
-
-        if (result == JFileChooser.APPROVE_OPTION) {
-            File file = fileChooser.getSelectedFile();
-            try {
-                openFile(file);
-            } catch (Exception e) {
-                showMessage("Error opening file: " + e.getMessage());
-            }
-        }
+        paneBufferController.openFileChooser();
     }
 
     void openLandingPage() {
-        StringBuilder builder = new StringBuilder();
-        builder.append("shed ").append(VERSION).append("\n");
-        builder.append("swing modal editor\n\n");
-        builder.append(":help        view help\n");
-        builder.append(":e <file>    open a file\n");
-        builder.append(":recent      show recent files\n");
-        builder.append(":ls          list open buffers\n\n");
-        builder.append("note: this is a scratch buffer and can be edited.\n");
-
-        FileBuffer landing = FileBuffer.createScratch("[landing]", builder.toString());
-        if (buffers.isEmpty()) {
-            buffers.add(landing);
-        } else {
-            buffers.set(0, landing);
-        }
-        loadBufferIntoEditor(landing);
+        paneBufferController.openLandingPage();
     }
 
     public void openFile(File file) throws IOException {
-        persistCurrentBufferState();
-        boolean trustedForLocalExecution = ensureProjectTrustForFile(file);
-        String projectConfigMessage = "";
-        if (trustedForLocalExecution) {
-            projectConfigMessage = configManager.applyProjectConfigForFile(file);
-            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
-                applyRuntimeConfigFromSettings();
-            }
-        } else {
-            projectConfigMessage = "Project local config/plugins blocked (untrusted project)";
-            String cleared = configManager.applyProjectConfigForFile(null);
-            if (cleared != null && !cleared.isEmpty()) {
-                applyRuntimeConfigFromSettings();
-            }
-        }
-
-        FileBuffer existing = findBufferByPath(file);
-        if (existing != null) {
-            loadBufferIntoEditor(existing);
-            if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
-                showMessage(projectConfigMessage);
-            }
-            return;
-        }
-
-        FileBuffer buffer;
-        if (file.exists()) {
-            buffer = new FileBuffer(file, configManager);
-        } else {
-            buffer = new FileBuffer(file.getAbsolutePath());
-        }
-
-        if (shouldReplaceSingleLandingBuffer()) {
-            buffers.set(0, buffer);
-        } else {
-            buffers.add(buffer);
-        }
-        loadBufferIntoEditor(buffer);
-        addToRecentFiles(file.getAbsolutePath());
-        registerFileWatch(buffer);
-        firePluginEvent("BufOpen");
-        refreshGitGutter();
-        if (buffer.isShowingPreviewOnly()) {
-            showMessage("Large-file preview loaded");
-        } else if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
-            showMessage(projectConfigMessage);
-        }
+        paneBufferController.openFile(file);
     }
 
     // Buffer management methods (called by CommandHandler)
     public FileBuffer getCurrentBuffer() {
-        EditorPane activePane = getActivePane();
-        if (activePane != null && activePane.getBuffer() != null) {
-            return activePane.getBuffer();
-        }
-        if (currentBufferIndex >= 0 && currentBufferIndex < buffers.size()) {
-            return buffers.get(currentBufferIndex);
-        }
-        return null;
+        return paneBufferController.getCurrentBuffer();
     }
 
     public JTextArea getTextArea() {
-        return writingArea;
+        return paneBufferController.getTextArea();
     }
 
     public String nextBuffer() {
-        if (buffers.isEmpty()) {
-            return "No buffers open";
-        }
-
-        currentBufferIndex = Math.max(0, buffers.indexOf(getCurrentBuffer()));
-        int nextIndex = (currentBufferIndex + 1) % buffers.size();
-        switchToBuffer(nextIndex);
-        return "Buffer " + (currentBufferIndex + 1) + " of " + buffers.size();
+        return paneBufferController.nextBuffer();
     }
 
     public String prevBuffer() {
-        if (buffers.isEmpty()) {
-            return "No buffers open";
-        }
-
-        currentBufferIndex = Math.max(0, buffers.indexOf(getCurrentBuffer()));
-        int prevIndex = currentBufferIndex - 1;
-        if (prevIndex < 0) {
-            prevIndex = buffers.size() - 1;
-        }
-        switchToBuffer(prevIndex);
-        return "Buffer " + (currentBufferIndex + 1) + " of " + buffers.size();
+        return paneBufferController.prevBuffer();
     }
 
     public String listBuffers() {
-        if (buffers.isEmpty()) {
-            return "No buffers open";
-        }
-
-        StringBuilder list = new StringBuilder("Buffers:\n");
-        for (int i = 0; i < buffers.size(); i++) {
-            FileBuffer buf = buffers.get(i);
-            list.append(i + 1).append(": ").append(buf.getDisplayName());
-            if (buf.isModified()) {
-                list.append(" [+]");
-            }
-            if (i == currentBufferIndex) {
-                list.append(" (current)");
-            }
-            list.append("\n");
-        }
-
-        showBufferListDialog(list.toString());
-        return "";
+        return paneBufferController.listBuffers();
     }
 
     public String deleteBuffer(boolean force) {
-        if (buffers.isEmpty()) {
-            return "No buffers to delete";
-        }
-
-        FileBuffer buffer = getCurrentBuffer();
-        if (!force && buffer != null && buffer.isModified() && buffers.size() > 1) {
-            return "Error: No write since last change (use :bd! to override)";
-        }
-
-        if (buffers.size() == 1) {
-            if (!force && hasUnsavedChanges(buffer)) {
-                int result = confirmDiscardChanges("Close the last buffer and quit anyway?");
-                if (result != JOptionPane.YES_OPTION) {
-                    return "Buffer close cancelled";
-                }
-            }
-            closeTerminalSession(buffer);
-            closeEditor();
-            return "Last buffer closed";
-        }
-
-        currentBufferIndex = Math.max(0, buffers.indexOf(buffer));
-        if (isTreeBuffer(buffer)) {
-            treeLineTargets.remove(buffer);
-            if (buffer == treeBuffer) {
-                treeBuffer = null;
-            }
-        }
-        if (buffer == quickfixBuffer) {
-            quickfixBuffer = null;
-        }
-        closeTerminalSession(buffer);
-        buffers.remove(buffer);
-        if (buffers.isEmpty()) {
-            openLandingPage();
-            return "Buffer deleted";
-        }
-        FileBuffer replacement = buffers.get(Math.min(currentBufferIndex, buffers.size() - 1));
-        for (EditorPane pane : editorPanes) {
-            if (pane.getBuffer() == buffer) {
-                loadBufferIntoPane(pane, replacement, 0);
-            }
-        }
-        return "Buffer deleted";
+        return paneBufferController.deleteBuffer(force);
     }
 
     void switchToBuffer(int index) {
-        if (index < 0 || index >= buffers.size()) {
-            return;
-        }
-
-        persistCurrentBufferState();
-
-        FileBuffer newBuffer = buffers.get(index);
-        loadBufferIntoEditor(newBuffer);
+        paneBufferController.switchToBuffer(index);
     }
 
     public String splitWindow(boolean vertical) {
-        EditorPane activePane = getActivePane();
-        FileBuffer currentBuffer = getCurrentBuffer();
-        if (activePane == null || currentBuffer == null) {
-            return "No active window";
-        }
-
-        Dimension size = getSize();
-        EditorPane newPane = createEditorPane(size);
-        editorPanes.add(newPane);
-        WindowLayoutNode.Orientation orientation = vertical ? WindowLayoutNode.Orientation.HORIZONTAL : WindowLayoutNode.Orientation.VERTICAL;
-        if (windowLayoutRoot == null) {
-            windowLayoutRoot = WindowLayoutNode.leaf(activePane);
-        }
-        double startRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.12 : 0.5;
-        windowLayoutRoot.splitLeaf(activePane, newPane, orientation, false, startRatio);
-        loadBufferIntoPane(newPane, currentBuffer, writingArea.getCaretPosition());
-        renderWindowLayout();
-        animateSplitForPane(newPane, startRatio, 0.5);
-        activateEditorPane(newPane);
-        flashPaneJump(newPane);
-        animateEditorHostTint(configManager.getCommandColor());
-        newPane.getTextArea().requestFocusInWindow();
-        return vertical ? "Vertical split created" : "Horizontal split created";
+        return paneBufferController.splitWindow(vertical);
     }
 
     public String closeActiveWindow() {
-        return closePane(getActivePane());
+        return paneBufferController.closeActiveWindow();
     }
 
     String closePane(EditorPane paneToClose) {
-        if (editorPanes.size() <= 1) {
-            return "Cannot close the only window";
-        }
-        if (paneToClose == null) {
-            return "No active window";
-        }
-
-        EditorPane previouslyActive = getActivePane();
-        FileBuffer closingBuffer = paneToClose.getBuffer();
-        if (paneToClose == treePane) {
-            treePane = null;
-        }
-        if (paneToClose.getBuffer() == quickfixBuffer) {
-            quickfixBuffer = null;
-        }
-        closeTerminalSession(closingBuffer);
-        paneToClose.closeTerminalPane();
-        if (isTreeBuffer(closingBuffer)) {
-            treeLineTargets.remove(closingBuffer);
-            buffers.remove(closingBuffer);
-            if (closingBuffer == treeBuffer) {
-                treeBuffer = null;
-            }
-        }
-
-        detachActiveDocumentListener();
-        editorPanes.remove(paneToClose);
-        windowLayoutRoot = windowLayoutRoot == null ? null : windowLayoutRoot.removeLeaf(paneToClose);
-        if (windowLayoutRoot == null && !editorPanes.isEmpty()) {
-            windowLayoutRoot = WindowLayoutNode.leaf(editorPanes.get(0));
-        }
-        renderWindowLayout();
-
-        EditorPane nextActive = null;
-        if (previouslyActive != null && previouslyActive != paneToClose && editorPanes.contains(previouslyActive)) {
-            nextActive = previouslyActive;
-        } else if (!editorPanes.isEmpty()) {
-            nextActive = editorPanes.get(0);
-        }
-
-        if (nextActive != null) {
-            activePaneIndex = Math.max(0, editorPanes.indexOf(nextActive));
-            bindActivePane(nextActive);
-            attachActiveDocumentListener();
-            updateCurrentLineHighlight();
-            refreshLineNumberPanel();
-            updateStatusBar();
-            requestActivePaneFocus();
-        }
-        return "Window closed";
+        return paneBufferController.closePane(paneToClose);
     }
 
     public String cycleWindowFocus() {
-        if (editorPanes.size() <= 1) {
-            return "Only one window";
-        }
-        int nextIndex = (activePaneIndex + 1) % editorPanes.size();
-        activateEditorPane(editorPanes.get(nextIndex));
-        flashPaneJump(getActivePane());
-        requestActivePaneFocus();
-        return "Window focus changed";
+        return paneBufferController.cycleWindowFocus();
     }
 
     public String resizeActiveWindow(double delta) {
-        if (windowLayoutRoot == null || windowLayoutRoot.isLeaf()) return "Only one window";
-        EditorPane activePane = getActivePane();
-        if (activePane == null) return "No active window";
-        if (windowLayoutRoot.adjustRatio(activePane, delta)) {
-            renderWindowLayout();
-            return "Window resized";
-        }
-        return "Cannot resize further";
+        return paneBufferController.resizeActiveWindow(delta);
     }
 
     public String equalizeWindows() {
-        if (windowLayoutRoot == null) {
-            return "No windows to equalize";
-        }
-        windowLayoutRoot.equalize();
-        renderWindowLayout();
-        return "Windows equalized";
+        return paneBufferController.equalizeWindows();
     }
 
     public String focusWindowDirection(int dx, int dy) {
-        if (editorPanes.size() <= 1) {
-            return "Only one window";
-        }
-        EditorPane activePane = getActivePane();
-        if (activePane == null) {
-            return "No active window";
-        }
-
-        WindowLayoutNode.Direction direction = toLayoutDirection(dx, dy);
-        List<EditorPane> candidates = windowLayoutRoot == null ? List.of() : windowLayoutRoot.findNeighborCandidates(activePane, direction);
-        if (candidates.isEmpty()) {
-            return "No window in that direction";
-        }
-
-        Rectangle activeBounds = paneBounds(activePane);
-        EditorPane bestPane = null;
-        double bestScore = Double.MAX_VALUE;
-
-        for (EditorPane pane : candidates) {
-            Rectangle candidateBounds = paneBounds(pane);
-            double score = directionalAlignmentScore(activeBounds, candidateBounds, direction);
-            if (score < bestScore) {
-                bestScore = score;
-                bestPane = pane;
-            }
-        }
-
-        if (bestPane == null) {
-            return "No window in that direction";
-        }
-
-        activateEditorPane(bestPane);
-        flashPaneJump(bestPane);
-        requestActivePaneFocus();
-        return "Window focus changed";
+        return paneBufferController.focusWindowDirection(dx, dy);
     }
 
     WindowLayoutNode.Direction toLayoutDirection(int dx, int dy) {
-        if (dx < 0) {
-            return WindowLayoutNode.Direction.LEFT;
-        }
-        if (dx > 0) {
-            return WindowLayoutNode.Direction.RIGHT;
-        }
-        if (dy < 0) {
-            return WindowLayoutNode.Direction.UP;
-        }
-        return WindowLayoutNode.Direction.DOWN;
+        return paneBufferController.toLayoutDirection(dx, dy);
     }
 
     double directionalAlignmentScore(Rectangle activeBounds, Rectangle candidateBounds, WindowLayoutNode.Direction direction) {
-        double axisDistance;
-        double orthogonalDistance;
-        switch (direction) {
-            case LEFT:
-                axisDistance = activeBounds.getX() - candidateBounds.getMaxX();
-                orthogonalDistance = Math.abs(activeBounds.getCenterY() - candidateBounds.getCenterY());
-                break;
-            case RIGHT:
-                axisDistance = candidateBounds.getX() - activeBounds.getMaxX();
-                orthogonalDistance = Math.abs(activeBounds.getCenterY() - candidateBounds.getCenterY());
-                break;
-            case UP:
-                axisDistance = activeBounds.getY() - candidateBounds.getMaxY();
-                orthogonalDistance = Math.abs(activeBounds.getCenterX() - candidateBounds.getCenterX());
-                break;
-            case DOWN:
-            default:
-                axisDistance = candidateBounds.getY() - activeBounds.getMaxY();
-                orthogonalDistance = Math.abs(activeBounds.getCenterX() - candidateBounds.getCenterX());
-                break;
-        }
-        if (axisDistance < 0) {
-            axisDistance = 0;
-        }
-        return axisDistance * 1000.0 + orthogonalDistance;
+        return paneBufferController.directionalAlignmentScore(activeBounds, candidateBounds, direction);
     }
 
     Rectangle paneBounds(EditorPane pane) {
-        return SwingUtilities.convertRectangle(
-            pane.getScrollPane().getParent(),
-            pane.getScrollPane().getBounds(),
-            editorHostPanel
-        );
+        return paneBufferController.paneBounds(pane);
     }
 
     FileBuffer findBufferByPath(File file) {
-        if (file == null) {
-            return null;
-        }
-        String targetPath = file.getAbsolutePath();
-        for (FileBuffer buffer : buffers) {
-            if (buffer.hasFilePath() && targetPath.equals(buffer.getFilePath())) {
-                return buffer;
-            }
-        }
-        return null;
+        return paneBufferController.findBufferByPath(file);
     }
 
     boolean shouldReplaceSingleLandingBuffer() {
-        if (buffers.size() != 1) {
-            return false;
-        }
-        FileBuffer current = buffers.get(0);
-        return current.isScratch() && "[landing]".equals(current.getDisplayName()) && !current.isModified();
+        return paneBufferController.shouldReplaceSingleLandingBuffer();
     }
 
     // Search methods

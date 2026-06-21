@@ -52,169 +52,169 @@ import java.util.regex.Pattern;
 import java.util.concurrent.TimeUnit;
 
 public class Texteditor extends JFrame implements KeyListener {
-    private static final long serialVersionUID = 1L;
+    static final long serialVersionUID = 1L;
 
     // Core components
-    private EditorState editorState;
-    private ModeEngine modeEngine;
-    private JTextArea writingArea;
-    private JLabel statusBar;
-    private JLabel commandBar;
-    private LineNumberPanel lineNumberPanel;
-    private JScrollPane editorScrollPane;
-    private JPanel editorHostPanel;
+    EditorState editorState;
+    ModeEngine modeEngine;
+    JTextArea writingArea;
+    JLabel statusBar;
+    JLabel commandBar;
+    LineNumberPanel lineNumberPanel;
+    JScrollPane editorScrollPane;
+    JPanel editorHostPanel;
 
     // Managers
-    private ClipboardManager clipboardManager;
-    private RegisterManager registerManager;
-    private SearchManager searchManager;
-    private CommandHandler commandHandler;
-    private ConfigManager configManager;
-    private HelpService helpService;
-    private GitService gitService;
-    private TreeService treeService;
-    private LspService lspService;
-    private SyntaxHighlightService syntaxHighlightService;
-    private AsyncJobService asyncJobService;
-    private QuickfixService quickfixService;
-    private PluginManager pluginManager;
+    ClipboardManager clipboardManager;
+    RegisterManager registerManager;
+    SearchManager searchManager;
+    CommandHandler commandHandler;
+    ConfigManager configManager;
+    HelpService helpService;
+    GitService gitService;
+    TreeService treeService;
+    LspService lspService;
+    SyntaxHighlightService syntaxHighlightService;
+    AsyncJobService asyncJobService;
+    QuickfixService quickfixService;
+    PluginManager pluginManager;
 
     // Buffer management
-    private List<FileBuffer> buffers;
-    private int currentBufferIndex;
-    private List<EditorPane> editorPanes;
-    private int activePaneIndex;
-    private WindowLayoutNode windowLayoutRoot;
-    private Component renderedLayoutComponent;
+    List<FileBuffer> buffers;
+    int currentBufferIndex;
+    List<EditorPane> editorPanes;
+    int activePaneIndex;
+    WindowLayoutNode windowLayoutRoot;
+    Component renderedLayoutComponent;
 
     // State variables
-    private String lastMessage;
-    private Timer messageResetTimer;
-    private UndoManager undoManager;
-    private DocumentListener bufferDocumentListener;
-    private String lastCommand;
-    private boolean suppressDocumentEvents;
-    private boolean suppressNextTypedChar;
-    private boolean closingDown;
-    private List<String> recentFiles;
-    private File recentFilesStore;
-    private File commandLogStore;
-    private File recoveryStoreDir;
-    private File trustedProjectsStore;
-    private Set<String> trustedProjectRoots;
-    private Deque<SpecialBufferReturnState> specialBufferReturns;
-    private List<String> commandHistory;
-    private int commandHistoryIndex;
-    private String commandHistoryPrefix;
-    private DateTimeFormatter commandLogTimeFormat;
-    private LineNumberMode lineNumberMode;
-    private String gitBranch;
-    private Object currentLineHighlightTag;
-    private List<Object> substitutePreviewTags;
-    private Highlighter.HighlightPainter currentLinePainter;
-    private Highlighter.HighlightPainter substitutePreviewPainter;
-    private boolean zenModeEnabled;
-    private String lastInsertedText;
-    private Timer externalChangeTimer;
-    private Timer recoverySnapshotTimer;
-    private boolean reloadPromptActive;
-    private List<Object> syntaxHighlightTags;
-    private List<SyntaxSpan> syntaxForegroundSpans;
-    private Color syntaxKeywordColor;
-    private Color syntaxStringColor;
-    private Color syntaxCommentColor;
-    private Color syntaxNumberColor;
-    private File lastPreviewedMarkdown;
-    private List<Integer> jumpList;
-    private int jumpIndex;
-    private List<Integer> changeList;
-    private int changeIndex;
-    private char lastFindChar;
-    private char lastFindType;
-    private Character recordingRegister;
-    private Character lastMacroRegister;
-    private List<NormalizedKeyStroke> macroBuffer;
-    private int macroPlaybackDepth;
-    private Character pendingTextObjectOperator;
-    private Character pendingTextObjectModifier;
-    private Character pendingSurroundAction;
-    private Character pendingSurroundOld;
-    private Character pendingSurroundTarget;
-    private boolean insertNormalOneShot;
-    private final List<Integer> extraCursors = new ArrayList<>();
-    private Map<String, LspClient> lspClients;
-    private Map<String, Integer> lspDocumentVersions;
-    private Map<String, String> lspErrors;
-    private List<LspClient.TextEdit> pendingLspRenameEdits;
-    private String pendingLspRenameTarget;
-    private EditorPane treePane;
-    private FileBuffer treeBuffer;
-    private File treeRoot;
-    private Map<FileBuffer, List<String>> treeLineTargets;
-    private FileBuffer quickfixBuffer;
-    private int keymapReplayDepth;
-    private List<RegisterContent> yankRing;
-    private Map<FileBuffer, TerminalSession> terminalSessions;
-    private Map<FileBuffer, PtyTerminalPane> ptyTerminalPanes;
-    private int terminalBufferCounter;
+    String lastMessage;
+    Timer messageResetTimer;
+    UndoManager undoManager;
+    DocumentListener bufferDocumentListener;
+    String lastCommand;
+    boolean suppressDocumentEvents;
+    boolean suppressNextTypedChar;
+    boolean closingDown;
+    List<String> recentFiles;
+    File recentFilesStore;
+    File commandLogStore;
+    File recoveryStoreDir;
+    File trustedProjectsStore;
+    Set<String> trustedProjectRoots;
+    Deque<SpecialBufferReturnState> specialBufferReturns;
+    List<String> commandHistory;
+    int commandHistoryIndex;
+    String commandHistoryPrefix;
+    DateTimeFormatter commandLogTimeFormat;
+    LineNumberMode lineNumberMode;
+    String gitBranch;
+    Object currentLineHighlightTag;
+    List<Object> substitutePreviewTags;
+    Highlighter.HighlightPainter currentLinePainter;
+    Highlighter.HighlightPainter substitutePreviewPainter;
+    boolean zenModeEnabled;
+    String lastInsertedText;
+    Timer externalChangeTimer;
+    Timer recoverySnapshotTimer;
+    boolean reloadPromptActive;
+    List<Object> syntaxHighlightTags;
+    List<SyntaxSpan> syntaxForegroundSpans;
+    Color syntaxKeywordColor;
+    Color syntaxStringColor;
+    Color syntaxCommentColor;
+    Color syntaxNumberColor;
+    File lastPreviewedMarkdown;
+    List<Integer> jumpList;
+    int jumpIndex;
+    List<Integer> changeList;
+    int changeIndex;
+    char lastFindChar;
+    char lastFindType;
+    Character recordingRegister;
+    Character lastMacroRegister;
+    List<NormalizedKeyStroke> macroBuffer;
+    int macroPlaybackDepth;
+    Character pendingTextObjectOperator;
+    Character pendingTextObjectModifier;
+    Character pendingSurroundAction;
+    Character pendingSurroundOld;
+    Character pendingSurroundTarget;
+    boolean insertNormalOneShot;
+    final List<Integer> extraCursors = new ArrayList<>();
+    Map<String, LspClient> lspClients;
+    Map<String, Integer> lspDocumentVersions;
+    Map<String, String> lspErrors;
+    List<LspClient.TextEdit> pendingLspRenameEdits;
+    String pendingLspRenameTarget;
+    EditorPane treePane;
+    FileBuffer treeBuffer;
+    File treeRoot;
+    Map<FileBuffer, List<String>> treeLineTargets;
+    FileBuffer quickfixBuffer;
+    int keymapReplayDepth;
+    List<RegisterContent> yankRing;
+    Map<FileBuffer, TerminalSession> terminalSessions;
+    Map<FileBuffer, PtyTerminalPane> ptyTerminalPanes;
+    int terminalBufferCounter;
 
     // Markdown / orgmode features
-    private MarkdownService markdownService;
-    private FuzzyMatchService fuzzyMatchService;
-    private SnippetService snippetService;
-    private BracketColorService bracketColorService;
-    private SymbolService symbolService;
-    private TaskService taskService;
-    private FileWatcherService fileWatcherService;
-    private SubstituteService substituteService;
-    private List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
-    private javax.swing.Timer diagnosticRefreshTimer;
-    private Map<Integer, Boolean> foldedLines; // headingLine -> folded
-    private String foldedContent; // stores hidden content per fold
-    private Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
-    private int concealLevel; // 0=show all, 1=conceal some, 2=full conceal
-    private List<Object> bracketHighlightTags;
-    private final List<Object> matchBracketTags = new ArrayList<>();
-    private List<Object> markdownHighlightTags;
-    private boolean bracketColorEnabled;
+    MarkdownService markdownService;
+    FuzzyMatchService fuzzyMatchService;
+    SnippetService snippetService;
+    BracketColorService bracketColorService;
+    SymbolService symbolService;
+    TaskService taskService;
+    FileWatcherService fileWatcherService;
+    SubstituteService substituteService;
+    List<int[]> diagnosticRanges = new ArrayList<>(); // [startOffset, endOffset, severity]
+    javax.swing.Timer diagnosticRefreshTimer;
+    Map<Integer, Boolean> foldedLines; // headingLine -> folded
+    String foldedContent; // stores hidden content per fold
+    Map<Integer, String> foldHiddenContent; // headingLine -> hidden text
+    int concealLevel; // 0=show all, 1=conceal some, 2=full conceal
+    List<Object> bracketHighlightTags;
+    final List<Object> matchBracketTags = new ArrayList<>();
+    List<Object> markdownHighlightTags;
+    boolean bracketColorEnabled;
     // Dramatic UI runtime settings
-    private boolean dramaticUiEnabled;
-    private boolean dramaticIdentityEnabled;
-    private boolean dramaticModeTransitionsEnabled;
-    private boolean dramaticCommandPaletteEnabled;
-    private boolean dramaticEditingFeedbackEnabled;
-    private boolean dramaticPanelAnimationsEnabled;
-    private boolean dramaticSoundEnabled;
-    private String dramaticSoundPack;
-    private int dramaticSoundVolume;
-    private boolean dramaticSoundModeCueEnabled;
-    private boolean dramaticSoundNavigateCueEnabled;
-    private boolean dramaticSoundSuccessCueEnabled;
-    private boolean dramaticSoundErrorCueEnabled;
-    private boolean dramaticReducedMotionEnabled;
-    private boolean dramaticPerformanceGuardrailsEnabled;
-    private double dramaticPerformanceCpuThreshold;
-    private int dramaticPerformanceLineThreshold;
-    private boolean whichKeyHintsEnabled;
-    private double cachedProcessCpuLoad;
-    private long cachedProcessCpuLoadAtMillis;
-    private int dramaticAnimationMs;
-    private int dramaticMinimapWidth;
-    private Timer modeTransitionTimer;
-    private Timer feedbackPulseTimer;
-    private Object feedbackPulseTag;
-    private Timer hostTintTimer;
-    private Timer splitAnimationTimer;
-    private Timer minimapWidthTimer;
-    private Timer paneJumpFlashTimer;
-    private EditorPane paneJumpFlashTarget;
-    private Border paneJumpFlashOriginalBorder;
+    boolean dramaticUiEnabled;
+    boolean dramaticIdentityEnabled;
+    boolean dramaticModeTransitionsEnabled;
+    boolean dramaticCommandPaletteEnabled;
+    boolean dramaticEditingFeedbackEnabled;
+    boolean dramaticPanelAnimationsEnabled;
+    boolean dramaticSoundEnabled;
+    String dramaticSoundPack;
+    int dramaticSoundVolume;
+    boolean dramaticSoundModeCueEnabled;
+    boolean dramaticSoundNavigateCueEnabled;
+    boolean dramaticSoundSuccessCueEnabled;
+    boolean dramaticSoundErrorCueEnabled;
+    boolean dramaticReducedMotionEnabled;
+    boolean dramaticPerformanceGuardrailsEnabled;
+    double dramaticPerformanceCpuThreshold;
+    int dramaticPerformanceLineThreshold;
+    boolean whichKeyHintsEnabled;
+    double cachedProcessCpuLoad;
+    long cachedProcessCpuLoadAtMillis;
+    int dramaticAnimationMs;
+    int dramaticMinimapWidth;
+    Timer modeTransitionTimer;
+    Timer feedbackPulseTimer;
+    Object feedbackPulseTag;
+    Timer hostTintTimer;
+    Timer splitAnimationTimer;
+    Timer minimapWidthTimer;
+    Timer paneJumpFlashTimer;
+    EditorPane paneJumpFlashTarget;
+    Border paneJumpFlashOriginalBorder;
 
     // Constants
-    private static final String VERSION = "2.0";
-    private static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
-    private static final Pattern HEX_COLOR_VALUE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$");
-    private static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
+    static final String VERSION = "2.0";
+    static final Pattern QUICKFIX_PATTERN = Pattern.compile("^(.+?):(\\d+)(?::(\\d+))?:(.*)$");
+    static final Pattern HEX_COLOR_VALUE_PATTERN = Pattern.compile("^#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?$");
+    static final String WORKSPACE_PROFILE_PREFIX = "workspace-";
 
     // Constructor
     public Texteditor(String[] args) {
@@ -394,7 +394,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Initialize UI components
-    private void initializeUI() {
+    void initializeUI() {
         this.setTitle("Shed " + VERSION);
         this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 
@@ -448,7 +448,7 @@ public class Texteditor extends JFrame implements KeyListener {
         });
     }
 
-    private EditorPane createEditorPane(Dimension screenSize) {
+    EditorPane createEditorPane(Dimension screenSize) {
         JTextArea textArea = new JTextArea() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -561,62 +561,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return pane;
     }
 
-    private static final class BlockCaret extends DefaultCaret {
-        private static final long serialVersionUID = 1L;
-
-        @Override
-        public void paint(Graphics g) {
-            JTextComponent component = getComponent();
-            if (component == null || !isVisible()) {
-                return;
-            }
-            try {
-                Rectangle2D modelBounds = component.modelToView2D(getDot());
-                if (modelBounds == null) {
-                    return;
-                }
-                Rectangle bounds = modelBounds.getBounds();
-                int caretWidth = Math.max(1, blockWidth(component, getDot()));
-                g.setXORMode(component.getBackground());
-                g.fillRect(bounds.x, bounds.y, caretWidth, bounds.height);
-                g.setPaintMode();
-            } catch (BadLocationException ignored) {
-            }
-        }
-
-        @Override
-        protected synchronized void damage(Rectangle r) {
-            if (r == null) {
-                return;
-            }
-            JTextComponent component = getComponent();
-            x = r.x;
-            y = r.y;
-            height = r.height;
-            width = component == null ? Math.max(1, r.width) : Math.max(1, blockWidth(component, getDot()));
-            repaint();
-        }
-
-        private int blockWidth(JTextComponent component, int dot) {
-            try {
-                int length = component.getDocument().getLength();
-                if (dot < length) {
-                    Rectangle2D current = component.modelToView2D(dot);
-                    Rectangle2D next = component.modelToView2D(dot + 1);
-                    if (current != null && next != null) {
-                        int width = (int) Math.round(next.getX() - current.getX());
-                        if (width > 0) {
-                            return width;
-                        }
-                    }
-                }
-            } catch (BadLocationException ignored) {
-            }
-            return Math.max(1, component.getFontMetrics(component.getFont()).charWidth('W'));
-        }
-    }
-
-    private void bindActivePane(EditorPane pane) {
+    void bindActivePane(EditorPane pane) {
         if (pane == null) {
             return;
         }
@@ -626,14 +571,14 @@ public class Texteditor extends JFrame implements KeyListener {
         searchManager = pane.getSearchManager();
     }
 
-    private EditorPane getActivePane() {
+    EditorPane getActivePane() {
         if (activePaneIndex < 0 || activePaneIndex >= editorPanes.size()) {
             return null;
         }
         return editorPanes.get(activePaneIndex);
     }
 
-    private void activateEditorPane(EditorPane pane) {
+    void activateEditorPane(EditorPane pane) {
         int index = editorPanes.indexOf(pane);
         if (index < 0 || index == activePaneIndex) {
             return;
@@ -648,7 +593,7 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
     }
 
-    private void requestActivePaneFocus() {
+    void requestActivePaneFocus() {
         EditorPane pane = getActivePane();
         if (pane != null && pane.getTerminalPane() != null) {
             pane.getTerminalPane().requestFocusInWindow();
@@ -659,7 +604,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void renderWindowLayout() {
+    void renderWindowLayout() {
         if (renderedLayoutComponent != null) {
             editorHostPanel.remove(renderedLayoutComponent);
         }
@@ -670,7 +615,7 @@ public class Texteditor extends JFrame implements KeyListener {
         editorHostPanel.repaint();
     }
 
-    private Font resolveEditorFont() {
+    Font resolveEditorFont() {
         int fontSize = configManager.getFontSize();
         String configuredFamily = configManager.getFontFamily();
         Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
@@ -686,7 +631,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new Font("Monospaced", Font.PLAIN, fontSize);
     }
 
-    private Font resolveInstalledFont(String family, int fontSize) {
+    Font resolveInstalledFont(String family, int fontSize) {
         if (family == null || family.trim().isEmpty()) {
             return null;
         }
@@ -701,7 +646,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private Font loadBundledHackFont(int fontSize) {
+    Font loadBundledHackFont(int fontSize) {
         try {
             Font hackFont = Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"));
             GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(hackFont);
@@ -738,7 +683,7 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
     }
 
-    private boolean applyConfiguredKeybinding(KeyEvent e) {
+    boolean applyConfiguredKeybinding(KeyEvent e) {
         if (editorState.mode == null || keymapReplayDepth > 32) {
             return false;
         }
@@ -773,7 +718,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private String modeKey(EditorMode mode) {
+    String modeKey(EditorMode mode) {
         if (mode == null) {
             return "normal";
         }
@@ -797,7 +742,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String keySpecFromEvent(KeyEvent e) {
+    String keySpecFromEvent(KeyEvent e) {
         if (e == null) {
             return null;
         }
@@ -845,7 +790,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private String ctrlTarget(int keyCode, char keyChar) {
+    String ctrlTarget(int keyCode, char keyChar) {
         if (keyCode == KeyEvent.VK_ESCAPE) {
             return "esc";
         }
@@ -879,7 +824,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private List<String> parseKeySequence(String mapping) {
+    List<String> parseKeySequence(String mapping) {
         List<String> tokens = new ArrayList<>();
         if (mapping == null || mapping.isEmpty()) {
             return tokens;
@@ -905,7 +850,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return tokens;
     }
 
-    private KeyEvent keyEventFromToken(String token) {
+    KeyEvent keyEventFromToken(String token) {
         if (token == null || token.isEmpty()) {
             return null;
         }
@@ -942,7 +887,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, 0, spec.keyCode, spec.keyChar);
     }
 
-    private KeyStrokeSpec keyStrokeSpec(String token) {
+    KeyStrokeSpec keyStrokeSpec(String token) {
         if (token == null || token.isEmpty()) {
             return null;
         }
@@ -982,16 +927,6 @@ public class Texteditor extends JFrame implements KeyListener {
                     return new KeyStrokeSpec(code, c);
                 }
                 return null;
-        }
-    }
-
-    private static final class KeyStrokeSpec {
-        private final int keyCode;
-        private final char keyChar;
-
-        private KeyStrokeSpec(int keyCode, char keyChar) {
-            this.keyCode = keyCode;
-            this.keyChar = keyChar;
         }
     }
 
@@ -1422,7 +1357,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean supportsCountPrefix(KeyEvent e) {
+    boolean supportsCountPrefix(KeyEvent e) {
         int code = e.getKeyCode();
         char c = e.getKeyChar();
 
@@ -1483,12 +1418,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void setPendingKeyWithHint(char pendingKey) {
+    void setPendingKeyWithHint(char pendingKey) {
         editorState.pendingKey = pendingKey;
         showWhichKeyHint(pendingKey);
     }
 
-    private void showWhichKeyHint(char pendingKey) {
+    void showWhichKeyHint(char pendingKey) {
         if (!whichKeyHintsEnabled) {
             return;
         }
@@ -1498,7 +1433,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String whichKeyHintText(char pendingKey) {
+    String whichKeyHintText(char pendingKey) {
         switch (pendingKey) {
             case 'g':
                 return "g: gg top, gq format, gf file, gx url, g; prev change, g, next change";
@@ -1537,7 +1472,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Handle pending multi-key commands
-    private void handlePendingKey(char c, int code) {
+    void handlePendingKey(char c, int code) {
         if (editorState.pendingKey == 'g') {
             if (c == 'g') {
                 if (editorState.pendingCount.isEmpty()) {
@@ -2186,7 +2121,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void normalizeVisualLineCaretForMotion() {
+    void normalizeVisualLineCaretForMotion() {
         int selectionStart = writingArea.getSelectionStart();
         int selectionEnd = writingArea.getSelectionEnd();
         int caret = writingArea.getCaretPosition();
@@ -2195,7 +2130,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void applyVisualLineOperator(char operator) {
+    void applyVisualLineOperator(char operator) {
         try {
             int selStart = writingArea.getSelectionStart();
             int selEnd = writingArea.getSelectionEnd();
@@ -2237,7 +2172,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void joinVisualSelection() {
+    void joinVisualSelection() {
         try {
             int selStart = writingArea.getSelectionStart();
             int selEnd = writingArea.getSelectionEnd();
@@ -2254,7 +2189,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void surroundVisualSelection(char surroundChar) {
+    void surroundVisualSelection(char surroundChar) {
         SurroundPair pair = surroundPair(surroundChar);
         if (pair == null) {
             showMessage("Unknown surround: " + surroundChar);
@@ -2269,7 +2204,7 @@ public class Texteditor extends JFrame implements KeyListener {
         showMessage("Surround added");
     }
 
-    private void toggleCommentSelection() {
+    void toggleCommentSelection() {
         try {
             int selStart = writingArea.getSelectionStart();
             int selEnd = writingArea.getSelectionEnd();
@@ -2283,7 +2218,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void toggleCommentLineRange(int startLine, int endLine) {
+    void toggleCommentLineRange(int startLine, int endLine) {
         try {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer == null) return;
@@ -2456,7 +2391,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void openCommandHistorySearch() {
+    void openCommandHistorySearch() {
         if (commandHistory.isEmpty()) {
             showMessage("No command history");
             return;
@@ -2546,7 +2481,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void incrementalSearchPreview() {
+    void incrementalSearchPreview() {
         String pattern = editorState.commandBuffer.length() > 1 ? editorState.commandBuffer.substring(1) : "";
         if (pattern.isEmpty()) {
             searchManager.clearHighlights();
@@ -2562,14 +2497,14 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private static int vimCharClass(char c) {
+    static int vimCharClass(char c) {
         if (Character.isLetterOrDigit(c) || c == '_') return 1;
         if (Character.isWhitespace(c)) return 0;
         return 2;
     }
 
     // Movement methods
-    private void moveUp() {
+    void moveUp() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2585,7 +2520,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveDown() {
+    void moveDown() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2602,21 +2537,21 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveLeft() {
+    void moveLeft() {
         int pos = writingArea.getCaretPosition();
         if (pos > 0) {
             writingArea.setCaretPosition(pos - 1);
         }
     }
 
-    private void moveRight() {
+    void moveRight() {
         int pos = writingArea.getCaretPosition();
         if (pos < writingArea.getText().length()) {
             writingArea.setCaretPosition(pos + 1);
         }
     }
 
-    private void moveWordForward() {
+    void moveWordForward() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         int len = text.length();
@@ -2631,7 +2566,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(pos, len));
     }
 
-    private void moveWordBackward() {
+    void moveWordBackward() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         if (pos <= 0) return;
@@ -2646,7 +2581,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(pos);
     }
 
-    private void moveWordEnd() {
+    void moveWordEnd() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         int len = text.length();
@@ -2662,7 +2597,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(pos, len));
     }
 
-    private void moveWordForwardBig() {
+    void moveWordForwardBig() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         while (pos < text.length() && !Character.isWhitespace(text.charAt(pos))) {
@@ -2674,7 +2609,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(pos, text.length()));
     }
 
-    private void moveWordBackwardBig() {
+    void moveWordBackwardBig() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         if (pos > 0) {
@@ -2689,7 +2624,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(pos);
     }
 
-    private void moveWordEndBig() {
+    void moveWordEndBig() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         if (pos < text.length()) {
@@ -2706,15 +2641,15 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(pos, text.length()));
     }
 
-    private void moveWordEndBackward() {
+    void moveWordEndBackward() {
         moveWordEndBackwardInternal(false);
     }
 
-    private void moveWordEndBackwardBig() {
+    void moveWordEndBackwardBig() {
         moveWordEndBackwardInternal(true);
     }
 
-    private void moveWordEndBackwardInternal(boolean bigWord) {
+    void moveWordEndBackwardInternal(boolean bigWord) {
         String text = writingArea.getText();
         int pos = Math.max(0, writingArea.getCaretPosition() - 1);
         while (pos > 0 && Character.isWhitespace(text.charAt(pos))) {
@@ -2731,11 +2666,11 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.max(0, pos));
     }
 
-    private boolean isMotionWordChar(char c, boolean bigWord) {
+    boolean isMotionWordChar(char c, boolean bigWord) {
         return bigWord ? !Character.isWhitespace(c) : isWordCharacter(c);
     }
 
-    private void moveLineStart() {
+    void moveLineStart() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2746,7 +2681,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveLineEnd() {
+    void moveLineEnd() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2757,7 +2692,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveLineFirstNonBlank() {
+    void moveLineFirstNonBlank() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2773,7 +2708,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveLineLastNonBlank() {
+    void moveLineLastNonBlank() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -2789,15 +2724,15 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveFileStart() {
+    void moveFileStart() {
         writingArea.setCaretPosition(0);
     }
 
-    private void moveFileEnd() {
+    void moveFileEnd() {
         writingArea.setCaretPosition(writingArea.getText().length());
     }
 
-    private void moveParagraphForward() {
+    void moveParagraphForward() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             for (int i = line + 1; i < writingArea.getLineCount(); i++) {
@@ -2812,7 +2747,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveParagraphBackward() {
+    void moveParagraphBackward() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             for (int i = Math.max(0, line - 1); i >= 0; i--) {
@@ -2827,7 +2762,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveSentenceForward() {
+    void moveSentenceForward() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         while (pos < text.length()) {
@@ -2845,7 +2780,7 @@ public class Texteditor extends JFrame implements KeyListener {
         moveFileEnd();
     }
 
-    private void moveSentenceBackward() {
+    void moveSentenceBackward() {
         String text = writingArea.getText();
         int pos = Math.max(0, writingArea.getCaretPosition() - 1);
         while (pos > 0) {
@@ -2863,7 +2798,7 @@ public class Texteditor extends JFrame implements KeyListener {
         moveFileStart();
     }
 
-    private void moveMatchingBracket() {
+    void moveMatchingBracket() {
         String text = writingArea.getText();
         int pos = writingArea.getCaretPosition();
         if (text.isEmpty() || pos < 0 || pos >= text.length()) {
@@ -2907,14 +2842,14 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveToFilePercent(int percent) {
+    void moveToFilePercent(int percent) {
         int clamped = Math.max(0, Math.min(100, percent));
         String text = writingArea.getText();
         int target = (int) Math.round((text.length() * clamped) / 100.0);
         writingArea.setCaretPosition(Math.min(target, text.length()));
     }
 
-    private void moveToScreenPosition(char position) {
+    void moveToScreenPosition(char position) {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             int y;
@@ -2936,7 +2871,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollCurrentLineTo(char anchor) {
+    void scrollCurrentLineTo(char anchor) {
         try {
             Rectangle lineBounds = writingArea.modelToView2D(writingArea.getCaretPosition()).getBounds();
             Rectangle visible = writingArea.getVisibleRect();
@@ -2958,13 +2893,13 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String lineText(int line) throws BadLocationException {
+    String lineText(int line) throws BadLocationException {
         int start = writingArea.getLineStartOffset(line);
         int end = writingArea.getLineEndOffset(line);
         return writingArea.getText().substring(start, end);
     }
 
-    private void scrollHalfPageDown() {
+    void scrollHalfPageDown() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             Point current = new Point(visible.x, visible.y + visible.height / 2);
@@ -2976,7 +2911,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollHalfPageUp() {
+    void scrollHalfPageUp() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             Point current = new Point(visible.x, Math.max(0, visible.y - visible.height / 2));
@@ -2988,7 +2923,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollFullPageDown() {
+    void scrollFullPageDown() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             Point target = new Point(visible.x, visible.y + visible.height);
@@ -3000,7 +2935,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollFullPageUp() {
+    void scrollFullPageUp() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             Point target = new Point(visible.x, Math.max(0, visible.y - visible.height));
@@ -3012,7 +2947,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollLineDown() {
+    void scrollLineDown() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
@@ -3022,7 +2957,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void scrollLineUp() {
+    void scrollLineUp() {
         try {
             Rectangle visible = writingArea.getVisibleRect();
             int lineHeight = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
@@ -3032,7 +2967,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String showFileInfo() {
+    String showFileInfo() {
         try {
             FileBuffer buffer = getCurrentBuffer();
             String name = buffer != null ? buffer.getDisplayName() : "[No file]";
@@ -3045,7 +2980,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String goToFileUnderCursor() {
+    String goToFileUnderCursor() {
         try {
             String text = writingArea.getText();
             int pos = writingArea.getCaretPosition();
@@ -3077,7 +3012,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String openBrowserUrl() {
+    String openBrowserUrl() {
         try {
             String text = writingArea.getText();
             int pos = writingArea.getCaretPosition();
@@ -3108,13 +3043,13 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void selectCurrentLine() {
+    void selectCurrentLine() {
         int caret = writingArea.getCaretPosition();
         selectLineRange(caret, caret);
         editorState.visualStartPos = writingArea.getSelectionStart();
     }
 
-    private void selectLineRange(int anchorPosition, int currentPosition) {
+    void selectLineRange(int anchorPosition, int currentPosition) {
         try {
             int anchorLine = writingArea.getLineOfOffset(anchorPosition);
             int currentLine = writingArea.getLineOfOffset(currentPosition);
@@ -3133,7 +3068,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void ensureCaretVisible(JTextArea area) {
+    void ensureCaretVisible(JTextArea area) {
         if (area == null) return;
         try {
             Rectangle2D bounds = area.modelToView2D(area.getCaretPosition());
@@ -3152,7 +3087,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean isPrintableKey(KeyEvent e) {
+    boolean isPrintableKey(KeyEvent e) {
         char c = e.getKeyChar();
         return c != KeyEvent.CHAR_UNDEFINED
             && !Character.isISOControl(c)
@@ -3161,7 +3096,7 @@ public class Texteditor extends JFrame implements KeyListener {
             && !e.isMetaDown();
     }
 
-    private String searchWordUnderCursor(boolean forward) {
+    String searchWordUnderCursor(boolean forward) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         if (text.isEmpty() || caret >= text.length()) {
@@ -3184,11 +3119,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return forward ? searchManager.searchForward(word) : searchManager.searchBackward(word);
     }
 
-    private boolean isWordCharacter(char c) {
+    boolean isWordCharacter(char c) {
         return Character.isLetterOrDigit(c) || c == '_';
     }
 
-    private void browseCommandHistory(int direction) {
+    void browseCommandHistory(int direction) {
         if (commandHistory.isEmpty()) {
             return;
         }
@@ -3213,7 +3148,7 @@ public class Texteditor extends JFrame implements KeyListener {
         editorState.commandBuffer = candidate;
     }
 
-    private void addCommandHistory(String entry) {
+    void addCommandHistory(String entry) {
         if (entry == null || entry.isEmpty()) {
             return;
         }
@@ -3227,7 +3162,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commandHistoryPrefix = "";
     }
 
-    private String completeCommand(String input) {
+    String completeCommand(String input) {
         if (input == null || input.isEmpty() || !input.startsWith(":")) {
             return input;
         }
@@ -3346,7 +3281,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return input;
     }
 
-    private String completePath(String prefix, String partialPath) {
+    String completePath(String prefix, String partialPath) {
         String trimmed = partialPath.trim();
         File base = trimmed.isEmpty() ? new File(".") : new File(trimmed);
         File directory = base.isDirectory() ? base : base.getParentFile();
@@ -3361,7 +3296,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return prefix + matches[0].getPath();
     }
 
-    private void updateCurrentLineHighlight() {
+    void updateCurrentLineHighlight() {
         Highlighter highlighter = writingArea.getHighlighter();
         if (currentLineHighlightTag != null) {
             highlighter.removeHighlight(currentLineHighlightTag);
@@ -3382,7 +3317,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String getGitBlameForCurrentLine(FileBuffer buffer) {
+    String getGitBlameForCurrentLine(FileBuffer buffer) {
         if (buffer == null || buffer.getFile() == null || buffer.isModified()) return null;
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition()) + 1;
@@ -3410,7 +3345,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private String findCurrentBreadcrumb() {
+    String findCurrentBreadcrumb() {
         try {
             FileBuffer buffer = getCurrentBuffer();
             if (buffer == null) {
@@ -3441,7 +3376,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return findCurrentScopeHeuristic();
     }
 
-    private String findCurrentScopeHeuristic() {
+    String findCurrentScopeHeuristic() {
         try {
             String text = writingArea.getText();
             int caret = writingArea.getCaretPosition();
@@ -3467,7 +3402,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private void updateMatchingBracketHighlight() {
+    void updateMatchingBracketHighlight() {
         Highlighter highlighter = writingArea.getHighlighter();
         for (Object tag : matchBracketTags) {
             highlighter.removeHighlight(tag);
@@ -3499,11 +3434,11 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean isBracketChar(char c) {
+    boolean isBracketChar(char c) {
         return c == '(' || c == ')' || c == '[' || c == ']' || c == '{' || c == '}';
     }
 
-    private int findMatchingBracketPos(String text, int pos, char bracket) {
+    int findMatchingBracketPos(String text, int pos, char bracket) {
         char match;
         int direction;
         switch (bracket) {
@@ -3525,7 +3460,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return -1;
     }
 
-    private void refreshLineNumberPanel() {
+    void refreshLineNumberPanel() {
         for (EditorPane pane : editorPanes) {
             pane.getLineNumberPanel().setMode(lineNumberMode);
             pane.getLineNumberPanel().setHighlightCurrentLine(configManager.getShowCurrentLine());
@@ -3545,7 +3480,7 @@ public class Texteditor extends JFrame implements KeyListener {
         editorHostPanel.repaint();
     }
 
-    private void applyThemeColors() {
+    void applyThemeColors() {
         Color editorForeground = configManager.getEditorForeground();
         Color caretColor = configManager.getCaretColor();
         Color selectionColor = configManager.getSelectionColor();
@@ -3584,7 +3519,7 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
     }
 
-    private void applySyntaxHighlighting() {
+    void applySyntaxHighlighting() {
         clearSyntaxHighlighting();
 
         FileBuffer buffer = getCurrentBuffer();
@@ -3616,7 +3551,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.repaint();
     }
 
-    private void clearSyntaxHighlighting() {
+    void clearSyntaxHighlighting() {
         Highlighter highlighter = writingArea.getHighlighter();
         for (Object tag : syntaxHighlightTags) {
             highlighter.removeHighlight(tag);
@@ -3626,11 +3561,11 @@ public class Texteditor extends JFrame implements KeyListener {
         clearBracketHighlighting();
     }
 
-    private String[] syntaxKeywordsFor(FileType fileType) {
+    String[] syntaxKeywordsFor(FileType fileType) {
         return syntaxHighlightService.keywordsFor(fileType);
     }
 
-    private void highlightJavaAnnotations(String text, boolean[] masked) {
+    void highlightJavaAnnotations(String text, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i] || text.charAt(i) != '@') {
@@ -3655,7 +3590,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightKeywords(String text, String[] keywords, boolean[] masked) {
+    void highlightKeywords(String text, String[] keywords, boolean[] masked) {
         if (keywords == null || keywords.length == 0) {
             return;
         }
@@ -3678,7 +3613,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean isKeywordMatch(String text, int start, String keyword, boolean[] masked) {
+    boolean isKeywordMatch(String text, int start, String keyword, boolean[] masked) {
         int end = start + keyword.length();
         if (start < 0 || end > text.length() || isMasked(masked, start, end)) {
             return false;
@@ -3694,7 +3629,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private void highlightComments(String text, FileType fileType, boolean[] masked) {
+    void highlightComments(String text, FileType fileType, boolean[] masked) {
         String[] linePrefixes = lineCommentPrefixesFor(fileType);
         String[][] blockPairs = blockCommentPairsFor(fileType);
         int i = 0;
@@ -3740,7 +3675,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightStrings(String text, FileType fileType, boolean[] masked) {
+    void highlightStrings(String text, FileType fileType, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i]) {
@@ -3795,7 +3730,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightTrailingWhitespace(Highlighter highlighter, String text) {
+    void highlightTrailingWhitespace(Highlighter highlighter, String text) {
         Highlighter.HighlightPainter trailingPainter = new DefaultHighlighter.DefaultHighlightPainter(new Color(0x80FF4444, true));
         int lineStart = 0;
         for (int i = 0; i <= text.length(); i++) {
@@ -3814,7 +3749,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightScopeRules(String text, FileType fileType, boolean[] masked) {
+    void highlightScopeRules(String text, FileType fileType, boolean[] masked) {
         List<SyntaxHighlightService.SyntaxRule> rules = syntaxHighlightService.scopeRulesFor(fileType);
         for (SyntaxHighlightService.SyntaxRule rule : rules) {
             java.util.regex.Matcher m = rule.pattern.matcher(text);
@@ -3836,7 +3771,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void highlightNumbers(String text, boolean[] masked) {
+    void highlightNumbers(String text, boolean[] masked) {
         int i = 0;
         while (i < text.length()) {
             if (masked[i]) {
@@ -3878,7 +3813,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void addSyntaxHighlight(int start, int end, Color color, boolean[] masked) {
+    void addSyntaxHighlight(int start, int end, Color color, boolean[] masked) {
         if (start < 0 || end <= start || start >= masked.length) {
             return;
         }
@@ -3890,7 +3825,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markMasked(masked, start, safeEnd);
     }
 
-    private boolean isMasked(boolean[] masked, int start, int end) {
+    boolean isMasked(boolean[] masked, int start, int end) {
         for (int i = start; i < end && i < masked.length; i++) {
             if (masked[i]) {
                 return true;
@@ -3899,36 +3834,36 @@ public class Texteditor extends JFrame implements KeyListener {
         return false;
     }
 
-    private void markMasked(boolean[] masked, int start, int end) {
+    void markMasked(boolean[] masked, int start, int end) {
         for (int i = Math.max(0, start); i < end && i < masked.length; i++) {
             masked[i] = true;
         }
     }
 
-    private boolean matchesAt(String text, int index, String token) {
+    boolean matchesAt(String text, int index, String token) {
         if (token == null || token.isEmpty() || index < 0 || index + token.length() > text.length()) {
             return false;
         }
         return text.regionMatches(index, token, 0, token.length());
     }
 
-    private boolean isIdentifierChar(char c) {
+    boolean isIdentifierChar(char c) {
         return Character.isLetterOrDigit(c) || c == '_';
     }
 
-    private boolean isStringDelimiter(FileType fileType, char c) {
+    boolean isStringDelimiter(FileType fileType, char c) {
         return syntaxHighlightService.isStringDelimiter(fileType, c);
     }
 
-    private String[] lineCommentPrefixesFor(FileType fileType) {
+    String[] lineCommentPrefixesFor(FileType fileType) {
         return syntaxHighlightService.lineCommentPrefixesFor(fileType);
     }
 
-    private String[][] blockCommentPairsFor(FileType fileType) {
+    String[][] blockCommentPairsFor(FileType fileType) {
         return syntaxHighlightService.blockCommentPairsFor(fileType);
     }
 
-    private void updateSubstitutePreview() {
+    void updateSubstitutePreview() {
         clearSubstitutePreview();
         if (editorState.mode != EditorMode.COMMAND || editorState.commandBuffer == null || !editorState.commandBuffer.startsWith(":")) {
             return;
@@ -3968,7 +3903,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void clearSubstitutePreview() {
+    void clearSubstitutePreview() {
         Highlighter highlighter = writingArea.getHighlighter();
         for (Object tag : substitutePreviewTags) {
             highlighter.removeHighlight(tag);
@@ -3976,7 +3911,7 @@ public class Texteditor extends JFrame implements KeyListener {
         substitutePreviewTags.clear();
     }
 
-    private SubstitutePreview parseSubstitutePreview(String command) {
+    SubstitutePreview parseSubstitutePreview(String command) {
         String working = command;
         int startLine = getCurrentCaretLine();
         int endLine = startLine;
@@ -4015,7 +3950,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new SubstitutePreview(parts[0], startLine, endLine);
     }
 
-    private int findRangeCommandStart(String command) {
+    int findRangeCommandStart(String command) {
         for (int i = 0; i < command.length(); i++) {
             char c = command.charAt(i);
             if (!Character.isDigit(c) && c != ',') {
@@ -4025,7 +3960,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return -1;
     }
 
-    private int getCurrentCaretLine() {
+    int getCurrentCaretLine() {
         try {
             return writingArea.getLineOfOffset(writingArea.getCaretPosition());
         } catch (BadLocationException e) {
@@ -4033,7 +3968,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String resolveGitBranch() {
+    String resolveGitBranch() {
         CommandResult branch = runCommand(new File("."), List.of("git", "rev-parse", "--abbrev-ref", "HEAD"));
         if (branch.exitCode != 0) {
             return "";
@@ -4052,11 +3987,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return branchName;
     }
 
-    private javax.swing.JWindow completionPopup;
-    private javax.swing.JList<String> completionList;
-    private javax.swing.DefaultListModel<String> completionModel;
-    private String completionPrefix;
-    private void showInlineCompletion() {
+    javax.swing.JWindow completionPopup;
+    javax.swing.JList<String> completionList;
+    javax.swing.DefaultListModel<String> completionModel;
+    String completionPrefix;
+    void showInlineCompletion() {
         try {
             String prefix = currentCompletionPrefix();
             if (prefix == null || prefix.length() < 2) { dismissCompletionPopup(); return; }
@@ -4095,7 +4030,7 @@ public class Texteditor extends JFrame implements KeyListener {
             completionPopup.setVisible(true);
         } catch (Exception ignored) { dismissCompletionPopup(); }
     }
-    private void dismissCompletionPopup() {
+    void dismissCompletionPopup() {
         if (completionPopup != null && completionPopup.isVisible()) completionPopup.setVisible(false);
     }
     boolean isCompletionPopupVisible() {
@@ -4118,7 +4053,7 @@ public class Texteditor extends JFrame implements KeyListener {
             markModified();
         }
     }
-    private List<String> gatherCompletions(String prefix) {
+    List<String> gatherCompletions(String prefix) {
         List<String> completions = new ArrayList<>();
         FileBuffer buffer = getCurrentBuffer();
         LspClient client = resolveLspClient(buffer);
@@ -4136,7 +4071,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return completions;
     }
 
-    private void addCursorAtNextMatch() {
+    void addCursorAtNextMatch() {
         String text = writingArea.getText();
         String selected = writingArea.getSelectedText();
         if (selected == null || selected.isEmpty()) {
@@ -4161,7 +4096,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String formatParagraph() {
+    String formatParagraph() {
         int tw = configManager.getTextWidth();
         if (tw <= 0) return "textwidth not set (use :set tw=80)";
         try {
@@ -4212,7 +4147,7 @@ public class Texteditor extends JFrame implements KeyListener {
             return "Formatted paragraph to " + tw + " columns";
         } catch (BadLocationException e) { return "Error: " + e.getMessage(); }
     }
-    private void moveDisplayLineDown() {
+    void moveDisplayLineDown() {
         try {
             Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
             if (r == null) return;
@@ -4222,7 +4157,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
         } catch (BadLocationException ignored) {}
     }
-    private void moveDisplayLineUp() {
+    void moveDisplayLineUp() {
         try {
             Rectangle2D r = writingArea.modelToView2D(writingArea.getCaretPosition());
             if (r == null) return;
@@ -4233,7 +4168,7 @@ public class Texteditor extends JFrame implements KeyListener {
             if (newPos >= 0 && newPos <= writingArea.getText().length()) writingArea.setCaretPosition(newPos);
         } catch (BadLocationException ignored) {}
     }
-    private void enterVisualBlockMode() {
+    void enterVisualBlockMode() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -4245,7 +4180,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException ignored) {}
     }
 
-    private int[] getVisualBlockBounds() {
+    int[] getVisualBlockBounds() {
         if (editorState.visualBlockStartLine < 0 || editorState.visualBlockStartCol < 0) return null;
         try {
             int caretPos = writingArea.getCaretPosition();
@@ -4259,7 +4194,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException ignored) { return null; }
     }
 
-    private void deleteVisualBlock() {
+    void deleteVisualBlock() {
         int[] bounds = getVisualBlockBounds();
         if (bounds == null) return;
         int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
@@ -4284,7 +4219,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException ignored) {}
     }
 
-    private void yankVisualBlock() {
+    void yankVisualBlock() {
         int[] bounds = getVisualBlockBounds();
         if (bounds == null) return;
         int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
@@ -4305,7 +4240,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException ignored) {}
     }
 
-    private static Character autoPairCloser(char c) {
+    static Character autoPairCloser(char c) {
         switch (c) {
             case '(': return ')';
             case '[': return ']';
@@ -4316,10 +4251,10 @@ public class Texteditor extends JFrame implements KeyListener {
             default: return null;
         }
     }
-    private static boolean isClosingPairChar(char c) {
+    static boolean isClosingPairChar(char c) {
         return c == ')' || c == ']' || c == '}' || c == '"' || c == '\'' || c == '`';
     }
-    private void applyMultiCursorInsert(char c) {
+    void applyMultiCursorInsert(char c) {
         if (extraCursors.isEmpty()) return;
         // Sort cursors descending so insertions don't shift earlier positions
         List<Integer> sorted = new ArrayList<>(extraCursors);
@@ -4336,7 +4271,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void applyMultiCursorBackspace() {
+    void applyMultiCursorBackspace() {
         if (extraCursors.isEmpty()) return;
         List<Integer> sorted = new ArrayList<>(extraCursors);
         sorted.sort(Collections.reverseOrder());
@@ -4349,7 +4284,7 @@ public class Texteditor extends JFrame implements KeyListener {
             extraCursors.set(i, Math.max(0, extraCursors.get(i) - 1));
         }
     }
-    private void applyMultiCursorDelete() {
+    void applyMultiCursorDelete() {
         if (extraCursors.isEmpty()) return;
         List<Integer> sorted = new ArrayList<>(extraCursors);
         sorted.sort(Collections.reverseOrder());
@@ -4359,7 +4294,7 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
     }
-    private void addCursorAbove() {
+    void addCursorAbove() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -4374,7 +4309,7 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         } catch (BadLocationException ignored) {}
     }
-    private void addCursorBelow() {
+    void addCursorBelow() {
         try {
             int pos = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(pos);
@@ -4389,13 +4324,13 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         } catch (BadLocationException ignored) {}
     }
-    private void clearExtraCursors() {
+    void clearExtraCursors() {
         if (!extraCursors.isEmpty()) {
             extraCursors.clear();
         }
     }
 
-    private void deleteWordBackwardInsert() {
+    void deleteWordBackwardInsert() {
         try {
             String text = writingArea.getText();
             int pos = writingArea.getCaretPosition();
@@ -4411,7 +4346,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (Exception ignored) {}
     }
 
-    private void deleteToLineStartInsert() {
+    void deleteToLineStartInsert() {
         try {
             String text = writingArea.getText();
             int pos = writingArea.getCaretPosition();
@@ -4422,7 +4357,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (Exception ignored) {}
     }
 
-    private String currentLineIndentation() {
+    String currentLineIndentation() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int start = writingArea.getLineStartOffset(line);
@@ -4443,7 +4378,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void moveLineIndentStart() {
+    void moveLineIndentStart() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int start = writingArea.getLineStartOffset(line);
@@ -4458,7 +4393,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void openLineBelow() {
+    void openLineBelow() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int lineEnd = writingArea.getLineEndOffset(line);
@@ -4470,7 +4405,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void openLineAbove() {
+    void openLineAbove() {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int lineStart = writingArea.getLineStartOffset(line);
@@ -4482,7 +4417,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void joinCurrentLine(boolean withSpace) {
+    void joinCurrentLine(boolean withSpace) {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             if (line >= writingArea.getLineCount() - 1) {
@@ -4499,7 +4434,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String applyLineOperator(char operator) {
+    String applyLineOperator(char operator) {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int start = writingArea.getLineStartOffset(line);
@@ -4528,7 +4463,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private int leadingWhitespace(String text) {
+    int leadingWhitespace(String text) {
         int count = 0;
         while (count < text.length() && Character.isWhitespace(text.charAt(count)) && text.charAt(count) != '\n') {
             count++;
@@ -4536,7 +4471,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return count;
     }
 
-    private String indentationForLine(int line) {
+    String indentationForLine(int line) {
         try {
             int start = writingArea.getLineStartOffset(line);
             int end = writingArea.getLineEndOffset(line);
@@ -4551,7 +4486,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String findCharacter(char type, char target) {
+    String findCharacter(char type, char target) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         int lineStart = text.lastIndexOf('\n', caret - 1) + 1;
@@ -4592,7 +4527,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Moved to " + target;
     }
 
-    private String repeatFind(boolean reverse) {
+    String repeatFind(boolean reverse) {
         if (lastFindType == '\0' || lastFindChar == '\0') {
             return "No previous find command";
         }
@@ -4618,7 +4553,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return findCharacter(repeatType, lastFindChar);
     }
 
-    private void recordJumpPosition() {
+    void recordJumpPosition() {
         int position = writingArea.getCaretPosition();
         if (jumpList.isEmpty() || jumpList.get(jumpList.size() - 1) != position) {
             if (jumpIndex >= 0 && jumpIndex < jumpList.size() - 1) {
@@ -4629,7 +4564,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void jumpBack() {
+    void jumpBack() {
         if (jumpList.isEmpty() || jumpIndex <= 0) {
             showMessage("At oldest jump");
             return;
@@ -4638,7 +4573,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
     }
 
-    private void jumpForward() {
+    void jumpForward() {
         if (jumpList.isEmpty() || jumpIndex >= jumpList.size() - 1) {
             showMessage("At newest jump");
             return;
@@ -4647,7 +4582,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(jumpList.get(jumpIndex), writingArea.getText().length()));
     }
 
-    private void recordChangePosition() {
+    void recordChangePosition() {
         int position = writingArea.getCaretPosition();
         if (changeList.isEmpty() || changeList.get(changeList.size() - 1) != position) {
             changeList.add(position);
@@ -4658,7 +4593,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void changePrev() {
+    void changePrev() {
         if (changeList.isEmpty() || changeIndex <= 0) {
             showMessage("At oldest change");
             return;
@@ -4667,7 +4602,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
     }
 
-    private void changeNext() {
+    void changeNext() {
         if (changeList.isEmpty() || changeIndex >= changeList.size() - 1) {
             showMessage("At newest change");
             return;
@@ -4676,7 +4611,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(Math.min(changeList.get(changeIndex), writingArea.getText().length()));
     }
 
-    private void checkForExternalChanges() {
+    void checkForExternalChanges() {
         if (reloadPromptActive) {
             return;
         }
@@ -4709,7 +4644,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {
+    void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {
         if (buffer == null || buffer.getFile() == null) {
             return;
         }
@@ -4751,7 +4686,7 @@ public class Texteditor extends JFrame implements KeyListener {
         buffer.refreshExternalTimestamp();
     }
 
-    private void showExternalConflictPreview(FileBuffer buffer) {
+    void showExternalConflictPreview(FileBuffer buffer) {
         if (buffer == null || buffer.getFile() == null) {
             return;
         }
@@ -4771,7 +4706,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void startRecoverySnapshotTimer() {
+    void startRecoverySnapshotTimer() {
         if (recoverySnapshotTimer != null) {
             recoverySnapshotTimer.stop();
         }
@@ -4780,14 +4715,14 @@ public class Texteditor extends JFrame implements KeyListener {
         recoverySnapshotTimer.start();
     }
 
-    private void persistRecoverySnapshotsSafely() {
+    void persistRecoverySnapshotsSafely() {
         try {
             persistRecoverySnapshots();
         } catch (Exception ignored) {
         }
     }
 
-    private void persistRecoverySnapshots() throws IOException {
+    void persistRecoverySnapshots() throws IOException {
         if (recoveryStoreDir == null) {
             return;
         }
@@ -4836,7 +4771,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void clearRecoverySnapshots() {
+    void clearRecoverySnapshots() {
         if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
             return;
         }
@@ -4852,7 +4787,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void promptRecoveryRestoreIfAvailable() {
+    void promptRecoveryRestoreIfAvailable() {
         if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
             return;
         }
@@ -4893,7 +4828,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private FileBuffer restoreRecoverySnapshot(File snapshotFile) {
+    FileBuffer restoreRecoverySnapshot(File snapshotFile) {
         if (snapshotFile == null || !snapshotFile.isFile()) {
             return null;
         }
@@ -4940,7 +4875,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void maybePreviewMarkdown(FileBuffer buffer) {
+    void maybePreviewMarkdown(FileBuffer buffer) {
         if (buffer == null || buffer.getFileType() != FileType.MARKDOWN || buffer.getFile() == null) {
             return;
         }
@@ -4960,7 +4895,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String renderMarkdownPreview(String markdown, String title) {
+    String renderMarkdownPreview(String markdown, String title) {
         StringBuilder html = new StringBuilder();
         html.append("<!doctype html><html><head><meta charset=\"utf-8\">");
         html.append("<title>").append(title).append("</title>");
@@ -5001,7 +4936,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return html.toString();
     }
 
-    private String escapeHtml(String value) {
+    String escapeHtml(String value) {
         return value
             .replace("&", "&amp;")
             .replace("<", "&lt;")
@@ -5010,13 +4945,13 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // ========== Markdown / Orgmode features ==========
 
-    private String[] getCurrentLines() {
+    String[] getCurrentLines() {
         return writingArea.getText().split("\n", -1);
     }
 
     // --- Heading folding ---
 
-    private String toggleFoldAtCursor() {
+    String toggleFoldAtCursor() {
         FileBuffer buf = getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) {
             return "";
@@ -5039,7 +4974,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {
+    String foldHeading(int headingLine, MarkdownService.FoldRange range, String[] lines) {
         try {
             int foldCount = range.endLine - range.startLine;
             int startOffset = writingArea.getLineStartOffset(range.startLine + 1);
@@ -5061,7 +4996,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String unfoldHeading(int headingLine, String[] lines) {
+    String unfoldHeading(int headingLine, String[] lines) {
         String hidden = foldHiddenContent.get(headingLine);
         if (hidden == null) return "Nothing to unfold";
         try {
@@ -5090,7 +5025,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String foldAll() {
+    String foldAll() {
         FileBuffer buf = getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
         String[] lines = getCurrentLines();
@@ -5108,7 +5043,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return count > 0 ? "Folded " + count + " sections" : "Nothing to fold";
     }
 
-    private String unfoldAll() {
+    String unfoldAll() {
         if (foldHiddenContent.isEmpty()) return "Nothing to unfold";
         // Unfold from bottom to top
         List<Integer> foldedHeadings = new ArrayList<>(foldedLines.keySet());
@@ -5128,7 +5063,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return count > 0 ? "Unfolded " + count + " sections" : "Nothing to unfold";
     }
 
-    private String globalFoldCycle() {
+    String globalFoldCycle() {
         boolean anyFolded = foldedLines.values().stream().anyMatch(v -> v);
         if (anyFolded) {
             return unfoldAll();
@@ -5139,7 +5074,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // --- Heading navigation ---
 
-    private String navigateHeading(boolean forward) {
+    String navigateHeading(boolean forward) {
         FileBuffer buf = getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
         String[] lines = getCurrentLines();
@@ -5152,7 +5087,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return gotoLine(target + 1);
     }
 
-    private String navigateHeadingAtLevel(boolean forward, int level) {
+    String navigateHeadingAtLevel(boolean forward, int level) {
         FileBuffer buf = getCurrentBuffer();
         if (buf == null || buf.getFileType() != FileType.MARKDOWN) return "";
         String[] lines = getCurrentLines();
@@ -5191,7 +5126,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // --- Heading promotion/demotion ---
 
-    private String markdownHeadingShift(boolean demote) {
+    String markdownHeadingShift(boolean demote) {
         String[] lines = getCurrentLines();
         int line = getCurrentCaretLine();
         if (line < 0 || line >= lines.length) return "";
@@ -5216,7 +5151,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String markdownSubtreeShift(boolean demote) {
+    String markdownSubtreeShift(boolean demote) {
         String[] lines = getCurrentLines();
         int line = getCurrentCaretLine();
         if (line < 0 || line >= lines.length || !markdownService.isHeading(lines[line])) {
@@ -5248,13 +5183,13 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // --- Table editing ---
 
-    private boolean isOnTableLine() {
+    boolean isOnTableLine() {
         String[] lines = getCurrentLines();
         int line = getCurrentCaretLine();
         return line >= 0 && line < lines.length && markdownService.isTableRow(lines[line]);
     }
 
-    private String markdownTableNextCell(boolean reverse) {
+    String markdownTableNextCell(boolean reverse) {
         try {
             int line = getCurrentCaretLine();
             String[] lines = getCurrentLines();
@@ -5462,7 +5397,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // --- Smart list continuation ---
 
-    private String handleMarkdownEnter() {
+    String handleMarkdownEnter() {
         String[] lines = getCurrentLines();
         int line = getCurrentCaretLine();
         if (line < 0 || line >= lines.length) return null;
@@ -5555,7 +5490,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // --- Snippet expansion ---
 
-    private boolean isOnCodeFenceLine() {
+    boolean isOnCodeFenceLine() {
         try {
             int line = getCurrentCaretLine();
             int lineStart = writingArea.getLineStartOffset(line);
@@ -5567,7 +5502,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String completeCodeFenceLanguage() {
+    String completeCodeFenceLanguage() {
         try {
             int line = getCurrentCaretLine();
             int lineStart = writingArea.getLineStartOffset(line);
@@ -5589,7 +5524,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String expandSnippetAtCursor() {
+    String expandSnippetAtCursor() {
         FileBuffer buf = getCurrentBuffer();
         if (buf == null) return "No buffer";
         FileType ft = buf.getFileType();
@@ -5635,7 +5570,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return bracketColorEnabled ? "Bracket colors enabled" : "Bracket colors disabled";
     }
 
-    private void applyBracketHighlighting() {
+    void applyBracketHighlighting() {
         clearBracketHighlighting();
         if (!bracketColorEnabled) return;
         String text = writingArea.getText();
@@ -5650,7 +5585,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void clearBracketHighlighting() {
+    void clearBracketHighlighting() {
         Highlighter highlighter = writingArea.getHighlighter();
         for (Object tag : bracketHighlightTags) {
             highlighter.removeHighlight(tag);
@@ -5678,7 +5613,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return fuzzyMatchService.matchStrings(prefix, allCommands, 10);
     }
 
-    private List<String> getAllCommandNames() {
+    List<String> getAllCommandNames() {
         List<String> commands = new ArrayList<>();
         commands.add("w"); commands.add("write"); commands.add("q"); commands.add("quit");
         commands.add("wq"); commands.add("x"); commands.add("e"); commands.add("edit");
@@ -5745,7 +5680,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Terminal opened";
     }
 
-    private File resolveTerminalStartDirectory() {
+    File resolveTerminalStartDirectory() {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer != null && buffer.getFile() != null && buffer.getFile().getParentFile() != null) {
             return buffer.getFile().getParentFile();
@@ -5753,7 +5688,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new File(".");
     }
 
-    private TerminalSession getActiveTerminalSession() {
+    TerminalSession getActiveTerminalSession() {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null) {
             return null;
@@ -5761,7 +5696,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return terminalSessions.get(buffer);
     }
 
-    private boolean handleTerminalInsertMode(TerminalSession session, KeyEvent e) {
+    boolean handleTerminalInsertMode(TerminalSession session, KeyEvent e) {
         if (session == null || writingArea == null) {
             return false;
         }
@@ -5855,14 +5790,14 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private void enforceTerminalInputBoundary(TerminalSession session) {
+    void enforceTerminalInputBoundary(TerminalSession session) {
         int caret = writingArea.getCaretPosition();
         if (caret < session.promptOffset) {
             writingArea.setCaretPosition(writingArea.getText().length());
         }
     }
 
-    private void insertTerminalInputText(TerminalSession session, String text) {
+    void insertTerminalInputText(TerminalSession session, String text) {
         enforceTerminalInputBoundary(session);
         int caret = writingArea.getCaretPosition();
         withSuppressedDocumentEvents(() -> writingArea.insert(text, caret));
@@ -5871,7 +5806,7 @@ public class Texteditor extends JFrame implements KeyListener {
         session.historyDraft = currentTerminalInput(session);
     }
 
-    private void executeTerminalLine(TerminalSession session) {
+    void executeTerminalLine(TerminalSession session) {
         enforceTerminalInputBoundary(session);
         String command = currentTerminalInput(session);
         appendTerminalText(session, "\n");
@@ -5922,7 +5857,7 @@ public class Texteditor extends JFrame implements KeyListener {
         session.runningJobId = jobId;
     }
 
-    private String handleTerminalBuiltin(TerminalSession session, String rawCommand) {
+    String handleTerminalBuiltin(TerminalSession session, String rawCommand) {
         List<String> args = parseQuotedArguments(rawCommand);
         if (args.isEmpty()) {
             return "";
@@ -5964,7 +5899,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private void handleTerminalCommandCompletion(
+    void handleTerminalCommandCompletion(
         TerminalSession session,
         String command,
         AsyncJobService.JobSnapshot snapshot,
@@ -6005,7 +5940,7 @@ public class Texteditor extends JFrame implements KeyListener {
         appendTerminalPrompt(session);
     }
 
-    private void terminalHistoryPrevious(TerminalSession session) {
+    void terminalHistoryPrevious(TerminalSession session) {
         if (session.history.isEmpty()) {
             return;
         }
@@ -6020,7 +5955,7 @@ public class Texteditor extends JFrame implements KeyListener {
         replaceTerminalInput(session, session.history.get(session.historyIndex));
     }
 
-    private void terminalHistoryNext(TerminalSession session) {
+    void terminalHistoryNext(TerminalSession session) {
         if (session.history.isEmpty()) {
             return;
         }
@@ -6033,7 +5968,7 @@ public class Texteditor extends JFrame implements KeyListener {
         replaceTerminalInput(session, session.historyDraft == null ? "" : session.historyDraft);
     }
 
-    private void replaceTerminalInput(TerminalSession session, String input) {
+    void replaceTerminalInput(TerminalSession session, String input) {
         String safeInput = input == null ? "" : input;
         String current = writingArea.getText();
         int start = Math.max(0, Math.min(session.promptOffset, current.length()));
@@ -6042,13 +5977,13 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.setCaretPosition(writingArea.getText().length());
     }
 
-    private String currentTerminalInput(TerminalSession session) {
+    String currentTerminalInput(TerminalSession session) {
         String text = writingArea.getText();
         int start = Math.max(0, Math.min(session.promptOffset, text.length()));
         return text.substring(start);
     }
 
-    private void appendTerminalPrompt(TerminalSession session) {
+    void appendTerminalPrompt(TerminalSession session) {
         String prompt = terminalPrompt(session);
         appendTerminalText(session, prompt);
         session.promptOffset = session.buffer.getContent().length();
@@ -6057,12 +5992,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String terminalPrompt(TerminalSession session) {
+    String terminalPrompt(TerminalSession session) {
         String dir = session.workingDirectory == null ? "." : session.workingDirectory.getAbsolutePath();
         return dir + " $ ";
     }
 
-    private void appendTerminalText(TerminalSession session, String text) {
+    void appendTerminalText(TerminalSession session, String text) {
         if (session == null || text == null || text.isEmpty()) {
             return;
         }
@@ -6074,7 +6009,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void closeTerminalSession(FileBuffer buffer) {
+    void closeTerminalSession(FileBuffer buffer) {
         if (buffer == null) {
             return;
         }
@@ -6089,7 +6024,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void closeExitedTerminal(FileBuffer buffer) {
+    void closeExitedTerminal(FileBuffer buffer) {
         if (buffer == null || !ptyTerminalPanes.containsKey(buffer)) {
             return;
         }
@@ -6126,7 +6061,7 @@ public class Texteditor extends JFrame implements KeyListener {
         showMessage("Terminal exited");
     }
 
-    private void installTerminalActivationListeners(EditorPane pane, Component component) {
+    void installTerminalActivationListeners(EditorPane pane, Component component) {
         if (pane == null || component == null) {
             return;
         }
@@ -6283,7 +6218,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private File resolveTaskProjectRoot() {
+    File resolveTaskProjectRoot() {
         FileBuffer buffer = getCurrentBuffer();
         File start = null;
         if (buffer != null && buffer.hasFilePath()) {
@@ -6302,7 +6237,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private File detectTaskProjectRoot(File file) {
+    File detectTaskProjectRoot(File file) {
         if (file == null) {
             return null;
         }
@@ -6321,7 +6256,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return fallback;
     }
 
-    private String showProjectTasks(File projectRoot, Map<String, String> tasks) {
+    String showProjectTasks(File projectRoot, Map<String, String> tasks) {
         StringBuilder sb = new StringBuilder();
         sb.append("Project tasks\n\n");
         sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
@@ -6341,7 +6276,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing tasks";
     }
 
-    private String saveProjectTask(File projectRoot, String name, String command) {
+    String saveProjectTask(File projectRoot, String name, String command) {
         String normalizedName = name == null ? "" : name.trim();
         String normalizedCommand = command == null ? "" : command.trim();
         if (normalizedName.isEmpty()) {
@@ -6360,7 +6295,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String removeProjectTask(File projectRoot, String name) {
+    String removeProjectTask(File projectRoot, String name) {
         String normalizedName = name == null ? "" : name.trim();
         if (normalizedName.isEmpty()) {
             return "Task name required";
@@ -6378,7 +6313,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {
+    String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {
         String normalizedName = taskName == null ? "" : taskName.trim();
         if (normalizedName.isEmpty()) {
             return "Task name required";
@@ -6412,7 +6347,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Task job " + jobId + " started (" + normalizedName + ")";
     }
 
-    private String inferBuiltInTaskCommand(String taskName, File projectRoot) {
+    String inferBuiltInTaskCommand(String taskName, File projectRoot) {
         String normalized = taskName == null ? "" : taskName.trim().toLowerCase(Locale.ROOT);
         if ("test".equals(normalized)) {
             if (new File(projectRoot, "pom.xml").isFile()) {
@@ -6439,7 +6374,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+    void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
         if (closingDown) {
             return;
         }
@@ -6644,7 +6579,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Quickfix closed";
     }
 
-    private void pruneSpecialBufferReturns(FileBuffer scratchBuffer) {
+    void pruneSpecialBufferReturns(FileBuffer scratchBuffer) {
         if (scratchBuffer == null || specialBufferReturns.isEmpty()) {
             return;
         }
@@ -6658,12 +6593,12 @@ public class Texteditor extends JFrame implements KeyListener {
         specialBufferReturns = rebuilt;
     }
 
-    private boolean isQuickfixBufferActive() {
+    boolean isQuickfixBufferActive() {
         FileBuffer current = getCurrentBuffer();
         return current != null && current == quickfixBuffer;
     }
 
-    private String openQuickfixSelection() {
+    String openQuickfixSelection() {
         if (!isQuickfixBufferActive()) {
             return "Quickfix buffer not active";
         }
@@ -6675,7 +6610,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return jumpToQuickfixEntry(entry);
     }
 
-    private String jumpToQuickfixEntry(QuickfixService.Entry entry) {
+    String jumpToQuickfixEntry(QuickfixService.Entry entry) {
         if (entry == null) {
             return "Quickfix is empty";
         }
@@ -6703,7 +6638,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Quickfix " + (quickfixService.currentIndex() + 1) + "/" + quickfixService.size();
     }
 
-    private void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {
+    void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {
         if (entries == null || entries.isEmpty()) {
             return;
         }
@@ -6716,7 +6651,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private List<QuickfixService.Entry> parseQuickfixEntries(String output, String defaultSource) {
+    List<QuickfixService.Entry> parseQuickfixEntries(String output, String defaultSource) {
         List<QuickfixService.Entry> entries = new ArrayList<>();
         if (output == null || output.isBlank()) {
             return entries;
@@ -6745,7 +6680,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return entries;
     }
 
-    private String validateShellCommand(String command) {
+    String validateShellCommand(String command) {
         if (command == null || command.isBlank()) {
             return "Error: command is empty";
         }
@@ -6761,7 +6696,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
+    CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
         return runExternalCommand(
             ShellCommand.forCommand(command),
             new File("."),
@@ -6773,7 +6708,7 @@ public class Texteditor extends JFrame implements KeyListener {
         );
     }
 
-    private CommandResult runExternalCommand(
+    CommandResult runExternalCommand(
         List<String> command,
         File workingDirectory,
         String input,
@@ -6840,7 +6775,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void readInputStreamCapped(InputStream stream, ByteArrayOutputStream out, int maxBytes, boolean[] truncated) {
+    void readInputStreamCapped(InputStream stream, ByteArrayOutputStream out, int maxBytes, boolean[] truncated) {
         byte[] buffer = new byte[8192];
         int total = 0;
         int limit = Math.max(1024, maxBytes);
@@ -6866,7 +6801,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+    void handleShellJobCompletion(AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
         if (closingDown) {
             return;
         }
@@ -6912,7 +6847,7 @@ public class Texteditor extends JFrame implements KeyListener {
             : "Shell job " + jobId + " complete (quickfix updated)");
     }
 
-    private void handleFilterJobCompletion(
+    void handleFilterJobCompletion(
         AsyncJobService.JobSnapshot snapshot,
         CommandResult result,
         Exception error,
@@ -6992,7 +6927,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void collectProjectFiles(File dir, String rootPath, List<String> result, int limit) {
+    void collectProjectFiles(File dir, String rootPath, List<String> result, int limit) {
         if (result.size() >= limit || dir == null || !dir.isDirectory()) return;
         File[] children = dir.listFiles();
         if (children == null) return;
@@ -7022,7 +6957,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return showFileFinderFromFolder(selection);
     }
 
-    private String showFileFinderFromFolder(File folder) {
+    String showFileFinderFromFolder(File folder) {
         File selection = chooseWithNavigator(JFileChooser.FILES_ONLY, folder, "Open File in " + folder.getPath());
         if (selection == null) {
             return "Folder selected: " + folder.getPath();
@@ -7039,7 +6974,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private File chooseWithNavigator(int selectionMode, File startDirectory, String title) {
+    File chooseWithNavigator(int selectionMode, File startDirectory, String title) {
         JFileChooser chooser = new JFileChooser();
         chooser.setFileSelectionMode(selectionMode);
         chooser.setDialogTitle(title);
@@ -7051,7 +6986,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return chooser.getSelectedFile();
     }
 
-    private File resolveNavigatorStartDirectory(File preferred) {
+    File resolveNavigatorStartDirectory(File preferred) {
         if (preferred != null && preferred.exists()) {
             return preferred;
         }
@@ -7099,7 +7034,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String revealCurrentInTree() {
+    String revealCurrentInTree() {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) {
             return "Current buffer is not file-backed";
@@ -7111,7 +7046,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return showFileTree(root.getAbsolutePath());
     }
 
-    private String treeCreateFile(String pathArgument) {
+    String treeCreateFile(String pathArgument) {
         File target = treeService.resolveActionPath(pathArgument, treeRoot);
         if (target == null) {
             return "Usage: :tree new <path>";
@@ -7131,7 +7066,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String treeCreateDirectory(String pathArgument) {
+    String treeCreateDirectory(String pathArgument) {
         File target = treeService.resolveActionPath(pathArgument, treeRoot);
         if (target == null) {
             return "Usage: :tree mkdir <path>";
@@ -7150,7 +7085,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String treeRename(String argument) {
+    String treeRename(String argument) {
         if (argument == null || argument.isBlank()) {
             return "Usage: :tree rename <from> <to>";
         }
@@ -7177,7 +7112,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String treeDelete(String argument, boolean force) {
+    String treeDelete(String argument, boolean force) {
         File target = treeService.resolveActionPath(argument, treeRoot);
         if (target == null) {
             return "Usage: :tree rm <path>";
@@ -7206,7 +7141,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String validateTreeDeleteTarget(File target) {
+    String validateTreeDeleteTarget(File target) {
         if (target == null || !configManager.getTreeDeleteProtectCritical()) {
             return null;
         }
@@ -7296,7 +7231,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Tree pane opened";
     }
 
-    private String closeTreePane() {
+    String closeTreePane() {
         if (treePane == null || !editorPanes.contains(treePane)) {
             return "Tree pane already closed";
         }
@@ -7308,7 +7243,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return result;
     }
 
-    private void appendTreeEntry(StringBuilder builder, List<String> lineTargets, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
+    void appendTreeEntry(StringBuilder builder, List<String> lineTargets, File entry, String prefix, boolean last, int[] rendered, int maxEntries) {
         if (rendered[0] >= maxEntries) {
             return;
         }
@@ -7335,12 +7270,12 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void appendTreeLine(StringBuilder builder, List<String> lineTargets, String text, String targetPath) {
+    void appendTreeLine(StringBuilder builder, List<String> lineTargets, String text, String targetPath) {
         builder.append(text).append("\n");
         lineTargets.add(targetPath);
     }
 
-    private File[] listTreeChildren(File directory) {
+    File[] listTreeChildren(File directory) {
         File[] children = directory.listFiles(file -> !shouldSkipHiddenPath(file));
         if (children == null || children.length == 0) {
             return new File[0];
@@ -7354,11 +7289,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return children;
     }
 
-    private String treeTitleSuffix(File root) {
+    String treeTitleSuffix(File root) {
         return treeService.titleSuffix(root);
     }
 
-    private FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
+    FileBuffer createOrReplaceTreeBuffer(String titleSuffix, String content, List<String> lineTargets) {
         FileBuffer replacement = FileBuffer.createScratch("[tree " + titleSuffix + "]", content);
         if (treeBuffer != null) {
             int index = buffers.indexOf(treeBuffer);
@@ -7376,7 +7311,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return replacement;
     }
 
-    private EditorPane resolveTreeContentPaneForTreeCommand() {
+    EditorPane resolveTreeContentPaneForTreeCommand() {
         EditorPane active = getActivePane();
         if (treePane != null && editorPanes.contains(treePane)) {
             if (active != null && active != treePane) {
@@ -7391,7 +7326,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return active;
     }
 
-    private EditorPane ensureTreePane(EditorPane contentPane) {
+    EditorPane ensureTreePane(EditorPane contentPane) {
         if (treePane != null && editorPanes.contains(treePane)) {
             return treePane;
         }
@@ -7418,16 +7353,16 @@ public class Texteditor extends JFrame implements KeyListener {
         return newPane;
     }
 
-    private boolean isTreePaneActive() {
+    boolean isTreePaneActive() {
         EditorPane active = getActivePane();
         return active != null && active == treePane && isTreeBuffer(getCurrentBuffer());
     }
 
-    private boolean isTreeBuffer(FileBuffer buffer) {
+    boolean isTreeBuffer(FileBuffer buffer) {
         return buffer != null && treeLineTargets.containsKey(buffer);
     }
 
-    private String openTreeSelection() {
+    String openTreeSelection() {
         FileBuffer current = getCurrentBuffer();
         if (!isTreeBuffer(current)) {
             return "Tree pane not active";
@@ -7478,7 +7413,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private EditorPane resolveTreeContentPaneForOpen() {
+    EditorPane resolveTreeContentPaneForOpen() {
         if (treePane != null && editorPanes.contains(treePane)) {
             for (EditorPane pane : editorPanes) {
                 if (pane != treePane) {
@@ -7564,7 +7499,7 @@ public class Texteditor extends JFrame implements KeyListener {
         });
     }
 
-    private File resolveGitRoot() {
+    File resolveGitRoot() {
         CommandResult result = runCommand(new File("."), List.of("git", "rev-parse", "--show-toplevel"));
         if (result.exitCode != 0) {
             return null;
@@ -7577,7 +7512,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return root.exists() ? root : null;
     }
 
-    private String showGitStatus(File gitRoot) {
+    String showGitStatus(File gitRoot) {
         CommandResult result = runCommand(gitRoot, List.of("git", "status", "--short", "--branch"));
         if (result.exitCode != 0) {
             return gitError(result);
@@ -7590,7 +7525,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git status";
     }
 
-    private String showGitDiff(File gitRoot, String args) {
+    String showGitDiff(File gitRoot, String args) {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.add("diff");
@@ -7607,8 +7542,8 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git diff";
     }
 
-    private File cachedGitRoot;
-    private boolean cachedGitRootResolved;
+    File cachedGitRoot;
+    boolean cachedGitRootResolved;
     void refreshGitGutter() {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) return;
@@ -7634,7 +7569,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }, "shed-git-gutter").start();
     }
 
-    private void parseUnifiedDiffForGutter(String diff, Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
+    void parseUnifiedDiffForGutter(String diff, Set<Integer> added, Set<Integer> modified, Set<Integer> deletedAfter) {
         // parse @@ -oldStart[,oldCount] +newStart[,newCount] @@ lines
         for (String line : diff.split("\n")) {
             if (!line.startsWith("@@")) continue;
@@ -7673,7 +7608,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String showGitLog(File gitRoot, String args) {
+    String showGitLog(File gitRoot, String args) {
         int count = 20;
         if (args != null && !args.isBlank()) {
             try {
@@ -7702,7 +7637,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git log";
     }
 
-    private String showGitBranches(File gitRoot) {
+    String showGitBranches(File gitRoot) {
         CommandResult result = runCommand(gitRoot, List.of("git", "branch", "--all", "--verbose"));
         if (result.exitCode != 0) {
             return gitError(result);
@@ -7715,7 +7650,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git branches";
     }
 
-    private String runGitAdd(File gitRoot, String args) {
+    String runGitAdd(File gitRoot, String args) {
         List<String> pathSpecs = splitWhitespaceArgs(args);
         if (pathSpecs.isEmpty()) {
             return "Usage: :git add <pathspec...>";
@@ -7732,7 +7667,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "git add complete";
     }
 
-    private String runGitRestoreStaged(File gitRoot, String args) {
+    String runGitRestoreStaged(File gitRoot, String args) {
         List<String> pathSpecs = splitWhitespaceArgs(args);
         if (pathSpecs.isEmpty()) {
             return "Usage: :git restore <pathspec...>";
@@ -7750,7 +7685,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "git restore --staged complete";
     }
 
-    private String runGitCommit(File gitRoot, String message) {
+    String runGitCommit(File gitRoot, String message) {
         if (message == null || message.isBlank()) {
             return "Usage: :git commit <message>";
         }
@@ -7771,7 +7706,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Commit complete";
     }
 
-    private String runGitAmend(File gitRoot, String argument) {
+    String runGitAmend(File gitRoot, String argument) {
         if (!gitHeadExists(gitRoot)) {
             return "Git error: cannot amend before first commit";
         }
@@ -7801,12 +7736,12 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Amend complete";
     }
 
-    private boolean gitHeadExists(File gitRoot) {
+    boolean gitHeadExists(File gitRoot) {
         CommandResult result = runCommand(gitRoot, List.of("git", "rev-parse", "--verify", "HEAD"));
         return result.exitCode == 0;
     }
 
-    private String runGitCheckout(File gitRoot, String argument) {
+    String runGitCheckout(File gitRoot, String argument) {
         if (argument == null || argument.isBlank()) {
             return "Usage: :git checkout <branch|path>";
         }
@@ -7825,7 +7760,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Checkout complete";
     }
 
-    private String runGitSwitch(File gitRoot, String argument) {
+    String runGitSwitch(File gitRoot, String argument) {
         if (argument == null || argument.isBlank()) {
             return "Usage: :git switch <branch>";
         }
@@ -7844,7 +7779,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Switch complete";
     }
 
-    private String runGitHunkCommand(File gitRoot, String argument) {
+    String runGitHunkCommand(File gitRoot, String argument) {
         List<String> args = splitWhitespaceArgs(argument);
         if (args.isEmpty()) {
             return "Usage: :git hunk stage|unstage|revert [line]";
@@ -7926,7 +7861,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "git hunk " + action + " complete (line " + line + ")";
     }
 
-    private String selectGitHunkPatch(String diff, int line) {
+    String selectGitHunkPatch(String diff, int line) {
         if (diff == null || diff.isBlank()) {
             return null;
         }
@@ -7964,7 +7899,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private boolean gitHunkContainsLine(String marker, int line) {
+    boolean gitHunkContainsLine(String marker, int line) {
         if (marker == null || !marker.startsWith("@@")) {
             return false;
         }
@@ -7987,7 +7922,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return line >= newStart && line < (newStart + newCount);
     }
 
-    private String relativizeAgainstGitRoot(File gitRoot, File file) {
+    String relativizeAgainstGitRoot(File gitRoot, File file) {
         if (gitRoot == null || file == null) {
             return null;
         }
@@ -8003,7 +7938,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String showGitHelp() {
+    String showGitHelp() {
         showScratchBuffer("[git help]",
             "Git commands\n\n"
                 + ":git                  Show status\n"
@@ -8021,7 +7956,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing git help";
     }
 
-    private List<String> splitWhitespaceArgs(String args) {
+    List<String> splitWhitespaceArgs(String args) {
         List<String> tokens = new ArrayList<>();
         if (args == null || args.isBlank()) {
             return tokens;
@@ -8035,7 +7970,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return tokens;
     }
 
-    private List<String> parseQuotedArguments(String raw) {
+    List<String> parseQuotedArguments(String raw) {
         List<String> tokens = new ArrayList<>();
         if (raw == null || raw.isBlank()) {
             return tokens;
@@ -8084,7 +8019,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return tokens;
     }
 
-    private CommandResult runCommand(File workingDirectory, List<String> command) {
+    CommandResult runCommand(File workingDirectory, List<String> command) {
         return runExternalCommand(
             command,
             workingDirectory,
@@ -8096,7 +8031,7 @@ public class Texteditor extends JFrame implements KeyListener {
         );
     }
 
-    private String gitError(CommandResult result) {
+    String gitError(CommandResult result) {
         String message = result.stderr == null ? "" : result.stderr.strip();
         if (message.isEmpty()) {
             message = result.stdout == null ? "" : result.stdout.strip();
@@ -8206,7 +8141,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return gotoLine(selected.getLine());
     }
 
-    private String formatSymbolCandidate(SymbolService.Symbol symbol) {
+    String formatSymbolCandidate(SymbolService.Symbol symbol) {
         StringBuilder indent = new StringBuilder();
         for (int i = 1; i < symbol.getLevel(); i++) {
             indent.append("  ");
@@ -8218,7 +8153,7 @@ public class Texteditor extends JFrame implements KeyListener {
             symbol.getName());
     }
 
-    private String describeSymbolCandidate(
+    String describeSymbolCandidate(
         String selection,
         Map<String, SymbolService.Symbol> candidateMap,
         List<SymbolService.Symbol> allSymbols
@@ -8243,7 +8178,7 @@ public class Texteditor extends JFrame implements KeyListener {
             + (breadcrumb.length() == 0 ? symbol.getName() : breadcrumb.toString());
     }
 
-    private void collectFiles(File directory, List<String> results) {
+    void collectFiles(File directory, List<String> results) {
         if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
             return;
         }
@@ -8263,7 +8198,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private List<String> grepFiles(String pattern) {
+    List<String> grepFiles(String pattern) {
         List<String> results = new ArrayList<>();
         if (pattern == null || pattern.isEmpty()) {
             return results;
@@ -8272,7 +8207,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return results;
     }
 
-    private void grepFilesRecursive(File directory, String pattern, List<String> results) {
+    void grepFilesRecursive(File directory, String pattern, List<String> results) {
         if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
             return;
         }
@@ -8303,11 +8238,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private interface PalettePreviewProvider {
-        String preview(String selection);
-    }
-
-    private String describeCommandPaletteCandidate(String selection) {
+    String describeCommandPaletteCandidate(String selection) {
         if (selection == null || selection.isBlank()) {
             return "Type to fuzzy-filter commands, then press Enter.";
         }
@@ -8516,7 +8447,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String describeGrepCandidate(String selection) {
+    String describeGrepCandidate(String selection) {
         if (selection == null || selection.isBlank()) {
             return "No match selected.";
         }
@@ -8527,11 +8458,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return selection;
     }
 
-    private String showPaletteDialog(String title, List<String> candidates) {
+    String showPaletteDialog(String title, List<String> candidates) {
         return showPaletteDialog(title, candidates, null);
     }
 
-    private void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
+    void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
         if (!dramaticCommandPaletteEnabled || !dramaticMotionAllowed()) {
             return;
         }
@@ -8563,7 +8494,7 @@ public class Texteditor extends JFrame implements KeyListener {
         timer.start();
     }
 
-    private String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
+    String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
         // undecorated modal dialog styled as floating picker
         JDialog dialog = new JDialog(this, title, true);
         dialog.setUndecorated(true);
@@ -8663,7 +8594,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return selection[0];
     }
 
-    private boolean shouldSkipHiddenPath(File file) {
+    boolean shouldSkipHiddenPath(File file) {
         if (file == null) {
             return true;
         }
@@ -8696,7 +8627,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing marks";
     }
 
-    private String trimForRegisterDisplay(String value) {
+    String trimForRegisterDisplay(String value) {
         String singleLine = value.replace("\n", "\\n");
         if (singleLine.length() > 80) {
             return singleLine.substring(0, 77) + "...";
@@ -8704,7 +8635,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return singleLine;
     }
 
-    private String describeOffset(int offset) {
+    String describeOffset(int offset) {
         try {
             int line = writingArea.getLineOfOffset(Math.min(offset, writingArea.getText().length()));
             int col = offset - writingArea.getLineStartOffset(line);
@@ -8714,7 +8645,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private MinimapPanel activeMinimapPanel;
+    MinimapPanel activeMinimapPanel;
     public String toggleMinimap() {
         EditorPane pane = getActivePane();
         if (pane == null) return "No active pane";
@@ -8773,7 +8704,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return zenModeEnabled ? "Zen mode enabled" : "Zen mode disabled";
     }
 
-    private void updateZenModeLayout() {
+    void updateZenModeLayout() {
         Color editorBackground = getModeBackground(editorState.mode == null ? EditorMode.NORMAL : editorState.mode);
         Color marginBackground = zenModeEnabled ? fadedMarginColor(editorBackground) : editorBackground;
         editorHostPanel.setBackground(marginBackground);
@@ -8800,11 +8731,11 @@ public class Texteditor extends JFrame implements KeyListener {
         editorHostPanel.repaint();
     }
 
-    private Color fadedMarginColor(Color base) {
+    Color fadedMarginColor(Color base) {
         return blendColor(base, configManager.getEditorForeground(), 0.12);
     }
 
-    private Color blendColor(Color base, Color overlay, double ratio) {
+    Color blendColor(Color base, Color overlay, double ratio) {
         double clamped = Math.max(0.0, Math.min(1.0, ratio));
         int r = (int) Math.round(base.getRed() * (1.0 - clamped) + overlay.getRed() * clamped);
         int g = (int) Math.round(base.getGreen() * (1.0 - clamped) + overlay.getGreen() * clamped);
@@ -8812,7 +8743,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new Color(r, g, b);
     }
 
-    private void refreshDramaticSettings() {
+    void refreshDramaticSettings() {
         boolean wasEnabled = dramaticUiEnabled;
         dramaticUiEnabled = configManager.getDramaticUiEnabled();
         dramaticIdentityEnabled = dramaticUiEnabled && configManager.getDramaticIdentityEnabled();
@@ -8849,14 +8780,14 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean dramaticMotionAllowed() {
+    boolean dramaticMotionAllowed() {
         return dramaticUiEnabled
             && !dramaticReducedMotionEnabled
             && dramaticAnimationMs > 0
             && !isDramaticPerformanceThrottled();
     }
 
-    private boolean isDramaticPerformanceThrottled() {
+    boolean isDramaticPerformanceThrottled() {
         if (!dramaticPerformanceGuardrailsEnabled) {
             return false;
         }
@@ -8871,7 +8802,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return cpuLoad >= 0.0 && cpuLoad >= dramaticPerformanceCpuThreshold;
     }
 
-    private double cachedProcessCpuLoad() {
+    double cachedProcessCpuLoad() {
         long now = System.currentTimeMillis();
         if (now - cachedProcessCpuLoadAtMillis < 1200) {
             return cachedProcessCpuLoad;
@@ -8881,7 +8812,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return cachedProcessCpuLoad;
     }
 
-    private double readProcessCpuLoad() {
+    double readProcessCpuLoad() {
         try {
             Object osBean = ManagementFactory.getOperatingSystemMXBean();
             Method method = osBean.getClass().getMethod("getProcessCpuLoad");
@@ -8898,17 +8829,17 @@ public class Texteditor extends JFrame implements KeyListener {
         return -1.0;
     }
 
-    private int animationDelayForSteps(int steps) {
+    int animationDelayForSteps(int steps) {
         return Math.max(12, dramaticAnimationMs / Math.max(1, steps));
     }
 
-    private double easeOut(double t) {
+    double easeOut(double t) {
         double clamped = Math.max(0.0, Math.min(1.0, t));
         double inverse = 1.0 - clamped;
         return 1.0 - inverse * inverse * inverse;
     }
 
-    private void applyDramaticFooterStyling() {
+    void applyDramaticFooterStyling() {
         if (statusBar == null || commandBar == null || editorState == null) {
             return;
         }
@@ -8948,7 +8879,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void animateModeTransition(EditorMode fromMode, EditorMode toMode) {
+    void animateModeTransition(EditorMode fromMode, EditorMode toMode) {
         if (!dramaticModeTransitionsEnabled) {
             return;
         }
@@ -8989,14 +8920,14 @@ public class Texteditor extends JFrame implements KeyListener {
         modeTransitionTimer.start();
     }
 
-    private void clearFeedbackPulse() {
+    void clearFeedbackPulse() {
         if (feedbackPulseTag != null && writingArea != null) {
             writingArea.getHighlighter().removeHighlight(feedbackPulseTag);
             feedbackPulseTag = null;
         }
     }
 
-    private void pulseCaretLine(Color color) {
+    void pulseCaretLine(Color color) {
         if (!dramaticEditingFeedbackEnabled || writingArea == null) {
             return;
         }
@@ -9056,7 +8987,7 @@ public class Texteditor extends JFrame implements KeyListener {
         feedbackPulseTimer.start();
     }
 
-    private void animateEditorHostTint(Color tint) {
+    void animateEditorHostTint(Color tint) {
         if (!dramaticPanelAnimationsEnabled || editorHostPanel == null || tint == null) {
             return;
         }
@@ -9087,7 +9018,7 @@ public class Texteditor extends JFrame implements KeyListener {
         hostTintTimer.start();
     }
 
-    private void animateSplitForPane(EditorPane pane, double startRatio, double targetRatio) {
+    void animateSplitForPane(EditorPane pane, double startRatio, double targetRatio) {
         if (!dramaticPanelAnimationsEnabled || pane == null || windowLayoutRoot == null) {
             return;
         }
@@ -9115,7 +9046,7 @@ public class Texteditor extends JFrame implements KeyListener {
         splitAnimationTimer.start();
     }
 
-    private void animateMinimapWidth(MinimapPanel panel, int fromWidth, int toWidth, Runnable onFinish) {
+    void animateMinimapWidth(MinimapPanel panel, int fromWidth, int toWidth, Runnable onFinish) {
         if (panel == null) {
             if (onFinish != null) {
                 onFinish.run();
@@ -9151,7 +9082,7 @@ public class Texteditor extends JFrame implements KeyListener {
         minimapWidthTimer.start();
     }
 
-    private void clearPaneJumpFlash() {
+    void clearPaneJumpFlash() {
         if (paneJumpFlashTarget != null && paneJumpFlashTarget.getScrollPane() != null) {
             paneJumpFlashTarget.getScrollPane().setBorder(paneJumpFlashOriginalBorder);
             paneJumpFlashTarget.getScrollPane().revalidate();
@@ -9161,7 +9092,7 @@ public class Texteditor extends JFrame implements KeyListener {
         paneJumpFlashOriginalBorder = null;
     }
 
-    private void flashPaneJump(EditorPane pane) {
+    void flashPaneJump(EditorPane pane) {
         if (!dramaticPanelAnimationsEnabled || pane == null || pane.getScrollPane() == null) {
             return;
         }
@@ -9206,14 +9137,7 @@ public class Texteditor extends JFrame implements KeyListener {
         paneJumpFlashTimer.start();
     }
 
-    private enum CueType {
-        MODE_CHANGE,
-        NAVIGATE,
-        SUCCESS,
-        ERROR
-    }
-
-    private void playCue(CueType cueType) {
+    void playCue(CueType cueType) {
         if (!dramaticSoundEnabled) {
             return;
         }
@@ -9244,7 +9168,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private int[] cuePattern(CueType cueType) {
+    int[] cuePattern(CueType cueType) {
         String pack = dramaticSoundPack == null ? "default" : dramaticSoundPack;
         int[] base;
         switch (pack) {
@@ -9315,7 +9239,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return getCurrentCaretLine() + 1;
     }
 
-    private String getWordAtCaret() {
+    String getWordAtCaret() {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         if (text.isEmpty() || caret >= text.length()) return "";
@@ -9513,7 +9437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing LSP log";
     }
 
-    private String currentBufferExtension() {
+    String currentBufferExtension() {
         FileBuffer buf = getCurrentBuffer();
         return buf == null ? "" : bufferExtension(buf);
     }
@@ -9666,7 +9590,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Cleared pending rename preview";
     }
 
-    private String buildLspRenamePreview(String targetName, List<LspClient.TextEdit> edits) {
+    String buildLspRenamePreview(String targetName, List<LspClient.TextEdit> edits) {
         StringBuilder builder = new StringBuilder();
         builder.append("LSP Rename Preview\n");
         builder.append("=".repeat(40)).append("\n\n");
@@ -9796,7 +9720,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {
+    List<LspClient.CodeAction> collectCursorCodeActions(LspClient client, String uri, int line, int column) {
         List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(uri);
         List<LspClient.Diagnostic> scoped = new ArrayList<>();
         for (LspClient.Diagnostic diagnostic : diagnostics) {
@@ -9807,7 +9731,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return client.codeActions(uri, line, column, scoped);
     }
 
-    private int parseOneBasedIndex(String value) {
+    int parseOneBasedIndex(String value) {
         if (value == null || value.isBlank()) {
             return -1;
         }
@@ -9848,7 +9772,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return jumpDiagnostic(false);
     }
 
-    private String jumpDiagnostic(boolean forward) {
+    String jumpDiagnostic(boolean forward) {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer == null || !buffer.hasFilePath()) {
             return "Diagnostics require a file-backed buffer";
@@ -9908,7 +9832,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private List<QuickfixService.Entry> diagnosticsToQuickfixEntries(String filePath, List<LspClient.Diagnostic> diagnostics) {
+    List<QuickfixService.Entry> diagnosticsToQuickfixEntries(String filePath, List<LspClient.Diagnostic> diagnostics) {
         List<QuickfixService.Entry> entries = new ArrayList<>();
         if (filePath == null || diagnostics == null) {
             return entries;
@@ -9928,7 +9852,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return entries;
     }
 
-    private String diagnosticSeverityLabel(int severity) {
+    String diagnosticSeverityLabel(int severity) {
         switch (severity) {
             case 1:
                 return "Error";
@@ -9943,7 +9867,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String openLspLocation(LspClient.Location location, String label) {
+    String openLspLocation(LspClient.Location location, String label) {
         String targetPath = filePathFromUri(location.getUri());
         if (targetPath == null || targetPath.isBlank()) {
             return "LSP " + label + " target has unsupported URI";
@@ -9967,7 +9891,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
+    WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
         WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
         if (edits == null || edits.isEmpty()) {
             return result;
@@ -10027,7 +9951,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return result;
     }
 
-    private int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
+    int applyTextEditsToCurrentArea(List<LspClient.TextEdit> edits) {
         List<ResolvedTextEdit> resolved = resolveTextEdits(writingArea.getText(), edits);
         if (resolved.isEmpty()) {
             return 0;
@@ -10039,7 +9963,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return resolved.size();
     }
 
-    private int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
+    int applyTextEditsToBuffer(FileBuffer buffer, List<LspClient.TextEdit> edits) {
         if (buffer == null) {
             return 0;
         }
@@ -10058,7 +9982,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return resolved.size();
     }
 
-    private int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
+    int applyTextEditsToFile(String filePath, List<LspClient.TextEdit> edits) {
         try {
             File file = new File(filePath);
             if (!file.exists() || !file.isFile()) {
@@ -10077,7 +10001,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {
+    String applyResolvedTextEdits(String text, List<ResolvedTextEdit> resolvedEdits) {
         StringBuilder builder = new StringBuilder(text == null ? "" : text);
         for (ResolvedTextEdit edit : resolvedEdits) {
             int safeStart = Math.max(0, Math.min(edit.startOffset, builder.length()));
@@ -10087,7 +10011,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return builder.toString();
     }
 
-    private List<ResolvedTextEdit> resolveTextEdits(String text, List<LspClient.TextEdit> edits) {
+    List<ResolvedTextEdit> resolveTextEdits(String text, List<LspClient.TextEdit> edits) {
         List<ResolvedTextEdit> resolved = new ArrayList<>();
         if (edits == null || edits.isEmpty()) {
             return resolved;
@@ -10116,7 +10040,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return resolved;
     }
 
-    private List<Integer> lineStartOffsets(String text) {
+    List<Integer> lineStartOffsets(String text) {
         List<Integer> starts = new ArrayList<>();
         starts.add(0);
         for (int i = 0; i < text.length(); i++) {
@@ -10127,7 +10051,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return starts;
     }
 
-    private int offsetForLineCharacter(String text, List<Integer> lineStarts, int line, int character) {
+    int offsetForLineCharacter(String text, List<Integer> lineStarts, int line, int character) {
         if (lineStarts == null || lineStarts.isEmpty()) {
             return 0;
         }
@@ -10138,7 +10062,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return Math.max(0, Math.min(lineStart + safeCharacter, lineEnd));
     }
 
-    private String filePathFromUri(String uri) {
+    String filePathFromUri(String uri) {
         if (uri == null || uri.isBlank()) {
             return null;
         }
@@ -10152,7 +10076,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String currentCompletionPrefix() {
+    String currentCompletionPrefix() {
         String text = writingArea.getText();
         int caret = Math.min(writingArea.getCaretPosition(), text.length());
         int start = caret;
@@ -10162,7 +10086,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return text.substring(start, caret);
     }
 
-    private List<String> collectBufferCompletions(String prefix) {
+    List<String> collectBufferCompletions(String prefix) {
         List<String> matches = new ArrayList<>();
         if (prefix == null || prefix.isEmpty()) {
             return matches;
@@ -10193,7 +10117,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return matches;
     }
 
-    private void addCompletionCandidate(String prefix, java.util.LinkedHashSet<String> unique, String candidate) {
+    void addCompletionCandidate(String prefix, java.util.LinkedHashSet<String> unique, String candidate) {
         if (candidate.length() <= prefix.length()) {
             return;
         }
@@ -10202,7 +10126,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void applyCompletion(String prefix, String completion) {
+    void applyCompletion(String prefix, String completion) {
         int caret = writingArea.getCaretPosition();
         int start = Math.max(0, caret - (prefix == null ? 0 : prefix.length()));
         writingArea.replaceRange(completion, start, caret);
@@ -10210,7 +10134,7 @@ public class Texteditor extends JFrame implements KeyListener {
         markModified();
     }
 
-    private LspClient resolveLspClient(FileBuffer buffer) {
+    LspClient resolveLspClient(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return null;
         }
@@ -10249,7 +10173,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void syncLspOpen(FileBuffer buffer) {
+    void syncLspOpen(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return;
         }
@@ -10265,7 +10189,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspDocumentVersions.put(uri, 1);
     }
 
-    private void syncLspChange(FileBuffer buffer) {
+    void syncLspChange(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return;
         }
@@ -10281,7 +10205,7 @@ public class Texteditor extends JFrame implements KeyListener {
         scheduleDiagnosticRefresh();
     }
 
-    private void scheduleDiagnosticRefresh() {
+    void scheduleDiagnosticRefresh() {
         if (diagnosticRefreshTimer == null) {
             diagnosticRefreshTimer = new javax.swing.Timer(500, ev -> refreshDiagnosticRanges());
             diagnosticRefreshTimer.setRepeats(false);
@@ -10303,29 +10227,29 @@ public class Texteditor extends JFrame implements KeyListener {
         refreshGitGutter();
     }
 
-    private void pollLspNotifications(FileBuffer buffer) {
+    void pollLspNotifications(FileBuffer buffer) {
         LspClient client = existingLspClient(buffer);
         if (client != null) {
             client.drainNotifications();
         }
     }
 
-    private LspClient existingLspClient(FileBuffer buffer) {
+    LspClient existingLspClient(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return null;
         }
         return lspClients.get(bufferExtension(buffer));
     }
 
-    private String bufferUri(FileBuffer buffer) {
+    String bufferUri(FileBuffer buffer) {
         return "file://" + new File(buffer.getFilePath()).getAbsolutePath();
     }
 
-    private String languageId(FileBuffer buffer) {
+    String languageId(FileBuffer buffer) {
         return lspService.languageId(buffer.getFileType());
     }
 
-    private String bufferExtension(FileBuffer buffer) {
+    String bufferExtension(FileBuffer buffer) {
         String path = buffer.getFilePath();
         if (path == null) {
             return "";
@@ -10337,12 +10261,12 @@ public class Texteditor extends JFrame implements KeyListener {
         return path.substring(dot + 1).toLowerCase();
     }
 
-    private String[] builtinLspCommand(String extension) {
+    String[] builtinLspCommand(String extension) {
         return lspService.builtinCommand(extension);
     }
 
     // Repeat last command
-    private void repeatLastCommand() {
+    void repeatLastCommand() {
         if (lastCommand.isEmpty()) {
             showMessage("No command to repeat");
             return;
@@ -10407,7 +10331,7 @@ public class Texteditor extends JFrame implements KeyListener {
         showMessage("Repeated: " + lastCommand);
     }
 
-    private void insertLastText() {
+    void insertLastText() {
         if (lastInsertedText != null && !lastInsertedText.isEmpty()) {
             int pos = writingArea.getCaretPosition();
             writingArea.insert(lastInsertedText, pos);
@@ -10416,7 +10340,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private int consumePendingCount() {
+    int consumePendingCount() {
         if (editorState.pendingCount == null || editorState.pendingCount.isEmpty()) {
             return 1;
         }
@@ -10425,31 +10349,31 @@ public class Texteditor extends JFrame implements KeyListener {
         return Math.max(1, count);
     }
 
-    private void repeatAction(int count, Runnable action) {
+    void repeatAction(int count, Runnable action) {
         for (int i = 0; i < Math.max(1, count); i++) {
             action.run();
         }
     }
 
-    private Character consumePendingRegister() {
+    Character consumePendingRegister() {
         Character register = editorState.pendingRegister;
         editorState.pendingRegister = null;
         return register;
     }
 
-    private void storeYank(Character register, String text, boolean lineWise) {
+    void storeYank(Character register, String text, boolean lineWise) {
         RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
         registerManager.setYank(register, content);
         addToYankRing(content);
     }
 
-    private void storeDelete(Character register, String text, boolean lineWise) {
+    void storeDelete(Character register, String text, boolean lineWise) {
         RegisterContent content = lineWise ? RegisterContent.lineWise(text) : RegisterContent.characterWise(text);
         registerManager.setDelete(register, content);
         addToYankRing(content);
     }
 
-    private void addToYankRing(RegisterContent content) {
+    void addToYankRing(RegisterContent content) {
         if (content == null || content.isMacro()) {
             return;
         }
@@ -10492,7 +10416,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Pasted yank ring item " + (index + 1);
     }
 
-    private String pasteFromRegister(boolean before) {
+    String pasteFromRegister(boolean before) {
         RegisterContent content = registerManager.get(consumePendingRegister());
         if (content == null || content.getText().isEmpty()) {
             return "Register empty";
@@ -10502,7 +10426,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Pasted";
     }
 
-    private String playMacro(Character register) {
+    String playMacro(Character register) {
         if (register == null) {
             return "No previously executed macro";
         }
@@ -10526,7 +10450,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Executed macro @" + register;
     }
 
-    private String yankToEndOfLine() {
+    String yankToEndOfLine() {
         try {
             int start = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(start);
@@ -10539,7 +10463,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String replaceCharacter(char replacement) {
+    String replaceCharacter(char replacement) {
         int caret = writingArea.getCaretPosition();
         String text = writingArea.getText();
         if (caret >= text.length()) {
@@ -10550,17 +10474,17 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Replaced character";
     }
 
-    private String applyMotionOperator(char operator, String motion) {
+    String applyMotionOperator(char operator, String motion) {
         MotionRange range = resolveMotionRange(motion);
         return applyResolvedRange(operator, range, motion);
     }
 
-    private String applyTextObjectOperator(char operator, char modifier, char objectKey) {
+    String applyTextObjectOperator(char operator, char modifier, char objectKey) {
         MotionRange range = resolveTextObjectRange(modifier, objectKey);
         return applyResolvedRange(operator, range, String.valueOf(modifier) + objectKey);
     }
 
-    private String applyResolvedRange(char operator, MotionRange range, String label) {
+    String applyResolvedRange(char operator, MotionRange range, String label) {
         if (range == null || range.start == range.end) {
             return "Unsupported target: " + label;
         }
@@ -10592,7 +10516,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private MotionRange resolveMotionRange(String motion) {
+    MotionRange resolveMotionRange(String motion) {
         try {
             int original = writingArea.getCaretPosition();
             if ("gg".equals(motion) || "G".equals(motion)) {
@@ -10628,7 +10552,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private MotionRange resolveTextObjectRange(char modifier, char objectKey) {
+    MotionRange resolveTextObjectRange(char modifier, char objectKey) {
         switch (objectKey) {
             case 'w':
             case 'W':
@@ -10658,7 +10582,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String handleSurroundPending(char c) {
+    String handleSurroundPending(char c) {
         if (pendingSurroundAction == 'c') {
             if (pendingSurroundOld == null) {
                 pendingSurroundOld = c;
@@ -10694,11 +10618,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Unsupported surround";
     }
 
-    private boolean isTextObjectKey(char c) {
+    boolean isTextObjectKey(char c) {
         return "wWps\"'`()[]{}<>".indexOf(c) >= 0;
     }
 
-    private String surroundChange(char oldChar, char newChar) {
+    String surroundChange(char oldChar, char newChar) {
         MotionRange range = resolveSurroundRange(oldChar);
         SurroundPair newPair = surroundPair(newChar);
         if (range == null || newPair == null) {
@@ -10710,7 +10634,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Surround changed";
     }
 
-    private String surroundDelete(char target) {
+    String surroundDelete(char target) {
         MotionRange range = resolveSurroundRange(target);
         if (range == null) {
             return "No matching surround found";
@@ -10721,7 +10645,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Surround deleted";
     }
 
-    private String surroundAdd(char targetObject, char surroundChar) {
+    String surroundAdd(char targetObject, char surroundChar) {
         MotionRange range = resolveTextObjectRange('i', targetObject);
         SurroundPair pair = surroundPair(surroundChar);
         if (range == null || pair == null) {
@@ -10733,7 +10657,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Surround added";
     }
 
-    private MotionRange resolveSurroundRange(char surround) {
+    MotionRange resolveSurroundRange(char surround) {
         if (surround == '"' || surround == '\'' || surround == '`') {
             return resolveQuoteObject(true, surround);
         }
@@ -10744,7 +10668,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return resolveBracketObject(true, pair.open, pair.close);
     }
 
-    private SurroundPair surroundPair(char surround) {
+    SurroundPair surroundPair(char surround) {
         switch (surround) {
             case '(':
             case ')':
@@ -10767,7 +10691,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private MotionRange resolveWordObject(boolean around, boolean bigWord) {
+    MotionRange resolveWordObject(boolean around, boolean bigWord) {
         String text = writingArea.getText();
         if (text.isEmpty()) {
             return null;
@@ -10789,7 +10713,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new MotionRange(start, end, false);
     }
 
-    private MotionRange resolveParagraphObject(boolean around) {
+    MotionRange resolveParagraphObject(boolean around) {
         try {
             int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
             int startLine = line;
@@ -10814,7 +10738,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private MotionRange resolveSentenceObject(boolean around) {
+    MotionRange resolveSentenceObject(boolean around) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         int start = caret;
@@ -10845,7 +10769,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new MotionRange(start, end, false);
     }
 
-    private MotionRange resolveQuoteObject(boolean around, char quote) {
+    MotionRange resolveQuoteObject(boolean around, char quote) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         int start = text.lastIndexOf(quote, Math.max(0, caret - 1));
@@ -10856,7 +10780,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
     }
 
-    private MotionRange resolveBracketObject(boolean around, char open, char close) {
+    MotionRange resolveBracketObject(boolean around, char open, char close) {
         String text = writingArea.getText();
         int caret = writingArea.getCaretPosition();
         int start = -1;
@@ -10896,7 +10820,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return around ? new MotionRange(start, end + 1, false) : new MotionRange(start + 1, end, false);
     }
 
-    private int previewMotionTarget(String motion) {
+    int previewMotionTarget(String motion) {
         int original = writingArea.getCaretPosition();
         switch (motion) {
             case "h":
@@ -10952,7 +10876,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Mode management
-    private void setMode(EditorMode mode) {
+    void setMode(EditorMode mode) {
         EditorMode oldMode = this.editorState.mode;
         if ((oldMode == EditorMode.VISUAL || oldMode == EditorMode.VISUAL_LINE) && mode != EditorMode.VISUAL && mode != EditorMode.VISUAL_LINE) {
             editorState.lastVisualStart = writingArea.getSelectionStart();
@@ -10973,7 +10897,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private Color getModeBackground(EditorMode mode) {
+    Color getModeBackground(EditorMode mode) {
         switch (mode) {
             case INSERT:
                 return configManager.getInsertColor();
@@ -10992,7 +10916,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Status bar update
-    private void updateStatusBar() {
+    void updateStatusBar() {
         FileBuffer buffer = getCurrentBuffer();
         StringBuilder status = new StringBuilder();
 
@@ -11057,7 +10981,7 @@ public class Texteditor extends JFrame implements KeyListener {
         applyDramaticFooterStyling();
     }
 
-    private String inlinePeekMessage(FileBuffer buffer) {
+    String inlinePeekMessage(FileBuffer buffer) {
         String quickfixPeek = quickfixInlinePeek();
         if (quickfixPeek != null) {
             return quickfixPeek;
@@ -11069,7 +10993,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private String quickfixInlinePeek() {
+    String quickfixInlinePeek() {
         if (!isQuickfixBufferActive()) {
             return null;
         }
@@ -11084,7 +11008,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return ("peek [" + source + "] " + location + safePreviewText(entry.getMessage(), 120)).trim();
     }
 
-    private String diagnosticInlinePeek(FileBuffer buffer) {
+    String diagnosticInlinePeek(FileBuffer buffer) {
         if (buffer == null || !buffer.hasFilePath()) {
             return null;
         }
@@ -11113,7 +11037,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "peek [diag " + severity + "] " + safePreviewText(best.getMessage(), 120);
     }
 
-    private String safePreviewText(String text, int maxLength) {
+    String safePreviewText(String text, int maxLength) {
         if (text == null) {
             return "";
         }
@@ -11124,7 +11048,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
     }
 
-    private void appendLspStatus(StringBuilder status, FileBuffer buffer) {
+    void appendLspStatus(StringBuilder status, FileBuffer buffer) {
         LspClient client = existingLspClient(buffer);
         if (client == null || !buffer.hasFilePath()) {
             return;
@@ -11172,7 +11096,7 @@ public class Texteditor extends JFrame implements KeyListener {
         status.append("  ");
     }
 
-    private void handleDocumentChange() {
+    void handleDocumentChange() {
         if (!suppressDocumentEvents) {
             markModified();
             updateCurrentLineHighlight();
@@ -11181,7 +11105,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void withSuppressedDocumentEvents(Runnable action) {
+    void withSuppressedDocumentEvents(Runnable action) {
         suppressDocumentEvents = true;
         try {
             action.run();
@@ -11190,23 +11114,23 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void detachActiveDocumentListener() {
+    void detachActiveDocumentListener() {
         if (bufferDocumentListener != null && writingArea.getDocument() != null) {
             writingArea.getDocument().removeDocumentListener(bufferDocumentListener);
         }
     }
 
-    private void attachActiveDocumentListener() {
+    void attachActiveDocumentListener() {
         if (bufferDocumentListener != null && writingArea.getDocument() != null) {
             writingArea.getDocument().addDocumentListener(bufferDocumentListener);
         }
     }
 
-    private void loadBufferIntoEditor(FileBuffer buffer) {
+    void loadBufferIntoEditor(FileBuffer buffer) {
         loadBufferIntoPane(getActivePane(), buffer, 0);
     }
 
-    private void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
+    void loadBufferIntoPane(EditorPane pane, FileBuffer buffer, int caretPosition) {
         if (pane == null || buffer == null) {
             return;
         }
@@ -11250,7 +11174,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void persistCurrentBufferState() {
+    void persistCurrentBufferState() {
         EditorPane pane = getActivePane();
         if (pane != null) {
             pane.setBuffer(getCurrentBuffer());
@@ -11258,7 +11182,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Mark buffer as modified
-    private void markModified() {
+    void markModified() {
         FileBuffer buffer = getCurrentBuffer();
         if (buffer != null) {
             buffer.setModified(true);
@@ -11274,7 +11198,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void updateDiffGutter(FileBuffer buffer) {
+    void updateDiffGutter(FileBuffer buffer) {
         if (lineNumberPanel != null && buffer != null) {
             lineNumberPanel.updateDiffMarkers(buffer.getSavedContent(), writingArea.getText());
         }
@@ -11304,7 +11228,7 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // File operations
-    private void openFileChooser() {
+    void openFileChooser() {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setCurrentDirectory(new File(System.getProperty("user.home")));
         int result = fileChooser.showOpenDialog(this);
@@ -11319,7 +11243,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void openLandingPage() {
+    void openLandingPage() {
         StringBuilder builder = new StringBuilder();
         builder.append("shed ").append(VERSION).append("\n");
         builder.append("swing modal editor\n\n");
@@ -11498,7 +11422,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Buffer deleted";
     }
 
-    private void switchToBuffer(int index) {
+    void switchToBuffer(int index) {
         if (index < 0 || index >= buffers.size()) {
             return;
         }
@@ -11539,7 +11463,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return closePane(getActivePane());
     }
 
-    private String closePane(EditorPane paneToClose) {
+    String closePane(EditorPane paneToClose) {
         if (editorPanes.size() <= 1) {
             return "Cannot close the only window";
         }
@@ -11661,7 +11585,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Window focus changed";
     }
 
-    private WindowLayoutNode.Direction toLayoutDirection(int dx, int dy) {
+    WindowLayoutNode.Direction toLayoutDirection(int dx, int dy) {
         if (dx < 0) {
             return WindowLayoutNode.Direction.LEFT;
         }
@@ -11674,7 +11598,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return WindowLayoutNode.Direction.DOWN;
     }
 
-    private double directionalAlignmentScore(Rectangle activeBounds, Rectangle candidateBounds, WindowLayoutNode.Direction direction) {
+    double directionalAlignmentScore(Rectangle activeBounds, Rectangle candidateBounds, WindowLayoutNode.Direction direction) {
         double axisDistance;
         double orthogonalDistance;
         switch (direction) {
@@ -11702,7 +11626,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return axisDistance * 1000.0 + orthogonalDistance;
     }
 
-    private Rectangle paneBounds(EditorPane pane) {
+    Rectangle paneBounds(EditorPane pane) {
         return SwingUtilities.convertRectangle(
             pane.getScrollPane().getParent(),
             pane.getScrollPane().getBounds(),
@@ -11710,7 +11634,7 @@ public class Texteditor extends JFrame implements KeyListener {
         );
     }
 
-    private FileBuffer findBufferByPath(File file) {
+    FileBuffer findBufferByPath(File file) {
         if (file == null) {
             return null;
         }
@@ -11723,7 +11647,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private boolean shouldReplaceSingleLandingBuffer() {
+    boolean shouldReplaceSingleLandingBuffer() {
         if (buffers.size() != 1) {
             return false;
         }
@@ -11773,7 +11697,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String substituteCurrentLine(String pattern, String replacement, boolean replaceAll) {
+    String substituteCurrentLine(String pattern, String replacement, boolean replaceAll) {
         try {
             int caretPosition = writingArea.getCaretPosition();
             int line = writingArea.getLineOfOffset(caretPosition);
@@ -11797,7 +11721,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {
+    ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {
         SubstituteService.Result r = substituteService.replaceRegex(text, pattern, replacement, replaceAll);
         return new ReplacementResult(r.getUpdatedText(), r.getMatchCount(), r.getFirstMatchOffset());
     }
@@ -11948,7 +11872,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return (persist ? "Applied and saved " : "Applied ") + applied + " palette key" + (applied == 1 ? "" : "s");
     }
 
-    private String mapPaletteAliasToConfigKey(String rawKey) {
+    String mapPaletteAliasToConfigKey(String rawKey) {
         if (rawKey == null || rawKey.isBlank()) {
             return null;
         }
@@ -11994,7 +11918,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String colorToHex(Color color) {
+    String colorToHex(Color color) {
         if (color == null) {
             return "#000000";
         }
@@ -12029,7 +11953,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean isThemeRelatedConfigKey(String key) {
+    boolean isThemeRelatedConfigKey(String key) {
         if (key == null) {
             return false;
         }
@@ -12123,7 +12047,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Settings reloaded";
     }
 
-    private boolean isSettingsFile(File file) {
+    boolean isSettingsFile(File file) {
         if (file == null) {
             return false;
         }
@@ -12135,13 +12059,13 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean didConfigKeyChange(String previousContent, String updatedContent, String key) {
+    boolean didConfigKeyChange(String previousContent, String updatedContent, String key) {
         String previousValue = extractConfigValue(previousContent, key);
         String updatedValue = extractConfigValue(updatedContent, key);
         return !Objects.equals(previousValue, updatedValue);
     }
 
-    private String extractConfigValue(String content, String key) {
+    String extractConfigValue(String content, String key) {
         if (content == null || key == null || key.isBlank()) {
             return null;
         }
@@ -12165,7 +12089,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private void applyRuntimeConfigFromSettings() {
+    void applyRuntimeConfigFromSettings() {
         refreshDramaticSettings();
         lineNumberMode = configManager.getLineNumberMode();
         Font editorFont = resolveEditorFont();
@@ -12293,7 +12217,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String saveSession(String nameArgument) {
+    String saveSession(String nameArgument) {
         File sessionFile = resolveSessionFile(nameArgument);
         File sessionDir = sessionFile.getParentFile();
         if (sessionDir != null && !sessionDir.exists()) {
@@ -12334,7 +12258,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private String loadSession(String nameArgument, boolean force) {
+    String loadSession(String nameArgument, boolean force) {
         File sessionFile = resolveSessionFile(nameArgument);
         if (!sessionFile.exists()) {
             return "Session not found: " + sessionFile.getAbsolutePath();
@@ -12362,7 +12286,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean restoreSessionV2(Map<String, Object> payload) {
+    boolean restoreSessionV2(Map<String, Object> payload) {
         Map<String, FileBuffer> idToBuffer = new HashMap<>();
         List<FileBuffer> restoredBuffers = deserializeSessionBuffers(payload.get("buffers"), idToBuffer);
         if (restoredBuffers.isEmpty()) {
@@ -12430,7 +12354,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private boolean restoreLegacySession(Map<String, Object> payload) {
+    boolean restoreLegacySession(Map<String, Object> payload) {
         List<String> filePaths = extractSessionFilePaths(payload.get("files"));
         if (filePaths.isEmpty()) {
             return false;
@@ -12486,7 +12410,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private Map<String, Object> captureSessionUiSettings() {
+    Map<String, Object> captureSessionUiSettings() {
         Map<String, Object> settings = new LinkedHashMap<>();
         String[] keys = {
             "theme",
@@ -12513,7 +12437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return settings;
     }
 
-    private void applySessionUiSettings(Map<String, Object> settings) {
+    void applySessionUiSettings(Map<String, Object> settings) {
         if (settings == null || settings.isEmpty()) {
             return;
         }
@@ -12528,7 +12452,7 @@ public class Texteditor extends JFrame implements KeyListener {
         applyRuntimeConfigFromSettings();
     }
 
-    private List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {
+    List<Map<String, Object>> serializeSessionBuffers(Map<FileBuffer, String> bufferIds) {
         List<Map<String, Object>> entries = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : buffers) {
@@ -12563,7 +12487,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return entries;
     }
 
-    private List<Map<String, Object>> serializeSessionPanes(Map<FileBuffer, String> bufferIds) {
+    List<Map<String, Object>> serializeSessionPanes(Map<FileBuffer, String> bufferIds) {
         List<Map<String, Object>> panes = new ArrayList<>();
         for (EditorPane pane : editorPanes) {
             if (pane == null) {
@@ -12580,7 +12504,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return panes;
     }
 
-    private List<FileBuffer> deserializeSessionBuffers(Object bufferObject, Map<String, FileBuffer> idToBuffer) {
+    List<FileBuffer> deserializeSessionBuffers(Object bufferObject, Map<String, FileBuffer> idToBuffer) {
         List<FileBuffer> restored = new ArrayList<>();
         List<Object> items = MiniJson.asArray(bufferObject);
         if (items == null) {
@@ -12638,7 +12562,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return restored;
     }
 
-    private Map<String, Object> serializeWindowLayout(WindowLayoutNode node) {
+    Map<String, Object> serializeWindowLayout(WindowLayoutNode node) {
         if (node == null) {
             return null;
         }
@@ -12657,7 +12581,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return serialized;
     }
 
-    private WindowLayoutNode deserializeWindowLayout(Map<String, Object> layout, List<EditorPane> panes) {
+    WindowLayoutNode deserializeWindowLayout(Map<String, Object> layout, List<EditorPane> panes) {
         if (layout == null || panes == null || panes.isEmpty()) {
             return null;
         }
@@ -12689,7 +12613,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return null;
     }
 
-    private void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
+    void resetEditorPanesForSession(int paneCount, Map<String, Object> layoutObject) {
         detachActiveDocumentListener();
         editorPanes.clear();
         int totalPanes = Math.max(1, paneCount);
@@ -12708,7 +12632,7 @@ public class Texteditor extends JFrame implements KeyListener {
         attachActiveDocumentListener();
     }
 
-    private WindowLayoutNode defaultLayoutForPanes(List<EditorPane> panes) {
+    WindowLayoutNode defaultLayoutForPanes(List<EditorPane> panes) {
         if (panes == null || panes.isEmpty()) {
             return null;
         }
@@ -12721,7 +12645,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return root;
     }
 
-    private List<String> extractSessionFilePaths(Object filesObject) {
+    List<String> extractSessionFilePaths(Object filesObject) {
         List<String> paths = new ArrayList<>();
         List<Object> files = MiniJson.asArray(filesObject);
         if (files == null) {
@@ -12745,7 +12669,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return paths;
     }
 
-    private String listSessions() {
+    String listSessions() {
         File dir = new File(configManager.getSessionDirectory());
         if (!dir.exists() || !dir.isDirectory()) {
             return "No sessions";
@@ -12768,7 +12692,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing sessions";
     }
 
-    private String listWorkspaceProfiles() {
+    String listWorkspaceProfiles() {
         File dir = new File(configManager.getSessionDirectory());
         if (!dir.exists() || !dir.isDirectory()) {
             return "No workspace profiles";
@@ -12796,7 +12720,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing workspace profiles";
     }
 
-    private String defaultWorkspaceProfileName() {
+    String defaultWorkspaceProfileName() {
         FileBuffer current = getCurrentBuffer();
         if (current != null && current.hasFilePath()) {
             File root = detectProjectTrustRoot(new File(current.getFilePath()));
@@ -12810,7 +12734,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "default";
     }
 
-    private File resolveSessionFile(String nameArgument) {
+    File resolveSessionFile(String nameArgument) {
         String rawName = nameArgument == null || nameArgument.isBlank()
             ? configManager.getSessionAutoloadName()
             : nameArgument.trim();
@@ -12819,7 +12743,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return new File(dir, safeName + ".json");
     }
 
-    private String sanitizeSessionName(String rawName) {
+    String sanitizeSessionName(String rawName) {
         if (rawName == null || rawName.isBlank()) {
             return "default";
         }
@@ -12836,7 +12760,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return sanitized.isEmpty() ? "default" : sanitized;
     }
 
-    private boolean hasUnsavedChangesInAnyBuffer() {
+    boolean hasUnsavedChangesInAnyBuffer() {
         for (FileBuffer buffer : buffers) {
             if (buffer != null && buffer.isModified()) {
                 return true;
@@ -12845,7 +12769,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return false;
     }
 
-    private void ensureSettingsFileSeeded(File settingsFile) throws IOException {
+    void ensureSettingsFileSeeded(File settingsFile) throws IOException {
         if (settingsFile == null) {
             return;
         }
@@ -12897,12 +12821,12 @@ public class Texteditor extends JFrame implements KeyListener {
         openScratchBuffer(topic == null || topic.isEmpty() ? "[help]" : "[help " + topic + "]", helpText, true);
     }
 
-    private String getHelpText(String topic) {
+    String getHelpText(String topic) {
         return helpService.getHelpText(topic, VERSION);
     }
 
     // Recent files management
-    private void addToRecentFiles(String filepath) {
+    void addToRecentFiles(String filepath) {
         if (filepath == null || filepath.isEmpty()) {
             return;
         }
@@ -12930,7 +12854,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing recent files";
     }
 
-    private void showBufferListDialog(String list) {
+    void showBufferListDialog(String list) {
         JTextArea textArea = new JTextArea(list);
         textArea.setEditable(false);
         textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
@@ -12942,18 +12866,18 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     // Quit handling
-    private void handleQuit(boolean force) {
+    void handleQuit(boolean force) {
         String message = requestQuit(force);
         if (!"Quitting".equals(message)) {
             showMessage(message);
         }
     }
 
-    private boolean hasUnsavedChanges(FileBuffer buffer) {
+    boolean hasUnsavedChanges(FileBuffer buffer) {
         return buffer != null && buffer.isModified();
     }
 
-    private int confirmDiscardChanges(String prompt) {
+    int confirmDiscardChanges(String prompt) {
         return JOptionPane.showConfirmDialog(this,
             prompt,
             "Unsaved Changes",
@@ -12986,7 +12910,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return pluginManager;
     }
 
-    private void firePluginEvent(String event) {
+    void firePluginEvent(String event) {
         if (pluginManager == null) return;
         pluginManager.fireEvent(event);
     }
@@ -13201,7 +13125,7 @@ public class Texteditor extends JFrame implements KeyListener {
         openScratchBuffer(title, content, true);
     }
 
-    private void openScratchBuffer(String title, String content, boolean returnable) {
+    void openScratchBuffer(String title, String content, boolean returnable) {
         persistCurrentBufferState();
 
         FileBuffer scratchBuffer = FileBuffer.createScratch(title, content);
@@ -13215,7 +13139,7 @@ public class Texteditor extends JFrame implements KeyListener {
         loadBufferIntoEditor(scratchBuffer);
     }
 
-    private boolean closeReturnableScratchBuffer() {
+    boolean closeReturnableScratchBuffer() {
         FileBuffer current = getCurrentBuffer();
         if (current == null || specialBufferReturns.isEmpty()) {
             return false;
@@ -13246,7 +13170,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return true;
     }
 
-    private void loadRecentFiles() {
+    void loadRecentFiles() {
         recentFiles.clear();
         if (!recentFilesStore.exists()) {
             return;
@@ -13257,7 +13181,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void saveRecentFiles() {
+    void saveRecentFiles() {
         try {
             ensureStoreDirectory(recentFilesStore);
             Files.write(recentFilesStore.toPath(), recentFiles, StandardCharsets.UTF_8);
@@ -13265,7 +13189,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void loadTrustedProjectRoots() {
+    void loadTrustedProjectRoots() {
         trustedProjectRoots.clear();
         if (trustedProjectsStore == null || !trustedProjectsStore.exists()) {
             return;
@@ -13281,7 +13205,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void saveTrustedProjectRoots() {
+    void saveTrustedProjectRoots() {
         if (trustedProjectsStore == null) {
             return;
         }
@@ -13301,7 +13225,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private boolean ensureProjectTrustForFile(File file) {
+    boolean ensureProjectTrustForFile(File file) {
         File projectRoot = detectProjectTrustRoot(file);
         if (projectRoot == null) {
             return true;
@@ -13336,7 +13260,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return false;
     }
 
-    private File detectProjectTrustRoot(File file) {
+    File detectProjectTrustRoot(File file) {
         if (file == null) {
             return null;
         }
@@ -13356,7 +13280,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return firstConfigRoot;
     }
 
-    private boolean hasProjectLocalExecutionSurface(File projectRoot) {
+    boolean hasProjectLocalExecutionSurface(File projectRoot) {
         if (projectRoot == null || !projectRoot.isDirectory()) {
             return false;
         }
@@ -13373,7 +13297,7 @@ public class Texteditor extends JFrame implements KeyListener {
         return pluginFiles != null && pluginFiles.length > 0;
     }
 
-    private void appendCommandLog(String entry) {
+    void appendCommandLog(String entry) {
         if (entry == null || entry.isBlank()) {
             return;
         }
@@ -13388,7 +13312,7 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private void ensureStoreDirectory(File store) throws IOException {
+    void ensureStoreDirectory(File store) throws IOException {
         if (store == null) {
             return;
         }
@@ -13398,8 +13322,8 @@ public class Texteditor extends JFrame implements KeyListener {
         }
     }
 
-    private static final Pattern HEX_COLOR_PATTERN = Pattern.compile("#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\b");
-    private void paintColorPreviews(Graphics g, JTextArea area) {
+    static final Pattern HEX_COLOR_PATTERN = Pattern.compile("#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\b");
+    void paintColorPreviews(Graphics g, JTextArea area) {
         String text = area.getText();
         if (text.isEmpty()) return;
         FontMetrics fm = g.getFontMetrics(area.getFont());
@@ -13425,7 +13349,7 @@ public class Texteditor extends JFrame implements KeyListener {
             } catch (Exception ignored) {}
         }
     }
-    private void paintWrapIndicators(Graphics g, JTextArea area) {
+    void paintWrapIndicators(Graphics g, JTextArea area) {
         FontMetrics fm = g.getFontMetrics(area.getFont());
         int lineH = fm.getHeight();
         g.setColor(new Color(255, 255, 255, 40));
@@ -13454,7 +13378,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (Exception ignored) {}
     }
 
-    private void paintVisualBlockOverlay(Graphics g, JTextArea area) {
+    void paintVisualBlockOverlay(Graphics g, JTextArea area) {
         if (editorState.mode != EditorMode.VISUAL_BLOCK || area != writingArea) return;
         int[] bounds = getVisualBlockBounds();
         if (bounds == null) return;
@@ -13476,7 +13400,7 @@ public class Texteditor extends JFrame implements KeyListener {
         } catch (BadLocationException ignored) {}
     }
 
-    private void paintDiagnosticOverlay(Graphics g, JTextArea area) {
+    void paintDiagnosticOverlay(Graphics g, JTextArea area) {
         if (area == null || diagnosticRanges.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g;
         FontMetrics fm = g2.getFontMetrics(area.getFont());
@@ -13552,7 +13476,7 @@ public class Texteditor extends JFrame implements KeyListener {
         writingArea.repaint();
     }
 
-    private void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
+    void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
         if (area == null || area != writingArea || syntaxForegroundSpans.isEmpty()) {
             return;
         }
@@ -13628,18 +13552,6 @@ public class Texteditor extends JFrame implements KeyListener {
         g2.dispose();
     }
 
-    private static final class SyntaxSpan {
-        private final int start;
-        private final int end;
-        private final Color color;
-
-        private SyntaxSpan(int start, int end, Color color) {
-            this.start = start;
-            this.end = end;
-            this.color = color;
-        }
-    }
-
     public void closeEditor() {
         if (closingDown) {
             return;
@@ -13680,129 +13592,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     @Override
     public void keyReleased(KeyEvent e) {}
-
-    private static class ReplacementResult {
-        private final String updatedText;
-        private final int matchCount;
-        private final int firstMatchOffset;
-
-        private ReplacementResult(String updatedText, int matchCount, int firstMatchOffset) {
-            this.updatedText = updatedText;
-            this.matchCount = matchCount;
-            this.firstMatchOffset = firstMatchOffset;
-        }
-    }
-
-    private static class SubstitutePreview {
-        private final String pattern;
-        private final int startLine;
-        private final int endLine;
-
-        private SubstitutePreview(String pattern, int startLine, int endLine) {
-            this.pattern = pattern;
-            this.startLine = startLine;
-            this.endLine = endLine;
-        }
-    }
-
-    private static class MotionRange {
-        private final int start;
-        private final int end;
-        private final boolean lineWise;
-
-        private MotionRange(int start, int end, boolean lineWise) {
-            this.start = Math.max(0, start);
-            this.end = Math.max(this.start, end);
-            this.lineWise = lineWise;
-        }
-    }
-
-    private static class SurroundPair {
-        private final char open;
-        private final char close;
-
-        private SurroundPair(char open, char close) {
-            this.open = open;
-            this.close = close;
-        }
-    }
-
-    private static class ResolvedTextEdit {
-        private final int startOffset;
-        private final int endOffset;
-        private final String newText;
-
-        private ResolvedTextEdit(int startOffset, int endOffset, String newText) {
-            this.startOffset = Math.max(0, startOffset);
-            this.endOffset = Math.max(this.startOffset, endOffset);
-            this.newText = newText == null ? "" : newText;
-        }
-    }
-
-    private static class WorkspaceEditApplyResult {
-        private int appliedEditCount;
-        private int touchedFiles;
-        private int failedFiles;
-
-        private WorkspaceEditApplyResult() {
-            this.appliedEditCount = 0;
-            this.touchedFiles = 0;
-            this.failedFiles = 0;
-        }
-    }
-
-    private static class SpecialBufferReturnState {
-        private final FileBuffer scratchBuffer;
-        private final FileBuffer returnBuffer;
-        private final int returnCaretPosition;
-
-        private SpecialBufferReturnState(FileBuffer scratchBuffer, FileBuffer returnBuffer, int returnCaretPosition) {
-            this.scratchBuffer = scratchBuffer;
-            this.returnBuffer = returnBuffer;
-            this.returnCaretPosition = returnCaretPosition;
-        }
-    }
-
-    private static class TerminalSession {
-        private final FileBuffer buffer;
-        private File workingDirectory;
-        private final List<String> history;
-        private int historyIndex;
-        private String historyDraft;
-        private int promptOffset;
-        private int runningJobId;
-
-        private TerminalSession(FileBuffer buffer, File workingDirectory) {
-            this.buffer = buffer;
-            this.workingDirectory = normalizeWorkingDirectory(workingDirectory);
-            this.history = new ArrayList<>();
-            this.historyIndex = 0;
-            this.historyDraft = "";
-            this.promptOffset = 0;
-            this.runningJobId = -1;
-        }
-
-        private static File normalizeWorkingDirectory(File directory) {
-            File candidate = directory == null ? new File(".") : directory;
-            try {
-                return candidate.getCanonicalFile();
-            } catch (IOException ignored) {
-                return candidate.getAbsoluteFile();
-            }
-        }
-    }
-
-    private static class CommandResult {
-        private final int exitCode;
-        private final String stdout;
-        private final String stderr;
-
-        private CommandResult(int exitCode, String stdout, String stderr) {
-            this.exitCode = exitCode;
-            this.stdout = stdout == null ? "" : stdout;
-            this.stderr = stderr == null ? "" : stderr;
-        }
-    }
 
     // Main method
     public static void main(String[] args) {

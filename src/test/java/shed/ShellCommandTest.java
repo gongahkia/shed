@@ -1,0 +1,40 @@
+package shed;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import java.util.Map;
+import org.junit.jupiter.api.Test;
+
+public class ShellCommandTest {
+    @Test
+    void usesShellEnvironmentWhenSupportedAndExecutable() {
+        assertEquals(
+            java.util.List.of("/usr/bin/bash", "-lc", "echo ok"),
+            ShellCommand.forCommand("echo ok", Map.of("SHELL", "/usr/bin/bash"), "/usr/bin/bash"::equals)
+        );
+    }
+
+    @Test
+    void fallsBackToLinuxBashWhenShellEnvironmentIsUnsupported() {
+        assertEquals(
+            java.util.List.of("/bin/bash", "-lc", "echo ok"),
+            ShellCommand.forCommand("echo ok", Map.of("SHELL", "/usr/bin/fish"), "/bin/bash"::equals)
+        );
+    }
+
+    @Test
+    void fallsBackToPosixShellWhenOnlyShExists() {
+        assertEquals(
+            java.util.List.of("/bin/sh", "-c", "echo ok"),
+            ShellCommand.forCommand("echo ok", Map.of(), "/bin/sh"::equals)
+        );
+    }
+
+    @Test
+    void keepsPathLookupFallbackWhenNoKnownShellPathExists() {
+        assertEquals(
+            java.util.List.of("sh", "-c", "echo ok"),
+            ShellCommand.forCommand("echo ok", Map.of(), path -> false)
+        );
+    }
+}

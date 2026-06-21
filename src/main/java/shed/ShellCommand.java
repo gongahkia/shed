@@ -28,6 +28,15 @@ final class ShellCommand {
         return List.of(shell, flag, command);
     }
 
+    static List<String> interactiveCommand() {
+        return interactiveCommand(System.getenv(), path -> new File(path).canExecute());
+    }
+
+    static List<String> interactiveCommand(Map<String, String> env, Predicate<String> executable) {
+        String shell = resolveShell(env, executable);
+        return usesLoginFlag(shell) ? List.of(shell, "-l") : List.of(shell);
+    }
+
     static String resolveShell(Map<String, String> env, Predicate<String> executable) {
         String shell = env == null ? null : env.get("SHELL");
         if (isUsableShell(shell, executable)) {

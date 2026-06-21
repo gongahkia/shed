@@ -155,6 +155,7 @@ public class Texteditor extends JFrame implements KeyListener {
     private int keymapReplayDepth;
     private List<RegisterContent> yankRing;
     private Map<FileBuffer, TerminalSession> terminalSessions;
+    private Map<FileBuffer, PtyTerminalPane> ptyTerminalPanes;
     private int terminalBufferCounter;
 
     // Markdown / orgmode features
@@ -291,6 +292,7 @@ public class Texteditor extends JFrame implements KeyListener {
         keymapReplayDepth = 0;
         yankRing = new ArrayList<>();
         terminalSessions = new HashMap<>();
+        ptyTerminalPanes = new HashMap<>();
         terminalBufferCounter = 1;
         treePane = null;
         treeBuffer = null;
@@ -1900,11 +1902,6 @@ public class Texteditor extends JFrame implements KeyListener {
             } else if (code == KeyEvent.VK_ESCAPE) {
                 dismissCompletionPopup(); e.consume(); return;
             }
-        }
-        TerminalSession terminalSession = getActiveTerminalSession();
-        if (terminalSession != null && handleTerminalInsertMode(terminalSession, e)) {
-            e.consume();
-            return;
         }
         if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
             dismissCompletionPopup();
@@ -5701,20 +5698,39 @@ public class Texteditor extends JFrame implements KeyListener {
     public String openTerminal() {
         File startDirectory = resolveTerminalStartDirectory();
         String title = "[Terminal " + (terminalBufferCounter++) + "]";
-        String banner = "Shed terminal (line mode)\n"
-            + "Enter runs command, Ctrl+C cancels running command.\n"
-            + "Built-ins: cd, pwd, clear.\n\n";
-        FileBuffer termBuffer = FileBuffer.createScratch(title, banner);
-        buffers.add(termBuffer);
-        splitWindow(false);
-        loadBufferIntoEditor(termBuffer);
+        PtyTerminalPane terminalPane;
+        try {
+            terminalPane = PtyTerminalPane.open(startDirectory, configManager);
+        } catch (IOException e) {
+            return "Terminal failed: " + e.getMessage();
+        }
 
-        TerminalSession session = new TerminalSession(termBuffer, startDirectory);
-        terminalSessions.put(termBuffer, session);
-        appendTerminalPrompt(session);
+        FileBuffer termBuffer = FileBuffer.createScratch(title, "");
+        buffers.add(termBuffer);
+
+        EditorPane activePane = getActivePane();
+        if (activePane == null) {
+            terminalPane.close();
+            return "No active window";
+        }
+        Dimension size = getSize();
+        EditorPane terminalEditorPane = createEditorPane(size);
+        terminalEditorPane.setBuffer(termBuffer);
+        terminalEditorPane.setTerminalPane(terminalPane);
+        installTerminalActivationListeners(terminalEditorPane, terminalPane.getComponent());
+        editorPanes.add(terminalEditorPane);
+        if (windowLayoutRoot == null) {
+            windowLayoutRoot = WindowLayoutNode.leaf(activePane);
+        }
+        double startRatio = dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0.12 : 0.5;
+        windowLayoutRoot.splitLeaf(activePane, terminalEditorPane, WindowLayoutNode.Orientation.VERTICAL, false, startRatio);
+        ptyTerminalPanes.put(termBuffer, terminalPane);
+        renderWindowLayout();
+        animateSplitForPane(terminalEditorPane, startRatio, 0.5);
+        activateEditorPane(terminalEditorPane);
         setMode(EditorMode.INSERT);
-        writingArea.setCaretPosition(writingArea.getText().length());
-        return "Terminal opened (insert mode)";
+        terminalPane.requestFocusInWindow();
+        return "Terminal opened";
     }
 
     private File resolveTerminalStartDirectory() {
@@ -6050,10 +6066,37 @@ public class Texteditor extends JFrame implements KeyListener {
         if (buffer == null) {
             return;
         }
+        PtyTerminalPane terminalPane = ptyTerminalPanes.remove(buffer);
+        if (terminalPane != null) {
+            terminalPane.close();
+        }
         TerminalSession session = terminalSessions.remove(buffer);
         if (session != null && session.runningJobId >= 0) {
             asyncJobService.cancel(session.runningJobId);
             session.runningJobId = -1;
+        }
+    }
+
+    private void installTerminalActivationListeners(EditorPane pane, Component component) {
+        if (pane == null || component == null) {
+            return;
+        }
+        component.addFocusListener(new java.awt.event.FocusAdapter() {
+            @Override
+            public void focusGained(java.awt.event.FocusEvent e) {
+                activateEditorPane(pane);
+            }
+        });
+        component.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mousePressed(java.awt.event.MouseEvent e) {
+                activateEditorPane(pane);
+            }
+        });
+        if (component instanceof Container) {
+            for (Component child : ((Container) component).getComponents()) {
+                installTerminalActivationListeners(pane, child);
+            }
         }
     }
 

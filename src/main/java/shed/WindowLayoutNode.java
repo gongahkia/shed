@@ -66,7 +66,7 @@ public class WindowLayoutNode {
 
     public Component render() {
         if (isLeaf()) {
-            return pane.getScrollPane();
+            return pane.getComponent();
         }
 
         int splitOrientation = orientation == Orientation.HORIZONTAL ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT;

@@ -1,5 +1,6 @@
 package shed;
 
+import java.awt.Component;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
@@ -9,6 +10,7 @@ public class EditorPane {
     private final JScrollPane scrollPane;
     private final SearchManager searchManager;
     private FileBuffer buffer;
+    private PtyTerminalPane terminalPane;
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
         this.textArea = textArea;
@@ -29,6 +31,10 @@ public class EditorPane {
         return scrollPane;
     }
 
+    public Component getComponent() {
+        return terminalPane == null ? scrollPane : terminalPane.getComponent();
+    }
+
     public SearchManager getSearchManager() {
         return searchManager;
     }
@@ -39,5 +45,21 @@ public class EditorPane {
 
     public void setBuffer(FileBuffer buffer) {
         this.buffer = buffer;
+    }
+
+    public PtyTerminalPane getTerminalPane() {
+        return terminalPane;
+    }
+
+    public void setTerminalPane(PtyTerminalPane terminalPane) {
+        closeTerminalPane();
+        this.terminalPane = terminalPane;
+    }
+
+    public void closeTerminalPane() {
+        if (terminalPane != null) {
+            terminalPane.close();
+            terminalPane = null;
+        }
     }
 }

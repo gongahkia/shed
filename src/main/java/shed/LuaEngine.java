@@ -261,7 +261,7 @@ public class LuaEngine {
         public LuaValue call(LuaValue arg) {
             String cmd = arg.checkjstring();
             try {
-                ProcessBuilder pb = new ProcessBuilder("bash", "-c", cmd);
+                ProcessBuilder pb = new ProcessBuilder(ShellCommand.forCommand(cmd));
                 pb.redirectErrorStream(true);
                 FileBuffer buf = editor.getCurrentBuffer();
                 if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {

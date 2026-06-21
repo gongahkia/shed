@@ -5880,7 +5880,7 @@ public class Texteditor extends JFrame implements KeyListener {
         int jobId = asyncJobService.submit(
             "terminal: " + command,
             token -> runExternalCommand(
-                List.of("zsh", "-lc", command),
+                ShellCommand.forCommand(command),
                 session.workingDirectory,
                 null,
                 token,
@@ -6306,7 +6306,7 @@ public class Texteditor extends JFrame implements KeyListener {
         int jobId = asyncJobService.submit(
             "task " + normalizedName + ": " + commandToRun,
             token -> runExternalCommand(
-                List.of("zsh", "-lc", commandToRun),
+                ShellCommand.forCommand(commandToRun),
                 projectRoot,
                 null,
                 token,
@@ -6671,7 +6671,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     private CommandResult runShellProcess(String command, String input, AsyncJobService.JobToken token) throws Exception {
         return runExternalCommand(
-            List.of("zsh", "-lc", command),
+            ShellCommand.forCommand(command),
             new File("."),
             input,
             token,
@@ -12988,7 +12988,7 @@ public class Texteditor extends JFrame implements KeyListener {
                 workingDirectory = buf.getFile().getParentFile();
             }
             CommandResult result = runExternalCommand(
-                List.of("bash", "-lc", interpolated),
+                ShellCommand.forCommand(interpolated),
                 workingDirectory,
                 null,
                 null,

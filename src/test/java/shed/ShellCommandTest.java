@@ -37,4 +37,20 @@ public class ShellCommandTest {
             ShellCommand.forCommand("echo ok", Map.of(), path -> false)
         );
     }
+
+    @Test
+    void interactiveShellUsesLoginModeForBashAndZsh() {
+        assertEquals(
+            java.util.List.of("/bin/zsh", "-l"),
+            ShellCommand.interactiveCommand(Map.of("SHELL", "/bin/zsh"), "/bin/zsh"::equals)
+        );
+    }
+
+    @Test
+    void interactiveShellUsesPlainCommandForPosixSh() {
+        assertEquals(
+            java.util.List.of("/bin/sh"),
+            ShellCommand.interactiveCommand(Map.of("SHELL", "/bin/sh"), "/bin/sh"::equals)
+        );
+    }
 }

@@ -648,6 +648,17 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
     }
 
+    private void requestActivePaneFocus() {
+        EditorPane pane = getActivePane();
+        if (pane != null && pane.getTerminalPane() != null) {
+            pane.getTerminalPane().requestFocusInWindow();
+            return;
+        }
+        if (writingArea != null) {
+            writingArea.requestFocusInWindow();
+        }
+    }
+
     private void renderWindowLayout() {
         if (renderedLayoutComponent != null) {
             editorHostPanel.remove(renderedLayoutComponent);
@@ -11170,9 +11181,20 @@ public class Texteditor extends JFrame implements KeyListener {
             }
         }
 
+        boolean replacedTerminalPane = pane.getTerminalPane() != null;
+        if (replacedTerminalPane) {
+            FileBuffer previousBuffer = pane.getBuffer();
+            if (previousBuffer != null) {
+                ptyTerminalPanes.remove(previousBuffer);
+            }
+            pane.closeTerminalPane();
+        }
         pane.setBuffer(buffer);
         withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
         pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
+        if (replacedTerminalPane) {
+            renderWindowLayout();
+        }
 
         if (activePane) {
             bindActivePane(pane);
@@ -11495,6 +11517,8 @@ public class Texteditor extends JFrame implements KeyListener {
         if (paneToClose.getBuffer() == quickfixBuffer) {
             quickfixBuffer = null;
         }
+        closeTerminalSession(closingBuffer);
+        paneToClose.closeTerminalPane();
         if (isTreeBuffer(closingBuffer)) {
             treeLineTargets.remove(closingBuffer);
             buffers.remove(closingBuffer);
@@ -11525,7 +11549,7 @@ public class Texteditor extends JFrame implements KeyListener {
             updateCurrentLineHighlight();
             refreshLineNumberPanel();
             updateStatusBar();
-            writingArea.requestFocusInWindow();
+            requestActivePaneFocus();
         }
         return "Window closed";
     }
@@ -11537,7 +11561,7 @@ public class Texteditor extends JFrame implements KeyListener {
         int nextIndex = (activePaneIndex + 1) % editorPanes.size();
         activateEditorPane(editorPanes.get(nextIndex));
         flashPaneJump(getActivePane());
-        writingArea.requestFocusInWindow();
+        requestActivePaneFocus();
         return "Window focus changed";
     }
 
@@ -11595,7 +11619,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
         activateEditorPane(bestPane);
         flashPaneJump(bestPane);
-        writingArea.requestFocusInWindow();
+        requestActivePaneFocus();
         return "Window focus changed";
     }
 
@@ -13587,6 +13611,12 @@ public class Texteditor extends JFrame implements KeyListener {
             recoverySnapshotTimer.stop();
         }
         clearRecoverySnapshots();
+        if (ptyTerminalPanes != null) {
+            for (PtyTerminalPane terminalPane : new ArrayList<>(ptyTerminalPanes.values())) {
+                terminalPane.close();
+            }
+            ptyTerminalPanes.clear();
+        }
         if (asyncJobService != null) {
             asyncJobService.shutdownNow();
         }
@@ -13602,10 +13632,6 @@ public class Texteditor extends JFrame implements KeyListener {
     public void keyTyped(KeyEvent e) {
         if (suppressNextTypedChar) {
             suppressNextTypedChar = false;
-            e.consume();
-            return;
-        }
-        if (editorState.mode == EditorMode.INSERT && getActiveTerminalSession() != null) {
             e.consume();
             return;
         }

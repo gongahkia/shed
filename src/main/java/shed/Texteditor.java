@@ -88,6 +88,11 @@ public class Texteditor extends JFrame implements KeyListener {
     DramaticUiController dramaticUiController;
     SyntaxUiController syntaxUiController;
     EditActionController editActionController;
+    InputController inputController;
+    PaletteController paletteController;
+    EditorUiController editorUiController;
+    RecoveryController recoveryController;
+    SearchReplaceController searchReplaceController;
 
     // Buffer management
     List<FileBuffer> buffers;
@@ -369,6 +374,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
         syntaxUiController = new SyntaxUiController(this);
         editActionController = new EditActionController(this);
+        inputController = new InputController(this);
+        paletteController = new PaletteController(this);
+        editorUiController = new EditorUiController(this);
+        recoveryController = new RecoveryController(this);
+        searchReplaceController = new SearchReplaceController(this);
 
         // Initialize UI
         initializeUI();
@@ -416,1730 +426,113 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Initialize UI components
     void initializeUI() {
-        this.setTitle("Shed " + VERSION);
-        this.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        this.setSize(screenSize.width / 2, screenSize.height);
-        this.setLayout(new BorderLayout(5, 5));
-        editorHostPanel = new JPanel(new BorderLayout());
-        undoManager = new UndoManager();
-        bufferDocumentListener = new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { handleDocumentChange(); }
-            public void removeUpdate(DocumentEvent e) { handleDocumentChange(); }
-            public void changedUpdate(DocumentEvent e) { handleDocumentChange(); }
-        };
-
-        EditorPane initialPane = createEditorPane(screenSize);
-        editorPanes.add(initialPane);
-        activePaneIndex = 0;
-        bindActivePane(initialPane);
-        windowLayoutRoot = WindowLayoutNode.leaf(initialPane);
-        renderWindowLayout();
-
-        // Create footer
-        statusBar = new JLabel();
-        statusBar.setBackground(configManager.getStatusBarBackground());
-        statusBar.setOpaque(true);
-        statusBar.setPreferredSize(new Dimension(screenSize.width / 2, 30));
-        statusBar.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
-        statusBar.setForeground(configManager.getStatusBarForeground());
-
-        commandBar = new JLabel();
-        commandBar.setBackground(configManager.getCommandBarBackground());
-        commandBar.setOpaque(true);
-        commandBar.setPreferredSize(new Dimension(screenSize.width / 2, 28));
-        commandBar.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 10));
-        commandBar.setForeground(configManager.getCommandBarForeground());
-
-        JPanel footerPanel = new JPanel(new GridLayout(2, 1));
-        footerPanel.add(statusBar);
-        footerPanel.add(commandBar);
-
-        // Add components
-        this.add(editorHostPanel, BorderLayout.CENTER);
-        this.add(footerPanel, BorderLayout.SOUTH);
-
-        // Window close handler
-        this.addWindowListener(new java.awt.event.WindowAdapter() {
-            @Override
-            public void windowClosing(java.awt.event.WindowEvent windowEvent) {
-                handleQuit(false);
-            }
-        });
+        editorUiController.initializeUI();
     }
 
     EditorPane createEditorPane(Dimension screenSize) {
-        JTextArea textArea = new JTextArea() {
-            @Override
-            protected void paintComponent(Graphics g) {
-                super.paintComponent(g);
-                FontMetrics fm = g.getFontMetrics(getFont());
-                int charW = fm.charWidth(' ');
-                int lineH = fm.getHeight();
-                int insetLeft = getInsets().left;
-
-                // Column ruler
-                int rulerCol = configManager.getRulerColumn();
-                if (rulerCol > 0) {
-                    int x = charW * rulerCol + insetLeft;
-                    g.setColor(new Color(255, 255, 255, 30));
-                    g.drawLine(x, 0, x, getHeight());
-                }
-
-                // Indent guides
-                int tabSize = getTabSize();
-                if (tabSize > 0) {
-                    g.setColor(new Color(255, 255, 255, 15));
-                    Rectangle clip = g.getClipBounds();
-                    int startY = clip != null ? clip.y : 0;
-                    int endY = clip != null ? clip.y + clip.height : getHeight();
-                    String text = getText();
-                    try {
-                        int startLine = getLineOfOffset(viewToModel2D(new Point(0, startY)));
-                        int endLine = Math.min(getLineCount() - 1, getLineOfOffset(viewToModel2D(new Point(0, endY))));
-                        for (int line = startLine; line <= endLine; line++) {
-                            int ls = getLineStartOffset(line);
-                            int le = getLineEndOffset(line);
-                            String lineText = text.substring(ls, Math.min(le, text.length()));
-                            int indent = 0;
-                            for (int j = 0; j < lineText.length() && (lineText.charAt(j) == ' ' || lineText.charAt(j) == '\t'); j++) {
-                                indent += lineText.charAt(j) == '\t' ? tabSize : 1;
-                            }
-                            Rectangle2D r = modelToView2D(ls);
-                            if (r == null) continue;
-                            int y1 = (int) r.getY();
-                            int y2 = y1 + lineH;
-                            for (int col = tabSize; col < indent; col += tabSize) {
-                                int x = charW * col + insetLeft;
-                                g.drawLine(x, y1, x, y2);
-                            }
-                        }
-                    } catch (Exception ignored) {}
-                }
-                paintSyntaxForegroundOverlay(g, this);
-                paintDiagnosticOverlay(g, this);
-                paintVisualBlockOverlay(g, this);
-                if (getLineWrap()) paintWrapIndicators(g, this);
-                paintColorPreviews(g, this);
-            }
-        };
-        textArea.addKeyListener(this);
-        textArea.setFont(resolveEditorFont());
-        textArea.setTabSize(configManager.getTabSize());
-        textArea.setCaret(new BlockCaret());
-        textArea.getCaret().setBlinkRate(0);
-        textArea.setCaretColor(configManager.getCaretColor());
-        textArea.setForeground(configManager.getEditorForeground());
-        textArea.setEditable(false);
-        textArea.setSelectionColor(configManager.getSelectionColor());
-        textArea.setSelectedTextColor(configManager.getSelectionTextColor());
-
-        LineNumberPanel paneLineNumberPanel = new LineNumberPanel(textArea);
-        paneLineNumberPanel.setMode(lineNumberMode);
-        paneLineNumberPanel.setHighlightCurrentLine(configManager.getShowCurrentLine());
-
-        JScrollPane paneScrollPane = new JScrollPane(textArea);
-        paneScrollPane.setWheelScrollingEnabled(true);
-        paneScrollPane.getVerticalScrollBar().setUnitIncrement(Math.max(16, textArea.getFontMetrics(textArea.getFont()).getHeight()));
-        if (lineNumberMode != LineNumberMode.NONE) {
-            paneScrollPane.setRowHeaderView(paneLineNumberPanel);
-        }
-        SearchManager paneSearchManager = new SearchManager(textArea);
-        final EditorPane[] paneRef = new EditorPane[1];
-        textArea.addCaretListener(e -> {
-            if (paneRef[0] != null && paneRef[0] != getActivePane()) {
-                activateEditorPane(paneRef[0]);
-            }
-            ensureCaretVisible(textArea);
-            updateCurrentLineHighlight();
-            updateMatchingBracketHighlight();
-            if (lineNumberPanel != null) {
-                lineNumberPanel.repaint();
-            }
-            dismissCompletionPopup();
-            updateStatusBar();
-        });
-        textArea.addFocusListener(new java.awt.event.FocusAdapter() {
-            @Override
-            public void focusGained(java.awt.event.FocusEvent e) {
-                if (paneRef[0] != null) {
-                    activateEditorPane(paneRef[0]);
-                }
-            }
-        });
-        textArea.addMouseListener(new java.awt.event.MouseAdapter() {
-            @Override
-            public void mousePressed(java.awt.event.MouseEvent e) {
-                if (paneRef[0] != null) {
-                    activateEditorPane(paneRef[0]);
-                }
-            }
-        });
-
-        EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
-        paneRef[0] = pane;
-        return pane;
+        return editorUiController.createEditorPane(screenSize);
     }
 
     void bindActivePane(EditorPane pane) {
-        if (pane == null) {
-            return;
-        }
-        writingArea = pane.getTextArea();
-        lineNumberPanel = pane.getLineNumberPanel();
-        editorScrollPane = pane.getScrollPane();
-        searchManager = pane.getSearchManager();
+        editorUiController.bindActivePane(pane);
     }
 
     EditorPane getActivePane() {
-        if (activePaneIndex < 0 || activePaneIndex >= editorPanes.size()) {
-            return null;
-        }
-        return editorPanes.get(activePaneIndex);
+        return editorUiController.getActivePane();
     }
 
     void activateEditorPane(EditorPane pane) {
-        int index = editorPanes.indexOf(pane);
-        if (index < 0 || index == activePaneIndex) {
-            return;
-        }
-        detachActiveDocumentListener();
-        activePaneIndex = index;
-        bindActivePane(pane);
-        attachActiveDocumentListener();
-        currentBufferIndex = pane.getBuffer() == null ? -1 : buffers.indexOf(pane.getBuffer());
-        updateCurrentLineHighlight();
-        refreshLineNumberPanel();
-        updateStatusBar();
+        editorUiController.activateEditorPane(pane);
     }
 
     void requestActivePaneFocus() {
-        EditorPane pane = getActivePane();
-        if (pane != null && pane.getTerminalPane() != null) {
-            pane.getTerminalPane().requestFocusInWindow();
-            return;
-        }
-        if (writingArea != null) {
-            writingArea.requestFocusInWindow();
-        }
+        editorUiController.requestActivePaneFocus();
     }
 
     void renderWindowLayout() {
-        if (renderedLayoutComponent != null) {
-            editorHostPanel.remove(renderedLayoutComponent);
-        }
-        renderedLayoutComponent = windowLayoutRoot == null ? new JPanel() : windowLayoutRoot.render();
-        editorHostPanel.add(renderedLayoutComponent, BorderLayout.CENTER);
-        updateZenModeLayout();
-        editorHostPanel.revalidate();
-        editorHostPanel.repaint();
+        editorUiController.renderWindowLayout();
     }
 
     Font resolveEditorFont() {
-        int fontSize = configManager.getFontSize();
-        String configuredFamily = configManager.getFontFamily();
-        Font configuredFont = resolveInstalledFont(configuredFamily, fontSize);
-        if (configuredFont != null) {
-            return configuredFont;
-        }
-
-        Font bundledHackFont = loadBundledHackFont(fontSize);
-        if (bundledHackFont != null) {
-            return bundledHackFont;
-        }
-
-        return new Font("Monospaced", Font.PLAIN, fontSize);
+        return editorUiController.resolveEditorFont();
     }
 
     Font resolveInstalledFont(String family, int fontSize) {
-        if (family == null || family.trim().isEmpty()) {
-            return null;
-        }
-
-        GraphicsEnvironment graphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment();
-        for (String availableFamily : graphicsEnvironment.getAvailableFontFamilyNames()) {
-            if (availableFamily.equalsIgnoreCase(family.trim())) {
-                return new Font(availableFamily, Font.PLAIN, fontSize);
-            }
-        }
-
-        return null;
+        return editorUiController.resolveInstalledFont(family, fontSize);
     }
 
     Font loadBundledHackFont(int fontSize) {
-        try {
-            Font hackFont = Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"));
-            GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(hackFont);
-            return hackFont.deriveFont((float) fontSize);
-        } catch (Exception e) {
-            return null;
-        }
+        return editorUiController.loadBundledHackFont(fontSize);
     }
 
     // Key event handling
     @Override
     public void keyPressed(KeyEvent e) {
-        // Ctrl+[ as Escape alternative
-        if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_OPEN_BRACKET) {
-            e = new KeyEvent(e.getComponent(), e.getID(), e.getWhen(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
-        }
-        EditorMode previousMode = editorState.mode;
-        if (editorState.mode == EditorMode.NORMAL && recordingRegister != null && !(editorState.pendingKey == '\0' && e.getKeyChar() == 'q')) {
-            macroBuffer.add(NormalizedKeyStroke.fromKeyEvent(e));
-        }
-        if (applyConfiguredKeybinding(e)) {
-            updateStatusBar();
-            return;
-        }
-        modeEngine.dispatch(this, editorState, e);
-        if (previousMode != EditorMode.INSERT && editorState.mode == EditorMode.INSERT && isPrintableKey(e)) {
-            suppressNextTypedChar = true;
-        }
-        // Ctrl+o one-shot: return to insert after one normal command completes
-        if (insertNormalOneShot && editorState.mode == EditorMode.NORMAL && editorState.pendingKey == '\0') {
-            insertNormalOneShot = false;
-            setMode(EditorMode.INSERT);
-        }
-        updateStatusBar();
+        inputController.keyPressed(e);
     }
 
     boolean applyConfiguredKeybinding(KeyEvent e) {
-        if (editorState.mode == null || keymapReplayDepth > 32) {
-            return false;
-        }
-        String keySpec = keySpecFromEvent(e);
-        if (keySpec == null || keySpec.isEmpty()) {
-            return false;
-        }
-        String mapping = configManager.getKeybinding(modeKey(editorState.mode), keySpec);
-        if (mapping == null) {
-            return false;
-        }
-        if (mapping.isEmpty() || mapping.equalsIgnoreCase("nop") || mapping.equalsIgnoreCase("<nop>")) {
-            return true;
-        }
-
-        List<String> replayTokens = parseKeySequence(mapping);
-        if (replayTokens.isEmpty()) {
-            return true;
-        }
-
-        keymapReplayDepth++;
-        try {
-            for (String token : replayTokens) {
-                KeyEvent replay = keyEventFromToken(token);
-                if (replay != null) {
-                    keyPressed(replay);
-                }
-            }
-        } finally {
-            keymapReplayDepth--;
-        }
-        return true;
+        return inputController.applyConfiguredKeybinding(e);
     }
 
     String modeKey(EditorMode mode) {
-        if (mode == null) {
-            return "normal";
-        }
-        switch (mode) {
-            case NORMAL:
-                return "normal";
-            case INSERT:
-                return "insert";
-            case VISUAL:
-                return "visual";
-            case VISUAL_LINE:
-                return "visual_line";
-            case REPLACE:
-                return "replace";
-            case COMMAND:
-                return "command";
-            case SEARCH:
-                return "search";
-            default:
-                return "normal";
-        }
+        return inputController.modeKey(mode);
     }
 
     String keySpecFromEvent(KeyEvent e) {
-        if (e == null) {
-            return null;
-        }
-        int code = e.getKeyCode();
-        if (code == KeyEvent.VK_ESCAPE) {
-            return "<esc>";
-        }
-        if (code == KeyEvent.VK_ENTER) {
-            return "<enter>";
-        }
-        if (code == KeyEvent.VK_TAB) {
-            return "<tab>";
-        }
-        if (code == KeyEvent.VK_SPACE) {
-            return "<space>";
-        }
-        if (code == KeyEvent.VK_BACK_SPACE) {
-            return "<bs>";
-        }
-        if (code == KeyEvent.VK_DELETE) {
-            return "<del>";
-        }
-        if (code == KeyEvent.VK_UP) {
-            return "<up>";
-        }
-        if (code == KeyEvent.VK_DOWN) {
-            return "<down>";
-        }
-        if (code == KeyEvent.VK_LEFT) {
-            return "<left>";
-        }
-        if (code == KeyEvent.VK_RIGHT) {
-            return "<right>";
-        }
-        char c = e.getKeyChar();
-        if (e.isControlDown()) {
-            String ctrlTarget = ctrlTarget(code, c);
-            if (ctrlTarget != null) {
-                return "<c-" + ctrlTarget + ">";
-            }
-        }
-        if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
-            return String.valueOf(c);
-        }
-        return null;
+        return inputController.keySpecFromEvent(e);
     }
 
     String ctrlTarget(int keyCode, char keyChar) {
-        if (keyCode == KeyEvent.VK_ESCAPE) {
-            return "esc";
-        }
-        if (keyCode == KeyEvent.VK_ENTER) {
-            return "enter";
-        }
-        if (keyCode == KeyEvent.VK_TAB) {
-            return "tab";
-        }
-        if (keyCode == KeyEvent.VK_UP) {
-            return "up";
-        }
-        if (keyCode == KeyEvent.VK_DOWN) {
-            return "down";
-        }
-        if (keyCode == KeyEvent.VK_LEFT) {
-            return "left";
-        }
-        if (keyCode == KeyEvent.VK_RIGHT) {
-            return "right";
-        }
-        if (keyCode == KeyEvent.VK_BACK_SPACE) {
-            return "bs";
-        }
-        if (keyCode == KeyEvent.VK_DELETE) {
-            return "del";
-        }
-        if (keyChar != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(keyChar)) {
-            return String.valueOf(Character.toLowerCase(keyChar));
-        }
-        return null;
+        return inputController.ctrlTarget(keyCode, keyChar);
     }
 
     List<String> parseKeySequence(String mapping) {
-        List<String> tokens = new ArrayList<>();
-        if (mapping == null || mapping.isEmpty()) {
-            return tokens;
-        }
-        int index = 0;
-        while (index < mapping.length()) {
-            char c = mapping.charAt(index);
-            if (Character.isWhitespace(c)) {
-                index++;
-                continue;
-            }
-            if (c == '<') {
-                int close = mapping.indexOf('>', index + 1);
-                if (close > index + 1) {
-                    tokens.add(mapping.substring(index, close + 1));
-                    index = close + 1;
-                    continue;
-                }
-            }
-            tokens.add(String.valueOf(c));
-            index++;
-        }
-        return tokens;
+        return inputController.parseKeySequence(mapping);
     }
 
     KeyEvent keyEventFromToken(String token) {
-        if (token == null || token.isEmpty()) {
-            return null;
-        }
-        long now = System.currentTimeMillis();
-        if (token.length() == 1) {
-            char c = token.charAt(0);
-            int code = KeyEvent.getExtendedKeyCodeForChar(c);
-            if (code == KeyEvent.VK_UNDEFINED) {
-                code = 0;
-            }
-            return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, 0, code, c);
-        }
-        if (!(token.startsWith("<") && token.endsWith(">"))) {
-            return null;
-        }
-
-        String inner = token.substring(1, token.length() - 1).trim().toLowerCase();
-        if (inner.isEmpty()) {
-            return null;
-        }
-
-        if (inner.startsWith("c-") && inner.length() > 2) {
-            KeyStrokeSpec ctrlSpec = keyStrokeSpec(inner.substring(2));
-            if (ctrlSpec == null) {
-                return null;
-            }
-            return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, KeyEvent.CTRL_DOWN_MASK, ctrlSpec.keyCode, ctrlSpec.keyChar);
-        }
-
-        KeyStrokeSpec spec = keyStrokeSpec(inner);
-        if (spec == null) {
-            return null;
-        }
-        return new KeyEvent(writingArea, KeyEvent.KEY_PRESSED, now, 0, spec.keyCode, spec.keyChar);
+        return inputController.keyEventFromToken(token);
     }
 
     KeyStrokeSpec keyStrokeSpec(String token) {
-        if (token == null || token.isEmpty()) {
-            return null;
-        }
-        switch (token) {
-            case "esc":
-                return new KeyStrokeSpec(KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
-            case "enter":
-            case "cr":
-                return new KeyStrokeSpec(KeyEvent.VK_ENTER, KeyEvent.CHAR_UNDEFINED);
-            case "tab":
-                return new KeyStrokeSpec(KeyEvent.VK_TAB, '\t');
-            case "space":
-                return new KeyStrokeSpec(KeyEvent.VK_SPACE, ' ');
-            case "bs":
-            case "backspace":
-                return new KeyStrokeSpec(KeyEvent.VK_BACK_SPACE, KeyEvent.CHAR_UNDEFINED);
-            case "del":
-            case "delete":
-                return new KeyStrokeSpec(KeyEvent.VK_DELETE, KeyEvent.CHAR_UNDEFINED);
-            case "up":
-                return new KeyStrokeSpec(KeyEvent.VK_UP, KeyEvent.CHAR_UNDEFINED);
-            case "down":
-                return new KeyStrokeSpec(KeyEvent.VK_DOWN, KeyEvent.CHAR_UNDEFINED);
-            case "left":
-                return new KeyStrokeSpec(KeyEvent.VK_LEFT, KeyEvent.CHAR_UNDEFINED);
-            case "right":
-                return new KeyStrokeSpec(KeyEvent.VK_RIGHT, KeyEvent.CHAR_UNDEFINED);
-            case "lt":
-                return new KeyStrokeSpec(KeyEvent.VK_UNDEFINED, '<');
-            default:
-                if (token.length() == 1) {
-                    char c = token.charAt(0);
-                    int code = KeyEvent.getExtendedKeyCodeForChar(c);
-                    if (code == KeyEvent.VK_UNDEFINED) {
-                        code = 0;
-                    }
-                    return new KeyStrokeSpec(code, c);
-                }
-                return null;
-        }
+        return inputController.keyStrokeSpec(token);
     }
 
     // Normal mode key handling
     void handleNormalMode(KeyEvent e) {
-        char c = e.getKeyChar();
-        int code = e.getKeyCode();
-
-        if (pendingTextObjectOperator != null) {
-            showMessage(applyTextObjectOperator(pendingTextObjectOperator, pendingTextObjectModifier, c));
-            pendingTextObjectOperator = null;
-            pendingTextObjectModifier = null;
-            return;
-        }
-        if (pendingSurroundAction != null) {
-            showMessage(handleSurroundPending(c));
-            return;
-        }
-
-        // Handle pending keys (multi-key commands)
-        if (editorState.pendingKey != '\0') {
-            handlePendingKey(c, code);
-            return;
-        }
-
-        // Accumulate numeric prefix for COUNTgg without breaking 0 line-start
-        if (Character.isDigit(c) && (!editorState.pendingCount.isEmpty() || c != '0')) {
-            editorState.pendingCount += c;
-            return;
-        }
-
-        if (!editorState.pendingCount.isEmpty() && !supportsCountPrefix(e)) {
-            editorState.pendingCount = "";
-        }
-
-        if (isQuickfixBufferActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
-            editorState.pendingCount = "";
-            showMessage(openQuickfixSelection());
-            return;
-        }
-
-        if (isTreePaneActive() && (code == KeyEvent.VK_ENTER || c == 'o')) {
-            editorState.pendingCount = "";
-            showMessage(openTreeSelection());
-            return;
-        }
-
-        // Mode switches
-        if (c == 'i') {
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'a') {
-            moveRight();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'A') {
-            moveLineEnd();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'I') {
-            moveLineIndentStart();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'o') {
-            openLineBelow();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'O') {
-            openLineAbove();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-            return;
-        } else if (c == 'v') {
-            setMode(EditorMode.VISUAL);
-            editorState.visualStartPos = writingArea.getCaretPosition();
-            return;
-        } else if (c == 'V') {
-            setMode(EditorMode.VISUAL_LINE);
-            selectCurrentLine();
-            return;
-        } else if (c == 'R') {
-            lastInsertedText = "";
-            setMode(EditorMode.REPLACE);
-            return;
-        } else if (c == ':') {
-            setMode(EditorMode.COMMAND);
-            editorState.commandBuffer = String.valueOf(c);
-            commandHistoryIndex = -1;
-            commandHistoryPrefix = editorState.commandBuffer;
-            updateSubstitutePreview();
-            return;
-        } else if (c == '/' || c == '?') {
-            editorState.searchStartPos = writingArea.getCaretPosition();
-            setMode(EditorMode.SEARCH);
-            editorState.searchForward = c == '/';
-            editorState.commandBuffer = String.valueOf(c);
-            commandHistoryIndex = -1;
-            return;
-        }
-
-        // Navigation
-        else if (code == KeyEvent.VK_UP || c == 'k') {
-            repeatAction(consumePendingCount(), this::moveUp);
-        } else if (code == KeyEvent.VK_DOWN || c == 'j') {
-            repeatAction(consumePendingCount(), this::moveDown);
-        } else if (code == KeyEvent.VK_LEFT || c == 'h') {
-            repeatAction(consumePendingCount(), this::moveLeft);
-        } else if (code == KeyEvent.VK_RIGHT || c == 'l') {
-            repeatAction(consumePendingCount(), this::moveRight);
-        }
-
-        // Word movements
-        else if (c == 'w') {
-            repeatAction(consumePendingCount(), this::moveWordForward);
-        } else if (c == 'b') {
-            repeatAction(consumePendingCount(), this::moveWordBackward);
-        } else if (c == 'e') {
-            repeatAction(consumePendingCount(), this::moveWordEnd);
-        } else if (c == 'W') {
-            repeatAction(consumePendingCount(), this::moveWordForwardBig);
-        } else if (c == 'B') {
-            repeatAction(consumePendingCount(), this::moveWordBackwardBig);
-        } else if (c == 'E') {
-            repeatAction(consumePendingCount(), this::moveWordEndBig);
-        }
-
-        // Line movements
-        else if (c == '0') {
-            moveLineStart();
-            editorState.pendingCount = "";
-        } else if (c == '^') {
-            moveLineFirstNonBlank();
-            editorState.pendingCount = "";
-        } else if (c == '$') {
-            moveLineEnd();
-            editorState.pendingCount = "";
-        }
-
-        // File movements
-        else if (c == 'g') {
-            setPendingKeyWithHint('g');
-        } else if (c == 'G') {
-            int count = consumePendingCount();
-            if (count > 1) {
-                showMessage(gotoLine(count));
-            } else {
-                moveFileEnd();
-            }
-        } else if (c == 'q') {
-            if (recordingRegister != null) {
-                registerManager.setMacro(recordingRegister, macroBuffer);
-                lastMacroRegister = recordingRegister;
-                showMessage("Recorded macro to @" + recordingRegister);
-                recordingRegister = null;
-                macroBuffer = new ArrayList<>();
-            } else {
-                setPendingKeyWithHint('q');
-            }
-            return;
-        } else if (c == '@') {
-            setPendingKeyWithHint('@');
-            return;
-        } else if (c == '"') {
-            setPendingKeyWithHint('"');
-        } else if (c == 'm' || c == '\'' || c == '`') {
-            setPendingKeyWithHint(c);
-        } else if (c == 'f' || c == 'F' || c == 't' || c == 'T' || c == '>' || c == '<' || c == '=' || c == 'r') {
-            setPendingKeyWithHint(c);
-        } else if (c == 'z') {
-            setPendingKeyWithHint('z');
-        } else if (c == ']') {
-            setPendingKeyWithHint(']');
-        } else if (c == '[') {
-            setPendingKeyWithHint('[');
-        } else if (c == '{') {
-            repeatAction(consumePendingCount(), this::moveParagraphBackward);
-        } else if (c == '}') {
-            repeatAction(consumePendingCount(), this::moveParagraphForward);
-        } else if (c == '(') {
-            repeatAction(consumePendingCount(), this::moveSentenceBackward);
-        } else if (c == ')') {
-            repeatAction(consumePendingCount(), this::moveSentenceForward);
-        } else if (c == '%') {
-            int count = consumePendingCount();
-            if (count > 1) {
-                moveToFilePercent(count);
-            } else {
-                moveMatchingBracket();
-            }
-        } else if (c == 'H') {
-            moveToScreenPosition('H');
-            editorState.pendingCount = "";
-        } else if (c == 'M') {
-            moveToScreenPosition('M');
-            editorState.pendingCount = "";
-        } else if (c == 'L') {
-            moveToScreenPosition('L');
-            editorState.pendingCount = "";
-        }
-
-        // Clipboard operations
-        else if (c == 'y') {
-            setPendingKeyWithHint('y');
-        } else if (c == 'd') {
-            setPendingKeyWithHint('d');
-        } else if (c == 'c') {
-            setPendingKeyWithHint('c');
-        } else if (c == 'x') {
-            int count = consumePendingCount();
-            StringBuilder deleted = new StringBuilder();
-            for (int i = 0; i < count; i++) {
-                String d = clipboardManager.deleteChar(writingArea);
-                if (d.isEmpty()) break;
-                deleted.append(d);
-            }
-            if (deleted.length() > 0) {
-                lastCommand = "x";
-                storeDelete(consumePendingRegister(), deleted.toString(), false);
-                markModified();
-            }
-        } else if (c == 'X') {
-            int count = consumePendingCount();
-            StringBuilder deleted = new StringBuilder();
-            for (int i = 0; i < count; i++) {
-                int pos = writingArea.getCaretPosition();
-                if (pos <= 0) break;
-                String text = writingArea.getText();
-                deleted.insert(0, text.charAt(pos - 1));
-                writingArea.replaceRange("", pos - 1, pos);
-            }
-            if (deleted.length() > 0) {
-                storeDelete(consumePendingRegister(), deleted.toString(), false);
-                markModified();
-            }
-        } else if (c == 's') {
-            int count = consumePendingCount();
-            StringBuilder deleted = new StringBuilder();
-            for (int i = 0; i < count; i++) {
-                String d = clipboardManager.deleteChar(writingArea);
-                if (d.isEmpty()) break;
-                deleted.append(d);
-            }
-            if (deleted.length() > 0) {
-                storeDelete(consumePendingRegister(), deleted.toString(), false);
-                markModified();
-            }
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-        } else if (c == 'S') {
-            editorState.pendingCount = "";
-            lastCommand = "S";
-            storeDelete(consumePendingRegister(), clipboardManager.deleteLine(writingArea), true);
-            markModified();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-        } else if (c == 'Y') {
-            editorState.pendingCount = "";
-            showMessage(yankToEndOfLine());
-        } else if (c == 'p') {
-            int count = consumePendingCount();
-            for (int i = 0; i < count; i++) {
-                pasteFromRegister(false);
-            }
-            editorState.pendingCount = "";
-        } else if (c == 'P') {
-            int count = consumePendingCount();
-            for (int i = 0; i < count; i++) {
-                pasteFromRegister(true);
-            }
-            editorState.pendingCount = "";
-        } else if (c == 'D') {
-            editorState.pendingCount = "";
-            lastCommand = "D";
-            storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
-            markModified();
-        } else if (c == 'C') {
-            editorState.pendingCount = "";
-            lastCommand = "C";
-            storeDelete(consumePendingRegister(), clipboardManager.deleteToEndOfLine(writingArea), false);
-            markModified();
-            lastInsertedText = "";
-            setMode(EditorMode.INSERT);
-        }
-
-        // Undo/Redo
-        else if (c == 'u') {
-            editorState.pendingCount = "";
-            if (undoManager.canUndo()) {
-                undoManager.undo();
-            }
-        } else if (e.isControlDown() && c == 'r') {
-            editorState.pendingCount = "";
-            if (undoManager.canRedo()) {
-                undoManager.redo();
-            }
-        }
-
-        // Search navigation
-        else if (c == 'n') {
-            editorState.pendingCount = "";
-            String result = searchManager.nextMatch();
-            showMessage(result);
-            if (result.startsWith("Match")) {
-                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-            }
-        } else if (c == 'N') {
-            editorState.pendingCount = "";
-            String result = searchManager.prevMatch();
-            showMessage(result);
-            if (result.startsWith("Match")) {
-                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-            }
-        } else if (c == '*') {
-            editorState.pendingCount = "";
-            String result = searchWordUnderCursor(true);
-            showMessage(result);
-            if (result.startsWith("Match")) {
-                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-            }
-        } else if (c == '#') {
-            editorState.pendingCount = "";
-            String result = searchWordUnderCursor(false);
-            showMessage(result);
-            if (result.startsWith("Match")) {
-                pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-            }
-        } else if (c == ';') {
-            editorState.pendingCount = "";
-            showMessage(repeatFind(false));
-        } else if (c == ',') {
-            editorState.pendingCount = "";
-            showMessage(repeatFind(true));
-        }
-
-        // Repeat last command
-        else if (c == '.') {
-            editorState.pendingCount = "";
-            repeatLastCommand();
-        } else if (c == 'J') {
-            editorState.pendingCount = "";
-            joinCurrentLine(true);
-        }
-
-        // Ctrl combinations
-        else if (e.isControlDown()) {
-            if (c == 'w' || code == KeyEvent.VK_W) {
-                editorState.pendingCount = "";
-                setPendingKeyWithHint('\u0017');
-                return;
-            } else if (c == 'p' || code == KeyEvent.VK_P) {
-                editorState.pendingCount = "";
-                showMessage(showFileFinder());
-            } else if (c == 'n' || code == KeyEvent.VK_N) {
-                editorState.pendingCount = "";
-                showMessage(showLspCompletionStatus());
-            } else if (c == 'o' || code == KeyEvent.VK_O) {
-                editorState.pendingCount = "";
-                jumpBack();
-            } else if (c == 'i' || code == KeyEvent.VK_I) {
-                editorState.pendingCount = "";
-                jumpForward();
-            } else if (c == 'd' || code == KeyEvent.VK_D) {
-                editorState.pendingCount = "";
-                if (e.isShiftDown()) {
-                    addCursorAtNextMatch();
-                } else {
-                    scrollHalfPageDown();
-                }
-            } else if (c == 'u' || code == KeyEvent.VK_U) {
-                editorState.pendingCount = "";
-                scrollHalfPageUp();
-            } else if (c == 'f' || code == KeyEvent.VK_F) {
-                editorState.pendingCount = "";
-                scrollFullPageDown();
-            } else if (c == 'b' || code == KeyEvent.VK_B) {
-                editorState.pendingCount = "";
-                scrollFullPageUp();
-            } else if (c == 'e' || code == KeyEvent.VK_E) {
-                editorState.pendingCount = "";
-                scrollLineDown();
-            } else if (c == 'y' || code == KeyEvent.VK_Y) {
-                editorState.pendingCount = "";
-                scrollLineUp();
-            } else if (c == 'g' || code == KeyEvent.VK_G) {
-                editorState.pendingCount = "";
-                showMessage(showFileInfo());
-            } else if (c == 'v' || code == KeyEvent.VK_V) {
-                editorState.pendingCount = "";
-                enterVisualBlockMode();
-                return;
-            }
-        }
-
-        // TAB: markdown fold cycling on heading lines
-        else if (code == KeyEvent.VK_TAB) {
-            editorState.pendingCount = "";
-            FileBuffer buf = getCurrentBuffer();
-            if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
-                if (e.isShiftDown()) {
-                    showMessage(globalFoldCycle());
-                } else {
-                    showMessage(toggleFoldAtCursor());
-                }
-            }
-        }
-
-        // Alt combinations for multi-cursor
-        else if (e.isAltDown()) {
-            if (code == KeyEvent.VK_J) {
-                if (e.isShiftDown()) addCursorAbove();
-                else addCursorBelow();
-            } else if (code == KeyEvent.VK_K) {
-                if (e.isShiftDown()) addCursorBelow();
-                else addCursorAbove();
-            }
-        }
-        // Escape (no-op in normal mode, but clear any messages)
-        else if (code == KeyEvent.VK_ESCAPE) {
-            editorState.pendingCount = "";
-            editorState.pendingKey = '\0';
-            clearExtraCursors();
-            showMessage("Already in normal mode");
-        }
+        inputController.handleNormalMode(e);
     }
 
     boolean supportsCountPrefix(KeyEvent e) {
-        int code = e.getKeyCode();
-        char c = e.getKeyChar();
-
-        if (e.isControlDown()) {
-            return c == 'd' || c == 'u' || code == KeyEvent.VK_D || code == KeyEvent.VK_U;
-        }
-
-        if (code == KeyEvent.VK_UP || code == KeyEvent.VK_DOWN || code == KeyEvent.VK_LEFT || code == KeyEvent.VK_RIGHT) {
-            return true;
-        }
-
-        switch (c) {
-            case 'h':
-            case 'j':
-            case 'k':
-            case 'l':
-            case 'w':
-            case 'b':
-            case 'e':
-            case 'W':
-            case 'B':
-            case 'E':
-            case '0':
-            case '^':
-            case '$':
-            case 'g':
-            case 'G':
-            case '{':
-            case '}':
-            case '(':
-            case ')':
-            case '%':
-            case 'n':
-            case 'N':
-            case ';':
-            case ',':
-            case 'd':
-            case 'y':
-            case 'c':
-            case 'x':
-            case 'X':
-            case 's':
-            case 'S':
-            case 'p':
-            case 'P':
-            case 'D':
-            case 'C':
-            case 'Y':
-            case 'J':
-            case 'f':
-            case 'F':
-            case 't':
-            case 'T':
-            case 'r':
-                return true;
-            default:
-                return false;
-        }
+        return inputController.supportsCountPrefix(e);
     }
 
     void setPendingKeyWithHint(char pendingKey) {
-        editorState.pendingKey = pendingKey;
-        showWhichKeyHint(pendingKey);
+        inputController.setPendingKeyWithHint(pendingKey);
     }
 
     void showWhichKeyHint(char pendingKey) {
-        if (!whichKeyHintsEnabled) {
-            return;
-        }
-        String hint = whichKeyHintText(pendingKey);
-        if (hint != null && !hint.isBlank()) {
-            showMessage(hint);
-        }
+        inputController.showWhichKeyHint(pendingKey);
     }
 
     String whichKeyHintText(char pendingKey) {
-        switch (pendingKey) {
-            case 'g':
-                return "g: gg top, gq format, gf file, gx url, g; prev change, g, next change";
-            case 'z':
-                return "z: zt top, zz center, zb bottom, za toggle fold, zM fold all, zR unfold all";
-            case '\u0017':
-                return "Ctrl-w: h/j/k/l move, s/v split, c close, w cycle, = equalize, +/- resize";
-            case 'd':
-                return "d: dd line, dw word, d{motion}, ds surround";
-            case 'y':
-                return "y: yy line, yw word, y{motion}, ys surround";
-            case 'c':
-                return "c: cc line, cw word, c{motion}, cs surround";
-            case 'f':
-            case 'F':
-            case 't':
-            case 'T':
-                return pendingKey + ": enter target character";
-            case 'r':
-                return "r: replace character under cursor";
-            case '"':
-                return "\": choose register";
-            case 'q':
-                return "q: choose register to start macro recording";
-            case '@':
-                return "@: choose register to replay macro";
-            case '>':
-            case '<':
-                return pendingKey + ": repeat for line op, or use with motion";
-            case '[':
-            case ']':
-                return pendingKey + ": heading navigation";
-            default:
-                return null;
-        }
+        return inputController.whichKeyHintText(pendingKey);
     }
 
     // Handle pending multi-key commands
     void handlePendingKey(char c, int code) {
-        if (editorState.pendingKey == 'g') {
-            if (c == 'g') {
-                if (editorState.pendingCount.isEmpty()) {
-                    moveFileStart();
-                } else {
-                    showMessage(gotoLine(Integer.parseInt(editorState.pendingCount)));
-                }
-            } else if (c == 'q') {
-                showMessage(formatParagraph());
-            } else if (c == 'j') {
-                moveDisplayLineDown();
-            } else if (c == 'k') {
-                moveDisplayLineUp();
-            } else if (c == 'e') {
-                repeatAction(consumePendingCount(), this::moveWordEndBackward);
-            } else if (c == 'E') {
-                repeatAction(consumePendingCount(), this::moveWordEndBackwardBig);
-            } else if (c == '0') {
-                moveLineStart();
-                editorState.pendingCount = "";
-            } else if (c == '$') {
-                moveLineEnd();
-                editorState.pendingCount = "";
-            } else if (c == '_') {
-                moveLineLastNonBlank();
-                editorState.pendingCount = "";
-            } else if (c == 'J') {
-                joinCurrentLine(false);
-            } else if (c == ';') {
-                changePrev();
-            } else if (c == ',') {
-                changeNext();
-            } else if (c == 'c') {
-                editorState.pendingKey = '\u0007';
-                return;
-            } else if (c == 'f') {
-                FileBuffer buf = getCurrentBuffer();
-                if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
-                    showMessage(goToMarkdownLink());
-                } else {
-                    showMessage(goToFileUnderCursor());
-                }
-            } else if (c == 'x') {
-                showMessage(openBrowserUrl());
-            } else if (c == 'O') {
-                showMessage(showOutline());
-            } else if (c == 'v') {
-                if (editorState.lastVisualStart >= 0 && editorState.lastVisualEnd >= 0
-                        && editorState.lastVisualStart <= writingArea.getText().length()
-                        && editorState.lastVisualEnd <= writingArea.getText().length()) {
-                    EditorMode vm = editorState.lastVisualMode != null ? editorState.lastVisualMode : EditorMode.VISUAL;
-                    editorState.visualStartPos = editorState.lastVisualStart;
-                    setMode(vm);
-                    writingArea.setSelectionStart(editorState.lastVisualStart);
-                    writingArea.setSelectionEnd(editorState.lastVisualEnd);
-                    writingArea.setCaretPosition(editorState.lastVisualEnd);
-                } else {
-                    showMessage("No previous visual selection");
-                }
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == 'y') {
-            if (c == 'y') {
-                int count = consumePendingCount();
-                lastCommand = "yy";
-                try {
-                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                    int startOffset = writingArea.getLineStartOffset(line);
-                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
-                    int endOffset = writingArea.getLineEndOffset(endLine);
-                    String yanked = writingArea.getText(startOffset, endOffset - startOffset);
-                    clipboardManager.yankSelection(yanked);
-                    storeYank(consumePendingRegister(), yanked, true);
-                    showMessage(count > 1 ? count + " lines yanked" : "Line yanked");
-                } catch (BadLocationException ex) {
-                    showMessage("Line yanked");
-                }
-            } else if (c == 's') {
-                pendingSurroundAction = 'y';
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'i' || c == 'a') {
-                pendingTextObjectOperator = 'y';
-                pendingTextObjectModifier = c;
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'g') {
-                editorState.pendingKey = 'Y';
-                return;
-            } else {
-                showMessage(applyMotionOperator('y', String.valueOf(c)));
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == 'd') {
-            if (c == 'd') {
-                int count = consumePendingCount();
-                lastCommand = "dd";
-                try {
-                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                    int startOffset = writingArea.getLineStartOffset(line);
-                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
-                    int endOffset = writingArea.getLineEndOffset(endLine);
-                    String deleted = writingArea.getText(startOffset, endOffset - startOffset);
-                    storeDelete(consumePendingRegister(), deleted, true);
-                    writingArea.replaceRange("", startOffset, endOffset);
-                    writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
-                    markModified();
-                    showMessage(count > 1 ? count + " lines deleted" : "Line deleted");
-                } catch (BadLocationException ex) {
-                    showMessage("Line deleted");
-                }
-            } else if (c == 's') {
-                pendingSurroundAction = 'd';
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'i' || c == 'a') {
-                pendingTextObjectOperator = 'd';
-                pendingTextObjectModifier = c;
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'g') {
-                editorState.pendingKey = 'D';
-                return;
-            } else if (c == 'w') {
-                int count = consumePendingCount();
-                lastCommand = "dw";
-                StringBuilder deleted = new StringBuilder();
-                for (int i = 0; i < count; i++) {
-                    String d = clipboardManager.deleteWord(writingArea);
-                    if (d.isEmpty()) break;
-                    deleted.append(d);
-                }
-                if (deleted.length() > 0) {
-                    storeDelete(consumePendingRegister(), deleted.toString(), false);
-                    markModified();
-                }
-                showMessage(count > 1 ? count + " words deleted" : "Word deleted");
-            } else {
-                showMessage(applyMotionOperator('d', String.valueOf(c)));
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == 'c') {
-            if (c == 'c') {
-                int count = consumePendingCount();
-                lastCommand = "cc";
-                try {
-                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                    int startOffset = writingArea.getLineStartOffset(line);
-                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
-                    int endOffset = writingArea.getLineEndOffset(endLine);
-                    String deleted = writingArea.getText(startOffset, endOffset - startOffset);
-                    storeDelete(consumePendingRegister(), deleted, true);
-                    writingArea.replaceRange("", startOffset, endOffset);
-                    writingArea.setCaretPosition(Math.min(startOffset, writingArea.getText().length()));
-                    markModified();
-                } catch (BadLocationException ex) {}
-                lastInsertedText = "";
-                setMode(EditorMode.INSERT);
-            } else if (c == 's') {
-                pendingSurroundAction = 'c';
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'i' || c == 'a') {
-                pendingTextObjectOperator = 'c';
-                pendingTextObjectModifier = c;
-                editorState.pendingKey = '\0';
-                return;
-            } else if (c == 'g') {
-                editorState.pendingKey = 'C';
-                return;
-            } else if (c == 'w') {
-                int count = consumePendingCount();
-                lastCommand = "cw";
-                StringBuilder deleted = new StringBuilder();
-                for (int i = 0; i < count; i++) {
-                    String d = clipboardManager.deleteWord(writingArea);
-                    if (d.isEmpty()) break;
-                    deleted.append(d);
-                }
-                if (deleted.length() > 0) {
-                    storeDelete(consumePendingRegister(), deleted.toString(), false);
-                    markModified();
-                }
-                lastInsertedText = "";
-                setMode(EditorMode.INSERT);
-            } else {
-                showMessage(applyMotionOperator('c', String.valueOf(c)));
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == 'q') {
-            recordingRegister = c;
-            macroBuffer = new ArrayList<>();
-            editorState.pendingKey = '\0';
-            showMessage("recording @" + c);
-        } else if (editorState.pendingKey == '@') {
-            if (c == '@') {
-                showMessage(playMacro(lastMacroRegister));
-            } else {
-                showMessage(playMacro(c));
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == '"') {
-            editorState.pendingRegister = c;
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == 'm') {
-            FileBuffer buffer = getCurrentBuffer();
-            if (buffer != null) {
-                buffer.setMark(c, writingArea.getCaretPosition());
-                showMessage("Mark set: " + c);
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == '\'' || editorState.pendingKey == '`') {
-            FileBuffer buffer = getCurrentBuffer();
-            if (buffer != null) {
-                Integer offset = buffer.getMark(c);
-                if (offset != null) {
-                    recordJumpPosition();
-                    if (editorState.pendingKey == '\'') {
-                        try {
-                            int line = writingArea.getLineOfOffset(Math.min(offset, writingArea.getText().length()));
-                            writingArea.setCaretPosition(writingArea.getLineStartOffset(line));
-                        } catch (BadLocationException e) {
-                            writingArea.setCaretPosition(Math.min(offset, writingArea.getText().length()));
-                        }
-                    } else {
-                        writingArea.setCaretPosition(Math.min(offset, writingArea.getText().length()));
-                    }
-                } else {
-                    showMessage("Mark not set: " + c);
-                }
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == 'f' || editorState.pendingKey == 'F' || editorState.pendingKey == 't' || editorState.pendingKey == 'T') {
-            showMessage(findCharacter(editorState.pendingKey, c));
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == 'r') {
-            showMessage(replaceCharacter(c));
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == '>' || editorState.pendingKey == '<' || editorState.pendingKey == '=') {
-            if (c == editorState.pendingKey) {
-                FileBuffer buf = getCurrentBuffer();
-                if (buf != null && buf.getFileType() == FileType.MARKDOWN && (editorState.pendingKey == '>' || editorState.pendingKey == '<')) {
-                    showMessage(markdownHeadingShift(editorState.pendingKey == '>'));
-                } else {
-                    showMessage(applyLineOperator(editorState.pendingKey));
-                }
-            } else if (c == 'r' && (editorState.pendingKey == '>' || editorState.pendingKey == '<')) {
-                FileBuffer buf = getCurrentBuffer();
-                if (buf != null && buf.getFileType() == FileType.MARKDOWN) {
-                    showMessage(markdownSubtreeShift(editorState.pendingKey == '>'));
-                }
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == 'D' || editorState.pendingKey == 'C' || editorState.pendingKey == 'Y') {
-            char operator = editorState.pendingKey == 'D' ? 'd' : editorState.pendingKey == 'C' ? 'c' : 'y';
-            showMessage(applyMotionOperator(operator, "g" + c));
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == '\u0017') {
-            switch (c) {
-                case 's':
-                    showMessage(splitWindow(false));
-                    break;
-                case 'v':
-                    showMessage(splitWindow(true));
-                    break;
-                case 'c':
-                    showMessage(closeActiveWindow());
-                    break;
-                case 'h':
-                    showMessage(focusWindowDirection(-1, 0));
-                    break;
-                case 'j':
-                    showMessage(focusWindowDirection(0, 1));
-                    break;
-                case 'k':
-                    showMessage(focusWindowDirection(0, -1));
-                    break;
-                case 'l':
-                    showMessage(focusWindowDirection(1, 0));
-                    break;
-                case 'w':
-                    showMessage(cycleWindowFocus());
-                    break;
-                case '=':
-                    showMessage(equalizeWindows());
-                    break;
-                case '+':
-                    showMessage(resizeActiveWindow(0.05));
-                    break;
-                case '-':
-                    showMessage(resizeActiveWindow(-0.05));
-                    break;
-                case '>':
-                    showMessage(resizeActiveWindow(0.05));
-                    break;
-                case '<':
-                    showMessage(resizeActiveWindow(-0.05));
-                    break;
-                default:
-                    break;
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == 'z') {
-            if (c == 't') {
-                scrollCurrentLineTo('t');
-            } else if (c == 'z') {
-                scrollCurrentLineTo('z');
-            } else if (c == 'b') {
-                scrollCurrentLineTo('b');
-            } else if (c == 'a') {
-                showMessage(toggleFoldAtCursor());
-            } else if (c == 'M') {
-                showMessage(foldAll());
-            } else if (c == 'R') {
-                showMessage(unfoldAll());
-            }
-            editorState.pendingKey = '\0';
-        } else if (editorState.pendingKey == ']') {
-            if (c == ']') {
-                showMessage(navigateHeading(true));
-            } else if (c >= '1' && c <= '6') {
-                showMessage(navigateHeadingAtLevel(true, c - '0'));
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == '[') {
-            if (c == '[') {
-                showMessage(navigateHeading(false));
-            } else if (c >= '1' && c <= '6') {
-                showMessage(navigateHeadingAtLevel(false, c - '0'));
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        } else if (editorState.pendingKey == '\u0007') {
-            // gc pending state: gcc = comment current line(s), gc{motion} = comment motion range
-            if (c == 'c') {
-                int count = consumePendingCount();
-                try {
-                    int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                    int endLine = Math.min(line + count, writingArea.getLineCount()) - 1;
-                    toggleCommentLineRange(line, endLine);
-                } catch (BadLocationException ignored) {}
-            } else {
-                MotionRange range = resolveMotionRange(String.valueOf(c));
-                if (range != null) {
-                    try {
-                        int startLine = writingArea.getLineOfOffset(range.start);
-                        int endLine = writingArea.getLineOfOffset(range.end > range.start ? range.end - 1 : range.end);
-                        toggleCommentLineRange(startLine, endLine);
-                    } catch (BadLocationException ignored) {}
-                }
-            }
-            editorState.pendingKey = '\0';
-            editorState.pendingCount = "";
-        }
-
+        inputController.handlePendingKey(c, code);
     }
 
     // Insert mode key handling
     void handleInsertMode(KeyEvent e) {
-        int code = e.getKeyCode();
-        if (isCompletionPopupVisible()) {
-            if (code == KeyEvent.VK_DOWN || (e.isControlDown() && code == KeyEvent.VK_N)) {
-                completionPopupNavigate(1); e.consume(); return;
-            } else if (code == KeyEvent.VK_UP || (e.isControlDown() && code == KeyEvent.VK_P)) {
-                completionPopupNavigate(-1); e.consume(); return;
-            } else if (code == KeyEvent.VK_TAB || code == KeyEvent.VK_ENTER) {
-                completionPopupAccept(); e.consume(); return;
-            } else if (code == KeyEvent.VK_ESCAPE) {
-                dismissCompletionPopup(); e.consume(); return;
-            }
-        }
-        if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
-            dismissCompletionPopup();
-            registerManager.updateLastInserted(lastInsertedText);
-            setMode(EditorMode.NORMAL);
-            // Move cursor back one position (Vim behavior)
-            int pos = writingArea.getCaretPosition();
-            if (pos > 0) {
-                writingArea.setCaretPosition(pos - 1);
-            }
-            return;
-        }
-
-        if (code == KeyEvent.VK_BACK_SPACE && !extraCursors.isEmpty()) {
-            applyMultiCursorBackspace();
-        }
-        if (code == KeyEvent.VK_BACK_SPACE && configManager.getAutoPairs()) {
-            String text = writingArea.getText();
-            int pos = writingArea.getCaretPosition();
-            if (pos > 0 && pos < text.length()) {
-                char before = text.charAt(pos - 1);
-                char after = text.charAt(pos);
-                Character expected = autoPairCloser(before);
-                if (expected != null && expected == after) {
-                    writingArea.replaceRange("", pos, pos + 1); // delete closing char
-                }
-            }
-        }
-        if (e.isControlDown()) {
-            if (code == KeyEvent.VK_W || e.getKeyChar() == 'w') {
-                // Ctrl+w: delete word backward
-                deleteWordBackwardInsert();
-                return;
-            } else if (code == KeyEvent.VK_U || e.getKeyChar() == 'u') {
-                // Ctrl+u: delete to start of line
-                deleteToLineStartInsert();
-                return;
-            } else if (code == KeyEvent.VK_O || e.getKeyChar() == 'o') {
-                // Ctrl+o: execute one normal mode command then return to insert
-                insertNormalOneShot = true;
-                setMode(EditorMode.NORMAL);
-                return;
-            } else if (code == KeyEvent.VK_J || e.getKeyChar() == 'j') {
-                // Ctrl+j: snippet expand (or code fence language complete in markdown)
-                FileBuffer buf = getCurrentBuffer();
-                if (buf != null && buf.getFileType() == FileType.MARKDOWN && isOnCodeFenceLine()) {
-                    showMessage(completeCodeFenceLanguage());
-                } else {
-                    showMessage(expandSnippetAtCursor());
-                }
-                return;
-            } else if (code == KeyEvent.VK_N || e.getKeyChar() == 'n') {
-                showInlineCompletion();
-                return;
-            }
-        }
-
-        if (!e.isControlDown() && !e.isAltDown()) {
-            char c = e.getKeyChar();
-            FileBuffer currentBuf = getCurrentBuffer();
-            boolean isMarkdown = currentBuf != null && currentBuf.getFileType() == FileType.MARKDOWN;
-            if (c == '\t' && isMarkdown && isOnTableLine()) {
-                // TAB in markdown table: move to next cell
-                showMessage(markdownTableNextCell(e.isShiftDown()));
-                e.consume();
-                return;
-            } else if (c == '\t' && configManager.getExpandTab()) {
-                writingArea.replaceSelection(" ".repeat(writingArea.getTabSize()));
-                lastInsertedText += " ".repeat(writingArea.getTabSize());
-                e.consume();
-            } else if (c == '\n') {
-                if (isMarkdown) {
-                    String continued = handleMarkdownEnter();
-                    if (continued != null) {
-                        e.consume();
-                        return;
-                    }
-                }
-                if (configManager.getAutoIndent()) {
-                    String indent = currentLineIndentation();
-                    SwingUtilities.invokeLater(() -> writingArea.insert(indent, writingArea.getCaretPosition()));
-                    lastInsertedText += "\n" + indent;
-                }
-            } else if (c != KeyEvent.CHAR_UNDEFINED && !Character.isISOControl(c)) {
-                if (configManager.getAutoPairs()) {
-                    Character closer = autoPairCloser(c);
-                    if (closer != null) {
-                        // auto-insert closing pair after the char is processed
-                        final char cl = closer;
-                        SwingUtilities.invokeLater(() -> {
-                            int p = writingArea.getCaretPosition();
-                            writingArea.insert(String.valueOf(cl), p);
-                            writingArea.setCaretPosition(p);
-                        });
-                    } else if (isClosingPairChar(c)) {
-                        // skip over if next char matches
-                        String text = writingArea.getText();
-                        int p = writingArea.getCaretPosition();
-                        if (p < text.length() && text.charAt(p) == c) {
-                            writingArea.setCaretPosition(p + 1);
-                            suppressNextTypedChar = true;
-                            e.consume();
-                            lastInsertedText += c;
-                            return;
-                        }
-                    }
-                }
-                lastInsertedText += c;
-                applyMultiCursorInsert(c);
-            }
-        }
+        inputController.handleInsertMode(e);
     }
 
     // Visual mode key handling
     void handleVisualMode(KeyEvent e) {
-        char c = e.getKeyChar();
-        int code = e.getKeyCode();
-        boolean lineMode = editorState.mode == EditorMode.VISUAL_LINE;
-
-        if (code == KeyEvent.VK_ESCAPE) {
-            clearExtraCursors();
-            setMode(EditorMode.NORMAL);
-            writingArea.setSelectionStart(writingArea.getCaretPosition());
-            writingArea.setSelectionEnd(writingArea.getCaretPosition());
-            return;
-        }
-
-        // Ctrl+d: add cursor at next match of selection
-        if (e.isControlDown() && (code == KeyEvent.VK_D || c == 'd')) {
-            addCursorAtNextMatch();
-            return;
-        }
-
-        // Handle pending keys
-        if (editorState.pendingKey == 'g') {
-            editorState.pendingKey = '\0';
-            if (c == 'c') {
-                toggleCommentSelection();
-            }
-            setMode(EditorMode.NORMAL);
-            return;
-        } else if (editorState.pendingKey == 'S') {
-            editorState.pendingKey = '\0';
-            surroundVisualSelection(c);
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        // Update selection as cursor moves
-        if (lineMode) {
-            normalizeVisualLineCaretForMotion();
-        }
-
-        // Navigation (same as normal mode)
-        if (code == KeyEvent.VK_UP || c == 'k') moveUp();
-        else if (code == KeyEvent.VK_DOWN || c == 'j') moveDown();
-        else if (code == KeyEvent.VK_LEFT || c == 'h') moveLeft();
-        else if (code == KeyEvent.VK_RIGHT || c == 'l') moveRight();
-        else if (c == 'w') moveWordForward();
-        else if (c == 'b') moveWordBackward();
-        else if (c == 'e') moveWordEnd();
-        else if (c == '0') moveLineStart();
-        else if (c == '$') moveLineEnd();
-
-        // Update selection
-        int newPos = writingArea.getCaretPosition();
-        boolean blockMode = editorState.mode == EditorMode.VISUAL_BLOCK;
-        if (blockMode) {
-            // block selection is virtual; don't use JTextArea selection
-            writingArea.repaint();
-        } else if (lineMode) {
-            selectLineRange(editorState.visualStartPos, newPos);
-        } else {
-            if (editorState.visualStartPos < newPos) {
-                writingArea.setSelectionStart(editorState.visualStartPos);
-                writingArea.setSelectionEnd(newPos);
-            } else {
-                writingArea.setSelectionStart(newPos);
-                writingArea.setSelectionEnd(editorState.visualStartPos);
-            }
-        }
-
-        // Operations on selection
-        if (c == 'g') {
-            editorState.pendingKey = 'g';
-            return;
-        } else if (c == 'S') {
-            editorState.pendingKey = 'S';
-            return;
-        } else if (c == 'y') {
-            if (blockMode) { yankVisualBlock(); setMode(EditorMode.NORMAL); }
-            else {
-                String selected = writingArea.getSelectedText();
-                if (selected != null) { clipboardManager.yankSelection(selected); storeYank(consumePendingRegister(), selected, lineMode); showMessage("Selection yanked"); }
-                setMode(EditorMode.NORMAL);
-            }
-        } else if (c == 'd' || c == 'x') {
-            if (blockMode) { deleteVisualBlock(); setMode(EditorMode.NORMAL); }
-            else {
-                String selected = writingArea.getSelectedText();
-                if (selected != null) { clipboardManager.yankSelection(selected); storeDelete(consumePendingRegister(), selected, lineMode); writingArea.replaceSelection(""); markModified(); showMessage("Selection deleted"); }
-                setMode(EditorMode.NORMAL);
-            }
-        } else if (c == 'c') {
-            if (blockMode) { deleteVisualBlock(); setMode(EditorMode.INSERT); }
-            else {
-                String selected = writingArea.getSelectedText();
-                if (selected != null) { clipboardManager.yankSelection(selected); storeDelete(consumePendingRegister(), selected, lineMode); writingArea.replaceSelection(""); markModified(); }
-                setMode(EditorMode.INSERT);
-            }
-        } else if (c == '>' || c == '<' || c == '=') {
-            applyVisualLineOperator(c);
-            setMode(EditorMode.NORMAL);
-        } else if (c == '~') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                StringBuilder toggled = new StringBuilder(selected.length());
-                for (char ch : selected.toCharArray()) {
-                    toggled.append(Character.isUpperCase(ch) ? Character.toLowerCase(ch) : Character.toUpperCase(ch));
-                }
-                writingArea.replaceSelection(toggled.toString());
-                markModified();
-            }
-            setMode(EditorMode.NORMAL);
-        } else if (c == 'U') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                writingArea.replaceSelection(selected.toUpperCase());
-                markModified();
-            }
-            setMode(EditorMode.NORMAL);
-        } else if (c == 'u') {
-            String selected = writingArea.getSelectedText();
-            if (selected != null) {
-                writingArea.replaceSelection(selected.toLowerCase());
-                markModified();
-            }
-            setMode(EditorMode.NORMAL);
-        } else if (c == 'J') {
-            joinVisualSelection();
-            setMode(EditorMode.NORMAL);
-        } else if (c == 'p' || c == 'P') {
-            String selected = writingArea.getSelectedText();
-            RegisterContent content = registerManager.get(consumePendingRegister());
-            if (selected != null && content != null && !content.getText().isEmpty()) {
-                storeDelete(null, selected, lineMode);
-                writingArea.replaceSelection(content.getText());
-                markModified();
-                showMessage("Pasted over selection");
-            }
-            setMode(EditorMode.NORMAL);
-        } else if (c == 'o') {
-            int selStart = writingArea.getSelectionStart();
-            int selEnd = writingArea.getSelectionEnd();
-            int caret = writingArea.getCaretPosition();
-            if (caret == selStart) {
-                editorState.visualStartPos = selStart;
-                writingArea.setCaretPosition(selEnd);
-            } else {
-                editorState.visualStartPos = selEnd;
-                writingArea.setCaretPosition(selStart);
-            }
-            // Re-apply selection after swap
-            int swappedPos = writingArea.getCaretPosition();
-            if (lineMode) {
-                selectLineRange(editorState.visualStartPos, swappedPos);
-            } else {
-                writingArea.setSelectionStart(Math.min(editorState.visualStartPos, swappedPos));
-                writingArea.setSelectionEnd(Math.max(editorState.visualStartPos, swappedPos));
-            }
-        }
+        inputController.handleVisualMode(e);
     }
 
     void normalizeVisualLineCaretForMotion() {
@@ -2168,202 +561,24 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Replace mode key handling
     void handleReplaceMode(KeyEvent e) {
-        if (e.getKeyCode() == KeyEvent.VK_ESCAPE) {
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        // In replace mode, overwrite character at cursor
-        if (!e.isControlDown() && !e.isAltDown()) {
-            char c = e.getKeyChar();
-            if (c != KeyEvent.CHAR_UNDEFINED && c != '\n') {
-                int pos = writingArea.getCaretPosition();
-                String text = writingArea.getText();
-
-                if (pos < text.length()) {
-                    // Replace character
-                    writingArea.replaceRange(String.valueOf(c), pos, pos + 1);
-                    markModified();
-                } else {
-                    // At end of text, just insert
-                    writingArea.insert(String.valueOf(c), pos);
-                    markModified();
-                }
-            }
-        }
+        inputController.handleReplaceMode(e);
     }
 
     // Command mode key handling
     void handleCommandMode(KeyEvent e) {
-        int code = e.getKeyCode();
-        char c = e.getKeyChar();
-
-        if (e.isControlDown() && (code == KeyEvent.VK_R || c == 'r')) {
-            openCommandHistorySearch();
-            updateSubstitutePreview();
-            return;
-        }
-
-        if (code == KeyEvent.VK_ESCAPE) {
-            editorState.commandBuffer = "";
-            clearSubstitutePreview();
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        if (code == KeyEvent.VK_ENTER) {
-            String result = commandHandler.execute(editorState.commandBuffer);
-            addCommandHistory(editorState.commandBuffer);
-            if (!result.isEmpty()) {
-                showMessage(result);
-            }
-            editorState.commandBuffer = "";
-            clearSubstitutePreview();
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        if (code == KeyEvent.VK_UP) {
-            browseCommandHistory(-1);
-            updateSubstitutePreview();
-            return;
-        }
-
-        if (code == KeyEvent.VK_DOWN) {
-            browseCommandHistory(1);
-            updateSubstitutePreview();
-            return;
-        }
-
-        if (code == KeyEvent.VK_TAB) {
-            editorState.commandBuffer = completeCommand(editorState.commandBuffer);
-            updateSubstitutePreview();
-            return;
-        }
-
-        if (code == KeyEvent.VK_BACK_SPACE) {
-            if (editorState.commandBuffer.length() > 1) {
-                editorState.commandBuffer = editorState.commandBuffer.substring(0, editorState.commandBuffer.length() - 1);
-            } else {
-                editorState.commandBuffer = "";
-                clearSubstitutePreview();
-                setMode(EditorMode.NORMAL);
-            }
-            updateSubstitutePreview();
-            return;
-        }
-
-        // Append character to command buffer
-        if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
-            editorState.commandBuffer += c;
-            updateSubstitutePreview();
-        }
+        inputController.handleCommandMode(e);
     }
 
     void openCommandHistorySearch() {
-        if (commandHistory.isEmpty()) {
-            showMessage("No command history");
-            return;
-        }
-        List<String> candidates = new ArrayList<>();
-        for (int i = commandHistory.size() - 1; i >= 0; i--) {
-            String entry = commandHistory.get(i);
-            if (entry != null && !entry.isBlank()) {
-                candidates.add(entry);
-            }
-        }
-        if (candidates.isEmpty()) {
-            showMessage("No command history");
-            return;
-        }
-        String selected = showPaletteDialog("Command History", candidates,
-            value -> value == null ? "" : "Recall history entry into : prompt");
-        if (selected == null || selected.isBlank()) {
-            showMessage("History search cancelled");
-            return;
-        }
-        editorState.commandBuffer = selected;
-        commandHistoryIndex = -1;
-        commandHistoryPrefix = editorState.commandBuffer;
+        inputController.openCommandHistorySearch();
     }
 
     void handleSearchMode(KeyEvent e) {
-        int code = e.getKeyCode();
-        char c = e.getKeyChar();
-
-        if (code == KeyEvent.VK_ESCAPE) {
-            // Restore cursor to pre-search position
-            if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
-                writingArea.setCaretPosition(editorState.searchStartPos);
-            }
-            searchManager.clearHighlights();
-            editorState.commandBuffer = "";
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        if (code == KeyEvent.VK_ENTER) {
-            String pattern = editorState.commandBuffer.length() > 1 ? editorState.commandBuffer.substring(1) : "";
-            String result = editorState.searchForward ? searchManager.searchForward(pattern) : searchManager.searchBackward(pattern);
-            if (!result.isEmpty()) {
-                showMessage(result);
-                if (result.startsWith("Match")) {
-                    pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-                }
-            }
-            if (!pattern.isEmpty()) {
-                addCommandHistory(editorState.commandBuffer);
-            }
-            editorState.commandBuffer = "";
-            setMode(EditorMode.NORMAL);
-            return;
-        }
-
-        if (code == KeyEvent.VK_UP) {
-            browseCommandHistory(-1);
-            return;
-        }
-
-        if (code == KeyEvent.VK_DOWN) {
-            browseCommandHistory(1);
-            return;
-        }
-
-        if (code == KeyEvent.VK_BACK_SPACE) {
-            if (editorState.commandBuffer.length() > 1) {
-                editorState.commandBuffer = editorState.commandBuffer.substring(0, editorState.commandBuffer.length() - 1);
-            } else {
-                editorState.commandBuffer = "";
-                if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
-                    writingArea.setCaretPosition(editorState.searchStartPos);
-                }
-                searchManager.clearHighlights();
-                setMode(EditorMode.NORMAL);
-            }
-            incrementalSearchPreview();
-            return;
-        }
-
-        if (c != KeyEvent.CHAR_UNDEFINED && !e.isControlDown()) {
-            editorState.commandBuffer += c;
-            incrementalSearchPreview();
-        }
+        inputController.handleSearchMode(e);
     }
 
     void incrementalSearchPreview() {
-        String pattern = editorState.commandBuffer.length() > 1 ? editorState.commandBuffer.substring(1) : "";
-        if (pattern.isEmpty()) {
-            searchManager.clearHighlights();
-            if (editorState.searchStartPos >= 0 && editorState.searchStartPos <= writingArea.getText().length()) {
-                writingArea.setCaretPosition(editorState.searchStartPos);
-            }
-            return;
-        }
-        if (editorState.searchForward) {
-            searchManager.searchForward(pattern);
-        } else {
-            searchManager.searchBackward(pattern);
-        }
+        inputController.incrementalSearchPreview();
     }
 
     static int vimCharClass(char c) {
@@ -2550,176 +765,19 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void browseCommandHistory(int direction) {
-        if (commandHistory.isEmpty()) {
-            return;
-        }
-        if (commandHistoryIndex < 0) {
-            commandHistoryPrefix = editorState.commandBuffer;
-            commandHistoryIndex = commandHistory.size();
-        }
-
-        int nextIndex = commandHistoryIndex + direction;
-        nextIndex = Math.max(0, Math.min(nextIndex, commandHistory.size()));
-        commandHistoryIndex = nextIndex;
-
-        if (commandHistoryIndex >= commandHistory.size()) {
-            editorState.commandBuffer = commandHistoryPrefix;
-            return;
-        }
-
-        String candidate = commandHistory.get(commandHistoryIndex);
-        if (!commandHistoryPrefix.isEmpty() && !candidate.startsWith(commandHistoryPrefix.substring(0, 1))) {
-            return;
-        }
-        editorState.commandBuffer = candidate;
+        inputController.browseCommandHistory(direction);
     }
 
     void addCommandHistory(String entry) {
-        if (entry == null || entry.isEmpty()) {
-            return;
-        }
-        appendCommandLog(entry);
-        commandHistory.remove(entry);
-        commandHistory.add(entry);
-        while (commandHistory.size() > 100) {
-            commandHistory.remove(0);
-        }
-        commandHistoryIndex = -1;
-        commandHistoryPrefix = "";
+        inputController.addCommandHistory(entry);
     }
 
     String completeCommand(String input) {
-        if (input == null || input.isEmpty() || !input.startsWith(":")) {
-            return input;
-        }
-
-        String withoutColon = input.substring(1);
-        if (withoutColon.startsWith("e ") || withoutColon.startsWith("w ")) {
-            return ":" + completePath(withoutColon.substring(0, 2), withoutColon.substring(2));
-        }
-        String lowered = withoutColon.toLowerCase();
-
-        List<String> knownCommands = new ArrayList<>();
-        knownCommands.add("w");
-        knownCommands.add("write");
-        knownCommands.add("q");
-        knownCommands.add("quit");
-        knownCommands.add("q!");
-        knownCommands.add("wq");
-        knownCommands.add("x");
-        knownCommands.add("e");
-        knownCommands.add("edit");
-        knownCommands.add("bn");
-        knownCommands.add("bp");
-        knownCommands.add("ls");
-        knownCommands.add("buffers");
-        knownCommands.add("bd");
-        knownCommands.add("set");
-        knownCommands.add("settings");
-        knownCommands.add("config");
-        knownCommands.add("log");
-        knownCommands.add("commandlog");
-        knownCommands.add("session");
-        knownCommands.add("sessions");
-        knownCommands.add("workspace");
-        knownCommands.add("ws");
-        knownCommands.add("jobs");
-        knownCommands.add("jobcancel");
-        knownCommands.add("jobkill");
-        knownCommands.add("drop");
-        knownCommands.add("task");
-        knownCommands.add("help");
-        knownCommands.add("wc");
-        knownCommands.add("recent");
-        knownCommands.add("d");
-        knownCommands.add("delete");
-        knownCommands.add("files");
-        knownCommands.add("folder");
-        knownCommands.add("folders");
-        knownCommands.add("tree");
-        knownCommands.add("git");
-        knownCommands.add("buf");
-        knownCommands.add("grep");
-        knownCommands.add("copen");
-        knownCommands.add("cclose");
-        knownCommands.add("cnext");
-        knownCommands.add("cprev");
-        knownCommands.add("cfirst");
-        knownCommands.add("clast");
-        knownCommands.add("cc");
-        knownCommands.add("lsp");
-        knownCommands.add("definition");
-        knownCommands.add("hover");
-        knownCommands.add("references");
-        knownCommands.add("diagnostics");
-        knownCommands.add("diag");
-        knownCommands.add("ldiag");
-        knownCommands.add("dnext");
-        knownCommands.add("dprev");
-        knownCommands.add("symbols");
-        knownCommands.add("sym");
-        knownCommands.add("registers");
-        knownCommands.add("marks");
-        knownCommands.add("yankring");
-        knownCommands.add("pastepicker");
-        knownCommands.add("yr");
-        knownCommands.add("zen");
-        knownCommands.add("theater");
-        knownCommands.add("normal");
-        knownCommands.add("reload");
-        knownCommands.add("source");
-        knownCommands.add("clean");
-        knownCommands.add("shedclean");
-        knownCommands.add("noh");
-        knownCommands.add("nohlsearch");
-        knownCommands.add("wa");
-        knownCommands.add("qa");
-        knownCommands.add("wqa");
-        knownCommands.add("split");
-        knownCommands.add("vsplit");
-        knownCommands.add("close");
-        knownCommands.add("themes");
-        // Markdown / orgmode commands
-        knownCommands.add("toc");
-        knownCommands.add("outline");
-        knownCommands.add("toggle");
-        knownCommands.add("table");
-        knownCommands.add("link");
-        knownCommands.add("img");
-        knownCommands.add("snippets");
-        knownCommands.add("bracketcolor");
-        knownCommands.add("term");
-        knownCommands.add("terminal");
-        knownCommands.add("conceal");
-        knownCommands.addAll(configManager.getConfiguredCommandAliases());
-
-        // Exact prefix match first
-        for (String command : knownCommands) {
-            if (command.startsWith(lowered)) {
-                return ":" + command;
-            }
-        }
-        // Fuzzy match fallback
-        List<String> fuzzy = fuzzyMatchService.matchStrings(lowered, knownCommands, 1);
-        if (!fuzzy.isEmpty()) {
-            return ":" + fuzzy.get(0);
-        }
-        return input;
+        return inputController.completeCommand(input);
     }
 
     String completePath(String prefix, String partialPath) {
-        String trimmed = partialPath.trim();
-        File base = trimmed.isEmpty() ? new File(".") : new File(trimmed);
-        File directory = base.isDirectory() ? base : base.getParentFile();
-        String needle = base.isDirectory() ? "" : base.getName();
-        if (directory == null) {
-            directory = new File(".");
-        }
-        File[] matches = directory.listFiles((dir, name) -> name.startsWith(needle));
-        if (matches == null || matches.length == 0) {
-            return prefix + partialPath;
-        }
-        return prefix + matches[0].getPath();
+        return inputController.completePath(prefix, partialPath);
     }
 
     void updateCurrentLineHighlight() {
@@ -2878,83 +936,22 @@ public class Texteditor extends JFrame implements KeyListener {
     javax.swing.DefaultListModel<String> completionModel;
     String completionPrefix;
     void showInlineCompletion() {
-        try {
-            String prefix = currentCompletionPrefix();
-            if (prefix == null || prefix.length() < 2) { dismissCompletionPopup(); return; }
-            List<String> completions = gatherCompletions(prefix);
-            if (completions.isEmpty()) { dismissCompletionPopup(); return; }
-            completionPrefix = prefix;
-            if (completionPopup == null) {
-                completionModel = new javax.swing.DefaultListModel<>();
-                completionList = new javax.swing.JList<>(completionModel);
-                completionList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-                completionList.setFocusable(false);
-                completionList.setFont(writingArea.getFont().deriveFont((float) writingArea.getFont().getSize()));
-                completionList.setBackground(configManager.getCommandBarBackground());
-                completionList.setForeground(configManager.getCommandBarForeground());
-                completionList.setSelectionBackground(configManager.getSelectionColor());
-                completionList.setSelectionForeground(configManager.getSelectionTextColor());
-                completionPopup = new javax.swing.JWindow(this);
-                javax.swing.JScrollPane sp = new javax.swing.JScrollPane(completionList);
-                sp.setBorder(javax.swing.BorderFactory.createLineBorder(configManager.getCaretColor()));
-                completionPopup.add(sp);
-                completionPopup.setFocusableWindowState(false);
-            }
-            completionModel.clear();
-            int max = Math.min(completions.size(), 12);
-            for (int i = 0; i < max; i++) completionModel.addElement(completions.get(i));
-            completionList.setSelectedIndex(0);
-            Rectangle2D caretRect = writingArea.modelToView2D(writingArea.getCaretPosition());
-            if (caretRect == null) return;
-            if (!writingArea.isShowing()) return;
-            java.awt.Point loc = writingArea.getLocationOnScreen();
-            int px = loc.x + (int) caretRect.getX();
-            int py = loc.y + (int) (caretRect.getY() + caretRect.getHeight());
-            int lineH = writingArea.getFontMetrics(writingArea.getFont()).getHeight();
-            completionPopup.setLocation(px, py);
-            completionPopup.setSize(300, Math.min(max * lineH + 4, 240));
-            completionPopup.setVisible(true);
-        } catch (Exception ignored) { dismissCompletionPopup(); }
+        inputController.showInlineCompletion();
     }
     void dismissCompletionPopup() {
-        if (completionPopup != null && completionPopup.isVisible()) completionPopup.setVisible(false);
+        inputController.dismissCompletionPopup();
     }
     boolean isCompletionPopupVisible() {
-        return completionPopup != null && completionPopup.isVisible();
+        return inputController.isCompletionPopupVisible();
     }
     void completionPopupNavigate(int direction) {
-        if (completionList == null || completionModel.isEmpty()) return;
-        int idx = completionList.getSelectedIndex() + direction;
-        if (idx < 0) idx = completionModel.size() - 1;
-        if (idx >= completionModel.size()) idx = 0;
-        completionList.setSelectedIndex(idx);
-        completionList.ensureIndexIsVisible(idx);
+        inputController.completionPopupNavigate(direction);
     }
     void completionPopupAccept() {
-        if (completionList == null) return;
-        String selected = completionList.getSelectedValue();
-        dismissCompletionPopup();
-        if (selected != null && completionPrefix != null) {
-            applyCompletion(completionPrefix, selected);
-            markModified();
-        }
+        inputController.completionPopupAccept();
     }
     List<String> gatherCompletions(String prefix) {
-        List<String> completions = new ArrayList<>();
-        FileBuffer buffer = getCurrentBuffer();
-        LspClient client = resolveLspClient(buffer);
-        if (buffer != null && client != null && buffer.hasFilePath()) {
-            String uri = bufferUri(buffer);
-            try {
-                int line = writingArea.getLineOfOffset(writingArea.getCaretPosition());
-                int col = writingArea.getCaretPosition() - writingArea.getLineStartOffset(line);
-                for (LspClient.CompletionItem item : client.completion(uri, line, col)) {
-                    if (item.getLabel() != null && !item.getLabel().isEmpty()) completions.add(item.getLabel());
-                }
-            } catch (BadLocationException ignored) {}
-        }
-        if (completions.isEmpty()) completions = collectBufferCompletions(prefix);
-        return completions;
+        return inputController.gatherCompletions(prefix);
     }
 
     void addCursorAtNextMatch() {
@@ -3093,267 +1090,39 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     void checkForExternalChanges() {
-        if (reloadPromptActive) {
-            return;
-        }
-        int autoReloaded = 0;
-        for (FileBuffer buffer : buffers) {
-            if (buffer == null || !buffer.hasFilePath() || !buffer.hasExternalChanges()) {
-                continue;
-            }
-            if (!buffer.isModified()) {
-                try {
-                    int caret = 0;
-                    if (buffer == getCurrentBuffer()) {
-                        caret = writingArea.getCaretPosition();
-                    }
-                    buffer.load(configManager);
-                    if (buffer == getCurrentBuffer()) {
-                        loadBufferIntoEditor(buffer);
-                        writingArea.setCaretPosition(Math.min(caret, writingArea.getText().length()));
-                    }
-                    autoReloaded++;
-                } catch (IOException e) {
-                    showMessage("Reload failed: " + e.getMessage());
-                }
-                continue;
-            }
-            promptExternalConflictForModifiedBuffer(buffer);
-        }
-        if (autoReloaded > 0) {
-            showMessage("Auto-reloaded " + autoReloaded + " externally changed buffer" + (autoReloaded == 1 ? "" : "s"));
-        }
+        recoveryController.checkForExternalChanges();
     }
 
     void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null) {
-            return;
-        }
-        reloadPromptActive = true;
-        String[] options = {"Keep Mine", "Reload Theirs", "View Both"};
-        int result = JOptionPane.showOptionDialog(
-            this,
-            "File changed on disk while modified in editor:\n"
-                + buffer.getDisplayName()
-                + "\nChoose how to resolve this conflict.",
-            "External Change Conflict",
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.WARNING_MESSAGE,
-            null,
-            options,
-            options[0]
-        );
-        reloadPromptActive = false;
-
-        if (result == 1) {
-            try {
-                int caret = buffer == getCurrentBuffer() ? writingArea.getCaretPosition() : 0;
-                buffer.load(configManager);
-                if (buffer == getCurrentBuffer()) {
-                    loadBufferIntoEditor(buffer);
-                    writingArea.setCaretPosition(Math.min(caret, writingArea.getText().length()));
-                }
-                showMessage("Reloaded from disk");
-            } catch (IOException e) {
-                showMessage("Reload failed: " + e.getMessage());
-            }
-            return;
-        }
-        if (result == 2) {
-            showExternalConflictPreview(buffer);
-            buffer.refreshExternalTimestamp();
-            return;
-        }
-        buffer.refreshExternalTimestamp();
+        recoveryController.promptExternalConflictForModifiedBuffer(buffer);
     }
 
     void showExternalConflictPreview(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null) {
-            return;
-        }
-        try {
-            String disk = Files.readString(buffer.getFile().toPath(), StandardCharsets.UTF_8);
-            StringBuilder preview = new StringBuilder();
-            preview.append("External Conflict Preview\n");
-            preview.append("File: ").append(buffer.getFilePath()).append("\n\n");
-            preview.append("===== YOUR BUFFER =====\n");
-            preview.append(buffer.getContent()).append("\n");
-            preview.append("===== DISK VERSION =====\n");
-            preview.append(disk).append("\n");
-            preview.append("Tip: copy needed parts, then save.\n");
-            showScratchBuffer("[external conflict] " + buffer.getDisplayName(), preview.toString());
-        } catch (IOException e) {
-            showMessage("Conflict preview failed: " + e.getMessage());
-        }
+        recoveryController.showExternalConflictPreview(buffer);
     }
 
     void startRecoverySnapshotTimer() {
-        if (recoverySnapshotTimer != null) {
-            recoverySnapshotTimer.stop();
-        }
-        recoverySnapshotTimer = new Timer(5000, e -> persistRecoverySnapshotsSafely());
-        recoverySnapshotTimer.setRepeats(true);
-        recoverySnapshotTimer.start();
+        recoveryController.startRecoverySnapshotTimer();
     }
 
     void persistRecoverySnapshotsSafely() {
-        try {
-            persistRecoverySnapshots();
-        } catch (Exception ignored) {
-        }
+        recoveryController.persistRecoverySnapshotsSafely();
     }
 
     void persistRecoverySnapshots() throws IOException {
-        if (recoveryStoreDir == null) {
-            return;
-        }
-        if (!recoveryStoreDir.exists()) {
-            Files.createDirectories(recoveryStoreDir.toPath());
-        }
-
-        Set<String> activeSnapshotFiles = new HashSet<>();
-        int scratchIndex = 1;
-        for (FileBuffer buffer : buffers) {
-            if (buffer == null || !buffer.isModified() || buffer == treeBuffer || buffer == quickfixBuffer) {
-                continue;
-            }
-            String snapshotId = buffer.hasFilePath()
-                ? "file-" + Integer.toHexString(buffer.getFilePath().hashCode())
-                : "scratch-" + (scratchIndex++);
-            String snapshotFileName = snapshotId + ".json";
-            activeSnapshotFiles.add(snapshotFileName);
-
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("id", snapshotId);
-            payload.put("name", buffer.getDisplayName());
-            payload.put("path", buffer.hasFilePath() ? buffer.getFilePath() : null);
-            payload.put("modified", true);
-            payload.put("content", buffer.getContent());
-            payload.put("savedAt", commandLogTimeFormat.format(LocalDateTime.now()));
-
-            Files.writeString(
-                new File(recoveryStoreDir, snapshotFileName).toPath(),
-                MiniJson.stringify(payload),
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE
-            );
-        }
-
-        File[] existing = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (existing == null) {
-            return;
-        }
-        for (File file : existing) {
-            if (!activeSnapshotFiles.contains(file.getName())) {
-                Files.deleteIfExists(file.toPath());
-            }
-        }
+        recoveryController.persistRecoverySnapshots();
     }
 
     void clearRecoverySnapshots() {
-        if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
-            return;
-        }
-        File[] snapshots = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (snapshots == null) {
-            return;
-        }
-        for (File snapshot : snapshots) {
-            try {
-                Files.deleteIfExists(snapshot.toPath());
-            } catch (IOException ignored) {
-            }
-        }
+        recoveryController.clearRecoverySnapshots();
     }
 
     void promptRecoveryRestoreIfAvailable() {
-        if (recoveryStoreDir == null || !recoveryStoreDir.exists()) {
-            return;
-        }
-        File[] snapshots = recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (snapshots == null || snapshots.length == 0) {
-            return;
-        }
-        java.util.Arrays.sort(snapshots, Comparator.comparing(File::getName));
-        int result = JOptionPane.showConfirmDialog(
-            this,
-            snapshots.length + " crash-recovery snapshot(s) were found. Restore now?",
-            "Crash Recovery",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        );
-        if (result != JOptionPane.YES_OPTION) {
-            return;
-        }
-
-        int restored = 0;
-        FileBuffer lastRestored = null;
-        for (File snapshot : snapshots) {
-            FileBuffer restoredBuffer = restoreRecoverySnapshot(snapshot);
-            if (restoredBuffer != null) {
-                restored++;
-                lastRestored = restoredBuffer;
-            }
-            try {
-                Files.deleteIfExists(snapshot.toPath());
-            } catch (IOException ignored) {
-            }
-        }
-        if (lastRestored != null) {
-            loadBufferIntoEditor(lastRestored);
-        }
-        if (restored > 0) {
-            showMessage("Recovered " + restored + " buffer" + (restored == 1 ? "" : "s") + " from crash snapshots");
-        }
+        recoveryController.promptRecoveryRestoreIfAvailable();
     }
 
     FileBuffer restoreRecoverySnapshot(File snapshotFile) {
-        if (snapshotFile == null || !snapshotFile.isFile()) {
-            return null;
-        }
-        try {
-            String json = Files.readString(snapshotFile.toPath(), StandardCharsets.UTF_8);
-            Map<String, Object> payload = MiniJson.asObject(MiniJson.parse(json));
-            if (payload == null) {
-                return null;
-            }
-            String content = MiniJson.asString(payload.get("content"));
-            String path = MiniJson.asString(payload.get("path"));
-            String name = MiniJson.asString(payload.get("name"));
-            String restoredContent = content == null ? "" : content;
-
-            if (path != null && !path.isBlank()) {
-                File file = new File(path);
-                FileBuffer existing = findBufferByPath(file);
-                if (existing == null) {
-                    FileBuffer buffer = file.exists() ? new FileBuffer(file, configManager) : new FileBuffer(file.getAbsolutePath());
-                    if (shouldReplaceSingleLandingBuffer()) {
-                        buffers.set(0, buffer);
-                    } else {
-                        buffers.add(buffer);
-                    }
-                    registerFileWatch(buffer);
-                    addToRecentFiles(file.getAbsolutePath());
-                    existing = buffer;
-                }
-                existing.setContent(restoredContent, true);
-                return existing;
-            }
-
-            String scratchName = name == null || name.isBlank() ? "[Recovered Scratch]" : "[Recovered] " + name;
-            FileBuffer scratch = FileBuffer.createScratch(scratchName, restoredContent);
-            scratch.setModified(true);
-            if (shouldReplaceSingleLandingBuffer()) {
-                buffers.set(0, scratch);
-            } else {
-                buffers.add(scratch);
-            }
-            return scratch;
-        } catch (Exception ignored) {
-            return null;
-        }
+        return recoveryController.restoreRecoverySnapshot(snapshotFile);
     }
 
     void maybePreviewMarkdown(FileBuffer buffer) {
@@ -3525,14 +1294,7 @@ public class Texteditor extends JFrame implements KeyListener {
     // --- File watcher integration ---
 
     public void registerFileWatch(FileBuffer buffer) {
-        if (buffer == null || buffer.getFile() == null || buffer.isScratch()) return;
-        fileWatcherService.watch(buffer.getFile(), file -> {
-            SwingUtilities.invokeLater(() -> {
-                if (!reloadPromptActive && buffer.getFile() != null && buffer.getFile().equals(file)) {
-                    checkForExternalChanges();
-                }
-            });
-        });
+        recoveryController.registerFileWatch(buffer);
     }
 
     // --- Fuzzy command completion ---
@@ -3989,606 +1751,79 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showCommandPalette() {
-        List<String> commands = commandHandler.getCommandNames();
-        List<String> candidates = new ArrayList<>();
-        for (String cmd : commands) {
-            candidates.add(":" + cmd);
-        }
-        String selected = showPaletteDialog("Command Palette", candidates, this::describeCommandPaletteCandidate);
-        if (selected == null || selected.isEmpty()) return "Command palette cancelled";
-        String cmd = selected.startsWith(":") ? selected.substring(1) : selected;
-        return commandHandler.execute(cmd);
+        return paletteController.showCommandPalette();
     }
 
     public String showBufferFinder() {
-        List<String> candidates = new ArrayList<>();
-        for (int i = 0; i < buffers.size(); i++) {
-            candidates.add((i + 1) + ": " + buffers.get(i).getDisplayName());
-        }
-        String selection = showPaletteDialog("Buffers", candidates, value -> "Switch to " + value);
-        if (selection == null || selection.isEmpty()) {
-            return "Buffer finder cancelled";
-        }
-        int colon = selection.indexOf(':');
-        if (colon > 0) {
-            try {
-                int bufferIndex = Integer.parseInt(selection.substring(0, colon).trim()) - 1;
-                switchToBuffer(bufferIndex);
-                return "Switched to buffer";
-            } catch (NumberFormatException ignored) {
-            }
-        }
-        return "Buffer finder cancelled";
+        return paletteController.showBufferFinder();
     }
 
     public String showGrepFinder(String pattern) {
-        List<String> candidates = grepFiles(pattern);
-        updateQuickfixEntries("grep " + (pattern == null ? "" : pattern), parseQuickfixEntries(String.join("\n", candidates), "grep"));
-        String selection = showPaletteDialog("Grep", candidates, this::describeGrepCandidate);
-        if (selection == null || selection.isEmpty()) {
-            return "Grep cancelled";
-        }
-
-        String[] parts = selection.split(":", 3);
-        if (parts.length < 2) {
-            return "Invalid grep selection";
-        }
-
-        try {
-            openFile(new File(parts[0]));
-            return gotoLine(Integer.parseInt(parts[1]));
-        } catch (Exception e) {
-            return "Error opening grep match: " + e.getMessage();
-        }
+        return paletteController.showGrepFinder(pattern);
     }
 
     public String showSymbols(String argument) {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null) {
-            return "No buffer";
-        }
-        List<SymbolService.Symbol> symbols = symbolService.collectSymbols(writingArea.getText(), buffer.getFileType());
-        if (symbols.isEmpty()) {
-            return "No symbols found";
-        }
-        String query = argument == null ? "" : argument.trim().toLowerCase(Locale.ROOT);
-        List<SymbolService.Symbol> filtered = new ArrayList<>();
-        for (SymbolService.Symbol symbol : symbols) {
-            if (query.isEmpty()) {
-                filtered.add(symbol);
-                continue;
-            }
-            String haystack = (symbol.getName() + " " + symbol.getKind()).toLowerCase(Locale.ROOT);
-            if (haystack.contains(query)) {
-                filtered.add(symbol);
-            }
-        }
-        if (filtered.isEmpty()) {
-            return "No symbols matched: " + query;
-        }
-
-        Map<String, SymbolService.Symbol> candidateMap = new LinkedHashMap<>();
-        for (SymbolService.Symbol symbol : filtered) {
-            String candidate = formatSymbolCandidate(symbol);
-            if (candidateMap.containsKey(candidate)) {
-                candidate = candidate + "  [#" + symbol.getLine() + "]";
-            }
-            candidateMap.put(candidate, symbol);
-        }
-        List<String> candidates = new ArrayList<>(candidateMap.keySet());
-        String selection = showPaletteDialog("Symbols", candidates, value -> describeSymbolCandidate(value, candidateMap, symbols));
-        if (selection == null || selection.isEmpty()) {
-            return "Symbols cancelled";
-        }
-        SymbolService.Symbol selected = candidateMap.get(selection);
-        if (selected == null) {
-            return "Invalid symbol selection";
-        }
-        return gotoLine(selected.getLine());
+        return paletteController.showSymbols(argument);
     }
 
     String formatSymbolCandidate(SymbolService.Symbol symbol) {
-        StringBuilder indent = new StringBuilder();
-        for (int i = 1; i < symbol.getLevel(); i++) {
-            indent.append("  ");
-        }
-        return String.format("%4d  %-8s  %s%s",
-            symbol.getLine(),
-            symbol.getKind(),
-            indent,
-            symbol.getName());
+        return paletteController.formatSymbolCandidate(symbol);
     }
 
-    String describeSymbolCandidate(
-        String selection,
-        Map<String, SymbolService.Symbol> candidateMap,
-        List<SymbolService.Symbol> allSymbols
-    ) {
-        if (selection == null || selection.isBlank()) {
-            return "Select a symbol to jump.";
-        }
-        SymbolService.Symbol symbol = candidateMap.get(selection);
-        if (symbol == null) {
-            return selection;
-        }
-        List<SymbolService.Symbol> trail = symbolService.breadcrumbTrail(allSymbols, symbol.getLine());
-        StringBuilder breadcrumb = new StringBuilder();
-        for (int i = 0; i < trail.size(); i++) {
-            if (i > 0) {
-                breadcrumb.append(" > ");
-            }
-            breadcrumb.append(trail.get(i).getName());
-        }
-        return "Line " + symbol.getLine()
-            + " [" + symbol.getKind() + "]\n"
-            + (breadcrumb.length() == 0 ? symbol.getName() : breadcrumb.toString());
+    String describeSymbolCandidate( String selection, Map<String, SymbolService.Symbol> candidateMap, List<SymbolService.Symbol> allSymbols ) {
+        return paletteController.describeSymbolCandidate(selection, candidateMap, allSymbols);
     }
 
     void collectFiles(File directory, List<String> results) {
-        if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
-            return;
-        }
-        File[] files = directory.listFiles();
-        if (files == null) {
-            return;
-        }
-        for (File file : files) {
-            if (results.size() >= 200) {
-                return;
-            }
-            if (file.isDirectory()) {
-                collectFiles(file, results);
-            } else {
-                results.add(file.getPath());
-            }
-        }
+        paletteController.collectFiles(directory, results);
     }
 
     List<String> grepFiles(String pattern) {
-        List<String> results = new ArrayList<>();
-        if (pattern == null || pattern.isEmpty()) {
-            return results;
-        }
-        grepFilesRecursive(new File("."), pattern, results);
-        return results;
+        return paletteController.grepFiles(pattern);
     }
 
     void grepFilesRecursive(File directory, String pattern, List<String> results) {
-        if (directory == null || results.size() >= 200 || shouldSkipHiddenPath(directory)) {
-            return;
-        }
-        File[] files = directory.listFiles();
-        if (files == null) {
-            return;
-        }
-        for (File file : files) {
-            if (results.size() >= 200) {
-                return;
-            }
-            if (file.isDirectory()) {
-                grepFilesRecursive(file, pattern, results);
-                continue;
-            }
-            try {
-                List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
-                for (int i = 0; i < lines.size(); i++) {
-                    if (lines.get(i).contains(pattern)) {
-                        results.add(file.getPath() + ":" + (i + 1) + ":" + lines.get(i).trim());
-                    }
-                    if (results.size() >= 200) {
-                        return;
-                    }
-                }
-            } catch (IOException ignored) {
-            }
-        }
+        paletteController.grepFilesRecursive(directory, pattern, results);
     }
 
     String describeCommandPaletteCandidate(String selection) {
-        if (selection == null || selection.isBlank()) {
-            return "Type to fuzzy-filter commands, then press Enter.";
-        }
-        String cmd = selection.startsWith(":") ? selection.substring(1) : selection;
-        int split = cmd.indexOf(' ');
-        String base = (split >= 0 ? cmd.substring(0, split) : cmd).toLowerCase(Locale.ROOT);
-        switch (base) {
-            case "w":
-            case "write":
-                return "Write current buffer to disk.";
-            case "q":
-            case "quit":
-            case "q!":
-                return "Quit current buffer/editor.";
-            case "wq":
-            case "x":
-                return "Write buffer, then quit.";
-            case "e":
-            case "edit":
-                return "Open file into a buffer.";
-            case "bn":
-            case "bnext":
-                return "Switch to next buffer.";
-            case "bp":
-            case "bprev":
-                return "Switch to previous buffer.";
-            case "ls":
-                return "List open buffers.";
-            case "buffers":
-            case "buf":
-                return "Open buffer picker.";
-            case "bd":
-            case "bdelete":
-                return "Delete current buffer.";
-            case "set":
-                return "Set runtime option (use :set! key=value to persist).";
-            case "settings":
-            case "shedrc":
-                return "Open global settings file.";
-            case "config":
-                return "Open settings or persist with :config save.";
-            case "log":
-            case "commandlog":
-                return "Open command log scratch buffer.";
-            case "session":
-            case "sessions":
-                return "Save/load/list named sessions.";
-            case "workspace":
-            case "ws":
-                return "Save/load/list workspace profiles (layout + UI settings).";
-            case "jobs":
-                return "Show async job list.";
-            case "jobcancel":
-            case "jobkill":
-                return "Cancel async job by id.";
-            case "drop":
-                return "Run async command against current file path.";
-            case "task":
-                return "Run project tasks (:task test/build) with quickfix integration.";
-            case "help":
-            case "h":
-                return "Open help text (topic optional).";
-            case "wc":
-            case "wordcount":
-                return "Show line/word/character counts.";
-            case "recent":
-                return "Show recent files scratch buffer.";
-            case "d":
-            case "delete":
-                return "Delete current line or a range.";
-            case "files":
-                return "Open project file finder.";
-            case "folder":
-            case "folders":
-                return "Pick folder, then open file picker.";
-            case "split":
-            case "sp":
-                return "Create horizontal split.";
-            case "vsplit":
-            case "vsp":
-                return "Create vertical split.";
-            case "close":
-            case "clo":
-                return "Close active split/window.";
-            case "tree":
-                return "Open tree pane and perform file operations.";
-            case "git":
-                return "Run integrated git subcommands.";
-            case "grep":
-            case "rg":
-                return "Search project text and populate quickfix.";
-            case "copen":
-                return "Open quickfix list.";
-            case "cclose":
-                return "Close quickfix list.";
-            case "cnext":
-            case "cn":
-                return "Jump to next quickfix entry.";
-            case "cprev":
-            case "cp":
-                return "Jump to previous quickfix entry.";
-            case "cfirst":
-                return "Jump to first quickfix entry.";
-            case "clast":
-                return "Jump to last quickfix entry.";
-            case "cc":
-                return "Jump to selected quickfix entry.";
-            case "lsp":
-                return "Run LSP actions and server management.";
-            case "definition":
-                return "Jump to symbol definition.";
-            case "hover":
-                return "Show hover docs in scratch buffer.";
-            case "references":
-                return "Find references and open quickfix.";
-            case "diagnostics":
-            case "diag":
-            case "ldiag":
-                return "Push diagnostics into quickfix.";
-            case "dnext":
-            case "dn":
-                return "Jump to next diagnostic.";
-            case "dprev":
-            case "dp":
-                return "Jump to previous diagnostic.";
-            case "symbols":
-            case "sym":
-                return "Open symbol picker and jump by class/function/heading.";
-            case "registers":
-            case "reg":
-                return "Show register contents.";
-            case "yankring":
-            case "pastepicker":
-            case "yr":
-                return "Pick from yank/delete history and paste.";
-            case "marks":
-                return "Show mark list for active buffer.";
-            case "themes":
-                return "Show and switch built-in themes.";
-            case "theater":
-                return "Apply dramatic UI preset: off/subtle/full.";
-            case "zen":
-                return "Toggle centered zen layout.";
-            case "minimap":
-                return "Toggle minimap side panel.";
-            case "normal":
-            case "norm":
-                return "Execute normal-mode keys on current/ranged lines.";
-            case "reload":
-            case "source":
-                return "Reload ~/.shed/shedrc from disk.";
-            case "clean":
-            case "shedclean":
-                return "Remove Shed metadata files.";
-            case "noh":
-            case "nohlsearch":
-                return "Clear search highlights.";
-            case "plugin":
-            case "plugins":
-                return "Manage plugins and package install/update/pin flows.";
-            case "palette":
-            case "commands":
-                return "Open command palette.";
-            case "undolist":
-            case "undotree":
-                return "Show undo history.";
-            case "wa":
-            case "wall":
-                return "Write all modified buffers.";
-            case "qa":
-            case "qall":
-                return "Quit all buffers/windows.";
-            case "wqa":
-            case "wqall":
-            case "xa":
-            case "xall":
-                return "Write all buffers, then quit all.";
-            case "toc":
-                return "Open markdown table of contents.";
-            case "outline":
-                return "Open markdown outline split.";
-            case "toggle":
-            case "checkbox":
-                return "Toggle markdown checkbox under cursor.";
-            case "table":
-                return "Insert/align/sort/edit markdown table.";
-            case "link":
-                return "Insert markdown link template.";
-            case "img":
-            case "image":
-                return "Insert markdown image template.";
-            case "snippets":
-            case "snippet":
-                return "List snippets for current file type.";
-            case "bracketcolor":
-            case "bracketcolors":
-                return "Toggle bracket pair colorization.";
-            case "term":
-            case "terminal":
-                return "Open an integrated shell split.";
-            case "conceal":
-            case "conceallevel":
-                return "Set markdown conceal level (0/1/2).";
-            default:
-                return "Run command :" + base;
-        }
+        return paletteController.describeCommandPaletteCandidate(selection);
     }
 
     String describeGrepCandidate(String selection) {
-        if (selection == null || selection.isBlank()) {
-            return "No match selected.";
-        }
-        String[] parts = selection.split(":", 3);
-        if (parts.length >= 3) {
-            return "Open " + parts[0] + " line " + parts[1] + "\n" + parts[2];
-        }
-        return selection;
+        return paletteController.describeGrepCandidate(selection);
     }
 
     String showPaletteDialog(String title, List<String> candidates) {
-        return showPaletteDialog(title, candidates, null);
+        return paletteController.showPaletteDialog(title, candidates);
     }
 
     void animatePaletteDialogOpen(JDialog dialog, Dimension targetSize) {
-        if (!dramaticCommandPaletteEnabled || !dramaticMotionAllowed()) {
-            return;
-        }
-        int steps = Math.max(5, Math.min(12, dramaticAnimationMs / 20));
-        int startWidth = Math.max(420, (int) Math.round(targetSize.width * 0.88));
-        int startHeight = Math.max(260, (int) Math.round(targetSize.height * 0.88));
-        Point target = dialog.getLocation();
-        int dx = (targetSize.width - startWidth) / 2;
-        int dy = 18;
-        dialog.setSize(startWidth, startHeight);
-        dialog.setLocation(target.x + dx, target.y + dy);
-        Timer timer = new Timer(animationDelayForSteps(steps), null);
-        final int[] tick = new int[] {0};
-        timer.addActionListener(ev -> {
-            double t = easeOut((double) tick[0] / steps);
-            int width = (int) Math.round(startWidth + (targetSize.width - startWidth) * t);
-            int height = (int) Math.round(startHeight + (targetSize.height - startHeight) * t);
-            int x = target.x + (targetSize.width - width) / 2;
-            int y = target.y + (int) Math.round(dy * (1.0 - t));
-            dialog.setSize(width, height);
-            dialog.setLocation(x, y);
-            tick[0]++;
-            if (tick[0] > steps) {
-                timer.stop();
-                dialog.setSize(targetSize);
-                dialog.setLocation(target);
-            }
-        });
-        timer.start();
+        paletteController.animatePaletteDialogOpen(dialog, targetSize);
     }
 
     String showPaletteDialog(String title, List<String> candidates, PalettePreviewProvider previewProvider) {
-        // undecorated modal dialog styled as floating picker
-        JDialog dialog = new JDialog(this, title, true);
-        dialog.setUndecorated(true);
-        dialog.getRootPane().setBorder(javax.swing.BorderFactory.createLineBorder(configManager.getCaretColor(), 1));
-        dialog.setLayout(new BorderLayout(6, 6));
-        dialog.getContentPane().setBackground(configManager.getCommandBarBackground());
-        JTextField filterField = new JTextField();
-        filterField.setFont(writingArea.getFont());
-        filterField.setBackground(configManager.getCommandBarBackground());
-        filterField.setForeground(configManager.getCommandBarForeground());
-        filterField.setCaretColor(configManager.getCaretColor());
-        filterField.setBorder(javax.swing.BorderFactory.createCompoundBorder(
-            javax.swing.BorderFactory.createMatteBorder(0, 0, 1, 0, configManager.getCaretColor()),
-            javax.swing.BorderFactory.createEmptyBorder(6, 8, 6, 8)));
-        DefaultListModel<String> model = new DefaultListModel<>();
-        for (String candidate : candidates) model.addElement(candidate);
-        JList<String> list = new JList<>(model);
-        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        list.setFont(writingArea.getFont());
-        list.setBackground(configManager.getCommandBarBackground());
-        list.setForeground(configManager.getCommandBarForeground());
-        list.setSelectionBackground(configManager.getSelectionColor());
-        list.setSelectionForeground(configManager.getSelectionTextColor());
-        if (!model.isEmpty()) list.setSelectedIndex(0);
-        JLabel titleLabel = new JLabel(" " + title);
-        titleLabel.setForeground(configManager.getCaretColor());
-        titleLabel.setFont(writingArea.getFont().deriveFont(java.awt.Font.BOLD));
-        titleLabel.setBorder(javax.swing.BorderFactory.createEmptyBorder(4, 6, 2, 6));
-        JTextArea previewArea = new JTextArea();
-        previewArea.setEditable(false);
-        previewArea.setLineWrap(true);
-        previewArea.setWrapStyleWord(true);
-        previewArea.setFocusable(false);
-        previewArea.setPreferredSize(new Dimension(260, 320));
-        previewArea.setFont(writingArea.getFont().deriveFont(Math.max(11f, writingArea.getFont().getSize2D() - 1f)));
-        previewArea.setBackground(configManager.getStatusBarBackground());
-        previewArea.setForeground(configManager.getStatusBarForeground());
-        previewArea.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, blendColor(configManager.getCaretColor(), configManager.getCommandBarBackground(), 0.45)),
-            BorderFactory.createEmptyBorder(6, 8, 6, 8)
-        ));
-        previewArea.setVisible(previewProvider != null && dramaticCommandPaletteEnabled);
-        final Runnable syncPreview = () -> {
-            String value = list.getSelectedValue();
-            if (previewProvider == null) {
-                previewArea.setText(value == null ? "" : value);
-                return;
-            }
-            String preview = previewProvider.preview(value);
-            previewArea.setText(preview == null ? "" : preview);
-            previewArea.setCaretPosition(0);
-        };
-        filterField.getDocument().addDocumentListener(new DocumentListener() {
-            public void insertUpdate(DocumentEvent e) { refilter(); }
-            public void removeUpdate(DocumentEvent e) { refilter(); }
-            public void changedUpdate(DocumentEvent e) { refilter(); }
-            private void refilter() {
-                String query = filterField.getText();
-                model.clear();
-                if (query.isEmpty()) { for (String c2 : candidates) model.addElement(c2); }
-                else { for (String m : fuzzyMatchService.matchStrings(query, candidates, 0)) model.addElement(m); }
-                if (!model.isEmpty()) list.setSelectedIndex(0);
-                syncPreview.run();
-            }
-        });
-        list.addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                syncPreview.run();
-            }
-        });
-        final String[] selection = new String[1];
-        list.addMouseListener(new java.awt.event.MouseAdapter() {
-            public void mouseClicked(java.awt.event.MouseEvent e) { if (e.getClickCount() == 2) { selection[0] = list.getSelectedValue(); dialog.dispose(); } }
-        });
-        filterField.addActionListener(e -> { selection[0] = list.getSelectedValue(); dialog.dispose(); });
-        filterField.addKeyListener(new java.awt.event.KeyAdapter() {
-            public void keyPressed(java.awt.event.KeyEvent e) {
-                if (e.getKeyCode() == java.awt.event.KeyEvent.VK_ESCAPE) dialog.dispose();
-                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_DOWN) { int idx = list.getSelectedIndex(); if (idx < model.getSize() - 1) list.setSelectedIndex(idx + 1); e.consume(); }
-                else if (e.getKeyCode() == java.awt.event.KeyEvent.VK_UP) { int idx = list.getSelectedIndex(); if (idx > 0) list.setSelectedIndex(idx - 1); e.consume(); }
-            }
-        });
-        dialog.add(titleLabel, BorderLayout.NORTH);
-        dialog.add(filterField, BorderLayout.CENTER);
-        JScrollPane sp = new JScrollPane(list);
-        sp.setPreferredSize(new Dimension(600, 320));
-        sp.setBorder(null);
-        dialog.add(sp, BorderLayout.SOUTH);
-        dialog.add(previewArea, BorderLayout.EAST);
-        syncPreview.run();
-        Dimension targetSize = dramaticCommandPaletteEnabled ? new Dimension(720, 420) : new Dimension(620, 400);
-        dialog.setSize(targetSize);
-        dialog.setLocationRelativeTo(this);
-        animatePaletteDialogOpen(dialog, targetSize);
-        playCue(CueType.SUCCESS);
-        dialog.setVisible(true);
-        return selection[0];
+        return paletteController.showPaletteDialog(title, candidates, previewProvider);
     }
 
     boolean shouldSkipHiddenPath(File file) {
-        if (file == null) {
-            return true;
-        }
-        String path = file.getPath();
-        if (".".equals(path) || "./".equals(path)) {
-            return false;
-        }
-        return file.getName().startsWith(".");
+        return paletteController.shouldSkipHiddenPath(file);
     }
 
     public String showRegisters() {
-        List<String> lines = registerManager.getDisplayLines();
-        if (lines.isEmpty()) {
-            return "No registers populated";
-        }
-        showScratchBuffer("[registers]", String.join("\n", lines));
-        return "Showing registers";
+        return paletteController.showRegisters();
     }
 
     public String showMarks() {
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || buffer.getMarks().isEmpty()) {
-            return "No marks set";
-        }
-        List<String> lines = new ArrayList<>();
-        for (java.util.Map.Entry<Character, Integer> entry : buffer.getMarks().entrySet()) {
-            lines.add(entry.getKey() + " " + describeOffset(entry.getValue()));
-        }
-        showScratchBuffer("[marks]", String.join("\n", lines));
-        return "Showing marks";
+        return paletteController.showMarks();
     }
 
     String trimForRegisterDisplay(String value) {
-        String singleLine = value.replace("\n", "\\n");
-        if (singleLine.length() > 80) {
-            return singleLine.substring(0, 77) + "...";
-        }
-        return singleLine;
+        return paletteController.trimForRegisterDisplay(value);
     }
 
     String describeOffset(int offset) {
-        try {
-            int line = writingArea.getLineOfOffset(Math.min(offset, writingArea.getText().length()));
-            int col = offset - writingArea.getLineStartOffset(line);
-            return (line + 1) + ":" + (col + 1);
-        } catch (BadLocationException e) {
-            return "1:1";
-        }
+        return paletteController.describeOffset(offset);
     }
 
     MinimapPanel activeMinimapPanel;
@@ -5097,223 +2332,36 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Mode management
     void setMode(EditorMode mode) {
-        EditorMode oldMode = this.editorState.mode;
-        if ((oldMode == EditorMode.VISUAL || oldMode == EditorMode.VISUAL_LINE) && mode != EditorMode.VISUAL && mode != EditorMode.VISUAL_LINE) {
-            editorState.lastVisualStart = writingArea.getSelectionStart();
-            editorState.lastVisualEnd = writingArea.getSelectionEnd();
-            editorState.lastVisualMode = oldMode;
-        }
-        this.editorState.mode = mode;
-        writingArea.setEditable(mode.isEditable());
-        writingArea.setBackground(getModeBackground(mode));
-        updateZenModeLayout();
-        if (mode != EditorMode.COMMAND) {
-            clearSubstitutePreview();
-        }
-        updateStatusBar();
-        if (oldMode != mode) {
-            animateModeTransition(oldMode, mode);
-            firePluginEvent("ModeChange");
-        }
+        editorUiController.setMode(mode);
     }
 
     Color getModeBackground(EditorMode mode) {
-        switch (mode) {
-            case INSERT:
-                return configManager.getInsertColor();
-            case VISUAL:
-            case VISUAL_LINE:
-                return configManager.getVisualColor();
-            case REPLACE:
-                return configManager.getReplaceColor();
-            case COMMAND:
-            case SEARCH:
-                return configManager.getCommandColor();
-            case NORMAL:
-            default:
-                return configManager.getNormalColor();
-        }
+        return editorUiController.getModeBackground(mode);
     }
 
     // Status bar update
     void updateStatusBar() {
-        FileBuffer buffer = getCurrentBuffer();
-        StringBuilder status = new StringBuilder();
-
-        if (buffer != null) {
-            pollLspNotifications(buffer);
-            status.append(buffer.getDisplayName());
-            if (buffer.isModified()) {
-                status.append(" [+]");
-            }
-            status.append("  ");
-        }
-
-        try {
-            int pos = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(pos);
-            int col = pos - writingArea.getLineStartOffset(line);
-            status.append((line + 1)).append(":").append((col + 1)).append("  ");
-        } catch (BadLocationException e) {
-            status.append("1:1  ");
-        }
-
-        String breadcrumb = findCurrentBreadcrumb();
-        if (breadcrumb != null && !breadcrumb.isBlank()) {
-            status.append(breadcrumb).append("  ");
-        }
-
-        EditorMode modeForStatus = editorState.mode == null ? EditorMode.NORMAL : editorState.mode;
-        status.append(modeForStatus.getDisplayName()).append("  ");
-        if (dramaticUiEnabled && isDramaticPerformanceThrottled()) {
-            status.append("dramatic:throttled").append("  ");
-        }
-
-        if (buffer != null) {
-            status.append(buffer.getFileType().getDisplayName()).append("  ");
-            status.append(buffer.getEncoding()).append("/").append(buffer.getLineEndingLabel()).append("  ");
-            appendLspStatus(status, buffer);
-        }
-
-        if (gitBranch != null && !gitBranch.isEmpty()) {
-            status.append("git:").append(gitBranch).append("  ");
-        }
-
-        int lineCount = writingArea.getLineCount();
-        status.append(lineCount).append(" line").append(lineCount != 1 ? "s" : "");
-        if (buffer != null && buffer.isLargeFile() && buffer.isShowingPreviewOnly()) {
-            status.append("  preview");
-        }
-
-        statusBar.setText(status.toString());
-
-        String inlinePeek = inlinePeekMessage(buffer);
-        if ((editorState.mode == EditorMode.COMMAND || editorState.mode == EditorMode.SEARCH) && !editorState.commandBuffer.isEmpty()) {
-            commandBar.setText(editorState.commandBuffer);
-        } else if (lastMessage != null && !lastMessage.isEmpty()) {
-            commandBar.setText(lastMessage);
-        } else if (inlinePeek != null) {
-            commandBar.setText(inlinePeek);
-        } else {
-            String blame = getGitBlameForCurrentLine(buffer);
-            commandBar.setText(blame != null ? blame : "");
-        }
-        applyDramaticFooterStyling();
+        editorUiController.updateStatusBar();
     }
 
     String inlinePeekMessage(FileBuffer buffer) {
-        String quickfixPeek = quickfixInlinePeek();
-        if (quickfixPeek != null) {
-            return quickfixPeek;
-        }
-        String diagnosticPeek = diagnosticInlinePeek(buffer);
-        if (diagnosticPeek != null) {
-            return diagnosticPeek;
-        }
-        return null;
+        return editorUiController.inlinePeekMessage(buffer);
     }
 
     String quickfixInlinePeek() {
-        if (!isQuickfixBufferActive()) {
-            return null;
-        }
-        int line = getCurrentCaretLine() + 1;
-        QuickfixService.Entry entry = quickfixService.atLine(line);
-        if (entry == null) {
-            return "quickfix: no entry on current line";
-        }
-        String source = entry.getSource() == null || entry.getSource().isBlank() ? "qf" : entry.getSource();
-        String fileName = entry.getFilePath() == null ? "" : new File(entry.getFilePath()).getName();
-        String location = fileName.isEmpty() ? "" : fileName + ":" + entry.getLine() + ":" + entry.getColumn() + " ";
-        return ("peek [" + source + "] " + location + safePreviewText(entry.getMessage(), 120)).trim();
+        return editorUiController.quickfixInlinePeek();
     }
 
     String diagnosticInlinePeek(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
-            return null;
-        }
-        LspClient client = existingLspClient(buffer);
-        if (client == null) {
-            return null;
-        }
-        List<LspClient.Diagnostic> diagnostics = client.getDiagnostics(bufferUri(buffer));
-        if (diagnostics == null || diagnostics.isEmpty()) {
-            return null;
-        }
-        int caretLine = getCurrentCaretLine();
-        LspClient.Diagnostic best = null;
-        for (LspClient.Diagnostic diagnostic : diagnostics) {
-            if (diagnostic == null || diagnostic.getLine() != caretLine) {
-                continue;
-            }
-            if (best == null || diagnostic.getSeverity() < best.getSeverity()) {
-                best = diagnostic;
-            }
-        }
-        if (best == null) {
-            return null;
-        }
-        String severity = diagnosticSeverityLabel(best.getSeverity()).toLowerCase(Locale.ROOT);
-        return "peek [diag " + severity + "] " + safePreviewText(best.getMessage(), 120);
+        return editorUiController.diagnosticInlinePeek(buffer);
     }
 
     String safePreviewText(String text, int maxLength) {
-        if (text == null) {
-            return "";
-        }
-        String normalized = text.replace('\n', ' ').trim();
-        if (normalized.length() <= maxLength) {
-            return normalized;
-        }
-        return normalized.substring(0, Math.max(0, maxLength - 3)) + "...";
+        return editorUiController.safePreviewText(text, maxLength);
     }
 
     void appendLspStatus(StringBuilder status, FileBuffer buffer) {
-        LspClient client = existingLspClient(buffer);
-        if (client == null || !buffer.hasFilePath()) {
-            return;
-        }
-        List<LspClient.Diagnostic> diagnosticEntries = client.getDiagnostics(bufferUri(buffer));
-        if (diagnosticEntries.isEmpty()) {
-            return;
-        }
-        int errors = 0;
-        int warnings = 0;
-        int infos = 0;
-        for (LspClient.Diagnostic diagnostic : diagnosticEntries) {
-            if (diagnostic == null) {
-                continue;
-            }
-            switch (diagnostic.getSeverity()) {
-                case 1:
-                    errors++;
-                    break;
-                case 2:
-                    warnings++;
-                    break;
-                case 3:
-                case 4:
-                default:
-                    infos++;
-                    break;
-            }
-        }
-        status.append("diag:");
-        if (errors > 0) {
-            status.append("E").append(errors);
-        }
-        if (warnings > 0) {
-            if (errors > 0) {
-                status.append("/");
-            }
-            status.append("W").append(warnings);
-        }
-        if (errors == 0 && warnings == 0) {
-            status.append(diagnosticEntries.size());
-        } else if (infos > 0) {
-            status.append("+").append(infos);
-        }
-        status.append("  ");
+        editorUiController.appendLspStatus(status, buffer);
     }
 
     void handleDocumentChange() {
@@ -5355,25 +2403,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Show message in status bar
     public void showMessage(String message) {
-        lastMessage = message == null ? "" : message;
-        if (!lastMessage.isEmpty()) {
-            String normalized = lastMessage.toLowerCase();
-            if (normalized.startsWith("error") || normalized.startsWith("invalid") || normalized.contains(" failed")) {
-                playCue(CueType.ERROR);
-            } else if (normalized.contains("opened") || normalized.contains("saved") || normalized.contains("loaded")) {
-                playCue(CueType.SUCCESS);
-            }
-        }
-        if (messageResetTimer != null) {
-            messageResetTimer.stop();
-        }
-        messageResetTimer = new Timer(3000, e -> {
-            lastMessage = "";
-            updateStatusBar();
-        });
-        messageResetTimer.setRepeats(false);
-        messageResetTimer.start();
-        updateStatusBar();
+        editorUiController.showMessage(message);
     }
 
     // File operations
@@ -5468,73 +2498,23 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Search methods
     public String search(String pattern) {
-        recordJumpPosition();
-        String result = searchManager.searchForward(pattern);
-        if (!configManager.getHighlightSearch()) {
-            searchManager.clearHighlights();
-        }
-        if (result.startsWith("Match")) {
-            pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-        }
-        return result;
+        return searchReplaceController.search(pattern);
     }
 
     public String searchBackward(String pattern) {
-        recordJumpPosition();
-        String result = searchManager.searchBackward(pattern);
-        if (!configManager.getHighlightSearch()) {
-            searchManager.clearHighlights();
-        }
-        if (result.startsWith("Match")) {
-            pulseCaretLine(blendColor(configManager.getSelectionColor(), configManager.getCaretColor(), 0.35));
-        }
-        return result;
+        return searchReplaceController.searchBackward(pattern);
     }
 
     public String substitute(String pattern, String replacement, boolean wholeBuffer, boolean replaceAll) {
-        if (wholeBuffer) {
-            ReplacementResult result = replaceLiteral(writingArea.getText(), pattern, replacement, replaceAll);
-            if (result.matchCount == 0) {
-                return "Pattern not found: " + pattern;
-            }
-            writingArea.setText(result.updatedText);
-            writingArea.setCaretPosition(Math.min(Math.max(0, result.firstMatchOffset), writingArea.getText().length()));
-            markModified();
-            searchManager.clearHighlights();
-            pulseCaretLine(configManager.getSubstitutePreviewColor());
-            return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
-        } else {
-            return substituteCurrentLine(pattern, replacement, replaceAll);
-        }
+        return searchReplaceController.substitute(pattern, replacement, wholeBuffer, replaceAll);
     }
 
     String substituteCurrentLine(String pattern, String replacement, boolean replaceAll) {
-        try {
-            int caretPosition = writingArea.getCaretPosition();
-            int line = writingArea.getLineOfOffset(caretPosition);
-            int lineStart = writingArea.getLineStartOffset(line);
-            int lineEnd = writingArea.getLineEndOffset(line);
-            String lineText = writingArea.getText().substring(lineStart, lineEnd);
-
-            ReplacementResult result = replaceLiteral(lineText, pattern, replacement, replaceAll);
-            if (result.matchCount == 0) {
-                return "Pattern not found: " + pattern;
-            }
-
-            writingArea.replaceRange(result.updatedText, lineStart, lineEnd);
-            writingArea.setCaretPosition(Math.min(lineStart + result.firstMatchOffset, writingArea.getText().length()));
-            searchManager.clearHighlights();
-            pulseCaretLine(configManager.getSubstitutePreviewColor());
-
-            return "Replaced " + result.matchCount + " occurrence" + (result.matchCount == 1 ? "" : "s");
-        } catch (BadLocationException e) {
-            return "Error: " + e.getMessage();
-        }
+        return searchReplaceController.substituteCurrentLine(pattern, replacement, replaceAll);
     }
 
     ReplacementResult replaceLiteral(String text, String pattern, String replacement, boolean replaceAll) {
-        SubstituteService.Result r = substituteService.replaceRegex(text, pattern, replacement, replaceAll);
-        return new ReplacementResult(r.getUpdatedText(), r.getMatchCount(), r.getFirstMatchOffset());
+        return searchReplaceController.replaceLiteral(text, pattern, replacement, replaceAll);
     }
 
     // Line number toggle
@@ -5952,232 +2932,26 @@ public class Texteditor extends JFrame implements KeyListener {
 
     static final Pattern HEX_COLOR_PATTERN = Pattern.compile("#[0-9A-Fa-f]{3}(?:[0-9A-Fa-f]{3})?\\b");
     void paintColorPreviews(Graphics g, JTextArea area) {
-        String text = area.getText();
-        if (text.isEmpty()) return;
-        FontMetrics fm = g.getFontMetrics(area.getFont());
-        Rectangle clip = g.getClipBounds();
-        java.util.regex.Matcher m = HEX_COLOR_PATTERN.matcher(text);
-        while (m.find()) {
-            try {
-                Rectangle2D r = area.modelToView2D(m.end());
-                if (r == null) continue;
-                if (clip != null && ((int) r.getY() < clip.y - 20 || (int) r.getY() > clip.y + clip.height + 20)) continue;
-                String hex = m.group();
-                if (hex.length() == 4) { // expand #RGB to #RRGGBB
-                    hex = "#" + hex.charAt(1) + hex.charAt(1) + hex.charAt(2) + hex.charAt(2) + hex.charAt(3) + hex.charAt(3);
-                }
-                Color c = Color.decode(hex);
-                int size = fm.getHeight() - 4;
-                int x = (int) r.getX() + 2;
-                int y = (int) r.getY() + 2;
-                g.setColor(c);
-                g.fillRect(x, y, size, size);
-                g.setColor(new Color(255, 255, 255, 80));
-                g.drawRect(x, y, size, size);
-            } catch (Exception ignored) {}
-        }
+        editorUiController.paintColorPreviews(g, area);
     }
     void paintWrapIndicators(Graphics g, JTextArea area) {
-        FontMetrics fm = g.getFontMetrics(area.getFont());
-        int lineH = fm.getHeight();
-        g.setColor(new Color(255, 255, 255, 40));
-        Rectangle clip = g.getClipBounds();
-        int startY = clip != null ? clip.y : 0;
-        int endY = clip != null ? clip.y + clip.height : area.getHeight();
-        try {
-            int startLine = area.getLineOfOffset(area.viewToModel2D(new Point(0, startY)));
-            int endLine = Math.min(area.getLineCount() - 1, area.getLineOfOffset(area.viewToModel2D(new Point(0, endY))));
-            for (int line = startLine; line <= endLine; line++) {
-                int ls = area.getLineStartOffset(line);
-                int le = area.getLineEndOffset(line);
-                Rectangle2D rStart = area.modelToView2D(ls);
-                Rectangle2D rEnd = area.modelToView2D(Math.max(ls, le - 1));
-                if (rStart == null || rEnd == null) continue;
-                if ((int) rEnd.getY() > (int) rStart.getY()) {
-                    // wrapped line: draw arrow at right edge for each wrapped row
-                    int rows = ((int) rEnd.getY() - (int) rStart.getY()) / lineH;
-                    int rightX = area.getWidth() - 10;
-                    for (int r = 0; r < rows; r++) {
-                        int y = (int) rStart.getY() + (r + 1) * lineH - lineH / 2;
-                        g.drawString("\u21B5", rightX, y); // ↵
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
+        editorUiController.paintWrapIndicators(g, area);
     }
 
     void paintVisualBlockOverlay(Graphics g, JTextArea area) {
-        if (editorState.mode != EditorMode.VISUAL_BLOCK || area != writingArea) return;
-        int[] bounds = getVisualBlockBounds();
-        if (bounds == null) return;
-        int startLine = bounds[0], endLine = bounds[1], startCol = bounds[2], endCol = bounds[3];
-        Graphics2D g2 = (Graphics2D) g;
-        Color sel = configManager.getSelectionColor();
-        g2.setColor(new Color(sel.getRed(), sel.getGreen(), sel.getBlue(), 100));
-        FontMetrics fm = g2.getFontMetrics(area.getFont());
-        int charW = fm.charWidth(' ');
-        try {
-            for (int line = startLine; line <= endLine && line < area.getLineCount(); line++) {
-                int ls = area.getLineStartOffset(line);
-                Rectangle2D r = area.modelToView2D(ls);
-                if (r == null) continue;
-                int x1 = (int) r.getX() + startCol * charW;
-                int x2 = (int) r.getX() + (endCol + 1) * charW;
-                g2.fillRect(x1, (int) r.getY(), x2 - x1, fm.getHeight());
-            }
-        } catch (BadLocationException ignored) {}
+        editorUiController.paintVisualBlockOverlay(g, area);
     }
 
     void paintDiagnosticOverlay(Graphics g, JTextArea area) {
-        if (area == null || diagnosticRanges.isEmpty()) return;
-        Graphics2D g2 = (Graphics2D) g;
-        FontMetrics fm = g2.getFontMetrics(area.getFont());
-        int ascent = fm.getAscent();
-        int descent = fm.getDescent();
-        int docLen = area.getDocument().getLength();
-        for (int[] dr : diagnosticRanges) {
-            int start = dr[0], end = dr[1], severity = dr[2];
-            if (start >= docLen || end > docLen || start >= end) continue;
-            Color c;
-            switch (severity) {
-                case 1: c = new Color(0xFF, 0x44, 0x44, 0xCC); break; // error
-                case 2: c = new Color(0xFF, 0xCC, 0x00, 0xCC); break; // warning
-                case 3: c = new Color(0x55, 0x99, 0xFF, 0xCC); break; // info
-                default: c = new Color(0x99, 0x99, 0x99, 0xCC); break; // hint
-            }
-            g2.setColor(c);
-            try {
-                Rectangle2D r1 = area.modelToView2D(start);
-                Rectangle2D r2 = area.modelToView2D(end);
-                if (r1 == null || r2 == null) continue;
-                int y = (int) (r1.getY() + ascent + descent);
-                int x1 = (int) r1.getX();
-                int x2 = (int) r2.getX();
-                if ((int) r1.getY() != (int) r2.getY()) {
-                    // multiline: just underline first line to EOL
-                    x2 = area.getWidth();
-                }
-                // draw wavy underline
-                for (int x = x1; x < x2; x += 4) {
-                    int amp = (x / 4 % 2 == 0) ? 0 : 2;
-                    int nextAmp = ((x + 4) / 4 % 2 == 0) ? 0 : 2;
-                    g2.drawLine(x, y + amp, Math.min(x + 4, x2), y + nextAmp);
-                }
-            } catch (BadLocationException ignored) {}
-        }
+        editorUiController.paintDiagnosticOverlay(g, area);
     }
 
     void refreshDiagnosticRanges() {
-        diagnosticRanges.clear();
-        EditorPane diagPane = getActivePane();
-        if (diagPane != null && diagPane.getLineNumberPanel() != null) diagPane.getLineNumberPanel().updateDiagnosticMarkers(null);
-        FileBuffer buffer = getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) { writingArea.repaint(); return; }
-        LspClient client = lspClients.get(bufferExtension(buffer));
-        if (client == null || !client.isAlive()) { writingArea.repaint(); return; }
-        String uri = bufferUri(buffer);
-        List<LspClient.Diagnostic> diags = client.getDiagnostics(uri);
-        if (diags == null || diags.isEmpty()) { writingArea.repaint(); return; }
-        try {
-            for (LspClient.Diagnostic d : diags) {
-                int line = d.getLine();
-                if (line >= writingArea.getLineCount()) continue;
-                int lineStart = writingArea.getLineStartOffset(line);
-                int lineEnd = writingArea.getLineEndOffset(line);
-                int startOff = Math.min(lineStart + d.getCharacter(), lineEnd);
-                int endOff = Math.min(startOff + 1, lineEnd); // at least 1 char wide
-                // try to expand to end of token
-                String text = writingArea.getText();
-                while (endOff < lineEnd && endOff < text.length() && !Character.isWhitespace(text.charAt(endOff))) endOff++;
-                diagnosticRanges.add(new int[]{startOff, endOff, d.getSeverity()});
-            }
-        } catch (BadLocationException ignored) {}
-        // update gutter diagnostic markers
-        java.util.HashMap<Integer, Integer> severityByLine = new java.util.HashMap<>();
-        for (LspClient.Diagnostic d : diags) {
-            int line = d.getLine();
-            Integer existing = severityByLine.get(line);
-            if (existing == null || d.getSeverity() < existing) severityByLine.put(line, d.getSeverity());
-        }
-        EditorPane pane = getActivePane();
-        if (pane != null && pane.getLineNumberPanel() != null) pane.getLineNumberPanel().updateDiagnosticMarkers(severityByLine);
-        writingArea.repaint();
+        editorUiController.refreshDiagnosticRanges();
     }
 
     void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
-        if (area == null || area != writingArea || syntaxForegroundSpans.isEmpty()) {
-            return;
-        }
-        int docLength = area.getDocument().getLength();
-        if (docLength <= 0) {
-            return;
-        }
-        int visibleStart = 0;
-        int visibleEnd = docLength;
-        Rectangle clip = g.getClipBounds();
-        if (clip != null) {
-            int start = area.viewToModel2D(new Point(clip.x, clip.y));
-            int end = area.viewToModel2D(new Point(clip.x + clip.width, clip.y + clip.height));
-            if (start < 0) {
-                start = 0;
-            }
-            if (end < start) {
-                end = start;
-            }
-            visibleStart = Math.min(start, docLength);
-            visibleEnd = Math.min(docLength, end + 1);
-        }
-
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setFont(area.getFont());
-        FontMetrics metrics = area.getFontMetrics(area.getFont());
-        int ascent = metrics.getAscent();
-        int tabPixels = Math.max(1, area.getTabSize() * metrics.charWidth(' '));
-        TabExpander tabExpander = (x, tabOffset) -> ((int) x / tabPixels + 1) * tabPixels;
-
-        for (SyntaxSpan span : syntaxForegroundSpans) {
-            if (span.end <= visibleStart || span.start >= visibleEnd) {
-                continue;
-            }
-            int spanStart = Math.max(span.start, visibleStart);
-            int spanEnd = Math.min(span.end, visibleEnd);
-            if (spanEnd <= spanStart) {
-                continue;
-            }
-            try {
-                int startLine = area.getLineOfOffset(spanStart);
-                int endLine = area.getLineOfOffset(Math.max(spanStart, spanEnd - 1));
-                for (int line = startLine; line <= endLine; line++) {
-                    int lineStart = area.getLineStartOffset(line);
-                    int lineEnd = area.getLineEndOffset(line);
-                    int segmentStart = Math.max(spanStart, lineStart);
-                    int segmentEnd = Math.min(spanEnd, lineEnd);
-                    while (segmentEnd > segmentStart) {
-                        char tail = area.getText(segmentEnd - 1, 1).charAt(0);
-                        if (tail == '\n' || tail == '\r') {
-                            segmentEnd--;
-                        } else {
-                            break;
-                        }
-                    }
-                    if (segmentEnd <= segmentStart) {
-                        continue;
-                    }
-                    Rectangle2D rect = area.modelToView2D(segmentStart);
-                    if (rect == null) {
-                        continue;
-                    }
-                    String text = area.getText(segmentStart, segmentEnd - segmentStart);
-                    Segment segment = new Segment(text.toCharArray(), 0, text.length());
-                    int x = (int) Math.round(rect.getX());
-                    int y = (int) Math.round(rect.getY()) + ascent;
-                    g2.setColor(span.color);
-                    Utilities.drawTabbedText(segment, x, y, (Graphics) g2, tabExpander, segmentStart);
-                }
-            } catch (BadLocationException ignored) {
-            }
-        }
-        g2.dispose();
+        editorUiController.paintSyntaxForegroundOverlay(g, area);
     }
 
     public void closeEditor() {
@@ -6208,18 +2982,13 @@ public class Texteditor extends JFrame implements KeyListener {
 
     @Override
     public void keyTyped(KeyEvent e) {
-        if (suppressNextTypedChar) {
-            suppressNextTypedChar = false;
-            e.consume();
-            return;
-        }
-        if (editorState.mode != EditorMode.INSERT) {
-            e.consume();
-        }
+        inputController.keyTyped(e);
     }
 
     @Override
-    public void keyReleased(KeyEvent e) {}
+    public void keyReleased(KeyEvent e) {
+        inputController.keyReleased(e);
+    }
 
     // Main method
     public static void main(String[] args) {

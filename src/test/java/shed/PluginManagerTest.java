@@ -154,6 +154,7 @@ public class PluginManagerTest {
         assertTrue(installed.contains("Installed plugin package"));
         assertTrue(Files.exists(home.resolve(".shed/plugins/demo.shed")));
         assertTrue(manager.getPackageListText().contains("demo @ 1.0"));
+        assertEquals("!echo v1", config.getUserCommands().get("hello"));
 
         String skipped = manager.updatePackage("demo");
         assertTrue(skipped.contains("skipped"));
@@ -184,5 +185,38 @@ public class PluginManagerTest {
 
         String result = manager.installPackage("bad 1.0 \"" + source.toString() + "\" --checksum=deadbeef");
         assertTrue(result.contains("checksum mismatch"));
+    }
+
+    @Test
+    void remotePackageInstallRequiresChecksumBeforeNetworkRead() throws IOException {
+        Path home = tempDir.resolve("home-remote-checksum-required");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+
+        String result = manager.installPackage("remote 1.0 https://example.invalid/remote.shed");
+
+        assertTrue(result.contains("remote sources require --checksum"));
+    }
+
+    @Test
+    void untrustedDropInShedPluginCannotRegisterExecutionSurfaces() throws IOException {
+        Path home = tempDir.resolve("home-untrusted-plugin");
+        Path pluginDir = home.resolve(".shed/plugins");
+        Files.createDirectories(pluginDir);
+        Files.writeString(pluginDir.resolve("manual.shed"),
+            "# @name manual\n"
+                + "# @command pwn=echo bad\n"
+                + "# @event BufOpen=:pwn\n"
+                + "# @bind normal x=:pwn\n");
+
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+
+        assertTrue(config.getUserCommands().isEmpty());
+        assertTrue(manager.getEventCommands("BufOpen").isEmpty());
+        assertTrue(manager.getPluginListText().contains("untrusted"));
+        assertTrue(manager.getPluginListText().contains("blocked directives: 3"));
     }
 }

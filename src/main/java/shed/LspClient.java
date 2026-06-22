@@ -10,7 +10,9 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -100,14 +102,20 @@ public class LspClient {
         private final int endLine;
         private final int endCharacter;
         private final String newText;
+        private final Integer documentVersion;
 
         public TextEdit(String uri, int startLine, int startCharacter, int endLine, int endCharacter, String newText) {
+            this(uri, startLine, startCharacter, endLine, endCharacter, newText, null);
+        }
+
+        public TextEdit(String uri, int startLine, int startCharacter, int endLine, int endCharacter, String newText, Integer documentVersion) {
             this.uri = uri;
             this.startLine = startLine;
             this.startCharacter = startCharacter;
             this.endLine = endLine;
             this.endCharacter = endCharacter;
             this.newText = newText == null ? "" : newText;
+            this.documentVersion = documentVersion;
         }
 
         public String getUri() {
@@ -132,6 +140,10 @@ public class LspClient {
 
         public String getNewText() {
             return newText;
+        }
+
+        public Integer getDocumentVersion() {
+            return documentVersion;
         }
     }
 
@@ -182,6 +194,7 @@ public class LspClient {
     private final BlockingQueue<Map<String, Object>> messageQueue;
     private final List<Map<String, Object>> deferredMessages;
     private final Map<String, List<Diagnostic>> diagnostics;
+    private final Set<Integer> staleRequestIds;
     private int requestId;
     private boolean initialized;
 
@@ -203,6 +216,7 @@ public class LspClient {
         this.messageQueue = new LinkedBlockingQueue<>();
         this.deferredMessages = new ArrayList<>();
         this.diagnostics = new HashMap<>();
+        this.staleRequestIds = ConcurrentHashMap.newKeySet();
         this.requestId = 0;
         this.initialized = false;
         startReaderThread();
@@ -531,6 +545,10 @@ public class LspClient {
             if (message.containsKey("method")) {
                 handleNotification(message);
             } else {
+                Integer responseId = MiniJson.asInt(message.get("id"));
+                if (responseId != null && staleRequestIds.remove(responseId)) {
+                    continue;
+                }
                 synchronized (deferredMessages) {
                     deferredMessages.add(message);
                 }
@@ -558,6 +576,13 @@ public class LspClient {
         hover.put("contentFormat", List.of("plaintext"));
         Map<String, Object> diagnosticsCapability = new LinkedHashMap<>();
         diagnosticsCapability.put("relatedInformation", Boolean.FALSE);
+        Map<String, Object> changeAnnotationSupport = new LinkedHashMap<>();
+        changeAnnotationSupport.put("groupsOnLabel", Boolean.TRUE);
+        Map<String, Object> workspaceEdit = new LinkedHashMap<>();
+        workspaceEdit.put("documentChanges", Boolean.TRUE);
+        workspaceEdit.put("changeAnnotationSupport", changeAnnotationSupport);
+        Map<String, Object> workspace = new LinkedHashMap<>();
+        workspace.put("workspaceEdit", workspaceEdit);
 
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("completion", completion);
@@ -565,6 +590,7 @@ public class LspClient {
         textDocument.put("definition", new LinkedHashMap<>());
         textDocument.put("publishDiagnostics", diagnosticsCapability);
         capabilities.put("textDocument", textDocument);
+        capabilities.put("workspace", workspace);
 
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("processId", ProcessHandle.current().pid());
@@ -599,7 +625,12 @@ public class LspClient {
         request.put("method", method);
         request.put("params", params);
         writeMessage(request);
-        return waitForResponse(id, timeoutMs);
+        Map<String, Object> response = waitForResponse(id, timeoutMs);
+        if (response == null) {
+            markRequestStale(id);
+            sendCancelRequest(id);
+        }
+        return response;
     }
 
     private void sendNotification(String method, Object params) {
@@ -608,6 +639,16 @@ public class LspClient {
         notification.put("method", method);
         notification.put("params", params);
         writeMessage(notification);
+    }
+
+    private void sendCancelRequest(int id) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("id", id);
+        sendNotification("$/cancelRequest", params);
+    }
+
+    private void markRequestStale(int id) {
+        staleRequestIds.add(id);
     }
 
     private void writeMessage(Map<String, Object> body) {
@@ -641,7 +682,11 @@ public class LspClient {
             }
             Integer responseId = MiniJson.asInt(message.get("id"));
             if (responseId != null && responseId == id) {
+                staleRequestIds.remove(id);
                 return message;
+            }
+            if (responseId != null && staleRequestIds.remove(responseId)) {
+                continue;
             }
             if (message.containsKey("method")) {
                 handleNotification(message);
@@ -661,6 +706,10 @@ public class LspClient {
                 Integer responseId = MiniJson.asInt(candidate.get("id"));
                 if (responseId != null && responseId == id) {
                     return deferredMessages.remove(i);
+                }
+                if (responseId != null && staleRequestIds.remove(responseId)) {
+                    deferredMessages.remove(i);
+                    i--;
                 }
             }
         }
@@ -722,7 +771,7 @@ public class LspClient {
         return new Location(uri, line, character);
     }
 
-    private List<TextEdit> parseTextEdits(String uri, List<Object> editObjects) {
+    static List<TextEdit> parseTextEdits(String uri, List<Object> editObjects, Integer documentVersion) {
         if (uri == null || editObjects == null || editObjects.isEmpty()) {
             return List.of();
         }
@@ -743,27 +792,16 @@ public class LspClient {
                 continue;
             }
             String newText = MiniJson.asString(edit.get("newText"));
-            edits.add(new TextEdit(uri, startLine, startCharacter, endLine, endCharacter, newText));
+            edits.add(new TextEdit(uri, startLine, startCharacter, endLine, endCharacter, newText, documentVersion));
         }
         return edits;
     }
 
-    private List<TextEdit> parseWorkspaceEdits(Map<String, Object> workspaceEdit) {
+    static List<TextEdit> parseWorkspaceEdits(Map<String, Object> workspaceEdit) {
         if (workspaceEdit == null) {
             return List.of();
         }
         List<TextEdit> edits = new ArrayList<>();
-
-        Map<String, Object> changes = MiniJson.asObject(workspaceEdit.get("changes"));
-        if (changes != null) {
-            for (Map.Entry<String, Object> entry : changes.entrySet()) {
-                List<Object> editArray = MiniJson.asArray(entry.getValue());
-                if (editArray == null) {
-                    continue;
-                }
-                edits.addAll(parseTextEdits(entry.getKey(), editArray));
-            }
-        }
 
         List<Object> documentChanges = MiniJson.asArray(workspaceEdit.get("documentChanges"));
         if (documentChanges != null) {
@@ -777,11 +815,24 @@ public class LspClient {
                 if (changeUri == null) {
                     continue;
                 }
+                Integer version = MiniJson.asInt(textDocumentObject.get("version"));
                 List<Object> editArray = MiniJson.asArray(change.get("edits"));
                 if (editArray == null) {
                     continue;
                 }
-                edits.addAll(parseTextEdits(changeUri, editArray));
+                edits.addAll(parseTextEdits(changeUri, editArray, version));
+            }
+            return edits;
+        }
+
+        Map<String, Object> changes = MiniJson.asObject(workspaceEdit.get("changes"));
+        if (changes != null) {
+            for (Map.Entry<String, Object> entry : changes.entrySet()) {
+                List<Object> editArray = MiniJson.asArray(entry.getValue());
+                if (editArray == null) {
+                    continue;
+                }
+                edits.addAll(parseTextEdits(entry.getKey(), editArray, null));
             }
         }
         return edits;

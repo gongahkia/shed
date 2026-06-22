@@ -70,18 +70,26 @@ public class PluginManager {
                  })
                  .sorted()
                  .forEach(p -> {
+                     File pluginFile = p.toFile();
+                     PluginTrust trust = assessPluginTrust(pluginFile);
                      if (p.toString().endsWith(".lua")) {
-                         luaEngine.loadScript(p.toFile());
+                         if (trust.trusted) {
+                             luaEngine.loadScript(pluginFile);
+                         } else {
+                             luaEngine.recordSkippedScript(pluginFile, trust.reason);
+                         }
                      } else {
-                         loadShedPlugin(p.toFile());
+                         loadShedPlugin(pluginFile, trust);
                      }
                  });
         } catch (IOException ignored) {
         }
     }
 
-    private void loadShedPlugin(File file) {
+    private void loadShedPlugin(File file, PluginTrust trust) {
         PluginInfo info = new PluginInfo(file.getName());
+        info.trusted = trust != null && trust.trusted;
+        info.trustReason = trust == null ? "unknown trust state" : trust.reason;
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -104,6 +112,10 @@ public class PluginManager {
                         info.description = value;
                         break;
                     case "command": {
+                        if (!info.trusted) {
+                            info.blockedDirectives++;
+                            break;
+                        }
                         int eq = value.indexOf('=');
                         if (eq > 0) {
                             String cmdName = value.substring(0, eq).trim();
@@ -114,6 +126,10 @@ public class PluginManager {
                         break;
                     }
                     case "bind": {
+                        if (!info.trusted) {
+                            info.blockedDirectives++;
+                            break;
+                        }
                         int space = value.indexOf(' ');
                         if (space > 0) {
                             String mode = value.substring(0, space).trim().toLowerCase();
@@ -129,6 +145,10 @@ public class PluginManager {
                         break;
                     }
                     case "event": {
+                        if (!info.trusted) {
+                            info.blockedDirectives++;
+                            break;
+                        }
                         int eq = value.indexOf('=');
                         if (eq > 0) {
                             String event = value.substring(0, eq).trim();
@@ -146,6 +166,38 @@ public class PluginManager {
         } catch (IOException ignored) {
         }
         plugins.add(info);
+    }
+
+    private PluginTrust assessPluginTrust(File file) {
+        if (file == null || !file.isFile()) {
+            return new PluginTrust(false, "not a regular plugin file");
+        }
+        PackageRecord record = packageRecordForFile(file.getName());
+        if (record == null) {
+            return new PluginTrust(false, "not installed by :plugin install");
+        }
+        try {
+            String actual = sha256Hex(Files.readAllBytes(file.toPath()));
+            String expected = normalizeChecksum(record.checksum);
+            if (expected == null || !actual.equals(expected)) {
+                return new PluginTrust(false, "checksum mismatch");
+            }
+            return new PluginTrust(true, "managed package sha256=" + shortChecksum(actual));
+        } catch (IOException e) {
+            return new PluginTrust(false, e.getMessage());
+        }
+    }
+
+    private PackageRecord packageRecordForFile(String fileName) {
+        if (fileName == null || fileName.isBlank()) {
+            return null;
+        }
+        for (PackageRecord record : packageIndex.values()) {
+            if (record != null && fileName.equals(record.fileName)) {
+                return record;
+            }
+        }
+        return null;
     }
 
     public void fireEvent(String event) {
@@ -188,6 +240,10 @@ public class PluginManager {
         sb.append("=".repeat(40)).append("\n\n");
         for (PluginInfo p : plugins) {
             sb.append("  ").append(p.name).append("  (").append(p.file).append(")\n");
+            sb.append("    trust: ").append(p.trusted ? "trusted" : "untrusted").append(" - ").append(p.trustReason).append("\n");
+            if (p.blockedDirectives > 0) {
+                sb.append("    blocked directives: ").append(p.blockedDirectives).append("\n");
+            }
             if (!p.description.isEmpty()) {
                 sb.append("    ").append(p.description).append("\n");
             }
@@ -449,6 +505,9 @@ public class PluginManager {
         if (spec == null) {
             throw new IOException("install spec required");
         }
+        if (isRemoteSource(spec.source) && (spec.expectedChecksum == null || spec.expectedChecksum.isBlank())) {
+            throw new IOException("remote sources require --checksum=<sha256>");
+        }
         File pluginDir = resolvePluginDirectory();
         if (!pluginDir.exists()) {
             Files.createDirectories(pluginDir.toPath());
@@ -557,7 +616,7 @@ public class PluginManager {
         if (source == null || source.isBlank()) {
             throw new IOException("source is required");
         }
-        if (source.startsWith("http://") || source.startsWith("https://")) {
+        if (isRemoteSource(source)) {
             URLConnection connection = new URL(source).openConnection();
             connection.setConnectTimeout(5000);
             connection.setReadTimeout(15000);
@@ -574,6 +633,10 @@ public class PluginManager {
             throw new IOException("source file too large (>2MB)");
         }
         return Files.readAllBytes(file.toPath());
+    }
+
+    private boolean isRemoteSource(String source) {
+        return source != null && (source.startsWith("http://") || source.startsWith("https://"));
     }
 
     private byte[] readBytesCapped(InputStream input, int limitBytes) throws IOException {
@@ -766,6 +829,8 @@ public class PluginManager {
         sb.append("Plugin: ").append(p.name).append("\n");
         sb.append("File: ").append(p.file).append("\n");
         if (!p.description.isEmpty()) sb.append("Description: ").append(p.description).append("\n");
+        sb.append("Trust: ").append(p.trusted ? "trusted" : "untrusted").append(" - ").append(p.trustReason).append("\n");
+        if (p.blockedDirectives > 0) sb.append("Blocked directives: ").append(p.blockedDirectives).append("\n");
         sb.append("\n");
         if (!p.commands.isEmpty()) {
             sb.append("Commands:\n");
@@ -884,10 +949,23 @@ public class PluginManager {
         }
     }
 
+    private static final class PluginTrust {
+        final boolean trusted;
+        final String reason;
+
+        PluginTrust(boolean trusted, String reason) {
+            this.trusted = trusted;
+            this.reason = reason == null || reason.isBlank() ? "unknown" : reason;
+        }
+    }
+
     static final class PluginInfo {
         String file;
         String name;
         String description;
+        boolean trusted;
+        String trustReason;
+        int blockedDirectives;
         final Map<String, String> commands;
         final Map<String, String> events;
         final List<String> bindings;
@@ -895,6 +973,9 @@ public class PluginManager {
             this.file = file;
             this.name = file.replace(".shed", "");
             this.description = "";
+            this.trusted = false;
+            this.trustReason = "not assessed";
+            this.blockedDirectives = 0;
             this.commands = new LinkedHashMap<>();
             this.events = new LinkedHashMap<>();
             this.bindings = new ArrayList<>();

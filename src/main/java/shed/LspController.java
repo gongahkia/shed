@@ -716,6 +716,10 @@ final class LspController {
         String currentPath = current == null ? null : current.getFilePath();
 
         for (Map.Entry<String, List<LspClient.TextEdit>> entry : groupedByUri.entrySet()) {
+            if (hasWorkspaceEditVersionConflict(entry.getKey(), entry.getValue())) {
+                result.failedFiles++;
+                continue;
+            }
             String path = filePathFromUri(entry.getKey());
             if (path == null || path.isBlank()) {
                 result.failedFiles++;
@@ -754,6 +758,24 @@ final class LspController {
             }
         }
         return result;
+    }
+
+
+    boolean hasWorkspaceEditVersionConflict(String uri, List<LspClient.TextEdit> edits) {
+        if (uri == null || edits == null || edits.isEmpty()) {
+            return false;
+        }
+        Integer currentVersion = editor.lspDocumentVersions.get(uri);
+        if (currentVersion == null) {
+            return false;
+        }
+        for (LspClient.TextEdit edit : edits) {
+            Integer expectedVersion = edit == null ? null : edit.getDocumentVersion();
+            if (expectedVersion != null && !expectedVersion.equals(currentVersion)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -828,7 +850,8 @@ final class LspController {
         }
         String source = text == null ? "" : text;
         List<Integer> lineStarts = lineStartOffsets(source);
-        for (LspClient.TextEdit edit : edits) {
+        for (int i = 0; i < edits.size(); i++) {
+            LspClient.TextEdit edit = edits.get(i);
             if (edit == null) {
                 continue;
             }
@@ -839,13 +862,16 @@ final class LspController {
                 startOffset = endOffset;
                 endOffset = swap;
             }
-            resolved.add(new ResolvedTextEdit(startOffset, endOffset, edit.getNewText()));
+            resolved.add(new ResolvedTextEdit(startOffset, endOffset, edit.getNewText(), i));
         }
         resolved.sort((left, right) -> {
             if (left.startOffset != right.startOffset) {
                 return Integer.compare(right.startOffset, left.startOffset);
             }
-            return Integer.compare(right.endOffset, left.endOffset);
+            if (left.endOffset != right.endOffset) {
+                return Integer.compare(right.endOffset, left.endOffset);
+            }
+            return Integer.compare(right.order, left.order);
         });
         return resolved;
     }

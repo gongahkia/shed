@@ -169,7 +169,6 @@ public class Texteditor extends JFrame implements KeyListener {
     FileBuffer quickfixBuffer;
     int keymapReplayDepth;
     List<RegisterContent> yankRing;
-    Map<FileBuffer, TerminalSession> terminalSessions;
     Map<FileBuffer, PtyTerminalPane> ptyTerminalPanes;
     int terminalBufferCounter;
 
@@ -309,7 +308,6 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingLspRenameTarget = null;
         keymapReplayDepth = 0;
         yankRing = new ArrayList<>();
-        terminalSessions = new HashMap<>();
         ptyTerminalPanes = new HashMap<>();
         terminalBufferCounter = 1;
         terminalController = new TerminalController(this);
@@ -1338,62 +1336,6 @@ public class Texteditor extends JFrame implements KeyListener {
 
     File resolveTerminalStartDirectory() {
         return terminalController.resolveTerminalStartDirectory();
-    }
-
-    TerminalSession getActiveTerminalSession() {
-        return terminalController.getActiveTerminalSession();
-    }
-
-    boolean handleTerminalInsertMode(TerminalSession session, KeyEvent e) {
-        return terminalController.handleTerminalInsertMode(session, e);
-    }
-
-    void enforceTerminalInputBoundary(TerminalSession session) {
-        terminalController.enforceTerminalInputBoundary(session);
-    }
-
-    void insertTerminalInputText(TerminalSession session, String text) {
-        terminalController.insertTerminalInputText(session, text);
-    }
-
-    void executeTerminalLine(TerminalSession session) {
-        terminalController.executeTerminalLine(session);
-    }
-
-    String handleTerminalBuiltin(TerminalSession session, String rawCommand) {
-        return terminalController.handleTerminalBuiltin(session, rawCommand);
-    }
-
-    void handleTerminalCommandCompletion( TerminalSession session, String command, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error ) {
-        terminalController.handleTerminalCommandCompletion(session, command, snapshot, result, error);
-    }
-
-    void terminalHistoryPrevious(TerminalSession session) {
-        terminalController.terminalHistoryPrevious(session);
-    }
-
-    void terminalHistoryNext(TerminalSession session) {
-        terminalController.terminalHistoryNext(session);
-    }
-
-    void replaceTerminalInput(TerminalSession session, String input) {
-        terminalController.replaceTerminalInput(session, input);
-    }
-
-    String currentTerminalInput(TerminalSession session) {
-        return terminalController.currentTerminalInput(session);
-    }
-
-    void appendTerminalPrompt(TerminalSession session) {
-        terminalController.appendTerminalPrompt(session);
-    }
-
-    String terminalPrompt(TerminalSession session) {
-        return terminalController.terminalPrompt(session);
-    }
-
-    void appendTerminalText(TerminalSession session, String text) {
-        terminalController.appendTerminalText(session, text);
     }
 
     void closeTerminalSession(FileBuffer buffer) {

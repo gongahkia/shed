@@ -12,6 +12,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 final class SyntaxUiController {
+    static final int MAX_FULL_SYNTAX_CHARS = 750_000;
+    static final int MAX_FULL_SYNTAX_LINES = 20_000;
     private final Texteditor editor;
 
     SyntaxUiController(Texteditor editor) {
@@ -262,6 +264,11 @@ final class SyntaxUiController {
         if (text.isEmpty()) {
             return;
         }
+        if (shouldSkipSyntaxHighlighting(text.length(), editor.writingArea.getLineCount(), buffer.isLargeFile())) {
+            editor.applyBracketHighlighting();
+            editor.writingArea.repaint();
+            return;
+        }
 
         boolean[] masked = new boolean[text.length()];
         FileType fileType = buffer.getFileType();
@@ -280,6 +287,11 @@ final class SyntaxUiController {
         }
         editor.applyBracketHighlighting();
         editor.writingArea.repaint();
+    }
+
+
+    static boolean shouldSkipSyntaxHighlighting(int charCount, int lineCount, boolean largeFile) {
+        return largeFile || charCount > MAX_FULL_SYNTAX_CHARS || lineCount > MAX_FULL_SYNTAX_LINES;
     }
 
 

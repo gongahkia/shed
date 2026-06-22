@@ -50,26 +50,23 @@ class MinimapPanel extends JPanel {
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        String text = textArea.getText();
-        if (text.isEmpty()) return;
+        if (textArea.getDocument().getLength() == 0) return;
         Graphics2D g2 = (Graphics2D) g;
-        String[] lines = text.split("\n", -1);
-        int totalLines = lines.length;
+        int totalLines = Math.max(1, textArea.getLineCount());
         int panelH = getHeight();
-        double scale = Math.min(2.0, (double) panelH / Math.max(1, totalLines));
-        // draw text as tiny colored pixels
+        double scale = scaleForLineCount(totalLines, panelH);
+        int lineStep = sampleStepForLineCount(totalLines, panelH);
         g2.setColor(textColor);
-        for (int i = 0; i < totalLines; i++) {
+        for (int i = 0; i < totalLines; i += lineStep) {
             int y = (int) (i * scale);
             if (y >= panelH) break;
-            String line = lines[i];
-            int len = Math.min(line.length(), pixelWidth);
+            int len = lineLength(i);
             if (len > 0) {
                 int w = Math.max(1, (int) (len * ((double) pixelWidth / 120)));
-                g2.fillRect(2, y, w, Math.max(1, (int) scale));
+                int drawWidth = Math.max(1, Math.min(Math.max(1, pixelWidth - 2), w));
+                g2.fillRect(2, y, drawWidth, Math.max(1, (int) Math.ceil(scale * lineStep)));
             }
         }
-        // draw viewport rectangle using line-based coordinates
         try {
             int firstVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y)));
             int lastVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y + textArea.getVisibleRect().height)));
@@ -81,16 +78,40 @@ class MinimapPanel extends JPanel {
     }
 
     private void scrollToMinimapY(int mouseY) {
-        String text = textArea.getText();
-        String[] lines = text.split("\n", -1);
-        double scale = Math.min(2.0, (double) getHeight() / Math.max(1, lines.length));
+        int lineCount = Math.max(1, textArea.getLineCount());
+        double scale = scaleForLineCount(lineCount, getHeight());
         int targetLine = (int) (mouseY / scale);
-        targetLine = Math.max(0, Math.min(targetLine, lines.length - 1));
+        targetLine = Math.max(0, Math.min(targetLine, lineCount - 1));
         try {
             int offset = textArea.getLineStartOffset(targetLine);
             textArea.setCaretPosition(offset);
             Rectangle2D r = textArea.modelToView2D(offset);
             if (r != null) textArea.scrollRectToVisible(r.getBounds());
         } catch (Exception ignored) {}
+    }
+
+    private int lineLength(int line) {
+        try {
+            int start = textArea.getLineStartOffset(line);
+            int end = textArea.getLineEndOffset(line);
+            int length = Math.max(0, end - start);
+            if (length > 0) {
+                String tail = textArea.getText(end - 1, 1);
+                if ("\n".equals(tail)) {
+                    length--;
+                }
+            }
+            return Math.min(length, pixelWidth);
+        } catch (Exception ignored) {
+            return 0;
+        }
+    }
+
+    static double scaleForLineCount(int totalLines, int panelHeight) {
+        return Math.min(2.0, (double) Math.max(1, panelHeight) / Math.max(1, totalLines));
+    }
+
+    static int sampleStepForLineCount(int totalLines, int panelHeight) {
+        return Math.max(1, (int) Math.ceil((double) Math.max(1, totalLines) / Math.max(1, panelHeight)));
     }
 }

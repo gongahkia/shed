@@ -79,6 +79,13 @@ public class LuaEngine {
         loadedScripts.add(info);
     }
 
+    public void recordSkippedScript(File file, String reason) {
+        LuaPluginInfo info = new LuaPluginInfo(file == null ? "(unknown)" : file.getName());
+        info.loaded = false;
+        info.error = reason == null || reason.isBlank() ? "blocked" : reason;
+        loadedScripts.add(info);
+    }
+
     public void fireEvent(String event) {
         List<LuaFunction> callbacks = eventCallbacks.get(event);
         if (callbacks == null) return;

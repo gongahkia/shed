@@ -123,6 +123,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
         registerCommand((args, range, force) -> editor.showJobs(), "jobs");
+        registerCommand((args, range, force) -> editor.showPerfReport(), "perf");
         registerCommand((args, range, force) -> editor.cancelJob(args), "jobcancel", "jobkill");
         registerCommand((args, range, force) -> editor.runDropCommand(args), "drop");
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");

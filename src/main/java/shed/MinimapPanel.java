@@ -18,9 +18,15 @@ class MinimapPanel extends JPanel {
     private Color textColor = new Color(0xFF, 0xFF, 0xFF, 40);
     private Color viewportColor = new Color(0xFF, 0xFF, 0xFF, 20);
     private int pixelWidth = 80;
+    private final PerfService perfService;
 
     public MinimapPanel(JTextArea textArea) {
+        this(textArea, null);
+    }
+
+    public MinimapPanel(JTextArea textArea, PerfService perfService) {
         this.textArea = textArea;
+        this.perfService = perfService;
         setPreferredSize(new Dimension(pixelWidth, Integer.MAX_VALUE));
         setBackground(bgColor);
         addMouseListener(new MouseAdapter() {
@@ -49,32 +55,41 @@ class MinimapPanel extends JPanel {
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-        if (textArea.getDocument().getLength() == 0) return;
-        Graphics2D g2 = (Graphics2D) g;
-        int totalLines = Math.max(1, textArea.getLineCount());
-        int panelH = getHeight();
-        double scale = scaleForLineCount(totalLines, panelH);
-        int lineStep = sampleStepForLineCount(totalLines, panelH);
-        g2.setColor(textColor);
-        for (int i = 0; i < totalLines; i += lineStep) {
-            int y = (int) (i * scale);
-            if (y >= panelH) break;
-            int len = lineLength(i);
-            if (len > 0) {
-                int w = Math.max(1, (int) (len * ((double) pixelWidth / 120)));
-                int drawWidth = Math.max(1, Math.min(Math.max(1, pixelWidth - 2), w));
-                g2.fillRect(2, y, drawWidth, Math.max(1, (int) Math.ceil(scale * lineStep)));
+        long started = System.nanoTime();
+        String detail = "";
+        try {
+            super.paintComponent(g);
+            if (textArea.getDocument().getLength() == 0) return;
+            Graphics2D g2 = (Graphics2D) g;
+            int totalLines = Math.max(1, textArea.getLineCount());
+            int panelH = getHeight();
+            detail = "lines=" + totalLines + " height=" + panelH;
+            double scale = scaleForLineCount(totalLines, panelH);
+            int lineStep = sampleStepForLineCount(totalLines, panelH);
+            g2.setColor(textColor);
+            for (int i = 0; i < totalLines; i += lineStep) {
+                int y = (int) (i * scale);
+                if (y >= panelH) break;
+                int len = lineLength(i);
+                if (len > 0) {
+                    int w = Math.max(1, (int) (len * ((double) pixelWidth / 120)));
+                    int drawWidth = Math.max(1, Math.min(Math.max(1, pixelWidth - 2), w));
+                    g2.fillRect(2, y, drawWidth, Math.max(1, (int) Math.ceil(scale * lineStep)));
+                }
+            }
+            try {
+                int firstVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y)));
+                int lastVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y + textArea.getVisibleRect().height)));
+                int vpTop = (int) (firstVisLine * scale);
+                int vpHeight = (int) ((lastVisLine - firstVisLine + 1) * scale);
+                g2.setColor(viewportColor);
+                g2.fillRect(0, vpTop, pixelWidth, Math.max(4, vpHeight));
+            } catch (Exception ignored) {}
+        } finally {
+            if (perfService != null) {
+                perfService.recordDuration("minimap.paint", started, detail);
             }
         }
-        try {
-            int firstVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y)));
-            int lastVisLine = textArea.getLineOfOffset(textArea.viewToModel2D(new java.awt.geom.Point2D.Double(0, textArea.getVisibleRect().y + textArea.getVisibleRect().height)));
-            int vpTop = (int) (firstVisLine * scale);
-            int vpHeight = (int) ((lastVisLine - firstVisLine + 1) * scale);
-            g2.setColor(viewportColor);
-            g2.fillRect(0, vpTop, pixelWidth, Math.max(4, vpHeight));
-        } catch (Exception ignored) {}
     }
 
     private void scrollToMinimapY(int mouseY) {

@@ -6,7 +6,10 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.List;
@@ -460,13 +463,15 @@ final class LspController {
                     return "Code action index out of range: " + requestedIndex;
                 }
                 LspClient.CodeAction action = actions.get(requestedIndex - 1);
-                WorkspaceEditApplyResult applyResult = applyWorkspaceTextEdits(action.getEdits());
+                WorkspaceEditApplyResult applyResult = applyWorkspaceOperations(action.getOperations());
                 boolean executed = false;
                 if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
                     executed = client.executeCommand(action.getCommandId(), action.getCommandArguments());
                 }
-                if (applyResult.appliedEditCount == 0 && !executed) {
-                    return "Code action produced no local edit and no executable command";
+                if (applyResult.appliedEditCount == 0 && applyResult.appliedResourceOperationCount == 0 && !executed) {
+                    return applyResult.failureReason == null || applyResult.failureReason.isBlank()
+                        ? "Code action produced no local edit and no executable command"
+                        : "Code action failed: " + applyResult.failureReason;
                 }
                 StringBuilder message = new StringBuilder();
                 message.append("Applied code action ").append(requestedIndex).append(": ").append(action.getTitle());
@@ -475,6 +480,13 @@ final class LspController {
                         .append(applyResult.appliedEditCount)
                         .append(" edit")
                         .append(applyResult.appliedEditCount == 1 ? "" : "s")
+                        .append(")");
+                }
+                if (applyResult.appliedResourceOperationCount > 0) {
+                    message.append(" (")
+                        .append(applyResult.appliedResourceOperationCount)
+                        .append(" resource op")
+                        .append(applyResult.appliedResourceOperationCount == 1 ? "" : "s")
                         .append(")");
                 }
                 if (executed) {
@@ -503,6 +515,9 @@ final class LspController {
                 }
                 if (!action.getEdits().isEmpty()) {
                     builder.append(" [edit]");
+                }
+                if (hasResourceOperation(action.getOperations())) {
+                    builder.append(" [resource]");
                 }
                 if (i < actions.size() - 1) {
                     builder.append("\n");
@@ -697,72 +712,545 @@ final class LspController {
 
 
     WorkspaceEditApplyResult applyWorkspaceTextEdits(List<LspClient.TextEdit> edits) {
-        WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
         if (edits == null || edits.isEmpty()) {
-            return result;
+            return new WorkspaceEditApplyResult();
         }
-        Map<String, List<LspClient.TextEdit>> groupedByUri = new HashMap<>();
+        List<LspClient.WorkspaceEditOperation> operations = new ArrayList<>();
         for (LspClient.TextEdit edit : edits) {
-            if (edit == null || edit.getUri() == null || edit.getUri().isBlank()) {
-                continue;
+            if (edit != null) {
+                operations.add(LspClient.WorkspaceEditOperation.textEdit(edit));
             }
-            groupedByUri.computeIfAbsent(edit.getUri(), key -> new ArrayList<>()).add(edit);
         }
-        if (groupedByUri.isEmpty()) {
+        return applyWorkspaceOperations(operations);
+    }
+
+
+    LspClient.WorkspaceEditResponse applyWorkspaceEditFromServer(String label, List<LspClient.WorkspaceEditOperation> operations) {
+        WorkspaceEditApplyResult result = applyWorkspaceOperations(operations);
+        boolean applied = result.failedFiles == 0 && (result.appliedEditCount > 0 || result.appliedResourceOperationCount > 0 || operations == null || operations.isEmpty());
+        if (!applied && result.failureReason == null) {
+            result.failureReason = "workspace edit failed";
+        }
+        if (operations != null && hasResourceOperation(operations)) {
+            editor.showScratchBuffer("[lsp workspace edit]", buildWorkspaceEditPreview(label, operations, result));
+        }
+        return new LspClient.WorkspaceEditResponse(applied, result.failureReason);
+    }
+
+
+    WorkspaceEditApplyResult applyWorkspaceOperations(List<LspClient.WorkspaceEditOperation> operations) {
+        WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
+        if (operations == null || operations.isEmpty()) {
             return result;
         }
-
-        FileBuffer current = editor.getCurrentBuffer();
-        String currentPath = current == null ? null : current.getFilePath();
-
-        for (Map.Entry<String, List<LspClient.TextEdit>> entry : groupedByUri.entrySet()) {
-            if (hasWorkspaceEditVersionConflict(entry.getKey(), entry.getValue())) {
-                result.failedFiles++;
-                continue;
+        WorkspaceEditPlan plan = buildWorkspaceEditPlan(operations, result);
+        if (plan == null || result.failedFiles > 0) {
+            if (result.failureReason == null || result.failureReason.isBlank()) {
+                result.failureReason = "workspace edit preflight failed";
             }
-            String path = filePathFromUri(entry.getKey());
-            if (path == null || path.isBlank()) {
-                result.failedFiles++;
-                continue;
-            }
-
-            FileBuffer targetBuffer = editor.findBufferByPath(new File(path));
-            if (targetBuffer != null) {
-                int applied = applyTextEditsToBuffer(targetBuffer, entry.getValue());
-                if (applied > 0) {
-                    result.appliedEditCount += applied;
-                    result.touchedFiles++;
-                } else {
-                    result.failedFiles++;
-                }
-                continue;
-            }
-
-            if (currentPath != null && currentPath.equals(path)) {
-                int applied = applyTextEditsToCurrentArea(entry.getValue());
-                if (applied > 0) {
-                    result.appliedEditCount += applied;
-                    result.touchedFiles++;
-                } else {
-                    result.failedFiles++;
-                }
-                continue;
-            }
-
-            int applied = applyTextEditsToFile(path, entry.getValue());
-            if (applied > 0) {
-                result.appliedEditCount += applied;
-                result.touchedFiles++;
-            } else {
-                result.failedFiles++;
-            }
+            return result;
+        }
+        WorkspaceEditTransaction transaction = new WorkspaceEditTransaction();
+        try {
+            List<StagedTextWrite> stagedWrites = prepareStagedTextWrites(plan.stagedTextByPath, transaction);
+            applyResourceActions(plan.resourceActions, transaction);
+            applyStagedTextWrites(stagedWrites, transaction);
+            transaction.commit();
+            result.appliedEditCount = plan.appliedEditCount;
+            result.appliedResourceOperationCount = plan.resourceActions.size();
+            result.touchedFiles = plan.touchedPaths.size();
+        } catch (IOException | RuntimeException e) {
+            transaction.rollbackQuietly();
+            result.failedFiles++;
+            result.failureReason = e.getMessage();
+        } finally {
+            transaction.cleanupTempsQuietly();
         }
         return result;
     }
 
 
+    WorkspaceEditPlan buildWorkspaceEditPlan(List<LspClient.WorkspaceEditOperation> operations, WorkspaceEditApplyResult result) {
+        WorkspaceEditPlan plan = new WorkspaceEditPlan();
+        for (int i = 0; i < operations.size(); i++) {
+            LspClient.WorkspaceEditOperation operation = operations.get(i);
+            if (operation == null || operation.getKind() == null) {
+                continue;
+            }
+            switch (operation.getKind()) {
+                case TEXT_EDIT: {
+                    List<LspClient.TextEdit> group = new ArrayList<>();
+                    LspClient.TextEdit first = operation.getTextEdit();
+                    if (first == null || first.getUri() == null || first.getUri().isBlank()) {
+                        failWorkspacePreflight(result, "text edit missing uri");
+                        return null;
+                    }
+                    group.add(first);
+                    while (i + 1 < operations.size() && sameTextEditTarget(first, operations.get(i + 1))) {
+                        i++;
+                        group.add(operations.get(i).getTextEdit());
+                    }
+                    Path path = workspacePathFromUri(first.getUri());
+                    if (path == null) {
+                        failWorkspacePreflight(result, "text edit outside workspace: " + first.getUri());
+                        return null;
+                    }
+                    if (hasWorkspaceEditVersionConflict(first.getUri(), group)) {
+                        failWorkspacePreflight(result, "stale document version: " + first.getUri());
+                        return null;
+                    }
+                    String pathKey = path.toString();
+                    String currentText = plan.stagedTextByPath.containsKey(pathKey)
+                        ? plan.stagedTextByPath.get(pathKey)
+                        : readWorkspaceTextForEdit(path);
+                    if (currentText == null) {
+                        failWorkspacePreflight(result, "text edit target missing: " + path);
+                        return null;
+                    }
+                    List<ResolvedTextEdit> resolved = resolveTextEdits(currentText, group);
+                    if (resolved.isEmpty()) {
+                        failWorkspacePreflight(result, "text edit target had no applicable edits: " + path);
+                        return null;
+                    }
+                    plan.stagedTextByPath.put(pathKey, applyResolvedTextEdits(currentText, resolved));
+                    plan.touchedPaths.add(pathKey);
+                    plan.appliedEditCount += resolved.size();
+                    break;
+                }
+                case CREATE: {
+                    Path path = workspacePathFromUri(operation.getUri());
+                    if (path == null) {
+                        failWorkspacePreflight(result, "create outside workspace: " + operation.getUri());
+                        return null;
+                    }
+                    String pathKey = path.toString();
+                    boolean exists = Files.exists(path) || plan.stagedTextByPath.containsKey(pathKey);
+                    if (Files.isDirectory(path)) {
+                        failWorkspacePreflight(result, "create target is directory: " + path);
+                        return null;
+                    }
+                    if (exists && !operation.isOverwrite() && !operation.isIgnoreIfExists()) {
+                        failWorkspacePreflight(result, "create target exists: " + path);
+                        return null;
+                    }
+                    if (!exists || operation.isOverwrite()) {
+                        plan.stagedTextByPath.put(pathKey, "");
+                        plan.resourceActions.add(ResourceAction.create(path, operation.isOverwrite()));
+                        plan.touchedPaths.add(pathKey);
+                    }
+                    break;
+                }
+                case RENAME: {
+                    Path oldPath = workspacePathFromUri(operation.getOldUri());
+                    Path newPath = workspacePathFromUri(operation.getNewUri());
+                    if (oldPath == null || newPath == null) {
+                        failWorkspacePreflight(result, "rename outside workspace");
+                        return null;
+                    }
+                    String oldKey = oldPath.toString();
+                    String newKey = newPath.toString();
+                    boolean oldExists = Files.exists(oldPath) || plan.stagedTextByPath.containsKey(oldKey);
+                    boolean newExists = Files.exists(newPath) || plan.stagedTextByPath.containsKey(newKey);
+                    if (!oldExists) {
+                        failWorkspacePreflight(result, "rename source missing: " + oldPath);
+                        return null;
+                    }
+                    if (newExists && !operation.isOverwrite() && !operation.isIgnoreIfExists()) {
+                        failWorkspacePreflight(result, "rename target exists: " + newPath);
+                        return null;
+                    }
+                    if (!newExists || operation.isOverwrite()) {
+                        if (plan.stagedTextByPath.containsKey(oldKey)) {
+                            plan.stagedTextByPath.put(newKey, plan.stagedTextByPath.remove(oldKey));
+                        } else if (Files.isRegularFile(oldPath)) {
+                            try {
+                                plan.stagedTextByPath.put(newKey, Files.readString(oldPath, StandardCharsets.UTF_8));
+                            } catch (IOException e) {
+                                failWorkspacePreflight(result, "rename source unreadable: " + oldPath);
+                                return null;
+                            }
+                        }
+                        plan.resourceActions.add(ResourceAction.rename(oldPath, newPath, operation.isOverwrite()));
+                        plan.touchedPaths.add(oldKey);
+                        plan.touchedPaths.add(newKey);
+                    }
+                    break;
+                }
+                case DELETE: {
+                    Path path = workspacePathFromUri(operation.getUri());
+                    if (path == null) {
+                        failWorkspacePreflight(result, "delete outside workspace: " + operation.getUri());
+                        return null;
+                    }
+                    String pathKey = path.toString();
+                    boolean exists = Files.exists(path) || plan.stagedTextByPath.containsKey(pathKey);
+                    if (!exists && operation.isIgnoreIfNotExists()) {
+                        break;
+                    }
+                    if (!exists) {
+                        failWorkspacePreflight(result, "delete target missing: " + path);
+                        return null;
+                    }
+                    if (Files.isDirectory(path) && !operation.isRecursive()) {
+                        failWorkspacePreflight(result, "delete target is directory: " + path);
+                        return null;
+                    }
+                    plan.stagedTextByPath.remove(pathKey);
+                    plan.resourceActions.add(ResourceAction.delete(path, operation.isRecursive()));
+                    plan.touchedPaths.add(pathKey);
+                    break;
+                }
+            }
+        }
+        return plan;
+    }
+
+
+    private void failWorkspacePreflight(WorkspaceEditApplyResult result, String reason) {
+        result.failedFiles++;
+        result.failureReason = reason == null ? "workspace edit preflight failed" : reason;
+    }
+
+
+    private boolean sameTextEditTarget(LspClient.TextEdit first, LspClient.WorkspaceEditOperation operation) {
+        if (first == null || operation == null || operation.getKind() != LspClient.WorkspaceEditOperation.Kind.TEXT_EDIT) {
+            return false;
+        }
+        LspClient.TextEdit next = operation.getTextEdit();
+        if (next == null) {
+            return false;
+        }
+        return Objects.equals(first.getUri(), next.getUri())
+            && Objects.equals(first.getDocumentVersion(), next.getDocumentVersion());
+    }
+
+
+    private String readWorkspaceTextForEdit(Path path) {
+        if (editor != null) {
+            FileBuffer buffer = editor.findBufferByPath(path.toFile());
+            if (buffer != null) {
+                return buffer == editor.getCurrentBuffer() ? editor.writingArea.getText() : buffer.getContent();
+            }
+        }
+        if (!Files.isRegularFile(path)) {
+            return null;
+        }
+        try {
+            return Files.readString(path, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+
+    private void applyResourceActions(List<ResourceAction> actions, WorkspaceEditTransaction transaction) throws IOException {
+        for (ResourceAction action : actions) {
+            switch (action.kind) {
+                case CREATE:
+                    createWorkspaceFile(action.path);
+                    break;
+                case RENAME:
+                    renameWorkspaceFile(action.path, action.targetPath, action.overwrite, transaction);
+                    break;
+                case DELETE:
+                    deleteWorkspacePath(action.path, action.recursive, transaction);
+                    break;
+            }
+        }
+    }
+
+
+    private void createWorkspaceFile(Path path) throws IOException {
+        Path parent = path.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+    }
+
+
+    private void renameWorkspaceFile(Path oldPath, Path newPath, boolean overwrite, WorkspaceEditTransaction transaction) throws IOException {
+        FileBuffer buffer = editor.findBufferByPath(oldPath.toFile());
+        Path parent = newPath.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path overwrittenBackup = null;
+        if (overwrite && Files.exists(newPath)) {
+            overwrittenBackup = moveToBackup(newPath);
+            transaction.trackBackup(overwrittenBackup);
+        }
+        Path overwrittenBackupRef = overwrittenBackup;
+        if (overwrittenBackupRef != null) {
+            transaction.addRollback(() -> {
+                if (Files.exists(overwrittenBackupRef)) {
+                    movePath(overwrittenBackupRef, newPath, true);
+                }
+            });
+        }
+        movePath(oldPath, newPath, false);
+        transaction.addRollback(() -> {
+            movePath(newPath, oldPath, true);
+            if (overwrittenBackupRef != null && Files.exists(overwrittenBackupRef)) {
+                movePath(overwrittenBackupRef, newPath, true);
+            }
+            if (buffer != null) {
+                buffer.retargetFile(oldPath.toFile());
+            }
+        });
+        if (buffer != null) {
+            buffer.retargetFile(newPath.toFile());
+        }
+    }
+
+
+    private void deleteWorkspacePath(Path path, boolean recursive, WorkspaceEditTransaction transaction) throws IOException {
+        FileBuffer buffer = editor.findBufferByPath(path.toFile());
+        Path backup = moveToBackup(path);
+        transaction.trackBackup(backup);
+        transaction.addRollback(() -> movePath(backup, path, true));
+        if (buffer != null) {
+            transaction.addCommit(() -> removeDeletedBuffer(buffer));
+        }
+    }
+
+
+    private List<StagedTextWrite> prepareStagedTextWrites(Map<String, String> stagedTextByPath, WorkspaceEditTransaction transaction) throws IOException {
+        List<StagedTextWrite> writes = new ArrayList<>();
+        for (Map.Entry<String, String> entry : stagedTextByPath.entrySet()) {
+            Path path = Path.of(entry.getKey());
+            Path temp = writeTempFileFor(path, entry.getValue());
+            transaction.trackTemp(temp);
+            writes.add(new StagedTextWrite(path, entry.getValue(), temp));
+        }
+        return writes;
+    }
+
+
+    private void applyStagedTextWrites(List<StagedTextWrite> writes, WorkspaceEditTransaction transaction) throws IOException {
+        for (StagedTextWrite write : writes) {
+            FileBuffer buffer = editor.findBufferByPath(write.path.toFile());
+            if (buffer != null) {
+                applyStagedTextToBuffer(buffer, write.text, transaction);
+            } else {
+                writeFileAtomically(write.path, write.tempPath, transaction);
+            }
+        }
+    }
+
+
+    private void applyStagedTextToBuffer(FileBuffer buffer, String text, WorkspaceEditTransaction transaction) {
+        String oldText = buffer == editor.getCurrentBuffer() ? editor.writingArea.getText() : buffer.getContent();
+        boolean oldModified = buffer.isModified();
+        transaction.addRollback(() -> restoreBufferText(buffer, oldText, oldModified));
+        if (buffer == editor.getCurrentBuffer()) {
+            editor.writingArea.setText(text == null ? "" : text);
+            editor.markModified();
+        } else {
+            buffer.setContent(text == null ? "" : text, true);
+        }
+    }
+
+
+    private void restoreBufferText(FileBuffer buffer, String text, boolean modified) {
+        if (buffer == editor.getCurrentBuffer()) {
+            editor.writingArea.setText(text == null ? "" : text);
+            buffer.setModified(modified);
+            editor.updateStatusBar();
+        } else {
+            buffer.setContent(text == null ? "" : text, modified);
+        }
+    }
+
+
+    private Path writeTempFileFor(Path path, String text) throws IOException {
+        Path parent = path.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path temp = Files.createTempFile(parent == null ? Path.of(".") : parent, "shed-lsp-", ".tmp");
+        Files.writeString(temp, text == null ? "" : text, StandardCharsets.UTF_8, StandardOpenOption.TRUNCATE_EXISTING);
+        return temp;
+    }
+
+
+    private void writeFileAtomically(Path path, Path temp, WorkspaceEditTransaction transaction) throws IOException {
+        if (Files.isDirectory(path)) {
+            throw new IOException("write target is directory: " + path);
+        }
+        Path backup = null;
+        boolean existed = Files.exists(path);
+        if (existed) {
+            backup = moveToBackup(path);
+            transaction.trackBackup(backup);
+        }
+        Path backupRef = backup;
+        transaction.addRollback(() -> {
+            Files.deleteIfExists(path);
+            if (backupRef != null && Files.exists(backupRef)) {
+                movePath(backupRef, path, true);
+            }
+        });
+        movePath(temp, path, true);
+    }
+
+
+    private Path moveToBackup(Path path) throws IOException {
+        Path parent = path.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        Path backup = Files.isDirectory(path)
+            ? Files.createTempDirectory(parent == null ? Path.of(".") : parent, "shed-lsp-backup-")
+            : Files.createTempFile(parent == null ? Path.of(".") : parent, "shed-lsp-backup-", ".tmp");
+        if (Files.exists(backup)) {
+            deletePathRecursively(backup);
+        }
+        movePath(path, backup, true);
+        return backup;
+    }
+
+
+    private void movePath(Path from, Path to, boolean replace) throws IOException {
+        Path parent = to.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        List<StandardCopyOption> options = new ArrayList<>();
+        if (replace) {
+            options.add(StandardCopyOption.REPLACE_EXISTING);
+        }
+        options.add(StandardCopyOption.ATOMIC_MOVE);
+        try {
+            Files.move(from, to, options.toArray(new StandardCopyOption[0]));
+        } catch (AtomicMoveNotSupportedException e) {
+            options.remove(StandardCopyOption.ATOMIC_MOVE);
+            Files.move(from, to, options.toArray(new StandardCopyOption[0]));
+        }
+    }
+
+
+    private void deletePathRecursively(Path path) throws IOException {
+        if (!Files.exists(path)) {
+            return;
+        }
+        if (Files.isDirectory(path)) {
+            try (java.util.stream.Stream<Path> paths = Files.walk(path)) {
+                for (Path candidate : paths.sorted(Comparator.reverseOrder()).toList()) {
+                    Files.deleteIfExists(candidate);
+                }
+            }
+            return;
+        }
+        Files.deleteIfExists(path);
+    }
+
+
+    private void removeDeletedBuffer(FileBuffer buffer) {
+        if (buffer == null) {
+            return;
+        }
+        boolean wasCurrent = buffer == editor.getCurrentBuffer();
+        editor.buffers.remove(buffer);
+        if (wasCurrent && !editor.buffers.isEmpty()) {
+            editor.switchToBuffer(Math.min(editor.currentBufferIndex, editor.buffers.size() - 1));
+        } else if (editor.buffers.isEmpty()) {
+            FileBuffer scratch = FileBuffer.createScratch("[No Name]", "");
+            editor.buffers.add(scratch);
+            editor.switchToBuffer(0);
+        }
+    }
+
+
+    private Path workspacePathFromUri(String uri) {
+        String filePath = filePathFromUri(uri);
+        if (filePath == null || filePath.isBlank()) {
+            return null;
+        }
+        try {
+            Path root = workspaceRootPath();
+            Path candidate = Path.of(filePath).toAbsolutePath().normalize();
+            if (!candidate.startsWith(root)) {
+                return null;
+            }
+            if (Files.exists(candidate)) {
+                Path real = candidate.toRealPath();
+                if (!real.startsWith(root)) {
+                    return null;
+                }
+            }
+            return candidate;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+
+    private Path workspaceRootPath() throws IOException {
+        return new File(".").getCanonicalFile().toPath().toAbsolutePath().normalize();
+    }
+
+
+    boolean hasResourceOperation(List<LspClient.WorkspaceEditOperation> operations) {
+        if (operations == null) {
+            return false;
+        }
+        for (LspClient.WorkspaceEditOperation operation : operations) {
+            if (operation != null && operation.getKind() != LspClient.WorkspaceEditOperation.Kind.TEXT_EDIT) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+
+    String buildWorkspaceEditPreview(String label, List<LspClient.WorkspaceEditOperation> operations, WorkspaceEditApplyResult result) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("LSP Workspace Edit\n");
+        builder.append("=".repeat(40)).append("\n\n");
+        if (label != null && !label.isBlank()) {
+            builder.append("Label: ").append(label).append("\n");
+        }
+        builder.append("Applied text edits: ").append(result == null ? 0 : result.appliedEditCount).append("\n");
+        builder.append("Applied resource ops: ").append(result == null ? 0 : result.appliedResourceOperationCount).append("\n");
+        if (result != null && result.failureReason != null && !result.failureReason.isBlank()) {
+            builder.append("Failure: ").append(result.failureReason).append("\n");
+        }
+        builder.append("\n");
+        if (operations != null) {
+            for (LspClient.WorkspaceEditOperation operation : operations) {
+                if (operation == null) {
+                    continue;
+                }
+                switch (operation.getKind()) {
+                    case CREATE:
+                        builder.append("create ").append(filePathFromUri(operation.getUri())).append("\n");
+                        break;
+                    case RENAME:
+                        builder.append("rename ").append(filePathFromUri(operation.getOldUri())).append(" -> ").append(filePathFromUri(operation.getNewUri())).append("\n");
+                        break;
+                    case DELETE:
+                        builder.append("delete ").append(filePathFromUri(operation.getUri())).append("\n");
+                        break;
+                    case TEXT_EDIT:
+                        LspClient.TextEdit edit = operation.getTextEdit();
+                        if (edit != null) {
+                            builder.append("edit ").append(filePathFromUri(edit.getUri())).append(":")
+                                .append(edit.getStartLine() + 1).append(":").append(edit.getStartCharacter() + 1)
+                                .append(" -> ").append(editor.safePreviewText(edit.getNewText(), 60)).append("\n");
+                        }
+                        break;
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+
     boolean hasWorkspaceEditVersionConflict(String uri, List<LspClient.TextEdit> edits) {
         if (uri == null || edits == null || edits.isEmpty()) {
+            return false;
+        }
+        if (editor == null || editor.lspDocumentVersions == null) {
             return false;
         }
         Integer currentVersion = editor.lspDocumentVersions.get(uri);
@@ -1008,6 +1496,7 @@ final class LspController {
 
         try {
             LspClient client = new LspClient(command, args, new File(".").toPath());
+            client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
             editor.lspClients.put(extension, client);
             editor.lspErrors.remove(extension);
             return client;
@@ -1117,6 +1606,136 @@ final class LspController {
 
     String[] builtinLspCommand(String extension) {
         return editor.lspService.builtinCommand(extension);
+    }
+
+
+    static final class WorkspaceEditPlan {
+        final Map<String, String> stagedTextByPath = new LinkedHashMap<>();
+        final List<ResourceAction> resourceActions = new ArrayList<>();
+        final Set<String> touchedPaths = new LinkedHashSet<>();
+        int appliedEditCount;
+    }
+
+
+    interface WorkspaceEditIoAction {
+        void run() throws IOException;
+    }
+
+
+    static final class StagedTextWrite {
+        final Path path;
+        final String text;
+        final Path tempPath;
+
+        StagedTextWrite(Path path, String text, Path tempPath) {
+            this.path = path;
+            this.text = text;
+            this.tempPath = tempPath;
+        }
+    }
+
+
+    final class WorkspaceEditTransaction {
+        private final List<WorkspaceEditIoAction> rollbackActions = new ArrayList<>();
+        private final List<WorkspaceEditIoAction> commitActions = new ArrayList<>();
+        private final List<Path> temps = new ArrayList<>();
+        private final List<Path> backups = new ArrayList<>();
+        private boolean committed;
+
+        void addRollback(WorkspaceEditIoAction action) {
+            if (action != null) {
+                rollbackActions.add(action);
+            }
+        }
+
+        void addCommit(WorkspaceEditIoAction action) {
+            if (action != null) {
+                commitActions.add(action);
+            }
+        }
+
+        void trackTemp(Path path) {
+            if (path != null) {
+                temps.add(path);
+            }
+        }
+
+        void trackBackup(Path path) {
+            if (path != null) {
+                backups.add(path);
+            }
+        }
+
+        void commit() throws IOException {
+            for (WorkspaceEditIoAction action : commitActions) {
+                action.run();
+            }
+            committed = true;
+        }
+
+        void rollbackQuietly() {
+            if (committed) {
+                return;
+            }
+            for (int i = rollbackActions.size() - 1; i >= 0; i--) {
+                try {
+                    rollbackActions.get(i).run();
+                } catch (IOException ignored) {
+                }
+            }
+        }
+
+        void cleanupTempsQuietly() {
+            for (Path temp : temps) {
+                try {
+                    deletePathRecursively(temp);
+                } catch (IOException ignored) {
+                }
+            }
+            if (committed) {
+                for (Path backup : backups) {
+                    try {
+                        deletePathRecursively(backup);
+                    } catch (IOException ignored) {
+                    }
+                }
+            }
+        }
+    }
+
+
+    static final class ResourceAction {
+        enum Kind {
+            CREATE,
+            RENAME,
+            DELETE
+        }
+
+        final Kind kind;
+        final Path path;
+        final Path targetPath;
+        final boolean overwrite;
+        final boolean recursive;
+
+        private ResourceAction(Kind kind, Path path, Path targetPath, boolean overwrite, boolean recursive) {
+            this.kind = kind;
+            this.path = path;
+            this.targetPath = targetPath;
+            this.overwrite = overwrite;
+            this.recursive = recursive;
+        }
+
+        static ResourceAction create(Path path, boolean overwrite) {
+            return new ResourceAction(Kind.CREATE, path, null, overwrite, false);
+        }
+
+        static ResourceAction rename(Path oldPath, Path newPath, boolean overwrite) {
+            return new ResourceAction(Kind.RENAME, oldPath, newPath, overwrite, false);
+        }
+
+        static ResourceAction delete(Path path, boolean recursive) {
+            return new ResourceAction(Kind.DELETE, path, null, false, recursive);
+        }
     }
 
 }

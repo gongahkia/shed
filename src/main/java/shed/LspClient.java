@@ -147,19 +147,124 @@ public class LspClient {
         }
     }
 
+    public static class WorkspaceEditOperation {
+        public enum Kind {
+            TEXT_EDIT,
+            CREATE,
+            RENAME,
+            DELETE
+        }
+
+        private final Kind kind;
+        private final TextEdit textEdit;
+        private final String uri;
+        private final String oldUri;
+        private final String newUri;
+        private final boolean overwrite;
+        private final boolean ignoreIfExists;
+        private final boolean recursive;
+        private final boolean ignoreIfNotExists;
+
+        private WorkspaceEditOperation(Kind kind, TextEdit textEdit, String uri, String oldUri, String newUri, boolean overwrite, boolean ignoreIfExists, boolean recursive, boolean ignoreIfNotExists) {
+            this.kind = kind;
+            this.textEdit = textEdit;
+            this.uri = uri;
+            this.oldUri = oldUri;
+            this.newUri = newUri;
+            this.overwrite = overwrite;
+            this.ignoreIfExists = ignoreIfExists;
+            this.recursive = recursive;
+            this.ignoreIfNotExists = ignoreIfNotExists;
+        }
+
+        public static WorkspaceEditOperation textEdit(TextEdit edit) {
+            return new WorkspaceEditOperation(Kind.TEXT_EDIT, edit, edit == null ? null : edit.getUri(), null, null, false, false, false, false);
+        }
+
+        public static WorkspaceEditOperation create(String uri, boolean overwrite, boolean ignoreIfExists) {
+            return new WorkspaceEditOperation(Kind.CREATE, null, uri, null, null, overwrite, ignoreIfExists, false, false);
+        }
+
+        public static WorkspaceEditOperation rename(String oldUri, String newUri, boolean overwrite, boolean ignoreIfExists) {
+            return new WorkspaceEditOperation(Kind.RENAME, null, null, oldUri, newUri, overwrite, ignoreIfExists, false, false);
+        }
+
+        public static WorkspaceEditOperation delete(String uri, boolean recursive, boolean ignoreIfNotExists) {
+            return new WorkspaceEditOperation(Kind.DELETE, null, uri, null, null, false, false, recursive, ignoreIfNotExists);
+        }
+
+        public Kind getKind() {
+            return kind;
+        }
+
+        public TextEdit getTextEdit() {
+            return textEdit;
+        }
+
+        public String getUri() {
+            return uri;
+        }
+
+        public String getOldUri() {
+            return oldUri;
+        }
+
+        public String getNewUri() {
+            return newUri;
+        }
+
+        public boolean isOverwrite() {
+            return overwrite;
+        }
+
+        public boolean isIgnoreIfExists() {
+            return ignoreIfExists;
+        }
+
+        public boolean isRecursive() {
+            return recursive;
+        }
+
+        public boolean isIgnoreIfNotExists() {
+            return ignoreIfNotExists;
+        }
+    }
+
+    public interface WorkspaceEditHandler {
+        WorkspaceEditResponse applyWorkspaceEdit(String label, List<WorkspaceEditOperation> operations);
+    }
+
+    public static class WorkspaceEditResponse {
+        private final boolean applied;
+        private final String failureReason;
+
+        public WorkspaceEditResponse(boolean applied, String failureReason) {
+            this.applied = applied;
+            this.failureReason = failureReason == null ? "" : failureReason;
+        }
+
+        public boolean isApplied() {
+            return applied;
+        }
+
+        public String getFailureReason() {
+            return failureReason;
+        }
+    }
+
     public static class CodeAction {
         private final String title;
         private final String kind;
         private final boolean preferred;
-        private final List<TextEdit> edits;
+        private final List<WorkspaceEditOperation> operations;
         private final String commandId;
         private final Object commandArguments;
 
-        public CodeAction(String title, String kind, boolean preferred, List<TextEdit> edits, String commandId, Object commandArguments) {
+        public CodeAction(String title, String kind, boolean preferred, List<WorkspaceEditOperation> operations, String commandId, Object commandArguments) {
             this.title = title == null ? "" : title;
             this.kind = kind == null ? "" : kind;
             this.preferred = preferred;
-            this.edits = edits == null ? List.of() : new ArrayList<>(edits);
+            this.operations = operations == null ? List.of() : new ArrayList<>(operations);
             this.commandId = commandId == null ? "" : commandId;
             this.commandArguments = commandArguments;
         }
@@ -177,7 +282,17 @@ public class LspClient {
         }
 
         public List<TextEdit> getEdits() {
+            List<TextEdit> edits = new ArrayList<>();
+            for (WorkspaceEditOperation operation : operations) {
+                if (operation != null && operation.getKind() == WorkspaceEditOperation.Kind.TEXT_EDIT && operation.getTextEdit() != null) {
+                    edits.add(operation.getTextEdit());
+                }
+            }
             return new ArrayList<>(edits);
+        }
+
+        public List<WorkspaceEditOperation> getOperations() {
+            return new ArrayList<>(operations);
         }
 
         public String getCommandId() {
@@ -195,6 +310,7 @@ public class LspClient {
     private final List<Map<String, Object>> deferredMessages;
     private final Map<String, List<Diagnostic>> diagnostics;
     private final Set<Integer> staleRequestIds;
+    private WorkspaceEditHandler workspaceEditHandler;
     private int requestId;
     private boolean initialized;
 
@@ -221,6 +337,10 @@ public class LspClient {
         this.initialized = false;
         startReaderThread();
         initialize(rootPath);
+    }
+
+    public void setWorkspaceEditHandler(WorkspaceEditHandler workspaceEditHandler) {
+        this.workspaceEditHandler = workspaceEditHandler;
     }
 
     public boolean isAlive() {
@@ -489,7 +609,7 @@ public class LspClient {
             }
             String kind = MiniJson.asString(actionObject.get("kind"));
             boolean preferred = Boolean.TRUE.equals(actionObject.get("isPreferred"));
-            List<TextEdit> edits = parseWorkspaceEdits(MiniJson.asObject(actionObject.get("edit")));
+            List<WorkspaceEditOperation> operations = parseWorkspaceOperations(MiniJson.asObject(actionObject.get("edit")));
             String commandId = "";
             Object commandArguments = null;
 
@@ -508,7 +628,7 @@ public class LspClient {
                 }
             }
 
-            actions.add(new CodeAction(title, kind, preferred, edits, commandId, commandArguments));
+            actions.add(new CodeAction(title, kind, preferred, operations, commandId, commandArguments));
         }
         return actions;
     }
@@ -543,7 +663,7 @@ public class LspClient {
                 return;
             }
             if (message.containsKey("method")) {
-                handleNotification(message);
+                handleIncomingMethod(message);
             } else {
                 Integer responseId = MiniJson.asInt(message.get("id"));
                 if (responseId != null && staleRequestIds.remove(responseId)) {
@@ -580,8 +700,10 @@ public class LspClient {
         changeAnnotationSupport.put("groupsOnLabel", Boolean.TRUE);
         Map<String, Object> workspaceEdit = new LinkedHashMap<>();
         workspaceEdit.put("documentChanges", Boolean.TRUE);
+        workspaceEdit.put("resourceOperations", List.of("create", "rename", "delete"));
         workspaceEdit.put("changeAnnotationSupport", changeAnnotationSupport);
         Map<String, Object> workspace = new LinkedHashMap<>();
+        workspace.put("applyEdit", Boolean.TRUE);
         workspace.put("workspaceEdit", workspaceEdit);
 
         Map<String, Object> textDocument = new LinkedHashMap<>();
@@ -689,7 +811,7 @@ public class LspClient {
                 continue;
             }
             if (message.containsKey("method")) {
-                handleNotification(message);
+                handleIncomingMethod(message);
             } else {
                 synchronized (deferredMessages) {
                     deferredMessages.add(message);
@@ -747,6 +869,62 @@ public class LspClient {
         diagnostics.put(uri, parsed);
     }
 
+    private void handleIncomingMethod(Map<String, Object> message) {
+        if (message == null) {
+            return;
+        }
+        if (message.containsKey("id")) {
+            handleServerRequest(message);
+            return;
+        }
+        handleNotification(message);
+    }
+
+    private void handleServerRequest(Map<String, Object> message) {
+        Object id = message.get("id");
+        String method = MiniJson.asString(message.get("method"));
+        if ("workspace/applyEdit".equals(method)) {
+            handleWorkspaceApplyEditRequest(id, MiniJson.asObject(message.get("params")));
+            return;
+        }
+        sendErrorResponse(id, -32601, "Method not found");
+    }
+
+    private void handleWorkspaceApplyEditRequest(Object id, Map<String, Object> params) {
+        String label = params == null ? null : MiniJson.asString(params.get("label"));
+        Map<String, Object> edit = params == null ? null : MiniJson.asObject(params.get("edit"));
+        List<WorkspaceEditOperation> operations = parseWorkspaceOperations(edit);
+        WorkspaceEditResponse applied = workspaceEditHandler == null
+            ? new WorkspaceEditResponse(false, "workspace/applyEdit handler unavailable")
+            : workspaceEditHandler.applyWorkspaceEdit(label, operations);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("applied", applied != null && applied.isApplied());
+        if (applied != null && !applied.isApplied() && !applied.getFailureReason().isBlank()) {
+            result.put("failureReason", applied.getFailureReason());
+        }
+        sendResponse(id, result);
+    }
+
+    private void sendResponse(Object id, Object result) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("result", result);
+        writeMessage(response);
+    }
+
+    private void sendErrorResponse(Object id, int code, String message) {
+        Map<String, Object> error = new LinkedHashMap<>();
+        error.put("code", code);
+        error.put("message", message == null ? "" : message);
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("jsonrpc", "2.0");
+        response.put("id", id);
+        response.put("error", error);
+        writeMessage(response);
+    }
+
     private Location parseLocation(Map<String, Object> location) {
         String uri = MiniJson.asString(location.get("uri"));
         Map<String, Object> range = MiniJson.asObject(location.get("range"));
@@ -798,16 +976,35 @@ public class LspClient {
     }
 
     static List<TextEdit> parseWorkspaceEdits(Map<String, Object> workspaceEdit) {
+        List<WorkspaceEditOperation> operations = parseWorkspaceOperations(workspaceEdit);
+        List<TextEdit> edits = new ArrayList<>();
+        for (WorkspaceEditOperation operation : operations) {
+            if (operation != null && operation.getKind() == WorkspaceEditOperation.Kind.TEXT_EDIT && operation.getTextEdit() != null) {
+                edits.add(operation.getTextEdit());
+            }
+        }
+        return edits;
+    }
+
+    static List<WorkspaceEditOperation> parseWorkspaceOperations(Map<String, Object> workspaceEdit) {
         if (workspaceEdit == null) {
             return List.of();
         }
-        List<TextEdit> edits = new ArrayList<>();
+        List<WorkspaceEditOperation> operations = new ArrayList<>();
 
         List<Object> documentChanges = MiniJson.asArray(workspaceEdit.get("documentChanges"));
         if (documentChanges != null) {
             for (Object item : documentChanges) {
                 Map<String, Object> change = MiniJson.asObject(item);
                 if (change == null) {
+                    continue;
+                }
+                String resourceKind = MiniJson.asString(change.get("kind"));
+                if (resourceKind != null) {
+                    WorkspaceEditOperation operation = parseResourceOperation(resourceKind, change);
+                    if (operation != null) {
+                        operations.add(operation);
+                    }
                     continue;
                 }
                 Map<String, Object> textDocumentObject = MiniJson.asObject(change.get("textDocument"));
@@ -820,9 +1017,9 @@ public class LspClient {
                 if (editArray == null) {
                     continue;
                 }
-                edits.addAll(parseTextEdits(changeUri, editArray, version));
+                operations.addAll(textEditOperations(parseTextEdits(changeUri, editArray, version)));
             }
-            return edits;
+            return operations;
         }
 
         Map<String, Object> changes = MiniJson.asObject(workspaceEdit.get("changes"));
@@ -832,10 +1029,41 @@ public class LspClient {
                 if (editArray == null) {
                     continue;
                 }
-                edits.addAll(parseTextEdits(entry.getKey(), editArray, null));
+                operations.addAll(textEditOperations(parseTextEdits(entry.getKey(), editArray, null)));
             }
         }
-        return edits;
+        return operations;
+    }
+
+    private static List<WorkspaceEditOperation> textEditOperations(List<TextEdit> edits) {
+        if (edits == null || edits.isEmpty()) {
+            return List.of();
+        }
+        List<WorkspaceEditOperation> operations = new ArrayList<>();
+        for (TextEdit edit : edits) {
+            if (edit != null) {
+                operations.add(WorkspaceEditOperation.textEdit(edit));
+            }
+        }
+        return operations;
+    }
+
+    private static WorkspaceEditOperation parseResourceOperation(String kind, Map<String, Object> change) {
+        Map<String, Object> options = MiniJson.asObject(change.get("options"));
+        boolean overwrite = options != null && Boolean.TRUE.equals(options.get("overwrite"));
+        boolean ignoreIfExists = options != null && Boolean.TRUE.equals(options.get("ignoreIfExists"));
+        boolean recursive = options != null && Boolean.TRUE.equals(options.get("recursive"));
+        boolean ignoreIfNotExists = options != null && Boolean.TRUE.equals(options.get("ignoreIfNotExists"));
+        switch (kind) {
+            case "create":
+                return WorkspaceEditOperation.create(MiniJson.asString(change.get("uri")), overwrite, ignoreIfExists);
+            case "rename":
+                return WorkspaceEditOperation.rename(MiniJson.asString(change.get("oldUri")), MiniJson.asString(change.get("newUri")), overwrite, ignoreIfExists);
+            case "delete":
+                return WorkspaceEditOperation.delete(MiniJson.asString(change.get("uri")), recursive, ignoreIfNotExists);
+            default:
+                return null;
+        }
     }
 
     private synchronized int nextRequestId() {

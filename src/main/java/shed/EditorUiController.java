@@ -628,6 +628,8 @@ final class EditorUiController {
 
 
     void paintDiagnosticOverlay(Graphics g, JTextArea area) {
+        long started = System.nanoTime();
+        try {
         if (area == null || editor.diagnosticRanges.isEmpty()) return;
         Graphics2D g2 = (Graphics2D) g;
         FontMetrics fm = g2.getFontMetrics(area.getFont());
@@ -664,10 +666,17 @@ final class EditorUiController {
                 }
             } catch (BadLocationException ignored) {}
         }
+        } finally {
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("diagnostic.paint", started, "ranges=" + editor.diagnosticRanges.size());
+            }
+        }
     }
 
 
     void refreshDiagnosticRanges() {
+        long started = System.nanoTime();
+        try {
         editor.diagnosticRanges.clear();
         EditorPane diagPane = getActivePane();
         if (diagPane != null && diagPane.getLineNumberPanel() != null) diagPane.getLineNumberPanel().updateDiagnosticMarkers(null);
@@ -702,10 +711,17 @@ final class EditorUiController {
         EditorPane pane = getActivePane();
         if (pane != null && pane.getLineNumberPanel() != null) pane.getLineNumberPanel().updateDiagnosticMarkers(severityByLine);
         editor.writingArea.repaint();
+        } finally {
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("diagnostic.refresh", started, "ranges=" + editor.diagnosticRanges.size());
+            }
+        }
     }
 
 
     void paintSyntaxForegroundOverlay(Graphics g, JTextArea area) {
+        long started = System.nanoTime();
+        try {
         if (area == null || area != editor.writingArea || editor.syntaxForegroundSpans.isEmpty()) {
             return;
         }
@@ -779,6 +795,11 @@ final class EditorUiController {
             }
         }
         g2.dispose();
+        } finally {
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("syntax.paint", started, "spans=" + editor.syntaxForegroundSpans.size());
+            }
+        }
     }
 
 }

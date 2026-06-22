@@ -334,6 +334,15 @@ public class FileBuffer {
         return file == null ? null : file.getAbsolutePath();
     }
 
+    void retargetFile(File newFile) {
+        this.file = newFile;
+        this.scratch = false;
+        this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
+        this.backupFile = buildBackupFile(newFile);
+        this.fileType = FileType.detect(newFile, getFullContent());
+        this.lastKnownModifiedTime = newFile != null && newFile.exists() ? newFile.lastModified() : 0L;
+    }
+
     public boolean hasFilePath() {
         return file != null;
     }

@@ -93,6 +93,7 @@ public class Texteditor extends JFrame implements KeyListener {
     EditorUiController editorUiController;
     RecoveryController recoveryController;
     SearchReplaceController searchReplaceController;
+    PerfService perfService;
 
     // Buffer management
     List<FileBuffer> buffers;
@@ -377,6 +378,7 @@ public class Texteditor extends JFrame implements KeyListener {
         editorUiController = new EditorUiController(this);
         recoveryController = new RecoveryController(this);
         searchReplaceController = new SearchReplaceController(this);
+        perfService = new PerfService();
 
         // Initialize UI
         initializeUI();
@@ -1410,6 +1412,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String showJobs() {
         return jobQuickfixController.showJobs();
+    }
+
+    public String showPerfReport() {
+        showScratchBuffer("[perf]", perfService == null ? "No perf service.\n" : perfService.report());
+        return "Showing perf";
     }
 
     public String cancelJob(String jobIdArgument) {

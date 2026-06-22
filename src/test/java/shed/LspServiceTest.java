@@ -4,7 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -63,6 +67,27 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesWorkspaceResourceOperationsInOrder() {
+        Map<String, Object> edit = MiniJson.asObject(MiniJson.parse(
+            "{\"documentChanges\":["
+                + "{\"kind\":\"create\",\"uri\":\"file:///tmp/new.java\",\"options\":{\"overwrite\":true}},"
+                + "{\"kind\":\"rename\",\"oldUri\":\"file:///tmp/new.java\",\"newUri\":\"file:///tmp/final.java\",\"options\":{\"ignoreIfExists\":true}},"
+                + "{\"kind\":\"delete\",\"uri\":\"file:///tmp/final.java\",\"options\":{\"recursive\":true}}"
+                + "]}"
+        ));
+
+        List<LspClient.WorkspaceEditOperation> operations = LspClient.parseWorkspaceOperations(edit);
+
+        assertEquals(3, operations.size());
+        assertEquals(LspClient.WorkspaceEditOperation.Kind.CREATE, operations.get(0).getKind());
+        assertTrue(operations.get(0).isOverwrite());
+        assertEquals(LspClient.WorkspaceEditOperation.Kind.RENAME, operations.get(1).getKind());
+        assertTrue(operations.get(1).isIgnoreIfExists());
+        assertEquals(LspClient.WorkspaceEditOperation.Kind.DELETE, operations.get(2).getKind());
+        assertTrue(operations.get(2).isRecursive());
+    }
+
+    @Test
     void sameOffsetWorkspaceInsertsKeepServerOrder() {
         LspController controller = new LspController(null);
         List<LspClient.TextEdit> edits = List.of(
@@ -73,5 +98,26 @@ public class LspServiceTest {
         String result = controller.applyResolvedTextEdits("x", controller.resolveTextEdits("x", edits));
 
         assertEquals("abx", result);
+    }
+
+    @Test
+    void workspaceCreateOverwriteResetsEarlierStagedText() throws Exception {
+        Path root = Path.of("target", "lsp-plan").toAbsolutePath().normalize();
+        Files.createDirectories(root);
+        Path file = root.resolve("overwrite.txt");
+        Files.writeString(file, "old", StandardCharsets.UTF_8);
+        String uri = file.toUri().toString();
+        LspController controller = new LspController(null);
+        WorkspaceEditApplyResult result = new WorkspaceEditApplyResult();
+
+        LspController.WorkspaceEditPlan plan = controller.buildWorkspaceEditPlan(List.of(
+            LspClient.WorkspaceEditOperation.textEdit(new LspClient.TextEdit(uri, 0, 0, 0, 3, "edited")),
+            LspClient.WorkspaceEditOperation.create(uri, true, false),
+            LspClient.WorkspaceEditOperation.textEdit(new LspClient.TextEdit(uri, 0, 0, 0, 0, "new"))
+        ), result);
+
+        assertNotNull(plan);
+        assertEquals(0, result.failedFiles);
+        assertEquals("new", plan.stagedTextByPath.get(file.toString()));
     }
 }

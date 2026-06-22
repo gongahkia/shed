@@ -253,40 +253,51 @@ final class SyntaxUiController {
 
 
     void applySyntaxHighlighting() {
-        clearSyntaxHighlighting();
+        long started = System.nanoTime();
+        String detail = "";
+        try {
+            clearSyntaxHighlighting();
 
-        FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null) {
-            return;
-        }
+            FileBuffer buffer = editor.getCurrentBuffer();
+            if (buffer == null) {
+                detail = "no-buffer";
+                return;
+            }
 
-        String text = editor.writingArea.getText();
-        if (text.isEmpty()) {
-            return;
-        }
-        if (shouldSkipSyntaxHighlighting(text.length(), editor.writingArea.getLineCount(), buffer.isLargeFile())) {
+            String text = editor.writingArea.getText();
+            detail = "chars=" + text.length() + " lines=" + editor.writingArea.getLineCount();
+            if (text.isEmpty()) {
+                return;
+            }
+            if (shouldSkipSyntaxHighlighting(text.length(), editor.writingArea.getLineCount(), buffer.isLargeFile())) {
+                editor.applyBracketHighlighting();
+                editor.writingArea.repaint();
+                detail += " skipped";
+                return;
+            }
+
+            boolean[] masked = new boolean[text.length()];
+            FileType fileType = buffer.getFileType();
+
+            highlightComments(text, fileType, masked);
+            highlightStrings(text, fileType, masked);
+            highlightNumbers(text, masked);
+            if (fileType == FileType.JAVA) {
+                highlightJavaAnnotations(text, masked);
+            }
+            highlightScopeRules(text, fileType, masked);
+            highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
+            if (editor.configManager.getShowWhitespace()) {
+                Highlighter highlighter = editor.writingArea.getHighlighter();
+                highlightTrailingWhitespace(highlighter, text);
+            }
             editor.applyBracketHighlighting();
             editor.writingArea.repaint();
-            return;
+        } finally {
+            if (editor.perfService != null) {
+                editor.perfService.recordDuration("syntax.highlight", started, detail);
+            }
         }
-
-        boolean[] masked = new boolean[text.length()];
-        FileType fileType = buffer.getFileType();
-
-        highlightComments(text, fileType, masked);
-        highlightStrings(text, fileType, masked);
-        highlightNumbers(text, masked);
-        if (fileType == FileType.JAVA) {
-            highlightJavaAnnotations(text, masked);
-        }
-        highlightScopeRules(text, fileType, masked);
-        highlightKeywords(text, syntaxKeywordsFor(fileType), masked);
-        if (editor.configManager.getShowWhitespace()) {
-            Highlighter highlighter = editor.writingArea.getHighlighter();
-            highlightTrailingWhitespace(highlighter, text);
-        }
-        editor.applyBracketHighlighting();
-        editor.writingArea.repaint();
     }
 
 

@@ -20,9 +20,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -37,6 +39,7 @@ public class PluginManager {
     private int eventDepth;
     private static final int MAX_EVENT_DEPTH = 3;
     private static final Pattern PACKAGE_NAME_PATTERN = Pattern.compile("[A-Za-z0-9._-]+");
+    private static final Set<String> ALL_PLUGIN_PERMISSIONS = Set.of("command", "keybind", "event", "lua", "shell", "config.write");
 
     public PluginManager(ConfigManager configManager, Texteditor editor) {
         this.configManager = configManager;
@@ -74,7 +77,11 @@ public class PluginManager {
                      PluginTrust trust = assessPluginTrust(pluginFile);
                      if (p.toString().endsWith(".lua")) {
                          if (trust.trusted) {
-                             luaEngine.loadScript(pluginFile);
+                             if (trust.permissions.contains("lua")) {
+                                 luaEngine.loadScript(pluginFile, trust.permissions);
+                             } else {
+                                 luaEngine.recordSkippedScript(pluginFile, "missing lua permission");
+                             }
                          } else {
                              luaEngine.recordSkippedScript(pluginFile, trust.reason);
                          }
@@ -90,6 +97,10 @@ public class PluginManager {
         PluginInfo info = new PluginInfo(file.getName());
         info.trusted = trust != null && trust.trusted;
         info.trustReason = trust == null ? "unknown trust state" : trust.reason;
+        info.permissions.clear();
+        if (trust != null) {
+            info.permissions.addAll(trust.permissions);
+        }
         try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
             while ((line = reader.readLine()) != null) {
@@ -112,7 +123,11 @@ public class PluginManager {
                         info.description = value;
                         break;
                     case "command": {
-                        if (!info.trusted) {
+                        if (!info.trusted || !trust.permissions.contains("command")) {
+                            info.blockedDirectives++;
+                            break;
+                        }
+                        if (!trust.permissions.contains("shell")) {
                             info.blockedDirectives++;
                             break;
                         }
@@ -126,7 +141,7 @@ public class PluginManager {
                         break;
                     }
                     case "bind": {
-                        if (!info.trusted) {
+                        if (!info.trusted || !trust.permissions.contains("keybind")) {
                             info.blockedDirectives++;
                             break;
                         }
@@ -145,7 +160,7 @@ public class PluginManager {
                         break;
                     }
                     case "event": {
-                        if (!info.trusted) {
+                        if (!info.trusted || !trust.permissions.contains("event")) {
                             info.blockedDirectives++;
                             break;
                         }
@@ -182,7 +197,7 @@ public class PluginManager {
             if (expected == null || !actual.equals(expected)) {
                 return new PluginTrust(false, "checksum mismatch");
             }
-            return new PluginTrust(true, "managed package sha256=" + shortChecksum(actual));
+            return new PluginTrust(true, "managed package sha256=" + shortChecksum(actual), record.permissions);
         } catch (IOException e) {
             return new PluginTrust(false, e.getMessage());
         }
@@ -241,6 +256,9 @@ public class PluginManager {
         for (PluginInfo p : plugins) {
             sb.append("  ").append(p.name).append("  (").append(p.file).append(")\n");
             sb.append("    trust: ").append(p.trusted ? "trusted" : "untrusted").append(" - ").append(p.trustReason).append("\n");
+            if (!p.permissions.isEmpty()) {
+                sb.append("    permissions: ").append(String.join(", ", p.permissions)).append("\n");
+            }
             if (p.blockedDirectives > 0) {
                 sb.append("    blocked directives: ").append(p.blockedDirectives).append("\n");
             }
@@ -382,6 +400,7 @@ public class PluginManager {
             if (record.expectedChecksum != null && !record.expectedChecksum.isBlank()) {
                 sb.append("  expected: ").append(record.expectedChecksum).append("\n");
             }
+            sb.append("  permissions: ").append(record.permissions.isEmpty() ? "(none)" : String.join(", ", record.permissions)).append("\n");
             sb.append("\n");
         }
         return sb.toString();
@@ -441,7 +460,8 @@ public class PluginManager {
                     record.version,
                     record.source,
                     record.expectedChecksum,
-                    false
+                    false,
+                    record.permissions
                 );
                 installPackageInternal(spec, false);
                 updated++;
@@ -537,6 +557,7 @@ public class PluginManager {
             fileName,
             checksum,
             normalizeChecksum(spec.expectedChecksum),
+            resolveInstallPermissions(spec),
             spec.pin,
             System.currentTimeMillis()
         );
@@ -552,6 +573,7 @@ public class PluginManager {
         List<String> positional = new ArrayList<>();
         String checksum = null;
         boolean pin = false;
+        Set<String> permissions = null;
         for (String token : tokens) {
             if (token == null || token.isBlank()) {
                 continue;
@@ -562,6 +584,14 @@ public class PluginManager {
             }
             if ("--pin".equals(token)) {
                 pin = true;
+                continue;
+            }
+            if ("--allow-all".equals(token)) {
+                permissions = new LinkedHashSet<>(ALL_PLUGIN_PERMISSIONS);
+                continue;
+            }
+            if (token.startsWith("--allow=")) {
+                permissions = parsePermissionList(token.substring("--allow=".length()));
                 continue;
             }
             positional.add(token);
@@ -581,7 +611,25 @@ public class PluginManager {
         if (source.isEmpty()) {
             throw new IOException("source is required");
         }
-        return new ParsedInstallSpec(name, version, source, checksum, pin);
+        return new ParsedInstallSpec(name, version, source, checksum, pin, permissions);
+    }
+
+    private Set<String> parsePermissionList(String raw) throws IOException {
+        Set<String> permissions = new LinkedHashSet<>();
+        if (raw == null || raw.isBlank()) {
+            return permissions;
+        }
+        for (String part : raw.split(",")) {
+            String permission = part == null ? "" : part.trim().toLowerCase(Locale.ROOT);
+            if (permission.isEmpty()) {
+                continue;
+            }
+            if (!ALL_PLUGIN_PERMISSIONS.contains(permission)) {
+                throw new IOException("unknown plugin permission: " + permission);
+            }
+            permissions.add(permission);
+        }
+        return permissions;
     }
 
     private File resolvePluginDirectory() {
@@ -610,6 +658,16 @@ public class PluginManager {
             lower = lower.substring(0, query);
         }
         return lower.endsWith(".lua") ? ".lua" : ".shed";
+    }
+
+    private Set<String> resolveInstallPermissions(ParsedInstallSpec spec) {
+        if (spec.permissions != null) {
+            return new LinkedHashSet<>(spec.permissions);
+        }
+        if (isRemoteSource(spec.source)) {
+            return new LinkedHashSet<>();
+        }
+        return new LinkedHashSet<>(ALL_PLUGIN_PERMISSIONS);
     }
 
     private byte[] readPluginSource(String source) throws IOException {
@@ -830,6 +888,7 @@ public class PluginManager {
         sb.append("File: ").append(p.file).append("\n");
         if (!p.description.isEmpty()) sb.append("Description: ").append(p.description).append("\n");
         sb.append("Trust: ").append(p.trusted ? "trusted" : "untrusted").append(" - ").append(p.trustReason).append("\n");
+        if (!p.permissions.isEmpty()) sb.append("Permissions: ").append(String.join(", ", p.permissions)).append("\n");
         if (p.blockedDirectives > 0) sb.append("Blocked directives: ").append(p.blockedDirectives).append("\n");
         sb.append("\n");
         if (!p.commands.isEmpty()) {
@@ -876,13 +935,15 @@ public class PluginManager {
         final String source;
         final String expectedChecksum;
         final boolean pin;
+        final Set<String> permissions;
 
-        ParsedInstallSpec(String name, String version, String source, String expectedChecksum, boolean pin) {
+        ParsedInstallSpec(String name, String version, String source, String expectedChecksum, boolean pin, Set<String> permissions) {
             this.name = name;
             this.version = version;
             this.source = source;
             this.expectedChecksum = expectedChecksum;
             this.pin = pin;
+            this.permissions = permissions == null ? null : new LinkedHashSet<>(permissions);
         }
     }
 
@@ -893,6 +954,7 @@ public class PluginManager {
         String fileName;
         String checksum;
         String expectedChecksum;
+        Set<String> permissions;
         boolean pinned;
         long installedAtEpochMs;
 
@@ -903,6 +965,7 @@ public class PluginManager {
             String fileName,
             String checksum,
             String expectedChecksum,
+            Set<String> permissions,
             boolean pinned,
             long installedAtEpochMs
         ) {
@@ -912,6 +975,7 @@ public class PluginManager {
             this.fileName = fileName;
             this.checksum = checksum;
             this.expectedChecksum = expectedChecksum;
+            this.permissions = permissions == null ? new LinkedHashSet<>() : new LinkedHashSet<>(permissions);
             this.pinned = pinned;
             this.installedAtEpochMs = installedAtEpochMs;
         }
@@ -926,6 +990,7 @@ public class PluginManager {
             if (expectedChecksum != null && !expectedChecksum.isBlank()) {
                 json.put("expectedChecksum", expectedChecksum);
             }
+            json.put("permissions", new ArrayList<>(permissions));
             json.put("pinned", pinned);
             json.put("installedAt", installedAtEpochMs);
             return json;
@@ -945,17 +1010,41 @@ public class PluginManager {
             boolean pinned = pinnedRaw instanceof Boolean && (Boolean) pinnedRaw;
             Object installedRaw = json.get("installedAt");
             long installedAt = installedRaw instanceof Number ? ((Number) installedRaw).longValue() : 0L;
-            return new PackageRecord(name, version, source, fileName, checksum, expectedChecksum, pinned, installedAt);
+            Set<String> permissions = parsePermissionsFromJson(json.get("permissions"), source);
+            return new PackageRecord(name, version, source, fileName, checksum, expectedChecksum, permissions, pinned, installedAt);
+        }
+
+        private static Set<String> parsePermissionsFromJson(Object raw, String source) {
+            List<Object> values = MiniJson.asArray(raw);
+            if (values == null) {
+                return source != null && (source.startsWith("http://") || source.startsWith("https://"))
+                    ? new LinkedHashSet<>()
+                    : new LinkedHashSet<>(ALL_PLUGIN_PERMISSIONS);
+            }
+            Set<String> permissions = new LinkedHashSet<>();
+            for (Object value : values) {
+                String permission = MiniJson.asString(value);
+                if (permission != null && ALL_PLUGIN_PERMISSIONS.contains(permission)) {
+                    permissions.add(permission);
+                }
+            }
+            return permissions;
         }
     }
 
     private static final class PluginTrust {
         final boolean trusted;
         final String reason;
+        final Set<String> permissions;
 
         PluginTrust(boolean trusted, String reason) {
+            this(trusted, reason, Set.of());
+        }
+
+        PluginTrust(boolean trusted, String reason, Set<String> permissions) {
             this.trusted = trusted;
             this.reason = reason == null || reason.isBlank() ? "unknown" : reason;
+            this.permissions = permissions == null ? Set.of() : new LinkedHashSet<>(permissions);
         }
     }
 
@@ -966,6 +1055,7 @@ public class PluginManager {
         boolean trusted;
         String trustReason;
         int blockedDirectives;
+        final Set<String> permissions;
         final Map<String, String> commands;
         final Map<String, String> events;
         final List<String> bindings;
@@ -976,6 +1066,7 @@ public class PluginManager {
             this.trusted = false;
             this.trustReason = "not assessed";
             this.blockedDirectives = 0;
+            this.permissions = new LinkedHashSet<>();
             this.commands = new LinkedHashMap<>();
             this.events = new LinkedHashMap<>();
             this.bindings = new ArrayList<>();

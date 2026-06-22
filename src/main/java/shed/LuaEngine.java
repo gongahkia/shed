@@ -23,12 +23,16 @@ import org.luaj.vm2.lib.ZeroArgFunction;
 import org.luaj.vm2.lib.jse.JseBaseLib;
 import org.luaj.vm2.lib.jse.JseMathLib;
 import javax.swing.text.BadLocationException;
+import javax.swing.SwingUtilities;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -40,6 +44,7 @@ public class LuaEngine {
     private final List<LuaPluginInfo> loadedScripts;
     private final Map<String, List<LuaFunction>> eventCallbacks;
     private static final long LOAD_TIMEOUT_MS = 5000;
+    private static final long EVENT_TIMEOUT_MS = 1000;
 
     public LuaEngine(Texteditor editor) {
         this.editor = editor;
@@ -53,9 +58,14 @@ public class LuaEngine {
     }
 
     public void loadScript(File file) {
+        loadScript(file, Set.of("command", "keybind", "event", "lua", "shell", "config.write"));
+    }
+
+    public void loadScript(File file, Set<String> permissions) {
         LuaPluginInfo info = new LuaPluginInfo(file.getName());
+        Set<String> allowed = permissions == null ? new LinkedHashSet<>() : new LinkedHashSet<>(permissions);
         Globals globals = createSandbox();
-        LuaTable shed = buildShedApi();
+        LuaTable shed = buildShedApi(allowed);
         globals.set("shed", shed);
         ExecutorService exec = Executors.newSingleThreadExecutor();
         try {
@@ -90,12 +100,18 @@ public class LuaEngine {
         List<LuaFunction> callbacks = eventCallbacks.get(event);
         if (callbacks == null) return;
         for (LuaFunction fn : callbacks) {
+            ExecutorService exec = Executors.newSingleThreadExecutor();
             try {
-                fn.call(LuaValue.valueOf(event)); // runs on EDT, no timeout (matches Vim autocmd behavior)
+                Future<?> future = exec.submit(() -> fn.call(LuaValue.valueOf(event)));
+                future.get(EVENT_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                showPluginMessage("Plugin event timeout: " + event);
             } catch (LuaError e) {
-                editor.showMessage("Plugin error: " + e.getMessage());
+                showPluginMessage("Plugin error: " + e.getMessage());
             } catch (Exception e) {
-                editor.showMessage("Plugin error: " + e.getMessage());
+                showPluginMessage("Plugin error: " + e.getMessage());
+            } finally {
+                exec.shutdownNow();
             }
         }
     }
@@ -119,7 +135,7 @@ public class LuaEngine {
         return globals;
     }
 
-    private LuaTable buildShedApi() {
+    private LuaTable buildShedApi(Set<String> permissions) {
         LuaTable shed = new LuaTable();
         shed.set("get_line", new GetLine());
         shed.set("set_line", new SetLine());
@@ -130,20 +146,92 @@ public class LuaEngine {
         shed.set("is_modified", new IsModified());
         shed.set("cursor_line", new CursorLine());
         shed.set("cursor_col", new CursorCol());
-        shed.set("command", new Command());
+        shed.set("command", permissions != null && permissions.contains("command") ? new Command() : new DeniedOneArg("command permission required"));
         shed.set("message", new Message());
-        shed.set("shell", new Shell());
+        shed.set("shell", permissions != null && permissions.contains("shell") ? new Shell() : new DeniedOneArg("shell permission required"));
         shed.set("config_get", new ConfigGet());
-        shed.set("config_set", new ConfigSet());
+        shed.set("config_set", permissions != null && permissions.contains("config.write") ? new ConfigSet() : new DeniedVarArg("config.write permission required"));
         shed.set("theme", new ThemeGet());
         shed.set("themes", new Themes());
-        shed.set("theme_set", new ThemeSet());
+        shed.set("theme_set", permissions != null && permissions.contains("config.write") ? new ThemeSet() : new DeniedVarArg("config.write permission required"));
         shed.set("palette_get", new PaletteGet());
-        shed.set("palette_set", new PaletteSet());
-        shed.set("theater", new Theater());
+        shed.set("palette_set", permissions != null && permissions.contains("config.write") ? new PaletteSet() : new DeniedVarArg("config.write permission required"));
+        shed.set("theater", permissions != null && permissions.contains("config.write") ? new Theater() : new DeniedOneArg("config.write permission required"));
         shed.set("mode", new Mode());
-        shed.set("on", new On());
+        shed.set("on", permissions != null && permissions.contains("event") ? new On() : new DeniedTwoArg("event permission required"));
         return shed;
+    }
+
+    private <T> T onEdt(Callable<T> callable, T fallback) {
+        if (editor == null || callable == null) {
+            return fallback;
+        }
+        if (SwingUtilities.isEventDispatchThread()) {
+            try {
+                return callable.call();
+            } catch (Exception e) {
+                return fallback;
+            }
+        }
+        final Object[] value = new Object[] {fallback};
+        final Exception[] error = new Exception[] {null};
+        try {
+            SwingUtilities.invokeAndWait(() -> {
+                try {
+                    value[0] = callable.call();
+                } catch (Exception e) {
+                    error[0] = e;
+                }
+            });
+        } catch (Exception e) {
+            return fallback;
+        }
+        if (error[0] != null) {
+            return fallback;
+        }
+        @SuppressWarnings("unchecked")
+        T cast = (T) value[0];
+        return cast;
+    }
+
+    private void showPluginMessage(String message) {
+        if (editor == null) {
+            return;
+        }
+        onEdt(() -> {
+            editor.showMessage(message);
+            return null;
+        }, null);
+    }
+
+    private static class DeniedOneArg extends OneArgFunction {
+        private final String message;
+        DeniedOneArg(String message) {
+            this.message = message;
+        }
+        public LuaValue call(LuaValue arg) {
+            return LuaValue.valueOf(message);
+        }
+    }
+
+    private static class DeniedTwoArg extends TwoArgFunction {
+        private final String message;
+        DeniedTwoArg(String message) {
+            this.message = message;
+        }
+        public LuaValue call(LuaValue arg1, LuaValue arg2) {
+            return LuaValue.valueOf(message);
+        }
+    }
+
+    private static class DeniedVarArg extends VarArgFunction {
+        private final String message;
+        DeniedVarArg(String message) {
+            this.message = message;
+        }
+        public Varargs invoke(Varargs args) {
+            return LuaValue.valueOf(message);
+        }
     }
 
     // -- buffer API --
@@ -151,18 +239,16 @@ public class LuaEngine {
     private class GetLine extends OneArgFunction {
         public LuaValue call(LuaValue arg) {
             int lineNum = arg.checkint(); // 1-indexed
-            try {
+            return LuaValue.valueOf(onEdt(() -> {
                 javax.swing.JTextArea area = editor.getTextArea();
                 int lineIdx = lineNum - 1;
-                if (lineIdx < 0 || lineIdx >= area.getLineCount()) return LuaValue.valueOf("");
+                if (lineIdx < 0 || lineIdx >= area.getLineCount()) return "";
                 int start = area.getLineStartOffset(lineIdx);
                 int end = area.getLineEndOffset(lineIdx);
                 String text = area.getText(start, end - start);
                 if (text.endsWith("\n")) text = text.substring(0, text.length() - 1);
-                return LuaValue.valueOf(text);
-            } catch (BadLocationException e) {
-                return LuaValue.valueOf("");
-            }
+                return text;
+            }, ""));
         }
     }
 
@@ -170,37 +256,35 @@ public class LuaEngine {
         public LuaValue call(LuaValue arg1, LuaValue arg2) {
             int lineNum = arg1.checkint();
             String newText = arg2.checkjstring();
-            try {
+            return LuaValue.valueOf(onEdt(() -> {
                 javax.swing.JTextArea area = editor.getTextArea();
                 int lineIdx = lineNum - 1;
-                if (lineIdx < 0 || lineIdx >= area.getLineCount()) return LuaValue.FALSE;
+                if (lineIdx < 0 || lineIdx >= area.getLineCount()) return false;
                 int start = area.getLineStartOffset(lineIdx);
                 int end = area.getLineEndOffset(lineIdx);
                 String existing = area.getText(start, end - start);
                 boolean hadNewline = existing.endsWith("\n");
                 area.replaceRange(newText + (hadNewline ? "\n" : ""), start, end);
-                return LuaValue.TRUE;
-            } catch (BadLocationException e) {
-                return LuaValue.FALSE;
-            }
+                return true;
+            }, false));
         }
     }
 
     private class LineCount extends ZeroArgFunction {
         public LuaValue call() {
-            return LuaValue.valueOf(editor.getTextArea().getLineCount());
+            return LuaValue.valueOf(onEdt(() -> editor.getTextArea().getLineCount(), 0));
         }
     }
 
     private class GetText extends ZeroArgFunction {
         public LuaValue call() {
-            return LuaValue.valueOf(editor.getTextArea().getText());
+            return LuaValue.valueOf(onEdt(() -> editor.getTextArea().getText(), ""));
         }
     }
 
     private class FilePath extends ZeroArgFunction {
         public LuaValue call() {
-            FileBuffer buf = editor.getCurrentBuffer();
+            FileBuffer buf = onEdt(editor::getCurrentBuffer, null);
             if (buf == null || !buf.hasFilePath()) return LuaValue.valueOf("");
             return LuaValue.valueOf(buf.getFilePath());
         }
@@ -208,7 +292,7 @@ public class LuaEngine {
 
     private class FileName extends ZeroArgFunction {
         public LuaValue call() {
-            FileBuffer buf = editor.getCurrentBuffer();
+            FileBuffer buf = onEdt(editor::getCurrentBuffer, null);
             if (buf == null) return LuaValue.valueOf("");
             return LuaValue.valueOf(buf.getDisplayName());
         }
@@ -216,7 +300,7 @@ public class LuaEngine {
 
     private class IsModified extends ZeroArgFunction {
         public LuaValue call() {
-            FileBuffer buf = editor.getCurrentBuffer();
+            FileBuffer buf = onEdt(editor::getCurrentBuffer, null);
             if (buf == null) return LuaValue.FALSE;
             return LuaValue.valueOf(buf.isModified());
         }
@@ -226,20 +310,18 @@ public class LuaEngine {
 
     private class CursorLine extends ZeroArgFunction {
         public LuaValue call() {
-            return LuaValue.valueOf(editor.getCurrentLineNumber());
+            return LuaValue.valueOf(onEdt(editor::getCurrentLineNumber, 1));
         }
     }
 
     private class CursorCol extends ZeroArgFunction {
         public LuaValue call() {
-            try {
+            return LuaValue.valueOf(onEdt(() -> {
                 javax.swing.JTextArea area = editor.getTextArea();
                 int caret = area.getCaretPosition();
                 int line = area.getLineOfOffset(caret);
-                return LuaValue.valueOf(caret - area.getLineStartOffset(line));
-            } catch (BadLocationException e) {
-                return LuaValue.valueOf(0);
-            }
+                return caret - area.getLineStartOffset(line);
+            }, 0));
         }
     }
 
@@ -248,18 +330,17 @@ public class LuaEngine {
     private class Command extends OneArgFunction {
         public LuaValue call(LuaValue arg) {
             String cmd = arg.checkjstring();
-            try {
-                String result = editor.executeCommand(cmd);
-                return LuaValue.valueOf(result == null ? "" : result);
-            } catch (Exception e) {
-                return LuaValue.valueOf("Error: " + e.getMessage());
-            }
+            String result = onEdt(() -> editor.executeCommand(cmd), "");
+            return LuaValue.valueOf(result == null ? "" : result);
         }
     }
 
     private class Message extends OneArgFunction {
         public LuaValue call(LuaValue arg) {
-            editor.showMessage(arg.checkjstring());
+            onEdt(() -> {
+                editor.showMessage(arg.checkjstring());
+                return null;
+            }, null);
             return LuaValue.NIL;
         }
     }
@@ -270,7 +351,7 @@ public class LuaEngine {
             try {
                 ProcessBuilder pb = new ProcessBuilder(ShellCommand.forCommand(cmd));
                 pb.redirectErrorStream(true);
-                FileBuffer buf = editor.getCurrentBuffer();
+                FileBuffer buf = onEdt(editor::getCurrentBuffer, null);
                 if (buf != null && buf.getFile() != null && buf.getFile().getParentFile() != null) {
                     pb.directory(buf.getFile().getParentFile());
                 }
@@ -303,9 +384,9 @@ public class LuaEngine {
             String key = args.arg(1).checkjstring();
             String value = args.arg(2).checkjstring();
             boolean persist = args.narg() >= 3 && args.arg(3).toboolean();
-            String result = persist
+            String result = onEdt(() -> persist
                 ? editor.setConfigOptionPersistent(key, value)
-                : editor.setConfigOption(key, value);
+                : editor.setConfigOption(key, value), "");
             return LuaValue.valueOf(result == null ? "" : result);
         }
     }
@@ -314,14 +395,14 @@ public class LuaEngine {
 
     private class ThemeGet extends ZeroArgFunction {
         public LuaValue call() {
-            return LuaValue.valueOf(editor.getCurrentThemeName());
+            return LuaValue.valueOf(onEdt(editor::getCurrentThemeName, ""));
         }
     }
 
     private class Themes extends ZeroArgFunction {
         public LuaValue call() {
             LuaTable table = new LuaTable();
-            List<String> themes = editor.getThemeIdsForPlugins();
+            List<String> themes = onEdt(editor::getThemeIdsForPlugins, List.of());
             for (int i = 0; i < themes.size(); i++) {
                 table.set(i + 1, LuaValue.valueOf(themes.get(i)));
             }
@@ -336,7 +417,7 @@ public class LuaEngine {
             if (theme == null || theme.isBlank()) {
                 return LuaValue.valueOf("Usage: shed.theme_set(name [, persist])");
             }
-            String result = editor.applyThemeFromPlugin(theme, persist);
+            String result = onEdt(() -> editor.applyThemeFromPlugin(theme, persist), "");
             return LuaValue.valueOf(result == null ? "" : result);
         }
     }
@@ -344,7 +425,7 @@ public class LuaEngine {
     private class PaletteGet extends ZeroArgFunction {
         public LuaValue call() {
             LuaTable table = new LuaTable();
-            Map<String, String> palette = editor.getActiveThemePaletteHex();
+            Map<String, String> palette = onEdt(editor::getActiveThemePaletteHex, Map.of());
             for (Map.Entry<String, String> entry : palette.entrySet()) {
                 if (entry.getKey() == null || entry.getValue() == null) {
                     continue;
@@ -377,7 +458,7 @@ public class LuaEngine {
                 }
                 overrides.put(key.tojstring(), val.tojstring());
             }
-            String result = editor.applyPaletteOverridesFromPlugin(overrides, persist);
+            String result = onEdt(() -> editor.applyPaletteOverridesFromPlugin(overrides, persist), "");
             return LuaValue.valueOf(result == null ? "" : result);
         }
     }
@@ -385,7 +466,7 @@ public class LuaEngine {
     private class Theater extends OneArgFunction {
         public LuaValue call(LuaValue arg) {
             String preset = arg.optjstring("");
-            String result = editor.applyTheaterPreset(preset);
+            String result = onEdt(() -> editor.applyTheaterPreset(preset), "");
             return LuaValue.valueOf(result == null ? "" : result);
         }
     }
@@ -394,9 +475,7 @@ public class LuaEngine {
 
     private class Mode extends ZeroArgFunction {
         public LuaValue call() {
-            FileBuffer buf = editor.getCurrentBuffer(); // just to check we have an editor
-            // access mode via the command
-            String result = editor.getModeName();
+            String result = onEdt(editor::getModeName, "normal");
             return LuaValue.valueOf(result == null ? "normal" : result);
         }
     }

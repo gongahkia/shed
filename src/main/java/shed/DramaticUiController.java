@@ -39,7 +39,7 @@ final class DramaticUiController {
             animateEditorHostTint(editor.configManager.getCommandColor());
             return "Minimap hidden";
         }
-        editor.activeMinimapPanel = new MinimapPanel(pane.getTextArea());
+        editor.activeMinimapPanel = new MinimapPanel(pane.getTextArea(), editor.perfService);
         editor.activeMinimapPanel.setColors(editor.configManager.getLineNumberBackground(), editor.configManager.getEditorForeground());
         int initialWidth = editor.dramaticPanelAnimationsEnabled && dramaticMotionAllowed() ? 0 : editor.dramaticMinimapWidth;
         editor.activeMinimapPanel.setPixelWidth(initialWidth);
@@ -285,19 +285,24 @@ final class DramaticUiController {
         int steps = Math.max(6, Math.min(20, editor.dramaticAnimationMs / 14));
         final int[] tick = new int[] {0};
         editor.modeTransitionTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = easeOut((double) tick[0] / steps);
-            Color blended = blendColor(fromColor, toColor, t);
-            editor.writingArea.setBackground(blended);
-            if (editor.editorHostPanel != null) {
-                editor.editorHostPanel.setBackground(editor.zenModeEnabled ? fadedMarginColor(blended) : blended);
-                editor.editorHostPanel.repaint();
-            }
-            tick[0]++;
-            if (tick[0] > steps) {
-                editor.modeTransitionTimer.stop();
-                editor.modeTransitionTimer = null;
-                updateZenModeLayout();
-                applyDramaticFooterStyling();
+            long started = System.nanoTime();
+            try {
+                double t = easeOut((double) tick[0] / steps);
+                Color blended = blendColor(fromColor, toColor, t);
+                editor.writingArea.setBackground(blended);
+                if (editor.editorHostPanel != null) {
+                    editor.editorHostPanel.setBackground(editor.zenModeEnabled ? fadedMarginColor(blended) : blended);
+                    editor.editorHostPanel.repaint();
+                }
+                tick[0]++;
+                if (tick[0] > steps) {
+                    editor.modeTransitionTimer.stop();
+                    editor.modeTransitionTimer = null;
+                    updateZenModeLayout();
+                    applyDramaticFooterStyling();
+                }
+            } finally {
+                recordDramaticTimer("dramatic.mode.timer", started);
             }
         });
         editor.modeTransitionTimer.start();
@@ -350,23 +355,28 @@ final class DramaticUiController {
         int steps = Math.max(5, Math.min(14, editor.dramaticAnimationMs / 18));
         final int[] tick = new int[] {0};
         editor.feedbackPulseTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            clearFeedbackPulse();
-            double progress = (double) tick[0] / steps;
-            int alpha = (int) Math.round(130 * (1.0 - progress));
-            alpha = Math.max(0, Math.min(255, alpha));
+            long started = System.nanoTime();
             try {
-                editor.feedbackPulseTag = editor.writingArea.getHighlighter().addHighlight(
-                    start,
-                    end,
-                    new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha))
-                );
-            } catch (BadLocationException ignored) {
-            }
-            tick[0]++;
-            if (tick[0] > steps) {
-                editor.feedbackPulseTimer.stop();
-                editor.feedbackPulseTimer = null;
                 clearFeedbackPulse();
+                double progress = (double) tick[0] / steps;
+                int alpha = (int) Math.round(130 * (1.0 - progress));
+                alpha = Math.max(0, Math.min(255, alpha));
+                try {
+                    editor.feedbackPulseTag = editor.writingArea.getHighlighter().addHighlight(
+                        start,
+                        end,
+                        new DefaultHighlighter.DefaultHighlightPainter(new Color(color.getRed(), color.getGreen(), color.getBlue(), alpha))
+                    );
+                } catch (BadLocationException ignored) {
+                }
+                tick[0]++;
+                if (tick[0] > steps) {
+                    editor.feedbackPulseTimer.stop();
+                    editor.feedbackPulseTimer = null;
+                    clearFeedbackPulse();
+                }
+            } finally {
+                recordDramaticTimer("dramatic.feedback.timer", started);
             }
         });
         editor.feedbackPulseTimer.start();
@@ -390,15 +400,20 @@ final class DramaticUiController {
         int steps = Math.max(6, Math.min(20, editor.dramaticAnimationMs / 14));
         final int[] tick = new int[] {0};
         editor.hostTintTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double progress = (double) tick[0] / steps;
-            double ratio = 0.30 * (1.0 - progress);
-            editor.editorHostPanel.setBackground(blendColor(base, tint, ratio));
-            editor.editorHostPanel.repaint();
-            tick[0]++;
-            if (tick[0] > steps) {
-                editor.hostTintTimer.stop();
-                editor.hostTintTimer = null;
-                updateZenModeLayout();
+            long started = System.nanoTime();
+            try {
+                double progress = (double) tick[0] / steps;
+                double ratio = 0.30 * (1.0 - progress);
+                editor.editorHostPanel.setBackground(blendColor(base, tint, ratio));
+                editor.editorHostPanel.repaint();
+                tick[0]++;
+                if (tick[0] > steps) {
+                    editor.hostTintTimer.stop();
+                    editor.hostTintTimer = null;
+                    updateZenModeLayout();
+                }
+            } finally {
+                recordDramaticTimer("dramatic.host.timer", started);
             }
         });
         editor.hostTintTimer.start();
@@ -420,14 +435,19 @@ final class DramaticUiController {
         final int[] tick = new int[] {0};
         final double delta = (targetRatio - startRatio) / Math.max(1, steps);
         editor.splitAnimationTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            boolean changed = editor.windowLayoutRoot.adjustRatio(pane, delta);
-            if (changed) {
-                editor.renderWindowLayout();
-            }
-            tick[0]++;
-            if (tick[0] > steps || !changed) {
-                editor.splitAnimationTimer.stop();
-                editor.splitAnimationTimer = null;
+            long started = System.nanoTime();
+            try {
+                boolean changed = editor.windowLayoutRoot.adjustRatio(pane, delta);
+                if (changed) {
+                    editor.renderWindowLayout();
+                }
+                tick[0]++;
+                if (tick[0] > steps || !changed) {
+                    editor.splitAnimationTimer.stop();
+                    editor.splitAnimationTimer = null;
+                }
+            } finally {
+                recordDramaticTimer("dramatic.split.timer", started);
             }
         });
         editor.splitAnimationTimer.start();
@@ -454,17 +474,22 @@ final class DramaticUiController {
         int steps = Math.max(5, Math.min(14, editor.dramaticAnimationMs / 18));
         final int[] tick = new int[] {0};
         editor.minimapWidthTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = easeOut((double) tick[0] / steps);
-            int width = (int) Math.round(fromWidth + (toWidth - fromWidth) * t);
-            panel.setPixelWidth(width);
-            tick[0]++;
-            if (tick[0] > steps) {
-                editor.minimapWidthTimer.stop();
-                editor.minimapWidthTimer = null;
-                panel.setPixelWidth(toWidth);
-                if (onFinish != null) {
-                    onFinish.run();
+            long started = System.nanoTime();
+            try {
+                double t = easeOut((double) tick[0] / steps);
+                int width = (int) Math.round(fromWidth + (toWidth - fromWidth) * t);
+                panel.setPixelWidth(width);
+                tick[0]++;
+                if (tick[0] > steps) {
+                    editor.minimapWidthTimer.stop();
+                    editor.minimapWidthTimer = null;
+                    panel.setPixelWidth(toWidth);
+                    if (onFinish != null) {
+                        onFinish.run();
+                    }
                 }
+            } finally {
+                recordDramaticTimer("dramatic.minimap.timer", started);
             }
         });
         editor.minimapWidthTimer.start();
@@ -513,15 +538,20 @@ final class DramaticUiController {
         int steps = Math.max(4, Math.min(12, editor.dramaticAnimationMs / 20));
         final int[] tick = new int[] {0};
         editor.paneJumpFlashTimer = new Timer(animationDelayForSteps(steps), ev -> {
-            double t = (double) tick[0] / steps;
-            int alpha = (int) Math.round((1.0 - t) * 180);
-            alpha = Math.max(0, Math.min(255, alpha));
-            scrollPane.setBorder(BorderFactory.createLineBorder(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha), 2));
-            tick[0]++;
-            if (tick[0] > steps) {
-                editor.paneJumpFlashTimer.stop();
-                editor.paneJumpFlashTimer = null;
-                clearPaneJumpFlash();
+            long started = System.nanoTime();
+            try {
+                double t = (double) tick[0] / steps;
+                int alpha = (int) Math.round((1.0 - t) * 180);
+                alpha = Math.max(0, Math.min(255, alpha));
+                scrollPane.setBorder(BorderFactory.createLineBorder(new Color(accent.getRed(), accent.getGreen(), accent.getBlue(), alpha), 2));
+                tick[0]++;
+                if (tick[0] > steps) {
+                    editor.paneJumpFlashTimer.stop();
+                    editor.paneJumpFlashTimer = null;
+                    clearPaneJumpFlash();
+                }
+            } finally {
+                recordDramaticTimer("dramatic.pane.timer", started);
             }
         });
         editor.paneJumpFlashTimer.start();
@@ -556,6 +586,13 @@ final class DramaticUiController {
             });
             beep.setRepeats(false);
             beep.start();
+        }
+    }
+
+
+    private void recordDramaticTimer(String name, long startedAtNanos) {
+        if (editor.perfService != null) {
+            editor.perfService.recordDuration(name, startedAtNanos, "");
         }
     }
 

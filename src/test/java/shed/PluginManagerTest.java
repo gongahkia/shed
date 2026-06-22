@@ -200,6 +200,26 @@ public class PluginManagerTest {
     }
 
     @Test
+    void packagePermissionsGateCommandRegistration() throws IOException {
+        Path home = tempDir.resolve("home-package-permissions");
+        Path sourceDir = tempDir.resolve("plugin-source-permissions");
+        Files.createDirectories(sourceDir);
+        Path source = sourceDir.resolve("limited.shed");
+        Files.writeString(source, "# @name limited\n# @command risky=echo risky\n# @bind normal x=:risky\n");
+
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+
+        String installed = manager.installPackage("limited 1.0 \"" + source + "\" --allow=keybind");
+
+        assertTrue(installed.contains("Installed plugin package"));
+        assertFalse(config.getUserCommands().containsKey("risky"));
+        assertEquals(":risky", config.getKeybinding("normal", "x"));
+        assertTrue(manager.getPluginListText().contains("blocked directives: 1"));
+    }
+
+    @Test
     void untrustedDropInShedPluginCannotRegisterExecutionSurfaces() throws IOException {
         Path home = tempDir.resolve("home-untrusted-plugin");
         Path pluginDir = home.resolve(".shed/plugins");

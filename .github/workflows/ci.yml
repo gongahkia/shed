@@ -28,3 +28,16 @@ jobs:
 
       - name: Build jar
         run: mvn -B -q -DskipTests package
+
+      - name: Verify jar artifact
+        run: |
+          test -f target/shed-2.0.0.jar
+          unzip -p target/shed-2.0.0.jar META-INF/MANIFEST.MF | grep 'Main-Class: shed.Texteditor'
+          jar tf target/shed-2.0.0.jar | grep 'assets/hackregfont.ttf'
+
+      - name: Upload jar artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shed-jar
+          path: target/shed-2.0.0.jar
+          if-no-files-found: error

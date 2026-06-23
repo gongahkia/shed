@@ -140,6 +140,10 @@ final class LspController {
             LspClient client = entry.getValue();
             sb.append("  .").append(ext).append("  ");
             sb.append(client.isAlive() ? "running" : "stopped");
+            Path root = editor.lspClientRoots.get(ext);
+            if (root != null) {
+                sb.append("  ").append(root);
+            }
             sb.append("\n");
         }
         if (!editor.lspErrors.isEmpty()) {
@@ -158,6 +162,7 @@ final class LspController {
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
         LspClient existing = editor.lspClients.remove(extension);
+        editor.lspClientRoots.remove(extension);
         if (existing != null) existing.stop();
         editor.lspErrors.remove(extension);
         // remove document versions for this extension so didOpen fires again
@@ -180,6 +185,7 @@ final class LspController {
         String extension = ext.isEmpty() ? currentBufferExtension() : ext.replace(".", "").toLowerCase();
         if (extension.isEmpty()) return "No extension specified and no file open";
         LspClient existing = editor.lspClients.remove(extension);
+        editor.lspClientRoots.remove(extension);
         if (existing == null) return "No LSP server running for ." + extension;
         existing.stop();
         editor.lspErrors.remove(extension);
@@ -1167,8 +1173,8 @@ final class LspController {
             return null;
         }
         try {
-            Path root = workspaceRootPath();
             Path candidate = Path.of(filePath).toAbsolutePath().normalize();
+            Path root = editor == null ? resolveWorkspaceRoot(candidate.getParent()) : workspaceRootPath(editor.getCurrentBuffer());
             if (!candidate.startsWith(root)) {
                 return null;
             }
@@ -1185,7 +1191,29 @@ final class LspController {
     }
 
 
-    private Path workspaceRootPath() throws IOException {
+    private Path workspaceRootPath(FileBuffer buffer) throws IOException {
+        if (buffer != null && buffer.hasFilePath()) {
+            File file = new File(buffer.getFilePath());
+            return resolveWorkspaceRoot(file.isDirectory() ? file.toPath() : file.toPath().getParent());
+        }
+        return resolveWorkspaceRoot(new File(".").getCanonicalFile().toPath());
+    }
+
+    Path resolveWorkspaceRoot(Path start) throws IOException {
+        Path current = start == null
+            ? new File(".").getCanonicalFile().toPath()
+            : start.toAbsolutePath().normalize();
+        if (Files.isRegularFile(current)) {
+            current = current.getParent();
+        }
+        for (Path candidate = current; candidate != null; candidate = candidate.getParent()) {
+            if (Files.exists(candidate.resolve(".git"))
+                || Files.exists(candidate.resolve("pom.xml"))
+                || Files.exists(candidate.resolve("package.json"))
+                || Files.exists(candidate.resolve("Makefile"))) {
+                return candidate.toRealPath();
+            }
+        }
         return new File(".").getCanonicalFile().toPath().toAbsolutePath().normalize();
     }
 
@@ -1397,8 +1425,8 @@ final class LspController {
             return null;
         }
         try {
-            return new File(new URI(uri)).getAbsolutePath();
-        } catch (URISyntaxException e) {
+            return Path.of(new URI(uri)).toFile().getAbsolutePath();
+        } catch (IllegalArgumentException | URISyntaxException e) {
             return uri.substring("file://".length());
         }
     }
@@ -1476,10 +1504,24 @@ final class LspController {
             return null;
         }
 
+        Path workspaceRoot;
+        try {
+            workspaceRoot = workspaceRootPath(buffer);
+        } catch (IOException e) {
+            editor.lspErrors.put(extension, e.getMessage());
+            return null;
+        }
+
         LspClient existing = editor.lspClients.get(extension);
         if (existing != null && existing.isAlive()) {
-            editor.lspErrors.remove(extension);
-            return existing;
+            Path existingRoot = editor.lspClientRoots.get(extension);
+            if (workspaceRoot.equals(existingRoot)) {
+                editor.lspErrors.remove(extension);
+                return existing;
+            }
+            existing.stop();
+            editor.lspClients.remove(extension);
+            editor.lspClientRoots.remove(extension);
         }
 
         String command = editor.configManager.getLspCommand(extension);
@@ -1495,9 +1537,10 @@ final class LspController {
         }
 
         try {
-            LspClient client = new LspClient(command, args, new File(".").toPath());
+            LspClient client = new LspClient(command, args, workspaceRoot);
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
             editor.lspClients.put(extension, client);
+            editor.lspClientRoots.put(extension, workspaceRoot);
             editor.lspErrors.remove(extension);
             return client;
         } catch (IOException e) {
@@ -1582,7 +1625,7 @@ final class LspController {
 
 
     String bufferUri(FileBuffer buffer) {
-        return "file://" + new File(buffer.getFilePath()).getAbsolutePath();
+        return new File(buffer.getFilePath()).toPath().toAbsolutePath().normalize().toUri().toString();
     }
 
 

@@ -349,6 +349,9 @@ public class LuaEngine {
         public LuaValue call(LuaValue arg) {
             String cmd = arg.checkjstring();
             try {
+                if (!editor.getConfigManager().getShellCommandEnabled()) {
+                    return LuaValue.valueOf("");
+                }
                 ProcessBuilder pb = new ProcessBuilder(ShellCommand.forCommand(cmd));
                 pb.redirectErrorStream(true);
                 FileBuffer buf = onEdt(editor::getCurrentBuffer, null);

@@ -649,6 +649,15 @@ final class JobQuickfixController {
         if (command.indexOf('\n') >= 0 || command.indexOf('\r') >= 0) {
             return "Error: command must be a single line";
         }
+        if (!editor.configManager.getShellCommandEnabled()) {
+            return "Error: shell commands disabled by shell.command.enabled=false";
+        }
+        for (int i = 0; i < command.length(); i++) {
+            char ch = command.charAt(i);
+            if (Character.isISOControl(ch) && ch != '\t') {
+                return "Error: command contains invalid control character";
+            }
+        }
         if (command.length() > editor.configManager.getShellCommandMaxLength()) {
             return "Error: command length exceeds shell.command.max.length";
         }

@@ -120,4 +120,31 @@ public class LspServiceTest {
         assertEquals(0, result.failedFiles);
         assertEquals("new", plan.stagedTextByPath.get(file.toString()));
     }
+
+    @Test
+    void bufferUriEncodesPathSpacesAndUriDecodeRestoresPath() throws Exception {
+        Path root = Path.of("target", "lsp uri").toAbsolutePath().normalize();
+        Files.createDirectories(root);
+        Path file = root.resolve("has space.java");
+        Files.writeString(file, "class A {}\n", StandardCharsets.UTF_8);
+        FileBuffer buffer = new FileBuffer(file.toFile());
+        LspController controller = new LspController(null);
+
+        String uri = controller.bufferUri(buffer);
+
+        assertEquals(file.toUri().toString(), uri);
+        assertTrue(uri.contains("%20"));
+        assertEquals(file.toFile().getAbsolutePath(), controller.filePathFromUri(uri));
+    }
+
+    @Test
+    void resolveWorkspaceRootPrefersProjectMarkers() throws Exception {
+        Path root = Path.of("target", "lsp-root").toAbsolutePath().normalize();
+        Path nested = root.resolve("src/main/java");
+        Files.createDirectories(nested);
+        Files.writeString(root.resolve("pom.xml"), "<project />", StandardCharsets.UTF_8);
+        LspController controller = new LspController(null);
+
+        assertEquals(root.toRealPath(), controller.resolveWorkspaceRoot(nested));
+    }
 }

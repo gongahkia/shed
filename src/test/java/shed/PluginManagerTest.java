@@ -220,8 +220,8 @@ public class PluginManagerTest {
     }
 
     @Test
-    void untrustedDropInShedPluginCannotRegisterExecutionSurfaces() throws IOException {
-        Path home = tempDir.resolve("home-untrusted-plugin");
+    void manualDropInShedPluginRegistersExecutionSurfacesWhenTrusted() throws IOException {
+        Path home = tempDir.resolve("home-manual-plugin");
         Path pluginDir = home.resolve(".shed/plugins");
         Files.createDirectories(pluginDir);
         Files.writeString(pluginDir.resolve("manual.shed"),
@@ -234,9 +234,9 @@ public class PluginManagerTest {
         ConfigManager config = new ConfigManager();
         PluginManager manager = new PluginManager(config, null);
 
-        assertTrue(config.getUserCommands().isEmpty());
-        assertTrue(manager.getEventCommands("BufOpen").isEmpty());
-        assertTrue(manager.getPluginListText().contains("untrusted"));
-        assertTrue(manager.getPluginListText().contains("blocked directives: 3"));
+        assertEquals("echo bad", config.getUserCommands().get("pwn"));
+        assertEquals(List.of("pwn"), manager.getEventCommands("BufOpen"));
+        assertTrue(manager.getPluginListText().contains("trusted local plugin file"));
+        assertFalse(manager.getPluginListText().contains("blocked directives"));
     }
 }

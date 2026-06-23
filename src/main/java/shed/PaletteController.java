@@ -182,12 +182,65 @@ final class PaletteController {
 
 
     List<String> grepFiles(String pattern) {
-        List<String> results = new ArrayList<>();
         if (pattern == null || pattern.isEmpty()) {
-            return results;
+            return new ArrayList<>();
         }
+        List<String> rgResults = grepFilesWithRipgrep(pattern);
+        if (!rgResults.isEmpty()) {
+            return rgResults;
+        }
+        List<String> results = new ArrayList<>();
         grepFilesRecursive(new File("."), pattern, results);
         return results;
+    }
+
+    List<String> grepFilesWithRipgrep(String pattern) {
+        List<String> results = new ArrayList<>();
+        String rg = findExecutableOnPath("rg");
+        if (rg == null) {
+            return results;
+        }
+        try {
+            Process process = new ProcessBuilder(
+                rg, "--line-number", "--no-heading", "--color", "never", "--", pattern, "."
+            ).redirectErrorStream(true).start();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (!line.isBlank()) {
+                        results.add(line);
+                    }
+                    if (results.size() >= 200) {
+                        process.destroyForcibly();
+                        return results;
+                    }
+                }
+            }
+            if (!process.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return new ArrayList<>();
+            }
+            return process.exitValue() == 0 ? results : new ArrayList<>();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ArrayList<>();
+        } catch (IOException e) {
+            return new ArrayList<>();
+        }
+    }
+
+    String findExecutableOnPath(String name) {
+        String path = System.getenv("PATH");
+        if (path == null || path.isBlank()) {
+            return null;
+        }
+        for (String entry : path.split(File.pathSeparator)) {
+            File candidate = new File(entry, name);
+            if (candidate.isFile() && candidate.canExecute()) {
+                return candidate.getAbsolutePath();
+            }
+        }
+        return null;
     }
 
 

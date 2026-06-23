@@ -69,7 +69,8 @@ public class ConfigManagerTest {
                 + "command.alias.ww=w\n"
                 + "session.restore.on.start=true\n"
                 + "session.autoload=work\n"
-                + "process.timeout.ms=5000\n");
+                + "process.timeout.ms=5000\n"
+                + "shell.command.enabled=false\n");
 
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
@@ -81,6 +82,7 @@ public class ConfigManagerTest {
         assertTrue(config.getSessionRestoreOnStart());
         assertEquals("work", config.getSessionAutoloadName());
         assertEquals(5000, config.getProcessTimeoutMs());
+        assertFalse(config.getShellCommandEnabled());
     }
 
     @Test

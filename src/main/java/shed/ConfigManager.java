@@ -58,6 +58,7 @@ public class ConfigManager {
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
     private static final int DEFAULT_PROCESS_TIMEOUT_MS = 15000;
     private static final int DEFAULT_PROCESS_OUTPUT_MAX_BYTES = 1024 * 1024;
+    private static final boolean DEFAULT_SHELL_COMMAND_ENABLED = true;
     private static final int DEFAULT_SHELL_COMMAND_MAX_LENGTH = 4096;
     private static final int DEFAULT_SCROLLOFF = 0;
     private static final boolean DEFAULT_AUTO_PAIRS = true;
@@ -202,6 +203,7 @@ public class ConfigManager {
         config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
         config.put("process.timeout.ms", String.valueOf(DEFAULT_PROCESS_TIMEOUT_MS));
         config.put("process.output.max.bytes", String.valueOf(DEFAULT_PROCESS_OUTPUT_MAX_BYTES));
+        config.put("shell.command.enabled", String.valueOf(DEFAULT_SHELL_COMMAND_ENABLED));
         config.put("shell.command.max.length", String.valueOf(DEFAULT_SHELL_COMMAND_MAX_LENGTH));
         config.put("scrolloff", String.valueOf(DEFAULT_SCROLLOFF));
         config.put("auto.pairs", String.valueOf(DEFAULT_AUTO_PAIRS));
@@ -572,6 +574,9 @@ public class ConfigManager {
 
     public int getShellCommandMaxLength() {
         return getInt("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
+    }
+    public boolean getShellCommandEnabled() {
+        return getBoolean("shell.command.enabled", DEFAULT_SHELL_COMMAND_ENABLED);
     }
     public int getScrolloff() {
         return getInt("scrolloff", DEFAULT_SCROLLOFF);
@@ -1000,6 +1005,7 @@ public class ConfigManager {
             + "session.dir=" + defaultSessionDirectoryPath() + "\n\n"
             + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
             + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
+            + "shell.command.enabled=" + DEFAULT_SHELL_COMMAND_ENABLED + "\n"
             + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
             + "# Dramatic UI (theater mode)\n"
             + "ui.dramatic=" + DEFAULT_DRAMATIC_UI + "\n"

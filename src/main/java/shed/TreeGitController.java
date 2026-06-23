@@ -1118,17 +1118,7 @@ final class TreeGitController {
 
 
     List<String> splitWhitespaceArgs(String args) {
-        List<String> tokens = new ArrayList<>();
-        if (args == null || args.isBlank()) {
-            return tokens;
-        }
-        String[] parts = args.trim().split("\\s+");
-        for (String part : parts) {
-            if (!part.isEmpty()) {
-                tokens.add(part);
-            }
-        }
-        return tokens;
+        return parseQuotedArguments(args);
     }
 
 

@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFilePermission;
+import java.nio.file.attribute.UserPrincipal;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
@@ -189,7 +191,10 @@ public class PluginManager {
         }
         PackageRecord record = packageRecordForFile(file.getName());
         if (record == null) {
-            return new PluginTrust(false, "not installed by :plugin install");
+            if (isTrustedLocalPluginFile(file)) {
+                return new PluginTrust(true, "trusted local plugin file", ALL_PLUGIN_PERMISSIONS);
+            }
+            return new PluginTrust(false, "not installed by :plugin install and local file is not trusted");
         }
         try {
             String actual = sha256Hex(Files.readAllBytes(file.toPath()));
@@ -201,6 +206,40 @@ public class PluginManager {
         } catch (IOException e) {
             return new PluginTrust(false, e.getMessage());
         }
+    }
+
+    private boolean isTrustedLocalPluginFile(File file) {
+        Path path = file.toPath();
+        try {
+            if (Files.isSymbolicLink(path)) {
+                return false;
+            }
+            UserPrincipal owner = Files.getOwner(path);
+            if (owner != null && !matchesLocalUser(owner.getName())) {
+                return false;
+            }
+            try {
+                Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(path);
+                if (permissions.contains(PosixFilePermission.GROUP_WRITE)
+                    || permissions.contains(PosixFilePermission.OTHERS_WRITE)) {
+                    return false;
+                }
+            } catch (UnsupportedOperationException ignored) {
+            }
+            return true;
+        } catch (IOException | SecurityException e) {
+            return false;
+        }
+    }
+
+    private boolean matchesLocalUser(String ownerName) {
+        String userName = System.getProperty("user.name");
+        if (ownerName == null || userName == null || userName.isBlank()) {
+            return false;
+        }
+        return ownerName.equals(userName)
+            || ownerName.endsWith("\\" + userName)
+            || ownerName.endsWith("/" + userName);
     }
 
     private PackageRecord packageRecordForFile(String fileName) {

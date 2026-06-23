@@ -12,6 +12,7 @@ import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
+import java.io.InputStream;
 import java.util.*;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -286,8 +287,10 @@ final class EditorUiController {
 
 
     Font loadBundledHackFont(int fontSize) {
-        try {
-            Font hackFont = Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"));
+        try (InputStream resource = EditorUiController.class.getClassLoader().getResourceAsStream("assets/hackregfont.ttf")) {
+            Font hackFont = resource == null
+                ? Font.createFont(Font.TRUETYPE_FONT, new File("assets/hackregfont.ttf"))
+                : Font.createFont(Font.TRUETYPE_FONT, resource);
             GraphicsEnvironment.getLocalGraphicsEnvironment().registerFont(hackFont);
             return hackFont.deriveFont((float) fontSize);
         } catch (Exception e) {

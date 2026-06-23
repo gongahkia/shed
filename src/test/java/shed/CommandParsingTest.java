@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.io.File;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 public class CommandParsingTest {
@@ -111,6 +112,15 @@ public class CommandParsingTest {
         String result = service.handle("status", null, handler);
         assertEquals("Not inside a git repository", result);
         assertNull(handler.lastCall);
+    }
+
+    @Test
+    void treeGitArgsKeepQuotedPathsWithSpaces() {
+        TreeGitController controller = new TreeGitController(null);
+
+        List<String> args = controller.splitWhitespaceArgs("\"dir with spaces/file.txt\" plain\\ path");
+
+        assertEquals(List.of("dir with spaces/file.txt", "plain path"), args);
     }
 
     private static class RecordingHandler implements GitService.Handler {

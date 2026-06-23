@@ -159,6 +159,7 @@ public class Texteditor extends JFrame implements KeyListener {
     boolean insertNormalOneShot;
     final List<Integer> extraCursors = new ArrayList<>();
     Map<String, LspClient> lspClients;
+    Map<String, Path> lspClientRoots;
     Map<String, Integer> lspDocumentVersions;
     Map<String, String> lspErrors;
     List<LspClient.TextEdit> pendingLspRenameEdits;
@@ -303,6 +304,7 @@ public class Texteditor extends JFrame implements KeyListener {
         pendingSurroundTarget = null;
         insertNormalOneShot = false;
         lspClients = new HashMap<>();
+        lspClientRoots = new HashMap<>();
         lspDocumentVersions = new HashMap<>();
         lspErrors = new HashMap<>();
         pendingLspRenameEdits = null;

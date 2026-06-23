@@ -27,6 +27,7 @@ public class FileBuffer {
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
+    private static final String LARGE_FILE_PREVIEW_MARKER = "[shed large-file preview: remaining content hidden until save or reload]";
 
     private File file;
     private String scratchName;
@@ -145,7 +146,7 @@ public class FileBuffer {
                 if (previewBuilder.length() > 0) {
                     previewBuilder.append("\n");
                 }
-                previewBuilder.append("[shed large-file preview: remaining content hidden until save or reload]");
+                previewBuilder.append(LARGE_FILE_PREVIEW_MARKER);
             }
             this.largeFileTail = buildTail(lines, previewLineCount);
             setDocumentText(previewBuilder.toString(), false);
@@ -306,10 +307,27 @@ public class FileBuffer {
     }
 
     public String getFullContent() {
-        if (largeFile && largeFileTail != null && !getContent().contains("[shed large-file preview:")) {
-            return getContent() + (getContent().endsWith("\n") || largeFileTail.startsWith("\n") ? "" : "\n") + largeFileTail;
+        String content = getContent();
+        if (largeFile && largeFileTail != null) {
+            String visibleContent = removeLargeFilePreviewMarker(content);
+            return visibleContent + (visibleContent.isEmpty() || visibleContent.endsWith("\n") || largeFileTail.startsWith("\n") ? "" : "\n") + largeFileTail;
         }
-        return getContent();
+        return content;
+    }
+
+    private String removeLargeFilePreviewMarker(String content) {
+        int markerIndex = content.indexOf(LARGE_FILE_PREVIEW_MARKER);
+        if (markerIndex < 0) {
+            return content;
+        }
+        int start = markerIndex;
+        int end = markerIndex + LARGE_FILE_PREVIEW_MARKER.length();
+        if (start > 0 && content.charAt(start - 1) == '\n') {
+            start--;
+        } else if (end < content.length() && content.charAt(end) == '\n') {
+            end++;
+        }
+        return content.substring(0, start) + content.substring(end);
     }
 
     private void updateLineCount() {

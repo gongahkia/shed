@@ -1,0 +1,100 @@
+# Layouts Research
+
+Backlog notes for post-v0.1 layout plugins. These are stubs, not commitments to ship in core.
+
+## v0.2 Candidates
+
+### Monocle
+
+Source model: dwm's `monocle(Monitor *m)` counts visible clients, updates the layout symbol, then resizes every tiled client to the monitor work area. This is the cleanest precedent for olly because it is pure placement with focus cycling outside the layout.
+
+olly shape:
+- `MonocleLayoutEngine`
+- all tiled windows receive `bounds`
+- only the focused window should be raised by z-order
+- optional status event: `monocle-index-changed`
+
+Source:
+- https://git.suckless.org/dwm/file/dwm.c.html
+
+### Spiral / Fibonacci
+
+Source model: XMonad's `XMonad.Layout.Spiral` exposes `spiral` and `spiralWithDir`, with a ratio controlling successive window sizes and configurable starting direction/rotation. awesome also exposes `awful.layout.suit.spiral` and `awful.layout.suit.spiral.dwindle` in its built-in layout list.
+
+olly shape:
+- `SpiralLayoutEngine`
+- config: `ratio`, `startDirection`, `rotation`
+- pure recursive split of remaining rect
+- no hidden windows
+
+Source:
+- https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-Spiral.html
+- https://awesomewm.org/apidoc/libraries/awful.layout.html
+
+### Grid
+
+Source model: Qtile `Matrix` divides the screen into equal cells with configurable columns. awesome's `fair` layout also targets roughly equal client sizes.
+
+olly shape:
+- `GridLayoutEngine`
+- config: `policy = square | fixedColumns(Int) | fixedRows(Int)`
+- deterministic row-major placement
+- last row may have empty cells; do not resize earlier rows based on tail count
+
+Source:
+- https://docs.qtile.org/en/latest/manual/ref/layouts.html
+- https://awesomewm.org/apidoc/libraries/awful.layout.html
+
+### ThreeCol / CenteredMaster
+
+Source model: XMonad `ThreeCol` is Tall-like but with three columns. `ThreeColMid` places the main window between stack columns; both stack columns use the same size when both are visible.
+
+olly shape:
+- `ThreeColumnLayoutEngine`
+- config: `masterCount`, `masterRatio`, `centerMaster`
+- centered master uses left/right stacks with balanced window counts
+- ultrawide-first defaults, not a MasterStack replacement
+
+Source:
+- https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-ThreeColumns.html
+
+### Accordion
+
+Source model: XMonad exposes decorated layouts based on `Accordion`. Its practical UI is vertical ribbons where only one region is expanded and siblings remain visible through title/decor strips.
+
+olly shape:
+- `AccordionLayoutEngine`
+- config: `expandedRatio`, `collapsedExtent`
+- focused window gets expanded rect
+- non-focused windows keep small interactive strips
+- needs accessibility-safe title-strip handling before shipping
+
+Source:
+- https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-DecorationMadness.html
+
+## v0.3+ Research Hooks
+
+### Frame Tree
+
+Source model: herbstluftwm starts with one frame; frames can contain windows or split into two frames. This maps to an olly plugin host that can nest layout engines inside frame leaves.
+
+Source:
+- https://herbstluftwm.org/tutorial.html
+- https://man.archlinux.org/man/herbstluftwm.1
+
+### Multi-Tag Union
+
+Source model: river supports tags instead of fixed workspaces; a window can have multiple tags and multiple tags can be displayed at once. olly already stores tags as a bitset, so the layout input can be the active union without changing the engine protocol.
+
+Source:
+- https://github.com/riverwm/river
+- https://isaacfreund.com/blog/river-intro/
+
+## Implementation Gate
+
+For any candidate above:
+- add focused unit tests for geometry edge cases
+- add a golden fixture under `Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots/`
+- emit typed `EngineEvent`s for user-visible state changes
+- keep `LayoutEngine.arrange()` synchronous and pure
+- no private macOS APIs

@@ -43,7 +43,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 7 — UX surfaces (`ollyApp`)
 
-(A) 2026-06-26 Implement menubar app target with `NSStatusItem` icon; menu shows active display, active tags, current engine, quick-actions +phase7 @swift @ui
 (A) 2026-06-26 Implement first-run onboarding window: AX permission walkthrough with copy-paste deeplinks; verify granted before exit +phase7 @swift @ui @ax
 (B) 2026-06-26 Implement overview mode (Niri-inspired): hold a chord to fade dim + show miniaturized columns/tags per display; click to focus +phase7 @swift @ui
 (B) 2026-06-26 Implement command palette: floating fuzzy launcher over all olly actions (`switch-tag`, `move-window`, `cycle-engine`, etc.); cite Nehir prior art in code comments +phase7 @swift @ui

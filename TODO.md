@@ -35,8 +35,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 5 — Swift DSL config (`ollyDSL`)
 
-(B) 2026-06-26 Provide a Swift package `olly-plugin-template/` users can clone to author custom layout engines; document recompile workflow +phase5 @swift @dsl @docs
-
 ---
 
 ## PHASE 6 — IPC + `ollyctl`

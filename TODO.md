@@ -15,7 +15,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 1 — AX foundation (`ollyKit`)
 
-(A) 2026-06-26 Implement `WindowMover`: setPosition/setSize via AX with retry+backoff; coalesce rapid sequential moves into one frame; respect `kAXResizableAttribute` and skip non-resizable +phase1 @swift @ax
 (A) 2026-06-26 Implement `DisplayMonitor` using `NSScreen.screens` + `CGDisplayRegisterReconfigurationCallback`; expose `[Display]` and change stream; map `CGDirectDisplayID` ↔ `NSScreen` +phase1 @swift ref:N§7
 (B) 2026-06-26 Add `ElectronWorkaround.swift`: for apps with bundle IDs in a known list, fall back to `CGWindowListCopyWindowInfo` matching by pid+bounds when AX returns 0 windows +phase1 @swift @ax
 (B) 2026-06-26 Add `FocusStack.swift`: maintain MRU per (display, tag-set); restore focus on tag switch +phase1 @swift

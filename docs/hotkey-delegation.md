@@ -25,7 +25,7 @@ At startup, `olly` treats a collision as a diagnostic, not as a second binding s
 
 - Compare DSL-declared chords against observable macOS symbolic hotkeys and readable known-daemon config files.
 - Log each collision with chord, `olly` action, and suspected external owner.
-- Show one startup toast summarizing collision count.
+- Show startup notifications for detected collisions.
 - Keep running after logging; the user resolves ownership by removing one binding.
 - If Carbon registration fails for a DSL chord, fail that binding fast and keep the failure visible in logs.
 

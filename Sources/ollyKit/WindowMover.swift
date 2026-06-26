@@ -164,7 +164,9 @@ protocol AXWindowMoveClient: AnyObject {
 private final class SystemAXWindowMoveClient: AXWindowMoveClient {
     func isResizable(_ element: AXUIElement) -> Bool {
         var value: CFTypeRef?
-        let error = AXUIElementCopyAttributeValue(element, "AXResizable" as CFString, &value)
+        let error = AXSignpost.interval("ax.read.resizable") {
+            AXUIElementCopyAttributeValue(element, "AXResizable" as CFString, &value)
+        }
         guard error == .success else {
             return true
         }
@@ -176,7 +178,9 @@ private final class SystemAXWindowMoveClient: AXWindowMoveClient {
         guard let value = AXValueCreate(.cgPoint, &position) else {
             return .failure
         }
-        return AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
+        return AXSignpost.interval("ax.write.position") {
+            AXUIElementSetAttributeValue(element, kAXPositionAttribute as CFString, value)
+        }
     }
 
     func setSize(_ size: CGSize, for element: AXUIElement) -> AXError {
@@ -184,6 +188,8 @@ private final class SystemAXWindowMoveClient: AXWindowMoveClient {
         guard let value = AXValueCreate(.cgSize, &size) else {
             return .failure
         }
-        return AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
+        return AXSignpost.interval("ax.write.size") {
+            AXUIElementSetAttributeValue(element, kAXSizeAttribute as CFString, value)
+        }
     }
 }

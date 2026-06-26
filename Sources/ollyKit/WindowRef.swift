@@ -141,7 +141,9 @@ public struct WindowRef {
 
     private static func processID(from axElement: AXUIElement) -> pid_t? {
         var processID = pid_t()
-        let error = AXUIElementGetPid(axElement, &processID)
+        let error = AXSignpost.interval("ax.read.pid") {
+            AXUIElementGetPid(axElement, &processID)
+        }
         return error == .success ? processID : nil
     }
 
@@ -155,7 +157,9 @@ public struct WindowRef {
 
     private static func stringAttribute(_ attribute: String, from axElement: AXUIElement) -> String? {
         var value: CFTypeRef?
-        let error = AXUIElementCopyAttributeValue(axElement, attribute as CFString, &value)
+        let error = AXSignpost.interval("ax.read.attribute") {
+            AXUIElementCopyAttributeValue(axElement, attribute as CFString, &value)
+        }
         guard error == .success else {
             return nil
         }
@@ -190,7 +194,9 @@ public struct WindowRef {
 
     private static func axValueAttribute(_ attribute: String, from axElement: AXUIElement) -> AXValue? {
         var value: CFTypeRef?
-        let error = AXUIElementCopyAttributeValue(axElement, attribute as CFString, &value)
+        let error = AXSignpost.interval("ax.read.attribute") {
+            AXUIElementCopyAttributeValue(axElement, attribute as CFString, &value)
+        }
         guard error == .success, let value, CFGetTypeID(value) == AXValueGetTypeID() else {
             return nil
         }
@@ -217,7 +223,9 @@ private enum PrivateAXWindowIDResolver {
 
         let function = unsafeBitCast(symbol, to: Function.self)
         var windowID = CGWindowID()
-        let error = function(axElement, &windowID)
+        let error = AXSignpost.interval("ax.read.privateWindowID") {
+            function(axElement, &windowID)
+        }
         guard error == .success, windowID != 0 else {
             return nil
         }

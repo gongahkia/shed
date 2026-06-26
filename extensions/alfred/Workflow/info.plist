@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>bundleid</key>
+  <string>dev.olly.alfred</string>
+  <key>category</key>
+  <string>Productivity</string>
+  <key>connections</key>
+  <dict>
+    <key>olly.filter</key>
+    <array>
+      <dict>
+        <key>destinationuid</key>
+        <string>olly.run</string>
+        <key>modifiers</key>
+        <integer>0</integer>
+        <key>modifiersubtext</key>
+        <string></string>
+        <key>vitoclose</key>
+        <false/>
+      </dict>
+    </array>
+  </dict>
+  <key>createdby</key>
+  <string>olly</string>
+  <key>description</key>
+  <string>Control a running olly instance via ollyctl IPC commands.</string>
+  <key>disabled</key>
+  <false/>
+  <key>name</key>
+  <string>Olly Control</string>
+  <key>objects</key>
+  <array>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>argumenttype</key>
+        <integer>1</integer>
+        <key>escaping</key>
+        <integer>102</integer>
+        <key>keyword</key>
+        <string>olly</string>
+        <key>queuedelaycustom</key>
+        <integer>0</integer>
+        <key>queuedelayimmediatelyinitially</key>
+        <true/>
+        <key>runningsubtext</key>
+        <string>Loading olly commands...</string>
+        <key>script</key>
+        <string>./scripts/olly_commands.py filter "{query}"</string>
+        <key>title</key>
+        <string>Olly</string>
+        <key>type</key>
+        <integer>0</integer>
+      </dict>
+      <key>type</key>
+      <string>alfred.workflow.input.scriptfilter</string>
+      <key>uid</key>
+      <string>olly.filter</string>
+      <key>version</key>
+      <integer>3</integer>
+    </dict>
+    <dict>
+      <key>config</key>
+      <dict>
+        <key>escaping</key>
+        <integer>102</integer>
+        <key>script</key>
+        <string>./scripts/olly_commands.py run "{query}"</string>
+        <key>type</key>
+        <integer>0</integer>
+      </dict>
+      <key>type</key>
+      <string>alfred.workflow.action.script</string>
+      <key>uid</key>
+      <string>olly.run</string>
+      <key>version</key>
+      <integer>2</integer>
+    </dict>
+  </array>
+  <key>readme</key>
+  <string>Type "olly" to run common ollyctl IPC commands.</string>
+  <key>uidata</key>
+  <dict>
+    <key>olly.filter</key>
+    <dict>
+      <key>xpos</key>
+      <integer>80</integer>
+      <key>ypos</key>
+      <integer>80</integer>
+    </dict>
+    <key>olly.run</key>
+    <dict>
+      <key>xpos</key>
+      <integer>360</integer>
+      <key>ypos</key>
+      <integer>80</integer>
+    </dict>
+  </dict>
+  <key>variables</key>
+  <dict>
+    <key>OLLYCTL</key>
+    <string>ollyctl</string>
+  </dict>
+  <key>version</key>
+  <string>0.1.0</string>
+  <key>webaddress</key>
+  <string>https://github.com/olly-dev/olly</string>
+</dict>
+</plist>

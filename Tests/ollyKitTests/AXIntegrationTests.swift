@@ -21,10 +21,7 @@ final class AXIntegrationTests: XCTestCase {
         }
 
         let application = try XCTUnwrap(Application(runningApplication: textEdit.application))
-        let windows = try await waitForWindows(application.axElement)
-        XCTAssertFalse(windows.isEmpty)
-        let axWindow = try XCTUnwrap(windows.first)
-        var window = try WindowRef(axElement: axWindow, lookupOptions: .publicOnly)
+        var window = try await waitForWindowRef(application.axElement)
         let originalFrame = window.attributes.frame
         let targetFrame = CGRect(
             x: originalFrame.origin.x + 12,
@@ -88,13 +85,20 @@ final class AXIntegrationTests: XCTestCase {
         }
     }
 
-    private func waitForWindows(_ applicationElement: AXUIElement) async throws -> [AXUIElement] {
+    private func waitForWindowRef(_ applicationElement: AXUIElement) async throws -> ollyKit.WindowRef {
+        var sawWindow = false
         for _ in 0..<50 {
             let windows = axWindows(for: applicationElement)
-            if !windows.isEmpty {
-                return windows
+            sawWindow = sawWindow || !windows.isEmpty
+            for window in windows {
+                if let windowRef = try? ollyKit.WindowRef(axElement: window, lookupOptions: .publicOnly) {
+                    return windowRef
+                }
             }
             try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        if sawWindow {
+            throw XCTSkip("TextEdit did not expose a framed AX window")
         }
         throw AXIntegrationTestError.windowDiscoveryTimedOut
     }

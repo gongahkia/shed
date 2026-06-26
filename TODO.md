@@ -20,7 +20,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 2 — Tag-based workspace model (`ollyCore`)
 
-(A) 2026-06-26 Implement `TagDispatcher`: applies tag changes — hides windows whose `windowTags ∩ activeTags == ∅` by moving offscreen (-32000,-32000); shows the rest; idempotent +phase2 @swift @ax ref:N§7
 (A) 2026-06-26 Implement window-to-tag assignment API: `assign(window, tags:)`, `toggle(window, tag:)`, `move(window, toDisplay:)` +phase2 @swift
 (A) 2026-06-26 Verify single-native-Space invariant: all olly-managed windows live on the same `CGSSpaceID`; if a window drifts (user dragged to a different Space), detect and re-home or unmanage +phase2 @swift @ax
 (B) 2026-06-26 Persist `(pid, bundleID, title-regex) → tags` mapping to `~/.config/olly/state.json` so windows reopen on their tag +phase2 @swift

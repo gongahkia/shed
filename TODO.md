@@ -25,7 +25,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 3 — Layout engine plugin contract (`ollyLayouts`)
 
-(A) 2026-06-26 Define `LayoutEngineFactory` protocol so DSL can construct engines by id+config; expose registry `LayoutEngineRegistry` (actor) +phase3 @swift @layout
 (A) 2026-06-26 Implement `EngineHost`: subscribes to WindowStore deltas + TagStore changes, invokes active engine per (display, active-tags), diffs Placements, hands to WindowMover +phase3 @swift @layout
 (A) 2026-06-26 Decision rule: when (display, active-tags) has no engine binding, fall back to `Floating` engine — never refuse to manage +phase3 @swift @layout
 (B) 2026-06-26 Add `LayoutEngineCapabilities` flags: `supportsManualSplits`, `supportsResizing`, `supportsFloatingMix`; engines declare so keybinds gray out gracefully +phase3 @swift @layout

@@ -28,6 +28,18 @@ swiftlint lint --config .swiftlint.yml --strict
 ./scripts/check-no-private-api.sh
 ```
 
+## SketchyBar
+
+Example integration lives in `extensions/sketchybar/`. It forwards `ollyctl events --json`
+into a SketchyBar custom event so a bar item can update from olly IPC.
+
+```sh
+mkdir -p ~/.config/sketchybar/olly
+cp -R extensions/sketchybar/* ~/.config/sketchybar/olly/
+chmod +x ~/.config/sketchybar/olly/plugins/*.sh
+printf '%s\n' 'source "$HOME/.config/sketchybar/olly/sketchybarrc"' >> ~/.config/sketchybar/sketchybarrc
+```
+
 ## Inspiration Credits
 
 Per NORTHSTAR §3, Olly studies these projects:

@@ -48,7 +48,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 8 — Ecosystem bridges
 
-(A) 2026-06-26 Add `extensions/sketchybar/` with example `sketchybarrc` consuming `ollyctl events`; document install in README +phase8 @ecosystem @docs ref:N§7
 (A) 2026-06-26 Add `extensions/jankyborders/` with snippet wiring olly focus events → JankyBorders config; verify no border-flicker on tag switch +phase8 @ecosystem @docs
 (A) 2026-06-26 Add `extensions/alfred/` Alfred workflow exposing top 15 IPC commands (tag-switch, focus, move-to-tag, set-engine, reload, state); mirror Klack-Control-for-Alfred structure +phase8 @ecosystem @docs ref:N§7
 (A) 2026-06-26 Add `extensions/raycast/` Raycast extension stub exposing top 10 olly IPC commands; publish to Raycast store after v0.1 +phase8 @ecosystem

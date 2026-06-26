@@ -36,7 +36,7 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [1, 2])
     }
 
-    func testArrangeThrowsWhenNoEngineIsBound() async throws {
+    func testArrangeFallsBackToFloatingWhenNoEngineIsBound() async throws {
         let tag = try Tag(index: 1)
         let windowStore = WindowStore()
         let tagStore = TagStore(defaultActiveTags: TagSet(tag))
@@ -48,14 +48,13 @@ final class EngineHostTests: XCTestCase {
             configProvider: { _ in nil },
             applyPlacement: { _, _ in }
         )
+        let frame = CGRect(x: 10, y: 20, width: 300, height: 200)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(tag).rawValue, frame: frame))
 
-        do {
-            _ = try await host.arrange(displayID: 1, bounds: .zero)
-            XCTFail("expected missing engine binding")
-        } catch EngineHostError.missingEngineBinding(1, TagSet(tag)) {
-        } catch {
-            XCTFail("unexpected error: \(error)")
-        }
+        let result = try await host.arrange(displayID: 1, bounds: .zero)
+
+        XCTAssertEqual(result.engineID, FloatingLayoutEngine.engineID)
+        XCTAssertEqual(result.placements, [Placement(windowID: 1, frame: frame, zOrder: 0, hidden: false)])
     }
 
     func testStartSubscribesToWindowAndTagChanges() async throws {
@@ -100,13 +99,17 @@ final class EngineHostTests: XCTestCase {
         XCTFail("timed out waiting for condition")
     }
 
-    private func window(id: WindowID, tagMask: UInt64) -> WindowState {
+    private func window(
+        id: WindowID,
+        tagMask: UInt64,
+        frame: CGRect = CGRect(x: 0, y: 0, width: 100, height: 100)
+    ) -> WindowState {
         WindowState(
             id: id,
             processID: 42,
             displayID: 1,
             tagMask: tagMask,
-            frame: CGRect(x: 0, y: 0, width: 100, height: 100)
+            frame: frame
         )
     }
 }

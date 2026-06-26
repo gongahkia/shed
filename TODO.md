@@ -25,7 +25,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 3 — Layout engine plugin contract (`ollyLayouts`)
 
-(A) 2026-06-26 Decision rule: when (display, active-tags) has no engine binding, fall back to `Floating` engine — never refuse to manage +phase3 @swift @layout
 (B) 2026-06-26 Add `LayoutEngineCapabilities` flags: `supportsManualSplits`, `supportsResizing`, `supportsFloatingMix`; engines declare so keybinds gray out gracefully +phase3 @swift @layout
 (B) 2026-06-26 Write `docs/plugin-authoring.md` with the full protocol + a 20-line example engine +phase3 @docs @layout
 
@@ -33,7 +32,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 4 — Built-in layout engines
 
-(A) 2026-06-26 Implement `Floating` engine: pass-through; respect user-set frames; track z-order; provides escape-hatch behavior +phase4 @swift @layout ref:N§5
 (A) 2026-06-26 Implement `MasterStack` (XMonad-Tall): one master + N slaves on the right; configurable masterRatio (default 0.55) and masterCount (default 1); rotate master with `swap-master` action +phase4 @swift @layout ref:N§5
 (A) 2026-06-26 Implement `Manual` (i3-like): explicit preselect-direction state per container; preselect arrow consumed by next-window; container tree mirrors i3 v4 semantics +phase4 @swift @layout ref:N§5
 (A) 2026-06-26 Implement `BSP` (Hyprland-Dwindle): recursive binary tree; auto-split on longer axis; rotate-children + flip-axis + balance-tree actions +phase4 @swift @layout ref:N§5

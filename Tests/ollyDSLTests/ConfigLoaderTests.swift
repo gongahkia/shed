@@ -7,6 +7,29 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(Config {}, Config(version: .v1))
     }
 
+    func testConfigBuilderAcceptsTopLevelSections() {
+        let config = Config {
+            Keybinds()
+            Rules()
+            Workspaces()
+            Engines()
+            Hooks()
+        }
+
+        XCTAssertEqual(config.keybinds, Keybinds())
+        XCTAssertEqual(config.rules, Rules())
+        XCTAssertEqual(config.workspaces, Workspaces())
+        XCTAssertEqual(config.engines, Engines())
+        XCTAssertEqual(config.hooks, Hooks())
+    }
+
+    func testConfigDecodingDefaultsMissingSections() throws {
+        let data = Data(#"{"version":"v1"}"#.utf8)
+        let config = try JSONDecoder().decode(Config.self, from: data)
+
+        XCTAssertEqual(config, Config())
+    }
+
     func testCompileIfNeededCachesBySourceHash() throws {
         let directory = try temporaryDirectory()
         let sourceURL = directory.appendingPathComponent("Config.swift")

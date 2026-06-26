@@ -35,7 +35,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 5 — Swift DSL config (`ollyDSL`)
 
-(A) 2026-06-26 Implement `@resultBuilder Config`: top-level accepts `Keybinds`, `Rules`, `Workspaces`, `Engines`, `Hooks` +phase5 @swift @dsl
 (A) 2026-06-26 Implement `Keybind(_:do:)` DSL with type-safe modifier+key + action enum; codegen list of registered hotkeys into `Carbon.RegisterEventHotKey` registry +phase5 @swift @dsl
 (A) 2026-06-26 Implement `Rule(match:apply:)` DSL: predicates on bundleID/title-regex/role/subrole; applies tags, engine override, floating flag +phase5 @swift @dsl
 (A) 2026-06-26 Implement `Tag.named(_:)` helper so users alias bitfield slots to names (`"comms"`, `"code"`); enforce uniqueness; surface compile-time errors +phase5 @swift @dsl

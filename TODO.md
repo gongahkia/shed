@@ -39,7 +39,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 6 — IPC + `ollyctl`
 
-(A) 2026-06-26 Define IPC commands v1: `state`, `focus`, `swap`, `move-to-tag`, `set-engine`, `tag-add`, `tag-remove`, `reload`, `subscribe-events`, `version` +phase6 @swift @ipc
 (A) 2026-06-26 Implement `ollyctl` CLI using `swift-argument-parser`; subcommand per IPC command; pretty + `--json` output +phase6 @swift @ipc
 (B) 2026-06-26 Add `ollyctl events` streaming subscriber so SketchyBar can pipe directly +phase6 @swift @ipc @ecosystem
 (B) 2026-06-26 Document the JSON schema in `docs/ipc.md`; version it; bump on breaking changes; integration test asserts schema does not drift +phase6 @docs @ipc

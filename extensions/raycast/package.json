@@ -1,0 +1,40 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "olly",
+  "title": "Olly",
+  "description": "Control olly window manager IPC commands.",
+  "icon": "command-icon.png",
+  "author": "olly",
+  "license": "MIT",
+  "commands": [
+    {
+      "name": "index",
+      "title": "Olly Commands",
+      "description": "Run common ollyctl IPC commands.",
+      "mode": "view"
+    }
+  ],
+  "preferences": [
+    {
+      "name": "ollyctlPath",
+      "title": "ollyctl Path",
+      "description": "Path to ollyctl. Defaults to resolving ollyctl from PATH.",
+      "type": "textfield",
+      "required": false,
+      "placeholder": "ollyctl"
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^1.90.0"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.0.4",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "scripts": {
+    "dev": "ray develop",
+    "build": "ray build",
+    "lint": "ray lint"
+  }
+}

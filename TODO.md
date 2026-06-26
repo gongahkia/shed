@@ -30,7 +30,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 4 — Built-in layout engines
 
-(A) 2026-06-26 Implement `Manual` (i3-like): explicit preselect-direction state per container; preselect arrow consumed by next-window; container tree mirrors i3 v4 semantics +phase4 @swift @layout ref:N§5
 (A) 2026-06-26 Implement `BSP` (Hyprland-Dwindle): recursive binary tree; auto-split on longer axis; rotate-children + flip-axis + balance-tree actions +phase4 @swift @layout ref:N§5
 (A) 2026-06-26 Implement `NiriScroll`: ordered list of columns on infinite x-strip; each column has stacked windows; viewport scroll follows focus; column-width presets (1/3, 1/2, 2/3, full); animations 200 ms ease-out via Core Animation +phase4 @swift @layout ref:N§5
 (B) 2026-06-26 Each engine emits typed `EngineEvent`s (column-created, master-swapped, etc.) on IPC for status bar integrations +phase4 @swift @ipc @ecosystem

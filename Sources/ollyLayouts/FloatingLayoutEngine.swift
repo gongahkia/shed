@@ -12,6 +12,7 @@ public struct FloatingLayoutEngine: LayoutEngine {
     public let id = FloatingLayoutEngine.engineID
     public let displayName = "Floating"
     public let config: Config
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing, .supportsFloatingMix]
 
     public init(config: Config = Config()) {
         self.config = config

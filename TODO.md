@@ -25,7 +25,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 3 — Layout engine plugin contract (`ollyLayouts`)
 
-(B) 2026-06-26 Add `LayoutEngineCapabilities` flags: `supportsManualSplits`, `supportsResizing`, `supportsFloatingMix`; engines declare so keybinds gray out gracefully +phase3 @swift @layout
 (B) 2026-06-26 Write `docs/plugin-authoring.md` with the full protocol + a 20-line example engine +phase3 @docs @layout
 
 ---

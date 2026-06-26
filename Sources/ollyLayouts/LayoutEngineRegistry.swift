@@ -11,11 +11,13 @@ public enum LayoutEngineRegistryError: Error, Equatable, Sendable {
 public struct AnyLayoutEngine {
     public let id: LayoutEngineID
     public let displayName: String
+    public let capabilities: LayoutEngineCapabilities
     private let arrangeHandler: ([WindowSnapshot], CGRect, WindowID?) -> [Placement]
 
     public init<Engine: LayoutEngine>(_ engine: Engine) {
         self.id = engine.id
         self.displayName = engine.displayName
+        self.capabilities = engine.capabilities
         self.arrangeHandler = engine.arrange
     }
 

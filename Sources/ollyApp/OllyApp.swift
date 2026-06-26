@@ -19,15 +19,32 @@ enum OllyApp {
 final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: OllyStatusMenuController?
     private var onboardingController: AXOnboardingWindowController?
+    private let overviewController = OverviewModeController()
+    private var overviewKeyMonitor: OverviewKeyHoldMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusController = OllyStatusMenuController()
         statusController?.install()
+        installOverviewMode()
         showOnboardingIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        overviewKeyMonitor?.remove()
         statusController?.remove()
+    }
+
+    private func installOverviewMode() {
+        let monitor = OverviewKeyHoldMonitor(
+            onActivate: { [weak overviewController] in
+                overviewController?.show()
+            },
+            onDeactivate: { [weak overviewController] in
+                overviewController?.hide()
+            }
+        )
+        monitor.install()
+        overviewKeyMonitor = monitor
     }
 
     private func showOnboardingIfNeeded() {

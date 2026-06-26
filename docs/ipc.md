@@ -499,19 +499,54 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
     },
     "event": {
       "type": "object",
-      "required": [
-        "engine"
-      ],
       "properties": {
         "engine": {
           "$ref": "#/$defs/engineEvent"
+        },
+        "focus": {
+          "$ref": "#/$defs/focusEvent"
         }
       },
+      "oneOf": [
+        {
+          "required": [
+            "engine"
+          ]
+        },
+        {
+          "required": [
+            "focus"
+          ]
+        }
+      ],
       "additionalProperties": false
     },
     "engineEvent": {
       "type": "object",
       "additionalProperties": true
+    },
+    "focusEvent": {
+      "type": "object",
+      "properties": {
+        "focusedWindowID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/windowID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        },
+        "tagMask": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
@@ -536,4 +571,10 @@ Event line:
 
 ```json
 {"version":1,"event":{"engine":{"arranged":{"displayID":1,"engineID":{"rawValue":"floating"},"placementCount":3,"appliedPlacementCount":2}}}}
+```
+
+Focus event line:
+
+```json
+{"version":1,"event":{"focus":{"focusedWindowID":42,"displayID":1,"tagMask":1}}}
 ```

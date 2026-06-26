@@ -21,4 +21,16 @@ final class IPCEventEnvelopeTests: XCTestCase {
         XCTAssertEqual(line.last, 0x0A)
         XCTAssertEqual(decoded, envelope)
     }
+
+    func testFocusEventEnvelopeRoundTripsAsNewlineDelimitedJSON() throws {
+        let envelope = IPCEventEnvelope(
+            event: .focus(IPCFocusEvent(focusedWindowID: 42, displayID: 7, tagMask: 3))
+        )
+
+        let line = try envelope.newlineDelimitedJSON()
+        let decoded = try JSONDecoder().decode(IPCEventEnvelope.self, from: Data(line.dropLast()))
+
+        XCTAssertEqual(line.last, 0x0A)
+        XCTAssertEqual(decoded, envelope)
+    }
 }

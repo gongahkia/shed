@@ -92,7 +92,15 @@ struct OllyCtlRunner {
         switch envelope.event {
         case let .engine(event):
             return renderEngineEvent(event)
+        case let .focus(event):
+            return renderFocusEvent(event)
         }
+    }
+
+    private func renderFocusEvent(_ event: IPCFocusEvent) -> String {
+        let window = event.focusedWindowID.map(String.init) ?? "-"
+        let display = event.displayID.map { " display \($0)" } ?? ""
+        return "focus window \(window)\(display)"
     }
 
     private func renderEngineEvent(_ event: EngineEvent) -> String {

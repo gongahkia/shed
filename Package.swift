@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "olly",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v14)
     ],
     products: [
         .executable(name: "ollyApp", targets: ["ollyApp"]),
@@ -13,7 +13,7 @@ let package = Package(
         .library(name: "ollyCore", targets: ["ollyCore"]),
         .library(name: "ollyLayouts", targets: ["ollyLayouts"]),
         .library(name: "ollyDSL", targets: ["ollyDSL"]),
-        .library(name: "ollyIPC", targets: ["ollyIPC"]),
+        .library(name: "ollyIPC", targets: ["ollyIPC"])
     ],
     targets: [
         .target(name: "ollyKit", exclude: ["README.md"]),
@@ -26,6 +26,6 @@ let package = Package(
             dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"],
             exclude: ["README.md"]
         ),
-        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"]),
+        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"])
     ]
 )

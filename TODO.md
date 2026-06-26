@@ -10,7 +10,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 0 — Repo bootstrap
 
-(C) 2026-06-26 Add issue + PR templates under `.github/`; enable Discussions for plugin RFC threads +phase0 @docs
 
 ---
 

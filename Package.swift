@@ -26,6 +26,7 @@ let package = Package(
             dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"],
             exclude: ["README.md"]
         ),
-        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"])
+        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"]),
+        .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"])
     ]
 )

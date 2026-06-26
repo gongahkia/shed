@@ -29,7 +29,7 @@ let package = Package(
         .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"]),
         .testTarget(name: "ollyKitTests", dependencies: ["ollyKit"]),
         .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"]),
-        .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"]),
+        .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"], exclude: ["Fixtures"]),
         .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"])
     ]
 )

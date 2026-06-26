@@ -43,7 +43,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 7 — UX surfaces (`ollyApp`)
 
-(C) 2026-06-26 Settings window for non-DSL users: minimal — open Config.swift in editor, reload, show last compile error +phase7 @swift @ui
 
 ---
 

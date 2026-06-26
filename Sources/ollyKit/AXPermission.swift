@@ -7,6 +7,13 @@ public enum AXPermissionStatus: Equatable, Sendable {
 }
 
 public enum AXPermission {
+    public static let accessibilitySettingsDeepLink =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+    public static var accessibilitySettingsURL: URL? {
+        URL(string: accessibilitySettingsDeepLink)
+    }
+
     public static func status(prompt: Bool = false) -> AXPermissionStatus {
         checkIsTrusted(prompt: prompt) ? .trusted : .missing
     }
@@ -66,9 +73,8 @@ public enum AXPermission {
     }
 
     @MainActor
-    private static func openAccessibilitySettings() {
-        let settingsURL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-        guard let url = URL(string: settingsURL) else {
+    public static func openAccessibilitySettings() {
+        guard let url = accessibilitySettingsURL else {
             return
         }
         NSWorkspace.shared.open(url)

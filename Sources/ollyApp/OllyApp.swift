@@ -18,14 +18,31 @@ enum OllyApp {
 
 final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: OllyStatusMenuController?
+    private var onboardingController: AXOnboardingWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusController = OllyStatusMenuController()
         statusController?.install()
+        showOnboardingIfNeeded()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         statusController?.remove()
+    }
+
+    private func showOnboardingIfNeeded() {
+        guard AXPermission.status(prompt: false) == .missing else {
+            return
+        }
+
+        let controller = AXOnboardingWindowController()
+        controller.onPermissionGranted = { [weak self] in
+            self?.statusController?.refreshState()
+            self?.onboardingController = nil
+        }
+        onboardingController = controller
+        controller.showWindow(nil)
+        NSApplication.shared.activate(ignoringOtherApps: true)
     }
 }
 
@@ -65,7 +82,7 @@ final class OllyStatusMenuController: NSObject {
         }
     }
 
-    private func refreshState() {
+    func refreshState() {
         state = makeState()
         rebuildMenu()
     }

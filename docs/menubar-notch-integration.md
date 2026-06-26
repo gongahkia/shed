@@ -44,6 +44,8 @@ ollyctl move-to-tag 1
 ollyctl set-engine niri-scroll
 ```
 
+Hotkey daemon delegation is documented in `docs/hotkey-delegation.md`.
+
 ## App Matrix
 
 | App | How olly yields | Integration recipe | Known conflicts |
@@ -72,10 +74,10 @@ ollyctl set-engine niri-scroll
 | OBS | Park hidden windows outside every `CGDisplayBounds` rect; float OBS controls/overlays. | Use normal display/window capture after olly arranges windows; do not capture parked-window coordinates. | If parked windows appear in capture, offscreen parking is wrong for that display topology. |
 | ScreenFlow | Park hidden windows outside every `CGDisplayBounds` rect; float ScreenFlow controls. | Use normal ScreenFlow recording; keep olly Accessibility and recorder Screen Recording grants separate. | Recording overlays can be tiled unless ScreenFlow is in `cooperativeApps`. |
 | CleanShot X | Park hidden windows outside every `CGDisplayBounds` rect; float CleanShot controls/overlays. | Use normal CleanShot capture/recording; add `pl.maketheweb.cleanshotx` to `cooperativeApps`. | Selection/recording overlays must not be tiled; parked windows must stay outside capture regions. |
-| Karabiner-Elements | Let Karabiner own remapping; olly owns only DSL-declared Carbon hotkeys. | Use a complex modification `shell_command` that runs `ollyctl ...`, or keep command ownership in olly DSL. | Double-bound chords cause duplicate actions; startup collision logging is a separate TODO. |
-| skhd | Let skhd own hotkeys when users prefer external bindings. | Bind commands such as `alt - j : ollyctl focus next`. | Double-bound chords cause duplicate actions; choose skhd or olly DSL as owner per chord. |
-| BetterTouchTool | Let BetterTouchTool own gestures/hotkeys when users prefer it. | [Unverified] Configure a trigger action that runs `/path/to/ollyctl ...`; keep matching olly DSL chord unbound. | Double-bound gestures/hotkeys cause duplicate actions; BetterTouchTool docs URL was not publicly fetchable from this environment beyond the product site. |
-| Hammerspoon | Let Hammerspoon own hotkeys/automation when users prefer Lua. | Use `hs.hotkey.bind(...)` and `hs.execute("/path/to/ollyctl ...")`. | Double-bound chords cause duplicate actions; long Lua callbacks add latency before `ollyctl` runs. |
+| Karabiner-Elements | Let Karabiner own remapping; olly owns only DSL-declared Carbon hotkeys. | Use a complex modification `shell_command` that runs `ollyctl ...`, or keep command ownership in olly DSL. | One owner per chord; startup diagnostics log collisions. See `docs/hotkey-delegation.md`. |
+| skhd | Let skhd own hotkeys when users prefer external bindings. | Bind commands such as `alt - j : ollyctl focus next`. | One owner per chord; startup diagnostics log collisions. See `docs/hotkey-delegation.md`. |
+| BetterTouchTool | Let BetterTouchTool own gestures/hotkeys when users prefer it. | Configure a Run Shell Script trigger action that runs `/path/to/ollyctl ...`; keep matching olly DSL chord unbound. | One owner per chord; startup diagnostics log collisions. See `docs/hotkey-delegation.md`. |
+| Hammerspoon | Let Hammerspoon own hotkeys/automation when users prefer Lua. | Use `hs.hotkey.bind(...)` and `hs.execute("/path/to/ollyctl ...")`. | One owner per chord; startup diagnostics log collisions. Long Lua callbacks add latency before `ollyctl` runs. |
 | JankyBorders | Emit focus events; do not draw first-party borders by default. | Use `extensions/jankyborders/olly_focus_borders.sh &`; it consumes `ollyctl events --json` and avoids duplicate focus replays. | Runtime flicker depends on installed `borders`; fixture verifier only covers duplicate-event suppression. |
 
 ## Bundle-ID Policy
@@ -125,8 +127,8 @@ Checked sources with reachable product or official-doc URLs on 2026-06-26:
 - ScreenFlow: <https://www.telestream.net/screenflow/overview.htm>
 - CleanShot X: <https://cleanshot.com/>
 - Karabiner-Elements `shell_command`: <https://karabiner-elements.pqrs.org/docs/json/complex-modifications-manipulator-definition/to/shell-command/>
-- skhd: <https://github.com/koekeishiya/skhd>
-- BetterTouchTool product site: <https://folivora.ai/>
+- skhd: <https://github.com/asmvik/skhd>
+- BetterTouchTool Run Shell Script examples: <https://docs.folivora.ai/docs/other-triggers/text-selection/>
 - Hammerspoon hotkeys and shell execution: <https://www.hammerspoon.org/docs/hs.hotkey.html>, <https://www.hammerspoon.org/docs/hs.html#execute>
 - JankyBorders: <https://github.com/FelixKratz/JankyBorders>
 - Apple safe-area and display bounds APIs: <https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets>, <https://developer.apple.com/documentation/coregraphics/cgdisplaybounds(_:)>

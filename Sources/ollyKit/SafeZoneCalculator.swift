@@ -18,6 +18,7 @@ public struct DisplaySafeAreaInsets: Codable, Equatable, Sendable {
 public enum SafeZoneKind: String, Codable, Equatable, Sendable {
     case menuBar
     case notch
+    case user
     case visibleFrame
 }
 
@@ -59,9 +60,11 @@ public struct SafeZoneCalculator: Sendable {
     public static let defaultNotchPadding: CGFloat = 12
 
     public let notchPadding: CGFloat
+    public let userReserves: [SafeZoneReserve]
 
-    public init(notchPadding: CGFloat = Self.defaultNotchPadding) {
+    public init(notchPadding: CGFloat = Self.defaultNotchPadding, userReserves: [SafeZoneReserve] = []) {
         self.notchPadding = max(0, notchPadding)
+        self.userReserves = userReserves
     }
 
     public func result(for display: Display) -> SafeZoneResult {
@@ -69,10 +72,12 @@ public struct SafeZoneCalculator: Sendable {
         let visibleFrame = display.visibleFrame.standardized
         let edgeReserves = edgeReserves(rawFrame: rawFrame, visibleFrame: visibleFrame)
         let safeInsets = safeInsets(for: display)
-        let topReserve = max(edgeReserves.top, safeInsets.top)
-        let leftReserve = max(edgeReserves.left, safeInsets.left)
-        let bottomReserve = max(edgeReserves.bottom, safeInsets.bottom)
-        let rightReserve = max(edgeReserves.right, safeInsets.right)
+        let displayUserReserves = userReserves.filter { $0.displayID == display.id }
+        let userInsets = userEdgeReserves(rawFrame: rawFrame, reserveRects: displayUserReserves.map(\.rect))
+        let topReserve = max(edgeReserves.top, safeInsets.top, userInsets.top)
+        let leftReserve = max(edgeReserves.left, safeInsets.left, userInsets.left)
+        let bottomReserve = max(edgeReserves.bottom, safeInsets.bottom, userInsets.bottom)
+        let rightReserve = max(edgeReserves.right, safeInsets.right, userInsets.right)
         let layoutFrame = inset(
             rawFrame,
             top: topReserve,
@@ -90,7 +95,8 @@ public struct SafeZoneCalculator: Sendable {
                 displayID: display.id,
                 rawFrame: rawFrame,
                 edgeReserves: edgeReserves,
-                notchTopReserve: safeInsets.top
+                notchTopReserve: safeInsets.top,
+                userReserves: displayUserReserves
             )
         )
     }
@@ -118,6 +124,18 @@ public struct SafeZoneCalculator: Sendable {
         )
     }
 
+    private func userEdgeReserves(rawFrame: CGRect, reserveRects: [CGRect]) -> DisplaySafeAreaInsets {
+        reserveRects.reduce(DisplaySafeAreaInsets()) { result, rect in
+            let rect = rect.standardized
+            return DisplaySafeAreaInsets(
+                top: max(result.top, topReserve(rawFrame: rawFrame, rect: rect)),
+                left: max(result.left, leftReserve(rawFrame: rawFrame, rect: rect)),
+                bottom: max(result.bottom, bottomReserve(rawFrame: rawFrame, rect: rect)),
+                right: max(result.right, rightReserve(rawFrame: rawFrame, rect: rect))
+            )
+        }
+    }
+
     private func inset(
         _ frame: CGRect,
         top: CGFloat,
@@ -134,7 +152,8 @@ public struct SafeZoneCalculator: Sendable {
         displayID: DisplayID,
         rawFrame: CGRect,
         edgeReserves: DisplaySafeAreaInsets,
-        notchTopReserve: CGFloat
+        notchTopReserve: CGFloat,
+        userReserves: [SafeZoneReserve]
     ) -> [SafeZoneReserve] {
         var reserves: [SafeZoneReserve] = []
         if edgeReserves.top > 0 {
@@ -158,10 +177,49 @@ public struct SafeZoneCalculator: Sendable {
         if edgeReserves.left > 0 || edgeReserves.bottom > 0 || edgeReserves.right > 0 {
             reserves.append(SafeZoneReserve(displayID: displayID, kind: .visibleFrame, rect: rawFrame))
         }
+        reserves.append(contentsOf: userReserves.map { reserve in
+            SafeZoneReserve(displayID: reserve.displayID, kind: .user, rect: reserve.rect.standardized)
+        })
         return reserves
     }
 
     private func topRect(in frame: CGRect, height: CGFloat) -> CGRect {
         CGRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height)
+    }
+
+    private func topReserve(rawFrame: CGRect, rect: CGRect) -> CGFloat {
+        guard rectCoversWidth(rawFrame: rawFrame, rect: rect), rect.maxY >= rawFrame.maxY else {
+            return 0
+        }
+        return max(0, rawFrame.maxY - rect.minY)
+    }
+
+    private func leftReserve(rawFrame: CGRect, rect: CGRect) -> CGFloat {
+        guard rectCoversHeight(rawFrame: rawFrame, rect: rect), rect.minX <= rawFrame.minX else {
+            return 0
+        }
+        return max(0, rect.maxX - rawFrame.minX)
+    }
+
+    private func bottomReserve(rawFrame: CGRect, rect: CGRect) -> CGFloat {
+        guard rectCoversWidth(rawFrame: rawFrame, rect: rect), rect.minY <= rawFrame.minY else {
+            return 0
+        }
+        return max(0, rect.maxY - rawFrame.minY)
+    }
+
+    private func rightReserve(rawFrame: CGRect, rect: CGRect) -> CGFloat {
+        guard rectCoversHeight(rawFrame: rawFrame, rect: rect), rect.maxX >= rawFrame.maxX else {
+            return 0
+        }
+        return max(0, rawFrame.maxX - rect.minX)
+    }
+
+    private func rectCoversWidth(rawFrame: CGRect, rect: CGRect) -> Bool {
+        rect.minX <= rawFrame.minX && rect.maxX >= rawFrame.maxX
+    }
+
+    private func rectCoversHeight(rawFrame: CGRect, rect: CGRect) -> Bool {
+        rect.minY <= rawFrame.minY && rect.maxY >= rawFrame.maxY
     }
 }

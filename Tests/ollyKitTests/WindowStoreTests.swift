@@ -1,0 +1,57 @@
+import CoreGraphics
+import XCTest
+@testable import ollyKit
+
+final class WindowStoreTests: XCTestCase {
+    func testUpsertIndexesByProcessDisplayAndTags() async {
+        let store = WindowStore()
+        let state = WindowState(
+            id: 7,
+            processID: 42,
+            displayID: 99,
+            tagMask: 0b1010,
+            frame: CGRect(x: 1, y: 2, width: 3, height: 4)
+        )
+
+        await store.upsert(state)
+
+        let processWindows = await store.windows(forProcessID: 42)
+        let displayWindows = await store.windows(onDisplay: 99)
+        let tagOneWindows = await store.windows(withTagIndex: 1)
+        let tagThreeWindows = await store.windows(withTagIndex: 3)
+        let intersectingWindows = await store.windows(intersectingTagMask: 0b1000)
+        let count = await store.count
+
+        XCTAssertEqual(processWindows, [state])
+        XCTAssertEqual(displayWindows, [state])
+        XCTAssertEqual(tagOneWindows, [state])
+        XCTAssertEqual(tagThreeWindows, [state])
+        XCTAssertEqual(intersectingWindows, [state])
+        XCTAssertEqual(count, 1)
+    }
+
+    func testRemoveEmitsDeltaAndUpdatesIndexes() async throws {
+        let store = WindowStore()
+        let state = WindowState(
+            id: 7,
+            processID: 42,
+            displayID: 99,
+            tagMask: 0b10,
+            frame: CGRect(x: 1, y: 2, width: 3, height: 4)
+        )
+        var iterator = await store.deltas().makeAsyncIterator()
+
+        await store.upsert(state)
+        let addedDelta = await iterator.next()
+        let removed = await store.remove(id: 7)
+        let removedDelta = await iterator.next()
+
+        XCTAssertEqual(addedDelta, .added(state))
+        XCTAssertEqual(removed, .removed(state))
+        XCTAssertEqual(removedDelta, .removed(state))
+        let processWindows = await store.windows(forProcessID: 42)
+        let count = await store.count
+        XCTAssertEqual(processWindows, [])
+        XCTAssertEqual(count, 0)
+    }
+}

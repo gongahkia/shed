@@ -128,12 +128,6 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case hooks(Hooks)
 }
 
-public struct Engines: Codable, Equatable, Sendable {
-    public init(_ build: () -> Void = {}) {
-        build()
-    }
-}
-
 public struct Hooks: Codable, Equatable, Sendable {
     public init(_ build: () -> Void = {}) {
         build()

@@ -72,6 +72,26 @@ public struct UnixDomainSocketClient: Sendable {
         return try IPCPOSIX.readLine(from: descriptor, path: socketPath.rawValue, maxLineBytes: maxLineBytes)
     }
 
+    public func openLineStream() throws -> UnixDomainSocketLineStream {
+        let descriptor = try IPCPOSIX.openUnixStreamSocket()
+        do {
+            try IPCPOSIX.setCloseOnExec(descriptor)
+            try IPCUnixSocketAddress.withSockAddr(path: socketPath.rawValue) { address, length in
+                guard Darwin.connect(descriptor, address, length) == 0 else {
+                    throw IPCSocketError.current(function: "connect")
+                }
+            }
+            return UnixDomainSocketLineStream(
+                descriptor: descriptor,
+                socketPath: socketPath,
+                maxLineBytes: maxLineBytes
+            )
+        } catch {
+            IPCPOSIX.close(descriptor)
+            throw error
+        }
+    }
+
     static func canConnect(to path: String) -> Bool {
         guard let descriptor = try? IPCPOSIX.openUnixStreamSocket() else {
             return false
@@ -83,6 +103,76 @@ public struct UnixDomainSocketClient: Sendable {
         return (try? IPCUnixSocketAddress.withSockAddr(path: path) { address, length in
             Darwin.connect(descriptor, address, length) == 0
         }) == true
+    }
+}
+
+public final class UnixDomainSocketLineStream {
+    public let socketPath: IPCSocketPath
+    public let maxLineBytes: Int
+
+    private var descriptor: Int32?
+    private var readBuffer = Data()
+
+    init(descriptor: Int32, socketPath: IPCSocketPath, maxLineBytes: Int) {
+        self.descriptor = descriptor
+        self.socketPath = socketPath
+        self.maxLineBytes = maxLineBytes
+    }
+
+    deinit {
+        close()
+    }
+
+    public func sendLine(_ line: Data) throws {
+        guard let descriptor else {
+            throw IPCSocketError.notRunning(socketPath.rawValue)
+        }
+        try IPCPOSIX.writeAll(JSONLineCodec.appendLineDelimiter(to: line), to: descriptor)
+    }
+
+    public func readLine() throws -> Data {
+        guard let descriptor else {
+            throw IPCSocketError.notRunning(socketPath.rawValue)
+        }
+        if let line = JSONLineCodec.popLine(from: &readBuffer) {
+            return line
+        }
+
+        var chunk = [UInt8](repeating: 0, count: 4_096)
+        while true {
+            let count = chunk.withUnsafeMutableBytes { rawBuffer in
+                Darwin.read(descriptor, rawBuffer.baseAddress, rawBuffer.count)
+            }
+
+            if count > 0 {
+                readBuffer.append(contentsOf: chunk.prefix(count))
+                if readBuffer.count > maxLineBytes {
+                    throw IPCSocketError.lineTooLong(limit: maxLineBytes)
+                }
+                if let line = JSONLineCodec.popLine(from: &readBuffer) {
+                    return line
+                }
+                continue
+            }
+
+            if count == 0 {
+                throw IPCSocketError.connectionClosedBeforeLine
+            }
+            if errno == EINTR {
+                continue
+            }
+            if errno == EAGAIN || errno == EWOULDBLOCK {
+                throw IPCSocketError.timedOut(socketPath.rawValue)
+            }
+            throw IPCSocketError.current(function: "read")
+        }
+    }
+
+    public func close() {
+        if let descriptor {
+            IPCPOSIX.close(descriptor)
+            self.descriptor = nil
+        }
     }
 }
 

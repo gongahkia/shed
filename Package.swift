@@ -33,6 +33,7 @@ let package = Package(
             name: "ollyctl",
             dependencies: [
                 "ollyIPC",
+                "ollyLayouts",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             exclude: ["README.md"]

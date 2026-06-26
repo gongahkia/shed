@@ -39,7 +39,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 6 — IPC + `ollyctl`
 
-(B) 2026-06-26 Add `ollyctl events` streaming subscriber so SketchyBar can pipe directly +phase6 @swift @ipc @ecosystem
 (B) 2026-06-26 Document the JSON schema in `docs/ipc.md`; version it; bump on breaking changes; integration test asserts schema does not drift +phase6 @docs @ipc
 
 ---

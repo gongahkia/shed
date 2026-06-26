@@ -35,7 +35,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 5 — Swift DSL config (`ollyDSL`)
 
-(A) 2026-06-26 Implement `Tag.named(_:)` helper so users alias bitfield slots to names (`"comms"`, `"code"`); enforce uniqueness; surface compile-time errors +phase5 @swift @dsl
 (A) 2026-06-26 Ship `examples/Config.swift` exercising all 5 engines, 8 named tags, 30+ keybinds, 10+ rules +phase5 @swift @dsl @docs
 (B) 2026-06-26 Implement live-reload: watch `~/.config/olly/Config.swift` with FSEvents; on change, recompile, swap registry atomically, retain previous on compile failure with toast +phase5 @swift @dsl
 (B) 2026-06-26 Provide a Swift package `olly-plugin-template/` users can clone to author custom layout engines; document recompile workflow +phase5 @swift @dsl @docs

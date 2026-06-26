@@ -1,9 +1,0 @@
-{
-  "preset": "concourse",
-  "width": 5,
-  "height": 4,
-  "floors": 2,
-  "agents_per_floor": 4,
-  "require_connected": true,
-  "perturbations": true
-}

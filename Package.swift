@@ -30,6 +30,7 @@ let package = Package(
         .testTarget(name: "ollyKitTests", dependencies: ["ollyKit"]),
         .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"]),
         .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"], exclude: ["Fixtures"]),
+        .testTarget(name: "ollyDSLTests", dependencies: ["ollyDSL"]),
         .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"])
     ]
 )

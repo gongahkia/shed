@@ -16,8 +16,6 @@ public struct IPCEventEnvelope: Codable, Equatable, Sendable {
     }
 
     public func newlineDelimitedJSON(encoder: JSONEncoder = JSONEncoder()) throws -> Data {
-        var data = try encoder.encode(self)
-        data.append(0x0A)
-        return data
+        try JSONLineCodec.encodeLine(self, encoder: encoder)
     }
 }

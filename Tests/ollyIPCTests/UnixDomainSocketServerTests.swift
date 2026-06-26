@@ -1,6 +1,7 @@
 import Foundation
 import XCTest
 import ollyIPC
+import ollyLayouts
 
 final class UnixDomainSocketServerTests: XCTestCase {
     func testServerHandlesNewlineDelimitedJSONOverUnixSocket() throws {
@@ -40,6 +41,48 @@ final class UnixDomainSocketServerTests: XCTestCase {
         XCTAssertThrowsError(try server.start()) { error in
             XCTAssertEqual(error as? IPCSocketError, .socketPathOccupied(socketPath.rawValue))
         }
+    }
+
+    func testLineStreamReadsMultipleServerLines() throws {
+        let socketPath = temporarySocketPath()
+        let ack = try JSONEncoder().encode(
+            IPCResponseEnvelope.ok(result: .subscribed(IPCSubscriptionInfo(eventKinds: [.engine])))
+        )
+        let event = try JSONEncoder().encode(
+            IPCEventEnvelope(
+                event: .engine(
+                    .arranged(
+                        EngineArrangedEvent(
+                            displayID: 1,
+                            engineID: "floating",
+                            placementCount: 2,
+                            appliedPlacementCount: 1
+                        )
+                    )
+                )
+            )
+        )
+        let server = UnixDomainSocketServer(socketPath: socketPath) { _ in
+            var response = ack
+            response.append(JSONLineCodec.lineFeed)
+            response.append(event)
+            return response
+        }
+        defer {
+            server.stop()
+            try? FileManager.default.removeItem(at: socketPath.directoryURL)
+        }
+
+        try server.start()
+
+        let stream = try UnixDomainSocketClient(socketPath: socketPath).openLineStream()
+        defer {
+            stream.close()
+        }
+        try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(command: .subscribeEvents(.init()))))
+
+        XCTAssertEqual(try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status, .success)
+        XCTAssertEqual(try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine()).version, 1)
     }
 
     private func temporarySocketPath() -> IPCSocketPath {

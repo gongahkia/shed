@@ -14,10 +14,12 @@ public struct EngineHostResult: Equatable, Sendable {
     public let engineID: LayoutEngineID
     public let placements: [Placement]
     public let appliedPlacements: [Placement]
+    public let events: [EngineEvent]
 }
 
 public typealias LayoutEngineConfigProvider = (LayoutEngineID) async -> Any?
 public typealias EngineHostPlacementHandler = (WindowState, Placement) async -> Void
+public typealias EngineEventPublisher = (EngineEvent) async -> Void
 
 public actor EngineHost {
     private let windowStore: WindowStore
@@ -25,6 +27,7 @@ public actor EngineHost {
     private let registry: LayoutEngineRegistry
     private let configProvider: LayoutEngineConfigProvider
     private let applyPlacement: EngineHostPlacementHandler
+    private let publishEvent: EngineEventPublisher
     private var previousPlacementsByWindowID: [WindowID: Placement] = [:]
 
     public init(
@@ -32,13 +35,15 @@ public actor EngineHost {
         tagStore: TagStore,
         registry: LayoutEngineRegistry,
         configProvider: @escaping LayoutEngineConfigProvider,
-        applyPlacement: @escaping EngineHostPlacementHandler
+        applyPlacement: @escaping EngineHostPlacementHandler,
+        publishEvent: @escaping EngineEventPublisher = { _ in }
     ) {
         self.windowStore = windowStore
         self.tagStore = tagStore
         self.registry = registry
         self.configProvider = configProvider
         self.applyPlacement = applyPlacement
+        self.publishEvent = publishEvent
     }
 
     public init(
@@ -47,21 +52,24 @@ public actor EngineHost {
         registry: LayoutEngineRegistry,
         windowMover: WindowMover,
         configProvider: @escaping LayoutEngineConfigProvider,
-        targetResolver: @escaping WindowMoveTargetResolver
+        targetResolver: @escaping WindowMoveTargetResolver,
+        publishEvent: @escaping EngineEventPublisher = { _ in }
     ) {
         self.init(
             windowStore: windowStore,
             tagStore: tagStore,
             registry: registry,
-            configProvider: configProvider
-        ) { window, placement in
-            guard let target = targetResolver(window) else {
-                return
-            }
-            await windowMover.setPosition(placement.frame.origin, for: target)
-            await windowMover.setSize(placement.frame.size, for: target)
-            await windowMover.flushNow()
-        }
+            configProvider: configProvider,
+            applyPlacement: { window, placement in
+                guard let target = targetResolver(window) else {
+                    return
+                }
+                await windowMover.setPosition(placement.frame.origin, for: target)
+                await windowMover.setSize(placement.frame.size, for: target)
+                await windowMover.flushNow()
+            },
+            publishEvent: publishEvent
+        )
     }
 
     public nonisolated func start(
@@ -96,11 +104,21 @@ public actor EngineHost {
         }
 
         removeStalePlacements(keeping: Set(placements.map(\.windowID)))
+        let event = EngineEvent.arranged(
+            EngineArrangedEvent(
+                displayID: displayID,
+                engineID: engine.id,
+                placementCount: placements.count,
+                appliedPlacementCount: changedPlacements.count
+            )
+        )
+        await publishEvent(event)
         return EngineHostResult(
             displayID: displayID,
             engineID: engine.id,
             placements: placements,
-            appliedPlacements: changedPlacements
+            appliedPlacements: changedPlacements,
+            events: [event]
         )
     }
 

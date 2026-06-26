@@ -12,6 +12,7 @@ final class EngineHostTests: XCTestCase {
         let tagStore = TagStore(defaultActiveTags: TagSet(tag))
         let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
         let recorder = EngineHostPlacementRecorder()
+        let eventRecorder = EngineHostEventRecorder()
         let host = EngineHost(
             windowStore: windowStore,
             tagStore: tagStore,
@@ -19,6 +20,9 @@ final class EngineHostTests: XCTestCase {
             configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
             applyPlacement: { window, placement in
                 await recorder.record(windowID: window.id, placement: placement)
+            },
+            publishEvent: { event in
+                await eventRecorder.record(event)
             }
         )
         await tagStore.bindEngine(engineID, to: tag, on: 1)
@@ -28,11 +32,26 @@ final class EngineHostTests: XCTestCase {
         let first = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
         let second = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
         let recordedWindowIDs = await recorder.windowIDs
+        let events = await eventRecorder.events
 
         XCTAssertEqual(first.engineID, engineID)
         XCTAssertEqual(first.placements.map(\.windowID), [1, 2])
         XCTAssertEqual(first.appliedPlacements.map(\.windowID), [1, 2])
+        XCTAssertEqual(
+            first.events,
+            [
+                .arranged(
+                    EngineArrangedEvent(
+                        displayID: 1,
+                        engineID: engineID,
+                        placementCount: 2,
+                        appliedPlacementCount: 2
+                    )
+                )
+            ]
+        )
         XCTAssertTrue(second.appliedPlacements.isEmpty)
+        XCTAssertEqual(events.count, 2)
         XCTAssertEqual(recordedWindowIDs, [1, 2])
     }
 
@@ -123,6 +142,14 @@ private actor EngineHostPlacementRecorder {
 
     func record(windowID: WindowID, placement: Placement) {
         records.append((windowID, placement))
+    }
+}
+
+private actor EngineHostEventRecorder {
+    private(set) var events: [EngineEvent] = []
+
+    func record(_ event: EngineEvent) {
+        events.append(event)
     }
 }
 

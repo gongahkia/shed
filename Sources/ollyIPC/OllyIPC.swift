@@ -1,6 +1,7 @@
 import ollyCore
+import ollyLayouts
 
 public enum OllyIPC {
     public static let moduleName = "ollyIPC"
-    public static let dependencyModules = [OllyCore.moduleName]
+    public static let dependencyModules = [OllyCore.moduleName, OllyLayouts.moduleName]
 }

@@ -48,7 +48,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 8 — Ecosystem bridges
 
-(A) 2026-06-26 Write `docs/menubar-notch-integration.md` covering: SketchyBar, Übersicht/simple-bar, Bartender, Hidden Bar, Ice, Alcove, NotchNook, Boring Notch, NotchBook, Brow, NotchFlow, TopNotch, Notchmeister, MediaMate, DynamicLake Pro, Tuneful, Alfred, Raycast, LaunchBar, Klack, Klakk, OBS, ScreenFlow, CleanShot X, Karabiner-Elements, skhd, BetterTouchTool, Hammerspoon, JankyBorders. For each: how olly yields, integration recipe, known conflicts +phase8 @ecosystem @docs ref:N§7
 (A) 2026-06-26 Implement `cooperativeApps` allowlist: bundle-ID list from NORTHSTAR §7b is built in; user can extend/replace via DSL; matching app's windows auto-float and are excluded from tile placement +phase8 @swift @dsl @ecosystem ref:N§7b
 (A) 2026-06-26 Implement safe-zone calculator: per-display reserved rects from notch (`NSScreen.safeAreaInsets` + 12 px buffer) and menubar; layout engines receive `bounds` already shrunk +phase8 @swift @layout ref:N§12b
 (A) 2026-06-26 Add DSL primitive `reserve(rect:on:)` and `notchPadding(_:)`; document and exercise in example Config +phase8 @swift @dsl ref:N§12b

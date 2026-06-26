@@ -10,7 +10,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 0 — Repo bootstrap
 
-(A) 2026-06-26 Initialize SwiftPM workspace at repo root with Package.swift targeting macOS 14+, executable target `ollyApp`, library targets `ollyKit`/`ollyCore`/`ollyLayouts`/`ollyDSL`/`ollyIPC`, executable target `ollyctl` +phase0 @swift ref:N§11
 (A) 2026-06-26 Add LICENSE file with MIT text; populate `Sources/<target>/README.md` stubs for each target +phase0 @docs ref:N§4-D9
 (A) 2026-06-26 Add `.swiftlint.yml` enforcing line-length 120, no force-unwraps in non-test code, file-header off; add `.swiftformat` matching SwiftLint +phase0 @ci ref:N§9
 (A) 2026-06-26 Add `.github/workflows/ci.yml` running `swift build -c release` + `swift test` on macos-14 runner; add lint job +phase0 @ci ref:N§9

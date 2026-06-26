@@ -108,6 +108,28 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(first.libraryURL, second.libraryURL)
     }
 
+    func testExampleConfigCompilesAndLoads() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let modulesURL = Bundle(for: Self.self).bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("Modules", isDirectory: true)
+        let loader = ConfigLoader(
+            sourceURL: packageRoot.appendingPathComponent("examples/Config.swift"),
+            cacheDirectory: try temporaryDirectory().appendingPathComponent("cache", isDirectory: true),
+            moduleSearchPaths: [modulesURL]
+        )
+
+        let loaded = try loader.load()
+
+        XCTAssertEqual(loaded.config.workspaces.tags.count, 8)
+        XCTAssertEqual(loaded.config.engines.engines.count, 5)
+        XCTAssertGreaterThanOrEqual(loaded.config.keybinds.bindings.count, 30)
+        XCTAssertGreaterThanOrEqual(loaded.config.rules.rules.count, 10)
+    }
+
     private func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ollyDSLTests-\(UUID().uuidString)", isDirectory: true)

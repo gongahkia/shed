@@ -14,13 +14,15 @@ public struct TagDispatchMove: Equatable, Sendable {
 
 public typealias TagWindowMoveHandler = (WindowState, CGRect) async -> Void
 public typealias WindowMoveTargetResolver = (WindowState) -> WindowMoveTarget?
+public typealias TagDisplayProvider = () async -> [Display]
 
 public actor TagDispatcher {
-    public static let defaultOffscreenOrigin = CGPoint(x: -32_000, y: -32_000)
+    public static let defaultOffscreenOrigin = OffscreenParking.defaultFallbackOrigin
 
     private let windowStore: WindowStore
     private let tagStore: TagStore
-    private let offscreenOrigin: CGPoint
+    private let offscreenParking: OffscreenParking
+    private let displayProvider: TagDisplayProvider
     private let moveWindow: TagWindowMoveHandler
     private var parkedWindowIDs: Set<WindowID> = []
     private var visibleFramesByWindowID: [WindowID: CGRect] = [:]
@@ -31,9 +33,26 @@ public actor TagDispatcher {
         offscreenOrigin: CGPoint = TagDispatcher.defaultOffscreenOrigin,
         moveWindow: @escaping TagWindowMoveHandler
     ) {
+        self.init(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            offscreenParking: OffscreenParking(fallbackOrigin: offscreenOrigin),
+            displayProvider: { [] },
+            moveWindow: moveWindow
+        )
+    }
+
+    public init(
+        windowStore: WindowStore,
+        tagStore: TagStore,
+        offscreenParking: OffscreenParking = .default,
+        displayProvider: @escaping TagDisplayProvider,
+        moveWindow: @escaping TagWindowMoveHandler
+    ) {
         self.windowStore = windowStore
         self.tagStore = tagStore
-        self.offscreenOrigin = offscreenOrigin
+        self.offscreenParking = offscreenParking
+        self.displayProvider = displayProvider
         self.moveWindow = moveWindow
     }
 
@@ -41,9 +60,16 @@ public actor TagDispatcher {
         windowStore: WindowStore,
         tagStore: TagStore,
         windowMover: WindowMover,
+        offscreenParking: OffscreenParking = .default,
+        displayProvider: @escaping TagDisplayProvider = { [] },
         targetResolver: @escaping WindowMoveTargetResolver
     ) {
-        self.init(windowStore: windowStore, tagStore: tagStore) { window, frame in
+        self.init(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            offscreenParking: offscreenParking,
+            displayProvider: displayProvider
+        ) { window, frame in
             guard let target = targetResolver(window) else {
                 return
             }
@@ -87,7 +113,7 @@ public actor TagDispatcher {
 
         parkedWindowIDs.insert(window.id)
         visibleFramesByWindowID[window.id] = window.frame
-        let frame = CGRect(origin: offscreenOrigin, size: window.frame.size)
+        let frame = offscreenParking.frame(for: window, avoiding: await displayProvider())
         await moveWindow(window, frame)
         return TagDispatchMove(windowID: window.id, targetFrame: frame, reason: .hide)
     }

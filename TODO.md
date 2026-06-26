@@ -20,7 +20,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 2 — Tag-based workspace model (`ollyCore`)
 
-(B) 2026-06-26 Add deterministic offscreen-park coordinates that survive sleep/wake and display unplug +phase2 @swift @ax
 (B) 2026-06-26 XCTest: tag toggle does not resize visible windows, hidden windows do not steal focus, dispatcher is idempotent under 100 random sequences +phase2 @swift
 
 ---

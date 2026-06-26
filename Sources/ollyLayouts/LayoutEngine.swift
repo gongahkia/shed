@@ -48,6 +48,13 @@ public protocol LayoutEngine {
     var id: LayoutEngineID { get }
     var displayName: String { get }
     var config: Config { get }
+    var capabilities: LayoutEngineCapabilities { get }
 
     func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement]
+}
+
+public extension LayoutEngine {
+    var capabilities: LayoutEngineCapabilities {
+        []
+    }
 }

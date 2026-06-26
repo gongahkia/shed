@@ -21,10 +21,14 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingController: AXOnboardingWindowController?
     private let overviewController = OverviewModeController()
     private let commandPaletteController = CommandPaletteController()
+    private let settingsWindowController = SettingsWindowController()
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusController = OllyStatusMenuController(
+            onOpenSettings: { [weak self] in
+                self?.settingsWindowController.show()
+            },
             onOpenCommandPalette: { [weak self] in
                 self?.commandPaletteController.show()
             }
@@ -71,16 +75,19 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
 final class OllyStatusMenuController: NSObject {
     private let displayMonitor: DisplayMonitor
     private let statusItem: NSStatusItem
+    private let onOpenSettings: () -> Void
     private let onOpenCommandPalette: () -> Void
     private var state = OllyMenuState.default
 
     init(
         displayMonitor: DisplayMonitor = DisplayMonitor(),
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength),
+        onOpenSettings: @escaping () -> Void = {},
         onOpenCommandPalette: @escaping () -> Void = {}
     ) {
         self.displayMonitor = displayMonitor
         self.statusItem = statusItem
+        self.onOpenSettings = onOpenSettings
         self.onOpenCommandPalette = onOpenCommandPalette
         super.init()
     }
@@ -133,6 +140,7 @@ final class OllyStatusMenuController: NSObject {
         menu.addItem(disabledItem("AX: \(state.axLabel)"))
         menu.addItem(.separator())
         menu.addItem(actionItem("Refresh Status", #selector(refreshStatus)))
+        menu.addItem(actionItem("Settings...", #selector(openSettings)))
         menu.addItem(actionItem("Command Palette...", #selector(openCommandPalette)))
         menu.addItem(actionItem("Open Config.swift", #selector(openConfig)))
         menu.addItem(actionItem("Copy `ollyctl state`", #selector(copyStateCommand)))
@@ -156,6 +164,10 @@ final class OllyStatusMenuController: NSObject {
 
     @objc private func refreshStatus() {
         refreshState()
+    }
+
+    @objc private func openSettings() {
+        onOpenSettings()
     }
 
     @objc private func openCommandPalette() {

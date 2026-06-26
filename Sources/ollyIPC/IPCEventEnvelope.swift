@@ -1,8 +1,22 @@
 import Foundation
 import ollyLayouts
+import ollyKit
+
+public struct IPCFocusEvent: Codable, Equatable, Sendable {
+    public let focusedWindowID: WindowID?
+    public let displayID: DisplayID?
+    public let tagMask: UInt64?
+
+    public init(focusedWindowID: WindowID?, displayID: DisplayID? = nil, tagMask: UInt64? = nil) {
+        self.focusedWindowID = focusedWindowID
+        self.displayID = displayID
+        self.tagMask = tagMask
+    }
+}
 
 public enum IPCEvent: Codable, Equatable, Sendable {
     case engine(EngineEvent)
+    case focus(IPCFocusEvent)
 }
 
 public struct IPCEventEnvelope: Codable, Equatable, Sendable {

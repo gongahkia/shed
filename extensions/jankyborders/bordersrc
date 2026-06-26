@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+BORDERS="${BORDERS:-borders}"
+
+"$BORDERS" \
+  active_color="${OLLY_BORDER_ACTIVE_COLOR:-0xff7aa2f7}" \
+  inactive_color="${OLLY_BORDER_INACTIVE_COLOR:-0xff303446}" \
+  width="${OLLY_BORDER_WIDTH:-5.0}" \
+  style="${OLLY_BORDER_STYLE:-round}" \
+  hidpi="${OLLY_BORDER_HIDPI:-on}"

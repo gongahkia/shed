@@ -43,7 +43,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 7 — UX surfaces (`ollyApp`)
 
-(B) 2026-06-26 Implement command palette: floating fuzzy launcher over all olly actions (`switch-tag`, `move-window`, `cycle-engine`, etc.); cite Nehir prior art in code comments +phase7 @swift @ui
 (C) 2026-06-26 Settings window for non-DSL users: minimal — open Config.swift in editor, reload, show last compile error +phase7 @swift @ui
 
 ---

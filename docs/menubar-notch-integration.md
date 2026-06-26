@@ -18,6 +18,10 @@ Tiled windows are arranged inside already-shrunk display bounds:
 | User reserves | `reserve(rect:on:)` | olly DSL |
 | Cooperative app windows | app window frame | `cooperativeApps` |
 
+`SafeZoneCalculator` derives the default per-display `layoutFrame` from `Display.frame`,
+`Display.visibleFrame`, and `Display.safeAreaInsets`; `EngineHost.arrange(display:)` passes
+that shrunk frame to layout engines.
+
 Floating windows may overlap reserved zones. Tiled windows must not.
 
 IPC surface for integrations:

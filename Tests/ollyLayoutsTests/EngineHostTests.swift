@@ -103,6 +103,38 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [1])
     }
 
+    func testArrangeWithDisplayUsesSafeZoneLayoutFrame() async throws {
+        let tag = try Tag(index: 1)
+        let engineID = LayoutEngineID(rawValue: "fixed")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(tag))
+        let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { _, _ in }
+        )
+        let display = Display(
+            id: 1,
+            frame: CGRect(x: 0, y: 0, width: 800, height: 600),
+            visibleFrame: CGRect(x: 0, y: 0, width: 800, height: 576),
+            safeAreaInsets: DisplaySafeAreaInsets(top: 40),
+            scaleFactor: 2,
+            localizedName: "Display",
+            isMain: true
+        )
+        await tagStore.bindEngine(engineID, to: tag, on: 1)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(tag).rawValue))
+
+        let result = try await host.arrange(display: display, safeZones: SafeZoneCalculator(notchPadding: 12))
+
+        XCTAssertEqual(result.placements, [
+            Placement(windowID: 1, frame: CGRect(x: 0, y: 0, width: 320, height: 548))
+        ])
+    }
+
     func testStartSubscribesToWindowAndTagChanges() async throws {
         let tag = try Tag(index: 1)
         let engineID = LayoutEngineID(rawValue: "fixed")

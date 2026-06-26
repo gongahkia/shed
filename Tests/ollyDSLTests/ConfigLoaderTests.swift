@@ -14,6 +14,7 @@ final class ConfigLoaderTests: XCTestCase {
             Workspaces()
             Engines()
             CooperativeApps()
+            SafeZones()
             Hooks()
         }
 
@@ -22,6 +23,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.workspaces, Workspaces())
         XCTAssertEqual(config.engines, Engines())
         XCTAssertEqual(config.cooperativeApps, CooperativeApps())
+        XCTAssertEqual(config.safeZones, SafeZones())
         XCTAssertEqual(config.hooks, Hooks())
     }
 
@@ -129,6 +131,8 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(loaded.config.workspaces.tags.count, 8)
         XCTAssertEqual(loaded.config.engines.engines.count, 5)
         XCTAssertTrue(loaded.config.cooperativeApps.contains(bundleID: "com.example.CustomOverlay"))
+        XCTAssertEqual(loaded.config.safeZones.notchPadding, 16)
+        XCTAssertEqual(loaded.config.safeZones.reserves.count, 1)
         XCTAssertGreaterThanOrEqual(loaded.config.keybinds.bindings.count, 30)
         XCTAssertGreaterThanOrEqual(loaded.config.rules.rules.count, 10)
     }

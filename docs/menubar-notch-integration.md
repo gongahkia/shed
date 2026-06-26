@@ -22,6 +22,15 @@ Tiled windows are arranged inside already-shrunk display bounds:
 `Display.visibleFrame`, and `Display.safeAreaInsets`; `EngineHost.arrange(display:)` passes
 that shrunk frame to layout engines.
 
+Users can tune notch padding and add edge-aligned reserves:
+
+```swift
+SafeZones {
+    notchPadding(16)
+    reserve(rect: CGRect(x: 0, y: 900, width: 1512, height: 82), on: 1)
+}
+```
+
 Floating windows may overlap reserved zones. Tiled windows must not.
 
 IPC surface for integrations:

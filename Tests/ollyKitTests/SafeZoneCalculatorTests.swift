@@ -63,6 +63,23 @@ final class SafeZoneCalculatorTests: XCTestCase {
         XCTAssertTrue(result.reserves.isEmpty)
     }
 
+    func testLayoutFrameShrinksForUserTopReserve() {
+        let display = makeDisplay(
+            frame: CGRect(x: 0, y: 0, width: 800, height: 600),
+            visibleFrame: CGRect(x: 0, y: 0, width: 800, height: 600)
+        )
+        let reserve = SafeZoneReserve(
+            displayID: 1,
+            kind: .user,
+            rect: CGRect(x: 0, y: 520, width: 800, height: 80)
+        )
+
+        let result = SafeZoneCalculator(userReserves: [reserve]).result(for: display)
+
+        XCTAssertEqual(result.layoutFrame, CGRect(x: 0, y: 0, width: 800, height: 520))
+        XCTAssertEqual(result.reserves, [reserve])
+    }
+
     private func makeDisplay(
         frame: CGRect,
         visibleFrame: CGRect,

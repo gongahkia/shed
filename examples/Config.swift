@@ -1,3 +1,4 @@
+import CoreGraphics
 import ollyCore
 import ollyDSL
 
@@ -24,6 +25,11 @@ public func ollyConfig() -> Config {
 
         CooperativeApps {
             CooperativeApp("com.example.CustomOverlay")
+        }
+
+        SafeZones {
+            notchPadding(16)
+            reserve(rect: CGRect(x: 0, y: 900, width: 1512, height: 82), on: 1)
         }
 
         Keybinds {

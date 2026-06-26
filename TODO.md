@@ -35,7 +35,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 5 — Swift DSL config (`ollyDSL`)
 
-(A) 2026-06-26 Implement `Rule(match:apply:)` DSL: predicates on bundleID/title-regex/role/subrole; applies tags, engine override, floating flag +phase5 @swift @dsl
 (A) 2026-06-26 Implement `Tag.named(_:)` helper so users alias bitfield slots to names (`"comms"`, `"code"`); enforce uniqueness; surface compile-time errors +phase5 @swift @dsl
 (A) 2026-06-26 Ship `examples/Config.swift` exercising all 5 engines, 8 named tags, 30+ keybinds, 10+ rules +phase5 @swift @dsl @docs
 (B) 2026-06-26 Implement live-reload: watch `~/.config/olly/Config.swift` with FSEvents; on change, recompile, swap registry atomically, retain previous on compile failure with toast +phase5 @swift @dsl

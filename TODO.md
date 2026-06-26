@@ -30,7 +30,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 4 — Built-in layout engines
 
-(C) 2026-06-26 Document v0.2 backlog stubs in `docs/layouts-research.md`: Monocle, Spiral/Fibonacci, Grid, ThreeCol/CenteredMaster, Accordion — include source citations to XMonad, dwm, awesome, qtile, herbstluftwm, river +phase4 @docs @layout ref:N§6
 
 ---
 

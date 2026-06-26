@@ -10,6 +10,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let rules: Rules
     public let workspaces: Workspaces
     public let engines: Engines
+    public let cooperativeApps: CooperativeApps
     public let hooks: Hooks
 
     public init(
@@ -18,6 +19,7 @@ public struct Config: Codable, Equatable, Sendable {
         rules: Rules = Rules(),
         workspaces: Workspaces = Workspaces(),
         engines: Engines = Engines(),
+        cooperativeApps: CooperativeApps = CooperativeApps(),
         hooks: Hooks = Hooks()
     ) {
         self.version = version
@@ -25,6 +27,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.rules = rules
         self.workspaces = workspaces
         self.engines = engines
+        self.cooperativeApps = cooperativeApps
         self.hooks = hooks
     }
 
@@ -40,6 +43,8 @@ public struct Config: Codable, Equatable, Sendable {
             rules: try container.decodeIfPresent(Rules.self, forKey: .rules) ?? Rules(),
             workspaces: try container.decodeIfPresent(Workspaces.self, forKey: .workspaces) ?? Workspaces(),
             engines: try container.decodeIfPresent(Engines.self, forKey: .engines) ?? Engines(),
+            cooperativeApps: try container.decodeIfPresent(CooperativeApps.self, forKey: .cooperativeApps)
+                ?? CooperativeApps(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks()
         )
     }
@@ -49,6 +54,7 @@ public struct Config: Codable, Equatable, Sendable {
         var rules = Rules()
         var workspaces = Workspaces()
         var engines = Engines()
+        var cooperativeApps = CooperativeApps()
         var hooks = Hooks()
 
         for section in sections {
@@ -61,6 +67,8 @@ public struct Config: Codable, Equatable, Sendable {
                 workspaces = value
             case let .engines(value):
                 engines = value
+            case let .cooperativeApps(value):
+                cooperativeApps = value
             case let .hooks(value):
                 hooks = value
             }
@@ -72,6 +80,7 @@ public struct Config: Codable, Equatable, Sendable {
             rules: rules,
             workspaces: workspaces,
             engines: engines,
+            cooperativeApps: cooperativeApps,
             hooks: hooks
         )
     }
@@ -115,6 +124,10 @@ public enum ConfigBuilder {
         [.engines(expression)]
     }
 
+    public static func buildExpression(_ expression: CooperativeApps) -> [ConfigSection] {
+        [.cooperativeApps(expression)]
+    }
+
     public static func buildExpression(_ expression: Hooks) -> [ConfigSection] {
         [.hooks(expression)]
     }
@@ -125,6 +138,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case rules(Rules)
     case workspaces(Workspaces)
     case engines(Engines)
+    case cooperativeApps(CooperativeApps)
     case hooks(Hooks)
 }
 

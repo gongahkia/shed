@@ -6,8 +6,10 @@ public typealias DisplayID = CGDirectDisplayID
 public struct WindowState: Equatable, Sendable {
     public let id: WindowID
     public let processID: pid_t
+    public let bundleID: String?
     public let displayID: DisplayID?
     public let tagMask: UInt64
+    public let isFloating: Bool
     public let frame: CGRect
     public let title: String?
     public let role: String?
@@ -16,8 +18,10 @@ public struct WindowState: Equatable, Sendable {
     public init(
         id: WindowID,
         processID: pid_t,
+        bundleID: String? = nil,
         displayID: DisplayID? = nil,
         tagMask: UInt64 = 0,
+        isFloating: Bool = false,
         frame: CGRect,
         title: String? = nil,
         role: String? = nil,
@@ -25,8 +29,10 @@ public struct WindowState: Equatable, Sendable {
     ) {
         self.id = id
         self.processID = processID
+        self.bundleID = bundleID
         self.displayID = displayID
         self.tagMask = tagMask
+        self.isFloating = isFloating
         self.frame = frame
         self.title = title
         self.role = role

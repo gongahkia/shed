@@ -18,6 +18,26 @@ final class WindowTagAssignmentTests: XCTestCase {
         XCTAssertEqual(storedTagMask, TagSet(two).rawValue)
     }
 
+    func testAssignPreservesWindowMetadata() async throws {
+        let one = try Tag(index: 1)
+        let two = try Tag(index: 2)
+        let store = WindowStore()
+        let assignment = WindowTagAssignment(windowStore: store)
+        await store.upsert(
+            window(
+                id: 1,
+                tagMask: TagSet(one).rawValue,
+                bundleID: "com.example.Overlay",
+                isFloating: true
+            )
+        )
+
+        let updated = try await assignment.assign(window: 1, tags: TagSet(two))
+
+        XCTAssertEqual(updated.bundleID, "com.example.Overlay")
+        XCTAssertTrue(updated.isFloating)
+    }
+
     func testToggleAddsAndRemovesTag() async throws {
         let one = try Tag(index: 1)
         let two = try Tag(index: 2)
@@ -60,13 +80,17 @@ final class WindowTagAssignmentTests: XCTestCase {
     private func window(
         id: WindowID,
         displayID: DisplayID = 1,
-        tagMask: UInt64 = 0
+        tagMask: UInt64 = 0,
+        bundleID: String? = nil,
+        isFloating: Bool = false
     ) -> WindowState {
         WindowState(
             id: id,
             processID: 42,
+            bundleID: bundleID,
             displayID: displayID,
             tagMask: tagMask,
+            isFloating: isFloating,
             frame: CGRect(x: 0, y: 0, width: 100, height: 100),
             title: "window",
             role: "AXWindow",

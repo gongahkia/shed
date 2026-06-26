@@ -147,7 +147,9 @@ struct OllyCtlRunner {
         }
         let windows = snapshot.windows.map { window in
             let title = window.title.map { " \"\($0)\"" } ?? ""
-            return "window \(window.windowID): pid \(window.processID)\(title)"
+            let bundle = window.bundleID.map { " bundle \($0)" } ?? ""
+            let floating = window.isFloating ? " floating" : ""
+            return "window \(window.windowID): pid \(window.processID)\(bundle)\(floating)\(title)"
         }
         return (displays + windows).isEmpty ? "no state" : (displays + windows).joined(separator: "\n")
     }

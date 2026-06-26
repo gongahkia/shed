@@ -71,6 +71,22 @@ Built-in defaults come from `NORTHSTAR.md` §7b. Apps without verified bundle ID
 section must stay user-configured until verified through a signed app bundle, `mdls`, or an
 official source.
 
+Users extend defaults:
+
+```swift
+CooperativeApps {
+    CooperativeApp("com.example.CustomOverlay")
+}
+```
+
+Users replace defaults:
+
+```swift
+CooperativeApps(mode: .replace) {
+    CooperativeApp("com.example.OnlyOverlay")
+}
+```
+
 ## Source Notes
 
 Checked sources with reachable product or official-doc URLs on 2026-06-26:

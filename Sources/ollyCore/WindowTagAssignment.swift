@@ -53,8 +53,10 @@ public actor WindowTagAssignment {
         WindowState(
             id: state.id,
             processID: state.processID,
+            bundleID: state.bundleID,
             displayID: displayID ?? state.displayID,
             tagMask: tagMask ?? state.tagMask,
+            isFloating: state.isFloating,
             frame: state.frame,
             title: state.title,
             role: state.role,

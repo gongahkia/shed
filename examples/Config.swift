@@ -22,6 +22,10 @@ public func ollyConfig() -> Config {
             EngineDeclaration.niriScroll
         }
 
+        CooperativeApps {
+            CooperativeApp("com.example.CustomOverlay")
+        }
+
         Keybinds {
             Keybind(KeyChord([.command, .option], .one), do: .switchTag(0))
             Keybind(KeyChord([.command, .option], .two), do: .switchTag(1))

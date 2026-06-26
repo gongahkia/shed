@@ -22,7 +22,7 @@ let package = Package(
         .target(name: "ollyKit", exclude: ["README.md"]),
         .target(name: "ollyCore", dependencies: ["ollyKit"], exclude: ["README.md"]),
         .target(name: "ollyLayouts", dependencies: ["ollyCore", "ollyKit"], exclude: ["README.md"]),
-        .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyLayouts"], exclude: ["README.md"]),
+        .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyKit", "ollyLayouts"], exclude: ["README.md"]),
         .target(name: "ollyIPC", dependencies: ["ollyKit", "ollyCore", "ollyLayouts"], exclude: ["README.md"]),
         .executableTarget(
             name: "ollyApp",

@@ -1,5 +1,6 @@
 import XCTest
 import ollyCore
+import ollyKit
 @testable import ollyDSL
 
 final class RuleTests: XCTestCase {
@@ -34,6 +35,25 @@ final class RuleTests: XCTestCase {
         }
 
         XCTAssertEqual(config.rules.rules, [rule])
+    }
+
+    func testCooperativeAppsExtendNorthstarDefaults() {
+        let apps = CooperativeApps {
+            CooperativeApp("com.example.CustomOverlay")
+        }
+
+        XCTAssertTrue(apps.contains(bundleID: "com.felixkratz.SketchyBar"))
+        XCTAssertTrue(apps.contains(bundleID: "org.hammerspoon.Hammerspoon"))
+        XCTAssertTrue(apps.contains(bundleID: "com.example.CustomOverlay"))
+    }
+
+    func testCooperativeAppsCanReplaceNorthstarDefaults() {
+        let apps = CooperativeApps(mode: .replace) {
+            CooperativeApp("com.example.OnlyOverlay")
+        }
+
+        XCTAssertFalse(apps.contains(bundleID: "com.felixkratz.SketchyBar"))
+        XCTAssertTrue(apps.contains(bundleID: "com.example.OnlyOverlay"))
     }
 
     func testRuleMatchRequiresAllSpecifiedPredicates() {
@@ -77,5 +97,50 @@ final class RuleTests: XCTestCase {
         let context = RuleContext(title: "README.md")
 
         XCTAssertFalse(match.matches(context))
+    }
+
+    func testConfigResolvesCooperativeAppsAsFloating() {
+        let config = Config {
+            CooperativeApps(mode: .replace) {
+                CooperativeApp("com.example.Overlay")
+            }
+            Rules {
+                Rule(
+                    match: RuleMatch(bundleID: "com.example.Overlay"),
+                    apply: RuleApply(engine: "bsp", floating: false)
+                )
+            }
+        }
+
+        let apply = config.resolvedApply(for: RuleContext(bundleID: "com.example.Overlay"))
+
+        XCTAssertEqual(apply.engineOverride, "bsp")
+        XCTAssertEqual(apply.floating, true)
+    }
+
+    func testConfigResolvesCooperativeWindowStateAsFloating() {
+        let state = WindowState(
+            id: 9,
+            processID: 42,
+            bundleID: "com.felixkratz.SketchyBar",
+            displayID: 1,
+            frame: .zero
+        )
+
+        let resolved = Config().resolvedWindowState(for: state)
+
+        XCTAssertTrue(resolved.isFloating)
+        XCTAssertEqual(resolved.bundleID, "com.felixkratz.SketchyBar")
+    }
+
+    func testRulesResolveLaterMatchesOverEarlierMatches() {
+        let rules = Rules {
+            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: "bsp"))
+            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: "niri-scroll"))
+        }
+
+        let apply = rules.resolvedApply(for: RuleContext(bundleID: "com.example.App"))
+
+        XCTAssertEqual(apply.engineOverride, "niri-scroll")
     }
 }

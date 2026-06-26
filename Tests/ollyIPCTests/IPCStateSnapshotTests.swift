@@ -16,8 +16,10 @@ final class IPCStateSnapshotTests: XCTestCase {
         let state = WindowState(
             id: 77,
             processID: 123,
+            bundleID: "com.example.Editor",
             displayID: 9,
             tagMask: tagSet.rawValue,
+            isFloating: true,
             frame: CGRect(x: 10, y: 20, width: 300, height: 400),
             title: "Editor",
             role: "AXWindow",
@@ -28,8 +30,10 @@ final class IPCStateSnapshotTests: XCTestCase {
 
         XCTAssertEqual(ipcState.windowID, 77)
         XCTAssertEqual(ipcState.processID, 123)
+        XCTAssertEqual(ipcState.bundleID, "com.example.Editor")
         XCTAssertEqual(ipcState.displayID, 9)
         XCTAssertEqual(ipcState.tags.map(\.rawValue), [1, 3])
+        XCTAssertTrue(ipcState.isFloating)
         XCTAssertEqual(ipcState.frame, IPCFrame(x: 10, y: 20, width: 300, height: 400))
         XCTAssertEqual(ipcState.title, "Editor")
     }

@@ -48,7 +48,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 8 — Ecosystem bridges
 
-(A) 2026-06-26 Implement `cooperativeApps` allowlist: bundle-ID list from NORTHSTAR §7b is built in; user can extend/replace via DSL; matching app's windows auto-float and are excluded from tile placement +phase8 @swift @dsl @ecosystem ref:N§7b
 (A) 2026-06-26 Implement safe-zone calculator: per-display reserved rects from notch (`NSScreen.safeAreaInsets` + 12 px buffer) and menubar; layout engines receive `bounds` already shrunk +phase8 @swift @layout ref:N§12b
 (A) 2026-06-26 Add DSL primitive `reserve(rect:on:)` and `notchPadding(_:)`; document and exercise in example Config +phase8 @swift @dsl ref:N§12b
 (B) 2026-06-26 Add `extensions/ubersicht/` simple-bar-compatible widget reading olly IPC; document config +phase8 @ecosystem @docs

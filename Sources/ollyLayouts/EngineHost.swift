@@ -87,7 +87,7 @@ public actor EngineHost {
         let engine = try await resolveEngine(for: tagState)
 
         let windows = await windowStore.windows(onDisplay: displayID).filter {
-            TagSet(rawValue: $0.tagMask).intersects(tagState.activeTags)
+            !$0.isFloating && TagSet(rawValue: $0.tagMask).intersects(tagState.activeTags)
         }
         let snapshots = windows.map(WindowSnapshot.init)
         let placements = engine.arrange(windows: snapshots, in: bounds, focus: focus)

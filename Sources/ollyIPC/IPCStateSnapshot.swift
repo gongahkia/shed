@@ -82,8 +82,10 @@ public struct IPCFrame: Codable, Equatable, Sendable {
 public struct IPCWindowState: Codable, Equatable, Sendable {
     public let windowID: WindowID
     public let processID: Int32
+    public let bundleID: String?
     public let displayID: DisplayID?
     public let tags: [IPCTagIndex]
+    public let isFloating: Bool
     public let frame: IPCFrame
     public let title: String?
     public let role: String?
@@ -92,8 +94,10 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public init(
         windowID: WindowID,
         processID: Int32,
+        bundleID: String? = nil,
         displayID: DisplayID? = nil,
         tags: [IPCTagIndex] = [],
+        isFloating: Bool = false,
         frame: IPCFrame,
         title: String? = nil,
         role: String? = nil,
@@ -101,8 +105,10 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     ) {
         self.windowID = windowID
         self.processID = processID
+        self.bundleID = bundleID
         self.displayID = displayID
         self.tags = tags
+        self.isFloating = isFloating
         self.frame = frame
         self.title = title
         self.role = role
@@ -113,8 +119,10 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.init(
             windowID: state.id,
             processID: state.processID,
+            bundleID: state.bundleID,
             displayID: state.displayID,
             tags: IPCTagIndex.indices(in: TagSet(rawValue: state.tagMask)),
+            isFloating: state.isFloating,
             frame: IPCFrame(state.frame),
             title: state.title,
             role: state.role,

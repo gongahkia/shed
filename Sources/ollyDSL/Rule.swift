@@ -1,5 +1,6 @@
 import Foundation
 import ollyCore
+import ollyKit
 
 public struct RuleMatch: Codable, Equatable, Sendable {
     public let bundleID: String?
@@ -69,6 +70,14 @@ public struct RuleApply: Codable, Equatable, Sendable {
         self.engineOverride = engine
         self.floating = floating
     }
+
+    public func merging(_ override: RuleApply) -> RuleApply {
+        RuleApply(
+            tags: override.tags ?? tags,
+            engine: override.engineOverride ?? engineOverride,
+            floating: override.floating ?? floating
+        )
+    }
 }
 
 public struct Rule: Codable, Equatable, Sendable {
@@ -90,6 +99,45 @@ public struct Rules: Codable, Equatable, Sendable {
 
     public init(@RuleBuilder _ build: () -> [Rule]) {
         self.rules = build()
+    }
+
+    public func resolvedApply(for context: RuleContext) -> RuleApply {
+        rules.reduce(RuleApply()) { result, rule in
+            rule.match.matches(context) ? result.merging(rule.apply) : result
+        }
+    }
+}
+
+public extension Config {
+    func resolvedApply(for context: RuleContext) -> RuleApply {
+        var apply = rules.resolvedApply(for: context)
+        if cooperativeApps.contains(bundleID: context.bundleID) {
+            apply = apply.merging(RuleApply(floating: true))
+        }
+        return apply
+    }
+
+    func resolvedWindowState(for state: WindowState) -> WindowState {
+        let apply = resolvedApply(
+            for: RuleContext(
+                bundleID: state.bundleID,
+                title: state.title,
+                role: state.role,
+                subrole: state.subrole
+            )
+        )
+        return WindowState(
+            id: state.id,
+            processID: state.processID,
+            bundleID: state.bundleID,
+            displayID: state.displayID,
+            tagMask: apply.tags?.rawValue ?? state.tagMask,
+            isFloating: apply.floating ?? state.isFloating,
+            frame: state.frame,
+            title: state.title,
+            role: state.role,
+            subrole: state.subrole
+        )
     }
 }
 

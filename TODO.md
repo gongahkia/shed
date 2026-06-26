@@ -15,7 +15,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 1 — AX foundation (`ollyKit`)
 
-(A) 2026-06-26 Implement `WindowRef.swift` wrapping `AXUIElementRef` with cached attrs: title, role, subrole, frame, pid, windowID via `_AXUIElementGetWindow` (note: this is borderline — keep behind a feature flag and add fallback via CGWindowList matching) +phase1 @swift @ax ref:N§4-D2
 (A) 2026-06-26 Implement `AXObserver+Combine.swift`: bridge AXObserver notifications (Created, UIElementDestroyed, FocusedWindowChanged, WindowMoved, WindowResized, MainWindowChanged, ApplicationActivated) to AsyncStream +phase1 @swift @ax
 (A) 2026-06-26 Implement `WindowStore`: actor holding canonical state — `[WindowID: WindowState]`, indexed by pid/display/tags; emit deltas to subscribers +phase1 @swift
 (A) 2026-06-26 Implement `WindowMover`: setPosition/setSize via AX with retry+backoff; coalesce rapid sequential moves into one frame; respect `kAXResizableAttribute` and skip non-resizable +phase1 @swift @ax

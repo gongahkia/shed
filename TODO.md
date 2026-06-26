@@ -10,7 +10,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 0 — Repo bootstrap
 
-(A) 2026-06-26 Add LICENSE file with MIT text; populate `Sources/<target>/README.md` stubs for each target +phase0 @docs ref:N§4-D9
 (A) 2026-06-26 Add `.swiftlint.yml` enforcing line-length 120, no force-unwraps in non-test code, file-header off; add `.swiftformat` matching SwiftLint +phase0 @ci ref:N§9
 (A) 2026-06-26 Add `.github/workflows/ci.yml` running `swift build -c release` + `swift test` on macos-14 runner; add lint job +phase0 @ci ref:N§9
 (A) 2026-06-26 Add `scripts/check-no-private-api.sh` grepping for known private symbols (CGS, SLS, SkyLight) and add as CI gate +phase0 @ci ref:N§4-D2

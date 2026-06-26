@@ -16,15 +16,16 @@ let package = Package(
         .library(name: "ollyIPC", targets: ["ollyIPC"]),
     ],
     targets: [
-        .target(name: "ollyKit"),
-        .target(name: "ollyCore", dependencies: ["ollyKit"]),
-        .target(name: "ollyLayouts", dependencies: ["ollyCore"]),
-        .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyLayouts"]),
-        .target(name: "ollyIPC", dependencies: ["ollyCore"]),
+        .target(name: "ollyKit", exclude: ["README.md"]),
+        .target(name: "ollyCore", dependencies: ["ollyKit"], exclude: ["README.md"]),
+        .target(name: "ollyLayouts", dependencies: ["ollyCore"], exclude: ["README.md"]),
+        .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyLayouts"], exclude: ["README.md"]),
+        .target(name: "ollyIPC", dependencies: ["ollyCore"], exclude: ["README.md"]),
         .executableTarget(
             name: "ollyApp",
-            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"]
+            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"],
+            exclude: ["README.md"]
         ),
-        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"]),
+        .executableTarget(name: "ollyctl", dependencies: ["ollyIPC"], exclude: ["README.md"]),
     ]
 )

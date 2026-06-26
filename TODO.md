@@ -20,7 +20,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 2 — Tag-based workspace model (`ollyCore`)
 
-(A) 2026-06-26 Define `Tag` as a typed `UInt64` bitfield index 0…63; `TagSet` value type with set algebra +phase2 @swift ref:N§4-D3
 (A) 2026-06-26 Implement `TagStore`: per-`Display` state holding `activeTags: TagSet`, `tagToEngine: [Tag: LayoutEngineID]`, MRU history +phase2 @swift
 (A) 2026-06-26 Implement `TagDispatcher`: applies tag changes — hides windows whose `windowTags ∩ activeTags == ∅` by moving offscreen (-32000,-32000); shows the rest; idempotent +phase2 @swift @ax ref:N§7
 (A) 2026-06-26 Implement window-to-tag assignment API: `assign(window, tags:)`, `toggle(window, tag:)`, `move(window, toDisplay:)` +phase2 @swift

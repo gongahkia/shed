@@ -14,9 +14,13 @@ consumes that response and then prints event lines.
 
 - `state`
 - `focus`
+- `move-window`
 - `swap`
+- `switch-tag`
 - `move-to-tag`
+- `toggle-tag`
 - `set-engine`
+- `cycle-engine`
 - `tag-add`
 - `tag-remove`
 - `reload`
@@ -55,9 +59,13 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
       "enum": [
         "state",
         "focus",
+        "move-window",
         "swap",
+        "switch-tag",
         "move-to-tag",
+        "toggle-tag",
         "set-engine",
+        "cycle-engine",
         "tag-add",
         "tag-remove",
         "reload",
@@ -172,10 +180,30 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         {
           "properties": {
             "name": {
+              "const": "move-window"
+            },
+            "arguments": {
+              "$ref": "#/$defs/directionalArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "swap"
             },
             "arguments": {
               "$ref": "#/$defs/directionalArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "switch-tag"
+            },
+            "arguments": {
+              "$ref": "#/$defs/tagArguments"
             }
           }
         },
@@ -192,10 +220,30 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         {
           "properties": {
             "name": {
+              "const": "toggle-tag"
+            },
+            "arguments": {
+              "$ref": "#/$defs/tagArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "set-engine"
             },
             "arguments": {
               "$ref": "#/$defs/setEngineArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "cycle-engine"
+            },
+            "arguments": {
+              "$ref": "#/$defs/cycleEngineArguments"
             }
           }
         },
@@ -309,6 +357,18 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         },
         "tag": {
           "$ref": "#/$defs/tagIndex"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "cycleEngineArguments": {
+      "type": "object",
+      "properties": {
+        "reverse": {
+          "type": "boolean"
         },
         "displayID": {
           "$ref": "#/$defs/displayID"

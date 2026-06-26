@@ -12,9 +12,13 @@ struct OllyCtl: ParsableCommand {
         subcommands: [
             State.self,
             Focus.self,
+            MoveWindow.self,
             Swap.self,
+            SwitchTag.self,
             MoveToTag.self,
+            ToggleTag.self,
             SetEngine.self,
+            CycleEngine.self,
             TagAdd.self,
             TagRemove.self,
             Reload.self,
@@ -69,6 +73,27 @@ struct Focus: ParsableCommand {
     }
 }
 
+struct MoveWindow: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "move-window",
+        abstract: "Move the focused window in a direction."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Argument(help: "Direction: up, down, left, right, next, previous.")
+    var direction: String
+
+    @Option(help: "Target display ID.")
+    var displayID: DisplayID?
+
+    func run() throws {
+        let command = IPCDirectionalCommand(direction: try parseDirection(direction), displayID: displayID)
+        try OllyCtlRunner(options: options).send(.moveWindow(command))
+    }
+}
+
 struct Swap: ParsableCommand {
     static let configuration = CommandConfiguration(abstract: "Swap the focused window in a direction.")
 
@@ -84,6 +109,27 @@ struct Swap: ParsableCommand {
     func run() throws {
         let command = IPCDirectionalCommand(direction: try parseDirection(direction), displayID: displayID)
         try OllyCtlRunner(options: options).send(.swap(command))
+    }
+}
+
+struct SwitchTag: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "switch-tag",
+        abstract: "Switch the active display view to one tag."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Argument(help: "Tag index in 0..<64.")
+    var tag: Int
+
+    @Option(help: "Target display ID.")
+    var displayID: DisplayID?
+
+    func run() throws {
+        let command = IPCTagCommand(tag: try parseTag(tag), displayID: displayID)
+        try OllyCtlRunner(options: options).send(.switchTag(command))
     }
 }
 
@@ -115,6 +161,27 @@ struct MoveToTag: ParsableCommand {
     }
 }
 
+struct ToggleTag: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "toggle-tag",
+        abstract: "Toggle a tag in the active display view."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Argument(help: "Tag index in 0..<64.")
+    var tag: Int
+
+    @Option(help: "Target display ID.")
+    var displayID: DisplayID?
+
+    func run() throws {
+        let command = IPCTagCommand(tag: try parseTag(tag), displayID: displayID)
+        try OllyCtlRunner(options: options).send(.toggleTag(command))
+    }
+}
+
 struct SetEngine: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "set-engine",
@@ -140,6 +207,27 @@ struct SetEngine: ParsableCommand {
             displayID: displayID
         )
         try OllyCtlRunner(options: options).send(.setEngine(command))
+    }
+}
+
+struct CycleEngine: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "cycle-engine",
+        abstract: "Cycle the active tag through configured layout engines."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Flag(help: "Cycle in reverse order.")
+    var reverse = false
+
+    @Option(help: "Target display ID.")
+    var displayID: DisplayID?
+
+    func run() throws {
+        let command = IPCCycleEngineCommand(reverse: reverse, displayID: displayID)
+        try OllyCtlRunner(options: options).send(.cycleEngine(command))
     }
 }
 

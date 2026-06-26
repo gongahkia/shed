@@ -5,9 +5,13 @@ import ollyKit
 public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
     case state
     case focus
+    case moveWindow = "move-window"
     case swap
+    case switchTag = "switch-tag"
     case moveToTag = "move-to-tag"
+    case toggleTag = "toggle-tag"
     case setEngine = "set-engine"
+    case cycleEngine = "cycle-engine"
     case tagAdd = "tag-add"
     case tagRemove = "tag-remove"
     case reload
@@ -74,6 +78,16 @@ public struct IPCSetEngineCommand: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCCycleEngineCommand: Codable, Equatable, Sendable {
+    public let reverse: Bool
+    public let displayID: DisplayID?
+
+    public init(reverse: Bool = false, displayID: DisplayID? = nil) {
+        self.reverse = reverse
+        self.displayID = displayID
+    }
+}
+
 public struct IPCTagCommand: Codable, Equatable, Sendable {
     public let tag: IPCTagIndex
     public let displayID: DisplayID?
@@ -108,9 +122,13 @@ public struct IPCVersionCommand: Codable, Equatable, Sendable {
 public enum IPCCommand: Equatable, Sendable {
     case state(IPCStateCommand)
     case focus(IPCDirectionalCommand)
+    case moveWindow(IPCDirectionalCommand)
     case swap(IPCDirectionalCommand)
+    case switchTag(IPCTagCommand)
     case moveToTag(IPCMoveToTagCommand)
+    case toggleTag(IPCTagCommand)
     case setEngine(IPCSetEngineCommand)
+    case cycleEngine(IPCCycleEngineCommand)
     case tagAdd(IPCTagCommand)
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
@@ -123,12 +141,20 @@ public enum IPCCommand: Equatable, Sendable {
             return .state
         case .focus:
             return .focus
+        case .moveWindow:
+            return .moveWindow
         case .swap:
             return .swap
+        case .switchTag:
+            return .switchTag
         case .moveToTag:
             return .moveToTag
+        case .toggleTag:
+            return .toggleTag
         case .setEngine:
             return .setEngine
+        case .cycleEngine:
+            return .cycleEngine
         case .tagAdd:
             return .tagAdd
         case .tagRemove:
@@ -156,18 +182,17 @@ extension IPCCommand: Codable {
         switch name {
         case .state:
             self = .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
-        case .focus:
-            self = .focus(try container.decodeRequired(IPCDirectionalCommand.self, forKey: .arguments))
-        case .swap:
-            self = .swap(try container.decodeRequired(IPCDirectionalCommand.self, forKey: .arguments))
+        case .focus, .moveWindow, .swap:
+            self = try Self.decodeDirectionalCommand(name, from: container)
+        case .switchTag, .toggleTag, .tagAdd, .tagRemove:
+            self = try Self.decodeTagCommand(name, from: container)
         case .moveToTag:
             self = .moveToTag(try container.decodeRequired(IPCMoveToTagCommand.self, forKey: .arguments))
         case .setEngine:
             self = .setEngine(try container.decodeRequired(IPCSetEngineCommand.self, forKey: .arguments))
-        case .tagAdd:
-            self = .tagAdd(try container.decodeRequired(IPCTagCommand.self, forKey: .arguments))
-        case .tagRemove:
-            self = .tagRemove(try container.decodeRequired(IPCTagCommand.self, forKey: .arguments))
+        case .cycleEngine:
+            let command = try container.decodeIfPresent(IPCCycleEngineCommand.self, forKey: .arguments) ?? .init()
+            self = .cycleEngine(command)
         case .reload:
             self = .reload(try container.decodeIfPresent(IPCReloadCommand.self, forKey: .arguments) ?? .init())
         case .subscribeEvents:
@@ -185,17 +210,15 @@ extension IPCCommand: Codable {
         switch self {
         case let .state(command):
             try container.encode(command, forKey: .arguments)
-        case let .focus(command):
+        case let .focus(command), let .moveWindow(command), let .swap(command):
             try container.encode(command, forKey: .arguments)
-        case let .swap(command):
+        case let .switchTag(command), let .toggleTag(command), let .tagAdd(command), let .tagRemove(command):
             try container.encode(command, forKey: .arguments)
         case let .moveToTag(command):
             try container.encode(command, forKey: .arguments)
         case let .setEngine(command):
             try container.encode(command, forKey: .arguments)
-        case let .tagAdd(command):
-            try container.encode(command, forKey: .arguments)
-        case let .tagRemove(command):
+        case let .cycleEngine(command):
             try container.encode(command, forKey: .arguments)
         case let .reload(command):
             try container.encode(command, forKey: .arguments)
@@ -203,6 +226,38 @@ extension IPCCommand: Codable {
             try container.encode(command, forKey: .arguments)
         case let .version(command):
             try container.encode(command, forKey: .arguments)
+        }
+    }
+
+    private static func decodeDirectionalCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        let command = try container.decodeRequired(IPCDirectionalCommand.self, forKey: .arguments)
+        switch name {
+        case .focus:
+            return .focus(command)
+        case .moveWindow:
+            return .moveWindow(command)
+        default:
+            return .swap(command)
+        }
+    }
+
+    private static func decodeTagCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        let command = try container.decodeRequired(IPCTagCommand.self, forKey: .arguments)
+        switch name {
+        case .switchTag:
+            return .switchTag(command)
+        case .toggleTag:
+            return .toggleTag(command)
+        case .tagAdd:
+            return .tagAdd(command)
+        default:
+            return .tagRemove(command)
         }
     }
 }

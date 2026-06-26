@@ -1,0 +1,96 @@
+import Foundation
+
+public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Sendable {
+    case acknowledged
+    case state
+    case subscribed
+    case version
+}
+
+public struct IPCAcknowledgement: Codable, Equatable, Sendable {
+    public let message: String?
+
+    public init(message: String? = nil) {
+        self.message = message
+    }
+}
+
+public struct IPCSubscriptionInfo: Codable, Equatable, Sendable {
+    public let eventKinds: [IPCEventKind]
+
+    public init(eventKinds: [IPCEventKind]) {
+        self.eventKinds = eventKinds
+    }
+}
+
+public struct IPCVersionInfo: Codable, Equatable, Sendable {
+    public let protocolVersion: Int
+    public let supportedCommands: [IPCCommandName]
+
+    public init(
+        protocolVersion: Int = OllyIPC.protocolVersion,
+        supportedCommands: [IPCCommandName] = OllyIPC.supportedCommandNames
+    ) {
+        self.protocolVersion = protocolVersion
+        self.supportedCommands = supportedCommands
+    }
+}
+
+public enum IPCCommandResult: Equatable, Sendable {
+    case acknowledged(IPCAcknowledgement)
+    case state(IPCStateSnapshot)
+    case subscribed(IPCSubscriptionInfo)
+    case version(IPCVersionInfo)
+
+    public var name: IPCCommandResultName {
+        switch self {
+        case .acknowledged:
+            return .acknowledged
+        case .state:
+            return .state
+        case .subscribed:
+            return .subscribed
+        case .version:
+            return .version
+        }
+    }
+}
+
+extension IPCCommandResult: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case payload
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let name = try container.decode(IPCCommandResultName.self, forKey: .name)
+
+        switch name {
+        case .acknowledged:
+            self = .acknowledged(try container.decode(IPCAcknowledgement.self, forKey: .payload))
+        case .state:
+            self = .state(try container.decode(IPCStateSnapshot.self, forKey: .payload))
+        case .subscribed:
+            self = .subscribed(try container.decode(IPCSubscriptionInfo.self, forKey: .payload))
+        case .version:
+            self = .version(try container.decode(IPCVersionInfo.self, forKey: .payload))
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
+
+        switch self {
+        case let .acknowledged(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .state(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .subscribed(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .version(payload):
+            try container.encode(payload, forKey: .payload)
+        }
+    }
+}

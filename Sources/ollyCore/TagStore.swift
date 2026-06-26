@@ -1,3 +1,4 @@
+import Foundation
 import ollyKit
 
 public struct LayoutEngineID: Codable, ExpressibleByStringLiteral, Hashable, RawRepresentable, Sendable {
@@ -32,10 +33,25 @@ public struct DisplayTagState: Equatable, Sendable {
     }
 }
 
+public enum TagStoreDelta: Equatable, Sendable {
+    case updated(previous: DisplayTagState, current: DisplayTagState)
+    case removed(DisplayTagState)
+
+    public var displayID: DisplayID {
+        switch self {
+        case let .updated(_, current):
+            return current.displayID
+        case let .removed(state):
+            return state.displayID
+        }
+    }
+}
+
 public actor TagStore {
     private let defaultActiveTags: TagSet
     private let maxHistoryCount: Int
     private var statesByDisplayID: [DisplayID: DisplayTagState] = [:]
+    private var subscribers: [UUID: AsyncStream<TagStoreDelta>.Continuation] = [:]
 
     public init(defaultActiveTags: TagSet = [], maxHistoryCount: Int = 16) {
         self.defaultActiveTags = defaultActiveTags
@@ -52,26 +68,32 @@ public actor TagStore {
 
     @discardableResult
     public func setActiveTags(_ tags: TagSet, on displayID: DisplayID) -> DisplayTagState {
-        var state = stateRef(for: displayID)
+        let previous = stateRef(for: displayID)
+        var state = previous
         state.activeTags = tags
         record(tags, in: &state)
         statesByDisplayID[displayID] = state
+        publishUpdate(previous: previous, current: state)
         return state
     }
 
     @discardableResult
     public func bindEngine(_ engineID: LayoutEngineID, to tag: Tag, on displayID: DisplayID) -> DisplayTagState {
-        var state = stateRef(for: displayID)
+        let previous = stateRef(for: displayID)
+        var state = previous
         state.tagToEngine[tag] = engineID
         statesByDisplayID[displayID] = state
+        publishUpdate(previous: previous, current: state)
         return state
     }
 
     @discardableResult
     public func unbindEngine(for tag: Tag, on displayID: DisplayID) -> DisplayTagState {
-        var state = stateRef(for: displayID)
+        let previous = stateRef(for: displayID)
+        var state = previous
         state.tagToEngine[tag] = nil
         statesByDisplayID[displayID] = state
+        publishUpdate(previous: previous, current: state)
         return state
     }
 
@@ -88,7 +110,28 @@ public actor TagStore {
     }
 
     public func removeDisplay(_ displayID: DisplayID) {
-        statesByDisplayID[displayID] = nil
+        guard let state = statesByDisplayID.removeValue(forKey: displayID) else {
+            return
+        }
+        publish(.removed(state))
+    }
+
+    public func deltas() -> AsyncStream<TagStoreDelta> {
+        let id = UUID()
+        var capturedContinuation: AsyncStream<TagStoreDelta>.Continuation?
+        let stream = AsyncStream<TagStoreDelta>(bufferingPolicy: .bufferingNewest(256)) { continuation in
+            capturedContinuation = continuation
+            continuation.onTermination = { [weak self] _ in
+                Task {
+                    await self?.removeSubscriber(id: id)
+                }
+            }
+        }
+
+        if let capturedContinuation {
+            subscribers[id] = capturedContinuation
+        }
+        return stream
     }
 
     private func stateRef(for displayID: DisplayID) -> DisplayTagState {
@@ -114,5 +157,22 @@ public actor TagStore {
         if state.mruHistory.count > maxHistoryCount {
             state.mruHistory.removeLast(state.mruHistory.count - maxHistoryCount)
         }
+    }
+
+    private func publishUpdate(previous: DisplayTagState, current: DisplayTagState) {
+        guard previous != current else {
+            return
+        }
+        publish(.updated(previous: previous, current: current))
+    }
+
+    private func publish(_ delta: TagStoreDelta) {
+        for subscriber in subscribers.values {
+            subscriber.yield(delta)
+        }
+    }
+
+    private func removeSubscriber(id: UUID) {
+        subscribers[id] = nil
     }
 }

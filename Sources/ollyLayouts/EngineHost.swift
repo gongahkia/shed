@@ -82,6 +82,14 @@ public actor EngineHost {
         }
     }
 
+    public nonisolated func start(
+        display: Display,
+        safeZones: SafeZoneCalculator = SafeZoneCalculator(),
+        focus: WindowID? = nil
+    ) -> Task<Void, Never> {
+        start(displayID: display.id, bounds: safeZones.layoutFrame(for: display), focus: focus)
+    }
+
     public func arrange(displayID: DisplayID, bounds: CGRect, focus: WindowID? = nil) async throws -> EngineHostResult {
         let tagState = await tagStore.state(for: displayID)
         let engine = try await resolveEngine(for: tagState)
@@ -120,6 +128,14 @@ public actor EngineHost {
             appliedPlacements: changedPlacements,
             events: [event]
         )
+    }
+
+    public func arrange(
+        display: Display,
+        safeZones: SafeZoneCalculator = SafeZoneCalculator(),
+        focus: WindowID? = nil
+    ) async throws -> EngineHostResult {
+        try await arrange(displayID: display.id, bounds: safeZones.layoutFrame(for: display), focus: focus)
     }
 
     private func runSubscriptions(displayID: DisplayID, bounds: CGRect, focus: WindowID?) async {

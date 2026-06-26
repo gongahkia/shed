@@ -6,9 +6,28 @@ public struct Display: Equatable, Sendable, Identifiable {
     public let id: DisplayID
     public let frame: CGRect
     public let visibleFrame: CGRect
+    public let safeAreaInsets: DisplaySafeAreaInsets
     public let scaleFactor: CGFloat
     public let localizedName: String
     public let isMain: Bool
+
+    public init(
+        id: DisplayID,
+        frame: CGRect,
+        visibleFrame: CGRect,
+        safeAreaInsets: DisplaySafeAreaInsets = DisplaySafeAreaInsets(),
+        scaleFactor: CGFloat,
+        localizedName: String,
+        isMain: Bool
+    ) {
+        self.id = id
+        self.frame = frame
+        self.visibleFrame = visibleFrame
+        self.safeAreaInsets = safeAreaInsets
+        self.scaleFactor = scaleFactor
+        self.localizedName = localizedName
+        self.isMain = isMain
+    }
 }
 
 public struct DisplayChange: Equatable, Sendable {
@@ -33,6 +52,7 @@ public final class DisplayMonitor {
                 id: displayID,
                 frame: screen.frame,
                 visibleFrame: screen.visibleFrame,
+                safeAreaInsets: DisplaySafeAreaInsets(screen.safeAreaInsets),
                 scaleFactor: screen.backingScaleFactor,
                 localizedName: screen.localizedName,
                 isMain: screen == NSScreen.main
@@ -67,6 +87,12 @@ public final class DisplayMonitor {
                 subscription.cancel()
             }
         }
+    }
+}
+
+private extension DisplaySafeAreaInsets {
+    init(_ insets: NSEdgeInsets) {
+        self.init(top: insets.top, left: insets.left, bottom: insets.bottom, right: insets.right)
     }
 }
 

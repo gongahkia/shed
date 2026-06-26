@@ -15,7 +15,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 1 — AX foundation (`ollyKit`)
 
-(B) 2026-06-26 Write XCTests covering AX permission flow, window discovery on a known app (TextEdit), move/resize fidelity (< 2 px tolerance), display hotplug events +phase1 @swift @ax
 (C) 2026-06-26 Add tracing via `os_signpost` around AX calls for later perf work +phase1 @swift
 
 ---

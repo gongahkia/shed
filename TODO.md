@@ -10,7 +10,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 0 — Repo bootstrap
 
-(A) 2026-06-26 Add `scripts/check-no-private-api.sh` grepping for known private symbols (CGS, SLS, SkyLight) and add as CI gate +phase0 @ci ref:N§4-D2
 (B) 2026-06-26 Add `scripts/bootstrap-dev.sh` running brew install of swiftformat swiftlint create-dmg, and prompting user to grant AX perms +phase0 @swift
 (B) 2026-06-26 Create top-level `README.md` skeleton citing inspirations from NORTHSTAR §3; add `## Status: pre-alpha` banner +phase0 @docs ref:N§3
 (B) 2026-06-26 Add `docs/architecture.md` skeleton with sections: AX layer, tag store, layout engines, DSL, IPC, multi-monitor +phase0 @docs ref:N§11

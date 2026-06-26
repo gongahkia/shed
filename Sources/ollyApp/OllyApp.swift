@@ -22,6 +22,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let overviewController = OverviewModeController()
     private let commandPaletteController = CommandPaletteController()
     private let settingsWindowController = SettingsWindowController()
+    private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -35,6 +36,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         )
         statusController?.install()
         installOverviewMode()
+        hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
     }
 

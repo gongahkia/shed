@@ -15,7 +15,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 1 — AX foundation (`ollyKit`)
 
-(C) 2026-06-26 Add tracing via `os_signpost` around AX calls for later perf work +phase1 @swift
 
 ---
 

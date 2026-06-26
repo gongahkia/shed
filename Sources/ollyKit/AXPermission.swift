@@ -46,7 +46,9 @@ public enum AXPermission {
     private static func checkIsTrusted(prompt: Bool) -> Bool {
         let promptKey = kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String
         let options = [promptKey: prompt] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
+        return AXSignpost.interval("ax.permission.status") {
+            AXIsProcessTrustedWithOptions(options)
+        }
     }
 
     @MainActor

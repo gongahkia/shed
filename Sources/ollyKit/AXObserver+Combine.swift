@@ -91,7 +91,9 @@ public final class AXObserverBridge {
 
     private func start() throws {
         var newObserver: AXObserver?
-        let createError = AXObserverCreate(processID, axObserverCallback, &newObserver)
+        let createError = AXSignpost.interval("ax.observer.create") {
+            AXObserverCreate(processID, axObserverCallback, &newObserver)
+        }
         guard createError == .success, let newObserver else {
             throw AXObserverBridgeError.observerCreateFailed(createError)
         }
@@ -99,7 +101,9 @@ public final class AXObserverBridge {
         observer = newObserver
         let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
         for notification in notifications {
-            let error = AXObserverAddNotification(newObserver, observedElement, notification.axName, refcon)
+            let error = AXSignpost.interval("ax.observer.addNotification") {
+                AXObserverAddNotification(newObserver, observedElement, notification.axName, refcon)
+            }
             guard error == .success else {
                 stop(finishStream: true)
                 throw AXObserverBridgeError.addNotificationFailed(notification, error)
@@ -113,7 +117,9 @@ public final class AXObserverBridge {
     private func stop(finishStream: Bool) {
         if let observer {
             for notification in registeredNotifications {
-                AXObserverRemoveNotification(observer, observedElement, notification.axName)
+                AXSignpost.interval("ax.observer.removeNotification") {
+                    AXObserverRemoveNotification(observer, observedElement, notification.axName)
+                }
             }
             CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
         }

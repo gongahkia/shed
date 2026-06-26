@@ -16,7 +16,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 1 — AX foundation (`ollyKit`)
 
-(A) 2026-06-26 Implement `AXPermission.swift`: check `AXIsProcessTrustedWithOptions`, present onboarding sheet on miss; expose async refresh +phase1 @swift @ax
 (A) 2026-06-26 Implement `Application.swift` wrapping `pid_t` + `AXUIElement` for running apps; subscribe to `NSWorkspace.didLaunchApplicationNotification` / didTerminate +phase1 @swift @ax
 (A) 2026-06-26 Implement `WindowRef.swift` wrapping `AXUIElementRef` with cached attrs: title, role, subrole, frame, pid, windowID via `_AXUIElementGetWindow` (note: this is borderline — keep behind a feature flag and add fallback via CGWindowList matching) +phase1 @swift @ax ref:N§4-D2
 (A) 2026-06-26 Implement `AXObserver+Combine.swift`: bridge AXObserver notifications (Created, UIElementDestroyed, FocusedWindowChanged, WindowMoved, WindowResized, MainWindowChanged, ApplicationActivated) to AsyncStream +phase1 @swift @ax

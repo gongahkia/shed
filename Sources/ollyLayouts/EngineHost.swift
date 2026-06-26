@@ -4,7 +4,6 @@ import ollyCore
 import ollyKit
 
 public enum EngineHostError: Error, Equatable, Sendable {
-    case missingEngineBinding(displayID: DisplayID, activeTags: TagSet)
     case missingEngineConfig(LayoutEngineID)
     case registry(LayoutEngineRegistryError)
     case engineFactoryFailed(String)
@@ -77,19 +76,7 @@ public actor EngineHost {
 
     public func arrange(displayID: DisplayID, bounds: CGRect, focus: WindowID? = nil) async throws -> EngineHostResult {
         let tagState = await tagStore.state(for: displayID)
-        let engineID = try resolveEngineID(displayID: displayID, tagState: tagState)
-        guard let config = await configProvider(engineID) else {
-            throw EngineHostError.missingEngineConfig(engineID)
-        }
-
-        let engine: AnyLayoutEngine
-        do {
-            engine = try await registry.makeEngine(id: engineID, config: config)
-        } catch let error as LayoutEngineRegistryError {
-            throw EngineHostError.registry(error)
-        } catch {
-            throw EngineHostError.engineFactoryFailed(String(describing: error))
-        }
+        let engine = try await resolveEngine(for: tagState)
 
         let windows = await windowStore.windows(onDisplay: displayID).filter {
             TagSet(rawValue: $0.tagMask).intersects(tagState.activeTags)
@@ -111,7 +98,7 @@ public actor EngineHost {
         removeStalePlacements(keeping: Set(placements.map(\.windowID)))
         return EngineHostResult(
             displayID: displayID,
-            engineID: engineID,
+            engineID: engine.id,
             placements: placements,
             appliedPlacements: changedPlacements
         )
@@ -145,13 +132,27 @@ public actor EngineHost {
         _ = try? await arrange(displayID: displayID, bounds: bounds, focus: focus)
     }
 
-    private func resolveEngineID(displayID: DisplayID, tagState: DisplayTagState) throws -> LayoutEngineID {
+    private func resolveEngine(for tagState: DisplayTagState) async throws -> AnyLayoutEngine {
         for tag in tagState.activeTags.tags {
             if let engineID = tagState.tagToEngine[tag] {
-                return engineID
+                return try await makeEngine(id: engineID)
             }
         }
-        throw EngineHostError.missingEngineBinding(displayID: displayID, activeTags: tagState.activeTags)
+        return AnyLayoutEngine(FloatingLayoutEngine())
+    }
+
+    private func makeEngine(id engineID: LayoutEngineID) async throws -> AnyLayoutEngine {
+        guard let config = await configProvider(engineID) else {
+            throw EngineHostError.missingEngineConfig(engineID)
+        }
+
+        do {
+            return try await registry.makeEngine(id: engineID, config: config)
+        } catch let error as LayoutEngineRegistryError {
+            throw EngineHostError.registry(error)
+        } catch {
+            throw EngineHostError.engineFactoryFailed(String(describing: error))
+        }
     }
 
     private func windowDeltas() async -> AsyncStream<WindowStoreDelta> {

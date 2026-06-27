@@ -4,8 +4,38 @@ import Foundation
 /// Parameters: No direct parameters; choose a case such as `.v1`.
 /// Example: `Config(version: .v1) { Keybinds() }`
 /// See also: `Config`, `ConfigLoader`.
-public enum DSLVersion: String, Codable, Equatable, Sendable {
+public enum DSLVersion: Codable, Equatable, Sendable {
     case v1 // swiftlint:disable:this identifier_name
+    case unsupported(String)
+
+    public static let current = DSLVersion.v1
+
+    public var rawValue: String {
+        switch self {
+        case .v1:
+            return "v1"
+        case let .unsupported(value):
+            return value
+        }
+    }
+
+    public init(rawValue: String) {
+        switch rawValue {
+        case "v1":
+            self = .v1
+        default:
+            self = .unsupported(rawValue)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 /// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, and hook sections.

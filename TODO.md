@@ -56,7 +56,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 (A) 2026-06-26 Cut v0.1.0 GitHub Release with `.dmg`, source tarball, SHA256SUMS; draft Homebrew cask PR +phase9 @release
 (B) 2026-06-26 Write a launch post for Hacker News + Lobsters + r/MacOS: lead with the multi-paradigm hot-swap hook, link benchmark table, screenshot grid; schedule for a Tue 09:00 ET +phase9 @release
 (B) 2026-06-26 Open RFC issues for the v0.2 backlog (Monocle, Spiral, Grid, ThreeCol, Accordion) inviting community plugins +phase9 @docs @layout
-(C) 2026-06-26 Add `docs/multi-monitor.md` deep-dive: virtual-workspace emulation, single-Space invariant, hotplug behavior, known limits vs Mission Control +phase9 @docs ref:N§7
 (C) 2026-06-26 Track adoption metrics: GitHub stars trajectory, brew install counts, Raycast extension installs; revisit positioning quarterly +phase9 @release
 
 ---

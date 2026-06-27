@@ -7,6 +7,7 @@ FILES = %w[
   Sources/ollyDSL/EngineDSL.swift
   Sources/ollyDSL/Keybind.swift
   Sources/ollyDSL/NamedTag.swift
+  Sources/ollyDSL/RawDSL.swift
   Sources/ollyDSL/Rule.swift
   Sources/ollyDSL/SafeZones.swift
 ].freeze

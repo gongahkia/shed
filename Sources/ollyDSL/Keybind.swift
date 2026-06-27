@@ -148,10 +148,47 @@ public enum Action: Codable, Equatable, Sendable {
 public struct Keybind: Codable, Equatable, Sendable {
     public let chord: KeyChord
     public let action: Action
+    public let rawHandler: RawDSLBlock<Void>?
 
-    public init(_ chord: KeyChord, do action: Action) {
+    public init(_ chord: KeyChord, do action: Action, rawHandler: RawDSLBlock<Void>? = nil) {
         self.chord = chord
         self.action = action
+        self.rawHandler = rawHandler
+    }
+
+    public static func raw(
+        _ chord: KeyChord,
+        label: String = "raw",
+        _ body: @escaping RawDSLHandler
+    ) -> Keybind {
+        Keybind(chord, do: .raw(label), rawHandler: RawDSLBlock(label, body))
+    }
+
+    public func runRaw(context: RawDSLContext) {
+        rawHandler?(context)
+    }
+
+    public static func == (lhs: Keybind, rhs: Keybind) -> Bool {
+        lhs.chord == rhs.chord && lhs.action == rhs.action
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case chord
+        case action
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            try container.decode(KeyChord.self, forKey: .chord),
+            do: try container.decode(Action.self, forKey: .action)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(chord, forKey: .chord)
+        try container.encode(action, forKey: .action)
     }
 }
 

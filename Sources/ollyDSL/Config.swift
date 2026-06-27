@@ -171,12 +171,94 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case hooks(Hooks)
 }
 
+/// Purpose: Declares one raw lifecycle hook callback.
+/// Parameters: Provide a stable label and closure receiving `RawDSLContext`.
+/// Example: `Hooks { .raw("reload") { context in _ = context.event } }`
+/// See also: `Hooks`, `RawDSLContext`.
+public struct HookDeclaration: Codable, Equatable, Sendable {
+    public let label: String
+    public let rawHandler: RawDSLBlock<Void>?
+
+    public init(label: String, rawHandler: RawDSLBlock<Void>? = nil) {
+        precondition(!label.isEmpty)
+        self.label = label
+        self.rawHandler = rawHandler
+    }
+
+    public static func raw(_ label: String = "raw", _ body: @escaping RawDSLHandler) -> HookDeclaration {
+        HookDeclaration(label: label, rawHandler: RawDSLBlock(label, body))
+    }
+
+    public func runRaw(context: RawDSLContext) {
+        rawHandler?(context)
+    }
+
+    public static func == (lhs: HookDeclaration, rhs: HookDeclaration) -> Bool {
+        lhs.label == rhs.label
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case label
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(label: try container.decode(String.self, forKey: .label))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(label, forKey: .label)
+    }
+}
+
 /// Purpose: Placeholder lifecycle hook section reserved for typed runtime callbacks.
-/// Parameters: Accepts a closure body for future hook declarations.
-/// Example: `Hooks { }`
-/// See also: `Config`, `ConfigSection`.
+/// Parameters: Pass hook declarations directly or use `@HookBuilder`.
+/// Example: `Hooks { .raw("startup") { _ in } }`
+/// See also: `HookDeclaration`, `ConfigSection`.
 public struct Hooks: Codable, Equatable, Sendable {
-    public init(_ build: () -> Void = {}) {
-        build()
+    public let declarations: [HookDeclaration]
+
+    public init(_ declarations: [HookDeclaration] = []) {
+        self.declarations = declarations
+    }
+
+    public init(@HookBuilder _ build: () -> [HookDeclaration]) {
+        self.declarations = build()
+    }
+
+    public func runRaw(context: RawDSLContext) {
+        declarations.forEach { $0.runRaw(context: context) }
+    }
+}
+
+/// Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
+/// Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
+/// Example: `Hooks { .raw("reload") { _ in } }`
+/// See also: `Hooks`, `HookDeclaration`.
+@resultBuilder
+public enum HookBuilder {
+    public static func buildBlock(_ components: [HookDeclaration]...) -> [HookDeclaration] {
+        components.flatMap { $0 }
+    }
+
+    public static func buildOptional(_ component: [HookDeclaration]?) -> [HookDeclaration] {
+        component ?? []
+    }
+
+    public static func buildEither(first component: [HookDeclaration]) -> [HookDeclaration] {
+        component
+    }
+
+    public static func buildEither(second component: [HookDeclaration]) -> [HookDeclaration] {
+        component
+    }
+
+    public static func buildArray(_ components: [[HookDeclaration]]) -> [HookDeclaration] {
+        components.flatMap { $0 }
+    }
+
+    public static func buildExpression(_ expression: HookDeclaration) -> [HookDeclaration] {
+        [expression]
     }
 }

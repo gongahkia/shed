@@ -37,6 +37,10 @@ public func ollyConfig() -> Config {
             reserve(rect: CGRect(x: 0, y: 900, width: 1512, height: 82), on: 1)
         }
 
+        Hooks {
+            .raw("example.noop") { _ in }
+        }
+
         Keybinds {
             Keybind(KeyChord([.command, .option], .one), do: .switchTag(0))
             Keybind(KeyChord([.command, .option], .two), do: .switchTag(1))

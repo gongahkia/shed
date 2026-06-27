@@ -87,7 +87,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 14 — DSL polish & documentation
 
-(A) 2026-06-26 Implement `.raw { ctx in ... }` escape hatch on every level: Keybind, Rule, Engine, Workspace, Hook — provides full Swift closure access to runtime state +phase14 @swift @dsl ref:N§14
 (A) 2026-06-26 Implement type-safe error catalog: duplicate-chord, duplicate-tag-name, unknown-engine-id, ambiguous-rule — all are compile-time errors via `@_unavailable` or where-clauses +phase14 @swift @dsl ref:N§14
 (A) 2026-06-26 Implement `DSLVersion` enum carried in Config; mismatched versions trigger migration prompt; `ollyctl migrate-config` generates a diff suggestion +phase14 @swift @dsl @ipc ref:N§14
 (A) 2026-06-26 Ship `examples/` directory with at least 6 working configs: minimal, niri-only, master-stack-heavy, ultrawide-3col, multi-display-tags, plugin-author (custom engine) +phase14 @dsl @docs

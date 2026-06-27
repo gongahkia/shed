@@ -18,7 +18,8 @@ final class LayoutSnapshotTests: XCTestCase {
             ("spiral", spiralPlacements(in: bounds)),
             ("grid", gridPlacements(in: bounds)),
             ("three-col", threeColPlacements(in: bounds)),
-            ("accordion", accordionPlacements(in: bounds))
+            ("accordion", accordionPlacements(in: bounds)),
+            ("paperwm-scroll", paperWMScrollPlacements(in: bounds))
         ]
 
         for (name, placements) in cases {
@@ -100,6 +101,18 @@ final class LayoutSnapshotTests: XCTestCase {
     private func accordionPlacements(in bounds: CGRect) -> [Placement] {
         let engine = AccordionLayoutEngine(config: AccordionLayoutEngine.Config(stripHeight: 50))
         return engine.arrange(windows: snapshots(1, 2, 3, 4, 5), in: bounds, focus: 3)
+    }
+
+    private func paperWMScrollPlacements(in bounds: CGRect) -> [Placement] {
+        PaperWMScrollLayoutEngine().arrange(
+            windows: [
+                WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 500, height: 200)),
+                WindowSnapshot(windowID: 3, frame: .zero)
+            ],
+            in: bounds,
+            focus: 3
+        )
     }
 
     private func assertMatchesGolden(name: String, placements: [Placement]) throws {

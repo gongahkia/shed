@@ -152,6 +152,21 @@ Source:
 - https://github.com/niri-wm/niri
 - https://github.com/paperwm/PaperWM
 
+### PaperWM Scroll
+
+Source model: PaperWM tiles new windows to the right of the active window, scrolls the tiling to reveal activated windows, can absorb windows vertically into the active column, and supports preferred window widths. This differs from `NiriScrollLayoutEngine`, whose columns use configured width presets (`oneThird`, `half`, `twoThirds`, `full`) rather than content-derived widths.
+
+olly shape:
+- `PaperWMScrollLayoutEngine`
+- `PaperWMScrollStrip` tracks explicit columns and viewport offset
+- column width is the max configured/current width of the windows in that column
+- missing windows append as new columns to the right
+- focus scroll clamps the viewport just enough to reveal the focused column
+
+Source:
+- https://github.com/paperwm/PaperWM
+- https://github.com/niri-wm/niri
+
 ## Implementation Gate
 
 For any candidate above:

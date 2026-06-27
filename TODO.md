@@ -64,7 +64,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 11 — Tier-1 layouts (v0.2)
 
-(A) 2026-06-26 Implement `ThreeCol` engine: centered master + left/right slave stacks; configurable masterRatio (default 0.5) and side-balance; ultrawide-friendly +phase11 @swift @layout ref:N§6
 (A) 2026-06-26 Implement `Accordion` engine: focused window expanded, others collapse to title strips at top/bottom; configurable stripHeight +phase11 @swift @layout ref:N§6
 (A) 2026-06-26 Snapshot tests for all 5 Tier-1 engines; document each in `docs/layouts-research.md` with a screenshot +phase11 @swift @docs @layout
 (B) 2026-06-26 Add DSL bindings: `Engines { Monocle(); Spiral(); Grid(.squareish); ThreeCol(masterRatio: 0.5); Accordion() }` with full doc-comments +phase11 @swift @dsl

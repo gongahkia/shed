@@ -3,6 +3,7 @@
 
 FILES = %w[
   Sources/ollyDSL/Animation.swift
+  Sources/ollyDSL/ConfigDiagnostics.swift
   Sources/ollyDSL/Config.swift
   Sources/ollyDSL/CooperativeApps.swift
   Sources/ollyDSL/EngineDSL.swift

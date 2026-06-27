@@ -85,6 +85,26 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `reduceMotion(.respectSystem)`
 - See also: `Animation`, `AnimationSetting`.
 
+## Config Diagnostics
+
+### ConfigCompileDiagnostic
+
+`struct ConfigCompileDiagnostic`
+
+- Purpose: Represents one Swift config compile diagnostic with source context.
+- Parameters: Provide line, column, message, source line, and suggestions.
+- Example: `ConfigCompileDiagnostic(line: 3, column: 9, message: "cannot find x")`
+- See also: `ConfigDiagnosticFormatter`, `ConfigLoaderError`.
+
+### ConfigDiagnosticFormatter
+
+`enum ConfigDiagnosticFormatter`
+
+- Purpose: Parses compiler output into user-facing config diagnostics.
+- Parameters: Pass raw `swiftc` output and the source text being compiled.
+- Example: `ConfigDiagnosticFormatter.render(compilerOutput: output, source: source)`
+- See also: `ConfigCompileDiagnostic`, `ConfigLoader`.
+
 ## Config
 
 ### DSLVersion

@@ -12,6 +12,7 @@ end
 symbol_graph_path, output_path = ARGV
 source_order = {
   "Animation.swift" => "Animation",
+  "ConfigDiagnostics.swift" => "Config Diagnostics",
   "Config.swift" => "Config",
   "Hooks.swift" => "Hooks",
   "Keybind.swift" => "Keybinds",

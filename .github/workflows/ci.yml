@@ -18,6 +18,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Check private API usage
         run: ./scripts/check-no-private-api.sh
+      - name: Check production timer usage
+        run: ./scripts/check-no-production-timers.sh
       - name: Build release
         run: swift build -c release
       - name: Test

@@ -113,10 +113,7 @@ final class ConfigLoaderTests: XCTestCase {
     }
 
     func testExampleConfigCompilesAndLoads() throws {
-        let packageRoot = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
+        let packageRoot = packageRoot()
         let modulesURL = Bundle(for: Self.self).bundleURL
             .deletingLastPathComponent()
             .appendingPathComponent("Modules", isDirectory: true)
@@ -137,11 +134,47 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(loaded.config.rules.rules.count, 10)
     }
 
+    func testNamedExampleConfigsCompileAndLoad() throws {
+        let packageRoot = packageRoot()
+        let modulesURL = Bundle(for: Self.self).bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("Modules", isDirectory: true)
+        let names = [
+            "minimal",
+            "niri-only",
+            "master-stack-heavy",
+            "ultrawide-3col",
+            "multi-display-tags",
+            "plugin-author"
+        ]
+
+        for name in names {
+            let loader = ConfigLoader(
+                sourceURL: packageRoot.appendingPathComponent("examples/\(name).swift"),
+                cacheDirectory: try temporaryDirectory().appendingPathComponent("cache", isDirectory: true),
+                moduleSearchPaths: [modulesURL]
+            )
+
+            let loaded = try loader.load()
+
+            XCTAssertEqual(loaded.config.version, .v1, name)
+            XCTAssertFalse(loaded.config.engines.engines.isEmpty, name)
+            XCTAssertFalse(loaded.config.workspaces.tags.isEmpty, name)
+        }
+    }
+
     private func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("ollyDSLTests-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    private func packageRoot() -> URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 
     private func fakeCompiler(countURL: URL) -> String {

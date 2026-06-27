@@ -10,7 +10,8 @@ hooks for SketchyBar, JankyBorders, Übersicht, Raycast, Alfred, and external ho
 
 ## Why Olly
 
-- One binary, multiple layout models: NiriScroll, BSP, Manual, Floating, MasterStack.
+- One binary, multiple layout models: Floating, MasterStack, Manual, BSP, NiriScroll,
+  Monocle, Spiral, Grid, ThreeCol, and Accordion.
 - Per-tag engine binding: use scrolling columns for web, BSP for code, floating for calls.
 - Swift DSL config: type-checked rules, keybinds, safe zones, and cooperative app handling.
 - IPC-first automation: Unix socket plus `ollyctl` JSON commands/events.
@@ -58,6 +59,11 @@ public func ollyConfig() -> Config {
             EngineDeclaration.bsp
             EngineDeclaration.niriScroll
             EngineDeclaration.masterStack
+            Monocle()
+            Spiral()
+            Grid(.squareish)
+            ThreeCol(masterRatio: 0.5)
+            Accordion()
             EngineDeclaration.floating
         }
 
@@ -91,6 +97,19 @@ ollyctl state --json
 ```
 
 ## Comparison
+
+| Built-in layout | Model |
+|---|---|
+| Floating | Pass-through frames for untiled windows and dialogs. |
+| MasterStack | Tall-style master pane plus stacked siblings. |
+| Manual | User-shaped split tree. |
+| BSP | Binary-space-partition tree. |
+| NiriScroll | Horizontal scrolling column strip. |
+| Monocle | Focused window fullscreen, siblings hidden offscreen. |
+| Spiral | Recursive golden-ratio split of the remaining rect. |
+| Grid | Square-ish or fixed row/column auto-pack. |
+| ThreeCol | Centered master with balanced side stacks. |
+| Accordion | Focused window expanded, siblings collapsed to strips. |
 
 | Project | Core model | Olly difference |
 |---|---|---|

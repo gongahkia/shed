@@ -13,7 +13,7 @@
 
 ## Perf Impact
 
-- [ ] No expected impact on NORTHSTAR §12a budgets.
+- [ ] No expected impact on `docs/performance.md` budgets.
 - [ ] Bench evidence attached or explained.
 
 ## Private API

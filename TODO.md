@@ -60,7 +60,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 10 — Performance & profiling (parallel with all phases; P0 for v0.1)
 
-(A) 2026-06-26 Define perf budget targets in `docs/performance.md` mirroring NORTHSTAR §12a; reference from PR template +phase10 @docs @ci ref:N§12a
 (A) 2026-06-26 Implement `PerfBench` target: scripted scenarios (cold start, hotkey-to-move, tag switch with N windows, wake-from-sleep, 7-day soak); exports JSON of p50/p95/p99 +phase10 @swift @ci ref:N§12a
 (A) 2026-06-26 Add CI job that runs `PerfBench` on each PR, fails if any p95 regresses > 10 % vs main baseline; baseline stored in `.perf-baseline.json` updated on main merges +phase10 @ci ref:N§12a
 (A) 2026-06-26 Implement AX-write coalescer: per-display 60 Hz CADisplayLink-driven flush; coalesce identical target frames; skip no-op writes (< 1 px delta) +phase10 @swift @ax ref:N§12a

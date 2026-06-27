@@ -73,9 +73,9 @@ public actor TagDispatcher {
             guard let target = targetResolver(window) else {
                 return
             }
-            await windowMover.setPosition(frame.origin, for: target)
-            await windowMover.setSize(frame.size, for: target)
-            await windowMover.flushNow()
+            let displayTarget = target.withFallbackDisplayID(window.displayID)
+            await windowMover.setPosition(frame.origin, for: displayTarget)
+            await windowMover.setSize(frame.size, for: displayTarget)
         }
     }
 

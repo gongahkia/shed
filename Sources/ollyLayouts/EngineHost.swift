@@ -64,9 +64,9 @@ public actor EngineHost {
                 guard let target = targetResolver(window) else {
                     return
                 }
-                await windowMover.setPosition(placement.frame.origin, for: target)
-                await windowMover.setSize(placement.frame.size, for: target)
-                await windowMover.flushNow()
+                let displayTarget = target.withFallbackDisplayID(window.displayID)
+                await windowMover.setPosition(placement.frame.origin, for: displayTarget)
+                await windowMover.setSize(placement.frame.size, for: displayTarget)
             },
             publishEvent: publishEvent
         )

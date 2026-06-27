@@ -1,27 +1,31 @@
+import CoreGraphics
 import Foundation
 import ollyCore
 import ollyKit
 
 /// Purpose: Describes the window properties a DSL rule must match.
-/// Parameters: Provide optional bundle ID, title regex, role, or subrole predicates.
-/// Example: `RuleMatch(bundleID: "com.apple.Terminal", titleRegex: "ssh")`
-/// See also: `Rule`, `RuleContext`.
+/// Parameters: Provide optional legacy fields and/or a composed `RulePredicate`.
+/// Example: `RuleMatch(bundleID: "com.apple.Terminal", predicate: role("AXWindow"))`
+/// See also: `Rule`, `RulePredicate`.
 public struct RuleMatch: Codable, Equatable, Sendable {
     public let bundleID: String?
     public let titleRegex: String?
     public let role: String?
     public let subrole: String?
+    public let predicate: RulePredicate?
 
     public init(
         bundleID: String? = nil,
         titleRegex: String? = nil,
         role: String? = nil,
-        subrole: String? = nil
+        subrole: String? = nil,
+        predicate: RulePredicate? = nil
     ) {
         self.bundleID = bundleID
         self.titleRegex = titleRegex
         self.role = role
         self.subrole = subrole
+        self.predicate = predicate
     }
 
     public func matches(_ context: RuleContext) -> Bool {
@@ -35,6 +39,9 @@ public struct RuleMatch: Codable, Equatable, Sendable {
             return false
         }
         if let subrole, subrole != context.subrole {
+            return false
+        }
+        if let predicate, !predicate.matches(context) {
             return false
         }
         return true
@@ -51,20 +58,31 @@ public struct RuleMatch: Codable, Equatable, Sendable {
 }
 
 /// Purpose: Carries runtime window metadata used to evaluate rule matches.
-/// Parameters: Provide bundle ID, title, role, and subrole values from a window snapshot.
-/// Example: `RuleContext(bundleID: "com.apple.finder", title: "Downloads")`
+/// Parameters: Provide bundle ID, title, role, subrole, parent bundle ID, and window size values.
+/// Example: `RuleContext(bundleID: "com.apple.finder", windowSize: CGSize(width: 500, height: 400))`
 /// See also: `RuleMatch`, `Rules`.
 public struct RuleContext: Codable, Equatable, Sendable {
     public let bundleID: String?
     public let title: String?
     public let role: String?
     public let subrole: String?
+    public let parentBundleID: String?
+    public let windowSize: CGSize?
 
-    public init(bundleID: String? = nil, title: String? = nil, role: String? = nil, subrole: String? = nil) {
+    public init(
+        bundleID: String? = nil,
+        title: String? = nil,
+        role: String? = nil,
+        subrole: String? = nil,
+        parentBundleID: String? = nil,
+        windowSize: CGSize? = nil
+    ) {
         self.bundleID = bundleID
         self.title = title
         self.role = role
         self.subrole = subrole
+        self.parentBundleID = parentBundleID
+        self.windowSize = windowSize
     }
 }
 
@@ -107,6 +125,10 @@ public struct Rule: Codable, Equatable, Sendable {
         self.rawHandler = rawHandler
     }
 
+    public init(match predicate: RulePredicate, apply: RuleApply, rawHandler: RawDSLBlock<Void>? = nil) {
+        self.init(match: RuleMatch(predicate: predicate), apply: apply, rawHandler: rawHandler)
+    }
+
     public static func raw(
         match: RuleMatch = RuleMatch(),
         apply: RuleApply = RuleApply(),
@@ -114,6 +136,15 @@ public struct Rule: Codable, Equatable, Sendable {
         _ body: @escaping RawDSLHandler
     ) -> Rule {
         Rule(match: match, apply: apply, rawHandler: RawDSLBlock(label, body))
+    }
+
+    public static func raw(
+        match predicate: RulePredicate,
+        apply: RuleApply = RuleApply(),
+        label: String = "raw",
+        _ body: @escaping RawDSLHandler
+    ) -> Rule {
+        Rule(match: predicate, apply: apply, rawHandler: RawDSLBlock(label, body))
     }
 
     public func runRaw(context: RawDSLContext) {
@@ -181,7 +212,8 @@ public extension Config {
                 bundleID: state.bundleID,
                 title: state.title,
                 role: state.role,
-                subrole: state.subrole
+                subrole: state.subrole,
+                windowSize: state.frame.size
             )
         )
         return WindowState(

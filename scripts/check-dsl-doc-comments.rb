@@ -9,6 +9,7 @@ FILES = %w[
   Sources/ollyDSL/NamedTag.swift
   Sources/ollyDSL/RawDSL.swift
   Sources/ollyDSL/Rule.swift
+  Sources/ollyDSL/RulePredicate.swift
   Sources/ollyDSL/SafeZones.swift
 ].freeze
 

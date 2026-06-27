@@ -82,9 +82,9 @@ Hotkey daemon delegation is documented in `docs/hotkey-delegation.md`.
 
 ## Bundle-ID Policy
 
-Built-in defaults come from `NORTHSTAR.md` §7b. Apps without verified bundle IDs in that
-section must stay user-configured until verified through a signed app bundle, `mdls`, or an
-official source.
+Built-in defaults are mirrored in `docs/cooperative-apps.yml` from `NORTHSTAR.md` §7b. Apps
+without verified bundle IDs in that section must stay user-configured until verified through a
+signed app bundle, `mdls`, or an official source.
 
 Users extend defaults:
 

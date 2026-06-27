@@ -56,6 +56,24 @@ final class RuleTests: XCTestCase {
         XCTAssertTrue(apps.contains(bundleID: "com.example.OnlyOverlay"))
     }
 
+    func testCooperativeAppsYamlMirrorsDefaults() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let yamlURL = packageRoot.appendingPathComponent("docs/cooperative-apps.yml")
+        let yaml = try String(contentsOf: yamlURL, encoding: .utf8)
+        let bundleIDs = yaml.components(separatedBy: .newlines).compactMap { line -> String? in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard trimmed.hasPrefix("bundle_id: ") else {
+                return nil
+            }
+            return String(trimmed.dropFirst("bundle_id: ".count))
+        }
+
+        XCTAssertEqual(bundleIDs, CooperativeApps.defaultBundleIDs)
+    }
+
     func testRuleMatchRequiresAllSpecifiedPredicates() {
         let match = RuleMatch(
             bundleID: "com.example.Editor",

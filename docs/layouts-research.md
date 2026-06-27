@@ -136,6 +136,22 @@ Source:
 - https://github.com/riverwm/river
 - https://isaacfreund.com/blog/river-intro/
 
+### Pinned Columns
+
+Source model: hyprscroller exposes `scroller:pin` for pinning a column in a scrolling layout. Niri and PaperWM establish the scrollable column model: columns live on an infinite horizontal strip and focus/navigation scrolls the visible viewport.
+
+olly shape:
+- `PinnedColumnsLayoutEngine<Base>`
+- wraps a scrollable base engine instead of extending `LayoutEngine`
+- detects columns from shared placement x-position and width
+- moves configured pinned columns to a fixed viewport edge
+- raises pinned placements above the scrolling strip so overlap remains visible
+
+Source:
+- https://github.com/dawsers/hyprscroller
+- https://github.com/niri-wm/niri
+- https://github.com/paperwm/PaperWM
+
 ## Implementation Gate
 
 For any candidate above:

@@ -23,15 +23,18 @@ public enum EngineConfigDeclaration: Codable, Equatable, Sendable {
 public struct EngineDeclaration: Codable, Equatable, Sendable {
     public let id: LayoutEngineID
     public let config: EngineConfigDeclaration?
+    public let animation: Animation?
     public let rawHandler: RawDSLBlock<Void>?
 
     public init(
         _ id: LayoutEngineID,
         config: EngineConfigDeclaration? = nil,
+        animation: Animation? = nil,
         rawHandler: RawDSLBlock<Void>? = nil
     ) {
         self.id = id
         self.config = config
+        self.animation = animation
         self.rawHandler = rawHandler
     }
 
@@ -49,19 +52,21 @@ public struct EngineDeclaration: Codable, Equatable, Sendable {
     }
 
     public static func == (lhs: EngineDeclaration, rhs: EngineDeclaration) -> Bool {
-        lhs.id == rhs.id && lhs.config == rhs.config
+        lhs.id == rhs.id && lhs.config == rhs.config && lhs.animation == rhs.animation
     }
 
     enum CodingKeys: String, CodingKey {
         case id
         case config
+        case animation
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             try container.decode(LayoutEngineID.self, forKey: .id),
-            config: try container.decodeIfPresent(EngineConfigDeclaration.self, forKey: .config)
+            config: try container.decodeIfPresent(EngineConfigDeclaration.self, forKey: .config),
+            animation: try container.decodeIfPresent(Animation.self, forKey: .animation)
         )
     }
 
@@ -69,6 +74,7 @@ public struct EngineDeclaration: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
         try container.encodeIfPresent(config, forKey: .config)
+        try container.encodeIfPresent(animation, forKey: .animation)
     }
 }
 

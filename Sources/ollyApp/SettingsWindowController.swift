@@ -11,6 +11,7 @@ final class SettingsWindowController: NSWindowController {
     private let statusLabel = NSTextField(labelWithString: "")
     private let errorTextView = NSTextView()
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
+    private var playgroundController: ConfigPlaygroundWindowController?
 
     init(
         sourceURL: URL = ConfigLoader.defaultSourceURL(),
@@ -44,10 +45,14 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private static func defaultLoader(sourceURL: URL) -> ConfigLoader {
+        ConfigLoader(sourceURL: sourceURL, moduleSearchPaths: defaultModuleSearchPaths())
+    }
+
+    private static func defaultModuleSearchPaths() -> [URL] {
         let modulesURL = Bundle.main.bundleURL
             .deletingLastPathComponent()
             .appendingPathComponent("Modules", isDirectory: true)
-        return ConfigLoader(sourceURL: sourceURL, moduleSearchPaths: [modulesURL])
+        return [modulesURL]
     }
 
     private func configureWindow(_ window: NSWindow) {
@@ -78,6 +83,7 @@ final class SettingsWindowController: NSWindowController {
         reloadButton.target = self
         reloadButton.action = #selector(reloadConfig)
         buttonRow.addArrangedSubview(reloadButton)
+        buttonRow.addArrangedSubview(button("Playground...", #selector(openPlayground)))
         buttonRow.addArrangedSubview(NSView())
 
         let errorScrollView = makeErrorScrollView()
@@ -138,6 +144,22 @@ final class SettingsWindowController: NSWindowController {
                 self.handleReloadEvent(event)
             }
         }
+    }
+
+    @objc private func openPlayground() {
+        let controller = ConfigPlaygroundWindowController(
+            sourceURL: sourceURL,
+            moduleSearchPaths: Self.defaultModuleSearchPaths()
+        )
+        controller.onClose = { [weak self] in
+            self?.playgroundController = nil
+        }
+        playgroundController = controller
+        guard let sheet = controller.window, let window else {
+            controller.showWindow(nil)
+            return
+        }
+        window.beginSheet(sheet)
     }
 
     private func handleReloadEvent(_ event: ConfigReloadEvent) {

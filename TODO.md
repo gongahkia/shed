@@ -88,7 +88,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 ## PHASE 14 — DSL polish & documentation
 
 (A) 2026-06-26 Implement type-safe error catalog: duplicate-chord, duplicate-tag-name, unknown-engine-id, ambiguous-rule — all are compile-time errors via `@_unavailable` or where-clauses +phase14 @swift @dsl ref:N§14
-(C) 2026-06-26 Live config playground: an in-app sheet where users see DSL compile errors with column markers + quick-fix suggestions +phase14 @ui @dsl
 
 ---
 

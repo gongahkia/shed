@@ -20,12 +20,23 @@ public func ollyConfig() -> Config {
             EngineDeclaration.masterStack
             EngineDeclaration.manual
             EngineDeclaration.bsp
-            EngineDeclaration.niriScroll
+            EngineDeclaration.niriScroll.animated(
+                Animation {
+                    duration(160.ms)
+                    curve(.easeInOut)
+                }
+            )
             Monocle()
             Spiral()
             Grid(.squareish)
             ThreeCol(masterRatio: 0.5)
             Accordion()
+        }
+
+        Animation {
+            duration(200.ms)
+            curve(.easeOut)
+            reduceMotion(.respectSystem)
         }
 
         CooperativeApps {

@@ -38,9 +38,9 @@ public enum DSLVersion: Codable, Equatable, Sendable {
     }
 }
 
-/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, and hook sections.
+/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, animation, and hook sections.
 /// Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-/// Example: `Config { Workspaces { Tag.named("web") }; Engines { .niriScroll } }`
+/// Example: `Config { Workspaces { Tag.named("web") }; Animation { duration(200.ms) } }`
 /// See also: `ConfigBuilder`, `ConfigSection`.
 public struct Config: Codable, Equatable, Sendable {
     public let version: DSLVersion
@@ -50,6 +50,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let engines: Engines
     public let cooperativeApps: CooperativeApps
     public let safeZones: SafeZones
+    public let animation: Animation
     public let hooks: Hooks
 
     public init(
@@ -60,6 +61,7 @@ public struct Config: Codable, Equatable, Sendable {
         engines: Engines = Engines(),
         cooperativeApps: CooperativeApps = CooperativeApps(),
         safeZones: SafeZones = SafeZones(),
+        animation: Animation = Animation(),
         hooks: Hooks = Hooks()
     ) {
         self.version = version
@@ -69,6 +71,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.engines = engines
         self.cooperativeApps = cooperativeApps
         self.safeZones = safeZones
+        self.animation = animation
         self.hooks = hooks
     }
 
@@ -87,6 +90,7 @@ public struct Config: Codable, Equatable, Sendable {
             cooperativeApps: try container.decodeIfPresent(CooperativeApps.self, forKey: .cooperativeApps)
                 ?? CooperativeApps(),
             safeZones: try container.decodeIfPresent(SafeZones.self, forKey: .safeZones) ?? SafeZones(),
+            animation: try container.decodeIfPresent(Animation.self, forKey: .animation) ?? Animation(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks()
         )
     }
@@ -98,6 +102,7 @@ public struct Config: Codable, Equatable, Sendable {
         var engines = Engines()
         var cooperativeApps = CooperativeApps()
         var safeZones = SafeZones()
+        var animation = Animation()
         var hooks = Hooks()
 
         for section in sections {
@@ -114,6 +119,8 @@ public struct Config: Codable, Equatable, Sendable {
                 cooperativeApps = value
             case let .safeZones(value):
                 safeZones = value
+            case let .animation(value):
+                animation = value
             case let .hooks(value):
                 hooks = value
             }
@@ -127,6 +134,7 @@ public struct Config: Codable, Equatable, Sendable {
             engines: engines,
             cooperativeApps: cooperativeApps,
             safeZones: safeZones,
+            animation: animation,
             hooks: hooks
         )
     }
@@ -182,6 +190,10 @@ public enum ConfigBuilder {
         [.safeZones(expression)]
     }
 
+    public static func buildExpression(_ expression: Animation) -> [ConfigSection] {
+        [.animation(expression)]
+    }
+
     public static func buildExpression(_ expression: Hooks) -> [ConfigSection] {
         [.hooks(expression)]
     }
@@ -198,6 +210,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case engines(Engines)
     case cooperativeApps(CooperativeApps)
     case safeZones(SafeZones)
+    case animation(Animation)
     case hooks(Hooks)
 }
 

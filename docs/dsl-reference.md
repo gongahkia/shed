@@ -2,6 +2,89 @@
 
 Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
+## Animation
+
+### AnimationDuration
+
+`struct AnimationDuration`
+
+- Purpose: Stores an animation duration in milliseconds.
+- Parameters: Provide a non-negative millisecond value directly or via `.ms`.
+- Example: `200.ms`
+- See also: `Animation`, `duration(_:)`.
+
+### AnimationCurve
+
+`enum AnimationCurve`
+
+- Purpose: Selects the timing curve for layout animations.
+- Parameters: Choose a named curve.
+- Example: `AnimationCurve.easeOut`
+- See also: `Animation`, `curve(_:)`.
+
+### ReduceMotionPolicy
+
+`enum ReduceMotionPolicy`
+
+- Purpose: Selects how animation respects macOS Reduce Motion.
+- Parameters: Choose system-respecting, always-on, or always-off animation behavior.
+- Example: `ReduceMotionPolicy.respectSystem`
+- See also: `Animation`, `reduceMotion(_:)`.
+
+### AnimationSetting
+
+`enum AnimationSetting`
+
+- Purpose: Represents one animation builder setting.
+- Parameters: Use `duration`, `curve`, or `reduceMotion` builder helpers.
+- Example: `duration(200.ms)`
+- See also: `Animation`, `AnimationBuilder`.
+
+### Animation
+
+`struct Animation`
+
+- Purpose: Configures global or per-engine layout animation behavior.
+- Parameters: Provide duration, timing curve, and Reduce Motion policy.
+- Example: `Animation { duration(200.ms); curve(.easeOut); reduceMotion(.respectSystem) }`
+- See also: `AnimationBuilder`, `EngineDeclaration`.
+
+### AnimationBuilder
+
+`@resultBuilder enum AnimationBuilder`
+
+- Purpose: Builds animation settings inside `Animation { ... }`.
+- Parameters: Accepts animation setting expressions, arrays, and conditionals.
+- Example: `Animation { duration(120.ms); curve(.linear) }`
+- See also: `Animation`, `AnimationSetting`.
+
+### duration(_:)
+
+`func duration(_ value: AnimationDuration) -> AnimationSetting`
+
+- Purpose: Declares an animation duration setting.
+- Parameters: Pass an `AnimationDuration`, commonly with `.ms`.
+- Example: `duration(200.ms)`
+- See also: `Animation`, `AnimationSetting`.
+
+### curve(_:)
+
+`func curve(_ value: AnimationCurve) -> AnimationSetting`
+
+- Purpose: Declares an animation curve setting.
+- Parameters: Pass an `AnimationCurve`.
+- Example: `curve(.easeOut)`
+- See also: `Animation`, `AnimationSetting`.
+
+### reduceMotion(_:)
+
+`func reduceMotion(_ value: ReduceMotionPolicy) -> AnimationSetting`
+
+- Purpose: Declares a Reduce Motion animation policy.
+- Parameters: Pass a `ReduceMotionPolicy`.
+- Example: `reduceMotion(.respectSystem)`
+- See also: `Animation`, `AnimationSetting`.
+
 ## Config
 
 ### DSLVersion
@@ -17,9 +100,9 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 `struct Config`
 
-- Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, and hook sections.
+- Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, animation, and hook sections.
 - Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-- Example: `Config { Workspaces { Tag.named("web") }; Engines { .niriScroll } }`
+- Example: `Config { Workspaces { Tag.named("web") }; Animation { duration(200.ms) } }`
 - See also: `ConfigBuilder`, `ConfigSection`.
 
 ### ConfigBuilder

@@ -2,3 +2,4 @@ CLAUDE.md
 AGENTS.md
 .build/
 .swiftpm/
+dist/

@@ -81,6 +81,12 @@ public actor TagDispatcher {
 
     @discardableResult
     public func apply(displayID: DisplayID) async -> [TagDispatchMove] {
+        await PerformanceSignpost.interval("dispatch.tagSwitch") {
+            await applyWithSignpost(displayID: displayID)
+        }
+    }
+
+    private func applyWithSignpost(displayID: DisplayID) async -> [TagDispatchMove] {
         let activeTags = await tagStore.activeTags(on: displayID)
         let windows = await windowStore.windows(onDisplay: displayID)
         var moves: [TagDispatchMove] = []

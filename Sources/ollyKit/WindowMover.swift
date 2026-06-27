@@ -175,6 +175,12 @@ public actor WindowMover {
     }
 
     private func apply(_ move: PendingMove) async {
+        await PerformanceSignpost.interval("ax.write") {
+            await applyWrites(move)
+        }
+    }
+
+    private func applyWrites(_ move: PendingMove) async {
         var frame = client.frame(for: move.target.axElement) ?? lastFrames[move.key]
 
         if let position = move.position {

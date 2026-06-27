@@ -48,7 +48,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 8 — Ecosystem bridges
 
-(B) 2026-06-26 Verify olly's offscreen-park coordinates never overlap any attached display rect — capture-tool friendly (OBS/CleanShot won't accidentally record parked windows) +phase8 @swift @ecosystem ref:N§7
 (C) 2026-06-26 Open-source the cooperative-apps allowlist as a separate YAML file + CONTRIBUTING note inviting community PRs to add bundle IDs +phase8 @docs @ecosystem
 
 ---

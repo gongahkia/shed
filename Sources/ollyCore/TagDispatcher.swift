@@ -37,7 +37,7 @@ public actor TagDispatcher {
             windowStore: windowStore,
             tagStore: tagStore,
             offscreenParking: OffscreenParking(fallbackOrigin: offscreenOrigin),
-            displayProvider: { [] },
+            displayProvider: { OffscreenParking.activeDisplays() },
             moveWindow: moveWindow
         )
     }

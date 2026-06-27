@@ -10,9 +10,7 @@ final class TagDispatcherTests: XCTestCase {
         let windowStore = WindowStore()
         let tagStore = TagStore(defaultActiveTags: TagSet(active))
         let recorder = TagMoveRecorder()
-        let dispatcher = TagDispatcher(windowStore: windowStore, tagStore: tagStore) { window, frame in
-            await recorder.record(windowID: window.id, frame: frame)
-        }
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
 
         await windowStore.upsert(window(id: 1, displayID: 7, tagMask: TagSet(active).rawValue))
         await windowStore.upsert(window(id: 2, displayID: 7, tagMask: TagSet(inactive).rawValue))
@@ -34,9 +32,7 @@ final class TagDispatcherTests: XCTestCase {
         let windowStore = WindowStore()
         let tagStore = TagStore(defaultActiveTags: TagSet(one))
         let recorder = TagMoveRecorder()
-        let dispatcher = TagDispatcher(windowStore: windowStore, tagStore: tagStore) { window, frame in
-            await recorder.record(windowID: window.id, frame: frame)
-        }
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
         let firstFrame = CGRect(x: 10, y: 10, width: 100, height: 100)
         let secondFrame = CGRect(x: 20, y: 20, width: 200, height: 200)
 
@@ -67,9 +63,7 @@ final class TagDispatcherTests: XCTestCase {
         let windowStore = WindowStore()
         let tagStore = TagStore(defaultActiveTags: [])
         let recorder = TagMoveRecorder()
-        let dispatcher = TagDispatcher(windowStore: windowStore, tagStore: tagStore) { window, frame in
-            await recorder.record(windowID: window.id, frame: frame)
-        }
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
 
         await windowStore.upsert(window(id: 1, displayID: 1, tagMask: TagSet(one).rawValue))
         await windowStore.upsert(window(id: 2, displayID: 2, tagMask: TagSet(one).rawValue))
@@ -81,6 +75,31 @@ final class TagDispatcherTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [2])
     }
 
+    func testApplyParksInactiveWindowOutsideProvidedDisplays() async throws {
+        let active = try Tag(index: 0)
+        let inactive = try Tag(index: 1)
+        let display = display(frame: CGRect(x: -33_000, y: -33_000, width: 4_000, height: 4_000))
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(active))
+        let recorder = TagMoveRecorder()
+        let dispatcher = TagDispatcher(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            displayProvider: { [display] }
+        ) { window, frame in
+            await recorder.record(windowID: window.id, frame: frame)
+        }
+
+        await windowStore.upsert(window(id: 1, displayID: display.id, tagMask: TagSet(inactive).rawValue))
+
+        let moves = await dispatcher.apply(displayID: display.id)
+        let move = try XCTUnwrap(moves.first)
+
+        XCTAssertTrue(OffscreenParking.default.isOffscreen(move.targetFrame, avoiding: [display]))
+        XCTAssertLessThan(move.targetFrame.maxX, display.frame.minX)
+        XCTAssertLessThan(move.targetFrame.maxY, display.frame.minY)
+    }
+
     private func window(
         id: WindowID,
         displayID: DisplayID,
@@ -88,6 +107,27 @@ final class TagDispatcherTests: XCTestCase {
         frame: CGRect = CGRect(x: 0, y: 0, width: 100, height: 100)
     ) -> WindowState {
         WindowState(id: id, processID: 42, displayID: displayID, tagMask: tagMask, frame: frame)
+    }
+
+    private func emptyDisplayDispatcher(
+        windowStore: WindowStore,
+        tagStore: TagStore,
+        recorder: TagMoveRecorder
+    ) -> TagDispatcher {
+        TagDispatcher(windowStore: windowStore, tagStore: tagStore, displayProvider: { [] }) { window, frame in
+            await recorder.record(windowID: window.id, frame: frame)
+        }
+    }
+
+    private func display(frame: CGRect) -> Display {
+        Display(
+            id: 7,
+            frame: frame,
+            visibleFrame: frame,
+            scaleFactor: 1,
+            localizedName: "Test",
+            isMain: true
+        )
     }
 }
 

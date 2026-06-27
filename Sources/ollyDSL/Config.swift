@@ -201,18 +201,33 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case hooks(Hooks)
 }
 
-/// Purpose: Declares one raw lifecycle hook callback.
-/// Parameters: Provide a stable label and closure receiving `RawDSLContext`.
-/// Example: `Hooks { .raw("reload") { context in _ = context.event } }`
+/// Purpose: Declares one raw or typed lifecycle hook callback.
+/// Parameters: Provide a stable label, hook kind, and optional in-memory closure.
+/// Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
 /// See also: `Hooks`, `RawDSLContext`.
 public struct HookDeclaration: Codable, Equatable, Sendable {
     public let label: String
+    public let kind: HookKind
     public let rawHandler: RawDSLBlock<Void>?
+    public let tagSwitchHandler: TagSwitchHookHandler?
+    public let displayChangeHandler: DisplayChangeHookHandler?
+    public let windowAppearedHandler: WindowAppearedHookHandler?
 
-    public init(label: String, rawHandler: RawDSLBlock<Void>? = nil) {
+    public init(
+        label: String,
+        kind: HookKind = .raw,
+        rawHandler: RawDSLBlock<Void>? = nil,
+        tagSwitchHandler: TagSwitchHookHandler? = nil,
+        displayChangeHandler: DisplayChangeHookHandler? = nil,
+        windowAppearedHandler: WindowAppearedHookHandler? = nil
+    ) {
         precondition(!label.isEmpty)
         self.label = label
+        self.kind = kind
         self.rawHandler = rawHandler
+        self.tagSwitchHandler = tagSwitchHandler
+        self.displayChangeHandler = displayChangeHandler
+        self.windowAppearedHandler = windowAppearedHandler
     }
 
     public static func raw(_ label: String = "raw", _ body: @escaping RawDSLHandler) -> HookDeclaration {
@@ -223,28 +238,45 @@ public struct HookDeclaration: Codable, Equatable, Sendable {
         rawHandler?(context)
     }
 
+    public func runTagSwitch(context: TagSwitchHookContext) {
+        tagSwitchHandler?(context)
+    }
+
+    public func runDisplayChange(context: DisplayChangeHookContext) {
+        displayChangeHandler?(context)
+    }
+
+    public func runWindowAppeared(context: WindowAppearedHookContext) {
+        windowAppearedHandler?(context)
+    }
+
     public static func == (lhs: HookDeclaration, rhs: HookDeclaration) -> Bool {
-        lhs.label == rhs.label
+        lhs.label == rhs.label && lhs.kind == rhs.kind
     }
 
     enum CodingKeys: String, CodingKey {
         case label
+        case kind
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(label: try container.decode(String.self, forKey: .label))
+        self.init(
+            label: try container.decode(String.self, forKey: .label),
+            kind: try container.decodeIfPresent(HookKind.self, forKey: .kind) ?? .raw
+        )
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(label, forKey: .label)
+        try container.encode(kind, forKey: .kind)
     }
 }
 
-/// Purpose: Placeholder lifecycle hook section reserved for typed runtime callbacks.
+/// Purpose: Groups raw and typed lifecycle hook declarations.
 /// Parameters: Pass hook declarations directly or use `@HookBuilder`.
-/// Example: `Hooks { .raw("startup") { _ in } }`
+/// Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
 /// See also: `HookDeclaration`, `ConfigSection`.
 public struct Hooks: Codable, Equatable, Sendable {
     public let declarations: [HookDeclaration]
@@ -260,11 +292,23 @@ public struct Hooks: Codable, Equatable, Sendable {
     public func runRaw(context: RawDSLContext) {
         declarations.forEach { $0.runRaw(context: context) }
     }
+
+    public func runTagSwitch(context: TagSwitchHookContext) {
+        declarations.forEach { $0.runTagSwitch(context: context) }
+    }
+
+    public func runDisplayChange(context: DisplayChangeHookContext) {
+        declarations.forEach { $0.runDisplayChange(context: context) }
+    }
+
+    public func runWindowAppeared(context: WindowAppearedHookContext) {
+        declarations.forEach { $0.runWindowAppeared(context: context) }
+    }
 }
 
 /// Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
 /// Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
-/// Example: `Hooks { .raw("reload") { _ in } }`
+/// Example: `Hooks { onDisplayChange { context in _ = context.change } }`
 /// See also: `Hooks`, `HookDeclaration`.
 @resultBuilder
 public enum HookBuilder {

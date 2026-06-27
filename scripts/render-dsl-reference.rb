@@ -12,9 +12,11 @@ end
 symbol_graph_path, output_path = ARGV
 source_order = {
   "Config.swift" => "Config",
+  "Hooks.swift" => "Hooks",
   "Keybind.swift" => "Keybinds",
   "NamedTag.swift" => "Workspaces",
   "EngineDSL.swift" => "Engines",
+  "RulePredicate.swift" => "Rule Predicates",
   "Rule.swift" => "Rules",
   "SafeZones.swift" => "Safe Zones",
   "CooperativeApps.swift" => "Cooperative Apps",

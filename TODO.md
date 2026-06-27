@@ -48,8 +48,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 8 — Ecosystem bridges
 
-(C) 2026-06-26 Open-source the cooperative-apps allowlist as a separate YAML file + CONTRIBUTING note inviting community PRs to add bundle IDs +phase8 @docs @ecosystem
-
 ---
 
 ## PHASE 9 — Docs, demo, release

@@ -171,11 +171,11 @@ public struct Keybinds: Codable, Equatable, Sendable {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds keybind declarations inside `Keybinds { ... }`.
 /// Parameters: Accepts `Keybind` expressions, arrays, and conditionals.
 /// Example: `Keybinds { Keybind(KeyChord([.command], .space), do: .noop) }`
 /// See also: `Keybinds`, `Keybind`.
+@resultBuilder
 public enum KeybindBuilder {
     public static func buildBlock(_ components: [Keybind]...) -> [Keybind] {
         components.flatMap { $0 }

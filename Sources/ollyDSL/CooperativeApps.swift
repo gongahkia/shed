@@ -92,11 +92,11 @@ public struct CooperativeApps: Codable, Equatable, Sendable {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds cooperative-app declarations inside `CooperativeApps { ... }`.
 /// Parameters: Accepts `CooperativeApp` and string expressions plus conditionals and arrays.
 /// Example: `CooperativeApps { "com.raycast.macos" }`
 /// See also: `CooperativeApps`, `CooperativeApp`.
+@resultBuilder
 public enum CooperativeAppBuilder {
     public static func buildBlock(_ components: [CooperativeApp]...) -> [CooperativeApp] {
         components.flatMap { $0 }

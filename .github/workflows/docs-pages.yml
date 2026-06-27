@@ -1,0 +1,45 @@
+name: Docs Pages
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy Docs
+    runs-on: macos-14
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Generate DSL reference
+        run: ./scripts/generate-dsl-reference.sh
+      - name: Prepare Pages artifact
+        run: |
+          rm -rf .build/pages
+          xcrun docc process-archive transform-for-static-hosting \
+            .build/dsl-reference/ollyDSL.doccarchive \
+            --output-path .build/pages \
+            --hosting-base-path olly
+          cp docs/dsl-reference.md .build/pages/dsl-reference.md
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .build/pages
+      - name: Deploy Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

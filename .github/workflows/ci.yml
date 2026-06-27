@@ -24,6 +24,17 @@ jobs:
         run: swift build -c release
       - name: Test
         run: swift test
+      - name: Generate DSL reference
+        run: ./scripts/generate-dsl-reference.sh
+      - name: Check generated DSL reference
+        run: git diff --exit-code docs/dsl-reference.md
+      - name: Upload DSL docs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dsl-reference
+          path: |
+            docs/dsl-reference.md
+            .build/dsl-reference/ollyDSL.doccarchive
 
   lint:
     name: Lint

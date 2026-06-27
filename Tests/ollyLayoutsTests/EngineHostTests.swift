@@ -163,6 +163,70 @@ final class EngineHostTests: XCTestCase {
         }
     }
 
+    func testRestoreAfterWakeReappliesLastPlacementSnapshot() async throws {
+        let tag = try Tag(index: 1)
+        let engineID = LayoutEngineID(rawValue: "fixed")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(tag))
+        let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
+        let recorder = EngineHostPlacementRecorder()
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { window, placement in
+                await recorder.record(windowID: window.id, placement: placement)
+            }
+        )
+        await tagStore.bindEngine(engineID, to: tag, on: 1)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(tag).rawValue))
+
+        _ = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let restoreResult = await host.restoreAfterWake(displayID: 1)
+        let result = try XCTUnwrap(restoreResult)
+        let windowIDs = await recorder.windowIDs
+
+        XCTAssertEqual(result.engineID, engineID)
+        XCTAssertEqual(result.restoredPlacementCount, 1)
+        XCTAssertTrue(result.isWithinTarget)
+        XCTAssertEqual(windowIDs, [1, 1])
+    }
+
+    func testWakeRestoreTaskRespondsToInjectedWakeStream() async throws {
+        let tag = try Tag(index: 1)
+        let engineID = LayoutEngineID(rawValue: "fixed")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(tag))
+        let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
+        let recorder = EngineHostPlacementRecorder()
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { window, placement in
+                await recorder.record(windowID: window.id, placement: placement)
+            }
+        )
+        let wakeStream = AsyncStream<Void> { continuation in
+            continuation.yield(())
+            continuation.finish()
+        }
+        await tagStore.bindEngine(engineID, to: tag, on: 1)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(tag).rawValue))
+        _ = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
+
+        let task = host.startWakeRestore(displayID: 1, wakeEvents: wakeStream)
+        defer {
+            task.cancel()
+        }
+
+        try await waitUntil {
+            await recorder.windowIDs == [1, 1]
+        }
+    }
+
     private func waitUntil(
         timeoutNanoseconds: UInt64 = 1_000_000_000,
         condition: () async -> Bool

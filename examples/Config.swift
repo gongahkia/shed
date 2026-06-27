@@ -39,6 +39,11 @@ public func ollyConfig() -> Config {
             reduceMotion(.respectSystem)
         }
 
+        Gestures {
+            fourFingerHorizontal(.scrollColumns)
+            fourFingerVertical(.switchTags)
+        }
+
         CooperativeApps {
             CooperativeApp("com.example.CustomOverlay")
         }

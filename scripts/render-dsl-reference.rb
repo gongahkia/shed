@@ -17,6 +17,7 @@ source_order = {
   "Keybind.swift" => "Keybinds",
   "NamedTag.swift" => "Workspaces",
   "EngineDSL.swift" => "Engines",
+  "Gestures.swift" => "Gestures",
   "RulePredicate.swift" => "Rule Predicates",
   "Rule.swift" => "Rules",
   "SafeZones.swift" => "Safe Zones",

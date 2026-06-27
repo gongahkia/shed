@@ -96,6 +96,30 @@ Source:
 
 ## v0.3+ Research Hooks
 
+### Tabbed / Stacked Bar UX
+
+Tabbed and Stacked layouts need a visible selector because multiple windows share one logical tile. The layout engine should stay pure and emit placement plus tab/stack metadata; rendering belongs in `ollyApp`.
+
+AX-only rendering:
+- Uses the target windows' own frames, titles, focus, and raise actions.
+- Keeps olly out of the drawing path and avoids overlay z-order bugs.
+- Cannot draw real tab strips or stack rails on another app's window chrome.
+- Offers no reliable pointer hit targets for selecting hidden siblings.
+- Works as a keyboard-only fallback when overlay windows are disabled.
+
+Overlay `NSWindow` rendering:
+- Uses olly-owned borderless panels positioned above the tile or along the stack rail.
+- Can draw selected state, titles, icons, hover, drag targets, and click-to-focus.
+- Must track display changes, safe zones, active tags, window moves, and Space visibility.
+- Must not become an app switcher target, steal key focus during normal tiling, or cover notch/menu-bar reserves.
+- Needs explicit accessibility labels and keyboard equivalents so tabs are not pointer-only.
+
+Decision for implementation:
+- Keep `TabbedLayoutEngine` and `StackedLayoutEngine` pure.
+- Add a separate `TabBarOverlayController` in `ollyApp` fed by engine metadata.
+- Treat AX-only mode as keyboard fallback, not as the primary tab/stack UI.
+- Do not model overlays as child windows of foreign app windows; olly owns them and repositions them from snapshots.
+
 ### Frame Tree
 
 Source model: herbstluftwm starts with one frame; frames can contain windows or split into two frames. This maps to an olly plugin host that can nest layout engines inside frame leaves.

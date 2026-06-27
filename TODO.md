@@ -87,7 +87,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 14 — DSL polish & documentation
 
-(A) 2026-06-26 Every public DSL primitive carries a Swift doc-comment with: purpose, parameter docs, 1-line example, "see also" cross-references; lint rule enforces presence +phase14 @swift @dsl @docs ref:N§14
 (A) 2026-06-26 Generate `docs/dsl-reference.md` via DocC; CI builds and uploads docs artifact; deploy to GitHub Pages on release +phase14 @ci @docs ref:N§14
 (A) 2026-06-26 Implement `.raw { ctx in ... }` escape hatch on every level: Keybind, Rule, Engine, Workspace, Hook — provides full Swift closure access to runtime state +phase14 @swift @dsl ref:N§14
 (A) 2026-06-26 Implement type-safe error catalog: duplicate-chord, duplicate-tag-name, unknown-engine-id, ambiguous-rule — all are compile-time errors via `@_unavailable` or where-clauses +phase14 @swift @dsl ref:N§14

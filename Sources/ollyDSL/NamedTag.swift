@@ -1,11 +1,19 @@
 import Foundation
 import ollyCore
 
+/// Purpose: Reports invalid workspace tag declarations before they become runtime state.
+/// Parameters: Inspect the associated duplicate name or tag count.
+/// Example: `XCTAssertThrowsError(try Workspaces(validating: declarations))`
+/// See also: `Workspaces`, `NamedTagDeclaration`.
 public enum WorkspacesError: Error, Equatable, Sendable {
     case duplicateTagName(String)
     case tooManyTags(Int)
 }
 
+/// Purpose: Captures a user-facing workspace tag name before assigning its numeric tag.
+/// Parameters: Pass a static tag name.
+/// Example: `Tag.named("web")`
+/// See also: `NamedTag`, `Workspaces`.
 public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     public let name: String
 
@@ -18,6 +26,10 @@ public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Binds a display name to a concrete River-style tag bit.
+/// Parameters: Pass the visible name and assigned `Tag`.
+/// Example: `NamedTag(name: "code", tag: try Tag(index: 1))`
+/// See also: `NamedTagDeclaration`, `Workspaces`.
 public struct NamedTag: Codable, Equatable, Sendable {
     public let name: String
     public let tag: Tag
@@ -34,6 +46,10 @@ public extension Tag {
     }
 }
 
+/// Purpose: Groups named workspace tags for the top-level config.
+/// Parameters: Pass resolved tags or build named tag declarations.
+/// Example: `Workspaces { Tag.named("web"); Tag.named("code") }`
+/// See also: `NamedTagDeclaration`, `WorkspacesBuilder`.
 public struct Workspaces: Codable, Equatable, Sendable {
     public let tags: [NamedTag]
 
@@ -71,6 +87,10 @@ public struct Workspaces: Codable, Equatable, Sendable {
 }
 
 @resultBuilder
+/// Purpose: Builds named tag declarations inside `Workspaces { ... }`.
+/// Parameters: Accepts `NamedTagDeclaration` expressions, arrays, and conditionals.
+/// Example: `Workspaces { Tag.named("chat") }`
+/// See also: `Workspaces`, `NamedTagDeclaration`.
 public enum WorkspacesBuilder {
     public static func buildBlock(_ components: [NamedTagDeclaration]...) -> [NamedTagDeclaration] {
         components.flatMap { $0 }

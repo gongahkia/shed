@@ -1,9 +1,17 @@
 import Foundation
 
+/// Purpose: Versions the Swift DSL schema stored in compiled config payloads.
+/// Parameters: No direct parameters; choose a case such as `.v1`.
+/// Example: `Config(version: .v1) { Keybinds() }`
+/// See also: `Config`, `ConfigLoader`.
 public enum DSLVersion: String, Codable, Equatable, Sendable {
     case v1 // swiftlint:disable:this identifier_name
 }
 
+/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, and hook sections.
+/// Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
+/// Example: `Config { Workspaces { Tag.named("web") }; Engines { .niriScroll } }`
+/// See also: `ConfigBuilder`, `ConfigSection`.
 public struct Config: Codable, Equatable, Sendable {
     public let version: DSLVersion
     public let keybinds: Keybinds
@@ -95,6 +103,10 @@ public struct Config: Codable, Equatable, Sendable {
 }
 
 @resultBuilder
+/// Purpose: Builds ordered `ConfigSection` values inside `Config { ... }`.
+/// Parameters: Accepts section expressions, conditionals, and arrays emitted by the config body.
+/// Example: `Config { Keybinds(); Rules() }`
+/// See also: `Config`, `ConfigSection`.
 public enum ConfigBuilder {
     public static func buildBlock(_ components: [ConfigSection]...) -> [ConfigSection] {
         components.flatMap { $0 }
@@ -145,6 +157,10 @@ public enum ConfigBuilder {
     }
 }
 
+/// Purpose: Wraps each top-level DSL section so `ConfigBuilder` can merge defaults deterministically.
+/// Parameters: Use one case per section, such as `.keybinds(Keybinds())`.
+/// Example: `ConfigSection.engines(Engines { .bsp })`
+/// See also: `Config`, `ConfigBuilder`.
 public enum ConfigSection: Codable, Equatable, Sendable {
     case keybinds(Keybinds)
     case rules(Rules)
@@ -155,6 +171,10 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case hooks(Hooks)
 }
 
+/// Purpose: Placeholder lifecycle hook section reserved for typed runtime callbacks.
+/// Parameters: Accepts a closure body for future hook declarations.
+/// Example: `Hooks { }`
+/// See also: `Config`, `ConfigSection`.
 public struct Hooks: Codable, Equatable, Sendable {
     public init(_ build: () -> Void = {}) {
         build()

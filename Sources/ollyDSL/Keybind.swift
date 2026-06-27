@@ -3,6 +3,10 @@ import Carbon.HIToolbox
 import Foundation
 import ollyCore
 
+/// Purpose: Represents command, shift, option, and control modifiers for DSL key chords.
+/// Parameters: Use predefined flags or initialize from a raw Carbon-compatible bit mask.
+/// Example: `KeyModifiers([.command, .option])`
+/// See also: `KeyChord`, `Keybind`.
 public struct KeyModifiers: Codable, Equatable, Hashable, OptionSet, Sendable {
     public let rawValue: UInt32
 
@@ -33,6 +37,10 @@ public struct KeyModifiers: Codable, Equatable, Hashable, OptionSet, Sendable {
     }
 }
 
+/// Purpose: Represents one physical keyboard key in a DSL key chord.
+/// Parameters: Use predefined static keys or initialize from a Carbon virtual key code.
+/// Example: `Key.a`
+/// See also: `KeyModifiers`, `KeyChord`.
 public struct Key: Codable, Equatable, Hashable, RawRepresentable, Sendable {
     public let rawValue: UInt32
 
@@ -88,6 +96,10 @@ public extension Key {
     static let downArrow = Key(rawValue: UInt32(kVK_DownArrow))
 }
 
+/// Purpose: Combines modifiers and a key into one bindable shortcut chord.
+/// Parameters: Pass `KeyModifiers` and `Key` values in order.
+/// Example: `KeyChord([.command, .option], .return)`
+/// See also: `Keybind`, `Keybinds`.
 public struct KeyChord: Codable, Equatable, Hashable, Sendable {
     public let modifiers: KeyModifiers
     public let key: Key
@@ -98,6 +110,10 @@ public struct KeyChord: Codable, Equatable, Hashable, Sendable {
     }
 }
 
+/// Purpose: Names directional movement targets for focus, swap, and move actions.
+/// Parameters: Use a case such as `.left`, `.next`, or `.previous`.
+/// Example: `Action.focus(.next)`
+/// See also: `Action`, `Keybind`.
 public enum Direction: String, Codable, Equatable, Sendable {
     case up
     case down
@@ -107,6 +123,10 @@ public enum Direction: String, Codable, Equatable, Sendable {
     case previous
 }
 
+/// Purpose: Declares the command performed when a keybind fires.
+/// Parameters: Select a case and provide its associated direction, tag, engine, or raw command.
+/// Example: `Action.setEngine(BSPLayoutEngine.engineID)`
+/// See also: `Keybind`, `Direction`.
 public enum Action: Codable, Equatable, Sendable {
     case focus(Direction)
     case swap(Direction)
@@ -121,6 +141,10 @@ public enum Action: Codable, Equatable, Sendable {
     case raw(String)
 }
 
+/// Purpose: Maps one `KeyChord` to one olly action.
+/// Parameters: Pass the chord and the action to execute.
+/// Example: `Keybind(KeyChord([.command], .return), do: .cycleEngine)`
+/// See also: `Keybinds`, `Action`.
 public struct Keybind: Codable, Equatable, Sendable {
     public let chord: KeyChord
     public let action: Action
@@ -131,6 +155,10 @@ public struct Keybind: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Groups keybind declarations for the top-level config.
+/// Parameters: Pass an array of `Keybind` values or use `@KeybindBuilder`.
+/// Example: `Keybinds { Keybind(KeyChord([.command], .j), do: .focus(.next)) }`
+/// See also: `Keybind`, `KeybindBuilder`.
 public struct Keybinds: Codable, Equatable, Sendable {
     public let bindings: [Keybind]
 
@@ -144,6 +172,10 @@ public struct Keybinds: Codable, Equatable, Sendable {
 }
 
 @resultBuilder
+/// Purpose: Builds keybind declarations inside `Keybinds { ... }`.
+/// Parameters: Accepts `Keybind` expressions, arrays, and conditionals.
+/// Example: `Keybinds { Keybind(KeyChord([.command], .space), do: .noop) }`
+/// See also: `Keybinds`, `Keybind`.
 public enum KeybindBuilder {
     public static func buildBlock(_ components: [Keybind]...) -> [Keybind] {
         components.flatMap { $0 }

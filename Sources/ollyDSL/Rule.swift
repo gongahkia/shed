@@ -2,6 +2,10 @@ import Foundation
 import ollyCore
 import ollyKit
 
+/// Purpose: Describes the window properties a DSL rule must match.
+/// Parameters: Provide optional bundle ID, title regex, role, or subrole predicates.
+/// Example: `RuleMatch(bundleID: "com.apple.Terminal", titleRegex: "ssh")`
+/// See also: `Rule`, `RuleContext`.
 public struct RuleMatch: Codable, Equatable, Sendable {
     public let bundleID: String?
     public let titleRegex: String?
@@ -46,6 +50,10 @@ public struct RuleMatch: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Carries runtime window metadata used to evaluate rule matches.
+/// Parameters: Provide bundle ID, title, role, and subrole values from a window snapshot.
+/// Example: `RuleContext(bundleID: "com.apple.finder", title: "Downloads")`
+/// See also: `RuleMatch`, `Rules`.
 public struct RuleContext: Codable, Equatable, Sendable {
     public let bundleID: String?
     public let title: String?
@@ -60,6 +68,10 @@ public struct RuleContext: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Declares the tag, engine, and floating changes applied by matching rules.
+/// Parameters: Provide optional tags, engine override, or floating state.
+/// Example: `RuleApply(tags: TagSet(try Tag(index: 2)), engine: BSPLayoutEngine.engineID)`
+/// See also: `Rule`, `Rules`.
 public struct RuleApply: Codable, Equatable, Sendable {
     public let tags: TagSet?
     public let engineOverride: LayoutEngineID?
@@ -80,6 +92,10 @@ public struct RuleApply: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Couples one `RuleMatch` predicate with one `RuleApply` payload.
+/// Parameters: Pass a match object and the changes to apply when it matches.
+/// Example: `Rule(match: RuleMatch(bundleID: "com.slack.Slack"), apply: RuleApply(floating: true))`
+/// See also: `Rules`, `RuleBuilder`.
 public struct Rule: Codable, Equatable, Sendable {
     public let match: RuleMatch
     public let apply: RuleApply
@@ -90,6 +106,10 @@ public struct Rule: Codable, Equatable, Sendable {
     }
 }
 
+/// Purpose: Groups rule declarations and resolves their cumulative apply payload.
+/// Parameters: Pass an array of `Rule` values or use `@RuleBuilder`.
+/// Example: `Rules { Rule(match: RuleMatch(role: "AXDialog"), apply: RuleApply(floating: true)) }`
+/// See also: `Rule`, `RuleApply`.
 public struct Rules: Codable, Equatable, Sendable {
     public let rules: [Rule]
 
@@ -142,6 +162,10 @@ public extension Config {
 }
 
 @resultBuilder
+/// Purpose: Builds rule declarations inside `Rules { ... }`.
+/// Parameters: Accepts `Rule` expressions, arrays, and conditional branches.
+/// Example: `Rules { Rule(match: RuleMatch(subrole: "AXSystemDialog"), apply: RuleApply(floating: true)) }`
+/// See also: `Rules`, `Rule`.
 public enum RuleBuilder {
     public static func buildBlock(_ components: [Rule]...) -> [Rule] {
         components.flatMap { $0 }

@@ -9,6 +9,7 @@ let package = Package(
     products: [
         .executable(name: "ollyApp", targets: ["ollyApp"]),
         .executable(name: "ollyctl", targets: ["ollyctl"]),
+        .executable(name: "PerfBench", targets: ["PerfBench"]),
         .library(name: "ollyKit", targets: ["ollyKit"]),
         .library(name: "ollyCore", targets: ["ollyCore"]),
         .library(name: "ollyLayouts", targets: ["ollyLayouts"]),
@@ -37,6 +38,10 @@ let package = Package(
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             exclude: ["README.md"]
+        ),
+        .executableTarget(
+            name: "PerfBench",
+            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL"]
         ),
         .testTarget(name: "ollyKitTests", dependencies: ["ollyKit"]),
         .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"]),

@@ -10,6 +10,7 @@ let package = Package(
         .executable(name: "ollyApp", targets: ["ollyApp"]),
         .executable(name: "ollyctl", targets: ["ollyctl"]),
         .executable(name: "PerfBench", targets: ["PerfBench"]),
+        .executable(name: "SoakHarness", targets: ["SoakHarness"]),
         .library(name: "ollyKit", targets: ["ollyKit"]),
         .library(name: "ollyCore", targets: ["ollyCore"]),
         .library(name: "ollyLayouts", targets: ["ollyLayouts"]),
@@ -42,6 +43,10 @@ let package = Package(
         .executableTarget(
             name: "PerfBench",
             dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL"]
+        ),
+        .executableTarget(
+            name: "SoakHarness",
+            dependencies: ["ollyKit"]
         ),
         .testTarget(name: "ollyKitTests", dependencies: ["ollyKit"]),
         .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"]),

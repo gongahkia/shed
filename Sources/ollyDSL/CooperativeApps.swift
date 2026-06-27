@@ -1,8 +1,16 @@
+/// Purpose: Chooses whether configured cooperative apps extend or replace olly's default allowlist.
+/// Parameters: Use `.extend` to add bundle IDs or `.replace` to ignore defaults.
+/// Example: `CooperativeApps(mode: .replace, bundleIDs: ["com.example.Overlay"])`
+/// See also: `CooperativeApps`, `CooperativeApp`.
 public enum CooperativeAppsMode: String, Codable, Equatable, Sendable {
     case extend
     case replace
 }
 
+/// Purpose: Declares one app bundle ID that olly should avoid tiling by default.
+/// Parameters: Pass a non-empty bundle identifier string.
+/// Example: `CooperativeApp("com.felixkratz.SketchyBar")`
+/// See also: `CooperativeApps`, `CooperativeAppBuilder`.
 public struct CooperativeApp: Codable, Equatable, ExpressibleByStringLiteral, Sendable {
     public let bundleID: String
 
@@ -16,6 +24,10 @@ public struct CooperativeApp: Codable, Equatable, ExpressibleByStringLiteral, Se
     }
 }
 
+/// Purpose: Configures apps whose windows should be floated for ecosystem compatibility.
+/// Parameters: Select a mode and provide bundle IDs or `CooperativeApp` entries.
+/// Example: `CooperativeApps { "com.example.NotchOverlay" }`
+/// See also: `CooperativeAppsMode`, `CooperativeApp`.
 public struct CooperativeApps: Codable, Equatable, Sendable {
     public static let defaultBundleIDs = [
         "com.lowtechguys.Alcove",
@@ -81,6 +93,10 @@ public struct CooperativeApps: Codable, Equatable, Sendable {
 }
 
 @resultBuilder
+/// Purpose: Builds cooperative-app declarations inside `CooperativeApps { ... }`.
+/// Parameters: Accepts `CooperativeApp` and string expressions plus conditionals and arrays.
+/// Example: `CooperativeApps { "com.raycast.macos" }`
+/// See also: `CooperativeApps`, `CooperativeApp`.
 public enum CooperativeAppBuilder {
     public static func buildBlock(_ components: [CooperativeApp]...) -> [CooperativeApp] {
         components.flatMap { $0 }

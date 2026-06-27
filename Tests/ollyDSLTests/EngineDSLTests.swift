@@ -15,6 +15,7 @@ final class EngineDSLTests: XCTestCase {
             EngineDeclaration.grid
             EngineDeclaration.threeCol
             EngineDeclaration.accordion
+            EngineDeclaration.tabbed
         }
 
         XCTAssertEqual(
@@ -29,7 +30,8 @@ final class EngineDSLTests: XCTestCase {
                 .spiral,
                 .grid,
                 .threeCol,
-                .accordion
+                .accordion,
+                .tabbed
             ]
         )
     }
@@ -41,6 +43,7 @@ final class EngineDSLTests: XCTestCase {
             Grid(.squareish)
             ThreeCol(masterRatio: 0.5)
             Accordion()
+            Tabbed(tabBarHeight: 30)
         }
 
         XCTAssertEqual(
@@ -65,6 +68,10 @@ final class EngineDSLTests: XCTestCase {
                 EngineDeclaration(
                     AccordionLayoutEngine.engineID,
                     config: .accordion(AccordionLayoutEngine.Config())
+                ),
+                EngineDeclaration(
+                    TabbedLayoutEngine.engineID,
+                    config: .tabbed(TabbedLayoutEngine.Config(tabBarHeight: 30))
                 )
             ]
         )

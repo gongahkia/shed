@@ -421,6 +421,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Engines { Accordion(stripHeight: 40) }`
 - See also: `ThreeCol(masterRatio:)`, `Monocle()`.
 
+### Tabbed(tabBarHeight:)
+
+`func Tabbed(tabBarHeight: CGFloat = 28) -> EngineDeclaration`
+
+- Purpose: Declares the Tabbed layout engine.
+- Parameters: `tabBarHeight` reserves space for the app-rendered top tab strip.
+- Example: `Engines { Tabbed(tabBarHeight: 30) }`
+- See also: `Accordion(stripHeight:)`, `Monocle()`.
+
 ### Engines
 
 `struct Engines`

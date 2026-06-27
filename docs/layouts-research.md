@@ -116,6 +116,7 @@ Overlay `NSWindow` rendering:
 
 Decision for implementation:
 - Keep `TabbedLayoutEngine` and `StackedLayoutEngine` pure.
+- `TabbedLayoutEngine` reserves a top tab-strip rect, places only the selected window in the content rect, and emits `TabbedLayoutTab` metadata for an app overlay.
 - Add a separate `TabBarOverlayController` in `ollyApp` fed by engine metadata.
 - Treat AX-only mode as keyboard fallback, not as the primary tab/stack UI.
 - Do not model overlays as child windows of foreign app windows; olly owns them and repositions them from snapshots.

@@ -70,7 +70,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 12 — Tier-2 layouts (v0.3, advanced UX)
 
-(A) 2026-06-26 Implement `Tabbed` engine (i3/Sway precedent): multiple windows share a tile, accessible via a top tab bar; render tab bar as a child `NSWindow` overlay or via AX-managed title bar +phase12 @swift @layout @ui ref:N§6
 (A) 2026-06-26 Implement `Stacked` engine: like Tabbed but full-height left title stack +phase12 @swift @layout @ui ref:N§6
 (A) 2026-06-26 Implement `TreeTab` engine (Qtile precedent): vertical tree of tabbed windows on a side rail; configurable rail width and side +phase12 @swift @layout @ui ref:N§6
 (C) 2026-06-26 Cut v0.3.0 release; update comparison table; blog post: "olly is now the macOS WM with the most layout engines" +phase12 @release

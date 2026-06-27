@@ -5,6 +5,7 @@ FILES = %w[
   Sources/ollyDSL/Config.swift
   Sources/ollyDSL/CooperativeApps.swift
   Sources/ollyDSL/EngineDSL.swift
+  Sources/ollyDSL/Hooks.swift
   Sources/ollyDSL/Keybind.swift
   Sources/ollyDSL/NamedTag.swift
   Sources/ollyDSL/RawDSL.swift

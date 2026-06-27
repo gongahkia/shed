@@ -44,18 +44,18 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 `struct HookDeclaration`
 
-- Purpose: Declares one raw lifecycle hook callback.
-- Parameters: Provide a stable label and closure receiving `RawDSLContext`.
-- Example: `Hooks { .raw("reload") { context in _ = context.event } }`
+- Purpose: Declares one raw or typed lifecycle hook callback.
+- Parameters: Provide a stable label, hook kind, and optional in-memory closure.
+- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
 - See also: `Hooks`, `RawDSLContext`.
 
 ### Hooks
 
 `struct Hooks`
 
-- Purpose: Placeholder lifecycle hook section reserved for typed runtime callbacks.
+- Purpose: Groups raw and typed lifecycle hook declarations.
 - Parameters: Pass hook declarations directly or use `@HookBuilder`.
-- Example: `Hooks { .raw("startup") { _ in } }`
+- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
 - See also: `HookDeclaration`, `ConfigSection`.
 
 ### HookBuilder
@@ -64,8 +64,73 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 - Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
 - Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
-- Example: `Hooks { .raw("reload") { _ in } }`
+- Example: `Hooks { onDisplayChange { context in _ = context.change } }`
 - See also: `Hooks`, `HookDeclaration`.
+
+## Hooks
+
+### HookKind
+
+`enum HookKind`
+
+- Purpose: Names the lifecycle event kind represented by a hook declaration.
+- Parameters: Choose raw, tag switch, display change, or window appeared.
+- Example: `HookKind.tagSwitch`
+- See also: `HookDeclaration`, `Hooks`.
+
+### TagSwitchHookContext
+
+`struct TagSwitchHookContext`
+
+- Purpose: Carries typed context for tag-switch lifecycle hooks.
+- Parameters: Provide display ID, previous tags, and active tags after the switch.
+- Example: `TagSwitchHookContext(displayID: 1, previousTags: [], activeTags: TagSet(rawValue: 2))`
+- See also: `onTagSwitch(_:_:)`, `Hooks`.
+
+### DisplayChangeHookContext
+
+`struct DisplayChangeHookContext`
+
+- Purpose: Carries typed context for display-change lifecycle hooks.
+- Parameters: Provide the `DisplayChange` emitted by `DisplayMonitor`.
+- Example: `DisplayChangeHookContext(change: change)`
+- See also: `onDisplayChange(_:_:)`, `Hooks`.
+
+### WindowAppearedHookContext
+
+`struct WindowAppearedHookContext`
+
+- Purpose: Carries typed context for window-appeared lifecycle hooks.
+- Parameters: Provide the `WindowState` that appeared.
+- Example: `WindowAppearedHookContext(window: window)`
+- See also: `onWindowAppeared(_:_:)`, `Hooks`.
+
+### onTagSwitch(_:_:)
+
+`func onTagSwitch(_ label: String = "onTagSwitch", _ body: @escaping TagSwitchHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for tag switches.
+- Parameters: Provide an optional stable label and a handler receiving `TagSwitchHookContext`.
+- Example: `onTagSwitch { context in _ = context.activeTags }`
+- See also: `TagSwitchHookContext`, `Hooks`.
+
+### onDisplayChange(_:_:)
+
+`func onDisplayChange(_ label: String = "onDisplayChange", _ body: @escaping DisplayChangeHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for display changes.
+- Parameters: Provide an optional stable label and a handler receiving `DisplayChangeHookContext`.
+- Example: `onDisplayChange { context in _ = context.change.displayID }`
+- See also: `DisplayChangeHookContext`, `Hooks`.
+
+### onWindowAppeared(_:_:)
+
+`func onWindowAppeared(_ label: String = "onWindowAppeared", _ body: @escaping WindowAppearedHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for newly appeared windows.
+- Parameters: Provide an optional stable label and a handler receiving `WindowAppearedHookContext`.
+- Example: `onWindowAppeared { context in _ = context.window.bundleID }`
+- See also: `WindowAppearedHookContext`, `Hooks`.
 
 ## Keybinds
 
@@ -270,6 +335,107 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Accepts engine expressions, arrays, and conditional branches.
 - Example: `Engines { .floating; .bsp; Monocle() }`
 - See also: `Engines`, `EngineDeclaration`.
+
+## Rule Predicates
+
+### WindowSizePredicate
+
+`enum WindowSizePredicate`
+
+- Purpose: Selects a window-size comparison for rule predicates.
+- Parameters: Use `.smallerThan` or `.largerThan` with a target size.
+- Example: `windowSize(.smallerThan(CGSize(width: 800, height: 600)))`
+- See also: `windowSize(_:)`, `RulePredicate`.
+
+### RulePredicate
+
+`struct RulePredicate`
+
+- Purpose: Represents a composable rule predicate tree.
+- Parameters: Build values with `bundleID`, `titleRegex`, `role`, `subrole`, `windowSize`, and operators.
+- Example: `bundleID("com.apple.Terminal") && role("AXWindow")`
+- See also: `RuleMatch`, `Rule`.
+
+### bundleID(_:)
+
+`func bundleID(_ value: String) -> RulePredicate`
+
+- Purpose: Matches windows owned by a bundle identifier.
+- Parameters: Pass the exact application bundle identifier.
+- Example: `bundleID("com.apple.Safari")`
+- See also: `RulePredicate`, `RuleMatch`.
+
+### titleRegex(_:)
+
+`func titleRegex(_ pattern: String) -> RulePredicate`
+
+- Purpose: Matches windows whose title satisfies a regular expression.
+- Parameters: Pass an `NSRegularExpression` pattern string.
+- Example: `titleRegex("^Downloads")`
+- See also: `RulePredicate`, `RuleMatch`.
+
+### role(_:)
+
+`func role(_ value: String) -> RulePredicate`
+
+- Purpose: Matches windows by Accessibility role.
+- Parameters: Pass the exact AX role string, such as `AXWindow`.
+- Example: `role("AXWindow")`
+- See also: `RulePredicate`, `RuleMatch`.
+
+### subrole(_:)
+
+`func subrole(_ value: String) -> RulePredicate`
+
+- Purpose: Matches windows by Accessibility subrole.
+- Parameters: Pass the exact AX subrole string, such as `AXDialog`.
+- Example: `subrole("AXDialog")`
+- See also: `RulePredicate`, `RuleMatch`.
+
+### windowSize(_:)
+
+`func windowSize(_ predicate: WindowSizePredicate) -> RulePredicate`
+
+- Purpose: Matches windows by their current frame size.
+- Parameters: Pass a `WindowSizePredicate` comparison.
+- Example: `windowSize(.largerThan(CGSize(width: 1200, height: 700)))`
+- See also: `WindowSizePredicate`, `RulePredicate`.
+
+### parentBundleID(_:)
+
+`func parentBundleID(_ value: String) -> RulePredicate`
+
+- Purpose: Matches windows whose parent process has a bundle identifier.
+- Parameters: Pass the exact parent application bundle identifier.
+- Example: `parentBundleID("com.apple.dt.Xcode")`
+- See also: `RulePredicate`, `RuleMatch`.
+
+### &&(_:_:)
+
+`func && (lhs: RulePredicate, rhs: RulePredicate) -> RulePredicate`
+
+- Purpose: Combines two rule predicates and requires both to match.
+- Parameters: Put `&&` between two `RulePredicate` values.
+- Example: `bundleID("com.apple.Terminal") && role("AXWindow")`
+- See also: `RulePredicate`, `Rule`.
+
+### ||(_:_:)
+
+`func || (lhs: RulePredicate, rhs: RulePredicate) -> RulePredicate`
+
+- Purpose: Combines two rule predicates and accepts either match.
+- Parameters: Put `||` between two `RulePredicate` values.
+- Example: `bundleID("com.apple.Safari") || parentBundleID("com.apple.dt.Xcode")`
+- See also: `RulePredicate`, `Rule`.
+
+### !(_:)
+
+`func ! (predicate: RulePredicate) -> RulePredicate`
+
+- Purpose: Negates one rule predicate.
+- Parameters: Prefix a `RulePredicate` with `!`.
+- Example: `!subrole("AXDialog")`
+- See also: `RulePredicate`, `Rule`.
 
 ## Rules
 

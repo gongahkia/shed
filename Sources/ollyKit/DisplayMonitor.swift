@@ -34,6 +34,12 @@ public struct DisplayChange: Equatable, Sendable {
     public let displayID: DisplayID
     public let flags: CGDisplayChangeSummaryFlags
     public let displays: [Display]
+
+    public init(displayID: DisplayID, flags: CGDisplayChangeSummaryFlags, displays: [Display]) {
+        self.displayID = displayID
+        self.flags = flags
+        self.displays = displays
+    }
 }
 
 public final class DisplayMonitor {

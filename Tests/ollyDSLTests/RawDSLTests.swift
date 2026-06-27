@@ -1,5 +1,7 @@
+import CoreGraphics
 import XCTest
 import ollyCore
+import ollyKit
 @testable import ollyDSL
 
 final class RawDSLTests: XCTestCase {
@@ -65,6 +67,44 @@ final class RawDSLTests: XCTestCase {
         XCTAssertEqual(decoded.hooks.declarations.map(\.label), ["reload"])
         XCTAssertNil(decoded.hooks.declarations.first?.rawHandler)
         XCTAssertEqual(decoded, config)
+    }
+
+    func testTypedHooksReceiveTypedContextsAndSerializeLabels() throws {
+        let recorder = RawInvocationRecorder()
+        let hooks = Hooks {
+            onTagSwitch { context in
+                recorder.record("tag:\(context.activeTags.rawValue)")
+            }
+            onDisplayChange("display.trace") { context in
+                recorder.record("display:\(context.change.displayID)")
+            }
+            onWindowAppeared { context in
+                recorder.record(context.window.bundleID)
+            }
+        }
+
+        hooks.runTagSwitch(
+            context: TagSwitchHookContext(displayID: 1, previousTags: [], activeTags: TagSet(rawValue: 2))
+        )
+        hooks.runDisplayChange(
+            context: DisplayChangeHookContext(
+                change: DisplayChange(displayID: 3, flags: CGDisplayChangeSummaryFlags(), displays: [])
+            )
+        )
+        hooks.runWindowAppeared(
+            context: WindowAppearedHookContext(
+                window: WindowState(id: 4, processID: 40, bundleID: "com.example.App", frame: .zero)
+            )
+        )
+
+        let data = try JSONEncoder().encode(hooks)
+        let decoded = try JSONDecoder().decode(Hooks.self, from: data)
+
+        XCTAssertEqual(recorder.events, ["tag:2", "display:3", "com.example.App"])
+        XCTAssertEqual(decoded.declarations.map(\.label), ["onTagSwitch", "display.trace", "onWindowAppeared"])
+        XCTAssertEqual(decoded.declarations.map(\.kind), [.tagSwitch, .displayChange, .windowAppeared])
+        XCTAssertEqual(decoded, hooks)
+        XCTAssertNil(decoded.declarations.first?.tagSwitchHandler)
     }
 }
 

@@ -39,6 +39,15 @@ public func ollyConfig() -> Config {
 
         Hooks {
             .raw("example.noop") { _ in }
+            onTagSwitch { context in
+                _ = context.activeTags
+            }
+            onDisplayChange { context in
+                _ = context.change.displayID
+            }
+            onWindowAppeared { context in
+                _ = context.window.bundleID
+            }
         }
 
         Keybinds {

@@ -60,7 +60,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 10 — Performance & profiling (parallel with all phases; P0 for v0.1)
 
-(B) 2026-06-26 Profile + tune wake-from-sleep: subscribe to `NSWorkspace.didWakeNotification`, restore active engine state from in-memory snapshot rather than re-querying all AX; target ≤ 500 ms +phase10 @swift @ax ref:N§12a
 (B) 2026-06-26 Add window-snapshot caching layer with weak references; invalidation only on confirmed AX delta, never on timer +phase10 @swift @ax
 (B) 2026-06-26 Build a flamegraph artifact uploader: PRs touching hot paths attach a release-build flamegraph from `PerfBench` as a CI artifact +phase10 @ci
 (C) 2026-06-26 Investigate using `dispatch_source_create(DISPATCH_SOURCE_TYPE_MACH_RECV)` for AX observer wakeups vs `CFRunLoop`; measure latency delta +phase10 @swift @ax

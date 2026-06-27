@@ -17,6 +17,29 @@ public struct EngineHostResult: Equatable, Sendable {
     public let events: [EngineEvent]
 }
 
+public struct EngineHostPlacementSnapshot: Equatable, Sendable {
+    public let window: WindowState
+    public let placement: Placement
+}
+
+public struct EngineHostSnapshot: Equatable, Sendable {
+    public let displayID: DisplayID
+    public let engineID: LayoutEngineID
+    public let placements: [EngineHostPlacementSnapshot]
+}
+
+public struct EngineHostWakeRestoreResult: Equatable, Sendable {
+    public let displayID: DisplayID
+    public let engineID: LayoutEngineID
+    public let restoredPlacementCount: Int
+    public let durationMilliseconds: Double
+    public let targetMilliseconds: Double
+
+    public var isWithinTarget: Bool {
+        durationMilliseconds <= targetMilliseconds
+    }
+}
+
 public typealias LayoutEngineConfigProvider = (LayoutEngineID) async -> Any?
 public typealias EngineHostPlacementHandler = (WindowState, Placement) async -> Void
 public typealias EngineEventPublisher = (EngineEvent) async -> Void
@@ -29,6 +52,7 @@ public actor EngineHost {
     private let applyPlacement: EngineHostPlacementHandler
     private let publishEvent: EngineEventPublisher
     private var previousPlacementsByWindowID: [WindowID: Placement] = [:]
+    private var snapshotsByDisplayID: [DisplayID: EngineHostSnapshot] = [:]
 
     public init(
         windowStore: WindowStore,
@@ -90,6 +114,43 @@ public actor EngineHost {
         start(displayID: display.id, bounds: safeZones.layoutFrame(for: display), focus: focus)
     }
 
+    public nonisolated func startWakeRestore(
+        displayID: DisplayID,
+        wakeEvents: AsyncStream<Void> = WakeNotificationMonitor().wakes()
+    ) -> Task<Void, Never> {
+        Task {
+            for await _ in wakeEvents {
+                _ = await restoreAfterWake(displayID: displayID)
+            }
+        }
+    }
+
+    public func snapshot(displayID: DisplayID) -> EngineHostSnapshot? {
+        snapshotsByDisplayID[displayID]
+    }
+
+    @discardableResult
+    public func restoreAfterWake(
+        displayID: DisplayID,
+        targetMilliseconds: Double = 500
+    ) async -> EngineHostWakeRestoreResult? {
+        guard let snapshot = snapshotsByDisplayID[displayID] else {
+            return nil
+        }
+
+        let start = ContinuousClock.now
+        for item in snapshot.placements {
+            await applyPlacement(item.window, item.placement)
+        }
+        return EngineHostWakeRestoreResult(
+            displayID: displayID,
+            engineID: snapshot.engineID,
+            restoredPlacementCount: snapshot.placements.count,
+            durationMilliseconds: Self.milliseconds(from: start.duration(to: ContinuousClock.now)),
+            targetMilliseconds: targetMilliseconds
+        )
+    }
+
     public func arrange(displayID: DisplayID, bounds: CGRect, focus: WindowID? = nil) async throws -> EngineHostResult {
         try await PerformanceSignpost.interval("layout.arrange") {
             try await arrangeWithSignpost(displayID: displayID, bounds: bounds, focus: focus)
@@ -113,6 +174,16 @@ public actor EngineHost {
             previousPlacementsByWindowID[$0.windowID] != $0
         }
         let windowsByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
+        snapshotsByDisplayID[displayID] = EngineHostSnapshot(
+            displayID: displayID,
+            engineID: engine.id,
+            placements: placements.compactMap { placement in
+                guard let window = windowsByID[placement.windowID] else {
+                    return nil
+                }
+                return EngineHostPlacementSnapshot(window: window, placement: placement)
+            }
+        )
 
         for placement in changedPlacements {
             if let window = windowsByID[placement.windowID] {
@@ -209,6 +280,11 @@ public actor EngineHost {
 
     private func removeStalePlacements(keeping liveWindowIDs: Set<WindowID>) {
         previousPlacementsByWindowID = previousPlacementsByWindowID.filter { liveWindowIDs.contains($0.key) }
+    }
+
+    private static func milliseconds(from duration: Duration) -> Double {
+        let components = duration.components
+        return Double(components.seconds) * 1_000 + Double(components.attoseconds) / 1_000_000_000_000_000
     }
 }
 

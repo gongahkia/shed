@@ -16,6 +16,7 @@ final class ConfigLoaderTests: XCTestCase {
             CooperativeApps()
             SafeZones()
             Animation()
+            Gestures()
             Hooks()
         }
 
@@ -26,6 +27,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.cooperativeApps, CooperativeApps())
         XCTAssertEqual(config.safeZones, SafeZones())
         XCTAssertEqual(config.animation, Animation())
+        XCTAssertEqual(config.gestures, Gestures())
         XCTAssertEqual(config.hooks, Hooks())
     }
 

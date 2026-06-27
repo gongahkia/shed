@@ -38,9 +38,9 @@ public enum DSLVersion: Codable, Equatable, Sendable {
     }
 }
 
-/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, animation, and hook sections.
+/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, gesture, and hook sections.
 /// Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-/// Example: `Config { Workspaces { Tag.named("web") }; Animation { duration(200.ms) } }`
+/// Example: `Config { Workspaces { Tag.named("web") }; Gestures { fourFingerVertical(.switchTags) } }`
 /// See also: `ConfigBuilder`, `ConfigSection`.
 public struct Config: Codable, Equatable, Sendable {
     public let version: DSLVersion
@@ -51,6 +51,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let cooperativeApps: CooperativeApps
     public let safeZones: SafeZones
     public let animation: Animation
+    public let gestures: Gestures
     public let hooks: Hooks
 
     public init(
@@ -62,6 +63,7 @@ public struct Config: Codable, Equatable, Sendable {
         cooperativeApps: CooperativeApps = CooperativeApps(),
         safeZones: SafeZones = SafeZones(),
         animation: Animation = Animation(),
+        gestures: Gestures = Gestures(),
         hooks: Hooks = Hooks()
     ) {
         self.version = version
@@ -72,6 +74,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.cooperativeApps = cooperativeApps
         self.safeZones = safeZones
         self.animation = animation
+        self.gestures = gestures
         self.hooks = hooks
     }
 
@@ -91,6 +94,7 @@ public struct Config: Codable, Equatable, Sendable {
                 ?? CooperativeApps(),
             safeZones: try container.decodeIfPresent(SafeZones.self, forKey: .safeZones) ?? SafeZones(),
             animation: try container.decodeIfPresent(Animation.self, forKey: .animation) ?? Animation(),
+            gestures: try container.decodeIfPresent(Gestures.self, forKey: .gestures) ?? Gestures(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks()
         )
     }
@@ -103,6 +107,7 @@ public struct Config: Codable, Equatable, Sendable {
         var cooperativeApps = CooperativeApps()
         var safeZones = SafeZones()
         var animation = Animation()
+        var gestures = Gestures()
         var hooks = Hooks()
 
         for section in sections {
@@ -121,6 +126,8 @@ public struct Config: Codable, Equatable, Sendable {
                 safeZones = value
             case let .animation(value):
                 animation = value
+            case let .gestures(value):
+                gestures = value
             case let .hooks(value):
                 hooks = value
             }
@@ -135,6 +142,7 @@ public struct Config: Codable, Equatable, Sendable {
             cooperativeApps: cooperativeApps,
             safeZones: safeZones,
             animation: animation,
+            gestures: gestures,
             hooks: hooks
         )
     }
@@ -194,6 +202,10 @@ public enum ConfigBuilder {
         [.animation(expression)]
     }
 
+    public static func buildExpression(_ expression: Gestures) -> [ConfigSection] {
+        [.gestures(expression)]
+    }
+
     public static func buildExpression(_ expression: Hooks) -> [ConfigSection] {
         [.hooks(expression)]
     }
@@ -211,6 +223,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case cooperativeApps(CooperativeApps)
     case safeZones(SafeZones)
     case animation(Animation)
+    case gestures(Gestures)
     case hooks(Hooks)
 }
 

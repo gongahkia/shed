@@ -60,7 +60,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 10 — Performance & profiling (parallel with all phases; P0 for v0.1)
 
-(A) 2026-06-26 Add `os_signpost` regions: ax.write, layout.arrange, dispatch.tagSwitch, dsl.reload; `xctrace` template committed under `scripts/profile.tracetemplate` +phase10 @swift ref:N§12a
 (A) 2026-06-26 Make `LayoutEngine.arrange()` non-suspending (synchronous, pure) by contract — enforced via protocol shape; CI compile-time check via attribute +phase10 @swift @layout ref:N§12a
 (B) 2026-06-26 Implement 7-day soak harness: simulate ~5 k window events/day, sample RSS every 10 min, gate < 5 % growth from baseline; runs nightly on a self-hosted Mac mini if available +phase10 @ci ref:N§12a
 (B) 2026-06-26 Profile + tune wake-from-sleep: subscribe to `NSWorkspace.didWakeNotification`, restore active engine state from in-memory snapshot rather than re-querying all AX; target ≤ 500 ms +phase10 @swift @ax ref:N§12a

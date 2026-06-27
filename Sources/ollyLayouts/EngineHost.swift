@@ -91,6 +91,16 @@ public actor EngineHost {
     }
 
     public func arrange(displayID: DisplayID, bounds: CGRect, focus: WindowID? = nil) async throws -> EngineHostResult {
+        try await PerformanceSignpost.interval("layout.arrange") {
+            try await arrangeWithSignpost(displayID: displayID, bounds: bounds, focus: focus)
+        }
+    }
+
+    private func arrangeWithSignpost(
+        displayID: DisplayID,
+        bounds: CGRect,
+        focus: WindowID?
+    ) async throws -> EngineHostResult {
         let tagState = await tagStore.state(for: displayID)
         let engine = try await resolveEngine(for: tagState)
 

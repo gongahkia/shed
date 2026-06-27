@@ -1,5 +1,6 @@
 import CoreServices
 import Foundation
+import ollyKit
 
 public struct ConfigReloadFailure: Equatable, Sendable {
     public let message: String
@@ -112,18 +113,20 @@ public final class ConfigReloader {
     }
 
     private func reloadOnQueue() -> ConfigReloadEvent {
-        do {
-            let loaded = try load()
-            loadedConfig = loaded
-            let event = ConfigReloadEvent.reloaded(loaded)
-            notify(event)
-            return event
-        } catch {
-            let event = ConfigReloadEvent.failed(
-                ConfigReloadFailure(message: String(describing: error), retainedConfig: loadedConfig)
-            )
-            notify(event)
-            return event
+        PerformanceSignpost.interval("dsl.reload") {
+            do {
+                let loaded = try load()
+                loadedConfig = loaded
+                let event = ConfigReloadEvent.reloaded(loaded)
+                notify(event)
+                return event
+            } catch {
+                let event = ConfigReloadEvent.failed(
+                    ConfigReloadFailure(message: String(describing: error), retainedConfig: loadedConfig)
+                )
+                notify(event)
+                return event
+            }
         }
     }
 }

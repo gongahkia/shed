@@ -13,7 +13,12 @@ final class LayoutSnapshotTests: XCTestCase {
             ("master-stack", masterStackPlacements(in: bounds)),
             ("manual", manualPlacements(in: bounds)),
             ("bsp", bspPlacements(in: bounds)),
-            ("niri-scroll", niriScrollPlacements(in: bounds))
+            ("niri-scroll", niriScrollPlacements(in: bounds)),
+            ("monocle", monoclePlacements(in: bounds)),
+            ("spiral", spiralPlacements(in: bounds)),
+            ("grid", gridPlacements(in: bounds)),
+            ("three-col", threeColPlacements(in: bounds)),
+            ("accordion", accordionPlacements(in: bounds))
         ]
 
         for (name, placements) in cases {
@@ -66,6 +71,35 @@ final class LayoutSnapshotTests: XCTestCase {
 
     private func niriScrollPlacements(in bounds: CGRect) -> [Placement] {
         NiriScrollLayoutEngine().arrange(windows: snapshots(1, 2, 3), in: bounds, focus: 3)
+    }
+
+    private func monoclePlacements(in bounds: CGRect) -> [Placement] {
+        MonocleLayoutEngine().arrange(
+            windows: [
+                WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 320, height: 220)),
+                WindowSnapshot(windowID: 3, frame: CGRect(x: 0, y: 0, width: 340, height: 240))
+            ],
+            in: bounds,
+            focus: 2
+        )
+    }
+
+    private func spiralPlacements(in bounds: CGRect) -> [Placement] {
+        SpiralLayoutEngine().arrange(windows: snapshots(1, 2, 3), in: bounds, focus: nil)
+    }
+
+    private func gridPlacements(in bounds: CGRect) -> [Placement] {
+        GridLayoutEngine().arrange(windows: snapshots(3, 1, 5, 2, 4), in: bounds, focus: nil)
+    }
+
+    private func threeColPlacements(in bounds: CGRect) -> [Placement] {
+        ThreeColLayoutEngine().arrange(windows: snapshots(1, 2, 3, 4, 5), in: bounds, focus: nil)
+    }
+
+    private func accordionPlacements(in bounds: CGRect) -> [Placement] {
+        let engine = AccordionLayoutEngine(config: AccordionLayoutEngine.Config(stripHeight: 50))
+        return engine.arrange(windows: snapshots(1, 2, 3, 4, 5), in: bounds, focus: 3)
     }
 
     private func assertMatchesGolden(name: String, placements: [Placement]) throws {

@@ -10,9 +10,13 @@ Source model: dwm's `monocle(Monitor *m)` counts visible clients, updates the la
 
 olly shape:
 - `MonocleLayoutEngine`
-- all tiled windows receive `bounds`
-- only the focused window should be raised by z-order
-- optional status event: `monocle-index-changed`
+- focused tiled window receives `bounds`
+- siblings are hidden offscreen with `hidden = true`
+- cycle helpers expose next/previous focus IDs
+
+Screenshot:
+
+![Monocle layout screenshot](layout-screenshots/monocle.png)
 
 Source:
 - https://git.suckless.org/dwm/file/dwm.c.html
@@ -23,9 +27,14 @@ Source model: XMonad's `XMonad.Layout.Spiral` exposes `spiral` and `spiralWithDi
 
 olly shape:
 - `SpiralLayoutEngine`
-- config: `ratio`, `startDirection`, `rotation`
-- pure recursive split of remaining rect
+- config: `splitRatio`, defaulting to the golden ratio
+- pure recursive split of the remaining rect
+- alternates split sides while choosing the longer remaining axis
 - no hidden windows
+
+Screenshot:
+
+![Spiral layout screenshot](layout-screenshots/spiral.png)
 
 Source:
 - https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-Spiral.html
@@ -37,9 +46,14 @@ Source model: Qtile `Matrix` divides the screen into equal cells with configurab
 
 olly shape:
 - `GridLayoutEngine`
-- config: `policy = square | fixedColumns(Int) | fixedRows(Int)`
+- config: `policy = squareish | fixedCols(Int) | fixedRows(Int)`
 - deterministic row-major placement
+- windows are sorted by AX window ID before placement
 - last row may have empty cells; do not resize earlier rows based on tail count
+
+Screenshot:
+
+![Grid layout screenshot](layout-screenshots/grid.png)
 
 Source:
 - https://docs.qtile.org/en/latest/manual/ref/layouts.html
@@ -50,10 +64,14 @@ Source:
 Source model: XMonad `ThreeCol` is Tall-like but with three columns. `ThreeColMid` places the main window between stack columns; both stack columns use the same size when both are visible.
 
 olly shape:
-- `ThreeColumnLayoutEngine`
-- config: `masterCount`, `masterRatio`, `centerMaster`
+- `ThreeColLayoutEngine`
+- config: `masterRatio`
 - centered master uses left/right stacks with balanced window counts
 - ultrawide-first defaults, not a MasterStack replacement
+
+Screenshot:
+
+![ThreeCol layout screenshot](layout-screenshots/three-col.png)
 
 Source:
 - https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-ThreeColumns.html
@@ -64,10 +82,14 @@ Source model: XMonad exposes decorated layouts based on `Accordion`. Its practic
 
 olly shape:
 - `AccordionLayoutEngine`
-- config: `expandedRatio`, `collapsedExtent`
+- config: `stripHeight`
 - focused window gets expanded rect
-- non-focused windows keep small interactive strips
-- needs accessibility-safe title-strip handling before shipping
+- non-focused windows keep small top/bottom strips
+- strip height clamps when needed to keep the expanded region visible
+
+Screenshot:
+
+![Accordion layout screenshot](layout-screenshots/accordion.png)
 
 Source:
 - https://xmonad.github.io/xmonad-docs/xmonad-contrib/XMonad-Layout-DecorationMadness.html

@@ -1,0 +1,29 @@
+[
+  {
+    "windowID": 1,
+    "x": 0,
+    "y": 0,
+    "width": 556,
+    "height": 600,
+    "zOrder": 0,
+    "hidden": false
+  },
+  {
+    "windowID": 2,
+    "x": 556,
+    "y": 0,
+    "width": 344,
+    "height": 370,
+    "zOrder": 1,
+    "hidden": false
+  },
+  {
+    "windowID": 3,
+    "x": 556,
+    "y": 370,
+    "width": 344,
+    "height": 230,
+    "zOrder": 2,
+    "hidden": false
+  }
+]

@@ -102,11 +102,11 @@ public struct Config: Codable, Equatable, Sendable {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds ordered `ConfigSection` values inside `Config { ... }`.
 /// Parameters: Accepts section expressions, conditionals, and arrays emitted by the config body.
 /// Example: `Config { Keybinds(); Rules() }`
 /// See also: `Config`, `ConfigSection`.
+@resultBuilder
 public enum ConfigBuilder {
     public static func buildBlock(_ components: [ConfigSection]...) -> [ConfigSection] {
         components.flatMap { $0 }

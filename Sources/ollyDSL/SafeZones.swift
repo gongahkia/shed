@@ -80,11 +80,11 @@ public func reserve(rect: CGRect, on displayID: DisplayID) -> SafeZoneDeclaratio
     .reserve(SafeZoneReservation(rect: rect, displayID: displayID))
 }
 
-@resultBuilder
 /// Purpose: Builds safe-zone declarations inside `SafeZones { ... }`.
 /// Parameters: Accepts safe-zone declarations, arrays, and conditionals.
 /// Example: `SafeZones { notchPadding(12) }`
 /// See also: `SafeZones`, `SafeZoneDeclaration`.
+@resultBuilder
 public enum SafeZoneBuilder {
     public static func buildBlock(_ components: [SafeZoneDeclaration]...) -> [SafeZoneDeclaration] {
         components.flatMap { $0 }

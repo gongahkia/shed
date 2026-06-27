@@ -161,11 +161,11 @@ public extension Config {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds rule declarations inside `Rules { ... }`.
 /// Parameters: Accepts `Rule` expressions, arrays, and conditional branches.
 /// Example: `Rules { Rule(match: RuleMatch(subrole: "AXSystemDialog"), apply: RuleApply(floating: true)) }`
 /// See also: `Rules`, `Rule`.
+@resultBuilder
 public enum RuleBuilder {
     public static func buildBlock(_ components: [Rule]...) -> [Rule] {
         components.flatMap { $0 }

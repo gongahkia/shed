@@ -86,11 +86,11 @@ public struct Workspaces: Codable, Equatable, Sendable {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds named tag declarations inside `Workspaces { ... }`.
 /// Parameters: Accepts `NamedTagDeclaration` expressions, arrays, and conditionals.
 /// Example: `Workspaces { Tag.named("chat") }`
 /// See also: `Workspaces`, `NamedTagDeclaration`.
+@resultBuilder
 public enum WorkspacesBuilder {
     public static func buildBlock(_ components: [NamedTagDeclaration]...) -> [NamedTagDeclaration] {
         components.flatMap { $0 }

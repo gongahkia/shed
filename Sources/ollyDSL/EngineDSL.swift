@@ -114,11 +114,11 @@ public struct Engines: Codable, Equatable, Sendable {
     }
 }
 
-@resultBuilder
 /// Purpose: Builds engine declarations inside `Engines { ... }`.
 /// Parameters: Accepts engine expressions, arrays, and conditional branches.
 /// Example: `Engines { .floating; .bsp; Monocle() }`
 /// See also: `Engines`, `EngineDeclaration`.
+@resultBuilder
 public enum EngineBuilder {
     public static func buildBlock(_ components: [EngineDeclaration]...) -> [EngineDeclaration] {
         components.flatMap { $0 }

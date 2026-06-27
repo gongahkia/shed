@@ -2,6 +2,10 @@
 
 `ollyLayouts` exposes layout engines as pure Swift values. Engines receive cached `WindowSnapshot` inputs and return deterministic `Placement` outputs. Engines must not call AX, perform I/O, mutate window state, or suspend; `EngineHost` owns diffing and window moves.
 
+## Starter Template
+
+Start from [`olly-plugin-template`](../olly-plugin-template/README.md). It contains a 49-line `HelloLayoutEngine`, a SwiftPM package, and a placement snapshot test you can run with `swift test --package-path olly-plugin-template` from this repo root.
+
 ## Protocol
 
 ```swift

@@ -89,7 +89,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 (A) 2026-06-26 Implement type-safe error catalog: duplicate-chord, duplicate-tag-name, unknown-engine-id, ambiguous-rule — all are compile-time errors via `@_unavailable` or where-clauses +phase14 @swift @dsl ref:N§14
 (B) 2026-06-26 Ship a DSL cookbook in `docs/dsl-cookbook.md`: 30+ snippets for common asks — "float Slack", "tag #4 always BSP", "different engine per display", "scratchpad tag", "follow-focus-to-display", "auto-rotate workspace on display unplug" +phase14 @docs @dsl
-(C) 2026-06-26 Plugin starter template `olly-plugin-template` repo: a working `Hello, layout!` engine in 80 lines of Swift with passing snapshot test; linked from `docs/plugin-authoring.md` +phase14 @swift @dsl @docs
 (C) 2026-06-26 Live config playground: an in-app sheet where users see DSL compile errors with column markers + quick-fix suggestions +phase14 @ui @dsl
 
 ---

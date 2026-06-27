@@ -64,7 +64,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 11 — Tier-1 layouts (v0.2)
 
-(A) 2026-06-26 Implement `Spiral` engine: recursive golden-ratio (or configurable) splits; first window full, next halves longer axis spirally; cite XMonad Spiral + Yabai fibonacci +phase11 @swift @layout ref:N§6
 (A) 2026-06-26 Implement `Grid` engine: square-ish auto-pack with configurable policy (squareish/fixedRows(n)/fixedCols(n)); deterministic ordering by AX windowID +phase11 @swift @layout ref:N§6
 (A) 2026-06-26 Implement `ThreeCol` engine: centered master + left/right slave stacks; configurable masterRatio (default 0.5) and side-balance; ultrawide-friendly +phase11 @swift @layout ref:N§6
 (A) 2026-06-26 Implement `Accordion` engine: focused window expanded, others collapse to title strips at top/bottom; configurable stripHeight +phase11 @swift @layout ref:N§6

@@ -79,7 +79,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 13 — Tier-3 architectural layouts + community engines (v1.0)
 
-(A) 2026-06-26 Implement `MultiTagUnion` view mode (River precedent): display arranges union of windows from N active tags simultaneously +phase13 @swift @layout @core ref:N§6
 (A) 2026-06-26 Implement `PinnedColumns` modifier for scrollable engines (Niri/hyprscroller/PaperWM precedent): pin a column to stay visible regardless of scroll position +phase13 @swift @layout ref:N§6
 (A) 2026-06-26 Implement `PaperWMScroll` engine: alternative scrollable model with variable-width content-driven columns; differentiate from NiriScroll in `docs/layouts-research.md` +phase13 @swift @layout ref:N§6
 (B) 2026-06-26 Promote external layout engine API: `.dylib` loading at runtime, signed package format `.ollyplugin`, version negotiation; defer until ABI proves stable across 2+ minor versions +phase13 @swift @dsl @release ref:N§4-D4

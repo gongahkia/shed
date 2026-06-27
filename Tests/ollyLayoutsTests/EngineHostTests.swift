@@ -103,6 +103,37 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [1])
     }
 
+    func testArrangeUsesUnionOfActiveTags() async throws {
+        let one = try Tag(index: 1)
+        let two = try Tag(index: 2)
+        let three = try Tag(index: 3)
+        let engineID = LayoutEngineID(rawValue: "fixed")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet([one, two]))
+        let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
+        let recorder = EngineHostPlacementRecorder()
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { window, placement in
+                await recorder.record(windowID: window.id, placement: placement)
+            }
+        )
+        await tagStore.bindEngine(engineID, to: one, on: 1)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(one).rawValue))
+        await windowStore.upsert(window(id: 2, tagMask: TagSet(two).rawValue))
+        await windowStore.upsert(window(id: 3, tagMask: TagSet([one, two]).rawValue))
+        await windowStore.upsert(window(id: 4, tagMask: TagSet(three).rawValue))
+
+        let result = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let recordedWindowIDs = await recorder.windowIDs
+
+        XCTAssertEqual(result.placements.map(\.windowID), [1, 2, 3])
+        XCTAssertEqual(recordedWindowIDs, [1, 2, 3])
+    }
+
     func testArrangeWithDisplayUsesSafeZoneLayoutFrame() async throws {
         let tag = try Tag(index: 1)
         let engineID = LayoutEngineID(rawValue: "fixed")

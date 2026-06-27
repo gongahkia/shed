@@ -127,6 +127,7 @@ ollyctl state --json
 - Borders: `extensions/jankyborders/`.
 - Hotkey daemons: see `docs/hotkey-delegation.md`.
 - Cooperative apps allowlist: `docs/cooperative-apps.yml`.
+- DSL cookbook: `docs/dsl-cookbook.md`.
 - Full integration matrix: `docs/menubar-notch-integration.md`.
 
 ## Development

@@ -53,6 +53,7 @@ public actor EngineHost {
     private let publishEvent: EngineEventPublisher
     private var previousPlacementsByWindowID: [WindowID: Placement] = [:]
     private var snapshotsByDisplayID: [DisplayID: EngineHostSnapshot] = [:]
+    private var placementArena = PlacementArena()
 
     public init(
         windowStore: WindowStore,
@@ -170,9 +171,10 @@ public actor EngineHost {
         }
         let snapshots = windows.map(WindowSnapshot.init)
         let placements = engine.arrange(windows: snapshots, in: bounds, focus: focus)
-        let changedPlacements = placements.filter {
-            previousPlacementsByWindowID[$0.windowID] != $0
-        }
+        placementArena.collectChangedPlacements(
+            from: placements,
+            previousPlacementsByWindowID: previousPlacementsByWindowID
+        )
         let windowsByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
         snapshotsByDisplayID[displayID] = EngineHostSnapshot(
             displayID: displayID,
@@ -185,12 +187,13 @@ public actor EngineHost {
             }
         )
 
-        for placement in changedPlacements {
+        for placement in placementArena.placements {
             if let window = windowsByID[placement.windowID] {
                 await applyPlacement(window, placement)
             }
             previousPlacementsByWindowID[placement.windowID] = placement
         }
+        let appliedPlacements = placementArena.toArray()
 
         removeStalePlacements(keeping: Set(placements.map(\.windowID)))
         let event = EngineEvent.arranged(
@@ -198,7 +201,7 @@ public actor EngineHost {
                 displayID: displayID,
                 engineID: engine.id,
                 placementCount: placements.count,
-                appliedPlacementCount: changedPlacements.count
+                appliedPlacementCount: appliedPlacements.count
             )
         )
         await publishEvent(event)
@@ -206,7 +209,7 @@ public actor EngineHost {
             displayID: displayID,
             engineID: engine.id,
             placements: placements,
-            appliedPlacements: changedPlacements,
+            appliedPlacements: appliedPlacements,
             events: [event]
         )
     }

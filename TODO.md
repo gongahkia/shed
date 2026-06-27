@@ -60,8 +60,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 10 — Performance & profiling (parallel with all phases; P0 for v0.1)
 
-(C) 2026-06-26 Memory-arena allocator for `Placement` arrays passed to WindowMover to avoid per-frame Swift `Array` allocations +phase10 @swift
-
 ---
 
 ## PHASE 11 — Tier-1 layouts (v0.2)

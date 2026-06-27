@@ -24,6 +24,18 @@ public struct AXNotificationEvent {
     public let element: AXUIElement
     public let notification: AXNotification
     public let rawNotificationName: String
+
+    public init(
+        processID: pid_t,
+        element: AXUIElement,
+        notification: AXNotification,
+        rawNotificationName: String
+    ) {
+        self.processID = processID
+        self.element = element
+        self.notification = notification
+        self.rawNotificationName = rawNotificationName
+    }
 }
 
 public enum AXObserverBridgeError: Error, Equatable {

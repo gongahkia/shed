@@ -22,6 +22,7 @@ public enum ConfigLoaderError: Error, CustomStringConvertible {
     case missingSymbol(String, URL)
     case nilConfig(String)
     case invalidUTF8(URL)
+    case dslVersionMismatch(DSLMigrationPrompt)
 
     public var description: String {
         switch self {
@@ -37,6 +38,11 @@ public enum ConfigLoaderError: Error, CustomStringConvertible {
             return "\(symbol) returned nil"
         case let .invalidUTF8(url):
             return "config library returned non-UTF8 JSON from \(url.path)"
+        case let .dslVersionMismatch(prompt):
+            if let diff = prompt.diffSuggestion, !diff.isEmpty {
+                return "\(prompt.message)\nSuggested diff:\n\(diff)"
+            }
+            return prompt.message
         }
     }
 }
@@ -121,7 +127,11 @@ public struct ConfigLoader {
         guard let json = String(validatingUTF8: jsonPointer) else {
             throw ConfigLoaderError.invalidUTF8(libraryURL)
         }
-        return try JSONDecoder().decode(Config.self, from: Data(json.utf8))
+        let config = try JSONDecoder().decode(Config.self, from: Data(json.utf8))
+        if let prompt = DSLVersionMigrator.prompt(for: config.version) {
+            throw ConfigLoaderError.dslVersionMismatch(prompt)
+        }
+        return config
     }
 
     public static func defaultSourceURL() -> URL {

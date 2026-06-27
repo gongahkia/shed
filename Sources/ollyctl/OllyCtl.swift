@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import ollyCore
+import ollyDSL
 import ollyIPC
 import ollyKit
 
@@ -24,6 +25,7 @@ struct OllyCtl: ParsableCommand {
             Reload.self,
             SubscribeEvents.self,
             Events.self,
+            MigrateConfig.self,
             Version.self
         ]
     )
@@ -338,5 +340,26 @@ struct Version: ParsableCommand {
 
     func run() throws {
         try OllyCtlRunner(options: options).send(.version(IPCVersionCommand()))
+    }
+}
+
+struct MigrateConfig: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "migrate-config",
+        abstract: "Print a DSLVersion migration diff for Config.swift."
+    )
+
+    @Option(name: .customLong("config"), help: "Path to Config.swift.")
+    var configPath: String?
+
+    func run() throws {
+        let url = configPath.map(URL.init(fileURLWithPath:)) ?? ConfigLoader.defaultSourceURL()
+        let source = try String(contentsOf: url, encoding: .utf8)
+        let suggestion = DSLVersionMigrator.suggestion(for: source, sourcePath: url.path)
+        if suggestion.isEmpty {
+            print("config already declares DSL \(DSLVersion.current.rawValue)")
+        } else {
+            print(suggestion.diff)
+        }
     }
 }

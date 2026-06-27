@@ -34,6 +34,7 @@ let package = Package(
         .executableTarget(
             name: "ollyctl",
             dependencies: [
+                "ollyDSL",
                 "ollyIPC",
                 "ollyLayouts",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")

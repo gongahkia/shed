@@ -88,7 +88,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 ## PHASE 14 — DSL polish & documentation
 
 (A) 2026-06-26 Implement type-safe error catalog: duplicate-chord, duplicate-tag-name, unknown-engine-id, ambiguous-rule — all are compile-time errors via `@_unavailable` or where-clauses +phase14 @swift @dsl ref:N§14
-(A) 2026-06-26 Implement `DSLVersion` enum carried in Config; mismatched versions trigger migration prompt; `ollyctl migrate-config` generates a diff suggestion +phase14 @swift @dsl @ipc ref:N§14
 (A) 2026-06-26 Ship `examples/` directory with at least 6 working configs: minimal, niri-only, master-stack-heavy, ultrawide-3col, multi-display-tags, plugin-author (custom engine) +phase14 @dsl @docs
 (B) 2026-06-26 Ship a DSL cookbook in `docs/dsl-cookbook.md`: 30+ snippets for common asks — "float Slack", "tag #4 always BSP", "different engine per display", "scratchpad tag", "follow-focus-to-display", "auto-rotate workspace on display unplug" +phase14 @docs @dsl
 (B) 2026-06-26 Implement `Rule` predicate builders: `bundleID(_)`, `titleRegex(_)`, `role(_)`, `subrole(_)`, `windowSize(.smallerThan: ...)`, `windowSize(.largerThan: ...)`, `parentBundleID(_)` (XPC services), composable with `&&` `||` `!` operators +phase14 @swift @dsl

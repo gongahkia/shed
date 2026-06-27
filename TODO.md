@@ -73,7 +73,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 (A) 2026-06-26 Implement `Tabbed` engine (i3/Sway precedent): multiple windows share a tile, accessible via a top tab bar; render tab bar as a child `NSWindow` overlay or via AX-managed title bar +phase12 @swift @layout @ui ref:N§6
 (A) 2026-06-26 Implement `Stacked` engine: like Tabbed but full-height left title stack +phase12 @swift @layout @ui ref:N§6
 (A) 2026-06-26 Implement `TreeTab` engine (Qtile precedent): vertical tree of tabbed windows on a side rail; configurable rail width and side +phase12 @swift @layout @ui ref:N§6
-(B) 2026-06-26 Implement `RatioTile` engine: pack N windows honoring their AX min/max-size constraints via 2D bin-packing; fall back to grid on infeasible +phase12 @swift @layout ref:N§6
 (B) 2026-06-26 Document Tab-bar/Stack-bar UX in `docs/layouts-research.md`; trade-offs of AX-only tab rendering vs overlay NSWindow +phase12 @docs @ui
 (C) 2026-06-26 Cut v0.3.0 release; update comparison table; blog post: "olly is now the macOS WM with the most layout engines" +phase12 @release
 

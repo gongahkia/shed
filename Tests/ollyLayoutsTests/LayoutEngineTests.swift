@@ -50,6 +50,22 @@ final class LayoutEngineTests: XCTestCase {
             ]
         )
     }
+
+    func testLayoutEngineArrangeSignatureIsSynchronous() {
+        let arrange: (StubLayoutEngine, [WindowSnapshot], CGRect, WindowID?) -> [Placement] = {
+            engine, windows, bounds, focus in
+            engine.arrange(windows: windows, in: bounds, focus: focus)
+        }
+
+        let placements = arrange(
+            StubLayoutEngine(config: StubLayoutEngine.Config(gap: 0)),
+            [WindowSnapshot(windowID: 1, frame: .zero)],
+            CGRect(x: 0, y: 0, width: 800, height: 600),
+            nil
+        )
+
+        XCTAssertEqual(placements.first?.frame, CGRect(x: 0, y: 0, width: 800, height: 600))
+    }
 }
 
 private struct StubLayoutEngine: LayoutEngine {

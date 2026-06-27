@@ -65,4 +65,9 @@ public extension LayoutEngine {
     var capabilities: LayoutEngineCapabilities {
         []
     }
+
+    @available(*, unavailable, message: "LayoutEngine.arrange must remain synchronous")
+    func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) async -> [Placement] {
+        fatalError("LayoutEngine.arrange must remain synchronous")
+    }
 }

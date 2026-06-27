@@ -21,6 +21,11 @@ public func ollyConfig() -> Config {
             EngineDeclaration.manual
             EngineDeclaration.bsp
             EngineDeclaration.niriScroll
+            Monocle()
+            Spiral()
+            Grid(.squareish)
+            ThreeCol(masterRatio: 0.5)
+            Accordion()
         }
 
         CooperativeApps {

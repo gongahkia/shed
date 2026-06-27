@@ -64,7 +64,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 11 — Tier-1 layouts (v0.2)
 
-(B) 2026-06-26 Add DSL bindings: `Engines { Monocle(); Spiral(); Grid(.squareish); ThreeCol(masterRatio: 0.5); Accordion() }` with full doc-comments +phase11 @swift @dsl
 (B) 2026-06-26 Cut v0.2.0 release with five new layouts; update README comparison table +phase11 @release
 
 ---

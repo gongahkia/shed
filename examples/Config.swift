@@ -95,7 +95,9 @@ public func ollyConfig() -> Config {
                 apply: RuleApply(tags: tag(0), engine: "floating", floating: true)
             )
             Rule(
-                match: RuleMatch(bundleID: "com.apple.Terminal", role: "AXWindow"),
+                match: bundleID("com.apple.Terminal") &&
+                    role("AXWindow") &&
+                    windowSize(.largerThan(CGSize(width: 600, height: 400))),
                 apply: RuleApply(tags: tag(1), engine: "bsp", floating: false)
             )
             Rule(

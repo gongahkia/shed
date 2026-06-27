@@ -117,6 +117,80 @@ final class RuleTests: XCTestCase {
         XCTAssertFalse(match.matches(context))
     }
 
+    func testRulePredicateBuildersComposeWithAndOrAndNot() {
+        let predicate = (
+            bundleID("com.example.Editor") &&
+                titleRegex("^README") &&
+                role("AXWindow") &&
+                windowSize(.largerThan(CGSize(width: 400, height: 300)))
+        ) || (
+            parentBundleID("com.example.HelperHost") &&
+                !subrole("AXDialog")
+        )
+
+        XCTAssertTrue(
+            predicate.matches(
+                RuleContext(
+                    bundleID: "com.example.Editor",
+                    title: "README.md",
+                    role: "AXWindow",
+                    subrole: "AXStandardWindow",
+                    windowSize: CGSize(width: 800, height: 600)
+                )
+            )
+        )
+        XCTAssertTrue(
+            predicate.matches(
+                RuleContext(
+                    subrole: "AXStandardWindow",
+                    parentBundleID: "com.example.HelperHost"
+                )
+            )
+        )
+        XCTAssertFalse(
+            predicate.matches(
+                RuleContext(
+                    bundleID: "com.example.Editor",
+                    title: "README.md",
+                    role: "AXWindow",
+                    subrole: "AXDialog",
+                    windowSize: CGSize(width: 200, height: 150)
+                )
+            )
+        )
+    }
+
+    func testRuleCanUsePredicateBuildersDirectly() {
+        let rules = Rules {
+            Rule(
+                match: bundleID("com.example.Editor") && windowSize(.smallerThan(CGSize(width: 500, height: 500))),
+                apply: RuleApply(engine: "floating", floating: true)
+            )
+        }
+
+        let apply = rules.resolvedApply(
+            for: RuleContext(
+                bundleID: "com.example.Editor",
+                windowSize: CGSize(width: 300, height: 400)
+            )
+        )
+
+        XCTAssertEqual(apply.engineOverride, "floating")
+        XCTAssertEqual(apply.floating, true)
+    }
+
+    func testRulePredicateCodableRoundTrips() throws {
+        let rule = Rule(
+            match: parentBundleID("com.example.Host") || subrole("AXDialog"),
+            apply: RuleApply(engine: "floating", floating: true)
+        )
+
+        let data = try JSONEncoder().encode(rule)
+        let decoded = try JSONDecoder().decode(Rule.self, from: data)
+
+        XCTAssertEqual(decoded, rule)
+    }
+
     func testConfigResolvesCooperativeAppsAsFloating() {
         let config = Config {
             CooperativeApps(mode: .replace) {

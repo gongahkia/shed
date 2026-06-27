@@ -278,17 +278,17 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 `struct RuleMatch`
 
 - Purpose: Describes the window properties a DSL rule must match.
-- Parameters: Provide optional bundle ID, title regex, role, or subrole predicates.
-- Example: `RuleMatch(bundleID: "com.apple.Terminal", titleRegex: "ssh")`
-- See also: `Rule`, `RuleContext`.
+- Parameters: Provide optional legacy fields and/or a composed `RulePredicate`.
+- Example: `RuleMatch(bundleID: "com.apple.Terminal", predicate: role("AXWindow"))`
+- See also: `Rule`, `RulePredicate`.
 
 ### RuleContext
 
 `struct RuleContext`
 
 - Purpose: Carries runtime window metadata used to evaluate rule matches.
-- Parameters: Provide bundle ID, title, role, and subrole values from a window snapshot.
-- Example: `RuleContext(bundleID: "com.apple.finder", title: "Downloads")`
+- Parameters: Provide bundle ID, title, role, subrole, parent bundle ID, and window size values.
+- Example: `RuleContext(bundleID: "com.apple.finder", windowSize: CGSize(width: 500, height: 400))`
 - See also: `RuleMatch`, `Rules`.
 
 ### RuleApply

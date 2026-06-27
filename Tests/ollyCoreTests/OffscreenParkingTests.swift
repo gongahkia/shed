@@ -23,6 +23,39 @@ final class OffscreenParkingTests: XCTestCase {
         XCTAssertTrue(parking.isOffscreen(frame, avoiding: displayFrames))
     }
 
+    func testFramesForCaptureToolSizesAvoidEveryAttachedDisplayRect() {
+        let parking = OffscreenParking()
+        let displayFrames = [
+            CGRect(x: -33_000, y: -33_000, width: 4_000, height: 4_000),
+            CGRect(x: -1_920, y: 0, width: 1_920, height: 1_080),
+            CGRect(x: 0, y: 0, width: 1_470, height: 956),
+            CGRect(x: 1_470, y: -200, width: 2_560, height: 1_440),
+            CGRect(x: -6_000, y: 1_400, width: 3_440, height: 1_440)
+        ]
+        let sizes = [
+            CGSize(width: 1, height: 1),
+            CGSize(width: 640, height: 480),
+            CGSize(width: 3_840, height: 2_160),
+            CGSize(width: 6_000, height: 4_000)
+        ]
+
+        for size in sizes {
+            let frame = parking.frame(for: size, avoiding: displayFrames)
+            XCTAssertTrue(parking.isOffscreen(frame, avoiding: displayFrames), "\(size) parked at \(frame)")
+        }
+    }
+
+    func testFrameAvoidsActiveCGDisplayBounds() throws {
+        let displayFrames = OffscreenParking.activeDisplayFrames()
+        if displayFrames.isEmpty {
+            throw XCTSkip("No active CGDisplayBounds available")
+        }
+        let parking = OffscreenParking()
+        let frame = parking.frame(for: CGSize(width: 640, height: 480), avoiding: displayFrames)
+
+        XCTAssertTrue(parking.isOffscreen(frame, avoiding: displayFrames))
+    }
+
     func testFallbackCollisionMovesPastDisplayUnion() {
         let parking = OffscreenParking()
         let displayFrames = [

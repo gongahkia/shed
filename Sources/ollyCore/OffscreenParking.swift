@@ -14,6 +14,23 @@ public struct OffscreenParking: Equatable, Sendable {
         self.margin = margin
     }
 
+    public static func activeDisplayFrames(maxDisplays: UInt32 = 32) -> [CGRect] {
+        activeDisplayBounds(maxDisplays: maxDisplays).map(\.frame)
+    }
+
+    public static func activeDisplays(maxDisplays: UInt32 = 32) -> [Display] {
+        activeDisplayBounds(maxDisplays: maxDisplays).map { bounds in
+            Display(
+                id: bounds.id,
+                frame: bounds.frame,
+                visibleFrame: bounds.frame,
+                scaleFactor: 1,
+                localizedName: "Display \(bounds.id)",
+                isMain: bounds.id == CGMainDisplayID()
+            )
+        }
+    }
+
     public func origin(avoiding displays: [Display]) -> CGPoint {
         origin(forSize: .zero, avoiding: displays.map(\.frame))
     }
@@ -43,6 +60,10 @@ public struct OffscreenParking: Equatable, Sendable {
         displayFrames.allSatisfy { !$0.intersects(frame) }
     }
 
+    public func isOffscreen(_ frame: CGRect, avoiding displays: [Display]) -> Bool {
+        isOffscreen(frame, avoiding: displays.map(\.frame))
+    }
+
     private func union(_ displayFrames: [CGRect]) -> CGRect? {
         guard var result = displayFrames.first else {
             return nil
@@ -52,5 +73,18 @@ public struct OffscreenParking: Equatable, Sendable {
             result = result.union(frame)
         }
         return result
+    }
+
+    private static func activeDisplayBounds(maxDisplays: UInt32) -> [(id: DisplayID, frame: CGRect)] {
+        let limit = max(1, maxDisplays)
+        let capacity = Int(limit)
+        var displays = [CGDirectDisplayID](repeating: 0, count: capacity)
+        var count: UInt32 = 0
+        guard CGGetActiveDisplayList(limit, &displays, &count) == .success else {
+            return []
+        }
+        return displays.prefix(Int(count)).map { id in
+            (id: id, frame: CGDisplayBounds(id))
+        }
     }
 }

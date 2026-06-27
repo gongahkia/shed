@@ -52,7 +52,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 9 — Docs, demo, release
 
-(A) 2026-06-26 Flesh out README.md: hero GIF, value prop, install (cask + dmg), 60-second config example, comparison table vs Nehir/Hiro/Paneru/Miri/AeroSpace/Yabai, full inspiration credits per NORTHSTAR §3 +phase9 @docs @release ref:N§3
 (A) 2026-06-26 Record 30-second screencast: 4-engine hot-swap across 2 displays + tag switching + command palette; commit as `docs/demo.gif` +phase9 @docs @release
 (A) 2026-06-26 Set up Developer ID signing + notarization in CI; gate release on stapled `.dmg` artifact +phase9 @ci @release ref:N§4-D8
 (A) 2026-06-26 Cut v0.1.0 GitHub Release with `.dmg`, source tarball, SHA256SUMS; draft Homebrew cask PR +phase9 @release

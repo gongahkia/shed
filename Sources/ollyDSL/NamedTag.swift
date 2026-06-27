@@ -16,13 +16,47 @@ public enum WorkspacesError: Error, Equatable, Sendable {
 /// See also: `NamedTag`, `Workspaces`.
 public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     public let name: String
+    public let rawHandler: RawDSLBlock<Void>?
 
-    public init(_ name: StaticString) {
+    public init(_ name: StaticString, rawHandler: RawDSLBlock<Void>? = nil) {
         self.name = String(describing: name)
+        self.rawHandler = rawHandler
     }
 
-    init(uncheckedName name: String) {
+    init(uncheckedName name: String, rawHandler: RawDSLBlock<Void>? = nil) {
         self.name = name
+        self.rawHandler = rawHandler
+    }
+
+    public static func raw(
+        _ name: StaticString,
+        label: String? = nil,
+        _ body: @escaping RawDSLHandler
+    ) -> NamedTagDeclaration {
+        let tagName = String(describing: name)
+        return NamedTagDeclaration(uncheckedName: tagName, rawHandler: RawDSLBlock(label ?? tagName, body))
+    }
+
+    public func runRaw(context: RawDSLContext) {
+        rawHandler?(context)
+    }
+
+    public static func == (lhs: NamedTagDeclaration, rhs: NamedTagDeclaration) -> Bool {
+        lhs.name == rhs.name
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(uncheckedName: try container.decode(String.self, forKey: .name))
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(name, forKey: .name)
     }
 }
 

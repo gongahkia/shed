@@ -99,10 +99,48 @@ public struct RuleApply: Codable, Equatable, Sendable {
 public struct Rule: Codable, Equatable, Sendable {
     public let match: RuleMatch
     public let apply: RuleApply
+    public let rawHandler: RawDSLBlock<Void>?
 
-    public init(match: RuleMatch, apply: RuleApply) {
+    public init(match: RuleMatch, apply: RuleApply, rawHandler: RawDSLBlock<Void>? = nil) {
         self.match = match
         self.apply = apply
+        self.rawHandler = rawHandler
+    }
+
+    public static func raw(
+        match: RuleMatch = RuleMatch(),
+        apply: RuleApply = RuleApply(),
+        label: String = "raw",
+        _ body: @escaping RawDSLHandler
+    ) -> Rule {
+        Rule(match: match, apply: apply, rawHandler: RawDSLBlock(label, body))
+    }
+
+    public func runRaw(context: RawDSLContext) {
+        rawHandler?(context)
+    }
+
+    public static func == (lhs: Rule, rhs: Rule) -> Bool {
+        lhs.match == rhs.match && lhs.apply == rhs.apply
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case match
+        case apply
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            match: try container.decode(RuleMatch.self, forKey: .match),
+            apply: try container.decode(RuleApply.self, forKey: .apply)
+        )
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(match, forKey: .match)
+        try container.encode(apply, forKey: .apply)
     }
 }
 

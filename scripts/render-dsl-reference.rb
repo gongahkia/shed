@@ -17,7 +17,8 @@ source_order = {
   "EngineDSL.swift" => "Engines",
   "Rule.swift" => "Rules",
   "SafeZones.swift" => "Safe Zones",
-  "CooperativeApps.swift" => "Cooperative Apps"
+  "CooperativeApps.swift" => "Cooperative Apps",
+  "RawDSL.swift" => "Raw Escape Hatches"
 }
 
 def source_basename(symbol)

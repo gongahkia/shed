@@ -40,14 +40,32 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `ConfigSection.engines(Engines { .bsp })`
 - See also: `Config`, `ConfigBuilder`.
 
+### HookDeclaration
+
+`struct HookDeclaration`
+
+- Purpose: Declares one raw lifecycle hook callback.
+- Parameters: Provide a stable label and closure receiving `RawDSLContext`.
+- Example: `Hooks { .raw("reload") { context in _ = context.event } }`
+- See also: `Hooks`, `RawDSLContext`.
+
 ### Hooks
 
 `struct Hooks`
 
 - Purpose: Placeholder lifecycle hook section reserved for typed runtime callbacks.
-- Parameters: Accepts a closure body for future hook declarations.
-- Example: `Hooks { }`
-- See also: `Config`, `ConfigSection`.
+- Parameters: Pass hook declarations directly or use `@HookBuilder`.
+- Example: `Hooks { .raw("startup") { _ in } }`
+- See also: `HookDeclaration`, `ConfigSection`.
+
+### HookBuilder
+
+`@resultBuilder enum HookBuilder`
+
+- Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
+- Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
+- Example: `Hooks { .raw("reload") { _ in } }`
+- See also: `Hooks`, `HookDeclaration`.
 
 ## Keybinds
 
@@ -402,4 +420,24 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Accepts `CooperativeApp` and string expressions plus conditionals and arrays.
 - Example: `CooperativeApps { "com.raycast.macos" }`
 - See also: `CooperativeApps`, `CooperativeApp`.
+
+## Raw Escape Hatches
+
+### RawDSLContext
+
+`struct RawDSLContext`
+
+- Purpose: Carries runtime state into raw Swift DSL closures.
+- Parameters: Provide any currently available config, window, rule, engine, tag, or event value.
+- Example: `RawDSLContext(engineID: BSPLayoutEngine.engineID)`
+- See also: `RawDSLBlock`, `Hooks`.
+
+### RawDSLBlock
+
+`struct RawDSLBlock<Output>`
+
+- Purpose: Stores a named raw Swift closure attached to a DSL primitive.
+- Parameters: Provide a stable label and closure receiving `RawDSLContext`.
+- Example: `RawDSLBlock("trace") { context in _ = context.event }`
+- See also: `RawDSLContext`, `HookDeclaration`.
 

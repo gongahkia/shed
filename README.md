@@ -110,6 +110,7 @@ ollyctl state --json
 | Grid | Square-ish or fixed row/column auto-pack. |
 | ThreeCol | Centered master with balanced side stacks. |
 | Accordion | Focused window expanded, siblings collapsed to strips. |
+| Tabbed | Focused window below an app-rendered tab strip; siblings hidden. |
 
 | Project | Core model | Olly difference |
 |---|---|---|

@@ -14,6 +14,7 @@ public enum EngineConfigDeclaration: Codable, Equatable, Sendable {
     case grid(GridLayoutEngine.Config)
     case threeCol(ThreeColLayoutEngine.Config)
     case accordion(AccordionLayoutEngine.Config)
+    case tabbed(TabbedLayoutEngine.Config)
 }
 
 /// Purpose: Declares one layout engine and its optional typed configuration.
@@ -89,6 +90,7 @@ public extension EngineDeclaration {
     static let grid = Grid()
     static let threeCol = ThreeCol()
     static let accordion = Accordion()
+    static let tabbed = Tabbed()
 }
 
 /// Purpose: Declares the Monocle layout engine.
@@ -143,6 +145,17 @@ public func Accordion(stripHeight: CGFloat = 48) -> EngineDeclaration {
     EngineDeclaration(
         AccordionLayoutEngine.engineID,
         config: .accordion(AccordionLayoutEngine.Config(stripHeight: stripHeight))
+    )
+}
+
+/// Purpose: Declares the Tabbed layout engine.
+/// Parameters: `tabBarHeight` reserves space for the app-rendered top tab strip.
+/// Example: `Engines { Tabbed(tabBarHeight: 30) }`
+/// See also: `Accordion(stripHeight:)`, `Monocle()`.
+public func Tabbed(tabBarHeight: CGFloat = 28) -> EngineDeclaration {
+    EngineDeclaration(
+        TabbedLayoutEngine.engineID,
+        config: .tabbed(TabbedLayoutEngine.Config(tabBarHeight: tabBarHeight))
     )
 }
 

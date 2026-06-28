@@ -12,6 +12,10 @@ struct ViewportUniforms {
 	float2 size;
 };
 
+struct FragmentUniforms {
+	uint useAtlas;
+};
+
 struct GlyphVertexOut {
 	float4 position [[position]];
 	float2 atlasUV;
@@ -49,9 +53,10 @@ vertex GlyphVertexOut glyph_vertex(
 fragment half4 glyph_fragment(
 	GlyphVertexOut in [[stage_in]],
 	texture2d<float, access::sample> atlas [[texture(0)]],
-	sampler atlasSampler [[sampler(0)]]
+	sampler atlasSampler [[sampler(0)]],
+	constant FragmentUniforms &uniforms [[buffer(0)]]
 ) {
-	const float coverage = atlas.sample(atlasSampler, in.atlasUV).r;
+	const float coverage = uniforms.useAtlas == 0 ? 1.0 : atlas.sample(atlasSampler, in.atlasUV).r;
 	const float4 color = in.color * coverage;
 	return half4(color);
 }

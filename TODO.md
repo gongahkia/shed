@@ -37,7 +37,7 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 x 2026-06-28 +Phase2-ColdStart @bench id:031 est:1h dep:020,030 Run `picobench measure --app Pico.app --warmup-purge` 20×, target <100 ms. Record in `bench/results/spike-empty-$(date +%F).md`. If >150 ms, investigate.
 x 2026-06-28 +Phase2-ColdStart @perf id:032 est:3h dep:031 If id:031 exceeds 150 ms: set `DYLD_PRINT_STATISTICS_DETAILS=1`, capture launch trace via `xcrun xctrace record --template 'App Launch' --launch Pico.app`. Identify worst offenders. Document findings in `bench/notes/coldstart-audit.md`. Remediation candidates: link `-dead_strip`, set `OTHER_SWIFT_FLAGS=-Osize`, kill any `@_cdecl` init, remove unused `import Foundation` chains.
-(B) 2026-06-28 +Phase2-ColdStart @perf id:033 est:2h dep:032 Add `bench/scripts/dyld_audit.sh`: runs binary with `DYLD_PRINT_STATISTICS=1`+`DYLD_PRINT_STATISTICS_DETAILS=1`, parses output, asserts rebase fixup count <2000. Wire into CI as a warning (not failure) gate.
+x 2026-06-28 +Phase2-ColdStart @perf id:033 est:2h dep:032 Add `bench/scripts/dyld_audit.sh`: runs binary with `DYLD_PRINT_STATISTICS=1`+`DYLD_PRINT_STATISTICS_DETAILS=1`, parses output, asserts rebase fixup count <2000. Wire into CI as a warning (not failure) gate.
 
 ---
 

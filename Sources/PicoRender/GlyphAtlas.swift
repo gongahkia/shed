@@ -38,7 +38,31 @@ public enum GlyphAtlasError: Error, CustomStringConvertible {
 }
 
 public final class GlyphAtlas {
+	public enum RenderingMode: Sendable, Equatable {
+		case grayscale
+		case subpixel
+
+		var pixelFormat: MTLPixelFormat {
+			switch self {
+			case .grayscale:
+				return .r8Unorm
+			case .subpixel:
+				return .rgba8Unorm
+			}
+		}
+
+		var bytesPerPixel: Int {
+			switch self {
+			case .grayscale:
+				return 1
+			case .subpixel:
+				return 4
+			}
+		}
+	}
+
 	public let texture: MTLTexture
+	public let renderingMode: RenderingMode
 
 	private var entries: [GlyphKey: GlyphAtlasEntry] = [:]
 	private var penX = 0
@@ -47,13 +71,14 @@ public final class GlyphAtlas {
 	private let width: Int
 	private let height: Int
 
-	public init(device: MTLDevice, size: Int = 2048) throws {
-		let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .r8Unorm, width: size, height: size, mipmapped: false)
+	public init(device: MTLDevice, size: Int = 2048, renderingMode: RenderingMode = .grayscale) throws {
+		let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: renderingMode.pixelFormat, width: size, height: size, mipmapped: false)
 		descriptor.usage = [.shaderRead]
 		guard let texture = device.makeTexture(descriptor: descriptor) else {
 			throw GlyphAtlasError.noCommandDevice
 		}
 		self.texture = texture
+		self.renderingMode = renderingMode
 		width = size
 		height = size
 	}
@@ -63,14 +88,14 @@ public final class GlyphAtlas {
 		if let entry = entries[key] {
 			return entry
 		}
-		let bitmap = try GlyphRasterizer.rasterize(glyph: glyph, font: font)
+		let bitmap = try GlyphRasterizer.rasterize(glyph: glyph, font: font, renderingMode: renderingMode)
 		let origin = try allocate(width: bitmap.width, height: bitmap.height)
 		let region = MTLRegionMake2D(origin.x, origin.y, bitmap.width, bitmap.height)
 		try bitmap.pixels.withUnsafeBytes { bytes in
 			guard let base = bytes.baseAddress else {
 				throw GlyphAtlasError.contextCreationFailed
 			}
-			texture.replace(region: region, mipmapLevel: 0, withBytes: base, bytesPerRow: bitmap.width)
+			texture.replace(region: region, mipmapLevel: 0, withBytes: base, bytesPerRow: bitmap.bytesPerRow)
 		}
 		let entry = GlyphAtlasEntry(
 			glyph: glyph,
@@ -120,12 +145,13 @@ struct GlyphBitmap: Equatable {
 	let width: Int
 	let height: Int
 	let pixels: [UInt8]
+	let bytesPerRow: Int
 	let advance: CGSize
 	let bounds: CGRect
 }
 
 enum GlyphRasterizer {
-	static func rasterize(glyph: CGGlyph, font: CTFont, padding: Int = 1) throws -> GlyphBitmap {
+	static func rasterize(glyph: CGGlyph, font: CTFont, padding: Int = 1, renderingMode: GlyphAtlas.RenderingMode = .grayscale) throws -> GlyphBitmap {
 		var glyph = glyph
 		var bounds = CTFontGetBoundingRectsForGlyphs(font, .default, &glyph, nil, 1)
 		if bounds.isNull || bounds.isEmpty {
@@ -133,8 +159,12 @@ enum GlyphRasterizer {
 		}
 		let width = max(1, Int(ceil(bounds.width)) + padding * 2)
 		let height = max(1, Int(ceil(bounds.height)) + padding * 2)
-		var pixels = [UInt8](repeating: 0, count: width * height)
-		let colorSpace = CGColorSpaceCreateDeviceGray()
+		let bytesPerRow = width * renderingMode.bytesPerPixel
+		var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+		let colorSpace = renderingMode == .subpixel ? CGColorSpaceCreateDeviceRGB() : CGColorSpaceCreateDeviceGray()
+		let bitmapInfo = renderingMode == .subpixel
+			? CGImageAlphaInfo.premultipliedLast.rawValue
+			: CGImageAlphaInfo.none.rawValue
 		try pixels.withUnsafeMutableBytes { buffer in
 			guard
 				let base = buffer.baseAddress,
@@ -143,22 +173,31 @@ enum GlyphRasterizer {
 					width: width,
 					height: height,
 					bitsPerComponent: 8,
-					bytesPerRow: width,
+					bytesPerRow: bytesPerRow,
 					space: colorSpace,
-					bitmapInfo: CGImageAlphaInfo.none.rawValue
+					bitmapInfo: bitmapInfo
 				)
 			else {
 				throw GlyphAtlasError.contextCreationFailed
 			}
 			context.setShouldAntialias(true)
 			context.setAllowsAntialiasing(true)
+			context.setShouldSmoothFonts(true)
+			context.setAllowsFontSmoothing(true)
+			context.setShouldSubpixelPositionFonts(true)
+			context.setAllowsFontSubpixelPositioning(true)
+			context.setShouldSubpixelQuantizeFonts(true)
+			context.setAllowsFontSubpixelQuantization(true)
 			context.setFillColor(gray: 1, alpha: 1)
+			if renderingMode == .subpixel {
+				context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+			}
 			context.translateBy(x: CGFloat(padding) - bounds.origin.x, y: CGFloat(padding) - bounds.origin.y)
 			var position = CGPoint.zero
 			CTFontDrawGlyphs(font, &glyph, &position, 1, context)
 		}
 		var advance = CGSize.zero
 		CTFontGetAdvancesForGlyphs(font, .default, &glyph, &advance, 1)
-		return GlyphBitmap(width: width, height: height, pixels: pixels, advance: advance, bounds: bounds)
+		return GlyphBitmap(width: width, height: height, pixels: pixels, bytesPerRow: bytesPerRow, advance: advance, bounds: bounds)
 	}
 }

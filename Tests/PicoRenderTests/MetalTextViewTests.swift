@@ -13,6 +13,13 @@ import Testing
 	#expect(!view.consumeDirtyForDisplayLink())
 }
 
+@Test func metalLayerUsesTripleBufferedSDRDrawable() throws {
+	let view = MetalTextView(frame: .zero)
+	let layer = try #require(view.makeBackingLayer() as? CAMetalLayer)
+	#expect(layer.maximumDrawableCount == 3)
+	#expect(!layer.wantsExtendedDynamicRangeContent)
+}
+
 @Test func cursorAndSelectionBuildSolidOverlayInstances() {
 	let view = MetalTextView(frame: .zero)
 	view.setSelectionRects([.init(x: 4, y: 8, width: 20, height: 10)])

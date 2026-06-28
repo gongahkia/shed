@@ -18,7 +18,7 @@ struct MetalViewportUniforms {
 }
 
 struct MetalFragmentUniforms {
-	var useAtlas: UInt32
+	var atlasMode: UInt32
 }
 
 public final class MetalTextView: NSView {
@@ -42,6 +42,7 @@ public final class MetalTextView: NSView {
 	private var samplerState: MTLSamplerState?
 	private var solidAtlasTexture: MTLTexture?
 	private var glyphAtlas: GlyphAtlas?
+	private var glyphAtlasRenderingMode: GlyphAtlas.RenderingMode?
 	private var lineShaper: LineShaper?
 	private var markedRangeUTF8: Range<Int>?
 	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -51,6 +52,7 @@ public final class MetalTextView: NSView {
 	}
 	public private(set) var topLineIndex = 0
 	public private(set) var xOffset: CGFloat = 0
+	public private(set) var displayLinkRefreshRate: Double?
 	public var lineHeight: CGFloat = 17 {
 		didSet { markDirty() }
 	}
@@ -117,6 +119,10 @@ public final class MetalTextView: NSView {
 		layer.device = metalDevice
 		layer.pixelFormat = .bgra8Unorm
 		layer.framebufferOnly = true
+		layer.maximumDrawableCount = 3
+		if #available(macOS 10.11, *) {
+			layer.wantsExtendedDynamicRangeContent = false
+		}
 		layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
 		return layer
 	}
@@ -137,6 +143,14 @@ public final class MetalTextView: NSView {
 	public override func setFrameSize(_ newSize: NSSize) {
 		super.setFrameSize(newSize)
 		updateDrawableSize()
+		markDirty()
+	}
+
+	public override func viewDidChangeBackingProperties() {
+		super.viewDidChangeBackingProperties()
+		updateDrawableSize()
+		resetGlyphCacheForCurrentScale()
+		restartDisplayLink()
 		markDirty()
 	}
 
@@ -1088,7 +1102,7 @@ public final class MetalTextView: NSView {
 	}
 
 	func textGlyphInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		guard let atlas = makeGlyphAtlas(), let shaper = makeLineShaper() else {
+		guard let atlas = makeGlyphAtlas(scale: scale), let shaper = makeLineShaper(scale: scale) else {
 			return []
 		}
 		var instances: [MetalGlyphInstance] = []
@@ -1146,6 +1160,10 @@ public final class MetalTextView: NSView {
 			return
 		}
 		let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+		layer.maximumDrawableCount = 3
+		if #available(macOS 10.11, *) {
+			layer.wantsExtendedDynamicRangeContent = false
+		}
 		layer.contentsScale = scale
 		layer.drawableSize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
 	}
@@ -1185,12 +1203,15 @@ public final class MetalTextView: NSView {
 			return
 		}
 		var link: CVDisplayLink?
-		guard CVDisplayLinkCreateWithActiveCGDisplays(&link) == kCVReturnSuccess, let link else {
+		let displayID = currentDisplayID() ?? CGMainDisplayID()
+		guard CVDisplayLinkCreateWithCGDisplay(displayID, &link) == kCVReturnSuccess, let link else {
 			return
 		}
+		displayLinkRefreshRate = refreshRate(for: link)
 		CVDisplayLinkSetOutputCallback(link, metalTextViewDisplayLinkCallback, Unmanaged.passUnretained(self).toOpaque())
 		guard CVDisplayLinkStart(link) == kCVReturnSuccess else {
 			CVDisplayLinkSetOutputCallback(link, nil, nil)
+			displayLinkRefreshRate = nil
 			return
 		}
 		displayLink = link
@@ -1203,6 +1224,15 @@ public final class MetalTextView: NSView {
 		CVDisplayLinkStop(displayLink)
 		CVDisplayLinkSetOutputCallback(displayLink, nil, nil)
 		self.displayLink = nil
+		displayLinkRefreshRate = nil
+	}
+
+	private func restartDisplayLink() {
+		guard displayLink != nil else {
+			return
+		}
+		stopDisplayLink()
+		startDisplayLink()
 	}
 
 	private func startCursorBlinkTimer() {
@@ -1237,7 +1267,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		var viewport = MetalViewportUniforms(size: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)))
-		var fragment = MetalFragmentUniforms(useAtlas: 0)
+		var fragment = MetalFragmentUniforms(atlasMode: 0)
 		instances.withUnsafeBytes { bytes in
 			guard let base = bytes.baseAddress else {
 				return
@@ -1254,11 +1284,11 @@ public final class MetalTextView: NSView {
 
 	private func renderText(encoder: MTLRenderCommandEncoder, drawableSize: CGSize, scale: CGFloat) {
 		let instances = textGlyphInstances(scale: scale)
-		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeGlyphAtlas() else {
+		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeGlyphAtlas(scale: scale) else {
 			return
 		}
 		var viewport = MetalViewportUniforms(size: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)))
-		var fragment = MetalFragmentUniforms(useAtlas: 1)
+		var fragment = MetalFragmentUniforms(atlasMode: atlas.renderingMode == .subpixel ? 2 : 1)
 		instances.withUnsafeBytes { bytes in
 			guard let base = bytes.baseAddress else {
 				return
@@ -1332,27 +1362,60 @@ public final class MetalTextView: NSView {
 		return texture
 	}
 
-	private func makeGlyphAtlas() -> GlyphAtlas? {
-		if let glyphAtlas {
+	private func makeGlyphAtlas(scale: CGFloat) -> GlyphAtlas? {
+		let renderingMode = glyphRenderingMode(scale: scale)
+		if let glyphAtlas, glyphAtlasRenderingMode == renderingMode {
 			return glyphAtlas
 		}
-		guard let metalDevice, let atlas = try? GlyphAtlas(device: metalDevice) else {
+		guard let metalDevice, let atlas = try? GlyphAtlas(device: metalDevice, renderingMode: renderingMode) else {
 			return nil
 		}
 		glyphAtlas = atlas
+		glyphAtlasRenderingMode = renderingMode
+		lineShaper = nil
 		return atlas
 	}
 
-	private func makeLineShaper() -> LineShaper? {
+	private func makeLineShaper(scale: CGFloat) -> LineShaper? {
 		if let lineShaper {
 			return lineShaper
 		}
-		guard let atlas = makeGlyphAtlas() else {
+		guard let atlas = makeGlyphAtlas(scale: scale) else {
 			return nil
 		}
 		let shaper = LineShaper(atlas: atlas)
 		lineShaper = shaper
 		return shaper
+	}
+
+	private func resetGlyphCacheForCurrentScale() {
+		let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
+		let mode = glyphRenderingMode(scale: scale)
+		guard glyphAtlasRenderingMode != mode else {
+			return
+		}
+		glyphAtlas = nil
+		glyphAtlasRenderingMode = nil
+		lineShaper = nil
+	}
+
+	private func glyphRenderingMode(scale: CGFloat) -> GlyphAtlas.RenderingMode {
+		scale < 2 ? .subpixel : .grayscale
+	}
+
+	private func currentDisplayID() -> CGDirectDisplayID? {
+		guard let number = window?.screen?.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+			return nil
+		}
+		return CGDirectDisplayID(number.uint32Value)
+	}
+
+	private func refreshRate(for link: CVDisplayLink) -> Double? {
+		let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
+		guard period.timeValue > 0, period.timeScale > 0 else {
+			return nil
+		}
+		return Double(period.timeScale) / Double(period.timeValue)
 	}
 
 	private func syncEditorState() {

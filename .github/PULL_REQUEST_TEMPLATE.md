@@ -4,6 +4,10 @@
 
 - ref:N§
 
+## RFC
+
+- Locked-decision changes (`NORTHSTAR.md` §4): RFC issue #
+
 ## Verification
 
 - [ ] `swift build -c release`

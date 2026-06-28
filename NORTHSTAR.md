@@ -8,7 +8,12 @@ Single source of truth. Load this every session. TODO.md references this file by
 
 ## 2. Why This Exists (Differentiators)
 
-- All extant macOS Niri-style WMs (`niri-mac`, `Miri`, `Paneru`, `OmniWM`/`Hiro`, `Nehir`) ship 1–2 hardcoded layouts. Nehir explicitly narrowed scope by dropping multi-layout. Gap: no macOS WM exposes a stable layout-engine plugin contract.
+- macOS Niri-style WMs now include archived early ports (`macniri`, `maria-rcks/miri`),
+  active single-workflow projects (`Paneru`, `OmniWM`/`Hiro`, `Nehir`), and newer
+  experimental ports (`klotski`, `nami`/`niri-mac`, `NiriSpace`, `Darniri`,
+  `Spatial`, `dimixar/miri`). [Inference] They validate demand for scrolling columns,
+  but still center one layout model or a forked existing WM. Gap: no surveyed macOS WM
+  exposes a stable layout-engine plugin contract.
 - `J-x-Z/macniri` (the cited inspiration) was archived 2026-04-04. The author concluded a Rust+Wayland port to macOS was a dead end. We avoid that mistake by going pure Swift + AX.
 - AeroSpace dominates conventional i3-style tiling on macOS but is single-paradigm. Yabai needs SIP off. Hammerspoon/Phoenix are scripting bridges, not WMs.
 - Our wedge: **one binary, N hot-swappable layouts per workspace, user-authored layouts via Swift DSL, ecosystem-friendly**.

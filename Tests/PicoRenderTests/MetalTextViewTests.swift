@@ -54,6 +54,20 @@ import Testing
 	#expect(view.editor.selections.secondaries == [Selection(anchor: 8, head: 11)])
 }
 
+@Test func commandClickTogglesAdditionalCursor() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abcdef")
+	view.toggleAdditionalCursor(at: 3)
+	#expect(view.editor.selections.primary == Selection(anchor: 0, head: 0))
+	#expect(view.editor.selections.secondaries == [Selection(anchor: 3, head: 3)])
+	view.toggleAdditionalCursor(at: 3)
+	#expect(view.editor.selections.primary == Selection(anchor: 0, head: 0))
+	#expect(view.editor.selections.secondaries.isEmpty)
+	view.toggleAdditionalCursor(at: 0)
+	#expect(view.editor.selections.primary == Selection(anchor: 0, head: 0))
+	#expect(view.editor.selections.secondaries.isEmpty)
+}
+
 @Test func viewportTracksVisibleLineRangeAndScrollOffsets() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.lineHeight = 20

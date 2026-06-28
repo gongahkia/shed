@@ -50,6 +50,24 @@ import Testing
 	#expect(result == .command("forwardChar"))
 }
 
+@Test func keymapLoaderLoadsTomlBindingsAndResolvesChord() throws {
+	let bindings = try KeymapLoader.load("""
+	[mode.normal]
+	"jk" = "exitInsert"
+	"Left" = "moveLeft"
+
+	[mode.emacs]
+	"C-f" = "forwardChar"
+	""")
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("j")) == .partial)
+	#expect(engine.handle(try keyEvent("k")) == .command("exitInsert"))
+	#expect(engine.handle(try keyEvent("", keyCode: 123)) == .command("moveLeft"))
+	engine.setMode(.emacs)
+	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("forwardChar"))
+}
+
 private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0) throws -> NSEvent {
 	try #require(NSEvent.keyEvent(
 		with: .keyDown,

@@ -28,6 +28,7 @@ final class PicoDocumentController: NSDocumentController {
 				document.makeWindowControllers()
 			}
 			document.showWindows()
+			noteRecentDocumentIfNeeded(document)
 			return true
 		}
 		do {
@@ -44,6 +45,7 @@ final class PicoDocumentController: NSDocumentController {
 
 	override func addDocument(_ document: NSDocument) {
 		super.addDocument(document)
+		noteRecentDocumentIfNeeded(document)
 		PicoTabCoordinator.shared.refresh()
 	}
 
@@ -58,6 +60,14 @@ final class PicoDocumentController: NSDocumentController {
 
 	override func makeDocument(withContentsOf url: URL, ofType typeName: String) throws -> NSDocument {
 		try PicoDocument(contentsOf: url, ofType: typeName)
+	}
+
+	private func noteRecentDocumentIfNeeded(_ document: NSDocument) {
+		guard let url = document.fileURL else {
+			return
+		}
+		noteNewRecentDocument(document)
+		noteNewRecentDocumentURL(url)
 	}
 }
 

@@ -4,6 +4,7 @@ import Foundation
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: PicoDocumentController
+	private weak var openRecentMenu: NSMenu?
 
 	init(documentController: PicoDocumentController) {
 		self.documentController = documentController
@@ -74,6 +75,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		return documentController.openDocument(at: url)
 	}
 
+	@objc private func openRecentDocument(_ sender: NSMenuItem) {
+		guard let url = sender.representedObject as? URL else {
+			return
+		}
+		_ = documentController.openDocument(at: url)
+	}
+
 	private func openWorkspace(at url: URL) -> Bool {
 		PicoWorkspaceController.shared.openWorkspace(at: url)
 		if documentController.documents.isEmpty {
@@ -107,6 +115,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		openItem.target = documentController
 		let openFolderItem = fileMenu.addItem(withTitle: "Open Folder...", action: #selector(openFolder(_:)), keyEquivalent: "O")
 		openFolderItem.target = self
+		let openRecentItem = fileMenu.addItem(withTitle: "Open Recent", action: nil, keyEquivalent: "")
+		let openRecentMenu = NSMenu(title: "Open Recent")
+		openRecentMenu.delegate = self
+		self.openRecentMenu = openRecentMenu
+		fileMenu.setSubmenu(openRecentMenu, for: openRecentItem)
 		let closeItem = fileMenu.addItem(withTitle: "Close", action: #selector(closeCurrentDocument(_:)), keyEquivalent: "w")
 		closeItem.target = self
 		fileMenu.addItem(.separator())
@@ -114,6 +127,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
 		fileItem.submenu = fileMenu
 		NSApp.mainMenu = mainMenu
+	}
+}
+
+extension AppDelegate: NSMenuDelegate {
+	func menuNeedsUpdate(_ menu: NSMenu) {
+		guard menu === openRecentMenu else {
+			return
+		}
+		menu.removeAllItems()
+		let urls = documentController.recentDocumentURLs
+		for url in urls {
+			let item = menu.addItem(withTitle: url.lastPathComponent, action: #selector(openRecentDocument(_:)), keyEquivalent: "")
+			item.target = self
+			item.representedObject = url
+		}
+		if !urls.isEmpty {
+			menu.addItem(.separator())
+		}
+		let clearItem = menu.addItem(withTitle: "Clear Menu", action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
+		clearItem.target = documentController
+		clearItem.isEnabled = !urls.isEmpty
 	}
 }
 

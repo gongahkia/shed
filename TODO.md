@@ -54,7 +54,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 (A) 2026-06-26 Record 30-second screencast: 4-engine hot-swap across 2 displays + tag switching + command palette; commit as `docs/demo.gif` +phase9 @docs @release
 (A) 2026-06-26 Cut v0.1.0 GitHub Release with `.dmg`, source tarball, SHA256SUMS; draft Homebrew cask PR +phase9 @release
-(B) 2026-06-26 Write a launch post for Hacker News + Lobsters + r/MacOS: lead with the multi-paradigm hot-swap hook, link benchmark table, screenshot grid; schedule for a Tue 09:00 ET +phase9 @release
 ---
 
 ## PHASE 10 — Performance & profiling (parallel with all phases; P0 for v0.1)

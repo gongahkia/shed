@@ -1,0 +1,58 @@
+{
+  "generatedAt" : "2026-06-28T03:41:04Z",
+  "iterations" : 50,
+  "scenarios" : [
+    {
+      "max" : 0.400458,
+      "min" : 0.0015,
+      "name" : "cold-start-proxy",
+      "p50" : 0.001584,
+      "p95" : 0.003375,
+      "p99" : 0.400458,
+      "sampleCount" : 50,
+      "unit" : "milliseconds"
+    },
+    {
+      "max" : 0.124792,
+      "min" : 0.008375,
+      "name" : "hotkey-to-move-proxy",
+      "p50" : 0.008709,
+      "p95" : 0.010166,
+      "p99" : 0.124792,
+      "sampleCount" : 50,
+      "unit" : "milliseconds"
+    },
+    {
+      "max" : 0.5195,
+      "min" : 0.325209,
+      "name" : "tag-switch-50-windows",
+      "p50" : 0.334708,
+      "p95" : 0.348583,
+      "p99" : 0.5195,
+      "sampleCount" : 50,
+      "unit" : "milliseconds"
+    },
+    {
+      "max" : 0.412791,
+      "min" : 0.320791,
+      "name" : "wake-from-sleep-proxy",
+      "p50" : 0.327709,
+      "p95" : 0.363584,
+      "p99" : 0.412791,
+      "sampleCount" : 50,
+      "unit" : "milliseconds"
+    },
+    {
+      "max" : 60.931708,
+      "min" : 58.390667,
+      "name" : "soak-5000-events",
+      "p50" : 59.530792,
+      "p95" : 60.422792,
+      "p99" : 60.931708,
+      "sampleCount" : 50,
+      "unit" : "milliseconds"
+    }
+  ],
+  "soakEvents" : 5000,
+  "windowCount" : 50
+}

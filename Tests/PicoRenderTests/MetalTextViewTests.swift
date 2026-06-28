@@ -105,6 +105,38 @@ import Testing
 	#expect(view.editor.selections.primary.head == 8)
 }
 
+@Test func emacsStandardMotionsMoveCursor() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "one two\nthree")
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "editor.moveRight"),
+		KeyBinding(mode: .emacs, chord: [Key("b", modifiers: .control)], commandID: "editor.moveLeft"),
+		KeyBinding(mode: .emacs, chord: [Key("n", modifiers: .control)], commandID: "editor.moveDown"),
+		KeyBinding(mode: .emacs, chord: [Key("p", modifiers: .control)], commandID: "editor.moveUp"),
+		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .option)], commandID: "editor.moveWordForward"),
+		KeyBinding(mode: .emacs, chord: [Key("b", modifiers: .option)], commandID: "editor.moveWordBackward"),
+		KeyBinding(mode: .emacs, chord: [Key(",", modifiers: [.option, .shift])], commandID: "editor.moveBufferStart"),
+		KeyBinding(mode: .emacs, chord: [Key(".", modifiers: [.option, .shift])], commandID: "editor.moveBufferEnd"),
+	])
+
+	#expect(view.handleKey(characters: "\u{06}", charactersIgnoringModifiers: "f", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.selections.primary.head == 1)
+	#expect(view.handleKey(characters: "\u{02}", charactersIgnoringModifiers: "b", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: "", charactersIgnoringModifiers: "n", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.selections.primary.head == 8)
+	#expect(view.handleKey(characters: "", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: "f", charactersIgnoringModifiers: "f", keyCode: 0, modifierFlags: .option))
+	#expect(view.editor.selections.primary.head == 4)
+	#expect(view.handleKey(characters: "b", charactersIgnoringModifiers: "b", keyCode: 0, modifierFlags: .option))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: "<", charactersIgnoringModifiers: ",", keyCode: 0, modifierFlags: [.option, .shift]))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: ">", charactersIgnoringModifiers: ".", keyCode: 0, modifierFlags: [.option, .shift]))
+	#expect(view.editor.selections.primary.head == view.editor.rope.length)
+}
+
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

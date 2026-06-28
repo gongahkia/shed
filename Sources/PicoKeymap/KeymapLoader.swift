@@ -92,8 +92,10 @@ public enum KeymapLoader {
 		}
 		for modifier in pieces {
 			switch modifier.lowercased() {
-			case "cmd", "command", "m":
+			case "cmd", "command":
 				modifiers.insert(.command)
+			case "m", "meta":
+				modifiers.insert(.option)
 			case "shift", "s":
 				modifiers.insert(.shift)
 			case "opt", "option", "alt", "a":
@@ -104,7 +106,16 @@ public enum KeymapLoader {
 				throw KeymapLoaderError.invalidKey(token)
 			}
 		}
-		return Key(specialKeyName(keyName) ?? keyName.lowercased(), modifiers: modifiers)
+		switch keyName {
+		case "<":
+			modifiers.insert(.shift)
+			return Key(",", modifiers: modifiers)
+		case ">":
+			modifiers.insert(.shift)
+			return Key(".", modifiers: modifiers)
+		default:
+			return Key(specialKeyName(keyName) ?? keyName.lowercased(), modifiers: modifiers)
+		}
 	}
 
 	private static func isModifiedKey(_ value: String) -> Bool {

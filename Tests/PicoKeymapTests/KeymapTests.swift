@@ -74,6 +74,20 @@ import Testing
 	#expect(result == .command("forwardChar"))
 }
 
+@Test func keymapLoaderTreatsMetaAsOption() throws {
+	let bindings = try KeymapLoader.load("""
+	[mode.emacs]
+	"M-f" = "forwardWord"
+	"M-<" = "bufferStart"
+	"M->" = "bufferEnd"
+	""")
+	let engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("f", modifiers: [.option])) == .command("forwardWord"))
+	#expect(engine.handle(try keyEvent(",", modifiers: [.option, .shift])) == .command("bufferStart"))
+	#expect(engine.handle(try keyEvent(".", modifiers: [.option, .shift])) == .command("bufferEnd"))
+}
+
 @Test func keymapLoaderLoadsTomlBindingsAndResolvesChord() throws {
 	let bindings = try KeymapLoader.load("""
 	[mode.normal]
@@ -147,6 +161,22 @@ import Testing
 @Test func keymapProfileParsesCommandLineFlag() throws {
 	#expect(try KeymapProfile.selected(from: ["PicoApp", "--profile=vim"]) == .vim)
 	#expect(try KeymapProfile.selected(from: ["PicoApp"]) == .plain)
+}
+
+@Test func bundledEmacsProfileDefinesStandardMotions() throws {
+	let bindings = try KeymapConfiguration.load(profile: .emacs, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("editor.moveRight"))
+	#expect(engine.handle(try keyEvent("b", modifiers: [.control])) == .command("editor.moveLeft"))
+	#expect(engine.handle(try keyEvent("n", modifiers: [.control])) == .command("editor.moveDown"))
+	#expect(engine.handle(try keyEvent("p", modifiers: [.control])) == .command("editor.moveUp"))
+	#expect(engine.handle(try keyEvent("a", modifiers: [.control])) == .command("editor.moveLineStart"))
+	#expect(engine.handle(try keyEvent("e", modifiers: [.control])) == .command("editor.moveLineEnd"))
+	#expect(engine.handle(try keyEvent("f", modifiers: [.option])) == .command("editor.moveWordForward"))
+	#expect(engine.handle(try keyEvent("b", modifiers: [.option])) == .command("editor.moveWordBackward"))
+	#expect(engine.handle(try keyEvent(",", modifiers: [.option, .shift])) == .command("editor.moveBufferStart"))
+	#expect(engine.handle(try keyEvent(".", modifiers: [.option, .shift])) == .command("editor.moveBufferEnd"))
 }
 
 private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0) throws -> NSEvent {

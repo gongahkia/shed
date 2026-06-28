@@ -2,6 +2,8 @@
 .swiftpm/
 *.xcodeproj/
 DerivedData/
+Pico.app/
+bench/traces/*.trace/
 bench/corpus/huge.log
 bench/results/*.json
 !.gitkeep

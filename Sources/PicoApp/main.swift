@@ -7,7 +7,6 @@ import PicoKeymap
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: PicoDocumentController
 	private let commandRegistry = CommandRegistry()
-	private let keymapEngine: KeymapEngine
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
 	private lazy var projectFind = ProjectFindController(
@@ -19,10 +18,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		self.documentController = documentController
 		do {
 			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
-			keymapEngine = KeymapEngine(bindings: try KeymapConfiguration.load(profile: profile))
+			let bindings = try KeymapConfiguration.load(profile: profile)
+			PicoAppKeymap.shared.configure(profile: profile, bindings: bindings)
 		} catch {
 			NSLog("failed to load keymap profile: \(error)")
-			keymapEngine = KeymapEngine()
+			PicoAppKeymap.shared.configure(profile: .plain, bindings: [])
 		}
 		super.init()
 		registerInitialCommands()

@@ -4,6 +4,7 @@
 "Cmd-Left" = "editor.moveLineStart"
 "Cmd-Right" = "editor.moveLineEnd"
 "Cmd-S" = "file.save"
+"Cmd-W" = "file.close"
 "Cmd-F" = "edit.find"
 "Cmd-G" = "edit.findNext"
 "Cmd-Shift-G" = "edit.findPrevious"

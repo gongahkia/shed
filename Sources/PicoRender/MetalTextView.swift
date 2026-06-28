@@ -3,6 +3,7 @@ import CoreText
 import CoreVideo
 import Metal
 import PicoEditor
+import PicoKeymap
 import QuartzCore
 
 struct MetalGlyphInstance {
@@ -65,6 +66,8 @@ public final class MetalTextView: NSView {
 	public var editorDidChange: ((Editor) -> Void)?
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
+	public var commandRequested: ((String) -> Bool)?
+	public var keymapEngine = KeymapEngine()
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -221,6 +224,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if dispatchKeymap(event) == .handled {
+			return
+		}
 		if !event.modifierFlags.intersection([.command, .control]).isEmpty {
 			super.keyDown(with: event)
 			return
@@ -229,20 +235,10 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func performKeyEquivalent(with event: NSEvent) -> Bool {
-		let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
-		guard flags == .command else {
-			return super.performKeyEquivalent(with: event)
-		}
-		switch event.charactersIgnoringModifiers?.lowercased() {
-		case "s":
-			saveRequested?()
+		if dispatchKeymap(event) == .handled {
 			return true
-		case "w":
-			closeRequested?()
-			return true
-		default:
-			return super.performKeyEquivalent(with: event)
 		}
+		return super.performKeyEquivalent(with: event)
 	}
 
 	@discardableResult
@@ -251,6 +247,82 @@ public final class MetalTextView: NSView {
 		charactersIgnoringModifiers: String?,
 		keyCode: UInt16,
 		modifierFlags: NSEvent.ModifierFlags = []
+	) -> Bool {
+		let event = NSEvent.keyEvent(
+			with: .keyDown,
+			location: .zero,
+			modifierFlags: modifierFlags,
+			timestamp: 0,
+			windowNumber: 0,
+			context: nil,
+			characters: characters ?? "",
+			charactersIgnoringModifiers: charactersIgnoringModifiers ?? characters ?? "",
+			isARepeat: false,
+			keyCode: keyCode
+		)
+		if let event, dispatchKeymap(event) == .handled {
+			return true
+		}
+		return handlePassthroughKey(characters: characters, charactersIgnoringModifiers: charactersIgnoringModifiers, keyCode: keyCode, modifierFlags: modifierFlags)
+	}
+
+	private enum KeyDispatchResult {
+		case handled
+		case passthrough
+	}
+
+	private func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
+		switch keymapEngine.handle(event) {
+		case .command(let commandID):
+			return performKeymapCommand(commandID) ? .handled : .passthrough
+		case .partial, .consumed:
+			return .handled
+		case .passthrough:
+			return .passthrough
+		}
+	}
+
+	private func performKeymapCommand(_ commandID: String) -> Bool {
+		switch commandID {
+		case "editor.moveLeft":
+			editor.moveCursor(.charBackward)
+		case "editor.moveRight":
+			editor.moveCursor(.charForward)
+		case "editor.moveLineStart":
+			editor.moveCursor(.lineStart)
+		case "editor.moveLineEnd":
+			editor.moveCursor(.lineEnd)
+		case "editor.moveBufferStart":
+			editor.moveCursor(.bufferStart)
+		case "editor.moveBufferEnd":
+			editor.moveCursor(.bufferEnd)
+		case "file.save":
+			saveRequested?()
+			return true
+		case "file.close":
+			closeRequested?()
+			return true
+		case "mode.normal":
+			keymapEngine.setMode(.normal)
+			return true
+		case "mode.insert":
+			keymapEngine.setMode(.insert)
+			return true
+		case "mode.emacs":
+			keymapEngine.setMode(.emacs)
+			return true
+		default:
+			return commandRequested?(commandID) == true
+		}
+		syncEditorState()
+		return true
+	}
+
+	private func handlePassthroughKey(
+		characters: String?,
+		charactersIgnoringModifiers: String?,
+		keyCode: UInt16,
+		modifierFlags: NSEvent.ModifierFlags
 	) -> Bool {
 		if !modifierFlags.intersection([.command, .control]).isEmpty {
 			return false

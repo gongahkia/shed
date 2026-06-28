@@ -84,7 +84,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 10 — Keymap engine
 
-(A) 2026-06-28 +Phase10-Keymap @keymap id:183 est:3h dep:180,084 Replace hardcoded keys in `MetalTextView.keyDown(_:)` with KeymapEngine dispatch. Acceptance: changing profile changes behavior without recompile.
 
 ---
 

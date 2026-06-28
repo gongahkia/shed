@@ -307,6 +307,15 @@ public final class MetalTextView: NSView {
 		case yank
 	}
 
+	private enum TextObject {
+		case innerWord
+		case aroundWord
+		case innerPair(Character, Character)
+		case aroundPair(Character, Character)
+		case innerParagraph
+		case aroundParagraph
+	}
+
 	private func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
 		switch keymapEngine.handle(event) {
 		case .command(let commandID):
@@ -319,6 +328,10 @@ public final class MetalTextView: NSView {
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
+		if let textObject = textObject(for: commandID), pendingOperator != nil {
+			applyPendingOperator(textObject: textObject)
+			return true
+		}
 		if let motion = motion(for: commandID), pendingOperator != nil {
 			applyPendingOperator(motion: motion)
 			return true
@@ -450,6 +463,41 @@ public final class MetalTextView: NSView {
 		}
 	}
 
+	private func textObject(for commandID: String) -> TextObject? {
+		switch commandID {
+		case "vim.textObject.innerWord":
+			return .innerWord
+		case "vim.textObject.aroundWord":
+			return .aroundWord
+		case "vim.textObject.innerDoubleQuote":
+			return .innerPair("\"", "\"")
+		case "vim.textObject.aroundDoubleQuote":
+			return .aroundPair("\"", "\"")
+		case "vim.textObject.innerSingleQuote":
+			return .innerPair("'", "'")
+		case "vim.textObject.aroundSingleQuote":
+			return .aroundPair("'", "'")
+		case "vim.textObject.innerParen":
+			return .innerPair("(", ")")
+		case "vim.textObject.aroundParen":
+			return .aroundPair("(", ")")
+		case "vim.textObject.innerBracket":
+			return .innerPair("[", "]")
+		case "vim.textObject.aroundBracket":
+			return .aroundPair("[", "]")
+		case "vim.textObject.innerBrace":
+			return .innerPair("{", "}")
+		case "vim.textObject.aroundBrace":
+			return .aroundPair("{", "}")
+		case "vim.textObject.innerParagraph":
+			return .innerParagraph
+		case "vim.textObject.aroundParagraph":
+			return .aroundParagraph
+		default:
+			return nil
+		}
+	}
+
 	private func beginOperator(_ op: VimOperator) -> Bool {
 		if !editor.selections.primary.isCaret {
 			applyOperator(op, range: editor.selections.primary.range)
@@ -474,6 +522,14 @@ public final class MetalTextView: NSView {
 		let end = projected.selections.primary.head
 		clearPendingOperator()
 		applyOperator(pendingOperator, range: min(start, end) ..< max(start, end))
+	}
+
+	private func applyPendingOperator(textObject: TextObject) {
+		guard let pendingOperator, let range = textObjectRange(textObject) else {
+			return
+		}
+		clearPendingOperator()
+		applyOperator(pendingOperator, range: range)
 	}
 
 	private func applyLineOperator(_ op: VimOperator) {
@@ -513,6 +569,101 @@ public final class MetalTextView: NSView {
 		let start = editor.rope.offset(forLine: line)
 		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
 		return start ..< end
+	}
+
+	private func textObjectRange(_ textObject: TextObject) -> Range<Int>? {
+		switch textObject {
+		case .innerWord:
+			return wordTextObjectRange(includeWhitespace: false)
+		case .aroundWord:
+			return wordTextObjectRange(includeWhitespace: true)
+		case .innerPair(let open, let close):
+			return pairTextObjectRange(open: open, close: close, includeDelimiters: false)
+		case .aroundPair(let open, let close):
+			return pairTextObjectRange(open: open, close: close, includeDelimiters: true)
+		case .innerParagraph:
+			return paragraphTextObjectRange(includeBlankLine: false)
+		case .aroundParagraph:
+			return paragraphTextObjectRange(includeBlankLine: true)
+		}
+	}
+
+	private func wordTextObjectRange(includeWhitespace: Bool) -> Range<Int>? {
+		let offsets = characterOffsets()
+		guard !offsets.isEmpty else {
+			return nil
+		}
+		let head = editor.selections.primary.head
+		let index = offsets.lastIndex { $0.offset <= head } ?? 0
+		var lowerIndex = index
+		while lowerIndex > 0, isTextObjectWordCharacter(offsets[lowerIndex - 1].character) {
+			lowerIndex -= 1
+		}
+		var upperIndex = index
+		while upperIndex + 1 < offsets.count, isTextObjectWordCharacter(offsets[upperIndex + 1].character) {
+			upperIndex += 1
+		}
+		guard isTextObjectWordCharacter(offsets[lowerIndex].character) else {
+			return nil
+		}
+		var lower = offsets[lowerIndex].offset
+		var upper = offsets[upperIndex].offset + String(offsets[upperIndex].character).utf8.count
+		if includeWhitespace {
+			var cursor = upperIndex + 1
+			while cursor < offsets.count, offsets[cursor].character.isWhitespace {
+				upper = offsets[cursor].offset + String(offsets[cursor].character).utf8.count
+				cursor += 1
+			}
+			if cursor == upperIndex + 1 {
+				cursor = lowerIndex - 1
+				while cursor >= 0, offsets[cursor].character.isWhitespace {
+					lower = offsets[cursor].offset
+					cursor -= 1
+				}
+			}
+		}
+		return lower ..< upper
+	}
+
+	private func pairTextObjectRange(open: Character, close: Character, includeDelimiters: Bool) -> Range<Int>? {
+		let offsets = characterOffsets()
+		let head = editor.selections.primary.head
+		guard let openIndex = offsets.lastIndex(where: { $0.offset <= head && $0.character == open }) else {
+			return nil
+		}
+		guard let closeIndex = offsets.firstIndex(where: { $0.offset > head && $0.character == close }) else {
+			return nil
+		}
+		let openEnd = offsets[openIndex].offset + String(offsets[openIndex].character).utf8.count
+		let closeEnd = offsets[closeIndex].offset + String(offsets[closeIndex].character).utf8.count
+		return includeDelimiters ? offsets[openIndex].offset ..< closeEnd : openEnd ..< offsets[closeIndex].offset
+	}
+
+	private func paragraphTextObjectRange(includeBlankLine: Bool) -> Range<Int>? {
+		let line = editor.rope.line(forOffset: editor.selections.primary.head)
+		var startLine = line
+		while startLine > 0, !lineIsBlank(startLine - 1) {
+			startLine -= 1
+		}
+		var endLine = line
+		while endLine + 1 < editor.rope.lineCount, !lineIsBlank(endLine + 1) {
+			endLine += 1
+		}
+		let start = editor.rope.offset(forLine: startLine)
+		let endLineAfterObject = min(endLine + 1, editor.rope.lineCount - 1)
+		var end = endLine + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: endLine + 1) : editor.rope.length
+		if includeBlankLine, endLineAfterObject + 1 < editor.rope.lineCount, lineIsBlank(endLineAfterObject) {
+			end = editor.rope.offset(forLine: endLineAfterObject + 1)
+		}
+		return start ..< end
+	}
+
+	private func lineIsBlank(_ line: Int) -> Bool {
+		editor.rope.slice(editor.rope.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+	}
+
+	private func isTextObjectWordCharacter(_ character: Character) -> Bool {
+		!character.isWhitespace && character.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) || $0.value == 95 }
 	}
 
 	private func repeatMotion(_ motion: Motion) {

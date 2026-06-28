@@ -113,6 +113,16 @@ import Testing
 	#expect(engine.handle(try keyEvent(";")) == .command("editor.repeatCharFind"))
 }
 
+@Test func bundledVimProfileDefinesTextObjects() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("i")) == .partial)
+	#expect(engine.handle(try keyEvent("w")) == .command("vim.textObject.innerWord"))
+	#expect(engine.handle(try keyEvent("a")) == .partial)
+	#expect(engine.handle(try keyEvent("'", modifiers: [.shift])) == .command("vim.textObject.aroundDoubleQuote"))
+}
+
 @Test func userKeymapConfigOverlaysSelectedProfile() throws {
 	let fixture = try TemporaryKeymapFixture()
 	defer { fixture.cleanUp() }

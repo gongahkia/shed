@@ -48,7 +48,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 3 — Metal text renderer
 
-(A) 2026-06-28 +Phase3-Renderer @metal id:047 est:3h dep:046 Spike test: load 10M-line synthetic buffer (in-memory `String` for now, no rope yet), scroll page-down repeatedly via automated input, measure FPS via signposts. Target 60+ fps. Document `bench/notes/render-spike.md`. If fails, audit: glyph cache misses? atlas thrashing? per-frame allocs?
 (B) 2026-06-28 +Phase3-Renderer @metal id:048 est:2h dep:046 Add IME (input method) support: implement `NSTextInputClient` on `MetalTextView`. Forward `insertText`, `setMarkedText`, `attributedSubstring(forProposedRange:)`. Acceptance: typing CJK with IME works (manual test).
 (B) 2026-06-28 +Phase3-Renderer @metal id:049 est:2h dep:046 ProMotion 120Hz support: ensure `CAMetalLayer.maximumDrawableCount = 3`, `wantsExtendedDynamicRangeContent = false`, `CVDisplayLink` runs at refresh rate. Verify on 120Hz display.
 (C) 2026-06-28 +Phase3-Renderer @metal id:050 est:3h dep:046 Subpixel-aa for non-Retina displays: detect via `backingScaleFactor < 2.0`, switch atlas to RGB (3-channel) and use Apple's recommended subpixel positioning.

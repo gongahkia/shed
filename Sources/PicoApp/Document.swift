@@ -304,6 +304,7 @@ final class EditorWindowController: NSWindowController {
 	private let editorView: MetalTextView
 	private var findMatches: [Range<Int>] = []
 	private var selectedFindMatchIndex: Int?
+	private var incrementalFindDirection: Int?
 
 	init(document: PicoDocument) {
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -363,14 +364,17 @@ final class EditorWindowController: NSWindowController {
 			editorView.exCommandLineRequested = { [weak self] completion in
 				PicoCommandPaletteBridge.shared.requestExCommand(relativeTo: self?.window, completion: completion)
 			}
-			findBarView.onDismiss = { [weak self] in
-				self?.setFindBarVisible(false)
-			}
+		findBarView.onDismiss = { [weak self] in
+			self?.setFindBarVisible(false)
+		}
 		findBarView.onStateChange = { [weak self] _ in
-			self?.refreshFindMatches()
+			self?.findStateDidChange()
 		}
 		findBarView.onFindNext = { [weak self] in
-			self?.findNext()
+			self?.selectFindMatchFromFindBar(direction: 1)
+		}
+		findBarView.onFindPrevious = { [weak self] in
+			self?.selectFindMatchFromFindBar(direction: -1)
 		}
 		PicoWorkspaceController.shared.register(fileTreeView)
 		PicoTabCoordinator.shared.register(tabBarView)
@@ -415,6 +419,12 @@ final class EditorWindowController: NSWindowController {
 		selectFindMatch(direction: -1)
 	}
 
+	func startIncrementalSearch(direction: Int) {
+		incrementalFindDirection = direction
+		setFindBarVisible(true)
+		selectFindMatch(direction: direction, focusEditorAfterSelection: false)
+	}
+
 	func selectAllFindMatches() {
 		guard !findBarView.isHidden else {
 			setFindBarVisible(true)
@@ -445,6 +455,10 @@ final class EditorWindowController: NSWindowController {
 			findNext()
 		case "edit.findPrevious":
 			findPrevious()
+		case "emacs.isearchForward":
+			startIncrementalSearch(direction: 1)
+		case "emacs.isearchBackward":
+			startIncrementalSearch(direction: -1)
 		case "edit.selectAllFindMatches":
 			selectAllFindMatches()
 		default:
@@ -497,10 +511,18 @@ final class EditorWindowController: NSWindowController {
 			refreshFindMatches()
 			findBarView.focusQuery()
 		} else {
+			incrementalFindDirection = nil
 			findMatches = []
 			selectedFindMatchIndex = nil
 			editorView.setFindMatchRanges([])
 			focusEditor()
+		}
+	}
+
+	private func findStateDidChange() {
+		refreshFindMatches()
+		if let incrementalFindDirection {
+			selectFindMatch(direction: incrementalFindDirection, refreshBeforeSelecting: false, focusEditorAfterSelection: false)
 		}
 	}
 
@@ -523,12 +545,18 @@ final class EditorWindowController: NSWindowController {
 		editorView.setFindMatchRanges(findMatches)
 	}
 
-	private func selectFindMatch(direction: Int) {
+	private func selectFindMatchFromFindBar(direction: Int) {
+		selectFindMatch(direction: direction, focusEditorAfterSelection: false)
+	}
+
+	private func selectFindMatch(direction: Int, refreshBeforeSelecting: Bool = true, focusEditorAfterSelection: Bool = true) {
 		guard !findBarView.isHidden else {
 			setFindBarVisible(true)
 			return
 		}
-		refreshFindMatches()
+		if refreshBeforeSelecting {
+			refreshFindMatches()
+		}
 		guard !findMatches.isEmpty else {
 			return
 		}
@@ -544,7 +572,9 @@ final class EditorWindowController: NSWindowController {
 		}
 		selectedFindMatchIndex = selectedIndex
 		editorView.selectUTF8Range(findMatches[selectedIndex])
-		focusEditor()
+		if focusEditorAfterSelection {
+			focusEditor()
+		}
 	}
 
 	private func wrappedIndex(_ index: Int, count: Int) -> Int {

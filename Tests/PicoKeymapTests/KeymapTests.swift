@@ -181,6 +181,8 @@ import Testing
 	#expect(engine.handle(try keyEvent("w", modifiers: [.option])) == .command("emacs.copyRegion"))
 	#expect(engine.handle(try keyEvent("y", modifiers: [.control])) == .command("emacs.yank"))
 	#expect(engine.handle(try keyEvent("y", modifiers: [.option])) == .command("emacs.yankPop"))
+	#expect(engine.handle(try keyEvent("s", modifiers: [.control])) == .command("emacs.isearchForward"))
+	#expect(engine.handle(try keyEvent("r", modifiers: [.control])) == .command("emacs.isearchBackward"))
 	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
 	#expect(engine.handle(try keyEvent("s", modifiers: [.control])) == .command("file.save"))
 	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)

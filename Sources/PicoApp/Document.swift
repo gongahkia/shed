@@ -271,12 +271,16 @@ final class EditorWindowController: NSWindowController {
 		)
 		window.title = document.fileURL?.lastPathComponent ?? "Untitled"
 		window.contentView = splitView
-		super.init(window: window)
-		window.delegate = self
-		document.attach(editorView)
-		findBarView.onDismiss = { [weak self] in
-			self?.setFindBarVisible(false)
-		}
+			super.init(window: window)
+			window.delegate = self
+			document.attach(editorView)
+			editorView.keymapEngine = PicoAppKeymap.shared.makeEngine()
+			editorView.commandRequested = { [weak self] commandID in
+				self?.performKeymapCommand(commandID) ?? false
+			}
+			findBarView.onDismiss = { [weak self] in
+				self?.setFindBarVisible(false)
+			}
 		findBarView.onStateChange = { [weak self] _ in
 			self?.refreshFindMatches()
 		}
@@ -338,6 +342,22 @@ final class EditorWindowController: NSWindowController {
 		selectedFindMatchIndex = nil
 		editorView.selectUTF8Ranges(findMatches)
 		focusEditor()
+	}
+
+	private func performKeymapCommand(_ commandID: String) -> Bool {
+		switch commandID {
+		case "edit.find":
+			toggleFindBar()
+		case "edit.findNext":
+			findNext()
+		case "edit.findPrevious":
+			findPrevious()
+		case "edit.selectAllFindMatches":
+			selectAllFindMatches()
+		default:
+			return false
+		}
+		return true
 	}
 
 	private func setFindBarVisible(_ visible: Bool) {

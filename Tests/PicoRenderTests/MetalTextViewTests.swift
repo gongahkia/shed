@@ -1,5 +1,6 @@
 import AppKit
 import PicoEditor
+import PicoKeymap
 @testable import PicoRender
 import Testing
 
@@ -59,6 +60,20 @@ import Testing
 	#expect(view.editor.selections.primary.head == 10)
 	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 51))
 	#expect(view.editor.text == "hello word")
+}
+
+@Test func keymapProfileChangesTextHandlingWithoutRecompile() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("h")], commandID: "editor.moveLeft"),
+		KeyBinding(mode: .normal, chord: [Key("i")], commandID: "mode.insert"),
+	])
+
+	#expect(view.handleKey(characters: "h", charactersIgnoringModifiers: "h", keyCode: 0))
+	#expect(view.editor.text == "")
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.editor.text == "x")
 }
 
 @Test func textInputClientCommitsAndMarksIMEText() {

@@ -76,6 +76,18 @@ import Testing
 	#expect(view.editor.text == "x")
 }
 
+@Test func keymapCountRepeatsMotionCommands() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "one two three")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("w")], commandID: "editor.moveWordForward"),
+	])
+
+	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(view.editor.selections.primary.head == 8)
+}
+
 @Test func textInputClientCommitsAndMarksIMEText() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)

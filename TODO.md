@@ -89,7 +89,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 11 — Vim profile
 
-(A) 2026-06-28 +Phase11-Vim @vim id:200 est:5h dep:183 Normal-mode motions: h/j/k/l, w/W/b/B/e/E, 0/^/$, gg/G, {/}, f/F/t/T, ;/,. Count prefixes (`3w`). All defined in `keys.vim.toml` mapped to motion commands.
 (A) 2026-06-28 +Phase11-Vim @vim id:201 est:5h dep:200 Operators: d, c, y. Operator-pending mode: after `d`, await motion or text object. Apply to selection. Support `dd` (line), `cc`, `yy`.
 (A) 2026-06-28 +Phase11-Vim @vim id:202 est:4h dep:201 Text objects: iw, aw, i", a", i', a', i(, a(, i[, a[, i{, a{, ip, ap. Resolved by tree-sitter when available else regex fallback.
 (A) 2026-06-28 +Phase11-Vim @vim id:203 est:3h dep:200 Visual modes: v (charwise), V (linewise), Ctrl-V (blockwise). Selection set populated; operators apply.

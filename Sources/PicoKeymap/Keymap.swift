@@ -108,6 +108,8 @@ public enum KeymapResult: Sendable, Equatable {
 public final class KeymapEngine {
 	public var modeStack: [Mode]
 	public private(set) var pendingChord: [Key] = []
+	public private(set) var pendingCount: Int?
+	public private(set) var lastCommandCount = 1
 	private var bindingsByMode: [Mode: [[Key]: String]] = [:]
 
 	public init(modeStack: [Mode] = [.insert], bindings: [KeyBinding] = []) {
@@ -125,16 +127,20 @@ public final class KeymapEngine {
 			bindingsByMode[binding.mode, default: [:]][binding.chord] = binding.commandID
 		}
 		pendingChord = []
+		pendingCount = nil
+		lastCommandCount = 1
 	}
 
 	public func setMode(_ mode: Mode) {
 		modeStack = [mode]
 		pendingChord = []
+		pendingCount = nil
 	}
 
 	public func pushMode(_ mode: Mode) {
 		modeStack.append(mode)
 		pendingChord = []
+		pendingCount = nil
 	}
 
 	@discardableResult
@@ -143,6 +149,7 @@ public final class KeymapEngine {
 			return nil
 		}
 		pendingChord = []
+		pendingCount = nil
 		return modeStack.popLast()
 	}
 
@@ -151,9 +158,13 @@ public final class KeymapEngine {
 			pendingChord = []
 			return .passthrough
 		}
-		if key.value == "escape", !pendingChord.isEmpty {
+		if key.value == "escape", (!pendingChord.isEmpty || pendingCount != nil) {
 			pendingChord = []
+			pendingCount = nil
 			return .consumed
+		}
+		if consumeCountPrefix(key) {
+			return .partial
 		}
 		return resolve(key)
 	}
@@ -164,16 +175,31 @@ public final class KeymapEngine {
 		if hasPrefix(chord, in: bindings) {
 			if let commandID = bindings[chord], !hasLongerMatch(chord, in: bindings) {
 				pendingChord = []
+				lastCommandCount = pendingCount ?? 1
+				pendingCount = nil
 				return .command(commandID)
 			}
 			pendingChord = chord
 			return .partial
 		}
 		pendingChord = []
+		pendingCount = nil
 		if let commandID = bindings[[key]] {
+			lastCommandCount = 1
 			return .command(commandID)
 		}
 		return .passthrough
+	}
+
+	private func consumeCountPrefix(_ key: Key) -> Bool {
+		guard mode == .normal, pendingChord.isEmpty, key.modifiers.isEmpty, key.value.count == 1, let digit = Int(key.value) else {
+			return false
+		}
+		if digit == 0, pendingCount == nil {
+			return false
+		}
+		pendingCount = min((pendingCount ?? 0) * 10 + digit, 9_999)
+		return true
 	}
 
 	private func hasPrefix(_ chord: [Key], in bindings: [[Key]: String]) -> Bool {

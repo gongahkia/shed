@@ -41,6 +41,30 @@ import Testing
 	#expect(engine.pendingChord.isEmpty)
 }
 
+@Test func keymapEngineTracksNormalModeCountPrefix() throws {
+	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("w")], commandID: "wordForward"),
+		KeyBinding(mode: .normal, chord: [Key("0")], commandID: "lineStart"),
+	])
+
+	#expect(engine.handle(try keyEvent("3")) == .partial)
+	#expect(engine.handle(try keyEvent("w")) == .command("wordForward"))
+	#expect(engine.lastCommandCount == 3)
+	#expect(engine.handle(try keyEvent("0")) == .command("lineStart"))
+	#expect(engine.lastCommandCount == 1)
+}
+
+@Test func keymapEngineKeepsZeroInsideCountPrefix() throws {
+	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("j")], commandID: "down"),
+	])
+
+	#expect(engine.handle(try keyEvent("1")) == .partial)
+	#expect(engine.handle(try keyEvent("0")) == .partial)
+	#expect(engine.handle(try keyEvent("j")) == .command("down"))
+	#expect(engine.lastCommandCount == 10)
+}
+
 @Test func keymapEngineNormalizesModifierKeys() throws {
 	let engine = KeymapEngine(modeStack: [.emacs], bindings: [
 		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "forwardChar"),
@@ -73,6 +97,20 @@ import Testing
 		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
 		#expect(!bindings.isEmpty)
 	}
+}
+
+@Test func bundledVimProfileDefinesNormalModeMotions() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("3")) == .partial)
+	#expect(engine.handle(try keyEvent("w")) == .command("editor.moveWordForward"))
+	#expect(engine.lastCommandCount == 3)
+	#expect(engine.handle(try keyEvent("w", modifiers: [.shift])) == .command("editor.moveBigWordForward"))
+	#expect(engine.handle(try keyEvent("4", modifiers: [.shift])) == .command("editor.moveLineEnd"))
+	#expect(engine.handle(try keyEvent("f")) == .command("editor.findCharForward"))
+	#expect(engine.handle(try keyEvent("f", modifiers: [.shift])) == .command("editor.findCharBackward"))
+	#expect(engine.handle(try keyEvent(";")) == .command("editor.repeatCharFind"))
 }
 
 @Test func userKeymapConfigOverlaysSelectedProfile() throws {

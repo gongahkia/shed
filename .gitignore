@@ -3,4 +3,5 @@ AGENTS.md
 .build/
 .swiftpm/
 dist/
+release/
 .perfbench-flamegraph/

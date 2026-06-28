@@ -68,6 +68,8 @@ public final class MetalTextView: NSView {
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
 	public var keymapEngine = KeymapEngine()
+	private var pendingCharacterMotion: CharacterMotion?
+	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -224,6 +226,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if handlePendingCharacterMotion(event) {
+			return
+		}
 		if dispatchKeymap(event) == .handled {
 			return
 		}
@@ -260,6 +265,9 @@ public final class MetalTextView: NSView {
 			isARepeat: false,
 			keyCode: keyCode
 		)
+		if let event, handlePendingCharacterMotion(event) {
+			return true
+		}
 		if let event, dispatchKeymap(event) == .handled {
 			return true
 		}
@@ -269,6 +277,26 @@ public final class MetalTextView: NSView {
 	private enum KeyDispatchResult {
 		case handled
 		case passthrough
+	}
+
+	private enum CharacterMotion {
+		case findForward
+		case findBackward
+		case tillForward
+		case tillBackward
+
+		var reversed: CharacterMotion {
+			switch self {
+			case .findForward:
+				return .findBackward
+			case .findBackward:
+				return .findForward
+			case .tillForward:
+				return .tillBackward
+			case .tillBackward:
+				return .tillForward
+			}
+		}
 	}
 
 	private func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
@@ -285,17 +313,55 @@ public final class MetalTextView: NSView {
 	private func performKeymapCommand(_ commandID: String) -> Bool {
 		switch commandID {
 		case "editor.moveLeft":
-			editor.moveCursor(.charBackward)
+			repeatMotion(.charBackward)
 		case "editor.moveRight":
-			editor.moveCursor(.charForward)
+			repeatMotion(.charForward)
+		case "editor.moveDown":
+			repeatMotion(.lineDown)
+		case "editor.moveUp":
+			repeatMotion(.lineUp)
+		case "editor.moveWordForward":
+			repeatMotion(.wordForward)
+		case "editor.moveWordBackward":
+			repeatMotion(.wordBackward)
+		case "editor.moveWordEnd":
+			repeatMotion(.wordEnd)
+		case "editor.moveBigWordForward":
+			repeatMotion(.bigWordForward)
+		case "editor.moveBigWordBackward":
+			repeatMotion(.bigWordBackward)
+		case "editor.moveBigWordEnd":
+			repeatMotion(.bigWordEnd)
 		case "editor.moveLineStart":
-			editor.moveCursor(.lineStart)
+			repeatMotion(.lineStart)
 		case "editor.moveLineEnd":
-			editor.moveCursor(.lineEnd)
+			repeatMotion(.lineEnd)
 		case "editor.moveBufferStart":
-			editor.moveCursor(.bufferStart)
+			repeatMotion(.bufferStart)
 		case "editor.moveBufferEnd":
-			editor.moveCursor(.bufferEnd)
+			repeatMotion(.bufferEnd)
+		case "editor.moveParagraphBackward":
+			repeatMotion(.paragraphBackward)
+		case "editor.moveParagraphForward":
+			repeatMotion(.paragraphForward)
+		case "editor.findCharForward":
+			pendingCharacterMotion = .findForward
+			return true
+		case "editor.findCharBackward":
+			pendingCharacterMotion = .findBackward
+			return true
+		case "editor.tillCharForward":
+			pendingCharacterMotion = .tillForward
+			return true
+		case "editor.tillCharBackward":
+			pendingCharacterMotion = .tillBackward
+			return true
+		case "editor.repeatCharFind":
+			repeatLastCharacterMotion(reversed: false)
+			return true
+		case "editor.repeatCharFindReverse":
+			repeatLastCharacterMotion(reversed: true)
+			return true
 		case "file.save":
 			saveRequested?()
 			return true
@@ -316,6 +382,77 @@ public final class MetalTextView: NSView {
 		}
 		syncEditorState()
 		return true
+	}
+
+	private func repeatMotion(_ motion: Motion) {
+		for _ in 0 ..< keymapRepeatCount {
+			editor.moveCursor(motion)
+		}
+	}
+
+	private var keymapRepeatCount: Int {
+		max(1, min(keymapEngine.lastCommandCount, 9_999))
+	}
+
+	private func handlePendingCharacterMotion(_ event: NSEvent) -> Bool {
+		guard let motion = pendingCharacterMotion, let key = Key(event: event), key.modifiers.isEmpty, key.value.count == 1, let value = key.value.first else {
+			return false
+		}
+		pendingCharacterMotion = nil
+		moveToCharacter(value, motion: motion, count: keymapRepeatCount)
+		lastCharacterMotion = (motion, value)
+		return true
+	}
+
+	private func repeatLastCharacterMotion(reversed: Bool) {
+		guard let lastCharacterMotion else {
+			return
+		}
+		let motion = reversed ? lastCharacterMotion.motion.reversed : lastCharacterMotion.motion
+		moveToCharacter(lastCharacterMotion.value, motion: motion, count: keymapRepeatCount)
+	}
+
+	private func moveToCharacter(_ value: Character, motion: CharacterMotion, count: Int) {
+		let offsets = characterOffsets()
+		guard !offsets.isEmpty else {
+			return
+		}
+		let lineRange = editor.rope.lineRange(editor.rope.line(forOffset: editor.selections.primary.head))
+		let lineOffsets = offsets.enumerated().filter { _, element in
+			lineRange.contains(element.offset)
+		}
+		let head = editor.selections.primary.head
+		let matches: [(offset: Int, index: Int)]
+		switch motion {
+		case .findForward, .tillForward:
+			matches = lineOffsets.filter { $0.element.offset > head && $0.element.character == value }.map { ($0.element.offset, $0.offset) }
+		case .findBackward, .tillBackward:
+			matches = Array(lineOffsets.filter { $0.element.offset < head && $0.element.character == value }.map { ($0.element.offset, $0.offset) }.reversed())
+		}
+		guard count > 0, count <= matches.count else {
+			return
+		}
+		let match = matches[count - 1]
+		let targetIndex: Int
+		switch motion {
+		case .findForward, .findBackward:
+			targetIndex = match.index
+		case .tillForward:
+			targetIndex = max(match.index - 1, 0)
+		case .tillBackward:
+			targetIndex = min(match.index + 1, offsets.count - 1)
+		}
+		let target = offsets[targetIndex].offset
+		editor.setSelection(SelectionSet(primary: Selection(anchor: target, head: target)))
+		syncEditorState()
+	}
+
+	private func characterOffsets() -> [(offset: Int, character: Character)] {
+		var offset = 0
+		return editor.text.map { character in
+			defer { offset += String(character).utf8.count }
+			return (offset, character)
+		}
 	}
 
 	private func handlePassthroughKey(

@@ -3,14 +3,22 @@ import Foundation
 public enum Motion: Sendable, Equatable {
 	case charForward
 	case charBackward
+	case lineDown
+	case lineUp
 	case wordForward
 	case wordBackward
+	case wordEnd
+	case bigWordForward
+	case bigWordBackward
+	case bigWordEnd
 	case lineStart
 	case lineEnd
 	case visualLineStart
 	case visualLineEnd
 	case bufferStart
 	case bufferEnd
+	case paragraphForward
+	case paragraphBackward
 	case pageDown
 	case pageUp
 }
@@ -98,10 +106,22 @@ public struct Editor: Sendable {
 				offset = nextCharacterRange(after: selection.head).upperBound
 			case .charBackward:
 				offset = previousCharacterRange(before: selection.head).lowerBound
+			case .lineDown:
+				offset = verticalLineOffset(from: selection.head, delta: 1)
+			case .lineUp:
+				offset = verticalLineOffset(from: selection.head, delta: -1)
 			case .wordForward:
 				offset = wordForward(from: selection.head)
 			case .wordBackward:
 				offset = wordBackward(from: selection.head)
+			case .wordEnd:
+				offset = wordEnd(from: selection.head, isWordCharacter: isAlphaNumeric)
+			case .bigWordForward:
+				offset = wordForward(from: selection.head, isWordCharacter: { !$0.isWhitespace })
+			case .bigWordBackward:
+				offset = wordBackward(from: selection.head, isWordCharacter: { !$0.isWhitespace })
+			case .bigWordEnd:
+				offset = wordEnd(from: selection.head, isWordCharacter: { !$0.isWhitespace })
 			case .lineStart, .visualLineStart:
 				offset = rope.offset(forLine: rope.line(forOffset: selection.head))
 			case .lineEnd, .visualLineEnd:
@@ -110,6 +130,10 @@ public struct Editor: Sendable {
 				offset = 0
 			case .bufferEnd:
 				offset = rope.length
+			case .paragraphForward:
+				offset = paragraphForward(from: selection.head)
+			case .paragraphBackward:
+				offset = paragraphBackward(from: selection.head)
 			case .pageDown:
 				let line = min(rope.line(forOffset: selection.head) + pageLineCount, max(0, rope.lineCount - 1))
 				offset = rope.offset(forLine: line)
@@ -214,15 +238,31 @@ public struct Editor: Sendable {
 		return offset ..< upper
 	}
 
+	private func verticalLineOffset(from offset: Int, delta: Int) -> Int {
+		let line = rope.line(forOffset: offset)
+		let lineRange = rope.lineRange(line)
+		let column = offset - lineRange.lowerBound
+		let targetLine = min(max(line + delta, 0), max(0, rope.lineCount - 1))
+		let targetRange = rope.lineRange(targetLine)
+		return min(targetRange.lowerBound + column, targetRange.upperBound)
+	}
+
 	private func wordForward(from offset: Int) -> Int {
+		wordForward(from: offset, isWordCharacter: isAlphaNumeric)
+	}
+
+	private func wordForward(from offset: Int, isWordCharacter: (Character) -> Bool) -> Int {
 		let chars = characterOffsets()
 		guard let index = chars.firstIndex(where: { $0.offset >= offset }), index < chars.count else {
 			return rope.length
 		}
 		let current = chars[index].character
-		if isAlphaNumeric(current) {
+		if isWordCharacter(current) {
 			var cursor = index
-			while cursor < chars.count, isAlphaNumeric(chars[cursor].character) {
+			while cursor < chars.count, isWordCharacter(chars[cursor].character) {
+				cursor += 1
+			}
+			while cursor < chars.count, chars[cursor].character.isWhitespace {
 				cursor += 1
 			}
 			return cursor < chars.count ? chars[cursor].offset : rope.length
@@ -231,18 +271,69 @@ public struct Editor: Sendable {
 	}
 
 	private func wordBackward(from offset: Int) -> Int {
+		wordBackward(from: offset, isWordCharacter: isAlphaNumeric)
+	}
+
+	private func wordBackward(from offset: Int, isWordCharacter: (Character) -> Bool) -> Int {
 		let chars = characterOffsets()
 		guard !chars.isEmpty, offset > 0 else {
 			return 0
 		}
 		var index = chars.lastIndex(where: { $0.offset < offset }) ?? 0
-		if isAlphaNumeric(chars[index].character) {
-			while index > 0, isAlphaNumeric(chars[index - 1].character) {
-				index -= 1
-			}
-			return chars[index].offset
+		while index > 0, chars[index].character.isWhitespace {
+			index -= 1
+		}
+		while index > 0, isWordCharacter(chars[index - 1].character) == isWordCharacter(chars[index].character), !chars[index - 1].character.isWhitespace {
+			index -= 1
 		}
 		return chars[index].offset
+	}
+
+	private func wordEnd(from offset: Int, isWordCharacter: (Character) -> Bool) -> Int {
+		let chars = characterOffsets()
+		guard let index = chars.firstIndex(where: { $0.offset >= offset }), index < chars.count else {
+			return rope.length
+		}
+		var cursor = index
+		if cursor < chars.count, chars[cursor].character.isWhitespace {
+			while cursor < chars.count, chars[cursor].character.isWhitespace {
+				cursor += 1
+			}
+		}
+		guard cursor < chars.count else {
+			return rope.length
+		}
+		let wordState = isWordCharacter(chars[cursor].character)
+		while cursor + 1 < chars.count, isWordCharacter(chars[cursor + 1].character) == wordState, !chars[cursor + 1].character.isWhitespace {
+			cursor += 1
+		}
+		return chars[cursor].offset
+	}
+
+	private func paragraphForward(from offset: Int) -> Int {
+		let currentLine = rope.line(forOffset: offset)
+		guard currentLine + 1 < rope.lineCount else {
+			return rope.length
+		}
+		for line in (currentLine + 1) ..< rope.lineCount {
+			if rope.slice(rope.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+				return rope.offset(forLine: min(line + 1, rope.lineCount - 1))
+			}
+		}
+		return rope.length
+	}
+
+	private func paragraphBackward(from offset: Int) -> Int {
+		let currentLine = rope.line(forOffset: offset)
+		guard currentLine > 0 else {
+			return 0
+		}
+		for line in stride(from: currentLine - 1, through: 0, by: -1) {
+			if rope.slice(rope.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+				return rope.offset(forLine: min(line + 1, rope.lineCount - 1))
+			}
+		}
+		return 0
 	}
 
 	private func characterOffsets() -> [(offset: Int, character: Character)] {

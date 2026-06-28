@@ -26,3 +26,9 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: ./scripts/check-pr-governance.rb
+
+      - name: Check cooperative app evidence
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/check-cooperative-app-evidence.rb

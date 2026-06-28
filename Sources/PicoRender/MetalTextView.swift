@@ -99,6 +99,7 @@ public final class MetalTextView: NSView {
 	private var insertUndoGroupActive = false
 	private let killRing = KillRing()
 	private var lastYankRange: Range<Int>?
+	private var optionDragAnchor: Int?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -272,6 +273,27 @@ public final class MetalTextView: NSView {
 		syncEditorState()
 	}
 
+	func updateColumnCursors(anchor: Int, head: Int) {
+		editor.setSelection(columnCursorSelection(anchor: anchor, head: head))
+		syncEditorState()
+	}
+
+	func columnCursorSelection(anchor: Int, head: Int) -> SelectionSet {
+		let clampedAnchor = min(max(anchor, 0), editor.rope.length)
+		let clampedHead = min(max(head, 0), editor.rope.length)
+		let anchorLine = editor.rope.line(forOffset: clampedAnchor)
+		let headLine = editor.rope.line(forOffset: clampedHead)
+		let lowerLine = min(anchorLine, headLine)
+		let upperLine = max(anchorLine, headLine)
+		let column = clampedAnchor - editor.rope.offset(forLine: anchorLine)
+		let selections = (lowerLine ... upperLine).map { line -> Selection in
+			let lineRange = editor.rope.lineRange(line)
+			let offset = min(max(lineRange.lowerBound + column, lineRange.lowerBound), lineRange.upperBound)
+			return Selection(anchor: offset, head: offset)
+		}
+		return SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst()))
+	}
+
 	public override func scrollWheel(with event: NSEvent) {
 		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}
@@ -282,7 +304,25 @@ public final class MetalTextView: NSView {
 			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
 			return
 		}
+		if event.modifierFlags.contains(.option) {
+			optionDragAnchor = utf8Offset(forMouseEvent: event)
+			updateColumnCursors(anchor: optionDragAnchor ?? 0, head: optionDragAnchor ?? 0)
+			return
+		}
 		super.mouseDown(with: event)
+	}
+
+	public override func mouseDragged(with event: NSEvent) {
+		if let optionDragAnchor {
+			updateColumnCursors(anchor: optionDragAnchor, head: utf8Offset(forMouseEvent: event))
+			return
+		}
+		super.mouseDragged(with: event)
+	}
+
+	public override func mouseUp(with event: NSEvent) {
+		optionDragAnchor = nil
+		super.mouseUp(with: event)
 	}
 
 	public override func keyDown(with event: NSEvent) {

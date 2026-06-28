@@ -7,15 +7,39 @@ final class PicoDocumentController: NSDocumentController {
 	override init() {
 		super.init()
 		PicoTabCoordinator.shared.install(documentController: self)
+		PicoWorkspaceController.shared.install(documentController: self)
 	}
 
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
 		PicoTabCoordinator.shared.install(documentController: self)
+		PicoWorkspaceController.shared.install(documentController: self)
 	}
 
 	override var defaultType: String? {
 		"public.data"
+	}
+
+	@discardableResult
+	func openDocument(at url: URL) -> Bool {
+		let typeName = defaultType ?? "public.data"
+		if let document = document(for: url) {
+			if document.windowControllers.isEmpty {
+				document.makeWindowControllers()
+			}
+			document.showWindows()
+			return true
+		}
+		do {
+			let document = try makeDocument(withContentsOf: url, ofType: typeName)
+			addDocument(document)
+			document.makeWindowControllers()
+			document.showWindows()
+			return true
+		} catch {
+			NSLog("failed to open \(url.path): \(error)")
+			return false
+		}
 	}
 
 	override func addDocument(_ document: NSDocument) {
@@ -81,42 +105,54 @@ final class PicoDocument: NSDocument {
 			self?.editor = editor
 			self?.updateChangeCount(.changeDone)
 		}
-			view.saveRequested = { [weak self] in
-				self?.save(nil)
-			}
-			view.closeRequested = { [weak self] in
-				self?.close()
-			}
+		view.saveRequested = { [weak self] in
+			self?.save(nil)
+		}
+		view.closeRequested = { [weak self] in
+			self?.close()
 		}
 	}
+}
 
 final class EditorWindowController: NSWindowController {
+	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let editorView: MetalTextView
 
 	init(document: PicoDocument) {
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
-		let contentView = NSStackView(frame: NSRect(x: 0, y: 0, width: 960, height: 672))
-		contentView.orientation = .vertical
-		contentView.alignment = .width
-		contentView.distribution = .fill
-		contentView.spacing = 0
+		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
+		editorStack.orientation = .vertical
+		editorStack.alignment = .width
+		editorStack.distribution = .fill
+		editorStack.spacing = 0
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		editorView.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-		contentView.addArrangedSubview(tabBarView)
-		contentView.addArrangedSubview(editorView)
+		editorStack.addArrangedSubview(tabBarView)
+		editorStack.addArrangedSubview(editorView)
+
+		let splitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
+		splitView.isVertical = true
+		splitView.dividerStyle = .thin
+		splitView.autoresizingMask = [.width, .height]
+		fileTreeView.translatesAutoresizingMaskIntoConstraints = false
+		editorStack.translatesAutoresizingMaskIntoConstraints = false
+		splitView.addArrangedSubview(fileTreeView)
+		splitView.addArrangedSubview(editorStack)
+		fileTreeView.widthAnchor.constraint(equalToConstant: 240).isActive = true
 		let window = NSWindow(
-			contentRect: contentView.frame,
+			contentRect: splitView.frame,
 			styleMask: [.titled, .closable, .miniaturizable, .resizable],
 			backing: .buffered,
 			defer: false
 		)
 		window.title = document.fileURL?.lastPathComponent ?? "Untitled"
-		window.contentView = contentView
+		window.contentView = splitView
 		super.init(window: window)
 		window.delegate = self
 		document.attach(editorView)
+		PicoWorkspaceController.shared.register(fileTreeView)
 		PicoTabCoordinator.shared.register(tabBarView)
 		window.makeFirstResponder(editorView)
 	}

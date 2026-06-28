@@ -19,6 +19,11 @@
 
 - [ ] If `Sources/ollyDSL/*.swift` changed, `examples/` and public doc comments were updated.
 
+## Cooperative Apps Evidence
+
+- Bundle IDs added/changed:
+- Evidence:
+
 ## Perf Impact
 
 - [ ] No expected impact on `NORTHSTAR.md` §12a / `docs/performance.md` budgets; PerfBench CI output reviewed.

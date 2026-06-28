@@ -32,7 +32,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 1 — Bench harness + baselines
 
-(A) 2026-06-28 +Phase1-Bench @bench id:021 est:2h dep:020 Add `bench/scripts/run_baseline.sh`: iterates competitors {Zed, Sublime Text, VSCode, CodeEdit, TextEdit}, runs picobench 20× each with `sudo purge` between, exports to `bench/results/baseline-$(date +%F).json` and a Markdown summary `bench/results/baseline-$(date +%F).md`.
 (A) 2026-06-28 +Phase1-Bench @bench id:022 est:1h dep:021 Install competitor apps via Homebrew cask: `brew install --cask zed visual-studio-code sublime-text codeedit`. Document in `bench/README.md`. Run `run_baseline.sh`, commit results.
 (B) 2026-06-28 +Phase1-Bench @bench id:023 est:2h dep:020 Extend `picobench` with `latency` subcommand: uses CGEventTap to inject a keypress into the target editor and measures glyph-paint via screen capture diff. Reference: `CGEventTap`, `CGDisplayStream`. Acceptance: returns ms latency.
 (C) 2026-06-28 +Phase1-Bench @ci id:024 est:1h dep:021 Add nightly GitHub Action (`workflow_dispatch` for manual + `schedule: cron 0 7 * * *`) running baseline bench, commits results to `bench/results/`.

@@ -43,22 +43,26 @@ public struct Rope: Sendable {
 
 	public func lineRange(_ index: Int) -> Range<Int> {
 		precondition(index >= 0, "line index out of bounds")
-		let text = root.text
-		var line = 0
-		var start = 0
-		for (offset, byte) in text.utf8.enumerated() {
-			if byte == 10 {
-				if line == index {
-					return start ..< offset
-				}
-				line += 1
-				start = offset + 1
-			}
+		guard index < lineCount else {
+			return length ..< length
 		}
-		if line == index {
-			return start ..< length
+		let start = offset(forLine: index)
+		let next = index + 1 < lineCount ? offset(forLine: index + 1) : length
+		let end = index + 1 < lineCount ? max(start, next - 1) : next
+		return start ..< end
+	}
+
+	public func offset(forLine line: Int) -> Int {
+		precondition(line >= 0, "line index out of bounds")
+		guard line < lineCount else {
+			return length
 		}
-		return length ..< length
+		return root.offset(forLine: line)
+	}
+
+	public func line(forOffset offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
+		return root.line(forOffset: offset)
 	}
 
 	public func graphemeIndex(forOffset offset: Int) -> Int {
@@ -145,6 +149,39 @@ private final class RopeNode: @unchecked Sendable {
 		}
 		return summary == children.reduce(.zero) { $0 + $1.summary } && children.allSatisfy { $0.validate() }
 	}
+
+	func offset(forLine line: Int) -> Int {
+		if let leafText {
+			return leafText.offset(forLine: line)
+		}
+		var remaining = line
+		var offset = 0
+		for child in children {
+			if remaining <= child.summary.lines {
+				return offset + child.offset(forLine: remaining)
+			}
+			remaining -= child.summary.lines
+			offset += child.summary.utf8Bytes
+		}
+		return summary.utf8Bytes
+	}
+
+	func line(forOffset target: Int) -> Int {
+		if let leafText {
+			return leafText.line(forOffset: target)
+		}
+		var offset = 0
+		var line = 0
+		for child in children {
+			let next = offset + child.summary.utf8Bytes
+			if target <= next {
+				return line + child.line(forOffset: target - offset)
+			}
+			offset = next
+			line += child.summary.lines
+		}
+		return line
+	}
 }
 
 private struct RopeSummary: Equatable, Sendable {
@@ -187,5 +224,32 @@ private extension String {
 			preconditionFailure("utf8 offset must be a character boundary")
 		}
 		return index
+	}
+
+	func offset(forLine line: Int) -> Int {
+		guard line > 0 else {
+			return 0
+		}
+		var currentLine = 0
+		for (offset, byte) in utf8.enumerated() {
+			if byte == 10 {
+				currentLine += 1
+				if currentLine == line {
+					return offset + 1
+				}
+			}
+		}
+		return utf8.count
+	}
+
+	func line(forOffset offset: Int) -> Int {
+		guard offset > 0 else {
+			return 0
+		}
+		var line = 0
+		for byte in utf8.prefix(offset) where byte == 10 {
+			line += 1
+		}
+		return line
 	}
 }

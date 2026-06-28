@@ -91,6 +91,20 @@ func ropeRandomEditsMatchCharacterArray(seed: UInt64) {
 	}
 }
 
+@Test func ropeLineOffsetWalkMatchesLinearScanOnLargeBuffer() {
+	let text = String(repeating: "abc\n", count: 100_000)
+	let rope = Rope(text)
+	let lines = [0, 1, 2, 99, 1_024, 65_535, 100_000]
+	for line in lines {
+		#expect(rope.offset(forLine: line) == linearOffset(forLine: line, in: text))
+	}
+	let offsets = [0, 1, 3, 4, 4_096, 262_144, text.utf8.count]
+	for offset in offsets {
+		#expect(rope.line(forOffset: offset) == linearLine(forOffset: offset, in: text))
+	}
+	#expect(rope.lineRange(65_535) == linearLineRange(65_535, in: text))
+}
+
 private struct SeededRNG {
 	private var state: UInt64
 
@@ -106,4 +120,28 @@ private struct SeededRNG {
 
 private func utf8Offset(forCharacterIndex index: Int, in chars: [Character]) -> Int {
 	chars.prefix(index).reduce(0) { $0 + String($1).utf8.count }
+}
+
+private func linearOffset(forLine target: Int, in text: String) -> Int {
+	guard target > 0 else {
+		return 0
+	}
+	var line = 0
+	for (offset, byte) in text.utf8.enumerated() where byte == 10 {
+		line += 1
+		if line == target {
+			return offset + 1
+		}
+	}
+	return text.utf8.count
+}
+
+private func linearLine(forOffset offset: Int, in text: String) -> Int {
+	text.utf8.prefix(offset).reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+}
+
+private func linearLineRange(_ line: Int, in text: String) -> Range<Int> {
+	let start = linearOffset(forLine: line, in: text)
+	let next = linearOffset(forLine: line + 1, in: text)
+	return start ..< max(start, next - 1)
 }

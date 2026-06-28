@@ -16,6 +16,7 @@ public enum EngineConfigDeclaration: Codable, Equatable, Sendable {
     case accordion(AccordionLayoutEngine.Config)
     case tabbed(TabbedLayoutEngine.Config)
     case stacked(StackedLayoutEngine.Config)
+    case treeTab(TreeTabLayoutEngine.Config)
 }
 
 /// Purpose: Declares one layout engine and its optional typed configuration.
@@ -93,6 +94,7 @@ public extension EngineDeclaration {
     static let accordion = Accordion()
     static let tabbed = Tabbed()
     static let stacked = Stacked()
+    static let treeTab = TreeTab()
 }
 
 /// Purpose: Declares the Monocle layout engine.
@@ -169,6 +171,17 @@ public func Stacked(railWidth: CGFloat = 160) -> EngineDeclaration {
     EngineDeclaration(
         StackedLayoutEngine.engineID,
         config: .stacked(StackedLayoutEngine.Config(railWidth: railWidth))
+    )
+}
+
+/// Purpose: Declares the TreeTab layout engine.
+/// Parameters: `railWidth` reserves space for the app-rendered side tree; `side` chooses left or right.
+/// Example: `Engines { TreeTab(railWidth: 180, side: .right) }`
+/// See also: `Tabbed(tabBarHeight:)`, `Stacked(railWidth:)`.
+public func TreeTab(railWidth: CGFloat = 150, side: TreeTabSide = .left) -> EngineDeclaration {
+    EngineDeclaration(
+        TreeTabLayoutEngine.engineID,
+        config: .treeTab(TreeTabLayoutEngine.Config(railWidth: railWidth, side: side))
     )
 }
 

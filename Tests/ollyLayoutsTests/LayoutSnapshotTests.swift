@@ -21,6 +21,7 @@ final class LayoutSnapshotTests: XCTestCase {
             ("accordion", accordionPlacements(in: bounds)),
             ("tabbed", tabbedPlacements(in: bounds)),
             ("stacked", stackedPlacements(in: bounds)),
+            ("tree-tab", treeTabPlacements(in: bounds)),
             ("paperwm-scroll", paperWMScrollPlacements(in: bounds))
         ]
 
@@ -119,6 +120,18 @@ final class LayoutSnapshotTests: XCTestCase {
 
     private func stackedPlacements(in bounds: CGRect) -> [Placement] {
         StackedLayoutEngine(config: StackedLayoutEngine.Config(railWidth: 160)).arrange(
+            windows: [
+                WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 3, frame: CGRect(x: 0, y: 0, width: 300, height: 200))
+            ],
+            in: bounds,
+            focus: 2
+        )
+    }
+
+    private func treeTabPlacements(in bounds: CGRect) -> [Placement] {
+        TreeTabLayoutEngine(config: TreeTabLayoutEngine.Config(railWidth: 150)).arrange(
             windows: [
                 WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
                 WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),

@@ -17,6 +17,7 @@ final class EngineDSLTests: XCTestCase {
             EngineDeclaration.accordion
             EngineDeclaration.tabbed
             EngineDeclaration.stacked
+            EngineDeclaration.treeTab
         }
 
         XCTAssertEqual(
@@ -33,7 +34,8 @@ final class EngineDSLTests: XCTestCase {
                 .threeCol,
                 .accordion,
                 .tabbed,
-                .stacked
+                .stacked,
+                .treeTab
             ]
         )
     }
@@ -47,6 +49,7 @@ final class EngineDSLTests: XCTestCase {
             Accordion()
             Tabbed(tabBarHeight: 30)
             Stacked(railWidth: 180)
+            TreeTab(railWidth: 160, side: .right)
         }
 
         XCTAssertEqual(
@@ -79,6 +82,10 @@ final class EngineDSLTests: XCTestCase {
                 EngineDeclaration(
                     StackedLayoutEngine.engineID,
                     config: .stacked(StackedLayoutEngine.Config(railWidth: 180))
+                ),
+                EngineDeclaration(
+                    TreeTabLayoutEngine.engineID,
+                    config: .treeTab(TreeTabLayoutEngine.Config(railWidth: 160, side: .right))
                 )
             ]
         )

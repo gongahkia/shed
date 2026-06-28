@@ -70,7 +70,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 12 — Tier-2 layouts (v0.3, advanced UX)
 
-(A) 2026-06-26 Implement `TreeTab` engine (Qtile precedent): vertical tree of tabbed windows on a side rail; configurable rail width and side +phase12 @swift @layout @ui ref:N§6
 (C) 2026-06-26 Cut v0.3.0 release; update comparison table; blog post: "olly is now the macOS WM with the most layout engines" +phase12 @release
 
 ---

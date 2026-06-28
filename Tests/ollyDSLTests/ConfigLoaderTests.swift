@@ -130,7 +130,7 @@ final class ConfigLoaderTests: XCTestCase {
         let loaded = try loader.load()
 
         XCTAssertEqual(loaded.config.workspaces.tags.count, 8)
-        XCTAssertEqual(loaded.config.engines.engines.count, 12)
+        XCTAssertEqual(loaded.config.engines.engines.count, 13)
         XCTAssertTrue(loaded.config.cooperativeApps.contains(bundleID: "com.example.CustomOverlay"))
         XCTAssertEqual(loaded.config.safeZones.notchPadding, 16)
         XCTAssertEqual(loaded.config.safeZones.reserves.count, 1)

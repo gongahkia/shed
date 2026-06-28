@@ -61,6 +61,20 @@ import Testing
 	#expect(captures.contains("string"))
 }
 
+@Test func syntaxThemeLoadsBundledAndFallsBackByCapturePrefix() throws {
+	let theme = try SyntaxTheme.loadDefaultDark()
+	#expect(theme.color(for: "keyword") != nil)
+	#expect(theme.color(for: "type.builtin") == theme.color(for: "type"))
+	let parsed = try SyntaxTheme.parse(#"""
+"keyword" = "#112233"
+"variable.parameter" = "#445566cc"
+"""#)
+	let keyword = try SyntaxColor(hex: "#112233")
+	let parameter = try SyntaxColor(hex: "#445566cc")
+	#expect(parsed.color(for: "keyword") == keyword)
+	#expect(parsed.color(for: "variable.parameter") == parameter)
+}
+
 private func largeTypeScriptLineSet() -> String {
 	String(repeating: "\n", count: 100_000) + "const done: boolean = true;\n"
 }

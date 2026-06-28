@@ -13,6 +13,16 @@ struct MetalGlyphInstance {
 	var color: SIMD4<Float>
 }
 
+public struct TextHighlightSpan: Sendable, Equatable {
+	public var range: Range<Int>
+	public var color: SIMD4<Float>
+
+	public init(range: Range<Int>, color: SIMD4<Float>) {
+		self.range = range
+		self.color = color
+	}
+}
+
 struct MetalViewportUniforms {
 	var size: SIMD2<Float>
 }
@@ -38,6 +48,9 @@ public final class MetalTextView: NSView {
 	private var selectionRects: [CGRect] = []
 	private var findMatchRanges: [Range<Int>] = []
 	private var findMatchRects: [CGRect] = []
+	public var highlightSpans: [TextHighlightSpan] = [] {
+		didSet { markDirty() }
+	}
 	private var renderPipeline: MTLRenderPipelineState?
 	private var samplerState: MTLSamplerState?
 	private var solidAtlasTexture: MTLTexture?
@@ -1107,9 +1120,11 @@ public final class MetalTextView: NSView {
 		}
 		var instances: [MetalGlyphInstance] = []
 		for lineIndex in visibleLineRange {
-			let range = editor.rope.lineRange(lineIndex)
-			let line = editor.rope.slice(range)
-			guard let glyphs = try? shaper.shape(line, font: textFont) else {
+			let lineRange = editor.rope.lineRange(lineIndex)
+			let line = editor.rope.slice(lineRange)
+			guard let glyphs = try? shaper.shape(line, font: textFont, colorForRange: { [weak self] range in
+				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+			}) else {
 				continue
 			}
 			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
@@ -1129,7 +1144,7 @@ public final class MetalTextView: NSView {
 						Float(glyph.atlasUV.u1),
 						Float(glyph.atlasUV.v1)
 					),
-					color: SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+					color: glyph.color
 				))
 			}
 		}
@@ -1146,6 +1161,13 @@ public final class MetalTextView: NSView {
 		findMatchRects.map { rect in
 			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34))
 		}
+	}
+
+	private func textColor(for range: Range<Int>) -> SIMD4<Float> {
+		guard let span = highlightSpans.last(where: { $0.range.overlaps(range) }) else {
+			return SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+		}
+		return span.color
 	}
 
 	private func cursorOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {

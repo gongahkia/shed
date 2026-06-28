@@ -13,6 +13,10 @@ public struct Rope: Sendable {
 		root.summary.lines + 1
 	}
 
+	public var graphemeCount: Int {
+		root.summary.graphemes
+	}
+
 	public mutating func insert(_ string: String, at offset: Int) {
 		precondition((0 ... length).contains(offset), "insert offset out of bounds")
 		var text = root.text
@@ -55,6 +59,21 @@ public struct Rope: Sendable {
 			return start ..< length
 		}
 		return length ..< length
+	}
+
+	public func graphemeIndex(forOffset offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
+		var bytes = 0
+		var graphemes = 0
+		for character in root.text {
+			let next = bytes + String(character).utf8.count
+			if offset < next {
+				return graphemes
+			}
+			bytes = next
+			graphemes += 1
+		}
+		return graphemes
 	}
 
 	func validateInvariants() -> Bool {
@@ -132,26 +151,30 @@ private struct RopeSummary: Equatable, Sendable {
 	var utf8Bytes: Int
 	var lines: Int
 	var scalars: Int
+	var graphemes: Int
 
-	static let zero = RopeSummary(utf8Bytes: 0, lines: 0, scalars: 0)
+	static let zero = RopeSummary(utf8Bytes: 0, lines: 0, scalars: 0, graphemes: 0)
 
-	init(utf8Bytes: Int, lines: Int, scalars: Int) {
+	init(utf8Bytes: Int, lines: Int, scalars: Int, graphemes: Int) {
 		self.utf8Bytes = utf8Bytes
 		self.lines = lines
 		self.scalars = scalars
+		self.graphemes = graphemes
 	}
 
 	init(_ text: String) {
 		utf8Bytes = text.utf8.count
 		lines = text.utf8.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
 		scalars = text.unicodeScalars.count
+		graphemes = text.count
 	}
 
 	static func + (lhs: RopeSummary, rhs: RopeSummary) -> RopeSummary {
 		RopeSummary(
 			utf8Bytes: lhs.utf8Bytes + rhs.utf8Bytes,
 			lines: lhs.lines + rhs.lines,
-			scalars: lhs.scalars + rhs.scalars
+			scalars: lhs.scalars + rhs.scalars,
+			graphemes: lhs.graphemes + rhs.graphemes
 		)
 	}
 }

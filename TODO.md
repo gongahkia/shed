@@ -56,7 +56,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 4 — Rope buffer
 
-(A) 2026-06-28 +Phase4-Buffer @buffer id:061 est:3h dep:060 Add summary metric for grapheme-cluster boundaries. Use `String.UnicodeScalarView` + `Character` clustering. Add `graphemeCount` to summary. API: `graphemeIndex(forOffset: Int) -> Int`.
 (A) 2026-06-28 +Phase4-Buffer @buffer id:062 est:4h dep:060 Property-based tests in `Tests/PicoEditorTests/RopeTests.swift` using Swift Testing parameterized tests: random insert/delete sequences, assert equivalence with `Array<Character>` reference impl. 10k iterations. Include xi-editor test vectors where available.
 (A) 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.
 (A) 2026-06-28 +Phase4-Buffer @buffer id:064 est:3h dep:060 Implement line-offset cache: O(1) `offset(forLine: Int)` and `line(forOffset: Int)` via tree summary walk. Test against linear scan on 100k-line buffer.

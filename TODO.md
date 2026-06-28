@@ -25,7 +25,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 0 — Bootstrap
 
-(A) 2026-06-28 +Phase0-Bootstrap @ci id:006 est:1.5h dep:004 Add `.github/workflows/ci.yml` running on `macos-14` (M-series): steps install hyperfine, `swift build -c release`, `swift test`, run bench harness in smoke mode (1 run). Cache `.build/`.
 (B) 2026-06-28 +Phase0-Bootstrap @repo id:007 est:0.5h dep:001 Add `.swiftformat` file: indent tabs, max line 120, organize-imports, no-trailing-closures-for-arguments. Add SwiftFormat pre-commit (optional, doc only).
 (B) 2026-06-28 +Phase0-Bootstrap @repo id:008 est:0.5h dep:001 Add `CONTRIBUTING.md` skeleton: link NORTHSTAR.md principles, KPI gates on PRs, "no new deps without an issue".
 (A) 2026-06-28 +Phase0-Bootstrap @bench id:009 est:1h dep:001 Create `bench/` directory structure: `bench/corpus/`, `bench/results/`, `bench/scripts/`. Add `bench/README.md` describing protocol (copy-paste from NORTHSTAR "Benchmark protocol" section).

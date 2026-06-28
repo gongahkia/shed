@@ -30,5 +30,6 @@ let package = Package(
 		.executableTarget(name: "PicoBench"),
 		.target(name: "CTreeSitter", sources: ["stub.c"]),
 		.target(name: "CTSGrammars", sources: ["stub.c"]),
+		.testTarget(name: "PicoEditorTests", dependencies: ["PicoEditor"]),
 	]
 )

@@ -32,6 +32,8 @@
 "Shift-V" = "vim.visual.line"
 "Ctrl-V" = "vim.visual.block"
 "Shift-;" = "vim.ex.start"
+"u" = "edit.undo"
+"Ctrl-R" = "edit.redo"
 "i" = "mode.insert"
 "/" = "edit.find"
 

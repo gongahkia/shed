@@ -105,6 +105,27 @@ import Testing
 	#expect(view.editor.selections.primary.head == 8)
 }
 
+@Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("i")], commandID: "mode.insert"),
+		KeyBinding(mode: .normal, chord: [Key("u")], commandID: "edit.undo"),
+		KeyBinding(mode: .normal, chord: [Key("r", modifiers: .control)], commandID: "edit.redo"),
+		KeyBinding(mode: .insert, chord: [Key("escape")], commandID: "mode.normal"),
+	])
+
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	for character in "abc" {
+		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
+	}
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(view.editor.text == "abc")
+	#expect(view.handleKey(characters: "u", charactersIgnoringModifiers: "u", keyCode: 0))
+	#expect(view.editor.text == "")
+	#expect(view.handleKey(characters: "\u{12}", charactersIgnoringModifiers: "r", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.text == "abc")
+}
+
 @Test func vimDeleteOperatorAppliesMotionAndLine() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "one two\nthree\n")

@@ -47,6 +47,20 @@ import Testing
 	#expect(editor.text == expected)
 }
 
+@Test func editorUndoRedoRestoresGroupedEditTranscript() {
+	var editor = Editor()
+	editor.beginUndoGroup()
+	editor.insert("a")
+	editor.insert("b")
+	editor.insert("c")
+	editor.endUndoGroup()
+	#expect(editor.text == "abc")
+	editor.undo()
+	#expect(editor.text == "")
+	editor.redo()
+	#expect(editor.text == "abc")
+}
+
 @Test func editorMotionPrimitivesMoveCursor() {
 	var editor = Editor(text: "abc, de\nsecond line\nthird")
 	editor.pageLineCount = 1

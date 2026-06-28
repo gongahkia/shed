@@ -96,6 +96,7 @@ public final class MetalTextView: NSView {
 	private var pendingRegister: String?
 	private var registers: [String: String] = [:]
 	private var pendingExCommand: String?
+	private var insertUndoGroupActive = false
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -450,6 +451,18 @@ public final class MetalTextView: NSView {
 		case "editor.repeatCharFindReverse":
 			repeatLastCharacterMotion(reversed: true)
 			return true
+		case "edit.undo":
+			endInsertUndoGroup()
+			editor.undo()
+			syncEditorState()
+			editorDidChange?(editor)
+			return true
+		case "edit.redo":
+			endInsertUndoGroup()
+			editor.redo()
+			syncEditorState()
+			editorDidChange?(editor)
+			return true
 		case "vim.operator.delete":
 			return beginOperator(.delete)
 		case "vim.operator.change":
@@ -499,10 +512,12 @@ public final class MetalTextView: NSView {
 			closeRequested?()
 			return true
 		case "mode.normal":
+			endInsertUndoGroup()
 			leaveVisualMode(collapse: true)
 			keymapEngine.setMode(.normal)
 			return true
 		case "mode.insert":
+			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
 			return true
 		case "mode.emacs":
@@ -513,6 +528,22 @@ public final class MetalTextView: NSView {
 		}
 		syncEditorState()
 		return true
+	}
+
+	private func beginInsertUndoGroup() {
+		guard !insertUndoGroupActive else {
+			return
+		}
+		editor.beginUndoGroup()
+		insertUndoGroupActive = true
+	}
+
+	private func endInsertUndoGroup() {
+		guard insertUndoGroupActive else {
+			return
+		}
+		editor.endUndoGroup()
+		insertUndoGroupActive = false
 	}
 
 	private func motion(for commandID: String) -> Motion? {
@@ -650,6 +681,7 @@ public final class MetalTextView: NSView {
 		case .change:
 			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
+			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
 		case .yank:
 			writeRegister(text, operation: .yank)
@@ -675,6 +707,7 @@ public final class MetalTextView: NSView {
 		case .change:
 			writeRegister(selections.map { editor.rope.slice($0) }.joined(), operation: .delete)
 			editor.deleteForward()
+			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
 			syncEditorState()
 			editorDidChange?(editor)

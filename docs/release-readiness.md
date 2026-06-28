@@ -51,3 +51,6 @@ Do not remove the v0.1.0 release TODO until:
 When the required secrets are configured, `.github/workflows/release-dmg.yml`
 publishes the notarized DMG, source tarball, and checksums to the tag's GitHub
 Release.
+
+The Homebrew cask PR body is drafted in `docs/homebrew-cask-pr.md`; it still
+needs the final release SHA before submission.

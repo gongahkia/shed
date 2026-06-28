@@ -1,4 +1,5 @@
 import Dispatch
+import Foundation
 import PicoEditor
 import PicoSyntax
 import Testing
@@ -73,6 +74,17 @@ import Testing
 	let parameter = try SyntaxColor(hex: "#445566cc")
 	#expect(parsed.color(for: "keyword") == keyword)
 	#expect(parsed.color(for: "variable.parameter") == parameter)
+}
+
+@Test func syntaxPipelineDetectsLanguageAndAllocatesParserLazily() throws {
+	let url = URL(fileURLWithPath: "/tmp/example.ts")
+	let language = try #require(SyntaxPipeline.language(forFileURL: url))
+	#expect(language == .typescript)
+	let pipeline = SyntaxPipeline(language: language)
+	#expect(!pipeline.didAllocateParser)
+	let tree = try pipeline.parse(Rope("const value = 1;\n"))
+	#expect(pipeline.didAllocateParser)
+	#expect(!tree.rootNode.hasError)
 }
 
 private func largeTypeScriptLineSet() -> String {

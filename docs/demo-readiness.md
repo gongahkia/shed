@@ -1,57 +1,59 @@
 # Demo Readiness
 
-Status: `docs/demo.gif` is not recorded. The current machine exposes only one
-display, so the two-display TODO cannot be completed from this environment.
+Status: `docs/demo.gif` was recorded on 2026-06-28.
 
-## Verified Blocker
+## Capture Setup
 
-Checked on 2026-06-28:
+The machine had one built-in display. For the two-display capture, BetterDisplay
+4.3.4 was installed through Homebrew, a temporary virtual display named
+`OllyDemo` was created, mirroring was disabled, and the display was discarded
+after capture.
 
-```sh
-system_profiler SPDisplaysDataType
-```
-
-Current output shows one online display:
+Verified capture displays before recording:
 
 ```text
 Color LCD
 Resolution: 2560 x 1664 Retina
 Main Display: Yes
+Mirror: Off
+Online: Yes
 Connection Type: Internal
+
+OllyDemo
+Resolution: 5120 x 2880
+UI Looks like: 2560 x 1440 @ 60.00Hz
+Mirror: Off
+Online: Yes
 ```
 
-`/Applications/BetterDisplay.app` is also absent, so no local virtual display is
-available.
+## Capture Commands
 
-## Capture Runbook
-
-Once two displays are online, record both displays for 30 seconds:
+Two display recordings were captured concurrently:
 
 ```sh
-screencapture -v -V 30 -D 1 /tmp/olly-demo-display-1.mov &
-screencapture -v -V 30 -D 2 /tmp/olly-demo-display-2.mov &
+screencapture -x -v -V 30 -D 1 /tmp/olly-demo-d1.mov &
+screencapture -x -v -V 30 -D 2 /tmp/olly-demo-d2.mov &
 wait
 ```
 
-During the capture, show:
-
-- four-engine hot-swap
-- tag switching
-- command palette
-
-Then build the GIF:
+The final GIF was built from the two recordings:
 
 ```sh
-ffmpeg \
-  -i /tmp/olly-demo-display-1.mov \
-  -i /tmp/olly-demo-display-2.mov \
-  -filter_complex "[0:v]scale=960:-1[a];[1:v]scale=960:-1[b];[a][b]hstack=inputs=2,fps=12" \
+ffmpeg -y \
+  -i /tmp/olly-demo-d1.mov \
+  -i /tmp/olly-demo-d2.mov \
+  -filter_complex '[0:v]fps=8,scale=480:540:force_original_aspect_ratio=decrease,pad=480:540:(ow-iw)/2:(oh-ih)/2:black[left];[1:v]fps=8,scale=480:540:force_original_aspect_ratio=decrease,pad=480:540:(ow-iw)/2:(oh-ih)/2:black[right];[left][right]hstack=inputs=2,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse=dither=bayer' \
   docs/demo.gif
 ```
 
-Verify the artifact before removing the TODO:
+## Artifact Verification
 
-```sh
-test -s docs/demo.gif
-git diff --stat docs/demo.gif
+```text
+width=960
+height=540
+duration=30.010000
+nb_frames=240
 ```
+
+The temporary virtual display was discarded after capture and BetterDisplay was
+uninstalled.

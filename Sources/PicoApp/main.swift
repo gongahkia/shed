@@ -81,12 +81,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "edit.findNext", title: "Find Next", defaultKey: "Cmd-G") { [weak self] in
 					self?.findNext(nil)
 				},
-				Command(id: "edit.findPrevious", title: "Find Previous", defaultKey: "Cmd-Shift-G") { [weak self] in
-					self?.findPrevious(nil)
-				},
-				Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
-					self?.performEditorMotion(.charBackward)
-				},
+					Command(id: "edit.findPrevious", title: "Find Previous", defaultKey: "Cmd-Shift-G") { [weak self] in
+						self?.findPrevious(nil)
+					},
+					Command(id: "edit.selectAllFindMatches", title: "Select All Find Matches", defaultKey: "Cmd-Ctrl-G") { [weak self] in
+						self?.selectAllFindMatches(nil)
+					},
+					Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
+						self?.performEditorMotion(.charBackward)
+					},
 				Command(id: "editor.moveRight", title: "Move Right", defaultKey: "Right") { [weak self] in
 					self?.performEditorMotion(.charForward)
 				},
@@ -125,6 +128,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func findPrevious(_ sender: Any?) {
 		activeEditorWindowController()?.findPrevious()
+	}
+
+	@objc private func selectAllFindMatches(_ sender: Any?) {
+		activeEditorWindowController()?.selectAllFindMatches()
 	}
 
 	private func openInitialDocument() {
@@ -221,10 +228,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		findItem.target = self
 		let findNextItem = editMenu.addItem(withTitle: "Find Next", action: #selector(findNext(_:)), keyEquivalent: "g")
 		findNextItem.target = self
-		let findPreviousItem = editMenu.addItem(withTitle: "Find Previous", action: #selector(findPrevious(_:)), keyEquivalent: "G")
-		findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
-		findPreviousItem.target = self
-		editItem.submenu = editMenu
+			let findPreviousItem = editMenu.addItem(withTitle: "Find Previous", action: #selector(findPrevious(_:)), keyEquivalent: "G")
+			findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
+			findPreviousItem.target = self
+			let selectAllFindMatchesItem = editMenu.addItem(withTitle: "Select All Find Matches", action: #selector(selectAllFindMatches(_:)), keyEquivalent: "g")
+			selectAllFindMatchesItem.keyEquivalentModifierMask = [.command, .control]
+			selectAllFindMatchesItem.target = self
+			editItem.submenu = editMenu
 
 		let commandMenu = NSMenu(title: "Command")
 		let paletteItem = commandMenu.addItem(withTitle: "Command Palette", action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")

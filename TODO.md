@@ -75,8 +75,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 8 — Command palette
 
-(A) 2026-06-28 +Phase8-Palette @core id:142 est:2h dep:140 Fuzzy matcher: implement FZF-style scoring (consecutive matches > non-consecutive > start-of-word bonus). Pure Swift, no deps. Ref: [fzf algo](https://github.com/junegunn/fzf/blob/master/src/algo/algo.go). Test: query "ods" on ["openDocument", "saveDocument"] ranks openDocument first.
-
 ---
 
 ## Phase 9 — Find/replace

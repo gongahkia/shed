@@ -35,11 +35,13 @@
 "u" = "edit.undo"
 "Ctrl-R" = "edit.redo"
 "Cmd-D" = "editor.addNextSelection"
+"Cmd-Ctrl-G" = "edit.selectAllFindMatches"
 "i" = "mode.insert"
 "/" = "edit.find"
 
 [mode.visual]
 "Cmd-D" = "editor.addNextSelection"
+"Cmd-Ctrl-G" = "edit.selectAllFindMatches"
 "Esc" = "mode.normal"
 "h" = "editor.moveLeft"
 "j" = "editor.moveDown"
@@ -88,5 +90,6 @@
 
 [mode.insert]
 "Cmd-D" = "editor.addNextSelection"
+"Cmd-Ctrl-G" = "edit.selectAllFindMatches"
 "Esc" = "mode.normal"
 "jk" = "mode.normal"

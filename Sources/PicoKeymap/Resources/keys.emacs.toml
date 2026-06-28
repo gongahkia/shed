@@ -14,6 +14,7 @@
 "C-y" = "emacs.yank"
 "M-y" = "emacs.yankPop"
 "Cmd-D" = "editor.addNextSelection"
+"Cmd-Ctrl-G" = "edit.selectAllFindMatches"
 "C-s" = "emacs.isearchForward"
 "C-r" = "emacs.isearchBackward"
 "C-x C-s" = "file.save"

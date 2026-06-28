@@ -133,6 +133,7 @@ import Testing
 		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
 		let engine = KeymapEngine(modeStack: [profile == .vim ? .normal : profile == .emacs ? .emacs : .insert], bindings: bindings)
 		#expect(engine.handle(try keyEvent("d", modifiers: [.command])) == .command("editor.addNextSelection"))
+		#expect(engine.handle(try keyEvent("g", modifiers: [.command, .control])) == .command("edit.selectAllFindMatches"))
 	}
 }
 

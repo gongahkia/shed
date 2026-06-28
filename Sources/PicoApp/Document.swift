@@ -76,7 +76,7 @@ final class PicoDocumentController: NSDocumentController {
 
 final class PicoDocument: NSDocument {
 	var editor = Editor()
-	private weak var editorView: MetalTextView?
+	private var editorViews: [MetalTextView] = []
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?
 	private var syntaxTree: Tree?
@@ -114,16 +114,15 @@ final class PicoDocument: NSDocument {
 			throw CocoaError(.fileReadCorruptFile)
 		}
 		editor = Editor(text: text)
-		editorView?.editor = editor
+		for view in editorViews {
+			view.editor = editor
+		}
 		configureSyntaxPipeline()
 		refreshSyntaxHighlights()
 		restartFileWatcher()
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
-		if let editorView {
-			editor = editorView.editor
-		}
 		return Data(editor.text.utf8)
 	}
 
@@ -133,18 +132,21 @@ final class PicoDocument: NSDocument {
 	}
 
 	func attach(_ view: MetalTextView) {
-		editorView = view
+		if !editorViews.contains(where: { $0 === view }) {
+			editorViews.append(view)
+		}
 		view.editor = editor
 		configureSyntaxPipeline()
 		refreshSyntaxHighlights()
-		view.editorDidChange = { [weak self] editor in
-			guard let self else {
+		view.editorDidChange = { [weak self, weak view] editor in
+			guard let self, let view else {
 				return
 			}
 			let oldRope = self.editor.rope
 			let edits = editor.lastEditBatch
 			self.editor = editor
 			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			self.syncSiblingEditorViews(source: view, editor: editor)
 			self.updateChangeCount(.changeDone)
 		}
 		view.saveRequested = { [weak self] in
@@ -156,11 +158,23 @@ final class PicoDocument: NSDocument {
 		restartFileWatcher()
 	}
 
+	func detach(_ view: MetalTextView) {
+		editorViews.removeAll { $0 === view }
+	}
+
+	private func syncSiblingEditorViews(source: MetalTextView, editor: Editor) {
+		for view in editorViews where view !== source {
+			var siblingEditor = editor
+			siblingEditor.selections = view.editor.selections
+			view.editor = siblingEditor
+		}
+	}
+
 	private func configureSyntaxPipeline() {
 		guard let url = fileURL, let language = SyntaxPipeline.language(forFileURL: url) else {
 			syntaxPipeline = nil
 			syntaxTree = nil
-			editorView?.highlightSpans = []
+			setHighlightSpans([])
 			return
 		}
 		if syntaxPipeline?.language != language {
@@ -170,8 +184,8 @@ final class PicoDocument: NSDocument {
 	}
 
 	private func refreshSyntaxHighlights(edits: [Edit] = [], oldRope: Rope? = nil) {
-		guard let editorView, let syntaxPipeline else {
-			editorView?.highlightSpans = []
+		guard let syntaxPipeline else {
+			setHighlightSpans([])
 			return
 		}
 		do {
@@ -202,9 +216,15 @@ final class PicoDocument: NSDocument {
 				}
 				return TextHighlightSpan(range: span.range, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
 			}
-			editorView.highlightSpans = renderedSpans
+			setHighlightSpans(renderedSpans)
 		} catch {
-			editorView.highlightSpans = []
+			setHighlightSpans([])
+		}
+	}
+
+	private func setHighlightSpans(_ spans: [TextHighlightSpan]) {
+		for view in editorViews {
+			view.highlightSpans = spans
 		}
 	}
 
@@ -297,18 +317,110 @@ final class PicoDocument: NSDocument {
 	}
 }
 
+final class EditorPaneController: NSViewController {
+	let editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+
+	override func loadView() {
+		view = editorView
+	}
+}
+
+final class EditorPaneCoordinator {
+	let rootSplitViewController = NSSplitViewController()
+	private(set) var panes: [EditorPaneController] = []
+	private(set) var activePane: EditorPaneController
+
+	init() {
+		let pane = EditorPaneController()
+		activePane = pane
+		panes = [pane]
+		rootSplitViewController.splitView.dividerStyle = .thin
+		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: pane))
+	}
+
+	var view: NSView {
+		rootSplitViewController.view
+	}
+
+	@discardableResult
+	func splitActive(vertical: Bool) -> EditorPaneController {
+		let newPane = EditorPaneController()
+		panes.append(newPane)
+		let parent = activePane.parent as? NSSplitViewController ?? rootSplitViewController
+		let index = parent.splitViewItems.firstIndex { $0.viewController === activePane } ?? 0
+		let oldItem = parent.splitViewItems[index]
+		parent.removeSplitViewItem(oldItem)
+		let nested = NSSplitViewController()
+		nested.splitView.isVertical = vertical
+		nested.splitView.dividerStyle = .thin
+		nested.addSplitViewItem(oldItem)
+		nested.addSplitViewItem(NSSplitViewItem(viewController: newPane))
+		parent.insertSplitViewItem(NSSplitViewItem(viewController: nested), at: index)
+		activePane = newPane
+		return newPane
+	}
+
+	func closeActive() -> EditorPaneController? {
+		guard panes.count > 1 else {
+			return nil
+		}
+		let pane = activePane
+		guard let parent = pane.parent as? NSSplitViewController, let index = parent.splitViewItems.firstIndex(where: { $0.viewController === pane }) else {
+			return nil
+		}
+		parent.removeSplitViewItem(parent.splitViewItems[index])
+		panes.removeAll { $0 === pane }
+		activePane = panes[min(index, panes.count - 1)]
+		collapseIfNeeded(parent)
+		return pane
+	}
+
+	func closeOtherPanes() -> [EditorPaneController] {
+		let kept = activePane
+		let removed = panes.filter { $0 !== kept }
+		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
+		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: kept))
+		panes = [kept]
+		activePane = kept
+		return removed
+	}
+
+	func focusAdjacent(delta: Int) -> EditorPaneController {
+		guard let index = panes.firstIndex(where: { $0 === activePane }) else {
+			return activePane
+		}
+		let next = (index + delta + panes.count) % panes.count
+		activePane = panes[next]
+		return activePane
+	}
+
+	private func collapseIfNeeded(_ split: NSSplitViewController) {
+		guard split !== rootSplitViewController, split.splitViewItems.count == 1, let child = split.splitViewItems.first else {
+			return
+		}
+		guard let parent = split.parent as? NSSplitViewController, let index = parent.splitViewItems.firstIndex(where: { $0.viewController === split }) else {
+			return
+		}
+		parent.removeSplitViewItem(parent.splitViewItems[index])
+		split.removeSplitViewItem(child)
+		parent.insertSplitViewItem(child, at: index)
+	}
+}
+
 final class EditorWindowController: NSWindowController {
 	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
-	private let editorView: MetalTextView
+	private let paneCoordinator = EditorPaneCoordinator()
+	private var editorView: MetalTextView {
+		paneCoordinator.activePane.editorView
+	}
 	private var findMatches: [Range<Int>] = []
 	private var selectedFindMatchIndex: Int?
 	private var incrementalFindDirection: Int?
 
 	init(document: PicoDocument) {
-		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
-		let editorContainer = NSView(frame: editorView.frame)
+		let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 		editorStack.orientation = .vertical
 		editorStack.alignment = .width
@@ -317,16 +429,16 @@ final class EditorWindowController: NSWindowController {
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-		editorView.translatesAutoresizingMaskIntoConstraints = false
+		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
 		findBarView.translatesAutoresizingMaskIntoConstraints = false
 		findBarView.isHidden = true
-		editorContainer.addSubview(editorView)
+		editorContainer.addSubview(paneCoordinator.view)
 		editorContainer.addSubview(findBarView)
 		NSLayoutConstraint.activate([
-			editorView.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
-			editorView.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
-			editorView.topAnchor.constraint(equalTo: editorContainer.topAnchor),
-			editorView.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
+			paneCoordinator.view.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
+			paneCoordinator.view.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
+			paneCoordinator.view.topAnchor.constraint(equalTo: editorContainer.topAnchor),
+			paneCoordinator.view.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
 			findBarView.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
 			findBarView.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
 			findBarView.topAnchor.constraint(equalTo: editorContainer.topAnchor),
@@ -353,20 +465,10 @@ final class EditorWindowController: NSWindowController {
 		window.contentView = splitView
 			super.init(window: window)
 			window.delegate = self
-			document.attach(editorView)
-			editorView.keymapEngine = PicoAppKeymap.shared.makeEngine()
-			editorView.commandRequested = { [weak self] commandID in
-				self?.performKeymapCommand(commandID) ?? false
+			installPane(paneCoordinator.activePane, document: document)
+			findBarView.onDismiss = { [weak self] in
+				self?.setFindBarVisible(false)
 			}
-			editorView.exCommandRequested = { [weak self] command in
-				self?.performExCommand(command) ?? false
-			}
-			editorView.exCommandLineRequested = { [weak self] completion in
-				PicoCommandPaletteBridge.shared.requestExCommand(relativeTo: self?.window, completion: completion)
-			}
-		findBarView.onDismiss = { [weak self] in
-			self?.setFindBarVisible(false)
-		}
 		findBarView.onStateChange = { [weak self] _ in
 			self?.findStateDidChange()
 		}
@@ -400,6 +502,54 @@ final class EditorWindowController: NSWindowController {
 
 	func focusEditor() {
 		window?.makeFirstResponder(editorView)
+	}
+
+	private func installPane(_ pane: EditorPaneController, document: PicoDocument) {
+		let view = pane.editorView
+		document.attach(view)
+		view.keymapEngine = PicoAppKeymap.shared.makeEngine()
+		view.commandRequested = { [weak self] commandID in
+			self?.performKeymapCommand(commandID) ?? false
+		}
+		view.exCommandRequested = { [weak self] command in
+			self?.performExCommand(command) ?? false
+		}
+		view.exCommandLineRequested = { [weak self] completion in
+			PicoCommandPaletteBridge.shared.requestExCommand(relativeTo: self?.window, completion: completion)
+		}
+	}
+
+	private func splitActivePane(vertical: Bool) {
+		guard let document = document as? PicoDocument else {
+			return
+		}
+		let pane = paneCoordinator.splitActive(vertical: vertical)
+		installPane(pane, document: document)
+		focusEditor()
+	}
+
+	private func closeActivePane() -> Bool {
+		guard let document = document as? PicoDocument, let pane = paneCoordinator.closeActive() else {
+			return false
+		}
+		document.detach(pane.editorView)
+		focusEditor()
+		return true
+	}
+
+	private func closeOtherPanes() {
+		guard let document = document as? PicoDocument else {
+			return
+		}
+		for pane in paneCoordinator.closeOtherPanes() {
+			document.detach(pane.editorView)
+		}
+		focusEditor()
+	}
+
+	private func focusAdjacentPane(delta: Int) {
+		_ = paneCoordinator.focusAdjacent(delta: delta)
+		focusEditor()
 	}
 
 	func performEditorMotion(_ motion: Motion) {
@@ -446,9 +596,19 @@ final class EditorWindowController: NSWindowController {
 		case "file.nextBuffer":
 			PicoTabCoordinator.shared.selectAdjacentDocument(delta: 1)
 		case "pane.close":
-			(document as? NSDocument)?.close()
-		case "pane.closeOthers", "pane.splitHorizontal", "pane.splitVertical":
-			break
+			if !closeActivePane() {
+				(document as? NSDocument)?.close()
+			}
+		case "pane.closeOthers":
+			closeOtherPanes()
+		case "pane.splitHorizontal":
+			splitActivePane(vertical: false)
+		case "pane.splitVertical":
+			splitActivePane(vertical: true)
+		case "pane.focusNext":
+			focusAdjacentPane(delta: 1)
+		case "pane.focusPrevious":
+			focusAdjacentPane(delta: -1)
 		case "edit.find":
 			toggleFindBar()
 		case "edit.findNext":

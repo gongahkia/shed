@@ -128,7 +128,10 @@ extension FileTreeSidebarView: NSOutlineViewDataSource, NSOutlineViewDelegate {
 		if let node = item as? FileTreeNode {
 			return node.children[index]
 		}
-		return rootNode!
+		guard let rootNode else {
+			preconditionFailure("root node requested before workspace root was set")
+		}
+		return rootNode
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
@@ -168,6 +171,10 @@ final class PicoWorkspaceController {
 	private var rootURL: URL?
 
 	private init() {}
+
+	var currentRootURL: URL? {
+		rootURL
+	}
 
 	func install(documentController: PicoDocumentController) {
 		self.documentController = documentController

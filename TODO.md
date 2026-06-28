@@ -79,7 +79,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 9 — Find/replace
 
-(B) 2026-06-28 +Phase9-Find @editor id:163 est:3h dep:160 Project-wide find: separate panel, walks workspace root, parallel via `DispatchQueue.global()`. Honors `.gitignore` via simple glob filter (no full git integration).
 
 ---
 

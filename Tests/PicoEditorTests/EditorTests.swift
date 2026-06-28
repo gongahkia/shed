@@ -44,3 +44,34 @@ import Testing
 	}
 	#expect(editor.text == expected)
 }
+
+@Test func editorMotionPrimitivesMoveCursor() {
+	var editor = Editor(text: "abc, de\nsecond line\nthird")
+	editor.pageLineCount = 1
+	editor.moveCursor(.charForward)
+	#expect(editor.selections.primary.head == 1)
+	editor.moveCursor(.charBackward)
+	#expect(editor.selections.primary.head == 0)
+	editor.moveCursor(.wordForward)
+	#expect(editor.selections.primary.head == 3)
+	editor.moveCursor(.wordForward)
+	#expect(editor.selections.primary.head == 4)
+	editor.moveCursor(.wordForward)
+	#expect(editor.selections.primary.head == 5)
+	editor.moveCursor(.wordForward)
+	#expect(editor.selections.primary.head == 7)
+	editor.moveCursor(.wordBackward)
+	#expect(editor.selections.primary.head == 5)
+	editor.moveCursor(.lineEnd)
+	#expect(editor.selections.primary.head == 7)
+	editor.moveCursor(.pageDown)
+	#expect(editor.selections.primary.head == 8)
+	editor.moveCursor(.lineEnd)
+	#expect(editor.selections.primary.head == 19)
+	editor.moveCursor(.pageUp)
+	#expect(editor.selections.primary.head == 0)
+	editor.moveCursor(.bufferEnd)
+	#expect(editor.selections.primary.head == editor.rope.length)
+	editor.moveCursor(.bufferStart)
+	#expect(editor.selections.primary.head == 0)
+}

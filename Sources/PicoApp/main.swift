@@ -8,6 +8,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
+	private lazy var projectFind = ProjectFindController(
+		workspaceURL: { PicoWorkspaceController.shared.currentRootURL },
+		openFile: { [weak self] url in _ = self?.documentController.openDocument(at: url) }
+	)
 
 	init(documentController: PicoDocumentController) {
 		self.documentController = documentController
@@ -75,24 +79,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "view.focusEditor", title: "Focus Editor", defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
-				Command(id: "edit.find", title: "Find", defaultKey: "Cmd-F") { [weak self] in
-					self?.toggleFindBar(nil)
-				},
-				Command(id: "edit.findNext", title: "Find Next", defaultKey: "Cmd-G") { [weak self] in
-					self?.findNext(nil)
-				},
+					Command(id: "edit.find", title: "Find", defaultKey: "Cmd-F") { [weak self] in
+						self?.toggleFindBar(nil)
+					},
+					Command(id: "edit.findNext", title: "Find Next", defaultKey: "Cmd-G") { [weak self] in
+						self?.findNext(nil)
+					},
 					Command(id: "edit.findPrevious", title: "Find Previous", defaultKey: "Cmd-Shift-G") { [weak self] in
 						self?.findPrevious(nil)
 					},
 					Command(id: "edit.selectAllFindMatches", title: "Select All Find Matches", defaultKey: "Cmd-Ctrl-G") { [weak self] in
 						self?.selectAllFindMatches(nil)
 					},
+					Command(id: "edit.findInProject", title: "Find in Project", defaultKey: "Cmd-Shift-F") { [weak self] in
+						self?.showProjectFind(nil)
+					},
 					Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
 					},
-				Command(id: "editor.moveRight", title: "Move Right", defaultKey: "Right") { [weak self] in
-					self?.performEditorMotion(.charForward)
-				},
+					Command(id: "editor.moveRight", title: "Move Right", defaultKey: "Right") { [weak self] in
+						self?.performEditorMotion(.charForward)
+					},
 				Command(id: "editor.moveLineStart", title: "Move Line Start", defaultKey: "Cmd-Left") { [weak self] in
 					self?.performEditorMotion(.lineStart)
 				},
@@ -132,6 +139,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func selectAllFindMatches(_ sender: Any?) {
 		activeEditorWindowController()?.selectAllFindMatches()
+	}
+
+	@objc private func showProjectFind(_ sender: Any?) {
+		projectFind.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	private func openInitialDocument() {
@@ -234,6 +245,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			let selectAllFindMatchesItem = editMenu.addItem(withTitle: "Select All Find Matches", action: #selector(selectAllFindMatches(_:)), keyEquivalent: "g")
 			selectAllFindMatchesItem.keyEquivalentModifierMask = [.command, .control]
 			selectAllFindMatchesItem.target = self
+			let findInProjectItem = editMenu.addItem(withTitle: "Find in Project", action: #selector(showProjectFind(_:)), keyEquivalent: "F")
+			findInProjectItem.keyEquivalentModifierMask = [.command, .shift]
+			findInProjectItem.target = self
 			editItem.submenu = editMenu
 
 		let commandMenu = NSMenu(title: "Command")

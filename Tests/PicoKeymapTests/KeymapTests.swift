@@ -134,6 +134,13 @@ import Testing
 		let engine = KeymapEngine(modeStack: [profile == .vim ? .normal : profile == .emacs ? .emacs : .insert], bindings: bindings)
 		#expect(engine.handle(try keyEvent("d", modifiers: [.command])) == .command("editor.addNextSelection"))
 		#expect(engine.handle(try keyEvent("g", modifiers: [.command, .control])) == .command("edit.selectAllFindMatches"))
+		#expect(engine.handle(try keyEvent("w", modifiers: [.command])) == .command("pane.close"))
+		#expect(engine.handle(try keyEvent("\\", modifiers: [.command])) == .command("pane.splitHorizontal"))
+		#expect(engine.handle(try keyEvent("\\", modifiers: [.command, .option])) == .command("pane.splitVertical"))
+		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 123)) == .command("pane.focusLeft"))
+		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 124)) == .command("pane.focusRight"))
+		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 126)) == .command("pane.focusUp"))
+		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 125)) == .command("pane.focusDown"))
 	}
 }
 

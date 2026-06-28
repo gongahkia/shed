@@ -605,9 +605,9 @@ final class EditorWindowController: NSWindowController {
 			splitActivePane(vertical: false)
 		case "pane.splitVertical":
 			splitActivePane(vertical: true)
-		case "pane.focusNext":
+		case "pane.focusRight", "pane.focusDown", "pane.focusNext":
 			focusAdjacentPane(delta: 1)
-		case "pane.focusPrevious":
+		case "pane.focusLeft", "pane.focusUp", "pane.focusPrevious":
 			focusAdjacentPane(delta: -1)
 		case "edit.find":
 			toggleFindBar()

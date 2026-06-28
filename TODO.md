@@ -52,7 +52,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 ## Phase 4 — Rope buffer
 
 (A) 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.
-(B) 2026-06-28 +Phase4-Buffer @buffer id:065 est:2h dep:062 Fuzz test: AFL/libFuzzer-style harness via `swift test --enable-fuzzing` if available else manual. Random ops + invariant checks (length, line count, content equality).
 
 ---
 

@@ -431,6 +431,14 @@ final class EditorWindowController: NSWindowController {
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
 		switch commandID {
+		case "file.open":
+			NSDocumentController.shared.openDocument(nil)
+		case "file.nextBuffer":
+			PicoTabCoordinator.shared.selectAdjacentDocument(delta: 1)
+		case "pane.close":
+			(document as? NSDocument)?.close()
+		case "pane.closeOthers", "pane.splitHorizontal", "pane.splitVertical":
+			break
 		case "edit.find":
 			toggleFindBar()
 		case "edit.findNext":

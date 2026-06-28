@@ -138,45 +138,71 @@ import Testing
 }
 
 @Test func emacsKillCopyAndYankUseKillRingAndClipboard() {
-	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
-	view.editor = Editor(text: "alpha beta gamma")
-	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
-		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .control)], commandID: "emacs.killRegion"),
-		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
-		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
-	])
-	NSPasteboard.general.clearContents()
+	withPasteboardLock {
+		let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+		view.editor = Editor(text: "alpha beta gamma")
+		view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+			KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .control)], commandID: "emacs.killRegion"),
+			KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
+			KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
+		])
+		NSPasteboard.general.clearContents()
 
-	view.selectUTF8Range(6 ..< 10)
-	#expect(view.handleKey(characters: "\u{17}", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .control))
-	#expect(view.editor.text == "alpha  gamma")
-	#expect(NSPasteboard.general.string(forType: .string) == "beta")
-	#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
-	#expect(view.editor.text == "alpha beta gamma")
-	view.selectUTF8Range(0 ..< 5)
-	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
-	#expect(view.editor.text == "alpha beta gamma")
-	#expect(NSPasteboard.general.string(forType: .string) == "alpha")
+		view.selectUTF8Range(6 ..< 10)
+		#expect(view.handleKey(characters: "\u{17}", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .control))
+		#expect(view.editor.text == "alpha  gamma")
+		#expect(NSPasteboard.general.string(forType: .string) == "beta")
+		#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
+		#expect(view.editor.text == "alpha beta gamma")
+		view.selectUTF8Range(0 ..< 5)
+		#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+		#expect(view.editor.text == "alpha beta gamma")
+		#expect(NSPasteboard.general.string(forType: .string) == "alpha")
+	}
 }
 
 @Test func emacsYankPopRotatesLastYank() {
+	withPasteboardLock {
+		let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+		view.editor = Editor(text: "alpha beta gamma")
+		view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+			KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
+			KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
+			KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .option)], commandID: "emacs.yankPop"),
+		])
+
+		view.selectUTF8Range(0 ..< 5)
+		#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+		view.selectUTF8Range(11 ..< 16)
+		#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+		view.selectUTF8Range(16 ..< 16)
+		#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
+		#expect(view.editor.text == "alpha beta gammagamma")
+		#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .option))
+		#expect(view.editor.text == "alpha beta gammaalpha")
+	}
+}
+
+@Test func emacsPrefixCommandsRouteToHost() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
-	view.editor = Editor(text: "alpha beta gamma")
+	var commands: [String] = []
+	view.commandRequested = { command in
+		commands.append(command)
+		return true
+	}
 	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
-		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
-		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
-		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .option)], commandID: "emacs.yankPop"),
+		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("b")], commandID: "file.nextBuffer"),
+		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("2")], commandID: "pane.splitHorizontal"),
+		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("3")], commandID: "pane.splitVertical"),
 	])
 
-	view.selectUTF8Range(0 ..< 5)
-	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
-	view.selectUTF8Range(11 ..< 16)
-	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
-	view.selectUTF8Range(16 ..< 16)
-	#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
-	#expect(view.editor.text == "alpha beta gammagamma")
-	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .option))
-	#expect(view.editor.text == "alpha beta gammaalpha")
+	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "b", charactersIgnoringModifiers: "b", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "3", charactersIgnoringModifiers: "3", keyCode: 0))
+	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical"])
 }
 
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
@@ -354,19 +380,21 @@ import Testing
 }
 
 @Test func vimPlusRegisterSyncsSystemClipboard() {
-	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
-	view.editor = Editor(text: "clip\n")
-	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
-		KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
-		KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
-		KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
-	])
+	withPasteboardLock {
+		let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+		view.editor = Editor(text: "clip\n")
+		view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+			KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
+			KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
+			KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
+		])
 
-	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
-	#expect(view.handleKey(characters: "+", charactersIgnoringModifiers: "=", keyCode: 0, modifierFlags: .shift))
-	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
-	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
-	#expect(NSPasteboard.general.string(forType: .string) == "clip\n")
+		#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+		#expect(view.handleKey(characters: "+", charactersIgnoringModifiers: "=", keyCode: 0, modifierFlags: .shift))
+		#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+		#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+		#expect(NSPasteboard.general.string(forType: .string) == "clip\n")
+	}
 }
 
 @Test func vimExSubstitutionEditsBuffer() {
@@ -453,4 +481,12 @@ import Testing
 	let glyphs = view.textGlyphInstances(scale: 2)
 	#expect(glyphs.count == 11)
 	#expect(glyphs.allSatisfy { $0.size.x > 0 && $0.size.y > 0 })
+}
+
+private let pasteboardTestLock = NSLock()
+
+private func withPasteboardLock(_ body: () -> Void) {
+	pasteboardTestLock.lock()
+	defer { pasteboardTestLock.unlock() }
+	body()
 }

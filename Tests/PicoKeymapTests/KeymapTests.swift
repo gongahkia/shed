@@ -181,6 +181,22 @@ import Testing
 	#expect(engine.handle(try keyEvent("w", modifiers: [.option])) == .command("emacs.copyRegion"))
 	#expect(engine.handle(try keyEvent("y", modifiers: [.control])) == .command("emacs.yank"))
 	#expect(engine.handle(try keyEvent("y", modifiers: [.option])) == .command("emacs.yankPop"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("s", modifiers: [.control])) == .command("file.save"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("file.open"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("b")) == .command("file.nextBuffer"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("k")) == .command("file.close"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("0")) == .command("pane.close"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("1")) == .command("pane.closeOthers"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("2")) == .command("pane.splitHorizontal"))
+	#expect(engine.handle(try keyEvent("x", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("3")) == .command("pane.splitVertical"))
 }
 
 private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0) throws -> NSEvent {

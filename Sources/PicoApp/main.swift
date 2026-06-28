@@ -87,11 +87,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
+let app = NSApplication.shared
 private let documentController = PicoDocumentController()
 private let appDelegate = AppDelegate(documentController: documentController)
 
 _ = documentController
-let app = NSApplication.shared
 app.setActivationPolicy(.regular)
 app.delegate = appDelegate
 app.run()

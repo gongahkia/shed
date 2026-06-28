@@ -1,18 +1,18 @@
 import AppKit
 import Dispatch
 import Foundation
+import PicoEditor
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: PicoDocumentController
+	private let commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
-	private lazy var commandPalette = CommandPaletteController(
-		documentController: documentController,
-		openFolder: { [weak self] in self?.openFolder(nil) },
-		closeDocument: { [weak self] in self?.closeCurrentDocument(nil) }
-	)
+	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
 
 	init(documentController: PicoDocumentController) {
 		self.documentController = documentController
+		super.init()
+		registerInitialCommands()
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,6 +49,61 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func toggleCommandPalette(_ sender: Any?) {
 		commandPalette.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func registerInitialCommands() {
+		do {
+			try commandRegistry.register([
+				Command(id: "file.new", title: "New File", defaultKey: "Cmd-N") { [weak self] in
+					self?.documentController.newDocument(nil)
+				},
+				Command(id: "file.open", title: "Open File", defaultKey: "Cmd-O") { [weak self] in
+					self?.documentController.openDocument(nil)
+				},
+				Command(id: "file.openFolder", title: "Open Folder", defaultKey: "Cmd-Shift-O") { [weak self] in
+					self?.openFolder(nil)
+				},
+				Command(id: "file.save", title: "Save File", defaultKey: "Cmd-S") { [weak self] in
+					self?.activeDocument()?.save(nil)
+				},
+				Command(id: "file.close", title: "Close File", defaultKey: "Cmd-W") { [weak self] in
+					self?.closeCurrentDocument(nil)
+				},
+				Command(id: "view.commandPalette", title: "Command Palette", defaultKey: "Cmd-Shift-P") { [weak self] in
+					self?.toggleCommandPalette(nil)
+				},
+				Command(id: "view.focusEditor", title: "Focus Editor", defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusEditor()
+				},
+				Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
+					self?.performEditorMotion(.charBackward)
+				},
+				Command(id: "editor.moveRight", title: "Move Right", defaultKey: "Right") { [weak self] in
+					self?.performEditorMotion(.charForward)
+				},
+				Command(id: "editor.moveLineStart", title: "Move Line Start", defaultKey: "Cmd-Left") { [weak self] in
+					self?.performEditorMotion(.lineStart)
+				},
+				Command(id: "editor.moveLineEnd", title: "Move Line End", defaultKey: "Cmd-Right") { [weak self] in
+					self?.performEditorMotion(.lineEnd)
+				},
+			])
+		} catch {
+			preconditionFailure("failed to register commands: \(error)")
+		}
+	}
+
+	private func activeDocument() -> NSDocument? {
+		NSApp.keyWindow?.windowController?.document as? NSDocument ?? documentController.currentDocument
+	}
+
+	private func activeEditorWindowController() -> EditorWindowController? {
+		NSApp.keyWindow?.windowController as? EditorWindowController
+			?? documentController.currentDocument?.windowControllers.first as? EditorWindowController
+	}
+
+	private func performEditorMotion(_ motion: Motion) {
+		activeEditorWindowController()?.performEditorMotion(motion)
 	}
 
 	private func openInitialDocument() {

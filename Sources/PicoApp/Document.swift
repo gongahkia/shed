@@ -281,6 +281,11 @@ final class EditorWindowController: NSWindowController {
 	func focusEditor() {
 		window?.makeFirstResponder(editorView)
 	}
+
+	func performEditorMotion(_ motion: Motion) {
+		editorView.performMotion(motion)
+		focusEditor()
+	}
 }
 
 extension EditorWindowController: NSWindowDelegate {

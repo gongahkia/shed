@@ -110,6 +110,7 @@ public final class KeymapEngine {
 	public private(set) var pendingChord: [Key] = []
 	public private(set) var pendingCount: Int?
 	public private(set) var lastCommandCount = 1
+	private var awaitingUniversalArgument = false
 	private var bindingsByMode: [Mode: [[Key]: String]] = [:]
 
 	public init(modeStack: [Mode] = [.insert], bindings: [KeyBinding] = []) {
@@ -129,18 +130,21 @@ public final class KeymapEngine {
 		pendingChord = []
 		pendingCount = nil
 		lastCommandCount = 1
+		awaitingUniversalArgument = false
 	}
 
 	public func setMode(_ mode: Mode) {
 		modeStack = [mode]
 		pendingChord = []
 		pendingCount = nil
+		awaitingUniversalArgument = false
 	}
 
 	public func pushMode(_ mode: Mode) {
 		modeStack.append(mode)
 		pendingChord = []
 		pendingCount = nil
+		awaitingUniversalArgument = false
 	}
 
 	@discardableResult
@@ -150,6 +154,7 @@ public final class KeymapEngine {
 		}
 		pendingChord = []
 		pendingCount = nil
+		awaitingUniversalArgument = false
 		return modeStack.popLast()
 	}
 
@@ -158,10 +163,14 @@ public final class KeymapEngine {
 			pendingChord = []
 			return .passthrough
 		}
-		if key.value == "escape", (!pendingChord.isEmpty || pendingCount != nil) {
+		if key.value == "escape", (!pendingChord.isEmpty || pendingCount != nil || awaitingUniversalArgument) {
 			pendingChord = []
 			pendingCount = nil
+			awaitingUniversalArgument = false
 			return .consumed
+		}
+		if consumeUniversalArgumentPrefix(key) {
+			return .partial
 		}
 		if consumeCountPrefix(key) {
 			return .partial
@@ -175,8 +184,9 @@ public final class KeymapEngine {
 		if hasPrefix(chord, in: bindings) {
 			if let commandID = bindings[chord], !hasLongerMatch(chord, in: bindings) {
 				pendingChord = []
-				lastCommandCount = pendingCount ?? 1
+				lastCommandCount = pendingCount ?? (awaitingUniversalArgument ? 4 : 1)
 				pendingCount = nil
+				awaitingUniversalArgument = false
 				return .command(commandID)
 			}
 			pendingChord = chord
@@ -184,6 +194,7 @@ public final class KeymapEngine {
 		}
 		pendingChord = []
 		pendingCount = nil
+		awaitingUniversalArgument = false
 		if let commandID = bindings[[key]] {
 			lastCommandCount = 1
 			return .command(commandID)
@@ -196,6 +207,22 @@ public final class KeymapEngine {
 			return false
 		}
 		if digit == 0, pendingCount == nil {
+			return false
+		}
+		pendingCount = min((pendingCount ?? 0) * 10 + digit, 9_999)
+		return true
+	}
+
+	private func consumeUniversalArgumentPrefix(_ key: Key) -> Bool {
+		guard mode == .emacs, pendingChord.isEmpty else {
+			return false
+		}
+		if key.modifiers == .control, key.value == "u" {
+			awaitingUniversalArgument = true
+			pendingCount = nil
+			return true
+		}
+		guard awaitingUniversalArgument, key.modifiers.isEmpty, key.value.count == 1, let digit = Int(key.value) else {
 			return false
 		}
 		pendingCount = min((pendingCount ?? 0) * 10 + digit, 9_999)

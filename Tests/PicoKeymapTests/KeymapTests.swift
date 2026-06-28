@@ -65,6 +65,21 @@ import Testing
 	#expect(engine.lastCommandCount == 10)
 }
 
+@Test func keymapEngineTracksEmacsUniversalArgument() throws {
+	let engine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "right"),
+	])
+
+	#expect(engine.handle(try keyEvent("u", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("1")) == .partial)
+	#expect(engine.handle(try keyEvent("2")) == .partial)
+	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("right"))
+	#expect(engine.lastCommandCount == 12)
+	#expect(engine.handle(try keyEvent("u", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("right"))
+	#expect(engine.lastCommandCount == 4)
+}
+
 @Test func keymapEngineNormalizesModifierKeys() throws {
 	let engine = KeymapEngine(modeStack: [.emacs], bindings: [
 		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "forwardChar"),

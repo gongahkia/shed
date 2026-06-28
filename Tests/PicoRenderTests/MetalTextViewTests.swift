@@ -222,6 +222,19 @@ import Testing
 	#expect(commands == ["emacs.isearchForward", "emacs.isearchBackward"])
 }
 
+@Test func emacsUniversalArgumentRepeatsNextCommand() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abcdef")
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "editor.moveRight"),
+	])
+
+	#expect(view.handleKey(characters: "\u{15}", charactersIgnoringModifiers: "u", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "3", charactersIgnoringModifiers: "3", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{06}", charactersIgnoringModifiers: "f", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.selections.primary.head == 3)
+}
+
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

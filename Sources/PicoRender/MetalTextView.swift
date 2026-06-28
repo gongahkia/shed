@@ -57,6 +57,8 @@ public final class MetalTextView: NSView {
 	public var editor = Editor() {
 		didSet { syncEditorState() }
 	}
+	public var editorDidChange: ((Editor) -> Void)?
+	public var saveRequested: (() -> Void)?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -81,6 +83,10 @@ public final class MetalTextView: NSView {
 	}
 
 	public override var acceptsFirstResponder: Bool {
+		true
+	}
+
+	public override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
 		true
 	}
 
@@ -178,12 +184,26 @@ public final class MetalTextView: NSView {
 		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}
 
+	public override func mouseDown(with event: NSEvent) {
+		window?.makeFirstResponder(self)
+		super.mouseDown(with: event)
+	}
+
 	public override func keyDown(with event: NSEvent) {
 		if !event.modifierFlags.intersection([.command, .control]).isEmpty {
 			super.keyDown(with: event)
 			return
 		}
 		interpretKeyEvents([event])
+	}
+
+	public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+		let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
+		if flags == .command, event.charactersIgnoringModifiers?.lowercased() == "s" {
+			saveRequested?()
+			return true
+		}
+		return super.performKeyEquivalent(with: event)
 	}
 
 	@discardableResult
@@ -196,11 +216,14 @@ public final class MetalTextView: NSView {
 		if !modifierFlags.intersection([.command, .control]).isEmpty {
 			return false
 		}
+		var didEdit = false
 		switch keyCode {
 		case 51:
 			editor.deleteBackward()
+			didEdit = true
 		case 117:
 			editor.deleteForward()
+			didEdit = true
 		case 123:
 			editor.moveCursor(.charBackward)
 		case 124:
@@ -210,8 +233,12 @@ public final class MetalTextView: NSView {
 				return false
 			}
 			editor.insert(characters)
+			didEdit = true
 		}
 		syncEditorState()
+		if didEdit {
+			editorDidChange?(editor)
+		}
 		return true
 	}
 
@@ -536,14 +563,18 @@ extension MetalTextView: NSTextInputClient {
 		replace(range: range, with: text)
 		markedRangeUTF8 = nil
 		syncEditorState()
+		editorDidChange?(editor)
 	}
 
 	public override func doCommand(by selector: Selector) {
+		var didEdit = false
 		switch selector {
 		case #selector(NSResponder.deleteBackward(_:)):
 			editor.deleteBackward()
+			didEdit = true
 		case #selector(NSResponder.deleteForward(_:)):
 			editor.deleteForward()
+			didEdit = true
 		case #selector(NSResponder.moveLeft(_:)):
 			editor.moveCursor(.charBackward)
 		case #selector(NSResponder.moveRight(_:)):
@@ -554,11 +585,15 @@ extension MetalTextView: NSTextInputClient {
 			editor.moveCursor(.lineEnd)
 		case #selector(NSResponder.insertNewline(_:)):
 			editor.insert("\n")
+			didEdit = true
 		default:
 			_ = tryToPerform(selector, with: nil)
 		}
 		markedRangeUTF8 = nil
 		syncEditorState()
+		if didEdit {
+			editorDidChange?(editor)
+		}
 	}
 
 	public func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
@@ -571,6 +606,7 @@ extension MetalTextView: NSTextInputClient {
 		let selection = utf8Range(in: text, forUTF16Range: selectedRange, baseUTF8Offset: lower) ?? upper ..< upper
 		editor.setSelection(SelectionSet(primary: Selection(anchor: selection.lowerBound, head: selection.upperBound)))
 		syncEditorState()
+		editorDidChange?(editor)
 	}
 
 	public func unmarkText() {

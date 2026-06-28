@@ -68,6 +68,17 @@ import Testing
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func optionDragBuildsColumnCursors() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abc\nde\nfghi\n")
+	view.updateColumnCursors(anchor: 1, head: 8)
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 1))
+	#expect(view.editor.selections.secondaries == [
+		Selection(anchor: 5, head: 5),
+		Selection(anchor: 8, head: 8),
+	])
+}
+
 @Test func viewportTracksVisibleLineRangeAndScrollOffsets() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.lineHeight = 20

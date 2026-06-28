@@ -17,8 +17,8 @@
 
 ## Perf Impact
 
-- [ ] No expected impact on `docs/performance.md` budgets.
-- [ ] Bench evidence attached or explained.
+- [ ] No expected impact on `NORTHSTAR.md` §12a / `docs/performance.md` budgets; PerfBench CI output reviewed.
+- [ ] PerfBench CI artifact/link attached or explained when impact is possible.
 
 ## Private API
 

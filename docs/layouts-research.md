@@ -2,6 +2,57 @@
 
 Backlog notes for post-v0.1 layout plugins. These are stubs, not commitments to ship in core.
 
+## 2026-06-28 Landscape Survey
+
+Scope: `NORTHSTAR.md` §2 and §6. Search covered current macOS Niri-style ports,
+AeroSpace/yabai changes, and Hyprland/PaperWM-style layout plugin trends.
+
+Findings:
+
+- `J-x-Z/macniri` and `maria-rcks/miri` are archived. `dimixar/miri` is an
+  independent active continuation with a Niri-like column model, virtual
+  workspaces, snapshot transitions, and a small declared private-API surface.
+- New or newly noticed macOS Niri-style experiments include `ncky/klotski`,
+  `pde201/niri-mac` (`nami`), `Gwen0x4c3/NiriSpace`, `stearz/Darniri`, and
+  `Floxyi/Spatial`. They broaden the landscape, but each still centers one
+  workflow: scrolling columns, AeroSpace-derived Niri layout, or a spatial
+  workspace canvas.
+- `Paneru`, `OmniWM`/`Hiro`, `Nehir`, and `AeroSpace` all remain active as of
+  this survey. `Nehir` has IPC and a command palette, but its README describes
+  the Niri scrolling column layout as the core layout paradigm.
+- `hy3` remains active in the Hyprland ecosystem. `hyprscroller` is still listed
+  by Awesome Hyprland, but the repo is archived; track `hyprslidr` as another
+  sliding/PaperWM-inspired plugin.
+- `PaperWM` remains active and is still the best GNOME precedent for variable
+  width scrolling columns. `yabai` remains the mature macOS BSP/SIP tradeoff
+  reference.
+
+Positioning impact:
+
+- Updated `NORTHSTAR.md` §2 to mention the broader active macOS Niri-style set.
+  [Inference] The olly wedge remains the stable layout-engine plugin contract plus
+  per-workspace hot-swapping.
+
+Sources checked on 2026-06-28:
+
+- https://github.com/J-x-Z/macniri
+- https://github.com/maria-rcks/miri
+- https://github.com/dimixar/miri
+- https://github.com/ncky/klotski
+- https://github.com/pde201/niri-mac
+- https://github.com/Gwen0x4c3/NiriSpace
+- https://github.com/stearz/Darniri
+- https://github.com/Floxyi/Spatial
+- https://github.com/karinushka/paneru
+- https://github.com/BarutSRB/OmniWM
+- https://github.com/apphane-dev/nehir
+- https://github.com/nikitabobko/AeroSpace
+- https://github.com/asmvik/yabai
+- https://github.com/outfoxxed/hy3
+- https://github.com/dawsers/hyprscroller
+- https://github.com/paperwm/PaperWM
+- https://github.com/hyprland-community/awesome-hyprland
+
 ## v0.2 Candidates
 
 ### Monocle

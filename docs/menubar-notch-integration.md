@@ -1,6 +1,6 @@
 # Menu Bar, Notch, and Ecosystem Integration
 
-Status: target contract for `olly` v0.1 ecosystem behavior. Last checked: 2026-06-26.
+Status: target contract for `olly` v0.1 ecosystem behavior. Last checked: 2026-06-28.
 Scope: `NORTHSTAR.md` §7, §7b, and §12b.
 
 ## Base Contract
@@ -58,6 +58,7 @@ Hotkey daemon delegation is documented in `docs/hotkey-delegation.md`.
 | Alcove | Reserve notch safe area plus configured vertical padding; float its surfaces. | Keep default notch reserve; add `com.lowtechguys.Alcove` to `cooperativeApps`; add a larger `reserve(rect:on:)` if its hover UI drops below 60 px. | Expanded notch UI can overlap top tiles if user reduces padding. |
 | NotchNook | Reserve notch safe area plus configured vertical padding; float its surfaces. | Keep default notch reserve; add `com.akashpawar.notchnook` to `cooperativeApps`; tune `notchPadding(_)` per display. | Popovers below the notch need manual reserve if taller than default. |
 | Boring Notch | Reserve notch safe area plus configured vertical padding; float its surfaces. | Keep default notch reserve; add `com.tymmesyde.boring-notch` to `cooperativeApps`. | Dynamic notch panels can collide with top-row tiles if padding is too small. |
+| MewNotch | Reserve notch safe area plus configured vertical padding; float its HUD/shelf surfaces. | Keep default notch reserve; add `com.monuk7735.mew.notch` to `cooperativeApps`; add a larger `reserve(rect:on:)` when its shelf, mirror, or bash-script view is used persistently. | Expanded HUD, shelf, mirror, and script panels can cover top tiles; bundle ID verified from `MewNotch.xcodeproj` on 2026-06-28. |
 | NotchBook | Treat as a notch utility until verified. | [Unverified] Bundle ID and official source not verified on 2026-06-26; users should add its bundle ID to `cooperativeApps` manually and tune `notchPadding(_)`. | [Unverified] Known conflicts cannot be product-specific without a verified source; default notch overlay conflicts apply. |
 | Brow | Reserve notch safe area plus configured vertical padding; float its surfaces. | Keep default notch reserve; add `com.brow-app.Brow` to `cooperativeApps`. | Top-center hover panels need explicit reserve if they exceed default notch depth. |
 | NotchFlow | Reserve notch safe area plus configured vertical padding; float its surfaces. | Keep default notch reserve; add `com.lukegrubb.NotchFlow` to `cooperativeApps`. | [Unverified] Official source not verified on 2026-06-26; validate bundle ID before shipping built-in allowlist updates. |
@@ -104,7 +105,7 @@ CooperativeApps(mode: .replace) {
 
 ## Source Notes
 
-Checked sources with reachable product or official-doc URLs on 2026-06-26:
+Checked sources with reachable product or official-doc URLs on 2026-06-28:
 
 - SketchyBar: <https://felixkratz.github.io/SketchyBar/>
 - simple-bar: <https://github.com/Jean-Tinland/simple-bar>
@@ -114,6 +115,7 @@ Checked sources with reachable product or official-doc URLs on 2026-06-26:
 - Alcove: <https://tryalcove.com/>
 - NotchNook: <https://lo.cafe/notchnook>
 - Boring Notch: <https://github.com/TheBoredTeam/boring.notch>
+- MewNotch: <https://github.com/monuk7735/mew-notch>; bundle ID verified from `MewNotch.xcodeproj`.
 - Brow: <https://brow-app.com/>
 - TopNotch: <https://topnotch.app/>
 - MediaMate: <https://wouter01.github.io/MediaMate/>
@@ -132,6 +134,10 @@ Checked sources with reachable product or official-doc URLs on 2026-06-26:
 - Hammerspoon hotkeys and shell execution: <https://www.hammerspoon.org/docs/hs.hotkey.html>, <https://www.hammerspoon.org/docs/hs.html#execute>
 - JankyBorders: <https://github.com/FelixKratz/JankyBorders>
 - Apple safe-area and display bounds APIs: <https://developer.apple.com/documentation/appkit/nsscreen/safeareainsets>, <https://developer.apple.com/documentation/coregraphics/cgdisplaybounds(_:)>
+- NotchMac: <https://github.com/kozhydlo/NotchMac>; documented as a new entrant, but not added to defaults because no release artifact or conflict repro was verified. Its README also declares private SkyLight, MediaRemote, and DisplayServices use.
+
+[Inference] No safe-zone default change is required from this survey; new verified
+notch utilities still fit the existing default-plus-manual-reserve model.
 
 No verified official URL was found from this environment for NotchBook, NotchFlow,
-Notchmeister, or Klakk on 2026-06-26.
+Notchmeister, or Klakk on 2026-06-28.

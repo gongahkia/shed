@@ -49,6 +49,7 @@ public func ollyConfig() -> Config {
 
         CooperativeApps {
             CooperativeApp("com.example.CustomOverlay")
+            CooperativeApp("com.monuk7735.mew.notch")
         }
 
         SafeZones {

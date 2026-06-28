@@ -9,6 +9,9 @@ defaults:
   - name: Boring Notch
     bundle_id: com.tymmesyde.boring-notch
     category: notch
+  - name: MewNotch
+    bundle_id: com.monuk7735.mew.notch
+    category: notch
   - name: NotchFlow
     bundle_id: com.lukegrubb.NotchFlow
     category: notch

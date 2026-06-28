@@ -48,7 +48,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 3 — Metal text renderer
 
-(A) 2026-06-28 +Phase3-Renderer @metal id:043 est:6h dep:042 Write Metal shaders `Sources/PicoRender/Shaders.metal`: vertex shader takes per-glyph (atlasUV, screenXY, color), fragment samples atlas texture (single-channel) and multiplies by color. One draw call per frame, instanced quads. Acceptance: renders shaped line.
 (A) 2026-06-28 +Phase3-Renderer @metal id:044 est:4h dep:043 Render loop via `CVDisplayLink` (NOT CADisplayLink — that's iOS-only on older AppKit). On vsync, if dirty, encode draw via `MTLCommandQueue`. Dirty flag set on text/scroll/cursor change. Acceptance: 60 fps idle (no draws), 60/120 fps under scroll.
 (A) 2026-06-28 +Phase3-Renderer @metal id:045 est:3h dep:044 Add cursor + selection overlay rendering: cursor = 2px vertical bar with blink (timer-driven dirty mark); selection = per-line quad behind glyphs. Use same shader pipeline w/ a uniform "no atlas, solid color" branch.
 (A) 2026-06-28 +Phase3-Renderer @metal id:046 est:4h dep:044 Implement viewport + scroll: `TextView` tracks `topLineIndex` + `xOffset`. Render only visible lines (`viewport.height / lineHeight + 1`). Mouse wheel → `scrollWheel(_:)` → update offsets → mark dirty. Acceptance: scroll a 100k-line buffer; CPU <10% sustained.

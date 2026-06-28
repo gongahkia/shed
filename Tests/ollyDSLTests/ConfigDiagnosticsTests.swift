@@ -26,4 +26,19 @@ final class ConfigDiagnosticsTests: XCTestCase {
 
         XCTAssertEqual(ConfigDiagnosticFormatter.render(compilerOutput: output, source: ""), output)
     }
+
+    func testDiagnosticFormatterRecognizesCatalogIDs() {
+        let source = """
+        import ollyDSL
+        public func ollyConfig() -> Config {
+            Config {}
+        }
+        """
+        let output = "/tmp/Config.swift:3:12: error: ambiguous-rule: use RuleMatch fields or a RulePredicate, not both"
+
+        let diagnostic = ConfigDiagnosticFormatter.diagnostics(from: output, source: source).first
+
+        XCTAssertEqual(diagnostic?.diagnosticID, .ambiguousRule)
+        XCTAssertEqual(diagnostic?.suggestions, ["use RuleMatch fields or a RulePredicate expression, not both in the same rule"])
+    }
 }

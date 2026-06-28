@@ -87,6 +87,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 ## Config Diagnostics
 
+### ConfigDiagnosticID
+
+`enum ConfigDiagnosticID`
+
+- Purpose: Names stable DSL compile-time diagnostic categories.
+- Parameters: Use the case matching the reported config error.
+- Example: `ConfigDiagnosticID.ambiguousRule`
+- See also: `ConfigCompileDiagnostic`, `ConfigDiagnosticFormatter`.
+
 ### ConfigCompileDiagnostic
 
 `struct ConfigCompileDiagnostic`
@@ -657,8 +666,8 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 `struct RuleMatch`
 
 - Purpose: Describes the window properties a DSL rule must match.
-- Parameters: Provide optional legacy fields and/or a composed `RulePredicate`.
-- Example: `RuleMatch(bundleID: "com.apple.Terminal", predicate: role("AXWindow"))`
+- Parameters: Provide optional field matches or one composed `RulePredicate`.
+- Example: `RuleMatch(bundleID: "com.apple.Terminal", role: "AXWindow")`
 - See also: `Rule`, `RulePredicate`.
 
 ### RuleContext

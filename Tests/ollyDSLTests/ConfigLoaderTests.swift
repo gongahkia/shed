@@ -116,6 +116,41 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(first.libraryURL, second.libraryURL)
     }
 
+    func testAmbiguousRuleMatchFailsAtCompileTime() throws {
+        let directory = try temporaryDirectory()
+        let sourceURL = directory.appendingPathComponent("Config.swift")
+        let modulesURL = Bundle(for: Self.self).bundleURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("Modules", isDirectory: true)
+        try """
+        import ollyDSL
+
+        public func ollyConfig() -> Config {
+            Config {
+                Rules {
+                    Rule(
+                        match: RuleMatch(bundleID: "com.example.App", predicate: role("AXWindow")),
+                        apply: RuleApply(engine: "floating")
+                    )
+                }
+            }
+        }
+        """.write(to: sourceURL, atomically: true, encoding: .utf8)
+
+        let loader = ConfigLoader(
+            sourceURL: sourceURL,
+            cacheDirectory: directory.appendingPathComponent("cache", isDirectory: true),
+            moduleSearchPaths: [modulesURL]
+        )
+
+        XCTAssertThrowsError(try loader.load()) { error in
+            guard case let ConfigLoaderError.compileFailed(_, _, output) = error else {
+                return XCTFail("expected compileFailed, got \(error)")
+            }
+            XCTAssertTrue(output.contains("ambiguous-rule"), output)
+        }
+    }
+
     func testExampleConfigCompilesAndLoads() throws {
         let packageRoot = packageRoot()
         let modulesURL = Bundle(for: Self.self).bundleURL

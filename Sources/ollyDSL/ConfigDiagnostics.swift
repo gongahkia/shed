@@ -1,10 +1,22 @@
 import Foundation
 
+/// Purpose: Names stable DSL compile-time diagnostic categories.
+/// Parameters: Use the case matching the reported config error.
+/// Example: `ConfigDiagnosticID.ambiguousRule`
+/// See also: `ConfigCompileDiagnostic`, `ConfigDiagnosticFormatter`.
+public enum ConfigDiagnosticID: String, CaseIterable, Codable, Equatable, Sendable {
+    case duplicateChord = "duplicate-chord"
+    case duplicateTagName = "duplicate-tag-name"
+    case unknownEngineID = "unknown-engine-id"
+    case ambiguousRule = "ambiguous-rule"
+}
+
 /// Purpose: Represents one Swift config compile diagnostic with source context.
 /// Parameters: Provide line, column, message, source line, and suggestions.
 /// Example: `ConfigCompileDiagnostic(line: 3, column: 9, message: "cannot find x")`
 /// See also: `ConfigDiagnosticFormatter`, `ConfigLoaderError`.
 public struct ConfigCompileDiagnostic: Equatable, Sendable {
+    public let diagnosticID: ConfigDiagnosticID?
     public let line: Int
     public let column: Int
     public let message: String
@@ -15,9 +27,11 @@ public struct ConfigCompileDiagnostic: Equatable, Sendable {
         line: Int,
         column: Int,
         message: String,
+        diagnosticID: ConfigDiagnosticID? = nil,
         sourceLine: String? = nil,
         suggestions: [String] = []
     ) {
+        self.diagnosticID = diagnosticID
         self.line = line
         self.column = column
         self.message = message
@@ -70,6 +84,7 @@ public enum ConfigDiagnosticFormatter {
             line: lineNumber,
             column: column,
             message: message,
+            diagnosticID: diagnosticID(for: message),
             sourceLine: sourceLine,
             suggestions: suggestions(for: message)
         )
@@ -88,6 +103,9 @@ public enum ConfigDiagnosticFormatter {
     }
 
     private static func suggestions(for message: String) -> [String] {
+        if let diagnosticID = diagnosticID(for: message) {
+            return suggestions(for: diagnosticID)
+        }
         let lowercased = message.lowercased()
         if lowercased.contains("cannot find") {
             return ["check the symbol name and required imports such as ollyDSL, ollyCore, or CoreGraphics"]
@@ -105,5 +123,22 @@ public enum ConfigDiagnosticFormatter {
             return ["add an explicit type or use the concrete DSL constructor"]
         }
         return ["open docs/dsl-reference.md and compare the nearest DSL primitive"]
+    }
+
+    private static func diagnosticID(for message: String) -> ConfigDiagnosticID? {
+        ConfigDiagnosticID.allCases.first { message.contains($0.rawValue) }
+    }
+
+    private static func suggestions(for diagnosticID: ConfigDiagnosticID) -> [String] {
+        switch diagnosticID {
+        case .duplicateChord:
+            return ["remove one keybind or choose a distinct KeyChord"]
+        case .duplicateTagName:
+            return ["rename one Tag.named declaration so every workspace tag is unique"]
+        case .unknownEngineID:
+            return ["declare the engine in Engines before referencing it from a rule or keybind"]
+        case .ambiguousRule:
+            return ["use RuleMatch fields or a RulePredicate expression, not both in the same rule"]
+        }
     }
 }

@@ -4,8 +4,8 @@ import ollyCore
 import ollyKit
 
 /// Purpose: Describes the window properties a DSL rule must match.
-/// Parameters: Provide optional legacy fields and/or a composed `RulePredicate`.
-/// Example: `RuleMatch(bundleID: "com.apple.Terminal", predicate: role("AXWindow"))`
+/// Parameters: Provide optional field matches or one composed `RulePredicate`.
+/// Example: `RuleMatch(bundleID: "com.apple.Terminal", role: "AXWindow")`
 /// See also: `Rule`, `RulePredicate`.
 public struct RuleMatch: Codable, Equatable, Sendable {
     public let bundleID: String?
@@ -18,14 +18,68 @@ public struct RuleMatch: Codable, Equatable, Sendable {
         bundleID: String? = nil,
         titleRegex: String? = nil,
         role: String? = nil,
-        subrole: String? = nil,
-        predicate: RulePredicate? = nil
+        subrole: String? = nil
     ) {
         self.bundleID = bundleID
         self.titleRegex = titleRegex
         self.role = role
         self.subrole = subrole
+        self.predicate = nil
+    }
+
+    public init(predicate: RulePredicate) {
+        self.bundleID = nil
+        self.titleRegex = nil
+        self.role = nil
+        self.subrole = nil
         self.predicate = predicate
+    }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(titleRegex: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(role: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, titleRegex: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, role: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(titleRegex: String, role: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(titleRegex: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(role: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, titleRegex: String, role: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, titleRegex: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, role: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(titleRegex: String, role: String, subrole: String, predicate: RulePredicate) { fatalError() }
+
+    @available(*, unavailable, message: "ambiguous-rule: use RuleMatch fields or a RulePredicate, not both")
+    public init(bundleID: String, titleRegex: String, role: String, subrole: String, predicate: RulePredicate) {
+        fatalError()
     }
 
     public func matches(_ context: RuleContext) -> Bool {

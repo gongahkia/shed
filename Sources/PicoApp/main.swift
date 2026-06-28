@@ -25,6 +25,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		openDocument(at: URL(fileURLWithPath: filename))
 	}
 
+	@objc private func closeCurrentDocument(_ sender: Any?) {
+		if let document = NSApp.keyWindow?.windowController?.document as? NSDocument {
+			document.close()
+			return
+		}
+		NSApp.keyWindow?.performClose(sender)
+	}
+
 	private func openInitialDocument() {
 		let files = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("--") }
 		if let path = files.first {
@@ -78,7 +86,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		newTabItem.target = documentController
 		let openItem = fileMenu.addItem(withTitle: "Open...", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
 		openItem.target = documentController
-		fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
+		let closeItem = fileMenu.addItem(withTitle: "Close", action: #selector(closeCurrentDocument(_:)), keyEquivalent: "w")
+		closeItem.target = self
 		fileMenu.addItem(.separator())
 		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
 		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")

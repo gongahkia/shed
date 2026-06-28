@@ -45,5 +45,9 @@ Do not remove the v0.1.0 release TODO until:
 
 - Release workflow has the signing/notarization secrets above.
 - `Release DMG` workflow passes for tag `v0.1.0`.
-- GitHub Release has `Olly.dmg`, source tarball, and `SHA256SUMS`.
+- GitHub Release has `Olly-v0.1.0.dmg`, `olly-v0.1.0-source.tar.gz`, and `SHA256SUMS`.
 - Homebrew cask PR exists and points at the final release artifact.
+
+When the required secrets are configured, `.github/workflows/release-dmg.yml`
+publishes the notarized DMG, source tarball, and checksums to the tag's GitHub
+Release.

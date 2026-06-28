@@ -75,6 +75,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "view.focusEditor", title: "Focus Editor", defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
+				Command(id: "edit.find", title: "Find", defaultKey: "Cmd-F") { [weak self] in
+					self?.toggleFindBar(nil)
+				},
 				Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
 					self?.performEditorMotion(.charBackward)
 				},
@@ -104,6 +107,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func performEditorMotion(_ motion: Motion) {
 		activeEditorWindowController()?.performEditorMotion(motion)
+	}
+
+	@objc private func toggleFindBar(_ sender: Any?) {
+		activeEditorWindowController()?.toggleFindBar()
 	}
 
 	private func openInitialDocument() {
@@ -163,9 +170,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let mainMenu = NSMenu()
 		let appItem = NSMenuItem()
 		let fileItem = NSMenuItem()
+		let editItem = NSMenuItem()
 		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
+		mainMenu.addItem(editItem)
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
@@ -192,6 +201,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
 		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
 		fileItem.submenu = fileMenu
+
+		let editMenu = NSMenu(title: "Edit")
+		let findItem = editMenu.addItem(withTitle: "Find", action: #selector(toggleFindBar(_:)), keyEquivalent: "f")
+		findItem.target = self
+		editItem.submenu = editMenu
 
 		let commandMenu = NSMenu(title: "Command")
 		let paletteItem = commandMenu.addItem(withTitle: "Command Palette", action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")

@@ -221,20 +221,36 @@ final class PicoDocument: NSDocument {
 final class EditorWindowController: NSWindowController {
 	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
+	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
 	private let editorView: MetalTextView
 
 	init(document: PicoDocument) {
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+		let editorContainer = NSView(frame: editorView.frame)
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 		editorStack.orientation = .vertical
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
-		editorView.setContentHuggingPriority(.defaultLow, for: .vertical)
-		editorView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
+		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+		editorView.translatesAutoresizingMaskIntoConstraints = false
+		findBarView.translatesAutoresizingMaskIntoConstraints = false
+		findBarView.isHidden = true
+		editorContainer.addSubview(editorView)
+		editorContainer.addSubview(findBarView)
+		NSLayoutConstraint.activate([
+			editorView.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
+			editorView.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
+			editorView.topAnchor.constraint(equalTo: editorContainer.topAnchor),
+			editorView.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
+			findBarView.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
+			findBarView.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
+			findBarView.topAnchor.constraint(equalTo: editorContainer.topAnchor),
+		])
 		editorStack.addArrangedSubview(tabBarView)
-		editorStack.addArrangedSubview(editorView)
+		editorStack.addArrangedSubview(editorContainer)
 
 		let splitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 		splitView.isVertical = true
@@ -256,6 +272,9 @@ final class EditorWindowController: NSWindowController {
 		super.init(window: window)
 		window.delegate = self
 		document.attach(editorView)
+		findBarView.onDismiss = { [weak self] in
+			self?.setFindBarVisible(false)
+		}
 		PicoWorkspaceController.shared.register(fileTreeView)
 		PicoTabCoordinator.shared.register(tabBarView)
 		window.makeFirstResponder(editorView)
@@ -285,6 +304,19 @@ final class EditorWindowController: NSWindowController {
 	func performEditorMotion(_ motion: Motion) {
 		editorView.performMotion(motion)
 		focusEditor()
+	}
+
+	func toggleFindBar() {
+		setFindBarVisible(findBarView.isHidden)
+	}
+
+	private func setFindBarVisible(_ visible: Bool) {
+		findBarView.isHidden = !visible
+		if visible {
+			findBarView.focusQuery()
+		} else {
+			focusEditor()
+		}
 	}
 }
 

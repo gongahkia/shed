@@ -4,6 +4,7 @@ import CoreVideo
 import Darwin
 import Dispatch
 import Foundation
+import PicoEditor
 
 private struct LatencyOptions {
 	var pid: Int32
@@ -17,6 +18,11 @@ private struct MeasureOptions {
 	var app: String
 	var args: [String]
 	var warmupPurge: Bool
+}
+
+private struct RopeOptions {
+	var operations: Int
+	var sliceLength: Int
 }
 
 private struct LatencyResult: Encodable {
@@ -38,6 +44,16 @@ private struct MeasureResult: Encodable {
 private struct RSSResult: Encodable {
 	var pid: Int32
 	var rss_kb: UInt64
+}
+
+private struct RopeBenchResult: Encodable {
+	var final_length: Int
+	var operations: Int
+	var random_insert_ns_per_op: Double
+	var sequential_insert_ns_per_op: Double
+	var slice_length: Int
+	var slice_ns_per_op: Double
+	var slice_checksum: Int
 }
 
 private struct SmokeResult: Encodable {
@@ -148,6 +164,8 @@ enum PicoBenchMain {
 			try printJSON(latency(parseLatency(Array(args.dropFirst()))))
 		case "measure":
 			try printJSON(measure(parseMeasure(Array(args.dropFirst()))))
+		case "rope":
+			try printJSON(rope(parseRope(Array(args.dropFirst()))))
 		case "rss":
 			let pid = try parsePID(Array(args.dropFirst()))
 			try printJSON(RSSResult(pid: pid, rss_kb: residentSizeKB(pid: pid)))
@@ -266,6 +284,71 @@ enum PicoBenchMain {
 			throw BenchError.usage("usage: picobench measure --app <path> [--args <arg>] [--warmup-purge]")
 		}
 		return MeasureOptions(app: app, args: appArgs, warmupPurge: warmupPurge)
+	}
+
+	private static func parseRope(_ args: [String]) throws -> RopeOptions {
+		var operations = 1_000_000
+		var sliceLength = 32
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--ops":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --ops")
+				}
+				operations = value
+				index = args.index(after: valueIndex)
+			case "--slice-length":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --slice-length")
+				}
+				sliceLength = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown rope option: \(arg)")
+			}
+		}
+		return RopeOptions(operations: operations, sliceLength: sliceLength)
+	}
+
+	private static func rope(_ options: RopeOptions) throws -> RopeBenchResult {
+		let operations = options.operations
+		let sliceLength = min(options.sliceLength, operations)
+		var sequential = Rope()
+		let sequentialNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				sequential.insert("a", at: sequential.length)
+			}
+		}
+		var random = Rope()
+		var insertRNG = BenchRNG(0xC0FFEE)
+		let randomNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				random.insert("a", at: insertRNG.nextInt(random.length + 1))
+			}
+		}
+		let sliceRope = Rope(String(repeating: "a", count: operations))
+		var sliceRNG = BenchRNG(0xBAD5EED)
+		var checksum = 0
+		let sliceUpperBound = max(1, sliceRope.length - sliceLength + 1)
+		let sliceNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				let start = sliceRNG.nextInt(sliceUpperBound)
+				checksum += sliceRope.slice(start ..< start + sliceLength).utf8.count
+			}
+		}
+		return RopeBenchResult(
+			final_length: sequential.length + random.length,
+			operations: operations,
+			random_insert_ns_per_op: Double(randomNS) / Double(operations),
+			sequential_insert_ns_per_op: Double(sequentialNS) / Double(operations),
+			slice_length: sliceLength,
+			slice_ns_per_op: Double(sliceNS) / Double(operations),
+			slice_checksum: checksum
+		)
 	}
 
 	private static func latency(_ options: LatencyOptions) throws -> LatencyResult {
@@ -559,9 +642,30 @@ enum PicoBenchMain {
 	private static let usage = """
 	usage:
 	  picobench measure --app <path> [--args <arg>] [--warmup-purge]
+	  picobench rope [--ops <count>] [--slice-length <bytes>]
 	  picobench rss --pid <pid>
 	  picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 	"""
+}
+
+private func measureNanoseconds(_ body: () -> Void) -> UInt64 {
+	let start = DispatchTime.now().uptimeNanoseconds
+	body()
+	return DispatchTime.now().uptimeNanoseconds - start
+}
+
+private struct BenchRNG {
+	private var state: UInt64
+
+	init(_ seed: UInt64) {
+		state = seed
+	}
+
+	mutating func nextInt(_ upperBound: Int) -> Int {
+		precondition(upperBound > 0)
+		state = state &* 2862933555777941757 &+ 3037000493
+		return Int(state % UInt64(upperBound))
+	}
 }
 
 private final class WindowWaiter {

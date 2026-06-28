@@ -27,7 +27,7 @@ let package = Package(
 		.target(name: "PicoEditor"),
 		.target(name: "PicoSyntax", dependencies: ["CTreeSitter", "CTSGrammars", "PicoEditor"]),
 		.target(name: "PicoKeymap", resources: [.process("Resources")]),
-		.executableTarget(name: "PicoBench"),
+		.executableTarget(name: "PicoBench", dependencies: ["PicoEditor"]),
 		.target(
 			name: "CTreeSitter",
 			path: "Sources/CTreeSitter",

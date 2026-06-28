@@ -177,6 +177,10 @@ import Testing
 	#expect(engine.handle(try keyEvent("b", modifiers: [.option])) == .command("editor.moveWordBackward"))
 	#expect(engine.handle(try keyEvent(",", modifiers: [.option, .shift])) == .command("editor.moveBufferStart"))
 	#expect(engine.handle(try keyEvent(".", modifiers: [.option, .shift])) == .command("editor.moveBufferEnd"))
+	#expect(engine.handle(try keyEvent("w", modifiers: [.control])) == .command("emacs.killRegion"))
+	#expect(engine.handle(try keyEvent("w", modifiers: [.option])) == .command("emacs.copyRegion"))
+	#expect(engine.handle(try keyEvent("y", modifiers: [.control])) == .command("emacs.yank"))
+	#expect(engine.handle(try keyEvent("y", modifiers: [.option])) == .command("emacs.yankPop"))
 }
 
 private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0) throws -> NSEvent {

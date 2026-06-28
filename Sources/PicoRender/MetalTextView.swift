@@ -97,6 +97,8 @@ public final class MetalTextView: NSView {
 	private var registers: [String: String] = [:]
 	private var pendingExCommand: String?
 	private var insertUndoGroupActive = false
+	private let killRing = KillRing()
+	private var lastYankRange: Range<Int>?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -388,6 +390,9 @@ public final class MetalTextView: NSView {
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
+		if commandID != "emacs.yank", commandID != "emacs.yankPop" {
+			lastYankRange = nil
+		}
 		if let motion = motion(for: commandID), visualMode != nil {
 			extendVisualSelection(motion: motion)
 			return true
@@ -462,6 +467,18 @@ public final class MetalTextView: NSView {
 			editor.redo()
 			syncEditorState()
 			editorDidChange?(editor)
+			return true
+		case "emacs.killRegion":
+			killSelectedText(delete: true)
+			return true
+		case "emacs.copyRegion":
+			killSelectedText(delete: false)
+			return true
+		case "emacs.yank":
+			yankFromKillRing()
+			return true
+		case "emacs.yankPop":
+			yankPopFromKillRing()
 			return true
 		case "vim.operator.delete":
 			return beginOperator(.delete)
@@ -544,6 +561,51 @@ public final class MetalTextView: NSView {
 		}
 		editor.endUndoGroup()
 		insertUndoGroupActive = false
+	}
+
+	private func killSelectedText(delete: Bool) {
+		let ranges = selectedNonEmptyRanges()
+		guard !ranges.isEmpty else {
+			return
+		}
+		let text = ranges.map { editor.rope.slice($0) }.joined()
+		killRing.push(text)
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		if delete {
+			editor.deleteForward()
+			syncEditorState()
+			editorDidChange?(editor)
+		}
+	}
+
+	private func yankFromKillRing() {
+		let text = killRing.current ?? NSPasteboard.general.string(forType: .string)
+		guard let text, !text.isEmpty else {
+			return
+		}
+		let range = editor.selections.primary.range
+		replace(range: range, with: text)
+		lastYankRange = range.lowerBound ..< range.lowerBound + text.utf8.count
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	private func yankPopFromKillRing() {
+		guard let lastYankRange, let text = killRing.rotate() else {
+			return
+		}
+		replace(range: lastYankRange, with: text)
+		self.lastYankRange = lastYankRange.lowerBound ..< lastYankRange.lowerBound + text.utf8.count
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	private func selectedNonEmptyRanges() -> [Range<Int>] {
+		([editor.selections.primary] + editor.selections.secondaries)
+			.map(\.range)
+			.filter { !$0.isEmpty }
+			.sorted { $0.lowerBound < $1.lowerBound }
 	}
 
 	private func motion(for commandID: String) -> Motion? {
@@ -1114,6 +1176,7 @@ public final class MetalTextView: NSView {
 		keyCode: UInt16,
 		modifierFlags: NSEvent.ModifierFlags
 	) -> Bool {
+		lastYankRange = nil
 		if !modifierFlags.intersection([.command, .control]).isEmpty {
 			return false
 		}
@@ -1539,6 +1602,7 @@ public final class MetalTextView: NSView {
 
 extension MetalTextView: NSTextInputClient {
 	public func insertText(_ string: Any, replacementRange: NSRange) {
+		lastYankRange = nil
 		let text = plainString(from: string)
 		let range = replacementUTF8Range(replacementRange) ?? markedRangeUTF8 ?? editor.selections.primary.range
 		replace(range: range, with: text)
@@ -1548,6 +1612,7 @@ extension MetalTextView: NSTextInputClient {
 	}
 
 	public override func doCommand(by selector: Selector) {
+		lastYankRange = nil
 		var didEdit = false
 		switch selector {
 		case #selector(NSResponder.deleteBackward(_:)):

@@ -137,6 +137,48 @@ import Testing
 	#expect(view.editor.selections.primary.head == view.editor.rope.length)
 }
 
+@Test func emacsKillCopyAndYankUseKillRingAndClipboard() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha beta gamma")
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .control)], commandID: "emacs.killRegion"),
+		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
+		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
+	])
+	NSPasteboard.general.clearContents()
+
+	view.selectUTF8Range(6 ..< 10)
+	#expect(view.handleKey(characters: "\u{17}", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.text == "alpha  gamma")
+	#expect(NSPasteboard.general.string(forType: .string) == "beta")
+	#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.text == "alpha beta gamma")
+	view.selectUTF8Range(0 ..< 5)
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+	#expect(view.editor.text == "alpha beta gamma")
+	#expect(NSPasteboard.general.string(forType: .string) == "alpha")
+}
+
+@Test func emacsYankPopRotatesLastYank() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha beta gamma")
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("w", modifiers: .option)], commandID: "emacs.copyRegion"),
+		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .control)], commandID: "emacs.yank"),
+		KeyBinding(mode: .emacs, chord: [Key("y", modifiers: .option)], commandID: "emacs.yankPop"),
+	])
+
+	view.selectUTF8Range(0 ..< 5)
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+	view.selectUTF8Range(11 ..< 16)
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
+	view.selectUTF8Range(16 ..< 16)
+	#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
+	#expect(view.editor.text == "alpha beta gammagamma")
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .option))
+	#expect(view.editor.text == "alpha beta gammaalpha")
+}
+
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

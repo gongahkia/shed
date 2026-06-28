@@ -44,7 +44,7 @@ x 2026-06-28 +Phase2-ColdStart @perf id:033 est:2h dep:032 Add `bench/scripts/dy
 ## Phase 3 — Metal text renderer
 
 (B) 2026-06-28 +Phase3-Renderer @metal id:049 est:2h dep:046 ProMotion 120Hz support: ensure `CAMetalLayer.maximumDrawableCount = 3`, `wantsExtendedDynamicRangeContent = false`, `CVDisplayLink` runs at refresh rate. Verify on 120Hz display.
-(C) 2026-06-28 +Phase3-Renderer @metal id:050 est:3h dep:046 Subpixel-aa for non-Retina displays: detect via `backingScaleFactor < 2.0`, switch atlas to RGB (3-channel) and use Apple's recommended subpixel positioning.
+x 2026-06-28 +Phase3-Renderer @metal id:050 est:3h dep:046 Subpixel-aa for non-Retina displays: detect via `backingScaleFactor < 2.0`, switch atlas to RGB (3-channel) and use Apple's recommended subpixel positioning.
 
 ---
 

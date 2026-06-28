@@ -13,7 +13,7 @@ struct ViewportUniforms {
 };
 
 struct FragmentUniforms {
-	uint useAtlas;
+	uint atlasMode;
 };
 
 struct GlyphVertexOut {
@@ -56,7 +56,9 @@ fragment half4 glyph_fragment(
 	sampler atlasSampler [[sampler(0)]],
 	constant FragmentUniforms &uniforms [[buffer(0)]]
 ) {
-	const float coverage = uniforms.useAtlas == 0 ? 1.0 : atlas.sample(atlasSampler, in.atlasUV).r;
-	const float4 color = in.color * coverage;
+	const float4 coverage = uniforms.atlasMode == 0 ? float4(1.0) : atlas.sample(atlasSampler, in.atlasUV);
+	const float alpha = uniforms.atlasMode == 2 ? max(max(coverage.r, coverage.g), coverage.b) : coverage.r;
+	const float3 rgb = uniforms.atlasMode == 2 ? in.color.rgb * coverage.rgb : in.color.rgb * coverage.r;
+	const float4 color = float4(rgb, in.color.a * alpha);
 	return half4(color);
 }

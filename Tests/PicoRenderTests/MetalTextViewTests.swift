@@ -69,6 +69,16 @@ import Testing
 	#expect(view.editor.text == "hello word")
 }
 
+@Test func textGlyphInstancesUseHighlightColors() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\n")
+	let red = SIMD4<Float>(1, 0, 0, 1)
+	view.highlightSpans = [TextHighlightSpan(range: 0 ..< 1, color: red)]
+	let instances = view.textGlyphInstances(scale: 1)
+	let first = try #require(instances.first)
+	#expect(first.color == red)
+}
+
 @Test func keymapProfileChangesTextHandlingWithoutRecompile() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

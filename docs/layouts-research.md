@@ -53,6 +53,33 @@ Sources checked on 2026-06-28:
 - https://github.com/paperwm/PaperWM
 - https://github.com/hyprland-community/awesome-hyprland
 
+## 2026-06-28 Layout Release Monitor
+
+Scope: recurring watchlist from TODO Phase 13.
+
+Current state:
+
+- PaperWM: active; latest GitHub release `v50.0.1` published 2026-04-21.
+- Karousel: active KDE/KWin scrollable tiling script; latest GitHub release
+  `v0.17` published 2026-06-07.
+- Bismuth: archived; latest GitHub release `v3.1.4` was published 2022-09-23.
+  Keep as an i3-like KDE precedent, not as an active release source.
+- hy3: active Hyprland i3/manual-tiling plugin; latest GitHub release
+  `hl0.55.0` published 2026-05-14.
+- hyprscroller: archived; no GitHub latest-release endpoint. Keep as historical
+  precedent for Hyprland scrolling layouts.
+- scroll (`dawsers/scroll`): active sway fork with one PaperWM/niri-like scrolling
+  layout; latest GitHub release `1.12.15` published 2026-05-26.
+
+Sources checked on 2026-06-28:
+
+- https://github.com/paperwm/PaperWM
+- https://github.com/peterfajdiga/karousel
+- https://github.com/Bismuth-Forge/bismuth
+- https://github.com/outfoxxed/hy3
+- https://github.com/dawsers/hyprscroller
+- https://github.com/dawsers/scroll
+
 ## v0.2 Candidates
 
 ### Monocle

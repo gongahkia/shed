@@ -52,6 +52,13 @@ final class PicoDocument: NSDocument {
 	func attach(_ view: MetalTextView) {
 		editorView = view
 		view.editor = editor
+		view.editorDidChange = { [weak self] editor in
+			self?.editor = editor
+			self?.updateChangeCount(.changeDone)
+		}
+		view.saveRequested = { [weak self] in
+			self?.save(nil)
+		}
 	}
 }
 

@@ -72,7 +72,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 7 — File system + tabs + tree
 
-(A) 2026-06-28 +Phase7-FS @appkit id:120 est:4h dep:084 `Sources/PicoApp/Document.swift`: subclass `NSDocument`. Override `read(from:ofType:)` to load into `Rope`. Override `write(to:ofType:)` to dump rope. Override `makeWindowControllers` to install `EditorWindowController` with `MetalTextView`. Test: open small.ts via File > Open, edit, save, verify on disk.
 (A) 2026-06-28 +Phase7-FS @appkit id:121 est:5h dep:120 Tab bar: custom `NSView` subclass `TabBarView`. Each tab = filename + dirty dot + close X. Click switches active document. Cmd-W closes. Cmd-T new untitled. Use `NSStackView` for layout. Style flat, no gradients.
 (A) 2026-06-28 +Phase7-FS @appkit id:122 est:5h dep:120 File tree sidebar: `NSOutlineView` in left split. Root = workspace folder (opened via File > Open Folder). Lazy-load children. Double-click opens file in new tab. Test: open this repo folder, navigate.
 (A) 2026-06-28 +Phase7-FS @appkit id:123 est:2h dep:121 Recent files: `NSDocumentController.shared.noteNewRecentDocument(_:)`. Menu auto-populates via AppKit standard behavior.

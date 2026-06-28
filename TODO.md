@@ -52,7 +52,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 9 — Docs, demo, release
 
-(A) 2026-06-26 Record 30-second screencast: 4-engine hot-swap across 2 displays + tag switching + command palette; commit as `docs/demo.gif` +phase9 @docs @release
 (A) 2026-06-26 Cut v0.1.0 GitHub Release with `.dmg`, source tarball, SHA256SUMS; draft Homebrew cask PR +phase9 @release
 ---
 

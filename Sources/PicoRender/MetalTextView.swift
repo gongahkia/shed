@@ -1,4 +1,5 @@
 import AppKit
+import CoreVideo
 import Metal
 import QuartzCore
 
@@ -9,6 +10,10 @@ public final class MetalTextView: NSView {
 
 	private let metalDevice: MTLDevice?
 	private let commandQueue: MTLCommandQueue?
+	private let dirtyLock = NSLock()
+	private var dirty = true
+	private var displayLink: CVDisplayLink?
+	public private(set) var renderedFrameCount = 0
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -42,17 +47,43 @@ public final class MetalTextView: NSView {
 	public override func viewDidMoveToWindow() {
 		super.viewDidMoveToWindow()
 		updateDrawableSize()
-		needsDisplay = true
+		if window == nil {
+			stopDisplayLink()
+		} else {
+			startDisplayLink()
+			markDirty()
+		}
 	}
 
 	public override func setFrameSize(_ newSize: NSSize) {
 		super.setFrameSize(newSize)
 		updateDrawableSize()
-		needsDisplay = true
+		markDirty()
 	}
 
 	public override func updateLayer() {
+		_ = consumeDirtyForDisplayLink()
 		renderClearColor()
+	}
+
+	deinit {
+		stopDisplayLink()
+	}
+
+	public func markDirty() {
+		dirtyLock.lock()
+		dirty = true
+		dirtyLock.unlock()
+	}
+
+	func consumeDirtyForDisplayLink() -> Bool {
+		dirtyLock.lock()
+		defer { dirtyLock.unlock() }
+		guard dirty else {
+			return false
+		}
+		dirty = false
+		return true
 	}
 
 	private func updateDrawableSize() {
@@ -86,5 +117,49 @@ public final class MetalTextView: NSView {
 		encoder.endEncoding()
 		commandBuffer.present(drawable)
 		commandBuffer.commit()
+		renderedFrameCount += 1
 	}
+
+	private func startDisplayLink() {
+		guard displayLink == nil else {
+			return
+		}
+		var link: CVDisplayLink?
+		guard CVDisplayLinkCreateWithActiveCGDisplays(&link) == kCVReturnSuccess, let link else {
+			return
+		}
+		CVDisplayLinkSetOutputCallback(link, metalTextViewDisplayLinkCallback, Unmanaged.passUnretained(self).toOpaque())
+		guard CVDisplayLinkStart(link) == kCVReturnSuccess else {
+			CVDisplayLinkSetOutputCallback(link, nil, nil)
+			return
+		}
+		displayLink = link
+	}
+
+	private func stopDisplayLink() {
+		guard let displayLink else {
+			return
+		}
+		CVDisplayLinkStop(displayLink)
+		CVDisplayLinkSetOutputCallback(displayLink, nil, nil)
+		self.displayLink = nil
+	}
+
+	fileprivate func displayLinkDidTick() {
+		guard consumeDirtyForDisplayLink() else {
+			return
+		}
+		DispatchQueue.main.async { [weak self] in
+			self?.renderClearColor()
+		}
+	}
+}
+
+private let metalTextViewDisplayLinkCallback: CVDisplayLinkOutputCallback = { _, _, _, _, _, context in
+	guard let context else {
+		return kCVReturnSuccess
+	}
+	let view = Unmanaged<MetalTextView>.fromOpaque(context).takeUnretainedValue()
+	view.displayLinkDidTick()
+	return kCVReturnSuccess
 }

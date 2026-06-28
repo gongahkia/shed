@@ -110,7 +110,7 @@ x 2026-06-28 +Phase12-Emacs @emacs id:224 est:2h dep:222 Universal arg: C-u <n>.
 ## Phase 13 — Multi-cursor + column select
 
 x 2026-06-28 +Phase13-MultiCursor @editor id:240 est:3h dep:081 Cmd-D: add next match of current word/selection as additional cursor. Reuses find next.
-(A) 2026-06-28 +Phase13-MultiCursor @editor id:241 est:2h dep:081 Cmd-Click on text: add cursor at clicked offset. Cmd-Click on existing cursor: remove it.
+x 2026-06-28 +Phase13-MultiCursor @editor id:241 est:2h dep:081 Cmd-Click on text: add cursor at clicked offset. Cmd-Click on existing cursor: remove it.
 (A) 2026-06-28 +Phase13-MultiCursor @editor id:242 est:3h dep:081 Column select via Opt-drag: builds a vertical block of cursors, one per affected line at the same visual column.
 (B) 2026-06-28 +Phase13-MultiCursor @editor id:243 est:2h dep:240 Cmd-Ctrl-G: select all matches (already in id:162; verify integrated here).
 

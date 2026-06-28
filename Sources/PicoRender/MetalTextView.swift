@@ -257,12 +257,31 @@ public final class MetalTextView: NSView {
 		syncEditorState()
 	}
 
+	func toggleAdditionalCursor(at offset: Int) {
+		let clamped = min(max(offset, 0), editor.rope.length)
+		var selections = [editor.selections.primary] + editor.selections.secondaries
+		if let index = selections.firstIndex(where: { $0.isCaret && $0.head == clamped }) {
+			guard selections.count > 1 else {
+				return
+			}
+			selections.remove(at: index)
+		} else {
+			selections.append(Selection(anchor: clamped, head: clamped))
+		}
+		editor.setSelection(SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst())))
+		syncEditorState()
+	}
+
 	public override func scrollWheel(with event: NSEvent) {
 		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}
 
 	public override func mouseDown(with event: NSEvent) {
 		window?.makeFirstResponder(self)
+		if event.modifierFlags.contains(.command) {
+			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
+			return
+		}
 		super.mouseDown(with: event)
 	}
 
@@ -1793,6 +1812,27 @@ extension MetalTextView: NSTextInputClient {
 			bestUTF16 += String(character).utf16.count
 		}
 		return baseUTF16 + bestUTF16
+	}
+
+	private func utf8Offset(forMouseEvent event: NSEvent) -> Int {
+		utf8Offset(forLocalPoint: convert(event.locationInWindow, from: nil))
+	}
+
+	private func utf8Offset(forLocalPoint local: NSPoint) -> Int {
+		let line = min(max(Int((local.y - topContentInset - textInset.y) / max(lineHeight, 1)) + topLineIndex, 0), max(0, editor.rope.lineCount - 1))
+		let lineRange = editor.rope.lineRange(line)
+		let lineText = editor.rope.slice(lineRange)
+		let targetX = local.x - textInset.x + xOffset
+		var offset = lineRange.lowerBound
+		for character in lineText {
+			let next = offset + String(character).utf8.count
+			let width = typographicWidth(editor.rope.slice(lineRange.lowerBound ..< next))
+			if width > targetX {
+				break
+			}
+			offset = next
+		}
+		return offset
 	}
 
 	private func plainString(from value: Any) -> String {

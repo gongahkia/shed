@@ -325,6 +325,19 @@ final class EditorPaneController: NSViewController {
 	}
 }
 
+private struct EditorPaneLayout: Codable, Equatable {
+	var vertical: Bool?
+	var children: [EditorPaneLayout]
+
+	static var leaf: EditorPaneLayout {
+		EditorPaneLayout(vertical: nil, children: [])
+	}
+
+	static func split(vertical: Bool, children: [EditorPaneLayout]) -> EditorPaneLayout {
+		EditorPaneLayout(vertical: vertical, children: children)
+	}
+}
+
 final class EditorPaneCoordinator {
 	let rootSplitViewController = NSSplitViewController()
 	private(set) var panes: [EditorPaneController] = []
@@ -394,6 +407,21 @@ final class EditorPaneCoordinator {
 		return activePane
 	}
 
+	fileprivate func layout() -> EditorPaneLayout {
+		layout(for: rootSplitViewController)
+	}
+
+	fileprivate func restore(layout: EditorPaneLayout) -> [EditorPaneController] {
+		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
+		panes = []
+		let rootItem = splitViewItem(for: layout)
+		rootSplitViewController.addSplitViewItem(rootItem)
+		if let first = panes.first {
+			activePane = first
+		}
+		return panes
+	}
+
 	private func collapseIfNeeded(_ split: NSSplitViewController) {
 		guard split !== rootSplitViewController, split.splitViewItems.count == 1, let child = split.splitViewItems.first else {
 			return
@@ -405,9 +433,39 @@ final class EditorPaneCoordinator {
 		split.removeSplitViewItem(child)
 		parent.insertSplitViewItem(child, at: index)
 	}
+
+	private func layout(for controller: NSViewController) -> EditorPaneLayout {
+		if controller is EditorPaneController {
+			return .leaf
+		}
+		guard let split = controller as? NSSplitViewController else {
+			return .leaf
+		}
+		return .split(vertical: split.splitView.isVertical, children: split.splitViewItems.map { layout(for: $0.viewController) })
+	}
+
+	private func splitViewItem(for layout: EditorPaneLayout) -> NSSplitViewItem {
+		NSSplitViewItem(viewController: viewController(for: layout))
+	}
+
+	private func viewController(for layout: EditorPaneLayout) -> NSViewController {
+		guard let vertical = layout.vertical else {
+			let pane = EditorPaneController()
+			panes.append(pane)
+			return pane
+		}
+		let split = NSSplitViewController()
+		split.splitView.isVertical = vertical
+		split.splitView.dividerStyle = .thin
+		for child in layout.children {
+			split.addSplitViewItem(splitViewItem(for: child))
+		}
+		return split
+	}
 }
 
 final class EditorWindowController: NSWindowController {
+	private static let paneLayoutStateKey = "dev.pico.editor.paneLayout"
 	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
@@ -462,6 +520,7 @@ final class EditorWindowController: NSWindowController {
 			defer: false
 		)
 		window.title = document.fileURL?.lastPathComponent ?? "Untitled"
+		window.isRestorable = true
 		window.contentView = splitView
 			super.init(window: window)
 			window.delegate = self
@@ -498,6 +557,33 @@ final class EditorWindowController: NSWindowController {
 		window?.orderFrontRegardless()
 		focusEditor()
 		PicoTabCoordinator.shared.refresh()
+	}
+
+	override func encodeRestorableState(with coder: NSCoder) {
+		super.encodeRestorableState(with: coder)
+		guard let data = try? JSONEncoder().encode(paneCoordinator.layout()), let string = String(data: data, encoding: .utf8) else {
+			return
+		}
+		coder.encode(string, forKey: Self.paneLayoutStateKey)
+	}
+
+	override func restoreState(with coder: NSCoder) {
+		super.restoreState(with: coder)
+		guard
+			let string = coder.decodeObject(forKey: Self.paneLayoutStateKey) as? String,
+			let data = string.data(using: .utf8),
+			let layout = try? JSONDecoder().decode(EditorPaneLayout.self, from: data),
+			let document = document as? PicoDocument
+		else {
+			return
+		}
+		for pane in paneCoordinator.panes {
+			document.detach(pane.editorView)
+		}
+		for pane in paneCoordinator.restore(layout: layout) {
+			installPane(pane, document: document)
+		}
+		focusEditor()
 	}
 
 	func focusEditor() {

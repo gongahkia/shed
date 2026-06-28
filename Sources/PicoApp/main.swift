@@ -78,6 +78,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "edit.find", title: "Find", defaultKey: "Cmd-F") { [weak self] in
 					self?.toggleFindBar(nil)
 				},
+				Command(id: "edit.findNext", title: "Find Next", defaultKey: "Cmd-G") { [weak self] in
+					self?.findNext(nil)
+				},
+				Command(id: "edit.findPrevious", title: "Find Previous", defaultKey: "Cmd-Shift-G") { [weak self] in
+					self?.findPrevious(nil)
+				},
 				Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
 					self?.performEditorMotion(.charBackward)
 				},
@@ -111,6 +117,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func toggleFindBar(_ sender: Any?) {
 		activeEditorWindowController()?.toggleFindBar()
+	}
+
+	@objc private func findNext(_ sender: Any?) {
+		activeEditorWindowController()?.findNext()
+	}
+
+	@objc private func findPrevious(_ sender: Any?) {
+		activeEditorWindowController()?.findPrevious()
 	}
 
 	private func openInitialDocument() {
@@ -205,6 +219,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let editMenu = NSMenu(title: "Edit")
 		let findItem = editMenu.addItem(withTitle: "Find", action: #selector(toggleFindBar(_:)), keyEquivalent: "f")
 		findItem.target = self
+		let findNextItem = editMenu.addItem(withTitle: "Find Next", action: #selector(findNext(_:)), keyEquivalent: "g")
+		findNextItem.target = self
+		let findPreviousItem = editMenu.addItem(withTitle: "Find Previous", action: #selector(findPrevious(_:)), keyEquivalent: "G")
+		findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
+		findPreviousItem.target = self
 		editItem.submenu = editMenu
 
 		let commandMenu = NSMenu(title: "Command")

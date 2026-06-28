@@ -35,6 +35,8 @@ public final class MetalTextView: NSView {
 	private var cursorBlinkVisible = true
 	private var cursorBlinkTimer: Timer?
 	private var selectionRects: [CGRect] = []
+	private var findMatchRanges: [Range<Int>] = []
+	private var findMatchRects: [CGRect] = []
 	private var renderPipeline: MTLRenderPipelineState?
 	private var samplerState: MTLSamplerState?
 	private var solidAtlasTexture: MTLTexture?
@@ -43,6 +45,9 @@ public final class MetalTextView: NSView {
 	private var markedRangeUTF8: Range<Int>?
 	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 	private let textInset = CGPoint(x: 8, y: 6)
+	public var topContentInset: CGFloat = 0 {
+		didSet { syncEditorState() }
+	}
 	public private(set) var topLineIndex = 0
 	public private(set) var xOffset: CGFloat = 0
 	public var lineHeight: CGFloat = 17 {
@@ -161,11 +166,17 @@ public final class MetalTextView: NSView {
 		markDirty()
 	}
 
+	public func setFindMatchRanges(_ ranges: [Range<Int>]) {
+		findMatchRanges = ranges
+		refreshFindMatchRects()
+	}
+
 	public var visibleLineRange: Range<Int> {
 		guard lineCount > 0 else {
 			return 0 ..< 0
 		}
-		let visibleCount = max(1, Int(ceil(bounds.height / max(lineHeight, 1))) + 1)
+		let visibleHeight = max(0, bounds.height - topContentInset)
+		let visibleCount = max(1, Int(ceil(visibleHeight / max(lineHeight, 1))) + 1)
 		let end = min(lineCount, topLineIndex + visibleCount)
 		return topLineIndex ..< end
 	}
@@ -178,11 +189,17 @@ public final class MetalTextView: NSView {
 		if deltaX != 0 {
 			xOffset = max(0, xOffset + deltaX)
 		}
+		refreshFindMatchRects()
 		markDirty()
 	}
 
 	public func performMotion(_ motion: Motion) {
 		editor.moveCursor(motion)
+		syncEditorState()
+	}
+
+	public func selectUTF8Range(_ range: Range<Int>) {
+		editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.upperBound)))
 		syncEditorState()
 	}
 
@@ -271,7 +288,7 @@ public final class MetalTextView: NSView {
 			guard let glyphs = try? shaper.shape(line, font: textFont) else {
 				continue
 			}
-			let y = textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
 			for glyph in glyphs {
 				guard let entry = try? atlas.entry(for: glyph.glyphID, font: textFont) else {
 					continue
@@ -298,6 +315,12 @@ public final class MetalTextView: NSView {
 	private func selectionOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
 		selectionRects.map { rect in
 			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35))
+		}
+	}
+
+	private func findMatchOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		findMatchRects.map { rect in
+			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34))
 		}
 	}
 
@@ -337,6 +360,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		let scale = layer.contentsScale
+		renderSolidInstances(findMatchOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
 		renderSolidInstances(selectionOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
 		renderText(encoder: encoder, drawableSize: layer.drawableSize, scale: scale)
 		renderSolidInstances(cursorOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
@@ -528,36 +552,51 @@ public final class MetalTextView: NSView {
 		let lineRange = editor.rope.lineRange(line)
 		let prefix = editor.rope.slice(lineRange.lowerBound ..< min(head, lineRange.upperBound))
 		let cursorX = textInset.x + typographicWidth(prefix) - xOffset
-		let cursorY = textInset.y + CGFloat(line - topLineIndex) * lineHeight
+		let cursorY = topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
+		refreshFindMatchRects()
 		markDirty()
 	}
 
 	private func selectionRects(for selections: SelectionSet) -> [CGRect] {
 		([selections.primary] + selections.secondaries).flatMap { selection -> [CGRect] in
-			let range = selection.range
-			guard !range.isEmpty else {
-				return []
+			rects(forUTF8Range: selection.range)
+		}
+	}
+
+	private func refreshFindMatchRects() {
+		findMatchRects = findMatchRanges.flatMap { rects(forUTF8Range: $0) }
+		markDirty()
+	}
+
+	private func rects(forUTF8Range range: Range<Int>) -> [CGRect] {
+		guard !range.isEmpty else {
+			return []
+		}
+		let startLine = editor.rope.line(forOffset: range.lowerBound)
+		let endLine = editor.rope.line(forOffset: range.upperBound)
+		guard startLine < visibleLineRange.upperBound, endLine >= visibleLineRange.lowerBound else {
+			return []
+		}
+		return (startLine ... endLine).compactMap { line -> CGRect? in
+			guard visibleLineRange.contains(line) else {
+				return nil
 			}
-			let startLine = editor.rope.line(forOffset: range.lowerBound)
-			let endLine = editor.rope.line(forOffset: range.upperBound)
-			return (startLine ... endLine).compactMap { line -> CGRect? in
-				let lineRange = editor.rope.lineRange(line)
-				let lower = max(range.lowerBound, lineRange.lowerBound)
-				let upper = min(range.upperBound, lineRange.upperBound)
-				guard lower < upper else {
-					return nil
-				}
-				let before = editor.rope.slice(lineRange.lowerBound ..< lower)
-				let selected = editor.rope.slice(lower ..< upper)
-				return CGRect(
-					x: textInset.x + typographicWidth(before) - xOffset,
-					y: textInset.y + CGFloat(line - topLineIndex) * lineHeight,
-					width: max(2, typographicWidth(selected)),
-					height: lineHeight
-				)
+			let lineRange = editor.rope.lineRange(line)
+			let lower = max(range.lowerBound, lineRange.lowerBound)
+			let upper = min(range.upperBound, lineRange.upperBound)
+			guard lower < upper else {
+				return nil
 			}
+			let before = editor.rope.slice(lineRange.lowerBound ..< lower)
+			let selected = editor.rope.slice(lower ..< upper)
+			return CGRect(
+				x: textInset.x + typographicWidth(before) - xOffset,
+				y: topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight,
+				width: max(2, typographicWidth(selected)),
+				height: lineHeight
+			)
 		}
 	}
 

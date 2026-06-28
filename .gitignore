@@ -1,0 +1,12 @@
+.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+bench/corpus/huge.log
+bench/results/*.json
+!.gitkeep
+!.gitignore
+!*.md
+.DS_Store
+*.xcuserstate
+CLAUDE.md

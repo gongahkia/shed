@@ -1,0 +1,240 @@
+# TODO
+
+Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Priority `(A)`–`(D)`. Tags: `+Phase` `@area` `id:NN` `est:Xh` `dep:NN` `ref:URL`. Completed: prefix `x YYYY-MM-DD`.
+
+## How to use this file
+- Read NORTHSTAR.md first. It defines scope, KPIs, architecture, principles.
+- Pick the highest-priority unblocked task (no `dep:` pointing to incomplete `id:`).
+- Each line is intended to be implementable in isolation. Refs and acceptance criteria are inline.
+- Mark complete by replacing the leading `(P)` with `x 2026-MM-DD`.
+- Add new tasks at end of section; do not renumber `id:`.
+- KPIs live in NORTHSTAR.md "KPI table". Anything you do should not regress them.
+
+## Conventions baked in
+- **Swift 5.9+**, macOS 13.0 deployment target. No iOS code paths.
+- **No external Swift deps** except vendored C: tree-sitter + grammars. No CocoaPods, no Carthage, no SPM remote pulls in release builds.
+- **One .app bundle, one binary.** No helper processes through v1.0.
+- **No `@MainActor` annotation on hot paths** unless required; explicit dispatch.
+- **No SwiftUI on launch path.** AppKit only for window + menus + first view.
+- **Errors:** use `throws`. No optional-eating, no force-unwraps outside tests.
+- **Tests:** Swift Testing (`import Testing`, `@Test`). XCTest tolerated only where Swift Testing lacks parity (e.g., performance baselines via `XCTMetric`).
+- **Comments:** in-line only, lowercase, sparing. WHY only, not WHAT.
+- **Style:** tabs in source. SwiftFormat config committed in `.swiftformat`.
+
+---
+
+## Phase 0 — Bootstrap
+
+(A) 2026-06-28 +Phase0-Bootstrap @repo id:002 est:0.5h dep:001 Add `LICENSE` (MIT, copyright 2026 Gabriel Ong) at repo root.
+(A) 2026-06-28 +Phase0-Bootstrap @repo id:003 est:0.5h dep:001 Add `README.md` stub: project tagline ("the macOS code editor that opens instantly"), status badge placeholder, link to NORTHSTAR.md and TODO.md. Defer bench table to Phase 16.
+(A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:004 est:2h dep:001 Create `Package.swift` (swift-tools-version:5.9) with empty targets: `PicoApp` (executable), `PicoRender`, `PicoEditor`, `PicoSyntax`, `PicoKeymap`, `PicoBench` (executable), `CTreeSitter` (C lib), `CTSGrammars` (C lib). Place Swift sources under `Sources/<Target>/`, C sources under `Sources/<CTarget>/`. Set `platforms: [.macOS(.v13)]`. Verify `swift build` succeeds with stub `main.swift` files.
+(A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:005 est:1h dep:004 Wire target deps: `PicoApp` depends on `PicoRender`+`PicoEditor`+`PicoSyntax`+`PicoKeymap`. `PicoRender` depends on `PicoEditor`. `PicoSyntax` depends on `CTreeSitter`+`CTSGrammars`+`PicoEditor`. `PicoBench` standalone.
+(A) 2026-06-28 +Phase0-Bootstrap @ci id:006 est:1.5h dep:004 Add `.github/workflows/ci.yml` running on `macos-14` (M-series): steps install hyperfine, `swift build -c release`, `swift test`, run bench harness in smoke mode (1 run). Cache `.build/`.
+(B) 2026-06-28 +Phase0-Bootstrap @repo id:007 est:0.5h dep:001 Add `.swiftformat` file: indent tabs, max line 120, organize-imports, no-trailing-closures-for-arguments. Add SwiftFormat pre-commit (optional, doc only).
+(B) 2026-06-28 +Phase0-Bootstrap @repo id:008 est:0.5h dep:001 Add `CONTRIBUTING.md` skeleton: link NORTHSTAR.md principles, KPI gates on PRs, "no new deps without an issue".
+(A) 2026-06-28 +Phase0-Bootstrap @bench id:009 est:1h dep:001 Create `bench/` directory structure: `bench/corpus/`, `bench/results/`, `bench/scripts/`. Add `bench/README.md` describing protocol (copy-paste from NORTHSTAR "Benchmark protocol" section).
+(A) 2026-06-28 +Phase0-Bootstrap @bench id:010 est:1h dep:009 Add `bench/scripts/gen_corpus.sh`: writes `small.ts` (1k lines of repeated TypeScript class boilerplate), `large.ts` (100k lines), `huge.log` (1 GB Apache-log-style synthetic). Script idempotent. `huge.log` gitignored. Commit `small.ts` + `large.ts`.
+
+---
+
+## Phase 1 — Bench harness + baselines
+
+(A) 2026-06-28 +Phase1-Bench @bench id:020 est:6h dep:005,009 Implement `PicoBench` Swift CLI in `Sources/PicoBench/main.swift`. CLI: `picobench measure --app <path> --args <args> --warmup-purge` launches the target app via `NSWorkspace.openApplication(at:configuration:)`, observes via `AXObserver` for `kAXWindowCreatedNotification` on the new pid, records monotonic timestamp delta from `Date.now` pre-launch to first-window event, prints JSON `{startup_ms, rss_kb, app}`. Also `picobench rss --pid N` for one-shot RSS. Use `proc_pid_rusage` (libsystem) for RSS. Reference: `man proc_pid_rusage`. Acceptance: returns within 5 s, outputs valid JSON.
+(A) 2026-06-28 +Phase1-Bench @bench id:021 est:2h dep:020 Add `bench/scripts/run_baseline.sh`: iterates competitors {Zed, Sublime Text, VSCode, CodeEdit, TextEdit}, runs picobench 20× each with `sudo purge` between, exports to `bench/results/baseline-$(date +%F).json` and a Markdown summary `bench/results/baseline-$(date +%F).md`.
+(A) 2026-06-28 +Phase1-Bench @bench id:022 est:1h dep:021 Install competitor apps via Homebrew cask: `brew install --cask zed visual-studio-code sublime-text codeedit`. Document in `bench/README.md`. Run `run_baseline.sh`, commit results.
+(B) 2026-06-28 +Phase1-Bench @bench id:023 est:2h dep:020 Extend `picobench` with `latency` subcommand: uses CGEventTap to inject a keypress into the target editor and measures glyph-paint via screen capture diff. Reference: `CGEventTap`, `CGDisplayStream`. Acceptance: returns ms latency.
+(C) 2026-06-28 +Phase1-Bench @ci id:024 est:1h dep:021 Add nightly GitHub Action (`workflow_dispatch` for manual + `schedule: cron 0 7 * * *`) running baseline bench, commits results to `bench/results/`.
+
+---
+
+## Phase 2 — Empty-app cold-start spike
+
+(A) 2026-06-28 +Phase2-ColdStart @swift id:030 est:3h dep:005 In `Sources/PicoApp/main.swift`, implement bare `NSApplication` setup: `NSApplication.shared.setActivationPolicy(.regular)`, install minimal delegate, no window, accept `--bench-exit-on-ready` arg → on `applicationDidFinishLaunching` print `READY <ns>` to stdout then `NSApp.terminate(nil)`. Build release: `swift build -c release`. Wrap output in a `.app` bundle via `bench/scripts/make_app.sh` (mkdir Pico.app/Contents/MacOS, copy binary, write minimal Info.plist with `CFBundleIdentifier=dev.pico.editor`, `LSMinimumSystemVersion=13.0`).
+(A) 2026-06-28 +Phase2-ColdStart @bench id:031 est:1h dep:020,030 Run `picobench measure --app Pico.app --warmup-purge` 20×, target <100 ms. Record in `bench/results/spike-empty-$(date +%F).md`. If >150 ms, investigate.
+(A) 2026-06-28 +Phase2-ColdStart @perf id:032 est:3h dep:031 If id:031 exceeds 150 ms: set `DYLD_PRINT_STATISTICS_DETAILS=1`, capture launch trace via `xcrun xctrace record --template 'App Launch' --launch Pico.app`. Identify worst offenders. Document findings in `bench/notes/coldstart-audit.md`. Remediation candidates: link `-dead_strip`, set `OTHER_SWIFT_FLAGS=-Osize`, kill any `@_cdecl` init, remove unused `import Foundation` chains.
+(B) 2026-06-28 +Phase2-ColdStart @perf id:033 est:2h dep:032 Add `bench/scripts/dyld_audit.sh`: runs binary with `DYLD_PRINT_STATISTICS=1`+`DYLD_PRINT_STATISTICS_DETAILS=1`, parses output, asserts rebase fixup count <2000. Wire into CI as a warning (not failure) gate.
+
+---
+
+## Phase 3 — Metal text renderer
+
+(A) 2026-06-28 +Phase3-Renderer @metal id:040 est:4h dep:005 In `Sources/PicoRender/`, create `MetalTextView.swift`: subclass `NSView`, override `makeBackingLayer` to return `CAMetalLayer`. Set `layer.device = MTLCreateSystemDefaultDevice()`, `pixelFormat = .bgra8Unorm`, `framebufferOnly = true`, `contentsScale = window.backingScaleFactor`. Acceptance: view renders solid clear color.
+(A) 2026-06-28 +Phase3-Renderer @metal id:041 est:6h dep:040 Implement `GlyphAtlas.swift`: bitmap atlas keyed by `(CTFont, CGGlyph)`. On miss, rasterize via `CTFontDrawGlyphs` into CGContext bitmap, upload region into `MTLTexture` (single 2048×2048 page, `.r8Unorm`). Pack via simple skyline algorithm. Acceptance: round-trip test rasters "Hello" glyphs, atlas texture readback matches CoreText reference.
+(A) 2026-06-28 +Phase3-Renderer @metal id:042 est:5h dep:041 Implement `LineShaper.swift`: takes a `String` line + font, calls `CTLineCreateWithAttributedString`, iterates `CTRun`s via `CTLineGetGlyphRuns`, extracts glyph IDs + positions via `CTRunGetGlyphsPtr`+`CTRunGetPositionsPtr`. Output: `[ShapedGlyph(glyphID, x, y, atlasUV)]`. Acceptance: shape a 100-line buffer in <2 ms (measured via signposts).
+(A) 2026-06-28 +Phase3-Renderer @metal id:043 est:6h dep:042 Write Metal shaders `Sources/PicoRender/Shaders.metal`: vertex shader takes per-glyph (atlasUV, screenXY, color), fragment samples atlas texture (single-channel) and multiplies by color. One draw call per frame, instanced quads. Acceptance: renders shaped line.
+(A) 2026-06-28 +Phase3-Renderer @metal id:044 est:4h dep:043 Render loop via `CVDisplayLink` (NOT CADisplayLink — that's iOS-only on older AppKit). On vsync, if dirty, encode draw via `MTLCommandQueue`. Dirty flag set on text/scroll/cursor change. Acceptance: 60 fps idle (no draws), 60/120 fps under scroll.
+(A) 2026-06-28 +Phase3-Renderer @metal id:045 est:3h dep:044 Add cursor + selection overlay rendering: cursor = 2px vertical bar with blink (timer-driven dirty mark); selection = per-line quad behind glyphs. Use same shader pipeline w/ a uniform "no atlas, solid color" branch.
+(A) 2026-06-28 +Phase3-Renderer @metal id:046 est:4h dep:044 Implement viewport + scroll: `TextView` tracks `topLineIndex` + `xOffset`. Render only visible lines (`viewport.height / lineHeight + 1`). Mouse wheel → `scrollWheel(_:)` → update offsets → mark dirty. Acceptance: scroll a 100k-line buffer; CPU <10% sustained.
+(A) 2026-06-28 +Phase3-Renderer @metal id:047 est:3h dep:046 Spike test: load 10M-line synthetic buffer (in-memory `String` for now, no rope yet), scroll page-down repeatedly via automated input, measure FPS via signposts. Target 60+ fps. Document `bench/notes/render-spike.md`. If fails, audit: glyph cache misses? atlas thrashing? per-frame allocs?
+(B) 2026-06-28 +Phase3-Renderer @metal id:048 est:2h dep:046 Add IME (input method) support: implement `NSTextInputClient` on `MetalTextView`. Forward `insertText`, `setMarkedText`, `attributedSubstring(forProposedRange:)`. Acceptance: typing CJK with IME works (manual test).
+(B) 2026-06-28 +Phase3-Renderer @metal id:049 est:2h dep:046 ProMotion 120Hz support: ensure `CAMetalLayer.maximumDrawableCount = 3`, `wantsExtendedDynamicRangeContent = false`, `CVDisplayLink` runs at refresh rate. Verify on 120Hz display.
+(C) 2026-06-28 +Phase3-Renderer @metal id:050 est:3h dep:046 Subpixel-aa for non-Retina displays: detect via `backingScaleFactor < 2.0`, switch atlas to RGB (3-channel) and use Apple's recommended subpixel positioning.
+
+---
+
+## Phase 4 — Rope buffer
+
+(A) 2026-06-28 +Phase4-Buffer @buffer id:060 est:6h dep:005 In `Sources/PicoEditor/Rope.swift`, implement `Rope`: B-tree, branching factor 8, leaf max 1024 UTF-8 bytes. Node summary: `(utf8Bytes: Int, lines: Int, scalars: Int)`. Public API: `init(_ s: String)`, `insert(_ s: String, at offset: Int)`, `remove(_ range: Range<Int>)`, `slice(_ range: Range<Int>) -> String`, `length: Int`, `lineCount: Int`, `lineRange(_ idx: Int) -> Range<Int>`. Ref: [xi-editor rope_science_01](https://github.com/xi-editor/xi-editor/blob/master/docs/docs/rope_science_01.md).
+(A) 2026-06-28 +Phase4-Buffer @buffer id:061 est:3h dep:060 Add summary metric for grapheme-cluster boundaries. Use `String.UnicodeScalarView` + `Character` clustering. Add `graphemeCount` to summary. API: `graphemeIndex(forOffset: Int) -> Int`.
+(A) 2026-06-28 +Phase4-Buffer @buffer id:062 est:4h dep:060 Property-based tests in `Tests/PicoEditorTests/RopeTests.swift` using Swift Testing parameterized tests: random insert/delete sequences, assert equivalence with `Array<Character>` reference impl. 10k iterations. Include xi-editor test vectors where available.
+(A) 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.
+(A) 2026-06-28 +Phase4-Buffer @buffer id:064 est:3h dep:060 Implement line-offset cache: O(1) `offset(forLine: Int)` and `line(forOffset: Int)` via tree summary walk. Test against linear scan on 100k-line buffer.
+(B) 2026-06-28 +Phase4-Buffer @buffer id:065 est:2h dep:062 Fuzz test: AFL/libFuzzer-style harness via `swift test --enable-fuzzing` if available else manual. Random ops + invariant checks (length, line count, content equality).
+
+---
+
+## Phase 5 — Editor core
+
+(A) 2026-06-28 +Phase5-Editor @editor id:080 est:3h dep:060 In `Sources/PicoEditor/Selection.swift`: `struct Selection { var anchor: Int; var head: Int; var affinity: Affinity }`. `struct SelectionSet { var primary: Selection; var secondaries: [Selection] }`. Methods: `merge()` (collapse overlaps), `map(through edit: Edit)`.
+(A) 2026-06-28 +Phase5-Editor @editor id:081 est:4h dep:060,080 `Sources/PicoEditor/Editor.swift`: holds `var rope: Rope`, `var selections: SelectionSet`, `var history: UndoStack`. Commands: `insert(_ s: String)`, `deleteBackward()`, `deleteForward()`, `moveCursor(_ motion: Motion)`, `setSelection(_ s: SelectionSet)`. All commands operate on every selection in set.
+(A) 2026-06-28 +Phase5-Editor @editor id:082 est:4h dep:081 Undo stack: rope snapshot every 32 edits, plus per-edit delta `Edit { range: Range<Int>; oldText: String; newText: String; selectionBefore: SelectionSet }`. `undo()` replays delta inverse; on snapshot boundary, restore snapshot. Test: 1000-edit transcript, undo to empty, redo to final, assert equality.
+(A) 2026-06-28 +Phase5-Editor @editor id:083 est:3h dep:081 Motion primitives: `charForward`, `charBackward`, `wordForward`, `wordBackward`, `lineStart`, `lineEnd`, `bufferStart`, `bufferEnd`, `pageDown`, `pageUp`. Word boundary: alpha-num run or single punct. Test each.
+(A) 2026-06-28 +Phase5-Editor @editor id:084 est:3h dep:040,081 Wire `MetalTextView` → `Editor`: `keyDown(_:)` → translate via `NSResponder` → call editor commands → mark renderer dirty. Initial wiring: hardcoded keys (typing inserts, backspace deletes, arrows move). Acceptance: can type "hello world" into empty buffer and see it render.
+(B) 2026-06-28 +Phase5-Editor @editor id:085 est:2h dep:083 Visual line vs logical line: soft-wrap support deferred to v0.2, but motion API must distinguish. Add `visualLineStart`/`visualLineEnd` no-op stubs.
+
+---
+
+## Phase 6 — Tree-sitter syntax
+
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:100 est:3h dep:005 Vendor tree-sitter C runtime: `git submodule add https://github.com/tree-sitter/tree-sitter Sources/CTreeSitter/upstream` (pin to latest release tag, document tag in `Sources/CTreeSitter/VERSION`). Configure SwiftPM C target: `path: "Sources/CTreeSitter"`, `sources: ["upstream/lib/src/lib.c"]`, `publicHeadersPath: "upstream/lib/include"`, `cSettings: [.headerSearchPath("upstream/lib/src")]`. Verify: `swift build` produces a `libCTreeSitter.a`-equivalent.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:101 est:5h dep:100 Vendor grammars under `Sources/CTSGrammars/grammars/<lang>/`: tree-sitter-typescript, -javascript, -json, -html, -css, -python, -rust, -go, -c, -cpp, -markdown, -yaml, -toml. Each via submodule pinned to a release tag. SwiftPM C target with one source group per grammar, all compiled together but symbols namespaced via `tree_sitter_<lang>`. Verify all link.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:102 est:4h dep:100,101 `Sources/PicoSyntax/Parser.swift`: Swift wrapper for `TSParser`, `TSTree`, `TSNode`. API: `Parser(language: Language)`, `parse(_ rope: Rope, oldTree: Tree?) -> Tree`, uses `TSInput` callback streaming from rope chunks (avoid full-string materialization). Test: parse `large.ts` (100k lines) in <300 ms initial, incremental edit reparse <5 ms.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:103 est:3h dep:102 Highlight queries: load `.scm` files from each grammar's `queries/highlights.scm`. Walk tree via `TSQuery` + `TSQueryCursor`. Output `[(range: Range<Int>, capture: String)]`. Test: TS keywords/strings/comments highlighted correctly.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:104 est:3h dep:103 Theme: `~/.config/pico/theme.toml` maps capture names → color (hex). Bundle default `default-dark.toml` (Solarized-ish) and `default-light.toml`. Apply to glyph rendering via per-glyph color in `ShapedGlyph`.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:105 est:3h dep:104 Lazy grammar loading: do NOT init parsers at launch. On `open(file:)`, detect language via file extension, then `dlopen` is N/A (we statically linked); but defer `TSParser` allocation + grammar bind until first parse. Verify cold-start unaffected with all grammars linked.
+(A) 2026-06-28 +Phase6-Syntax @treesitter id:106 est:3h dep:082,103 Incremental reparse on edit: editor commands emit `TSInputEdit` → `Parser.edit(tree, edit)` → `Parser.parse(rope, oldTree)`. Highlight diff applied to dirty line range. Acceptance: typing in middle of 100k-line file maintains <16 ms frame time.
+
+---
+
+## Phase 7 — File system + tabs + tree
+
+(A) 2026-06-28 +Phase7-FS @appkit id:120 est:4h dep:084 `Sources/PicoApp/Document.swift`: subclass `NSDocument`. Override `read(from:ofType:)` to load into `Rope`. Override `write(to:ofType:)` to dump rope. Override `makeWindowControllers` to install `EditorWindowController` with `MetalTextView`. Test: open small.ts via File > Open, edit, save, verify on disk.
+(A) 2026-06-28 +Phase7-FS @appkit id:121 est:5h dep:120 Tab bar: custom `NSView` subclass `TabBarView`. Each tab = filename + dirty dot + close X. Click switches active document. Cmd-W closes. Cmd-T new untitled. Use `NSStackView` for layout. Style flat, no gradients.
+(A) 2026-06-28 +Phase7-FS @appkit id:122 est:5h dep:120 File tree sidebar: `NSOutlineView` in left split. Root = workspace folder (opened via File > Open Folder). Lazy-load children. Double-click opens file in new tab. Test: open this repo folder, navigate.
+(A) 2026-06-28 +Phase7-FS @appkit id:123 est:2h dep:121 Recent files: `NSDocumentController.shared.noteNewRecentDocument(_:)`. Menu auto-populates via AppKit standard behavior.
+(B) 2026-06-28 +Phase7-FS @appkit id:124 est:3h dep:122 File watcher: use `DispatchSource.makeFileSystemObjectSource` per open file. On external change, prompt to reload.
+(B) 2026-06-28 +Phase7-FS @appkit id:125 est:2h dep:120 Autosave + Versions: enable via `NSDocument.autosavesInPlace = true`. Test that `.~lock` files don't appear (NSDocument handles).
+
+---
+
+## Phase 8 — Command palette
+
+(A) 2026-06-28 +Phase8-Palette @appkit id:140 est:3h dep:121 `Sources/PicoApp/CommandPalette.swift`: borderless `NSPanel`, centered on active window, dismissed on Esc or focus loss. `NSTextField` + `NSTableView` results list. Toggle via Cmd-Shift-P.
+(A) 2026-06-28 +Phase8-Palette @core id:141 est:3h dep:140 `Sources/PicoEditor/CommandRegistry.swift`: `Command { id: String; title: String; defaultKey: String?; run: () -> Void }`. Modules register commands at init. Initial set: editor motions, file ops, view ops.
+(A) 2026-06-28 +Phase8-Palette @core id:142 est:2h dep:140 Fuzzy matcher: implement FZF-style scoring (consecutive matches > non-consecutive > start-of-word bonus). Pure Swift, no deps. Ref: [fzf algo](https://github.com/junegunn/fzf/blob/master/src/algo/algo.go). Test: query "ods" on ["openDocument", "saveDocument"] ranks openDocument first.
+
+---
+
+## Phase 9 — Find/replace
+
+(A) 2026-06-28 +Phase9-Find @editor id:160 est:4h dep:121 Find bar: thin `NSView` overlay at top of editor pane, toggled Cmd-F. Fields: query, replace, options (regex, case, whole-word). Use `NSRegularExpression` for regex.
+(A) 2026-06-28 +Phase9-Find @editor id:161 est:3h dep:160,081 Find next/prev (Cmd-G / Cmd-Shift-G): wraps. Highlights all matches in viewport using selection renderer.
+(A) 2026-06-28 +Phase9-Find @editor id:162 est:3h dep:161 Find-all → multi-cursor: Cmd-Ctrl-G adds a cursor at every match. Verify selection merge on overlap.
+(B) 2026-06-28 +Phase9-Find @editor id:163 est:3h dep:160 Project-wide find: separate panel, walks workspace root, parallel via `DispatchQueue.global()`. Honors `.gitignore` via simple glob filter (no full git integration).
+
+---
+
+## Phase 10 — Keymap engine
+
+(A) 2026-06-28 +Phase10-Keymap @keymap id:180 est:4h dep:005 `Sources/PicoKeymap/Keymap.swift`: `enum Mode { case normal, insert, visual, operatorPending, command, emacs }`. `KeymapEngine` maintains `var modeStack: [Mode]`, `var pendingChord: [Key]`. `func handle(_ event: NSEvent) -> KeymapResult` where result is `.command(id)`, `.partial`, `.passthrough`, `.consumed`.
+(A) 2026-06-28 +Phase10-Keymap @keymap id:181 est:3h dep:180 TOML keymap loader: schema `[mode.normal] "j" = "moveDown"`. Parse via a minimal hand-written TOML reader (avoid deps), or vendor TOMLDecoder-like 200-LOC parser. Acceptance: load `keys.toml`, resolve "jk" chord in normal mode.
+(A) 2026-06-28 +Phase10-Keymap @keymap id:182 est:2h dep:181 Bundle defaults: `Resources/keys.plain.toml`, `Resources/keys.vim.toml`, `Resources/keys.emacs.toml`. User config at `~/.config/pico/keys.toml` overlays selected profile. Switch via Settings or `--profile=vim` flag.
+(A) 2026-06-28 +Phase10-Keymap @keymap id:183 est:3h dep:180,084 Replace hardcoded keys in `MetalTextView.keyDown(_:)` with KeymapEngine dispatch. Acceptance: changing profile changes behavior without recompile.
+
+---
+
+## Phase 11 — Vim profile
+
+(A) 2026-06-28 +Phase11-Vim @vim id:200 est:5h dep:183 Normal-mode motions: h/j/k/l, w/W/b/B/e/E, 0/^/$, gg/G, {/}, f/F/t/T, ;/,. Count prefixes (`3w`). All defined in `keys.vim.toml` mapped to motion commands.
+(A) 2026-06-28 +Phase11-Vim @vim id:201 est:5h dep:200 Operators: d, c, y. Operator-pending mode: after `d`, await motion or text object. Apply to selection. Support `dd` (line), `cc`, `yy`.
+(A) 2026-06-28 +Phase11-Vim @vim id:202 est:4h dep:201 Text objects: iw, aw, i", a", i', a', i(, a(, i[, a[, i{, a{, ip, ap. Resolved by tree-sitter when available else regex fallback.
+(A) 2026-06-28 +Phase11-Vim @vim id:203 est:3h dep:200 Visual modes: v (charwise), V (linewise), Ctrl-V (blockwise). Selection set populated; operators apply.
+(A) 2026-06-28 +Phase11-Vim @vim id:204 est:3h dep:201 Registers: `"`, `0`, `1`-`9`, named `a`-`z`. Yank/delete writes; paste (`p`, `P`) reads. System clipboard = `"+` register, synced via `NSPasteboard.general`.
+(A) 2026-06-28 +Phase11-Vim @vim id:205 est:3h dep:200 Ex commands: `:w`, `:q`, `:wq`, `:x`, `:e <path>`, `:bn`/`:bp`, `:%s/x/y/g`. Command-line via existing CommandPalette UI in command mode.
+(A) 2026-06-28 +Phase11-Vim @vim id:206 est:2h dep:201,082 Wire `u` to undo, `Ctrl-R` to redo. Mind vim's edit-grouping semantics: an insert-mode session = one undo unit.
+(B) 2026-06-28 +Phase11-Vim @vim id:207 est:3h dep:200 Search: `/`, `?`, `n`, `N`. Reuse find infra (id:161).
+(B) 2026-06-28 +Phase11-Vim @vim id:208 est:2h dep:200 Marks: `'` jump-back; defer named marks (a-z) to v0.2.
+(C) 2026-06-28 +Phase11-Vim @vim id:209 est:5h dep:201 Macros: `q<reg>` record, `@<reg>` replay. Recursion-safe.
+
+---
+
+## Phase 12 — Emacs profile
+
+(A) 2026-06-28 +Phase12-Emacs @emacs id:220 est:4h dep:183 Standard motions: C-f, C-b, C-n, C-p, C-a, C-e, M-f, M-b, M-<, M->. Defined in `keys.emacs.toml`.
+(A) 2026-06-28 +Phase12-Emacs @emacs id:221 est:3h dep:220 Kill ring: `KillRing` class, ring of 60 entries. M-w copy, C-w cut, C-y paste, M-y rotate. Sync C-w/M-w to system clipboard.
+(A) 2026-06-28 +Phase12-Emacs @emacs id:222 est:3h dep:220 Prefix keys: C-x map (C-x C-s save, C-x C-f open, C-x b switch buffer, C-x k kill buffer, C-x 0/1/2/3 window ops mapped to split-pane equivalents).
+(A) 2026-06-28 +Phase12-Emacs @emacs id:223 est:3h dep:220 Incremental search: C-s forward, C-r backward. Reuse find infra.
+(B) 2026-06-28 +Phase12-Emacs @emacs id:224 est:2h dep:222 Universal arg: C-u <n>. Pass to next command as count.
+
+---
+
+## Phase 13 — Multi-cursor + column select
+
+(A) 2026-06-28 +Phase13-MultiCursor @editor id:240 est:3h dep:081 Cmd-D: add next match of current word/selection as additional cursor. Reuses find next.
+(A) 2026-06-28 +Phase13-MultiCursor @editor id:241 est:2h dep:081 Cmd-Click on text: add cursor at clicked offset. Cmd-Click on existing cursor: remove it.
+(A) 2026-06-28 +Phase13-MultiCursor @editor id:242 est:3h dep:081 Column select via Opt-drag: builds a vertical block of cursors, one per affected line at the same visual column.
+(B) 2026-06-28 +Phase13-MultiCursor @editor id:243 est:2h dep:240 Cmd-Ctrl-G: select all matches (already in id:162; verify integrated here).
+
+---
+
+## Phase 14 — Split panes
+
+(A) 2026-06-28 +Phase14-Splits @appkit id:260 est:4h dep:121 Replace single editor view with nestable `NSSplitViewController`. Each leaf = `EditorViewController` wrapping a `MetalTextView`. Same buffer can be shown in multiple panes (shared rope, independent viewport/selection).
+(A) 2026-06-28 +Phase14-Splits @appkit id:261 est:2h dep:260 Bindings: Cmd-\ horizontal split, Cmd-Opt-\ vertical, Cmd-W close pane (falls back to close tab if last pane), Cmd-Opt-Arrow focus pane in direction.
+(B) 2026-06-28 +Phase14-Splits @appkit id:262 est:2h dep:260 Save/restore pane layout per window via NSCoder. Honored on relaunch.
+
+---
+
+## Phase 15 — Hardening + regression bench
+
+(A) 2026-06-28 +Phase15-Hardening @ci id:280 est:3h dep:021 Add `bench/scripts/regression.sh`: runs full bench against current `pico` build, compares to `bench/results/baseline-pico-current.json`, fails if any KPI worse by >5%. Wire into CI on PRs.
+(A) 2026-06-28 +Phase15-Hardening @perf id:281 est:4h dep:047 Memory leak audit: `xcrun leaks --atExit -- ./pico --bench-exit-on-ready`. Fix all. Document in `bench/notes/leak-audit.md`.
+(A) 2026-06-28 +Phase15-Hardening @perf id:282 est:3h dep:281 Instruments Allocations trace: open `large.ts`, scroll, edit; identify alloc hotspots. Target zero per-frame allocs in render path.
+(A) 2026-06-28 +Phase15-Hardening @perf id:283 est:2h dep:032 Final dyld audit: re-run `dyld_audit.sh` after all phases, expect <2000 rebases. If grown, identify cause (Swift reference types are #1 suspect — see [Emerge tools post](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)).
+(A) 2026-06-28 +Phase15-Hardening @bench id:284 est:2h dep:280 Re-run full baseline bench. Commit `bench/results/release-candidate.md`. Verify pico beats Zed on cold-start KPI on M-series. If not, do not ship.
+(B) 2026-06-28 +Phase15-Hardening @qa id:285 est:4h dep:047 Soak test: open repo as workspace, open 50 files across tabs, edit each, keep running for 1 h. No crashes, RSS growth <10%.
+
+---
+
+## Phase 16 — Packaging + release
+
+(A) 2026-06-28 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`: bundle id `dev.pico.editor` (or final-name), version 0.1.0, `LSApplicationCategoryType=public.app-category.developer-tools`, `NSAppleEventsUsageDescription` (none, but document), high-resolution capable.
+(A) 2026-06-28 +Phase16-Release @release id:301 est:2h dep:300 Code signing: Developer ID Application cert. Build: `codesign --sign "Developer ID Application: <name>" --options runtime --timestamp Pico.app`. Document in `bench/notes/codesign.md`.
+(A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Pico.dmg --apple-id ... --wait` → `xcrun stapler staple Pico.dmg`. Script in `scripts/notarize.sh`.
+(A) 2026-06-28 +Phase16-Release @release id:303 est:2h dep:301 Build DMG via `create-dmg` (brew). Background image optional. Script in `scripts/make_dmg.sh`.
+(A) 2026-06-28 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with pico vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
+(A) 2026-06-28 +Phase16-Release @release id:305 est:3h dep:303 GitHub Release workflow: `.github/workflows/release.yml` triggered on tag `v*.*.*`. Builds release, signs, notarizes, stapes, uploads DMG + SHA256.
+(B) 2026-06-28 +Phase16-Release @release id:306 est:3h dep:305 Sparkle integration: vendor Sparkle XPC service, point at `https://<host>/appcast.xml`. Defer publishing infra to v0.2 if no host yet.
+(B) 2026-06-28 +Phase16-Release @release id:307 est:3h dep:304 Submit Homebrew cask: open PR against `homebrew/homebrew-cask` per their docs.
+(C) 2026-06-28 +Phase16-Release @release id:308 est:2h dep:304 Pick a final name (NORTHSTAR.md "codename pico"). Decide via short list, register a domain if available. Rebrand bundle id, repo name, README.
+
+---
+
+## Cross-cutting
+
+(B) 2026-06-28 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has ASCII; add SVG via excalidraw export, commit to `docs/arch.svg`).
+(B) 2026-06-28 +XCut @docs id:401 est:1h `docs/keymap-reference.md` auto-generated from the three TOML profiles (write a tiny Swift script `scripts/gen_keymap_docs.swift`).
+(B) 2026-06-28 +XCut @i18n id:402 est:2h Localization: pin `en` only for v0.1. Use `String(localized:)` for all user-visible strings so future locales are mechanical.
+(C) 2026-06-28 +XCut @a11y id:403 est:3h VoiceOver: implement `accessibilityLabel`, `accessibilityRole`, `accessibilityValue` on `MetalTextView` per `NSAccessibilityElement` protocol. At minimum: read current line.
+(C) 2026-06-28 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/pico/themes/*.toml`.
+
+---
+
+## References (consolidated)
+
+- Apple — [Reducing your app's launch time](https://developer.apple.com/documentation/xcode/reducing-your-app-s-launch-time)
+- Apple — [Core Text Programming Guide](https://developer.apple.com/library/archive/documentation/StringsTextFonts/Conceptual/CoreText_Programming/Overview/Overview.html)
+- Metal by Example — [Rendering 3D Text with Core Text](https://metalbyexample.com/text-3d/)
+- Metal by Example — [Rendering Text with SDF](https://metalbyexample.com/rendering-text-in-metal-with-signed-distance-fields/)
+- Xi editor — [Rope science part 1](https://github.com/xi-editor/xi-editor/blob/master/docs/docs/rope_science_01.md), [retrospective](https://raphlinus.github.io/xi/2020/06/27/xi-retrospective.html)
+- Zed — [Rope & SumTree](https://zed.dev/blog/zed-decoded-rope-sumtree)
+- VSCode — [Text Buffer Reimplementation](https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation)
+- Text data structures — [Gap Buffers vs Ropes](https://coredumped.dev/2023/08/09/text-showdown-gap-buffers-vs-ropes/)
+- Tree-sitter — [official](https://github.com/tree-sitter/tree-sitter), [SwiftTreeSitter (reference wrapper)](https://github.com/viktorstrate/swift-tree-sitter)
+- VimR — [Neovim GUI in Swift](https://github.com/qvacua/vimr) (reference for AppKit+Metal+rope-ish architecture, not for embedding nvim)
+- CodeEdit — [source](https://github.com/CodeEditApp/CodeEdit) (reference for native AppKit code-editor patterns)
+- CotEditor — [source](https://github.com/coteditor/CotEditor) (reference for plain-text editor structure)
+- Hyperfine — [github](https://github.com/sharkdp/hyperfine)
+- FZF algo — [src/algo/algo.go](https://github.com/junegunn/fzf/blob/master/src/algo/algo.go)
+- Emerge Tools — [Swift Reference Types and Startup](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)
+- todo.txt format — [spec](https://github.com/todotxt/todo.txt)

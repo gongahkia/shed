@@ -341,6 +341,81 @@ public final class HighlightQuery {
 	}
 }
 
+public final class SyntaxPipeline {
+	public let language: Language
+	private var parser: Parser?
+	private var highlightQuery: HighlightQuery?
+	public private(set) var didAllocateParser = false
+
+	public init(language: Language) {
+		self.language = language
+	}
+
+	public static func language(forFileURL url: URL) -> Language? {
+		switch url.pathExtension.lowercased() {
+		case "c", "h":
+			return .c
+		case "cc", "cpp", "cxx", "hpp", "hxx":
+			return .cpp
+		case "css":
+			return .css
+		case "go":
+			return .go
+		case "html", "htm":
+			return .html
+		case "js", "mjs", "cjs":
+			return .javascript
+		case "json":
+			return .json
+		case "md", "markdown":
+			return .markdown
+		case "py":
+			return .python
+		case "rs":
+			return .rust
+		case "toml":
+			return .toml
+		case "tsx":
+			return .tsx
+		case "ts":
+			return .typescript
+		case "yaml", "yml":
+			return .yaml
+		default:
+			return nil
+		}
+	}
+
+	public func parse(_ rope: Rope, oldTree: Tree? = nil) throws -> Tree {
+		let parser = try ensureParser()
+		return try parser.parse(rope, oldTree: oldTree)
+	}
+
+	public func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
+		let query = try ensureQuery()
+		return try query.highlights(in: tree, byteRange: byteRange)
+	}
+
+	private func ensureParser() throws -> Parser {
+		if let parser {
+			return parser
+		}
+		let parser = try Parser(language: language)
+		self.parser = parser
+		didAllocateParser = true
+		return parser
+	}
+
+	private func ensureQuery() throws -> HighlightQuery {
+		if let highlightQuery {
+			return highlightQuery
+		}
+		let query = try HighlightQuery(language: language)
+		highlightQuery = query
+		return query
+	}
+}
+
 private final class RopeInput {
 	let rope: Rope
 	let capacity = 16 * 1024

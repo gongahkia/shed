@@ -4,6 +4,7 @@ import Dispatch
 import Foundation
 import PicoEditor
 import PicoRender
+import PicoSyntax
 
 final class PicoDocumentController: NSDocumentController {
 	override init() {
@@ -76,12 +77,18 @@ final class PicoDocumentController: NSDocumentController {
 final class PicoDocument: NSDocument {
 	var editor = Editor()
 	private weak var editorView: MetalTextView?
+	private var syntaxPipeline: SyntaxPipeline?
+	private var syntaxTheme: SyntaxTheme?
+	private var syntaxTree: Tree?
 	private let fileWatcherQueue = DispatchQueue(label: "dev.pico.editor.file-watcher")
 	private var fileWatchSource: DispatchSourceFileSystemObject?
 	private var pendingExternalChangePrompt = false
 
 	override var fileURL: URL? {
-		didSet { restartFileWatcher() }
+		didSet {
+			configureSyntaxPipeline()
+			restartFileWatcher()
+		}
 	}
 
 	override init() {
@@ -107,6 +114,8 @@ final class PicoDocument: NSDocument {
 		}
 		editor = Editor(text: text)
 		editorView?.editor = editor
+		configureSyntaxPipeline()
+		refreshSyntaxHighlights()
 		restartFileWatcher()
 	}
 
@@ -125,8 +134,11 @@ final class PicoDocument: NSDocument {
 	func attach(_ view: MetalTextView) {
 		editorView = view
 		view.editor = editor
+		configureSyntaxPipeline()
+		refreshSyntaxHighlights()
 		view.editorDidChange = { [weak self] editor in
 			self?.editor = editor
+			self?.refreshSyntaxHighlights()
 			self?.updateChangeCount(.changeDone)
 		}
 		view.saveRequested = { [weak self] in
@@ -136,6 +148,42 @@ final class PicoDocument: NSDocument {
 			self?.close()
 		}
 		restartFileWatcher()
+	}
+
+	private func configureSyntaxPipeline() {
+		guard let url = fileURL, let language = SyntaxPipeline.language(forFileURL: url) else {
+			syntaxPipeline = nil
+			syntaxTree = nil
+			editorView?.highlightSpans = []
+			return
+		}
+		if syntaxPipeline?.language != language {
+			syntaxPipeline = SyntaxPipeline(language: language)
+			syntaxTree = nil
+		}
+	}
+
+	private func refreshSyntaxHighlights() {
+		guard let editorView, let syntaxPipeline else {
+			editorView?.highlightSpans = []
+			return
+		}
+		do {
+			if syntaxTheme == nil {
+				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
+			}
+			let tree = try syntaxPipeline.parse(editor.rope)
+			syntaxTree = tree
+			let spans = try syntaxPipeline.highlights(in: tree).compactMap { span -> TextHighlightSpan? in
+				guard let color = syntaxTheme?.color(for: span.capture) else {
+					return nil
+				}
+				return TextHighlightSpan(range: span.range, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
+			}
+			editorView.highlightSpans = spans
+		} catch {
+			editorView.highlightSpans = []
+		}
 	}
 
 	private func restartFileWatcher() {

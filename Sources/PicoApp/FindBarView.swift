@@ -13,6 +13,7 @@ final class FindBarView: NSView {
 	var onDismiss: (() -> Void)?
 	var onStateChange: ((FindBarState) -> Void)?
 	var onFindNext: (() -> Void)?
+	var onFindPrevious: (() -> Void)?
 	private let queryField = FindBarTextField(frame: .zero)
 	private let replaceField = FindBarTextField(frame: .zero)
 	private let regexButton = NSButton(checkboxWithTitle: "Regex", target: nil, action: nil)
@@ -67,6 +68,7 @@ final class FindBarView: NSView {
 			field.font = .systemFont(ofSize: 12)
 			field.onCancel = { [weak self] in self?.onDismiss?() }
 			field.onConfirm = { [weak self] in self?.onFindNext?() }
+			field.onFindPrevious = { [weak self] in self?.onFindPrevious?() }
 			field.delegate = self
 		}
 		for button in [regexButton, caseButton, wholeWordButton] {
@@ -132,8 +134,17 @@ extension FindBarView: NSTextFieldDelegate {
 final class FindBarTextField: NSTextField {
 	var onCancel: (() -> Void)?
 	var onConfirm: (() -> Void)?
+	var onFindPrevious: (() -> Void)?
 
 	override func keyDown(with event: NSEvent) {
+		if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "s" {
+			onConfirm?()
+			return
+		}
+		if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "r" {
+			onFindPrevious?()
+			return
+		}
 		switch event.keyCode {
 		case 36:
 			onConfirm?()

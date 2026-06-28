@@ -205,6 +205,23 @@ import Testing
 	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical"])
 }
 
+@Test func emacsIncrementalSearchCommandsRouteToHost() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var commands: [String] = []
+	view.commandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("s", modifiers: .control)], commandID: "emacs.isearchForward"),
+		KeyBinding(mode: .emacs, chord: [Key("r", modifiers: .control)], commandID: "emacs.isearchBackward"),
+	])
+
+	#expect(view.handleKey(characters: "\u{13}", charactersIgnoringModifiers: "s", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "\u{12}", charactersIgnoringModifiers: "r", keyCode: 0, modifierFlags: .control))
+	#expect(commands == ["emacs.isearchForward", "emacs.isearchBackward"])
+}
+
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

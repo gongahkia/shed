@@ -50,7 +50,8 @@ x 2026-06-28 +Phase2-ColdStart @perf id:032 est:3h dep:031 If id:031 exceeds 150
 
 ## Phase 4 — Rope buffer
 
-(A) 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.
+x 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.
+(A) 2026-06-28 +Phase4-Buffer @buffer id:064 est:4h dep:063 Bring rope random insert below the <100 ns/op target. Current 1M release run: 331,601.466 ns/op. Replace per-edit `String` leaf copy/path allocation with a faster edit representation, then rerun `bench/notes/rope-bench.md`.
 
 ---
 

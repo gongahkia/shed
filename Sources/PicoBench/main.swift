@@ -1,13 +1,32 @@
 import AppKit
 import ApplicationServices
+import CoreVideo
 import Darwin
 import Dispatch
 import Foundation
+
+private struct LatencyOptions {
+	var pid: Int32
+	var keyCode: CGKeyCode
+	var displayID: CGDirectDisplayID
+	var timeoutMS: Int
+	var dirtyRects: Int
+}
 
 private struct MeasureOptions {
 	var app: String
 	var args: [String]
 	var warmupPurge: Bool
+}
+
+private struct LatencyResult: Encodable {
+	var display_id: UInt32
+	var dirty_rects: Int
+	var event_to_keydown_ms: Double
+	var key_code: UInt16
+	var keydown_to_paint_ms: Double
+	var latency_ms: Double
+	var pid: Int32
 }
 
 private struct MeasureResult: Encodable {
@@ -38,6 +57,15 @@ private enum BenchError: Error, CustomStringConvertible {
 	case axPermissionMissing
 	case axObserverFailed(AXError)
 	case axNotificationFailed(AXError)
+	case appNotRunning(Int32)
+	case displayStreamFailed
+	case displayStreamStartFailed(CGError)
+	case eventListenPermissionMissing
+	case eventPostFailed
+	case eventPostPermissionMissing
+	case eventTapFailed
+	case latencyTimeout
+	case screenCapturePermissionMissing
 	case windowTimeout
 	case rssFailed(Int32, Int32)
 	case purgeTimeout
@@ -60,6 +88,24 @@ private enum BenchError: Error, CustomStringConvertible {
 			"AXObserverCreate failed: \(error.rawValue)"
 		case let .axNotificationFailed(error):
 			"AXObserverAddNotification failed: \(error.rawValue)"
+		case let .appNotRunning(pid):
+			"no running app for pid \(pid)"
+		case .displayStreamFailed:
+			"CGDisplayStreamCreateWithDispatchQueue failed"
+		case let .displayStreamStartFailed(error):
+			"CGDisplayStreamStart failed: \(error.rawValue)"
+		case .eventListenPermissionMissing:
+			"input monitoring permission is required for latency"
+		case .eventPostFailed:
+			"failed to create keyboard event"
+		case .eventPostPermissionMissing:
+			"accessibility event-post permission is required for latency"
+		case .eventTapFailed:
+			"CGEventTapCreateForPid failed"
+		case .latencyTimeout:
+			"latency measurement timed out"
+		case .screenCapturePermissionMissing:
+			"screen capture permission is required for latency"
 		case .windowTimeout:
 			"window creation timed out"
 		case let .rssFailed(pid, err):
@@ -90,10 +136,16 @@ enum PicoBenchMain {
 			try printJSON(SmokeResult(mode: "smoke", runs: parseRuns(args)))
 			return
 		}
+		if args.isEmpty || args.first == "--help" || args.first == "-h" {
+			print(usage)
+			return
+		}
 		guard let command = args.first else {
-			throw BenchError.usage("usage: picobench measure --app <path> [--args <arg>] [--warmup-purge] | picobench rss --pid <pid>")
+			throw BenchError.usage(usage)
 		}
 		switch command {
+		case "latency":
+			try printJSON(latency(parseLatency(Array(args.dropFirst()))))
 		case "measure":
 			try printJSON(measure(parseMeasure(Array(args.dropFirst()))))
 		case "rss":
@@ -124,6 +176,61 @@ enum PicoBenchMain {
 			throw BenchError.badPID(valueIndex < args.endIndex ? args[valueIndex] : "")
 		}
 		return pid
+	}
+
+	private static func parseLatency(_ args: [String]) throws -> LatencyOptions {
+		var pid: Int32?
+		var keyCode: CGKeyCode = 0
+		var displayID = CGMainDisplayID()
+		var timeoutMS = 2_000
+		var dirtyRects = 1
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--pid":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int32(args[valueIndex]) else {
+					throw BenchError.badPID(valueIndex < args.endIndex ? args[valueIndex] : "")
+				}
+				pid = value
+				index = args.index(after: valueIndex)
+			case "--key-code":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt16(args[valueIndex]) else {
+					throw BenchError.usage("invalid --key-code")
+				}
+				keyCode = CGKeyCode(value)
+				index = args.index(after: valueIndex)
+			case "--display":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt32(args[valueIndex]) else {
+					throw BenchError.usage("invalid --display")
+				}
+				displayID = CGDirectDisplayID(value)
+				index = args.index(after: valueIndex)
+			case "--timeout-ms":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --timeout-ms")
+				}
+				timeoutMS = value
+				index = args.index(after: valueIndex)
+			case "--dirty-rects":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --dirty-rects")
+				}
+				dirtyRects = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown latency option: \(arg)")
+			}
+		}
+		guard let pid else {
+			throw BenchError.usage("usage: picobench latency --pid <pid> [--key-code <code>]")
+		}
+		return LatencyOptions(pid: pid, keyCode: keyCode, displayID: displayID, timeoutMS: timeoutMS, dirtyRects: dirtyRects)
 	}
 
 	private static func parseMeasure(_ args: [String]) throws -> MeasureOptions {
@@ -159,6 +266,54 @@ enum PicoBenchMain {
 			throw BenchError.usage("usage: picobench measure --app <path> [--args <arg>] [--warmup-purge]")
 		}
 		return MeasureOptions(app: app, args: appArgs, warmupPurge: warmupPurge)
+	}
+
+	private static func latency(_ options: LatencyOptions) throws -> LatencyResult {
+		guard CGPreflightListenEventAccess() else {
+			throw BenchError.eventListenPermissionMissing
+		}
+		guard CGPreflightPostEventAccess() else {
+			throw BenchError.eventPostPermissionMissing
+		}
+		guard CGPreflightScreenCaptureAccess() else {
+			throw BenchError.screenCapturePermissionMissing
+		}
+		guard let app = NSRunningApplication(processIdentifier: options.pid) else {
+			throw BenchError.appNotRunning(options.pid)
+		}
+		app.activate(options: [.activateIgnoringOtherApps])
+		let deadline = Date(timeIntervalSinceNow: Double(options.timeoutMS) / 1000)
+		let probe = LatencyProbe(requiredDirtyRects: options.dirtyRects)
+		let tap = try makeEventTap(pid: options.pid, probe: probe)
+		let tapSource = CFMachPortCreateRunLoopSource(nil, tap, 0)
+		CFRunLoopAddSource(CFRunLoopGetCurrent(), tapSource, .defaultMode)
+		defer {
+			CFRunLoopRemoveSource(CFRunLoopGetCurrent(), tapSource, .defaultMode)
+			CFMachPortInvalidate(tap)
+		}
+		let stream = try makeDisplayStream(displayID: options.displayID, probe: probe)
+		defer { stream.stop() }
+		try wait(until: { probe.hasBaseline }, deadline: deadline)
+		Thread.sleep(forTimeInterval: 0.05)
+		let postedAt = DispatchTime.now().uptimeNanoseconds
+		probe.markPosted(postedAt)
+		try postKey(pid: options.pid, keyCode: options.keyCode)
+		try wait(until: { probe.keyDownTimestamp != nil }, deadline: deadline)
+		try wait(until: { probe.paintTimestamp != nil }, deadline: deadline)
+		guard let keyDownAt = probe.keyDownTimestamp, let paintAt = probe.paintTimestamp else {
+			throw BenchError.latencyTimeout
+		}
+		let eventToKeyDown = Double(keyDownAt - postedAt) / 1_000_000
+		let keyDownToPaint = Double(paintAt - keyDownAt) / 1_000_000
+		return LatencyResult(
+			display_id: options.displayID,
+			dirty_rects: probe.paintDirtyRects,
+			event_to_keydown_ms: eventToKeyDown,
+			key_code: options.keyCode,
+			keydown_to_paint_ms: keyDownToPaint,
+			latency_ms: keyDownToPaint,
+			pid: options.pid
+		)
 	}
 
 	private static func measure(_ options: MeasureOptions) throws -> MeasureResult {
@@ -269,6 +424,66 @@ enum PicoBenchMain {
 		return !windows.isEmpty
 	}
 
+	private static func makeEventTap(pid: Int32, probe: LatencyProbe) throws -> CFMachPort {
+		let mask = CGEventMask(1) << CGEventType.keyDown.rawValue
+		let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(probe).toOpaque())
+		guard let tap = CGEvent.tapCreateForPid(
+			pid: pid,
+			place: .headInsertEventTap,
+			options: .listenOnly,
+			eventsOfInterest: mask,
+			callback: latencyEventTapCallback,
+			userInfo: refcon
+		) else {
+			throw BenchError.eventTapFailed
+		}
+		CGEvent.tapEnable(tap: tap, enable: true)
+		return tap
+	}
+
+	private static func makeDisplayStream(displayID: CGDirectDisplayID, probe: LatencyProbe) throws -> CGDisplayStream {
+		let width = CGDisplayPixelsWide(displayID)
+		let height = CGDisplayPixelsHigh(displayID)
+		let queue = DispatchQueue(label: "dev.pico.picobench.latency.display")
+		guard let stream = CGDisplayStream(
+			dispatchQueueDisplay: displayID,
+			outputWidth: width,
+			outputHeight: height,
+			pixelFormat: Int32(kCVPixelFormatType_32BGRA),
+			properties: nil,
+			queue: queue,
+			handler: { status, _, _, update in
+				probe.handleFrame(status: status, update: update)
+			}
+		) else {
+			throw BenchError.displayStreamFailed
+		}
+		let error = stream.start()
+		guard error == .success else {
+			throw BenchError.displayStreamStartFailed(error)
+		}
+		return stream
+	}
+
+	private static func postKey(pid: Int32, keyCode: CGKeyCode) throws {
+		let source = CGEventSource(stateID: .hidSystemState)
+		guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+		      let up = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) else {
+			throw BenchError.eventPostFailed
+		}
+		down.post(tap: .cghidEventTap)
+		up.post(tap: .cghidEventTap)
+	}
+
+	private static func wait(until condition: () -> Bool, deadline: Date) throws {
+		while !condition(), Date() < deadline {
+			RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.005))
+		}
+		guard condition() else {
+			throw BenchError.latencyTimeout
+		}
+	}
+
 	private static func residentSizeKB(pid: Int32) throws -> UInt64 {
 		var info = rusage_info_v2()
 		let result = withUnsafeMutablePointer(to: &info) { pointer in
@@ -321,6 +536,13 @@ enum PicoBenchMain {
 			print(#"{"error":"unknown"}"#)
 		}
 	}
+
+	private static let usage = """
+	usage:
+	  picobench measure --app <path> [--args <arg>] [--warmup-purge]
+	  picobench rss --pid <pid>
+	  picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
+	"""
 }
 
 private final class WindowWaiter {
@@ -349,10 +571,94 @@ private final class WindowWaiter {
 	}
 }
 
+private final class LatencyProbe {
+	private let lock = NSLock()
+	private let requiredDirtyRects: Int
+	private var baselineReady = false
+	private var postedAt: UInt64?
+	private var keyDownAt: UInt64?
+	private var paintAt: UInt64?
+	private var dirtyRectsAtPaint = 0
+
+	init(requiredDirtyRects: Int) {
+		self.requiredDirtyRects = requiredDirtyRects
+	}
+
+	var hasBaseline: Bool {
+		lock.lock()
+		defer { lock.unlock() }
+		return baselineReady
+	}
+
+	var keyDownTimestamp: UInt64? {
+		lock.lock()
+		defer { lock.unlock() }
+		return keyDownAt
+	}
+
+	var paintTimestamp: UInt64? {
+		lock.lock()
+		defer { lock.unlock() }
+		return paintAt
+	}
+
+	var paintDirtyRects: Int {
+		lock.lock()
+		defer { lock.unlock() }
+		return dirtyRectsAtPaint
+	}
+
+	func markPosted(_ timestamp: UInt64) {
+		lock.lock()
+		defer { lock.unlock() }
+		postedAt = timestamp
+	}
+
+	func markKeyDown(_ timestamp: UInt64) {
+		lock.lock()
+		defer { lock.unlock() }
+		guard keyDownAt == nil else {
+			return
+		}
+		keyDownAt = timestamp
+	}
+
+	func handleFrame(status: CGDisplayStreamFrameStatus, update: CGDisplayStreamUpdate?) {
+		guard status == .frameComplete else {
+			return
+		}
+		var count = 0
+		if let update {
+			var rectCount = 0
+			_ = update.getRects(.dirtyRects, rectCount: &rectCount)
+			count = rectCount
+		}
+		lock.lock()
+		defer { lock.unlock() }
+		guard baselineReady else {
+			baselineReady = true
+			return
+		}
+		guard postedAt != nil, keyDownAt != nil, paintAt == nil, count >= requiredDirtyRects else {
+			return
+		}
+		paintAt = DispatchTime.now().uptimeNanoseconds
+		dirtyRectsAtPaint = count
+	}
+}
+
 private let axCallback: AXObserverCallback = { _, _, notification, refcon in
 	guard notification as String == kAXWindowCreatedNotification, let refcon else {
 		return
 	}
 	let waiter = Unmanaged<WindowWaiter>.fromOpaque(refcon).takeUnretainedValue()
 	waiter.mark(DispatchTime.now().uptimeNanoseconds)
+}
+
+private let latencyEventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
+	if type == .keyDown, let refcon {
+		let probe = Unmanaged<LatencyProbe>.fromOpaque(refcon).takeUnretainedValue()
+		probe.markKeyDown(DispatchTime.now().uptimeNanoseconds)
+	}
+	return Unmanaged.passUnretained(event)
 }

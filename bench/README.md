@@ -14,3 +14,13 @@
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
 - **Regression gate:** PR CI runs the harness against `pico` only; fails if any KPI regresses >5% vs `main` baseline.
+
+## CLI
+
+```sh
+picobench measure --app <path> [--args <arg>] [--warmup-purge]
+picobench rss --pid <pid>
+picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
+```
+
+`latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.

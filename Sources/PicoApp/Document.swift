@@ -278,6 +278,12 @@ final class EditorWindowController: NSWindowController {
 			editorView.commandRequested = { [weak self] commandID in
 				self?.performKeymapCommand(commandID) ?? false
 			}
+			editorView.exCommandRequested = { [weak self] command in
+				self?.performExCommand(command) ?? false
+			}
+			editorView.exCommandLineRequested = { [weak self] completion in
+				PicoCommandPaletteBridge.shared.requestExCommand(relativeTo: self?.window, completion: completion)
+			}
 			findBarView.onDismiss = { [weak self] in
 				self?.setFindBarVisible(false)
 			}
@@ -358,6 +364,43 @@ final class EditorWindowController: NSWindowController {
 			return false
 		}
 		return true
+	}
+
+	private func performExCommand(_ command: String) -> Bool {
+		switch command {
+		case "w":
+			(document as? NSDocument)?.save(nil)
+		case "q":
+			(document as? NSDocument)?.close()
+		case "wq", "x":
+			(document as? NSDocument)?.save(nil)
+			(document as? NSDocument)?.close()
+		case "bn":
+			PicoTabCoordinator.shared.selectAdjacentDocument(delta: 1)
+		case "bp":
+			PicoTabCoordinator.shared.selectAdjacentDocument(delta: -1)
+		default:
+			if command.hasPrefix("e ") {
+				return openExCommandPath(String(command.dropFirst(2)))
+			}
+			return false
+		}
+		return true
+	}
+
+	private func openExCommandPath(_ path: String) -> Bool {
+		let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !trimmed.isEmpty else {
+			return false
+		}
+		let url: URL
+		if trimmed.hasPrefix("/") {
+			url = URL(fileURLWithPath: trimmed)
+		} else {
+			let base = document?.fileURL?.deletingLastPathComponent() ?? PicoWorkspaceController.shared.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+			url = base.appendingPathComponent(trimmed)
+		}
+		return PicoWorkspaceController.shared.openFile(at: url)
 	}
 
 	private func setFindBarVisible(_ visible: Bool) {

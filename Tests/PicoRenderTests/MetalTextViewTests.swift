@@ -257,6 +257,63 @@ import Testing
 	#expect(NSPasteboard.general.string(forType: .string) == "clip\n")
 }
 
+@Test func vimExSubstitutionEditsBuffer() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "foo foo\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key(";", modifiers: .shift)], commandID: "vim.ex.start"),
+	])
+
+	#expect(view.handleKey(characters: ":", charactersIgnoringModifiers: ";", keyCode: 0, modifierFlags: .shift))
+	for character in "%s/foo/bar/g" {
+		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
+	}
+	#expect(view.handleKey(characters: "\n", charactersIgnoringModifiers: "\n", keyCode: 36))
+	#expect(view.editor.text == "bar bar\n")
+}
+
+@Test func vimExCommandRoutesToHost() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var commands: [String] = []
+	view.exCommandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key(";", modifiers: .shift)], commandID: "vim.ex.start"),
+	])
+
+	#expect(view.handleKey(characters: ":", charactersIgnoringModifiers: ";", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(view.handleKey(characters: "q", charactersIgnoringModifiers: "q", keyCode: 0))
+	#expect(view.handleKey(characters: "\n", charactersIgnoringModifiers: "\n", keyCode: 36))
+	#expect(commands == ["wq"])
+}
+
+@Test func vimExCommandUsesCommandLineRequestWhenAvailable() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var completion: ((String?) -> Void)?
+	var commands: [String] = []
+	view.exCommandLineRequested = { finish in
+		completion = finish
+		return true
+	}
+	view.exCommandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key(";", modifiers: .shift)], commandID: "vim.ex.start"),
+	])
+
+	#expect(view.handleKey(characters: ":", charactersIgnoringModifiers: ";", keyCode: 0, modifierFlags: .shift))
+	#expect(view.keymapEngine.mode == .command)
+	#expect(completion != nil)
+	completion?(":wq")
+	#expect(view.keymapEngine.mode == .normal)
+	#expect(commands == ["wq"])
+}
+
 @Test func textInputClientCommitsAndMarksIMEText() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)

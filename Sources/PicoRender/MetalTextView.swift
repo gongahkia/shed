@@ -67,6 +67,8 @@ public final class MetalTextView: NSView {
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
+	public var exCommandRequested: ((String) -> Bool)?
+	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var keymapEngine = KeymapEngine()
 	private var pendingCharacterMotion: CharacterMotion?
 	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
@@ -78,6 +80,7 @@ public final class MetalTextView: NSView {
 	private var awaitingRegister = false
 	private var pendingRegister: String?
 	private var registers: [String: String] = [:]
+	private var pendingExCommand: String?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -234,6 +237,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if handleExCommandInput(event) {
+			return
+		}
 		if handlePendingRegister(event) {
 			return
 		}
@@ -276,6 +282,9 @@ public final class MetalTextView: NSView {
 			isARepeat: false,
 			keyCode: keyCode
 		)
+		if let event, handleExCommandInput(event) {
+			return true
+		}
 		if let event, handlePendingRegister(event) {
 			return true
 		}
@@ -428,6 +437,15 @@ public final class MetalTextView: NSView {
 			return true
 		case "vim.pasteBefore":
 			pasteRegister(after: false)
+			return true
+		case "vim.ex.start":
+			keymapEngine.setMode(.command)
+			if exCommandLineRequested?({ [weak self] command in
+				self?.finishExCommand(command)
+			}) == true {
+				return true
+			}
+			pendingExCommand = ""
 			return true
 		case "vim.visual.char":
 			beginVisualMode(.character)
@@ -646,6 +664,68 @@ public final class MetalTextView: NSView {
 		let start = editor.rope.offset(forLine: line)
 		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
 		return start ..< end
+	}
+
+	private func handleExCommandInput(_ event: NSEvent) -> Bool {
+		guard pendingExCommand != nil else {
+			return false
+		}
+		switch event.keyCode {
+		case 36:
+			let command = pendingExCommand ?? ""
+			pendingExCommand = nil
+			finishExCommand(command)
+		case 51:
+			if pendingExCommand?.isEmpty == false {
+				pendingExCommand?.removeLast()
+			}
+		case 53:
+			pendingExCommand = nil
+			keymapEngine.setMode(.normal)
+		default:
+			guard event.modifierFlags.intersection([.command, .control]).isEmpty, let characters = event.characters, !characters.isEmpty else {
+				return true
+			}
+			pendingExCommand? += characters
+		}
+		return true
+	}
+
+	private func finishExCommand(_ command: String?) {
+		keymapEngine.setMode(.normal)
+		guard let command else {
+			return
+		}
+		executeExCommand(command)
+	}
+
+	private func executeExCommand(_ command: String) {
+		let trimmed = command.trimmingCharacters(in: .whitespacesAndNewlines)
+		let normalized = trimmed.hasPrefix(":") ? String(trimmed.dropFirst()) : trimmed
+		if executeSubstitution(normalized) {
+			return
+		}
+		_ = exCommandRequested?(normalized)
+	}
+
+	private func executeSubstitution(_ command: String) -> Bool {
+		guard command.hasPrefix("%s/"), command.hasSuffix("/g") else {
+			return false
+		}
+		let body = command.dropFirst(3).dropLast(2)
+		let parts = body.split(separator: "/", omittingEmptySubsequences: false)
+		guard parts.count == 2 else {
+			return false
+		}
+		let needle = String(parts[0])
+		let replacement = String(parts[1])
+		guard !needle.isEmpty else {
+			return true
+		}
+		editor = Editor(text: editor.text.replacingOccurrences(of: needle, with: replacement))
+		syncEditorState()
+		editorDidChange?(editor)
+		return true
 	}
 
 	private func handlePendingRegister(_ event: NSEvent) -> Bool {

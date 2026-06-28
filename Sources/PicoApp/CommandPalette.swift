@@ -1,22 +1,14 @@
 import AppKit
 import Dispatch
-
-struct CommandPaletteItem {
-	let title: String
-	let run: () -> Void
-}
+import PicoEditor
 
 final class CommandPaletteController: NSObject {
-	private let documentController: PicoDocumentController
-	private let openFolder: () -> Void
-	private let closeDocument: () -> Void
+	private let registry: CommandRegistry
 	private var panel: CommandPalettePanel?
 	private var contentView: CommandPaletteView?
 
-	init(documentController: PicoDocumentController, openFolder: @escaping () -> Void, closeDocument: @escaping () -> Void) {
-		self.documentController = documentController
-		self.openFolder = openFolder
-		self.closeDocument = closeDocument
+	init(registry: CommandRegistry) {
+		self.registry = registry
 	}
 
 	func toggle(relativeTo hostWindow: NSWindow?) {
@@ -33,7 +25,7 @@ final class CommandPaletteController: NSObject {
 
 	private func show(relativeTo hostWindow: NSWindow?) {
 		let panel = makePanelIfNeeded()
-		contentView?.setItems(commandItems())
+		contentView?.setItems(registry.commands)
 		center(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
@@ -82,26 +74,6 @@ final class CommandPaletteController: NSObject {
 		panel.setFrame(frame, display: true)
 	}
 
-	private func commandItems() -> [CommandPaletteItem] {
-		[
-			CommandPaletteItem(title: "New File") { [weak documentController] in
-				documentController?.newDocument(nil)
-			},
-			CommandPaletteItem(title: "Open File") { [weak documentController] in
-				documentController?.openDocument(nil)
-			},
-			CommandPaletteItem(title: "Open Folder") { [openFolder] in
-				openFolder()
-			},
-			CommandPaletteItem(title: "Save File") { [weak documentController] in
-				let document = NSApp.keyWindow?.windowController?.document as? NSDocument ?? documentController?.currentDocument
-				document?.save(nil)
-			},
-			CommandPaletteItem(title: "Close File") { [closeDocument] in
-				closeDocument()
-			},
-		]
-	}
 }
 
 extension CommandPaletteController: NSWindowDelegate {
@@ -154,12 +126,12 @@ final class CommandPalettePanel: NSPanel {
 
 final class CommandPaletteView: NSView {
 	var onCancel: (() -> Void)?
-	var onRun: ((CommandPaletteItem) -> Void)?
+	var onRun: ((Command) -> Void)?
 	private let inputField = CommandPaletteInputField(frame: .zero)
 	private let tableView = NSTableView()
 	private let scrollView = NSScrollView()
-	private var items: [CommandPaletteItem] = []
-	private var filteredItems: [CommandPaletteItem] = []
+	private var items: [Command] = []
+	private var filteredItems: [Command] = []
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -171,7 +143,7 @@ final class CommandPaletteView: NSView {
 		configure()
 	}
 
-	func setItems(_ items: [CommandPaletteItem]) {
+	func setItems(_ items: [Command]) {
 		self.items = items
 		inputField.stringValue = ""
 		filterItems()

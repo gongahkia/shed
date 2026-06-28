@@ -181,6 +181,11 @@ public final class MetalTextView: NSView {
 		markDirty()
 	}
 
+	public func performMotion(_ motion: Motion) {
+		editor.moveCursor(motion)
+		syncEditorState()
+	}
+
 	public override func scrollWheel(with event: NSEvent) {
 		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}

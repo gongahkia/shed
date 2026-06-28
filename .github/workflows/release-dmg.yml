@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   notarized-dmg:
     name: Build signed notarized DMG
@@ -13,6 +16,14 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Require tag ref
+        run: |
+          test "${GITHUB_REF_TYPE}" = "tag"
+          case "${GITHUB_REF_NAME}" in
+            v*) ;;
+            *) echo "release ref must be a v* tag" >&2; exit 1 ;;
+          esac
 
       - name: Require release secrets
         env:
@@ -60,9 +71,39 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
         run: scripts/notarize-macos-dmg.sh
 
-      - name: Upload stapled DMG
+      - name: Prepare release assets
+        run: |
+          release_dir="dist/release"
+          version="${GITHUB_REF_NAME}"
+          dmg_name="Olly-${version}.dmg"
+          source_name="olly-${version}-source.tar.gz"
+          mkdir -p "$release_dir"
+          cp dist/Olly.dmg "$release_dir/$dmg_name"
+          git archive --format tar.gz --prefix "olly-${version}/" -o "$release_dir/$source_name" HEAD
+          (cd "$release_dir" && shasum -a 256 "$dmg_name" "$source_name" > SHA256SUMS)
+
+      - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
-          name: Olly.dmg
-          path: dist/Olly.dmg
+          name: release-assets
+          path: dist/release/
           if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          release_dir="dist/release"
+          assets=(
+            "$release_dir/Olly-${GITHUB_REF_NAME}.dmg"
+            "$release_dir/olly-${GITHUB_REF_NAME}-source.tar.gz"
+            "$release_dir/SHA256SUMS"
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "${assets[@]}" \
+              --verify-tag \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi

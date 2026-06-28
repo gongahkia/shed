@@ -127,6 +127,7 @@ These bundle IDs are floated by default; users can override in DSL. Updated as e
 com.lowtechguys.Alcove
 com.akashpawar.notchnook
 com.tymmesyde.boring-notch
+com.monuk7735.mew.notch
 com.lukegrubb.NotchFlow
 com.codykerns.TopNotch
 com.notchmeister.Notchmeister

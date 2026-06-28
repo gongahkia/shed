@@ -92,4 +92,3 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 (B) 2026-06-26 Maintain `docs/layouts-research.md` as living doc; add a new entry whenever a contributor proposes or studies a new layout paradigm +continuous @docs ref:N§6
 (B) 2026-06-26 Maintain `docs/menubar-notch-integration.md` as living doc; add an entry whenever a new menubar/notch utility ships or breaks integration +continuous @docs @ecosystem ref:N§7
 (B) 2026-06-26 Cooperative-apps allowlist (NORTHSTAR §7b) is updated via PR; require evidence (screenshot or repro) of conflict before adding bundle IDs +continuous @ecosystem @docs ref:N§7b
-(C) 2026-06-26 Quarterly: re-survey notch-app ecosystem (Alcove/NotchNook/Boring Notch releases, new entrants); update cooperative-apps list + safe-zone defaults if a notch app's expansion behavior changes +continuous @docs @ecosystem ref:N§7b

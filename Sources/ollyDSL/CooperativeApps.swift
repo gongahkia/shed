@@ -26,13 +26,14 @@ public struct CooperativeApp: Codable, Equatable, ExpressibleByStringLiteral, Se
 
 /// Purpose: Configures apps whose windows should be floated for ecosystem compatibility.
 /// Parameters: Select a mode and provide bundle IDs or `CooperativeApp` entries.
-/// Example: `CooperativeApps { "com.example.NotchOverlay" }`
+/// Example: `CooperativeApps { "com.monuk7735.mew.notch" }`
 /// See also: `CooperativeAppsMode`, `CooperativeApp`.
 public struct CooperativeApps: Codable, Equatable, Sendable {
     public static let defaultBundleIDs = [
         "com.lowtechguys.Alcove",
         "com.akashpawar.notchnook",
         "com.tymmesyde.boring-notch",
+        "com.monuk7735.mew.notch",
         "com.lukegrubb.NotchFlow",
         "com.codykerns.TopNotch",
         "com.notchmeister.Notchmeister",

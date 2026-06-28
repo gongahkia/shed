@@ -788,7 +788,7 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 - Purpose: Configures apps whose windows should be floated for ecosystem compatibility.
 - Parameters: Select a mode and provide bundle IDs or `CooperativeApp` entries.
-- Example: `CooperativeApps { "com.example.NotchOverlay" }`
+- Example: `CooperativeApps { "com.monuk7735.mew.notch" }`
 - See also: `CooperativeAppsMode`, `CooperativeApp`.
 
 ### CooperativeAppBuilder

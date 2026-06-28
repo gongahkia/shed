@@ -430,6 +430,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Engines { Tabbed(tabBarHeight: 30) }`
 - See also: `Accordion(stripHeight:)`, `Monocle()`.
 
+### Stacked(railWidth:)
+
+`func Stacked(railWidth: CGFloat = 160) -> EngineDeclaration`
+
+- Purpose: Declares the Stacked layout engine.
+- Parameters: `railWidth` reserves space for the app-rendered left title rail.
+- Example: `Engines { Stacked(railWidth: 180) }`
+- See also: `Tabbed(tabBarHeight:)`, `Accordion(stripHeight:)`.
+
 ### Engines
 
 `struct Engines`

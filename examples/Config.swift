@@ -32,6 +32,7 @@ public func ollyConfig() -> Config {
             ThreeCol(masterRatio: 0.5)
             Accordion()
             Tabbed(tabBarHeight: 30)
+            Stacked(railWidth: 180)
         }
 
         Animation {
@@ -92,6 +93,7 @@ public func ollyConfig() -> Config {
             Keybind(KeyChord([.command, .option], .b), do: .setEngine("bsp"))
             Keybind(KeyChord([.command, .option], .n), do: .setEngine("niri-scroll"))
             Keybind(KeyChord([.command, .option], .t), do: .setEngine("tabbed"))
+            Keybind(KeyChord([.command, .option], .s), do: .setEngine("stacked"))
             Keybind(KeyChord([.command, .option], .space), do: .cycleEngine)
             Keybind(KeyChord([.command, .shift], .r), do: .reload)
 

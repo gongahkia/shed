@@ -111,6 +111,7 @@ ollyctl state --json
 | ThreeCol | Centered master with balanced side stacks. |
 | Accordion | Focused window expanded, siblings collapsed to strips. |
 | Tabbed | Focused window below an app-rendered tab strip; siblings hidden. |
+| Stacked | Focused window beside an app-rendered full-height title rail. |
 
 | Project | Core model | Olly difference |
 |---|---|---|

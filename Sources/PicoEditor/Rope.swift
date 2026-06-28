@@ -41,6 +41,27 @@ public struct Rope: Sendable {
 		return String(text[lower ..< upper])
 	}
 
+	public func chunk(at offset: Int, maxBytes: Int) -> String {
+		precondition((0 ... length).contains(offset), "chunk offset out of bounds")
+		precondition(maxBytes > 0, "chunk size must be positive")
+		guard offset < length else {
+			return ""
+		}
+		var chunk = ""
+		chunk.reserveCapacity(maxBytes)
+		_ = root.appendChunk(at: offset, maxBytes: maxBytes, into: &chunk)
+		return chunk
+	}
+
+	public func copyUTF8Chunk(at offset: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		precondition((0 ... length).contains(offset), "chunk offset out of bounds")
+		precondition(maxBytes > 0, "chunk size must be positive")
+		guard offset < length else {
+			return 0
+		}
+		return root.copyUTF8Chunk(at: offset, maxBytes: maxBytes, into: buffer)
+	}
+
 	public func lineRange(_ index: Int) -> Range<Int> {
 		precondition(index >= 0, "line index out of bounds")
 		guard index < lineCount else {
@@ -182,6 +203,48 @@ private final class RopeNode: @unchecked Sendable {
 		}
 		return line
 	}
+
+	func appendChunk(at target: Int, maxBytes: Int, into chunk: inout String) -> Int {
+		if let leafText {
+			let text = leafText.chunk(at: target, maxBytes: maxBytes)
+			chunk += text
+			return text.utf8.count
+		}
+		var skipped = target
+		var bytes = 0
+		for child in children {
+			if skipped >= child.summary.utf8Bytes {
+				skipped -= child.summary.utf8Bytes
+				continue
+			}
+			bytes += child.appendChunk(at: skipped, maxBytes: maxBytes - bytes, into: &chunk)
+			if bytes >= maxBytes {
+				break
+			}
+			skipped = 0
+		}
+		return bytes
+	}
+
+	func copyUTF8Chunk(at target: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		if let leafText {
+			return leafText.copyUTF8Chunk(at: target, maxBytes: maxBytes, into: buffer)
+		}
+		var skipped = target
+		var bytes = 0
+		for child in children {
+			if skipped >= child.summary.utf8Bytes {
+				skipped -= child.summary.utf8Bytes
+				continue
+			}
+			bytes += child.copyUTF8Chunk(at: skipped, maxBytes: maxBytes - bytes, into: buffer.advanced(by: bytes))
+			if bytes >= maxBytes {
+				break
+			}
+			skipped = 0
+		}
+		return bytes
+	}
 }
 
 private struct RopeSummary: Equatable, Sendable {
@@ -251,5 +314,59 @@ private extension String {
 			line += 1
 		}
 		return line
+	}
+
+	func chunk(at offset: Int, maxBytes: Int) -> String {
+		guard offset < utf8.count else {
+			return ""
+		}
+		let start = index(atUTF8Offset: offset)
+		var end = start
+		var bytes = 0
+		while end < endIndex {
+			let next = index(after: end)
+			let byteCount = self[end ..< next].utf8.count
+			if bytes > 0, bytes + byteCount > maxBytes {
+				break
+			}
+			bytes += byteCount
+			end = next
+			if bytes >= maxBytes {
+				break
+			}
+		}
+		return String(self[start ..< end])
+	}
+
+	func copyUTF8Chunk(at offset: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		guard offset < utf8.count else {
+			return 0
+		}
+		let view = utf8
+		let start = view.index(view.startIndex, offsetBy: offset)
+		var end = view.index(start, offsetBy: min(maxBytes, view.distance(from: start, to: view.endIndex)))
+		while end > start, end < view.endIndex, view[end].isUTF8Continuation {
+			end = view.index(before: end)
+		}
+		if end == start {
+			end = view.index(after: start)
+			while end < view.endIndex, view[end].isUTF8Continuation {
+				end = view.index(after: end)
+			}
+		}
+		var index = start
+		var bytes = 0
+		while index < end {
+			buffer[bytes] = view[index]
+			bytes += 1
+			index = view.index(after: index)
+		}
+		return bytes
+	}
+}
+
+private extension UInt8 {
+	var isUTF8Continuation: Bool {
+		(self & 0b1100_0000) == 0b1000_0000
 	}
 }

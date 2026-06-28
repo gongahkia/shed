@@ -1,11 +1,8 @@
 import AppKit
 import Dispatch
 import Foundation
-import PicoRender
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
-	private var window: NSWindow?
-
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		if CommandLine.arguments.contains("--bench-exit-on-ready") {
 			let ns = DispatchTime.now().uptimeNanoseconds
@@ -13,31 +10,77 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			NSApp.terminate(nil)
 			return
 		}
-		let editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
-		let window = NSWindow(
-			contentRect: editorView.frame,
-			styleMask: [.titled, .closable, .miniaturizable, .resizable],
-			backing: .buffered,
-			defer: false
-		)
-		window.title = "Pico"
-		window.contentView = editorView
-		window.makeFirstResponder(editorView)
-		window.center()
-		window.makeKeyAndOrderFront(nil)
+		installMainMenu()
+		openInitialDocument()
 		NSApp.activate(ignoringOtherApps: true)
-		self.window = window
+	}
+
+	func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+		openDocument(at: URL(fileURLWithPath: filename))
+	}
+
+	private func openInitialDocument() {
+		let files = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("--") }
+		if let path = files.first {
+			_ = openDocument(at: URL(fileURLWithPath: path))
+			return
+		}
+		do {
+			_ = try NSDocumentController.shared.openUntitledDocumentAndDisplay(true)
+		} catch {
+			NSLog("failed to open untitled document: \(error)")
+		}
+	}
+
+	private func openDocument(at url: URL) -> Bool {
+		let controller = NSDocumentController.shared
+		let typeName = controller.defaultType ?? "public.data"
+		if let document = controller.document(for: url) {
+			if document.windowControllers.isEmpty {
+				document.makeWindowControllers()
+			}
+			document.showWindows()
+			return true
+		}
+		do {
+			let document = try controller.makeDocument(withContentsOf: url, ofType: typeName)
+			controller.addDocument(document)
+			document.makeWindowControllers()
+			document.showWindows()
+			return true
+		} catch {
+			NSLog("failed to open \(url.path): \(error)")
+			return false
+		}
+	}
+
+	private func installMainMenu() {
+		let mainMenu = NSMenu()
+		let appItem = NSMenuItem()
+		let fileItem = NSMenuItem()
+		mainMenu.addItem(appItem)
+		mainMenu.addItem(fileItem)
+
+		let appMenu = NSMenu()
+		appMenu.addItem(withTitle: "Quit Pico", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+		appItem.submenu = appMenu
+
+		let fileMenu = NSMenu(title: "File")
+		fileMenu.addItem(withTitle: "New", action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
+		fileMenu.addItem(withTitle: "Open...", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
+		fileMenu.addItem(.separator())
+		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
+		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
+		fileItem.submenu = fileMenu
+		NSApp.mainMenu = mainMenu
 	}
 }
 
 private let appDelegate = AppDelegate()
+private let documentController = PicoDocumentController()
 
-@main
-enum PicoAppMain {
-	static func main() {
-		let app = NSApplication.shared
-		app.setActivationPolicy(.regular)
-		app.delegate = appDelegate
-		app.run()
-	}
-}
+_ = documentController
+let app = NSApplication.shared
+app.setActivationPolicy(.regular)
+app.delegate = appDelegate
+app.run()

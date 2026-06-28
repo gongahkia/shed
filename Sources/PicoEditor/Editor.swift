@@ -1,8 +1,16 @@
+import Foundation
+
 public enum Motion: Sendable, Equatable {
 	case charForward
 	case charBackward
+	case wordForward
+	case wordBackward
+	case lineStart
+	case lineEnd
 	case bufferStart
 	case bufferEnd
+	case pageDown
+	case pageUp
 }
 
 public struct UndoStack: Sendable, Equatable {
@@ -44,6 +52,7 @@ public struct Editor: Sendable {
 	public var rope: Rope
 	public var selections: SelectionSet
 	public var history: UndoStack
+	public var pageLineCount = 40
 
 	public init(text: String = "") {
 		rope = Rope(text)
@@ -87,10 +96,24 @@ public struct Editor: Sendable {
 				offset = nextCharacterRange(after: selection.head).upperBound
 			case .charBackward:
 				offset = previousCharacterRange(before: selection.head).lowerBound
+			case .wordForward:
+				offset = wordForward(from: selection.head)
+			case .wordBackward:
+				offset = wordBackward(from: selection.head)
+			case .lineStart:
+				offset = rope.offset(forLine: rope.line(forOffset: selection.head))
+			case .lineEnd:
+				offset = rope.lineRange(rope.line(forOffset: selection.head)).upperBound
 			case .bufferStart:
 				offset = 0
 			case .bufferEnd:
 				offset = rope.length
+			case .pageDown:
+				let line = min(rope.line(forOffset: selection.head) + pageLineCount, max(0, rope.lineCount - 1))
+				offset = rope.offset(forLine: line)
+			case .pageUp:
+				let line = max(rope.line(forOffset: selection.head) - pageLineCount, 0)
+				offset = rope.offset(forLine: line)
 			}
 			return Selection(anchor: offset, head: offset, affinity: selection.affinity)
 		}
@@ -189,6 +212,45 @@ public struct Editor: Sendable {
 		return offset ..< upper
 	}
 
+	private func wordForward(from offset: Int) -> Int {
+		let chars = characterOffsets()
+		guard let index = chars.firstIndex(where: { $0.offset >= offset }), index < chars.count else {
+			return rope.length
+		}
+		let current = chars[index].character
+		if isAlphaNumeric(current) {
+			var cursor = index
+			while cursor < chars.count, isAlphaNumeric(chars[cursor].character) {
+				cursor += 1
+			}
+			return cursor < chars.count ? chars[cursor].offset : rope.length
+		}
+		return index + 1 < chars.count ? chars[index + 1].offset : rope.length
+	}
+
+	private func wordBackward(from offset: Int) -> Int {
+		let chars = characterOffsets()
+		guard !chars.isEmpty, offset > 0 else {
+			return 0
+		}
+		var index = chars.lastIndex(where: { $0.offset < offset }) ?? 0
+		if isAlphaNumeric(chars[index].character) {
+			while index > 0, isAlphaNumeric(chars[index - 1].character) {
+				index -= 1
+			}
+			return chars[index].offset
+		}
+		return chars[index].offset
+	}
+
+	private func characterOffsets() -> [(offset: Int, character: Character)] {
+		var offset = 0
+		return text.map { character in
+			defer { offset += String(character).utf8.count }
+			return (offset, character)
+		}
+	}
+
 	private mutating func apply(_ edit: Edit) {
 		if !edit.range.isEmpty {
 			rope.remove(edit.range)
@@ -230,6 +292,10 @@ private func merge(_ ranges: [Range<Int>]) -> [Range<Int>] {
 	}
 	merged.append(current)
 	return merged
+}
+
+private func isAlphaNumeric(_ character: Character) -> Bool {
+	!character.unicodeScalars.isEmpty && character.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
 }
 
 private extension String {

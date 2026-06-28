@@ -36,3 +36,27 @@ import Testing
 	#expect(view.topLineIndex == 0)
 	#expect(view.xOffset == 0)
 }
+
+@Test func keyHandlingEditsEditorAndMarksDirty() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	_ = view.consumeDirtyForDisplayLink()
+	for character in "hello world" {
+		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
+	}
+	#expect(view.editor.text == "hello world")
+	#expect(view.consumeDirtyForDisplayLink())
+	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 123))
+	#expect(view.editor.selections.primary.head == 10)
+	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 51))
+	#expect(view.editor.text == "hello word")
+}
+
+@Test func typedTextBuildsGlyphInstancesForRendering() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	for character in "hello world" {
+		view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0)
+	}
+	let glyphs = view.textGlyphInstances(scale: 2)
+	#expect(glyphs.count == 11)
+	#expect(glyphs.allSatisfy { $0.size.x > 0 && $0.size.y > 0 })
+}

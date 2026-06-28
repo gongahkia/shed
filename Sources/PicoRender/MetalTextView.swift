@@ -1,6 +1,8 @@
 import AppKit
+import CoreText
 import CoreVideo
 import Metal
+import PicoEditor
 import QuartzCore
 
 struct MetalGlyphInstance {
@@ -36,6 +38,10 @@ public final class MetalTextView: NSView {
 	private var renderPipeline: MTLRenderPipelineState?
 	private var samplerState: MTLSamplerState?
 	private var solidAtlasTexture: MTLTexture?
+	private var glyphAtlas: GlyphAtlas?
+	private var lineShaper: LineShaper?
+	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+	private let textInset = CGPoint(x: 8, y: 6)
 	public private(set) var topLineIndex = 0
 	public private(set) var xOffset: CGFloat = 0
 	public var lineHeight: CGFloat = 17 {
@@ -47,6 +53,9 @@ public final class MetalTextView: NSView {
 			markDirty()
 		}
 	}
+	public var editor = Editor() {
+		didSet { syncEditorState() }
+	}
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -54,6 +63,7 @@ public final class MetalTextView: NSView {
 		commandQueue = device?.makeCommandQueue()
 		super.init(frame: frameRect)
 		wantsLayer = true
+		syncEditorState()
 	}
 
 	public required init?(coder: NSCoder) {
@@ -62,9 +72,14 @@ public final class MetalTextView: NSView {
 		commandQueue = device?.makeCommandQueue()
 		super.init(coder: coder)
 		wantsLayer = true
+		syncEditorState()
 	}
 
 	public override var wantsUpdateLayer: Bool {
+		true
+	}
+
+	public override var acceptsFirstResponder: Bool {
 		true
 	}
 
@@ -162,14 +177,96 @@ public final class MetalTextView: NSView {
 		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}
 
-	func solidOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		var instances = selectionRects.map { rect in
-			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35))
+	public override func keyDown(with event: NSEvent) {
+		if !handleKey(
+			characters: event.characters,
+			charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+			keyCode: event.keyCode,
+			modifierFlags: event.modifierFlags
+		) {
+			super.keyDown(with: event)
 		}
-		if cursorBlinkVisible, let cursorRect {
-			instances.append(solidInstance(rect: cursorRect, scale: scale, color: SIMD4<Float>(0.92, 0.94, 0.96, 1.0)))
+	}
+
+	@discardableResult
+	func handleKey(
+		characters: String?,
+		charactersIgnoringModifiers: String?,
+		keyCode: UInt16,
+		modifierFlags: NSEvent.ModifierFlags = []
+	) -> Bool {
+		if !modifierFlags.intersection([.command, .control]).isEmpty {
+			return false
+		}
+		switch keyCode {
+		case 51:
+			editor.deleteBackward()
+		case 117:
+			editor.deleteForward()
+		case 123:
+			editor.moveCursor(.charBackward)
+		case 124:
+			editor.moveCursor(.charForward)
+		default:
+			guard let characters, !characters.isEmpty, charactersIgnoringModifiers != "\u{1b}" else {
+				return false
+			}
+			editor.insert(characters)
+		}
+		syncEditorState()
+		return true
+	}
+
+	func solidOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		selectionOverlayInstances(scale: scale) + cursorOverlayInstances(scale: scale)
+	}
+
+	func textGlyphInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		guard let atlas = makeGlyphAtlas(), let shaper = makeLineShaper() else {
+			return []
+		}
+		var instances: [MetalGlyphInstance] = []
+		for lineIndex in visibleLineRange {
+			let range = editor.rope.lineRange(lineIndex)
+			let line = editor.rope.slice(range)
+			guard let glyphs = try? shaper.shape(line, font: textFont) else {
+				continue
+			}
+			let y = textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			for glyph in glyphs {
+				guard let entry = try? atlas.entry(for: glyph.glyphID, font: textFont) else {
+					continue
+				}
+				instances.append(MetalGlyphInstance(
+					screenOrigin: SIMD2<Float>(
+						Float((textInset.x + glyph.x + entry.bounds.origin.x - xOffset) * scale),
+						Float((y - entry.bounds.origin.y) * scale)
+					),
+					size: SIMD2<Float>(Float(CGFloat(entry.width) * scale), Float(CGFloat(entry.height) * scale)),
+					atlasUV: SIMD4<Float>(
+						Float(glyph.atlasUV.u0),
+						Float(glyph.atlasUV.v0),
+						Float(glyph.atlasUV.u1),
+						Float(glyph.atlasUV.v1)
+					),
+					color: SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+				))
+			}
 		}
 		return instances
+	}
+
+	private func selectionOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		selectionRects.map { rect in
+			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35))
+		}
+	}
+
+	private func cursorOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		if cursorBlinkVisible, let cursorRect {
+			return [solidInstance(rect: cursorRect, scale: scale, color: SIMD4<Float>(0.92, 0.94, 0.96, 1.0))]
+		}
+		return []
 	}
 
 	private func updateDrawableSize() {
@@ -200,7 +297,10 @@ public final class MetalTextView: NSView {
 		else {
 			return
 		}
-		renderSolidOverlays(encoder: encoder, drawableSize: layer.drawableSize)
+		let scale = layer.contentsScale
+		renderSolidInstances(selectionOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
+		renderText(encoder: encoder, drawableSize: layer.drawableSize, scale: scale)
+		renderSolidInstances(cursorOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
 		encoder.endEncoding()
 		commandBuffer.present(drawable)
 		commandBuffer.commit()
@@ -259,9 +359,7 @@ public final class MetalTextView: NSView {
 		}
 	}
 
-	private func renderSolidOverlays(encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
-		let scale = layer?.contentsScale ?? 1
-		let instances = solidOverlayInstances(scale: scale)
+	private func renderSolidInstances(_ instances: [MetalGlyphInstance], encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
 		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeSolidAtlasTexture() else {
 			return
 		}
@@ -275,6 +373,27 @@ public final class MetalTextView: NSView {
 			encoder.setVertexBytes(base, length: bytes.count, index: 0)
 			encoder.setVertexBytes(&viewport, length: MemoryLayout<MetalViewportUniforms>.stride, index: 1)
 			encoder.setFragmentTexture(atlas, index: 0)
+			encoder.setFragmentSamplerState(sampler, index: 0)
+			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
+			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
+		}
+	}
+
+	private func renderText(encoder: MTLRenderCommandEncoder, drawableSize: CGSize, scale: CGFloat) {
+		let instances = textGlyphInstances(scale: scale)
+		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeGlyphAtlas() else {
+			return
+		}
+		var viewport = MetalViewportUniforms(size: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)))
+		var fragment = MetalFragmentUniforms(useAtlas: 1)
+		instances.withUnsafeBytes { bytes in
+			guard let base = bytes.baseAddress else {
+				return
+			}
+			encoder.setRenderPipelineState(pipeline)
+			encoder.setVertexBytes(base, length: bytes.count, index: 0)
+			encoder.setVertexBytes(&viewport, length: MemoryLayout<MetalViewportUniforms>.stride, index: 1)
+			encoder.setFragmentTexture(atlas.texture, index: 0)
 			encoder.setFragmentSamplerState(sampler, index: 0)
 			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
 			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
@@ -327,6 +446,77 @@ public final class MetalTextView: NSView {
 		texture.replace(region: MTLRegionMake2D(0, 0, 1, 1), mipmapLevel: 0, withBytes: &coverage, bytesPerRow: 1)
 		solidAtlasTexture = texture
 		return texture
+	}
+
+	private func makeGlyphAtlas() -> GlyphAtlas? {
+		if let glyphAtlas {
+			return glyphAtlas
+		}
+		guard let metalDevice, let atlas = try? GlyphAtlas(device: metalDevice) else {
+			return nil
+		}
+		glyphAtlas = atlas
+		return atlas
+	}
+
+	private func makeLineShaper() -> LineShaper? {
+		if let lineShaper {
+			return lineShaper
+		}
+		guard let atlas = makeGlyphAtlas() else {
+			return nil
+		}
+		let shaper = LineShaper(atlas: atlas)
+		lineShaper = shaper
+		return shaper
+	}
+
+	private func syncEditorState() {
+		lineCount = editor.rope.lineCount
+		let head = editor.selections.primary.head
+		let line = editor.rope.line(forOffset: head)
+		let lineRange = editor.rope.lineRange(line)
+		let prefix = editor.rope.slice(lineRange.lowerBound ..< min(head, lineRange.upperBound))
+		let cursorX = textInset.x + typographicWidth(prefix) - xOffset
+		let cursorY = textInset.y + CGFloat(line - topLineIndex) * lineHeight
+		setCursor(x: cursorX, y: cursorY, height: lineHeight)
+		setSelectionRects(selectionRects(for: editor.selections))
+		markDirty()
+	}
+
+	private func selectionRects(for selections: SelectionSet) -> [CGRect] {
+		([selections.primary] + selections.secondaries).flatMap { selection -> [CGRect] in
+			let range = selection.range
+			guard !range.isEmpty else {
+				return []
+			}
+			let startLine = editor.rope.line(forOffset: range.lowerBound)
+			let endLine = editor.rope.line(forOffset: range.upperBound)
+			return (startLine ... endLine).compactMap { line -> CGRect? in
+				let lineRange = editor.rope.lineRange(line)
+				let lower = max(range.lowerBound, lineRange.lowerBound)
+				let upper = min(range.upperBound, lineRange.upperBound)
+				guard lower < upper else {
+					return nil
+				}
+				let before = editor.rope.slice(lineRange.lowerBound ..< lower)
+				let selected = editor.rope.slice(lower ..< upper)
+				return CGRect(
+					x: textInset.x + typographicWidth(before) - xOffset,
+					y: textInset.y + CGFloat(line - topLineIndex) * lineHeight,
+					width: max(2, typographicWidth(selected)),
+					height: lineHeight
+				)
+			}
+		}
+	}
+
+	private func typographicWidth(_ text: String) -> CGFloat {
+		guard !text.isEmpty else {
+			return 0
+		}
+		let attributed = NSAttributedString(string: text, attributes: [kCTFontAttributeName as NSAttributedString.Key: textFont])
+		return CTLineGetTypographicBounds(CTLineCreateWithAttributedString(attributed), nil, nil, nil)
 	}
 }
 

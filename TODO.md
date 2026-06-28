@@ -63,7 +63,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 5 — Editor core
 
-(A) 2026-06-28 +Phase5-Editor @editor id:084 est:3h dep:040,081 Wire `MetalTextView` → `Editor`: `keyDown(_:)` → translate via `NSResponder` → call editor commands → mark renderer dirty. Initial wiring: hardcoded keys (typing inserts, backspace deletes, arrows move). Acceptance: can type "hello world" into empty buffer and see it render.
 (B) 2026-06-28 +Phase5-Editor @editor id:085 est:2h dep:083 Visual line vs logical line: soft-wrap support deferred to v0.2, but motion API must distinguish. Add `visualLineStart`/`visualLineEnd` no-op stubs.
 
 ---

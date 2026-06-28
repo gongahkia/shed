@@ -25,3 +25,22 @@ import Testing
 	#expect(editor.text == "x x")
 	#expect(editor.history.edits.count == 2)
 }
+
+@Test func editorUndoRedoRestoresThousandEditTranscript() {
+	var editor = Editor()
+	var expected = ""
+	for index in 0 ..< 1_000 {
+		let char = String(UnicodeScalar(97 + (index % 26))!)
+		editor.insert(char)
+		expected += char
+	}
+	#expect(editor.text == expected)
+	for _ in 0 ..< 1_000 {
+		editor.undo()
+	}
+	#expect(editor.text == "")
+	for _ in 0 ..< 1_000 {
+		editor.redo()
+	}
+	#expect(editor.text == expected)
+}

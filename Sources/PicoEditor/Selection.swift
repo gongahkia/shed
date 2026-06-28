@@ -82,11 +82,13 @@ public struct Edit: Sendable, Equatable {
 	public var range: Range<Int>
 	public var oldText: String
 	public var newText: String
+	public var selectionBefore: SelectionSet
 
-	public init(range: Range<Int>, oldText: String, newText: String) {
+	public init(range: Range<Int>, oldText: String, newText: String, selectionBefore: SelectionSet = SelectionSet()) {
 		self.range = range
 		self.oldText = oldText
 		self.newText = newText
+		self.selectionBefore = selectionBefore
 	}
 
 	var delta: Int {

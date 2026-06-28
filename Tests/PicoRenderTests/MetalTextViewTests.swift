@@ -39,6 +39,21 @@ import Testing
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func commandDSelectsCurrentWordThenAddsNextMatch() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "foo bar foo foo")
+	view.editor.setSelection(SelectionSet(primary: Selection(anchor: 1, head: 1)))
+	view.keymapEngine = KeymapEngine(modeStack: [.insert], bindings: [
+		KeyBinding(mode: .insert, chord: [Key("d", modifiers: .command)], commandID: "editor.addNextSelection"),
+	])
+
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0, modifierFlags: .command))
+	#expect(view.editor.selections.primary.range == 0 ..< 3)
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0, modifierFlags: .command))
+	#expect(view.editor.selections.primary.range == 0 ..< 3)
+	#expect(view.editor.selections.secondaries == [Selection(anchor: 8, head: 11)])
+}
+
 @Test func viewportTracksVisibleLineRangeAndScrollOffsets() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.lineHeight = 20

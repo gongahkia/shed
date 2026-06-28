@@ -9,4 +9,5 @@
 "Cmd-G" = "edit.findNext"
 "Cmd-Shift-G" = "edit.findPrevious"
 "Cmd-Ctrl-G" = "edit.selectAllFindMatches"
+"Cmd-D" = "editor.addNextSelection"
 "Cmd-Shift-F" = "edit.findInProject"

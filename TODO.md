@@ -25,7 +25,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 0 — Bootstrap
 
-(A) 2026-06-28 +Phase0-Bootstrap @repo id:002 est:0.5h dep:001 Add `LICENSE` (MIT, copyright 2026 Gabriel Ong) at repo root.
 (A) 2026-06-28 +Phase0-Bootstrap @repo id:003 est:0.5h dep:001 Add `README.md` stub: project tagline ("the macOS code editor that opens instantly"), status badge placeholder, link to NORTHSTAR.md and TODO.md. Defer bench table to Phase 16.
 (A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:004 est:2h dep:001 Create `Package.swift` (swift-tools-version:5.9) with empty targets: `PicoApp` (executable), `PicoRender`, `PicoEditor`, `PicoSyntax`, `PicoKeymap`, `PicoBench` (executable), `CTreeSitter` (C lib), `CTSGrammars` (C lib). Place Swift sources under `Sources/<Target>/`, C sources under `Sources/<CTarget>/`. Set `platforms: [.macOS(.v13)]`. Verify `swift build` succeeds with stub `main.swift` files.
 (A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:005 est:1h dep:004 Wire target deps: `PicoApp` depends on `PicoRender`+`PicoEditor`+`PicoSyntax`+`PicoKeymap`. `PicoRender` depends on `PicoEditor`. `PicoSyntax` depends on `CTreeSitter`+`CTSGrammars`+`PicoEditor`. `PicoBench` standalone.

@@ -91,6 +91,7 @@ let package = Package(
 			]
 		),
 		.testTarget(name: "PicoEditorTests", dependencies: ["PicoEditor"]),
+		.testTarget(name: "PicoKeymapTests", dependencies: ["PicoKeymap"]),
 		.testTarget(name: "PicoRenderTests", dependencies: ["PicoRender"]),
 		.testTarget(name: "PicoSyntaxTests", dependencies: ["PicoSyntax", "PicoEditor"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars"]),

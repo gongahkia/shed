@@ -48,7 +48,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 3 — Metal text renderer
 
-(A) 2026-06-28 +Phase3-Renderer @metal id:041 est:6h dep:040 Implement `GlyphAtlas.swift`: bitmap atlas keyed by `(CTFont, CGGlyph)`. On miss, rasterize via `CTFontDrawGlyphs` into CGContext bitmap, upload region into `MTLTexture` (single 2048×2048 page, `.r8Unorm`). Pack via simple skyline algorithm. Acceptance: round-trip test rasters "Hello" glyphs, atlas texture readback matches CoreText reference.
 (A) 2026-06-28 +Phase3-Renderer @metal id:042 est:5h dep:041 Implement `LineShaper.swift`: takes a `String` line + font, calls `CTLineCreateWithAttributedString`, iterates `CTRun`s via `CTLineGetGlyphRuns`, extracts glyph IDs + positions via `CTRunGetGlyphsPtr`+`CTRunGetPositionsPtr`. Output: `[ShapedGlyph(glyphID, x, y, atlasUV)]`. Acceptance: shape a 100-line buffer in <2 ms (measured via signposts).
 (A) 2026-06-28 +Phase3-Renderer @metal id:043 est:6h dep:042 Write Metal shaders `Sources/PicoRender/Shaders.metal`: vertex shader takes per-glyph (atlasUV, screenXY, color), fragment samples atlas texture (single-channel) and multiplies by color. One draw call per frame, instanced quads. Acceptance: renders shaped line.
 (A) 2026-06-28 +Phase3-Renderer @metal id:044 est:4h dep:043 Render loop via `CVDisplayLink` (NOT CADisplayLink — that's iOS-only on older AppKit). On vsync, if dirty, encode draw via `MTLCommandQueue`. Dirty flag set on text/scroll/cursor change. Acceptance: 60 fps idle (no draws), 60/120 fps under scroll.

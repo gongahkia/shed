@@ -208,7 +208,7 @@ final class CommandPaletteView: NSView {
 
 	private func filterItems() {
 		let query = inputField.stringValue.lowercased()
-		filteredItems = query.isEmpty ? items : items.filter { $0.title.lowercased().contains(query) }
+		filteredItems = FuzzyMatcher.ranked(items, query: query, includeUnmatched: false, by: \.title)
 		tableView.reloadData()
 		if !filteredItems.isEmpty {
 			tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)

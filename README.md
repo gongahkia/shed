@@ -1,22 +1,42 @@
 # Olly
 
-![Olly target workflow preview](docs/hero.gif)
+![Olly workflow preview](docs/demo.gif)
 
-> Status: pre-alpha. The package builds and tests, but v0.1 is not released yet.
+> Status: pre-alpha. `main` builds and tests, but v0.1.0 is not released yet.
+> The final release is gated on signed/notarized distribution assets and a runtime
+> smoke test for the app IPC service.
 
-Olly is a pure-Swift macOS window manager built around hot-swappable layout engines. The target
-v0.1 shape is AX-only, tag-based, and scriptable through `ollyctl`, with first-party ecosystem
-hooks for SketchyBar, JankyBorders, Übersicht, Raycast, Alfred, and external hotkey daemons.
+Olly is a pure-Swift macOS window manager experiment built around hot-swappable
+layout engines, River-style tags, and a Swift DSL config. The v0.x constraint is
+strict: Accessibility APIs only, no SIP-off requirement, and no private windowing
+APIs.
 
 ## Why Olly
 
-- One binary, multiple layout models: Floating, MasterStack, Manual, BSP, NiriScroll,
-  Monocle, Spiral, Grid, ThreeCol, and Accordion.
-- Per-tag engine binding: use scrolling columns for web, BSP for code, floating for calls.
-- Swift DSL config: type-checked rules, keybinds, safe zones, and cooperative app handling.
-- IPC-first automation: Unix socket plus `ollyctl` JSON commands/events.
-- Ecosystem posture: yield screen real estate, emit events, do not compete with bars, launchers,
-  border tools, notch apps, hotkey daemons, or capture tools.
+- One package, many layout models: floating, BSP, Niri-style scrolling columns,
+  master-stack, manual split trees, monocle, grid, spiral, tabbed, stacked, and
+  more.
+- Per-tag engine binding: use BSP for code, scrolling columns for browsers,
+  floating for calls, and a different layout again on another display.
+- Swift DSL config: typed tags, rules, keybinds, safe zones, animations, hooks,
+  and cooperative app behavior.
+- IPC-first design: newline-delimited JSON over a Unix-domain socket, with
+  `ollyctl` and first-party extension examples.
+- Ecosystem posture: yield screen real estate and emit events instead of
+  competing with menu bars, launchers, borders, notch utilities, hotkey daemons,
+  and capture tools.
+
+## Current Shape
+
+| Area | State |
+|---|---|
+| AX/window layer | Permission checks, display discovery, window snapshots, movement, wake handling, and AX tests. |
+| Workspace model | River-style tag bitsets, per-display active tags, MRU history, persistence, and dispatch tests. |
+| Layout engines | Shared `LayoutEngine` protocol, registry, placement diffing, and built-in engines. |
+| DSL | Result-builder config, rules, keybinds, safe zones, migrations, examples, and diagnostics. |
+| IPC | Protocol schema, Unix socket client/server library, event envelopes, and `ollyctl`. |
+| App shell | Menu bar item, AX onboarding, settings, overview mode, and command palette UI. |
+| Release | Local ad-hoc DMG smoke test passes; final Developer ID signing/notarization is not configured. |
 
 ## Install
 
@@ -29,16 +49,19 @@ swift test
 .build/release/ollyApp
 ```
 
-Planned v0.1 release paths:
+Planned v0.1.0 release paths:
 
 ```sh
 brew install --cask olly
 ```
 
-or download `Olly.dmg` from the GitHub release, open it, and drag `Olly.app` to `/Applications`.
-No v0.1 cask or DMG is present in this repo yet.
+or download `Olly-v0.1.0.dmg` from the GitHub release and drag `Olly.app` to
+`/Applications`.
 
-## 60-Second Config
+No public v0.1.0 DMG or Homebrew cask exists yet. See
+[`docs/release-readiness.md`](docs/release-readiness.md) for the current gate.
+
+## Config
 
 Create `~/.config/olly/Config.swift`:
 
@@ -81,57 +104,87 @@ public func ollyConfig() -> Config {
         }
 
         Rules {
-            Rule(match: RuleMatch(bundleID: "com.apple.dt.Xcode"), apply: RuleApply(tags: tag(0), engine: .bsp))
-            Rule(match: RuleMatch(bundleID: "com.apple.Safari"), apply: RuleApply(tags: tag(1), engine: .niriScroll))
-            Rule(match: RuleMatch(subrole: "AXDialog"), apply: RuleApply(engine: .floating, floating: true))
+            Rule(
+                match: RuleMatch(bundleID: "com.apple.dt.Xcode"),
+                apply: RuleApply(tags: tag(0), engine: .bsp)
+            )
+            Rule(
+                match: RuleMatch(bundleID: "com.apple.Safari"),
+                apply: RuleApply(tags: tag(1), engine: .niriScroll)
+            )
+            Rule(
+                match: RuleMatch(subrole: "AXDialog"),
+                apply: RuleApply(engine: .floating, floating: true)
+            )
         }
     }
 }
 ```
 
-Reload after edits:
+More configs live in [`examples/`](examples/):
+
+- `minimal.swift`
+- `niri-only.swift`
+- `master-stack-heavy.swift`
+- `ultrawide-3col.swift`
+- `multi-display-tags.swift`
+- `plugin-author.swift`
+
+## CLI
+
+`ollyctl` is the scriptable surface for a running Olly IPC service:
 
 ```sh
-ollyctl reload
 ollyctl state --json
+ollyctl switch-tag 1
+ollyctl set-engine bsp
+ollyctl cycle-engine
+ollyctl focus next
+ollyctl move-to-tag 2
+ollyctl events --replay-current-state
+ollyctl migrate-config --config ~/.config/olly/Config.swift
 ```
 
-## Comparison
+The protocol is documented in [`docs/ipc.md`](docs/ipc.md).
 
-| Built-in layout | Model |
+## Layout Engines
+
+| Engine ID | Model |
 |---|---|
-| Floating | Pass-through frames for untiled windows and dialogs. |
-| MasterStack | Tall-style master pane plus stacked siblings. |
-| Manual | User-shaped split tree. |
-| BSP | Binary-space-partition tree. |
-| NiriScroll | Horizontal scrolling column strip. |
-| Monocle | Focused window fullscreen, siblings hidden offscreen. |
-| Spiral | Recursive golden-ratio split of the remaining rect. |
-| Grid | Square-ish or fixed row/column auto-pack. |
-| ThreeCol | Centered master with balanced side stacks. |
-| Accordion | Focused window expanded, siblings collapsed to strips. |
-| Tabbed | Focused window below an app-rendered tab strip; siblings hidden. |
-| Stacked | Focused window beside an app-rendered full-height title rail. |
-| TreeTab | Focused window beside an app-rendered nested side tree. |
+| `floating` | Pass-through frames for untiled windows and dialogs. |
+| `master-stack` | Tall-style master pane plus stacked siblings. |
+| `manual` | User-shaped split tree. |
+| `bsp` | Binary-space-partition tree. |
+| `niri-scroll` | Horizontal scrolling column strip. |
+| `paperwm-scroll` | PaperWM-style variable-width scrolling columns. |
+| `monocle` | Focused window fullscreen, siblings hidden offscreen. |
+| `spiral` | Recursive golden-ratio split of the remaining rect. |
+| `grid` | Square-ish or fixed row/column auto-pack. |
+| `three-col` | Centered master with balanced side stacks. |
+| `accordion` | Focused window expanded, siblings collapsed to strips. |
+| `tabbed` | Focused window below an app-rendered tab strip. |
+| `stacked` | Focused window beside an app-rendered full-height title rail. |
+| `tree-tab` | Focused window beside an app-rendered nested side tree. |
+| `vertical-tile` | Master/full-height layout for rotated displays. |
+| `ratio-tile` | Aspect-ratio-aware tile packing. |
+| `frame` | Recursive frame tree host. |
+| `pseudotile.*` | Wrapper that centers a preferred-size tile inside another engine. |
+| `pinned-columns.*` | Wrapper that pins columns inside a scrolling engine. |
 
-| Project | Core model | Olly difference |
-|---|---|---|
-| [Nehir](https://github.com/apphane-dev/nehir) | macOS tiling WM with IPC/live-config precedent. | Olly makes layout engines the central plugin primitive and ships multiple built-ins. |
-| [Hiro / OmniWM](https://github.com/BarutSRB/OmniWM) | Niri/Hyprland-inspired macOS WM with signed distribution focus. | Olly keeps a Swift DSL plus stable engine contract as the main extension point. |
-| [Paneru](https://github.com/karinushka/paneru) | Sliding infinite-strip macOS WM. | Olly includes a Niri-style engine but lets each tag use a different layout model. |
-| [Miri](https://github.com/maria-rcks/miri) | Niri-like keyboard-first macOS WM over AX. | Olly targets hot-swappable layouts, IPC integrations, and cooperative app defaults. |
-| [AeroSpace](https://github.com/nikitabobko/AeroSpace) | i3-inspired tree tiling with virtual workspace emulation. | Olly uses River-style tags and per-tag engine binding instead of one tiling paradigm. |
-| [yabai](https://github.com/asmvik/yabai) | Mature macOS WM utility with BSP, CLI, and deep automation surface. | Olly v0.x stays AX-only and treats SIP-off/private APIs as out of scope. |
+Layout snapshots are tested under
+[`Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots`](Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots).
 
 ## Ecosystem
 
-- Menu/status bars: `extensions/sketchybar/`, `extensions/ubersicht/`.
-- Launchers: `extensions/alfred/`, `extensions/raycast/`.
-- Borders: `extensions/jankyborders/`.
-- Hotkey daemons: see `docs/hotkey-delegation.md`.
-- Cooperative apps allowlist: `docs/cooperative-apps.yml`.
-- DSL cookbook: `docs/dsl-cookbook.md`.
-- Full integration matrix: `docs/menubar-notch-integration.md`.
+- Menu/status bars: [`extensions/sketchybar/`](extensions/sketchybar/),
+  [`extensions/ubersicht/`](extensions/ubersicht/).
+- Launchers: [`extensions/alfred/`](extensions/alfred/),
+  [`extensions/raycast/`](extensions/raycast/).
+- Borders: [`extensions/jankyborders/`](extensions/jankyborders/).
+- Hotkey daemons: [`docs/hotkey-delegation.md`](docs/hotkey-delegation.md).
+- Cooperative apps: [`docs/cooperative-apps.yml`](docs/cooperative-apps.yml).
+- Full integration matrix:
+  [`docs/menubar-notch-integration.md`](docs/menubar-notch-integration.md).
 
 ## Development
 
@@ -143,22 +196,33 @@ swift build -c release
 swift test
 ```
 
-Products:
+SwiftPM products:
 
-- `ollyApp`: menubar app target.
+- `ollyApp`: menu bar app target.
 - `ollyctl`: CLI client.
+- `PerfBench`: layout/config benchmark runner.
+- `SoakHarness`: long-running AX/window movement harness.
 - `ollyKit`, `ollyCore`, `ollyLayouts`, `ollyDSL`, `ollyIPC`: library targets.
+
+Useful docs:
+
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/dsl-cookbook.md`](docs/dsl-cookbook.md)
+- [`docs/dsl-reference.md`](docs/dsl-reference.md)
+- [`docs/performance.md`](docs/performance.md)
+- [`docs/plugin-authoring.md`](docs/plugin-authoring.md)
+- [`docs/homebrew-cask-pr.md`](docs/homebrew-cask-pr.md)
 
 ## Inspiration Credits
 
-Per `NORTHSTAR.md` §3, Olly studies and credits:
+Per `NORTHSTAR.md` section 3, Olly studies and credits:
 
 - [niri](https://github.com/niri-wm/niri): scrollable tiling model.
 - [macniri](https://github.com/J-x-Z/macniri): cautionary macOS port reference.
 - [river](https://github.com/riverwm/river): external layout generator architecture.
 - [AeroSpace](https://github.com/nikitabobko/AeroSpace): virtual workspace emulation on macOS.
 - [Hiro / OmniWM](https://github.com/BarutSRB/OmniWM): macOS multi-layout precedent.
-- [Nehir](https://github.com/apphane-dev/nehir): IPC, live config, command palette bar.
+- [Nehir](https://github.com/apphane-dev/nehir): IPC, live config, and command palette precedent.
 - [Paneru](https://github.com/karinushka/paneru): Lua scripting and sliding layout precedent.
 - [Hammerspoon](https://github.com/Hammerspoon/hammerspoon): macOS extension ecosystem reference.
 - [Swindler](https://github.com/tmandry/Swindler): Swift AX abstraction reference.

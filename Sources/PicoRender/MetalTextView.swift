@@ -70,6 +70,8 @@ public final class MetalTextView: NSView {
 	public var keymapEngine = KeymapEngine()
 	private var pendingCharacterMotion: CharacterMotion?
 	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
+	private var pendingOperator: VimOperator?
+	private var pendingOperatorCount = 1
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -299,6 +301,12 @@ public final class MetalTextView: NSView {
 		}
 	}
 
+	private enum VimOperator {
+		case delete
+		case change
+		case yank
+	}
+
 	private func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
 		switch keymapEngine.handle(event) {
 		case .command(let commandID):
@@ -311,6 +319,10 @@ public final class MetalTextView: NSView {
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
+		if let motion = motion(for: commandID), pendingOperator != nil {
+			applyPendingOperator(motion: motion)
+			return true
+		}
 		switch commandID {
 		case "editor.moveLeft":
 			repeatMotion(.charBackward)
@@ -362,6 +374,21 @@ public final class MetalTextView: NSView {
 		case "editor.repeatCharFindReverse":
 			repeatLastCharacterMotion(reversed: true)
 			return true
+		case "vim.operator.delete":
+			return beginOperator(.delete)
+		case "vim.operator.change":
+			return beginOperator(.change)
+		case "vim.operator.yank":
+			return beginOperator(.yank)
+		case "vim.operator.line.delete":
+			applyLineOperator(.delete)
+			return true
+		case "vim.operator.line.change":
+			applyLineOperator(.change)
+			return true
+		case "vim.operator.line.yank":
+			applyLineOperator(.yank)
+			return true
 		case "file.save":
 			saveRequested?()
 			return true
@@ -382,6 +409,110 @@ public final class MetalTextView: NSView {
 		}
 		syncEditorState()
 		return true
+	}
+
+	private func motion(for commandID: String) -> Motion? {
+		switch commandID {
+		case "editor.moveLeft":
+			return .charBackward
+		case "editor.moveRight":
+			return .charForward
+		case "editor.moveDown":
+			return .lineDown
+		case "editor.moveUp":
+			return .lineUp
+		case "editor.moveWordForward":
+			return .wordForward
+		case "editor.moveWordBackward":
+			return .wordBackward
+		case "editor.moveWordEnd":
+			return .wordEnd
+		case "editor.moveBigWordForward":
+			return .bigWordForward
+		case "editor.moveBigWordBackward":
+			return .bigWordBackward
+		case "editor.moveBigWordEnd":
+			return .bigWordEnd
+		case "editor.moveLineStart":
+			return .lineStart
+		case "editor.moveLineEnd":
+			return .lineEnd
+		case "editor.moveBufferStart":
+			return .bufferStart
+		case "editor.moveBufferEnd":
+			return .bufferEnd
+		case "editor.moveParagraphForward":
+			return .paragraphForward
+		case "editor.moveParagraphBackward":
+			return .paragraphBackward
+		default:
+			return nil
+		}
+	}
+
+	private func beginOperator(_ op: VimOperator) -> Bool {
+		if !editor.selections.primary.isCaret {
+			applyOperator(op, range: editor.selections.primary.range)
+			return true
+		}
+		pendingOperator = op
+		pendingOperatorCount = keymapRepeatCount
+		keymapEngine.pushMode(.operatorPending)
+		return true
+	}
+
+	private func applyPendingOperator(motion: Motion) {
+		guard let pendingOperator else {
+			return
+		}
+		let start = editor.selections.primary.head
+		var projected = editor
+		let count = max(1, pendingOperatorCount * keymapRepeatCount)
+		for _ in 0 ..< count {
+			projected.moveCursor(motion)
+		}
+		let end = projected.selections.primary.head
+		clearPendingOperator()
+		applyOperator(pendingOperator, range: min(start, end) ..< max(start, end))
+	}
+
+	private func applyLineOperator(_ op: VimOperator) {
+		clearPendingOperator()
+		applyOperator(op, range: currentLineIncludingNewline())
+	}
+
+	private func clearPendingOperator() {
+		pendingOperator = nil
+		pendingOperatorCount = 1
+		if keymapEngine.mode == .operatorPending {
+			_ = keymapEngine.popMode()
+		}
+	}
+
+	private func applyOperator(_ op: VimOperator, range: Range<Int>) {
+		guard !range.isEmpty else {
+			return
+		}
+		let text = editor.rope.slice(range)
+		switch op {
+		case .delete:
+			replace(range: range, with: "")
+		case .change:
+			replace(range: range, with: "")
+			keymapEngine.setMode(.insert)
+		case .yank:
+			NSPasteboard.general.clearContents()
+			NSPasteboard.general.setString(text, forType: .string)
+			editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
+			syncEditorState()
+		}
+	}
+
+	private func currentLineIncludingNewline() -> Range<Int> {
+		let line = editor.rope.line(forOffset: editor.selections.primary.head)
+		let start = editor.rope.offset(forLine: line)
+		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
+		return start ..< end
 	}
 
 	private func repeatMotion(_ motion: Motion) {

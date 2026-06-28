@@ -66,7 +66,7 @@ x 2026-06-28 +Phase6-Syntax @treesitter id:102 est:4h dep:100,101 `Sources/PicoS
 x 2026-06-28 +Phase6-Syntax @treesitter id:103 est:3h dep:102 Highlight queries: load `.scm` files from each grammar's `queries/highlights.scm`. Walk tree via `TSQuery` + `TSQueryCursor`. Output `[(range: Range<Int>, capture: String)]`. Test: TS keywords/strings/comments highlighted correctly.
 x 2026-06-28 +Phase6-Syntax @treesitter id:104 est:3h dep:103 Theme: `~/.config/pico/theme.toml` maps capture names → color (hex). Bundle default `default-dark.toml` (Solarized-ish) and `default-light.toml`. Apply to glyph rendering via per-glyph color in `ShapedGlyph`.
 x 2026-06-28 +Phase6-Syntax @treesitter id:105 est:3h dep:104 Lazy grammar loading: do NOT init parsers at launch. On `open(file:)`, detect language via file extension, then `dlopen` is N/A (we statically linked); but defer `TSParser` allocation + grammar bind until first parse. Verify cold-start unaffected with all grammars linked.
-(A) 2026-06-28 +Phase6-Syntax @treesitter id:106 est:3h dep:082,103 Incremental reparse on edit: editor commands emit `TSInputEdit` → `Parser.edit(tree, edit)` → `Parser.parse(rope, oldTree)`. Highlight diff applied to dirty line range. Acceptance: typing in middle of 100k-line file maintains <16 ms frame time.
+x 2026-06-28 +Phase6-Syntax @treesitter id:106 est:3h dep:082,103 Incremental reparse on edit: editor commands emit `TSInputEdit` → `Parser.edit(tree, edit)` → `Parser.parse(rope, oldTree)`. Highlight diff applied to dirty line range. Acceptance: typing in middle of 100k-line file maintains <16 ms frame time.
 
 ---
 

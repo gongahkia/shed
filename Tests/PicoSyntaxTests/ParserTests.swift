@@ -62,6 +62,13 @@ import Testing
 	#expect(captures.contains("string"))
 }
 
+@Test func highlightSpanMapsThroughEditorEdit() throws {
+	let edit = Edit(range: 5 ..< 7, oldText: "bc", newText: "XYZ")
+	#expect(HighlightSpan(range: 0 ..< 3, capture: "keyword").mapped(through: edit)?.range == 0 ..< 3)
+	#expect(HighlightSpan(range: 10 ..< 14, capture: "string").mapped(through: edit)?.range == 11 ..< 15)
+	#expect(HighlightSpan(range: 6 ..< 7, capture: "variable").mapped(through: edit) == nil)
+}
+
 @Test func syntaxThemeLoadsBundledAndFallsBackByCapturePrefix() throws {
 	let theme = try SyntaxTheme.loadDefaultDark()
 	#expect(theme.color(for: "keyword") != nil)
@@ -87,8 +94,50 @@ import Testing
 	#expect(!tree.rootNode.hasError)
 }
 
+@Test func syntaxPipelineIncrementalMiddleEditFitsFrameBudget() throws {
+	var editor = Editor(text: largeTypeScriptLineSetWithMiddleLine())
+	let pipeline = SyntaxPipeline(language: .typescript)
+	let tree = try pipeline.parse(editor.rope)
+	_ = try pipeline.highlights(in: tree, byteRange: editor.rope.lineRange(50_000))
+	let oldRope = editor.rope
+	let editOffset = oldRope.lineRange(50_000).upperBound
+	editor.setSelection(SelectionSet(primary: Selection(anchor: editOffset, head: editOffset)))
+	editor.insert(" ")
+	let edit = try #require(editor.lastEditBatch.first)
+	let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
+	tree.edit(inputEdit)
+	let dirtyRange = editor.rope.lineRange(50_000)
+	let start = DispatchTime.now().uptimeNanoseconds
+	let newTree = try pipeline.parse(editor.rope, oldTree: tree)
+	let dirtySpans = try pipeline.highlights(in: newTree, byteRange: dirtyRange)
+	let end = DispatchTime.now().uptimeNanoseconds
+	#expect(!newTree.rootNode.hasError)
+	#expect(!dirtySpans.isEmpty)
+	#if !DEBUG
+	#expect(milliseconds(end - start) < 16)
+	#endif
+}
+
+@Test func inputEditBuildsTreeSitterEditFromEditorEdit() throws {
+	let oldRope = Rope("const value = 1;\n")
+	var editor = Editor(text: oldRope.slice(0 ..< oldRope.length))
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 14, head: 14)))
+	editor.insert("0")
+	let edit = try #require(editor.lastEditBatch.first)
+	let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
+	#expect(inputEdit.startByte == 14)
+	#expect(inputEdit.oldEndByte == 14)
+	#expect(inputEdit.newEndByte == 15)
+	#expect(inputEdit.startPoint == Point(row: 0, column: 14))
+	#expect(inputEdit.newEndPoint == Point(row: 0, column: 15))
+}
+
 private func largeTypeScriptLineSet() -> String {
 	String(repeating: "\n", count: 100_000) + "const done: boolean = true;\n"
+}
+
+private func largeTypeScriptLineSetWithMiddleLine() -> String {
+	String(repeating: "\n", count: 50_000) + "const done: boolean = true;\n" + String(repeating: "\n", count: 50_000)
 }
 
 private func milliseconds(_ nanoseconds: UInt64) -> Double {

@@ -80,6 +80,7 @@ final class PicoDocument: NSDocument {
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?
 	private var syntaxTree: Tree?
+	private var syntaxHighlightSpans: [HighlightSpan] = []
 	private let fileWatcherQueue = DispatchQueue(label: "dev.pico.editor.file-watcher")
 	private var fileWatchSource: DispatchSourceFileSystemObject?
 	private var pendingExternalChangePrompt = false
@@ -137,9 +138,14 @@ final class PicoDocument: NSDocument {
 		configureSyntaxPipeline()
 		refreshSyntaxHighlights()
 		view.editorDidChange = { [weak self] editor in
-			self?.editor = editor
-			self?.refreshSyntaxHighlights()
-			self?.updateChangeCount(.changeDone)
+			guard let self else {
+				return
+			}
+			let oldRope = self.editor.rope
+			let edits = editor.lastEditBatch
+			self.editor = editor
+			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			self.updateChangeCount(.changeDone)
 		}
 		view.saveRequested = { [weak self] in
 			self?.save(nil)
@@ -163,7 +169,7 @@ final class PicoDocument: NSDocument {
 		}
 	}
 
-	private func refreshSyntaxHighlights() {
+	private func refreshSyntaxHighlights(edits: [Edit] = [], oldRope: Rope? = nil) {
 		guard let editorView, let syntaxPipeline else {
 			editorView?.highlightSpans = []
 			return
@@ -172,18 +178,43 @@ final class PicoDocument: NSDocument {
 			if syntaxTheme == nil {
 				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
 			}
-			let tree = try syntaxPipeline.parse(editor.rope)
-			syntaxTree = tree
-			let spans = try syntaxPipeline.highlights(in: tree).compactMap { span -> TextHighlightSpan? in
+			let spans: [HighlightSpan]
+			if edits.count == 1, let edit = edits.first, isSingleLineEdit(edit), let oldRope, let tree = syntaxTree {
+				let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
+				tree.edit(inputEdit)
+				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
+				syntaxTree = newTree
+				let dirtyRange = dirtyLineRange(containing: inputEdit.newEndByte)
+				let dirtySpans = try syntaxPipeline.highlights(in: newTree, byteRange: dirtyRange)
+				syntaxHighlightSpans = syntaxHighlightSpans.compactMap { $0.mapped(through: edit) }
+				syntaxHighlightSpans.removeAll { $0.range.overlaps(dirtyRange) }
+				syntaxHighlightSpans += dirtySpans
+				spans = syntaxHighlightSpans
+			} else {
+				let tree = try syntaxPipeline.parse(editor.rope)
+				syntaxTree = tree
+				spans = try syntaxPipeline.highlights(in: tree)
+				syntaxHighlightSpans = spans
+			}
+			let renderedSpans = spans.compactMap { span -> TextHighlightSpan? in
 				guard let color = syntaxTheme?.color(for: span.capture) else {
 					return nil
 				}
 				return TextHighlightSpan(range: span.range, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
 			}
-			editorView.highlightSpans = spans
+			editorView.highlightSpans = renderedSpans
 		} catch {
 			editorView.highlightSpans = []
 		}
+	}
+
+	private func dirtyLineRange(containing offset: Int) -> Range<Int> {
+		let line = editor.rope.line(forOffset: min(offset, editor.rope.length))
+		return editor.rope.lineRange(line)
+	}
+
+	private func isSingleLineEdit(_ edit: Edit) -> Bool {
+		!edit.oldText.utf8.contains(10) && !edit.newText.utf8.contains(10)
 	}
 
 	private func restartFileWatcher() {

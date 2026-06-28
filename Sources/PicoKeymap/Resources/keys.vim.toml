@@ -25,8 +25,26 @@
 "d" = "vim.operator.delete"
 "c" = "vim.operator.change"
 "y" = "vim.operator.yank"
+"v" = "vim.visual.char"
+"Shift-V" = "vim.visual.line"
+"Ctrl-V" = "vim.visual.block"
 "i" = "mode.insert"
 "/" = "edit.find"
+
+[mode.visual]
+"Esc" = "mode.normal"
+"h" = "editor.moveLeft"
+"j" = "editor.moveDown"
+"k" = "editor.moveUp"
+"l" = "editor.moveRight"
+"w" = "editor.moveWordForward"
+"b" = "editor.moveWordBackward"
+"e" = "editor.moveWordEnd"
+"0" = "editor.moveLineStart"
+"Shift-4" = "editor.moveLineEnd"
+"d" = "vim.operator.delete"
+"c" = "vim.operator.change"
+"y" = "vim.operator.yank"
 
 [mode.operatorPending]
 "h" = "editor.moveLeft"

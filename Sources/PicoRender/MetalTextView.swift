@@ -72,6 +72,9 @@ public final class MetalTextView: NSView {
 	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
 	private var pendingOperator: VimOperator?
 	private var pendingOperatorCount = 1
+	private var visualAnchor: Int?
+	private var visualHead: Int?
+	private var visualMode: VisualMode?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -307,6 +310,12 @@ public final class MetalTextView: NSView {
 		case yank
 	}
 
+	private enum VisualMode {
+		case character
+		case line
+		case block
+	}
+
 	private enum TextObject {
 		case innerWord
 		case aroundWord
@@ -328,6 +337,10 @@ public final class MetalTextView: NSView {
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
+		if let motion = motion(for: commandID), visualMode != nil {
+			extendVisualSelection(motion: motion)
+			return true
+		}
 		if let textObject = textObject(for: commandID), pendingOperator != nil {
 			applyPendingOperator(textObject: textObject)
 			return true
@@ -393,6 +406,15 @@ public final class MetalTextView: NSView {
 			return beginOperator(.change)
 		case "vim.operator.yank":
 			return beginOperator(.yank)
+		case "vim.visual.char":
+			beginVisualMode(.character)
+			return true
+		case "vim.visual.line":
+			beginVisualMode(.line)
+			return true
+		case "vim.visual.block":
+			beginVisualMode(.block)
+			return true
 		case "vim.operator.line.delete":
 			applyLineOperator(.delete)
 			return true
@@ -409,6 +431,7 @@ public final class MetalTextView: NSView {
 			closeRequested?()
 			return true
 		case "mode.normal":
+			leaveVisualMode(collapse: true)
 			keymapEngine.setMode(.normal)
 			return true
 		case "mode.insert":
@@ -500,7 +523,9 @@ public final class MetalTextView: NSView {
 
 	private func beginOperator(_ op: VimOperator) -> Bool {
 		if !editor.selections.primary.isCaret {
-			applyOperator(op, range: editor.selections.primary.range)
+			applySelectionOperator(op)
+			leaveVisualMode(collapse: op == .yank)
+			keymapEngine.setMode(op == .change ? .insert : .normal)
 			return true
 		}
 		pendingOperator = op
@@ -564,11 +589,114 @@ public final class MetalTextView: NSView {
 		}
 	}
 
+	private func applySelectionOperator(_ op: VimOperator) {
+		let selections = ([editor.selections.primary] + editor.selections.secondaries)
+			.map(\.range)
+			.filter { !$0.isEmpty }
+			.sorted { $0.lowerBound < $1.lowerBound }
+		guard !selections.isEmpty else {
+			return
+		}
+		switch op {
+		case .delete:
+			editor.deleteForward()
+			syncEditorState()
+			editorDidChange?(editor)
+		case .change:
+			editor.deleteForward()
+			keymapEngine.setMode(.insert)
+			syncEditorState()
+			editorDidChange?(editor)
+		case .yank:
+			let text = selections.map { editor.rope.slice($0) }.joined()
+			NSPasteboard.general.clearContents()
+			NSPasteboard.general.setString(text, forType: .string)
+			editor.setSelection(SelectionSet(primary: Selection(anchor: selections[0].lowerBound, head: selections[0].lowerBound)))
+			syncEditorState()
+		}
+	}
+
 	private func currentLineIncludingNewline() -> Range<Int> {
 		let line = editor.rope.line(forOffset: editor.selections.primary.head)
 		let start = editor.rope.offset(forLine: line)
 		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
 		return start ..< end
+	}
+
+	private func beginVisualMode(_ mode: VisualMode) {
+		visualAnchor = editor.selections.primary.head
+		visualHead = editor.selections.primary.head
+		visualMode = mode
+		keymapEngine.setMode(.visual)
+		updateVisualSelection(head: editor.selections.primary.head)
+	}
+
+	private func extendVisualSelection(motion: Motion) {
+		guard visualMode != nil else {
+			return
+		}
+		var projected = editor
+		let head = visualHead ?? editor.selections.primary.head
+		projected.setSelection(SelectionSet(primary: Selection(anchor: head, head: head)))
+		for _ in 0 ..< keymapRepeatCount {
+			projected.moveCursor(motion)
+		}
+		updateVisualSelection(head: projected.selections.primary.head)
+	}
+
+	private func updateVisualSelection(head: Int) {
+		guard let visualAnchor, let visualMode else {
+			return
+		}
+		visualHead = head
+		switch visualMode {
+		case .character:
+			editor.setSelection(SelectionSet(primary: Selection(anchor: visualAnchor, head: head)))
+		case .line:
+			editor.setSelection(SelectionSet(primary: Selection(anchor: lineStart(for: visualAnchor), head: lineEndIncludingNewline(for: head))))
+		case .block:
+			editor.setSelection(blockSelection(anchor: visualAnchor, head: head))
+		}
+		syncEditorState()
+	}
+
+	private func leaveVisualMode(collapse: Bool) {
+		visualAnchor = nil
+		visualHead = nil
+		visualMode = nil
+		if collapse {
+			let head = editor.selections.primary.range.lowerBound
+			editor.setSelection(SelectionSet(primary: Selection(anchor: head, head: head)))
+			syncEditorState()
+		}
+	}
+
+	private func lineStart(for offset: Int) -> Int {
+		editor.rope.offset(forLine: editor.rope.line(forOffset: offset))
+	}
+
+	private func lineEndIncludingNewline(for offset: Int) -> Int {
+		let line = editor.rope.line(forOffset: offset)
+		return line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
+	}
+
+	private func blockSelection(anchor: Int, head: Int) -> SelectionSet {
+		let anchorLine = editor.rope.line(forOffset: anchor)
+		let headLine = editor.rope.line(forOffset: head)
+		let lowerLine = min(anchorLine, headLine)
+		let upperLine = max(anchorLine, headLine)
+		let anchorColumn = anchor - editor.rope.offset(forLine: anchorLine)
+		let headColumn = head - editor.rope.offset(forLine: headLine)
+		let lowerColumn = min(anchorColumn, headColumn)
+		let upperColumn = max(anchorColumn, headColumn) + 1
+		let selections = (lowerLine ... upperLine).map { line -> Selection in
+			let lineStart = editor.rope.offset(forLine: line)
+			let lineEnd = editor.rope.lineRange(line).upperBound
+			let lower = min(lineStart + lowerColumn, lineEnd)
+			let upper = min(lineStart + upperColumn, lineEnd)
+			return Selection(anchor: lower, head: upper)
+		}
+		return SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst()))
 	}
 
 	private func textObjectRange(_ textObject: TextObject) -> Range<Int>? {

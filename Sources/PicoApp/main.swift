@@ -5,6 +5,11 @@ import Foundation
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: PicoDocumentController
 	private weak var openRecentMenu: NSMenu?
+	private lazy var commandPalette = CommandPaletteController(
+		documentController: documentController,
+		openFolder: { [weak self] in self?.openFolder(nil) },
+		closeDocument: { [weak self] in self?.closeCurrentDocument(nil) }
+	)
 
 	init(documentController: PicoDocumentController) {
 		self.documentController = documentController
@@ -40,6 +45,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		NSApp.keyWindow?.performClose(sender)
+	}
+
+	@objc private func toggleCommandPalette(_ sender: Any?) {
+		commandPalette.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	private func openInitialDocument() {
@@ -99,8 +108,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let mainMenu = NSMenu()
 		let appItem = NSMenuItem()
 		let fileItem = NSMenuItem()
+		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
+		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
 		appMenu.addItem(withTitle: "Quit Pico", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
@@ -126,6 +137,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
 		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
 		fileItem.submenu = fileMenu
+
+		let commandMenu = NSMenu(title: "Command")
+		let paletteItem = commandMenu.addItem(withTitle: "Command Palette", action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
+		paletteItem.keyEquivalentModifierMask = [.command, .shift]
+		paletteItem.target = self
+		commandItem.submenu = commandMenu
 		NSApp.mainMenu = mainMenu
 	}
 }

@@ -240,6 +240,20 @@ public struct InputEdit: Sendable, Equatable {
 		self.newEndPoint = newEndPoint
 	}
 
+	public init(edit: Edit, oldRope: Rope, newRope: Rope) {
+		let startByte = edit.range.lowerBound
+		let oldEndByte = edit.range.upperBound
+		let newEndByte = edit.range.lowerBound + edit.newText.utf8.count
+		self.init(
+			startByte: startByte,
+			oldEndByte: oldEndByte,
+			newEndByte: newEndByte,
+			startPoint: Point(rope: oldRope, offset: startByte),
+			oldEndPoint: Point(rope: oldRope, offset: oldEndByte),
+			newEndPoint: Point(rope: newRope, offset: newEndByte)
+		)
+	}
+
 	fileprivate var rawEdit: TSInputEdit {
 		TSInputEdit(
 			start_byte: UInt32(startByte),
@@ -252,6 +266,13 @@ public struct InputEdit: Sendable, Equatable {
 	}
 }
 
+private extension Point {
+	init(rope: Rope, offset: Int) {
+		let row = rope.line(forOffset: offset)
+		self.init(row: row, column: offset - rope.offset(forLine: row))
+	}
+}
+
 public struct HighlightSpan: Sendable, Equatable {
 	public var range: Range<Int>
 	public var capture: String
@@ -259,6 +280,25 @@ public struct HighlightSpan: Sendable, Equatable {
 	public init(range: Range<Int>, capture: String) {
 		self.range = range
 		self.capture = capture
+	}
+
+	public func mapped(through edit: Edit) -> HighlightSpan? {
+		let lowerBound = mapOffset(range.lowerBound, through: edit)
+		let upperBound = mapOffset(range.upperBound, through: edit)
+		guard lowerBound < upperBound else {
+			return nil
+		}
+		return HighlightSpan(range: lowerBound ..< upperBound, capture: capture)
+	}
+
+	private func mapOffset(_ offset: Int, through edit: Edit) -> Int {
+		if offset <= edit.range.lowerBound {
+			return offset
+		}
+		if offset >= edit.range.upperBound {
+			return offset + edit.newText.utf8.count - (edit.range.upperBound - edit.range.lowerBound)
+		}
+		return edit.range.lowerBound + edit.newText.utf8.count
 	}
 }
 

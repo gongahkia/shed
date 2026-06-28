@@ -62,6 +62,7 @@ public struct Editor: Sendable {
 	public var rope: Rope
 	public var selections: SelectionSet
 	public var history: UndoStack
+	public private(set) var lastEditBatch: [Edit] = []
 	public var pageLineCount = 40
 
 	public init(text: String = "") {
@@ -99,6 +100,7 @@ public struct Editor: Sendable {
 	}
 
 	public mutating func moveCursor(_ motion: Motion) {
+		lastEditBatch = []
 		let moved = selectionsForEdit().map { selection -> Selection in
 			let offset: Int
 			switch motion {
@@ -147,11 +149,13 @@ public struct Editor: Sendable {
 	}
 
 	public mutating func setSelection(_ selectionSet: SelectionSet) {
+		lastEditBatch = []
 		selections = selectionSet
 		selections.merge()
 	}
 
 	public mutating func undo() {
+		lastEditBatch = []
 		guard let entry = history.popUndo() else {
 			return
 		}
@@ -164,6 +168,7 @@ public struct Editor: Sendable {
 	}
 
 	public mutating func redo() {
+		lastEditBatch = []
 		guard let entry = history.popRedo() else {
 			return
 		}
@@ -199,6 +204,7 @@ public struct Editor: Sendable {
 		}
 		carets.reverse()
 		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
+		lastEditBatch = Array(recordedEdits.reversed())
 		for edit in recordedEdits.reversed() {
 			history.record(edit, selectionAfter: selections, textBefore: textBefore)
 		}

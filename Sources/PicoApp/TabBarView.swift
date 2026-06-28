@@ -190,7 +190,7 @@ final class PicoTabCoordinator {
 	}
 
 	private func selectedDocument() -> PicoDocument? {
-		NSApp.keyWindow?.windowController?.document as? PicoDocument
+		NSApplication.shared.keyWindow?.windowController?.document as? PicoDocument
 	}
 
 	private func title(for document: PicoDocument) -> String {

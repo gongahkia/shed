@@ -15,6 +15,7 @@ public enum EngineConfigDeclaration: Codable, Equatable, Sendable {
     case threeCol(ThreeColLayoutEngine.Config)
     case accordion(AccordionLayoutEngine.Config)
     case tabbed(TabbedLayoutEngine.Config)
+    case stacked(StackedLayoutEngine.Config)
 }
 
 /// Purpose: Declares one layout engine and its optional typed configuration.
@@ -91,6 +92,7 @@ public extension EngineDeclaration {
     static let threeCol = ThreeCol()
     static let accordion = Accordion()
     static let tabbed = Tabbed()
+    static let stacked = Stacked()
 }
 
 /// Purpose: Declares the Monocle layout engine.
@@ -156,6 +158,17 @@ public func Tabbed(tabBarHeight: CGFloat = 28) -> EngineDeclaration {
     EngineDeclaration(
         TabbedLayoutEngine.engineID,
         config: .tabbed(TabbedLayoutEngine.Config(tabBarHeight: tabBarHeight))
+    )
+}
+
+/// Purpose: Declares the Stacked layout engine.
+/// Parameters: `railWidth` reserves space for the app-rendered left title rail.
+/// Example: `Engines { Stacked(railWidth: 180) }`
+/// See also: `Tabbed(tabBarHeight:)`, `Accordion(stripHeight:)`.
+public func Stacked(railWidth: CGFloat = 160) -> EngineDeclaration {
+    EngineDeclaration(
+        StackedLayoutEngine.engineID,
+        config: .stacked(StackedLayoutEngine.Config(railWidth: railWidth))
     )
 }
 

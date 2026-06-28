@@ -20,6 +20,7 @@ final class LayoutSnapshotTests: XCTestCase {
             ("three-col", threeColPlacements(in: bounds)),
             ("accordion", accordionPlacements(in: bounds)),
             ("tabbed", tabbedPlacements(in: bounds)),
+            ("stacked", stackedPlacements(in: bounds)),
             ("paperwm-scroll", paperWMScrollPlacements(in: bounds))
         ]
 
@@ -106,6 +107,18 @@ final class LayoutSnapshotTests: XCTestCase {
 
     private func tabbedPlacements(in bounds: CGRect) -> [Placement] {
         TabbedLayoutEngine(config: TabbedLayoutEngine.Config(tabBarHeight: 30)).arrange(
+            windows: [
+                WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
+                WindowSnapshot(windowID: 3, frame: CGRect(x: 0, y: 0, width: 300, height: 200))
+            ],
+            in: bounds,
+            focus: 2
+        )
+    }
+
+    private func stackedPlacements(in bounds: CGRect) -> [Placement] {
+        StackedLayoutEngine(config: StackedLayoutEngine.Config(railWidth: 160)).arrange(
             windows: [
                 WindowSnapshot(windowID: 1, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),
                 WindowSnapshot(windowID: 2, frame: CGRect(x: 0, y: 0, width: 300, height: 200)),

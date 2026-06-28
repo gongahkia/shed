@@ -37,7 +37,7 @@ Keybinds {
 Rules {
     Rule(
         match: bundleID("com.tinyspeck.slackmacgap"),
-        apply: RuleApply(tags: tag(0), engine: "floating", floating: true)
+        apply: RuleApply(tags: tag(0), engine: .floating, floating: true)
     )
 }
 ```
@@ -46,7 +46,7 @@ Rules {
 
 ```swift
 Rules {
-    Rule(match: subrole("AXDialog"), apply: RuleApply(engine: "floating", floating: true))
+    Rule(match: subrole("AXDialog"), apply: RuleApply(engine: .floating, floating: true))
 }
 ```
 
@@ -56,7 +56,7 @@ Rules {
 Rules {
     Rule(
         match: bundleID("com.apple.finder") && titleRegex("^Downloads"),
-        apply: RuleApply(tags: tag(3), engine: "master-stack", floating: false)
+        apply: RuleApply(tags: tag(3), engine: .masterStack, floating: false)
     )
 }
 ```
@@ -71,7 +71,7 @@ Keybinds {
     Keybind(KeyChord([.command, .shift], .four), do: .moveWindowToTag(3))
 }
 Rules {
-    Rule(match: bundleID("com.apple.Terminal"), apply: RuleApply(tags: tag(3), engine: "bsp"))
+    Rule(match: bundleID("com.apple.Terminal"), apply: RuleApply(tags: tag(3), engine: .bsp))
 }
 ```
 
@@ -84,7 +84,7 @@ Keybinds {
     Keybind(KeyChord([.command, .shift], .s), do: .moveWindowToTag(1))
 }
 Rules {
-    Rule(match: subrole("AXSystemDialog"), apply: RuleApply(tags: tag(1), engine: "floating", floating: true))
+    Rule(match: subrole("AXSystemDialog"), apply: RuleApply(tags: tag(1), engine: .floating, floating: true))
 }
 ```
 
@@ -92,9 +92,9 @@ Rules {
 
 ```swift
 Rules {
-    Rule(match: bundleID("com.apple.Terminal"), apply: RuleApply(engine: "bsp"))
-    Rule(match: bundleID("com.apple.Safari"), apply: RuleApply(engine: "niri-scroll"))
-    Rule(match: bundleID("com.apple.finder"), apply: RuleApply(engine: "floating", floating: true))
+    Rule(match: bundleID("com.apple.Terminal"), apply: RuleApply(engine: .bsp))
+    Rule(match: bundleID("com.apple.Safari"), apply: RuleApply(engine: .niriScroll))
+    Rule(match: bundleID("com.apple.finder"), apply: RuleApply(engine: .floating, floating: true))
 }
 ```
 
@@ -248,7 +248,7 @@ Rules {
 
 ```swift
 Engines {
-    EngineDeclaration.raw("dev.olly.example.dynamic") { context in
+    EngineDeclaration.raw(LayoutEngineID(rawValue: "dev.olly.example.dynamic")) { context in
         _ = context.engineID
     }
 }
@@ -261,7 +261,10 @@ Engines {
     EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.example.hello"))
 }
 Rules {
-    Rule(match: bundleID("com.example.PluginPreview"), apply: RuleApply(engine: "dev.olly.example.hello"))
+    Rule(
+        match: bundleID("com.example.PluginPreview"),
+        apply: RuleApply(engine: LayoutEngineID(rawValue: "dev.olly.example.hello"))
+    )
 }
 ```
 
@@ -271,7 +274,7 @@ Rules {
 Rules {
     Rule(
         match: parentBundleID("com.apple.dt.Xcode") && !subrole("AXDialog"),
-        apply: RuleApply(engine: "niri-scroll")
+        apply: RuleApply(engine: .niriScroll)
     )
 }
 ```
@@ -282,7 +285,7 @@ Rules {
 Rules {
     Rule(
         match: bundleID("com.apple.Terminal") && windowSize(.largerThan(CGSize(width: 600, height: 400))),
-        apply: RuleApply(engine: "bsp", floating: false)
+        apply: RuleApply(engine: .bsp, floating: false)
     )
 }
 ```
@@ -293,7 +296,7 @@ Rules {
 Rules {
     Rule(
         match: bundleID("com.apple.Terminal"),
-        apply: RuleApply(tags: tag(0).union(tag(4)), engine: "bsp")
+        apply: RuleApply(tags: tag(0).union(tag(4)), engine: .bsp)
     )
 }
 ```
@@ -306,7 +309,7 @@ Engines {
     Grid(.fixedCols(3))
 }
 Rules {
-    Rule(match: bundleID("com.apple.dt.Xcode"), apply: RuleApply(tags: tag(0), engine: "three-col"))
+    Rule(match: bundleID("com.apple.dt.Xcode"), apply: RuleApply(tags: tag(0), engine: .threeCol))
 }
 ```
 
@@ -318,7 +321,7 @@ Engines {
     EngineDeclaration.floating
 }
 Keybinds {
-    Keybind(KeyChord([.command, .option], .m), do: .setEngine("master-stack"))
+    Keybind(KeyChord([.command, .option], .m), do: .setEngine(.masterStack))
 }
 ```
 

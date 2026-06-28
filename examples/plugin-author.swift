@@ -25,7 +25,11 @@ public func ollyConfig() -> Config {
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.example.PluginPreview"),
-                apply: RuleApply(tags: tag(0), engine: "dev.olly.example.hello", floating: false)
+                apply: RuleApply(
+                    tags: tag(0),
+                    engine: LayoutEngineID(rawValue: "dev.olly.example.hello"),
+                    floating: false
+                )
             )
         }
     }

@@ -1,7 +1,7 @@
 import Foundation
 import ollyKit
 
-public struct LayoutEngineID: Codable, ExpressibleByStringLiteral, Hashable, RawRepresentable, Sendable {
+public struct LayoutEngineID: Codable, Hashable, RawRepresentable, Sendable {
     public let rawValue: String
 
     public init(rawValue: String) {
@@ -9,9 +9,6 @@ public struct LayoutEngineID: Codable, ExpressibleByStringLiteral, Hashable, Raw
         self.rawValue = rawValue
     }
 
-    public init(stringLiteral value: String) {
-        self.init(rawValue: value)
-    }
 }
 
 public struct DisplayTagState: Equatable, Sendable {

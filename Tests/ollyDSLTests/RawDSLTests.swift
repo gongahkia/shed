@@ -30,7 +30,8 @@ final class RawDSLTests: XCTestCase {
         ) { context in
             recorder.record(context.ruleContext?.bundleID)
         }
-        let engine = EngineDeclaration.raw("raw-engine") { context in
+        let rawEngineID = LayoutEngineID(rawValue: "raw-engine")
+        let engine = EngineDeclaration.raw(rawEngineID) { context in
             recorder.record(context.engineID?.rawValue)
         }
         let workspace = NamedTagDeclaration.raw("scratch") { context in
@@ -43,13 +44,13 @@ final class RawDSLTests: XCTestCase {
         }
 
         rule.runRaw(context: RawDSLContext(ruleContext: RuleContext(bundleID: "com.example.App")))
-        engine.runRaw(context: RawDSLContext(engineID: "raw-engine"))
+        engine.runRaw(context: RawDSLContext(engineID: rawEngineID))
         workspace.runRaw(context: RawDSLContext(tag: try? Tag(index: 7)))
         hooks.runRaw(context: RawDSLContext(event: "startup"))
 
         XCTAssertEqual(recorder.events, ["com.example.App", "raw-engine", "7", "startup"])
         XCTAssertEqual(rule.apply.floating, true)
-        XCTAssertEqual(engine.id, "raw-engine")
+        XCTAssertEqual(engine.id, rawEngineID)
         XCTAssertEqual(workspace.name, "scratch")
         XCTAssertEqual(hooks.declarations.map(\.label), ["startup"])
     }

@@ -81,9 +81,9 @@ public func ollyConfig() -> Config {
         }
 
         Rules {
-            Rule(match: RuleMatch(bundleID: "com.apple.dt.Xcode"), apply: RuleApply(tags: tag(0), engine: "bsp"))
-            Rule(match: RuleMatch(bundleID: "com.apple.Safari"), apply: RuleApply(tags: tag(1), engine: "niri-scroll"))
-            Rule(match: RuleMatch(subrole: "AXDialog"), apply: RuleApply(engine: "floating", floating: true))
+            Rule(match: RuleMatch(bundleID: "com.apple.dt.Xcode"), apply: RuleApply(tags: tag(0), engine: .bsp))
+            Rule(match: RuleMatch(bundleID: "com.apple.Safari"), apply: RuleApply(tags: tag(1), engine: .niriScroll))
+            Rule(match: RuleMatch(subrole: "AXDialog"), apply: RuleApply(engine: .floating, floating: true))
         }
     }
 }

@@ -30,15 +30,15 @@ public func ollyConfig() -> Config {
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Safari"),
-                apply: RuleApply(tags: tag(2), engine: "niri-scroll", floating: false)
+                apply: RuleApply(tags: tag(2), engine: .niriScroll, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.tinyspeck.slackmacgap"),
-                apply: RuleApply(tags: tag(3), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(3), engine: .floating, floating: true)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Terminal"),
-                apply: RuleApply(tags: tag(0).union(tag(4)), engine: "bsp", floating: false)
+                apply: RuleApply(tags: tag(0).union(tag(4)), engine: .bsp, floating: false)
             )
         }
     }

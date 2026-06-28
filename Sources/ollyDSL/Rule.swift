@@ -155,6 +155,11 @@ public struct RuleApply: Codable, Equatable, Sendable {
         self.floating = floating
     }
 
+    @available(*, unavailable, message: "unknown-engine-id: use a typed LayoutEngineID such as .bsp")
+    public init(tags: TagSet? = nil, engine: String, floating: Bool? = nil) {
+        fatalError()
+    }
+
     public func merging(_ override: RuleApply) -> RuleApply {
         RuleApply(
             tags: override.tags ?? tags,

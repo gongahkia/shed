@@ -16,19 +16,19 @@ public func ollyConfig() -> Config {
         }
 
         Keybinds {
-            Keybind(KeyChord([.command, .option], .u), do: .setEngine("three-col"))
-            Keybind(KeyChord([.command, .option], .g), do: .setEngine("grid"))
+            Keybind(KeyChord([.command, .option], .u), do: .setEngine(.threeCol))
+            Keybind(KeyChord([.command, .option], .g), do: .setEngine(.grid))
             Keybind(KeyChord([.option], .tab), do: .focus(.next))
         }
 
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.apple.dt.Xcode"),
-                apply: RuleApply(tags: tag(0), engine: "three-col", floating: false)
+                apply: RuleApply(tags: tag(0), engine: .threeCol, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.finder"),
-                apply: RuleApply(tags: tag(1), engine: "grid", floating: false)
+                apply: RuleApply(tags: tag(1), engine: .grid, floating: false)
             )
         }
     }

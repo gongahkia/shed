@@ -44,6 +44,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Install lint tools
         run: brew install swiftlint swiftformat
+      - name: DSL change coverage
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: ./scripts/check-dsl-change-coverage.rb
       - name: DSL doc comments
         run: ./scripts/check-dsl-doc-comments.rb
       - name: SwiftLint

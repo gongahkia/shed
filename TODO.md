@@ -89,7 +89,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## Cross-cutting / continuous
 
-(A) 2026-06-26 Every DSL change requires a corresponding entry in `examples/` exercising the new primitive and a doc-comment update +continuous @dsl @docs ref:N§14
 (B) 2026-06-26 Maintain `docs/layouts-research.md` as living doc; add a new entry whenever a contributor proposes or studies a new layout paradigm +continuous @docs ref:N§6
 (B) 2026-06-26 Maintain `docs/menubar-notch-integration.md` as living doc; add an entry whenever a new menubar/notch utility ships or breaks integration +continuous @docs @ecosystem ref:N§7
 (B) 2026-06-26 No new private-API usage without an RFC + fallback path; CI gate `scripts/check-no-private-api.sh` blocks +continuous @ci ref:N§4-D2

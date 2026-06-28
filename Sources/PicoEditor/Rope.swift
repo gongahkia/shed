@@ -1,0 +1,168 @@
+public struct Rope: Sendable {
+	private var root: RopeNode
+
+	public init(_ string: String = "") {
+		root = RopeNode.build(from: string)
+	}
+
+	public var length: Int {
+		root.summary.utf8Bytes
+	}
+
+	public var lineCount: Int {
+		root.summary.lines + 1
+	}
+
+	public mutating func insert(_ string: String, at offset: Int) {
+		precondition((0 ... length).contains(offset), "insert offset out of bounds")
+		var text = root.text
+		text.insert(contentsOf: string, at: text.index(atUTF8Offset: offset))
+		root = RopeNode.build(from: text)
+	}
+
+	public mutating func remove(_ range: Range<Int>) {
+		precondition(range.lowerBound >= 0 && range.upperBound <= length, "remove range out of bounds")
+		var text = root.text
+		let lower = text.index(atUTF8Offset: range.lowerBound)
+		let upper = text.index(atUTF8Offset: range.upperBound)
+		text.removeSubrange(lower ..< upper)
+		root = RopeNode.build(from: text)
+	}
+
+	public func slice(_ range: Range<Int>) -> String {
+		precondition(range.lowerBound >= 0 && range.upperBound <= length, "slice range out of bounds")
+		let text = root.text
+		let lower = text.index(atUTF8Offset: range.lowerBound)
+		let upper = text.index(atUTF8Offset: range.upperBound)
+		return String(text[lower ..< upper])
+	}
+
+	public func lineRange(_ index: Int) -> Range<Int> {
+		precondition(index >= 0, "line index out of bounds")
+		let text = root.text
+		var line = 0
+		var start = 0
+		for (offset, byte) in text.utf8.enumerated() {
+			if byte == 10 {
+				if line == index {
+					return start ..< offset
+				}
+				line += 1
+				start = offset + 1
+			}
+		}
+		if line == index {
+			return start ..< length
+		}
+		return length ..< length
+	}
+
+	func validateInvariants() -> Bool {
+		root.validate()
+	}
+}
+
+private final class RopeNode: @unchecked Sendable {
+	let children: [RopeNode]
+	let leafText: String?
+	let summary: RopeSummary
+
+	var text: String {
+		if let leafText {
+			return leafText
+		}
+		return children.map(\.text).joined()
+	}
+
+	private init(text: String) {
+		children = []
+		leafText = text
+		summary = RopeSummary(text)
+	}
+
+	private init(children: [RopeNode]) {
+		self.children = children
+		leafText = nil
+		summary = children.reduce(.zero) { $0 + $1.summary }
+	}
+
+	static func build(from text: String) -> RopeNode {
+		var leaves: [RopeNode] = []
+		var chunk = ""
+		var chunkBytes = 0
+		for character in text {
+			let bytes = String(character).utf8.count
+			if chunkBytes > 0, chunkBytes + bytes > 1024 {
+				leaves.append(RopeNode(text: chunk))
+				chunk = ""
+				chunkBytes = 0
+			}
+			chunk.append(character)
+			chunkBytes += bytes
+		}
+		if !chunk.isEmpty || leaves.isEmpty {
+			leaves.append(RopeNode(text: chunk))
+		}
+		var level = leaves
+		while level.count > 1 {
+			var next: [RopeNode] = []
+			var index = 0
+			while index < level.count {
+				let end = min(index + 8, level.count)
+				next.append(RopeNode(children: Array(level[index ..< end])))
+				index = end
+			}
+			level = next
+		}
+		return level[0]
+	}
+
+	func validate() -> Bool {
+		if let leafText {
+			return leafText.utf8.count <= 1024 && summary == RopeSummary(leafText)
+		}
+		guard (1 ... 8).contains(children.count) else {
+			return false
+		}
+		return summary == children.reduce(.zero) { $0 + $1.summary } && children.allSatisfy { $0.validate() }
+	}
+}
+
+private struct RopeSummary: Equatable, Sendable {
+	var utf8Bytes: Int
+	var lines: Int
+	var scalars: Int
+
+	static let zero = RopeSummary(utf8Bytes: 0, lines: 0, scalars: 0)
+
+	init(utf8Bytes: Int, lines: Int, scalars: Int) {
+		self.utf8Bytes = utf8Bytes
+		self.lines = lines
+		self.scalars = scalars
+	}
+
+	init(_ text: String) {
+		utf8Bytes = text.utf8.count
+		lines = text.utf8.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+		scalars = text.unicodeScalars.count
+	}
+
+	static func + (lhs: RopeSummary, rhs: RopeSummary) -> RopeSummary {
+		RopeSummary(
+			utf8Bytes: lhs.utf8Bytes + rhs.utf8Bytes,
+			lines: lhs.lines + rhs.lines,
+			scalars: lhs.scalars + rhs.scalars
+		)
+	}
+}
+
+private extension String {
+	func index(atUTF8Offset offset: Int) -> String.Index {
+		precondition((0 ... utf8.count).contains(offset), "utf8 offset out of bounds")
+		let utf8Index = utf8.index(utf8.startIndex, offsetBy: offset)
+		guard let index = String.Index(utf8Index, within: self) else {
+			preconditionFailure("utf8 offset must be a character boundary")
+		}
+		return index
+	}
+}

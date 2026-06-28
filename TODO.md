@@ -56,7 +56,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 4 — Rope buffer
 
-(A) 2026-06-28 +Phase4-Buffer @buffer id:060 est:6h dep:005 In `Sources/PicoEditor/Rope.swift`, implement `Rope`: B-tree, branching factor 8, leaf max 1024 UTF-8 bytes. Node summary: `(utf8Bytes: Int, lines: Int, scalars: Int)`. Public API: `init(_ s: String)`, `insert(_ s: String, at offset: Int)`, `remove(_ range: Range<Int>)`, `slice(_ range: Range<Int>) -> String`, `length: Int`, `lineCount: Int`, `lineRange(_ idx: Int) -> Range<Int>`. Ref: [xi-editor rope_science_01](https://github.com/xi-editor/xi-editor/blob/master/docs/docs/rope_science_01.md).
 (A) 2026-06-28 +Phase4-Buffer @buffer id:061 est:3h dep:060 Add summary metric for grapheme-cluster boundaries. Use `String.UnicodeScalarView` + `Character` clustering. Add `graphemeCount` to summary. API: `graphemeIndex(forOffset: Int) -> Int`.
 (A) 2026-06-28 +Phase4-Buffer @buffer id:062 est:4h dep:060 Property-based tests in `Tests/PicoEditorTests/RopeTests.swift` using Swift Testing parameterized tests: random insert/delete sequences, assert equivalence with `Array<Character>` reference impl. 10k iterations. Include xi-editor test vectors where available.
 (A) 2026-06-28 +Phase4-Buffer @buffer id:063 est:3h dep:060 Benchmarks via `XCTMetric` (or signposts in a CLI): insert 1M chars sequentially, insert 1M chars at random positions, slice 1M ranges. Target: random insert <100 ns/op amortized. Document `bench/notes/rope-bench.md`.

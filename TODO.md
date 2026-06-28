@@ -63,7 +63,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 5 — Editor core
 
-(A) 2026-06-28 +Phase5-Editor @editor id:080 est:3h dep:060 In `Sources/PicoEditor/Selection.swift`: `struct Selection { var anchor: Int; var head: Int; var affinity: Affinity }`. `struct SelectionSet { var primary: Selection; var secondaries: [Selection] }`. Methods: `merge()` (collapse overlaps), `map(through edit: Edit)`.
 (A) 2026-06-28 +Phase5-Editor @editor id:081 est:4h dep:060,080 `Sources/PicoEditor/Editor.swift`: holds `var rope: Rope`, `var selections: SelectionSet`, `var history: UndoStack`. Commands: `insert(_ s: String)`, `deleteBackward()`, `deleteForward()`, `moveCursor(_ motion: Motion)`, `setSelection(_ s: SelectionSet)`. All commands operate on every selection in set.
 (A) 2026-06-28 +Phase5-Editor @editor id:082 est:4h dep:081 Undo stack: rope snapshot every 32 edits, plus per-edit delta `Edit { range: Range<Int>; oldText: String; newText: String; selectionBefore: SelectionSet }`. `undo()` replays delta inverse; on snapshot boundary, restore snapshot. Test: 1000-edit transcript, undo to empty, redo to final, assert equality.
 (A) 2026-06-28 +Phase5-Editor @editor id:083 est:3h dep:081 Motion primitives: `charForward`, `charBackward`, `wordForward`, `wordBackward`, `lineStart`, `lineEnd`, `bufferStart`, `bufferEnd`, `pageDown`, `pageUp`. Word boundary: alpha-num run or single punct. Test each.

@@ -100,7 +100,7 @@ x 2026-06-28 +Phase11-Vim @vim id:206 est:2h dep:201,082 Wire `u` to undo, `Ctrl
 ## Phase 12 — Emacs profile
 
 x 2026-06-28 +Phase12-Emacs @emacs id:220 est:4h dep:183 Standard motions: C-f, C-b, C-n, C-p, C-a, C-e, M-f, M-b, M-<, M->. Defined in `keys.emacs.toml`.
-(A) 2026-06-28 +Phase12-Emacs @emacs id:221 est:3h dep:220 Kill ring: `KillRing` class, ring of 60 entries. M-w copy, C-w cut, C-y paste, M-y rotate. Sync C-w/M-w to system clipboard.
+x 2026-06-28 +Phase12-Emacs @emacs id:221 est:3h dep:220 Kill ring: `KillRing` class, ring of 60 entries. M-w copy, C-w cut, C-y paste, M-y rotate. Sync C-w/M-w to system clipboard.
 (A) 2026-06-28 +Phase12-Emacs @emacs id:222 est:3h dep:220 Prefix keys: C-x map (C-x C-s save, C-x C-f open, C-x b switch buffer, C-x k kill buffer, C-x 0/1/2/3 window ops mapped to split-pane equivalents).
 (A) 2026-06-28 +Phase12-Emacs @emacs id:223 est:3h dep:220 Incremental search: C-s forward, C-r backward. Reuse find infra.
 (B) 2026-06-28 +Phase12-Emacs @emacs id:224 est:2h dep:222 Universal arg: C-u <n>. Pass to next command as count.

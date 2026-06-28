@@ -61,6 +61,19 @@ import Testing
 	#expect(editor.text == "abc")
 }
 
+@Test func killRingStoresSixtyEntriesAndRotates() {
+	let ring = KillRing()
+	for index in 0 ..< 61 {
+		ring.push("entry-\(index)")
+	}
+	#expect(ring.current == "entry-60")
+	for _ in 0 ..< 59 {
+		_ = ring.rotate()
+	}
+	#expect(ring.current == "entry-1")
+	#expect(ring.rotate() == "entry-60")
+}
+
 @Test func editorMotionPrimitivesMoveCursor() {
 	var editor = Editor(text: "abc, de\nsecond line\nthird")
 	editor.pageLineCount = 1

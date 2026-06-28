@@ -81,11 +81,14 @@ final class PicoDocument: NSDocument {
 			self?.editor = editor
 			self?.updateChangeCount(.changeDone)
 		}
-		view.saveRequested = { [weak self] in
-			self?.save(nil)
+			view.saveRequested = { [weak self] in
+				self?.save(nil)
+			}
+			view.closeRequested = { [weak self] in
+				self?.close()
+			}
 		}
 	}
-}
 
 final class EditorWindowController: NSWindowController {
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))

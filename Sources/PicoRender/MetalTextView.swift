@@ -59,6 +59,7 @@ public final class MetalTextView: NSView {
 	}
 	public var editorDidChange: ((Editor) -> Void)?
 	public var saveRequested: (() -> Void)?
+	public var closeRequested: (() -> Void)?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -199,11 +200,19 @@ public final class MetalTextView: NSView {
 
 	public override func performKeyEquivalent(with event: NSEvent) -> Bool {
 		let flags = event.modifierFlags.intersection([.command, .shift, .control, .option])
-		if flags == .command, event.charactersIgnoringModifiers?.lowercased() == "s" {
+		guard flags == .command else {
+			return super.performKeyEquivalent(with: event)
+		}
+		switch event.charactersIgnoringModifiers?.lowercased() {
+		case "s":
 			saveRequested?()
 			return true
+		case "w":
+			closeRequested?()
+			return true
+		default:
+			return super.performKeyEquivalent(with: event)
 		}
-		return super.performKeyEquivalent(with: event)
 	}
 
 	@discardableResult

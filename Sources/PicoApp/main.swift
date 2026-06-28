@@ -30,6 +30,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			document.close()
 			return
 		}
+		if let document = documentController.currentDocument {
+			document.close()
+			return
+		}
+		if let document = documentController.documents.last {
+			document.close()
+			return
+		}
 		NSApp.keyWindow?.performClose(sender)
 	}
 

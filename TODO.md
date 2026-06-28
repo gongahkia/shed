@@ -72,7 +72,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 7 — File system + tabs + tree
 
-(A) 2026-06-28 +Phase7-FS @appkit id:121 est:5h dep:120 Tab bar: custom `NSView` subclass `TabBarView`. Each tab = filename + dirty dot + close X. Click switches active document. Cmd-W closes. Cmd-T new untitled. Use `NSStackView` for layout. Style flat, no gradients.
 (A) 2026-06-28 +Phase7-FS @appkit id:122 est:5h dep:120 File tree sidebar: `NSOutlineView` in left split. Root = workspace folder (opened via File > Open Folder). Lazy-load children. Double-click opens file in new tab. Test: open this repo folder, navigate.
 (A) 2026-06-28 +Phase7-FS @appkit id:123 est:2h dep:121 Recent files: `NSDocumentController.shared.noteNewRecentDocument(_:)`. Menu auto-populates via AppKit standard behavior.
 (B) 2026-06-28 +Phase7-FS @appkit id:124 est:3h dep:122 File watcher: use `DispatchSource.makeFileSystemObjectSource` per open file. On external change, prompt to reload.

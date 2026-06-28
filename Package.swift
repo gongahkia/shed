@@ -28,7 +28,13 @@ let package = Package(
 		.target(name: "PicoSyntax", dependencies: ["CTreeSitter", "CTSGrammars", "PicoEditor"]),
 		.target(name: "PicoKeymap"),
 		.executableTarget(name: "PicoBench"),
-		.target(name: "CTreeSitter", sources: ["stub.c"]),
+		.target(
+			name: "CTreeSitter",
+			path: "Sources/CTreeSitter",
+			sources: ["upstream/lib/src/lib.c"],
+			publicHeadersPath: "upstream/lib/include",
+			cSettings: [.headerSearchPath("upstream/lib/src")]
+		),
 		.target(name: "CTSGrammars", sources: ["stub.c"]),
 		.testTarget(name: "PicoEditorTests", dependencies: ["PicoEditor"]),
 		.testTarget(name: "PicoRenderTests", dependencies: ["PicoRender"]),

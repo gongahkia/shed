@@ -88,6 +88,42 @@ import Testing
 	#expect(view.editor.selections.primary.head == 8)
 }
 
+@Test func vimDeleteOperatorAppliesMotionAndLine() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "one two\nthree\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .operatorPending, chord: [Key("w")], commandID: "editor.moveWordForward"),
+		KeyBinding(mode: .operatorPending, chord: [Key("d")], commandID: "vim.operator.line.delete"),
+	])
+
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(view.editor.text == "two\nthree\n")
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.editor.text == "three\n")
+}
+
+@Test func vimChangeAndYankLineOperators() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha\nbeta\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("c")], commandID: "vim.operator.change"),
+		KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
+		KeyBinding(mode: .operatorPending, chord: [Key("c")], commandID: "vim.operator.line.change"),
+		KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
+	])
+
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(NSPasteboard.general.string(forType: .string) == "alpha\n")
+	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
+	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
+	#expect(view.editor.text == "beta\n")
+	#expect(view.keymapEngine.mode == .insert)
+}
+
 @Test func textInputClientCommitsAndMarksIMEText() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)

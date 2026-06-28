@@ -192,7 +192,7 @@ public final class KeymapEngine {
 	}
 
 	private func consumeCountPrefix(_ key: Key) -> Bool {
-		guard mode == .normal, pendingChord.isEmpty, key.modifiers.isEmpty, key.value.count == 1, let digit = Int(key.value) else {
+		guard (mode == .normal || mode == .operatorPending), pendingChord.isEmpty, key.modifiers.isEmpty, key.value.count == 1, let digit = Int(key.value) else {
 			return false
 		}
 		if digit == 0, pendingCount == nil {

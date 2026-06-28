@@ -89,7 +89,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## Cross-cutting / continuous
 
-(A) 2026-06-26 Every PR cites the NORTHSTAR section(s) it touches; reject PRs that change locked decisions (NORTHSTAR §4) without an RFC issue first +continuous @docs ref:N§4
 (A) 2026-06-26 Every PR must demonstrate it does not regress §12a perf budgets — PR template includes a `Perf impact` checkbox referencing CI bench output +continuous @ci ref:N§12a
 (A) 2026-06-26 Every DSL change requires a corresponding entry in `examples/` exercising the new primitive and a doc-comment update +continuous @dsl @docs ref:N§14
 (B) 2026-06-26 Maintain `docs/layouts-research.md` as living doc; add a new entry whenever a contributor proposes or studies a new layout paradigm +continuous @docs ref:N§6

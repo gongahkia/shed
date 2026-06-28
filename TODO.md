@@ -79,7 +79,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 9 — Find/replace
 
-(A) 2026-06-28 +Phase9-Find @editor id:161 est:3h dep:160,081 Find next/prev (Cmd-G / Cmd-Shift-G): wraps. Highlights all matches in viewport using selection renderer.
 (A) 2026-06-28 +Phase9-Find @editor id:162 est:3h dep:161 Find-all → multi-cursor: Cmd-Ctrl-G adds a cursor at every match. Verify selection merge on overlap.
 (B) 2026-06-28 +Phase9-Find @editor id:163 est:3h dep:160 Project-wide find: separate panel, walks workspace root, parallel via `DispatchQueue.global()`. Honors `.gitignore` via simple glob filter (no full git integration).
 

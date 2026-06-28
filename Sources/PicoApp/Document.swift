@@ -223,6 +223,8 @@ final class EditorWindowController: NSWindowController {
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
 	private let editorView: MetalTextView
+	private var findMatches: [Range<Int>] = []
+	private var selectedFindMatchIndex: Int?
 
 	init(document: PicoDocument) {
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -275,6 +277,12 @@ final class EditorWindowController: NSWindowController {
 		findBarView.onDismiss = { [weak self] in
 			self?.setFindBarVisible(false)
 		}
+		findBarView.onStateChange = { [weak self] _ in
+			self?.refreshFindMatches()
+		}
+		findBarView.onFindNext = { [weak self] in
+			self?.findNext()
+		}
 		PicoWorkspaceController.shared.register(fileTreeView)
 		PicoTabCoordinator.shared.register(tabBarView)
 		window.makeFirstResponder(editorView)
@@ -310,13 +318,85 @@ final class EditorWindowController: NSWindowController {
 		setFindBarVisible(findBarView.isHidden)
 	}
 
+	func findNext() {
+		selectFindMatch(direction: 1)
+	}
+
+	func findPrevious() {
+		selectFindMatch(direction: -1)
+	}
+
 	private func setFindBarVisible(_ visible: Bool) {
 		findBarView.isHidden = !visible
+		editorView.topContentInset = visible ? 38 : 0
 		if visible {
+			refreshFindMatches()
 			findBarView.focusQuery()
 		} else {
+			findMatches = []
+			selectedFindMatchIndex = nil
+			editorView.setFindMatchRanges([])
 			focusEditor()
 		}
+	}
+
+	private func refreshFindMatches() {
+		guard !findBarView.isHidden, let expression = findBarView.regularExpression() else {
+			findMatches = []
+			selectedFindMatchIndex = nil
+			editorView.setFindMatchRanges([])
+			return
+		}
+		let text = editorView.editor.text
+		let fullRange = NSRange(text.startIndex ..< text.endIndex, in: text)
+		findMatches = expression.matches(in: text, range: fullRange).compactMap { result in
+			guard result.range.length > 0, let range = Range(result.range, in: text) else {
+				return nil
+			}
+			return utf8Range(range, in: text)
+		}
+		selectedFindMatchIndex = nil
+		editorView.setFindMatchRanges(findMatches)
+	}
+
+	private func selectFindMatch(direction: Int) {
+		guard !findBarView.isHidden else {
+			setFindBarVisible(true)
+			return
+		}
+		refreshFindMatches()
+		guard !findMatches.isEmpty else {
+			return
+		}
+		let selectedIndex: Int
+		if let selectedFindMatchIndex {
+			selectedIndex = wrappedIndex(selectedFindMatchIndex + direction, count: findMatches.count)
+		} else if direction >= 0 {
+			let cursor = editorView.editor.selections.primary.head
+			selectedIndex = findMatches.firstIndex { $0.lowerBound >= cursor } ?? 0
+		} else {
+			let cursor = editorView.editor.selections.primary.head
+			selectedIndex = findMatches.lastIndex { $0.upperBound <= cursor } ?? findMatches.count - 1
+		}
+		selectedFindMatchIndex = selectedIndex
+		editorView.selectUTF8Range(findMatches[selectedIndex])
+		focusEditor()
+	}
+
+	private func wrappedIndex(_ index: Int, count: Int) -> Int {
+		(index % count + count) % count
+	}
+
+	private func utf8Range(_ range: Range<String.Index>, in text: String) -> Range<Int>? {
+		guard
+			let lowerIndex = range.lowerBound.samePosition(in: text.utf8),
+			let upperIndex = range.upperBound.samePosition(in: text.utf8)
+		else {
+			return nil
+		}
+		let lower = text.utf8.distance(from: text.utf8.startIndex, to: lowerIndex)
+		let upper = text.utf8.distance(from: text.utf8.startIndex, to: upperIndex)
+		return lower ..< upper
 	}
 }
 

@@ -93,7 +93,7 @@ final class PicoDocument: NSDocument {
 	}
 
 	override class var autosavesInPlace: Bool {
-		false
+		true
 	}
 
 	override func updateChangeCount(_ change: NSDocument.ChangeType) {

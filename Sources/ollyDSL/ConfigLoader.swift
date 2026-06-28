@@ -92,6 +92,14 @@ public struct ConfigLoader {
         }
 
         let sourceData = try Data(contentsOf: sourceURL)
+        if let source = String(data: sourceData, encoding: .utf8),
+           let output = ConfigSourcePreflight.compilerOutput(sourceURL: sourceURL, source: source) {
+            throw ConfigLoaderError.compileFailed(
+                command: "olly-config-preflight \(sourceURL.path)",
+                exitCode: 1,
+                output: output
+            )
+        }
         let hash = Self.contentHash(for: sourceData)
         let cacheURL = cacheDirectory.appendingPathComponent(hash, isDirectory: true)
         let libraryURL = cacheURL.appendingPathComponent("Config.dylib")

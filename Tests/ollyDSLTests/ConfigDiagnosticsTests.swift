@@ -39,6 +39,31 @@ final class ConfigDiagnosticsTests: XCTestCase {
         let diagnostic = ConfigDiagnosticFormatter.diagnostics(from: output, source: source).first
 
         XCTAssertEqual(diagnostic?.diagnosticID, .ambiguousRule)
-        XCTAssertEqual(diagnostic?.suggestions, ["use RuleMatch fields or a RulePredicate expression, not both in the same rule"])
+        XCTAssertEqual(
+            diagnostic?.suggestions,
+            ["use RuleMatch fields or a RulePredicate expression, not both in the same rule"]
+        )
+    }
+
+    func testDiagnosticFormatterRecognizesDuplicateCatalogIDs() {
+        let source = """
+        import ollyDSL
+        public func ollyConfig() -> Config {
+            Config {}
+        }
+        """
+        let output = [
+            "/tmp/Config.swift:3:12: error: duplicate-chord: option+j was already declared at line 2",
+            "/tmp/Config.swift:4:12: error: duplicate-tag-name: \"code\" was already declared at line 3"
+        ].joined(separator: "\n")
+
+        let diagnostics = ConfigDiagnosticFormatter.diagnostics(from: output, source: source)
+
+        XCTAssertEqual(diagnostics.map(\.diagnosticID), [.duplicateChord, .duplicateTagName])
+        XCTAssertEqual(diagnostics[0].suggestions, ["remove one keybind or choose a distinct KeyChord"])
+        XCTAssertEqual(
+            diagnostics[1].suggestions,
+            ["rename one Tag.named declaration so every workspace tag is unique"]
+        )
     }
 }

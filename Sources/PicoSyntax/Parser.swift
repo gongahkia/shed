@@ -1,5 +1,6 @@
 import CTreeSitter
 import CTSGrammars
+import Foundation
 import PicoEditor
 
 public enum SyntaxError: Error, Equatable {
@@ -7,6 +8,9 @@ public enum SyntaxError: Error, Equatable {
 	case incompatibleLanguage(Language)
 	case parseFailed
 	case documentTooLarge(Int)
+	case queryLoadFailed(Language)
+	case queryCompileFailed(Language, UInt32, Int)
+	case queryCursorAllocationFailed
 }
 
 public enum Language: Sendable, Equatable, CaseIterable {
@@ -58,6 +62,39 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return tree_sitter_typescript()
 		case .yaml:
 			return tree_sitter_yaml()
+		}
+	}
+
+	var queryResourceName: String {
+		switch self {
+		case .c:
+			return "c"
+		case .cpp:
+			return "cpp"
+		case .css:
+			return "css"
+		case .go:
+			return "go"
+		case .html:
+			return "html"
+		case .javascript:
+			return "javascript"
+		case .json:
+			return "json"
+		case .markdown:
+			return "markdown"
+		case .markdownInline:
+			return "markdown-inline"
+		case .python:
+			return "python"
+		case .rust:
+			return "rust"
+		case .toml:
+			return "toml"
+		case .tsx, .typescript:
+			return "typescript"
+		case .yaml:
+			return "yaml"
 		}
 	}
 }
@@ -212,6 +249,95 @@ public struct InputEdit: Sendable, Equatable {
 			old_end_point: oldEndPoint.rawPoint,
 			new_end_point: newEndPoint.rawPoint
 		)
+	}
+}
+
+public struct HighlightSpan: Sendable, Equatable {
+	public var range: Range<Int>
+	public var capture: String
+
+	public init(range: Range<Int>, capture: String) {
+		self.range = range
+		self.capture = capture
+	}
+}
+
+public final class HighlightQuery {
+	private let query: OpaquePointer
+
+	public init(language: Language) throws {
+		guard let rawLanguage = language.rawLanguage else {
+			throw SyntaxError.incompatibleLanguage(language)
+		}
+		let source = try Self.loadSource(language: language)
+		var errorOffset: UInt32 = 0
+		var errorType = TSQueryErrorNone
+		let query = source.withCString { pointer in
+			ts_query_new(rawLanguage, pointer, UInt32(source.utf8.count), &errorOffset, &errorType)
+		}
+		guard let query else {
+			throw SyntaxError.queryCompileFailed(language, errorOffset, Int(errorType.rawValue))
+		}
+		self.query = query
+	}
+
+	deinit {
+		ts_query_delete(query)
+	}
+
+	public func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
+		guard let cursor = ts_query_cursor_new() else {
+			throw SyntaxError.queryCursorAllocationFailed
+		}
+		defer {
+			ts_query_cursor_delete(cursor)
+		}
+		if let byteRange {
+			_ = ts_query_cursor_set_byte_range(cursor, UInt32(byteRange.lowerBound), UInt32(byteRange.upperBound))
+		}
+		ts_query_cursor_exec(cursor, query, tree.rootNode.node)
+		var spans: [HighlightSpan] = []
+		var match = TSQueryMatch()
+		var captureIndex: UInt32 = 0
+		while ts_query_cursor_next_capture(cursor, &match, &captureIndex) {
+			let index = Int(captureIndex)
+			guard index < Int(match.capture_count) else {
+				continue
+			}
+			let capture = match.captures[index]
+			let name = captureName(for: capture.index)
+			let node = Node(capture.node)
+			spans.append(HighlightSpan(range: node.byteRange, capture: name))
+		}
+		return spans.sorted { lhs, rhs in
+			lhs.range.lowerBound == rhs.range.lowerBound ? lhs.capture < rhs.capture : lhs.range.lowerBound < rhs.range.lowerBound
+		}
+	}
+
+	private func captureName(for index: UInt32) -> String {
+		var length: UInt32 = 0
+		let pointer = ts_query_capture_name_for_id(query, index, &length)
+		guard let pointer else {
+			return ""
+		}
+		let bytes = UnsafeRawPointer(pointer).assumingMemoryBound(to: UInt8.self)
+		let buffer = UnsafeBufferPointer(start: bytes, count: Int(length))
+		return String(decoding: buffer, as: UTF8.self)
+	}
+
+	private static func loadSource(language: Language) throws -> String {
+		if language == .typescript || language == .tsx {
+			return try loadSource(resourceName: "javascript", language: language) + "\n" + loadSource(resourceName: "typescript", language: language)
+		}
+		return try loadSource(resourceName: language.queryResourceName, language: language)
+	}
+
+	private static func loadSource(resourceName: String, language: Language) throws -> String {
+		let subdirectory = "Resources/queries/\(resourceName)"
+		guard let url = Bundle.module.url(forResource: "highlights", withExtension: "scm", subdirectory: subdirectory) else {
+			throw SyntaxError.queryLoadFailed(language)
+		}
+		return try String(contentsOf: url, encoding: .utf8)
 	}
 }
 

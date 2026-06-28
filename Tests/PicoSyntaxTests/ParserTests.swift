@@ -48,6 +48,19 @@ import Testing
 	#endif
 }
 
+@Test func highlightQueryCapturesTypeScriptBasics() throws {
+	let text = "// note\nconst value = \"ok\";\n"
+	let rope = Rope(text)
+	let parser = try Parser(language: .typescript)
+	let tree = try parser.parse(rope)
+	let query = try HighlightQuery(language: .typescript)
+	let highlights = try query.highlights(in: tree)
+	let captures = Set(highlights.map(\.capture))
+	#expect(captures.contains("comment"))
+	#expect(captures.contains("keyword"))
+	#expect(captures.contains("string"))
+}
+
 private func largeTypeScriptLineSet() -> String {
 	String(repeating: "\n", count: 100_000) + "const done: boolean = true;\n"
 }

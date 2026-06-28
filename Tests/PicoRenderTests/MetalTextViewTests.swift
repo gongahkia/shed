@@ -111,13 +111,16 @@ import Testing
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("c")], commandID: "vim.operator.change"),
 		KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
+		KeyBinding(mode: .normal, chord: [Key("p", modifiers: .shift)], commandID: "vim.pasteBefore"),
 		KeyBinding(mode: .operatorPending, chord: [Key("c")], commandID: "vim.operator.line.change"),
 		KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
 	])
 
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
-	#expect(NSPasteboard.general.string(forType: .string) == "alpha\n")
+	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.text == "alpha\nalpha\nbeta\n")
+	view.editor = Editor(text: "alpha\nbeta\n")
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
 	#expect(view.editor.text == "beta\n")
@@ -173,12 +176,14 @@ import Testing
 	view.editor = Editor(text: "alpha\nbeta\n")
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("v", modifiers: .shift)], commandID: "vim.visual.line"),
+		KeyBinding(mode: .normal, chord: [Key("p", modifiers: .shift)], commandID: "vim.pasteBefore"),
 		KeyBinding(mode: .visual, chord: [Key("y")], commandID: "vim.operator.yank"),
 	])
 
 	#expect(view.handleKey(characters: "V", charactersIgnoringModifiers: "v", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
-	#expect(NSPasteboard.general.string(forType: .string) == "alpha\n")
+	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.text == "alpha\nalpha\nbeta\n")
 	#expect(view.keymapEngine.mode == .normal)
 }
 
@@ -194,6 +199,62 @@ import Testing
 	#expect(view.handleKey(characters: "j", charactersIgnoringModifiers: "j", keyCode: 0))
 	#expect(view.editor.selections.primary.range == 0 ..< 1)
 	#expect(view.editor.selections.secondaries == [Selection(anchor: 3, head: 4)])
+}
+
+@Test func vimRegistersYankAndPasteNamedRegister() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
+		KeyBinding(mode: .normal, chord: [Key("p", modifiers: .shift)], commandID: "vim.pasteBefore"),
+		KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
+	])
+
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	view.editor = Editor(text: "beta\n")
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.text == "alpha\nbeta\n")
+}
+
+@Test func vimDeleteWritesNumberedRegister() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha\nbeta\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .normal, chord: [Key("p", modifiers: .shift)], commandID: "vim.pasteBefore"),
+		KeyBinding(mode: .operatorPending, chord: [Key("d")], commandID: "vim.operator.line.delete"),
+	])
+
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.editor.text == "beta\n")
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "1", charactersIgnoringModifiers: "1", keyCode: 0))
+	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.text == "alpha\nbeta\n")
+}
+
+@Test func vimPlusRegisterSyncsSystemClipboard() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "clip\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("y")], commandID: "vim.operator.yank"),
+		KeyBinding(mode: .operatorPending, chord: [Key("y")], commandID: "vim.operator.line.yank"),
+	])
+
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "+", charactersIgnoringModifiers: "=", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(NSPasteboard.general.string(forType: .string) == "clip\n")
 }
 
 @Test func textInputClientCommitsAndMarksIMEText() {

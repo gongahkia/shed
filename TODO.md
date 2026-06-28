@@ -89,7 +89,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 11 — Vim profile
 
-(A) 2026-06-28 +Phase11-Vim @vim id:204 est:3h dep:201 Registers: `"`, `0`, `1`-`9`, named `a`-`z`. Yank/delete writes; paste (`p`, `P`) reads. System clipboard = `"+` register, synced via `NSPasteboard.general`.
 (A) 2026-06-28 +Phase11-Vim @vim id:205 est:3h dep:200 Ex commands: `:w`, `:q`, `:wq`, `:x`, `:e <path>`, `:bn`/`:bp`, `:%s/x/y/g`. Command-line via existing CommandPalette UI in command mode.
 (A) 2026-06-28 +Phase11-Vim @vim id:206 est:2h dep:201,082 Wire `u` to undo, `Ctrl-R` to redo. Mind vim's edit-grouping semantics: an insert-mode session = one undo unit.
 (B) 2026-06-28 +Phase11-Vim @vim id:207 est:3h dep:200 Search: `/`, `?`, `n`, `N`. Reuse find infra (id:161).

@@ -84,7 +84,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 10 — Keymap engine
 
-(A) 2026-06-28 +Phase10-Keymap @keymap id:181 est:3h dep:180 TOML keymap loader: schema `[mode.normal] "j" = "moveDown"`. Parse via a minimal hand-written TOML reader (avoid deps), or vendor TOMLDecoder-like 200-LOC parser. Acceptance: load `keys.toml`, resolve "jk" chord in normal mode.
 (A) 2026-06-28 +Phase10-Keymap @keymap id:182 est:2h dep:181 Bundle defaults: `Resources/keys.plain.toml`, `Resources/keys.vim.toml`, `Resources/keys.emacs.toml`. User config at `~/.config/pico/keys.toml` overlays selected profile. Switch via Settings or `--profile=vim` flag.
 (A) 2026-06-28 +Phase10-Keymap @keymap id:183 est:3h dep:180,084 Replace hardcoded keys in `MetalTextView.keyDown(_:)` with KeymapEngine dispatch. Acceptance: changing profile changes behavior without recompile.
 

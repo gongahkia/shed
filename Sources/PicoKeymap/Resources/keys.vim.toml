@@ -34,10 +34,12 @@
 "Shift-;" = "vim.ex.start"
 "u" = "edit.undo"
 "Ctrl-R" = "edit.redo"
+"Cmd-D" = "editor.addNextSelection"
 "i" = "mode.insert"
 "/" = "edit.find"
 
 [mode.visual]
+"Cmd-D" = "editor.addNextSelection"
 "Esc" = "mode.normal"
 "h" = "editor.moveLeft"
 "j" = "editor.moveDown"
@@ -85,5 +87,6 @@
 "ap" = "vim.textObject.aroundParagraph"
 
 [mode.insert]
+"Cmd-D" = "editor.addNextSelection"
 "Esc" = "mode.normal"
 "jk" = "mode.normal"

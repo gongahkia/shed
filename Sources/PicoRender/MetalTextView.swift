@@ -480,6 +480,9 @@ public final class MetalTextView: NSView {
 		case "emacs.yankPop":
 			yankPopFromKillRing()
 			return true
+		case "editor.addNextSelection":
+			addNextSelectionMatch()
+			return true
 		case "vim.operator.delete":
 			return beginOperator(.delete)
 		case "vim.operator.change":
@@ -606,6 +609,76 @@ public final class MetalTextView: NSView {
 			.map(\.range)
 			.filter { !$0.isEmpty }
 			.sorted { $0.lowerBound < $1.lowerBound }
+	}
+
+	private func addNextSelectionMatch() {
+		let selectedRanges = selectedNonEmptyRanges()
+		let queryRange: Range<Int>
+		if let selectedRange = selectedRanges.first {
+			queryRange = selectedRange
+		} else if let wordRange = wordRange(at: editor.selections.primary.head) {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: wordRange.lowerBound, head: wordRange.upperBound)))
+			syncEditorState()
+			return
+		} else {
+			return
+		}
+		let query = editor.rope.slice(queryRange)
+		guard !query.isEmpty, let nextRange = nextMatchRange(for: query, after: selectedRanges.map(\.upperBound).max() ?? queryRange.upperBound, excluding: selectedRanges) else {
+			return
+		}
+		let selections = [editor.selections.primary] + editor.selections.secondaries + [Selection(anchor: nextRange.lowerBound, head: nextRange.upperBound)]
+		editor.setSelection(SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst())))
+		syncEditorState()
+	}
+
+	private func wordRange(at offset: Int) -> Range<Int>? {
+		let offsets = characterOffsets()
+		guard !offsets.isEmpty else {
+			return nil
+		}
+		let clamped = min(max(offset, 0), editor.rope.length)
+		let index = offsets.lastIndex { $0.offset <= clamped } ?? 0
+		guard isTextObjectWordCharacter(offsets[index].character) else {
+			return nil
+		}
+		var lowerIndex = index
+		while lowerIndex > 0, isTextObjectWordCharacter(offsets[lowerIndex - 1].character) {
+			lowerIndex -= 1
+		}
+		var upperIndex = index
+		while upperIndex + 1 < offsets.count, isTextObjectWordCharacter(offsets[upperIndex + 1].character) {
+			upperIndex += 1
+		}
+		return offsets[lowerIndex].offset ..< offsets[upperIndex].offset + String(offsets[upperIndex].character).utf8.count
+	}
+
+	private func nextMatchRange(for query: String, after offset: Int, excluding excluded: [Range<Int>]) -> Range<Int>? {
+		let text = editor.text
+		guard let startIndex = String.Index(text.utf8.index(text.utf8.startIndex, offsetBy: min(offset, text.utf8.count)), within: text) else {
+			return nil
+		}
+		let ranges = [
+			startIndex ..< text.endIndex,
+			text.startIndex ..< startIndex,
+		]
+		for searchRange in ranges {
+			var cursor = searchRange.lowerBound
+			while cursor < searchRange.upperBound, let match = text.range(of: query, range: cursor ..< searchRange.upperBound) {
+				let utf8Match = utf8Range(match, in: text)
+				if !excluded.contains(where: { $0 == utf8Match }) {
+					return utf8Match
+				}
+				cursor = match.upperBound
+			}
+		}
+		return nil
+	}
+
+	private func utf8Range(_ range: Range<String.Index>, in text: String) -> Range<Int> {
+		let lower = text.utf8.distance(from: text.utf8.startIndex, to: range.lowerBound.samePosition(in: text.utf8) ?? text.utf8.startIndex)
+		let upper = text.utf8.distance(from: text.utf8.startIndex, to: range.upperBound.samePosition(in: text.utf8) ?? text.utf8.endIndex)
+		return lower ..< upper
 	}
 
 	private func motion(for commandID: String) -> Motion? {

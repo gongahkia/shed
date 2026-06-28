@@ -128,6 +128,14 @@ import Testing
 	}
 }
 
+@Test func bundledProfilesDefineAddNextSelection() throws {
+	for profile in KeymapProfile.allCases {
+		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
+		let engine = KeymapEngine(modeStack: [profile == .vim ? .normal : profile == .emacs ? .emacs : .insert], bindings: bindings)
+		#expect(engine.handle(try keyEvent("d", modifiers: [.command])) == .command("editor.addNextSelection"))
+	}
+}
+
 @Test func bundledVimProfileDefinesNormalModeMotions() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)

@@ -26,7 +26,7 @@ let package = Package(
 		.target(name: "PicoRender", dependencies: ["PicoEditor"], resources: [.copy("Shaders.metal")]),
 		.target(name: "PicoEditor"),
 		.target(name: "PicoSyntax", dependencies: ["CTreeSitter", "CTSGrammars", "PicoEditor"]),
-		.target(name: "PicoKeymap"),
+		.target(name: "PicoKeymap", resources: [.process("Resources")]),
 		.executableTarget(name: "PicoBench"),
 		.target(
 			name: "CTreeSitter",

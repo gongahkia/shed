@@ -1,0 +1,11 @@
+[mode.insert]
+"Left" = "editor.moveLeft"
+"Right" = "editor.moveRight"
+"Cmd-Left" = "editor.moveLineStart"
+"Cmd-Right" = "editor.moveLineEnd"
+"Cmd-S" = "file.save"
+"Cmd-F" = "edit.find"
+"Cmd-G" = "edit.findNext"
+"Cmd-Shift-G" = "edit.findPrevious"
+"Cmd-Ctrl-G" = "edit.selectAllFindMatches"
+"Cmd-Shift-F" = "edit.findInProject"

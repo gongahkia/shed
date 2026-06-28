@@ -1,0 +1,13 @@
+[mode.normal]
+"h" = "editor.moveLeft"
+"l" = "editor.moveRight"
+"0" = "editor.moveLineStart"
+"$" = "editor.moveLineEnd"
+"gg" = "editor.moveBufferStart"
+"G" = "editor.moveBufferEnd"
+"i" = "mode.insert"
+"/" = "edit.find"
+
+[mode.insert]
+"Esc" = "mode.normal"
+"jk" = "mode.normal"

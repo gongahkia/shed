@@ -1,0 +1,9 @@
+[mode.emacs]
+"C-f" = "editor.moveRight"
+"C-b" = "editor.moveLeft"
+"C-a" = "editor.moveLineStart"
+"C-e" = "editor.moveLineEnd"
+"C-s" = "edit.find"
+"C-r" = "edit.findPrevious"
+"C-x C-s" = "file.save"
+"C-x C-f" = "file.open"

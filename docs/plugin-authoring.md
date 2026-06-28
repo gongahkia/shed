@@ -6,6 +6,38 @@
 
 Start from [`olly-plugin-template`](../olly-plugin-template/README.md). It contains a 49-line `HelloLayoutEngine`, a SwiftPM package, and a placement snapshot test you can run with `swift test --package-path olly-plugin-template` from this repo root.
 
+## Loading Model
+
+v0.x plugins are SwiftPM packages consumed by the user's config sidecar. The
+sidecar is recompiled with the plugin module on `ConfigLoader.moduleSearchPaths`;
+there is no runtime `.dylib` loading in v0.x.
+
+Dynamic layout plugins are deferred until v1.0, after the Swift protocol ABI has
+stayed stable for at least two minor releases (`ref:N§4-D4`). The planned package
+shape is a signed `.ollyplugin` bundle:
+
+```text
+Example.ollyplugin/
+|-- manifest.json
+|-- macos-arm64/Example.dylib
+|-- macos-x86_64/Example.dylib
+`-- signature
+```
+
+`manifest.json` fields:
+
+- `id`: reverse-DNS engine package ID, e.g. `dev.olly.example.layouts`.
+- `engines`: exported layout engine IDs.
+- `apiVersion`: layout plugin ABI version.
+- `minOllyVersion`: oldest compatible olly release.
+- `swiftCompiler`: compiler/build metadata used to produce the binary.
+- `signature`: Developer ID or future olly registry signature metadata.
+
+Version negotiation is fail-fast: olly loads only packages whose `apiVersion`
+matches a supported ABI and whose `minOllyVersion` is satisfied. Unknown engine
+IDs, duplicate IDs, missing signatures, or unsupported ABI versions reject the
+package before any engine is instantiated.
+
 ## Protocol
 
 ```swift

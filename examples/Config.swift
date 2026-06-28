@@ -33,6 +33,7 @@ public func ollyConfig() -> Config {
             Accordion()
             Tabbed(tabBarHeight: 30)
             Stacked(railWidth: 180)
+            TreeTab(railWidth: 160, side: .left)
         }
 
         Animation {
@@ -94,6 +95,7 @@ public func ollyConfig() -> Config {
             Keybind(KeyChord([.command, .option], .n), do: .setEngine("niri-scroll"))
             Keybind(KeyChord([.command, .option], .t), do: .setEngine("tabbed"))
             Keybind(KeyChord([.command, .option], .s), do: .setEngine("stacked"))
+            Keybind(KeyChord([.command, .option], .y), do: .setEngine("tree-tab"))
             Keybind(KeyChord([.command, .option], .space), do: .cycleEngine)
             Keybind(KeyChord([.command, .shift], .r), do: .reload)
 

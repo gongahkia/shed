@@ -112,6 +112,7 @@ ollyctl state --json
 | Accordion | Focused window expanded, siblings collapsed to strips. |
 | Tabbed | Focused window below an app-rendered tab strip; siblings hidden. |
 | Stacked | Focused window beside an app-rendered full-height title rail. |
+| TreeTab | Focused window beside an app-rendered nested side tree. |
 
 | Project | Core model | Olly difference |
 |---|---|---|

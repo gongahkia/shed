@@ -439,6 +439,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Engines { Stacked(railWidth: 180) }`
 - See also: `Tabbed(tabBarHeight:)`, `Accordion(stripHeight:)`.
 
+### TreeTab(railWidth:side:)
+
+`func TreeTab(railWidth: CGFloat = 150, side: TreeTabSide = .left) -> EngineDeclaration`
+
+- Purpose: Declares the TreeTab layout engine.
+- Parameters: `railWidth` reserves space for the app-rendered side tree; `side` chooses left or right.
+- Example: `Engines { TreeTab(railWidth: 180, side: .right) }`
+- See also: `Tabbed(tabBarHeight:)`, `Stacked(railWidth:)`.
+
 ### Engines
 
 `struct Engines`

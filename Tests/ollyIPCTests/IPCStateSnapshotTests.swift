@@ -52,7 +52,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertEqual(ipcState.displayID, 11)
         XCTAssertEqual(ipcState.activeTags.map(\.rawValue), [2])
         XCTAssertEqual(ipcState.tagEngines, [
-            IPCTagEngineBinding(tag: try IPCTagIndex(validating: 2), engineID: "master-stack")
+            IPCTagEngineBinding(tag: try IPCTagIndex(validating: 2), engineID: LayoutEngineID(rawValue: "master-stack"))
         ])
         XCTAssertEqual(ipcState.mruHistory.map { $0.map(\.rawValue) }, [[2]])
     }

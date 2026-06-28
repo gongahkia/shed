@@ -54,7 +54,7 @@ final class UnixDomainSocketServerTests: XCTestCase {
                     .arranged(
                         EngineArrangedEvent(
                             displayID: 1,
-                            engineID: "floating",
+                            engineID: FloatingLayoutEngine.engineID,
                             placementCount: 2,
                             appliedPlacementCount: 1
                         )

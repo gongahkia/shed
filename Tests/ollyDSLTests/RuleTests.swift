@@ -8,7 +8,7 @@ final class RuleTests: XCTestCase {
         let tag = try Tag(index: 2)
         let first = Rule(
             match: RuleMatch(bundleID: "com.example.Terminal", titleRegex: "^build", role: "AXWindow"),
-            apply: RuleApply(tags: TagSet(tag), engine: "bsp", floating: false)
+            apply: RuleApply(tags: TagSet(tag), engine: .bsp, floating: false)
         )
         let second = Rule(
             match: RuleMatch(subrole: "AXDialog"),
@@ -26,7 +26,7 @@ final class RuleTests: XCTestCase {
     func testConfigStoresRuleSection() {
         let rule = Rule(
             match: RuleMatch(bundleID: "com.example.Chat"),
-            apply: RuleApply(engine: "floating", floating: true)
+            apply: RuleApply(engine: .floating, floating: true)
         )
         let config = Config {
             Rules {
@@ -164,7 +164,7 @@ final class RuleTests: XCTestCase {
         let rules = Rules {
             Rule(
                 match: bundleID("com.example.Editor") && windowSize(.smallerThan(CGSize(width: 500, height: 500))),
-                apply: RuleApply(engine: "floating", floating: true)
+                apply: RuleApply(engine: .floating, floating: true)
             )
         }
 
@@ -175,14 +175,14 @@ final class RuleTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(apply.engineOverride, "floating")
+        XCTAssertEqual(apply.engineOverride, .floating)
         XCTAssertEqual(apply.floating, true)
     }
 
     func testRulePredicateCodableRoundTrips() throws {
         let rule = Rule(
             match: parentBundleID("com.example.Host") || subrole("AXDialog"),
-            apply: RuleApply(engine: "floating", floating: true)
+            apply: RuleApply(engine: .floating, floating: true)
         )
 
         let data = try JSONEncoder().encode(rule)
@@ -199,14 +199,14 @@ final class RuleTests: XCTestCase {
             Rules {
                 Rule(
                     match: RuleMatch(bundleID: "com.example.Overlay"),
-                    apply: RuleApply(engine: "bsp", floating: false)
+                    apply: RuleApply(engine: .bsp, floating: false)
                 )
             }
         }
 
         let apply = config.resolvedApply(for: RuleContext(bundleID: "com.example.Overlay"))
 
-        XCTAssertEqual(apply.engineOverride, "bsp")
+        XCTAssertEqual(apply.engineOverride, .bsp)
         XCTAssertEqual(apply.floating, true)
     }
 
@@ -227,12 +227,12 @@ final class RuleTests: XCTestCase {
 
     func testRulesResolveLaterMatchesOverEarlierMatches() {
         let rules = Rules {
-            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: "bsp"))
-            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: "niri-scroll"))
+            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: .bsp))
+            Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: .niriScroll))
         }
 
         let apply = rules.resolvedApply(for: RuleContext(bundleID: "com.example.App"))
 
-        XCTAssertEqual(apply.engineOverride, "niri-scroll")
+        XCTAssertEqual(apply.engineOverride, .niriScroll)
     }
 }

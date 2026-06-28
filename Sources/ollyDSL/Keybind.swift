@@ -141,6 +141,13 @@ public enum Action: Codable, Equatable, Sendable {
     case raw(String)
 }
 
+public extension Action {
+    @available(*, unavailable, message: "unknown-engine-id: use a typed LayoutEngineID such as .bsp")
+    static func setEngine(_ engine: String) -> Action {
+        fatalError()
+    }
+}
+
 /// Purpose: Maps one `KeyChord` to one olly action.
 /// Parameters: Pass the chord and the action to execute.
 /// Example: `Keybind(KeyChord([.command], .return), do: .cycleEngine)`

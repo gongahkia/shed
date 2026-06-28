@@ -15,7 +15,7 @@ public func ollyConfig() -> Config {
         }
 
         Keybinds {
-            Keybind(KeyChord([.command, .option], .m), do: .setEngine("master-stack"))
+            Keybind(KeyChord([.command, .option], .m), do: .setEngine(.masterStack))
             Keybind(KeyChord([.option], .j), do: .focus(.next))
             Keybind(KeyChord([.option, .shift], .j), do: .swap(.next))
         }
@@ -23,11 +23,11 @@ public func ollyConfig() -> Config {
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Terminal"),
-                apply: RuleApply(tags: tag(0), engine: "master-stack", floating: false)
+                apply: RuleApply(tags: tag(0), engine: .masterStack, floating: false)
             )
             Rule(
                 match: RuleMatch(subrole: "AXDialog"),
-                apply: RuleApply(engine: "floating", floating: true)
+                apply: RuleApply(engine: .floating, floating: true)
             )
         }
     }

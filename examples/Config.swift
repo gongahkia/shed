@@ -89,14 +89,14 @@ public func ollyConfig() -> Config {
             Keybind(KeyChord([.command, .shift], .seven), do: .moveWindowToTag(6))
             Keybind(KeyChord([.command, .shift], .eight), do: .moveWindowToTag(7))
 
-            Keybind(KeyChord([.command, .option], .f), do: .setEngine("floating"))
-            Keybind(KeyChord([.command, .option], .m), do: .setEngine("master-stack"))
-            Keybind(KeyChord([.command, .option], .u), do: .setEngine("manual"))
-            Keybind(KeyChord([.command, .option], .b), do: .setEngine("bsp"))
-            Keybind(KeyChord([.command, .option], .n), do: .setEngine("niri-scroll"))
-            Keybind(KeyChord([.command, .option], .t), do: .setEngine("tabbed"))
-            Keybind(KeyChord([.command, .option], .s), do: .setEngine("stacked"))
-            Keybind(KeyChord([.command, .option], .y), do: .setEngine("tree-tab"))
+            Keybind(KeyChord([.command, .option], .f), do: .setEngine(.floating))
+            Keybind(KeyChord([.command, .option], .m), do: .setEngine(.masterStack))
+            Keybind(KeyChord([.command, .option], .u), do: .setEngine(.manual))
+            Keybind(KeyChord([.command, .option], .b), do: .setEngine(.bsp))
+            Keybind(KeyChord([.command, .option], .n), do: .setEngine(.niriScroll))
+            Keybind(KeyChord([.command, .option], .t), do: .setEngine(.tabbed))
+            Keybind(KeyChord([.command, .option], .s), do: .setEngine(.stacked))
+            Keybind(KeyChord([.command, .option], .y), do: .setEngine(.treeTab))
             Keybind(KeyChord([.command, .option], .space), do: .cycleEngine)
             Keybind(KeyChord([.command, .shift], .r), do: .reload)
 
@@ -120,45 +120,45 @@ public func ollyConfig() -> Config {
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.tinyspeck.slackmacgap"),
-                apply: RuleApply(tags: tag(0), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(0), engine: .floating, floating: true)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.MobileSMS"),
-                apply: RuleApply(tags: tag(0), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(0), engine: .floating, floating: true)
             )
             Rule(
                 match: bundleID("com.apple.Terminal") &&
                     role("AXWindow") &&
                     windowSize(.largerThan(CGSize(width: 600, height: 400))),
-                apply: RuleApply(tags: tag(1), engine: "bsp", floating: false)
+                apply: RuleApply(tags: tag(1), engine: .bsp, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.dt.Xcode"),
-                apply: RuleApply(tags: tag(1), engine: "niri-scroll", floating: false)
+                apply: RuleApply(tags: tag(1), engine: .niriScroll, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Safari"),
-                apply: RuleApply(tags: tag(2), engine: "niri-scroll", floating: false)
+                apply: RuleApply(tags: tag(2), engine: .niriScroll, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.finder", titleRegex: "^Downloads"),
-                apply: RuleApply(tags: tag(3), engine: "master-stack", floating: false)
+                apply: RuleApply(tags: tag(3), engine: .masterStack, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Music"),
-                apply: RuleApply(tags: tag(4), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(4), engine: .floating, floating: true)
             )
             Rule(
                 match: RuleMatch(bundleID: "us.zoom.xos"),
-                apply: RuleApply(tags: tag(6), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(6), engine: .floating, floating: true)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.iCal"),
-                apply: RuleApply(tags: tag(5), engine: "master-stack", floating: false)
+                apply: RuleApply(tags: tag(5), engine: .masterStack, floating: false)
             )
             Rule(
                 match: RuleMatch(subrole: "AXDialog"),
-                apply: RuleApply(tags: tag(7), engine: "floating", floating: true)
+                apply: RuleApply(tags: tag(7), engine: .floating, floating: true)
             )
         }
     }

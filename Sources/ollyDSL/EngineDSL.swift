@@ -97,6 +97,26 @@ public extension EngineDeclaration {
     static let treeTab = TreeTab()
 }
 
+public extension LayoutEngineID {
+    static let floating = FloatingLayoutEngine.engineID
+    static let masterStack = MasterStackLayoutEngine.engineID
+    static let manual = ManualLayoutEngine.engineID
+    static let bsp = BSPLayoutEngine.engineID
+    static let niriScroll = NiriScrollLayoutEngine.engineID
+    static let monocle = MonocleLayoutEngine.engineID
+    static let spiral = SpiralLayoutEngine.engineID
+    static let grid = GridLayoutEngine.engineID
+    static let threeCol = ThreeColLayoutEngine.engineID
+    static let accordion = AccordionLayoutEngine.engineID
+    static let tabbed = TabbedLayoutEngine.engineID
+    static let stacked = StackedLayoutEngine.engineID
+    static let treeTab = TreeTabLayoutEngine.engineID
+    static let frame = FrameLayoutEngine.engineID
+    static let paperWMScroll = PaperWMScrollLayoutEngine.engineID
+    static let verticalTile = VerticalTileLayoutEngine.engineID
+    static let ratioTile = RatioTileLayoutEngine.engineID
+}
+
 /// Purpose: Declares the Monocle layout engine.
 /// Parameters: No parameters; Monocle expands focus to display bounds and hides siblings.
 /// Example: `Engines { Monocle() }`

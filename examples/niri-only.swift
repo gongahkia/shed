@@ -22,11 +22,11 @@ public func ollyConfig() -> Config {
         Rules {
             Rule(
                 match: RuleMatch(bundleID: "com.apple.Safari"),
-                apply: RuleApply(tags: tag(0), engine: "niri-scroll", floating: false)
+                apply: RuleApply(tags: tag(0), engine: .niriScroll, floating: false)
             )
             Rule(
                 match: RuleMatch(bundleID: "com.apple.dt.Xcode"),
-                apply: RuleApply(tags: tag(1), engine: "niri-scroll", floating: false)
+                apply: RuleApply(tags: tag(1), engine: .niriScroll, floating: false)
             )
         }
     }

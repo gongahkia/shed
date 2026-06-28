@@ -136,7 +136,7 @@ public enum ConfigDiagnosticFormatter {
         case .duplicateTagName:
             return ["rename one Tag.named declaration so every workspace tag is unique"]
         case .unknownEngineID:
-            return ["declare the engine in Engines before referencing it from a rule or keybind"]
+            return ["use a built-in typed engine such as .bsp or an explicit LayoutEngineID(rawValue:)"]
         case .ambiguousRule:
             return ["use RuleMatch fields or a RulePredicate expression, not both in the same rule"]
         }

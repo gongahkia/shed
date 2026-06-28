@@ -26,29 +26,55 @@ public enum Motion: Sendable, Equatable {
 public struct UndoStack: Sendable, Equatable {
 	public private(set) var edits: [UndoEntry] = []
 	private var redoEdits: [UndoEntry] = []
+	private var activeGroupID: Int?
+	private var nextGroupID = 1
 
 	public init() {}
 
 	mutating func record(_ edit: Edit, selectionAfter: SelectionSet, textBefore: String) {
 		let snapshot = edits.count.isMultiple(of: 32) ? textBefore : nil
-		edits.append(UndoEntry(edit: edit, selectionAfter: selectionAfter, snapshotBefore: snapshot))
+		edits.append(UndoEntry(edit: edit, selectionAfter: selectionAfter, snapshotBefore: snapshot, groupID: activeGroupID))
 		redoEdits.removeAll()
 	}
 
-	mutating func popUndo() -> UndoEntry? {
+	mutating func beginGroup() {
+		guard activeGroupID == nil else {
+			return
+		}
+		activeGroupID = nextGroupID
+		nextGroupID += 1
+	}
+
+	mutating func endGroup() {
+		activeGroupID = nil
+	}
+
+	mutating func popUndo() -> [UndoEntry]? {
 		guard let entry = edits.popLast() else {
 			return nil
 		}
-		redoEdits.append(entry)
-		return entry
+		var entries = [entry]
+		if let groupID = entry.groupID {
+			while edits.last?.groupID == groupID, let groupedEntry = edits.popLast() {
+				entries.append(groupedEntry)
+			}
+		}
+		redoEdits.append(contentsOf: entries)
+		return entries
 	}
 
-	mutating func popRedo() -> UndoEntry? {
+	mutating func popRedo() -> [UndoEntry]? {
 		guard let entry = redoEdits.popLast() else {
 			return nil
 		}
-		edits.append(entry)
-		return entry
+		var entries = [entry]
+		if let groupID = entry.groupID {
+			while redoEdits.last?.groupID == groupID, let groupedEntry = redoEdits.popLast() {
+				entries.append(groupedEntry)
+			}
+		}
+		edits.append(contentsOf: entries)
+		return entries
 	}
 }
 
@@ -56,6 +82,7 @@ public struct UndoEntry: Sendable, Equatable {
 	public var edit: Edit
 	public var selectionAfter: SelectionSet
 	public var snapshotBefore: String?
+	public var groupID: Int?
 }
 
 public struct Editor: Sendable {
@@ -73,6 +100,14 @@ public struct Editor: Sendable {
 
 	public var text: String {
 		rope.slice(0 ..< rope.length)
+	}
+
+	public mutating func beginUndoGroup() {
+		history.beginGroup()
+	}
+
+	public mutating func endUndoGroup() {
+		history.endGroup()
 	}
 
 	public mutating func insert(_ string: String) {
@@ -156,24 +191,28 @@ public struct Editor: Sendable {
 
 	public mutating func undo() {
 		lastEditBatch = []
-		guard let entry = history.popUndo() else {
+		guard let entries = history.popUndo() else {
 			return
 		}
-		if let snapshot = entry.snapshotBefore {
+		if entries.count == 1, let entry = entries.first, let snapshot = entry.snapshotBefore {
 			rope = Rope(snapshot)
 		} else {
-			applyInverse(entry.edit)
+			for entry in entries {
+				applyInverse(entry.edit)
+			}
 		}
-		selections = entry.edit.selectionBefore
+		selections = entries.last?.edit.selectionBefore ?? selections
 	}
 
 	public mutating func redo() {
 		lastEditBatch = []
-		guard let entry = history.popRedo() else {
+		guard let entries = history.popRedo() else {
 			return
 		}
-		apply(entry.edit)
-		selections = entry.selectionAfter
+		for entry in entries {
+			apply(entry.edit)
+		}
+		selections = entries.last?.selectionAfter ?? selections
 	}
 
 	private mutating func replaceSelections(with string: String) {

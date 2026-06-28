@@ -113,6 +113,14 @@ import Testing
 	#expect(engine.handle(try keyEvent(";")) == .command("editor.repeatCharFind"))
 }
 
+@Test func bundledVimProfileDefinesUndoRedo() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("u")) == .command("edit.undo"))
+	#expect(engine.handle(try keyEvent("r", modifiers: [.control])) == .command("edit.redo"))
+}
+
 @Test func bundledVimProfileDefinesTextObjects() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)

@@ -124,6 +124,34 @@ import Testing
 	#expect(view.keymapEngine.mode == .insert)
 }
 
+@Test func vimTextObjectsApplyToPendingOperator() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha beta")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .operatorPending, chord: [Key("i"), Key("w")], commandID: "vim.textObject.innerWord"),
+	])
+
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(view.editor.text == " beta")
+}
+
+@Test func vimQuoteTextObjectUsesShiftedQuoteBinding() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "\"value\" tail")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .operatorPending, chord: [Key("a"), Key("'", modifiers: .shift)], commandID: "vim.textObject.aroundDoubleQuote"),
+	])
+
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.text == " tail")
+}
+
 @Test func textInputClientCommitsAndMarksIMEText() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)

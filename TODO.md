@@ -89,7 +89,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 11 — Vim profile
 
-(A) 2026-06-28 +Phase11-Vim @vim id:202 est:4h dep:201 Text objects: iw, aw, i", a", i', a', i(, a(, i[, a[, i{, a{, ip, ap. Resolved by tree-sitter when available else regex fallback.
 (A) 2026-06-28 +Phase11-Vim @vim id:203 est:3h dep:200 Visual modes: v (charwise), V (linewise), Ctrl-V (blockwise). Selection set populated; operators apply.
 (A) 2026-06-28 +Phase11-Vim @vim id:204 est:3h dep:201 Registers: `"`, `0`, `1`-`9`, named `a`-`z`. Yank/delete writes; paste (`p`, `P`) reads. System clipboard = `"+` register, synced via `NSPasteboard.general`.
 (A) 2026-06-28 +Phase11-Vim @vim id:205 est:3h dep:200 Ex commands: `:w`, `:q`, `:wq`, `:x`, `:e <path>`, `:bn`/`:bp`, `:%s/x/y/g`. Command-line via existing CommandPalette UI in command mode.

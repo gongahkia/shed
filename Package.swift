@@ -33,7 +33,10 @@ let package = Package(
 			path: "Sources/CTreeSitter",
 			sources: ["upstream/lib/src/lib.c"],
 			publicHeadersPath: "upstream/lib/include",
-			cSettings: [.headerSearchPath("upstream/lib/src")]
+			cSettings: [
+				.headerSearchPath("upstream/lib/src"),
+				.unsafeFlags(["-O3"], .when(configuration: .release)),
+			]
 		),
 		.target(
 			name: "CTSGrammars",
@@ -84,10 +87,12 @@ let package = Package(
 				.headerSearchPath("grammars/typescript/typescript/src"),
 				.headerSearchPath("grammars/typescript/tsx/src"),
 				.headerSearchPath("grammars/yaml/src"),
+				.unsafeFlags(["-O3"], .when(configuration: .release)),
 			]
 		),
 		.testTarget(name: "PicoEditorTests", dependencies: ["PicoEditor"]),
 		.testTarget(name: "PicoRenderTests", dependencies: ["PicoRender"]),
+		.testTarget(name: "PicoSyntaxTests", dependencies: ["PicoSyntax", "PicoEditor"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars"]),
 	]
 )

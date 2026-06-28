@@ -105,6 +105,21 @@ func ropeRandomEditsMatchCharacterArray(seed: UInt64) {
 	#expect(rope.lineRange(65_535) == linearLineRange(65_535, in: text))
 }
 
+@Test func ropeChunkReadsDoNotMaterializeWholeBuffer() {
+	let text = String(repeating: "abc\n", count: 2_000) + "é🇸🇬tail"
+	let rope = Rope(text)
+	var offset = 0
+	var rebuilt = ""
+	while offset < rope.length {
+		let chunk = rope.chunk(at: offset, maxBytes: 257)
+		#expect(!chunk.isEmpty)
+		#expect(chunk.utf8.count <= 257 || chunk.count == 1)
+		rebuilt += chunk
+		offset += chunk.utf8.count
+	}
+	#expect(rebuilt == text)
+}
+
 private struct SeededRNG {
 	private var state: UInt64
 

@@ -368,7 +368,7 @@ public final class MetalTextView: NSView {
 				return
 			}
 			encoder.setRenderPipelineState(pipeline)
-			encoder.setVertexBytes(base, length: bytes.count, index: 0)
+			setInstanceData(base: base, length: bytes.count, encoder: encoder)
 			encoder.setVertexBytes(&viewport, length: MemoryLayout<MetalViewportUniforms>.stride, index: 1)
 			encoder.setFragmentTexture(atlas, index: 0)
 			encoder.setFragmentSamplerState(sampler, index: 0)
@@ -389,13 +389,24 @@ public final class MetalTextView: NSView {
 				return
 			}
 			encoder.setRenderPipelineState(pipeline)
-			encoder.setVertexBytes(base, length: bytes.count, index: 0)
+			setInstanceData(base: base, length: bytes.count, encoder: encoder)
 			encoder.setVertexBytes(&viewport, length: MemoryLayout<MetalViewportUniforms>.stride, index: 1)
 			encoder.setFragmentTexture(atlas.texture, index: 0)
 			encoder.setFragmentSamplerState(sampler, index: 0)
 			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
 			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
 		}
+	}
+
+	private func setInstanceData(base: UnsafeRawPointer, length: Int, encoder: MTLRenderCommandEncoder) {
+		if length <= 4_096 {
+			encoder.setVertexBytes(base, length: length, index: 0)
+			return
+		}
+		guard let buffer = metalDevice?.makeBuffer(bytes: base, length: length) else {
+			return
+		}
+		encoder.setVertexBuffer(buffer, offset: 0, index: 0)
 	}
 
 	private func makeRenderPipeline() -> MTLRenderPipelineState? {

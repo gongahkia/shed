@@ -71,7 +71,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 7 — File system + tabs + tree
 
-(B) 2026-06-28 +Phase7-FS @appkit id:124 est:3h dep:122 File watcher: use `DispatchSource.makeFileSystemObjectSource` per open file. On external change, prompt to reload.
 (B) 2026-06-28 +Phase7-FS @appkit id:125 est:2h dep:120 Autosave + Versions: enable via `NSDocument.autosavesInPlace = true`. Test that `.~lock` files don't appear (NSDocument handles).
 
 ---

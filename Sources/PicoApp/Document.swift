@@ -1,4 +1,6 @@
 import AppKit
+import Darwin
+import Dispatch
 import Foundation
 import PicoEditor
 import PicoRender
@@ -74,9 +76,20 @@ final class PicoDocumentController: NSDocumentController {
 final class PicoDocument: NSDocument {
 	var editor = Editor()
 	private weak var editorView: MetalTextView?
+	private let fileWatcherQueue = DispatchQueue(label: "dev.pico.editor.file-watcher")
+	private var fileWatchSource: DispatchSourceFileSystemObject?
+	private var pendingExternalChangePrompt = false
+
+	override var fileURL: URL? {
+		didSet { restartFileWatcher() }
+	}
 
 	override init() {
 		super.init()
+	}
+
+	deinit {
+		stopFileWatcher()
 	}
 
 	override class var autosavesInPlace: Bool {
@@ -94,6 +107,7 @@ final class PicoDocument: NSDocument {
 		}
 		editor = Editor(text: text)
 		editorView?.editor = editor
+		restartFileWatcher()
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
@@ -120,6 +134,86 @@ final class PicoDocument: NSDocument {
 		}
 		view.closeRequested = { [weak self] in
 			self?.close()
+		}
+		restartFileWatcher()
+	}
+
+	private func restartFileWatcher() {
+		stopFileWatcher()
+		guard let url = fileURL, url.isFileURL else {
+			return
+		}
+		let descriptor = open(url.path, O_EVTONLY)
+		guard descriptor >= 0 else {
+			return
+		}
+		let source = DispatchSource.makeFileSystemObjectSource(
+			fileDescriptor: descriptor,
+			eventMask: [.write, .delete, .rename, .extend],
+			queue: fileWatcherQueue
+		)
+		source.setEventHandler { [weak self] in
+			DispatchQueue.main.async {
+				self?.externalFileDidChange()
+			}
+		}
+		source.setCancelHandler {
+			Darwin.close(descriptor)
+		}
+		fileWatchSource = source
+		source.resume()
+	}
+
+	private func stopFileWatcher() {
+		fileWatchSource?.cancel()
+		fileWatchSource = nil
+	}
+
+	private func externalFileDidChange() {
+		guard !pendingExternalChangePrompt, let url = fileURL else {
+			return
+		}
+		pendingExternalChangePrompt = true
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+			self?.promptForExternalFileChange(at: url)
+		}
+	}
+
+	private func promptForExternalFileChange(at url: URL) {
+		if (try? String(contentsOf: url, encoding: .utf8)) == editor.text {
+			pendingExternalChangePrompt = false
+			restartFileWatcher()
+			return
+		}
+		let alert = NSAlert()
+		alert.messageText = "\(displayName ?? url.lastPathComponent) changed on disk"
+		alert.informativeText = "Reload the file from disk?"
+		alert.addButton(withTitle: "Reload")
+		alert.addButton(withTitle: "Keep Editing")
+		if let window = windowControllers.first?.window {
+			alert.beginSheetModal(for: window) { [weak self] response in
+				self?.handleExternalFilePrompt(response, url: url)
+			}
+		} else {
+			handleExternalFilePrompt(alert.runModal(), url: url)
+		}
+	}
+
+	private func handleExternalFilePrompt(_ response: NSApplication.ModalResponse, url: URL) {
+		if response == .alertFirstButtonReturn {
+			reloadFromDisk(at: url)
+		}
+		pendingExternalChangePrompt = false
+		restartFileWatcher()
+	}
+
+	private func reloadFromDisk(at url: URL) {
+		do {
+			let data = try Data(contentsOf: url)
+			try read(from: data, ofType: fileType ?? "public.data")
+			updateChangeCount(.changeCleared)
+		} catch {
+			presentError(error)
 		}
 	}
 }

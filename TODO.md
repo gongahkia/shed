@@ -77,7 +77,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 (B) 2026-06-26 Promote external layout engine API: `.dylib` loading at runtime, signed package format `.ollyplugin`, version negotiation; defer until ABI proves stable across 2+ minor versions +phase13 @swift @dsl @release ref:N§4-D4
 (B) 2026-06-26 Publish a `Layout Engine Showcase` repo with 3 community-contributed engines as case studies +phase13 @docs @release
-(C) 2026-06-26 Continuous: monitor PaperWM (GNOME), Karousel (KDE), Bismuth (KDE), hy3, hyprscroller, scrollwm; add notes to `docs/layouts-research.md` on each release +phase13 @docs
 
 ---
 

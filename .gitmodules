@@ -1,3 +1,30 @@
 [submodule "Sources/CTreeSitter/upstream"]
 	path = Sources/CTreeSitter/upstream
 	url = https://github.com/tree-sitter/tree-sitter
+[submodule "Sources/CTSGrammars/grammars/typescript"]
+	path = Sources/CTSGrammars/grammars/typescript
+	url = https://github.com/tree-sitter/tree-sitter-typescript.git
+[submodule "Sources/CTSGrammars/grammars/javascript"]
+	path = Sources/CTSGrammars/grammars/javascript
+	url = https://github.com/tree-sitter/tree-sitter-javascript.git
+[submodule "Sources/CTSGrammars/grammars/json"]
+	path = Sources/CTSGrammars/grammars/json
+	url = https://github.com/tree-sitter/tree-sitter-json.git
+[submodule "Sources/CTSGrammars/grammars/html"]
+	path = Sources/CTSGrammars/grammars/html
+	url = https://github.com/tree-sitter/tree-sitter-html.git
+[submodule "Sources/CTSGrammars/grammars/css"]
+	path = Sources/CTSGrammars/grammars/css
+	url = https://github.com/tree-sitter/tree-sitter-css.git
+[submodule "Sources/CTSGrammars/grammars/python"]
+	path = Sources/CTSGrammars/grammars/python
+	url = https://github.com/tree-sitter/tree-sitter-python.git
+[submodule "Sources/CTSGrammars/grammars/rust"]
+	path = Sources/CTSGrammars/grammars/rust
+	url = https://github.com/tree-sitter/tree-sitter-rust.git
+[submodule "Sources/CTSGrammars/grammars/go"]
+	path = Sources/CTSGrammars/grammars/go
+	url = https://github.com/tree-sitter/tree-sitter-go.git
+[submodule "Sources/CTSGrammars/grammars/c"]
+	path = Sources/CTSGrammars/grammars/c
+	url = https://github.com/tree-sitter/tree-sitter-c.git

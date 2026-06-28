@@ -15,6 +15,10 @@
 - [ ] `swiftlint lint --config .swiftlint.yml --strict`
 - [ ] `./scripts/check-no-private-api.sh`
 
+## DSL Changes
+
+- [ ] If `Sources/ollyDSL/*.swift` changed, `examples/` and public doc comments were updated.
+
 ## Perf Impact
 
 - [ ] No expected impact on `NORTHSTAR.md` §12a / `docs/performance.md` budgets; PerfBench CI output reviewed.

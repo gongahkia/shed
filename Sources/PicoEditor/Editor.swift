@@ -7,6 +7,8 @@ public enum Motion: Sendable, Equatable {
 	case wordBackward
 	case lineStart
 	case lineEnd
+	case visualLineStart
+	case visualLineEnd
 	case bufferStart
 	case bufferEnd
 	case pageDown
@@ -100,9 +102,9 @@ public struct Editor: Sendable {
 				offset = wordForward(from: selection.head)
 			case .wordBackward:
 				offset = wordBackward(from: selection.head)
-			case .lineStart:
+			case .lineStart, .visualLineStart:
 				offset = rope.offset(forLine: rope.line(forOffset: selection.head))
-			case .lineEnd:
+			case .lineEnd, .visualLineEnd:
 				offset = rope.lineRange(rope.line(forOffset: selection.head)).upperBound
 			case .bufferStart:
 				offset = 0

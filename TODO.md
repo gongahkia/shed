@@ -59,7 +59,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 5 — Editor core
 
-(B) 2026-06-28 +Phase5-Editor @editor id:085 est:2h dep:083 Visual line vs logical line: soft-wrap support deferred to v0.2, but motion API must distinguish. Add `visualLineStart`/`visualLineEnd` no-op stubs.
 
 ---
 

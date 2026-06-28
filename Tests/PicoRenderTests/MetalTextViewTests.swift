@@ -1,3 +1,4 @@
+import AppKit
 @testable import PicoRender
 import Testing
 
@@ -49,6 +50,25 @@ import Testing
 	#expect(view.editor.selections.primary.head == 10)
 	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 51))
 	#expect(view.editor.text == "hello word")
+}
+
+@Test func textInputClientCommitsAndMarksIMEText() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	let noReplacement = NSRange(location: NSNotFound, length: 0)
+	view.insertText("a", replacementRange: noReplacement)
+	#expect(view.editor.text == "a")
+	#expect(view.selectedRange() == NSRange(location: 1, length: 0))
+	view.setMarkedText("かな", selectedRange: NSRange(location: 2, length: 0), replacementRange: noReplacement)
+	#expect(view.editor.text == "aかな")
+	#expect(view.hasMarkedText())
+	#expect(view.markedRange() == NSRange(location: 1, length: 2))
+	#expect(view.selectedRange() == NSRange(location: 3, length: 0))
+	view.insertText("仮名", replacementRange: noReplacement)
+	#expect(view.editor.text == "a仮名")
+	#expect(!view.hasMarkedText())
+	#expect(view.attributedSubstring(forProposedRange: NSRange(location: 1, length: 2), actualRange: nil)?.string == "仮名")
+	view.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
+	#expect(view.editor.text == "a仮")
 }
 
 @Test func typedTextBuildsGlyphInstancesForRendering() {

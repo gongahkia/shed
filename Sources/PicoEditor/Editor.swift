@@ -1,0 +1,173 @@
+public enum Motion: Sendable, Equatable {
+	case charForward
+	case charBackward
+	case bufferStart
+	case bufferEnd
+}
+
+public struct UndoStack: Sendable, Equatable {
+	public private(set) var edits: [Edit] = []
+
+	public init() {}
+
+	mutating func record(_ edit: Edit) {
+		edits.append(edit)
+	}
+}
+
+public struct Editor: Sendable {
+	public var rope: Rope
+	public var selections: SelectionSet
+	public var history: UndoStack
+
+	public init(text: String = "") {
+		rope = Rope(text)
+		selections = SelectionSet()
+		history = UndoStack()
+	}
+
+	public var text: String {
+		rope.slice(0 ..< rope.length)
+	}
+
+	public mutating func insert(_ string: String) {
+		replaceSelections(with: string)
+	}
+
+	public mutating func deleteBackward() {
+		let ranges = selectionsForEdit().map { selection -> Range<Int> in
+			if !selection.isCaret {
+				return selection.range
+			}
+			return previousCharacterRange(before: selection.head)
+		}
+		replace(ranges: ranges, with: "")
+	}
+
+	public mutating func deleteForward() {
+		let ranges = selectionsForEdit().map { selection -> Range<Int> in
+			if !selection.isCaret {
+				return selection.range
+			}
+			return nextCharacterRange(after: selection.head)
+		}
+		replace(ranges: ranges, with: "")
+	}
+
+	public mutating func moveCursor(_ motion: Motion) {
+		let moved = selectionsForEdit().map { selection -> Selection in
+			let offset: Int
+			switch motion {
+			case .charForward:
+				offset = nextCharacterRange(after: selection.head).upperBound
+			case .charBackward:
+				offset = previousCharacterRange(before: selection.head).lowerBound
+			case .bufferStart:
+				offset = 0
+			case .bufferEnd:
+				offset = rope.length
+			}
+			return Selection(anchor: offset, head: offset, affinity: selection.affinity)
+		}
+		selections = SelectionSet(primary: moved[0], secondaries: Array(moved.dropFirst()))
+	}
+
+	public mutating func setSelection(_ selectionSet: SelectionSet) {
+		selections = selectionSet
+		selections.merge()
+	}
+
+	private mutating func replaceSelections(with string: String) {
+		let ranges = selectionsForEdit().map(\.range)
+		replace(ranges: ranges, with: string)
+	}
+
+	private mutating func replace(ranges: [Range<Int>], with string: String) {
+		let normalized = merge(ranges.filter { !$0.isEmpty || !string.isEmpty })
+		guard !normalized.isEmpty else {
+			return
+		}
+		var carets: [Selection] = []
+		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
+			let oldText = rope.slice(range)
+			if !range.isEmpty {
+				rope.remove(range)
+			}
+			if !string.isEmpty {
+				rope.insert(string, at: range.lowerBound)
+			}
+			history.record(Edit(range: range, oldText: oldText, newText: string))
+			let caret = range.lowerBound + string.utf8.count
+			carets.append(Selection(anchor: caret, head: caret))
+		}
+		carets.reverse()
+		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
+	}
+
+	private func selectionsForEdit() -> [Selection] {
+		var set = selections
+		set.merge()
+		return [set.primary] + set.secondaries
+	}
+
+	private func previousCharacterRange(before offset: Int) -> Range<Int> {
+		guard offset > 0 else {
+			return 0 ..< 0
+		}
+		let text = text
+		let index = text.index(atUTF8Offset: offset)
+		let previous = text.index(before: index)
+		guard let utf8Previous = previous.samePosition(in: text.utf8) else {
+			preconditionFailure("previous character must align with utf8")
+		}
+		let lower = text.utf8.distance(from: text.utf8.startIndex, to: utf8Previous)
+		return lower ..< offset
+	}
+
+	private func nextCharacterRange(after offset: Int) -> Range<Int> {
+		guard offset < rope.length else {
+			return rope.length ..< rope.length
+		}
+		let text = text
+		let index = text.index(atUTF8Offset: offset)
+		let next = text.index(after: index)
+		guard let utf8Next = next.samePosition(in: text.utf8) else {
+			preconditionFailure("next character must align with utf8")
+		}
+		let upper = text.utf8.distance(from: text.utf8.startIndex, to: utf8Next)
+		return offset ..< upper
+	}
+}
+
+private func merge(_ ranges: [Range<Int>]) -> [Range<Int>] {
+	let sorted = ranges.sorted { lhs, rhs in
+		if lhs.lowerBound == rhs.lowerBound {
+			return lhs.upperBound < rhs.upperBound
+		}
+		return lhs.lowerBound < rhs.lowerBound
+	}
+	guard var current = sorted.first else {
+		return []
+	}
+	var merged: [Range<Int>] = []
+	for range in sorted.dropFirst() {
+		if range.lowerBound <= current.upperBound {
+			current = current.lowerBound ..< max(current.upperBound, range.upperBound)
+		} else {
+			merged.append(current)
+			current = range
+		}
+	}
+	merged.append(current)
+	return merged
+}
+
+private extension String {
+	func index(atUTF8Offset offset: Int) -> String.Index {
+		let utf8Index = utf8.index(utf8.startIndex, offsetBy: offset)
+		guard let index = String.Index(utf8Index, within: self) else {
+			preconditionFailure("utf8 offset must be a character boundary")
+		}
+		return index
+	}
+}

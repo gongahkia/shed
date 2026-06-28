@@ -63,7 +63,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 5 — Editor core
 
-(A) 2026-06-28 +Phase5-Editor @editor id:081 est:4h dep:060,080 `Sources/PicoEditor/Editor.swift`: holds `var rope: Rope`, `var selections: SelectionSet`, `var history: UndoStack`. Commands: `insert(_ s: String)`, `deleteBackward()`, `deleteForward()`, `moveCursor(_ motion: Motion)`, `setSelection(_ s: SelectionSet)`. All commands operate on every selection in set.
 (A) 2026-06-28 +Phase5-Editor @editor id:082 est:4h dep:081 Undo stack: rope snapshot every 32 edits, plus per-edit delta `Edit { range: Range<Int>; oldText: String; newText: String; selectionBefore: SelectionSet }`. `undo()` replays delta inverse; on snapshot boundary, restore snapshot. Test: 1000-edit transcript, undo to empty, redo to final, assert equality.
 (A) 2026-06-28 +Phase5-Editor @editor id:083 est:3h dep:081 Motion primitives: `charForward`, `charBackward`, `wordForward`, `wordBackward`, `lineStart`, `lineEnd`, `bufferStart`, `bufferEnd`, `pageDown`, `pageUp`. Word boundary: alpha-num run or single punct. Test each.
 (A) 2026-06-28 +Phase5-Editor @editor id:084 est:3h dep:040,081 Wire `MetalTextView` → `Editor`: `keyDown(_:)` → translate via `NSResponder` → call editor commands → mark renderer dirty. Initial wiring: hardcoded keys (typing inserts, backspace deletes, arrows move). Acceptance: can type "hello world" into empty buffer and see it render.

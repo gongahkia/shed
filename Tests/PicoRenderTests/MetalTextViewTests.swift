@@ -152,6 +152,50 @@ import Testing
 	#expect(view.editor.text == " tail")
 }
 
+@Test func vimVisualCharModeAppliesDeleteOperator() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("v")], commandID: "vim.visual.char"),
+		KeyBinding(mode: .visual, chord: [Key("l")], commandID: "editor.moveRight"),
+		KeyBinding(mode: .visual, chord: [Key("d")], commandID: "vim.operator.delete"),
+	])
+
+	#expect(view.handleKey(characters: "v", charactersIgnoringModifiers: "v", keyCode: 0))
+	#expect(view.handleKey(characters: "l", charactersIgnoringModifiers: "l", keyCode: 0))
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.editor.text == "bc")
+	#expect(view.keymapEngine.mode == .normal)
+}
+
+@Test func vimVisualLineModeYanksWholeLine() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "alpha\nbeta\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("v", modifiers: .shift)], commandID: "vim.visual.line"),
+		KeyBinding(mode: .visual, chord: [Key("y")], commandID: "vim.operator.yank"),
+	])
+
+	#expect(view.handleKey(characters: "V", charactersIgnoringModifiers: "v", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
+	#expect(NSPasteboard.general.string(forType: .string) == "alpha\n")
+	#expect(view.keymapEngine.mode == .normal)
+}
+
+@Test func vimVisualBlockModePopulatesSelectionSet() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "ab\ncd\n")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("v", modifiers: .control)], commandID: "vim.visual.block"),
+		KeyBinding(mode: .visual, chord: [Key("j")], commandID: "editor.moveDown"),
+	])
+
+	#expect(view.handleKey(characters: "\u{16}", charactersIgnoringModifiers: "v", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "j", charactersIgnoringModifiers: "j", keyCode: 0))
+	#expect(view.editor.selections.primary.range == 0 ..< 1)
+	#expect(view.editor.selections.secondaries == [Selection(anchor: 3, head: 4)])
+}
+
 @Test func textInputClientCommitsAndMarksIMEText() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)

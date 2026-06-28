@@ -25,7 +25,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 0 — Bootstrap
 
-(A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:004 est:2h dep:001 Create `Package.swift` (swift-tools-version:5.9) with empty targets: `PicoApp` (executable), `PicoRender`, `PicoEditor`, `PicoSyntax`, `PicoKeymap`, `PicoBench` (executable), `CTreeSitter` (C lib), `CTSGrammars` (C lib). Place Swift sources under `Sources/<Target>/`, C sources under `Sources/<CTarget>/`. Set `platforms: [.macOS(.v13)]`. Verify `swift build` succeeds with stub `main.swift` files.
 (A) 2026-06-28 +Phase0-Bootstrap @swiftpm id:005 est:1h dep:004 Wire target deps: `PicoApp` depends on `PicoRender`+`PicoEditor`+`PicoSyntax`+`PicoKeymap`. `PicoRender` depends on `PicoEditor`. `PicoSyntax` depends on `CTreeSitter`+`CTSGrammars`+`PicoEditor`. `PicoBench` standalone.
 (A) 2026-06-28 +Phase0-Bootstrap @ci id:006 est:1.5h dep:004 Add `.github/workflows/ci.yml` running on `macos-14` (M-series): steps install hyperfine, `swift build -c release`, `swift test`, run bench harness in smoke mode (1 run). Cache `.build/`.
 (B) 2026-06-28 +Phase0-Bootstrap @repo id:007 est:0.5h dep:001 Add `.swiftformat` file: indent tabs, max line 120, organize-imports, no-trailing-closures-for-arguments. Add SwiftFormat pre-commit (optional, doc only).

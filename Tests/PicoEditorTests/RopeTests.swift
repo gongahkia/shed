@@ -26,3 +26,16 @@ import Testing
 	#expect(rope.lineCount == 1_001)
 	#expect(rope.validateInvariants())
 }
+
+@Test func ropeTracksGraphemeClustersByUTF8Offset() {
+	let text = "aé🇸🇬e\u{301}"
+	let rope = Rope(text)
+	#expect(rope.graphemeCount == text.count)
+	#expect(rope.graphemeIndex(forOffset: 0) == 0)
+	var offset = 0
+	for (index, character) in text.enumerated() {
+		offset += String(character).utf8.count
+		#expect(rope.graphemeIndex(forOffset: offset) == index + 1)
+	}
+	#expect(rope.validateInvariants())
+}

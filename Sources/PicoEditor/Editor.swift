@@ -6,13 +6,38 @@ public enum Motion: Sendable, Equatable {
 }
 
 public struct UndoStack: Sendable, Equatable {
-	public private(set) var edits: [Edit] = []
+	public private(set) var edits: [UndoEntry] = []
+	private var redoEdits: [UndoEntry] = []
 
 	public init() {}
 
-	mutating func record(_ edit: Edit) {
-		edits.append(edit)
+	mutating func record(_ edit: Edit, selectionAfter: SelectionSet, textBefore: String) {
+		let snapshot = edits.count.isMultiple(of: 32) ? textBefore : nil
+		edits.append(UndoEntry(edit: edit, selectionAfter: selectionAfter, snapshotBefore: snapshot))
+		redoEdits.removeAll()
 	}
+
+	mutating func popUndo() -> UndoEntry? {
+		guard let entry = edits.popLast() else {
+			return nil
+		}
+		redoEdits.append(entry)
+		return entry
+	}
+
+	mutating func popRedo() -> UndoEntry? {
+		guard let entry = redoEdits.popLast() else {
+			return nil
+		}
+		edits.append(entry)
+		return entry
+	}
+}
+
+public struct UndoEntry: Sendable, Equatable {
+	public var edit: Edit
+	public var selectionAfter: SelectionSet
+	public var snapshotBefore: String?
 }
 
 public struct Editor: Sendable {
@@ -77,6 +102,26 @@ public struct Editor: Sendable {
 		selections.merge()
 	}
 
+	public mutating func undo() {
+		guard let entry = history.popUndo() else {
+			return
+		}
+		if let snapshot = entry.snapshotBefore {
+			rope = Rope(snapshot)
+		} else {
+			applyInverse(entry.edit)
+		}
+		selections = entry.edit.selectionBefore
+	}
+
+	public mutating func redo() {
+		guard let entry = history.popRedo() else {
+			return
+		}
+		apply(entry.edit)
+		selections = entry.selectionAfter
+	}
+
 	private mutating func replaceSelections(with string: String) {
 		let ranges = selectionsForEdit().map(\.range)
 		replace(ranges: ranges, with: string)
@@ -87,6 +132,9 @@ public struct Editor: Sendable {
 		guard !normalized.isEmpty else {
 			return
 		}
+		let textBefore = text
+		let selectionBefore = selections
+		var recordedEdits: [Edit] = []
 		var carets: [Selection] = []
 		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
 			let oldText = rope.slice(range)
@@ -96,12 +144,15 @@ public struct Editor: Sendable {
 			if !string.isEmpty {
 				rope.insert(string, at: range.lowerBound)
 			}
-			history.record(Edit(range: range, oldText: oldText, newText: string))
+			recordedEdits.append(Edit(range: range, oldText: oldText, newText: string, selectionBefore: selectionBefore))
 			let caret = range.lowerBound + string.utf8.count
 			carets.append(Selection(anchor: caret, head: caret))
 		}
 		carets.reverse()
 		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
+		for edit in recordedEdits.reversed() {
+			history.record(edit, selectionAfter: selections, textBefore: textBefore)
+		}
 	}
 
 	private func selectionsForEdit() -> [Selection] {
@@ -136,6 +187,25 @@ public struct Editor: Sendable {
 		}
 		let upper = text.utf8.distance(from: text.utf8.startIndex, to: utf8Next)
 		return offset ..< upper
+	}
+
+	private mutating func apply(_ edit: Edit) {
+		if !edit.range.isEmpty {
+			rope.remove(edit.range)
+		}
+		if !edit.newText.isEmpty {
+			rope.insert(edit.newText, at: edit.range.lowerBound)
+		}
+	}
+
+	private mutating func applyInverse(_ edit: Edit) {
+		let range = edit.range.lowerBound ..< edit.range.lowerBound + edit.newText.utf8.count
+		if !range.isEmpty {
+			rope.remove(range)
+		}
+		if !edit.oldText.isEmpty {
+			rope.insert(edit.oldText, at: edit.range.lowerBound)
+		}
 	}
 }
 

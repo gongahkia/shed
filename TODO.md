@@ -118,7 +118,7 @@ x 2026-06-28 +Phase13-MultiCursor @editor id:243 est:2h dep:240 Cmd-Ctrl-G: sele
 
 ## Phase 14 — Split panes
 
-(A) 2026-06-28 +Phase14-Splits @appkit id:260 est:4h dep:121 Replace single editor view with nestable `NSSplitViewController`. Each leaf = `EditorViewController` wrapping a `MetalTextView`. Same buffer can be shown in multiple panes (shared rope, independent viewport/selection).
+x 2026-06-28 +Phase14-Splits @appkit id:260 est:4h dep:121 Replace single editor view with nestable `NSSplitViewController`. Each leaf = `EditorViewController` wrapping a `MetalTextView`. Same buffer can be shown in multiple panes (shared rope, independent viewport/selection).
 (A) 2026-06-28 +Phase14-Splits @appkit id:261 est:2h dep:260 Bindings: Cmd-\ horizontal split, Cmd-Opt-\ vertical, Cmd-W close pane (falls back to close tab if last pane), Cmd-Opt-Arrow focus pane in direction.
 (B) 2026-06-28 +Phase14-Splits @appkit id:262 est:2h dep:260 Save/restore pane layout per window via NSCoder. Honored on relaunch.
 

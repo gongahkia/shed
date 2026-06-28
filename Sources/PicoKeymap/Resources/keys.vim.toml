@@ -31,6 +31,7 @@
 "v" = "vim.visual.char"
 "Shift-V" = "vim.visual.line"
 "Ctrl-V" = "vim.visual.block"
+"Shift-;" = "vim.ex.start"
 "i" = "mode.insert"
 "/" = "edit.find"
 

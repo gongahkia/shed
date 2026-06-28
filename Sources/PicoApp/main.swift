@@ -25,6 +25,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			PicoAppKeymap.shared.configure(profile: .plain, bindings: [])
 		}
 		super.init()
+		PicoCommandPaletteBridge.shared.showExCommand = { [weak self] window, completion in
+			guard let self else {
+				return false
+			}
+			self.commandPalette.showExCommand(relativeTo: window, completion: completion)
+			return true
+		}
 		registerInitialCommands()
 	}
 

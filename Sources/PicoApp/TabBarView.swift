@@ -165,6 +165,15 @@ final class PicoTabCoordinator {
 		}
 	}
 
+	func selectAdjacentDocument(delta: Int) {
+		let documents = picoDocuments()
+		guard !documents.isEmpty, let selected = selectedDocument(), let index = documents.firstIndex(where: { $0 === selected }) else {
+			return
+		}
+		let next = (index + delta + documents.count) % documents.count
+		selectDocument(ObjectIdentifier(documents[next]))
+	}
+
 	private func selectDocument(_ id: ObjectIdentifier) {
 		guard let document = picoDocuments().first(where: { ObjectIdentifier($0) == id }) else {
 			return

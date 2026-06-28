@@ -2,10 +2,22 @@ import AppKit
 import Dispatch
 import PicoEditor
 
+final class PicoCommandPaletteBridge {
+	static let shared = PicoCommandPaletteBridge()
+	var showExCommand: ((NSWindow?, @escaping (String?) -> Void) -> Bool)?
+
+	private init() {}
+
+	func requestExCommand(relativeTo window: NSWindow?, completion: @escaping (String?) -> Void) -> Bool {
+		showExCommand?(window, completion) ?? false
+	}
+}
+
 final class CommandPaletteController: NSObject {
 	private let registry: CommandRegistry
 	private var panel: CommandPalettePanel?
 	private var contentView: CommandPaletteView?
+	private var cancelHandler: (() -> Void)?
 
 	init(registry: CommandRegistry) {
 		self.registry = registry
@@ -20,11 +32,31 @@ final class CommandPaletteController: NSObject {
 	}
 
 	func close() {
+		cancelHandler = nil
 		panel?.close()
+	}
+
+	func showExCommand(relativeTo hostWindow: NSWindow?, completion: @escaping (String?) -> Void) {
+		let panel = makePanelIfNeeded()
+		cancelHandler = { completion(nil) }
+		contentView?.onCancel = { [weak self] in self?.cancel() }
+		contentView?.onRunText = { [weak self] text in
+			self?.cancelHandler = nil
+			self?.panel?.close()
+			completion(text)
+		}
+		contentView?.setCommandLine(":")
+		center(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		contentView?.focusInput()
 	}
 
 	private func show(relativeTo hostWindow: NSWindow?) {
 		let panel = makePanelIfNeeded()
+		cancelHandler = nil
+		contentView?.onCancel = { [weak self] in self?.close() }
+		contentView?.onRunText = nil
 		contentView?.setItems(registry.commands)
 		center(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
@@ -74,6 +106,13 @@ final class CommandPaletteController: NSObject {
 		panel.setFrame(frame, display: true)
 	}
 
+	private func cancel() {
+		let handler = cancelHandler
+		cancelHandler = nil
+		panel?.close()
+		handler?()
+	}
+
 }
 
 extension CommandPaletteController: NSWindowDelegate {
@@ -85,14 +124,14 @@ extension CommandPaletteController: NSWindowDelegate {
 			guard let panel, panel.isVisible, !panel.isKeyWindow else {
 				return
 			}
-			self?.close()
+			self?.cancel()
 		}
 	}
 }
 
 extension CommandPaletteController: CommandPalettePanelDelegate {
 	func commandPalettePanelDidCancel(_ panel: CommandPalettePanel) {
-		close()
+		cancel()
 	}
 }
 
@@ -127,11 +166,13 @@ final class CommandPalettePanel: NSPanel {
 final class CommandPaletteView: NSView {
 	var onCancel: (() -> Void)?
 	var onRun: ((Command) -> Void)?
+	var onRunText: ((String) -> Void)?
 	private let inputField = CommandPaletteInputField(frame: .zero)
 	private let tableView = NSTableView()
 	private let scrollView = NSScrollView()
 	private var items: [Command] = []
 	private var filteredItems: [Command] = []
+	private var acceptsRawText = false
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -144,13 +185,27 @@ final class CommandPaletteView: NSView {
 	}
 
 	func setItems(_ items: [Command]) {
+		acceptsRawText = false
 		self.items = items
 		inputField.stringValue = ""
+		inputField.placeholderString = "Command"
+		scrollView.isHidden = false
 		filterItems()
+	}
+
+	func setCommandLine(_ value: String) {
+		acceptsRawText = true
+		items = []
+		filteredItems = []
+		inputField.placeholderString = ""
+		inputField.stringValue = value
+		scrollView.isHidden = true
+		tableView.reloadData()
 	}
 
 	func focusInput() {
 		window?.makeFirstResponder(inputField)
+		inputField.currentEditor()?.selectedRange = NSRange(location: inputField.stringValue.count, length: 0)
 	}
 
 	private func configure() {
@@ -207,6 +262,9 @@ final class CommandPaletteView: NSView {
 	}
 
 	private func filterItems() {
+		guard !acceptsRawText else {
+			return
+		}
 		let query = inputField.stringValue.lowercased()
 		filteredItems = FuzzyMatcher.ranked(items, query: query, includeUnmatched: false, by: \.title)
 		tableView.reloadData()
@@ -216,6 +274,9 @@ final class CommandPaletteView: NSView {
 	}
 
 	private func moveSelection(_ delta: Int) {
+		guard !acceptsRawText else {
+			return
+		}
 		guard !filteredItems.isEmpty else {
 			return
 		}
@@ -226,6 +287,10 @@ final class CommandPaletteView: NSView {
 	}
 
 	private func runSelectedItem() {
+		if acceptsRawText {
+			onRunText?(inputField.stringValue)
+			return
+		}
 		guard tableView.selectedRow >= 0, tableView.selectedRow < filteredItems.count else {
 			return
 		}

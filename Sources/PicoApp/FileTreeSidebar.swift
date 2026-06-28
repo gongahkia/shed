@@ -194,4 +194,8 @@ final class PicoWorkspaceController {
 			sidebar.setRootURL(url)
 		}
 	}
+
+	func openFile(at url: URL) -> Bool {
+		documentController?.openDocument(at: url) ?? false
+	}
 }

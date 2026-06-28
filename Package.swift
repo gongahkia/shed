@@ -19,10 +19,13 @@ let package = Package(
 	],
 	dependencies: [],
 	targets: [
-		.executableTarget(name: "PicoApp"),
-		.target(name: "PicoRender"),
+		.executableTarget(
+			name: "PicoApp",
+			dependencies: ["PicoRender", "PicoEditor", "PicoSyntax", "PicoKeymap"]
+		),
+		.target(name: "PicoRender", dependencies: ["PicoEditor"]),
 		.target(name: "PicoEditor"),
-		.target(name: "PicoSyntax"),
+		.target(name: "PicoSyntax", dependencies: ["CTreeSitter", "CTSGrammars", "PicoEditor"]),
 		.target(name: "PicoKeymap"),
 		.executableTarget(name: "PicoBench"),
 		.target(name: "CTreeSitter", sources: ["stub.c"]),

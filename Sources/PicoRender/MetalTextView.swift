@@ -36,6 +36,17 @@ public final class MetalTextView: NSView {
 	private var renderPipeline: MTLRenderPipelineState?
 	private var samplerState: MTLSamplerState?
 	private var solidAtlasTexture: MTLTexture?
+	public private(set) var topLineIndex = 0
+	public private(set) var xOffset: CGFloat = 0
+	public var lineHeight: CGFloat = 17 {
+		didSet { markDirty() }
+	}
+	public var lineCount: Int = 0 {
+		didSet {
+			topLineIndex = min(topLineIndex, max(0, lineCount - 1))
+			markDirty()
+		}
+	}
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -125,6 +136,30 @@ public final class MetalTextView: NSView {
 	public func setSelectionRects(_ rects: [CGRect]) {
 		selectionRects = rects
 		markDirty()
+	}
+
+	public var visibleLineRange: Range<Int> {
+		guard lineCount > 0 else {
+			return 0 ..< 0
+		}
+		let visibleCount = max(1, Int(ceil(bounds.height / max(lineHeight, 1))) + 1)
+		let end = min(lineCount, topLineIndex + visibleCount)
+		return topLineIndex ..< end
+	}
+
+	public func scroll(deltaX: CGFloat, deltaY: CGFloat) {
+		if deltaY != 0, lineCount > 0 {
+			let lineDelta = Int((deltaY / max(lineHeight, 1)).rounded(.toNearestOrAwayFromZero))
+			topLineIndex = min(max(topLineIndex + lineDelta, 0), max(0, lineCount - 1))
+		}
+		if deltaX != 0 {
+			xOffset = max(0, xOffset + deltaX)
+		}
+		markDirty()
+	}
+
+	public override func scrollWheel(with event: NSEvent) {
+		scroll(deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY)
 	}
 
 	func solidOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {

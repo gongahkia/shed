@@ -54,3 +54,6 @@ Release.
 
 The Homebrew cask PR body is drafted in `docs/homebrew-cask-pr.md`; it still
 needs the final release SHA before submission.
+
+The 30-second two-display demo blocker is tracked separately in
+`docs/demo-readiness.md`.

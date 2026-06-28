@@ -81,4 +81,11 @@ final class EditorWindowController: NSWindowController {
 		super.windowDidLoad()
 		window?.center()
 	}
+
+	override func showWindow(_ sender: Any?) {
+		super.showWindow(sender)
+		window?.makeKeyAndOrderFront(sender)
+		window?.orderFrontRegardless()
+		window?.makeFirstResponder(editorView)
+	}
 }

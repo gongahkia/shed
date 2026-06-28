@@ -3,6 +3,12 @@ import Dispatch
 import Foundation
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
+	private let documentController: PicoDocumentController
+
+	init(documentController: PicoDocumentController) {
+		self.documentController = documentController
+	}
+
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		if CommandLine.arguments.contains("--bench-exit-on-ready") {
 			let ns = DispatchTime.now().uptimeNanoseconds
@@ -26,14 +32,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		do {
-			_ = try NSDocumentController.shared.openUntitledDocumentAndDisplay(true)
+			_ = try documentController.openUntitledDocumentAndDisplay(true)
 		} catch {
 			NSLog("failed to open untitled document: \(error)")
 		}
 	}
 
 	private func openDocument(at url: URL) -> Bool {
-		let controller = NSDocumentController.shared
+		let controller = documentController
 		let typeName = controller.defaultType ?? "public.data"
 		if let document = controller.document(for: url) {
 			if document.windowControllers.isEmpty {
@@ -66,8 +72,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		appItem.submenu = appMenu
 
 		let fileMenu = NSMenu(title: "File")
-		fileMenu.addItem(withTitle: "New", action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
-		fileMenu.addItem(withTitle: "Open...", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
+		let newItem = fileMenu.addItem(withTitle: "New", action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
+		newItem.target = documentController
+		let openItem = fileMenu.addItem(withTitle: "Open...", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
+		openItem.target = documentController
 		fileMenu.addItem(.separator())
 		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
 		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
@@ -76,8 +84,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
-private let appDelegate = AppDelegate()
 private let documentController = PicoDocumentController()
+private let appDelegate = AppDelegate(documentController: documentController)
 
 _ = documentController
 let app = NSApplication.shared

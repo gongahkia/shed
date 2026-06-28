@@ -24,3 +24,19 @@ picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms
 ```
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
+
+## 2026-06-28 baseline
+
+Installed Homebrew casks:
+- Zed 1.8.2
+- Visual Studio Code 1.126.0
+- Sublime Text 4200
+- CodeEdit 0.3.6
+
+Baseline command:
+
+```sh
+PICO_BASELINE_PURGE=0 bench/scripts/run_baseline.sh
+```
+
+`sudo purge` was unavailable non-interactively (`sudo: a password is required`), so this baseline records no-purge cold starts.

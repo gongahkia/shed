@@ -325,10 +325,29 @@ enum PicoBenchMain {
 		let start = DispatchTime.now().uptimeNanoseconds
 		let deadline = Date(timeIntervalSinceNow: 5)
 		let app = try launch(url: url, args: options.args, deadline: deadline)
-		defer { app.terminate() }
+		defer { terminate(app) }
 		let firstWindow = try waitForFirstWindow(pid: app.processIdentifier, start: start, deadline: deadline)
 		let startup = Double(firstWindow - start) / 1_000_000
 		return MeasureResult(startup_ms: startup, rss_kb: try residentSizeKB(pid: app.processIdentifier), app: url.lastPathComponent)
+	}
+
+	private static func terminate(_ app: NSRunningApplication) {
+		guard !app.isTerminated else {
+			return
+		}
+		app.terminate()
+		let deadline = Date(timeIntervalSinceNow: 2)
+		while !app.isTerminated, Date() < deadline {
+			RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
+		}
+		if !app.isTerminated {
+			app.forceTerminate()
+			let forceDeadline = Date(timeIntervalSinceNow: 1)
+			while !app.isTerminated, Date() < forceDeadline {
+				RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
+			}
+		}
+		Thread.sleep(forTimeInterval: 0.05)
 	}
 
 	private static func launch(url: URL, args: [String], deadline: Date) throws -> NSRunningApplication {

@@ -75,6 +75,9 @@ public final class MetalTextView: NSView {
 	private var visualAnchor: Int?
 	private var visualHead: Int?
 	private var visualMode: VisualMode?
+	private var awaitingRegister = false
+	private var pendingRegister: String?
+	private var registers: [String: String] = [:]
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -231,6 +234,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if handlePendingRegister(event) {
+			return
+		}
 		if handlePendingCharacterMotion(event) {
 			return
 		}
@@ -270,6 +276,9 @@ public final class MetalTextView: NSView {
 			isARepeat: false,
 			keyCode: keyCode
 		)
+		if let event, handlePendingRegister(event) {
+			return true
+		}
 		if let event, handlePendingCharacterMotion(event) {
 			return true
 		}
@@ -314,6 +323,11 @@ public final class MetalTextView: NSView {
 		case character
 		case line
 		case block
+	}
+
+	private enum RegisterOperation {
+		case yank
+		case delete
 	}
 
 	private enum TextObject {
@@ -406,6 +420,15 @@ public final class MetalTextView: NSView {
 			return beginOperator(.change)
 		case "vim.operator.yank":
 			return beginOperator(.yank)
+		case "vim.registerPrefix":
+			awaitingRegister = true
+			return true
+		case "vim.pasteAfter":
+			pasteRegister(after: true)
+			return true
+		case "vim.pasteBefore":
+			pasteRegister(after: false)
+			return true
 		case "vim.visual.char":
 			beginVisualMode(.character)
 			return true
@@ -577,13 +600,14 @@ public final class MetalTextView: NSView {
 		let text = editor.rope.slice(range)
 		switch op {
 		case .delete:
+			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
 		case .change:
+			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
 			keymapEngine.setMode(.insert)
 		case .yank:
-			NSPasteboard.general.clearContents()
-			NSPasteboard.general.setString(text, forType: .string)
+			writeRegister(text, operation: .yank)
 			editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
 			syncEditorState()
 		}
@@ -599,18 +623,19 @@ public final class MetalTextView: NSView {
 		}
 		switch op {
 		case .delete:
+			writeRegister(selections.map { editor.rope.slice($0) }.joined(), operation: .delete)
 			editor.deleteForward()
 			syncEditorState()
 			editorDidChange?(editor)
 		case .change:
+			writeRegister(selections.map { editor.rope.slice($0) }.joined(), operation: .delete)
 			editor.deleteForward()
 			keymapEngine.setMode(.insert)
 			syncEditorState()
 			editorDidChange?(editor)
 		case .yank:
 			let text = selections.map { editor.rope.slice($0) }.joined()
-			NSPasteboard.general.clearContents()
-			NSPasteboard.general.setString(text, forType: .string)
+			writeRegister(text, operation: .yank)
 			editor.setSelection(SelectionSet(primary: Selection(anchor: selections[0].lowerBound, head: selections[0].lowerBound)))
 			syncEditorState()
 		}
@@ -621,6 +646,84 @@ public final class MetalTextView: NSView {
 		let start = editor.rope.offset(forLine: line)
 		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
 		return start ..< end
+	}
+
+	private func handlePendingRegister(_ event: NSEvent) -> Bool {
+		guard awaitingRegister, let key = Key(event: event), let register = registerName(for: key) else {
+			return false
+		}
+		pendingRegister = register
+		awaitingRegister = false
+		return true
+	}
+
+	private func registerName(for key: Key) -> String? {
+		if key.modifiers == .shift, key.value == "'" {
+			return "\""
+		}
+		if key.modifiers == .shift, key.value == "=" {
+			return "+"
+		}
+		guard key.modifiers.isEmpty, key.value.count == 1 else {
+			return nil
+		}
+		let value = key.value
+		if value == "\"" || value == "+" || value == "0" || ("1" ... "9").contains(value) {
+			return value
+		}
+		if value >= "a", value <= "z" {
+			return value
+		}
+		return nil
+	}
+
+	private func writeRegister(_ text: String, operation: RegisterOperation) {
+		let target = pendingRegister ?? "\""
+		registers["\""] = text
+		if operation == .yank {
+			registers["0"] = text
+		} else {
+			for index in stride(from: 9, through: 2, by: -1) {
+				registers[String(index)] = registers[String(index - 1)]
+			}
+			registers["1"] = text
+		}
+		if target == "+" {
+			NSPasteboard.general.clearContents()
+			NSPasteboard.general.setString(text, forType: .string)
+		} else {
+			registers[target] = text
+		}
+		pendingRegister = nil
+	}
+
+	private func readRegister() -> String? {
+		let target = pendingRegister ?? "\""
+		defer { pendingRegister = nil }
+		if target == "+" {
+			return NSPasteboard.general.string(forType: .string)
+		}
+		return registers[target] ?? registers["\""]
+	}
+
+	private func pasteRegister(after: Bool) {
+		guard let text = readRegister(), !text.isEmpty else {
+			return
+		}
+		let head = editor.selections.primary.head
+		let offset = after ? offsetAfterCharacter(at: head) : head
+		editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
+		editor.insert(text)
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	private func offsetAfterCharacter(at offset: Int) -> Int {
+		let offsets = characterOffsets()
+		guard let index = offsets.firstIndex(where: { $0.offset >= offset }) else {
+			return editor.rope.length
+		}
+		return min(editor.rope.length, offsets[index].offset + String(offsets[index].character).utf8.count)
 	}
 
 	private func beginVisualMode(_ mode: VisualMode) {

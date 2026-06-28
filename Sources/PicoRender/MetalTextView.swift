@@ -199,7 +199,15 @@ public final class MetalTextView: NSView {
 	}
 
 	public func selectUTF8Range(_ range: Range<Int>) {
-		editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.upperBound)))
+		selectUTF8Ranges([range])
+	}
+
+	public func selectUTF8Ranges(_ ranges: [Range<Int>]) {
+		let selections = ranges.map { Selection(anchor: $0.lowerBound, head: $0.upperBound) }
+		guard let primary = selections.first else {
+			return
+		}
+		editor.setSelection(SelectionSet(primary: primary, secondaries: Array(selections.dropFirst())))
 		syncEditorState()
 	}
 

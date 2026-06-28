@@ -1,4 +1,5 @@
 import AppKit
+import PicoEditor
 @testable import PicoRender
 import Testing
 
@@ -20,6 +21,14 @@ import Testing
 	#expect(instances[0].size == SIMD2<Float>(40, 20))
 	#expect(instances[1].screenOrigin == SIMD2<Float>(60, 16))
 	#expect(instances[1].size == SIMD2<Float>(4, 20))
+}
+
+@Test func selectingUTF8RangesMergesOverlaps() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abcdef")
+	view.selectUTF8Ranges([1 ..< 4, 3 ..< 5])
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 5))
+	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
 @Test func viewportTracksVisibleLineRangeAndScrollOffsets() {

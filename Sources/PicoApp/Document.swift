@@ -326,6 +326,20 @@ final class EditorWindowController: NSWindowController {
 		selectFindMatch(direction: -1)
 	}
 
+	func selectAllFindMatches() {
+		guard !findBarView.isHidden else {
+			setFindBarVisible(true)
+			return
+		}
+		refreshFindMatches()
+		guard !findMatches.isEmpty else {
+			return
+		}
+		selectedFindMatchIndex = nil
+		editorView.selectUTF8Ranges(findMatches)
+		focusEditor()
+	}
+
 	private func setFindBarVisible(_ visible: Bool) {
 		findBarView.isHidden = !visible
 		editorView.topContentInset = visible ? 38 : 0

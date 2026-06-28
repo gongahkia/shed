@@ -68,6 +68,31 @@ import Testing
 	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("forwardChar"))
 }
 
+@Test func bundledKeymapProfilesLoad() throws {
+	for profile in KeymapProfile.allCases {
+		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
+		#expect(!bindings.isEmpty)
+	}
+}
+
+@Test func userKeymapConfigOverlaysSelectedProfile() throws {
+	let fixture = try TemporaryKeymapFixture()
+	defer { fixture.cleanUp() }
+	try fixture.write("""
+	[mode.insert]
+	"Left" = "custom.moveLeft"
+	""")
+
+	let bindings = try KeymapConfiguration.load(profile: .plain, userConfigURL: fixture.url)
+	let engine = KeymapEngine(modeStack: [.insert], bindings: bindings)
+	#expect(engine.handle(try keyEvent("", keyCode: 123)) == .command("custom.moveLeft"))
+}
+
+@Test func keymapProfileParsesCommandLineFlag() throws {
+	#expect(try KeymapProfile.selected(from: ["PicoApp", "--profile=vim"]) == .vim)
+	#expect(try KeymapProfile.selected(from: ["PicoApp"]) == .plain)
+}
+
 private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [], keyCode: UInt16 = 0) throws -> NSEvent {
 	try #require(NSEvent.keyEvent(
 		with: .keyDown,
@@ -81,4 +106,23 @@ private func keyEvent(_ characters: String, modifiers: NSEvent.ModifierFlags = [
 		isARepeat: false,
 		keyCode: keyCode
 	))
+}
+
+private struct TemporaryKeymapFixture {
+	let url: URL
+
+	init() throws {
+		let directory = FileManager.default.temporaryDirectory
+			.appendingPathComponent("pico-keymap-\(UUID().uuidString)", isDirectory: true)
+		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+		url = directory.appendingPathComponent("keys.toml")
+	}
+
+	func write(_ contents: String) throws {
+		try contents.write(to: url, atomically: true, encoding: .utf8)
+	}
+
+	func cleanUp() {
+		try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+	}
 }

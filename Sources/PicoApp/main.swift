@@ -2,10 +2,12 @@ import AppKit
 import Dispatch
 import Foundation
 import PicoEditor
+import PicoKeymap
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: PicoDocumentController
 	private let commandRegistry = CommandRegistry()
+	private let keymapEngine: KeymapEngine
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
 	private lazy var projectFind = ProjectFindController(
@@ -15,6 +17,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	init(documentController: PicoDocumentController) {
 		self.documentController = documentController
+		do {
+			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
+			keymapEngine = KeymapEngine(bindings: try KeymapConfiguration.load(profile: profile))
+		} catch {
+			NSLog("failed to load keymap profile: \(error)")
+			keymapEngine = KeymapEngine()
+		}
 		super.init()
 		registerInitialCommands()
 	}

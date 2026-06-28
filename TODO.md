@@ -79,8 +79,6 @@ Read NORTHSTAR.md before starting. Cite NORTHSTAR section anchors in PRs (e.g. `
 
 ## PHASE 14 — DSL polish & documentation
 
-(A) 2026-06-26 Implement compile-time duplicate-chord and duplicate-tag-name diagnostics without value-level runtime checks +phase14 @swift @dsl ref:N§14
-
 ---
 
 ## Cross-cutting / continuous

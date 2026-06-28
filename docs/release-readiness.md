@@ -1,7 +1,28 @@
 # Release Readiness
 
 Status: v0.1.0 is not cut. This file records the local artifact smoke test and
-the external blockers for the GitHub Release task.
+the blockers for the GitHub Release task.
+
+## Runtime Release Gate
+
+Do not tag v0.1.0 until the app runtime owns the IPC service used by `ollyctl`.
+The current `ollyApp` target owns the menu bar, AX onboarding, settings,
+overview mode, and command palette UI, but no `UnixDomainSocketServer` wiring was
+found in `Sources/ollyApp`.
+
+Verified on 2026-06-28:
+
+```sh
+swift run -c release ollyctl state
+```
+
+Result:
+
+```text
+Error: connect failed with errno 2
+```
+
+This is a release blocker independent of signing/notarization.
 
 ## Local Artifact Smoke Test
 
@@ -15,15 +36,10 @@ git archive --format tar.gz --prefix olly-v0.1.0/ -o release/v0.1.0/olly-v0.1.0-
 (cd release/v0.1.0 && shasum -a 256 Olly-v0.1.0-ad-hoc.dmg olly-v0.1.0-source.tar.gz > SHA256SUMS)
 ```
 
-Result:
-
-```text
-65ccf84c60ef529a2cd8f1be5df155d933afd46a9b295e994f73935f01859eca  Olly-v0.1.0-ad-hoc.dmg
-07a8ee0c093e312f13852de3da84a9a789b5788e1552b4e2356bbd9b18d2c566  olly-v0.1.0-source.tar.gz
-```
-
 The DMG is ad-hoc signed only. It is not notarized and must not be published as
-the final v0.1.0 artifact.
+the final v0.1.0 artifact. The source tarball SHA changes with every source
+commit, so read the current ignored smoke-test values from
+`release/v0.1.0/SHA256SUMS` instead of committing them here.
 
 ## Required GitHub Secrets
 
@@ -39,10 +55,11 @@ the final v0.1.0 artifact.
 `gh secret list --repo gongahkia/olly` returned no configured secrets on
 2026-06-28 from this environment.
 
-## Release Gate
+## Distribution Release Gate
 
 Do not remove the v0.1.0 release TODO until:
 
+- App runtime smoke test passes with `ollyctl state`.
 - Release workflow has the signing/notarization secrets above.
 - `Release DMG` workflow passes for tag `v0.1.0`.
 - GitHub Release has `Olly-v0.1.0.dmg`, `olly-v0.1.0-source.tar.gz`, and `SHA256SUMS`.

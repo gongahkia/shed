@@ -163,3 +163,8 @@ Current section distribution:
 
 - Replaced the custom project-find panel subclass with a plain titled `NSPanel`; local verification showed that configuration already reports `canBecomeKey == true`.
 - Static rebase fixups after project-find panel subclass cleanup: `2566`; target remains `<2000`; result remains fail.
+
+## Command palette panel subclass cleanup
+
+- Replaced the custom borderless command-palette panel subclass with a plain hidden-titlebar `NSPanel`; local verification showed that configuration reports `canBecomeKey == true` and `canBecomeMain == false`.
+- Static rebase fixups after command-palette panel subclass cleanup: `2547`; target remains `<2000`; result remains fail.

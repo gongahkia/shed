@@ -12,7 +12,7 @@ enum ItsyCommandPaletteBridge {
 
 final class CommandPaletteController: NSObject {
 	private let registry: CommandRegistry
-	private var panel: CommandPalettePanel?
+	private var panel: NSPanel?
 	private var contentView: CommandPaletteView?
 	private var cancelHandler: (() -> Void)?
 
@@ -61,14 +61,14 @@ final class CommandPaletteController: NSObject {
 		contentView?.focusInput()
 	}
 
-	private func makePanelIfNeeded() -> CommandPalettePanel {
+	private func makePanelIfNeeded() -> NSPanel {
 		if let panel {
 			return panel
 		}
 		let size = NSSize(width: 560, height: 280)
-		let panel = CommandPalettePanel(
+		let panel = NSPanel(
 			contentRect: NSRect(origin: .zero, size: size),
-			styleMask: [.borderless],
+			styleMask: [.titled, .fullSizeContentView],
 			backing: .buffered,
 			defer: false
 		)
@@ -79,8 +79,9 @@ final class CommandPaletteController: NSObject {
 			item.run()
 		}
 		panel.contentView = contentView
-		panel.onCancel = { [weak self] in self?.cancel() }
 		panel.title = L10n.string("Command Palette")
+		panel.titleVisibility = .hidden
+		panel.titlebarAppearsTransparent = true
 		panel.isReleasedWhenClosed = false
 		panel.hasShadow = true
 		panel.level = .floating
@@ -123,30 +124,6 @@ extension CommandPaletteController: NSWindowDelegate {
 			}
 			self?.cancel()
 		}
-	}
-}
-
-final class CommandPalettePanel: NSPanel {
-	var onCancel: (() -> Void)?
-
-	override var canBecomeKey: Bool {
-		true
-	}
-
-	override var canBecomeMain: Bool {
-		false
-	}
-
-	override func cancelOperation(_ sender: Any?) {
-		onCancel?()
-	}
-
-	override func keyDown(with event: NSEvent) {
-		if event.keyCode == 53 {
-			onCancel?()
-			return
-		}
-		super.keyDown(with: event)
 	}
 }
 

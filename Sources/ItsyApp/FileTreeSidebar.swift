@@ -49,9 +49,10 @@ final class FileTreeNode {
 final class FileTreeSidebarView: NSView {
 	var onOpenFile: ((URL) -> Void)?
 	var onPreviewFile: ((URL) -> Void)?
-	private let outlineView = FileTreeOutlineView()
+	private let outlineView = NSOutlineView()
 	private let scrollView = NSScrollView()
 	private var rootNode: FileTreeNode?
+	private var keyMonitor: Any?
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -61,6 +62,12 @@ final class FileTreeSidebarView: NSView {
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
 		configure()
+	}
+
+	deinit {
+		if let keyMonitor {
+			NSEvent.removeMonitor(keyMonitor)
+		}
 	}
 
 	func setRootURL(_ url: URL?) {
@@ -85,11 +92,19 @@ final class FileTreeSidebarView: NSView {
 		outlineView.delegate = self
 		outlineView.target = self
 		outlineView.doubleAction = #selector(doubleClick(_:))
-		outlineView.onPreview = { [weak self] in
-			self?.previewSelection()
-		}
 		outlineView.rowSizeStyle = .small
 		outlineView.usesAlternatingRowBackgroundColors = false
+		keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+			guard let self,
+			      event.keyCode == 49,
+			      self.window?.isKeyWindow == true,
+			      self.window?.firstResponder === self.outlineView
+			else {
+				return event
+			}
+			self.previewSelection()
+			return nil
+		}
 
 		scrollView.documentView = outlineView
 		scrollView.hasVerticalScroller = true
@@ -129,18 +144,6 @@ final class FileTreeSidebarView: NSView {
 			return
 		}
 		onPreviewFile?(node.url)
-	}
-}
-
-private final class FileTreeOutlineView: NSOutlineView {
-	var onPreview: (() -> Void)?
-
-	override func keyDown(with event: NSEvent) {
-		if event.keyCode == 49 {
-			onPreview?()
-			return
-		}
-		super.keyDown(with: event)
 	}
 }
 

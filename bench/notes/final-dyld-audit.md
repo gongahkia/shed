@@ -168,3 +168,8 @@ Current section distribution:
 
 - Replaced the custom borderless command-palette panel subclass with a plain hidden-titlebar `NSPanel`; local verification showed that configuration reports `canBecomeKey == true` and `canBecomeMain == false`.
 - Static rebase fixups after command-palette panel subclass cleanup: `2547`; target remains `<2000`; result remains fail.
+
+## File tree outline subclass cleanup
+
+- Replaced the file-tree `NSOutlineView` subclass with a local key monitor scoped to the outline view for Space preview.
+- Static rebase fixups after file-tree outline subclass cleanup: `2543`; target remains `<2000`; result remains fail.

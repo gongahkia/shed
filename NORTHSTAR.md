@@ -76,6 +76,8 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 
 ## Architecture (frozen at this level)
 
+![Pico architecture](docs/arch.svg)
+
 ```
 ┌────────────────────────────────────────────────────────┐
 │ AppKit shell                                           │

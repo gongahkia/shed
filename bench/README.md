@@ -28,6 +28,14 @@ itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
 
+Memory audit:
+
+```sh
+bench/scripts/memory_audit.sh
+```
+
+This launches the release binary, waits for `first_draw`, samples `ItsyBench rss`, runs `vmmap -summary`, and writes `bench/results/memory-YYYY-MM-DD.{json,md}`.
+
 ## 2026-06-28 baseline
 
 Installed Homebrew casks:

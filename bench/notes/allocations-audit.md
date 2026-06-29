@@ -75,3 +75,35 @@ Largest resident contributors:
 | `__DATA` | 8790K |
 
 [Inference] The idle-RSS miss is dominated by system/AppKit/Metal mapped regions and graphics surfaces, not app-owned heap alone. Reducing app heap allocations will not by itself close the `<30 MB` RSS target.
+
+## 2026-06-29 reproducible idle memory audit
+
+Command:
+
+```sh
+ITSY_MEMORY_DATE=2026-06-29-current bench/scripts/memory_audit.sh
+```
+
+Committed reports: `bench/results/memory-2026-06-29-current.json` and `bench/results/memory-2026-06-29-current.md`.
+
+Latest local output:
+
+- RSS: `92016 KB`
+- Physical footprint: `98611 KB`
+
+Largest resident rows:
+
+| Region | Resident KB |
+|---|---:|
+| `__TEXT` | 388403 |
+| `__OBJC_RO` | 57754 |
+| owned unmapped graphics | 49971 |
+| `__AUTH_CONST` | 44134 |
+| `__LINKEDIT` | 19866 |
+| IOSurface | 19661 |
+| `__DATA_CONST` | 18739 |
+| mapped file | 15770 |
+| MALLOC_SMALL | 13722 |
+| `__DATA` | 9654 |
+
+[Inference] The automated run confirms the `<30 MB` RSS target is still missed by about 62 MB on this machine. The top rows point first to system/library mappings and graphics surfaces; follow-up work should measure feature-stripped launch variants before removing editor-owned data structures.

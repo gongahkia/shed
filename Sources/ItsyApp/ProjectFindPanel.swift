@@ -120,7 +120,7 @@ final class ProjectFindView: NSView {
 	var onCancel: (() -> Void)?
 	var onSearch: ((String) -> Void)?
 	var onOpenMatch: ((ProjectFindMatch) -> Void)?
-	private let queryField = ProjectFindTextField(frame: .zero)
+	private let queryField = ItsyActionTextField(frame: .zero)
 	private let statusLabel = NSTextField(labelWithString: "")
 	private let tableView = NSTableView()
 	private let scrollView = NSScrollView()
@@ -244,17 +244,5 @@ extension ProjectFindView: NSTableViewDataSource, NSTableViewDelegate {
 			cell.textField = textField
 		}
 		return cell
-	}
-}
-
-final class ProjectFindTextField: NSTextField {
-	var onCancel: (() -> Void)?
-
-	override func keyDown(with event: NSEvent) {
-		if event.keyCode == 53 {
-			onCancel?()
-			return
-		}
-		super.keyDown(with: event)
 	}
 }

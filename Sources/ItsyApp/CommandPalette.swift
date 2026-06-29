@@ -154,7 +154,7 @@ final class CommandPaletteView: NSView {
 	var onCancel: (() -> Void)?
 	var onRun: ((Command) -> Void)?
 	var onRunText: ((String) -> Void)?
-	private let inputField = CommandPaletteInputField(frame: .zero)
+	private let inputField = ItsyActionTextField(frame: .zero)
 	private let tableView = NSTableView()
 	private let scrollView = NSScrollView()
 	private var items: [Command] = []
@@ -315,26 +315,5 @@ extension CommandPaletteView: NSTableViewDataSource, NSTableViewDelegate {
 			cell.textField = textField
 		}
 		return cell
-	}
-}
-
-final class CommandPaletteInputField: NSTextField {
-	var onCancel: (() -> Void)?
-	var onConfirm: (() -> Void)?
-	var onMoveSelection: ((Int) -> Void)?
-
-	override func keyDown(with event: NSEvent) {
-		switch event.keyCode {
-		case 53:
-			onCancel?()
-		case 36:
-			onConfirm?()
-		case 125:
-			onMoveSelection?(1)
-		case 126:
-			onMoveSelection?(-1)
-		default:
-			super.keyDown(with: event)
-		}
 	}
 }

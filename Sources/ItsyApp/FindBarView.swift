@@ -14,8 +14,8 @@ final class FindBarView: NSView {
 	var onStateChange: ((FindBarState) -> Void)?
 	var onFindNext: (() -> Void)?
 	var onFindPrevious: (() -> Void)?
-	private let queryField = FindBarTextField(frame: .zero)
-	private let replaceField = FindBarTextField(frame: .zero)
+	private let queryField = ItsyActionTextField(frame: .zero)
+	private let replaceField = ItsyActionTextField(frame: .zero)
 	private let regexButton = NSButton(checkboxWithTitle: L10n.string("Regex"), target: nil, action: nil)
 	private let caseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
 	private let wholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
@@ -69,6 +69,7 @@ final class FindBarView: NSView {
 			field.onCancel = { [weak self] in self?.onDismiss?() }
 			field.onConfirm = { [weak self] in self?.onFindNext?() }
 			field.onFindPrevious = { [weak self] in self?.onFindPrevious?() }
+			field.handlesFindShortcuts = true
 			field.delegate = self
 		}
 		for button in [regexButton, caseButton, wholeWordButton] {
@@ -131,26 +132,34 @@ extension FindBarView: NSTextFieldDelegate {
 	}
 }
 
-final class FindBarTextField: NSTextField {
+final class ItsyActionTextField: NSTextField {
 	var onCancel: (() -> Void)?
 	var onConfirm: (() -> Void)?
 	var onFindPrevious: (() -> Void)?
+	var onMoveSelection: ((Int) -> Void)?
+	var handlesFindShortcuts = false
 
 	override func keyDown(with event: NSEvent) {
-		if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "s" {
+		if handlesFindShortcuts, event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "s", onConfirm != nil {
 			onConfirm?()
 			return
 		}
-		if event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "r" {
+		if handlesFindShortcuts, event.modifierFlags.contains(.control), event.charactersIgnoringModifiers == "r", onFindPrevious != nil {
 			onFindPrevious?()
 			return
 		}
 		switch event.keyCode {
-		case 36:
+		case 36 where onConfirm != nil:
 			onConfirm?()
 			return
-		case 53:
+		case 53 where onCancel != nil:
 			onCancel?()
+			return
+		case 125 where onMoveSelection != nil:
+			onMoveSelection?(1)
+			return
+		case 126 where onMoveSelection != nil:
+			onMoveSelection?(-1)
 			return
 		default:
 			break

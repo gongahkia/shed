@@ -143,3 +143,8 @@ Current section distribution:
 
 - Made unused module marker enums internal and switched the smoke test to `@testable import ItsyEditor`.
 - Static rebase fixups after module-marker visibility cleanup: `2622`; target remains `<2000`; result remains fail.
+
+## Text field subclass cleanup
+
+- Replaced three AppKit text-field subclasses with one shared `ItsyActionTextField` and kept find-only shortcuts behind an explicit flag.
+- Static rebase fixups after text-field subclass cleanup: `2596`; target remains `<2000`; result remains fail.

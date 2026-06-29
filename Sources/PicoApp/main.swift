@@ -36,12 +36,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
-		if CommandLine.arguments.contains("--bench-exit-on-ready") {
-			let ns = DispatchTime.now().uptimeNanoseconds
-			FileHandle.standardOutput.write(Data("READY \(ns)\n".utf8))
-			NSApp.terminate(nil)
-			return
-		}
 		installMainMenu()
 		openInitialDocument()
 		NSApp.activate(ignoringOtherApps: true)
@@ -294,6 +288,12 @@ extension AppDelegate: NSMenuDelegate {
 		clearItem.target = documentController
 		clearItem.isEnabled = !urls.isEmpty
 	}
+}
+
+if CommandLine.arguments.contains("--bench-exit-on-ready") {
+	let ns = DispatchTime.now().uptimeNanoseconds
+	FileHandle.standardOutput.write(Data("READY \(ns)\n".utf8))
+	exit(0)
 }
 
 let app = NSApplication.shared

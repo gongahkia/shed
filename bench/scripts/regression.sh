@@ -8,6 +8,7 @@ out="${PICO_REGRESSION_OUT:-$repo_dir/bench/results/regression-current.json}"
 runs="${PICO_REGRESSION_RUNS:-20}"
 threshold="${PICO_REGRESSION_THRESHOLD:-0.05}"
 rope_ops="${PICO_REGRESSION_ROPE_OPS:-1000000}"
+rope_runs="${PICO_REGRESSION_ROPE_RUNS:-5}"
 slice_length="${PICO_REGRESSION_SLICE_LENGTH:-32}"
 picobench="${PICOBENCH:-$repo_dir/.build/release/PicoBench}"
 picoapp="${PICO_APP_BINARY:-$repo_dir/.build/release/PicoApp}"
@@ -26,13 +27,15 @@ if [[ ! -x "$picobench" || ! -x "$picoapp" ]]; then
 fi
 
 mkdir -p "$(dirname "$out")"
-printf -v app_command '%q --bench-exit-on-ready' "$picoapp"
-hyperfine_args=(--warmup 0 --runs "$runs" --export-json "$hyperfine_json")
+app_command="$picoapp --bench-exit-on-ready"
+hyperfine_args=(--shell=none --warmup 0 --runs "$runs" --export-json "$hyperfine_json")
 if [[ "${PICO_REGRESSION_PURGE:-0}" != "0" ]]; then
 	hyperfine_args+=(--prepare "purge")
 fi
 hyperfine "${hyperfine_args[@]}" "$app_command" >/dev/null
-"$picobench" rope --ops "$rope_ops" --slice-length "$slice_length" >"$rope_json"
+for _ in $(seq 1 "$rope_runs"); do
+	"$picobench" rope --ops "$rope_ops" --slice-length "$slice_length" >>"$rope_json"
+done
 
 ruby -rjson -rtime -e '
 	def swift_loc(repo)
@@ -55,15 +58,15 @@ ruby -rjson -rtime -e '
 	baseline_path, hyperfine_path, rope_path, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
-	rope = JSON.parse(File.read(rope_path))
+	rope_runs = File.readlines(rope_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 	bench = hyperfine.fetch("results").first
 	current = {
 		"cold_start_ready_ms" => bench.fetch("mean").to_f * 1000.0,
 		"cold_start_ready_min_ms" => bench.fetch("min").to_f * 1000.0,
 		"cold_start_ready_max_ms" => bench.fetch("max").to_f * 1000.0,
-		"rope_random_insert_ns_per_op" => rope.fetch("random_insert_ns_per_op").to_f,
-		"rope_sequential_insert_ns_per_op" => rope.fetch("sequential_insert_ns_per_op").to_f,
-		"rope_slice_ns_per_op" => rope.fetch("slice_ns_per_op").to_f,
+		"rope_random_insert_ns_per_op" => rope_runs.map { |run| run.fetch("random_insert_ns_per_op").to_f }.min,
+		"rope_sequential_insert_ns_per_op" => rope_runs.map { |run| run.fetch("sequential_insert_ns_per_op").to_f }.min,
+		"rope_slice_ns_per_op" => rope_runs.map { |run| run.fetch("slice_ns_per_op").to_f }.min,
 		"binary_size_kb" => File.size(binary).to_f / 1024.0,
 		"swift_loc" => swift_loc(repo).to_f
 	}
@@ -88,6 +91,7 @@ ruby -rjson -rtime -e '
 		"generated_at" => Time.now.utc.iso8601,
 		"baseline" => baseline_path,
 		"runs" => hyperfine.fetch("results").first.fetch("times").length,
+		"rope_runs" => rope_runs.length,
 		"threshold" => default_threshold,
 		"metrics" => rows
 	}

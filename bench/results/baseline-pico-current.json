@@ -6,7 +6,7 @@
       "name": "cold_start_ready_ms",
       "unit": "ms",
       "direction": "lower",
-      "baseline": 70.0
+      "baseline": 8.0
     },
     {
       "name": "rope_random_insert_ns_per_op",
@@ -24,19 +24,19 @@
       "name": "rope_slice_ns_per_op",
       "unit": "ns/op",
       "direction": "lower",
-      "baseline": 309.64
+      "baseline": 331.0
     },
     {
       "name": "binary_size_kb",
       "unit": "KB",
       "direction": "lower",
-      "baseline": 11559.289
+      "baseline": 11560.0
     },
     {
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",
-      "baseline": 9948
+      "baseline": 9947
     }
   ]
 }

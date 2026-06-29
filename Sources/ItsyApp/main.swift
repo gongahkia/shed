@@ -34,7 +34,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		self?.reloadSyntaxThemes()
 	}
 	private lazy var projectFind = ProjectFindController(
-		workspaceURL: { ItsyWorkspaceController.shared.currentRootURL },
+		workspaceURL: { ItsyWorkspaceController.currentRootURL },
 		openFile: { [weak self] url in _ = self?.documentController.openDocument(at: url) }
 	)
 
@@ -44,13 +44,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		do {
 			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
 			let bindings = try KeymapConfiguration.load(profile: profile)
-			ItsyAppKeymap.shared.configure(profile: profile, bindings: bindings)
+			ItsyAppKeymap.configure(profile: profile, bindings: bindings)
 		} catch {
 			NSLog("failed to load keymap profile: \(error)")
-			ItsyAppKeymap.shared.configure(profile: .plain, bindings: [])
+			ItsyAppKeymap.configure(profile: .plain, bindings: [])
 		}
 		super.init()
-		ItsyCommandPaletteBridge.shared.showExCommand = { [weak self] window, completion in
+		ItsyCommandPaletteBridge.showExCommand = { [weak self] window, completion in
 			guard let self else {
 				return false
 			}
@@ -258,7 +258,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func openWorkspace(at url: URL) -> Bool {
-		ItsyWorkspaceController.shared.openWorkspace(at: url)
+		ItsyWorkspaceController.openWorkspace(at: url)
 		if documentController.documents.isEmpty {
 			do {
 				_ = try documentController.openUntitledDocumentAndDisplay(true)

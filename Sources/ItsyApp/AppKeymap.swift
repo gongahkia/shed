@@ -1,19 +1,15 @@
 import ItsyKeymap
 
-final class ItsyAppKeymap {
-	static let shared = ItsyAppKeymap()
+enum ItsyAppKeymap {
+	private static var bindings: [KeyBinding] = []
+	private static var initialMode: Mode = .insert
 
-	private var bindings: [KeyBinding] = []
-	private var initialMode: Mode = .insert
-
-	private init() {}
-
-	func configure(profile: KeymapProfile, bindings: [KeyBinding]) {
+	static func configure(profile: KeymapProfile, bindings: [KeyBinding]) {
 		self.bindings = bindings
 		initialMode = profile.initialMode
 	}
 
-	func makeEngine() -> KeymapEngine {
+	static func makeEngine() -> KeymapEngine {
 		KeymapEngine(modeStack: [initialMode], bindings: bindings)
 	}
 }

@@ -145,31 +145,27 @@ private final class TabActionButton: NSButton {
 	}
 }
 
-final class ItsyTabCoordinator {
-	static let shared = ItsyTabCoordinator()
+enum ItsyTabCoordinator {
+	private static weak var documentController: ItsyDocumentController?
+	private static let tabBars = NSHashTable<TabBarView>.weakObjects()
 
-	private weak var documentController: ItsyDocumentController?
-	private let tabBars = NSHashTable<TabBarView>.weakObjects()
-
-	private init() {}
-
-	func install(documentController: ItsyDocumentController) {
+	static func install(documentController: ItsyDocumentController) {
 		self.documentController = documentController
 		refresh()
 	}
 
-	func register(_ tabBar: TabBarView) {
+	static func register(_ tabBar: TabBarView) {
 		tabBars.add(tabBar)
-		tabBar.onSelect = { [weak self] id in
-			self?.selectDocument(id)
+		tabBar.onSelect = { id in
+			selectDocument(id)
 		}
-		tabBar.onClose = { [weak self] id in
-			self?.closeDocument(id)
+		tabBar.onClose = { id in
+			closeDocument(id)
 		}
 		refresh()
 	}
 
-	func refresh() {
+	static func refresh() {
 		let documents = itsyDocuments()
 		let selectedID = selectedDocument().map(ObjectIdentifier.init)
 		let tabs = documents.map { document in
@@ -185,7 +181,7 @@ final class ItsyTabCoordinator {
 		}
 	}
 
-	func selectAdjacentDocument(delta: Int) {
+	static func selectAdjacentDocument(delta: Int) {
 		let documents = itsyDocuments()
 		guard !documents.isEmpty, let selected = selectedDocument(), let index = documents.firstIndex(where: { $0 === selected }) else {
 			return
@@ -194,14 +190,14 @@ final class ItsyTabCoordinator {
 		selectDocument(ObjectIdentifier(documents[next]))
 	}
 
-	private func selectDocument(_ id: ObjectIdentifier) {
+	private static func selectDocument(_ id: ObjectIdentifier) {
 		guard let document = itsyDocuments().first(where: { ObjectIdentifier($0) == id }) else {
 			return
 		}
 		documentController?.showDocument(document)
 	}
 
-	private func closeDocument(_ id: ObjectIdentifier) {
+	private static func closeDocument(_ id: ObjectIdentifier) {
 		guard let document = itsyDocuments().first(where: { ObjectIdentifier($0) == id }) else {
 			return
 		}
@@ -209,15 +205,15 @@ final class ItsyTabCoordinator {
 		refresh()
 	}
 
-	private func itsyDocuments() -> [ItsyDocument] {
+	private static func itsyDocuments() -> [ItsyDocument] {
 		(documentController?.documents ?? []).compactMap { $0 as? ItsyDocument }
 	}
 
-	private func selectedDocument() -> ItsyDocument? {
+	private static func selectedDocument() -> ItsyDocument? {
 		NSApplication.shared.keyWindow?.windowController?.document as? ItsyDocument
 	}
 
-	private func title(for document: ItsyDocument) -> String {
+	private static func title(for document: ItsyDocument) -> String {
 		if let fileName = document.fileURL?.lastPathComponent {
 			return fileName
 		}

@@ -2,13 +2,10 @@ import AppKit
 import Dispatch
 import ItsyEditor
 
-final class ItsyCommandPaletteBridge {
-	static let shared = ItsyCommandPaletteBridge()
-	var showExCommand: ((NSWindow?, @escaping (String?) -> Void) -> Bool)?
+enum ItsyCommandPaletteBridge {
+	static var showExCommand: ((NSWindow?, @escaping (String?) -> Void) -> Bool)?
 
-	private init() {}
-
-	func requestExCommand(relativeTo window: NSWindow?, completion: @escaping (String?) -> Void) -> Bool {
+	static func requestExCommand(relativeTo window: NSWindow?, completion: @escaping (String?) -> Void) -> Bool {
 		showExCommand?(window, completion) ?? false
 	}
 }

@@ -137,7 +137,7 @@ x 2026-06-29 +Phase15-Hardening @bench id:284 est:2h dep:280 Re-run full baselin
 
 ## Phase 16 — Packaging + release
 
-(A) 2026-06-28 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`: bundle id `dev.pico.editor` (or final-name), version 0.1.0, `LSApplicationCategoryType=public.app-category.developer-tools`, `NSAppleEventsUsageDescription` (none, but document), high-resolution capable.
+x 2026-06-29 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`: bundle id `dev.pico.editor` (or final-name), version 0.1.0, `LSApplicationCategoryType=public.app-category.developer-tools`, `NSAppleEventsUsageDescription` (none, but document), high-resolution capable.
 (A) 2026-06-28 +Phase16-Release @release id:301 est:2h dep:300 Code signing: Developer ID Application cert. Build: `codesign --sign "Developer ID Application: <name>" --options runtime --timestamp Pico.app`. Document in `bench/notes/codesign.md`.
 (A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Pico.dmg --apple-id ... --wait` → `xcrun stapler staple Pico.dmg`. Script in `scripts/notarize.sh`.
 (A) 2026-06-28 +Phase16-Release @release id:303 est:2h dep:301 Build DMG via `create-dmg` (brew). Background image optional. Script in `scripts/make_dmg.sh`.

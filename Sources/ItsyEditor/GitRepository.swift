@@ -260,6 +260,10 @@ public struct GitRepository: Sendable {
 		return try GitStatusParser.parse(output)
 	}
 
+	public func snapshot() throws -> GitWorkspaceSnapshot {
+		GitWorkspaceSnapshot(root: root, status: try status())
+	}
+
 	public func diff(path: String, staged: Bool = false) throws -> String {
 		var arguments = ["diff"]
 		if staged {
@@ -281,5 +285,12 @@ public struct GitRepository: Sendable {
 			return
 		}
 		_ = try runner.runGit(arguments: ["restore", "--staged", "--"] + paths, root: root)
+	}
+
+	public static func discoverRoot(containing url: URL, runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL {
+		let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
+		let root = values?.isDirectory == true ? url : url.deletingLastPathComponent()
+		let output = try runner.runGit(arguments: ["rev-parse", "--show-toplevel"], root: root)
+		return URL(fileURLWithPath: output.trimmingCharacters(in: .whitespacesAndNewlines), isDirectory: true)
 	}
 }

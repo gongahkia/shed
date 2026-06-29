@@ -60,6 +60,34 @@ import Testing
 	#expect(unstaged.entries.contains(GitStatusEntry(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: "new.txt")))
 }
 
+@Test func gitWorkspaceSnapshotLooksUpEntriesByURL() {
+	let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+	let status = GitStatus(entries: [
+		GitStatusEntry(kind: .ordinary, indexStatus: ".", worktreeStatus: "M", path: "Sources/App.swift"),
+		GitStatusEntry(kind: .renamed, indexStatus: "R", worktreeStatus: ".", path: "Sources/New.swift", originalPath: "Sources/Old.swift"),
+	])
+	let snapshot = GitWorkspaceSnapshot(root: root, status: status)
+
+	#expect(snapshot.relativePath(for: root.appendingPathComponent("Sources/App.swift")) == "Sources/App.swift")
+	#expect(snapshot.entry(for: root.appendingPathComponent("Sources/App.swift"))?.worktreeStatus == "M")
+	#expect(snapshot.entry(for: root.appendingPathComponent("Sources/Old.swift"))?.kind == .renamed)
+	#expect(snapshot.entry(for: URL(fileURLWithPath: "/tmp/other/App.swift")) == nil)
+}
+
+@Test func gitRepositoryDiscoversRootFromNestedDirectory() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	try fixture.git(["init"])
+	let nested = fixture.root.appendingPathComponent("Sources/Nested", isDirectory: true)
+	try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+
+	let root = try GitRepository.discoverRoot(containing: nested)
+
+	#expect(root.standardizedFileURL.path == fixture.root.standardizedFileURL.path)
+}
+
 private final class TemporaryGitFixture {
 	let root: URL
 

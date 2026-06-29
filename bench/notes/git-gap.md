@@ -12,12 +12,13 @@
 - Added a pure `ItsyEditor` Git core that shells out to `/usr/bin/git`.
 - Added porcelain v2 status parsing for branch headers, ordinary entries, renames, unmerged entries, untracked files, staged counts, and unstaged counts.
 - Added status, diff, stage, and unstage repository commands.
+- Added Git root discovery and workspace snapshots with URL-to-status lookup.
+- Wired workspace open to refresh Git status and feed simple file-tree status suffixes.
 - Added parser and real temporary-repository tests.
 
 ## Not done yet
 
 - No Git panel.
-- No file-tree status badges.
 - No gutter hunk indicators.
 - No commit UI.
 - No branch/switch/fetch/pull/push/stash/conflict workflows.

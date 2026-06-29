@@ -42,3 +42,9 @@ Render-path changes in `MetalTextView`:
 - Cache shaped visible-line glyph data by line range, rendering mode, and highlight revision. Cursor blink and repaint over already-shaped visible lines now reuse cached CoreText output.
 
 Remaining allocation hotspot is initial full-file syntax highlight materialization for `large.ts`, not instance upload. The largest app-owned categories are `HighlightSpan`, `TextHighlightSpan`, `Substring`, and `String` storage produced while parsing/highlighting the 100k-line file and handling the edit.
+
+## 2026-06-29 idle memory update
+
+- Default glyph atlas size is now `1024x1024` instead of `2048x2048`.
+- [Inference] On Retina/grayscale this reduces the initial glyph atlas texture from about 4 MB to 1 MB; on non-Retina/subpixel it reduces the page from about 16 MB to 4 MB.
+- Shaped-line cache cap is now 512 visible-line entries instead of 2048 to reduce retained CoreText-derived glyph arrays after large-file scrolling.

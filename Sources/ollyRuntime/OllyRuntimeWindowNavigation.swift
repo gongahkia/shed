@@ -59,18 +59,25 @@ extension OllyRuntime {
             targetID: targetID,
             windows: windows
         )
-        await applyLayoutOrder(nextOrder, windows: windows)
+        try await applyLayoutOrder(nextOrder, windows: windows)
         try await arrange(displayID: displayID)
     }
 
-    private func applyLayoutOrder(_ orderedIDs: [WindowID], windows: [WindowState]) async {
+    private func applyLayoutOrder(_ orderedIDs: [WindowID], windows: [WindowState]) async throws {
         let windowsByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
+        var updatedWindows: [WindowState] = []
         for (index, windowID) in orderedIDs.enumerated() {
             guard let window = windowsByID[windowID], window.layoutOrder != index else {
+                if let window = windowsByID[windowID] {
+                    updatedWindows.append(window)
+                }
                 continue
             }
-            await windowStore.upsert(window.withLayoutOrder(index))
+            let updated = window.withLayoutOrder(index)
+            updatedWindows.append(updated)
+            await windowStore.upsert(updated)
         }
+        try await statePersistence.upsertLayoutOrders(for: updatedWindows)
     }
 
     private func reorderedWindowIDs(
@@ -120,63 +127,52 @@ extension OllyRuntime {
         windows: [WindowState],
         focusedWindowID: WindowID
     ) async throws -> WindowID {
-        let framesByID = await latestFramesByWindowID(displayID: displayID, windows: windows)
-        guard let sourceFrame = framesByID[focusedWindowID] else {
+        let geometry = await latestGeometry(displayID: displayID, windows: windows)
+        guard let sourceFrame = geometry.framesByID[focusedWindowID] else {
             throw OllyRuntimeError.missingFocusedWindow
         }
-        let sourceCenter = sourceFrame.center
-        let candidates = windows.filter { window in
-            guard window.id != focusedWindowID,
-                  let frame = framesByID[window.id] else {
-                return false
-            }
-            return direction.containsCandidate(source: sourceCenter, candidate: frame.center)
-        }
-        guard let best = candidates.min(by: { lhs, rhs in
-            let lhsScore = direction.score(source: sourceCenter, candidate: framesByID[lhs.id]?.center ?? .zero)
-            let rhsScore = direction.score(source: sourceCenter, candidate: framesByID[rhs.id]?.center ?? .zero)
-            return lhsScore == rhsScore ? lhs.id < rhs.id : lhsScore < rhsScore
-        }) else {
+        let resolver = DirectionalTargetResolver(
+            direction: direction,
+            sourceID: focusedWindowID,
+            sourceFrame: sourceFrame,
+            windows: windows,
+            framesByID: geometry.framesByID,
+            hiddenWindowIDs: geometry.hiddenWindowIDs
+        )
+        guard let best = resolver.target() else {
             throw OllyRuntimeError.missingDirectionalTarget(direction)
         }
-        return best.id
+        return best
     }
 
-    private func latestFramesByWindowID(
+    private func latestGeometry(
         displayID: DisplayID,
         windows: [WindowState]
-    ) async -> [WindowID: CGRect] {
+    ) async -> RuntimeWindowGeometry {
         var frames = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0.frame) })
+        var hiddenWindowIDs = Set<WindowID>()
         if let snapshot = await engineHost.snapshot(displayID: displayID) {
-            for placement in snapshot.placements where !placement.placement.hidden {
-                frames[placement.window.id] = placement.placement.frame
+            for placement in snapshot.placements {
+                if placement.placement.hidden {
+                    hiddenWindowIDs.insert(placement.window.id)
+                    frames[placement.window.id] = nil
+                } else {
+                    frames[placement.window.id] = placement.placement.frame
+                }
             }
         }
-        return frames
+        return RuntimeWindowGeometry(framesByID: frames, hiddenWindowIDs: hiddenWindowIDs)
     }
+}
+
+private struct RuntimeWindowGeometry {
+    let framesByID: [WindowID: CGRect]
+    let hiddenWindowIDs: Set<WindowID>
 }
 
 private enum WindowReorderOperation {
     case move
     case swap
-}
-
-private extension WindowState {
-    func withLayoutOrder(_ layoutOrder: Int) -> WindowState {
-        WindowState(
-            id: id,
-            processID: processID,
-            bundleID: bundleID,
-            displayID: displayID,
-            tagMask: tagMask,
-            isFloating: isFloating,
-            layoutOrder: layoutOrder,
-            frame: frame,
-            title: title,
-            role: role,
-            subrole: subrole
-        )
-    }
 }
 
 private extension IPCDirection {
@@ -189,37 +185,150 @@ private extension IPCDirection {
         }
     }
 
-    func containsCandidate(source: CGPoint, candidate: CGPoint) -> Bool {
+    func containsCandidate(source: CGRect, candidate: CGRect) -> Bool {
         switch self {
         case .left:
-            return candidate.x < source.x
+            return candidate.midX < source.midX
         case .right:
-            return candidate.x > source.x
+            return candidate.midX > source.midX
         case .upward:
-            return candidate.y < source.y
+            return candidate.midY < source.midY
         case .downward:
-            return candidate.y > source.y
+            return candidate.midY > source.midY
         case .next, .previous:
             return false
         }
     }
+}
 
-    func score(source: CGPoint, candidate: CGPoint) -> CGFloat {
-        let deltaX = candidate.x - source.x
-        let deltaY = candidate.y - source.y
-        switch self {
-        case .left, .right:
-            return abs(deltaX) * 1_000 + abs(deltaY)
-        case .upward, .downward:
-            return abs(deltaY) * 1_000 + abs(deltaX)
+private struct DirectionalTargetResolver {
+    let direction: IPCDirection
+    let sourceID: WindowID
+    let sourceFrame: CGRect
+    let windows: [WindowState]
+    let framesByID: [WindowID: CGRect]
+    let hiddenWindowIDs: Set<WindowID>
+
+    func target() -> WindowID? {
+        windows.compactMap(candidate).min { lhs, rhs in
+            lhs.score == rhs.score ? lhs.window.id < rhs.window.id : lhs.score < rhs.score
+        }?.window.id
+    }
+
+    private func candidate(_ window: WindowState) -> DirectionalTargetCandidate? {
+        guard window.id != sourceID,
+              !hiddenWindowIDs.contains(window.id),
+              let frame = framesByID[window.id],
+              direction.containsCandidate(source: sourceFrame, candidate: frame) else {
+            return nil
+        }
+        return DirectionalTargetCandidate(
+            window: window,
+            score: DirectionalTargetScore(direction: direction, source: sourceFrame, candidate: frame, window: window)
+        )
+    }
+}
+
+private struct DirectionalTargetCandidate {
+    let window: WindowState
+    let score: DirectionalTargetScore
+}
+
+private struct DirectionalTargetScore: Comparable {
+    let perpendicularRank: Int
+    let primaryGap: CGFloat
+    let perpendicularGap: CGFloat
+    let primaryCenterDistance: CGFloat
+    let layoutOrder: Int
+    let windowID: WindowID
+
+    init(direction: IPCDirection, source: CGRect, candidate: CGRect, window: WindowState) {
+        let metrics = DirectionalMetrics(direction: direction, source: source, candidate: candidate)
+        self.perpendicularRank = metrics.perpendicularOverlap > 0 ? 0 : 1
+        self.primaryGap = metrics.primaryGap
+        self.perpendicularGap = metrics.perpendicularGap
+        self.primaryCenterDistance = metrics.primaryCenterDistance
+        self.layoutOrder = window.layoutOrder ?? Int(window.id)
+        self.windowID = window.id
+    }
+
+    static func < (lhs: DirectionalTargetScore, rhs: DirectionalTargetScore) -> Bool {
+        if lhs.perpendicularRank != rhs.perpendicularRank {
+            return lhs.perpendicularRank < rhs.perpendicularRank
+        }
+        if lhs.primaryGap != rhs.primaryGap {
+            return lhs.primaryGap < rhs.primaryGap
+        }
+        if lhs.perpendicularGap != rhs.perpendicularGap {
+            return lhs.perpendicularGap < rhs.perpendicularGap
+        }
+        if lhs.primaryCenterDistance != rhs.primaryCenterDistance {
+            return lhs.primaryCenterDistance < rhs.primaryCenterDistance
+        }
+        if lhs.layoutOrder != rhs.layoutOrder {
+            return lhs.layoutOrder < rhs.layoutOrder
+        }
+        return lhs.windowID < rhs.windowID
+    }
+}
+
+private struct DirectionalMetrics {
+    let primaryGap: CGFloat
+    let perpendicularGap: CGFloat
+    let perpendicularOverlap: CGFloat
+    let primaryCenterDistance: CGFloat
+
+    init(direction: IPCDirection, source: CGRect, candidate: CGRect) {
+        switch direction {
+        case .left:
+            self.primaryGap = max(0, source.minX - candidate.maxX)
+            self.primaryCenterDistance = abs(source.midX - candidate.midX)
+            self.perpendicularOverlap = source.verticalOverlap(with: candidate)
+            self.perpendicularGap = source.verticalGap(to: candidate)
+        case .right:
+            self.primaryGap = max(0, candidate.minX - source.maxX)
+            self.primaryCenterDistance = abs(candidate.midX - source.midX)
+            self.perpendicularOverlap = source.verticalOverlap(with: candidate)
+            self.perpendicularGap = source.verticalGap(to: candidate)
+        case .upward:
+            self.primaryGap = max(0, source.minY - candidate.maxY)
+            self.primaryCenterDistance = abs(source.midY - candidate.midY)
+            self.perpendicularOverlap = source.horizontalOverlap(with: candidate)
+            self.perpendicularGap = source.horizontalGap(to: candidate)
+        case .downward:
+            self.primaryGap = max(0, candidate.minY - source.maxY)
+            self.primaryCenterDistance = abs(candidate.midY - source.midY)
+            self.perpendicularOverlap = source.horizontalOverlap(with: candidate)
+            self.perpendicularGap = source.horizontalGap(to: candidate)
         case .next, .previous:
-            return .greatestFiniteMagnitude
+            self.primaryGap = .greatestFiniteMagnitude
+            self.perpendicularGap = .greatestFiniteMagnitude
+            self.perpendicularOverlap = 0
+            self.primaryCenterDistance = .greatestFiniteMagnitude
         }
     }
 }
 
 private extension CGRect {
-    var center: CGPoint {
-        CGPoint(x: midX, y: midY)
+    func horizontalOverlap(with other: CGRect) -> CGFloat {
+        max(0, min(maxX, other.maxX) - max(minX, other.minX))
+    }
+
+    func verticalOverlap(with other: CGRect) -> CGFloat {
+        max(0, min(maxY, other.maxY) - max(minY, other.minY))
+    }
+
+    func horizontalGap(to other: CGRect) -> CGFloat {
+        if horizontalOverlap(with: other) > 0 {
+            return 0
+        }
+        return other.maxX < minX ? minX - other.maxX : other.minX - maxX
+    }
+
+    func verticalGap(to other: CGRect) -> CGFloat {
+        if verticalOverlap(with: other) > 0 {
+            return 0
+        }
+        return other.maxY < minY ? minY - other.maxY : other.minY - maxY
     }
 }

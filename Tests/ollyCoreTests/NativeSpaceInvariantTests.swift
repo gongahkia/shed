@@ -74,8 +74,9 @@ final class NativeSpaceInvariantTests: XCTestCase {
         let result = await invariant.verify()
 
         XCTAssertFalse(result.isVerified)
+        XCTAssertFalse(result.isProviderSupported)
         XCTAssertNil(result.expectedSpaceID)
-        XCTAssertEqual(result.issues, [.unknownSpace(windowID: 1)])
+        XCTAssertEqual(result.issues, [.unsupportedNativeSpaces(windowID: 1)])
     }
 
     private func window(id: WindowID) -> WindowState {

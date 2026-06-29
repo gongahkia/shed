@@ -23,6 +23,7 @@ final class WindowTagPersistenceTests: XCTestCase {
         XCTAssertEqual(loaded.rules, [rule])
         XCTAssertTrue(json.contains("\"version\" : 1"))
         XCTAssertTrue(json.contains("\"tags\" : 2"))
+        XCTAssertTrue(json.contains("\"layoutOrders\""))
     }
 
     func testUpsertReplacesExistingRule() async throws {
@@ -66,6 +67,39 @@ final class WindowTagPersistenceTests: XCTestCase {
 
         XCTAssertTrue(rule.matches(processID: 99, bundleID: "com.example.App", title: "a+b"))
         XCTAssertFalse(rule.matches(processID: 99, bundleID: "com.example.App", title: "aaab"))
+    }
+
+    func testLayoutOrderPersistsByStableWindowIdentity() async throws {
+        let stateURL = temporaryStateURL()
+        let persistence = WindowTagPersistence(stateURL: stateURL)
+        let window = WindowState(
+            id: 100,
+            processID: 42,
+            bundleID: "com.example.App",
+            displayID: 7,
+            tagMask: 3,
+            layoutOrder: 2,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            title: " Docs ",
+            role: "AXWindow",
+            subrole: "AXStandardWindow"
+        )
+        let restartedWindow = WindowState(
+            id: 200,
+            processID: 99,
+            bundleID: "com.example.App",
+            displayID: 7,
+            tagMask: 3,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100),
+            title: "Docs",
+            role: "AXWindow",
+            subrole: "AXStandardWindow"
+        )
+
+        try await persistence.upsertLayoutOrders(for: [window])
+        let layoutOrder = try await persistence.layoutOrder(for: restartedWindow)
+
+        XCTAssertEqual(layoutOrder, 2)
     }
 
     func testInvalidRegexThrows() {

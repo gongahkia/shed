@@ -49,8 +49,36 @@ extension OllyRuntime {
         return IPCStateSnapshot(displays: displays, windows: windows, focusedWindowID: focusedWindowID)
     }
 
-    func setFocusedWindow(_ windowID: WindowID?) {
+    func persistedState() async throws -> WindowTagPersistenceState {
+        try await statePersistence.load()
+    }
+
+    func setFocusedWindow(
+        _ windowID: WindowID?,
+        displayID: DisplayID? = nil,
+        tagMask: UInt64? = nil,
+        publish: Bool = false
+    ) async {
         focusedWindowID = windowID
+        guard publish else {
+            return
+        }
+        if let windowID, let displayID {
+            let activeTags: UInt64
+            if let tagMask {
+                activeTags = tagMask
+            } else {
+                activeTags = await tagStore.activeTags(on: displayID).rawValue
+            }
+            await focusStack.recordFocus(windowID: windowID, displayID: displayID, tagMask: activeTags)
+            await eventHub.publish(
+                .focus(IPCFocusEvent(focusedWindowID: windowID, displayID: displayID, tagMask: activeTags))
+            )
+        } else {
+            await eventHub.publish(
+                .focus(IPCFocusEvent(focusedWindowID: windowID, displayID: displayID, tagMask: tagMask))
+            )
+        }
     }
 
     func switchTag(_ command: IPCTagCommand) async throws {
@@ -90,6 +118,7 @@ extension OllyRuntime {
         let windowID = try command.windowID ?? focusedWindowID.requiredFocusedWindow()
         let tag = try Tag(index: Int(command.tag.rawValue))
         let state = try await assignment.assign(window: windowID, tags: TagSet(tag))
+        try await statePersistence.upsertLayoutOrders(for: [state])
         let displayID = command.displayID ?? state.displayID ?? selectedDisplay(nil)?.id
         if let displayID {
             try await applyAndArrange(displayID: displayID)
@@ -169,11 +198,18 @@ extension OllyRuntime {
             return
         }
         let snapshot = await stateSnapshot(displayID: nil)
-        for window in snapshot.windows {
-            let event = IPCEvent.focus(IPCFocusEvent(focusedWindowID: window.windowID, displayID: window.displayID))
-            if let data = try? JSONEncoder().encode(IPCEventEnvelope(event: event)) {
-                connection.sendLine(data)
+        let focusedWindow = snapshot.focusedWindowID.flatMap { id in
+            snapshot.windows.first { $0.windowID == id }
+        }
+        let event = IPCEvent.focus(IPCFocusEvent(
+            focusedWindowID: snapshot.focusedWindowID,
+            displayID: focusedWindow?.displayID,
+            tagMask: focusedWindow?.tags.reduce(UInt64(0)) { mask, tag in
+                mask | (UInt64(1) << UInt64(tag.rawValue))
             }
+        ))
+        if let data = try? JSONEncoder().encode(IPCEventEnvelope(event: event)) {
+            connection.sendLine(data)
         }
     }
 }

@@ -15,6 +15,7 @@ public enum NativeSpaceDriftPolicy: Equatable, Sendable {
 }
 
 public enum NativeSpaceInvariantIssue: Equatable, Sendable {
+    case unsupportedNativeSpaces(windowID: WindowID)
     case unknownSpace(windowID: WindowID)
     case drifted(windowID: WindowID, expected: NativeSpaceID, actual: NativeSpaceID)
 }
@@ -24,18 +25,44 @@ public struct NativeSpaceInvariantResult: Equatable, Sendable {
     public let issues: [NativeSpaceInvariantIssue]
     public let rehomedWindowIDs: [WindowID]
     public let unmanagedWindowIDs: [WindowID]
+    public let isProviderSupported: Bool
 
     public var isVerified: Bool {
-        expectedSpaceID != nil && issues.isEmpty
+        isProviderSupported && expectedSpaceID != nil && issues.isEmpty
+    }
+
+    public init(
+        expectedSpaceID: NativeSpaceID?,
+        issues: [NativeSpaceInvariantIssue],
+        rehomedWindowIDs: [WindowID],
+        unmanagedWindowIDs: [WindowID],
+        isProviderSupported: Bool = true
+    ) {
+        self.expectedSpaceID = expectedSpaceID
+        self.issues = issues
+        self.rehomedWindowIDs = rehomedWindowIDs
+        self.unmanagedWindowIDs = unmanagedWindowIDs
+        self.isProviderSupported = isProviderSupported
     }
 }
 
 public protocol WindowNativeSpaceProviding {
+    var isSupported: Bool { get }
     func nativeSpaceID(for window: WindowState) async -> NativeSpaceID?
+}
+
+public extension WindowNativeSpaceProviding {
+    var isSupported: Bool {
+        true
+    }
 }
 
 public struct PublicWindowNativeSpaceProvider: WindowNativeSpaceProviding {
     public init() {}
+
+    public var isSupported: Bool {
+        false
+    }
 
     public func nativeSpaceID(for window: WindowState) async -> NativeSpaceID? {
         nil
@@ -68,6 +95,16 @@ public actor NativeSpaceInvariant {
 
     public func verify(expectedSpaceID: NativeSpaceID? = nil) async -> NativeSpaceInvariantResult {
         let windows = await windowStore.allWindows()
+        guard spaceProvider.isSupported else {
+            return NativeSpaceInvariantResult(
+                expectedSpaceID: nil,
+                issues: windows.map { .unsupportedNativeSpaces(windowID: $0.id) },
+                rehomedWindowIDs: [],
+                unmanagedWindowIDs: [],
+                isProviderSupported: false
+            )
+        }
+
         var baseline = expectedSpaceID
         var issues: [NativeSpaceInvariantIssue] = []
         var rehomedWindowIDs: [WindowID] = []

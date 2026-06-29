@@ -52,7 +52,7 @@ final class ProjectFindController: NSObject {
 		contentView.onOpenMatch = { [weak self] match in self?.openFile(match.url) }
 		panel.contentView = contentView
 		panel.findDelegate = self
-		panel.title = "Find in Project"
+		panel.title = L10n.string("Find in Project")
 		panel.isReleasedWhenClosed = false
 		panel.minSize = NSSize(width: 520, height: 260)
 		panel.delegate = self
@@ -72,7 +72,7 @@ final class ProjectFindController: NSObject {
 	private func updateStatusForCurrentWorkspace() {
 		guard let root = workspaceURL() else {
 			contentView?.setResults([])
-			contentView?.setStatus("Open a folder first")
+			contentView?.setStatus(L10n.string("Open a folder first"))
 			return
 		}
 		contentView?.setResults([])
@@ -88,10 +88,10 @@ final class ProjectFindController: NSObject {
 		}
 		guard let root = workspaceURL() else {
 			contentView?.setResults([])
-			contentView?.setStatus("Open a folder first")
+			contentView?.setStatus(L10n.string("Open a folder first"))
 			return
 		}
-		contentView?.setStatus("Searching...")
+		contentView?.setStatus(L10n.string("Searching..."))
 		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
 			let matches = ProjectFind.search(root: root, options: ProjectFindOptions(query: query))
 			DispatchQueue.main.async { [weak self] in
@@ -99,7 +99,7 @@ final class ProjectFindController: NSObject {
 					return
 				}
 				self.contentView?.setResults(matches)
-				self.contentView?.setStatus("\(matches.count) matches")
+				self.contentView?.setStatus(L10n.string("\(matches.count) matches"))
 			}
 		}
 	}
@@ -169,7 +169,7 @@ final class ProjectFindView: NSView {
 		wantsLayer = true
 		layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
-		queryField.placeholderString = "Find in project"
+		queryField.placeholderString = L10n.string("Find in project")
 		queryField.font = .systemFont(ofSize: 15)
 		queryField.isBordered = true
 		queryField.focusRingType = .default

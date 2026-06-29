@@ -22,6 +22,12 @@ if [[ -z "$identity" ]]; then
 	identity="${identities[0]}"
 fi
 
+if [[ -d "$app_dir/Contents/Frameworks" ]]; then
+	while IFS= read -r -d '' code_path; do
+		codesign --force --sign "$identity" --options runtime --timestamp "$code_path"
+	done < <(find "$app_dir/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm -111 \) -print0)
+fi
+
 codesign --force --sign "$identity" --options runtime --timestamp "$app_dir"
 codesign --verify --deep --strict --verbose=2 "$app_dir"
 codesign -dvvv --entitlements :- "$app_dir"

@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: brew install create-dmg
+      - name: Import Developer ID certificate
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_APPLICATION_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          : "${CERTIFICATE_BASE64:?missing DEVELOPER_ID_APPLICATION_CERTIFICATE_BASE64}"
+          : "${CERTIFICATE_PASSWORD:?missing DEVELOPER_ID_APPLICATION_CERTIFICATE_PASSWORD}"
+          : "${KEYCHAIN_PASSWORD:?missing KEYCHAIN_PASSWORD}"
+          keychain="$RUNNER_TEMP/itsy-signing.keychain-db"
+          cert_path="$RUNNER_TEMP/developer-id.p12"
+          echo "$CERTIFICATE_BASE64" | base64 -D > "$cert_path"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$keychain"
+          security import "$cert_path" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+          security list-keychains -d user -s "$keychain" login.keychain-db
+          security default-keychain -s "$keychain"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
+          security find-identity -v -p codesigning "$keychain"
+      - name: Test
+        run: swift test
+      - name: Build app
+        run: |
+          swift build -c release
+          bench/scripts/make_app.sh
+      - name: Verify tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
+          test "v$version" = "$GITHUB_REF_NAME"
+      - name: Sign app
+        env:
+          ITSY_CODESIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}
+        run: scripts/codesign.sh
+      - name: Build DMG
+        env:
+          ITSY_CODESIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}
+        run: scripts/make_dmg.sh
+      - name: Notarize and staple
+        env:
+          ITSY_NOTARY_APPLE_ID: ${{ secrets.APPLE_ID }}
+          ITSY_NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ITSY_NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: scripts/notarize.sh
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Itsy DMG
+          path: |
+            dist/*.dmg
+            dist/*.sha256
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.sha256 --title "$GITHUB_REF_NAME" --notes "Itsy $GITHUB_REF_NAME"

@@ -3,6 +3,7 @@
 *.xcodeproj/
 DerivedData/
 Itsy.app/
+dist/
 bench/traces/*.trace/
 bench/corpus/huge.log
 bench/results/*.json

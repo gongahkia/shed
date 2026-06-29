@@ -142,7 +142,7 @@ x 2026-06-29 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`:
 (A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Itsy.dmg --apple-id ... --wait` → `xcrun stapler staple Itsy.dmg`. Script in `scripts/notarize.sh`.
 x 2026-06-29 +Phase16-Release @release id:303 est:2h dep:301 Build DMG via `create-dmg` (brew). Background image optional. Script in `scripts/make_dmg.sh`.
 x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with itsy vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
-(A) 2026-06-28 +Phase16-Release @release id:305 est:3h dep:303 GitHub Release workflow: `.github/workflows/release.yml` triggered on tag `v*.*.*`. Builds release, signs, notarizes, stapes, uploads DMG + SHA256.
+x 2026-06-29 +Phase16-Release @release id:305 est:3h dep:303 GitHub Release workflow: `.github/workflows/release.yml` triggered on tag `v*.*.*`. Builds release, signs, notarizes, staples, uploads DMG + SHA256.
 (B) 2026-06-28 +Phase16-Release @release id:306 est:3h dep:305 Sparkle integration: vendor Sparkle XPC service, point at `https://<host>/appcast.xml`. Defer publishing infra to v0.2 if no host yet.
 (B) 2026-06-28 +Phase16-Release @release id:307 est:3h dep:304 Submit Homebrew cask: open PR against `homebrew/homebrew-cask` per their docs.
 (C) 2026-06-28 +Phase16-Release @release id:308 est:2h dep:304 Pick a final name (NORTHSTAR.md "codename itsy"). Decide via short list, register a domain if available. Rebrand bundle id, repo name, README.

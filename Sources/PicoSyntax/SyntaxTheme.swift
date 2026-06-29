@@ -41,6 +41,9 @@ public struct SyntaxColor: Sendable, Equatable {
 
 public struct SyntaxTheme: Sendable, Equatable {
 	public var colors: [String: SyntaxColor]
+	public static let selectedThemeDefaultsKey = "dev.pico.editor.syntaxTheme"
+	public static let userThemeDirectoryName = "themes"
+	public static let defaultChoiceID = "bundled:default-dark"
 
 	public init(colors: [String: SyntaxColor]) {
 		self.colors = colors
@@ -69,6 +72,15 @@ public struct SyntaxTheme: Sendable, Equatable {
 	}
 
 	public static func loadUserOrDefault(fileManager: FileManager = .default) throws -> SyntaxTheme {
+		try loadSelectedOrDefault(fileManager: fileManager)
+	}
+
+	public static func loadSelectedOrDefault(defaults: UserDefaults = .standard, fileManager: FileManager = .default) throws -> SyntaxTheme {
+		if let selectedID = defaults.string(forKey: selectedThemeDefaultsKey), !selectedID.isEmpty {
+			if let selectedTheme = try? loadChoice(id: selectedID, fileManager: fileManager) {
+				return selectedTheme
+			}
+		}
 		let url = fileManager.homeDirectoryForCurrentUser
 			.appendingPathComponent(".config")
 			.appendingPathComponent("pico")
@@ -77,6 +89,49 @@ public struct SyntaxTheme: Sendable, Equatable {
 			return try parse(String(contentsOf: url, encoding: .utf8))
 		}
 		return try loadDefaultDark()
+	}
+
+	public static func availableChoices(fileManager: FileManager = .default) -> [SyntaxThemeChoice] {
+		var choices = [
+			SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark"),
+			SyntaxThemeChoice(id: "bundled:default-light", displayName: "Default Light"),
+		]
+		let userThemesURL = userThemesDirectory(fileManager: fileManager)
+		let urls = (try? fileManager.contentsOfDirectory(
+			at: userThemesURL,
+			includingPropertiesForKeys: nil,
+			options: [.skipsHiddenFiles]
+		)) ?? []
+		let userChoices = urls
+			.filter { $0.pathExtension == "toml" }
+			.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+			.map { url in
+				SyntaxThemeChoice(
+					id: "user:\(url.lastPathComponent)",
+					displayName: url.deletingPathExtension().lastPathComponent
+				)
+			}
+		choices.append(contentsOf: userChoices)
+		return choices
+	}
+
+	public static func userThemesDirectory(fileManager: FileManager = .default) -> URL {
+		fileManager.homeDirectoryForCurrentUser
+			.appendingPathComponent(".config")
+			.appendingPathComponent("pico")
+			.appendingPathComponent(userThemeDirectoryName, isDirectory: true)
+	}
+
+	public static func loadChoice(id: String, fileManager: FileManager = .default) throws -> SyntaxTheme {
+		if id.hasPrefix("bundled:") {
+			return try loadBundled(name: String(id.dropFirst("bundled:".count)))
+		}
+		if id.hasPrefix("user:") {
+			let fileName = String(id.dropFirst("user:".count))
+			let url = userThemesDirectory(fileManager: fileManager).appendingPathComponent(fileName)
+			return try parse(String(contentsOf: url, encoding: .utf8))
+		}
+		throw SyntaxThemeError.themeLoadFailed(id)
 	}
 
 	public static func loadBundled(name: String) throws -> SyntaxTheme {
@@ -126,5 +181,15 @@ public struct SyntaxTheme: Sendable, Equatable {
 			return String(value.dropFirst().dropLast())
 		}
 		return value
+	}
+}
+
+public struct SyntaxThemeChoice: Sendable, Equatable {
+	public var id: String
+	public var displayName: String
+
+	public init(id: String, displayName: String) {
+		self.id = id
+		self.displayName = displayName
 	}
 }

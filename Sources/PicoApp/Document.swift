@@ -178,6 +178,11 @@ final class PicoDocument: NSDocument {
 		editorViews.removeAll { $0 === view }
 	}
 
+	func reloadSyntaxTheme() {
+		syntaxTheme = nil
+		refreshSyntaxHighlights()
+	}
+
 	private func syncSiblingEditorViews(source: MetalTextView, editor: Editor) {
 		for view in editorViews where view !== source {
 			var siblingEditor = editor

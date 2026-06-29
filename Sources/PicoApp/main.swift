@@ -9,6 +9,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
+	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
+		self?.reloadSyntaxThemes()
+	}
 	private lazy var projectFind = ProjectFindController(
 		workspaceURL: { PicoWorkspaceController.shared.currentRootURL },
 		openFile: { [weak self] url in _ = self?.documentController.openDocument(at: url) }
@@ -89,6 +92,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
+				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
+					self?.showSettings(nil)
+				},
 					Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in
 						self?.toggleFindBar(nil)
 					},
@@ -153,6 +159,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func showProjectFind(_ sender: Any?) {
 		projectFind.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	@objc private func showSettings(_ sender: Any?) {
+		settingsWindow.showWindow(sender)
+	}
+
+	private func reloadSyntaxThemes() {
+		for document in documentController.documents {
+			(document as? PicoDocument)?.reloadSyntaxTheme()
+		}
 	}
 
 	private func openInitialDocument() {
@@ -220,6 +236,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
+		let settingsItem = appMenu.addItem(withTitle: L10n.string("Settings..."), action: #selector(showSettings(_:)), keyEquivalent: ",")
+		settingsItem.target = self
+		appMenu.addItem(.separator())
 		appMenu.addItem(withTitle: L10n.string("Quit Pico"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 		appItem.submenu = appMenu
 

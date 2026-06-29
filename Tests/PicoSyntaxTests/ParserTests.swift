@@ -83,6 +83,20 @@ import Testing
 	#expect(parsed.color(for: "variable.parameter") == parameter)
 }
 
+@Test func syntaxThemeListsAndLoadsSelectedBundledChoice() throws {
+	let choices = SyntaxTheme.availableChoices()
+	#expect(choices.contains(SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark")))
+	#expect(choices.contains(SyntaxThemeChoice(id: "bundled:default-light", displayName: "Default Light")))
+
+	let suiteName = "dev.pico.editor.tests.theme.\(UUID().uuidString)"
+	let defaults = try #require(UserDefaults(suiteName: suiteName))
+	defer { defaults.removePersistentDomain(forName: suiteName) }
+	defaults.set("bundled:default-light", forKey: SyntaxTheme.selectedThemeDefaultsKey)
+
+	let selected = try SyntaxTheme.loadSelectedOrDefault(defaults: defaults)
+	#expect(selected == (try SyntaxTheme.loadDefaultLight()))
+}
+
 @Test func syntaxPipelineDetectsLanguageAndAllocatesParserLazily() throws {
 	let url = URL(fileURLWithPath: "/tmp/example.ts")
 	let language = try #require(SyntaxPipeline.language(forFileURL: url))

@@ -151,7 +151,7 @@ x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`:
 
 ## Cross-cutting
 
-(B) 2026-06-28 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has ASCII; add SVG via excalidraw export, commit to `docs/arch.svg`).
+x 2026-06-29 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has ASCII; add SVG via excalidraw export, commit to `docs/arch.svg`).
 (B) 2026-06-28 +XCut @docs id:401 est:1h `docs/keymap-reference.md` auto-generated from the three TOML profiles (write a tiny Swift script `scripts/gen_keymap_docs.swift`).
 (B) 2026-06-28 +XCut @i18n id:402 est:2h Localization: pin `en` only for v0.1. Use `String(localized:)` for all user-visible strings so future locales are mechanical.
 (C) 2026-06-28 +XCut @a11y id:403 est:3h VoiceOver: implement `accessibilityLabel`, `accessibilityRole`, `accessibilityValue` on `MetalTextView` per `NSAccessibilityElement` protocol. At minimum: read current line.

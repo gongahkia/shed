@@ -76,6 +76,7 @@ public struct UnixDomainSocketClient: Sendable {
         let descriptor = try IPCPOSIX.openUnixStreamSocket()
         do {
             try IPCPOSIX.setCloseOnExec(descriptor)
+            try IPCPOSIX.setSocketTimeout(timeout, on: descriptor)
             try IPCUnixSocketAddress.withSockAddr(path: socketPath.rawValue) { address, length in
                 guard Darwin.connect(descriptor, address, length) == 0 else {
                     throw IPCSocketError.current(function: "connect")

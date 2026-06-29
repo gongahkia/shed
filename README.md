@@ -76,6 +76,7 @@ Itsy is intentionally narrow:
 - Problems panel is in progress; task output can populate compiler-style diagnostics.
 - Declarative extension manifest ABI is in progress; no executable plugin runtime yet.
 - Workspace file/symbol index is in progress; no global symbol UI yet.
+- DAP protocol core is in progress; no integrated debugger UI yet.
 - No Electron, terminal, collaboration, or telemetry.
 
 ## Formatting

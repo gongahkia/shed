@@ -8,3 +8,4 @@ Each file exports `ollyConfig() -> Config` and is compiled by `ConfigLoaderTests
 - `ultrawide-3col.swift`: centered master for wide displays.
 - `multi-display-tags.swift`: tag layout for multiple displays.
 - `plugin-author.swift`: custom engine ID placeholders for plugin authors.
+- `layout-engine-showcase/`: standalone SwiftPM package with three custom layout engines.

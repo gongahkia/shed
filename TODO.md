@@ -141,7 +141,7 @@ x 2026-06-29 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`:
 (A) 2026-06-28 +Phase16-Release @release id:301 est:2h dep:300 Code signing: Developer ID Application cert. Build: `codesign --sign "Developer ID Application: <name>" --options runtime --timestamp Pico.app`. Document in `bench/notes/codesign.md`.
 (A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Pico.dmg --apple-id ... --wait` → `xcrun stapler staple Pico.dmg`. Script in `scripts/notarize.sh`.
 (A) 2026-06-28 +Phase16-Release @release id:303 est:2h dep:301 Build DMG via `create-dmg` (brew). Background image optional. Script in `scripts/make_dmg.sh`.
-(A) 2026-06-28 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with pico vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
+x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with pico vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
 (A) 2026-06-28 +Phase16-Release @release id:305 est:3h dep:303 GitHub Release workflow: `.github/workflows/release.yml` triggered on tag `v*.*.*`. Builds release, signs, notarizes, stapes, uploads DMG + SHA256.
 (B) 2026-06-28 +Phase16-Release @release id:306 est:3h dep:305 Sparkle integration: vendor Sparkle XPC service, point at `https://<host>/appcast.xml`. Defer publishing infra to v0.2 if no host yet.
 (B) 2026-06-28 +Phase16-Release @release id:307 est:3h dep:304 Submit Homebrew cask: open PR against `homebrew/homebrew-cask` per their docs.

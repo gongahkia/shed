@@ -22,6 +22,7 @@ let package = Package(
 		.library(name: "ItsySyntax", type: .static, targets: ["ItsySyntax"]),
 		.library(name: "ItsyKeymap", type: .static, targets: ["ItsyKeymap"]),
 		.library(name: "ItsyLSP", type: .static, targets: ["ItsyLSP"]),
+		.library(name: "ItsyDAP", type: .static, targets: ["ItsyDAP"]),
 		.library(name: "CTreeSitter", type: .static, targets: ["CTreeSitter"]),
 		.library(name: "CTSGrammars", type: .static, targets: ["CTSGrammars"]),
 	],
@@ -37,6 +38,7 @@ let package = Package(
 		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyKeymap", resources: [.process("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyLSP", swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyDAP", swiftSettings: releaseSwiftSettings),
 		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"], swiftSettings: releaseSwiftSettings),
 		.target(
 			name: "CTreeSitter",
@@ -105,6 +107,7 @@ let package = Package(
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
 		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor", "CTSGrammars"]),
 		.testTarget(name: "ItsyLSPTests", dependencies: ["ItsyLSP"]),
+		.testTarget(name: "ItsyDAPTests", dependencies: ["ItsyDAP"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars"]),
 	]
 )

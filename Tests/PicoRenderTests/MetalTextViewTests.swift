@@ -20,6 +20,17 @@ import Testing
 	#expect(!layer.wantsExtendedDynamicRangeContent)
 }
 
+@Test func textViewExposesCurrentLineToAccessibility() throws {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "alpha\nbeta\n")
+	view.selectUTF8Range(6 ..< 6)
+
+	#expect(view.isAccessibilityElement())
+	#expect(view.accessibilityRole() == .textArea)
+	#expect(view.accessibilityLabel() == "Editor")
+	#expect(try #require(view.accessibilityValue() as? String) == "Line 2: beta")
+}
+
 @Test func cursorAndSelectionBuildSolidOverlayInstances() {
 	let view = MetalTextView(frame: .zero)
 	view.setSelectionRects([.init(x: 4, y: 8, width: 20, height: 10)])

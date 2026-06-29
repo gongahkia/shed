@@ -15,7 +15,8 @@ let package = Package(
         .library(name: "ollyCore", targets: ["ollyCore"]),
         .library(name: "ollyLayouts", targets: ["ollyLayouts"]),
         .library(name: "ollyDSL", targets: ["ollyDSL"]),
-        .library(name: "ollyIPC", targets: ["ollyIPC"])
+        .library(name: "ollyIPC", targets: ["ollyIPC"]),
+        .library(name: "ollyRuntime", targets: ["ollyRuntime"])
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2")
@@ -26,9 +27,10 @@ let package = Package(
         .target(name: "ollyLayouts", dependencies: ["ollyCore", "ollyKit"], exclude: ["README.md"]),
         .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyKit", "ollyLayouts"], exclude: ["README.md"]),
         .target(name: "ollyIPC", dependencies: ["ollyKit", "ollyCore", "ollyLayouts"], exclude: ["README.md"]),
+        .target(name: "ollyRuntime", dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"]),
         .executableTarget(
             name: "ollyApp",
-            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"],
+            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC", "ollyRuntime"],
             exclude: ["README.md"]
         ),
         .executableTarget(
@@ -53,6 +55,10 @@ let package = Package(
         .testTarget(name: "ollyCoreTests", dependencies: ["ollyCore"]),
         .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"], exclude: ["Fixtures"]),
         .testTarget(name: "ollyDSLTests", dependencies: ["ollyDSL"]),
-        .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"])
+        .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"]),
+        .testTarget(
+            name: "ollyRuntimeTests",
+            dependencies: ["ollyRuntime", "ollyDSL", "ollyIPC", "ollyKit", "ollyLayouts"]
+        )
     ]
 )

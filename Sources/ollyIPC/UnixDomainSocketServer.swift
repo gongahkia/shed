@@ -2,13 +2,67 @@ import Darwin
 import Dispatch
 import Foundation
 
+public final class UnixDomainSocketServerConnection: @unchecked Sendable {
+    public let id: UUID
+
+    private let descriptor: Int32
+    private let queue: DispatchQueue
+    private let onClose: @Sendable (Int32) -> Void
+    private var isClosed = false
+    private var closeHandlers: [@Sendable () -> Void] = []
+
+    init(descriptor: Int32, queue: DispatchQueue, onClose: @escaping @Sendable (Int32) -> Void) {
+        self.id = UUID()
+        self.descriptor = descriptor
+        self.queue = queue
+        self.onClose = onClose
+    }
+
+    public func sendLine(_ line: Data) {
+        queue.async { [self] in
+            guard !isClosed else {
+                return
+            }
+            try? IPCPOSIX.writeAll(JSONLineCodec.appendLineDelimiter(to: line), to: descriptor)
+        }
+    }
+
+    public func onClose(_ handler: @escaping @Sendable () -> Void) {
+        queue.async { [self] in
+            if isClosed {
+                handler()
+            } else {
+                closeHandlers.append(handler)
+            }
+        }
+    }
+
+    public func close() {
+        queue.async { [descriptor, onClose] in
+            onClose(descriptor)
+        }
+    }
+
+    func markClosedOnQueue() {
+        guard !isClosed else {
+            return
+        }
+        isClosed = true
+        let handlers = closeHandlers
+        closeHandlers.removeAll()
+        handlers.forEach { $0() }
+    }
+}
+
 public final class UnixDomainSocketServer {
     public typealias LineHandler = @Sendable (Data) throws -> Data?
+    public typealias ConnectionLineHandler = @Sendable (UnixDomainSocketServerConnection, Data) async -> Void
 
     public let socketPath: IPCSocketPath
     public let maxLineBytes: Int
 
-    private let handler: LineHandler
+    private let handler: LineHandler?
+    private let connectionHandler: ConnectionLineHandler?
     private let queue: DispatchQueue
     private let queueKey = DispatchSpecificKey<Void>()
     private let fileManager: FileManager
@@ -16,6 +70,7 @@ public final class UnixDomainSocketServer {
     private var listenSource: DispatchSourceRead?
     private var clientSources: [Int32: DispatchSourceRead] = [:]
     private var clientBuffers: [Int32: Data] = [:]
+    private var clientConnections: [Int32: UnixDomainSocketServerConnection] = [:]
 
     public init(
         socketPath: IPCSocketPath = .resolved(),
@@ -28,6 +83,23 @@ public final class UnixDomainSocketServer {
         self.maxLineBytes = maxLineBytes
         self.fileManager = fileManager
         self.handler = handler
+        self.connectionHandler = nil
+        self.queue = DispatchQueue(label: queueLabel)
+        self.queue.setSpecific(key: queueKey, value: ())
+    }
+
+    public init(
+        socketPath: IPCSocketPath = .resolved(),
+        queueLabel: String = "dev.olly.ipc.socket-server",
+        maxLineBytes: Int = 1_048_576,
+        fileManager: FileManager = .default,
+        connectionHandler: @escaping ConnectionLineHandler
+    ) {
+        self.socketPath = socketPath
+        self.maxLineBytes = maxLineBytes
+        self.fileManager = fileManager
+        self.handler = nil
+        self.connectionHandler = connectionHandler
         self.queue = DispatchQueue(label: queueLabel)
         self.queue.setSpecific(key: queueKey, value: ())
     }
@@ -165,8 +237,15 @@ public final class UnixDomainSocketServer {
         source.setEventHandler { [weak self] in
             self?.readAvailableData(from: descriptor)
         }
+        let connection = UnixDomainSocketServerConnection(
+            descriptor: descriptor,
+            queue: queue
+        ) { [weak self] descriptor in
+            self?.closeClient(descriptor)
+        }
         clientSources[descriptor] = source
         clientBuffers[descriptor] = Data()
+        clientConnections[descriptor] = connection
         source.resume()
     }
 
@@ -208,8 +287,13 @@ public final class UnixDomainSocketServer {
         while var buffer = clientBuffers[descriptor], let line = JSONLineCodec.popLine(from: &buffer) {
             clientBuffers[descriptor] = buffer
             do {
-                if let response = try handler(line) {
+                if let handler, let response = try handler(line) {
                     try IPCPOSIX.writeAll(JSONLineCodec.appendLineDelimiter(to: response), to: descriptor)
+                }
+                if let connectionHandler, let connection = clientConnections[descriptor] {
+                    Task {
+                        await connectionHandler(connection, line)
+                    }
                 }
             } catch {
                 closeClient(descriptor)
@@ -222,6 +306,8 @@ public final class UnixDomainSocketServer {
         clientSources[descriptor]?.cancel()
         clientSources[descriptor] = nil
         clientBuffers[descriptor] = nil
+        clientConnections[descriptor]?.markClosedOnQueue()
+        clientConnections[descriptor] = nil
         IPCPOSIX.close(descriptor)
     }
 

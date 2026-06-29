@@ -3,6 +3,7 @@ import Foundation
 import ollyCore
 import ollyKit
 import ollyLayouts
+import ollyRuntime
 
 @main
 enum OllyApp {
@@ -23,6 +24,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let commandPaletteController = CommandPaletteController()
     private let settingsWindowController = SettingsWindowController()
     private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
+    private let runtime = OllyRuntime()
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -32,16 +34,23 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
             },
             onOpenCommandPalette: { [weak self] in
                 self?.commandPaletteController.show()
+            },
+            onRefreshStatus: { [weak self] in
+                self?.refreshStatusFromRuntime()
             }
         )
         statusController?.install()
         installOverviewMode()
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
+        startRuntime()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         overviewKeyMonitor?.remove()
+        Task { [runtime] in
+            await runtime.stop()
+        }
         statusController?.remove()
     }
 
@@ -65,12 +74,39 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
 
         let controller = AXOnboardingWindowController()
         controller.onPermissionGranted = { [weak self] in
-            self?.statusController?.refreshState()
+            self?.refreshStatusFromRuntime()
             self?.onboardingController = nil
         }
         onboardingController = controller
         controller.showWindow(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
+    }
+
+    private func startRuntime() {
+        Task { [runtime, weak self] in
+            do {
+                try await runtime.start()
+                let snapshot = await runtime.menuSnapshot()
+                await self?.renderRuntimeSnapshot(snapshot)
+            } catch {
+                await self?.renderRuntimeError(String(describing: error))
+            }
+        }
+    }
+
+    private func refreshStatusFromRuntime() {
+        Task { [runtime, weak self] in
+            let snapshot = await runtime.menuSnapshot()
+            await self?.renderRuntimeSnapshot(snapshot)
+        }
+    }
+
+    @MainActor private func renderRuntimeSnapshot(_ snapshot: OllyRuntimeMenuSnapshot) {
+        statusController?.apply(snapshot: snapshot)
+    }
+
+    @MainActor private func renderRuntimeError(_ message: String) {
+        statusController?.apply(error: message)
     }
 }
 
@@ -79,18 +115,21 @@ final class OllyStatusMenuController: NSObject {
     private let statusItem: NSStatusItem
     private let onOpenSettings: () -> Void
     private let onOpenCommandPalette: () -> Void
+    private let onRefreshStatus: () -> Void
     private var state = OllyMenuState.default
 
     init(
         displayMonitor: DisplayMonitor = DisplayMonitor(),
         statusItem: NSStatusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength),
         onOpenSettings: @escaping () -> Void = {},
-        onOpenCommandPalette: @escaping () -> Void = {}
+        onOpenCommandPalette: @escaping () -> Void = {},
+        onRefreshStatus: @escaping () -> Void = {}
     ) {
         self.displayMonitor = displayMonitor
         self.statusItem = statusItem
         self.onOpenSettings = onOpenSettings
         self.onOpenCommandPalette = onOpenCommandPalette
+        self.onRefreshStatus = onRefreshStatus
         super.init()
     }
 
@@ -121,6 +160,16 @@ final class OllyStatusMenuController: NSObject {
         rebuildMenu()
     }
 
+    func apply(snapshot: OllyRuntimeMenuSnapshot) {
+        state = OllyMenuState(snapshot: snapshot)
+        rebuildMenu()
+    }
+
+    func apply(error: String) {
+        state = state.with(lastError: error, isIPCServerRunning: false)
+        rebuildMenu()
+    }
+
     private func makeState() -> OllyMenuState {
         let displays = displayMonitor.displays()
         let activeDisplay = displays.first(where: \.isMain) ?? displays.first
@@ -129,7 +178,9 @@ final class OllyStatusMenuController: NSObject {
             displayID: activeDisplay?.id,
             activeTags: [0],
             currentEngineID: FloatingLayoutEngine.engineID,
-            axStatus: AXPermission.status(prompt: false)
+            axStatus: AXPermission.status(prompt: false),
+            isIPCServerRunning: false,
+            lastError: nil
         )
     }
 
@@ -140,6 +191,10 @@ final class OllyStatusMenuController: NSObject {
         menu.addItem(disabledItem("Tags: \(state.tagLabel)"))
         menu.addItem(disabledItem("Engine: \(state.currentEngineID.rawValue)"))
         menu.addItem(disabledItem("AX: \(state.axLabel)"))
+        menu.addItem(disabledItem("IPC: \(state.ipcLabel)"))
+        if let error = state.lastErrorLabel {
+            menu.addItem(disabledItem("Error: \(error)"))
+        }
         menu.addItem(.separator())
         menu.addItem(actionItem("Refresh Status", #selector(refreshStatus)))
         menu.addItem(actionItem("Settings...", #selector(openSettings)))
@@ -165,7 +220,7 @@ final class OllyStatusMenuController: NSObject {
     }
 
     @objc private func refreshStatus() {
-        refreshState()
+        onRefreshStatus()
     }
 
     @objc private func openSettings() {
@@ -204,14 +259,60 @@ struct OllyMenuState: Equatable {
     let activeTags: [UInt8]
     let currentEngineID: LayoutEngineID
     let axStatus: AXPermissionStatus
+    let isIPCServerRunning: Bool
+    let lastError: String?
+
+    init(
+        displayName: String,
+        displayID: DisplayID?,
+        activeTags: [UInt8],
+        currentEngineID: LayoutEngineID,
+        axStatus: AXPermissionStatus,
+        isIPCServerRunning: Bool,
+        lastError: String?
+    ) {
+        self.displayName = displayName
+        self.displayID = displayID
+        self.activeTags = activeTags
+        self.currentEngineID = currentEngineID
+        self.axStatus = axStatus
+        self.isIPCServerRunning = isIPCServerRunning
+        self.lastError = lastError
+    }
 
     static let `default` = OllyMenuState(
         displayName: "No display",
         displayID: nil,
         activeTags: [0],
         currentEngineID: FloatingLayoutEngine.engineID,
-        axStatus: .missing
+        axStatus: .missing,
+        isIPCServerRunning: false,
+        lastError: nil
     )
+
+    init(snapshot: OllyRuntimeMenuSnapshot) {
+        self.init(
+            displayName: snapshot.displayName,
+            displayID: snapshot.displayID,
+            activeTags: snapshot.activeTags,
+            currentEngineID: snapshot.currentEngineID,
+            axStatus: snapshot.axStatus,
+            isIPCServerRunning: snapshot.isIPCServerRunning,
+            lastError: snapshot.lastError
+        )
+    }
+
+    func with(lastError: String?, isIPCServerRunning: Bool) -> OllyMenuState {
+        OllyMenuState(
+            displayName: displayName,
+            displayID: displayID,
+            activeTags: activeTags,
+            currentEngineID: currentEngineID,
+            axStatus: axStatus,
+            isIPCServerRunning: isIPCServerRunning,
+            lastError: lastError
+        )
+    }
 
     var displayLabel: String {
         if let displayID {
@@ -231,5 +332,20 @@ struct OllyMenuState: Equatable {
         case .missing:
             return "Missing"
         }
+    }
+
+    var ipcLabel: String {
+        isIPCServerRunning ? "Running" : "Stopped"
+    }
+
+    var lastErrorLabel: String? {
+        guard let lastError, !lastError.isEmpty else {
+            return nil
+        }
+        let maxLength = 120
+        guard lastError.count > maxLength else {
+            return lastError
+        }
+        return "\(lastError.prefix(maxLength))..."
     }
 }

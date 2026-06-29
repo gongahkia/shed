@@ -79,7 +79,7 @@ final class CommandPaletteController: NSObject {
 			item.run()
 		}
 		panel.contentView = contentView
-		panel.paletteDelegate = self
+		panel.onCancel = { [weak self] in self?.cancel() }
 		panel.title = L10n.string("Command Palette")
 		panel.isReleasedWhenClosed = false
 		panel.hasShadow = true
@@ -126,18 +126,8 @@ extension CommandPaletteController: NSWindowDelegate {
 	}
 }
 
-extension CommandPaletteController: CommandPalettePanelDelegate {
-	func commandPalettePanelDidCancel(_ panel: CommandPalettePanel) {
-		cancel()
-	}
-}
-
-protocol CommandPalettePanelDelegate: AnyObject {
-	func commandPalettePanelDidCancel(_ panel: CommandPalettePanel)
-}
-
 final class CommandPalettePanel: NSPanel {
-	weak var paletteDelegate: CommandPalettePanelDelegate?
+	var onCancel: (() -> Void)?
 
 	override var canBecomeKey: Bool {
 		true
@@ -148,12 +138,12 @@ final class CommandPalettePanel: NSPanel {
 	}
 
 	override func cancelOperation(_ sender: Any?) {
-		paletteDelegate?.commandPalettePanelDidCancel(self)
+		onCancel?()
 	}
 
 	override func keyDown(with event: NSEvent) {
 		if event.keyCode == 53 {
-			paletteDelegate?.commandPalettePanelDidCancel(self)
+			onCancel?()
 			return
 		}
 		super.keyDown(with: event)

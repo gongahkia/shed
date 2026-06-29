@@ -117,3 +117,8 @@ Current section distribution:
 
 - Replaced the private `ProjectFindPanelDelegate` protocol with a panel cancel closure.
 - Static rebase fixups after project-find cancel cleanup: `3718`; target remains `<2000`; result remains fail.
+
+## Command palette cancel cleanup
+
+- Replaced the private `CommandPalettePanelDelegate` protocol with a panel cancel closure while keeping `NSWindowDelegate` for blur dismissal.
+- Static rebase fixups after command-palette cancel cleanup: `3717`; target remains `<2000`; result remains fail.

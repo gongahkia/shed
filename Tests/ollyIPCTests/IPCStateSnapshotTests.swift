@@ -20,6 +20,7 @@ final class IPCStateSnapshotTests: XCTestCase {
             displayID: 9,
             tagMask: tagSet.rawValue,
             isFloating: true,
+            layoutOrder: 4,
             frame: CGRect(x: 10, y: 20, width: 300, height: 400),
             title: "Editor",
             role: "AXWindow",
@@ -34,6 +35,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertEqual(ipcState.displayID, 9)
         XCTAssertEqual(ipcState.tags.map(\.rawValue), [1, 3])
         XCTAssertTrue(ipcState.isFloating)
+        XCTAssertEqual(ipcState.layoutOrder, 4)
         XCTAssertEqual(ipcState.frame, IPCFrame(x: 10, y: 20, width: 300, height: 400))
         XCTAssertEqual(ipcState.title, "Editor")
     }

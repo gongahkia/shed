@@ -86,6 +86,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public let displayID: DisplayID?
     public let tags: [IPCTagIndex]
     public let isFloating: Bool
+    public let layoutOrder: Int?
     public let frame: IPCFrame
     public let title: String?
     public let role: String?
@@ -98,6 +99,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         displayID: DisplayID? = nil,
         tags: [IPCTagIndex] = [],
         isFloating: Bool = false,
+        layoutOrder: Int? = nil,
         frame: IPCFrame,
         title: String? = nil,
         role: String? = nil,
@@ -109,6 +111,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.displayID = displayID
         self.tags = tags
         self.isFloating = isFloating
+        self.layoutOrder = layoutOrder
         self.frame = frame
         self.title = title
         self.role = role
@@ -123,6 +126,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             displayID: state.displayID,
             tags: IPCTagIndex.indices(in: TagSet(rawValue: state.tagMask)),
             isFloating: state.isFloating,
+            layoutOrder: state.layoutOrder,
             frame: IPCFrame(state.frame),
             title: state.title,
             role: state.role,

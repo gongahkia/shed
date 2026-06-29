@@ -1,5 +1,11 @@
 # Workspace Index Gap
 
+## Sources Checked
+
+- VS Code Code Navigation documentation: competitive baseline includes file-local symbols and workspace-wide symbol lookup.
+- Microsoft LSP 3.17 specification: language servers can provide `textDocument/documentSymbol` and `workspace/symbol` responses for richer symbol sources.
+- Zed Outline Panel documentation: competitive baseline includes symbol lists with type prefixes and jump-to-location behavior.
+
 ## Local Baseline
 
 - `ProjectFind` already has root walking, `.gitignore` filtering, binary-file rejection, relative paths, and size caps.

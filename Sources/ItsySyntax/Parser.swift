@@ -31,7 +31,7 @@ public enum Language: Sendable, Equatable, CaseIterable {
 	case yaml
 
 	var rawLanguage: OpaquePointer? {
-		GrammarLoader.shared.language(for: self)
+		GrammarLoader.language(for: self)
 	}
 
 	fileprivate var symbolName: String {
@@ -114,13 +114,12 @@ public enum Language: Sendable, Equatable, CaseIterable {
 	}
 }
 
-private final class GrammarLoader {
-	static let shared = GrammarLoader()
+private enum GrammarLoader {
 	private typealias LanguageFactory = @convention(c) () -> OpaquePointer?
-	private let lock = NSLock()
-	private var handles: [String: UnsafeMutableRawPointer] = [:]
+	private static let lock = NSLock()
+	private static var handles: [String: UnsafeMutableRawPointer] = [:]
 
-	func language(for language: Language) -> OpaquePointer? {
+	static func language(for language: Language) -> OpaquePointer? {
 		lock.lock()
 		defer { lock.unlock() }
 		if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
@@ -143,12 +142,12 @@ private final class GrammarLoader {
 		return nil
 	}
 
-	private func libraryURLs(for language: Language) -> [URL] {
+	private static func libraryURLs(for language: Language) -> [URL] {
 		let name = "libitsy-tree-sitter-\(language.libraryStem).dylib"
 		return libraryDirectories().map { $0.appendingPathComponent(name) }
 	}
 
-	private func libraryDirectories() -> [URL] {
+	private static func libraryDirectories() -> [URL] {
 		var directories: [URL] = []
 		if let path = ProcessInfo.processInfo.environment["ITSY_GRAMMAR_LIBRARY_DIR"], !path.isEmpty {
 			directories.append(URL(fileURLWithPath: path))

@@ -29,3 +29,15 @@
 - `ItsyBench measure --staged --app Itsy.app` now preserves the first-window-visible KPI and adds internal stage deltas from `ITSY_BENCH_STAGES_PATH`.
 - Stages currently emitted: `process_start`, `delegate_init`, `app_did_finish_launching`, `main_menu_installed`, `initial_document_opened`, `app_activated`, `first_draw`.
 - [Inference] This separates process/window-manager launch cost from app delegate and first Metal draw work without changing competitor measurement semantics.
+
+Sequential staged sample after grammar dylib, static library, native integration, memory, and release-pipeline changes:
+
+| Run | process_start ms | delegate_init ms | app_did_finish_launching ms | initial_document_opened ms | first_window_visible ms | first_draw ms | RSS KB |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 51.304 | 89.207 | 123.730 | 231.040 | 256.715 | 263.226 | 77424 |
+| 2 | 58.441 | 93.734 | 144.915 | 249.946 | 280.628 | 270.442 | 77344 |
+| 3 | 51.060 | 85.664 | 120.934 | 224.183 | 250.726 | 256.871 | 77504 |
+
+Mean first-window-visible: `262.690 ms`. Mean `applicationDidFinishLaunching`: `129.858 ms`. Mean first draw: `263.513 ms`.
+
+[Inference] The current `<150 ms` miss is after `applicationDidFinishLaunching`, mostly between initial document/window activation and AX-visible window detection. The staged data does not prove the app meets the cold-start KPI.

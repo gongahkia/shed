@@ -191,3 +191,9 @@ Current section distribution:
 - Replaced the private immutable `RopeNode` class with an `indirect enum` so the persistent rope tree no longer emits Swift class metadata.
 - Static rebase fixups after rope-node enum cleanup: `2507`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `20` to `19`.
+
+## Command palette descriptor experiment
+
+- Replaced app command-palette per-command closures with static command descriptors plus one id dispatcher.
+- Static rebase fixups increased from `2507` to `2520` (`__DATA_CONST,__const` increased from `693` to `703`, `__DATA,__objc_const` from `950` to `953`).
+- The experiment was reverted. This path does not reduce the remaining dyld gap.

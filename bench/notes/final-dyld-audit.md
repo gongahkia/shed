@@ -128,3 +128,8 @@ Current section distribution:
 - Added release-only `-Xfrontend -disable-reflection-metadata` Swift settings to the app/runtime Swift targets.
 - Static rebase fixups after rebuilding the app normally with reflection metadata disabled: `2661`; target remains `<2000`; result remains fail.
 - `swift test -c release` passes; after release tests, rebuild with `swift build -c release` before auditing because the test build rewrites release artifacts with test settings.
+
+## Release concrete metadata accessor cleanup
+
+- Added release-only `-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors` beside reflection metadata stripping.
+- Static rebase fixups after rebuilding the app normally with both metadata flags: `2639`; target remains `<2000`; result remains fail.

@@ -13,15 +13,15 @@
 - Added incremental `Content-Length` frame extraction and frame encoding.
 - Added LSP document, change, position/range, initialize, and publish-diagnostics data models.
 - Added an actor-isolated session core with request ID allocation, pending-response routing, initialize/initialized sequencing, shutdown/exit sequencing, and injectable transport.
+- Added a `Process`/`Pipe` transport with guarded start/write/close/terminate and stdout/stderr/termination events.
+- Added a high-level process client/router that feeds stdout into the session, exposes server/stderr/termination events, and owns the read pump.
 
 ## Not done yet
 
-- No server process lifecycle.
-- No server process read loop.
 - No document sync from `ItsyDocument`.
 - No diagnostics/problem UI.
 - No completion, hover, definition, references, rename, code action, or formatting request plumbing.
 
 ## Next slice
 
-Implement the process transport/read loop around `Process` and `Pipe`, then attach diagnostics to a non-rendering document model before any UI surface.
+Attach open/change/close document sync to the editor model, then surface diagnostics outside the renderer.

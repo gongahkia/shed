@@ -39,3 +39,11 @@
 
 - Keep id105 lazy grammar loading high priority; [Inference] it is the largest plausible reduction for `__DATA_CONST/__const` and the 9.4 MB `__TEXT,__const` table footprint.
 - Convert reference types only where semantics are already value-like. AppKit-facing controllers/views still need reference semantics.
+
+## 2026-06-29 update
+
+- `ItsySyntax` no longer links `CTSGrammars`; grammar symbols resolve with `dlopen`/`dlsym`.
+- `bench/scripts/build_grammar_dylibs.sh` builds one dylib per grammar group, and `bench/scripts/make_app.sh` places them under `Itsy.app/Contents/Frameworks/ItsyGrammars`.
+- Tests still link `CTSGrammars` so parser coverage runs without prebuilt local dylibs.
+- Release binary grammar symbol audit: `nm -gU .build/release/ItsyApp | rg 'tree_sitter_'` returns no matches.
+- Static rebase fixups after grammar split: `3816`; still above `<2000`, now tracked by the Swift reference-type and library-linkage follow-ups.

@@ -19,6 +19,7 @@ private struct MeasureOptions {
 	var args: [String]
 	var newInstance: Bool
 	var staged: Bool
+	var timeoutMS: Int
 	var warmupPurge: Bool
 }
 
@@ -260,6 +261,7 @@ enum ItsyBenchMain {
 		var appArgs: [String] = []
 		var newInstance = false
 		var staged = false
+		var timeoutMS = 5_000
 		var warmupPurge = false
 		var index = args.startIndex
 		while index < args.endIndex {
@@ -285,6 +287,13 @@ enum ItsyBenchMain {
 			case "--staged":
 				staged = true
 				index = args.index(after: index)
+			case "--timeout-ms":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --timeout-ms")
+				}
+				timeoutMS = value
+				index = args.index(after: valueIndex)
 			case "--warmup-purge":
 				warmupPurge = true
 				index = args.index(after: index)
@@ -293,9 +302,9 @@ enum ItsyBenchMain {
 			}
 		}
 		guard let app else {
-			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]")
+			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]")
 		}
-		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, staged: staged, warmupPurge: warmupPurge)
+		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, staged: staged, timeoutMS: timeoutMS, warmupPurge: warmupPurge)
 	}
 
 	private static func parseRope(_ args: [String]) throws -> RopeOptions {
@@ -418,7 +427,7 @@ enum ItsyBenchMain {
 		try requireAccessibility()
 		let url = URL(fileURLWithPath: options.app)
 		let start = DispatchTime.now().uptimeNanoseconds
-		let deadline = Date(timeIntervalSinceNow: 5)
+		let deadline = Date(timeIntervalSinceNow: Double(options.timeoutMS) / 1000)
 		let stageURL = options.staged ? temporaryStageURL() : nil
 		if let stageURL {
 			FileManager.default.createFile(atPath: stageURL.path, contents: nil)
@@ -695,7 +704,7 @@ enum ItsyBenchMain {
 
 	private static let usage = """
 	usage:
-	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]
+	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]

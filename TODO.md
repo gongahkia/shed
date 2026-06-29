@@ -149,6 +149,15 @@ x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`:
 
 ---
 
+## Phase 17 — Native macOS integration
+
+x 2026-06-29 +Phase17-Native @appkit id:500 est:2h Services menu registration: `NSRegisterServicesProvider`, text-selection service, file service, `NSServices` app bundle metadata.
+x 2026-06-29 +Phase17-Native @quicklook id:501 est:2h Quick Look preview from file tree with Space via `QLPreviewPanel`.
+x 2026-06-29 +Phase17-Native @documents id:502 est:1h Versions/AutoSave: `autosavesInPlace` and `preservesVersions`.
+x 2026-06-29 +Phase17-Native @handoff id:503 est:2h Handoff `NSUserActivity` per open file with cursor offset restore.
+
+---
+
 ## Cross-cutting
 
 x 2026-06-29 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has ASCII; add SVG via excalidraw export, commit to `docs/arch.svg`).

@@ -25,7 +25,7 @@ let package = Package(
 		),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")]),
 		.target(name: "ItsyEditor"),
-		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "CTSGrammars", "ItsyEditor"], resources: [.copy("Resources")]),
+		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")]),
 		.target(name: "ItsyKeymap", resources: [.process("Resources")]),
 		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"]),
 		.target(
@@ -93,7 +93,7 @@ let package = Package(
 		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
-		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor"]),
+		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor", "CTSGrammars"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars"]),
 	]
 )

@@ -1,5 +1,5 @@
 import CTreeSitter
-import CTSGrammars
+import Darwin
 import Foundation
 import ItsyEditor
 
@@ -31,37 +31,52 @@ public enum Language: Sendable, Equatable, CaseIterable {
 	case yaml
 
 	var rawLanguage: OpaquePointer? {
+		GrammarLoader.shared.language(for: self)
+	}
+
+	fileprivate var symbolName: String {
 		switch self {
 		case .c:
-			return tree_sitter_c()
+			return "tree_sitter_c"
 		case .cpp:
-			return tree_sitter_cpp()
+			return "tree_sitter_cpp"
 		case .css:
-			return tree_sitter_css()
+			return "tree_sitter_css"
 		case .go:
-			return tree_sitter_go()
+			return "tree_sitter_go"
 		case .html:
-			return tree_sitter_html()
+			return "tree_sitter_html"
 		case .javascript:
-			return tree_sitter_javascript()
+			return "tree_sitter_javascript"
 		case .json:
-			return tree_sitter_json()
+			return "tree_sitter_json"
 		case .markdown:
-			return tree_sitter_markdown()
+			return "tree_sitter_markdown"
 		case .markdownInline:
-			return tree_sitter_markdown_inline()
+			return "tree_sitter_markdown_inline"
 		case .python:
-			return tree_sitter_python()
+			return "tree_sitter_python"
 		case .rust:
-			return tree_sitter_rust()
+			return "tree_sitter_rust"
 		case .toml:
-			return tree_sitter_toml()
+			return "tree_sitter_toml"
 		case .tsx:
-			return tree_sitter_tsx()
+			return "tree_sitter_tsx"
 		case .typescript:
-			return tree_sitter_typescript()
+			return "tree_sitter_typescript"
 		case .yaml:
-			return tree_sitter_yaml()
+			return "tree_sitter_yaml"
+		}
+	}
+
+	fileprivate var libraryStem: String {
+		switch self {
+		case .markdownInline:
+			return "markdown"
+		case .tsx, .typescript:
+			return "typescript"
+		default:
+			return queryResourceName
 		}
 	}
 
@@ -96,6 +111,58 @@ public enum Language: Sendable, Equatable, CaseIterable {
 		case .yaml:
 			return "yaml"
 		}
+	}
+}
+
+private final class GrammarLoader {
+	static let shared = GrammarLoader()
+	private typealias LanguageFactory = @convention(c) () -> OpaquePointer?
+	private let lock = NSLock()
+	private var handles: [String: UnsafeMutableRawPointer] = [:]
+
+	func language(for language: Language) -> OpaquePointer? {
+		lock.lock()
+		defer { lock.unlock() }
+		if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
+		}
+		let stem = language.libraryStem
+		if let handle = handles[stem], let symbol = dlsym(handle, language.symbolName) {
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
+		}
+		for url in libraryURLs(for: language) {
+			guard let handle = dlopen(url.path, RTLD_NOW | RTLD_LOCAL) else {
+				continue
+			}
+			handles[stem] = handle
+			guard let symbol = dlsym(handle, language.symbolName) else {
+				continue
+			}
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
+		}
+		return nil
+	}
+
+	private func libraryURLs(for language: Language) -> [URL] {
+		let name = "libitsy-tree-sitter-\(language.libraryStem).dylib"
+		return libraryDirectories().map { $0.appendingPathComponent(name) }
+	}
+
+	private func libraryDirectories() -> [URL] {
+		var directories: [URL] = []
+		if let path = ProcessInfo.processInfo.environment["ITSY_GRAMMAR_LIBRARY_DIR"], !path.isEmpty {
+			directories.append(URL(fileURLWithPath: path))
+		}
+		if let frameworksURL = Bundle.main.privateFrameworksURL {
+			directories.append(frameworksURL.appendingPathComponent("ItsyGrammars"))
+		}
+		if let resourceURL = Bundle.main.resourceURL {
+			directories.append(resourceURL.appendingPathComponent("ItsyGrammars"))
+		}
+		let cwd = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+		directories.append(cwd.appendingPathComponent(".build/release/ItsyGrammars"))
+		directories.append(cwd.appendingPathComponent("Itsy.app/Contents/Frameworks/ItsyGrammars"))
+		return directories
 	}
 }
 

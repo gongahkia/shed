@@ -19,13 +19,14 @@ public struct ShapedGlyph: Sendable, Equatable {
 }
 
 public struct LineShaper {
-	private let atlas: GlyphAtlas
+	public init() {}
 
-	public init(atlas: GlyphAtlas) {
-		self.atlas = atlas
-	}
-
-	public func shape(_ line: String, font: CTFont, colorForRange: (Range<Int>) -> SIMD4<Float> = { _ in SIMD4<Float>(1, 1, 1, 1) }) throws -> [ShapedGlyph] {
+	public func shape(
+		_ line: String,
+		font: CTFont,
+		atlas: inout GlyphAtlas,
+		colorForRange: (Range<Int>) -> SIMD4<Float> = { _ in SIMD4<Float>(1, 1, 1, 1) }
+	) throws -> [ShapedGlyph] {
 		guard !line.isEmpty else {
 			return []
 		}
@@ -45,7 +46,7 @@ public struct LineShaper {
 			shaped.reserveCapacity(shaped.count + glyphCount)
 			for index in 0 ..< glyphCount {
 				let entry = try atlas.entry(for: glyphs[index], font: font)
-				let uv = atlasUV(for: entry)
+				let uv = atlasUV(for: entry, atlas: atlas)
 				let utf16Start = max(0, min(stringIndices[index], utf8Offsets.count - 1))
 				let utf16End = index + 1 < stringIndices.count ? max(utf16Start, min(stringIndices[index + 1], utf8Offsets.count - 1)) : utf8Offsets.count - 1
 				let range = utf8Offsets[utf16Start] ..< utf8Offsets[utf16End]
@@ -55,7 +56,7 @@ public struct LineShaper {
 		return shaped
 	}
 
-	private func atlasUV(for entry: GlyphAtlasEntry) -> AtlasUV {
+	private func atlasUV(for entry: GlyphAtlasEntry, atlas: GlyphAtlas) -> AtlasUV {
 		let textureWidth = CGFloat(atlas.texture.width)
 		let textureHeight = CGFloat(atlas.texture.height)
 		let u0 = CGFloat(entry.textureX) / textureWidth

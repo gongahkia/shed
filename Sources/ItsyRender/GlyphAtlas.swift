@@ -37,7 +37,7 @@ public enum GlyphAtlasError: Error, CustomStringConvertible {
 	}
 }
 
-public final class GlyphAtlas {
+public struct GlyphAtlas {
 	public static let defaultSize = 1024
 
 	public enum RenderingMode: Sendable, Hashable {
@@ -85,7 +85,7 @@ public final class GlyphAtlas {
 		height = size
 	}
 
-	public func entry(for glyph: CGGlyph, font: CTFont) throws -> GlyphAtlasEntry {
+	public mutating func entry(for glyph: CGGlyph, font: CTFont) throws -> GlyphAtlasEntry {
 		let key = GlyphKey(font: font, glyph: glyph)
 		if let entry = entries[key] {
 			return entry
@@ -112,7 +112,7 @@ public final class GlyphAtlas {
 		return entry
 	}
 
-	private func allocate(width glyphWidth: Int, height glyphHeight: Int) throws -> (x: Int, y: Int) {
+	private mutating func allocate(width glyphWidth: Int, height glyphHeight: Int) throws -> (x: Int, y: Int) {
 		guard glyphWidth <= width, glyphHeight <= height else {
 			throw GlyphAtlasError.glyphTooLarge(glyphWidth, glyphHeight)
 		}

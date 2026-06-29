@@ -49,6 +49,8 @@ private struct CachedLineGlyph {
 }
 
 public final class MetalTextView: NSView {
+	private static let accessibilityLocale = Locale(identifier: "en")
+
 	public var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
 		didSet { needsDisplay = true }
 	}
@@ -131,6 +133,7 @@ public final class MetalTextView: NSView {
 	private let killRing = KillRing()
 	private var lastYankRange: Range<Int>?
 	private var optionDragAnchor: Int?
+	private var lastAccessibilityValue: String?
 
 	public override init(frame frameRect: NSRect) {
 		let device = MTLCreateSystemDefaultDevice()
@@ -156,6 +159,22 @@ public final class MetalTextView: NSView {
 
 	public override var acceptsFirstResponder: Bool {
 		true
+	}
+
+	public override func isAccessibilityElement() -> Bool {
+		true
+	}
+
+	public override func accessibilityRole() -> NSAccessibility.Role? {
+		.textArea
+	}
+
+	public override func accessibilityLabel() -> String? {
+		Self.localized("Editor")
+	}
+
+	public override func accessibilityValue() -> Any? {
+		accessibilityCurrentLineValue()
 	}
 
 	public override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
@@ -1781,7 +1800,29 @@ public final class MetalTextView: NSView {
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
 		refreshFindMatchRects()
+		refreshAccessibilityValue()
 		markDirty()
+	}
+
+	private func accessibilityCurrentLineValue() -> String {
+		let head = min(max(editor.selections.primary.head, 0), editor.rope.length)
+		let line = editor.rope.line(forOffset: head)
+		let text = editor.rope.slice(editor.rope.lineRange(line))
+		if text.isEmpty {
+			return Self.localized("Line \(line + 1): blank")
+		}
+		return Self.localized("Line \(line + 1): \(text)")
+	}
+
+	private func refreshAccessibilityValue() {
+		let value = accessibilityCurrentLineValue()
+		guard value != lastAccessibilityValue else {
+			return
+		}
+		lastAccessibilityValue = value
+		if window != nil {
+			NSAccessibility.post(element: self, notification: .valueChanged)
+		}
 	}
 
 	private func selectionRects(for selections: SelectionSet) -> [CGRect] {
@@ -1831,6 +1872,10 @@ public final class MetalTextView: NSView {
 		}
 		let attributed = NSAttributedString(string: text, attributes: [kCTFontAttributeName as NSAttributedString.Key: textFont])
 		return CTLineGetTypographicBounds(CTLineCreateWithAttributedString(attributed), nil, nil, nil)
+	}
+
+	private static func localized(_ value: String.LocalizationValue) -> String {
+		String(localized: value, bundle: .module, locale: accessibilityLocale)
 	}
 }
 

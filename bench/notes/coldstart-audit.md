@@ -41,3 +41,5 @@ Sequential staged sample after grammar dylib, static library, native integration
 Mean first-window-visible: `262.690 ms`. Mean `applicationDidFinishLaunching`: `129.858 ms`. Mean first draw: `263.513 ms`.
 
 [Inference] The current `<150 ms` miss is after `applicationDidFinishLaunching`, mostly between initial document/window activation and AX-visible window detection. The staged data does not prove the app meets the cold-start KPI.
+
+`ItsyBench` now falls back to polling `AXWindows` when `kAXWindowCreatedNotification` registration is unavailable, so staged measurement does not fail on AX notification error `-25204`.

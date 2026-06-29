@@ -75,6 +75,7 @@ Itsy is intentionally narrow:
 - Task discovery/run core and a minimal task panel are in progress.
 - Problems panel is in progress; task output can populate compiler-style diagnostics.
 - Declarative extension manifest ABI is in progress; no executable plugin runtime yet.
+- Workspace file/symbol index is in progress; no global symbol UI yet.
 - No Electron, terminal, collaboration, or telemetry.
 
 ## Formatting

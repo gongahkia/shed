@@ -48,3 +48,30 @@ Remaining allocation hotspot is initial full-file syntax highlight materializati
 - Default glyph atlas size is now `1024x1024` instead of `2048x2048`.
 - [Inference] On Retina/grayscale this reduces the initial glyph atlas texture from about 4 MB to 1 MB; on non-Retina/subpixel it reduces the page from about 16 MB to 4 MB.
 - Shaped-line cache cap is now 512 visible-line entries instead of 2048 to reduce retained CoreText-derived glyph arrays after large-file scrolling.
+
+## 2026-06-29 idle VM breakdown
+
+Command shape:
+
+```sh
+.build/release/ItsyApp &
+.build/release/ItsyBench rss --pid <pid>
+vmmap -summary <pid>
+```
+
+Observed RSS from `ItsyBench`: `92176 KB`. `vmmap -summary` reported physical footprint `96.5M`.
+
+Largest resident contributors:
+
+| Region | Resident |
+|---|---:|
+| owned unmapped graphics | 48.8M |
+| `__OBJC_RO` | 48.1M |
+| `__AUTH_CONST` | 39.0M |
+| IOSurface | 19.2M |
+| `__DATA_CONST` | 17.2M |
+| MALLOC zones total | 14.8M |
+| `__LINKEDIT` | 10.7M |
+| `__DATA` | 8790K |
+
+[Inference] The idle-RSS miss is dominated by system/AppKit/Metal mapped regions and graphics surfaces, not app-owned heap alone. Reducing app heap allocations will not by itself close the `<30 MB` RSS target.

@@ -30,10 +30,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
 		self?.reloadSyntaxThemes()
 	}
-	private lazy var projectFind = ProjectFindController(
-		workspaceURL: { ItsyWorkspaceController.currentRootURL },
-		openFile: { [weak self] url in _ = self?.documentController.openDocument(at: url) }
-	)
+	private var projectFindPanel: NSPanel?
+	private var projectFindContentView: ProjectFindView?
+	private var projectFindGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -201,7 +200,95 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	@objc private func showProjectFind(_ sender: Any?) {
-		projectFind.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		toggleProjectFind(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleProjectFind(relativeTo hostWindow: NSWindow?) {
+		if projectFindPanel?.isVisible == true {
+			closeProjectFind()
+			return
+		}
+		showProjectFind(relativeTo: hostWindow)
+	}
+
+	private func closeProjectFind() {
+		projectFindPanel?.close()
+	}
+
+	private func showProjectFind(relativeTo hostWindow: NSWindow?) {
+		let panel = makeProjectFindPanelIfNeeded()
+		centerProjectFind(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		projectFindContentView?.focusInput()
+		updateProjectFindStatusForCurrentWorkspace()
+	}
+
+	private func makeProjectFindPanelIfNeeded() -> NSPanel {
+		if let panel = projectFindPanel {
+			return panel
+		}
+		let size = NSSize(width: 760, height: 380)
+		let panel = NSPanel(
+			contentRect: NSRect(origin: .zero, size: size),
+			styleMask: [.titled, .closable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		let contentView = ProjectFindView(frame: NSRect(origin: .zero, size: size))
+		contentView.onCancel = { [weak self] in self?.closeProjectFind() }
+		contentView.onSearch = { [weak self] query in self?.searchProjectFind(query: query) }
+		contentView.onOpenMatch = { [weak self] match in _ = self?.documentController.openDocument(at: match.url) }
+		panel.contentView = contentView
+		panel.title = L10n.string("Find in Project")
+		panel.isReleasedWhenClosed = false
+		panel.minSize = NSSize(width: 520, height: 260)
+		projectFindPanel = panel
+		projectFindContentView = contentView
+		return panel
+	}
+
+	private func centerProjectFind(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(760, max(520, hostFrame.width - 80))
+		let height = min(420, max(260, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	private func updateProjectFindStatusForCurrentWorkspace() {
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			projectFindContentView?.setResults([])
+			projectFindContentView?.setStatus(L10n.string("Open a folder first"))
+			return
+		}
+		projectFindContentView?.setResults([])
+		projectFindContentView?.setStatus(root.path)
+	}
+
+	private func searchProjectFind(query: String) {
+		projectFindGeneration += 1
+		let generation = projectFindGeneration
+		guard !query.isEmpty else {
+			updateProjectFindStatusForCurrentWorkspace()
+			return
+		}
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			projectFindContentView?.setResults([])
+			projectFindContentView?.setStatus(L10n.string("Open a folder first"))
+			return
+		}
+		projectFindContentView?.setStatus(L10n.string("Searching..."))
+		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+			let matches = ProjectFind.search(root: root, options: ProjectFindOptions(query: query))
+			DispatchQueue.main.async { [weak self] in
+				guard let self, self.projectFindGeneration == generation else {
+					return
+				}
+				self.projectFindContentView?.setResults(matches)
+				self.projectFindContentView?.setStatus(L10n.string("\(matches.count) matches"))
+			}
+		}
 	}
 
 	@objc private func showSettings(_ sender: Any?) {

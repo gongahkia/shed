@@ -613,6 +613,7 @@ final class EditorWindowController: NSWindowController {
 	}
 	private var fileTreeRootURL: NSURL?
 	private var fileTreeChildCache: [NSURL: [NSURL]] = [:]
+	private var gitSnapshot: GitWorkspaceSnapshot?
 	private var fileTreeKeyMonitor: Any?
 	private var fileTreePreviewURL: URL?
 	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
@@ -758,6 +759,11 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
+	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
+		gitSnapshot = snapshot
+		fileTreeOutlineView.reloadData()
+	}
+
 	@objc private func doubleClickFileTree(_ sender: Any?) {
 		let row = fileTreeOutlineView.clickedRow
 		guard row >= 0, let url = fileTreeOutlineView.item(atRow: row) as? NSURL else {
@@ -792,7 +798,33 @@ final class EditorWindowController: NSWindowController {
 
 	private func fileTreeTitle(for url: NSURL) -> String {
 		let fileURL = url as URL
-		return fileURL.lastPathComponent.isEmpty ? fileURL.path : fileURL.lastPathComponent
+		let title = fileURL.lastPathComponent.isEmpty ? fileURL.path : fileURL.lastPathComponent
+		guard let status = fileTreeGitStatus(for: fileURL) else {
+			return title
+		}
+		return "\(title) [\(status)]"
+	}
+
+	private func fileTreeGitStatus(for url: URL) -> String? {
+		guard let entry = gitSnapshot?.entry(for: url) else {
+			return nil
+		}
+		if entry.kind == .untracked {
+			return "?"
+		}
+		if entry.kind == .unmerged {
+			return "U"
+		}
+		if entry.isStaged, entry.isUnstaged {
+			return "*"
+		}
+		if entry.isStaged {
+			return entry.indexStatus.map(String.init)
+		}
+		if entry.isUnstaged {
+			return entry.worktreeStatus.map(String.init)
+		}
+		return nil
 	}
 
 	private func fileTreeChildren(of url: NSURL) -> [NSURL] {

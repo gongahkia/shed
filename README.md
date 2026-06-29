@@ -213,7 +213,7 @@ SwiftPM products:
 - `ollyctl`: CLI client.
 - `PerfBench`: layout/config benchmark runner.
 - `SoakHarness`: long-running AX/window movement harness.
-- `ollyKit`, `ollyCore`, `ollyLayouts`, `ollyDSL`, `ollyIPC`: library targets.
+- `ollyKit`, `ollyCore`, `ollyLayouts`, `ollyDSL`, `ollyIPC`, `ollyDiagnostics`: library targets.
 
 Useful docs:
 

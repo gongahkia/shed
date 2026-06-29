@@ -12,9 +12,13 @@ struct OllyCtl: ParsableCommand {
         abstract: "Control a running olly instance over IPC.",
         subcommands: [
             State.self,
+            ListWindows.self,
+            ListDisplays.self,
             Focus.self,
             MoveWindow.self,
+            MoveToDisplay.self,
             Swap.self,
+            ToggleFloating.self,
             SwitchTag.self,
             MoveToTag.self,
             ToggleTag.self,

@@ -38,6 +38,7 @@ public struct OllyRuntimeMenuSnapshot: Equatable, Sendable {
 public enum OllyRuntimeError: Error, CustomStringConvertible {
     case displayUnavailable
     case engineUnavailable(LayoutEngineID)
+    case windowUnavailable(WindowID)
     case missingFocusedWindow
     case missingDirectionalTarget(IPCDirection)
     case axOperationFailed(String, AXError)
@@ -49,6 +50,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "display unavailable"
         case let .engineUnavailable(engineID):
             return "engine unavailable: \(engineID.rawValue)"
+        case let .windowUnavailable(windowID):
+            return "window unavailable: \(windowID)"
         case .missingFocusedWindow:
             return "no focused window"
         case let .missingDirectionalTarget(direction):
@@ -66,6 +69,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "display_unavailable"
         case .engineUnavailable:
             return "engine_unavailable"
+        case .windowUnavailable:
+            return "window_unavailable"
         case .missingFocusedWindow:
             return "missing_focused_window"
         case .missingDirectionalTarget:
@@ -78,6 +83,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     }
 }
 
+// swiftlint:disable:next type_body_length
 public actor OllyRuntime {
     private let socketPath: IPCSocketPath
     let configLoader: ConfigLoader
@@ -247,13 +253,13 @@ public actor OllyRuntime {
         connection: UnixDomainSocketServerConnection
     ) async throws -> IPCResponseEnvelope? {
         switch request.command {
-        case .state, .version, .subscribeEvents:
+        case .state, .listWindows, .listDisplays, .version, .subscribeEvents:
             return try await queryResponse(for: request, connection: connection)
-        case .switchTag, .toggleTag, .tagAdd, .tagRemove, .moveToTag:
+        case .switchTag, .toggleTag, .tagAdd, .tagRemove, .moveToTag, .moveToDisplay:
             return try await tagResponse(for: request)
         case .setEngine, .cycleEngine:
             return try await engineResponse(for: request)
-        case .focus, .moveWindow, .swap, .reload, .restoreWindows:
+        case .focus, .moveWindow, .swap, .toggleFloating, .reload, .restoreWindows:
             return try await controlResponse(for: request)
         }
     }
@@ -265,6 +271,10 @@ public actor OllyRuntime {
         switch request.command {
         case let .state(command):
             return .ok(id: request.id, result: .state(await stateSnapshot(displayID: command.displayID)))
+        case let .listWindows(command):
+            return .ok(id: request.id, result: .state(await windowListSnapshot(command)))
+        case let .listDisplays(command):
+            return .ok(id: request.id, result: .state(await displayListSnapshot(command)))
         case .version:
             return .ok(id: request.id, result: .version(IPCVersionInfo()))
         case let .subscribeEvents(command):
@@ -300,6 +310,9 @@ public actor OllyRuntime {
         case let .moveToTag(command):
             try await moveToTag(command)
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window moved to tag")))
+        case let .moveToDisplay(command):
+            try await moveToDisplay(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window moved to display")))
         default:
             preconditionFailure("invalid tag command")
         }
@@ -329,6 +342,9 @@ public actor OllyRuntime {
         case let .swap(command):
             try await swapWindow(command)
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window swapped")))
+        case let .toggleFloating(command):
+            try await toggleFloating(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "floating toggled")))
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))

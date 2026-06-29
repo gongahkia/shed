@@ -14,8 +14,12 @@ consumes that response and then prints event lines.
 
 - `state`
 - `focus`
+- `list-windows`
+- `list-displays`
 - `move-window`
+- `move-to-display`
 - `swap`
+- `toggle-floating`
 - `switch-tag`
 - `move-to-tag`
 - `toggle-tag`
@@ -40,6 +44,10 @@ re-inserts the focused window before or after the directional target; `swap` exc
 with that target. If no focused window or no directional target exists, the response is a structured error.
 `state` responses include `layoutOrder` for windows that have been explicitly reordered. Olly persists
 layout order by stable window identity and restores it on later window discovery when the identity matches.
+
+`list-windows` and `list-displays` return scoped `state` payloads for scripts that need stable query
+commands instead of parsing the full runtime state. `toggle-floating` changes whether a window participates
+in tiling, and `move-to-display` updates Olly's display assignment before re-arranging the affected displays.
 
 ## Schema
 
@@ -73,8 +81,12 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       "enum": [
         "state",
         "focus",
+        "list-windows",
+        "list-displays",
         "move-window",
+        "move-to-display",
         "swap",
+        "toggle-floating",
         "switch-tag",
         "move-to-tag",
         "toggle-tag",
@@ -195,6 +207,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "list-windows"
+            },
+            "arguments": {
+              "$ref": "#/$defs/windowQueryArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "list-displays"
+            },
+            "arguments": {
+              "$ref": "#/$defs/displayQueryArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "move-window"
             },
             "arguments": {
@@ -205,10 +237,30 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "move-to-display"
+            },
+            "arguments": {
+              "$ref": "#/$defs/moveToDisplayArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "swap"
             },
             "arguments": {
               "$ref": "#/$defs/directionalArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "toggle-floating"
+            },
+            "arguments": {
+              "$ref": "#/$defs/floatingArguments"
             }
           }
         },
@@ -346,6 +398,57 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       "properties": {
         "direction": {
           "$ref": "#/$defs/direction"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "windowQueryArguments": {
+      "type": "object",
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "displayQueryArguments": {
+      "type": "object",
+      "properties": {
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "moveToDisplayArguments": {
+      "type": "object",
+      "required": [
+        "displayID"
+      ],
+      "properties": {
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        },
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "floatingArguments": {
+      "type": "object",
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "floating": {
+          "type": "boolean"
         },
         "displayID": {
           "$ref": "#/$defs/displayID"

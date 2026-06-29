@@ -33,7 +33,15 @@ public actor WindowTagAssignment {
     @discardableResult
     public func move(window windowID: WindowID, toDisplay displayID: DisplayID) async throws -> WindowState {
         let state = try await state(for: windowID)
-        let updated = copy(state, displayID: displayID)
+        let updated = state.withDisplayID(displayID)
+        await windowStore.upsert(updated)
+        return updated
+    }
+
+    @discardableResult
+    public func setFloating(window windowID: WindowID, floating: Bool) async throws -> WindowState {
+        let state = try await state(for: windowID)
+        let updated = state.withFloating(floating)
         await windowStore.upsert(updated)
         return updated
     }
@@ -45,17 +53,13 @@ public actor WindowTagAssignment {
         return state
     }
 
-    private func copy(
-        _ state: WindowState,
-        tagMask: UInt64? = nil,
-        displayID: DisplayID? = nil
-    ) -> WindowState {
+    private func copy(_ state: WindowState, tagMask: UInt64) -> WindowState {
         WindowState(
             id: state.id,
             processID: state.processID,
             bundleID: state.bundleID,
-            displayID: displayID ?? state.displayID,
-            tagMask: tagMask ?? state.tagMask,
+            displayID: state.displayID,
+            tagMask: tagMask,
             isFloating: state.isFloating,
             layoutOrder: state.layoutOrder,
             frame: state.frame,

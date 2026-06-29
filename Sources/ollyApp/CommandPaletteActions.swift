@@ -28,6 +28,27 @@ struct CommandPaletteActionCatalog {
     private func baseActions() -> [CommandPaletteAction] {
         [
             action("state", "Show State", "Print current olly state", ["inspect"], .state(IPCStateCommand())),
+            action(
+                "list-windows",
+                "List Windows",
+                "Print known windows",
+                ["inspect"],
+                .listWindows(IPCWindowQueryCommand())
+            ),
+            action(
+                "list-displays",
+                "List Displays",
+                "Print known displays",
+                ["inspect"],
+                .listDisplays(IPCDisplayQueryCommand())
+            ),
+            action(
+                "toggle-floating",
+                "Toggle Floating",
+                "Toggle focused window tiling",
+                ["window"],
+                .toggleFloating(IPCFloatingCommand())
+            ),
             action("reload", "Reload Config", "Reload Config.swift", ["dsl"], .reload(IPCReloadCommand())),
             action(
                 "restore-windows",

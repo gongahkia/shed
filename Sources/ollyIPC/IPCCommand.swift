@@ -5,8 +5,12 @@ import ollyKit
 public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
     case state
     case focus
+    case listWindows = "list-windows"
+    case listDisplays = "list-displays"
     case moveWindow = "move-window"
+    case moveToDisplay = "move-to-display"
     case swap
+    case toggleFloating = "toggle-floating"
     case switchTag = "switch-tag"
     case moveToTag = "move-to-tag"
     case toggleTag = "toggle-tag"
@@ -51,6 +55,46 @@ public struct IPCDirectionalCommand: Codable, Equatable, Sendable {
 
     public init(direction: IPCDirection, displayID: DisplayID? = nil) {
         self.direction = direction
+        self.displayID = displayID
+    }
+}
+
+public struct IPCWindowQueryCommand: Codable, Equatable, Sendable {
+    public let windowID: WindowID?
+    public let displayID: DisplayID?
+
+    public init(windowID: WindowID? = nil, displayID: DisplayID? = nil) {
+        self.windowID = windowID
+        self.displayID = displayID
+    }
+}
+
+public struct IPCDisplayQueryCommand: Codable, Equatable, Sendable {
+    public let displayID: DisplayID?
+
+    public init(displayID: DisplayID? = nil) {
+        self.displayID = displayID
+    }
+}
+
+public struct IPCMoveToDisplayCommand: Codable, Equatable, Sendable {
+    public let displayID: DisplayID
+    public let windowID: WindowID?
+
+    public init(displayID: DisplayID, windowID: WindowID? = nil) {
+        self.displayID = displayID
+        self.windowID = windowID
+    }
+}
+
+public struct IPCFloatingCommand: Codable, Equatable, Sendable {
+    public let windowID: WindowID?
+    public let floating: Bool?
+    public let displayID: DisplayID?
+
+    public init(windowID: WindowID? = nil, floating: Bool? = nil, displayID: DisplayID? = nil) {
+        self.windowID = windowID
+        self.floating = floating
         self.displayID = displayID
     }
 }
@@ -127,8 +171,12 @@ public struct IPCVersionCommand: Codable, Equatable, Sendable {
 public enum IPCCommand: Equatable, Sendable {
     case state(IPCStateCommand)
     case focus(IPCDirectionalCommand)
+    case listWindows(IPCWindowQueryCommand)
+    case listDisplays(IPCDisplayQueryCommand)
     case moveWindow(IPCDirectionalCommand)
+    case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
+    case toggleFloating(IPCFloatingCommand)
     case switchTag(IPCTagCommand)
     case moveToTag(IPCMoveToTagCommand)
     case toggleTag(IPCTagCommand)
@@ -147,10 +195,18 @@ public enum IPCCommand: Equatable, Sendable {
             return .state
         case .focus:
             return .focus
+        case .listWindows:
+            return .listWindows
+        case .listDisplays:
+            return .listDisplays
         case .moveWindow:
             return .moveWindow
+        case .moveToDisplay:
+            return .moveToDisplay
         case .swap:
             return .swap
+        case .toggleFloating:
+            return .toggleFloating
         case .switchTag:
             return .switchTag
         case .moveToTag:
@@ -183,6 +239,7 @@ extension IPCCommand: Codable {
         case arguments
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let name = try container.decode(IPCCommandName.self, forKey: .name)
@@ -190,8 +247,22 @@ extension IPCCommand: Codable {
         switch name {
         case .state:
             self = .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
+        case .listWindows:
+            self = .listWindows(
+                try container.decodeIfPresent(IPCWindowQueryCommand.self, forKey: .arguments) ?? .init()
+            )
+        case .listDisplays:
+            self = .listDisplays(
+                try container.decodeIfPresent(IPCDisplayQueryCommand.self, forKey: .arguments) ?? .init()
+            )
         case .focus, .moveWindow, .swap:
             self = try Self.decodeDirectionalCommand(name, from: container)
+        case .moveToDisplay:
+            self = .moveToDisplay(try container.decodeRequired(IPCMoveToDisplayCommand.self, forKey: .arguments))
+        case .toggleFloating:
+            self = .toggleFloating(
+                try container.decodeIfPresent(IPCFloatingCommand.self, forKey: .arguments) ?? .init()
+            )
         case .switchTag, .toggleTag, .tagAdd, .tagRemove:
             self = try Self.decodeTagCommand(name, from: container)
         case .moveToTag:
@@ -215,6 +286,7 @@ extension IPCCommand: Codable {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
@@ -222,7 +294,15 @@ extension IPCCommand: Codable {
         switch self {
         case let .state(command):
             try container.encode(command, forKey: .arguments)
+        case let .listWindows(command):
+            try container.encode(command, forKey: .arguments)
+        case let .listDisplays(command):
+            try container.encode(command, forKey: .arguments)
         case let .focus(command), let .moveWindow(command), let .swap(command):
+            try container.encode(command, forKey: .arguments)
+        case let .moveToDisplay(command):
+            try container.encode(command, forKey: .arguments)
+        case let .toggleFloating(command):
             try container.encode(command, forKey: .arguments)
         case let .switchTag(command), let .toggleTag(command), let .tagAdd(command), let .tagRemove(command):
             try container.encode(command, forKey: .arguments)

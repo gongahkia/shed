@@ -246,3 +246,10 @@ Current section distribution:
 - `swift build -c release -Xswiftc -cross-module-optimization` worsened static rebase fixups to `2465`; `__DATA_CONST,__const` rose from `704` to `763`.
 - `swift build -c release -Xswiftc -Osize` worsened static rebase fixups to `2416`; `__DATA_CONST,__objc_protolist` and `__DATA,__objc_protorefs` each rose from `11` to `12`.
 - Normal `swift build -c release` restored static rebase fixups to `2406`; target remains `<2000`; result remains fail.
+
+## Find bar subclass cleanup
+
+- Folded `FindBarView` state/layout into the existing `EditorWindowController`; `FindBarState` and the shared action text field remain.
+- Static rebase fixups after find-bar subclass cleanup: `2384`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `13` to `12`.
+- Section deltas: `__DATA,__objc_const` dropped from `885` to `874`; `__DATA_CONST,__const` dropped from `704` to `703`; `__DATA,__objc_data` dropped from `80` to `72`; `__DATA,__data` dropped from `47` to `46`.

@@ -601,8 +601,8 @@ final class EditorWindowController: NSWindowController {
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
 	private let findBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
-	private let findQueryField = ItsyActionTextField(frame: .zero)
-	private let findReplaceField = ItsyActionTextField(frame: .zero)
+	private let findQueryField = NSTextField(frame: .zero)
+	private let findReplaceField = NSTextField(frame: .zero)
 	private let findRegexButton = NSButton(checkboxWithTitle: L10n.string("Regex"), target: nil, action: nil)
 	private let findCaseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
 	private let findWholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
@@ -617,6 +617,7 @@ final class EditorWindowController: NSWindowController {
 	private var fileTreePreviewURL: URL?
 	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
 	private var tabBoundsObserver: NSObjectProtocol?
+	private var findKeyMonitor: Any?
 	private var findMatches: [Range<Int>] = []
 	private var selectedFindMatchIndex: Int?
 	private var incrementalFindDirection: Int?
@@ -695,6 +696,9 @@ final class EditorWindowController: NSWindowController {
 	deinit {
 		if let fileTreeKeyMonitor {
 			NSEvent.removeMonitor(fileTreeKeyMonitor)
+		}
+		if let findKeyMonitor {
+			NSEvent.removeMonitor(findKeyMonitor)
 		}
 		if let tabBoundsObserver {
 			NotificationCenter.default.removeObserver(tabBoundsObserver)
@@ -983,8 +987,8 @@ final class EditorWindowController: NSWindowController {
 
 	private static func configureFindBarView(
 		_ findBarView: NSView,
-		queryField: ItsyActionTextField,
-		replaceField: ItsyActionTextField,
+		queryField: NSTextField,
+		replaceField: NSTextField,
 		regexButton: NSButton,
 		caseButton: NSButton,
 		wholeWordButton: NSButton,
@@ -999,7 +1003,6 @@ final class EditorWindowController: NSWindowController {
 		replaceField.placeholderString = L10n.string("Replace")
 		for field in [queryField, replaceField] {
 			field.font = .systemFont(ofSize: 12)
-			field.handlesFindShortcuts = true
 		}
 		for button in [regexButton, caseButton, wholeWordButton] {
 			button.font = .systemFont(ofSize: 11)
@@ -1038,10 +1041,25 @@ final class EditorWindowController: NSWindowController {
 
 	private func installFindBarActions() {
 		for field in [findQueryField, findReplaceField] {
-			field.onCancel = { [weak self] in self?.setFindBarVisible(false) }
-			field.onConfirm = { [weak self] in self?.selectFindMatchFromFindBar(direction: 1) }
-			field.onFindPrevious = { [weak self] in self?.selectFindMatchFromFindBar(direction: -1) }
 			field.delegate = self
+		}
+		findKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+			guard let self,
+			      self.window?.isKeyWindow == true,
+			      self.isFindFieldEditing,
+			      event.modifierFlags.contains(.control)
+			else {
+				return event
+			}
+			if event.charactersIgnoringModifiers == "s" {
+				self.selectFindMatchFromFindBar(direction: 1)
+				return nil
+			}
+			if event.charactersIgnoringModifiers == "r" {
+				self.selectFindMatchFromFindBar(direction: -1)
+				return nil
+			}
+			return event
 		}
 		for button in [findRegexButton, findCaseButton, findWholeWordButton] {
 			button.target = self
@@ -1049,6 +1067,13 @@ final class EditorWindowController: NSWindowController {
 		}
 		findCloseButton.target = self
 		findCloseButton.action = #selector(closeFindBar(_:))
+	}
+
+	private var isFindFieldEditing: Bool {
+		guard let firstResponder = window?.firstResponder else {
+			return false
+		}
+		return firstResponder === findQueryField.currentEditor() || firstResponder === findReplaceField.currentEditor()
 	}
 
 	private var findState: FindBarState {
@@ -1425,6 +1450,22 @@ extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate, NSOutli
 			return
 		}
 		findStateDidChange()
+	}
+
+	func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+		guard control === findQueryField || control === findReplaceField else {
+			return false
+		}
+		switch commandSelector {
+		case #selector(NSResponder.insertNewline(_:)):
+			selectFindMatchFromFindBar(direction: 1)
+			return true
+		case #selector(NSResponder.cancelOperation(_:)):
+			setFindBarVisible(false)
+			return true
+		default:
+			return false
+		}
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {

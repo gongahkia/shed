@@ -274,3 +274,10 @@ Current section distribution:
 - Static rebase fixups after file-tree sidebar cleanup: `2313`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `10` to `9`.
 - Section deltas: `__DATA,__objc_const` dropped from `840` to `835`; `__DATA_CONST,__const` dropped from `701` to `700`; `__DATA,__objc_data` dropped from `56` to `48`; `__DATA,__data` dropped from `44` to `43`.
+
+## Text field subclass cleanup
+
+- Replaced the shared `ItsyActionTextField` subclass with plain `NSTextField` controls and existing delegate/key-monitor routing.
+- Static rebase fixups after text-field subclass cleanup: `2297`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `9` to `8`.
+- Section deltas: `__DATA,__objc_const` dropped from `835` to `822`; `__DATA,__objc_data` dropped from `48` to `41`; `__DATA,__data` dropped from `43` to `42`; `__DATA_CONST,__const` rose from `700` to `703`; `__DATA,__objc_selrefs` rose from `656` to `659`.

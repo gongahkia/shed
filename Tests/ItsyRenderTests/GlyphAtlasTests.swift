@@ -6,6 +6,8 @@ import Testing
 @Test func glyphAtlasUploadsCoreTextRaster() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
 	let atlas = try GlyphAtlas(device: device)
+	#expect(atlas.texture.width == GlyphAtlas.defaultSize)
+	#expect(atlas.texture.height == GlyphAtlas.defaultSize)
 	let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 	var chars: [UniChar] = Array("Hello".utf16)
 	var glyphs = [CGGlyph](repeating: 0, count: chars.count)

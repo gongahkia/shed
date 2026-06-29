@@ -38,6 +38,8 @@ public enum GlyphAtlasError: Error, CustomStringConvertible {
 }
 
 public final class GlyphAtlas {
+	public static let defaultSize = 1024
+
 	public enum RenderingMode: Sendable, Hashable {
 		case grayscale
 		case subpixel
@@ -71,7 +73,7 @@ public final class GlyphAtlas {
 	private let width: Int
 	private let height: Int
 
-	public init(device: MTLDevice, size: Int = 2048, renderingMode: RenderingMode = .grayscale) throws {
+	public init(device: MTLDevice, size: Int = defaultSize, renderingMode: RenderingMode = .grayscale) throws {
 		let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: renderingMode.pixelFormat, width: size, height: size, mipmapped: false)
 		descriptor.usage = [.shaderRead]
 		guard let texture = device.makeTexture(descriptor: descriptor) else {

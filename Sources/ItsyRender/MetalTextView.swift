@@ -52,6 +52,7 @@ public final class MetalTextView: NSView {
 	private static let accessibilityLocale = Locale(identifier: "en")
 	private static let benchStageLock = NSLock()
 	private static var recordedBenchStages: Set<String> = []
+	private static let maxCachedShapedLines = 512
 
 	public var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
 		didSet { needsDisplay = true }
@@ -1655,7 +1656,7 @@ public final class MetalTextView: NSView {
 				color: glyph.color
 			))
 		}
-		if lineShapeCache.count > 2048 {
+		if lineShapeCache.count > Self.maxCachedShapedLines {
 			lineShapeCache.removeAll(keepingCapacity: true)
 		}
 		lineShapeCache[key] = cached

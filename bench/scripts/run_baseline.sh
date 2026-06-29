@@ -43,7 +43,7 @@ for entry in "${apps[@]}"; do
 		if [[ "$purge" != "0" ]]; then
 			sudo purge
 		fi
-		result="$("$picobench" measure --app "$path")"
+		result="$("$picobench" measure --app "$path" --new-instance)"
 		ruby -rjson -e '
 			payload = JSON.parse(STDIN.read)
 			payload["competitor"] = ARGV[0]

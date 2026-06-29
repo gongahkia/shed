@@ -527,54 +527,36 @@ enum ItsyBenchMain {
 		let element = AXUIElementCreateApplication(pid)
 		let waiter = WindowWaiter()
 		var observer: AXObserver?
-		var observerError: AXError = .failure
-		while Date() < deadline {
-			observerError = AXObserverCreate(pid, axCallback, &observer)
-			if observerError == .success, observer != nil {
-				break
-			}
-			Thread.sleep(forTimeInterval: 0.02)
-		}
-		guard observerError == .success, let observer else {
-			throw BenchError.axObserverFailed(observerError)
-		}
-		let source = AXObserverGetRunLoopSource(observer)
-		CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .defaultMode)
-		let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(waiter).toOpaque())
 		var notificationAdded = false
-		var lastNotifyError: AXError = .success
-		while !notificationAdded, Date() < deadline {
-			if hasWindow(element) {
-				waiter.mark(DispatchTime.now().uptimeNanoseconds)
-				break
-			}
-			lastNotifyError = AXObserverAddNotification(observer, element, kAXWindowCreatedNotification as CFString, refcon)
-			if lastNotifyError == .success {
+		if AXObserverCreate(pid, axCallback, &observer) == .success, let observer {
+			let source = AXObserverGetRunLoopSource(observer)
+			CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .defaultMode)
+			let refcon = UnsafeMutableRawPointer(Unmanaged.passUnretained(waiter).toOpaque())
+			if AXObserverAddNotification(observer, element, kAXWindowCreatedNotification as CFString, refcon) == .success {
 				notificationAdded = true
-			} else {
-				Thread.sleep(forTimeInterval: 0.02)
 			}
-		}
-		if !notificationAdded, !waiter.hasValue {
-			CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .defaultMode)
-			throw BenchError.axNotificationFailed(lastNotifyError)
-		}
-		defer {
-			if notificationAdded {
-				AXObserverRemoveNotification(observer, element, kAXWindowCreatedNotification as CFString)
+			defer {
+				if notificationAdded {
+					AXObserverRemoveNotification(observer, element, kAXWindowCreatedNotification as CFString)
+				}
+				CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .defaultMode)
 			}
-			CFRunLoopRemoveSource(CFRunLoopGetCurrent(), source, .defaultMode)
+			return try waitForFirstWindowValue(element: element, waiter: waiter, start: start, deadline: deadline)
 		}
-		if hasWindow(element) {
-			waiter.mark(DispatchTime.now().uptimeNanoseconds)
-		}
-		while !waiter.hasValue, Date() < deadline {
+		return try waitForFirstWindowValue(element: element, waiter: waiter, start: start, deadline: deadline)
+	}
+
+	private static func waitForFirstWindowValue(element: AXUIElement, waiter: WindowWaiter, start: UInt64, deadline: Date) throws -> UInt64 {
+		while Date() < deadline {
+			if hasWindow(element) {
+				return max(DispatchTime.now().uptimeNanoseconds, start)
+			}
+			if let timestamp = waiter.timestamp {
+				return max(timestamp, start)
+			}
 			RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
 		}
-		guard let timestamp = waiter.timestamp else {
-			throw BenchError.windowTimeout
-		}
-		return max(timestamp, start)
+		throw BenchError.windowTimeout
 	}
 
 	private static func dispatchDeadline(_ deadline: Date) -> DispatchTime {

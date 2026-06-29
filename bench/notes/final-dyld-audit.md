@@ -79,3 +79,10 @@ Current section distribution:
 - `23` `__DATA/__objc_protorefs`
 
 [Inference] Remaining rebase work is now dominated by AppKit/ObjC-facing classes and selectors, not statically linked grammar tables. Further reduction requires shrinking the AppKit subclass/controller surface or splitting non-launch UI out of the launch binary; converting additional pure Swift structs/classes is unlikely to close the full gap alone.
+
+## Quick Look linkage update
+
+- `FileTreeSidebar` no longer imports `QuickLookUI` at compile time; it loads `QLPreviewPanel` lazily with `dlopen` and Objective-C selectors when Space preview is requested.
+- `otool -L .build/release/ItsyApp | rg 'QuickLook|QuickLookUI|swiftQuickLook'` now returns no matches.
+- `swift -e` verification confirms `dlopen("/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI", RTLD_LAZY | RTLD_LOCAL)` succeeds and `QLPreviewPanel` responds to `sharedPreviewPanel`.
+- Static rebase fixups after lazy Quick Look: `3829`; target remains `<2000`; result remains fail.

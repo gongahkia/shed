@@ -1,5 +1,5 @@
 import AppKit
-import QuickLookUI
+import Darwin
 
 final class FileTreeNode: NSObject {
 	let url: URL
@@ -144,27 +144,62 @@ private final class FileTreeOutlineView: NSOutlineView {
 	}
 }
 
-private final class ItsyQuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+private final class ItsyQuickLookController: NSObject {
 	static let shared = ItsyQuickLookController()
+	private static let panelSelector = NSSelectorFromString("sharedPreviewPanel")
+	private static let dataSourceSelector = NSSelectorFromString("setDataSource:")
+	private static let delegateSelector = NSSelectorFromString("setDelegate:")
+	private static let reloadSelector = NSSelectorFromString("reloadData")
+	private static let orderFrontSelector = NSSelectorFromString("makeKeyAndOrderFront:")
+	private static let quickLookFrameworkPaths = [
+		"/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI",
+		"/System/Library/Frameworks/QuickLookUI.framework/Versions/A/QuickLookUI",
+	]
+
 	private var previewURL: URL?
+	private var quickLookHandle: UnsafeMutableRawPointer?
 
 	func preview(_ url: URL) {
 		previewURL = url
-		guard let panel = QLPreviewPanel.shared() else {
+		guard let panel = sharedPanel() else {
 			return
 		}
-		panel.dataSource = self
-		panel.delegate = self
-		panel.reloadData()
-		panel.makeKeyAndOrderFront(nil)
+		_ = panel.perform(Self.dataSourceSelector, with: self)
+		_ = panel.perform(Self.delegateSelector, with: self)
+		_ = panel.perform(Self.reloadSelector)
+		_ = panel.perform(Self.orderFrontSelector, with: nil)
 	}
 
-	func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+	@objc(numberOfPreviewItemsInPreviewPanel:)
+	func numberOfPreviewItems(in panel: AnyObject) -> Int {
 		previewURL == nil ? 0 : 1
 	}
 
-	func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+	@objc(previewPanel:previewItemAtIndex:)
+	func previewPanel(_ panel: AnyObject, previewItemAt index: Int) -> AnyObject? {
 		previewURL as NSURL?
+	}
+
+	private func sharedPanel() -> NSObject? {
+		ensureQuickLookLoaded()
+		guard let panelClass = NSClassFromString("QLPreviewPanel") as AnyObject?,
+		      panelClass.responds(to: Self.panelSelector)
+		else {
+			return nil
+		}
+		return panelClass.perform(Self.panelSelector)?.takeUnretainedValue() as? NSObject
+	}
+
+	private func ensureQuickLookLoaded() {
+		guard quickLookHandle == nil, NSClassFromString("QLPreviewPanel") == nil else {
+			return
+		}
+		for path in Self.quickLookFrameworkPaths {
+			if let handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL) {
+				quickLookHandle = handle
+				return
+			}
+		}
 	}
 }
 

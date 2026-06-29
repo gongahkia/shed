@@ -20,6 +20,7 @@ struct CommandPaletteActionCatalog {
             command: IPCCommand.moveWindow
         ))
         actions.append(contentsOf: directionalActions(prefix: "swap", title: "Swap Window", command: IPCCommand.swap))
+        actions.append(contentsOf: snapActions())
         actions.append(contentsOf: manualPreselectActions())
         actions.append(contentsOf: bspTreeActions())
         actions.append(contentsOf: tagActions())
@@ -146,6 +147,25 @@ struct CommandPaletteActionCatalog {
                 "Bind \(engineID.rawValue) to active tag",
                 ["layout", "engine"],
                 .setEngine(IPCSetEngineCommand(engineID: engineID))
+            )
+        }
+    }
+
+    private func snapActions() -> [CommandPaletteAction] {
+        [
+            ("left-half", "Snap Left Half", IPCSnapPosition.leftHalf),
+            ("right-half", "Snap Right Half", IPCSnapPosition.rightHalf),
+            ("top-half", "Snap Top Half", IPCSnapPosition.topHalf),
+            ("bottom-half", "Snap Bottom Half", IPCSnapPosition.bottomHalf),
+            ("center", "Center Window", IPCSnapPosition.center),
+            ("maximize", "Maximize Window", IPCSnapPosition.maximize)
+        ].map { id, title, position in
+            action(
+                "snap-window-\(id)",
+                title,
+                "Snap focused window",
+                ["window", "snap", "zone"],
+                .snapWindow(IPCSnapWindowCommand(position: position))
             )
         }
     }

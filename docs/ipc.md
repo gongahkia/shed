@@ -20,6 +20,8 @@ consumes that response and then prints event lines.
 - `move-to-display`
 - `swap`
 - `toggle-floating`
+- `snap-window`
+- `dispatch-gesture`
 - `manual-preselect`
 - `bsp-tree`
 - `switch-tag`
@@ -50,6 +52,10 @@ layout order by stable window identity and restores it on later window discovery
 `list-windows` and `list-displays` return scoped `state` payloads for scripts that need stable query
 commands instead of parsing the full runtime state. `toggle-floating` changes whether a window participates
 in tiling, and `move-to-display` updates Olly's display assignment before re-arranging the affected displays.
+`snap-window` places a window in a safe-layout display zone and makes it floating by default so the next
+tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
+DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
+runtime action.
 `manual-preselect` and `bsp-tree` expose engine tree controls for manual/BSP layouts; both return structured
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
 
@@ -91,6 +97,8 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "move-to-display",
         "swap",
         "toggle-floating",
+        "snap-window",
+        "dispatch-gesture",
         "manual-preselect",
         "bsp-tree",
         "switch-tag",
@@ -125,6 +133,37 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "focus",
         "tag",
         "window"
+      ]
+    },
+    "snapPosition": {
+      "type": "string",
+      "enum": [
+        "left-half",
+        "right-half",
+        "top-half",
+        "bottom-half",
+        "top-left",
+        "top-right",
+        "bottom-left",
+        "bottom-right",
+        "center",
+        "maximize"
+      ]
+    },
+    "gestureTrigger": {
+      "type": "string",
+      "enum": [
+        "fourFingerHorizontal",
+        "fourFingerVertical"
+      ]
+    },
+    "gestureMotion": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right",
+        "upward",
+        "downward"
       ]
     },
     "manualPreselectDirection": {
@@ -301,6 +340,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "arguments": {
               "$ref": "#/$defs/floatingArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "snap-window"
+            },
+            "arguments": {
+              "$ref": "#/$defs/snapWindowArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "dispatch-gesture"
+            },
+            "arguments": {
+              "$ref": "#/$defs/dispatchGestureArguments"
             }
           }
         },
@@ -509,6 +568,47 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "floating": {
           "type": "boolean"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "snapWindowArguments": {
+      "type": "object",
+      "required": [
+        "position",
+        "makeFloating"
+      ],
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/snapPosition"
+        },
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        },
+        "makeFloating": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "dispatchGestureArguments": {
+      "type": "object",
+      "required": [
+        "trigger",
+        "motion"
+      ],
+      "properties": {
+        "trigger": {
+          "$ref": "#/$defs/gestureTrigger"
+        },
+        "motion": {
+          "$ref": "#/$defs/gestureMotion"
         },
         "displayID": {
           "$ref": "#/$defs/displayID"

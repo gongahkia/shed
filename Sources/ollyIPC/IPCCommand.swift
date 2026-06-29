@@ -11,6 +11,8 @@ public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
     case moveToDisplay = "move-to-display"
     case swap
     case toggleFloating = "toggle-floating"
+    case snapWindow = "snap-window"
+    case dispatchGesture = "dispatch-gesture"
     case manualPreselect = "manual-preselect"
     case bspTree = "bsp-tree"
     case switchTag = "switch-tag"
@@ -57,46 +59,6 @@ public struct IPCDirectionalCommand: Codable, Equatable, Sendable {
 
     public init(direction: IPCDirection, displayID: DisplayID? = nil) {
         self.direction = direction
-        self.displayID = displayID
-    }
-}
-
-public struct IPCWindowQueryCommand: Codable, Equatable, Sendable {
-    public let windowID: WindowID?
-    public let displayID: DisplayID?
-
-    public init(windowID: WindowID? = nil, displayID: DisplayID? = nil) {
-        self.windowID = windowID
-        self.displayID = displayID
-    }
-}
-
-public struct IPCDisplayQueryCommand: Codable, Equatable, Sendable {
-    public let displayID: DisplayID?
-
-    public init(displayID: DisplayID? = nil) {
-        self.displayID = displayID
-    }
-}
-
-public struct IPCMoveToDisplayCommand: Codable, Equatable, Sendable {
-    public let displayID: DisplayID
-    public let windowID: WindowID?
-
-    public init(displayID: DisplayID, windowID: WindowID? = nil) {
-        self.displayID = displayID
-        self.windowID = windowID
-    }
-}
-
-public struct IPCFloatingCommand: Codable, Equatable, Sendable {
-    public let windowID: WindowID?
-    public let floating: Bool?
-    public let displayID: DisplayID?
-
-    public init(windowID: WindowID? = nil, floating: Bool? = nil, displayID: DisplayID? = nil) {
-        self.windowID = windowID
-        self.floating = floating
         self.displayID = displayID
     }
 }
@@ -179,6 +141,8 @@ public enum IPCCommand: Equatable, Sendable {
     case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
     case toggleFloating(IPCFloatingCommand)
+    case snapWindow(IPCSnapWindowCommand)
+    case dispatchGesture(IPCDispatchGestureCommand)
     case manualPreselect(IPCManualPreselectCommand)
     case bspTree(IPCBSPTreeCommand)
     case switchTag(IPCTagCommand)
@@ -211,6 +175,10 @@ public enum IPCCommand: Equatable, Sendable {
             return .swap
         case .toggleFloating:
             return .toggleFloating
+        case .snapWindow:
+            return .snapWindow
+        case .dispatchGesture:
+            return .dispatchGesture
         case .manualPreselect:
             return .manualPreselect
         case .bspTree:
@@ -271,6 +239,10 @@ extension IPCCommand: Codable {
             self = .toggleFloating(
                 try container.decodeIfPresent(IPCFloatingCommand.self, forKey: .arguments) ?? .init()
             )
+        case .snapWindow:
+            self = .snapWindow(try container.decodeRequired(IPCSnapWindowCommand.self, forKey: .arguments))
+        case .dispatchGesture:
+            self = .dispatchGesture(try container.decodeRequired(IPCDispatchGestureCommand.self, forKey: .arguments))
         case .manualPreselect:
             self = .manualPreselect(try container.decodeRequired(IPCManualPreselectCommand.self, forKey: .arguments))
         case .bspTree:
@@ -315,6 +287,10 @@ extension IPCCommand: Codable {
         case let .moveToDisplay(command):
             try container.encode(command, forKey: .arguments)
         case let .toggleFloating(command):
+            try container.encode(command, forKey: .arguments)
+        case let .snapWindow(command):
+            try container.encode(command, forKey: .arguments)
+        case let .dispatchGesture(command):
             try container.encode(command, forKey: .arguments)
         case let .manualPreselect(command):
             try container.encode(command, forKey: .arguments)

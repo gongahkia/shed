@@ -257,6 +257,103 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testSnapWindowUsesSafeLayoutBoundsAndFloatsWindow() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 100, y: 100, width: 320, height: 240))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(.snapWindow(.init(position: .rightHalf, displayID: displayID)), to: socketPath)
+
+            XCTAssertEqual(response.status, .success)
+            let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            let window = try XCTUnwrap(snapshot.windows.first)
+            XCTAssertEqual(window.isFloating, true)
+            XCTAssertEqual(window.frame, IPCFrame(x: 720, y: 0, width: 720, height: 860))
+        }
+    }
+
+    func testSnapWindowCanKeepWindowTiled() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 200, height: 100))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(
+                .snapWindow(.init(position: .center, displayID: displayID, makeFloating: false)),
+                to: socketPath
+            )
+
+            XCTAssertEqual(response.status, .success)
+            let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            let window = try XCTUnwrap(snapshot.windows.first)
+            XCTAssertEqual(window.isFloating, false)
+            XCTAssertEqual(window.frame, IPCFrame(x: 620, y: 380, width: 200, height: 100))
+        }
+    }
+
+    func testDispatchGestureSwitchesTagsFromConfiguredGestures() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Workspaces {
+                    Tag.named("code")
+                    Tag.named("web")
+                }
+                Gestures {
+                    fourFingerVertical(.switchTags)
+                }
+            })
+            await runtime.initializeDisplays()
+
+            let response = try send(
+                .dispatchGesture(.init(trigger: .fourFingerVertical, motion: .downward, displayID: displayID)),
+                to: socketPath
+            )
+
+            XCTAssertEqual(response.status, .success)
+            let display = try XCTUnwrap(try stateSnapshot(from: send(.state(.init()), to: socketPath)).displays.first)
+            XCTAssertEqual(display.activeTags.map(\.rawValue), [1])
+        }
+    }
+
+    func testDispatchGestureScrollsColumnsByMovingRuntimeFocus() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Gestures {
+                    fourFingerHorizontal(.scrollColumns)
+                }
+            })
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(
+                .dispatchGesture(.init(trigger: .fourFingerHorizontal, motion: .right, displayID: displayID)),
+                to: socketPath
+            )
+
+            XCTAssertEqual(response.status, .success)
+            let snapshot = try stateSnapshot(from: send(.state(.init()), to: socketPath))
+            XCTAssertEqual(snapshot.focusedWindowID, 2)
+        }
+    }
+
+    func testDispatchGestureReturnsStructuredErrorForUnboundGesture() async throws {
+        try await withRuntime { _, socketPath, displayID in
+            let response = try send(
+                .dispatchGesture(.init(trigger: .fourFingerHorizontal, motion: .left, displayID: displayID)),
+                to: socketPath
+            )
+
+            XCTAssertEqual(response.status, .error)
+            XCTAssertEqual(response.error?.code, "gesture_unbound")
+        }
+    }
+
     func testManualPreselectMutatesManualTree() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -378,6 +475,10 @@ private func tag(_ value: Int) throws -> IPCTagIndex {
 private extension OllyRuntime {
     func configForTest(engineID: LayoutEngineID) async -> Any? {
         await configStore.config(for: engineID)
+    }
+
+    func replaceConfigForTest(_ config: Config) async {
+        await configStore.replace(with: config)
     }
 }
 

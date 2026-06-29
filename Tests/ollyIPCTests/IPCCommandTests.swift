@@ -17,6 +17,8 @@ final class IPCCommandTests: XCTestCase {
                 "move-to-display",
                 "swap",
                 "toggle-floating",
+                "snap-window",
+                "dispatch-gesture",
                 "manual-preselect",
                 "bsp-tree",
                 "switch-tag",
@@ -44,6 +46,12 @@ final class IPCCommandTests: XCTestCase {
             .moveToDisplay(IPCMoveToDisplayCommand(displayID: 2, windowID: 42)),
             .swap(IPCDirectionalCommand(direction: .right)),
             .toggleFloating(IPCFloatingCommand(windowID: 42, floating: true, displayID: 1)),
+            .snapWindow(IPCSnapWindowCommand(position: .topRight, windowID: 42, displayID: 1)),
+            .dispatchGesture(IPCDispatchGestureCommand(
+                trigger: .fourFingerHorizontal,
+                motion: .left,
+                displayID: 1
+            )),
             .manualPreselect(IPCManualPreselectCommand(direction: .left, windowID: 42, displayID: 1)),
             .bspTree(IPCBSPTreeCommand(action: .flipAxis, path: BSPContainerPath([0]), displayID: 1)),
             .switchTag(IPCTagCommand(tag: try tag(1), displayID: 2)),

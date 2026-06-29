@@ -80,6 +80,13 @@ Create a trigger, add a Run Shell Script action, and use an absolute command pat
 /opt/homebrew/bin/ollyctl set-engine niri-scroll
 ```
 
+For touchpad gestures, keep the recognition in BetterTouchTool and dispatch the configured
+Olly DSL gesture:
+
+```sh
+/opt/homebrew/bin/ollyctl dispatch-gesture fourFingerHorizontal right
+```
+
 Do not also bind that same keyboard shortcut in `Keybinds`.
 
 ## Hammerspoon

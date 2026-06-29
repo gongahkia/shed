@@ -3,7 +3,10 @@
 import PackageDescription
 
 let releaseSwiftSettings: [SwiftSetting] = [
-	.unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release)),
+	.unsafeFlags([
+		"-Xfrontend", "-disable-reflection-metadata",
+		"-Xfrontend", "-disable-concrete-type-metadata-mangled-name-accessors",
+	], .when(configuration: .release)),
 ]
 
 let package = Package(

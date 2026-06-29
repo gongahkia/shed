@@ -97,3 +97,8 @@ Current section distribution:
 
 - Removed unused `NSObject` inheritance and empty `NSWindowDelegate` conformance from `ProjectFindController`.
 - Static rebase fixups after project-find cleanup: `3758`; target remains `<2000`; result remains fail.
+
+## Services provider cleanup
+
+- Folded service selectors into the existing `AppDelegate` and removed the separate `ItsyServicesProvider` `NSObject` subclass.
+- Static rebase fixups after services-provider cleanup: `3742`; target remains `<2000`; result remains fail.

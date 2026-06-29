@@ -26,9 +26,6 @@ private func recordBenchStage(_ name: String) {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
-	private lazy var servicesProvider = ItsyServicesProvider { [weak self] url in
-		self?.documentController.openDocument(at: url) ?? false
-	}
 	private lazy var commandPalette = CommandPaletteController(registry: makeCommandRegistry())
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
 		self?.reloadSyntaxThemes()
@@ -271,8 +268,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func installServicesProvider() {
-		NSApp.servicesProvider = servicesProvider
-		NSRegisterServicesProvider(servicesProvider, "Itsy")
+		NSApp.servicesProvider = self
+		NSRegisterServicesProvider(self, "Itsy")
 		NSUpdateDynamicServices()
 	}
 
@@ -338,14 +335,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		commandItem.submenu = commandMenu
 		NSApp.mainMenu = mainMenu
 	}
-}
-
-private final class ItsyServicesProvider: NSObject {
-	private let openURL: (URL) -> Bool
-
-	init(openURL: @escaping (URL) -> Bool) {
-		self.openURL = openURL
-	}
 
 	@objc func openSelection(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {
 		guard let text = pasteboard.string(forType: .string), !text.isEmpty else {
@@ -355,7 +344,7 @@ private final class ItsyServicesProvider: NSObject {
 		do {
 			let url = FileManager.default.temporaryDirectory.appendingPathComponent("Itsy-Service-\(UUID().uuidString).txt")
 			try text.write(to: url, atomically: true, encoding: .utf8)
-			if !openURL(url) {
+			if !documentController.openDocument(at: url) {
 				serviceError.pointee = L10n.string("Itsy could not open the service text") as NSString
 			}
 		} catch {
@@ -369,7 +358,7 @@ private final class ItsyServicesProvider: NSObject {
 			serviceError.pointee = L10n.string("No file was provided") as NSString
 			return
 		}
-		for url in urls where !openURL(url) {
+		for url in urls where !documentController.openDocument(at: url) {
 			serviceError.pointee = L10n.string("Itsy could not open \(url.lastPathComponent)") as NSString
 			return
 		}

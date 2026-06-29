@@ -92,3 +92,8 @@ Current section distribution:
 - Converted value-like app singleton wrappers to static namespaces: `ItsyAppKeymap`, `ItsyCommandPaletteBridge`, `ItsyTabCoordinator`, and `ItsyWorkspaceController`.
 - Removed unnecessary `NSObject` inheritance from `FileTreeNode`; `NSOutlineView` still accepts it as the outline item object.
 - Static rebase fixups after singleton cleanup: `3762`; target remains `<2000`; result remains fail.
+
+## Project find delegate cleanup
+
+- Removed unused `NSObject` inheritance and empty `NSWindowDelegate` conformance from `ProjectFindController`.
+- Static rebase fixups after project-find cleanup: `3758`; target remains `<2000`; result remains fail.

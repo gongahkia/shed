@@ -10,6 +10,8 @@ final class SettingsWindowController: NSWindowController {
     private let pathLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(labelWithString: "")
     private let errorTextView = NSTextView()
+    private let profilePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let createConfigButton = NSButton(title: "Create Config", target: nil, action: nil)
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
     private var playgroundController: ConfigPlaygroundWindowController?
 
@@ -39,6 +41,7 @@ final class SettingsWindowController: NSWindowController {
 
     func show() {
         pathLabel.stringValue = sourceURL.path
+        refreshCreateConfigButton()
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -79,7 +82,12 @@ final class SettingsWindowController: NSWindowController {
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 8
+        configureProfilePopUp()
+        createConfigButton.target = self
+        createConfigButton.action = #selector(createConfig)
         buttonRow.addArrangedSubview(button("Open in Editor", #selector(openConfig)))
+        buttonRow.addArrangedSubview(createConfigButton)
+        buttonRow.addArrangedSubview(profilePopUp)
         reloadButton.target = self
         reloadButton.action = #selector(reloadConfig)
         buttonRow.addArrangedSubview(reloadButton)
@@ -121,14 +129,35 @@ final class SettingsWindowController: NSWindowController {
         return button
     }
 
+    private func configureProfilePopUp() {
+        profilePopUp.removeAllItems()
+        for profile in ConfigTemplateProfile.allCases {
+            profilePopUp.addItem(withTitle: profile.displayName)
+            profilePopUp.lastItem?.representedObject = profile.rawValue
+        }
+        profilePopUp.selectItem(withTitle: ConfigTemplateProfile.defaultProfile.displayName)
+    }
+
     @objc private func openConfig() {
         do {
-            try ensureConfigExists()
+            try ensureConfigExists(profile: selectedProfile())
             NSWorkspace.shared.open(sourceURL)
             statusLabel.stringValue = "Opened Config.swift"
+            refreshCreateConfigButton()
         } catch {
             showError(error)
         }
+    }
+
+    @objc private func createConfig() {
+        do {
+            try ensureConfigExists(profile: selectedProfile())
+            statusLabel.stringValue = "Created \(selectedProfile().displayName) config"
+            errorTextView.string = ""
+        } catch {
+            showError(error)
+        }
+        refreshCreateConfigButton()
     }
 
     @objc private func reloadConfig() {
@@ -175,12 +204,24 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
-    private func ensureConfigExists() throws {
+    private func selectedProfile() -> ConfigTemplateProfile {
+        guard let rawValue = profilePopUp.selectedItem?.representedObject as? String,
+              let profile = try? ConfigTemplateProfile(name: rawValue) else {
+            return .defaultProfile
+        }
+        return profile
+    }
+
+    private func ensureConfigExists(profile: ConfigTemplateProfile) throws {
         try fileManager.createDirectory(at: sourceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard !fileManager.fileExists(atPath: sourceURL.path) else {
             return
         }
-        try Self.defaultConfigSource.write(to: sourceURL, atomically: true, encoding: .utf8)
+        try profile.source.write(to: sourceURL, atomically: true, encoding: .utf8)
+    }
+
+    private func refreshCreateConfigButton() {
+        createConfigButton.isEnabled = !fileManager.fileExists(atPath: sourceURL.path)
     }
 
     private func showError(_ error: Error) {
@@ -189,11 +230,4 @@ final class SettingsWindowController: NSWindowController {
         errorTextView.string = String(describing: error)
     }
 
-    private static let defaultConfigSource = """
-    import ollyDSL
-
-    public func ollyConfig() -> Config {
-        Config {}
-    }
-    """
 }

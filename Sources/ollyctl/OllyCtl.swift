@@ -33,6 +33,7 @@ struct OllyCtl: ParsableCommand {
             Doctor.self,
             SubscribeEvents.self,
             Events.self,
+            InitConfig.self,
             MigrateConfig.self,
             Version.self
         ]

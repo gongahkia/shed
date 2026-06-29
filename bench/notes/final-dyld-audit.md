@@ -138,3 +138,8 @@ Current section distribution:
 
 - Replaced `EditorPaneLayout: Codable` JSON state with compact manual layout encoding to remove Codable/CodingKeys metadata from the app binary.
 - Static rebase fixups after pane-layout state cleanup: `2626`; target remains `<2000`; result remains fail.
+
+## Module marker visibility cleanup
+
+- Made unused module marker enums internal and switched the smoke test to `@testable import ItsyEditor`.
+- Static rebase fixups after module-marker visibility cleanup: `2622`; target remains `<2000`; result remains fail.

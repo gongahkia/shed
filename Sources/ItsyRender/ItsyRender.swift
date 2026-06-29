@@ -1,1 +1,1 @@
-public enum ItsyRenderModule {}
+enum ItsyRenderModule {}

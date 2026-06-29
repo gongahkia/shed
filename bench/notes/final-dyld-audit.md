@@ -133,3 +133,8 @@ Current section distribution:
 
 - Added release-only `-Xfrontend -disable-concrete-type-metadata-mangled-name-accessors` beside reflection metadata stripping.
 - Static rebase fixups after rebuilding the app normally with both metadata flags: `2639`; target remains `<2000`; result remains fail.
+
+## Pane layout state cleanup
+
+- Replaced `EditorPaneLayout: Codable` JSON state with compact manual layout encoding to remove Codable/CodingKeys metadata from the app binary.
+- Static rebase fixups after pane-layout state cleanup: `2626`; target remains `<2000`; result remains fail.

@@ -391,7 +391,7 @@ final class EditorPaneController: NSViewController {
 	}
 }
 
-private struct EditorPaneLayout: Codable, Equatable {
+private struct EditorPaneLayout: Equatable {
 	var vertical: Bool?
 	var children: [EditorPaneLayout]
 
@@ -401,6 +401,52 @@ private struct EditorPaneLayout: Codable, Equatable {
 
 	static func split(vertical: Bool, children: [EditorPaneLayout]) -> EditorPaneLayout {
 		EditorPaneLayout(vertical: vertical, children: children)
+	}
+
+	var encoded: String {
+		guard let vertical else {
+			return "L"
+		}
+		let marker = vertical ? "V" : "H"
+		return "\(marker)[\(children.map(\.encoded).joined(separator: ","))]"
+	}
+
+	static func decode(_ value: String) -> EditorPaneLayout? {
+		var index = value.startIndex
+		guard let layout = decode(in: value, index: &index), index == value.endIndex else {
+			return nil
+		}
+		return layout
+	}
+
+	private static func decode(in value: String, index: inout String.Index) -> EditorPaneLayout? {
+		guard index < value.endIndex else {
+			return nil
+		}
+		let marker = value[index]
+		index = value.index(after: index)
+		if marker == "L" {
+			return .leaf
+		}
+		guard marker == "V" || marker == "H", index < value.endIndex, value[index] == "[" else {
+			return nil
+		}
+		index = value.index(after: index)
+		var children: [EditorPaneLayout] = []
+		while index < value.endIndex, value[index] != "]" {
+			guard let child = decode(in: value, index: &index) else {
+				return nil
+			}
+			children.append(child)
+			if index < value.endIndex, value[index] == "," {
+				index = value.index(after: index)
+			}
+		}
+		guard index < value.endIndex, value[index] == "]" else {
+			return nil
+		}
+		index = value.index(after: index)
+		return .split(vertical: marker == "V", children: children)
 	}
 }
 
@@ -653,18 +699,14 @@ final class EditorWindowController: NSWindowController {
 
 	override func encodeRestorableState(with coder: NSCoder) {
 		super.encodeRestorableState(with: coder)
-		guard let data = try? JSONEncoder().encode(paneCoordinator.layout()), let string = String(data: data, encoding: .utf8) else {
-			return
-		}
-		coder.encode(string, forKey: Self.paneLayoutStateKey)
+		coder.encode(paneCoordinator.layout().encoded, forKey: Self.paneLayoutStateKey)
 	}
 
 	override func restoreState(with coder: NSCoder) {
 		super.restoreState(with: coder)
 		guard
 			let string = coder.decodeObject(forKey: Self.paneLayoutStateKey) as? String,
-			let data = string.data(using: .utf8),
-			let layout = try? JSONDecoder().decode(EditorPaneLayout.self, from: data),
+			let layout = EditorPaneLayout.decode(string),
 			let document = document as? ItsyDocument
 		else {
 			return

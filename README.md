@@ -70,7 +70,8 @@ Itsy is intentionally narrow:
 - AppKit shell, Metal text view, Swift rope buffer.
 - Built-in plain/vim/emacs keymap profiles.
 - Tree-sitter syntax highlighting for common code formats.
-- No Electron, LSP, terminal, plugin runtime, AI, collaboration, or telemetry.
+- LSP protocol core is in progress; no integrated LSP UI yet.
+- No Electron, terminal, plugin runtime, collaboration, or telemetry.
 
 ## Formatting
 

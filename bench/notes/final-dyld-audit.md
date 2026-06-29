@@ -211,3 +211,10 @@ Current section distribution:
 - Static rebase fixups after Quick Look delegate cleanup: `2464`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `18` to `17`.
 - Section deltas: `__DATA,__objc_const` dropped from `920` to `913`; `__DATA,__objc_data` dropped from `109` to `102`; `__DATA,__data` dropped from `56` to `55`.
+
+## Project find controller cleanup
+
+- Folded `ProjectFindController` panel/search state into the existing `AppDelegate`.
+- Static rebase fixups after project-find controller cleanup: `2445`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `17` to `16`.
+- Section deltas: `__DATA,__objc_const` dropped from `913` to `901`; `__DATA_CONST,__const` dropped from `703` to `702`; `__DATA,__data` dropped from `55` to `50`.

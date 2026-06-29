@@ -24,6 +24,10 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 		self.arguments = arguments
 		self.workingDirectory = workingDirectory
 	}
+
+	public var commandLine: String {
+		([command] + arguments).joined(separator: " ")
+	}
 }
 
 public enum WorkspaceTaskDiscovery {

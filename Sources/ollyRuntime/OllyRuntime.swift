@@ -41,6 +41,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case windowUnavailable(WindowID)
     case missingFocusedWindow
     case missingDirectionalTarget(IPCDirection)
+    case gestureUnbound(trigger: String, motion: String)
+    case unsupportedGestureAction(String)
     case axOperationFailed(String, AXError)
     case unsupportedAXCommand(String)
     case unsupportedEngineCommand(command: String, engineID: LayoutEngineID)
@@ -57,6 +59,10 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "no focused window"
         case let .missingDirectionalTarget(direction):
             return "no window in direction: \(direction.rawValue)"
+        case let .gestureUnbound(trigger, motion):
+            return "no gesture binding for \(trigger) \(motion)"
+        case let .unsupportedGestureAction(action):
+            return "gesture action is unsupported: \(action)"
         case let .axOperationFailed(operation, error):
             return "\(operation) failed: \(error)"
         case let .unsupportedAXCommand(command):
@@ -78,6 +84,10 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "missing_focused_window"
         case .missingDirectionalTarget:
             return "missing_directional_target"
+        case .gestureUnbound:
+            return "gesture_unbound"
+        case .unsupportedGestureAction:
+            return "unsupported_gesture_action"
         case .axOperationFailed:
             return "ax_operation_failed"
         case .unsupportedAXCommand:
@@ -264,7 +274,7 @@ public actor OllyRuntime {
             return try await tagResponse(for: request)
         case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
-        case .focus, .moveWindow, .swap, .toggleFloating, .reload, .restoreWindows:
+        case .focus, .moveWindow, .swap, .toggleFloating, .snapWindow, .dispatchGesture, .reload, .restoreWindows:
             return try await controlResponse(for: request)
         }
     }
@@ -356,6 +366,12 @@ public actor OllyRuntime {
         case let .toggleFloating(command):
             try await toggleFloating(command)
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "floating toggled")))
+        case let .snapWindow(command):
+            try await snapWindow(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window snapped")))
+        case let .dispatchGesture(command):
+            try await dispatchGesture(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "gesture dispatched")))
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))

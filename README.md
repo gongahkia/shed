@@ -145,6 +145,8 @@ ollyctl bsp-tree flip-axis
 ollyctl manual-preselect right
 ollyctl focus next
 ollyctl toggle-floating
+ollyctl snap-window left-half
+ollyctl dispatch-gesture fourFingerHorizontal right
 ollyctl move-to-tag 2
 ollyctl move-to-display 69734272
 ollyctl doctor

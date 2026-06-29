@@ -36,13 +36,19 @@ rebase_count="$(
 )"
 
 if [[ -z "$rebase_count" ]]; then
-	echo "warning: dyld statistics emitted no rebase fixup count; audit skipped" >&2
-	exit 0
+	if ! command -v dyld_info >/dev/null 2>&1; then
+		echo "warning: dyld statistics emitted no rebase fixup count; audit skipped" >&2
+		exit 0
+	fi
+	rebase_count="$(dyld_info -fixups "$binary" | awk '$4 == "rebase" {count++} END {print count+0}')"
+	source_label="static dyld_info fallback"
+else
+	source_label="runtime dyld statistics"
 fi
 
 if (( rebase_count >= threshold )); then
-	echo "dyld rebase fixups $rebase_count >= limit $threshold" >&2
+	echo "dyld rebase fixups $rebase_count >= limit $threshold ($source_label)" >&2
 	exit 1
 fi
 
-echo "dyld rebase fixups $rebase_count < limit $threshold"
+echo "dyld rebase fixups $rebase_count < limit $threshold ($source_label)"

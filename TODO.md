@@ -129,7 +129,7 @@ x 2026-06-28 +Phase14-Splits @appkit id:262 est:2h dep:260 Save/restore pane lay
 x 2026-06-29 +Phase15-Hardening @ci id:280 est:3h dep:021 Add `bench/scripts/regression.sh`: runs full bench against current `pico` build, compares to `bench/results/baseline-pico-current.json`, fails if any KPI worse by >5%. Wire into CI on PRs.
 x 2026-06-29 +Phase15-Hardening @perf id:281 est:4h dep:047 Memory leak audit: `xcrun leaks --atExit -- ./pico --bench-exit-on-ready`. Fix all. Document in `bench/notes/leak-audit.md`.
 x 2026-06-29 +Phase15-Hardening @perf id:282 est:3h dep:281 Instruments Allocations trace: open `large.ts`, scroll, edit; identify alloc hotspots. Target zero per-frame allocs in render path.
-(A) 2026-06-28 +Phase15-Hardening @perf id:283 est:2h dep:032 Final dyld audit: re-run `dyld_audit.sh` after all phases, expect <2000 rebases. If grown, identify cause (Swift reference types are #1 suspect — see [Emerge tools post](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)).
+x 2026-06-29 +Phase15-Hardening @perf id:283 est:2h dep:032 Final dyld audit: re-run `dyld_audit.sh` after all phases, expect <2000 rebases. If grown, identify cause (Swift reference types are #1 suspect — see [Emerge tools post](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)).
 (A) 2026-06-28 +Phase15-Hardening @bench id:284 est:2h dep:280 Re-run full baseline bench. Commit `bench/results/release-candidate.md`. Verify pico beats Zed on cold-start KPI on M-series. If not, do not ship.
 (B) 2026-06-28 +Phase15-Hardening @qa id:285 est:4h dep:047 Soak test: open repo as workspace, open 50 files across tabs, edit each, keep running for 1 h. No crashes, RSS growth <10%.
 

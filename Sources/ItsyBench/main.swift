@@ -18,6 +18,7 @@ private struct MeasureOptions {
 	var app: String
 	var args: [String]
 	var newInstance: Bool
+	var staged: Bool
 	var warmupPurge: Bool
 }
 
@@ -37,9 +38,11 @@ private struct LatencyResult: Encodable {
 }
 
 private struct MeasureResult: Encodable {
-	var startup_ms: Double
-	var rss_kb: UInt64
 	var app: String
+	var first_window_visible_ms: Double
+	var rss_kb: UInt64
+	var stage_ms: [String: Double]?
+	var startup_ms: Double
 }
 
 private struct RSSResult: Encodable {
@@ -256,6 +259,7 @@ enum ItsyBenchMain {
 		var app: String?
 		var appArgs: [String] = []
 		var newInstance = false
+		var staged = false
 		var warmupPurge = false
 		var index = args.startIndex
 		while index < args.endIndex {
@@ -278,6 +282,9 @@ enum ItsyBenchMain {
 			case "--new-instance":
 				newInstance = true
 				index = args.index(after: index)
+			case "--staged":
+				staged = true
+				index = args.index(after: index)
 			case "--warmup-purge":
 				warmupPurge = true
 				index = args.index(after: index)
@@ -286,9 +293,9 @@ enum ItsyBenchMain {
 			}
 		}
 		guard let app else {
-			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]")
+			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]")
 		}
-		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, warmupPurge: warmupPurge)
+		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, staged: staged, warmupPurge: warmupPurge)
 	}
 
 	private static func parseRope(_ args: [String]) throws -> RopeOptions {
@@ -412,11 +419,25 @@ enum ItsyBenchMain {
 		let url = URL(fileURLWithPath: options.app)
 		let start = DispatchTime.now().uptimeNanoseconds
 		let deadline = Date(timeIntervalSinceNow: 5)
-		let app = try launch(url: url, args: options.args, newInstance: options.newInstance, deadline: deadline)
+		let stageURL = options.staged ? temporaryStageURL() : nil
+		if let stageURL {
+			FileManager.default.createFile(atPath: stageURL.path, contents: nil)
+		}
+		let environment = stageURL.map { ["ITSY_BENCH_STAGES_PATH": $0.path] } ?? [:]
+		let app = try launch(url: url, args: options.args, newInstance: options.newInstance, environment: environment, deadline: deadline)
 		defer { terminate(app) }
 		let firstWindow = try waitForFirstWindow(pid: app.processIdentifier, start: start, deadline: deadline)
+		if let stageURL {
+			_ = waitForStage("first_draw", at: stageURL, deadline: deadline)
+		}
 		let startup = Double(firstWindow - start) / 1_000_000
-		return MeasureResult(startup_ms: startup, rss_kb: try residentSizeKB(pid: app.processIdentifier), app: url.lastPathComponent)
+		return MeasureResult(
+			app: url.lastPathComponent,
+			first_window_visible_ms: startup,
+			rss_kb: try residentSizeKB(pid: app.processIdentifier),
+			stage_ms: stageURL.map { loadStages(from: $0, since: start) },
+			startup_ms: startup
+		)
 	}
 
 	private static func terminate(_ app: NSRunningApplication) {
@@ -438,12 +459,15 @@ enum ItsyBenchMain {
 		Thread.sleep(forTimeInterval: 0.05)
 	}
 
-	private static func launch(url: URL, args: [String], newInstance: Bool, deadline: Date) throws -> NSRunningApplication {
+	private static func launch(url: URL, args: [String], newInstance: Bool, environment: [String: String], deadline: Date) throws -> NSRunningApplication {
 		let config = NSWorkspace.OpenConfiguration()
 		config.arguments = args
 		config.activates = false
 		config.addsToRecentItems = false
 		config.createsNewApplicationInstance = newInstance
+		if !environment.isEmpty {
+			config.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
+		}
 		let semaphore = DispatchSemaphore(value: 0)
 		var runningApp: NSRunningApplication?
 		var launchError: Error?
@@ -462,6 +486,41 @@ enum ItsyBenchMain {
 			throw BenchError.launchFailed("no running app returned")
 		}
 		return runningApp
+	}
+
+	private static func temporaryStageURL() -> URL {
+		FileManager.default.temporaryDirectory.appendingPathComponent("itsy-bench-stages-\(UUID().uuidString).log")
+	}
+
+	private static func waitForStage(_ name: String, at url: URL, deadline: Date) -> Bool {
+		while Date() < deadline {
+			if loadRawStages(from: url)[name] != nil {
+				return true
+			}
+			RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
+		}
+		return false
+	}
+
+	private static func loadStages(from url: URL, since start: UInt64) -> [String: Double] {
+		loadRawStages(from: url).mapValues { timestamp in
+			Double(timestamp - min(timestamp, start)) / 1_000_000
+		}
+	}
+
+	private static func loadRawStages(from url: URL) -> [String: UInt64] {
+		guard let text = try? String(contentsOf: url, encoding: .utf8) else {
+			return [:]
+		}
+		var stages: [String: UInt64] = [:]
+		for line in text.split(separator: "\n") {
+			let parts = line.split(separator: " ")
+			guard parts.count == 2, let timestamp = UInt64(parts[1]) else {
+				continue
+			}
+			stages[String(parts[0])] = timestamp
+		}
+		return stages
 	}
 
 	private static func waitForFirstWindow(pid: pid_t, start: UInt64, deadline: Date) throws -> UInt64 {
@@ -654,7 +713,7 @@ enum ItsyBenchMain {
 
 	private static let usage = """
 	usage:
-	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
+	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]

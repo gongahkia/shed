@@ -61,6 +61,7 @@ else
 fi
 
 codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+scripts/validate-macos-app-bundle.sh "$APP_BUNDLE"
 
 STAGING="$DIST_DIR/dmg-root"
 mkdir -p "$STAGING"

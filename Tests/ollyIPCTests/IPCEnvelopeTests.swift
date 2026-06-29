@@ -30,6 +30,19 @@ final class IPCEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded.status, .success)
     }
 
+    func testRestoreWindowsResponseRoundTrips() throws {
+        let envelope = IPCResponseEnvelope.ok(
+            id: "request-restore",
+            result: .restoredWindows(IPCRestoreWindowsInfo(restoredCount: 2, skippedCount: 1, failedCount: 0))
+        )
+
+        let data = try JSONEncoder().encode(envelope)
+        let decoded = try JSONDecoder().decode(IPCResponseEnvelope.self, from: data)
+
+        XCTAssertEqual(decoded, envelope)
+        XCTAssertEqual(decoded.status, .success)
+    }
+
     func testErrorResponseEnvelopeRoundTrips() throws {
         let envelope = IPCResponseEnvelope.failure(
             id: "request-3",

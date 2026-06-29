@@ -29,6 +29,13 @@ struct CommandPaletteActionCatalog {
         [
             action("state", "Show State", "Print current olly state", ["inspect"], .state(IPCStateCommand())),
             action("reload", "Reload Config", "Reload Config.swift", ["dsl"], .reload(IPCReloadCommand())),
+            action(
+                "restore-windows",
+                "Restore Windows",
+                "Restore windows parked or hidden by olly",
+                ["recovery"],
+                .restoreWindows(IPCRestoreWindowsCommand())
+            ),
             action("version", "Show IPC Version", "Print protocol version", ["debug"], .version(IPCVersionCommand())),
             action(
                 "cycle-engine",

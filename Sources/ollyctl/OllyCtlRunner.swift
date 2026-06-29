@@ -62,6 +62,8 @@ struct OllyCtlRunner {
         switch result {
         case let .acknowledged(payload):
             return payload.message ?? "ok"
+        case let .restoredWindows(info):
+            return "restored \(info.restoredCount), skipped \(info.skippedCount), failed \(info.failedCount)"
         case let .state(snapshot):
             return renderState(snapshot)
         case let .subscribed(info):

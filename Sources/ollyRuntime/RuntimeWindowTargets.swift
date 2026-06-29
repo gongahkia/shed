@@ -29,6 +29,12 @@ final class RuntimeWindowTargets: @unchecked Sendable {
         }
     }
 
+    func target(for windowID: WindowID) -> WindowMoveTarget? {
+        queue.sync {
+            targetsByWindowID[windowID]
+        }
+    }
+
     func windowID(for element: AXUIElement) -> WindowID? {
         queue.sync {
             windowIDsByElementHash[Self.elementHash(element)]

@@ -26,6 +26,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
     private let runtime = OllyRuntime()
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
+    private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusController = OllyStatusMenuController(
@@ -46,11 +47,25 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         startRuntime()
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        _ = sender
+        guard !isTerminating else {
+            return .terminateNow
+        }
+        isTerminating = true
+        overviewKeyMonitor?.remove()
+        Task { [runtime, weak self] in
+            await runtime.stop()
+            await MainActor.run {
+                self?.statusController?.remove()
+                NSApplication.shared.reply(toApplicationShouldTerminate: true)
+            }
+        }
+        return .terminateLater
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         overviewKeyMonitor?.remove()
-        Task { [runtime] in
-            await runtime.stop()
-        }
         statusController?.remove()
     }
 

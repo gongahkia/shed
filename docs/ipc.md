@@ -24,6 +24,7 @@ consumes that response and then prints event lines.
 - `tag-add`
 - `tag-remove`
 - `reload`
+- `restore-windows`
 - `subscribe-events`
 - `version`
 
@@ -42,8 +43,8 @@ layout order by stable window identity and restores it on later window discovery
 
 ## Schema
 
-The schema block below is tested against the Swift IPC constants. Breaking wire changes must bump
-`protocolVersion`, `$id`, and this document.
+The schema block below is tested against the Swift IPC constants. v1 changes are additive only;
+breaking wire changes must bump `protocolVersion`, `$id`, and this document.
 
 <!-- ipc-schema:start -->
 ```json
@@ -82,6 +83,7 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         "tag-add",
         "tag-remove",
         "reload",
+        "restore-windows",
         "subscribe-events",
         "version"
       ]
@@ -293,6 +295,16 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         {
           "properties": {
             "name": {
+              "const": "restore-windows"
+            },
+            "arguments": {
+              "$ref": "#/$defs/emptyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "subscribe-events"
             },
             "arguments": {
@@ -467,6 +479,7 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
           "type": "string",
           "enum": [
             "acknowledged",
+            "restored-windows",
             "state",
             "subscribed",
             "version"
@@ -484,6 +497,16 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
             },
             "payload": {
               "$ref": "#/$defs/acknowledgementPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "restored-windows"
+            },
+            "payload": {
+              "$ref": "#/$defs/restoredWindowsPayload"
             }
           }
         },
@@ -528,6 +551,29 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
             "string",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "restoredWindowsPayload": {
+      "type": "object",
+      "required": [
+        "restoredCount",
+        "skippedCount",
+        "failedCount"
+      ],
+      "properties": {
+        "restoredCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skippedCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedCount": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -845,6 +891,12 @@ Response:
 
 ```json
 {"version":1,"status":"ok","result":{"name":"acknowledged","payload":{"message":"focused"}}}
+```
+
+Restore windows response:
+
+```json
+{"version":1,"status":"ok","result":{"name":"restored-windows","payload":{"restoredCount":1,"skippedCount":0,"failedCount":0}}}
 ```
 
 Event line:

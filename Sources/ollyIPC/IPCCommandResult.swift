@@ -2,6 +2,7 @@ import Foundation
 
 public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Sendable {
     case acknowledged
+    case restoredWindows = "restored-windows"
     case state
     case subscribed
     case version
@@ -23,6 +24,18 @@ public struct IPCSubscriptionInfo: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCRestoreWindowsInfo: Codable, Equatable, Sendable {
+    public let restoredCount: Int
+    public let skippedCount: Int
+    public let failedCount: Int
+
+    public init(restoredCount: Int, skippedCount: Int, failedCount: Int) {
+        self.restoredCount = restoredCount
+        self.skippedCount = skippedCount
+        self.failedCount = failedCount
+    }
+}
+
 public struct IPCVersionInfo: Codable, Equatable, Sendable {
     public let protocolVersion: Int
     public let supportedCommands: [IPCCommandName]
@@ -38,6 +51,7 @@ public struct IPCVersionInfo: Codable, Equatable, Sendable {
 
 public enum IPCCommandResult: Equatable, Sendable {
     case acknowledged(IPCAcknowledgement)
+    case restoredWindows(IPCRestoreWindowsInfo)
     case state(IPCStateSnapshot)
     case subscribed(IPCSubscriptionInfo)
     case version(IPCVersionInfo)
@@ -46,6 +60,8 @@ public enum IPCCommandResult: Equatable, Sendable {
         switch self {
         case .acknowledged:
             return .acknowledged
+        case .restoredWindows:
+            return .restoredWindows
         case .state:
             return .state
         case .subscribed:
@@ -69,6 +85,8 @@ extension IPCCommandResult: Codable {
         switch name {
         case .acknowledged:
             self = .acknowledged(try container.decode(IPCAcknowledgement.self, forKey: .payload))
+        case .restoredWindows:
+            self = .restoredWindows(try container.decode(IPCRestoreWindowsInfo.self, forKey: .payload))
         case .state:
             self = .state(try container.decode(IPCStateSnapshot.self, forKey: .payload))
         case .subscribed:
@@ -84,6 +102,8 @@ extension IPCCommandResult: Codable {
 
         switch self {
         case let .acknowledged(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .restoredWindows(payload):
             try container.encode(payload, forKey: .payload)
         case let .state(payload):
             try container.encode(payload, forKey: .payload)

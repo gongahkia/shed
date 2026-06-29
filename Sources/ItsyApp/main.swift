@@ -26,7 +26,10 @@ private func recordBenchStage(_ name: String) {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
-	private lazy var commandPalette = CommandPaletteController(registry: makeCommandRegistry())
+	private lazy var commandRegistry = makeCommandRegistry()
+	private var commandPalettePanel: NSPanel?
+	private var commandPaletteContentView: CommandPaletteView?
+	private var commandPaletteCancelHandler: (() -> Void)?
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
 		self?.reloadSyntaxThemes()
 	}
@@ -50,7 +53,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			guard let self else {
 				return false
 			}
-			self.commandPalette.showExCommand(relativeTo: window, completion: completion)
+			self.showExCommand(relativeTo: window, completion: completion)
 			return true
 		}
 	}
@@ -105,7 +108,98 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	@objc private func toggleCommandPalette(_ sender: Any?) {
-		commandPalette.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		toggleCommandPalettePanel(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleCommandPalettePanel(relativeTo hostWindow: NSWindow?) {
+		if commandPalettePanel?.isVisible == true {
+			closeCommandPalette()
+			return
+		}
+		showCommandPalette(relativeTo: hostWindow)
+	}
+
+	private func closeCommandPalette() {
+		commandPaletteCancelHandler = nil
+		commandPalettePanel?.close()
+	}
+
+	private func showExCommand(relativeTo hostWindow: NSWindow?, completion: @escaping (String?) -> Void) {
+		let panel = makeCommandPalettePanelIfNeeded()
+		commandPaletteCancelHandler = { completion(nil) }
+		commandPaletteContentView?.onCancel = { [weak self] in self?.cancelCommandPalette() }
+		commandPaletteContentView?.onRunText = { [weak self] text in
+			self?.commandPaletteCancelHandler = nil
+			self?.commandPalettePanel?.close()
+			completion(text)
+		}
+		commandPaletteContentView?.setCommandLine(":")
+		centerCommandPalette(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		commandPaletteContentView?.focusInput()
+	}
+
+	private func showCommandPalette(relativeTo hostWindow: NSWindow?) {
+		let panel = makeCommandPalettePanelIfNeeded()
+		commandPaletteCancelHandler = nil
+		commandPaletteContentView?.onCancel = { [weak self] in self?.closeCommandPalette() }
+		commandPaletteContentView?.onRunText = nil
+		commandPaletteContentView?.setItems(commandRegistry.commands)
+		centerCommandPalette(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		commandPaletteContentView?.focusInput()
+	}
+
+	private func makeCommandPalettePanelIfNeeded() -> NSPanel {
+		if let panel = commandPalettePanel {
+			return panel
+		}
+		let size = NSSize(width: 560, height: 280)
+		let panel = NSPanel(
+			contentRect: NSRect(origin: .zero, size: size),
+			styleMask: [.titled, .fullSizeContentView],
+			backing: .buffered,
+			defer: false
+		)
+		let contentView = CommandPaletteView(frame: NSRect(origin: .zero, size: size))
+		contentView.onCancel = { [weak self] in self?.closeCommandPalette() }
+		contentView.onRun = { [weak self] item in
+			self?.closeCommandPalette()
+			item.run()
+		}
+		panel.contentView = contentView
+		panel.title = L10n.string("Command Palette")
+		panel.titleVisibility = .hidden
+		panel.titlebarAppearsTransparent = true
+		panel.isReleasedWhenClosed = false
+		panel.hasShadow = true
+		panel.level = .floating
+		panel.delegate = self
+		commandPalettePanel = panel
+		commandPaletteContentView = contentView
+		return panel
+	}
+
+	private func centerCommandPalette(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(560, max(360, hostFrame.width - 80))
+		let height: CGFloat = 280
+		let frame = NSRect(
+			x: hostFrame.midX - width / 2,
+			y: hostFrame.midY - height / 2,
+			width: width,
+			height: height
+		)
+		panel.setFrame(frame, display: true)
+	}
+
+	private func cancelCommandPalette() {
+		let handler = commandPaletteCancelHandler
+		commandPaletteCancelHandler = nil
+		commandPalettePanel?.close()
+		handler?()
 	}
 
 	private func makeCommandRegistry() -> CommandRegistry {
@@ -456,7 +550,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
-extension AppDelegate: NSMenuDelegate {
+extension AppDelegate: NSMenuDelegate, NSWindowDelegate {
 	func menuNeedsUpdate(_ menu: NSMenu) {
 		guard menu === openRecentMenu else {
 			return
@@ -474,6 +568,18 @@ extension AppDelegate: NSMenuDelegate {
 		let clearItem = menu.addItem(withTitle: L10n.string("Clear Menu"), action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
 		clearItem.target = documentController
 		clearItem.isEnabled = !urls.isEmpty
+	}
+
+	func windowDidResignKey(_ notification: Notification) {
+		guard let panel = notification.object as? NSPanel, panel === commandPalettePanel else {
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self, weak panel] in
+			guard let self, let panel, panel.isVisible, !panel.isKeyWindow else {
+				return
+			}
+			self.cancelCommandPalette()
+		}
 	}
 }
 

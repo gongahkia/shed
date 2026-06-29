@@ -281,3 +281,10 @@ Current section distribution:
 - Static rebase fixups after text-field subclass cleanup: `2297`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `9` to `8`.
 - Section deltas: `__DATA,__objc_const` dropped from `835` to `822`; `__DATA,__objc_data` dropped from `48` to `41`; `__DATA,__data` dropped from `43` to `42`; `__DATA_CONST,__const` rose from `700` to `703`; `__DATA,__objc_selrefs` rose from `656` to `659`.
+
+## Syntax wrapper visibility cleanup
+
+- Made `Parser` and `HighlightQuery` internal implementation details behind `SyntaxPipeline`; tests use `@testable import ItsySyntax`.
+- Static rebase fixups after syntax-wrapper visibility cleanup: `2295`; target remains `<2000`; result remains fail.
+- Section deltas: `__DATA,__objc_data` dropped from `41` to `40`; `__DATA,__data` dropped from `42` to `41`.
+- Move-only C-resource wrapper experiment compiled in release and dropped `__DATA_CONST,__objc_classlist` from `8` to `5`, but default parallel `swift test` crashed with signal 11; not kept.

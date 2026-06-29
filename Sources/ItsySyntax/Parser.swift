@@ -165,10 +165,10 @@ private enum GrammarLoader {
 	}
 }
 
-public final class Parser {
+final class Parser {
 	private let parser: OpaquePointer
 
-	public init(language: Language) throws {
+	init(language: Language) throws {
 		guard let parser = ts_parser_new() else {
 			throw SyntaxError.parserAllocationFailed
 		}
@@ -183,7 +183,7 @@ public final class Parser {
 		ts_parser_delete(parser)
 	}
 
-	public func parse(_ rope: Rope, oldTree: Tree? = nil) throws -> Tree {
+	func parse(_ rope: Rope, oldTree: Tree? = nil) throws -> Tree {
 		guard rope.length <= Int(UInt32.max) else {
 			throw SyntaxError.documentTooLarge(rope.length)
 		}
@@ -371,10 +371,10 @@ public struct HighlightSpan: Sendable, Equatable {
 	}
 }
 
-public final class HighlightQuery {
+final class HighlightQuery {
 	private let query: OpaquePointer
 
-	public init(language: Language) throws {
+	init(language: Language) throws {
 		guard let rawLanguage = language.rawLanguage else {
 			throw SyntaxError.incompatibleLanguage(language)
 		}
@@ -394,7 +394,7 @@ public final class HighlightQuery {
 		ts_query_delete(query)
 	}
 
-	public func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
+	func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
 		guard let cursor = ts_query_cursor_new() else {
 			throw SyntaxError.queryCursorAllocationFailed
 		}

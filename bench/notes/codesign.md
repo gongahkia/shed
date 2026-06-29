@@ -26,7 +26,7 @@ Validation steps in the script:
 
 - `scripts/make_dmg.sh` uses `create-dmg` when installed, falls back to `hdiutil`, verifies the app signature unless `ITSY_ALLOW_UNSIGNED_DMG=1`, builds `dist/Itsy-0.1.0.dmg`, verifies the DMG, mounts it with `scripts/verify_dmg.sh`, optionally signs it, and writes `dist/Itsy-0.1.0.dmg.sha256`.
 - `scripts/notarize.sh` submits the DMG with `xcrun notarytool`, waits, staples, validates the staple, and runs `spctl` on the DMG.
-- `.github/workflows/release.yml` runs on `v*.*.*` tags, imports a Developer ID Application certificate from secrets, builds/tests/signs/packages/notarizes, uploads the DMG artifact, and creates a GitHub Release.
+- `.github/workflows/release.yml` runs on `v*.*.*` tags, imports a Developer ID Application certificate from secrets, builds/tests/signs/packages/notarizes, verifies the DMG/SHA assets, uploads the DMG artifact, and creates a GitHub Release with `gh release create --verify-tag`.
 
 Required release secrets:
 
@@ -37,6 +37,12 @@ Required release secrets:
 - `APPLE_ID`
 - `APPLE_TEAM_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
+
+Release workflow validation:
+
+- YAML parse: `ruby -e 'require "yaml"; YAML.load_file(".github/workflows/release.yml")'`
+- Local unsigned asset smoke: `ITSY_ALLOW_UNSIGNED_DMG=1 scripts/make_dmg.sh && shasum -c dist/Itsy-0.1.0.dmg.sha256 && ITSY_ALLOW_UNSIGNED_DMG=1 scripts/verify_dmg.sh dist/Itsy-0.1.0.dmg`
+- [Unverified] The GitHub release job itself requires repository secrets and a Developer ID Application certificate, so it was not executed locally.
 
 ## Local status
 
@@ -63,7 +69,7 @@ ITSY_ALLOW_UNSIGNED_DMG=1 scripts/make_dmg.sh
 
 This validates bundle layout and DMG integrity only. It does not satisfy id:301 or id:302.
 
-2026-06-29 local result: unsigned `hdiutil` fallback built `dist/Itsy-0.1.0.dmg`; `hdiutil verify` and mounted bundle validation passed. SHA-256: `89104a772e2723e51ec5a5a82d556130cb4d115965c4c36a3e5da33b019d40bb`.
+2026-06-29 local result: unsigned `hdiutil` fallback built `dist/Itsy-0.1.0.dmg`; `hdiutil verify` and mounted bundle validation passed. SHA-256: `88e8c5619565c932cb89a475f77062fbd2374f2f68c101046571c7d5868c3302`.
 
 ## Notes
 

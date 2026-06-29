@@ -84,6 +84,38 @@ public struct WindowState: Equatable, Sendable {
             subrole: subrole
         )
     }
+
+    public func withFloating(_ isFloating: Bool) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
+
+    public func withDisplayID(_ displayID: DisplayID?) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
 }
 
 public enum WindowStoreDelta: Equatable, Sendable {

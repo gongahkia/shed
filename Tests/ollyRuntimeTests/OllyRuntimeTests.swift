@@ -195,6 +195,68 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testListWindowsAndDisplaysReturnScopedState() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+
+            let windows = try stateSnapshot(from: send(
+                .listWindows(.init(windowID: 2, displayID: displayID)),
+                to: socketPath
+            ))
+            XCTAssertTrue(windows.displays.isEmpty)
+            XCTAssertEqual(windows.windows.map(\.windowID), [2])
+
+            let displays = try stateSnapshot(from: send(.listDisplays(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(displays.displays.map(\.displayID), [displayID])
+            XCTAssertTrue(displays.windows.isEmpty)
+        }
+    }
+
+    func testToggleFloatingUpdatesFocusedWindow() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            XCTAssertEqual(try send(.toggleFloating(.init()), to: socketPath).status, .success)
+            var snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isFloating, true)
+
+            let command = IPCFloatingCommand(windowID: 1, floating: false, displayID: displayID)
+            XCTAssertEqual(try send(.toggleFloating(command), to: socketPath).status, .success)
+            snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isFloating, false)
+        }
+    }
+
+    func testMoveToDisplayUpdatesWindowDisplay() async throws {
+        let secondaryDisplay = Display(
+            id: 99,
+            frame: CGRect(x: 1440, y: 0, width: 1200, height: 900),
+            visibleFrame: CGRect(x: 1440, y: 0, width: 1200, height: 860),
+            scaleFactor: 2,
+            localizedName: "Secondary",
+            isMain: false
+        )
+        try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(.moveToDisplay(.init(displayID: 99)), to: socketPath)
+
+            XCTAssertEqual(response.status, .success)
+            let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.displayID, 99)
+        }
+    }
+
     func testSpatialTargetPrefersPerpendicularOverlapBeforeNearestCenter() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -234,9 +296,10 @@ final class OllyRuntimeTests: XCTestCase {
 
 private func withRuntime(
     snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
+    extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
 ) async throws {
-    let fixture = try RuntimeFixture()
+    let fixture = try RuntimeFixture(extraDisplays: extraDisplays)
     let runtime = fixture.makeRuntime(snapshotCache: snapshotCache)
     do {
         try await runtime.start()
@@ -296,8 +359,9 @@ private struct RuntimeFixture {
     let directoryURL: URL
     let socketPath: IPCSocketPath
     let display: Display
+    let displays: [Display]
 
-    init() throws {
+    init(extraDisplays: [Display] = []) throws {
         let id = String(UUID().uuidString.prefix(8))
         directoryURL = URL(fileURLWithPath: "/tmp", isDirectory: true)
             .appendingPathComponent("olly-runtime-\(id)", isDirectory: true)
@@ -310,6 +374,7 @@ private struct RuntimeFixture {
             localizedName: "Test Display",
             isMain: true
         )
+        displays = [display] + extraDisplays
     }
 
     func makeRuntime(snapshotCache: WindowSnapshotCache = WindowSnapshotCache()) -> OllyRuntime {
@@ -319,7 +384,7 @@ private struct RuntimeFixture {
                 sourceURL: directoryURL.appendingPathComponent("missing.swift"),
                 cacheDirectory: directoryURL.appendingPathComponent("cache", isDirectory: true)
             ),
-            displayProvider: { [display] in [display] },
+            displayProvider: { [displays] in displays },
             snapshotCache: snapshotCache,
             statePersistence: WindowTagPersistence(
                 stateURL: directoryURL.appendingPathComponent("state.json")

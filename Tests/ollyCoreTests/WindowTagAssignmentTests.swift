@@ -64,6 +64,19 @@ final class WindowTagAssignmentTests: XCTestCase {
         XCTAssertEqual(updated.tagMask, TagSet(one).rawValue)
     }
 
+    func testSetFloatingChangesFloatingOnly() async throws {
+        let one = try Tag(index: 1)
+        let store = WindowStore()
+        let assignment = WindowTagAssignment(windowStore: store)
+        await store.upsert(window(id: 1, displayID: 1, tagMask: TagSet(one).rawValue))
+
+        let updated = try await assignment.setFloating(window: 1, floating: true)
+
+        XCTAssertTrue(updated.isFloating)
+        XCTAssertEqual(updated.displayID, 1)
+        XCTAssertEqual(updated.tagMask, TagSet(one).rawValue)
+    }
+
     func testMissingWindowThrows() async {
         let store = WindowStore()
         let assignment = WindowTagAssignment(windowStore: store)

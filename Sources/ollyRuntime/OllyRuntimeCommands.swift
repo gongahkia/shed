@@ -49,6 +49,21 @@ extension OllyRuntime {
         return IPCStateSnapshot(displays: displays, windows: windows, focusedWindowID: focusedWindowID)
     }
 
+    func windowListSnapshot(_ command: IPCWindowQueryCommand) async -> IPCStateSnapshot {
+        let windows = await windowStore.allWindows()
+            .filter { command.displayID == nil || $0.displayID == command.displayID }
+            .filter { command.windowID == nil || $0.id == command.windowID }
+            .map(IPCWindowState.init)
+        return IPCStateSnapshot(displays: [], windows: windows, focusedWindowID: focusedWindowID)
+    }
+
+    func displayListSnapshot(_ command: IPCDisplayQueryCommand) async -> IPCStateSnapshot {
+        let displays = await tagStore.allStates()
+            .filter { command.displayID == nil || $0.displayID == command.displayID }
+            .map(IPCDisplayState.init)
+        return IPCStateSnapshot(displays: displays, windows: [], focusedWindowID: focusedWindowID)
+    }
+
     func persistedState() async throws -> WindowTagPersistenceState {
         try await statePersistence.load()
     }
@@ -126,6 +141,33 @@ extension OllyRuntime {
         let displayID = command.displayID ?? state.displayID ?? selectedDisplay(nil)?.id
         if let displayID {
             try await applyAndArrange(displayID: displayID)
+        }
+    }
+
+    func moveToDisplay(_ command: IPCMoveToDisplayCommand) async throws {
+        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let windowID = try command.windowID ?? focusedWindowID.requiredFocusedWindow()
+        guard let current = await windowStore.state(for: windowID) else {
+            throw OllyRuntimeError.windowUnavailable(windowID)
+        }
+        let previousDisplayID = current.displayID
+        let state = try await assignment.move(window: windowID, toDisplay: displayID)
+        try await statePersistence.upsertLayoutOrders(for: [state])
+        for arrangeDisplayID in Set([previousDisplayID, state.displayID].compactMap { $0 }) {
+            try await arrange(displayID: arrangeDisplayID)
+        }
+    }
+
+    func toggleFloating(_ command: IPCFloatingCommand) async throws {
+        let windowID = try command.windowID ?? focusedWindowID.requiredFocusedWindow()
+        guard let current = await windowStore.state(for: windowID) else {
+            throw OllyRuntimeError.windowUnavailable(windowID)
+        }
+        let floating = command.floating ?? !current.isFloating
+        let state = try await assignment.setFloating(window: windowID, floating: floating)
+        let displayID = command.displayID ?? state.displayID ?? selectedDisplay(nil)?.id
+        if let displayID {
+            try await arrange(displayID: displayID)
         }
     }
 

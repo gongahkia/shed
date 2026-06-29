@@ -136,11 +136,15 @@ More configs live in [`examples/`](examples/):
 
 ```sh
 ollyctl state --json
+ollyctl list-windows
+ollyctl list-displays
 ollyctl switch-tag 1
 ollyctl set-engine bsp
 ollyctl cycle-engine
 ollyctl focus next
+ollyctl toggle-floating
 ollyctl move-to-tag 2
+ollyctl move-to-display 69734272
 ollyctl events --replay-current-state
 ollyctl migrate-config --config ~/.config/olly/Config.swift
 ```

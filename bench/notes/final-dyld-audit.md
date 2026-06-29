@@ -122,3 +122,9 @@ Current section distribution:
 
 - Replaced the private `CommandPalettePanelDelegate` protocol with a panel cancel closure while keeping `NSWindowDelegate` for blur dismissal.
 - Static rebase fixups after command-palette cancel cleanup: `3717`; target remains `<2000`; result remains fail.
+
+## Release reflection metadata cleanup
+
+- Added release-only `-Xfrontend -disable-reflection-metadata` Swift settings to the app/runtime Swift targets.
+- Static rebase fixups after rebuilding the app normally with reflection metadata disabled: `2661`; target remains `<2000`; result remains fail.
+- `swift test -c release` passes; after release tests, rebuild with `swift build -c release` before auditing because the test build rewrites release artifacts with test settings.

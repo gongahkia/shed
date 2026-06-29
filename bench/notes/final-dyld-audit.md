@@ -288,3 +288,9 @@ Current section distribution:
 - Static rebase fixups after syntax-wrapper visibility cleanup: `2295`; target remains `<2000`; result remains fail.
 - Section deltas: `__DATA,__objc_data` dropped from `41` to `40`; `__DATA,__data` dropped from `42` to `41`.
 - Move-only C-resource wrapper experiment compiled in release and dropped `__DATA_CONST,__objc_classlist` from `8` to `5`, but default parallel `swift test` crashed with signal 11; not kept.
+
+## Render API visibility cleanup
+
+- Made `MetalTextView` members unused outside `ItsyRender` internal; app-facing editor/find/keymap APIs remain public.
+- Static rebase fixups after render API visibility cleanup: `2294`; target remains `<2000`; result remains fail.
+- Section delta: `__DATA,__objc_selrefs` dropped from `659` to `658`.

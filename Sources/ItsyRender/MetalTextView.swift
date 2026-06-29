@@ -54,7 +54,7 @@ public final class MetalTextView: NSView {
 	private static var recordedBenchStages: Set<String> = []
 	private static let maxCachedShapedLines = 512
 
-	public var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
+	var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
 		didSet { needsDisplay = true }
 	}
 
@@ -63,7 +63,7 @@ public final class MetalTextView: NSView {
 	private let dirtyLock = NSLock()
 	private var dirty = true
 	private var displayLink: CVDisplayLink?
-	public private(set) var renderedFrameCount = 0
+	private(set) var renderedFrameCount = 0
 	private var cursorRect: CGRect?
 	private var cursorBlinkVisible = true
 	private var cursorBlinkTimer: Timer?
@@ -95,13 +95,13 @@ public final class MetalTextView: NSView {
 	public var topContentInset: CGFloat = 0 {
 		didSet { syncEditorState() }
 	}
-	public private(set) var topLineIndex = 0
-	public private(set) var xOffset: CGFloat = 0
-	public private(set) var displayLinkRefreshRate: Double?
-	public var lineHeight: CGFloat = 17 {
+	private(set) var topLineIndex = 0
+	private(set) var xOffset: CGFloat = 0
+	private(set) var displayLinkRefreshRate: Double?
+	var lineHeight: CGFloat = 17 {
 		didSet { markDirty() }
 	}
-	public var lineCount: Int = 0 {
+	var lineCount: Int = 0 {
 		didSet {
 			topLineIndex = min(topLineIndex, max(0, lineCount - 1))
 			markDirty()
@@ -240,7 +240,7 @@ public final class MetalTextView: NSView {
 		stopCursorBlinkTimer()
 	}
 
-	public func markDirty() {
+	func markDirty() {
 		dirtyLock.lock()
 		dirty = true
 		dirtyLock.unlock()
@@ -256,18 +256,18 @@ public final class MetalTextView: NSView {
 		return true
 	}
 
-	public func setCursor(x: CGFloat, y: CGFloat, height: CGFloat) {
+	func setCursor(x: CGFloat, y: CGFloat, height: CGFloat) {
 		cursorRect = CGRect(x: x, y: y, width: 2, height: height)
 		cursorBlinkVisible = true
 		markDirty()
 	}
 
-	public func clearCursor() {
+	func clearCursor() {
 		cursorRect = nil
 		markDirty()
 	}
 
-	public func setSelectionRects(_ rects: [CGRect]) {
+	func setSelectionRects(_ rects: [CGRect]) {
 		selectionRects = rects
 		markDirty()
 	}
@@ -277,7 +277,7 @@ public final class MetalTextView: NSView {
 		refreshFindMatchRects()
 	}
 
-	public var visibleLineRange: Range<Int> {
+	var visibleLineRange: Range<Int> {
 		guard lineCount > 0 else {
 			return 0 ..< 0
 		}
@@ -287,7 +287,7 @@ public final class MetalTextView: NSView {
 		return topLineIndex ..< end
 	}
 
-	public func scroll(deltaX: CGFloat, deltaY: CGFloat) {
+	func scroll(deltaX: CGFloat, deltaY: CGFloat) {
 		if deltaY != 0, lineCount > 0 {
 			let lineDelta = Int((deltaY / max(lineHeight, 1)).rounded(.toNearestOrAwayFromZero))
 			topLineIndex = min(max(topLineIndex + lineDelta, 0), max(0, lineCount - 1))

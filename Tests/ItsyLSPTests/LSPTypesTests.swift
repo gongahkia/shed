@@ -70,3 +70,15 @@ import Testing
 
 	#expect(decoded == params)
 }
+
+@Test func initializeParamsEncodeRequiredNulls() throws {
+	let params = LSPInitializeParams(processId: nil, rootUri: nil)
+
+	let value = try LSPAny(encoding: params)
+
+	#expect(value == .object([
+		"processId": .null,
+		"rootUri": .null,
+		"capabilities": .object([:]),
+	]))
+}

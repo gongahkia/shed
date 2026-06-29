@@ -169,4 +169,40 @@ public struct LSPInitializeParams: Codable, Equatable, Sendable {
 		self.rootUri = rootUri
 		self.capabilities = capabilities
 	}
+
+	private enum CodingKeys: String, CodingKey {
+		case processId
+		case rootUri
+		case capabilities
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		if container.contains(.processId), try !container.decodeNil(forKey: .processId) {
+			processId = try container.decode(Int.self, forKey: .processId)
+		} else {
+			processId = nil
+		}
+		if container.contains(.rootUri), try !container.decodeNil(forKey: .rootUri) {
+			rootUri = try container.decode(String.self, forKey: .rootUri)
+		} else {
+			rootUri = nil
+		}
+		capabilities = try container.decodeIfPresent(LSPAny.self, forKey: .capabilities) ?? .object([:])
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		if let processId {
+			try container.encode(processId, forKey: .processId)
+		} else {
+			try container.encodeNil(forKey: .processId)
+		}
+		if let rootUri {
+			try container.encode(rootUri, forKey: .rootUri)
+		} else {
+			try container.encodeNil(forKey: .rootUri)
+		}
+		try container.encode(capabilities, forKey: .capabilities)
+	}
 }

@@ -102,3 +102,8 @@ Current section distribution:
 
 - Folded service selectors into the existing `AppDelegate` and removed the separate `ItsyServicesProvider` `NSObject` subclass.
 - Static rebase fixups after services-provider cleanup: `3742`; target remains `<2000`; result remains fail.
+
+## Grammar loader cleanup
+
+- Converted `GrammarLoader` from a singleton class to a static namespace while keeping the same lock and `dlopen` handle cache.
+- Static rebase fixups after grammar-loader cleanup: `3727`; target remains `<2000`; result remains fail.

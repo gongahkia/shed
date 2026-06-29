@@ -17,6 +17,7 @@ private struct LatencyOptions {
 private struct MeasureOptions {
 	var app: String
 	var args: [String]
+	var newInstance: Bool
 	var warmupPurge: Bool
 }
 
@@ -254,6 +255,7 @@ enum PicoBenchMain {
 	private static func parseMeasure(_ args: [String]) throws -> MeasureOptions {
 		var app: String?
 		var appArgs: [String] = []
+		var newInstance = false
 		var warmupPurge = false
 		var index = args.startIndex
 		while index < args.endIndex {
@@ -273,6 +275,9 @@ enum PicoBenchMain {
 				}
 				appArgs.append(args[valueIndex])
 				index = args.index(after: valueIndex)
+			case "--new-instance":
+				newInstance = true
+				index = args.index(after: index)
 			case "--warmup-purge":
 				warmupPurge = true
 				index = args.index(after: index)
@@ -281,9 +286,9 @@ enum PicoBenchMain {
 			}
 		}
 		guard let app else {
-			throw BenchError.usage("usage: picobench measure --app <path> [--args <arg>] [--warmup-purge]")
+			throw BenchError.usage("usage: picobench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]")
 		}
-		return MeasureOptions(app: app, args: appArgs, warmupPurge: warmupPurge)
+		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, warmupPurge: warmupPurge)
 	}
 
 	private static func parseRope(_ args: [String]) throws -> RopeOptions {
@@ -407,7 +412,7 @@ enum PicoBenchMain {
 		let url = URL(fileURLWithPath: options.app)
 		let start = DispatchTime.now().uptimeNanoseconds
 		let deadline = Date(timeIntervalSinceNow: 5)
-		let app = try launch(url: url, args: options.args, deadline: deadline)
+		let app = try launch(url: url, args: options.args, newInstance: options.newInstance, deadline: deadline)
 		defer { terminate(app) }
 		let firstWindow = try waitForFirstWindow(pid: app.processIdentifier, start: start, deadline: deadline)
 		let startup = Double(firstWindow - start) / 1_000_000
@@ -433,11 +438,12 @@ enum PicoBenchMain {
 		Thread.sleep(forTimeInterval: 0.05)
 	}
 
-	private static func launch(url: URL, args: [String], deadline: Date) throws -> NSRunningApplication {
+	private static func launch(url: URL, args: [String], newInstance: Bool, deadline: Date) throws -> NSRunningApplication {
 		let config = NSWorkspace.OpenConfiguration()
 		config.arguments = args
 		config.activates = false
 		config.addsToRecentItems = false
+		config.createsNewApplicationInstance = newInstance
 		let semaphore = DispatchSemaphore(value: 0)
 		var runningApp: NSRunningApplication?
 		var launchError: Error?
@@ -462,7 +468,14 @@ enum PicoBenchMain {
 		let element = AXUIElementCreateApplication(pid)
 		let waiter = WindowWaiter()
 		var observer: AXObserver?
-		let observerError = AXObserverCreate(pid, axCallback, &observer)
+		var observerError: AXError = .failure
+		while Date() < deadline {
+			observerError = AXObserverCreate(pid, axCallback, &observer)
+			if observerError == .success, observer != nil {
+				break
+			}
+			Thread.sleep(forTimeInterval: 0.02)
+		}
 		guard observerError == .success, let observer else {
 			throw BenchError.axObserverFailed(observerError)
 		}
@@ -641,7 +654,7 @@ enum PicoBenchMain {
 
 	private static let usage = """
 	usage:
-	  picobench measure --app <path> [--args <arg>] [--warmup-purge]
+	  picobench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
 	  picobench rope [--ops <count>] [--slice-length <bytes>]
 	  picobench rss --pid <pid>
 	  picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]

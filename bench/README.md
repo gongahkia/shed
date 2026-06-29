@@ -18,7 +18,7 @@
 ## CLI
 
 ```sh
-picobench measure --app <path> [--args <arg>] [--warmup-purge]
+picobench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
 picobench rss --pid <pid>
 picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```

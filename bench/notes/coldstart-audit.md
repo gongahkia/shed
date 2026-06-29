@@ -43,3 +43,19 @@ Mean first-window-visible: `262.690 ms`. Mean `applicationDidFinishLaunching`: `
 [Inference] The current `<150 ms` miss is after `applicationDidFinishLaunching`, mostly between initial document/window activation and AX-visible window detection. The staged data does not prove the app meets the cold-start KPI.
 
 `ItsyBench` now falls back to polling `AXWindows` when `kAXWindowCreatedNotification` registration is unavailable, so staged measurement does not fail on AX notification error `-25204`.
+
+## 2026-06-29 staged refresh
+
+After the AppKit metadata cleanup commits, a 5-run staged sample against `Itsy.app` produced one `window creation timed out` result and four successful runs:
+
+| Run | process_start ms | delegate_init ms | app_did_finish_launching ms | initial_document_opened ms | first_window_visible ms | first_draw ms | RSS KB |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | timeout | timeout | timeout | timeout | timeout | timeout | timeout |
+| 2 | 68.831 | 123.582 | 172.848 | 269.319 | 289.834 | 295.153 | 86736 |
+| 3 | 63.595 | 93.303 | 142.130 | 235.310 | 266.055 | 269.540 | 86704 |
+| 4 | 69.676 | 107.558 | 152.573 | 239.647 | 264.129 | 274.171 | 86768 |
+| 5 | 69.824 | 124.651 | 178.736 | 267.083 | 303.291 | 300.172 | 86752 |
+
+Successful-run mean first-window-visible: `280.827 ms`. Mean `applicationDidFinishLaunching`: `161.572 ms`. Mean first draw: `284.759 ms`. Mean RSS: `86740 KB`.
+
+Status remains fail for the `<150 ms` cold-start target and `<30 MB` idle-RAM target.

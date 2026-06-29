@@ -153,3 +153,8 @@ Current section distribution:
 
 - Replaced the custom tab button subclass with plain `NSButton.tag` routing owned by `TabBarView`.
 - Static rebase fixups after tab-button subclass cleanup: `2587`; target remains `<2000`; result remains fail.
+
+## Editor pane controller cleanup
+
+- Replaced the trivial `NSViewController` subclass for editor panes with a value wrapper around a plain `NSViewController` and `MetalTextView`.
+- Static rebase fixups after editor-pane controller cleanup: `2582`; target remains `<2000`; result remains fail.

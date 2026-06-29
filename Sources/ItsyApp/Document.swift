@@ -383,11 +383,14 @@ final class ItsyDocument: NSDocument {
 	}
 }
 
-final class EditorPaneController: NSViewController {
-	let editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+struct EditorPane {
+	let viewController: NSViewController
+	let editorView: MetalTextView
 
-	override func loadView() {
-		view = editorView
+	init() {
+		viewController = NSViewController()
+		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+		viewController.view = editorView
 	}
 }
 
@@ -452,15 +455,17 @@ private struct EditorPaneLayout: Equatable {
 
 struct EditorPaneCoordinator {
 	let rootSplitViewController = NSSplitViewController()
-	private(set) var panes: [EditorPaneController] = []
-	private(set) var activePane: EditorPaneController
+	private(set) var panes: [EditorPane] = []
+	private var activePaneIndex = 0
+	var activePane: EditorPane {
+		panes[activePaneIndex]
+	}
 
 	init() {
-		let pane = EditorPaneController()
-		activePane = pane
+		let pane = EditorPane()
 		panes = [pane]
 		rootSplitViewController.splitView.dividerStyle = .thin
-		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: pane))
+		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: pane.viewController))
 	}
 
 	var view: NSView {
@@ -468,54 +473,55 @@ struct EditorPaneCoordinator {
 	}
 
 	@discardableResult
-	mutating func splitActive(vertical: Bool) -> EditorPaneController {
-		let newPane = EditorPaneController()
+	mutating func splitActive(vertical: Bool) -> EditorPane {
+		let activePane = activePane
+		let newPane = EditorPane()
 		panes.append(newPane)
-		let parent = activePane.parent as? NSSplitViewController ?? rootSplitViewController
-		let index = parent.splitViewItems.firstIndex { $0.viewController === activePane } ?? 0
+		let parent = activePane.viewController.parent as? NSSplitViewController ?? rootSplitViewController
+		let index = parent.splitViewItems.firstIndex { $0.viewController === activePane.viewController } ?? 0
 		let oldItem = parent.splitViewItems[index]
 		parent.removeSplitViewItem(oldItem)
 		let nested = NSSplitViewController()
 		nested.splitView.isVertical = vertical
 		nested.splitView.dividerStyle = .thin
 		nested.addSplitViewItem(oldItem)
-		nested.addSplitViewItem(NSSplitViewItem(viewController: newPane))
+		nested.addSplitViewItem(NSSplitViewItem(viewController: newPane.viewController))
 		parent.insertSplitViewItem(NSSplitViewItem(viewController: nested), at: index)
-		activePane = newPane
+		activePaneIndex = panes.count - 1
 		return newPane
 	}
 
-	mutating func closeActive() -> EditorPaneController? {
+	mutating func closeActive() -> EditorPane? {
 		guard panes.count > 1 else {
 			return nil
 		}
 		let pane = activePane
-		guard let parent = pane.parent as? NSSplitViewController, let index = parent.splitViewItems.firstIndex(where: { $0.viewController === pane }) else {
+		guard let parent = pane.viewController.parent as? NSSplitViewController, let index = parent.splitViewItems.firstIndex(where: { $0.viewController === pane.viewController }) else {
 			return nil
 		}
 		parent.removeSplitViewItem(parent.splitViewItems[index])
-		panes.removeAll { $0 === pane }
-		activePane = panes[min(index, panes.count - 1)]
+		panes.removeAll { $0.viewController === pane.viewController }
+		activePaneIndex = min(activePaneIndex, panes.count - 1)
 		collapseIfNeeded(parent)
 		return pane
 	}
 
-	mutating func closeOtherPanes() -> [EditorPaneController] {
+	mutating func closeOtherPanes() -> [EditorPane] {
 		let kept = activePane
-		let removed = panes.filter { $0 !== kept }
+		let removed = panes.filter { $0.viewController !== kept.viewController }
 		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
-		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: kept))
+		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: kept.viewController))
 		panes = [kept]
-		activePane = kept
+		activePaneIndex = 0
 		return removed
 	}
 
-	mutating func focusAdjacent(delta: Int) -> EditorPaneController {
-		guard let index = panes.firstIndex(where: { $0 === activePane }) else {
+	mutating func focusAdjacent(delta: Int) -> EditorPane {
+		guard !panes.isEmpty else {
 			return activePane
 		}
-		let next = (index + delta + panes.count) % panes.count
-		activePane = panes[next]
+		let next = (activePaneIndex + delta + panes.count) % panes.count
+		activePaneIndex = next
 		return activePane
 	}
 
@@ -523,13 +529,13 @@ struct EditorPaneCoordinator {
 		layout(for: rootSplitViewController)
 	}
 
-	fileprivate mutating func restore(layout: EditorPaneLayout) -> [EditorPaneController] {
+	fileprivate mutating func restore(layout: EditorPaneLayout) -> [EditorPane] {
 		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
 		panes = []
 		let rootItem = splitViewItem(for: layout)
 		rootSplitViewController.addSplitViewItem(rootItem)
-		if let first = panes.first {
-			activePane = first
+		if !panes.isEmpty {
+			activePaneIndex = 0
 		}
 		return panes
 	}
@@ -547,7 +553,7 @@ struct EditorPaneCoordinator {
 	}
 
 	private func layout(for controller: NSViewController) -> EditorPaneLayout {
-		if controller is EditorPaneController {
+		if panes.contains(where: { $0.viewController === controller }) {
 			return .leaf
 		}
 		guard let split = controller as? NSSplitViewController else {
@@ -562,9 +568,9 @@ struct EditorPaneCoordinator {
 
 	private mutating func viewController(for layout: EditorPaneLayout) -> NSViewController {
 		guard let vertical = layout.vertical else {
-			let pane = EditorPaneController()
+			let pane = EditorPane()
 			panes.append(pane)
-			return pane
+			return pane.viewController
 		}
 		let split = NSSplitViewController()
 		split.splitView.isVertical = vertical
@@ -724,7 +730,7 @@ final class EditorWindowController: NSWindowController {
 		window?.makeFirstResponder(editorView)
 	}
 
-	private func installPane(_ pane: EditorPaneController, document: ItsyDocument) {
+	private func installPane(_ pane: EditorPane, document: ItsyDocument) {
 		let view = pane.editorView
 		document.attach(view)
 		view.keymapEngine = ItsyAppKeymap.makeEngine()

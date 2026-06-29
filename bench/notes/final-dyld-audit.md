@@ -107,3 +107,8 @@ Current section distribution:
 
 - Converted `GrammarLoader` from a singleton class to a static namespace while keeping the same lock and `dlopen` handle cache.
 - Static rebase fixups after grammar-loader cleanup: `3727`; target remains `<2000`; result remains fail.
+
+## Editor pane coordinator cleanup
+
+- Converted `EditorPaneCoordinator` from a private class to a private struct owned mutably by `EditorWindowController`.
+- Static rebase fixups after editor-pane coordinator cleanup: `3719`; target remains `<2000`; result remains fail.

@@ -1,7 +1,7 @@
 import Dispatch
 import Foundation
 import ItsyEditor
-import ItsySyntax
+@testable import ItsySyntax
 import Testing
 
 @Test func parserParsesTypeScriptProgram() throws {

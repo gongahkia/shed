@@ -5,7 +5,7 @@ Date: 2026-06-28
 Command:
 
 ```sh
-PICO_RENDER_SPIKE=1 swift test -c release --filter renderSpikeScrollsTenMillionLineBuffer
+ITSY_RENDER_SPIKE=1 swift test -c release --filter renderSpikeScrollsTenMillionLineBuffer
 ```
 
 Result:
@@ -17,4 +17,4 @@ Result:
 - Target: >=60 fps
 - Status: pass
 
-Scope: this spike covers viewport scroll math, dirty marking, and visible-range calculation. Glyph atlas upload, shader rendering, and line shaping are covered by PicoRender tests.
+Scope: this spike covers viewport scroll math, dirty marking, and visible-range calculation. Glyph atlas upload, shader rendering, and line shaping are covered by ItsyRender tests.

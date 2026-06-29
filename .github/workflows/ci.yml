@@ -23,7 +23,7 @@ jobs:
       - name: Test
         run: swift test
       - name: Bench smoke
-        run: .build/release/PicoBench --smoke --runs 1
+        run: .build/release/ItsyBench --smoke --runs 1
       - name: Regression bench
         if: github.event_name == 'pull_request'
         run: bench/scripts/regression.sh

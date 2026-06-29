@@ -1,6 +1,6 @@
 # NORTHSTAR
 
-Codename: `pico`. Final name TBD.
+Codename: `itsy`. Final name TBD.
 
 ## Mission
 A macOS-native code editor that **opens instantly, edits anything, stays out of the way**. Sub-150 ms cold start, sub-30 MB idle RAM, modal-editing-native, OSS.
@@ -29,7 +29,7 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 - Multi-cursor + column select
 - Split panes (horizontal / vertical, arbitrary depth)
 - Keymap engine + 3 profiles: plain (macOS-standard), vim (normal/insert/visual/operator-pending), emacs (chord-based)
-- Custom keybind config (`~/.config/pico/keys.toml`)
+- Custom keybind config (`~/.config/itsy/keys.toml`)
 - Undo/redo (rope snapshots + per-edit deltas)
 - Native macOS integration: Services menu, Quick Look, Versions/AutoSave, Handoff, dark mode, Retina
 - Notarized .dmg distribution + Homebrew cask
@@ -63,7 +63,7 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
 - **Tooling:** `hyperfine --warmup 0 --runs 20 --prepare 'sudo purge'` per cmd.
 - **Cold-start measurement:** Each editor under test gets a `--bench-exit-on-ready` shim:
-  - For `pico`: native flag — print timestamp on `applicationDidFinishLaunching` + first paint, then `NSApp.terminate`.
+  - For `itsy`: native flag — print timestamp on `applicationDidFinishLaunching` + first paint, then `NSApp.terminate`.
   - For Zed/Sublime/VSCode/CodeEdit: external observer (Swift CLI using Accessibility API `AXObserver` to detect first window-visible event), records timestamp, then `kill -TERM`.
 - **Corpus** (checked into `bench/corpus/`):
   - `small.ts` (1 kLOC)
@@ -72,17 +72,17 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
   - `cold.empty` (no file)
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
-- **Regression gate:** PR CI runs the harness against `pico` only; fails if any KPI regresses >5% vs `main` baseline.
+- **Regression gate:** PR CI runs the harness against `itsy` only; fails if any KPI regresses >5% vs `main` baseline.
 
 ## Architecture (frozen at this level)
 
-![Pico architecture](docs/arch.svg)
+![Itsy architecture](docs/arch.svg)
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │ AppKit shell                                           │
 │  NSApplication · NSWindow · NSMenu · NSToolbar         │
-│  Document model: NSDocument subclass (PicoDocument)    │
+│  Document model: NSDocument subclass (ItsyDocument)    │
 ├────────────────────────────────────────────────────────┤
 │ TextView (custom NSView, Metal-backed via CAMetalLayer)│
 │  - CoreText shaping (CTLine, CTRun)                    │
@@ -103,17 +103,17 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 │ Keymap engine (pure Swift)                             │
 │  - State: mode stack, pending chord prefix             │
 │  - Profiles: plain / vim / emacs (TOML-defined)        │
-│  - User overlay: ~/.config/pico/keys.toml              │
+│  - User overlay: ~/.config/itsy/keys.toml              │
 └────────────────────────────────────────────────────────┘
 ```
 
 Modules (SwiftPM targets):
-- `PicoApp` — AppKit shell, entry point
-- `PicoRender` — Metal renderer, glyph atlas
-- `PicoEditor` — buffer, selections, commands, undo
-- `PicoSyntax` — tree-sitter wrapper, grammar loader
-- `PicoKeymap` — modal engine, profile loader
-- `PicoBench` — harness binary (separate executable)
+- `ItsyApp` — AppKit shell, entry point
+- `ItsyRender` — Metal renderer, glyph atlas
+- `ItsyEditor` — buffer, selections, commands, undo
+- `ItsySyntax` — tree-sitter wrapper, grammar loader
+- `ItsyKeymap` — modal engine, profile loader
+- `ItsyBench` — harness binary (separate executable)
 - `CTreeSitter` — C target, vendored tree-sitter runtime
 - `CTSGrammars` — C target, vendored grammars (one source group per lang, conditionally compiled)
 
@@ -125,9 +125,9 @@ Modules (SwiftPM targets):
 5. **Two-person-decade scope.** Mitigation: ruthless OUT list above; cut anything that doesn't move a KPI.
 
 ## Non-goals (durable)
-- Plugin ecosystem. Pico is what ships; extension would betray the cold-start KPI.
-- Configurability beyond keys + theme + tab width. Pico is opinionated.
-- Web. Pico does not render HTML preview, not even for Markdown.
+- Plugin ecosystem. Itsy is what ships; extension would betray the cold-start KPI.
+- Configurability beyond keys + theme + tab width. Itsy is opinionated.
+- Web. Itsy does not render HTML preview, not even for Markdown.
 - Sync. No cloud, no settings sync, no telemetry pings.
 
 ## Definition of done (v1.0)
@@ -135,4 +135,4 @@ Modules (SwiftPM targets):
 - Bench results published per release in `bench/results/`.
 - Notarized + Sparkle-updatable .dmg on GitHub Releases.
 - Homebrew cask in `homebrew-cask`.
-- README shows the bench table with `pico` winning ≥4 KPIs vs Zed/Sublime/VSCode head-to-head.
+- README shows the bench table with `itsy` winning ≥4 KPIs vs Zed/Sublime/VSCode head-to-head.

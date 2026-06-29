@@ -6,9 +6,9 @@ bench_dir="$(cd "$script_dir/.." && pwd)"
 repo_dir="$(cd "$bench_dir/.." && pwd)"
 results_dir="$bench_dir/results"
 runs="${RUNS:-20}"
-only="${PICO_BASELINE_ONLY:-}"
-purge="${PICO_BASELINE_PURGE:-1}"
-picobench="${PICOBENCH:-$repo_dir/.build/release/PicoBench}"
+only="${ITSY_BASELINE_ONLY:-}"
+purge="${ITSY_BASELINE_PURGE:-1}"
+itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
 date_stamp="${BASELINE_DATE:-$(date +%F)}"
 json_out="$results_dir/baseline-$date_stamp.json"
 md_out="$results_dir/baseline-$date_stamp.md"
@@ -17,7 +17,7 @@ ndjson="$(mktemp)"
 trap 'rm -f "$ndjson"' EXIT
 mkdir -p "$results_dir"
 
-if [[ ! -x "$picobench" ]]; then
+if [[ ! -x "$itsybench" ]]; then
 	(cd "$repo_dir" && swift build -c release)
 fi
 
@@ -43,7 +43,7 @@ for entry in "${apps[@]}"; do
 		if [[ "$purge" != "0" ]]; then
 			sudo purge
 		fi
-		result="$("$picobench" measure --app "$path" --new-instance)"
+		result="$("$itsybench" measure --app "$path" --new-instance)"
 		ruby -rjson -e '
 			payload = JSON.parse(STDIN.read)
 			payload["competitor"] = ARGV[0]

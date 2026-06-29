@@ -5,11 +5,11 @@
 ```sh
 swift build -c release
 bench/scripts/make_app.sh
-codesign --force --sign - --entitlements /tmp/pico-debug-entitlements.plist Pico.app
-xcrun xctrace record --quiet --no-prompt --template 'Allocations' --time-limit 10s --output bench/traces/pico-allocations-2026-06-29.trace --launch -- Pico.app bench/corpus/large.ts
+codesign --force --sign - --entitlements /tmp/itsy-debug-entitlements.plist Itsy.app
+xcrun xctrace record --quiet --no-prompt --template 'Allocations' --time-limit 10s --output bench/traces/itsy-allocations-2026-06-29.trace --launch -- Itsy.app bench/corpus/large.ts
 ```
 
-During the trace, `System Events` sent 40 Down-arrow key events, inserted `x`, then sent 20 Up-arrow key events. The trace is local and gitignored at `bench/traces/pico-allocations-2026-06-29.trace`.
+During the trace, `System Events` sent 40 Down-arrow key events, inserted `x`, then sent 20 Up-arrow key events. The trace is local and gitignored at `bench/traces/itsy-allocations-2026-06-29.trace`.
 
 ## Result
 
@@ -18,7 +18,7 @@ Trace summary:
 ```text
 template: Allocations
 duration: 10.848151 s
-target: Pico bench/corpus/large.ts
+target: Itsy bench/corpus/large.ts
 end: time limit reached
 ```
 

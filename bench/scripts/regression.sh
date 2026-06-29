@@ -3,38 +3,38 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/../.." && pwd)"
-baseline="${PICO_REGRESSION_BASELINE:-$repo_dir/bench/results/baseline-pico-current.json}"
-out="${PICO_REGRESSION_OUT:-$repo_dir/bench/results/regression-current.json}"
-runs="${PICO_REGRESSION_RUNS:-20}"
-threshold="${PICO_REGRESSION_THRESHOLD:-0.05}"
-rope_ops="${PICO_REGRESSION_ROPE_OPS:-1000000}"
-rope_runs="${PICO_REGRESSION_ROPE_RUNS:-5}"
-slice_length="${PICO_REGRESSION_SLICE_LENGTH:-32}"
-picobench="${PICOBENCH:-$repo_dir/.build/release/PicoBench}"
-picoapp="${PICO_APP_BINARY:-$repo_dir/.build/release/PicoApp}"
+baseline="${ITSY_REGRESSION_BASELINE:-$repo_dir/bench/results/baseline-itsy-current.json}"
+out="${ITSY_REGRESSION_OUT:-$repo_dir/bench/results/regression-current.json}"
+runs="${ITSY_REGRESSION_RUNS:-20}"
+threshold="${ITSY_REGRESSION_THRESHOLD:-0.05}"
+rope_ops="${ITSY_REGRESSION_ROPE_OPS:-1000000}"
+rope_runs="${ITSY_REGRESSION_ROPE_RUNS:-5}"
+slice_length="${ITSY_REGRESSION_SLICE_LENGTH:-32}"
+itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
+itsyapp="${ITSY_APP_BINARY:-$repo_dir/.build/release/ItsyApp}"
 hyperfine_json="$(mktemp)"
 rope_json="$(mktemp)"
 
 trap 'rm -f "$hyperfine_json" "$rope_json"' EXIT
 
 if [[ ! -f "$baseline" ]]; then
-	echo "missing pico regression baseline: $baseline" >&2
+	echo "missing itsy regression baseline: $baseline" >&2
 	exit 1
 fi
 
-if [[ ! -x "$picobench" || ! -x "$picoapp" ]]; then
+if [[ ! -x "$itsybench" || ! -x "$itsyapp" ]]; then
 	(cd "$repo_dir" && swift build -c release)
 fi
 
 mkdir -p "$(dirname "$out")"
-app_command="$picoapp --bench-exit-on-ready"
+app_command="$itsyapp --bench-exit-on-ready"
 hyperfine_args=(--shell=none --warmup 0 --runs "$runs" --export-json "$hyperfine_json")
-if [[ "${PICO_REGRESSION_PURGE:-0}" != "0" ]]; then
+if [[ "${ITSY_REGRESSION_PURGE:-0}" != "0" ]]; then
 	hyperfine_args+=(--prepare "purge")
 fi
 hyperfine "${hyperfine_args[@]}" "$app_command" >/dev/null
 for _ in $(seq 1 "$rope_runs"); do
-	"$picobench" rope --ops "$rope_ops" --slice-length "$slice_length" >>"$rope_json"
+	"$itsybench" rope --ops "$rope_ops" --slice-length "$slice_length" >>"$rope_json"
 done
 
 ruby -rjson -rtime -e '
@@ -96,7 +96,7 @@ ruby -rjson -rtime -e '
 		"metrics" => rows
 	}
 	File.write(out_path, JSON.pretty_generate(report) + "\n")
-	lines = ["# Pico regression", "", "| Metric | Baseline | Current | Limit | Status |", "|---|---:|---:|---:|---|"]
+	lines = ["# Itsy regression", "", "| Metric | Baseline | Current | Limit | Status |", "|---|---:|---:|---:|---|"]
 	rows.each do |row|
 		lines << format("| %s | %s %s | %s %s | %s %s | %s |",
 			row.fetch("name"),
@@ -123,12 +123,12 @@ ruby -rjson -rtime -e '
 			value_text(row.fetch("baseline").to_f),
 			row.fetch("unit", ""))
 		if ENV["GITHUB_ACTIONS"] == "true"
-			puts "::error title=Pico regression::#{escape_command(message)}"
+			puts "::error title=Itsy regression::#{escape_command(message)}"
 		else
 			warn message
 		end
 	end
 	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$rope_json" "$out" "$repo_dir" "$picoapp" "$threshold"
+' "$baseline" "$hyperfine_json" "$rope_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

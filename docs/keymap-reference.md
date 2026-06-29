@@ -1,6 +1,6 @@
 # Keymap Reference
 
-Generated from `Sources/PicoKeymap/Resources/keys.*.toml`.
+Generated from `Sources/ItsyKeymap/Resources/keys.*.toml`.
 
 Regenerate:
 
@@ -10,7 +10,7 @@ scripts/gen_keymap_docs.swift
 
 ## Plain
 
-- Source: `Sources/PicoKeymap/Resources/keys.plain.toml`
+- Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
 - Bindings: `18`
 
 ### mode.insert
@@ -38,7 +38,7 @@ scripts/gen_keymap_docs.swift
 
 ## Vim
 
-- Source: `Sources/PicoKeymap/Resources/keys.vim.toml`
+- Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
 - Bindings: `115`
 
 ### mode.normal
@@ -178,7 +178,7 @@ scripts/gen_keymap_docs.swift
 
 ## Emacs
 
-- Source: `Sources/PicoKeymap/Resources/keys.emacs.toml`
+- Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
 - Bindings: `33`
 
 ### mode.emacs

@@ -1,6 +1,6 @@
 # Empty-app cold-start spike 2026-06-28
 
-Command: `.build/release/PicoBench measure --app Pico.app --warmup-purge`
+Command: `.build/release/ItsyBench measure --app Itsy.app --warmup-purge`
 Runs: 20
 Target: <100 ms
 Result: fail
@@ -14,7 +14,7 @@ Result: fail
 
 ## Investigation
 
-Direct binary probe: `/usr/bin/time -p Pico.app/Contents/MacOS/Pico --bench-exit-on-ready` averaged 0.068 s over 10 runs (min 0.050 s, max 0.100 s).
+Direct binary probe: `/usr/bin/time -p Itsy.app/Contents/MacOS/Itsy --bench-exit-on-ready` averaged 0.068 s over 10 runs (min 0.050 s, max 0.100 s).
 
 [Inference] The >150 ms result is dominated by the `NSWorkspace` app-bundle launch + first-window/AX-observer path, not the app-delegate ready path measured by `--bench-exit-on-ready`.
 

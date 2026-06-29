@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-binary="${DYLD_AUDIT_BINARY:-$repo_dir/.build/release/PicoApp}"
+binary="${DYLD_AUDIT_BINARY:-$repo_dir/.build/release/ItsyApp}"
 threshold="${DYLD_AUDIT_REBASE_LIMIT:-2000}"
 output="$(mktemp)"
 

@@ -13,7 +13,7 @@ gen_ts() {
 	local tmp="$out.tmp"
 	awk -v n="$lines" 'BEGIN {
 		for (i = 1; i <= n; i++) {
-			printf("export class PicoFixture%06d { value = %d; render(): string { return `line-%06d`; } }\n", i, i, i)
+			printf("export class ItsyFixture%06d { value = %d; render(): string { return `line-%06d`; } }\n", i, i, i)
 		}
 	}' > "$tmp"
 	mv "$tmp" "$out"
@@ -27,7 +27,7 @@ gen_huge_log() {
 		use warnings;
 		my ($path, $target) = @ARGV;
 		open my $fh, ">:raw", $path or die "open $path: $!";
-		my $line = qq{127.0.0.1 - - [28/Jun/2026:00:00:00 +0000] "GET /pico/index.html HTTP/1.1" 200 1234 "-" "pico-bench/1.0"\n};
+		my $line = qq{127.0.0.1 - - [28/Jun/2026:00:00:00 +0000] "GET /itsy/index.html HTTP/1.1" 200 1234 "-" "itsy-bench/1.0"\n};
 		my $block = $line x 8192;
 		my $written = 0;
 		while ($written + length($block) <= $target) {

@@ -9,6 +9,11 @@ public enum LSPAny: Codable, Equatable, Sendable {
 	case array([LSPAny])
 	case object([String: LSPAny])
 
+	public init<Value: Encodable>(encoding value: Value, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(value)
+		self = try decoder.decode(LSPAny.self, from: data)
+	}
+
 	public init(from decoder: Decoder) throws {
 		let container = try decoder.singleValueContainer()
 		if container.decodeNil() {
@@ -49,7 +54,7 @@ public enum LSPAny: Codable, Equatable, Sendable {
 	}
 }
 
-public enum JSONRPCID: Codable, Equatable, Sendable {
+public enum JSONRPCID: Codable, Equatable, Hashable, Sendable {
 	case string(String)
 	case int(Int)
 	case double(Double)

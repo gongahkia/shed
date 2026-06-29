@@ -12,15 +12,16 @@
 - Added JSON-RPC ID/value/request/notification/response/error models.
 - Added incremental `Content-Length` frame extraction and frame encoding.
 - Added LSP document, change, position/range, initialize, and publish-diagnostics data models.
+- Added an actor-isolated session core with request ID allocation, pending-response routing, initialize/initialized sequencing, shutdown/exit sequencing, and injectable transport.
 
 ## Not done yet
 
 - No server process lifecycle.
-- No initialize/shutdown state machine.
+- No server process read loop.
 - No document sync from `ItsyDocument`.
 - No diagnostics/problem UI.
 - No completion, hover, definition, references, rename, code action, or formatting request plumbing.
 
 ## Next slice
 
-Implement an `LSPClient` process/session layer with request IDs, pending response routing, initialize/initialized/shutdown sequencing, and injected byte streams for tests before attaching it to the editor UI.
+Implement the process transport/read loop around `Process` and `Pipe`, then attach diagnostics to a non-rendering document model before any UI surface.

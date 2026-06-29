@@ -112,3 +112,8 @@ Current section distribution:
 
 - Converted `EditorPaneCoordinator` from a private class to a private struct owned mutably by `EditorWindowController`.
 - Static rebase fixups after editor-pane coordinator cleanup: `3719`; target remains `<2000`; result remains fail.
+
+## Project find cancel cleanup
+
+- Replaced the private `ProjectFindPanelDelegate` protocol with a panel cancel closure.
+- Static rebase fixups after project-find cancel cleanup: `3718`; target remains `<2000`; result remains fail.

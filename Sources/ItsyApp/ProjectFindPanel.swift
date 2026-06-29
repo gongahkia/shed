@@ -51,7 +51,7 @@ final class ProjectFindController {
 		contentView.onSearch = { [weak self] query in self?.search(query: query) }
 		contentView.onOpenMatch = { [weak self] match in self?.openFile(match.url) }
 		panel.contentView = contentView
-		panel.findDelegate = self
+		panel.onCancel = { [weak self] in self?.close() }
 		panel.title = L10n.string("Find in Project")
 		panel.isReleasedWhenClosed = false
 		panel.minSize = NSSize(width: 520, height: 260)
@@ -104,25 +104,15 @@ final class ProjectFindController {
 	}
 }
 
-extension ProjectFindController: ProjectFindPanelDelegate {
-	func projectFindPanelDidCancel(_ panel: ProjectFindPanel) {
-		close()
-	}
-}
-
-protocol ProjectFindPanelDelegate: AnyObject {
-	func projectFindPanelDidCancel(_ panel: ProjectFindPanel)
-}
-
 final class ProjectFindPanel: NSPanel {
-	weak var findDelegate: ProjectFindPanelDelegate?
+	var onCancel: (() -> Void)?
 
 	override var canBecomeKey: Bool {
 		true
 	}
 
 	override func cancelOperation(_ sender: Any?) {
-		findDelegate?.projectFindPanelDidCancel(self)
+		onCancel?()
 	}
 }
 

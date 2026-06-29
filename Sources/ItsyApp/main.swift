@@ -25,12 +25,11 @@ private func recordBenchStage(_ name: String) {
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
-	private var commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
 	private lazy var servicesProvider = ItsyServicesProvider { [weak self] url in
 		self?.documentController.openDocument(at: url) ?? false
 	}
-	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
+	private lazy var commandPalette = CommandPaletteController(registry: makeCommandRegistry())
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
 		self?.reloadSyntaxThemes()
 	}
@@ -58,7 +57,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			self.commandPalette.showExCommand(relativeTo: window, completion: completion)
 			return true
 		}
-		registerInitialCommands()
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
@@ -114,9 +112,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		commandPalette.toggle(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
-	private func registerInitialCommands() {
+	private func makeCommandRegistry() -> CommandRegistry {
+		var registry = CommandRegistry()
 		do {
-			try commandRegistry.register([
+			try registry.register([
 				Command(id: "file.new", title: L10n.string("New File"), defaultKey: "Cmd-N") { [weak self] in
 					self?.documentController.newDocument(nil)
 				},
@@ -169,6 +168,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					self?.performEditorMotion(.lineEnd)
 				},
 			])
+			return registry
 		} catch {
 			preconditionFailure("failed to register commands: \(error)")
 		}

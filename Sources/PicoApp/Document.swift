@@ -26,23 +26,30 @@ final class PicoDocumentController: NSDocumentController {
 	@discardableResult
 	func openDocument(at url: URL) -> Bool {
 		let typeName = defaultType ?? "public.data"
-		if let document = document(for: url) {
-			if document.windowControllers.isEmpty {
-				document.makeWindowControllers()
-			}
-			document.showWindows()
+		if let document = document(for: url) as? PicoDocument {
+			showDocument(document)
 			noteRecentDocumentIfNeeded(document)
 			return true
 		}
 		do {
-			let document = try makeDocument(withContentsOf: url, ofType: typeName)
+			guard let document = try makeDocument(withContentsOf: url, ofType: typeName) as? PicoDocument else {
+				return false
+			}
 			addDocument(document)
-			document.makeWindowControllers()
-			document.showWindows()
+			showDocument(document)
 			return true
 		} catch {
 			NSLog("failed to open \(url.path): \(error)")
 			return false
+		}
+	}
+
+	func showDocument(_ document: PicoDocument) {
+		if let controller = activeEditorWindowController() {
+			controller.display(document: document)
+		} else {
+			document.makeWindowControllers()
+			document.showWindows()
 		}
 	}
 
@@ -71,6 +78,15 @@ final class PicoDocumentController: NSDocumentController {
 		}
 		noteNewRecentDocument(document)
 		noteNewRecentDocumentURL(url)
+	}
+
+	private func activeEditorWindowController() -> EditorWindowController? {
+		if let controller = NSApp.keyWindow?.windowController as? EditorWindowController {
+			return controller
+		}
+		return documents.lazy.compactMap { document in
+			(document as? PicoDocument)?.windowControllers.first as? EditorWindowController
+		}.first
 	}
 }
 
@@ -555,6 +571,32 @@ final class EditorWindowController: NSWindowController {
 		super.showWindow(sender)
 		window?.makeKeyAndOrderFront(sender)
 		window?.orderFrontRegardless()
+		focusEditor()
+		PicoTabCoordinator.shared.refresh()
+	}
+
+	func display(document newDocument: PicoDocument) {
+		if self.document as? PicoDocument === newDocument {
+			showWindow(nil)
+			focusEditor()
+			PicoTabCoordinator.shared.refresh()
+			return
+		}
+		if let oldDocument = self.document as? PicoDocument {
+			for pane in paneCoordinator.panes {
+				oldDocument.detach(pane.editorView)
+			}
+			oldDocument.removeWindowController(self)
+		}
+		if !newDocument.windowControllers.contains(where: { $0 === self }) {
+			newDocument.addWindowController(self)
+		}
+		for pane in paneCoordinator.panes {
+			installPane(pane, document: newDocument)
+		}
+		window?.title = newDocument.fileURL?.lastPathComponent ?? newDocument.displayName
+		window?.representedURL = newDocument.fileURL
+		showWindow(nil)
 		focusEditor()
 		PicoTabCoordinator.shared.refresh()
 	}

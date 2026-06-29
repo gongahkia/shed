@@ -14,6 +14,7 @@ final class TabBarView: NSView {
 	var onSelect: ((ObjectIdentifier) -> Void)?
 	var onClose: ((ObjectIdentifier) -> Void)?
 
+	private let scrollView = NSScrollView()
 	private let stackView = NSStackView()
 
 	override init(frame frameRect: NSRect) {
@@ -29,19 +30,31 @@ final class TabBarView: NSView {
 	private func configure() {
 		wantsLayer = true
 		layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		scrollView.drawsBackground = false
+		scrollView.borderType = .noBorder
+		scrollView.hasHorizontalScroller = true
+		scrollView.hasVerticalScroller = false
+		scrollView.autohidesScrollers = true
+		scrollView.scrollerStyle = .overlay
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
 		stackView.orientation = .horizontal
 		stackView.alignment = .centerY
 		stackView.spacing = 2
 		stackView.edgeInsets = NSEdgeInsets(top: 3, left: 6, bottom: 3, right: 6)
-		stackView.translatesAutoresizingMaskIntoConstraints = false
-		addSubview(stackView)
+		scrollView.documentView = stackView
+		addSubview(scrollView)
 		NSLayoutConstraint.activate([
-			stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-			stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-			stackView.topAnchor.constraint(equalTo: topAnchor),
-			stackView.bottomAnchor.constraint(equalTo: bottomAnchor),
+			scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: topAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
 			heightAnchor.constraint(equalToConstant: 32),
 		])
+	}
+
+	override func layout() {
+		super.layout()
+		layoutTabContent()
 	}
 
 	private func rebuildTabs() {
@@ -52,9 +65,16 @@ final class TabBarView: NSView {
 		for tab in tabs {
 			stackView.addArrangedSubview(makeTabView(tab))
 		}
-		let spacer = NSView()
-		spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-		stackView.addArrangedSubview(spacer)
+		layoutTabContent()
+	}
+
+	private func layoutTabContent() {
+		stackView.layoutSubtreeIfNeeded()
+		let fit = stackView.fittingSize
+		let height = max(bounds.height, 32)
+		let width = max(scrollView.contentView.bounds.width, fit.width)
+		stackView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+		scrollView.documentView = stackView
 	}
 
 	private func makeTabView(_ tab: PicoTab) -> NSView {
@@ -178,12 +198,7 @@ final class PicoTabCoordinator {
 		guard let document = picoDocuments().first(where: { ObjectIdentifier($0) == id }) else {
 			return
 		}
-		if document.windowControllers.isEmpty {
-			document.makeWindowControllers()
-		}
-		document.showWindows()
-		(document.windowControllers.first as? EditorWindowController)?.focusEditor()
-		refresh()
+		documentController?.showDocument(document)
 	}
 
 	private func closeDocument(_ id: ObjectIdentifier) {

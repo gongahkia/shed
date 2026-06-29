@@ -588,7 +588,13 @@ final class EditorWindowController: NSWindowController {
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
-	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
+	private let findBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
+	private let findQueryField = ItsyActionTextField(frame: .zero)
+	private let findReplaceField = ItsyActionTextField(frame: .zero)
+	private let findRegexButton = NSButton(checkboxWithTitle: L10n.string("Regex"), target: nil, action: nil)
+	private let findCaseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
+	private let findWholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
+	private let findCloseButton = NSButton(title: L10n.string("X"), target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
@@ -607,6 +613,15 @@ final class EditorWindowController: NSWindowController {
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
 		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
+		Self.configureFindBarView(
+			findBarView,
+			queryField: findQueryField,
+			replaceField: findReplaceField,
+			regexButton: findRegexButton,
+			caseButton: findCaseButton,
+			wholeWordButton: findWholeWordButton,
+			closeButton: findCloseButton
+		)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
@@ -647,20 +662,9 @@ final class EditorWindowController: NSWindowController {
 		window.contentView = splitView
 		super.init(window: window)
 		installTabBoundsObserver()
+		installFindBarActions()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
-		findBarView.onDismiss = { [weak self] in
-			self?.setFindBarVisible(false)
-		}
-		findBarView.onStateChange = { [weak self] _ in
-			self?.findStateDidChange()
-		}
-		findBarView.onFindNext = { [weak self] in
-			self?.selectFindMatchFromFindBar(direction: 1)
-		}
-		findBarView.onFindPrevious = { [weak self] in
-			self?.selectFindMatchFromFindBar(direction: -1)
-		}
 		ItsyWorkspaceController.register(fileTreeView)
 		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
@@ -789,6 +793,110 @@ final class EditorWindowController: NSWindowController {
 			return
 		}
 		ItsyTabCoordinator.closeDocument(tabID)
+	}
+
+	private static func configureFindBarView(
+		_ findBarView: NSView,
+		queryField: ItsyActionTextField,
+		replaceField: ItsyActionTextField,
+		regexButton: NSButton,
+		caseButton: NSButton,
+		wholeWordButton: NSButton,
+		closeButton: NSButton
+	) {
+		findBarView.wantsLayer = true
+		findBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		findBarView.layer?.borderWidth = 1
+		findBarView.layer?.borderColor = NSColor.separatorColor.cgColor
+
+		queryField.placeholderString = L10n.string("Find")
+		replaceField.placeholderString = L10n.string("Replace")
+		for field in [queryField, replaceField] {
+			field.font = .systemFont(ofSize: 12)
+			field.handlesFindShortcuts = true
+		}
+		for button in [regexButton, caseButton, wholeWordButton] {
+			button.font = .systemFont(ofSize: 11)
+			button.setContentCompressionResistancePriority(.required, for: .horizontal)
+		}
+		closeButton.isBordered = false
+		closeButton.font = .systemFont(ofSize: 11)
+		closeButton.toolTip = L10n.string("Close")
+		closeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+		let stack = NSStackView()
+		stack.orientation = .horizontal
+		stack.alignment = .centerY
+		stack.spacing = 8
+		stack.edgeInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+		stack.translatesAutoresizingMaskIntoConstraints = false
+		findBarView.addSubview(stack)
+
+		queryField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
+		replaceField.widthAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
+		stack.addArrangedSubview(queryField)
+		stack.addArrangedSubview(replaceField)
+		stack.addArrangedSubview(regexButton)
+		stack.addArrangedSubview(caseButton)
+		stack.addArrangedSubview(wholeWordButton)
+		stack.addArrangedSubview(closeButton)
+
+		NSLayoutConstraint.activate([
+			stack.leadingAnchor.constraint(equalTo: findBarView.leadingAnchor),
+			stack.trailingAnchor.constraint(equalTo: findBarView.trailingAnchor),
+			stack.topAnchor.constraint(equalTo: findBarView.topAnchor),
+			stack.bottomAnchor.constraint(equalTo: findBarView.bottomAnchor),
+			findBarView.heightAnchor.constraint(equalToConstant: 38),
+		])
+	}
+
+	private func installFindBarActions() {
+		for field in [findQueryField, findReplaceField] {
+			field.onCancel = { [weak self] in self?.setFindBarVisible(false) }
+			field.onConfirm = { [weak self] in self?.selectFindMatchFromFindBar(direction: 1) }
+			field.onFindPrevious = { [weak self] in self?.selectFindMatchFromFindBar(direction: -1) }
+			field.delegate = self
+		}
+		for button in [findRegexButton, findCaseButton, findWholeWordButton] {
+			button.target = self
+			button.action = #selector(findOptionChanged(_:))
+		}
+		findCloseButton.target = self
+		findCloseButton.action = #selector(closeFindBar(_:))
+	}
+
+	private var findState: FindBarState {
+		FindBarState(
+			query: findQueryField.stringValue,
+			replacement: findReplaceField.stringValue,
+			usesRegex: findRegexButton.state == .on,
+			isCaseSensitive: findCaseButton.state == .on,
+			matchesWholeWord: findWholeWordButton.state == .on
+		)
+	}
+
+	private func focusFindQuery() {
+		window?.makeFirstResponder(findQueryField)
+		findQueryField.currentEditor()?.selectAll(nil)
+	}
+
+	private func findRegularExpression() -> NSRegularExpression? {
+		let state = findState
+		guard !state.query.isEmpty else {
+			return nil
+		}
+		let basePattern = state.usesRegex ? state.query : NSRegularExpression.escapedPattern(for: state.query)
+		let pattern = state.matchesWholeWord ? "\\b(?:\(basePattern))\\b" : basePattern
+		let options: NSRegularExpression.Options = state.isCaseSensitive ? [] : [.caseInsensitive]
+		return try? NSRegularExpression(pattern: pattern, options: options)
+	}
+
+	@objc private func closeFindBar(_ sender: Any?) {
+		setFindBarVisible(false)
+	}
+
+	@objc private func findOptionChanged(_ sender: Any?) {
+		findStateDidChange()
 	}
 
 	override func windowDidLoad() {
@@ -1026,7 +1134,7 @@ final class EditorWindowController: NSWindowController {
 		editorView.topContentInset = visible ? 38 : 0
 		if visible {
 			refreshFindMatches()
-			findBarView.focusQuery()
+			focusFindQuery()
 		} else {
 			incrementalFindDirection = nil
 			findMatches = []
@@ -1037,6 +1145,8 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func findStateDidChange() {
+		let expression = findRegularExpression()
+		findQueryField.textColor = findState.query.isEmpty || expression != nil ? .labelColor : .systemRed
 		refreshFindMatches()
 		if let incrementalFindDirection {
 			selectFindMatch(direction: incrementalFindDirection, refreshBeforeSelecting: false, focusEditorAfterSelection: false)
@@ -1044,7 +1154,7 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func refreshFindMatches() {
-		guard !findBarView.isHidden, let expression = findBarView.regularExpression() else {
+		guard !findBarView.isHidden, let expression = findRegularExpression() else {
 			findMatches = []
 			selectedFindMatchIndex = nil
 			editorView.setFindMatchRanges([])
@@ -1111,7 +1221,7 @@ final class EditorWindowController: NSWindowController {
 	}
 }
 
-extension EditorWindowController: NSWindowDelegate {
+extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate {
 	func windowDidBecomeKey(_ notification: Notification) {
 		ItsyTabCoordinator.refresh()
 	}
@@ -1122,5 +1232,12 @@ extension EditorWindowController: NSWindowDelegate {
 
 	func windowWillClose(_ notification: Notification) {
 		ItsyTabCoordinator.refresh()
+	}
+
+	func controlTextDidChange(_ notification: Notification) {
+		guard let field = notification.object as? NSTextField, field === findQueryField || field === findReplaceField else {
+			return
+		}
+		findStateDidChange()
 	}
 }

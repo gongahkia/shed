@@ -267,3 +267,10 @@ Current section distribution:
 - Static rebase fixups after command-palette view cleanup: `2329`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `11` to `10`.
 - Section deltas: `__DATA,__objc_const` dropped from `857` to `840`; `__DATA_CONST,__const` dropped from `702` to `701`; `__DATA,__objc_data` dropped from `64` to `56`; `__DATA,__data` dropped from `45` to `44`; `__DATA,__objc_selrefs` rose from `655` to `656`.
+
+## File tree sidebar cleanup
+
+- Folded `FileTreeSidebarView` state/layout/Quick Look/data-source handling into the existing `EditorWindowController`; the workspace coordinator now tracks window controllers directly.
+- Static rebase fixups after file-tree sidebar cleanup: `2313`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `10` to `9`.
+- Section deltas: `__DATA,__objc_const` dropped from `840` to `835`; `__DATA_CONST,__const` dropped from `701` to `700`; `__DATA,__objc_data` dropped from `56` to `48`; `__DATA,__data` dropped from `44` to `43`.

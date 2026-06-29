@@ -239,3 +239,10 @@ Current section distribution:
 - Static rebase fixups after tab-bar subclass cleanup: `2406`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `14` to `13`.
 - Section deltas: `__DATA,__objc_const` dropped from `892` to `885`; `__DATA,__objc_data` dropped from `87` to `80`; `__DATA,__data` dropped from `48` to `47`; `__DATA_CONST,__const` rose from `701` to `704`; `__DATA,__objc_selrefs` rose from `652` to `655`.
+
+## Release flag experiments
+
+- `swift build -c release -Xlinker -dead_strip` did not change static rebase fixups: `2406`.
+- `swift build -c release -Xswiftc -cross-module-optimization` worsened static rebase fixups to `2465`; `__DATA_CONST,__const` rose from `704` to `763`.
+- `swift build -c release -Xswiftc -Osize` worsened static rebase fixups to `2416`; `__DATA_CONST,__objc_protolist` and `__DATA,__objc_protorefs` each rose from `11` to `12`.
+- Normal `swift build -c release` restored static rebase fixups to `2406`; target remains `<2000`; result remains fail.

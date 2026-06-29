@@ -155,7 +155,7 @@ x 2026-06-29 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has AS
 x 2026-06-29 +XCut @docs id:401 est:1h `docs/keymap-reference.md` auto-generated from the three TOML profiles (write a tiny Swift script `scripts/gen_keymap_docs.swift`).
 x 2026-06-29 +XCut @i18n id:402 est:2h Localization: pin `en` only for v0.1. Use `String(localized:)` for all user-visible strings so future locales are mechanical.
 x 2026-06-29 +XCut @a11y id:403 est:3h VoiceOver: implement `accessibilityLabel`, `accessibilityRole`, `accessibilityValue` on `MetalTextView` per `NSAccessibilityElement` protocol. At minimum: read current line.
-(C) 2026-06-28 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/pico/themes/*.toml`.
+x 2026-06-29 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/pico/themes/*.toml`.
 
 ---
 

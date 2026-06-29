@@ -1,57 +1,13 @@
 import AppKit
 import Darwin
 
-final class FileTreeNode {
-	let url: URL
-	let isDirectory: Bool
-	private var cachedChildren: [FileTreeNode]?
-
-	init(url: URL) {
-		self.url = url
-		let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
-		isDirectory = values?.isDirectory == true
-	}
-
-	var title: String {
-		url.lastPathComponent.isEmpty ? url.path : url.lastPathComponent
-	}
-
-	var children: [FileTreeNode] {
-		guard isDirectory else {
-			return []
-		}
-		if let cachedChildren {
-			return cachedChildren
-		}
-		let keys: [URLResourceKey] = [.isDirectoryKey, .isHiddenKey]
-		let contents = (try? FileManager.default.contentsOfDirectory(
-			at: url,
-			includingPropertiesForKeys: keys,
-			options: [.skipsPackageDescendants]
-		)) ?? []
-		let nodes = contents.compactMap { child -> FileTreeNode? in
-			let values = try? child.resourceValues(forKeys: Set(keys))
-			if values?.isHidden == true {
-				return nil
-			}
-			return FileTreeNode(url: child)
-		}
-		cachedChildren = nodes.sorted { lhs, rhs in
-			if lhs.isDirectory != rhs.isDirectory {
-				return lhs.isDirectory && !rhs.isDirectory
-			}
-			return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
-		}
-		return cachedChildren ?? []
-	}
-}
-
 final class FileTreeSidebarView: NSView {
 	var onOpenFile: ((URL) -> Void)?
 	var onPreviewFile: ((URL) -> Void)?
 	private let outlineView = NSOutlineView()
 	private let scrollView = NSScrollView()
-	private var rootNode: FileTreeNode?
+	private var rootURL: NSURL?
+	private var childCache: [NSURL: [NSURL]] = [:]
 	private var keyMonitor: Any?
 
 	override init(frame frameRect: NSRect) {
@@ -71,10 +27,11 @@ final class FileTreeSidebarView: NSView {
 	}
 
 	func setRootURL(_ url: URL?) {
-		rootNode = url.map(FileTreeNode.init(url:))
+		rootURL = url.map { $0 as NSURL }
+		childCache.removeAll(keepingCapacity: true)
 		outlineView.reloadData()
-		if rootNode != nil {
-			outlineView.expandItem(rootNode)
+		if let rootURL {
+			outlineView.expandItem(rootURL)
 		}
 	}
 
@@ -121,29 +78,71 @@ final class FileTreeSidebarView: NSView {
 
 	@objc private func doubleClick(_ sender: Any?) {
 		let row = outlineView.clickedRow
-		guard row >= 0, let node = outlineView.item(atRow: row) as? FileTreeNode else {
+		guard row >= 0, let url = outlineView.item(atRow: row) as? NSURL else {
 			return
 		}
-		if node.isDirectory {
-			if outlineView.isItemExpanded(node) {
-				outlineView.collapseItem(node)
+		if isDirectory(url) {
+			if outlineView.isItemExpanded(url) {
+				outlineView.collapseItem(url)
 			} else {
-				outlineView.expandItem(node)
+				outlineView.expandItem(url)
 			}
 			return
 		}
-		onOpenFile?(node.url)
+		onOpenFile?(url as URL)
 	}
 
 	private func previewSelection() {
 		let row = outlineView.selectedRow
 		guard row >= 0,
-		      let node = outlineView.item(atRow: row) as? FileTreeNode,
-		      !node.isDirectory
+		      let url = outlineView.item(atRow: row) as? NSURL,
+		      !isDirectory(url)
 		else {
 			return
 		}
-		onPreviewFile?(node.url)
+		onPreviewFile?(url as URL)
+	}
+
+	private func isDirectory(_ url: NSURL) -> Bool {
+		let values = try? (url as URL).resourceValues(forKeys: [.isDirectoryKey])
+		return values?.isDirectory == true
+	}
+
+	private func title(for url: NSURL) -> String {
+		let fileURL = url as URL
+		return fileURL.lastPathComponent.isEmpty ? fileURL.path : fileURL.lastPathComponent
+	}
+
+	private func children(of url: NSURL) -> [NSURL] {
+		guard isDirectory(url) else {
+			return []
+		}
+		if let cached = childCache[url] {
+			return cached
+		}
+		let keys: [URLResourceKey] = [.isDirectoryKey, .isHiddenKey]
+		let contents = (try? FileManager.default.contentsOfDirectory(
+			at: url as URL,
+			includingPropertiesForKeys: keys,
+			options: [.skipsPackageDescendants]
+		)) ?? []
+		let nodes = contents.compactMap { child -> NSURL? in
+			let values = try? child.resourceValues(forKeys: Set(keys))
+			if values?.isHidden == true {
+				return nil
+			}
+			return child as NSURL
+		}
+		let sorted = nodes.sorted { lhs, rhs in
+			let lhsDirectory = isDirectory(lhs)
+			let rhsDirectory = isDirectory(rhs)
+			if lhsDirectory != rhsDirectory {
+				return lhsDirectory && !rhsDirectory
+			}
+			return title(for: lhs).localizedStandardCompare(title(for: rhs)) == .orderedAscending
+		}
+		childCache[url] = sorted
+		return sorted
 	}
 }
 
@@ -208,28 +207,28 @@ private final class ItsyQuickLookController: NSObject {
 
 extension FileTreeSidebarView: NSOutlineViewDataSource, NSOutlineViewDelegate {
 	func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
-		if let node = item as? FileTreeNode {
-			return node.children.count
+		if let url = item as? NSURL {
+			return children(of: url).count
 		}
-		return rootNode == nil ? 0 : 1
+		return rootURL == nil ? 0 : 1
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
-		if let node = item as? FileTreeNode {
-			return node.children[index]
+		if let url = item as? NSURL {
+			return children(of: url)[index]
 		}
-		guard let rootNode else {
+		guard let rootURL else {
 			preconditionFailure("root node requested before workspace root was set")
 		}
-		return rootNode
+		return rootURL
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
-		(item as? FileTreeNode)?.isDirectory == true
+		(item as? NSURL).map(isDirectory(_:)) == true
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
-		guard let node = item as? FileTreeNode else {
+		guard let url = item as? NSURL else {
 			return nil
 		}
 		let identifier = NSUserInterfaceItemIdentifier("FileTreeCell")
@@ -238,7 +237,7 @@ extension FileTreeSidebarView: NSOutlineViewDataSource, NSOutlineViewDelegate {
 		let textField = cell.textField ?? NSTextField(labelWithString: "")
 		textField.lineBreakMode = .byTruncatingMiddle
 		textField.font = .systemFont(ofSize: 12)
-		textField.stringValue = node.title
+		textField.stringValue = title(for: url)
 		if textField.superview == nil {
 			textField.translatesAutoresizingMaskIntoConstraints = false
 			cell.addSubview(textField)

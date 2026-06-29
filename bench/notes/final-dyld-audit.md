@@ -173,3 +173,9 @@ Current section distribution:
 
 - Replaced the file-tree `NSOutlineView` subclass with a local key monitor scoped to the outline view for Space preview.
 - Static rebase fixups after file-tree outline subclass cleanup: `2543`; target remains `<2000`; result remains fail.
+
+## File tree node cleanup
+
+- Replaced the private Swift `FileTreeNode` class with `NSURL` outline items plus a per-sidebar child cache.
+- Static rebase fixups after file-tree node cleanup: `2527`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `22` to `21`.

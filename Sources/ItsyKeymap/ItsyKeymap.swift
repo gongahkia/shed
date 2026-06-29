@@ -1,1 +1,1 @@
-public enum ItsyKeymapModule {}
+enum ItsyKeymapModule {}

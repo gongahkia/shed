@@ -1,1 +1,1 @@
-public enum ItsyEditorModule {}
+enum ItsyEditorModule {}

@@ -1,4 +1,4 @@
-import ItsyEditor
+@testable import ItsyEditor
 import Testing
 
 @Test func itsyEditorModuleLinks() {

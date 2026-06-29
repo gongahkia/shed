@@ -35,7 +35,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsStatusLabel: NSTextField?
 	private var projectFindPanel: NSPanel?
-	private var projectFindContentView: ProjectFindView?
+	private var projectFindInputField: ItsyActionTextField?
+	private var projectFindStatusLabel: NSTextField?
+	private var projectFindTableView: NSTableView?
+	private var projectFindMatches: [ProjectFindMatch] = []
 	private var projectFindGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
@@ -315,7 +318,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		centerProjectFind(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
-		projectFindContentView?.focusInput()
+		projectFindPanel?.makeFirstResponder(projectFindInputField)
 		updateProjectFindStatusForCurrentWorkspace()
 	}
 
@@ -330,17 +333,74 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			backing: .buffered,
 			defer: false
 		)
-		let contentView = ProjectFindView(frame: NSRect(origin: .zero, size: size))
-		contentView.onCancel = { [weak self] in self?.closeProjectFind() }
-		contentView.onSearch = { [weak self] query in self?.searchProjectFind(query: query) }
-		contentView.onOpenMatch = { [weak self] match in _ = self?.documentController.openDocument(at: match.url) }
+		let contentView = NSView(frame: NSRect(origin: .zero, size: size))
+		configureProjectFindView(contentView)
 		panel.contentView = contentView
 		panel.title = L10n.string("Find in Project")
 		panel.isReleasedWhenClosed = false
 		panel.minSize = NSSize(width: 520, height: 260)
 		projectFindPanel = panel
-		projectFindContentView = contentView
 		return panel
+	}
+
+	private func configureProjectFindView(_ contentView: NSView) {
+		contentView.wantsLayer = true
+		contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+		let queryField = ItsyActionTextField(frame: .zero)
+		queryField.placeholderString = L10n.string("Find in project")
+		queryField.font = .systemFont(ofSize: 15)
+		queryField.isBordered = true
+		queryField.focusRingType = .default
+		queryField.translatesAutoresizingMaskIntoConstraints = false
+		queryField.onCancel = { [weak self] in self?.closeProjectFind() }
+		queryField.delegate = self
+		contentView.addSubview(queryField)
+
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 11)
+		statusLabel.textColor = .secondaryLabelColor
+		statusLabel.lineBreakMode = .byTruncatingMiddle
+		statusLabel.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(statusLabel)
+
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("result"))
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowHeight = 24
+		tableView.intercellSpacing = NSSize(width: 0, height: 0)
+		tableView.usesAlternatingRowBackgroundColors = true
+		tableView.dataSource = self
+		tableView.delegate = self
+		tableView.target = self
+		tableView.doubleAction = #selector(openSelectedProjectFindMatch(_:))
+
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = true
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(scrollView)
+
+		NSLayoutConstraint.activate([
+			queryField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+			queryField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+			queryField.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
+			queryField.heightAnchor.constraint(equalToConstant: 28),
+			statusLabel.leadingAnchor.constraint(equalTo: queryField.leadingAnchor),
+			statusLabel.trailingAnchor.constraint(equalTo: queryField.trailingAnchor),
+			statusLabel.topAnchor.constraint(equalTo: queryField.bottomAnchor, constant: 6),
+			statusLabel.heightAnchor.constraint(equalToConstant: 16),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+			scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 8),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -14),
+		])
+		projectFindInputField = queryField
+		projectFindStatusLabel = statusLabel
+		projectFindTableView = tableView
 	}
 
 	private func centerProjectFind(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -353,12 +413,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func updateProjectFindStatusForCurrentWorkspace() {
 		guard let root = ItsyWorkspaceController.currentRootURL else {
-			projectFindContentView?.setResults([])
-			projectFindContentView?.setStatus(L10n.string("Open a folder first"))
+			setProjectFindResults([])
+			setProjectFindStatus(L10n.string("Open a folder first"))
 			return
 		}
-		projectFindContentView?.setResults([])
-		projectFindContentView?.setStatus(root.path)
+		setProjectFindResults([])
+		setProjectFindStatus(root.path)
+	}
+
+	private func setProjectFindStatus(_ status: String) {
+		projectFindStatusLabel?.stringValue = status
+	}
+
+	private func setProjectFindResults(_ matches: [ProjectFindMatch]) {
+		projectFindMatches = matches
+		projectFindTableView?.reloadData()
+		if !matches.isEmpty {
+			projectFindTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
 	}
 
 	private func searchProjectFind(query: String) {
@@ -369,21 +441,28 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		guard let root = ItsyWorkspaceController.currentRootURL else {
-			projectFindContentView?.setResults([])
-			projectFindContentView?.setStatus(L10n.string("Open a folder first"))
+			setProjectFindResults([])
+			setProjectFindStatus(L10n.string("Open a folder first"))
 			return
 		}
-		projectFindContentView?.setStatus(L10n.string("Searching..."))
+		setProjectFindStatus(L10n.string("Searching..."))
 		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
 			let matches = ProjectFind.search(root: root, options: ProjectFindOptions(query: query))
 			DispatchQueue.main.async { [weak self] in
 				guard let self, self.projectFindGeneration == generation else {
 					return
 				}
-				self.projectFindContentView?.setResults(matches)
-				self.projectFindContentView?.setStatus(L10n.string("\(matches.count) matches"))
+				self.setProjectFindResults(matches)
+				self.setProjectFindStatus(L10n.string("\(matches.count) matches"))
 			}
 		}
+	}
+
+	@objc private func openSelectedProjectFindMatch(_ sender: Any?) {
+		guard let tableView = projectFindTableView, tableView.selectedRow >= 0, tableView.selectedRow < projectFindMatches.count else {
+			return
+		}
+		_ = documentController.openDocument(at: projectFindMatches[tableView.selectedRow].url)
 	}
 
 	@objc private func showSettings(_ sender: Any?) {
@@ -659,7 +738,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
-extension AppDelegate: NSMenuDelegate, NSWindowDelegate {
+extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	func menuNeedsUpdate(_ menu: NSMenu) {
 		guard menu === openRecentMenu else {
 			return
@@ -689,6 +768,42 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate {
 			}
 			self.cancelCommandPalette()
 		}
+	}
+
+	func controlTextDidChange(_ notification: Notification) {
+		guard let field = notification.object as? NSTextField, field === projectFindInputField else {
+			return
+		}
+		searchProjectFind(query: field.stringValue)
+	}
+
+	func numberOfRows(in tableView: NSTableView) -> Int {
+		tableView === projectFindTableView ? projectFindMatches.count : 0
+	}
+
+	func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+		guard tableView === projectFindTableView else {
+			return nil
+		}
+		let identifier = NSUserInterfaceItemIdentifier("ProjectFindCell")
+		let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+		cell.identifier = identifier
+		let textField = cell.textField ?? NSTextField(labelWithString: "")
+		let match = projectFindMatches[row]
+		textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+		textField.lineBreakMode = .byTruncatingTail
+		textField.stringValue = "\(match.relativePath):\(match.line):\(match.column)  \(match.lineText)"
+		if textField.superview == nil {
+			textField.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(textField)
+			NSLayoutConstraint.activate([
+				textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+				textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+				textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+			])
+			cell.textField = textField
+		}
+		return cell
 	}
 }
 

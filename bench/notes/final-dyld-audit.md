@@ -253,3 +253,10 @@ Current section distribution:
 - Static rebase fixups after find-bar subclass cleanup: `2384`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `13` to `12`.
 - Section deltas: `__DATA,__objc_const` dropped from `885` to `874`; `__DATA_CONST,__const` dropped from `704` to `703`; `__DATA,__objc_data` dropped from `80` to `72`; `__DATA,__data` dropped from `47` to `46`.
+
+## Project find view cleanup
+
+- Folded `ProjectFindView` state/layout/table delegates into the existing `AppDelegate`.
+- Static rebase fixups after project-find view cleanup: `2356`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `12` to `11`.
+- Section deltas: `__DATA,__objc_const` dropped from `874` to `857`; `__DATA_CONST,__const` dropped from `703` to `702`; `__DATA,__objc_data` dropped from `72` to `64`; `__DATA,__data` dropped from `46` to `45`.

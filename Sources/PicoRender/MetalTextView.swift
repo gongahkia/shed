@@ -129,6 +129,12 @@ public final class MetalTextView: NSView {
 	private var pendingRegister: String?
 	private var registers: [String: String] = [:]
 	private var jumpBackSelection: SelectionSet?
+	private var macroRegisters: [String: [RecordedKey]] = [:]
+	private var recordingMacroRegister: String?
+	private var currentMacroEvents: [RecordedKey] = []
+	private var awaitingMacroRecordRegister = false
+	private var awaitingMacroReplayRegister = false
+	private var replayingMacro = false
 	private var pendingExCommand: String?
 	private var insertUndoGroupActive = false
 	private let killRing = KillRing()
@@ -377,16 +383,24 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if handlePendingMacroRegister(event) {
+			return
+		}
+		let recordsMacro = shouldRecordMacroEvent(event)
 		if handleExCommandInput(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return
 		}
 		if handlePendingRegister(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return
 		}
 		if handlePendingCharacterMotion(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return
 		}
 		if dispatchKeymap(event) == .handled {
+			recordMacroEvent(event, when: recordsMacro)
 			return
 		}
 		if !event.modifierFlags.intersection([.command, .control]).isEmpty {
@@ -394,6 +408,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		interpretKeyEvents([event])
+		recordMacroEvent(event, when: recordsMacro)
 	}
 
 	public override func performKeyEquivalent(with event: NSEvent) -> Bool {
@@ -422,19 +437,31 @@ public final class MetalTextView: NSView {
 			isARepeat: false,
 			keyCode: keyCode
 		)
+		if let event, handlePendingMacroRegister(event) {
+			return true
+		}
+		let recordsMacro = event.map { shouldRecordMacroEvent($0) } ?? false
 		if let event, handleExCommandInput(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return true
 		}
 		if let event, handlePendingRegister(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return true
 		}
 		if let event, handlePendingCharacterMotion(event) {
+			recordMacroEvent(event, when: recordsMacro)
 			return true
 		}
 		if let event, dispatchKeymap(event) == .handled {
+			recordMacroEvent(event, when: recordsMacro)
 			return true
 		}
-		return handlePassthroughKey(characters: characters, charactersIgnoringModifiers: charactersIgnoringModifiers, keyCode: keyCode, modifierFlags: modifierFlags)
+		let handled = handlePassthroughKey(characters: characters, charactersIgnoringModifiers: charactersIgnoringModifiers, keyCode: keyCode, modifierFlags: modifierFlags)
+		if let event, handled {
+			recordMacroEvent(event, when: recordsMacro)
+		}
+		return handled
 	}
 
 	private enum KeyDispatchResult {
@@ -477,6 +504,20 @@ public final class MetalTextView: NSView {
 	private enum RegisterOperation {
 		case yank
 		case delete
+	}
+
+	private struct RecordedKey {
+		var characters: String
+		var charactersIgnoringModifiers: String
+		var keyCode: UInt16
+		var modifierFlags: NSEvent.ModifierFlags
+
+		init(_ event: NSEvent) {
+			characters = event.characters ?? ""
+			charactersIgnoringModifiers = event.charactersIgnoringModifiers ?? characters
+			keyCode = event.keyCode
+			modifierFlags = event.modifierFlags.intersection([.command, .shift, .option, .control])
+		}
 	}
 
 	private enum TextObject {
@@ -604,6 +645,12 @@ public final class MetalTextView: NSView {
 			return true
 		case "vim.jumpBack":
 			jumpBack()
+		case "vim.macro.recordPrefix":
+			handleMacroRecordPrefix()
+			return true
+		case "vim.macro.replayPrefix":
+			awaitingMacroReplayRegister = true
+			return true
 		case "vim.pasteAfter":
 			pasteRegister(after: true)
 			return true
@@ -1057,6 +1104,26 @@ public final class MetalTextView: NSView {
 		return true
 	}
 
+	private func handlePendingMacroRegister(_ event: NSEvent) -> Bool {
+		if awaitingMacroRecordRegister {
+			awaitingMacroRecordRegister = false
+			if let register = macroRegisterName(for: event) {
+				startMacroRecording(register)
+			}
+			return true
+		}
+		if awaitingMacroReplayRegister {
+			let recordsRegister = recordingMacroRegister != nil && !replayingMacro
+			awaitingMacroReplayRegister = false
+			recordMacroEvent(event, when: recordsRegister)
+			if let register = macroRegisterName(for: event) {
+				replayMacro(register)
+			}
+			return true
+		}
+		return false
+	}
+
 	private func registerName(for key: Key) -> String? {
 		if key.modifiers == .shift, key.value == "'" {
 			return "\""
@@ -1075,6 +1142,73 @@ public final class MetalTextView: NSView {
 			return value
 		}
 		return nil
+	}
+
+	private func macroRegisterName(for event: NSEvent) -> String? {
+		guard let key = Key(event: event), key.modifiers.isEmpty, key.value.count == 1 else {
+			return nil
+		}
+		if ("a" ... "z").contains(key.value) || ("0" ... "9").contains(key.value) {
+			return key.value
+		}
+		return nil
+	}
+
+	private func handleMacroRecordPrefix() {
+		if recordingMacroRegister != nil {
+			stopMacroRecording()
+		} else {
+			awaitingMacroRecordRegister = true
+		}
+	}
+
+	private func startMacroRecording(_ register: String) {
+		recordingMacroRegister = register
+		currentMacroEvents = []
+	}
+
+	private func stopMacroRecording() {
+		guard let register = recordingMacroRegister else {
+			return
+		}
+		macroRegisters[register] = currentMacroEvents
+		recordingMacroRegister = nil
+		currentMacroEvents = []
+	}
+
+	private func replayMacro(_ register: String) {
+		guard !replayingMacro, let events = macroRegisters[register], !events.isEmpty else {
+			return
+		}
+		replayingMacro = true
+		defer { replayingMacro = false }
+		for event in events {
+			_ = handleKey(
+				characters: event.characters,
+				charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+				keyCode: event.keyCode,
+				modifierFlags: event.modifierFlags
+			)
+		}
+	}
+
+	private func shouldRecordMacroEvent(_ event: NSEvent) -> Bool {
+		guard recordingMacroRegister != nil, !replayingMacro else {
+			return false
+		}
+		guard let key = Key(event: event) else {
+			return false
+		}
+		if keymapEngine.mode == .normal, key.modifiers.isEmpty, key.value == "q" {
+			return false
+		}
+		return true
+	}
+
+	private func recordMacroEvent(_ event: NSEvent, when shouldRecord: Bool) {
+		if shouldRecord {
+			currentMacroEvents.append(RecordedKey(event))
+		}
 	}
 
 	private func writeRegister(_ text: String, operation: RegisterOperation) {

@@ -184,6 +184,14 @@ import Testing
 	#expect(engine.handle(try keyEvent("'")) == .command("vim.jumpBack"))
 }
 
+@Test func bundledVimProfileDefinesMacroCommands() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("q")) == .command("vim.macro.recordPrefix"))
+	#expect(engine.handle(try keyEvent("2", modifiers: [.shift])) == .command("vim.macro.replayPrefix"))
+}
+
 @Test func bundledVimProfileDefinesTextObjects() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)

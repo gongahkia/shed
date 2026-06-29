@@ -186,6 +186,52 @@ import Testing
 	#expect(view.editor.selections.primary.head == 0)
 }
 
+@Test func vimMacroRecordsAndReplaysKeys() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("q")], commandID: "vim.macro.recordPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("2", modifiers: .shift)], commandID: "vim.macro.replayPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("i")], commandID: "mode.insert"),
+		KeyBinding(mode: .insert, chord: [Key("escape")], commandID: "mode.normal"),
+	])
+
+	#expect(view.handleKey(characters: "q", charactersIgnoringModifiers: "q", keyCode: 0))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(view.handleKey(characters: "q", charactersIgnoringModifiers: "q", keyCode: 0))
+	view.editor = Editor(text: "")
+	#expect(view.handleKey(characters: "@", charactersIgnoringModifiers: "2", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.editor.text == "x")
+	#expect(view.keymapEngine.mode == .normal)
+}
+
+@Test func vimMacroReplaySkipsRecursiveReplay() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("q")], commandID: "vim.macro.recordPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("2", modifiers: .shift)], commandID: "vim.macro.replayPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("i")], commandID: "mode.insert"),
+		KeyBinding(mode: .insert, chord: [Key("escape")], commandID: "mode.normal"),
+	])
+
+	#expect(view.handleKey(characters: "q", charactersIgnoringModifiers: "q", keyCode: 0))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(view.handleKey(characters: "@", charactersIgnoringModifiers: "2", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "q", charactersIgnoringModifiers: "q", keyCode: 0))
+	view.editor = Editor(text: "")
+	#expect(view.handleKey(characters: "@", charactersIgnoringModifiers: "2", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.editor.text == "x")
+	#expect(view.keymapEngine.mode == .normal)
+}
+
 @Test func emacsStandardMotionsMoveCursor() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "one two\nthree")

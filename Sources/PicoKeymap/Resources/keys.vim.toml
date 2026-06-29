@@ -27,6 +27,8 @@
 "y" = "vim.operator.yank"
 "Shift-'" = "vim.registerPrefix"
 "''" = "vim.jumpBack"
+"q" = "vim.macro.recordPrefix"
+"Shift-2" = "vim.macro.replayPrefix"
 "p" = "vim.pasteAfter"
 "Shift-P" = "vim.pasteBefore"
 "v" = "vim.visual.char"

@@ -24,9 +24,7 @@ if [[ -z "$app_executable" ]]; then
     app_executable="$app_bundle/Contents/MacOS/Olly"
 fi
 
-if [[ ! -x "$ollyctl_executable" ]]; then
-    swift build -c release --product ollyctl
-fi
+swift build -c release --product ollyctl >/dev/null
 
 XDG_RUNTIME_DIR="$socket_dir" "$app_executable" &
 app_pid="$!"

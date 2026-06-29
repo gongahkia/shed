@@ -2,7 +2,7 @@ import AppKit
 import Dispatch
 import ItsyEditor
 
-final class ProjectFindController: NSObject {
+final class ProjectFindController {
 	private let workspaceURL: () -> URL?
 	private let openFile: (URL) -> Void
 	private var panel: ProjectFindPanel?
@@ -55,7 +55,6 @@ final class ProjectFindController: NSObject {
 		panel.title = L10n.string("Find in Project")
 		panel.isReleasedWhenClosed = false
 		panel.minSize = NSSize(width: 520, height: 260)
-		panel.delegate = self
 		self.panel = panel
 		self.contentView = contentView
 		return panel
@@ -104,8 +103,6 @@ final class ProjectFindController: NSObject {
 		}
 	}
 }
-
-extension ProjectFindController: NSWindowDelegate {}
 
 extension ProjectFindController: ProjectFindPanelDelegate {
 	func projectFindPanelDidCancel(_ panel: ProjectFindPanel) {

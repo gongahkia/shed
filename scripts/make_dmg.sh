@@ -50,6 +50,7 @@ if [[ -n "$dmg_identity" ]]; then
 fi
 
 hdiutil verify "$dmg_path" >/dev/null
+"$repo_dir/scripts/verify_dmg.sh" "$dmg_path" >/dev/null
 shasum -a 256 "$dmg_path" > "$dmg_path.sha256"
 cat "$dmg_path.sha256"
 echo "$dmg_path"

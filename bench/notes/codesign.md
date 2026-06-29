@@ -24,7 +24,7 @@ Validation steps in the script:
 
 ## Release pipeline
 
-- `scripts/make_dmg.sh` uses `create-dmg` when installed, falls back to `hdiutil`, verifies the app signature unless `ITSY_ALLOW_UNSIGNED_DMG=1`, builds `dist/Itsy-0.1.0.dmg`, verifies the DMG, optionally signs it, and writes `dist/Itsy-0.1.0.dmg.sha256`.
+- `scripts/make_dmg.sh` uses `create-dmg` when installed, falls back to `hdiutil`, verifies the app signature unless `ITSY_ALLOW_UNSIGNED_DMG=1`, builds `dist/Itsy-0.1.0.dmg`, verifies the DMG, mounts it with `scripts/verify_dmg.sh`, optionally signs it, and writes `dist/Itsy-0.1.0.dmg.sha256`.
 - `scripts/notarize.sh` submits the DMG with `xcrun notarytool`, waits, staples, validates the staple, and runs `spctl` on the DMG.
 - `.github/workflows/release.yml` runs on `v*.*.*` tags, imports a Developer ID Application certificate from secrets, builds/tests/signs/packages/notarizes, uploads the DMG artifact, and creates a GitHub Release.
 
@@ -63,7 +63,7 @@ ITSY_ALLOW_UNSIGNED_DMG=1 scripts/make_dmg.sh
 
 This validates bundle layout and DMG integrity only. It does not satisfy id:301 or id:302.
 
-2026-06-29 local result: unsigned `hdiutil` fallback built `dist/Itsy-0.1.0.dmg`; `hdiutil verify` passed.
+2026-06-29 local result: unsigned `hdiutil` fallback built `dist/Itsy-0.1.0.dmg`; `hdiutil verify` and mounted bundle validation passed. SHA-256: `89104a772e2723e51ec5a5a82d556130cb4d115965c4c36a3e5da33b019d40bb`.
 
 ## Notes
 

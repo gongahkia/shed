@@ -147,6 +147,7 @@ ollyctl focus next
 ollyctl toggle-floating
 ollyctl move-to-tag 2
 ollyctl move-to-display 69734272
+ollyctl doctor
 ollyctl events --replay-current-state
 ollyctl migrate-config --config ~/.config/olly/Config.swift
 ```
@@ -216,6 +217,7 @@ Useful docs:
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/dsl-cookbook.md`](docs/dsl-cookbook.md)
 - [`docs/dsl-reference.md`](docs/dsl-reference.md)
+- [`docs/doctor.md`](docs/doctor.md)
 - [`docs/performance.md`](docs/performance.md)
 - [`docs/plugin-authoring.md`](docs/plugin-authoring.md)
 - [`docs/homebrew-cask-pr.md`](docs/homebrew-cask-pr.md)

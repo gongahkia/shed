@@ -56,6 +56,7 @@ let package = Package(
         .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"], exclude: ["Fixtures"]),
         .testTarget(name: "ollyDSLTests", dependencies: ["ollyDSL"]),
         .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"]),
+        .testTarget(name: "ollyctlTests", dependencies: ["ollyctl"]),
         .testTarget(
             name: "ollyRuntimeTests",
             dependencies: ["ollyRuntime", "ollyDSL", "ollyIPC", "ollyKit", "ollyLayouts"]

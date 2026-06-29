@@ -128,6 +128,7 @@ public final class MetalTextView: NSView {
 	private var awaitingRegister = false
 	private var pendingRegister: String?
 	private var registers: [String: String] = [:]
+	private var jumpBackSelection: SelectionSet?
 	private var pendingExCommand: String?
 	private var insertUndoGroupActive = false
 	private let killRing = KillRing()
@@ -601,6 +602,8 @@ public final class MetalTextView: NSView {
 		case "vim.registerPrefix":
 			awaitingRegister = true
 			return true
+		case "vim.jumpBack":
+			jumpBack()
 		case "vim.pasteAfter":
 			pasteRegister(after: true)
 			return true
@@ -634,6 +637,8 @@ public final class MetalTextView: NSView {
 		case "vim.operator.line.yank":
 			applyLineOperator(.yank)
 			return true
+		case "edit.findNext", "edit.findPrevious", "vim.searchForward", "vim.searchBackward":
+			return performHostCommand(commandID, recordsJump: keymapEngine.mode == .normal)
 		case "file.save":
 			saveRequested?()
 			return true
@@ -653,9 +658,20 @@ public final class MetalTextView: NSView {
 			keymapEngine.setMode(.emacs)
 			return true
 		default:
-			return commandRequested?(commandID) == true
+			return performHostCommand(commandID)
 		}
 		syncEditorState()
+		return true
+	}
+
+	private func performHostCommand(_ commandID: String, recordsJump: Bool = false) -> Bool {
+		let before = editor.selections
+		guard commandRequested?(commandID) == true else {
+			return false
+		}
+		if recordsJump {
+			jumpBackSelection = before
+		}
 		return true
 	}
 
@@ -1282,9 +1298,43 @@ public final class MetalTextView: NSView {
 	}
 
 	private func repeatMotion(_ motion: Motion) {
+		let before = editor.selections
 		for _ in 0 ..< keymapRepeatCount {
 			editor.moveCursor(motion)
 		}
+		if keymapEngine.mode == .normal, isJumpMotion(motion), editor.selections != before {
+			jumpBackSelection = before
+		}
+	}
+
+	private func isJumpMotion(_ motion: Motion) -> Bool {
+		switch motion {
+		case .bufferStart, .bufferEnd, .paragraphForward, .paragraphBackward, .pageDown, .pageUp:
+			return true
+		default:
+			return false
+		}
+	}
+
+	private func jumpBack() {
+		let current = editor.selections
+		guard let target = jumpBackSelection else {
+			return
+		}
+		editor.setSelection(clampedSelectionSet(target))
+		jumpBackSelection = current
+	}
+
+	private func clampedSelectionSet(_ selectionSet: SelectionSet) -> SelectionSet {
+		let length = editor.rope.length
+		func clamped(_ selection: Selection) -> Selection {
+			Selection(
+				anchor: min(max(selection.anchor, 0), length),
+				head: min(max(selection.head, 0), length),
+				affinity: selection.affinity
+			)
+		}
+		return SelectionSet(primary: clamped(selectionSet.primary), secondaries: selectionSet.secondaries.map { clamped($0) })
 	}
 
 	private var keymapRepeatCount: Int {

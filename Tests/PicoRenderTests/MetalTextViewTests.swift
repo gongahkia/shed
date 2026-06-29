@@ -166,6 +166,26 @@ import Testing
 	#expect(view.editor.selections.primary.head == 8)
 }
 
+@Test func vimJumpBackReturnsToPreviousJumpSelection() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "one\ntwo\nthree")
+	view.editor.setSelection(SelectionSet(primary: Selection(anchor: 4, head: 4)))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("g"), Key("g")], commandID: "editor.moveBufferStart"),
+		KeyBinding(mode: .normal, chord: [Key("'"), Key("'")], commandID: "vim.jumpBack"),
+	])
+
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: "'", charactersIgnoringModifiers: "'", keyCode: 0))
+	#expect(view.handleKey(characters: "'", charactersIgnoringModifiers: "'", keyCode: 0))
+	#expect(view.editor.selections.primary.head == 4)
+	#expect(view.handleKey(characters: "'", charactersIgnoringModifiers: "'", keyCode: 0))
+	#expect(view.handleKey(characters: "'", charactersIgnoringModifiers: "'", keyCode: 0))
+	#expect(view.editor.selections.primary.head == 0)
+}
+
 @Test func emacsStandardMotionsMoveCursor() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "one two\nthree")

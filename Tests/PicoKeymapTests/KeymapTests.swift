@@ -176,6 +176,14 @@ import Testing
 	#expect(engine.handle(try keyEvent("n", modifiers: [.shift])) == .command("edit.findPrevious"))
 }
 
+@Test func bundledVimProfileDefinesJumpBackMark() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("'")) == .partial)
+	#expect(engine.handle(try keyEvent("'")) == .command("vim.jumpBack"))
+}
+
 @Test func bundledVimProfileDefinesTextObjects() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)

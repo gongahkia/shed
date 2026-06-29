@@ -92,7 +92,7 @@ x 2026-06-28 +Phase6-Syntax @treesitter id:106 est:3h dep:082,103 Incremental re
 
 x 2026-06-28 +Phase11-Vim @vim id:206 est:2h dep:201,082 Wire `u` to undo, `Ctrl-R` to redo. Mind vim's edit-grouping semantics: an insert-mode session = one undo unit.
 x 2026-06-29 +Phase11-Vim @vim id:207 est:3h dep:200 Search: `/`, `?`, `n`, `N`. Reuse find infra (id:161).
-(B) 2026-06-28 +Phase11-Vim @vim id:208 est:2h dep:200 Marks: `'` jump-back; defer named marks (a-z) to v0.2.
+x 2026-06-29 +Phase11-Vim @vim id:208 est:2h dep:200 Marks: `'` jump-back; defer named marks (a-z) to v0.2.
 (C) 2026-06-28 +Phase11-Vim @vim id:209 est:5h dep:201 Macros: `q<reg>` record, `@<reg>` replay. Recursion-safe.
 
 ---

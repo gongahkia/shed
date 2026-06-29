@@ -14,10 +14,10 @@
 
 ## Not done yet
 
-- No problem matcher integration.
 - No task cancellation.
 - No compound/background/watch tasks.
+- No configurable problem matchers.
 
 ## Next slice
 
-Add a task picker/output panel wired to the workspace root and command palette.
+Add task cancellation, then support configurable problem matchers and compound/background/watch tasks.

@@ -19,11 +19,10 @@
 
 ## Not done yet
 
-- No Git panel.
 - No gutter hunk indicators.
 - No commit UI.
 - No branch/switch/fetch/pull/push/stash/conflict workflows.
 
 ## Next slice
 
-Attach this core to an app-level Git model that refreshes from the open project root and can feed both file-tree badges and a future Git panel.
+Add a diff viewer and commit workflow, then expand branch/switch/fetch/pull/push/stash/conflict operations.

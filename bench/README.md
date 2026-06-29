@@ -3,8 +3,8 @@
 ## Benchmark protocol (frozen)
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
 - **Tooling:** `hyperfine --warmup 0 --runs 20 --prepare 'sudo purge'` per cmd.
-- **Cold-start measurement:** Each editor under test gets a `--bench-exit-on-ready` shim:
-  - For `itsy`: native flag — print timestamp on `applicationDidFinishLaunching` + first paint, then `NSApp.terminate`.
+- **Cold-start measurement:** Each editor under test gets a startup probe:
+  - For `itsy`: `itsybench measure --staged` sets `ITSY_BENCH_STAGES_PATH` and records internal stage deltas for `process_start`, `delegate_init`, `app_did_finish_launching`, `main_menu_installed`, `initial_document_opened`, `app_activated`, and `first_draw` alongside the external first-window-visible KPI.
   - For Zed/Sublime/VSCode/CodeEdit: external observer (Swift CLI using Accessibility API `AXObserver` to detect first window-visible event), records timestamp, then `kill -TERM`.
 - **Corpus** (checked into `bench/corpus/`):
   - `small.ts` (1 kLOC)
@@ -18,7 +18,7 @@
 ## CLI
 
 ```sh
-itsybench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
+itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```

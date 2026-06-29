@@ -23,3 +23,9 @@
 - Try release flags `-dead_strip` and `-Osize`, then re-run id031 before taking larger code changes.
 - Keep id105 lazy grammar loading high priority; [Inference] it is the most plausible path to reducing binary constant data.
 - Review the 12 app/library `import Foundation` uses after measurement is split; no single import is proven hot by this trace.
+
+## 2026-06-29 update
+
+- `ItsyBench measure --staged --app Itsy.app` now preserves the first-window-visible KPI and adds internal stage deltas from `ITSY_BENCH_STAGES_PATH`.
+- Stages currently emitted: `process_start`, `delegate_init`, `app_did_finish_launching`, `main_menu_installed`, `initial_document_opened`, `app_activated`, `first_draw`.
+- [Inference] This separates process/window-manager launch cost from app delegate and first Metal draw work without changing competitor measurement semantics.

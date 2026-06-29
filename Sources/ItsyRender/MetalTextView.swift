@@ -50,6 +50,8 @@ private struct CachedLineGlyph {
 
 public final class MetalTextView: NSView {
 	private static let accessibilityLocale = Locale(identifier: "en")
+	private static let benchStageLock = NSLock()
+	private static var recordedBenchStages: Set<String> = []
 
 	public var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
 		didSet { needsDisplay = true }
@@ -1726,6 +1728,7 @@ public final class MetalTextView: NSView {
 		commandBuffer.present(drawable)
 		commandBuffer.commit()
 		renderedFrameCount += 1
+		Self.recordBenchStageOnce("first_draw")
 	}
 
 	private func startDisplayLink() {
@@ -2060,6 +2063,28 @@ public final class MetalTextView: NSView {
 
 	private static func localized(_ value: String.LocalizationValue) -> String {
 		String(localized: value, bundle: .module, locale: accessibilityLocale)
+	}
+
+	private static func recordBenchStageOnce(_ name: String) {
+		benchStageLock.lock()
+		let inserted = recordedBenchStages.insert(name).inserted
+		benchStageLock.unlock()
+		guard inserted, let path = ProcessInfo.processInfo.environment["ITSY_BENCH_STAGES_PATH"] else {
+			return
+		}
+		let line = "\(name) \(DispatchTime.now().uptimeNanoseconds)\n"
+		let url = URL(fileURLWithPath: path)
+		if !FileManager.default.fileExists(atPath: path) {
+			FileManager.default.createFile(atPath: path, contents: nil)
+		}
+		guard let handle = try? FileHandle(forWritingTo: url) else {
+			return
+		}
+		defer {
+			try? handle.close()
+		}
+		_ = try? handle.seekToEnd()
+		_ = try? handle.write(contentsOf: Data(line.utf8))
 	}
 }
 

@@ -4,6 +4,25 @@ import Foundation
 import ItsyEditor
 import ItsyKeymap
 
+private func recordBenchStage(_ name: String) {
+	guard let path = ProcessInfo.processInfo.environment["ITSY_BENCH_STAGES_PATH"] else {
+		return
+	}
+	let line = "\(name) \(DispatchTime.now().uptimeNanoseconds)\n"
+	let url = URL(fileURLWithPath: path)
+	if !FileManager.default.fileExists(atPath: path) {
+		FileManager.default.createFile(atPath: path, contents: nil)
+	}
+	guard let handle = try? FileHandle(forWritingTo: url) else {
+		return
+	}
+	defer {
+		try? handle.close()
+	}
+	_ = try? handle.seekToEnd()
+	_ = try? handle.write(contentsOf: Data(line.utf8))
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private let commandRegistry = CommandRegistry()
@@ -19,6 +38,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
+		recordBenchStage("delegate_init")
 		do {
 			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
 			let bindings = try KeymapConfiguration.load(profile: profile)
@@ -39,9 +59,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
+		recordBenchStage("app_did_finish_launching")
 		installMainMenu()
+		recordBenchStage("main_menu_installed")
 		openInitialDocument()
+		recordBenchStage("initial_document_opened")
 		NSApp.activate(ignoringOtherApps: true)
+		recordBenchStage("app_activated")
 	}
 
 	func application(_ sender: NSApplication, openFile filename: String) -> Bool {
@@ -314,6 +338,8 @@ if CommandLine.arguments.contains("--bench-exit-on-ready") {
 	FileHandle.standardOutput.write(Data("READY \(ns)\n".utf8))
 	exit(0)
 }
+
+recordBenchStage("process_start")
 
 let app = NSApplication.shared
 private let documentController = ItsyDocumentController()

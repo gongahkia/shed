@@ -283,6 +283,27 @@ import Testing
 	#expect(commands == ["emacs.isearchForward", "emacs.isearchBackward"])
 }
 
+@Test func vimSearchCommandsRouteToHost() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var commands: [String] = []
+	view.commandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("/")], commandID: "vim.searchForward"),
+		KeyBinding(mode: .normal, chord: [Key("/", modifiers: .shift)], commandID: "vim.searchBackward"),
+		KeyBinding(mode: .normal, chord: [Key("n")], commandID: "edit.findNext"),
+		KeyBinding(mode: .normal, chord: [Key("n", modifiers: .shift)], commandID: "edit.findPrevious"),
+	])
+
+	#expect(view.handleKey(characters: "/", charactersIgnoringModifiers: "/", keyCode: 0))
+	#expect(view.handleKey(characters: "?", charactersIgnoringModifiers: "/", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "n", charactersIgnoringModifiers: "n", keyCode: 0))
+	#expect(view.handleKey(characters: "N", charactersIgnoringModifiers: "n", keyCode: 0, modifierFlags: .shift))
+	#expect(commands == ["vim.searchForward", "vim.searchBackward", "edit.findNext", "edit.findPrevious"])
+}
+
 @Test func emacsUniversalArgumentRepeatsNextCommand() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abcdef")

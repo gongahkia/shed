@@ -44,7 +44,10 @@
 "Cmd-Opt-Up" = "pane.focusUp"
 "Cmd-Opt-Down" = "pane.focusDown"
 "i" = "mode.insert"
-"/" = "edit.find"
+"/" = "vim.searchForward"
+"Shift-/" = "vim.searchBackward"
+"n" = "edit.findNext"
+"Shift-N" = "edit.findPrevious"
 
 [mode.visual]
 "Cmd-D" = "editor.addNextSelection"

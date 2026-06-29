@@ -30,6 +30,7 @@ struct OllyCtl: ParsableCommand {
             TagRemove.self,
             Reload.self,
             RestoreWindows.self,
+            Doctor.self,
             SubscribeEvents.self,
             Events.self,
             MigrateConfig.self,

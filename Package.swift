@@ -10,12 +10,12 @@ let package = Package(
 	products: [
 		.executable(name: "ItsyApp", targets: ["ItsyApp"]),
 		.executable(name: "ItsyBench", targets: ["ItsyBench"]),
-		.library(name: "ItsyRender", targets: ["ItsyRender"]),
-		.library(name: "ItsyEditor", targets: ["ItsyEditor"]),
-		.library(name: "ItsySyntax", targets: ["ItsySyntax"]),
-		.library(name: "ItsyKeymap", targets: ["ItsyKeymap"]),
-		.library(name: "CTreeSitter", targets: ["CTreeSitter"]),
-		.library(name: "CTSGrammars", targets: ["CTSGrammars"]),
+		.library(name: "ItsyRender", type: .static, targets: ["ItsyRender"]),
+		.library(name: "ItsyEditor", type: .static, targets: ["ItsyEditor"]),
+		.library(name: "ItsySyntax", type: .static, targets: ["ItsySyntax"]),
+		.library(name: "ItsyKeymap", type: .static, targets: ["ItsyKeymap"]),
+		.library(name: "CTreeSitter", type: .static, targets: ["CTreeSitter"]),
+		.library(name: "CTSGrammars", type: .static, targets: ["CTSGrammars"]),
 	],
 	dependencies: [],
 	targets: [

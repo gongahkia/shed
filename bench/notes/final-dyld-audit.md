@@ -54,3 +54,10 @@
 - Left C-resource wrappers as classes: `Parser`, `Tree`, `HighlightQuery`, `RopeInput`, and `GlyphAtlas`; they own pointers/resources with `deinit`.
 - Left `RopeNode` as a class because the rope is a persistent tree of shared child nodes; changing it would be a buffer representation rewrite, not a local reference-type cleanup.
 - Static rebase fixups after these conversions: `3759`; remaining gap is dominated by value metadata plus AppKit/ObjC classes and needs the library/linker work next.
+
+## Library linkage update
+
+- `otool -L .build/release/ItsyApp` shows no internal `Itsy*` dynamic libraries in the launch image list.
+- SwiftPM library products are now explicitly `.static` so release builds cannot accidentally flip these modules into dylib products.
+- Mergeable-library Xcode settings are not applied because this repo is SwiftPM-only and has no Xcode project build setting surface.
+- Static rebase fixups after explicit static products: `3759`; no change, confirming internal dynamic-library loading was not a current contributor.

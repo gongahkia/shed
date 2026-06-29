@@ -86,3 +86,9 @@ Current section distribution:
 - `otool -L .build/release/ItsyApp | rg 'QuickLook|QuickLookUI|swiftQuickLook'` now returns no matches.
 - `swift -e` verification confirms `dlopen("/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI", RTLD_LAZY | RTLD_LOCAL)` succeeds and `QLPreviewPanel` responds to `sharedPreviewPanel`.
 - Static rebase fixups after lazy Quick Look: `3829`; target remains `<2000`; result remains fail.
+
+## Singleton reference cleanup
+
+- Converted value-like app singleton wrappers to static namespaces: `ItsyAppKeymap`, `ItsyCommandPaletteBridge`, `ItsyTabCoordinator`, and `ItsyWorkspaceController`.
+- Removed unnecessary `NSObject` inheritance from `FileTreeNode`; `NSOutlineView` still accepts it as the outline item object.
+- Static rebase fixups after singleton cleanup: `3762`; target remains `<2000`; result remains fail.

@@ -1,7 +1,7 @@
 import AppKit
 import Darwin
 
-final class FileTreeNode: NSObject {
+final class FileTreeNode {
 	let url: URL
 	let isDirectory: Bool
 	private var cachedChildren: [FileTreeNode]?
@@ -250,27 +250,23 @@ extension FileTreeSidebarView: NSOutlineViewDataSource, NSOutlineViewDelegate {
 	}
 }
 
-final class ItsyWorkspaceController {
-	static let shared = ItsyWorkspaceController()
+enum ItsyWorkspaceController {
+	private static weak var documentController: ItsyDocumentController?
+	private static let sidebars = NSHashTable<FileTreeSidebarView>.weakObjects()
+	private static var rootURL: URL?
 
-	private weak var documentController: ItsyDocumentController?
-	private let sidebars = NSHashTable<FileTreeSidebarView>.weakObjects()
-	private var rootURL: URL?
-
-	private init() {}
-
-	var currentRootURL: URL? {
+	static var currentRootURL: URL? {
 		rootURL
 	}
 
-	func install(documentController: ItsyDocumentController) {
+	static func install(documentController: ItsyDocumentController) {
 		self.documentController = documentController
 	}
 
-	func register(_ sidebar: FileTreeSidebarView) {
+	static func register(_ sidebar: FileTreeSidebarView) {
 		sidebars.add(sidebar)
-		sidebar.onOpenFile = { [weak self] url in
-			self?.documentController?.openDocument(at: url)
+		sidebar.onOpenFile = { url in
+			documentController?.openDocument(at: url)
 		}
 		sidebar.onPreviewFile = { url in
 			ItsyQuickLookController.shared.preview(url)
@@ -278,14 +274,14 @@ final class ItsyWorkspaceController {
 		sidebar.setRootURL(rootURL)
 	}
 
-	func openWorkspace(at url: URL) {
+	static func openWorkspace(at url: URL) {
 		rootURL = url
 		for sidebar in sidebars.allObjects {
 			sidebar.setRootURL(url)
 		}
 	}
 
-	func openFile(at url: URL) -> Bool {
+	static func openFile(at url: URL) -> Bool {
 		documentController?.openDocument(at: url) ?? false
 	}
 }

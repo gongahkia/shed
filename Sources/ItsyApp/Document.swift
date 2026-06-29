@@ -9,14 +9,14 @@ import ItsySyntax
 final class ItsyDocumentController: NSDocumentController {
 	override init() {
 		super.init()
-		ItsyTabCoordinator.shared.install(documentController: self)
-		ItsyWorkspaceController.shared.install(documentController: self)
+		ItsyTabCoordinator.install(documentController: self)
+		ItsyWorkspaceController.install(documentController: self)
 	}
 
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
-		ItsyTabCoordinator.shared.install(documentController: self)
-		ItsyWorkspaceController.shared.install(documentController: self)
+		ItsyTabCoordinator.install(documentController: self)
+		ItsyWorkspaceController.install(documentController: self)
 	}
 
 	override var defaultType: String? {
@@ -56,12 +56,12 @@ final class ItsyDocumentController: NSDocumentController {
 	override func addDocument(_ document: NSDocument) {
 		super.addDocument(document)
 		noteRecentDocumentIfNeeded(document)
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	override func removeDocument(_ document: NSDocument) {
 		super.removeDocument(document)
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	override func makeUntitledDocument(ofType typeName: String) throws -> NSDocument {
@@ -132,7 +132,7 @@ final class ItsyDocument: NSDocument {
 
 	override func updateChangeCount(_ change: NSDocument.ChangeType) {
 		super.updateChangeCount(change)
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	override func read(from data: Data, ofType typeName: String) throws {
@@ -603,8 +603,8 @@ final class EditorWindowController: NSWindowController {
 		findBarView.onFindPrevious = { [weak self] in
 			self?.selectFindMatchFromFindBar(direction: -1)
 		}
-		ItsyWorkspaceController.shared.register(fileTreeView)
-		ItsyTabCoordinator.shared.register(tabBarView)
+		ItsyWorkspaceController.register(fileTreeView)
+		ItsyTabCoordinator.register(tabBarView)
 		window.makeFirstResponder(editorView)
 	}
 
@@ -622,14 +622,14 @@ final class EditorWindowController: NSWindowController {
 		window?.makeKeyAndOrderFront(sender)
 		window?.orderFrontRegardless()
 		focusEditor()
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	func display(document newDocument: ItsyDocument) {
 		if self.document as? ItsyDocument === newDocument {
 			showWindow(nil)
 			focusEditor()
-			ItsyTabCoordinator.shared.refresh()
+			ItsyTabCoordinator.refresh()
 			return
 		}
 		if let oldDocument = self.document as? ItsyDocument {
@@ -648,7 +648,7 @@ final class EditorWindowController: NSWindowController {
 		window?.representedURL = newDocument.fileURL
 		showWindow(nil)
 		focusEditor()
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	override func encodeRestorableState(with coder: NSCoder) {
@@ -685,7 +685,7 @@ final class EditorWindowController: NSWindowController {
 	private func installPane(_ pane: EditorPaneController, document: ItsyDocument) {
 		let view = pane.editorView
 		document.attach(view)
-		view.keymapEngine = ItsyAppKeymap.shared.makeEngine()
+		view.keymapEngine = ItsyAppKeymap.makeEngine()
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
 		}
@@ -693,7 +693,7 @@ final class EditorWindowController: NSWindowController {
 			self?.performExCommand(command) ?? false
 		}
 		view.exCommandLineRequested = { [weak self] completion in
-			ItsyCommandPaletteBridge.shared.requestExCommand(relativeTo: self?.window, completion: completion)
+			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
 	}
 
@@ -772,7 +772,7 @@ final class EditorWindowController: NSWindowController {
 		case "file.open":
 			NSDocumentController.shared.openDocument(nil)
 		case "file.nextBuffer":
-			ItsyTabCoordinator.shared.selectAdjacentDocument(delta: 1)
+			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
 		case "pane.close":
 			if !closeActivePane() {
 				(document as? NSDocument)?.close()
@@ -819,9 +819,9 @@ final class EditorWindowController: NSWindowController {
 			(document as? NSDocument)?.save(nil)
 			(document as? NSDocument)?.close()
 		case "bn":
-			ItsyTabCoordinator.shared.selectAdjacentDocument(delta: 1)
+			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
 		case "bp":
-			ItsyTabCoordinator.shared.selectAdjacentDocument(delta: -1)
+			ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
 		default:
 			if command.hasPrefix("e ") {
 				return openExCommandPath(String(command.dropFirst(2)))
@@ -840,10 +840,10 @@ final class EditorWindowController: NSWindowController {
 		if trimmed.hasPrefix("/") {
 			url = URL(fileURLWithPath: trimmed)
 		} else {
-			let base = document?.fileURL?.deletingLastPathComponent() ?? ItsyWorkspaceController.shared.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+			let base = document?.fileURL?.deletingLastPathComponent() ?? ItsyWorkspaceController.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 			url = base.appendingPathComponent(trimmed)
 		}
-		return ItsyWorkspaceController.shared.openFile(at: url)
+		return ItsyWorkspaceController.openFile(at: url)
 	}
 
 	private func setFindBarVisible(_ visible: Bool) {
@@ -938,14 +938,14 @@ final class EditorWindowController: NSWindowController {
 
 extension EditorWindowController: NSWindowDelegate {
 	func windowDidBecomeKey(_ notification: Notification) {
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	func windowDidBecomeMain(_ notification: Notification) {
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 
 	func windowWillClose(_ notification: Notification) {
-		ItsyTabCoordinator.shared.refresh()
+		ItsyTabCoordinator.refresh()
 	}
 }

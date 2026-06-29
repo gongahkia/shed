@@ -24,7 +24,7 @@ Validation steps in the script:
 
 ## Release pipeline
 
-- `scripts/make_dmg.sh` requires `create-dmg`, verifies the app signature unless `ITSY_ALLOW_UNSIGNED_DMG=1`, builds `dist/Itsy-0.1.0.dmg`, optionally signs the DMG, and writes `dist/Itsy-0.1.0.dmg.sha256`.
+- `scripts/make_dmg.sh` uses `create-dmg` when installed, falls back to `hdiutil`, verifies the app signature unless `ITSY_ALLOW_UNSIGNED_DMG=1`, builds `dist/Itsy-0.1.0.dmg`, verifies the DMG, optionally signs it, and writes `dist/Itsy-0.1.0.dmg.sha256`.
 - `scripts/notarize.sh` submits the DMG with `xcrun notarytool`, waits, staples, validates the staple, and runs `spctl` on the DMG.
 - `.github/workflows/release.yml` runs on `v*.*.*` tags, imports a Developer ID Application certificate from secrets, builds/tests/signs/packages/notarizes, uploads the DMG artifact, and creates a GitHub Release.
 
@@ -54,6 +54,16 @@ Running `scripts/codesign.sh` currently fails fast with:
 expected exactly one Developer ID Application identity; found 0
 set ITSY_CODESIGN_IDENTITY='Developer ID Application: <name> (<team>)'
 ```
+
+Unsigned DMG packaging is locally smoke-tested with:
+
+```sh
+ITSY_ALLOW_UNSIGNED_DMG=1 scripts/make_dmg.sh
+```
+
+This validates bundle layout and DMG integrity only. It does not satisfy id:301 or id:302.
+
+2026-06-29 local result: unsigned `hdiutil` fallback built `dist/Itsy-0.1.0.dmg`; `hdiutil verify` passed.
 
 ## Notes
 

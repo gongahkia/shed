@@ -3,11 +3,13 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 app_dir="${ITSY_APP_DIR:-$repo_dir/Itsy.app}"
+app_name="Itsy"
 version="0.1.0"
 if [[ -f "$app_dir/Contents/Info.plist" ]]; then
+	app_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' "$app_dir/Contents/Info.plist")"
 	version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app_dir/Contents/Info.plist")"
 fi
-dmg_path="${ITSY_DMG_PATH:-$repo_dir/dist/Itsy-$version.dmg}"
+dmg_path="${ITSY_DMG_PATH:-$repo_dir/dist/$app_name-$version.dmg}"
 
 if [[ ! -f "$dmg_path" ]]; then
 	echo "missing DMG: $dmg_path" >&2

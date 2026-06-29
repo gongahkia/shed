@@ -61,7 +61,7 @@ ruby -rjson -rtime -e '
 	rope_runs = File.readlines(rope_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 	bench = hyperfine.fetch("results").first
 	current = {
-		"cold_start_ready_ms" => bench.fetch("mean").to_f * 1000.0,
+		"cold_start_ready_ms" => bench.fetch("median").to_f * 1000.0,
 		"cold_start_ready_min_ms" => bench.fetch("min").to_f * 1000.0,
 		"cold_start_ready_max_ms" => bench.fetch("max").to_f * 1000.0,
 		"rope_random_insert_ns_per_op" => rope_runs.map { |run| run.fetch("random_insert_ns_per_op").to_f }.min,

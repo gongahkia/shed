@@ -404,7 +404,7 @@ private struct EditorPaneLayout: Codable, Equatable {
 	}
 }
 
-final class EditorPaneCoordinator {
+struct EditorPaneCoordinator {
 	let rootSplitViewController = NSSplitViewController()
 	private(set) var panes: [EditorPaneController] = []
 	private(set) var activePane: EditorPaneController
@@ -422,7 +422,7 @@ final class EditorPaneCoordinator {
 	}
 
 	@discardableResult
-	func splitActive(vertical: Bool) -> EditorPaneController {
+	mutating func splitActive(vertical: Bool) -> EditorPaneController {
 		let newPane = EditorPaneController()
 		panes.append(newPane)
 		let parent = activePane.parent as? NSSplitViewController ?? rootSplitViewController
@@ -439,7 +439,7 @@ final class EditorPaneCoordinator {
 		return newPane
 	}
 
-	func closeActive() -> EditorPaneController? {
+	mutating func closeActive() -> EditorPaneController? {
 		guard panes.count > 1 else {
 			return nil
 		}
@@ -454,7 +454,7 @@ final class EditorPaneCoordinator {
 		return pane
 	}
 
-	func closeOtherPanes() -> [EditorPaneController] {
+	mutating func closeOtherPanes() -> [EditorPaneController] {
 		let kept = activePane
 		let removed = panes.filter { $0 !== kept }
 		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
@@ -464,7 +464,7 @@ final class EditorPaneCoordinator {
 		return removed
 	}
 
-	func focusAdjacent(delta: Int) -> EditorPaneController {
+	mutating func focusAdjacent(delta: Int) -> EditorPaneController {
 		guard let index = panes.firstIndex(where: { $0 === activePane }) else {
 			return activePane
 		}
@@ -477,7 +477,7 @@ final class EditorPaneCoordinator {
 		layout(for: rootSplitViewController)
 	}
 
-	fileprivate func restore(layout: EditorPaneLayout) -> [EditorPaneController] {
+	fileprivate mutating func restore(layout: EditorPaneLayout) -> [EditorPaneController] {
 		rootSplitViewController.splitViewItems.forEach { rootSplitViewController.removeSplitViewItem($0) }
 		panes = []
 		let rootItem = splitViewItem(for: layout)
@@ -510,11 +510,11 @@ final class EditorPaneCoordinator {
 		return .split(vertical: split.splitView.isVertical, children: split.splitViewItems.map { layout(for: $0.viewController) })
 	}
 
-	private func splitViewItem(for layout: EditorPaneLayout) -> NSSplitViewItem {
+	private mutating func splitViewItem(for layout: EditorPaneLayout) -> NSSplitViewItem {
 		NSSplitViewItem(viewController: viewController(for: layout))
 	}
 
-	private func viewController(for layout: EditorPaneLayout) -> NSViewController {
+	private mutating func viewController(for layout: EditorPaneLayout) -> NSViewController {
 		guard let vertical = layout.vertical else {
 			let pane = EditorPaneController()
 			panes.append(pane)
@@ -535,7 +535,7 @@ final class EditorWindowController: NSWindowController {
 	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
 	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
-	private let paneCoordinator = EditorPaneCoordinator()
+	private var paneCoordinator = EditorPaneCoordinator()
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}

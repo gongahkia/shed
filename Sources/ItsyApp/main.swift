@@ -45,6 +45,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var projectFindTableView: NSTableView?
 	private var projectFindMatches: [ProjectFindMatch] = []
 	private var projectFindGeneration = 0
+	private var gitPanel: NSPanel?
+	private var gitStatusLabel: NSTextField?
+	private var gitTableView: NSTableView?
+	private var gitEntries: [GitStatusEntry] = []
+	private var gitRootURL: URL?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -362,6 +367,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					Command(id: "edit.findInProject", title: L10n.string("Find in Project"), defaultKey: "Cmd-Shift-F") { [weak self] in
 						self?.showProjectFind(nil)
 					},
+					Command(id: "git.changes", title: L10n.string("Git Changes"), defaultKey: nil) { [weak self] in
+						self?.showGitChanges(nil)
+					},
+					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
+						self?.refreshGitChanges(nil)
+					},
 					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
 					},
@@ -577,6 +588,207 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		_ = documentController.openDocument(at: projectFindMatches[tableView.selectedRow].url)
 	}
 
+	@objc private func showGitChanges(_ sender: Any?) {
+		toggleGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleGitChanges(relativeTo hostWindow: NSWindow?) {
+		if gitPanel?.isVisible == true {
+			closeGitChanges()
+			return
+		}
+		showGitChanges(relativeTo: hostWindow)
+	}
+
+	private func closeGitChanges() {
+		gitPanel?.close()
+	}
+
+	private func showGitChanges(relativeTo hostWindow: NSWindow?) {
+		let panel = makeGitPanelIfNeeded()
+		centerGitPanel(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		refreshGitChanges(nil)
+	}
+
+	private func makeGitPanelIfNeeded() -> NSPanel {
+		if let panel = gitPanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Git Changes")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureGitView(contentView)
+		gitPanel = panel
+		return panel
+	}
+
+	private func configureGitView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 12)
+		statusLabel.textColor = .secondaryLabelColor
+		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
+		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
+		let unstageButton = NSButton(title: L10n.string("Unstage"), target: self, action: #selector(unstageSelectedGitEntries(_:)))
+		let buttonStack = NSStackView(views: [refreshButton, stageButton, unstageButton])
+		buttonStack.orientation = .horizontal
+		buttonStack.spacing = 8
+		let header = NSStackView(views: [statusLabel, buttonStack])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.distribution = .fill
+		header.spacing = 12
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("git"))
+		column.title = L10n.string("Changes")
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowSizeStyle = .small
+		tableView.usesAlternatingRowBackgroundColors = false
+		tableView.dataSource = self
+		tableView.delegate = self
+		tableView.target = self
+		tableView.doubleAction = #selector(openSelectedGitEntry(_:))
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		header.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(header)
+		contentView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		gitStatusLabel = statusLabel
+		gitTableView = tableView
+	}
+
+	private func centerGitPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(680, max(520, hostFrame.width - 100))
+		let height = min(460, max(280, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	@objc private func refreshGitChanges(_ sender: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			setGitEntries([], root: nil, status: L10n.string("Open a folder first"), isError: true)
+			return
+		}
+		guard let gitRoot = try? GitRepository.discoverRoot(containing: root) else {
+			setGitEntries([], root: nil, status: L10n.string("Not a Git repository"), isError: true)
+			ItsyWorkspaceController.refreshGitStatus()
+			return
+		}
+		do {
+			let snapshot = try GitRepository(root: gitRoot).snapshot()
+			let status = "\(snapshot.branchLabel) - \(snapshot.status.stagedCount) staged, \(snapshot.status.unstagedCount) unstaged"
+			setGitEntries(snapshot.status.entries, root: gitRoot, status: status, isError: false)
+			ItsyWorkspaceController.refreshGitStatus()
+		} catch {
+			setGitEntries([], root: gitRoot, status: String(describing: error), isError: true)
+		}
+	}
+
+	private func setGitEntries(_ entries: [GitStatusEntry], root: URL?, status: String, isError: Bool) {
+		gitEntries = entries
+		gitRootURL = root
+		gitStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
+		gitStatusLabel?.stringValue = status
+		gitTableView?.reloadData()
+		if !entries.isEmpty {
+			gitTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	@objc private func stageSelectedGitEntries(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		let paths = selectedGitPaths()
+		guard !paths.isEmpty else {
+			return
+		}
+		do {
+			try GitRepository(root: gitRootURL).stage(paths: paths)
+			refreshGitChanges(nil)
+		} catch {
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
+		}
+	}
+
+	@objc private func unstageSelectedGitEntries(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		let paths = selectedGitPaths()
+		guard !paths.isEmpty else {
+			return
+		}
+		do {
+			try GitRepository(root: gitRootURL).unstage(paths: paths)
+			refreshGitChanges(nil)
+		} catch {
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
+		}
+	}
+
+	private func selectedGitPaths() -> [String] {
+		guard let tableView = gitTableView else {
+			return []
+		}
+		return tableView.selectedRowIndexes.compactMap { row in
+			guard row >= 0, row < gitEntries.count else {
+				return nil
+			}
+			return gitEntries[row].path
+		}
+	}
+
+	@objc private func openSelectedGitEntry(_ sender: Any?) {
+		guard let tableView = gitTableView,
+		      let gitRootURL,
+		      tableView.selectedRow >= 0,
+		      tableView.selectedRow < gitEntries.count
+		else {
+			return
+		}
+		_ = documentController.openDocument(at: gitRootURL.appendingPathComponent(gitEntries[tableView.selectedRow].path))
+	}
+
+	private func gitEntryTitle(_ entry: GitStatusEntry) -> String {
+		let original = entry.originalPath.map { " <- \($0)" } ?? ""
+		return "\(gitEntryStatus(entry))  \(entry.path)\(original)"
+	}
+
+	private func gitEntryStatus(_ entry: GitStatusEntry) -> String {
+		if entry.kind == .untracked {
+			return "??"
+		}
+		if entry.kind == .unmerged {
+			return "UU"
+		}
+		let index = entry.indexStatus.map(String.init) ?? "."
+		let worktree = entry.worktreeStatus.map(String.init) ?? "."
+		return index + worktree
+	}
+
 	@objc private func showSettings(_ sender: Any?) {
 		let controller = makeSettingsWindowControllerIfNeeded()
 		refreshSettingsThemes()
@@ -759,10 +971,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let appItem = NSMenuItem()
 		let fileItem = NSMenuItem()
 		let editItem = NSMenuItem()
+		let gitItem = NSMenuItem()
 		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
 		mainMenu.addItem(editItem)
+		mainMenu.addItem(gitItem)
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
@@ -808,6 +1022,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			findInProjectItem.keyEquivalentModifierMask = [.command, .shift]
 			findInProjectItem.target = self
 			editItem.submenu = editMenu
+
+		let gitMenu = NSMenu(title: L10n.string("Git"))
+		let gitChangesItem = gitMenu.addItem(withTitle: L10n.string("Git Changes"), action: #selector(showGitChanges(_:)), keyEquivalent: "")
+		gitChangesItem.target = self
+		let gitRefreshItem = gitMenu.addItem(withTitle: L10n.string("Refresh Git Status"), action: #selector(refreshGitChanges(_:)), keyEquivalent: "")
+		gitRefreshItem.target = self
+		gitItem.submenu = gitMenu
 
 		let commandMenu = NSMenu(title: L10n.string("Command"))
 		let paletteItem = commandMenu.addItem(withTitle: L10n.string("Command Palette"), action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
@@ -927,6 +1148,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === projectFindTableView {
 			return projectFindMatches.count
 		}
+		if tableView === gitTableView {
+			return gitEntries.count
+		}
 		if tableView === commandPaletteTableView {
 			return commandPaletteFilteredItems.count
 		}
@@ -948,6 +1172,26 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 				NSLayoutConstraint.activate([
 					textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 12),
 					textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
+					textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				])
+				cell.textField = textField
+			}
+			return cell
+		}
+		if tableView === gitTableView {
+			let identifier = NSUserInterfaceItemIdentifier("GitCell")
+			let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+			cell.identifier = identifier
+			let textField = cell.textField ?? NSTextField(labelWithString: "")
+			textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+			textField.lineBreakMode = .byTruncatingTail
+			textField.stringValue = gitEntryTitle(gitEntries[row])
+			if textField.superview == nil {
+				textField.translatesAutoresizingMaskIntoConstraints = false
+				cell.addSubview(textField)
+				NSLayoutConstraint.activate([
+					textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+					textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
 					textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
 				])
 				cell.textField = textField

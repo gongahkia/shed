@@ -14,6 +14,7 @@
 - Added status, diff, stage, and unstage repository commands.
 - Added Git root discovery and workspace snapshots with URL-to-status lookup.
 - Wired workspace open to refresh Git status and feed simple file-tree status suffixes.
+- Added a minimal Git Changes panel with refresh, open, stage, and unstage actions.
 - Added parser and real temporary-repository tests.
 
 ## Not done yet

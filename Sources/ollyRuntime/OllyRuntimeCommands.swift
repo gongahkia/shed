@@ -53,6 +53,10 @@ extension OllyRuntime {
         try await statePersistence.load()
     }
 
+    func recoveryState() async throws -> WindowRecoveryJournalState {
+        try await recoveryJournal.load()
+    }
+
     func setFocusedWindow(
         _ windowID: WindowID?,
         displayID: DisplayID? = nil,
@@ -156,8 +160,73 @@ extension OllyRuntime {
     }
 
     func applyAndArrange(displayID: DisplayID) async throws {
-        _ = await dispatcher.apply(displayID: displayID)
+        let moves = await dispatcher.apply(displayID: displayID)
+        await recordRecoveryMoves(moves)
         try await arrange(displayID: displayID)
+    }
+
+    func restoreWindows(_ command: IPCRestoreWindowsCommand) async -> IPCRestoreWindowsInfo {
+        _ = command
+        return await restoreJournaledWindows()
+    }
+
+    func restoreJournaledWindows() async -> IPCRestoreWindowsInfo {
+        let entries: [WindowRecoveryEntry]
+        do {
+            entries = try await recoveryJournal.load().entries
+        } catch {
+            lastError = String(describing: error)
+            return IPCRestoreWindowsInfo(restoredCount: 0, skippedCount: 0, failedCount: 1)
+        }
+
+        var restoredIDs: [WindowID] = []
+        var skippedCount = 0
+
+        for entry in entries {
+            guard let target = windowTargets.target(for: entry.windowID) else {
+                skippedCount += 1
+                continue
+            }
+            let frame = entry.originalFrame.cgRect
+            let displayTarget = target.withFallbackDisplayID(entry.displayID)
+            await windowMover.setPosition(frame.origin, for: displayTarget)
+            await windowMover.setSize(frame.size, for: displayTarget)
+            restoredIDs.append(entry.windowID)
+        }
+
+        if !restoredIDs.isEmpty {
+            await windowMover.flushNow()
+        }
+
+        do {
+            try await recoveryJournal.remove(windowIDs: restoredIDs)
+            return IPCRestoreWindowsInfo(
+                restoredCount: restoredIDs.count,
+                skippedCount: skippedCount,
+                failedCount: 0
+            )
+        } catch {
+            lastError = String(describing: error)
+            return IPCRestoreWindowsInfo(
+                restoredCount: restoredIDs.count,
+                skippedCount: skippedCount,
+                failedCount: 1
+            )
+        }
+    }
+
+    func recordRecoveryMoves(_ moves: [TagDispatchMove]) async {
+        for move in moves {
+            switch move.reason {
+            case .hide:
+                guard let window = await windowStore.state(for: move.windowID) else {
+                    continue
+                }
+                try? await recoveryJournal.record(window: window, parkedFrame: move.targetFrame)
+            case .show:
+                try? await recoveryJournal.remove(windowID: move.windowID)
+            }
+        }
     }
 
     func arrange(displayID: DisplayID) async throws {

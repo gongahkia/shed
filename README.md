@@ -194,6 +194,7 @@ swiftlint lint --config .swiftlint.yml --strict
 ./scripts/check-no-private-api.sh
 swift build -c release
 swift test
+./scripts/smoke-app-ipc.sh
 ```
 
 SwiftPM products:

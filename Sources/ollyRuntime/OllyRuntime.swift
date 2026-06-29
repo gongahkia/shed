@@ -92,7 +92,8 @@ public actor OllyRuntime {
     let eventHub = RuntimeEventHub()
     let windowTargets = RuntimeWindowTargets()
     let statePersistence: WindowTagPersistence
-    private let windowMover: WindowMover
+    let recoveryJournal: WindowRecoveryJournal
+    let windowMover: WindowMover
     let assignment: WindowTagAssignment
     let dispatcher: TagDispatcher
     let engineHost: EngineHost
@@ -111,6 +112,7 @@ public actor OllyRuntime {
         applicationMonitor: ApplicationMonitor = ApplicationMonitor(),
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         statePersistence: WindowTagPersistence = WindowTagPersistence(),
+        recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
         scanAXOnStart: Bool = true
     ) {
         self.socketPath = socketPath
@@ -119,6 +121,7 @@ public actor OllyRuntime {
         self.applicationMonitor = applicationMonitor
         self.snapshotCache = snapshotCache
         self.statePersistence = statePersistence
+        self.recoveryJournal = recoveryJournal
         self.scanAXOnStart = scanAXOnStart
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
@@ -136,12 +139,21 @@ public actor OllyRuntime {
             windowStore: windowStore,
             tagStore: tagStore,
             registry: registry,
-            windowMover: windowMover,
             configProvider: { [configStore] engineID in
                 await configStore.config(for: engineID)
             },
-            targetResolver: { [windowTargets] window in
-                windowTargets.target(for: window)
+            applyPlacement: { [windowMover, windowTargets, recoveryJournal] window, placement in
+                if placement.hidden {
+                    try? await recoveryJournal.record(window: window, parkedFrame: placement.frame)
+                } else {
+                    try? await recoveryJournal.remove(windowID: window.id)
+                }
+                guard let target = windowTargets.target(for: window) else {
+                    return
+                }
+                let displayTarget = target.withFallbackDisplayID(window.displayID)
+                await windowMover.setPosition(placement.frame.origin, for: displayTarget)
+                await windowMover.setSize(placement.frame.size, for: displayTarget)
             },
             publishEvent: { [eventHub] event in
                 await eventHub.publish(.engine(event))
@@ -170,12 +182,14 @@ public actor OllyRuntime {
         self.server = server
     }
 
-    public func stop() {
+    public func stop() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
         stopAXObservers()
+        _ = await restoreJournaledWindows()
         server?.stop()
         server = nil
+        windowTargets.removeAll()
     }
 
     public func menuSnapshot() async -> OllyRuntimeMenuSnapshot {
@@ -239,7 +253,7 @@ public actor OllyRuntime {
             return try await tagResponse(for: request)
         case .setEngine, .cycleEngine:
             return try await engineResponse(for: request)
-        case .focus, .moveWindow, .swap, .reload:
+        case .focus, .moveWindow, .swap, .reload, .restoreWindows:
             return try await controlResponse(for: request)
         }
     }
@@ -318,6 +332,9 @@ public actor OllyRuntime {
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))
+        case let .restoreWindows(command):
+            let info = await restoreWindows(command)
+            return .ok(id: request.id, result: .restoredWindows(info))
         default:
             preconditionFailure("invalid control command")
         }

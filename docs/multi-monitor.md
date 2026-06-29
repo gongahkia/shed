@@ -85,7 +85,7 @@ against the remaining active display bounds. `OffscreenParking` tests cover this
 | Fullscreen apps | Out of scope for v0.x; macOS owns native fullscreen. | Fullscreen apps create native Spaces. |
 | Per-Space wallpapers/focus modes | Not represented. | Owned by macOS. |
 | Cross-Space window moves | Detected as drift when observable; otherwise unmanaged. | Native operation. |
-| Crash recovery | Tag persistence can restore olly state; parked positions may need reconciliation. | macOS keeps native Space assignment. |
+| Crash recovery | `restore-windows` uses the recovery journal to move parked windows back when AX targets are still known. | macOS keeps native Space assignment. |
 
 ## Verification
 
@@ -93,3 +93,4 @@ against the remaining active display bounds. `OffscreenParking` tests cover this
 - `OffscreenParkingTests` cover active `CGDisplayBounds` avoidance and display-unplug recompute.
 - `TagDispatcherTests` cover display-scoped apply and offscreen parking through a display provider.
 - `OllyRuntimeAXAcceptanceTests` are opt-in: set `OLLY_RUN_AX_ACCEPTANCE=1` and grant Accessibility trust.
+- `OllyRuntimeAXMatrixTests` are opt-in: set `OLLY_RUN_AX_MATRIX=1`; they emit an installed/running/window-count compatibility report for common apps.

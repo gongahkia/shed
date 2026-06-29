@@ -24,6 +24,8 @@ jobs:
         run: swift build -c release
       - name: Test
         run: swift test
+      - name: Check IPC schema docs
+        run: ./scripts/check-ipc-schema-docs.sh
       - name: Generate DSL reference
         run: ./scripts/generate-dsl-reference.sh
       - name: Check generated DSL reference

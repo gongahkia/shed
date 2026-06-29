@@ -10,6 +10,7 @@ final class IPCSchemaDocumentationTests: XCTestCase {
         let commandName = try XCTUnwrap(definitions["commandName"] as? [String: Any])
         let eventKind = try XCTUnwrap(definitions["eventKind"] as? [String: Any])
         let statePayload = try XCTUnwrap(definitions["statePayload"] as? [String: Any])
+        let restoredWindowsPayload = try XCTUnwrap(definitions["restoredWindowsPayload"] as? [String: Any])
         let windowState = try XCTUnwrap(definitions["windowState"] as? [String: Any])
         let windowProperties = try XCTUnwrap(windowState["properties"] as? [String: Any])
 
@@ -17,6 +18,10 @@ final class IPCSchemaDocumentationTests: XCTestCase {
         XCTAssertEqual(commandName["enum"] as? [String], IPCCommandName.allCases.map(\.rawValue))
         XCTAssertEqual(eventKind["enum"] as? [String], IPCEventKind.allCases.map(\.rawValue))
         XCTAssertNotNil(statePayload["properties"] as? [String: Any])
+        XCTAssertEqual(
+            restoredWindowsPayload["required"] as? [String],
+            ["restoredCount", "skippedCount", "failedCount"]
+        )
         XCTAssertNotNil(windowProperties["layoutOrder"])
     }
 

@@ -23,6 +23,7 @@ struct OllyCtl: ParsableCommand {
             TagAdd.self,
             TagRemove.self,
             Reload.self,
+            RestoreWindows.self,
             SubscribeEvents.self,
             Events.self,
             MigrateConfig.self,
@@ -282,6 +283,20 @@ struct Reload: ParsableCommand {
 
     func run() throws {
         try OllyCtlRunner(options: options).send(.reload(IPCReloadCommand()))
+    }
+}
+
+struct RestoreWindows: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "restore-windows",
+        abstract: "Restore windows parked or hidden by olly."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    func run() throws {
+        try OllyCtlRunner(options: options).send(.restoreWindows(IPCRestoreWindowsCommand()))
     }
 }
 

@@ -122,7 +122,10 @@ struct BenchmarkRunner {
         let scenarios = [
             try await measure("cold-start-proxy", runColdStartProxy),
             try await measure("hotkey-to-move-proxy", runHotkeyToMoveProxy),
+            try await measure("layout-recompute-\(options.windowCount)-windows", runLayoutRecompute),
+            try await measure("state-snapshot-\(options.windowCount)-windows", runStateSnapshotProxy),
             try await measure("tag-switch-\(options.windowCount)-windows", runTagSwitch),
+            try await measure("recovery-journal-\(options.windowCount)-windows", runRecoveryJournal),
             try await measure("wake-from-sleep-proxy", runWakeFromSleepProxy),
             try await measure("soak-\(options.soakEvents)-events", runSoak)
         ]
@@ -206,6 +209,46 @@ struct BenchmarkRunner {
         await tags.setActiveTags(TagSet(inactive), on: 1)
         let moves = await dispatcher.apply(displayID: 1)
         sink.consume(moves.count)
+    }
+
+    private func runLayoutRecompute() async throws {
+        let engine = MasterStackLayoutEngine()
+        let snapshots = windows(count: options.windowCount, active: try Tag(index: 0), inactive: try Tag(index: 0))
+            .map(WindowSnapshot.init)
+        let placements = engine.arrange(
+            windows: snapshots,
+            in: CGRect(x: 0, y: 0, width: 1_470, height: 918),
+            focus: snapshots.first?.windowID
+        )
+        sink.consume(placements.count)
+    }
+
+    private func runStateSnapshotProxy() async throws {
+        let store = WindowStore()
+        let tags = TagStore(defaultActiveTags: TagSet(try Tag(index: 0)))
+        for window in windows(count: options.windowCount, active: try Tag(index: 0), inactive: try Tag(index: 1)) {
+            await store.upsert(window)
+        }
+        let displayStates = await tags.allStates()
+        let windows = await store.allWindows()
+        sink.consume(displayStates.count + windows.count)
+    }
+
+    private func runRecoveryJournal() async throws {
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("recovery.json")
+        let journal = WindowRecoveryJournal(stateURL: stateURL)
+        defer {
+            try? FileManager.default.removeItem(at: stateURL.deletingLastPathComponent())
+        }
+        let parkedFrame = CGRect(x: -32_000, y: -32_000, width: 640, height: 420)
+        for window in windows(count: options.windowCount, active: try Tag(index: 0), inactive: try Tag(index: 1)) {
+            try await journal.record(window: window, parkedFrame: parkedFrame)
+        }
+        let state = try await journal.load()
+        try await journal.remove(windowIDs: state.entries.map(\.windowID))
+        sink.consume(state.entries.count)
     }
 
     private func runWakeFromSleepProxy() async throws {

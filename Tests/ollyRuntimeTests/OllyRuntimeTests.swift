@@ -169,6 +169,32 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testRestoreWindowsReportsSkippedTargetsFromRecoveryJournal() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+
+            let switched = try send(.switchTag(.init(tag: tag(1), displayID: displayID)), to: socketPath)
+            XCTAssertEqual(switched.status, .success)
+            let parkedIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            XCTAssertEqual(parkedIDs, [1, 2])
+
+            let response = try send(.restoreWindows(.init()), to: socketPath)
+
+            XCTAssertEqual(response.status, .success)
+            guard case let .restoredWindows(info)? = response.result else {
+                return XCTFail("expected restored-windows result")
+            }
+            XCTAssertEqual(info.restoredCount, 0)
+            XCTAssertEqual(info.skippedCount, 2)
+            XCTAssertEqual(info.failedCount, 0)
+            let remainingIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            XCTAssertEqual(remainingIDs, [1, 2])
+        }
+    }
+
     func testSpatialTargetPrefersPerpendicularOverlapBeforeNearestCenter() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -297,6 +323,9 @@ private struct RuntimeFixture {
             snapshotCache: snapshotCache,
             statePersistence: WindowTagPersistence(
                 stateURL: directoryURL.appendingPathComponent("state.json")
+            ),
+            recoveryJournal: WindowRecoveryJournal(
+                stateURL: directoryURL.appendingPathComponent("recovery.json")
             ),
             scanAXOnStart: false
         )

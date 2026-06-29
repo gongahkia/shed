@@ -5,24 +5,20 @@ the blockers for the GitHub Release task.
 
 ## Runtime Release Gate
 
-Do not tag v0.1.0 until the app runtime owns the IPC service used by `ollyctl`.
-The current `ollyApp` target owns the menu bar, AX onboarding, settings,
-overview mode, and command palette UI, but no `UnixDomainSocketServer` wiring was
-found in `Sources/ollyApp`.
-
-Verified on 2026-06-28:
+`ollyApp` owns the `OllyRuntime` instance and starts the Unix-domain IPC server
+used by `ollyctl`. The release smoke path is:
 
 ```sh
-swift run -c release ollyctl state
+./scripts/smoke-app-ipc.sh
 ```
 
-Result:
+The script launches the app, waits for the IPC socket, and verifies:
 
-```text
-Error: connect failed with errno 2
-```
+- `ollyctl version`
+- `ollyctl state`
+- `ollyctl restore-windows`
 
-This is a release blocker independent of signing/notarization.
+This gate must pass before tagging v0.1.0.
 
 ## Local Artifact Smoke Test
 
@@ -30,6 +26,7 @@ Command run on 2026-06-28:
 
 ```sh
 VERSION=v0.1.0 BUILD_NUMBER=1 CODESIGN_IDENTITY='-' ./scripts/package-macos-dmg.sh
+./scripts/validate-macos-app-bundle.sh dist/Olly.app
 mkdir -p release/v0.1.0
 cp dist/Olly.dmg release/v0.1.0/Olly-v0.1.0-ad-hoc.dmg
 git archive --format tar.gz --prefix olly-v0.1.0/ -o release/v0.1.0/olly-v0.1.0-source.tar.gz HEAD
@@ -60,6 +57,7 @@ commit, so read the current ignored smoke-test values from
 Do not remove the v0.1.0 release TODO until:
 
 - App runtime smoke test passes with `ollyctl state`.
+- Local ad-hoc bundle validation passes.
 - Release workflow has the signing/notarization secrets above.
 - `Release DMG` workflow passes for tag `v0.1.0`.
 - GitHub Release has `Olly-v0.1.0.dmg`, `olly-v0.1.0-source.tar.gz`, and `SHA256SUMS`.

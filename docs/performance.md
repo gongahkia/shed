@@ -37,8 +37,11 @@ runtime-sensitive.
 
 Attach one of:
 
-- `PerfBench` JSON once the benchmark target exists.
+- `PerfBench` JSON from `swift run -c release PerfBench --output <path>`.
 - Instruments or `xctrace` evidence for targeted hot-path changes.
 - A written explanation that the PR only changes docs, tests, fixtures, or non-runtime metadata.
 
-Until `PerfBench` lands, use focused unit tests plus release-build smoke timing where possible.
+Current `PerfBench` coverage includes cold-start proxy, hotkey-to-move proxy,
+layout recompute, state snapshot, tag switch, recovery journal, wake proxy, and
+synthetic soak scenarios. Real desktop AX timing remains opt-in and should be
+attached separately when a change depends on live Accessibility behavior.

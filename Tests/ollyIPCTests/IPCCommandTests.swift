@@ -20,6 +20,7 @@ final class IPCCommandTests: XCTestCase {
                 "tag-add",
                 "tag-remove",
                 "reload",
+                "restore-windows",
                 "subscribe-events",
                 "version"
             ]
@@ -40,6 +41,7 @@ final class IPCCommandTests: XCTestCase {
             .tagAdd(IPCTagCommand(tag: try tag(4), displayID: 2)),
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),
+            .restoreWindows(IPCRestoreWindowsCommand()),
             .subscribeEvents(IPCSubscribeEventsCommand(eventKinds: [.engine, .focus], replayCurrentState: true)),
             .version(IPCVersionCommand())
         ]

@@ -15,6 +15,7 @@ public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
     case tagAdd = "tag-add"
     case tagRemove = "tag-remove"
     case reload
+    case restoreWindows = "restore-windows"
     case subscribeEvents = "subscribe-events"
     case version
 }
@@ -102,6 +103,10 @@ public struct IPCReloadCommand: Codable, Equatable, Sendable {
     public init() {}
 }
 
+public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable {
+    public init() {}
+}
+
 public struct IPCSubscribeEventsCommand: Codable, Equatable, Sendable {
     public let eventKinds: [IPCEventKind]
     public let replayCurrentState: Bool
@@ -132,6 +137,7 @@ public enum IPCCommand: Equatable, Sendable {
     case tagAdd(IPCTagCommand)
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
+    case restoreWindows(IPCRestoreWindowsCommand)
     case subscribeEvents(IPCSubscribeEventsCommand)
     case version(IPCVersionCommand)
 
@@ -161,6 +167,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .tagRemove
         case .reload:
             return .reload
+        case .restoreWindows:
+            return .restoreWindows
         case .subscribeEvents:
             return .subscribeEvents
         case .version:
@@ -195,6 +203,10 @@ extension IPCCommand: Codable {
             self = .cycleEngine(command)
         case .reload:
             self = .reload(try container.decodeIfPresent(IPCReloadCommand.self, forKey: .arguments) ?? .init())
+        case .restoreWindows:
+            self = .restoreWindows(
+                try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init()
+            )
         case .subscribeEvents:
             let command = try container.decodeIfPresent(IPCSubscribeEventsCommand.self, forKey: .arguments) ?? .init()
             self = .subscribeEvents(command)
@@ -221,6 +233,8 @@ extension IPCCommand: Codable {
         case let .cycleEngine(command):
             try container.encode(command, forKey: .arguments)
         case let .reload(command):
+            try container.encode(command, forKey: .arguments)
+        case let .restoreWindows(command):
             try container.encode(command, forKey: .arguments)
         case let .subscribeEvents(command):
             try container.encode(command, forKey: .arguments)

@@ -5,6 +5,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/../.." && pwd)"
 duration="${PICO_SOAK_DURATION:-3600}"
 interval="${PICO_SOAK_INTERVAL:-60}"
+settle="${PICO_SOAK_SETTLE:-60}"
 file_count="${PICO_SOAK_FILES:-50}"
 workspace="${PICO_SOAK_WORKSPACE:-/tmp/pico-soak-workspace}"
 results_dir="$repo_dir/bench/results"
@@ -64,7 +65,7 @@ while IFS= read -r rel; do
 	sleep 0.03
 done < "$files"
 
-sleep 5
+sleep "$settle"
 window_count="$(osascript -e 'tell application "System Events" to count windows of process "Pico"' 2>/dev/null || echo 0)"
 baseline_rss="$(ps -o rss= -p "$pid" | tr -d ' ')"
 start_time="$(date +%s)"
@@ -93,6 +94,7 @@ ruby -rjson -rcsv -e '
 		"pid" => ARGV[2].to_i,
 		"opened_files" => ARGV[3].to_i,
 		"windows" => ARGV[4].to_i,
+		"settle_s" => ARGV[6].to_i,
 		"duration_s" => rows.last[0],
 		"samples" => rows.length,
 		"baseline_rss_kb" => baseline,
@@ -101,8 +103,8 @@ ruby -rjson -rcsv -e '
 		"final_growth_percent" => ((final - baseline).to_f / baseline) * 100.0,
 		"peak_growth_percent" => ((max - baseline).to_f / baseline) * 100.0
 	}
-	summary["pass"] = summary.fetch("peak_growth_percent") < 10.0
+	summary["pass"] = summary.fetch("windows") == 1 && summary.fetch("peak_growth_percent") < 10.0
 	File.write(ARGV[5], JSON.pretty_generate(summary) + "\n")
 	puts JSON.pretty_generate(summary)
 	exit(summary["pass"] ? 0 : 1)
-' "$csv_out" "$baseline_rss" "$pid" "$opened" "$window_count" "$json_out"
+' "$csv_out" "$baseline_rss" "$pid" "$opened" "$window_count" "$json_out" "$settle"

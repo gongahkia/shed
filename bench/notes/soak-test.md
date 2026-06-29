@@ -19,4 +19,17 @@
 
 ## Full gate
 
-- Full id:285 gate remains pending: run `bench/scripts/soak.sh` for 3600 s and require `peak_growth_percent < 10`.
+- Harness rule: open/edit 50 files, wait `PICO_SOAK_SETTLE` (`60` s default), then measure RSS for `PICO_SOAK_DURATION` (`3600` s default).
+- Pass rule: exactly one Pico window and `peak_growth_percent < 10`.
+- Full id:285 gate: pass.
+- Result file: `bench/results/soak-2026-06-29.json`.
+- CSV file: `bench/results/soak-2026-06-29.csv`.
+- Opened files: `50`.
+- Windows: `1`.
+- Duration: `3601` s.
+- Baseline RSS: `114512` KB.
+- Peak RSS: `122352` KB.
+- Final RSS: `59584` KB.
+- Peak growth: `6.846444040799217%`.
+- Final growth: `-47.96702528992595%`.
+- Process cleanup: verified no remaining `Pico`, `PicoBench`, or `xctrace` processes after completion.

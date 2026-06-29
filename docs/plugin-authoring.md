@@ -6,8 +6,7 @@
 
 Start from [`olly-plugin-template`](../olly-plugin-template/README.md). It contains a 49-line `HelloLayoutEngine`, a SwiftPM package, and a placement snapshot test you can run with `swift test --package-path olly-plugin-template` from this repo root.
 
-For broader examples, see the private showcase repo:
-<https://github.com/gongahkia/olly-layout-engine-showcase>.
+For broader examples, see [`examples/layout-engine-showcase`](../examples/layout-engine-showcase/).
 
 ## Loading Model
 

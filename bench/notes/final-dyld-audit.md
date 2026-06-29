@@ -197,3 +197,10 @@ Current section distribution:
 - Replaced app command-palette per-command closures with static command descriptors plus one id dispatcher.
 - Static rebase fixups increased from `2507` to `2520` (`__DATA_CONST,__const` increased from `693` to `703`, `__DATA,__objc_const` from `950` to `953`).
 - The experiment was reverted. This path does not reduce the remaining dyld gap.
+
+## Glyph atlas value cleanup
+
+- Converted `GlyphAtlas` from a Swift class to a struct, passed mutable atlas state through `LineShaper`, and removed the now-stateless cached `LineShaper` field.
+- Static rebase fixups after glyph-atlas cleanup: `2480`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `19` to `18`.
+- Section deltas: `__DATA,__objc_const` dropped from `950` to `920`; `__DATA,__data` dropped from `62` to `56`; `__DATA_CONST,__const` rose from `693` to `703`.

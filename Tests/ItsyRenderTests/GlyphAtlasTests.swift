@@ -5,7 +5,7 @@ import Testing
 
 @Test func glyphAtlasUploadsCoreTextRaster() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
-	let atlas = try GlyphAtlas(device: device)
+	var atlas = try GlyphAtlas(device: device)
 	#expect(atlas.texture.width == GlyphAtlas.defaultSize)
 	#expect(atlas.texture.height == GlyphAtlas.defaultSize)
 	let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
@@ -28,7 +28,7 @@ import Testing
 
 @Test func glyphAtlasUploadsSubpixelRasterAsRGBTexture() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
-	let atlas = try GlyphAtlas(device: device, renderingMode: .subpixel)
+	var atlas = try GlyphAtlas(device: device, renderingMode: .subpixel)
 	let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 	var chars: [UniChar] = Array("A".utf16)
 	var glyphs = [CGGlyph](repeating: 0, count: chars.count)

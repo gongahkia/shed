@@ -2,6 +2,10 @@
 
 import PackageDescription
 
+let releaseSwiftSettings: [SwiftSetting] = [
+	.unsafeFlags(["-Xfrontend", "-disable-reflection-metadata"], .when(configuration: .release)),
+]
+
 let package = Package(
 	name: "Itsy",
 	platforms: [
@@ -21,13 +25,14 @@ let package = Package(
 	targets: [
 		.executableTarget(
 			name: "ItsyApp",
-			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap"]
+			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap"],
+			swiftSettings: releaseSwiftSettings
 		),
-		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")]),
-		.target(name: "ItsyEditor"),
-		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")]),
-		.target(name: "ItsyKeymap", resources: [.process("Resources")]),
-		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"]),
+		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyEditor", swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyKeymap", resources: [.process("Resources")], swiftSettings: releaseSwiftSettings),
+		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"], swiftSettings: releaseSwiftSettings),
 		.target(
 			name: "CTreeSitter",
 			path: "Sources/CTreeSitter",

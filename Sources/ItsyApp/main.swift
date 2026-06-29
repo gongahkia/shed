@@ -50,6 +50,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitTableView: NSTableView?
 	private var gitEntries: [GitStatusEntry] = []
 	private var gitRootURL: URL?
+	private var taskPanel: NSPanel?
+	private var taskStatusLabel: NSTextField?
+	private var taskTableView: NSTableView?
+	private var taskOutputTextView: NSTextView?
+	private var workspaceTasks: [WorkspaceTask] = []
+	private var taskRunGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -372,6 +378,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					},
 					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
 						self?.refreshGitChanges(nil)
+					},
+					Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
+						self?.showTasks(nil)
+					},
+					Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
+						self?.refreshTasks(nil)
 					},
 					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
@@ -789,6 +801,190 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		return index + worktree
 	}
 
+	@objc private func showTasks(_ sender: Any?) {
+		toggleTasks(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleTasks(relativeTo hostWindow: NSWindow?) {
+		if taskPanel?.isVisible == true {
+			closeTasks()
+			return
+		}
+		showTasks(relativeTo: hostWindow)
+	}
+
+	private func closeTasks() {
+		taskPanel?.close()
+	}
+
+	private func showTasks(relativeTo hostWindow: NSWindow?) {
+		let panel = makeTaskPanelIfNeeded()
+		centerTaskPanel(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		refreshTasks(nil)
+	}
+
+	private func makeTaskPanelIfNeeded() -> NSPanel {
+		if let panel = taskPanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Tasks")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureTaskView(contentView)
+		taskPanel = panel
+		return panel
+	}
+
+	private func configureTaskView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 12)
+		statusLabel.textColor = .secondaryLabelColor
+		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshTasks(_:)))
+		let runButton = NSButton(title: L10n.string("Run"), target: self, action: #selector(runSelectedTask(_:)))
+		let buttonStack = NSStackView(views: [refreshButton, runButton])
+		buttonStack.orientation = .horizontal
+		buttonStack.spacing = 8
+		let header = NSStackView(views: [statusLabel, buttonStack])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.distribution = .fill
+		header.spacing = 12
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("task"))
+		column.title = L10n.string("Tasks")
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowSizeStyle = .small
+		tableView.dataSource = self
+		tableView.delegate = self
+		tableView.target = self
+		tableView.doubleAction = #selector(runSelectedTask(_:))
+		let taskScrollView = NSScrollView()
+		taskScrollView.documentView = tableView
+		taskScrollView.hasVerticalScroller = true
+		taskScrollView.drawsBackground = false
+		let outputTextView = NSTextView()
+		outputTextView.isEditable = false
+		outputTextView.isSelectable = true
+		outputTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+		outputTextView.string = ""
+		let outputScrollView = NSScrollView()
+		outputScrollView.documentView = outputTextView
+		outputScrollView.hasVerticalScroller = true
+		outputScrollView.drawsBackground = false
+		header.translatesAutoresizingMaskIntoConstraints = false
+		taskScrollView.translatesAutoresizingMaskIntoConstraints = false
+		outputScrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(header)
+		contentView.addSubview(taskScrollView)
+		contentView.addSubview(outputScrollView)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			taskScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			taskScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			taskScrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+			taskScrollView.heightAnchor.constraint(equalToConstant: 180),
+			outputScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			outputScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			outputScrollView.topAnchor.constraint(equalTo: taskScrollView.bottomAnchor, constant: 1),
+			outputScrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		taskStatusLabel = statusLabel
+		taskTableView = tableView
+		taskOutputTextView = outputTextView
+	}
+
+	private func centerTaskPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(780, max(560, hostFrame.width - 100))
+		let height = min(560, max(360, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	@objc private func refreshTasks(_ sender: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			setTasks([], status: L10n.string("Open a folder first"), output: "", isError: true)
+			return
+		}
+		let tasks = WorkspaceTaskDiscovery.discover(root: root)
+		setTasks(tasks, status: L10n.string("\(tasks.count) tasks"), output: taskOutputTextView?.string ?? "", isError: false)
+	}
+
+	private func setTasks(_ tasks: [WorkspaceTask], status: String, output: String, isError: Bool) {
+		workspaceTasks = tasks
+		taskStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
+		taskStatusLabel?.stringValue = status
+		taskOutputTextView?.string = output
+		taskTableView?.reloadData()
+		if !tasks.isEmpty {
+			taskTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	@objc private func runSelectedTask(_ sender: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL,
+		      let task = selectedTask()
+		else {
+			return
+		}
+		taskRunGeneration += 1
+		let generation = taskRunGeneration
+		taskStatusLabel?.textColor = .secondaryLabelColor
+		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
+		taskOutputTextView?.string = "$ \(task.commandLine)\n"
+		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+			let result = Result { try WorkspaceTaskRunner().run(task, root: root) }
+			DispatchQueue.main.async {
+				guard let self, self.taskRunGeneration == generation else {
+					return
+				}
+				self.applyTaskResult(result)
+			}
+		}
+	}
+
+	private func selectedTask() -> WorkspaceTask? {
+		guard let tableView = taskTableView,
+		      tableView.selectedRow >= 0,
+		      tableView.selectedRow < workspaceTasks.count
+		else {
+			return nil
+		}
+		return workspaceTasks[tableView.selectedRow]
+	}
+
+	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>) {
+		switch result {
+		case let .success(taskResult):
+			taskStatusLabel?.textColor = taskResult.succeeded ? .secondaryLabelColor : .systemRed
+			taskStatusLabel?.stringValue = L10n.string("\(taskResult.task.label) exited \(taskResult.exitStatus)")
+			taskOutputTextView?.string = [
+				"$ \(taskResult.task.commandLine)",
+				taskResult.stdout,
+				taskResult.stderr,
+			].filter { !$0.isEmpty }.joined(separator: "\n")
+		case let .failure(error):
+			taskStatusLabel?.textColor = .systemRed
+			taskStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	private func taskTitle(_ task: WorkspaceTask) -> String {
+		"\(task.label)  [\(task.source.rawValue)]"
+	}
+
 	@objc private func showSettings(_ sender: Any?) {
 		let controller = makeSettingsWindowControllerIfNeeded()
 		refreshSettingsThemes()
@@ -972,11 +1168,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let fileItem = NSMenuItem()
 		let editItem = NSMenuItem()
 		let gitItem = NSMenuItem()
+		let taskItem = NSMenuItem()
 		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
 		mainMenu.addItem(editItem)
 		mainMenu.addItem(gitItem)
+		mainMenu.addItem(taskItem)
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
@@ -1029,6 +1227,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let gitRefreshItem = gitMenu.addItem(withTitle: L10n.string("Refresh Git Status"), action: #selector(refreshGitChanges(_:)), keyEquivalent: "")
 		gitRefreshItem.target = self
 		gitItem.submenu = gitMenu
+
+		let taskMenu = NSMenu(title: L10n.string("Tasks"))
+		let taskRunItem = taskMenu.addItem(withTitle: L10n.string("Run Task"), action: #selector(showTasks(_:)), keyEquivalent: "")
+		taskRunItem.target = self
+		let taskRefreshItem = taskMenu.addItem(withTitle: L10n.string("Refresh Tasks"), action: #selector(refreshTasks(_:)), keyEquivalent: "")
+		taskRefreshItem.target = self
+		taskItem.submenu = taskMenu
 
 		let commandMenu = NSMenu(title: L10n.string("Command"))
 		let paletteItem = commandMenu.addItem(withTitle: L10n.string("Command Palette"), action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
@@ -1151,6 +1356,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === gitTableView {
 			return gitEntries.count
 		}
+		if tableView === taskTableView {
+			return workspaceTasks.count
+		}
 		if tableView === commandPaletteTableView {
 			return commandPaletteFilteredItems.count
 		}
@@ -1186,6 +1394,26 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
 			textField.lineBreakMode = .byTruncatingTail
 			textField.stringValue = gitEntryTitle(gitEntries[row])
+			if textField.superview == nil {
+				textField.translatesAutoresizingMaskIntoConstraints = false
+				cell.addSubview(textField)
+				NSLayoutConstraint.activate([
+					textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+					textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+					textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				])
+				cell.textField = textField
+			}
+			return cell
+		}
+		if tableView === taskTableView {
+			let identifier = NSUserInterfaceItemIdentifier("TaskCell")
+			let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+			cell.identifier = identifier
+			let textField = cell.textField ?? NSTextField(labelWithString: "")
+			textField.font = .systemFont(ofSize: 12)
+			textField.lineBreakMode = .byTruncatingTail
+			textField.stringValue = taskTitle(workspaceTasks[row])
 			if textField.superview == nil {
 				textField.translatesAutoresizingMaskIntoConstraints = false
 				cell.addSubview(textField)

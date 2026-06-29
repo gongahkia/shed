@@ -72,7 +72,7 @@ Itsy is intentionally narrow:
 - Tree-sitter syntax highlighting for common code formats.
 - LSP protocol core is in progress; no integrated LSP UI yet.
 - Git status/diff core and a minimal changes panel are in progress.
-- Task discovery/run core is in progress; no integrated task UI yet.
+- Task discovery/run core and a minimal task panel are in progress.
 - No Electron, terminal, plugin runtime, collaboration, or telemetry.
 
 ## Formatting

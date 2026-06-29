@@ -119,6 +119,16 @@ import Testing
 	#expect(first.color == red)
 }
 
+@Test func lineShapeCacheInvalidatesAfterSameLengthEdit() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "iii\n")
+	let narrow = try #require(view.textGlyphInstances(scale: 1).first)
+	view.editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: 1)))
+	view.editor.insert("W")
+	let wide = try #require(view.textGlyphInstances(scale: 1).first)
+	#expect(wide.size.x > narrow.size.x)
+}
+
 @Test func keymapProfileChangesTextHandlingWithoutRecompile() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

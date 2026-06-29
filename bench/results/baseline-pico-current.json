@@ -30,13 +30,13 @@
       "name": "binary_size_kb",
       "unit": "KB",
       "direction": "lower",
-      "baseline": 11560.0
+      "baseline": 11573.0
     },
     {
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",
-      "baseline": 9947
+      "baseline": 10051
     }
   ]
 }

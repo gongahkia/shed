@@ -38,7 +38,7 @@ public enum GlyphAtlasError: Error, CustomStringConvertible {
 }
 
 public final class GlyphAtlas {
-	public enum RenderingMode: Sendable, Equatable {
+	public enum RenderingMode: Sendable, Hashable {
 		case grayscale
 		case subpixel
 

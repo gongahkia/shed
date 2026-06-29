@@ -31,6 +31,23 @@ struct MetalFragmentUniforms {
 	var atlasMode: UInt32
 }
 
+private struct LineShapeCacheKey: Hashable {
+	var lineIndex: Int
+	var lowerBound: Int
+	var upperBound: Int
+	var renderingMode: GlyphAtlas.RenderingMode
+	var highlightRevision: Int
+}
+
+private struct CachedLineGlyph {
+	var originX: CGFloat
+	var originYOffset: CGFloat
+	var width: CGFloat
+	var height: CGFloat
+	var atlasUV: SIMD4<Float>
+	var color: SIMD4<Float>
+}
+
 public final class MetalTextView: NSView {
 	public var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
 		didSet { needsDisplay = true }
@@ -49,7 +66,11 @@ public final class MetalTextView: NSView {
 	private var findMatchRanges: [Range<Int>] = []
 	private var findMatchRects: [CGRect] = []
 	public var highlightSpans: [TextHighlightSpan] = [] {
-		didSet { markDirty() }
+		didSet {
+			highlightRevision += 1
+			lineShapeCache.removeAll(keepingCapacity: true)
+			markDirty()
+		}
 	}
 	private var renderPipeline: MTLRenderPipelineState?
 	private var samplerState: MTLSamplerState?
@@ -57,6 +78,13 @@ public final class MetalTextView: NSView {
 	private var glyphAtlas: GlyphAtlas?
 	private var glyphAtlasRenderingMode: GlyphAtlas.RenderingMode?
 	private var lineShaper: LineShaper?
+	private let renderPass = MTLRenderPassDescriptor()
+	private var instanceBuffer: MTLBuffer?
+	private var instanceBufferCapacity = 0
+	private var textInstanceScratch: [MetalGlyphInstance] = []
+	private var solidInstanceScratch: [MetalGlyphInstance] = []
+	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
+	private var highlightRevision = 0
 	private var markedRangeUTF8: Range<Int>?
 	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 	private let textInset = CGPoint(x: 8, y: 6)
@@ -76,7 +104,10 @@ public final class MetalTextView: NSView {
 		}
 	}
 	public var editor = Editor() {
-		didSet { syncEditorState() }
+		didSet {
+			lineShapeCache.removeAll(keepingCapacity: true)
+			syncEditorState()
+		}
 	}
 	public var editorDidChange: ((Editor) -> Void)?
 	public var saveRequested: (() -> Void)?
@@ -1339,55 +1370,102 @@ public final class MetalTextView: NSView {
 	}
 
 	func solidOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		selectionOverlayInstances(scale: scale) + cursorOverlayInstances(scale: scale)
+		var instances: [MetalGlyphInstance] = []
+		appendSelectionOverlayInstances(scale: scale, into: &instances)
+		appendCursorOverlayInstances(scale: scale, into: &instances)
+		return instances
 	}
 
 	func textGlyphInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		guard let atlas = makeGlyphAtlas(scale: scale), let shaper = makeLineShaper(scale: scale) else {
-			return []
-		}
 		var instances: [MetalGlyphInstance] = []
+		appendTextGlyphInstances(scale: scale, into: &instances)
+		return instances
+	}
+
+	private func appendTextGlyphInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		guard let atlas = makeGlyphAtlas(scale: scale), let shaper = makeLineShaper(scale: scale) else {
+			return
+		}
+		let renderingMode = glyphRenderingMode(scale: scale)
 		for lineIndex in visibleLineRange {
 			let lineRange = editor.rope.lineRange(lineIndex)
-			let line = editor.rope.slice(lineRange)
-			guard let glyphs = try? shaper.shape(line, font: textFont, colorForRange: { [weak self] range in
-				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
-			}) else {
+			let key = LineShapeCacheKey(
+				lineIndex: lineIndex,
+				lowerBound: lineRange.lowerBound,
+				upperBound: lineRange.upperBound,
+				renderingMode: renderingMode,
+				highlightRevision: highlightRevision
+			)
+			let glyphs = cachedGlyphs(for: key, lineRange: lineRange, atlas: atlas, shaper: shaper)
+			guard !glyphs.isEmpty else {
 				continue
 			}
 			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
 			for glyph in glyphs {
-				guard let entry = try? atlas.entry(for: glyph.glyphID, font: textFont) else {
-					continue
-				}
 				instances.append(MetalGlyphInstance(
 					screenOrigin: SIMD2<Float>(
-						Float((textInset.x + glyph.x + entry.bounds.origin.x - xOffset) * scale),
-						Float((y - entry.bounds.origin.y) * scale)
+						Float((glyph.originX - xOffset) * scale),
+						Float((y + glyph.originYOffset) * scale)
 					),
-					size: SIMD2<Float>(Float(CGFloat(entry.width) * scale), Float(CGFloat(entry.height) * scale)),
-					atlasUV: SIMD4<Float>(
-						Float(glyph.atlasUV.u0),
-						Float(glyph.atlasUV.v0),
-						Float(glyph.atlasUV.u1),
-						Float(glyph.atlasUV.v1)
-					),
+					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
+					atlasUV: glyph.atlasUV,
 					color: glyph.color
 				))
 			}
 		}
-		return instances
 	}
 
-	private func selectionOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		selectionRects.map { rect in
-			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35))
+	private func cachedGlyphs(
+		for key: LineShapeCacheKey,
+		lineRange: Range<Int>,
+		atlas: GlyphAtlas,
+		shaper: LineShaper
+	) -> [CachedLineGlyph] {
+		if let cached = lineShapeCache[key] {
+			return cached
+		}
+		let line = editor.rope.slice(lineRange)
+		guard !line.isEmpty, let shaped = try? shaper.shape(line, font: textFont, colorForRange: { [weak self] range in
+			self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+		}) else {
+			return []
+		}
+		var cached: [CachedLineGlyph] = []
+		cached.reserveCapacity(shaped.count)
+		for glyph in shaped {
+			guard let entry = try? atlas.entry(for: glyph.glyphID, font: textFont) else {
+				continue
+			}
+			cached.append(CachedLineGlyph(
+				originX: textInset.x + glyph.x + entry.bounds.origin.x,
+				originYOffset: -entry.bounds.origin.y,
+				width: CGFloat(entry.width),
+				height: CGFloat(entry.height),
+				atlasUV: SIMD4<Float>(
+					Float(glyph.atlasUV.u0),
+					Float(glyph.atlasUV.v0),
+					Float(glyph.atlasUV.u1),
+					Float(glyph.atlasUV.v1)
+				),
+				color: glyph.color
+			))
+		}
+		if lineShapeCache.count > 2048 {
+			lineShapeCache.removeAll(keepingCapacity: true)
+		}
+		lineShapeCache[key] = cached
+		return cached
+	}
+
+	private func appendSelectionOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		for rect in selectionRects {
+			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35)))
 		}
 	}
 
-	private func findMatchOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
-		findMatchRects.map { rect in
-			solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34))
+	private func appendFindMatchOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		for rect in findMatchRects {
+			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34)))
 		}
 	}
 
@@ -1398,11 +1476,10 @@ public final class MetalTextView: NSView {
 		return span.color
 	}
 
-	private func cursorOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+	private func appendCursorOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		if cursorBlinkVisible, let cursorRect {
-			return [solidInstance(rect: cursorRect, scale: scale, color: SIMD4<Float>(0.92, 0.94, 0.96, 1.0))]
+			instances.append(solidInstance(rect: cursorRect, scale: scale, color: SIMD4<Float>(0.92, 0.94, 0.96, 1.0)))
 		}
-		return []
 	}
 
 	private func updateDrawableSize() {
@@ -1426,23 +1503,23 @@ public final class MetalTextView: NSView {
 		else {
 			return
 		}
-		let pass = MTLRenderPassDescriptor()
-		pass.colorAttachments[0].texture = drawable.texture
-		pass.colorAttachments[0].loadAction = .clear
-		pass.colorAttachments[0].storeAction = .store
-		pass.colorAttachments[0].clearColor = clearColor
+		renderPass.colorAttachments[0].texture = drawable.texture
+		renderPass.colorAttachments[0].loadAction = .clear
+		renderPass.colorAttachments[0].storeAction = .store
+		renderPass.colorAttachments[0].clearColor = clearColor
 		guard
 			let commandBuffer = commandQueue.makeCommandBuffer(),
-			let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: pass)
+			let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPass)
 		else {
 			return
 		}
 		let scale = layer.contentsScale
-		renderSolidInstances(findMatchOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
-		renderSolidInstances(selectionOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
+		renderFindMatchInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
+		renderSelectionInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderText(encoder: encoder, drawableSize: layer.drawableSize, scale: scale)
-		renderSolidInstances(cursorOverlayInstances(scale: scale), encoder: encoder, drawableSize: layer.drawableSize)
+		renderCursorInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		encoder.endEncoding()
+		renderPass.colorAttachments[0].texture = nil
 		commandBuffer.present(drawable)
 		commandBuffer.commit()
 		renderedFrameCount += 1
@@ -1532,14 +1609,33 @@ public final class MetalTextView: NSView {
 		}
 	}
 
+	private func renderFindMatchInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
+		solidInstanceScratch.removeAll(keepingCapacity: true)
+		appendFindMatchOverlayInstances(scale: scale, into: &solidInstanceScratch)
+		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
+	}
+
+	private func renderSelectionInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
+		solidInstanceScratch.removeAll(keepingCapacity: true)
+		appendSelectionOverlayInstances(scale: scale, into: &solidInstanceScratch)
+		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
+	}
+
+	private func renderCursorInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
+		solidInstanceScratch.removeAll(keepingCapacity: true)
+		appendCursorOverlayInstances(scale: scale, into: &solidInstanceScratch)
+		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
+	}
+
 	private func renderText(encoder: MTLRenderCommandEncoder, drawableSize: CGSize, scale: CGFloat) {
-		let instances = textGlyphInstances(scale: scale)
-		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeGlyphAtlas(scale: scale) else {
+		textInstanceScratch.removeAll(keepingCapacity: true)
+		appendTextGlyphInstances(scale: scale, into: &textInstanceScratch)
+		guard !textInstanceScratch.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeGlyphAtlas(scale: scale) else {
 			return
 		}
 		var viewport = MetalViewportUniforms(size: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)))
 		var fragment = MetalFragmentUniforms(atlasMode: atlas.renderingMode == .subpixel ? 2 : 1)
-		instances.withUnsafeBytes { bytes in
+		textInstanceScratch.withUnsafeBytes { bytes in
 			guard let base = bytes.baseAddress else {
 				return
 			}
@@ -1549,7 +1645,7 @@ public final class MetalTextView: NSView {
 			encoder.setFragmentTexture(atlas.texture, index: 0)
 			encoder.setFragmentSamplerState(sampler, index: 0)
 			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
-			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
+			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: textInstanceScratch.count)
 		}
 	}
 
@@ -1558,9 +1654,14 @@ public final class MetalTextView: NSView {
 			encoder.setVertexBytes(base, length: length, index: 0)
 			return
 		}
-		guard let buffer = metalDevice?.makeBuffer(bytes: base, length: length) else {
+		if instanceBufferCapacity < length {
+			instanceBuffer = metalDevice?.makeBuffer(length: length)
+			instanceBufferCapacity = instanceBuffer?.length ?? 0
+		}
+		guard let buffer = instanceBuffer else {
 			return
 		}
+		buffer.contents().copyMemory(from: base, byteCount: length)
 		encoder.setVertexBuffer(buffer, offset: 0, index: 0)
 	}
 
@@ -1647,6 +1748,7 @@ public final class MetalTextView: NSView {
 		glyphAtlas = nil
 		glyphAtlasRenderingMode = nil
 		lineShaper = nil
+		lineShapeCache.removeAll(keepingCapacity: true)
 	}
 
 	private func glyphRenderingMode(scale: CGFloat) -> GlyphAtlas.RenderingMode {

@@ -51,8 +51,8 @@
 ## Swift reference-type audit update
 
 - Converted value-like pure Swift references to structs: `CommandRegistry`, `KillRing`, `KeymapEngine`, `LineShaper`, and `SyntaxPipeline`.
-- Left C-resource wrappers as classes: `Parser`, `Tree`, `HighlightQuery`, `RopeInput`, and `GlyphAtlas`; they own pointers/resources with `deinit`.
-- Left `RopeNode` as a class because the rope is a persistent tree of shared child nodes; changing it would be a buffer representation rewrite, not a local reference-type cleanup.
+- Left C-resource wrappers as classes: `Parser`, `Tree`, `HighlightQuery`, and `GlyphAtlas`; they own pointers/resources with `deinit`.
+- `RopeInput` and `RopeNode` were converted in later cleanups below.
 - Static rebase fixups after these conversions: `3759`; remaining gap is dominated by value metadata plus AppKit/ObjC classes and needs the library/linker work next.
 
 ## Library linkage update
@@ -185,3 +185,9 @@ Current section distribution:
 - Replaced parser `RopeInput` class storage with stack-owned scratch state passed directly to the synchronous tree-sitter input callback.
 - Static rebase fixups after rope-input scratch cleanup: `2509`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `21` to `20`.
+
+## Rope node enum cleanup
+
+- Replaced the private immutable `RopeNode` class with an `indirect enum` so the persistent rope tree no longer emits Swift class metadata.
+- Static rebase fixups after rope-node enum cleanup: `2507`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `20` to `19`.

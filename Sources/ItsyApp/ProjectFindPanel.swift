@@ -5,7 +5,7 @@ import ItsyEditor
 final class ProjectFindController {
 	private let workspaceURL: () -> URL?
 	private let openFile: (URL) -> Void
-	private var panel: ProjectFindPanel?
+	private var panel: NSPanel?
 	private var contentView: ProjectFindView?
 	private var searchGeneration = 0
 
@@ -35,12 +35,12 @@ final class ProjectFindController {
 		updateStatusForCurrentWorkspace()
 	}
 
-	private func makePanelIfNeeded() -> ProjectFindPanel {
+	private func makePanelIfNeeded() -> NSPanel {
 		if let panel {
 			return panel
 		}
 		let size = NSSize(width: 760, height: 380)
-		let panel = ProjectFindPanel(
+		let panel = NSPanel(
 			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.titled, .closable, .resizable],
 			backing: .buffered,
@@ -51,7 +51,6 @@ final class ProjectFindController {
 		contentView.onSearch = { [weak self] query in self?.search(query: query) }
 		contentView.onOpenMatch = { [weak self] match in self?.openFile(match.url) }
 		panel.contentView = contentView
-		panel.onCancel = { [weak self] in self?.close() }
 		panel.title = L10n.string("Find in Project")
 		panel.isReleasedWhenClosed = false
 		panel.minSize = NSSize(width: 520, height: 260)
@@ -101,18 +100,6 @@ final class ProjectFindController {
 				self.contentView?.setStatus(L10n.string("\(matches.count) matches"))
 			}
 		}
-	}
-}
-
-final class ProjectFindPanel: NSPanel {
-	var onCancel: (() -> Void)?
-
-	override var canBecomeKey: Bool {
-		true
-	}
-
-	override func cancelOperation(_ sender: Any?) {
-		onCancel?()
 	}
 }
 

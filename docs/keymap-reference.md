@@ -39,7 +39,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/PicoKeymap/Resources/keys.vim.toml`
-- Bindings: `113`
+- Bindings: `115`
 
 ### mode.normal
 
@@ -73,6 +73,8 @@ scripts/gen_keymap_docs.swift
 | `y` | `vim.operator.yank` |
 | `Shift-'` | `vim.registerPrefix` |
 | `''` | `vim.jumpBack` |
+| `q` | `vim.macro.recordPrefix` |
+| `Shift-2` | `vim.macro.replayPrefix` |
 | `p` | `vim.pasteAfter` |
 | `Shift-P` | `vim.pasteBefore` |
 | `v` | `vim.visual.char` |

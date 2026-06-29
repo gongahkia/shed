@@ -1,0 +1,42 @@
+{
+  "schema": 1,
+  "threshold": 0.05,
+  "metrics": [
+    {
+      "name": "cold_start_ready_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "baseline": 70.0
+    },
+    {
+      "name": "rope_random_insert_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 10.747
+    },
+    {
+      "name": "rope_sequential_insert_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 12.18
+    },
+    {
+      "name": "rope_slice_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 309.64
+    },
+    {
+      "name": "binary_size_kb",
+      "unit": "KB",
+      "direction": "lower",
+      "baseline": 11559.289
+    },
+    {
+      "name": "swift_loc",
+      "unit": "LOC",
+      "direction": "lower",
+      "baseline": 9948
+    }
+  ]
+}

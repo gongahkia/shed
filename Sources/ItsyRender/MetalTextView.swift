@@ -1970,6 +1970,10 @@ public final class MetalTextView: NSView {
 	}
 
 	private func refreshRate(for link: CVDisplayLink) -> Double? {
+		let actualPeriod = CVDisplayLinkGetActualOutputVideoRefreshPeriod(link)
+		if actualPeriod > 0 {
+			return 1 / actualPeriod
+		}
 		let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
 		guard period.timeValue > 0, period.timeScale > 0 else {
 			return nil

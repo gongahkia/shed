@@ -18,10 +18,13 @@
 ## CLI
 
 ```sh
+itsybench display [--display <id>]
 itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```
+
+`display` reports CGDisplay mode dimensions plus CVDisplayLink actual/nominal refresh Hz for ProMotion verification.
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
 

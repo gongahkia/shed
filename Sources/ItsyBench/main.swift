@@ -28,6 +28,21 @@ private struct RopeOptions {
 	var sliceLength: Int
 }
 
+private struct DisplayOptions {
+	var displayID: CGDirectDisplayID
+}
+
+private struct DisplayResult: Encodable {
+	var actual_refresh_hz: Double?
+	var display_id: UInt32
+	var mode_height: Int?
+	var mode_pixel_height: Int?
+	var mode_pixel_width: Int?
+	var mode_refresh_hz: Double?
+	var mode_width: Int?
+	var nominal_refresh_hz: Double?
+}
+
 private struct LatencyResult: Encodable {
 	var display_id: UInt32
 	var dirty_rects: Int
@@ -165,6 +180,8 @@ enum ItsyBenchMain {
 			throw BenchError.usage(usage)
 		}
 		switch command {
+		case "display":
+			try printJSON(display(parseDisplay(Array(args.dropFirst()))))
 		case "latency":
 			try printJSON(latency(parseLatency(Array(args.dropFirst()))))
 		case "measure":
@@ -199,6 +216,26 @@ enum ItsyBenchMain {
 			throw BenchError.badPID(valueIndex < args.endIndex ? args[valueIndex] : "")
 		}
 		return pid
+	}
+
+	private static func parseDisplay(_ args: [String]) throws -> DisplayOptions {
+		var displayID = CGMainDisplayID()
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--display":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt32(args[valueIndex]) else {
+					throw BenchError.usage("invalid --display")
+				}
+				displayID = CGDirectDisplayID(value)
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown display option: \(arg)")
+			}
+		}
+		return DisplayOptions(displayID: displayID)
 	}
 
 	private static func parseLatency(_ args: [String]) throws -> LatencyOptions {
@@ -333,6 +370,21 @@ enum ItsyBenchMain {
 			}
 		}
 		return RopeOptions(operations: operations, sliceLength: sliceLength)
+	}
+
+	private static func display(_ options: DisplayOptions) throws -> DisplayResult {
+		let mode = CGDisplayCopyDisplayMode(options.displayID)
+		let rates = displayLinkRates(for: options.displayID)
+		return DisplayResult(
+			actual_refresh_hz: rates.actual,
+			display_id: options.displayID,
+			mode_height: mode.map { $0.height },
+			mode_pixel_height: mode.map { $0.pixelHeight },
+			mode_pixel_width: mode.map { $0.pixelWidth },
+			mode_refresh_hz: mode.map(\.refreshRate),
+			mode_width: mode.map { $0.width },
+			nominal_refresh_hz: rates.nominal
+		)
 	}
 
 	private static func rope(_ options: RopeOptions) throws -> RopeBenchResult {
@@ -630,6 +682,20 @@ enum ItsyBenchMain {
 		return stream
 	}
 
+	private static func displayLinkRates(for displayID: CGDirectDisplayID) -> (actual: Double?, nominal: Double?) {
+		var link: CVDisplayLink?
+		guard CVDisplayLinkCreateWithCGDisplay(displayID, &link) == kCVReturnSuccess, let link else {
+			return (nil, nil)
+		}
+		let actualPeriod = CVDisplayLinkGetActualOutputVideoRefreshPeriod(link)
+		let actual = actualPeriod > 0 ? 1 / actualPeriod : nil
+		let nominalPeriod = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(link)
+		let nominal = nominalPeriod.timeValue > 0 && nominalPeriod.timeScale > 0
+			? Double(nominalPeriod.timeScale) / Double(nominalPeriod.timeValue)
+			: nil
+		return (actual, nominal)
+	}
+
 	private static func postKey(pid: Int32, keyCode: CGKeyCode) throws {
 		let source = CGEventSource(stateID: .hidSystemState)
 		guard let down = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
@@ -704,6 +770,7 @@ enum ItsyBenchMain {
 
 	private static let usage = """
 	usage:
+	  itsybench display [--display <id>]
 	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>

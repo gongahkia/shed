@@ -3,20 +3,27 @@ import Foundation
 import ollyKit
 
 public struct WindowRecoveryFrame: Codable, Equatable, Sendable {
-    public let x: Double
-    public let y: Double
+    public let originX: Double
+    public let originY: Double
     public let width: Double
     public let height: Double
 
     public init(_ frame: CGRect) {
-        self.x = Double(frame.origin.x)
-        self.y = Double(frame.origin.y)
+        self.originX = Double(frame.origin.x)
+        self.originY = Double(frame.origin.y)
         self.width = Double(frame.size.width)
         self.height = Double(frame.size.height)
     }
 
     public var cgRect: CGRect {
-        CGRect(x: x, y: y, width: width, height: height)
+        CGRect(x: originX, y: originY, width: width, height: height)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case originX = "x"
+        case originY = "y"
+        case width
+        case height
     }
 }
 

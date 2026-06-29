@@ -25,7 +25,7 @@ private func recordBenchStage(_ name: String) {
 
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
-	private let commandRegistry = CommandRegistry()
+	private var commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in

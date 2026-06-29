@@ -448,7 +448,7 @@ public final class HighlightQuery {
 	}
 }
 
-public final class SyntaxPipeline {
+public struct SyntaxPipeline {
 	public let language: Language
 	private var parser: Parser?
 	private var highlightQuery: HighlightQuery?
@@ -493,17 +493,17 @@ public final class SyntaxPipeline {
 		}
 	}
 
-	public func parse(_ rope: Rope, oldTree: Tree? = nil) throws -> Tree {
+	public mutating func parse(_ rope: Rope, oldTree: Tree? = nil) throws -> Tree {
 		let parser = try ensureParser()
 		return try parser.parse(rope, oldTree: oldTree)
 	}
 
-	public func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
+	public mutating func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
 		let query = try ensureQuery()
 		return try query.highlights(in: tree, byteRange: byteRange)
 	}
 
-	private func ensureParser() throws -> Parser {
+	private mutating func ensureParser() throws -> Parser {
 		if let parser {
 			return parser
 		}
@@ -513,7 +513,7 @@ public final class SyntaxPipeline {
 		return parser
 	}
 
-	private func ensureQuery() throws -> HighlightQuery {
+	private mutating func ensureQuery() throws -> HighlightQuery {
 		if let highlightQuery {
 			return highlightQuery
 		}

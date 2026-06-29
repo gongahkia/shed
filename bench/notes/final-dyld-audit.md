@@ -47,3 +47,10 @@
 - Tests still link `CTSGrammars` so parser coverage runs without prebuilt local dylibs.
 - Release binary grammar symbol audit: `nm -gU .build/release/ItsyApp | rg 'tree_sitter_'` returns no matches.
 - Static rebase fixups after grammar split: `3816`; still above `<2000`, now tracked by the Swift reference-type and library-linkage follow-ups.
+
+## Swift reference-type audit update
+
+- Converted value-like pure Swift references to structs: `CommandRegistry`, `KillRing`, `KeymapEngine`, `LineShaper`, and `SyntaxPipeline`.
+- Left C-resource wrappers as classes: `Parser`, `Tree`, `HighlightQuery`, `RopeInput`, and `GlyphAtlas`; they own pointers/resources with `deinit`.
+- Left `RopeNode` as a class because the rope is a persistent tree of shared child nodes; changing it would be a buffer representation rewrite, not a local reference-type cleanup.
+- Static rebase fixups after these conversions: `3759`; remaining gap is dominated by value metadata plus AppKit/ObjC classes and needs the library/linker work next.

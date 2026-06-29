@@ -62,7 +62,7 @@ import Testing
 }
 
 @Test func killRingStoresSixtyEntriesAndRotates() {
-	let ring = KillRing()
+	var ring = KillRing()
 	for index in 0 ..< 61 {
 		ring.push("entry-\(index)")
 	}

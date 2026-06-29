@@ -205,9 +205,12 @@ final class ItsyDocument: NSDocument {
 	}
 
 	private func refreshSyntaxHighlights(edits: [Edit] = [], oldRope: Rope? = nil) {
-		guard let syntaxPipeline else {
+		guard var syntaxPipeline else {
 			setHighlightSpans([])
 			return
+		}
+		defer {
+			self.syntaxPipeline = syntaxPipeline
 		}
 		do {
 			if syntaxTheme == nil {

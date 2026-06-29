@@ -101,7 +101,7 @@ import Testing
 	let url = URL(fileURLWithPath: "/tmp/example.ts")
 	let language = try #require(SyntaxPipeline.language(forFileURL: url))
 	#expect(language == .typescript)
-	let pipeline = SyntaxPipeline(language: language)
+	var pipeline = SyntaxPipeline(language: language)
 	#expect(!pipeline.didAllocateParser)
 	let tree = try pipeline.parse(Rope("const value = 1;\n"))
 	#expect(pipeline.didAllocateParser)
@@ -110,7 +110,7 @@ import Testing
 
 @Test func syntaxPipelineIncrementalMiddleEditFitsFrameBudget() throws {
 	var editor = Editor(text: largeTypeScriptLineSetWithMiddleLine())
-	let pipeline = SyntaxPipeline(language: .typescript)
+	var pipeline = SyntaxPipeline(language: .typescript)
 	let tree = try pipeline.parse(editor.rope)
 	_ = try pipeline.highlights(in: tree, byteRange: editor.rope.lineRange(50_000))
 	let oldRope = editor.rope

@@ -18,7 +18,7 @@ public struct ShapedGlyph: Sendable, Equatable {
 	public let color: SIMD4<Float>
 }
 
-public final class LineShaper {
+public struct LineShaper {
 	private let atlas: GlyphAtlas
 
 	public init(atlas: GlyphAtlas) {

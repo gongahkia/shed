@@ -26,7 +26,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run PerfBench
-        run: swift run -c release PerfBench --output "$RUNNER_TEMP/perfbench.json"
+        run: swift run -c release PerfBench --fail-on-budget --output "$RUNNER_TEMP/perfbench.json"
 
       - name: Load base baseline
         env:
@@ -56,7 +56,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run PerfBench
-        run: swift run -c release PerfBench --output "$RUNNER_TEMP/perfbench.json"
+        run: swift run -c release PerfBench --fail-on-budget --output "$RUNNER_TEMP/perfbench.json"
 
       - name: Upload PerfBench report
         uses: actions/upload-artifact@v4

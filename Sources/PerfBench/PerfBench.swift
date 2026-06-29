@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import ollyCore
+import ollyDiagnostics
 import ollyDSL
 import ollyKit
 import ollyLayouts
@@ -12,6 +13,12 @@ enum PerfBench {
             let options = try PerfBenchOptions(arguments: Array(CommandLine.arguments.dropFirst()))
             let report = try await BenchmarkRunner(options: options).run()
             try ReportWriter.write(report, to: options.outputPath)
+            if options.failOnBudget, report.diagnostics.hasFailures {
+                throw PerfBenchError.budgetFailed(
+                    failed: report.diagnostics.failedCount,
+                    missing: report.diagnostics.missingCount
+                )
+            }
         } catch {
             FileHandle.standardError.write(Data("PerfBench failed: \(error)\n".utf8))
             throw error
@@ -24,6 +31,7 @@ struct PerfBenchOptions {
     var windowCount = 50
     var soakEvents = 5_000
     var outputPath: String?
+    var failOnBudget = false
 
     init(arguments: [String]) throws {
         var index = 0
@@ -38,6 +46,8 @@ struct PerfBenchOptions {
                 soakEvents = try Self.intValue(arguments, after: &index, name: argument)
             case "--output":
                 outputPath = try Self.stringValue(arguments, after: &index, name: argument)
+            case "--fail-on-budget":
+                failOnBudget = true
             case "--help", "-h":
                 throw PerfBenchError.help
             default:
@@ -72,17 +82,23 @@ enum PerfBenchError: Error, CustomStringConvertible {
     case missingValue(String)
     case invalidValue(String, String)
     case unknownArgument(String)
+    case budgetFailed(failed: Int, missing: Int)
 
     var description: String {
         switch self {
         case .help:
-            return "usage: PerfBench [--iterations N] [--windows N] [--soak-events N] [--output path]"
+            return [
+                "usage: PerfBench [--iterations N] [--windows N]",
+                "[--soak-events N] [--output path] [--fail-on-budget]"
+            ].joined(separator: " ")
         case let .missingValue(name):
             return "\(name) requires a value"
         case let .invalidValue(name, value):
             return "\(name) requires an integer, got \(value)"
         case let .unknownArgument(argument):
             return "unknown argument \(argument)"
+        case let .budgetFailed(failed, missing):
+            return "performance budget failed: \(failed) failed, \(missing) missing"
         }
     }
 }
@@ -92,18 +108,8 @@ struct BenchReport: Encodable {
     let iterations: Int
     let windowCount: Int
     let soakEvents: Int
-    let scenarios: [ScenarioResult]
-}
-
-struct ScenarioResult: Encodable {
-    let name: String
-    let unit: String
-    let sampleCount: Int
-    let p50: Double
-    let p95: Double
-    let p99: Double
-    let min: Double
-    let max: Double
+    let scenarios: [PerformanceScenarioResult]
+    let diagnostics: PerformanceBudgetDiagnostics
 }
 
 final class Sink {
@@ -129,24 +135,32 @@ struct BenchmarkRunner {
             try await measure("wake-from-sleep-proxy", runWakeFromSleepProxy),
             try await measure("soak-\(options.soakEvents)-events", runSoak)
         ]
-        sink.consume(scenarios.count)
+        let diagnostics = PerformanceBudgetEvaluator.evaluate(
+            scenarios: scenarios,
+            budgets: PerformanceBudgetCatalog.v0ProxyBudgets(
+                windowCount: options.windowCount,
+                soakEvents: options.soakEvents
+            )
+        )
+        sink.consume(scenarios.count + diagnostics.passedCount)
         return BenchReport(
             generatedAt: ISO8601DateFormatter().string(from: Date()),
             iterations: options.iterations,
             windowCount: options.windowCount,
             soakEvents: options.soakEvents,
-            scenarios: scenarios
+            scenarios: scenarios,
+            diagnostics: diagnostics
         )
     }
 
-    private func measure(_ name: String, _ block: () async throws -> Void) async throws -> ScenarioResult {
+    private func measure(_ name: String, _ block: () async throws -> Void) async throws -> PerformanceScenarioResult {
         var samples: [Double] = []
         for _ in 0..<options.iterations {
             let start = ContinuousClock.now
             try await block()
             samples.append(Self.milliseconds(from: start.duration(to: ContinuousClock.now)))
         }
-        return ScenarioResult(
+        return PerformanceScenarioResult(
             name: name,
             unit: "milliseconds",
             sampleCount: samples.count,

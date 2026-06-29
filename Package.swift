@@ -16,6 +16,7 @@ let package = Package(
         .library(name: "ollyLayouts", targets: ["ollyLayouts"]),
         .library(name: "ollyDSL", targets: ["ollyDSL"]),
         .library(name: "ollyIPC", targets: ["ollyIPC"]),
+        .library(name: "ollyDiagnostics", targets: ["ollyDiagnostics"]),
         .library(name: "ollyRuntime", targets: ["ollyRuntime"])
     ],
     dependencies: [
@@ -27,6 +28,7 @@ let package = Package(
         .target(name: "ollyLayouts", dependencies: ["ollyCore", "ollyKit"], exclude: ["README.md"]),
         .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyKit", "ollyLayouts"], exclude: ["README.md"]),
         .target(name: "ollyIPC", dependencies: ["ollyKit", "ollyCore", "ollyLayouts"], exclude: ["README.md"]),
+        .target(name: "ollyDiagnostics"),
         .target(name: "ollyRuntime", dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"]),
         .executableTarget(
             name: "ollyApp",
@@ -45,7 +47,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "PerfBench",
-            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL"]
+            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyDiagnostics"]
         ),
         .executableTarget(
             name: "SoakHarness",
@@ -56,6 +58,7 @@ let package = Package(
         .testTarget(name: "ollyLayoutsTests", dependencies: ["ollyLayouts"], exclude: ["Fixtures"]),
         .testTarget(name: "ollyDSLTests", dependencies: ["ollyDSL"]),
         .testTarget(name: "ollyIPCTests", dependencies: ["ollyIPC"]),
+        .testTarget(name: "ollyDiagnosticsTests", dependencies: ["ollyDiagnostics"]),
         .testTarget(name: "ollyctlTests", dependencies: ["ollyctl"]),
         .testTarget(
             name: "ollyRuntimeTests",

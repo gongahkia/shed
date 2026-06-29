@@ -17,5 +17,7 @@ windows, 5,000 soak events.
 Notes:
 
 - These are synthetic proxy scenarios, not full AX-on-desktop measurements.
+- Current `PerfBench` JSON also includes budget diagnostics; run with
+  `--fail-on-budget` to enforce them locally or in CI.
 - Source JSON: [`metrics/perfbench/2026-06-28.json`](../metrics/perfbench/2026-06-28.json).
 - Budgets: [`docs/performance.md`](performance.md).

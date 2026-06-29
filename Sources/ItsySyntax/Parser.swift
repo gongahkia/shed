@@ -187,14 +187,17 @@ public final class Parser {
 		guard rope.length <= Int(UInt32.max) else {
 			throw SyntaxError.documentTooLarge(rope.length)
 		}
-		let input = RopeInput(rope)
-		let tsInput = TSInput(
-			payload: Unmanaged.passUnretained(input).toOpaque(),
-			read: ropeInputRead,
-			encoding: TSInputEncodingUTF8,
-			decode: nil
-		)
-		let tree = try withExtendedLifetime(input) {
+		var input = RopeInput(rope)
+		defer {
+			input.deallocate()
+		}
+		let tree = try withUnsafeMutablePointer(to: &input) { inputPointer in
+			let tsInput = TSInput(
+				payload: UnsafeMutableRawPointer(inputPointer),
+				read: ropeInputRead,
+				encoding: TSInputEncodingUTF8,
+				decode: nil
+			)
 			guard let tree = ts_parser_parse(parser, oldTree?.tree, tsInput) else {
 				throw SyntaxError.parseFailed
 			}
@@ -522,7 +525,7 @@ public struct SyntaxPipeline {
 	}
 }
 
-private final class RopeInput {
+private struct RopeInput {
 	let rope: Rope
 	let capacity = 16 * 1024
 	let buffer: UnsafeMutablePointer<CChar>
@@ -532,7 +535,7 @@ private final class RopeInput {
 		buffer = UnsafeMutablePointer<CChar>.allocate(capacity: capacity + 1)
 	}
 
-	deinit {
+	func deallocate() {
 		buffer.deallocate()
 	}
 
@@ -560,6 +563,6 @@ private let ropeInputRead: @convention(c) (
 		bytesRead?.pointee = 0
 		return nil
 	}
-	let input = Unmanaged<RopeInput>.fromOpaque(payload).takeUnretainedValue()
-	return input.read(byteIndex: byteIndex, bytesRead: bytesRead)
+	let input = payload.assumingMemoryBound(to: RopeInput.self)
+	return input.pointee.read(byteIndex: byteIndex, bytesRead: bytesRead)
 }

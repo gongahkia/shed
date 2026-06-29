@@ -179,3 +179,9 @@ Current section distribution:
 - Replaced the private Swift `FileTreeNode` class with `NSURL` outline items plus a per-sidebar child cache.
 - Static rebase fixups after file-tree node cleanup: `2527`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `22` to `21`.
+
+## Rope input scratch cleanup
+
+- Replaced parser `RopeInput` class storage with stack-owned scratch state passed directly to the synchronous tree-sitter input callback.
+- Static rebase fixups after rope-input scratch cleanup: `2509`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `21` to `20`.

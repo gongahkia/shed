@@ -294,3 +294,10 @@ Current section distribution:
 - Made `MetalTextView` members unused outside `ItsyRender` internal; app-facing editor/find/keymap APIs remain public.
 - Static rebase fixups after render API visibility cleanup: `2294`; target remains `<2000`; result remains fail.
 - Section delta: `__DATA,__objc_selrefs` dropped from `659` to `658`.
+
+## Remaining dyld blocker
+
+- Current static rebase gap: `294` fixups over target.
+- Current section distribution: `822 __DATA,__objc_const`, `703 __DATA_CONST,__const`, `658 __DATA,__objc_selrefs`, `41 __DATA,__objc_data`, `40 __DATA,__data`, `11 __DATA_CONST,__objc_protolist`, `11 __DATA,__objc_protorefs`, `8 __DATA_CONST,__objc_classlist`.
+- Remaining `__DATA_CONST,__objc_classlist` entries are the AppKit-facing app/render classes plus the C-resource syntax wrappers; removing the syntax wrapper classes with move-only structs was rejected because default parallel `swift test` crashed.
+- [Inference] Reaching `<2000` now requires a larger architecture change that removes AppKit-exposed selector/protocol surface from the launch binary, not more narrow value-type or visibility edits.

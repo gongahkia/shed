@@ -74,7 +74,8 @@ Itsy is intentionally narrow:
 - Git status/diff core and a minimal changes panel are in progress.
 - Task discovery/run core and a minimal task panel are in progress.
 - Problems panel is in progress; task output can populate compiler-style diagnostics.
-- No Electron, terminal, plugin runtime, collaboration, or telemetry.
+- Declarative extension manifest ABI is in progress; no executable plugin runtime yet.
+- No Electron, terminal, collaboration, or telemetry.
 
 ## Formatting
 

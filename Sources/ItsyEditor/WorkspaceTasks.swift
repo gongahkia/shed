@@ -6,6 +6,7 @@ public enum WorkspaceTaskSource: String, Codable, Equatable, Sendable {
 	case packageScript
 	case makefile
 	case shellScript
+	case extensionManifest
 }
 
 public struct WorkspaceTask: Codable, Equatable, Sendable {
@@ -37,6 +38,7 @@ public enum WorkspaceTaskDiscovery {
 		tasks += packageJSONTasks(root: root)
 		tasks += makefileTasks(root: root)
 		tasks += shellScriptTasks(root: root, fileManager: fileManager)
+		tasks += extensionTasks(root: root, fileManager: fileManager)
 		return tasks
 	}
 
@@ -112,6 +114,12 @@ public enum WorkspaceTaskDiscovery {
 			}
 		}
 		return tasks.sorted { $0.label.localizedStandardCompare($1.label) == .orderedAscending }
+	}
+
+	private static func extensionTasks(root: URL, fileManager: FileManager) -> [WorkspaceTask] {
+		ExtensionManifestLoader.discover(root: root, fileManager: fileManager).flatMap { manifest in
+			ExtensionTaskMapper.tasks(from: manifest, root: root)
+		}
 	}
 
 	private static func relativePath(_ url: URL, root: URL) -> String? {

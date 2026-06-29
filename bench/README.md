@@ -18,7 +18,7 @@
 ## CLI
 
 ```sh
-itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--warmup-purge]
+itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```

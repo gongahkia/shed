@@ -59,3 +59,15 @@ After the AppKit metadata cleanup commits, a 5-run staged sample against `Itsy.a
 Successful-run mean first-window-visible: `280.827 ms`. Mean `applicationDidFinishLaunching`: `161.572 ms`. Mean first draw: `284.759 ms`. Mean RSS: `86740 KB`.
 
 Status remains fail for the `<150 ms` cold-start target and `<30 MB` idle-RAM target.
+
+`ItsyBench measure` now accepts `--timeout-ms <ms>` for staged diagnostics. With `--timeout-ms 10000`, a 5-run staged sample completed without dropping the slow first-launch outlier:
+
+| Run | process_start ms | delegate_init ms | app_did_finish_launching ms | initial_document_opened ms | first_window_visible ms | first_draw ms | RSS KB |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 546.332 | 588.802 | 635.246 | 734.166 | 765.095 | 770.868 | 86896 |
+| 2 | 50.977 | 85.097 | 121.118 | 221.909 | 251.295 | 255.989 | 86848 |
+| 3 | 46.477 | 77.552 | 107.415 | 192.098 | 221.362 | 225.933 | 86704 |
+| 4 | 46.504 | 74.804 | 107.523 | 194.245 | 217.508 | 227.546 | 86672 |
+| 5 | 48.993 | 81.225 | 119.485 | 214.146 | 237.057 | 241.158 | 87040 |
+
+Successful-run mean first-window-visible including the first-launch outlier: `338.463 ms`. Warm-run mean excluding run 1: `231.805 ms`.

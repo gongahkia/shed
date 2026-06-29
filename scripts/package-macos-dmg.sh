@@ -66,6 +66,7 @@ scripts/validate-macos-app-bundle.sh "$APP_BUNDLE"
 STAGING="$DIST_DIR/dmg-root"
 mkdir -p "$STAGING"
 cp -R "$APP_BUNDLE" "$STAGING/"
+ln -s /Applications "$STAGING/Applications"
 hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
 rm -rf "$STAGING"
 

@@ -72,15 +72,12 @@ jobs:
         run: scripts/notarize-macos-dmg.sh
 
       - name: Prepare release assets
-        run: |
-          release_dir="dist/release"
-          version="${GITHUB_REF_NAME}"
-          dmg_name="Olly-${version}.dmg"
-          source_name="olly-${version}-source.tar.gz"
-          mkdir -p "$release_dir"
-          cp dist/Olly.dmg "$release_dir/$dmg_name"
-          git archive --format tar.gz --prefix "olly-${version}/" -o "$release_dir/$source_name" HEAD
-          (cd "$release_dir" && shasum -a 256 "$dmg_name" "$source_name" > SHA256SUMS)
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: scripts/prepare-release-assets.sh
+
+      - name: Validate release assets
+        run: scripts/validate-release-assets.sh dist/release
 
       - name: Upload release assets
         uses: actions/upload-artifact@v4
@@ -98,6 +95,7 @@ jobs:
             "$release_dir/Olly-${GITHUB_REF_NAME}.dmg"
             "$release_dir/olly-${GITHUB_REF_NAME}-source.tar.gz"
             "$release_dir/SHA256SUMS"
+            "$release_dir/release-manifest.json"
           )
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber

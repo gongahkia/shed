@@ -3,12 +3,22 @@ import Darwin
 
 final class FileTreeSidebarView: NSView {
 	var onOpenFile: ((URL) -> Void)?
-	var onPreviewFile: ((URL) -> Void)?
+	private static let panelSelector = NSSelectorFromString("sharedPreviewPanel")
+	private static let dataSourceSelector = NSSelectorFromString("setDataSource:")
+	private static let delegateSelector = NSSelectorFromString("setDelegate:")
+	private static let reloadSelector = NSSelectorFromString("reloadData")
+	private static let orderFrontSelector = NSSelectorFromString("makeKeyAndOrderFront:")
+	private static let quickLookFrameworkPaths = [
+		"/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI",
+		"/System/Library/Frameworks/QuickLookUI.framework/Versions/A/QuickLookUI",
+	]
+	private static var quickLookHandle: UnsafeMutableRawPointer?
 	private let outlineView = NSOutlineView()
 	private let scrollView = NSScrollView()
 	private var rootURL: NSURL?
 	private var childCache: [NSURL: [NSURL]] = [:]
 	private var keyMonitor: Any?
+	private var previewURL: URL?
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -100,7 +110,7 @@ final class FileTreeSidebarView: NSView {
 		else {
 			return
 		}
-		onPreviewFile?(url as URL)
+		preview(url as URL)
 	}
 
 	private func isDirectory(_ url: NSURL) -> Bool {
@@ -144,22 +154,6 @@ final class FileTreeSidebarView: NSView {
 		childCache[url] = sorted
 		return sorted
 	}
-}
-
-private final class ItsyQuickLookController: NSObject {
-	static let shared = ItsyQuickLookController()
-	private static let panelSelector = NSSelectorFromString("sharedPreviewPanel")
-	private static let dataSourceSelector = NSSelectorFromString("setDataSource:")
-	private static let delegateSelector = NSSelectorFromString("setDelegate:")
-	private static let reloadSelector = NSSelectorFromString("reloadData")
-	private static let orderFrontSelector = NSSelectorFromString("makeKeyAndOrderFront:")
-	private static let quickLookFrameworkPaths = [
-		"/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI",
-		"/System/Library/Frameworks/QuickLookUI.framework/Versions/A/QuickLookUI",
-	]
-
-	private var previewURL: URL?
-	private var quickLookHandle: UnsafeMutableRawPointer?
 
 	func preview(_ url: URL) {
 		previewURL = url
@@ -185,20 +179,20 @@ private final class ItsyQuickLookController: NSObject {
 	private func sharedPanel() -> NSObject? {
 		ensureQuickLookLoaded()
 		guard let panelClass = NSClassFromString("QLPreviewPanel") as AnyObject?,
-		      panelClass.responds(to: Self.panelSelector)
+		      panelClass.responds(to: FileTreeSidebarView.panelSelector)
 		else {
 			return nil
 		}
-		return panelClass.perform(Self.panelSelector)?.takeUnretainedValue() as? NSObject
+		return panelClass.perform(FileTreeSidebarView.panelSelector)?.takeUnretainedValue() as? NSObject
 	}
 
 	private func ensureQuickLookLoaded() {
-		guard quickLookHandle == nil, NSClassFromString("QLPreviewPanel") == nil else {
+		guard Self.quickLookHandle == nil, NSClassFromString("QLPreviewPanel") == nil else {
 			return
 		}
-		for path in Self.quickLookFrameworkPaths {
+		for path in FileTreeSidebarView.quickLookFrameworkPaths {
 			if let handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL) {
-				quickLookHandle = handle
+				Self.quickLookHandle = handle
 				return
 			}
 		}
@@ -269,9 +263,6 @@ enum ItsyWorkspaceController {
 		sidebars.add(sidebar)
 		sidebar.onOpenFile = { url in
 			documentController?.openDocument(at: url)
-		}
-		sidebar.onPreviewFile = { url in
-			ItsyQuickLookController.shared.preview(url)
 		}
 		sidebar.setRootURL(rootURL)
 	}

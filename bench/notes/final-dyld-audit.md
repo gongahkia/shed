@@ -204,3 +204,10 @@ Current section distribution:
 - Static rebase fixups after glyph-atlas cleanup: `2480`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `19` to `18`.
 - Section deltas: `__DATA,__objc_const` dropped from `950` to `920`; `__DATA,__data` dropped from `62` to `56`; `__DATA_CONST,__const` rose from `693` to `703`.
+
+## Quick Look delegate cleanup
+
+- Folded `ItsyQuickLookController` into the existing `FileTreeSidebarView` Quick Look delegate/data-source path.
+- Static rebase fixups after Quick Look delegate cleanup: `2464`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `18` to `17`.
+- Section deltas: `__DATA,__objc_const` dropped from `920` to `913`; `__DATA,__objc_data` dropped from `109` to `102`; `__DATA,__data` dropped from `56` to `55`.

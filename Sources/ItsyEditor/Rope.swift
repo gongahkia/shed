@@ -219,31 +219,35 @@ private struct RepeatedASCII: Sendable, Equatable {
 	}
 }
 
-private final class RopeNode: @unchecked Sendable {
+private indirect enum RopeNode: Sendable {
 	private static let maxLeafBytes = 1024
 	private static let maxChildren = 8
 
-	let children: [RopeNode]
-	let leafText: String?
-	let summary: RopeSummary
+	case leaf(String, RopeSummary)
+	case branch([RopeNode], RopeSummary)
+
+	var summary: RopeSummary {
+		switch self {
+		case let .leaf(_, summary), let .branch(_, summary):
+			return summary
+		}
+	}
 
 	var text: String {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			return leafText
+		case let .branch(children, _):
+			return children.map(\.text).joined()
 		}
-		return children.map(\.text).joined()
 	}
 
 	init(text: String) {
-		children = []
-		leafText = text
-		summary = RopeSummary(text)
+		self = .leaf(text, RopeSummary(text))
 	}
 
 	private init(children: [RopeNode]) {
-		self.children = children
-		leafText = nil
-		summary = children.reduce(.zero) { $0 + $1.summary }
+		self = .branch(children, children.reduce(.zero) { $0 + $1.summary })
 	}
 
 	static func build(from text: String) -> RopeNode {
@@ -300,161 +304,176 @@ private final class RopeNode: @unchecked Sendable {
 	}
 
 	func validate() -> Bool {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, summary):
 			return leafText.utf8.count <= Self.maxLeafBytes && summary == RopeSummary(leafText)
+		case let .branch(children, summary):
+			guard (1 ... Self.maxChildren).contains(children.count) else {
+				return false
+			}
+			return summary == children.reduce(.zero) { $0 + $1.summary } && children.allSatisfy { $0.validate() }
 		}
-		guard (1 ... Self.maxChildren).contains(children.count) else {
-			return false
-		}
-		return summary == children.reduce(.zero) { $0 + $1.summary } && children.allSatisfy { $0.validate() }
 	}
 
 	func inserting(_ string: String, at target: Int) -> [RopeNode] {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			var text = leafText
 			text.insert(contentsOf: string, at: text.index(atUTF8Offset: target))
 			return Self.leaves(from: text)
-		}
-		var offset = 0
-		var inserted = false
-		var next: [RopeNode] = []
-		for child in children {
-			let childEnd = offset + child.summary.utf8Bytes
-			if !inserted, target <= childEnd {
-				next += child.inserting(string, at: target - offset)
-				inserted = true
-			} else {
-				next.append(child)
+		case let .branch(children, _):
+			var offset = 0
+			var inserted = false
+			var next: [RopeNode] = []
+			for child in children {
+				let childEnd = offset + child.summary.utf8Bytes
+				if !inserted, target <= childEnd {
+					next += child.inserting(string, at: target - offset)
+					inserted = true
+				} else {
+					next.append(child)
+				}
+				offset = childEnd
 			}
-			offset = childEnd
+			return Self.packChildren(next)
 		}
-		return Self.packChildren(next)
 	}
 
 	func removing(_ range: Range<Int>) -> [RopeNode] {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			var text = leafText
 			let lower = text.index(atUTF8Offset: range.lowerBound)
 			let upper = text.index(atUTF8Offset: range.upperBound)
 			text.removeSubrange(lower ..< upper)
 			return text.isEmpty ? [] : Self.leaves(from: text)
-		}
-		var offset = 0
-		var next: [RopeNode] = []
-		for child in children {
-			let childStart = offset
-			let childEnd = offset + child.summary.utf8Bytes
-			if range.upperBound <= childStart || range.lowerBound >= childEnd {
-				next.append(child)
-			} else {
-				let lower = max(0, range.lowerBound - childStart)
-				let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
-				next += child.removing(lower ..< upper)
+		case let .branch(children, _):
+			var offset = 0
+			var next: [RopeNode] = []
+			for child in children {
+				let childStart = offset
+				let childEnd = offset + child.summary.utf8Bytes
+				if range.upperBound <= childStart || range.lowerBound >= childEnd {
+					next.append(child)
+				} else {
+					let lower = max(0, range.lowerBound - childStart)
+					let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
+					next += child.removing(lower ..< upper)
+				}
+				offset = childEnd
 			}
-			offset = childEnd
+			return Self.packChildren(next)
 		}
-		return Self.packChildren(next)
 	}
 
 	func offset(forLine line: Int) -> Int {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			return leafText.offset(forLine: line)
-		}
-		var remaining = line
-		var offset = 0
-		for child in children {
-			if remaining <= child.summary.lines {
-				return offset + child.offset(forLine: remaining)
+		case let .branch(children, summary):
+			var remaining = line
+			var offset = 0
+			for child in children {
+				if remaining <= child.summary.lines {
+					return offset + child.offset(forLine: remaining)
+				}
+				remaining -= child.summary.lines
+				offset += child.summary.utf8Bytes
 			}
-			remaining -= child.summary.lines
-			offset += child.summary.utf8Bytes
+			return summary.utf8Bytes
 		}
-		return summary.utf8Bytes
 	}
 
 	func line(forOffset target: Int) -> Int {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			return leafText.line(forOffset: target)
-		}
-		var offset = 0
-		var line = 0
-		for child in children {
-			let next = offset + child.summary.utf8Bytes
-			if target <= next {
-				return line + child.line(forOffset: target - offset)
+		case let .branch(children, _):
+			var offset = 0
+			var line = 0
+			for child in children {
+				let next = offset + child.summary.utf8Bytes
+				if target <= next {
+					return line + child.line(forOffset: target - offset)
+				}
+				offset = next
+				line += child.summary.lines
 			}
-			offset = next
-			line += child.summary.lines
+			return line
 		}
-		return line
 	}
 
 	func appendChunk(at target: Int, maxBytes: Int, into chunk: inout String) -> Int {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			let text = leafText.chunk(at: target, maxBytes: maxBytes)
 			chunk += text
 			return text.utf8.count
-		}
-		var skipped = target
-		var bytes = 0
-		for child in children {
-			if skipped >= child.summary.utf8Bytes {
-				skipped -= child.summary.utf8Bytes
-				continue
+		case let .branch(children, _):
+			var skipped = target
+			var bytes = 0
+			for child in children {
+				if skipped >= child.summary.utf8Bytes {
+					skipped -= child.summary.utf8Bytes
+					continue
+				}
+				bytes += child.appendChunk(at: skipped, maxBytes: maxBytes - bytes, into: &chunk)
+				if bytes >= maxBytes {
+					break
+				}
+				skipped = 0
 			}
-			bytes += child.appendChunk(at: skipped, maxBytes: maxBytes - bytes, into: &chunk)
-			if bytes >= maxBytes {
-				break
-			}
-			skipped = 0
+			return bytes
 		}
-		return bytes
 	}
 
 	func appendSlice(_ range: Range<Int>, into result: inout String) {
 		guard !range.isEmpty else {
 			return
 		}
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			let lower = leafText.index(atUTF8Offset: range.lowerBound)
 			let upper = leafText.index(atUTF8Offset: range.upperBound)
 			result += leafText[lower ..< upper]
-			return
-		}
-		var offset = 0
-		for child in children {
-			let childStart = offset
-			let childEnd = offset + child.summary.utf8Bytes
-			if range.upperBound <= childStart {
-				break
+		case let .branch(children, _):
+			var offset = 0
+			for child in children {
+				let childStart = offset
+				let childEnd = offset + child.summary.utf8Bytes
+				if range.upperBound <= childStart {
+					break
+				}
+				if range.lowerBound < childEnd {
+					let lower = max(0, range.lowerBound - childStart)
+					let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
+					child.appendSlice(lower ..< upper, into: &result)
+				}
+				offset = childEnd
 			}
-			if range.lowerBound < childEnd {
-				let lower = max(0, range.lowerBound - childStart)
-				let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
-				child.appendSlice(lower ..< upper, into: &result)
-			}
-			offset = childEnd
 		}
 	}
 
 	func copyUTF8Chunk(at target: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
-		if let leafText {
+		switch self {
+		case let .leaf(leafText, _):
 			return leafText.copyUTF8Chunk(at: target, maxBytes: maxBytes, into: buffer)
-		}
-		var skipped = target
-		var bytes = 0
-		for child in children {
-			if skipped >= child.summary.utf8Bytes {
-				skipped -= child.summary.utf8Bytes
-				continue
+		case let .branch(children, _):
+			var skipped = target
+			var bytes = 0
+			for child in children {
+				if skipped >= child.summary.utf8Bytes {
+					skipped -= child.summary.utf8Bytes
+					continue
+				}
+				bytes += child.copyUTF8Chunk(at: skipped, maxBytes: maxBytes - bytes, into: buffer.advanced(by: bytes))
+				if bytes >= maxBytes {
+					break
+				}
+				skipped = 0
 			}
-			bytes += child.copyUTF8Chunk(at: skipped, maxBytes: maxBytes - bytes, into: buffer.advanced(by: bytes))
-			if bytes >= maxBytes {
-				break
-			}
-			skipped = 0
+			return bytes
 		}
-		return bytes
 	}
 }
 

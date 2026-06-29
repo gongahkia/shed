@@ -68,6 +68,22 @@ public struct WindowState: Equatable, Sendable {
             subrole: subrole
         )
     }
+
+    public func withLayoutOrder(_ layoutOrder: Int?) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
 }
 
 public enum WindowStoreDelta: Equatable, Sendable {

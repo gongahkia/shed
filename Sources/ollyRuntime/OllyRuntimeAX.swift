@@ -1,4 +1,5 @@
 import ApplicationServices
+import AppKit
 import CoreGraphics
 import Foundation
 import ollyCore
@@ -29,20 +30,15 @@ extension OllyRuntime {
                 focusedWindowID: sourceID
             )
         }
-        focusedWindowID = nextID
-        if let window = windows.first(where: { $0.id == nextID }),
-           let target = windowTargets.target(for: window) {
-            AXUIElementSetAttributeValue(target.axElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        guard let window = windows.first(where: { $0.id == nextID }),
+              let target = windowTargets.target(for: window) else {
+            throw OllyRuntimeError.axOperationFailed("focus", .invalidUIElement)
         }
-        let activeTags = await tagStore.activeTags(on: displayID)
-        await focusStack.recordFocus(
-            windowID: nextID,
-            displayID: displayID,
-            tagMask: activeTags.rawValue
-        )
-        await eventHub.publish(
-            .focus(IPCFocusEvent(focusedWindowID: nextID, displayID: displayID, tagMask: activeTags.rawValue))
-        )
+        let error = AXUIElementSetAttributeValue(target.axElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        guard error == .success else {
+            throw OllyRuntimeError.axOperationFailed("focus", error)
+        }
+        await setFocusedWindow(nextID, displayID: displayID, publish: true)
     }
 
     private func wrappingFocusTarget(direction: IPCDirection, windows: [WindowState]) -> WindowID {
@@ -71,10 +67,43 @@ extension OllyRuntime {
         tasks.append(task)
     }
 
+    func startAXObservation(for application: Application) {
+        applicationsByProcessID[application.processID] = application
+        guard axObserversByProcessID[application.processID] == nil else {
+            return
+        }
+        let bridge = AXObserverBridge(application: application)
+        do {
+            let events = try bridge.events()
+            axObserversByProcessID[application.processID] = bridge
+            let task = Task { [weak self] in
+                for await event in events {
+                    guard let self, !Task.isCancelled else {
+                        return
+                    }
+                    await self.handle(axEvent: event)
+                }
+            }
+            tasks.append(task)
+        } catch {
+            lastError = "AX observer failed for pid \(application.processID): \(error)"
+        }
+    }
+
+    func stopAXObservers() {
+        for observer in axObserversByProcessID.values {
+            observer.stop()
+        }
+        axObserversByProcessID.removeAll()
+        applicationsByProcessID.removeAll()
+        windowTargets.removeAll()
+    }
+
     func handle(applicationEvent: ApplicationEvent) async {
         switch applicationEvent {
         case let .launched(application):
             await refreshWindows(for: application)
+            startAXObservation(for: application)
         case let .terminated(application):
             let windows = await windowStore.windows(forProcessID: application.processID)
             for window in windows {
@@ -82,36 +111,52 @@ extension OllyRuntime {
                 await focusStack.remove(windowID: window.id)
                 windowTargets.remove(windowID: window.id)
             }
+            axObserversByProcessID[application.processID]?.stop()
+            axObserversByProcessID[application.processID] = nil
+            applicationsByProcessID[application.processID] = nil
         }
     }
 
     func refreshAllWindows() async {
         for application in applicationMonitor.runningApplications() {
             await refreshWindows(for: application)
+            startAXObservation(for: application)
         }
     }
 
     func refreshWindows(for application: Application) async {
+        applicationsByProcessID[application.processID] = application
         for element in axWindows(for: application.axElement) {
-            guard let snapshot = try? await snapshotCache.snapshot(for: element),
-                  let windowID = snapshot.attributes.windowID else {
-                continue
-            }
-            let displayID = displayID(for: snapshot.attributes.frame)
-            let baseState = WindowState(
-                id: windowID,
-                processID: snapshot.attributes.processID,
-                bundleID: application.bundleIdentifier,
-                displayID: displayID,
-                tagMask: Self.defaultActiveTags.rawValue,
-                isFloating: false,
-                frame: snapshot.attributes.frame,
-                title: snapshot.attributes.title,
-                role: snapshot.attributes.role,
-                subrole: snapshot.attributes.subrole
-            )
-            await upsertRuntimeWindow(baseState, element: element)
+            await refreshWindowElement(element, application: application)
         }
+    }
+
+    func handle(axEvent event: AXNotificationEvent) async {
+        if event.notification == .uiElementDestroyed {
+            await removeWindow(for: event.element)
+        }
+        await snapshotCache.invalidate(for: event)
+        switch event.notification {
+        case .focusedWindowChanged, .mainWindowChanged, .applicationActivated:
+            await refreshFocusedWindow(from: event)
+        case .windowCreated:
+            let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
+            await refreshWindowElement(event.element, application: application)
+            await refreshWindows(for: application)
+        case .windowMoved, .windowResized:
+            let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
+            await refreshWindowElement(event.element, application: application)
+        case .uiElementDestroyed:
+            break
+        }
+    }
+
+    func refreshFocusedWindowFromSystem() async {
+        guard let application = frontmostApplication(),
+              let element = focusedWindowElement(for: application.axElement) else {
+            return
+        }
+        await refreshFocusedWindow(element: element, application: application)
     }
 
     func reapplyRulesToStoredWindows() async {
@@ -131,7 +176,7 @@ extension OllyRuntime {
                 windowSize: state.frame.size
             )
         )
-        let resolved = config.resolvedWindowState(for: state)
+        let resolved = await restoredLayoutOrder(config.resolvedWindowState(for: state))
         await windowStore.upsert(resolved)
         if let element {
             windowTargets.set(
@@ -144,6 +189,86 @@ extension OllyRuntime {
             for tag in TagSet(rawValue: resolved.tagMask).tags {
                 await tagStore.bindEngine(engineID, to: tag, on: displayID)
             }
+        }
+    }
+
+    private func refreshWindowElement(_ element: AXUIElement, application: Application) async {
+        guard let snapshot = try? await snapshotCache.snapshot(for: element),
+              let windowID = snapshot.attributes.windowID else {
+            return
+        }
+        let displayID = displayID(for: snapshot.attributes.frame)
+        let baseState = WindowState(
+            id: windowID,
+            processID: snapshot.attributes.processID,
+            bundleID: application.bundleIdentifier,
+            displayID: displayID,
+            tagMask: Self.defaultActiveTags.rawValue,
+            isFloating: false,
+            frame: snapshot.attributes.frame,
+            title: snapshot.attributes.title,
+            role: snapshot.attributes.role,
+            subrole: snapshot.attributes.subrole
+        )
+        await upsertRuntimeWindow(baseState, element: element)
+    }
+
+    private func refreshFocusedWindow(from event: AXNotificationEvent) async {
+        let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
+        if let snapshot = try? await snapshotCache.snapshot(for: event.element),
+           snapshot.attributes.windowID != nil {
+            await refreshFocusedWindow(element: event.element, application: application)
+            return
+        }
+        guard let focusedElement = focusedWindowElement(for: application.axElement) else {
+            return
+        }
+        await refreshFocusedWindow(element: focusedElement, application: application)
+    }
+
+    private func refreshFocusedWindow(element: AXUIElement, application: Application) async {
+        await refreshWindowElement(element, application: application)
+        guard let windowID = windowTargets.windowID(for: element),
+              let window = await windowStore.state(for: windowID),
+              let displayID = window.displayID else {
+            return
+        }
+        await setFocusedWindow(windowID, displayID: displayID, tagMask: window.tagMask, publish: true)
+    }
+
+    private func removeWindow(for element: AXUIElement) async {
+        guard let windowID = windowTargets.windowID(for: element) else {
+            return
+        }
+        await windowStore.remove(id: windowID)
+        await focusStack.remove(windowID: windowID)
+        windowTargets.remove(windowID: windowID)
+        if focusedWindowID == windowID {
+            focusedWindowID = nil
+            await eventHub.publish(.focus(IPCFocusEvent(focusedWindowID: nil)))
+        }
+    }
+
+    private func restoredLayoutOrder(_ state: WindowState) async -> WindowState {
+        guard state.layoutOrder == nil,
+              let layoutOrder = try? await statePersistence.layoutOrder(for: state) else {
+            return state
+        }
+        return state.withLayoutOrder(layoutOrder)
+    }
+
+    private func focusedWindowElement(for applicationElement: AXUIElement) -> AXUIElement? {
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(applicationElement, kAXFocusedWindowAttribute as CFString, &value)
+        guard error == .success, let value else {
+            return nil
+        }
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
+
+    private func frontmostApplication() -> Application? {
+        applicationMonitor.runningApplications().first { application in
+            NSRunningApplication(processIdentifier: application.processID)?.isActive == true
         }
     }
 

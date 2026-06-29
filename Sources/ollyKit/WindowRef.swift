@@ -12,6 +12,22 @@ public struct WindowAttributes: Equatable, Sendable {
     public let frame: CGRect
     public let processID: pid_t
     public let windowID: WindowID?
+
+    public init(
+        title: String?,
+        role: String?,
+        subrole: String?,
+        frame: CGRect,
+        processID: pid_t,
+        windowID: WindowID?
+    ) {
+        self.title = title
+        self.role = role
+        self.subrole = subrole
+        self.frame = frame
+        self.processID = processID
+        self.windowID = windowID
+    }
 }
 
 public struct WindowIDLookupOptions: Equatable, Sendable {

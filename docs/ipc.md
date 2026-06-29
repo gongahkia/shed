@@ -29,14 +29,16 @@ consumes that response and then prints event lines.
 
 ## Directional window operations
 
-`focus` accepts `next`/`previous` and spatial `left`/`right`/`up`/`down`. Spatial directions choose the
-nearest visible tiled window whose center is in that direction, using the latest layout placement when
-available and the captured window frame otherwise.
+`focus` accepts `next`/`previous` and spatial `left`/`right`/`up`/`down`. Spatial directions use the
+latest visible layout placement when available and the captured window frame otherwise. Selection prefers
+windows in the requested direction with perpendicular overlap, then nearest primary-axis distance, then
+layout order/window ID.
 
 `move-window` and `swap` operate on the focused tiled window in the active display/tag set. `move-window`
 re-inserts the focused window before or after the directional target; `swap` exchanges the focused window
 with that target. If no focused window or no directional target exists, the response is a structured error.
-`state` responses include `layoutOrder` for windows that have been explicitly reordered.
+`state` responses include `layoutOrder` for windows that have been explicitly reordered. Olly persists
+layout order by stable window identity and restores it on later window discovery when the identity matches.
 
 ## Schema
 
@@ -472,6 +474,273 @@ The schema block below is tested against the Swift IPC constants. Breaking wire 
         },
         "payload": {
           "type": "object"
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "name": {
+              "const": "acknowledged"
+            },
+            "payload": {
+              "$ref": "#/$defs/acknowledgementPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "state"
+            },
+            "payload": {
+              "$ref": "#/$defs/statePayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "subscribed"
+            },
+            "payload": {
+              "$ref": "#/$defs/subscriptionPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "version"
+            },
+            "payload": {
+              "$ref": "#/$defs/versionPayload"
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
+    },
+    "acknowledgementPayload": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "subscriptionPayload": {
+      "type": "object",
+      "required": [
+        "eventKinds"
+      ],
+      "properties": {
+        "eventKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eventKind"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "versionPayload": {
+      "type": "object",
+      "required": [
+        "protocolVersion",
+        "supportedCommands"
+      ],
+      "properties": {
+        "protocolVersion": {
+          "$ref": "#/$defs/protocolVersion"
+        },
+        "supportedCommands": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/commandName"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "statePayload": {
+      "type": "object",
+      "required": [
+        "displays",
+        "windows"
+      ],
+      "properties": {
+        "displays": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/displayState"
+          }
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/windowState"
+          }
+        },
+        "focusedWindowID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/windowID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "windowState": {
+      "type": "object",
+      "required": [
+        "windowID",
+        "processID",
+        "tags",
+        "isFloating",
+        "frame"
+      ],
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "processID": {
+          "type": "integer"
+        },
+        "bundleID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/displayID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tagIndex"
+          }
+        },
+        "isFloating": {
+          "type": "boolean"
+        },
+        "layoutOrder": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "title": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "subrole": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "displayState": {
+      "type": "object",
+      "required": [
+        "displayID",
+        "activeTags",
+        "tagEngines",
+        "mruHistory"
+      ],
+      "properties": {
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        },
+        "activeTags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tagIndex"
+          }
+        },
+        "tagEngines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/tagEngineBinding"
+          }
+        },
+        "mruHistory": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/tagIndex"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "tagEngineBinding": {
+      "type": "object",
+      "required": [
+        "tag",
+        "engineID"
+      ],
+      "properties": {
+        "tag": {
+          "$ref": "#/$defs/tagIndex"
+        },
+        "engineID": {
+          "$ref": "#/$defs/layoutEngineID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "frame": {
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
         }
       },
       "additionalProperties": false

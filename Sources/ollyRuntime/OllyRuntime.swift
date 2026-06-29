@@ -40,7 +40,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case engineUnavailable(LayoutEngineID)
     case missingFocusedWindow
     case missingDirectionalTarget(IPCDirection)
-    case notImplemented(String)
+    case axOperationFailed(String, AXError)
     case unsupportedAXCommand(String)
 
     public var description: String {
@@ -53,8 +53,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "no focused window"
         case let .missingDirectionalTarget(direction):
             return "no window in direction: \(direction.rawValue)"
-        case let .notImplemented(command):
-            return "\(command) is not implemented"
+        case let .axOperationFailed(operation, error):
+            return "\(operation) failed: \(error)"
         case let .unsupportedAXCommand(command):
             return "\(command) requires Accessibility permission"
         }
@@ -70,8 +70,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "missing_focused_window"
         case .missingDirectionalTarget:
             return "missing_directional_target"
-        case .notImplemented:
-            return "not_implemented"
+        case .axOperationFailed:
+            return "ax_operation_failed"
         case .unsupportedAXCommand:
             return "ax_unavailable"
         }
@@ -84,19 +84,22 @@ public actor OllyRuntime {
     let displayProvider: @Sendable () -> [Display]
     private let scanAXOnStart: Bool
     let applicationMonitor: ApplicationMonitor
-    let snapshotCache = WindowSnapshotCache()
+    let snapshotCache: WindowSnapshotCache
     let windowStore = WindowStore()
     let tagStore = TagStore(defaultActiveTags: OllyRuntime.defaultActiveTags)
     let focusStack = FocusStack()
     let configStore = RuntimeConfigStore()
     let eventHub = RuntimeEventHub()
     let windowTargets = RuntimeWindowTargets()
+    let statePersistence: WindowTagPersistence
     private let windowMover: WindowMover
     let assignment: WindowTagAssignment
     let dispatcher: TagDispatcher
     let engineHost: EngineHost
     private let registry: LayoutEngineRegistry
     private var server: UnixDomainSocketServer?
+    var applicationsByProcessID: [pid_t: Application] = [:]
+    var axObserversByProcessID: [pid_t: AXObserverBridge] = [:]
     var tasks: [Task<Void, Never>] = []
     var focusedWindowID: WindowID?
     var lastError: String?
@@ -106,12 +109,16 @@ public actor OllyRuntime {
         configLoader: ConfigLoader = ConfigLoader(),
         displayProvider: @escaping @Sendable () -> [Display] = { DisplayMonitor().displays() },
         applicationMonitor: ApplicationMonitor = ApplicationMonitor(),
+        snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
+        statePersistence: WindowTagPersistence = WindowTagPersistence(),
         scanAXOnStart: Bool = true
     ) {
         self.socketPath = socketPath
         self.configLoader = configLoader
         self.displayProvider = displayProvider
         self.applicationMonitor = applicationMonitor
+        self.snapshotCache = snapshotCache
+        self.statePersistence = statePersistence
         self.scanAXOnStart = scanAXOnStart
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
@@ -151,6 +158,7 @@ public actor OllyRuntime {
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
             startApplicationObservation()
+            await refreshFocusedWindowFromSystem()
         }
         let server = UnixDomainSocketServer(socketPath: socketPath) { [weak self] connection, line in
             guard let self else {
@@ -165,6 +173,7 @@ public actor OllyRuntime {
     public func stop() {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        stopAXObservers()
         server?.stop()
         server = nil
     }

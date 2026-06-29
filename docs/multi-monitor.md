@@ -44,11 +44,12 @@ Space so virtual tag switches can be implemented by moving and parking windows.
 `NativeSpaceInvariant` checks managed windows against a baseline `NativeSpaceID`:
 
 - `isVerified == true`: every known managed window shares the same native Space.
+- `unsupportedNativeSpaces`: the active provider cannot inspect native Space IDs through public APIs.
 - `unknownSpace`: public APIs cannot identify a window's native Space.
 - `drifted`: a window moved to another native Space.
 
-Current public provider behavior is conservative: when native Space cannot be verified, olly
-reports `unknownSpace` instead of guessing.
+Current public provider behavior is conservative and public-only: olly does not call private SkyLight/CGS
+Spaces APIs. The default provider reports `unsupportedNativeSpaces` instead of guessing.
 
 Drift policy:
 
@@ -88,6 +89,7 @@ against the remaining active display bounds. `OffscreenParking` tests cover this
 
 ## Verification
 
-- `NativeSpaceInvariantTests` cover verified, drifted, rehome, unmanage, and unknown-space cases.
+- `NativeSpaceInvariantTests` cover verified, drifted, rehome, unmanage, unsupported, and unknown-space cases.
 - `OffscreenParkingTests` cover active `CGDisplayBounds` avoidance and display-unplug recompute.
 - `TagDispatcherTests` cover display-scoped apply and offscreen parking through a display provider.
+- `OllyRuntimeAXAcceptanceTests` are opt-in: set `OLLY_RUN_AX_ACCEPTANCE=1` and grant Accessibility trust.

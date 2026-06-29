@@ -20,6 +20,8 @@ struct CommandPaletteActionCatalog {
             command: IPCCommand.moveWindow
         ))
         actions.append(contentsOf: directionalActions(prefix: "swap", title: "Swap Window", command: IPCCommand.swap))
+        actions.append(contentsOf: manualPreselectActions())
+        actions.append(contentsOf: bspTreeActions())
         actions.append(contentsOf: tagActions())
         actions.append(contentsOf: engineActions())
         return actions
@@ -144,6 +146,39 @@ struct CommandPaletteActionCatalog {
                 "Bind \(engineID.rawValue) to active tag",
                 ["layout", "engine"],
                 .setEngine(IPCSetEngineCommand(engineID: engineID))
+            )
+        }
+    }
+
+    private func manualPreselectActions() -> [CommandPaletteAction] {
+        [
+            ("left", "Manual Preselect Left", ManualPreselectDirection.left),
+            ("right", "Manual Preselect Right", ManualPreselectDirection.right),
+            ("up", "Manual Preselect Up", ManualPreselectDirection.up),
+            ("down", "Manual Preselect Down", ManualPreselectDirection.down)
+        ].map { id, title, direction in
+            action(
+                "manual-preselect-\(id)",
+                title,
+                "Set manual split direction",
+                ["layout", "manual"],
+                .manualPreselect(IPCManualPreselectCommand(direction: direction))
+            )
+        }
+    }
+
+    private func bspTreeActions() -> [CommandPaletteAction] {
+        [
+            ("rotate", "BSP Rotate Children", BSPTreeAction.rotateChildren),
+            ("flip", "BSP Flip Axis", BSPTreeAction.flipAxis),
+            ("balance", "BSP Balance Tree", BSPTreeAction.balanceTree)
+        ].map { id, title, treeAction in
+            action(
+                "bsp-tree-\(id)",
+                title,
+                "Mutate active BSP tree",
+                ["layout", "bsp"],
+                .bspTree(IPCBSPTreeCommand(action: treeAction))
             )
         }
     }

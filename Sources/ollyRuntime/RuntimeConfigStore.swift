@@ -25,6 +25,7 @@ actor RuntimeConfigStore {
     ]
 
     private var config: Config
+    private var runtimeOverrides: [LayoutEngineID: Any] = [:]
 
     init(config: Config = Config()) {
         self.config = config
@@ -36,6 +37,7 @@ actor RuntimeConfigStore {
 
     func replace(with config: Config) {
         self.config = config
+        runtimeOverrides.removeAll()
     }
 
     func availableEngineIDs() -> [LayoutEngineID] {
@@ -44,11 +46,29 @@ actor RuntimeConfigStore {
     }
 
     func config(for engineID: LayoutEngineID) -> Any? {
+        if let override = runtimeOverrides[engineID] {
+            return override
+        }
         if let declaration = config.engines.engines.first(where: { $0.id == engineID }),
            let typedConfig = declaration.config {
             return configPayload(typedConfig)
         }
         return defaultConfig(for: engineID)
+    }
+
+    func updateManualTree(_ transform: (ManualLayoutTree) throws -> ManualLayoutTree) throws -> ManualLayoutTree {
+        let current = (config(for: ManualLayoutEngine.engineID) as? ManualLayoutEngine.Config)?.tree
+            ?? ManualLayoutTree()
+        let updatedTree = try transform(current)
+        runtimeOverrides[ManualLayoutEngine.engineID] = ManualLayoutEngine.Config(tree: updatedTree)
+        return updatedTree
+    }
+
+    func updateBSPTree(_ transform: (BSPLayoutTree) throws -> BSPLayoutTree) throws -> BSPLayoutTree {
+        let current = (config(for: BSPLayoutEngine.engineID) as? BSPLayoutEngine.Config)?.tree ?? BSPLayoutTree()
+        let updatedTree = try transform(current)
+        runtimeOverrides[BSPLayoutEngine.engineID] = BSPLayoutEngine.Config(tree: updatedTree)
+        return updatedTree
     }
 
     private func configPayload(_ declaration: EngineConfigDeclaration) -> Any {

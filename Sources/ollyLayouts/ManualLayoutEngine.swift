@@ -327,7 +327,7 @@ public struct ManualLayoutTree: Codable, Equatable, Sendable {
         }
     }
 
-    private func reconciled(with windowIDs: [WindowID]) -> ManualLayoutTree {
+    public func reconciled(with windowIDs: [WindowID]) -> ManualLayoutTree {
         let windowIDSet = Set(windowIDs)
         let prunedRoot = root?.pruned(to: windowIDSet)
         let existingWindowIDs = Set(prunedRoot?.windowIDs() ?? [])

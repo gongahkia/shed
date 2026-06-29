@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 import ollyCore
 import ollyIPC
+import ollyLayouts
 
 final class IPCCommandTests: XCTestCase {
     func testCommandNamesAreStable() {
@@ -16,6 +17,8 @@ final class IPCCommandTests: XCTestCase {
                 "move-to-display",
                 "swap",
                 "toggle-floating",
+                "manual-preselect",
+                "bsp-tree",
                 "switch-tag",
                 "move-to-tag",
                 "toggle-tag",
@@ -41,6 +44,8 @@ final class IPCCommandTests: XCTestCase {
             .moveToDisplay(IPCMoveToDisplayCommand(displayID: 2, windowID: 42)),
             .swap(IPCDirectionalCommand(direction: .right)),
             .toggleFloating(IPCFloatingCommand(windowID: 42, floating: true, displayID: 1)),
+            .manualPreselect(IPCManualPreselectCommand(direction: .left, windowID: 42, displayID: 1)),
+            .bspTree(IPCBSPTreeCommand(action: .flipAxis, path: BSPContainerPath([0]), displayID: 1)),
             .switchTag(IPCTagCommand(tag: try tag(1), displayID: 2)),
             .moveToTag(IPCMoveToTagCommand(tag: try tag(2), windowID: 42)),
             .toggleTag(IPCTagCommand(tag: try tag(6))),

@@ -257,6 +257,50 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testManualPreselectMutatesManualTree() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+            XCTAssertEqual(
+                try send(.setEngine(.init(engineID: ManualLayoutEngine.engineID, displayID: displayID)), to: socketPath).status,
+                .success
+            )
+
+            let response = try send(.manualPreselect(.init(direction: .right, displayID: displayID)), to: socketPath)
+
+            XCTAssertEqual(response.status, .success)
+            let rawConfig = await runtime.configForTest(engineID: ManualLayoutEngine.engineID)
+            let config = try XCTUnwrap(rawConfig as? ManualLayoutEngine.Config)
+            let path = try XCTUnwrap(config.tree.path(to: 1))
+            XCTAssertEqual(path, ManualContainerPath([0]))
+            XCTAssertEqual(config.tree.root?.children.first?.preselect, .right)
+        }
+    }
+
+    func testBSPTreeCommandMutatesBSPTree() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+            XCTAssertEqual(
+                try send(.setEngine(.init(engineID: BSPLayoutEngine.engineID, displayID: displayID)), to: socketPath).status,
+                .success
+            )
+
+            let response = try send(.bspTree(.init(action: .flipAxis, displayID: displayID)), to: socketPath)
+
+            XCTAssertEqual(response.status, .success)
+            let rawConfig = await runtime.configForTest(engineID: BSPLayoutEngine.engineID)
+            let config = try XCTUnwrap(rawConfig as? BSPLayoutEngine.Config)
+            XCTAssertEqual(config.tree.root?.axis, .vertical)
+        }
+    }
+
     func testSpatialTargetPrefersPerpendicularOverlapBeforeNearestCenter() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -329,6 +373,12 @@ private func stateSnapshot(from response: IPCResponseEnvelope) throws -> IPCStat
 
 private func tag(_ value: Int) throws -> IPCTagIndex {
     try IPCTagIndex(validating: value)
+}
+
+private extension OllyRuntime {
+    func configForTest(engineID: LayoutEngineID) async -> Any? {
+        await configStore.config(for: engineID)
+    }
 }
 
 private func seedWindows(

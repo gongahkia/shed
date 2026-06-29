@@ -141,6 +141,8 @@ ollyctl list-displays
 ollyctl switch-tag 1
 ollyctl set-engine bsp
 ollyctl cycle-engine
+ollyctl bsp-tree flip-axis
+ollyctl manual-preselect right
 ollyctl focus next
 ollyctl toggle-floating
 ollyctl move-to-tag 2

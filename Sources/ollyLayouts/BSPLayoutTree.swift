@@ -360,7 +360,7 @@ public struct BSPLayoutTree: Codable, Equatable, Sendable {
         }
     }
 
-    private func reconciled(with windowIDs: [WindowID], in bounds: CGRect) -> BSPLayoutTree {
+    public func reconciled(with windowIDs: [WindowID], in bounds: CGRect) -> BSPLayoutTree {
         let windowIDSet = Set(windowIDs)
         let prunedRoot = root?.pruned(to: windowIDSet)
         let existingWindowIDs = Set(prunedRoot?.windowIDs() ?? [])

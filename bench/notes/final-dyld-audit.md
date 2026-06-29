@@ -225,3 +225,10 @@ Current section distribution:
 - Static rebase fixups after command-palette controller cleanup: `2429`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `16` to `15`.
 - Section deltas: `__DATA,__objc_const` dropped from `901` to `896`; `__DATA_CONST,__const` dropped from `702` to `701`; `__DATA,__objc_data` dropped from `102` to `94`; `__DATA,__data` dropped from `50` to `49`.
+
+## Settings controller cleanup
+
+- Replaced `ThemeSettingsWindowController` with a lazy plain `NSWindowController` owned by the existing `AppDelegate`.
+- Static rebase fixups after settings-controller cleanup: `2416`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `15` to `14`.
+- Section deltas: `__DATA,__objc_const` dropped from `896` to `892`; `__DATA,__objc_data` dropped from `94` to `87`; `__DATA,__data` dropped from `49` to `48`.

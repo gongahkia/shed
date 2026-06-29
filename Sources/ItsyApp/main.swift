@@ -56,6 +56,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var taskOutputTextView: NSTextView?
 	private var workspaceTasks: [WorkspaceTask] = []
 	private var taskRunGeneration = 0
+	private var problemsPanel: NSPanel?
+	private var problemsStatusLabel: NSTextField?
+	private var problemsTableView: NSTableView?
+	private var workspaceProblems: [WorkspaceProblem] = []
+	private var problemsRootURL: URL?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -384,6 +389,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					},
 					Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
 						self?.refreshTasks(nil)
+					},
+					Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
+						self?.showProblems(nil)
 					},
 					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
@@ -975,6 +983,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				taskResult.stdout,
 				taskResult.stderr,
 			].filter { !$0.isEmpty }.joined(separator: "\n")
+			if let root = ItsyWorkspaceController.currentRootURL {
+				setProblems(WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root))
+			}
 		case let .failure(error):
 			taskStatusLabel?.textColor = .systemRed
 			taskStatusLabel?.stringValue = String(describing: error)
@@ -983,6 +994,124 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func taskTitle(_ task: WorkspaceTask) -> String {
 		"\(task.label)  [\(task.source.rawValue)]"
+	}
+
+	@objc private func showProblems(_ sender: Any?) {
+		toggleProblems(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleProblems(relativeTo hostWindow: NSWindow?) {
+		if problemsPanel?.isVisible == true {
+			closeProblems()
+			return
+		}
+		showProblems(relativeTo: hostWindow)
+	}
+
+	private func closeProblems() {
+		problemsPanel?.close()
+	}
+
+	private func showProblems(relativeTo hostWindow: NSWindow?) {
+		let panel = makeProblemsPanelIfNeeded()
+		centerProblemsPanel(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		refreshProblemsStatus()
+	}
+
+	private func makeProblemsPanelIfNeeded() -> NSPanel {
+		if let panel = problemsPanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 720, height: 420),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Problems")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureProblemsView(contentView)
+		problemsPanel = panel
+		return panel
+	}
+
+	private func configureProblemsView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 12)
+		statusLabel.textColor = .secondaryLabelColor
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("problem"))
+		column.title = L10n.string("Problems")
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowSizeStyle = .small
+		tableView.dataSource = self
+		tableView.delegate = self
+		tableView.target = self
+		tableView.doubleAction = #selector(openSelectedProblem(_:))
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		statusLabel.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(statusLabel)
+		contentView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			statusLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		problemsStatusLabel = statusLabel
+		problemsTableView = tableView
+	}
+
+	private func centerProblemsPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(760, max(560, hostFrame.width - 100))
+		let height = min(460, max(300, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	private func setProblems(_ snapshot: WorkspaceProblemSnapshot) {
+		workspaceProblems = snapshot.problems
+		problemsRootURL = snapshot.root
+		problemsTableView?.reloadData()
+		refreshProblemsStatus()
+		if !workspaceProblems.isEmpty {
+			problemsTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	private func refreshProblemsStatus() {
+		let errors = workspaceProblems.filter { $0.severity == .error }.count
+		let warnings = workspaceProblems.filter { $0.severity == .warning }.count
+		problemsStatusLabel?.stringValue = L10n.string("\(errors) errors, \(warnings) warnings, \(workspaceProblems.count) total")
+	}
+
+	@objc private func openSelectedProblem(_ sender: Any?) {
+		guard let tableView = problemsTableView,
+		      let problemsRootURL,
+		      tableView.selectedRow >= 0,
+		      tableView.selectedRow < workspaceProblems.count
+		else {
+			return
+		}
+		_ = documentController.openDocument(at: problemsRootURL.appendingPathComponent(workspaceProblems[tableView.selectedRow].path))
+	}
+
+	private func problemTitle(_ problem: WorkspaceProblem) -> String {
+		let column = problem.column.map { ":\($0)" } ?? ""
+		return "\(problem.severity.rawValue)  \(problem.path):\(problem.line)\(column)  \(problem.message)"
 	}
 
 	@objc private func showSettings(_ sender: Any?) {
@@ -1169,12 +1298,14 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let editItem = NSMenuItem()
 		let gitItem = NSMenuItem()
 		let taskItem = NSMenuItem()
+		let problemItem = NSMenuItem()
 		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
 		mainMenu.addItem(editItem)
 		mainMenu.addItem(gitItem)
 		mainMenu.addItem(taskItem)
+		mainMenu.addItem(problemItem)
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
@@ -1234,6 +1365,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let taskRefreshItem = taskMenu.addItem(withTitle: L10n.string("Refresh Tasks"), action: #selector(refreshTasks(_:)), keyEquivalent: "")
 		taskRefreshItem.target = self
 		taskItem.submenu = taskMenu
+
+		let problemMenu = NSMenu(title: L10n.string("Problems"))
+		let problemShowItem = problemMenu.addItem(withTitle: L10n.string("Problems"), action: #selector(showProblems(_:)), keyEquivalent: "M")
+		problemShowItem.keyEquivalentModifierMask = [.command, .shift]
+		problemShowItem.target = self
+		problemItem.submenu = problemMenu
 
 		let commandMenu = NSMenu(title: L10n.string("Command"))
 		let paletteItem = commandMenu.addItem(withTitle: L10n.string("Command Palette"), action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
@@ -1359,6 +1496,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === taskTableView {
 			return workspaceTasks.count
 		}
+		if tableView === problemsTableView {
+			return workspaceProblems.count
+		}
 		if tableView === commandPaletteTableView {
 			return commandPaletteFilteredItems.count
 		}
@@ -1414,6 +1554,26 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			textField.font = .systemFont(ofSize: 12)
 			textField.lineBreakMode = .byTruncatingTail
 			textField.stringValue = taskTitle(workspaceTasks[row])
+			if textField.superview == nil {
+				textField.translatesAutoresizingMaskIntoConstraints = false
+				cell.addSubview(textField)
+				NSLayoutConstraint.activate([
+					textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+					textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+					textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				])
+				cell.textField = textField
+			}
+			return cell
+		}
+		if tableView === problemsTableView {
+			let identifier = NSUserInterfaceItemIdentifier("ProblemCell")
+			let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+			cell.identifier = identifier
+			let textField = cell.textField ?? NSTextField(labelWithString: "")
+			textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+			textField.lineBreakMode = .byTruncatingTail
+			textField.stringValue = problemTitle(workspaceProblems[row])
 			if textField.superview == nil {
 				textField.translatesAutoresizingMaskIntoConstraints = false
 				cell.addSubview(textField)

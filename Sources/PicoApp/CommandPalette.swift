@@ -83,7 +83,7 @@ final class CommandPaletteController: NSObject {
 		}
 		panel.contentView = contentView
 		panel.paletteDelegate = self
-		panel.title = "Command Palette"
+		panel.title = L10n.string("Command Palette")
 		panel.isReleasedWhenClosed = false
 		panel.hasShadow = true
 		panel.level = .floating
@@ -188,7 +188,7 @@ final class CommandPaletteView: NSView {
 		acceptsRawText = false
 		self.items = items
 		inputField.stringValue = ""
-		inputField.placeholderString = "Command"
+		inputField.placeholderString = L10n.string("Command")
 		scrollView.isHidden = false
 		filterItems()
 	}
@@ -215,7 +215,7 @@ final class CommandPaletteView: NSView {
 		layer?.borderWidth = 1
 		layer?.borderColor = NSColor.separatorColor.cgColor
 
-		inputField.placeholderString = "Command"
+		inputField.placeholderString = L10n.string("Command")
 		inputField.font = .systemFont(ofSize: 18)
 		inputField.isBordered = false
 		inputField.focusRingType = .none

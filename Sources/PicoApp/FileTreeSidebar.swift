@@ -74,7 +74,7 @@ final class FileTreeSidebarView: NSView {
 		layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
 		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
-		column.title = "Files"
+		column.title = L10n.string("Files")
 		column.resizingMask = .autoresizingMask
 		outlineView.addTableColumn(column)
 		outlineView.outlineTableColumn = column

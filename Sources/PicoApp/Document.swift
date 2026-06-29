@@ -301,10 +301,10 @@ final class PicoDocument: NSDocument {
 			return
 		}
 		let alert = NSAlert()
-		alert.messageText = "\(displayName ?? url.lastPathComponent) changed on disk"
-		alert.informativeText = "Reload the file from disk?"
-		alert.addButton(withTitle: "Reload")
-		alert.addButton(withTitle: "Keep Editing")
+		alert.messageText = L10n.string("\(displayName ?? url.lastPathComponent) changed on disk")
+		alert.informativeText = L10n.string("Reload the file from disk?")
+		alert.addButton(withTitle: L10n.string("Reload"))
+		alert.addButton(withTitle: L10n.string("Keep Editing"))
 		if let window = windowControllers.first?.window {
 			alert.beginSheetModal(for: window) { [weak self] response in
 				self?.handleExternalFilePrompt(response, url: url)
@@ -535,7 +535,7 @@ final class EditorWindowController: NSWindowController {
 			backing: .buffered,
 			defer: false
 		)
-		window.title = document.fileURL?.lastPathComponent ?? "Untitled"
+		window.title = document.fileURL?.lastPathComponent ?? L10n.string("Untitled")
 		window.isRestorable = true
 		window.contentView = splitView
 			super.init(window: window)

@@ -68,52 +68,52 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private func registerInitialCommands() {
 		do {
 			try commandRegistry.register([
-				Command(id: "file.new", title: "New File", defaultKey: "Cmd-N") { [weak self] in
+				Command(id: "file.new", title: L10n.string("New File"), defaultKey: "Cmd-N") { [weak self] in
 					self?.documentController.newDocument(nil)
 				},
-				Command(id: "file.open", title: "Open File", defaultKey: "Cmd-O") { [weak self] in
+				Command(id: "file.open", title: L10n.string("Open File"), defaultKey: "Cmd-O") { [weak self] in
 					self?.documentController.openDocument(nil)
 				},
-				Command(id: "file.openFolder", title: "Open Folder", defaultKey: "Cmd-Shift-O") { [weak self] in
+				Command(id: "file.openFolder", title: L10n.string("Open Folder"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.openFolder(nil)
 				},
-				Command(id: "file.save", title: "Save File", defaultKey: "Cmd-S") { [weak self] in
+				Command(id: "file.save", title: L10n.string("Save File"), defaultKey: "Cmd-S") { [weak self] in
 					self?.activeDocument()?.save(nil)
 				},
-				Command(id: "file.close", title: "Close File", defaultKey: "Cmd-W") { [weak self] in
+				Command(id: "file.close", title: L10n.string("Close File"), defaultKey: "Cmd-W") { [weak self] in
 					self?.closeCurrentDocument(nil)
 				},
-				Command(id: "view.commandPalette", title: "Command Palette", defaultKey: "Cmd-Shift-P") { [weak self] in
+				Command(id: "view.commandPalette", title: L10n.string("Command Palette"), defaultKey: "Cmd-Shift-P") { [weak self] in
 					self?.toggleCommandPalette(nil)
 				},
-				Command(id: "view.focusEditor", title: "Focus Editor", defaultKey: nil) { [weak self] in
+				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
-					Command(id: "edit.find", title: "Find", defaultKey: "Cmd-F") { [weak self] in
+					Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in
 						self?.toggleFindBar(nil)
 					},
-					Command(id: "edit.findNext", title: "Find Next", defaultKey: "Cmd-G") { [weak self] in
+					Command(id: "edit.findNext", title: L10n.string("Find Next"), defaultKey: "Cmd-G") { [weak self] in
 						self?.findNext(nil)
 					},
-					Command(id: "edit.findPrevious", title: "Find Previous", defaultKey: "Cmd-Shift-G") { [weak self] in
+					Command(id: "edit.findPrevious", title: L10n.string("Find Previous"), defaultKey: "Cmd-Shift-G") { [weak self] in
 						self?.findPrevious(nil)
 					},
-					Command(id: "edit.selectAllFindMatches", title: "Select All Find Matches", defaultKey: "Cmd-Ctrl-G") { [weak self] in
+					Command(id: "edit.selectAllFindMatches", title: L10n.string("Select All Find Matches"), defaultKey: "Cmd-Ctrl-G") { [weak self] in
 						self?.selectAllFindMatches(nil)
 					},
-					Command(id: "edit.findInProject", title: "Find in Project", defaultKey: "Cmd-Shift-F") { [weak self] in
+					Command(id: "edit.findInProject", title: L10n.string("Find in Project"), defaultKey: "Cmd-Shift-F") { [weak self] in
 						self?.showProjectFind(nil)
 					},
-					Command(id: "editor.moveLeft", title: "Move Left", defaultKey: "Left") { [weak self] in
+					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
 					},
-					Command(id: "editor.moveRight", title: "Move Right", defaultKey: "Right") { [weak self] in
+					Command(id: "editor.moveRight", title: L10n.string("Move Right"), defaultKey: "Right") { [weak self] in
 						self?.performEditorMotion(.charForward)
 					},
-				Command(id: "editor.moveLineStart", title: "Move Line Start", defaultKey: "Cmd-Left") { [weak self] in
+				Command(id: "editor.moveLineStart", title: L10n.string("Move Line Start"), defaultKey: "Cmd-Left") { [weak self] in
 					self?.performEditorMotion(.lineStart)
 				},
-				Command(id: "editor.moveLineEnd", title: "Move Line End", defaultKey: "Cmd-Right") { [weak self] in
+				Command(id: "editor.moveLineEnd", title: L10n.string("Move Line End"), defaultKey: "Cmd-Right") { [weak self] in
 					self?.performEditorMotion(.lineEnd)
 				},
 			])
@@ -220,48 +220,48 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
-		appMenu.addItem(withTitle: "Quit Pico", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+		appMenu.addItem(withTitle: L10n.string("Quit Pico"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 		appItem.submenu = appMenu
 
-		let fileMenu = NSMenu(title: "File")
-		let newItem = fileMenu.addItem(withTitle: "New", action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
+		let fileMenu = NSMenu(title: L10n.string("File"))
+		let newItem = fileMenu.addItem(withTitle: L10n.string("New"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
 		newItem.target = documentController
-		let newTabItem = fileMenu.addItem(withTitle: "New Tab", action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "t")
+		let newTabItem = fileMenu.addItem(withTitle: L10n.string("New Tab"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "t")
 		newTabItem.target = documentController
-		let openItem = fileMenu.addItem(withTitle: "Open...", action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
+		let openItem = fileMenu.addItem(withTitle: L10n.string("Open..."), action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
 		openItem.target = documentController
-		let openFolderItem = fileMenu.addItem(withTitle: "Open Folder...", action: #selector(openFolder(_:)), keyEquivalent: "O")
+		let openFolderItem = fileMenu.addItem(withTitle: L10n.string("Open Folder..."), action: #selector(openFolder(_:)), keyEquivalent: "O")
 		openFolderItem.target = self
-		let openRecentItem = fileMenu.addItem(withTitle: "Open Recent", action: nil, keyEquivalent: "")
-		let openRecentMenu = NSMenu(title: "Open Recent")
+		let openRecentItem = fileMenu.addItem(withTitle: L10n.string("Open Recent"), action: nil, keyEquivalent: "")
+		let openRecentMenu = NSMenu(title: L10n.string("Open Recent"))
 		openRecentMenu.delegate = self
 		self.openRecentMenu = openRecentMenu
 		fileMenu.setSubmenu(openRecentMenu, for: openRecentItem)
-		let closeItem = fileMenu.addItem(withTitle: "Close", action: #selector(closeCurrentDocument(_:)), keyEquivalent: "w")
+		let closeItem = fileMenu.addItem(withTitle: L10n.string("Close"), action: #selector(closeCurrentDocument(_:)), keyEquivalent: "w")
 		closeItem.target = self
 		fileMenu.addItem(.separator())
-		fileMenu.addItem(withTitle: "Save", action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
-		fileMenu.addItem(withTitle: "Save As...", action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
+		fileMenu.addItem(withTitle: L10n.string("Save"), action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
+		fileMenu.addItem(withTitle: L10n.string("Save As..."), action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
 		fileItem.submenu = fileMenu
 
-		let editMenu = NSMenu(title: "Edit")
-		let findItem = editMenu.addItem(withTitle: "Find", action: #selector(toggleFindBar(_:)), keyEquivalent: "f")
+		let editMenu = NSMenu(title: L10n.string("Edit"))
+		let findItem = editMenu.addItem(withTitle: L10n.string("Find"), action: #selector(toggleFindBar(_:)), keyEquivalent: "f")
 		findItem.target = self
-		let findNextItem = editMenu.addItem(withTitle: "Find Next", action: #selector(findNext(_:)), keyEquivalent: "g")
+		let findNextItem = editMenu.addItem(withTitle: L10n.string("Find Next"), action: #selector(findNext(_:)), keyEquivalent: "g")
 		findNextItem.target = self
-			let findPreviousItem = editMenu.addItem(withTitle: "Find Previous", action: #selector(findPrevious(_:)), keyEquivalent: "G")
+			let findPreviousItem = editMenu.addItem(withTitle: L10n.string("Find Previous"), action: #selector(findPrevious(_:)), keyEquivalent: "G")
 			findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
 			findPreviousItem.target = self
-			let selectAllFindMatchesItem = editMenu.addItem(withTitle: "Select All Find Matches", action: #selector(selectAllFindMatches(_:)), keyEquivalent: "g")
+			let selectAllFindMatchesItem = editMenu.addItem(withTitle: L10n.string("Select All Find Matches"), action: #selector(selectAllFindMatches(_:)), keyEquivalent: "g")
 			selectAllFindMatchesItem.keyEquivalentModifierMask = [.command, .control]
 			selectAllFindMatchesItem.target = self
-			let findInProjectItem = editMenu.addItem(withTitle: "Find in Project", action: #selector(showProjectFind(_:)), keyEquivalent: "F")
+			let findInProjectItem = editMenu.addItem(withTitle: L10n.string("Find in Project"), action: #selector(showProjectFind(_:)), keyEquivalent: "F")
 			findInProjectItem.keyEquivalentModifierMask = [.command, .shift]
 			findInProjectItem.target = self
 			editItem.submenu = editMenu
 
-		let commandMenu = NSMenu(title: "Command")
-		let paletteItem = commandMenu.addItem(withTitle: "Command Palette", action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
+		let commandMenu = NSMenu(title: L10n.string("Command"))
+		let paletteItem = commandMenu.addItem(withTitle: L10n.string("Command Palette"), action: #selector(toggleCommandPalette(_:)), keyEquivalent: "P")
 		paletteItem.keyEquivalentModifierMask = [.command, .shift]
 		paletteItem.target = self
 		commandItem.submenu = commandMenu
@@ -284,7 +284,7 @@ extension AppDelegate: NSMenuDelegate {
 		if !urls.isEmpty {
 			menu.addItem(.separator())
 		}
-		let clearItem = menu.addItem(withTitle: "Clear Menu", action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
+		let clearItem = menu.addItem(withTitle: L10n.string("Clear Menu"), action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
 		clearItem.target = documentController
 		clearItem.isEnabled = !urls.isEmpty
 	}

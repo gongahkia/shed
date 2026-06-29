@@ -16,9 +16,9 @@ final class FindBarView: NSView {
 	var onFindPrevious: (() -> Void)?
 	private let queryField = FindBarTextField(frame: .zero)
 	private let replaceField = FindBarTextField(frame: .zero)
-	private let regexButton = NSButton(checkboxWithTitle: "Regex", target: nil, action: nil)
-	private let caseButton = NSButton(checkboxWithTitle: "Case", target: nil, action: nil)
-	private let wholeWordButton = NSButton(checkboxWithTitle: "Word", target: nil, action: nil)
+	private let regexButton = NSButton(checkboxWithTitle: L10n.string("Regex"), target: nil, action: nil)
+	private let caseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
+	private let wholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -62,8 +62,8 @@ final class FindBarView: NSView {
 		layer?.borderWidth = 1
 		layer?.borderColor = NSColor.separatorColor.cgColor
 
-		queryField.placeholderString = "Find"
-		replaceField.placeholderString = "Replace"
+		queryField.placeholderString = L10n.string("Find")
+		replaceField.placeholderString = L10n.string("Replace")
 		for field in [queryField, replaceField] {
 			field.font = .systemFont(ofSize: 12)
 			field.onCancel = { [weak self] in self?.onDismiss?() }
@@ -78,10 +78,10 @@ final class FindBarView: NSView {
 			button.setContentCompressionResistancePriority(.required, for: .horizontal)
 		}
 
-		let closeButton = NSButton(title: "X", target: self, action: #selector(close(_:)))
+		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(close(_:)))
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11)
-		closeButton.toolTip = "Close"
+		closeButton.toolTip = L10n.string("Close")
 		closeButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
 		let stack = NSStackView()

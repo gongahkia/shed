@@ -100,10 +100,10 @@ final class TabBarView: NSView {
 		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		selectButton.toolTip = tab.title
 
-		let closeButton = TabActionButton(title: "X", tabID: tab.id, target: self, action: #selector(closeTab(_:)))
+		let closeButton = TabActionButton(title: L10n.string("X"), tabID: tab.id, target: self, action: #selector(closeTab(_:)))
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
-		closeButton.toolTip = "Close"
+		closeButton.toolTip = L10n.string("Close")
 
 		stack.addArrangedSubview(selectButton)
 		stack.addArrangedSubview(closeButton)

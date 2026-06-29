@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookUI
 
 final class FileTreeNode: NSObject {
 	let url: URL
@@ -47,7 +48,8 @@ final class FileTreeNode: NSObject {
 
 final class FileTreeSidebarView: NSView {
 	var onOpenFile: ((URL) -> Void)?
-	private let outlineView = NSOutlineView()
+	var onPreviewFile: ((URL) -> Void)?
+	private let outlineView = FileTreeOutlineView()
 	private let scrollView = NSScrollView()
 	private var rootNode: FileTreeNode?
 
@@ -83,6 +85,9 @@ final class FileTreeSidebarView: NSView {
 		outlineView.delegate = self
 		outlineView.target = self
 		outlineView.doubleAction = #selector(doubleClick(_:))
+		outlineView.onPreview = { [weak self] in
+			self?.previewSelection()
+		}
 		outlineView.rowSizeStyle = .small
 		outlineView.usesAlternatingRowBackgroundColors = false
 
@@ -113,6 +118,53 @@ final class FileTreeSidebarView: NSView {
 			return
 		}
 		onOpenFile?(node.url)
+	}
+
+	private func previewSelection() {
+		let row = outlineView.selectedRow
+		guard row >= 0,
+		      let node = outlineView.item(atRow: row) as? FileTreeNode,
+		      !node.isDirectory
+		else {
+			return
+		}
+		onPreviewFile?(node.url)
+	}
+}
+
+private final class FileTreeOutlineView: NSOutlineView {
+	var onPreview: (() -> Void)?
+
+	override func keyDown(with event: NSEvent) {
+		if event.keyCode == 49 {
+			onPreview?()
+			return
+		}
+		super.keyDown(with: event)
+	}
+}
+
+private final class ItsyQuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
+	static let shared = ItsyQuickLookController()
+	private var previewURL: URL?
+
+	func preview(_ url: URL) {
+		previewURL = url
+		guard let panel = QLPreviewPanel.shared() else {
+			return
+		}
+		panel.dataSource = self
+		panel.delegate = self
+		panel.reloadData()
+		panel.makeKeyAndOrderFront(nil)
+	}
+
+	func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
+		previewURL == nil ? 0 : 1
+	}
+
+	func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
+		previewURL as NSURL?
 	}
 }
 
@@ -184,6 +236,9 @@ final class ItsyWorkspaceController {
 		sidebars.add(sidebar)
 		sidebar.onOpenFile = { [weak self] url in
 			self?.documentController?.openDocument(at: url)
+		}
+		sidebar.onPreviewFile = { url in
+			ItsyQuickLookController.shared.preview(url)
 		}
 		sidebar.setRootURL(rootURL)
 	}

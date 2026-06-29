@@ -46,6 +46,43 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 	<true/>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSUserActivityTypes</key>
+	<array>
+		<string>dev.itsy.editor.open-file</string>
+	</array>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Open Selection in Itsy</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>openSelection</string>
+			<key>NSPortName</key>
+			<string>Itsy</string>
+			<key>NSSendTypes</key>
+			<array>
+				<string>NSStringPboardType</string>
+			</array>
+		</dict>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Open File in Itsy</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>openFile</string>
+			<key>NSPortName</key>
+			<string>Itsy</string>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>public.data</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
 PLIST

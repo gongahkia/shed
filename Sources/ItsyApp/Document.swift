@@ -91,11 +91,16 @@ final class ItsyDocumentController: NSDocumentController {
 }
 
 final class ItsyDocument: NSDocument {
+	static let handoffActivityType = "dev.itsy.editor.open-file"
+	static let handoffURLKey = "url"
+	static let handoffCursorOffsetKey = "cursorOffset"
+
 	var editor = Editor()
 	private var editorViews: [MetalTextView] = []
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?
 	private var syntaxTree: Tree?
+	private var handoffActivity: NSUserActivity?
 	private var syntaxHighlightSpans: [HighlightSpan] = []
 	private let fileWatcherQueue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
 	private var fileWatchSource: DispatchSourceFileSystemObject?
@@ -104,6 +109,7 @@ final class ItsyDocument: NSDocument {
 	override var fileURL: URL? {
 		didSet {
 			configureSyntaxPipeline()
+			updateHandoffActivity()
 			restartFileWatcher()
 		}
 	}
@@ -117,6 +123,10 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override class var autosavesInPlace: Bool {
+		true
+	}
+
+	override class var preservesVersions: Bool {
 		true
 	}
 
@@ -135,6 +145,7 @@ final class ItsyDocument: NSDocument {
 		}
 		configureSyntaxPipeline()
 		refreshSyntaxHighlights()
+		updateHandoffActivity()
 		restartFileWatcher()
 	}
 
@@ -162,6 +173,7 @@ final class ItsyDocument: NSDocument {
 			let edits = editor.lastEditBatch
 			self.editor = editor
 			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			self.updateHandoffActivity()
 			self.syncSiblingEditorViews(source: view, editor: editor)
 			self.updateChangeCount(.changeDone)
 		}
@@ -172,6 +184,7 @@ final class ItsyDocument: NSDocument {
 			self?.close()
 		}
 		restartFileWatcher()
+		updateHandoffActivity()
 	}
 
 	func detach(_ view: MetalTextView) {
@@ -181,6 +194,35 @@ final class ItsyDocument: NSDocument {
 	func reloadSyntaxTheme() {
 		syntaxTheme = nil
 		refreshSyntaxHighlights()
+	}
+
+	func restoreHandoffCursorOffset(_ offset: Int) {
+		let clamped = min(max(offset, 0), editor.rope.length)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: clamped, head: clamped)))
+		for view in editorViews {
+			view.editor = editor
+		}
+		updateHandoffActivity()
+	}
+
+	private func updateHandoffActivity() {
+		guard let url = fileURL else {
+			handoffActivity?.invalidate()
+			handoffActivity = nil
+			return
+		}
+		let activity = handoffActivity ?? NSUserActivity(activityType: Self.handoffActivityType)
+		activity.title = displayName
+		activity.isEligibleForHandoff = true
+		activity.userInfo = [
+			Self.handoffURLKey: url.absoluteString,
+			Self.handoffCursorOffsetKey: editor.selections.primary.head,
+		]
+		activity.becomeCurrent()
+		handoffActivity = activity
+		for controller in windowControllers {
+			controller.window?.userActivity = activity
+		}
 	}
 
 	private func syncSiblingEditorViews(source: MetalTextView, editor: Editor) {

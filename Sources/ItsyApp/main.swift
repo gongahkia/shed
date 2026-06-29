@@ -27,6 +27,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private var commandRegistry = CommandRegistry()
 	private weak var openRecentMenu: NSMenu?
+	private lazy var servicesProvider = ItsyServicesProvider { [weak self] url in
+		self?.documentController.openDocument(at: url) ?? false
+	}
 	private lazy var commandPalette = CommandPaletteController(registry: commandRegistry)
 	private lazy var settingsWindow = ThemeSettingsWindowController { [weak self] in
 		self?.reloadSyntaxThemes()
@@ -60,6 +63,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
 		recordBenchStage("app_did_finish_launching")
+		installServicesProvider()
 		installMainMenu()
 		recordBenchStage("main_menu_installed")
 		openInitialDocument()
@@ -70,6 +74,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	func application(_ sender: NSApplication, openFile filename: String) -> Bool {
 		openPath(URL(fileURLWithPath: filename))
+	}
+
+	func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([NSUserActivityRestoring]) -> Void) -> Bool {
+		guard userActivity.activityType == ItsyDocument.handoffActivityType,
+		      let value = userActivity.userInfo?[ItsyDocument.handoffURLKey] as? String,
+		      let url = URL(string: value)
+		else {
+			return false
+		}
+		guard documentController.openDocument(at: url),
+		      let document = documentController.document(for: url) as? ItsyDocument
+		else {
+			return false
+		}
+		if let offset = userActivity.userInfo?[ItsyDocument.handoffCursorOffsetKey] as? Int {
+			document.restoreHandoffCursorOffset(offset)
+		}
+		return true
 	}
 
 	@objc private func closeCurrentDocument(_ sender: Any?) {
@@ -248,6 +270,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		return true
 	}
 
+	private func installServicesProvider() {
+		NSApp.servicesProvider = servicesProvider
+		NSRegisterServicesProvider(servicesProvider, "Itsy")
+		NSUpdateDynamicServices()
+	}
+
 	private func installMainMenu() {
 		let mainMenu = NSMenu()
 		let appItem = NSMenuItem()
@@ -309,6 +337,46 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		paletteItem.target = self
 		commandItem.submenu = commandMenu
 		NSApp.mainMenu = mainMenu
+	}
+}
+
+private final class ItsyServicesProvider: NSObject {
+	private let openURL: (URL) -> Bool
+
+	init(openURL: @escaping (URL) -> Bool) {
+		self.openURL = openURL
+	}
+
+	@objc func openSelection(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {
+		guard let text = pasteboard.string(forType: .string), !text.isEmpty else {
+			serviceError.pointee = L10n.string("No text selection was provided") as NSString
+			return
+		}
+		do {
+			let url = FileManager.default.temporaryDirectory.appendingPathComponent("Itsy-Service-\(UUID().uuidString).txt")
+			try text.write(to: url, atomically: true, encoding: .utf8)
+			if !openURL(url) {
+				serviceError.pointee = L10n.string("Itsy could not open the service text") as NSString
+			}
+		} catch {
+			self.error(serviceError, "Itsy could not create the service file")
+		}
+	}
+
+	@objc func openFile(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {
+		let urls = (pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
+		guard !urls.isEmpty else {
+			serviceError.pointee = L10n.string("No file was provided") as NSString
+			return
+		}
+		for url in urls where !openURL(url) {
+			serviceError.pointee = L10n.string("Itsy could not open \(url.lastPathComponent)") as NSString
+			return
+		}
+	}
+
+	private func error(_ pointer: AutoreleasingUnsafeMutablePointer<NSString?>, _ message: String.LocalizationValue) {
+		pointer.pointee = L10n.string(message) as NSString
 	}
 }
 

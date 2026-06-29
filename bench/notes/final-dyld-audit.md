@@ -61,3 +61,21 @@
 - SwiftPM library products are now explicitly `.static` so release builds cannot accidentally flip these modules into dylib products.
 - Mergeable-library Xcode settings are not applied because this repo is SwiftPM-only and has no Xcode project build setting surface.
 - Static rebase fixups after explicit static products: `3759`; no change, confirming internal dynamic-library loading was not a current contributor.
+
+## Current failure breakdown
+
+After the native integration, memory, and release-pipeline changes, `bench/scripts/dyld_audit.sh` reports `3859` static rebase fixups. Target remains `<2000`; result remains fail.
+
+Current section distribution:
+
+- `1753` `__DATA/__objc_const`
+- `877` `__DATA/__objc_selrefs`
+- `812` `__DATA_CONST/__const`
+- `187` `__DATA/__objc_data`
+- `105` `__DATA/__data`
+- `43` `__DATA_CONST/__got`
+- `36` `__DATA_CONST/__objc_classlist`
+- `23` `__DATA_CONST/__objc_protolist`
+- `23` `__DATA/__objc_protorefs`
+
+[Inference] Remaining rebase work is now dominated by AppKit/ObjC-facing classes and selectors, not statically linked grammar tables. Further reduction requires shrinking the AppKit subclass/controller surface or splitting non-launch UI out of the launch binary; converting additional pure Swift structs/classes is unlikely to close the full gap alone.

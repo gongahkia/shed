@@ -48,6 +48,9 @@ fi
 
 if (( rebase_count >= threshold )); then
 	echo "dyld rebase fixups $rebase_count >= limit $threshold ($source_label)" >&2
+	if [[ "$source_label" == "static dyld_info fallback" ]]; then
+		dyld_info -fixups "$binary" | awk '/rebase/ && $1 ~ /^__/ { key=$1 "," $2; count[key]++ } END { for (key in count) print count[key], key }' | sort -nr >&2 || true
+	fi
 	exit 1
 fi
 

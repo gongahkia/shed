@@ -260,3 +260,10 @@ Current section distribution:
 - Static rebase fixups after project-find view cleanup: `2356`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `12` to `11`.
 - Section deltas: `__DATA,__objc_const` dropped from `874` to `857`; `__DATA_CONST,__const` dropped from `703` to `702`; `__DATA,__objc_data` dropped from `72` to `64`; `__DATA,__data` dropped from `46` to `45`.
+
+## Command palette view cleanup
+
+- Folded `CommandPaletteView` state/layout/table delegates into the existing `AppDelegate`.
+- Static rebase fixups after command-palette view cleanup: `2329`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `11` to `10`.
+- Section deltas: `__DATA,__objc_const` dropped from `857` to `840`; `__DATA_CONST,__const` dropped from `702` to `701`; `__DATA,__objc_data` dropped from `64` to `56`; `__DATA,__data` dropped from `45` to `44`; `__DATA,__objc_selrefs` rose from `655` to `656`.

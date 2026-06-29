@@ -29,8 +29,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandRegistry = makeCommandRegistry()
 	private var commandPalettePanel: NSPanel?
-	private var commandPaletteContentView: CommandPaletteView?
+	private var commandPaletteInputField: ItsyActionTextField?
+	private var commandPaletteTableView: NSTableView?
 	private var commandPaletteCancelHandler: (() -> Void)?
+	private var commandPaletteRunText: ((String) -> Void)?
+	private var commandPaletteItems: [Command] = []
+	private var commandPaletteFilteredItems: [Command] = []
+	private var commandPaletteAcceptsRawText = false
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsStatusLabel: NSTextField?
@@ -125,35 +130,36 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func closeCommandPalette() {
 		commandPaletteCancelHandler = nil
+		commandPaletteRunText = nil
 		commandPalettePanel?.close()
 	}
 
 	private func showExCommand(relativeTo hostWindow: NSWindow?, completion: @escaping (String?) -> Void) {
 		let panel = makeCommandPalettePanelIfNeeded()
 		commandPaletteCancelHandler = { completion(nil) }
-		commandPaletteContentView?.onCancel = { [weak self] in self?.cancelCommandPalette() }
-		commandPaletteContentView?.onRunText = { [weak self] text in
+		commandPaletteRunText = { [weak self] text in
 			self?.commandPaletteCancelHandler = nil
 			self?.commandPalettePanel?.close()
 			completion(text)
 		}
-		commandPaletteContentView?.setCommandLine(":")
+		commandPaletteInputField?.onCancel = { [weak self] in self?.cancelCommandPalette() }
+		setCommandPaletteCommandLine(":")
 		centerCommandPalette(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
-		commandPaletteContentView?.focusInput()
+		focusCommandPaletteInput()
 	}
 
 	private func showCommandPalette(relativeTo hostWindow: NSWindow?) {
 		let panel = makeCommandPalettePanelIfNeeded()
 		commandPaletteCancelHandler = nil
-		commandPaletteContentView?.onCancel = { [weak self] in self?.closeCommandPalette() }
-		commandPaletteContentView?.onRunText = nil
-		commandPaletteContentView?.setItems(commandRegistry.commands)
+		commandPaletteRunText = nil
+		commandPaletteInputField?.onCancel = { [weak self] in self?.closeCommandPalette() }
+		setCommandPaletteItems(commandRegistry.commands)
 		centerCommandPalette(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
-		commandPaletteContentView?.focusInput()
+		focusCommandPaletteInput()
 	}
 
 	private func makeCommandPalettePanelIfNeeded() -> NSPanel {
@@ -167,12 +173,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			backing: .buffered,
 			defer: false
 		)
-		let contentView = CommandPaletteView(frame: NSRect(origin: .zero, size: size))
-		contentView.onCancel = { [weak self] in self?.closeCommandPalette() }
-		contentView.onRun = { [weak self] item in
-			self?.closeCommandPalette()
-			item.run()
-		}
+		let contentView = NSView(frame: NSRect(origin: .zero, size: size))
+		configureCommandPaletteView(contentView)
 		panel.contentView = contentView
 		panel.title = L10n.string("Command Palette")
 		panel.titleVisibility = .hidden
@@ -182,8 +184,60 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.level = .floating
 		panel.delegate = self
 		commandPalettePanel = panel
-		commandPaletteContentView = contentView
 		return panel
+	}
+
+	private func configureCommandPaletteView(_ contentView: NSView) {
+		contentView.wantsLayer = true
+		contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		contentView.layer?.cornerRadius = 8
+		contentView.layer?.borderWidth = 1
+		contentView.layer?.borderColor = NSColor.separatorColor.cgColor
+
+		let inputField = ItsyActionTextField(frame: .zero)
+		inputField.placeholderString = L10n.string("Command")
+		inputField.font = .systemFont(ofSize: 18)
+		inputField.isBordered = false
+		inputField.focusRingType = .none
+		inputField.backgroundColor = .clear
+		inputField.translatesAutoresizingMaskIntoConstraints = false
+		inputField.onConfirm = { [weak self] in self?.runCommandPaletteSelection() }
+		inputField.onMoveSelection = { [weak self] delta in self?.moveCommandPaletteSelection(delta) }
+		inputField.delegate = self
+		contentView.addSubview(inputField)
+
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("command"))
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowHeight = 30
+		tableView.intercellSpacing = NSSize(width: 0, height: 0)
+		tableView.usesAlternatingRowBackgroundColors = false
+		tableView.dataSource = self
+		tableView.delegate = self
+		tableView.target = self
+		tableView.doubleAction = #selector(runCommandPaletteTableSelection(_:))
+
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(scrollView)
+
+		NSLayoutConstraint.activate([
+			inputField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 18),
+			inputField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -18),
+			inputField.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 14),
+			inputField.heightAnchor.constraint(equalToConstant: 32),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+			scrollView.topAnchor.constraint(equalTo: inputField.bottomAnchor, constant: 10),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+		])
+		commandPaletteInputField = inputField
+		commandPaletteTableView = tableView
 	}
 
 	private func centerCommandPalette(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -204,6 +258,69 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		commandPaletteCancelHandler = nil
 		commandPalettePanel?.close()
 		handler?()
+	}
+
+	private func setCommandPaletteItems(_ items: [Command]) {
+		commandPaletteAcceptsRawText = false
+		commandPaletteItems = items
+		commandPaletteInputField?.stringValue = ""
+		commandPaletteInputField?.placeholderString = L10n.string("Command")
+		commandPaletteTableView?.enclosingScrollView?.isHidden = false
+		filterCommandPaletteItems()
+	}
+
+	private func setCommandPaletteCommandLine(_ value: String) {
+		commandPaletteAcceptsRawText = true
+		commandPaletteItems = []
+		commandPaletteFilteredItems = []
+		commandPaletteInputField?.placeholderString = ""
+		commandPaletteInputField?.stringValue = value
+		commandPaletteTableView?.enclosingScrollView?.isHidden = true
+		commandPaletteTableView?.reloadData()
+	}
+
+	private func focusCommandPaletteInput() {
+		commandPalettePanel?.makeFirstResponder(commandPaletteInputField)
+		commandPaletteInputField?.currentEditor()?.selectedRange = NSRange(location: commandPaletteInputField?.stringValue.count ?? 0, length: 0)
+	}
+
+	private func filterCommandPaletteItems() {
+		guard !commandPaletteAcceptsRawText else {
+			return
+		}
+		let query = commandPaletteInputField?.stringValue.lowercased() ?? ""
+		commandPaletteFilteredItems = FuzzyMatcher.ranked(commandPaletteItems, query: query, includeUnmatched: false, by: \.title)
+		commandPaletteTableView?.reloadData()
+		if !commandPaletteFilteredItems.isEmpty {
+			commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	private func moveCommandPaletteSelection(_ delta: Int) {
+		guard !commandPaletteAcceptsRawText, !commandPaletteFilteredItems.isEmpty, let tableView = commandPaletteTableView else {
+			return
+		}
+		let current = tableView.selectedRow >= 0 ? tableView.selectedRow : 0
+		let next = min(max(current + delta, 0), commandPaletteFilteredItems.count - 1)
+		tableView.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
+		tableView.scrollRowToVisible(next)
+	}
+
+	private func runCommandPaletteSelection() {
+		if commandPaletteAcceptsRawText {
+			commandPaletteRunText?(commandPaletteInputField?.stringValue ?? "")
+			return
+		}
+		guard let tableView = commandPaletteTableView, tableView.selectedRow >= 0, tableView.selectedRow < commandPaletteFilteredItems.count else {
+			return
+		}
+		let item = commandPaletteFilteredItems[tableView.selectedRow]
+		closeCommandPalette()
+		item.run()
+	}
+
+	@objc private func runCommandPaletteTableSelection(_ sender: Any?) {
+		runCommandPaletteSelection()
 	}
 
 	private func makeCommandRegistry() -> CommandRegistry {
@@ -771,17 +888,47 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 	}
 
 	func controlTextDidChange(_ notification: Notification) {
-		guard let field = notification.object as? NSTextField, field === projectFindInputField else {
+		guard let field = notification.object as? NSTextField else {
 			return
 		}
-		searchProjectFind(query: field.stringValue)
+		if field === projectFindInputField {
+			searchProjectFind(query: field.stringValue)
+		} else if field === commandPaletteInputField {
+			filterCommandPaletteItems()
+		}
 	}
 
 	func numberOfRows(in tableView: NSTableView) -> Int {
-		tableView === projectFindTableView ? projectFindMatches.count : 0
+		if tableView === projectFindTableView {
+			return projectFindMatches.count
+		}
+		if tableView === commandPaletteTableView {
+			return commandPaletteFilteredItems.count
+		}
+		return 0
 	}
 
 	func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+		if tableView === commandPaletteTableView {
+			let identifier = NSUserInterfaceItemIdentifier("CommandPaletteCell")
+			let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+			cell.identifier = identifier
+			let textField = cell.textField ?? NSTextField(labelWithString: "")
+			textField.font = .systemFont(ofSize: 13)
+			textField.lineBreakMode = .byTruncatingTail
+			textField.stringValue = commandPaletteFilteredItems[row].title
+			if textField.superview == nil {
+				textField.translatesAutoresizingMaskIntoConstraints = false
+				cell.addSubview(textField)
+				NSLayoutConstraint.activate([
+					textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 12),
+					textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
+					textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				])
+				cell.textField = textField
+			}
+			return cell
+		}
 		guard tableView === projectFindTableView else {
 			return nil
 		}

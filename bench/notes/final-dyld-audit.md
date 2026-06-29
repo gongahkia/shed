@@ -232,3 +232,10 @@ Current section distribution:
 - Static rebase fixups after settings-controller cleanup: `2416`; target remains `<2000`; result remains fail.
 - Static `__DATA_CONST,__objc_classlist` entries dropped from `15` to `14`.
 - Section deltas: `__DATA,__objc_const` dropped from `896` to `892`; `__DATA,__objc_data` dropped from `94` to `87`; `__DATA,__data` dropped from `49` to `48`.
+
+## Tab bar subclass cleanup
+
+- Folded `TabBarView` state/layout into the existing `EditorWindowController`; the tab coordinator now tracks window controllers directly.
+- Static rebase fixups after tab-bar subclass cleanup: `2406`; target remains `<2000`; result remains fail.
+- Static `__DATA_CONST,__objc_classlist` entries dropped from `14` to `13`.
+- Section deltas: `__DATA,__objc_const` dropped from `892` to `885`; `__DATA,__objc_data` dropped from `87` to `80`; `__DATA,__data` dropped from `48` to `47`; `__DATA_CONST,__const` rose from `701` to `704`; `__DATA,__objc_selrefs` rose from `652` to `655`.

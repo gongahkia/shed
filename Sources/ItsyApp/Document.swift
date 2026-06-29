@@ -585,12 +585,16 @@ struct EditorPaneCoordinator {
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
-	private let tabBarView = TabBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
+	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
+	private let tabScrollView = NSScrollView()
+	private let tabStackView = NSStackView()
 	private let findBarView = FindBarView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
+	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
+	private var tabBoundsObserver: NSObjectProtocol?
 	private var findMatches: [Range<Int>] = []
 	private var selectedFindMatchIndex: Int?
 	private var incrementalFindDirection: Int?
@@ -602,6 +606,7 @@ final class EditorWindowController: NSWindowController {
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
+		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
@@ -640,12 +645,13 @@ final class EditorWindowController: NSWindowController {
 		window.title = document.fileURL?.lastPathComponent ?? L10n.string("Untitled")
 		window.isRestorable = true
 		window.contentView = splitView
-			super.init(window: window)
-			window.delegate = self
-			installPane(paneCoordinator.activePane, document: document)
-			findBarView.onDismiss = { [weak self] in
-				self?.setFindBarVisible(false)
-			}
+		super.init(window: window)
+		installTabBoundsObserver()
+		window.delegate = self
+		installPane(paneCoordinator.activePane, document: document)
+		findBarView.onDismiss = { [weak self] in
+			self?.setFindBarVisible(false)
+		}
 		findBarView.onStateChange = { [weak self] _ in
 			self?.findStateDidChange()
 		}
@@ -656,12 +662,133 @@ final class EditorWindowController: NSWindowController {
 			self?.selectFindMatchFromFindBar(direction: -1)
 		}
 		ItsyWorkspaceController.register(fileTreeView)
-		ItsyTabCoordinator.register(tabBarView)
+		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
 	}
 
 	required init?(coder: NSCoder) {
 		nil
+	}
+
+	deinit {
+		if let tabBoundsObserver {
+			NotificationCenter.default.removeObserver(tabBoundsObserver)
+		}
+	}
+
+	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) {
+		tabBarView.wantsLayer = true
+		tabBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		scrollView.drawsBackground = false
+		scrollView.borderType = .noBorder
+		scrollView.hasHorizontalScroller = true
+		scrollView.hasVerticalScroller = false
+		scrollView.autohidesScrollers = true
+		scrollView.scrollerStyle = .overlay
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.contentView.postsBoundsChangedNotifications = true
+		stackView.orientation = .horizontal
+		stackView.alignment = .centerY
+		stackView.spacing = 2
+		stackView.edgeInsets = NSEdgeInsets(top: 3, left: 6, bottom: 3, right: 6)
+		scrollView.documentView = stackView
+		tabBarView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			scrollView.leadingAnchor.constraint(equalTo: tabBarView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: tabBarView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: tabBarView.topAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: tabBarView.bottomAnchor),
+			tabBarView.heightAnchor.constraint(equalToConstant: 32),
+		])
+	}
+
+	private func installTabBoundsObserver() {
+		tabBoundsObserver = NotificationCenter.default.addObserver(
+			forName: NSView.boundsDidChangeNotification,
+			object: tabScrollView.contentView,
+			queue: nil
+		) { [weak self] _ in
+			self?.layoutTabContent()
+		}
+	}
+
+	func setTabs(_ tabs: [ItsyTab]) {
+		for view in tabStackView.arrangedSubviews {
+			tabStackView.removeArrangedSubview(view)
+			view.removeFromSuperview()
+		}
+		tabIDsByTag = Dictionary(uniqueKeysWithValues: tabs.enumerated().map { index, tab in (index, tab.id) })
+		for (index, tab) in tabs.enumerated() {
+			tabStackView.addArrangedSubview(makeTabView(tab, tag: index))
+		}
+		layoutTabContent()
+	}
+
+	private func layoutTabContent() {
+		tabStackView.layoutSubtreeIfNeeded()
+		let fit = tabStackView.fittingSize
+		let height = max(tabBarView.bounds.height, 32)
+		let width = max(tabScrollView.contentView.bounds.width, fit.width)
+		tabStackView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+		tabScrollView.documentView = tabStackView
+	}
+
+	private func makeTabView(_ tab: ItsyTab, tag: Int) -> NSView {
+		let container = NSView()
+		container.wantsLayer = true
+		container.layer?.backgroundColor = tab.isSelected
+			? NSColor.selectedControlColor.withAlphaComponent(0.24).cgColor
+			: NSColor.clear.cgColor
+
+		let stack = NSStackView()
+		stack.orientation = .horizontal
+		stack.alignment = .centerY
+		stack.spacing = 4
+		stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 6)
+		stack.translatesAutoresizingMaskIntoConstraints = false
+		container.addSubview(stack)
+
+		let title = tab.isDirty ? "• \(tab.title)" : tab.title
+		let selectButton = NSButton(title: title, target: self, action: #selector(selectTab(_:)))
+		selectButton.tag = tag
+		selectButton.isBordered = false
+		selectButton.font = .systemFont(ofSize: 12, weight: tab.isSelected ? .semibold : .regular)
+		selectButton.lineBreakMode = .byTruncatingMiddle
+		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+		selectButton.toolTip = tab.title
+
+		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
+		closeButton.tag = tag
+		closeButton.isBordered = false
+		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
+		closeButton.toolTip = L10n.string("Close")
+
+		stack.addArrangedSubview(selectButton)
+		stack.addArrangedSubview(closeButton)
+		NSLayoutConstraint.activate([
+			stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			stack.topAnchor.constraint(equalTo: container.topAnchor),
+			stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			container.heightAnchor.constraint(equalToConstant: 26),
+			container.widthAnchor.constraint(greaterThanOrEqualToConstant: 96),
+			container.widthAnchor.constraint(lessThanOrEqualToConstant: 220),
+		])
+		return container
+	}
+
+	@objc private func selectTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		ItsyTabCoordinator.selectDocument(tabID)
+	}
+
+	@objc private func closeTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		ItsyTabCoordinator.closeDocument(tabID)
 	}
 
 	override func windowDidLoad() {

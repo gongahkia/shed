@@ -105,7 +105,7 @@ public enum KeymapResult: Sendable, Equatable {
 	case consumed
 }
 
-public final class KeymapEngine {
+public struct KeymapEngine: Sendable {
 	public var modeStack: [Mode]
 	public private(set) var pendingChord: [Key] = []
 	public private(set) var pendingCount: Int?
@@ -122,7 +122,7 @@ public final class KeymapEngine {
 		modeStack.last ?? .insert
 	}
 
-	public func setBindings(_ bindings: [KeyBinding]) {
+	public mutating func setBindings(_ bindings: [KeyBinding]) {
 		bindingsByMode = [:]
 		for binding in bindings where !binding.chord.isEmpty {
 			bindingsByMode[binding.mode, default: [:]][binding.chord] = binding.commandID
@@ -133,14 +133,14 @@ public final class KeymapEngine {
 		awaitingUniversalArgument = false
 	}
 
-	public func setMode(_ mode: Mode) {
+	public mutating func setMode(_ mode: Mode) {
 		modeStack = [mode]
 		pendingChord = []
 		pendingCount = nil
 		awaitingUniversalArgument = false
 	}
 
-	public func pushMode(_ mode: Mode) {
+	public mutating func pushMode(_ mode: Mode) {
 		modeStack.append(mode)
 		pendingChord = []
 		pendingCount = nil
@@ -148,7 +148,7 @@ public final class KeymapEngine {
 	}
 
 	@discardableResult
-	public func popMode() -> Mode? {
+	public mutating func popMode() -> Mode? {
 		guard modeStack.count > 1 else {
 			return nil
 		}
@@ -158,7 +158,7 @@ public final class KeymapEngine {
 		return modeStack.popLast()
 	}
 
-	public func handle(_ event: NSEvent) -> KeymapResult {
+	public mutating func handle(_ event: NSEvent) -> KeymapResult {
 		guard let key = Key(event: event) else {
 			pendingChord = []
 			return .passthrough
@@ -178,7 +178,7 @@ public final class KeymapEngine {
 		return resolve(key)
 	}
 
-	private func resolve(_ key: Key) -> KeymapResult {
+	private mutating func resolve(_ key: Key) -> KeymapResult {
 		let bindings = bindingsByMode[mode] ?? [:]
 		let chord = pendingChord + [key]
 		if hasPrefix(chord, in: bindings) {
@@ -202,7 +202,7 @@ public final class KeymapEngine {
 		return .passthrough
 	}
 
-	private func consumeCountPrefix(_ key: Key) -> Bool {
+	private mutating func consumeCountPrefix(_ key: Key) -> Bool {
 		guard (mode == .normal || mode == .operatorPending), pendingChord.isEmpty, key.modifiers.isEmpty, key.value.count == 1, let digit = Int(key.value) else {
 			return false
 		}
@@ -213,7 +213,7 @@ public final class KeymapEngine {
 		return true
 	}
 
-	private func consumeUniversalArgumentPrefix(_ key: Key) -> Bool {
+	private mutating func consumeUniversalArgumentPrefix(_ key: Key) -> Bool {
 		guard mode == .emacs, pendingChord.isEmpty else {
 			return false
 		}

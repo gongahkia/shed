@@ -17,7 +17,7 @@ public enum CommandRegistryError: Error, Equatable {
 	case missingID(String)
 }
 
-public final class CommandRegistry {
+public struct CommandRegistry {
 	private var orderedCommands: [Command] = []
 	private var commandsByID: [String: Command] = [:]
 
@@ -27,7 +27,7 @@ public final class CommandRegistry {
 		orderedCommands
 	}
 
-	public func register(_ command: Command) throws {
+	public mutating func register(_ command: Command) throws {
 		guard commandsByID[command.id] == nil else {
 			throw CommandRegistryError.duplicateID(command.id)
 		}
@@ -35,7 +35,7 @@ public final class CommandRegistry {
 		commandsByID[command.id] = command
 	}
 
-	public func register(_ commands: [Command]) throws {
+	public mutating func register(_ commands: [Command]) throws {
 		for command in commands {
 			try register(command)
 		}

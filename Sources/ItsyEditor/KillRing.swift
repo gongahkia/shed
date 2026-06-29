@@ -1,4 +1,4 @@
-public final class KillRing {
+public struct KillRing: Sendable {
 	public let capacity: Int
 	private var entries: [String] = []
 	private var currentIndex = 0
@@ -14,7 +14,7 @@ public final class KillRing {
 		return entries[currentIndex]
 	}
 
-	public func push(_ text: String) {
+	public mutating func push(_ text: String) {
 		guard !text.isEmpty else {
 			return
 		}
@@ -26,7 +26,7 @@ public final class KillRing {
 		currentIndex = 0
 	}
 
-	public func rotate() -> String? {
+	public mutating func rotate() -> String? {
 		guard !entries.isEmpty else {
 			return nil
 		}

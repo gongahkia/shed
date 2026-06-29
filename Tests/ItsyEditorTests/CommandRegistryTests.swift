@@ -2,7 +2,7 @@ import ItsyEditor
 import Testing
 
 @Test func commandRegistryStoresAndRunsCommandsInOrder() throws {
-	let registry = CommandRegistry()
+	var registry = CommandRegistry()
 	var transcript: [String] = []
 	try registry.register([
 		Command(id: "file.open", title: "Open File", defaultKey: "Cmd-O") {
@@ -21,7 +21,7 @@ import Testing
 }
 
 @Test func commandRegistryRejectsDuplicateAndMissingIDs() throws {
-	let registry = CommandRegistry()
+	var registry = CommandRegistry()
 	try registry.register(Command(id: "view.palette", title: "Command Palette") {})
 
 	do {

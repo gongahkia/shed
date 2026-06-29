@@ -139,7 +139,7 @@ public final class MetalTextView: NSView {
 	private var replayingMacro = false
 	private var pendingExCommand: String?
 	private var insertUndoGroupActive = false
-	private let killRing = KillRing()
+	private var killRing = KillRing()
 	private var lastYankRange: Range<Int>?
 	private var optionDragAnchor: Int?
 	private var lastAccessibilityValue: String?

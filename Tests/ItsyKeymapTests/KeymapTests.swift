@@ -3,7 +3,7 @@ import ItsyKeymap
 import Testing
 
 @Test func keymapEngineResolvesSingleKeyCommand() throws {
-	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+	var engine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("j")], commandID: "moveDown"),
 	])
 
@@ -13,7 +13,7 @@ import Testing
 }
 
 @Test func keymapEngineTracksPendingChord() throws {
-	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+	var engine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("g"), Key("g")], commandID: "bufferStart"),
 	])
 
@@ -24,7 +24,7 @@ import Testing
 }
 
 @Test func keymapEngineFallsThroughUnknownKeys() throws {
-	let engine = KeymapEngine(modeStack: [.insert], bindings: [
+	var engine = KeymapEngine(modeStack: [.insert], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("j")], commandID: "moveDown"),
 	])
 
@@ -32,7 +32,7 @@ import Testing
 }
 
 @Test func keymapEngineClearsPendingChordOnEscape() throws {
-	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+	var engine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("g"), Key("g")], commandID: "bufferStart"),
 	])
 
@@ -42,7 +42,7 @@ import Testing
 }
 
 @Test func keymapEngineTracksNormalModeCountPrefix() throws {
-	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+	var engine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("w")], commandID: "wordForward"),
 		KeyBinding(mode: .normal, chord: [Key("0")], commandID: "lineStart"),
 	])
@@ -55,7 +55,7 @@ import Testing
 }
 
 @Test func keymapEngineKeepsZeroInsideCountPrefix() throws {
-	let engine = KeymapEngine(modeStack: [.normal], bindings: [
+	var engine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("j")], commandID: "down"),
 	])
 
@@ -66,7 +66,7 @@ import Testing
 }
 
 @Test func keymapEngineTracksEmacsUniversalArgument() throws {
-	let engine = KeymapEngine(modeStack: [.emacs], bindings: [
+	var engine = KeymapEngine(modeStack: [.emacs], bindings: [
 		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "right"),
 	])
 
@@ -81,7 +81,7 @@ import Testing
 }
 
 @Test func keymapEngineNormalizesModifierKeys() throws {
-	let engine = KeymapEngine(modeStack: [.emacs], bindings: [
+	var engine = KeymapEngine(modeStack: [.emacs], bindings: [
 		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: .control)], commandID: "forwardChar"),
 	])
 
@@ -96,7 +96,7 @@ import Testing
 	"M-<" = "bufferStart"
 	"M->" = "bufferEnd"
 	""")
-	let engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("f", modifiers: [.option])) == .command("forwardWord"))
 	#expect(engine.handle(try keyEvent(",", modifiers: [.option, .shift])) == .command("bufferStart"))
@@ -112,7 +112,7 @@ import Testing
 	[mode.emacs]
 	"C-f" = "forwardChar"
 	""")
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("j")) == .partial)
 	#expect(engine.handle(try keyEvent("k")) == .command("exitInsert"))
@@ -131,7 +131,7 @@ import Testing
 @Test func bundledProfilesDefineAddNextSelection() throws {
 	for profile in KeymapProfile.allCases {
 		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
-		let engine = KeymapEngine(modeStack: [profile == .vim ? .normal : profile == .emacs ? .emacs : .insert], bindings: bindings)
+		var engine = KeymapEngine(modeStack: [profile == .vim ? .normal : profile == .emacs ? .emacs : .insert], bindings: bindings)
 		#expect(engine.handle(try keyEvent("d", modifiers: [.command])) == .command("editor.addNextSelection"))
 		#expect(engine.handle(try keyEvent("g", modifiers: [.command, .control])) == .command("edit.selectAllFindMatches"))
 		#expect(engine.handle(try keyEvent("w", modifiers: [.command])) == .command("pane.close"))
@@ -146,7 +146,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesNormalModeMotions() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("3")) == .partial)
 	#expect(engine.handle(try keyEvent("w")) == .command("editor.moveWordForward"))
@@ -160,7 +160,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesUndoRedo() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("u")) == .command("edit.undo"))
 	#expect(engine.handle(try keyEvent("r", modifiers: [.control])) == .command("edit.redo"))
@@ -168,7 +168,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesSearchCommands() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("/")) == .command("vim.searchForward"))
 	#expect(engine.handle(try keyEvent("/", modifiers: [.shift])) == .command("vim.searchBackward"))
@@ -178,7 +178,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesJumpBackMark() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("'")) == .partial)
 	#expect(engine.handle(try keyEvent("'")) == .command("vim.jumpBack"))
@@ -186,7 +186,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesMacroCommands() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("q")) == .command("vim.macro.recordPrefix"))
 	#expect(engine.handle(try keyEvent("2", modifiers: [.shift])) == .command("vim.macro.replayPrefix"))
@@ -194,7 +194,7 @@ import Testing
 
 @Test func bundledVimProfileDefinesTextObjects() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("i")) == .partial)
 	#expect(engine.handle(try keyEvent("w")) == .command("vim.textObject.innerWord"))
@@ -211,7 +211,7 @@ import Testing
 	""")
 
 	let bindings = try KeymapConfiguration.load(profile: .plain, userConfigURL: fixture.url)
-	let engine = KeymapEngine(modeStack: [.insert], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.insert], bindings: bindings)
 	#expect(engine.handle(try keyEvent("", keyCode: 123)) == .command("custom.moveLeft"))
 }
 
@@ -222,7 +222,7 @@ import Testing
 
 @Test func bundledEmacsProfileDefinesStandardMotions() throws {
 	let bindings = try KeymapConfiguration.load(profile: .emacs, userConfigURL: nil)
-	let engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
+	var engine = KeymapEngine(modeStack: [.emacs], bindings: bindings)
 
 	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("editor.moveRight"))
 	#expect(engine.handle(try keyEvent("b", modifiers: [.control])) == .command("editor.moveLeft"))

@@ -166,6 +166,16 @@ import Testing
 	#expect(engine.handle(try keyEvent("r", modifiers: [.control])) == .command("edit.redo"))
 }
 
+@Test func bundledVimProfileDefinesSearchCommands() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	let engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("/")) == .command("vim.searchForward"))
+	#expect(engine.handle(try keyEvent("/", modifiers: [.shift])) == .command("vim.searchBackward"))
+	#expect(engine.handle(try keyEvent("n")) == .command("edit.findNext"))
+	#expect(engine.handle(try keyEvent("n", modifiers: [.shift])) == .command("edit.findPrevious"))
+}
+
 @Test func bundledVimProfileDefinesTextObjects() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	let engine = KeymapEngine(modeStack: [.operatorPending], bindings: bindings)

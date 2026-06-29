@@ -39,7 +39,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/PicoKeymap/Resources/keys.vim.toml`
-- Bindings: `109`
+- Bindings: `112`
 
 ### mode.normal
 
@@ -90,7 +90,10 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Opt-Up` | `pane.focusUp` |
 | `Cmd-Opt-Down` | `pane.focusDown` |
 | `i` | `mode.insert` |
-| `/` | `edit.find` |
+| `/` | `vim.searchForward` |
+| `Shift-/` | `vim.searchBackward` |
+| `n` | `edit.findNext` |
+| `Shift-N` | `edit.findPrevious` |
 
 ### mode.visual
 

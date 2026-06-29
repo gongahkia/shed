@@ -748,6 +748,10 @@ final class EditorWindowController: NSWindowController {
 			findNext()
 		case "edit.findPrevious":
 			findPrevious()
+		case "vim.searchForward":
+			startIncrementalSearch(direction: 1)
+		case "vim.searchBackward":
+			startIncrementalSearch(direction: -1)
 		case "emacs.isearchForward":
 			startIncrementalSearch(direction: 1)
 		case "emacs.isearchBackward":

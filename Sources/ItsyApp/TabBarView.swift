@@ -16,6 +16,7 @@ final class TabBarView: NSView {
 
 	private let scrollView = NSScrollView()
 	private let stackView = NSStackView()
+	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -62,8 +63,9 @@ final class TabBarView: NSView {
 			stackView.removeArrangedSubview(view)
 			view.removeFromSuperview()
 		}
-		for tab in tabs {
-			stackView.addArrangedSubview(makeTabView(tab))
+		tabIDsByTag = Dictionary(uniqueKeysWithValues: tabs.enumerated().map { index, tab in (index, tab.id) })
+		for (index, tab) in tabs.enumerated() {
+			stackView.addArrangedSubview(makeTabView(tab, tag: index))
 		}
 		layoutTabContent()
 	}
@@ -77,7 +79,7 @@ final class TabBarView: NSView {
 		scrollView.documentView = stackView
 	}
 
-	private func makeTabView(_ tab: ItsyTab) -> NSView {
+	private func makeTabView(_ tab: ItsyTab, tag: Int) -> NSView {
 		let container = NSView()
 		container.wantsLayer = true
 		container.layer?.backgroundColor = tab.isSelected
@@ -93,14 +95,16 @@ final class TabBarView: NSView {
 		container.addSubview(stack)
 
 		let title = tab.isDirty ? "• \(tab.title)" : tab.title
-		let selectButton = TabActionButton(title: title, tabID: tab.id, target: self, action: #selector(selectTab(_:)))
+		let selectButton = NSButton(title: title, target: self, action: #selector(selectTab(_:)))
+		selectButton.tag = tag
 		selectButton.isBordered = false
 		selectButton.font = .systemFont(ofSize: 12, weight: tab.isSelected ? .semibold : .regular)
 		selectButton.lineBreakMode = .byTruncatingMiddle
 		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		selectButton.toolTip = tab.title
 
-		let closeButton = TabActionButton(title: L10n.string("X"), tabID: tab.id, target: self, action: #selector(closeTab(_:)))
+		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
+		closeButton.tag = tag
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
 		closeButton.toolTip = L10n.string("Close")
@@ -119,29 +123,18 @@ final class TabBarView: NSView {
 		return container
 	}
 
-	@objc private func selectTab(_ sender: TabActionButton) {
-		onSelect?(sender.tabID)
+	@objc private func selectTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		onSelect?(tabID)
 	}
 
-	@objc private func closeTab(_ sender: TabActionButton) {
-		onClose?(sender.tabID)
-	}
-}
-
-private final class TabActionButton: NSButton {
-	let tabID: ObjectIdentifier
-
-	init(title: String, tabID: ObjectIdentifier, target: AnyObject?, action: Selector?) {
-		self.tabID = tabID
-		super.init(frame: .zero)
-		self.title = title
-		self.target = target
-		self.action = action
-		setButtonType(.momentaryChange)
-	}
-
-	required init?(coder: NSCoder) {
-		nil
+	@objc private func closeTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		onClose?(tabID)
 	}
 }
 

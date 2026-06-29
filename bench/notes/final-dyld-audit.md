@@ -148,3 +148,8 @@ Current section distribution:
 
 - Replaced three AppKit text-field subclasses with one shared `ItsyActionTextField` and kept find-only shortcuts behind an explicit flag.
 - Static rebase fixups after text-field subclass cleanup: `2596`; target remains `<2000`; result remains fail.
+
+## Tab button subclass cleanup
+
+- Replaced the custom tab button subclass with plain `NSButton.tag` routing owned by `TabBarView`.
+- Static rebase fixups after tab-button subclass cleanup: `2587`; target remains `<2000`; result remains fail.

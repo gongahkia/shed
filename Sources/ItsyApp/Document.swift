@@ -584,7 +584,19 @@ struct EditorPaneCoordinator {
 
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
-	private let fileTreeView = FileTreeSidebarView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
+	private static let quickLookPanelSelector = NSSelectorFromString("sharedPreviewPanel")
+	private static let quickLookDataSourceSelector = NSSelectorFromString("setDataSource:")
+	private static let quickLookDelegateSelector = NSSelectorFromString("setDelegate:")
+	private static let quickLookReloadSelector = NSSelectorFromString("reloadData")
+	private static let quickLookOrderFrontSelector = NSSelectorFromString("makeKeyAndOrderFront:")
+	private static let quickLookFrameworkPaths = [
+		"/System/Library/Frameworks/QuickLookUI.framework/QuickLookUI",
+		"/System/Library/Frameworks/QuickLookUI.framework/Versions/A/QuickLookUI",
+	]
+	private static var quickLookHandle: UnsafeMutableRawPointer?
+	private let fileTreeView = NSView(frame: NSRect(x: 0, y: 0, width: 240, height: 672))
+	private let fileTreeOutlineView = NSOutlineView()
+	private let fileTreeScrollView = NSScrollView()
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
@@ -599,6 +611,10 @@ final class EditorWindowController: NSWindowController {
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
+	private var fileTreeRootURL: NSURL?
+	private var fileTreeChildCache: [NSURL: [NSURL]] = [:]
+	private var fileTreeKeyMonitor: Any?
+	private var fileTreePreviewURL: URL?
 	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
 	private var tabBoundsObserver: NSObjectProtocol?
 	private var findMatches: [Range<Int>] = []
@@ -612,6 +628,7 @@ final class EditorWindowController: NSWindowController {
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
+		Self.configureFileTreeView(fileTreeView, outlineView: fileTreeOutlineView, scrollView: fileTreeScrollView)
 		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
 		Self.configureFindBarView(
 			findBarView,
@@ -661,11 +678,12 @@ final class EditorWindowController: NSWindowController {
 		window.isRestorable = true
 		window.contentView = splitView
 		super.init(window: window)
+		installFileTreeActions()
 		installTabBoundsObserver()
 		installFindBarActions()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
-		ItsyWorkspaceController.register(fileTreeView)
+		ItsyWorkspaceController.register(self)
 		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
 	}
@@ -675,8 +693,176 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	deinit {
+		if let fileTreeKeyMonitor {
+			NSEvent.removeMonitor(fileTreeKeyMonitor)
+		}
 		if let tabBoundsObserver {
 			NotificationCenter.default.removeObserver(tabBoundsObserver)
+		}
+	}
+
+	private static func configureFileTreeView(_ fileTreeView: NSView, outlineView: NSOutlineView, scrollView: NSScrollView) {
+		fileTreeView.wantsLayer = true
+		fileTreeView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("name"))
+		column.title = L10n.string("Files")
+		column.resizingMask = .autoresizingMask
+		outlineView.addTableColumn(column)
+		outlineView.outlineTableColumn = column
+		outlineView.headerView = nil
+		outlineView.rowSizeStyle = .small
+		outlineView.usesAlternatingRowBackgroundColors = false
+
+		scrollView.documentView = outlineView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		fileTreeView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			scrollView.leadingAnchor.constraint(equalTo: fileTreeView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: fileTreeView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: fileTreeView.topAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: fileTreeView.bottomAnchor),
+		])
+	}
+
+	private func installFileTreeActions() {
+		fileTreeOutlineView.dataSource = self
+		fileTreeOutlineView.delegate = self
+		fileTreeOutlineView.target = self
+		fileTreeOutlineView.doubleAction = #selector(doubleClickFileTree(_:))
+		fileTreeKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+			guard let self,
+			      event.keyCode == 49,
+			      self.window?.isKeyWindow == true,
+			      self.window?.firstResponder === self.fileTreeOutlineView
+			else {
+				return event
+			}
+			self.previewFileTreeSelection()
+			return nil
+		}
+	}
+
+	func setWorkspaceRootURL(_ url: URL?) {
+		fileTreeRootURL = url.map { $0 as NSURL }
+		fileTreeChildCache.removeAll(keepingCapacity: true)
+		fileTreeOutlineView.reloadData()
+		if let fileTreeRootURL {
+			fileTreeOutlineView.expandItem(fileTreeRootURL)
+		}
+	}
+
+	@objc private func doubleClickFileTree(_ sender: Any?) {
+		let row = fileTreeOutlineView.clickedRow
+		guard row >= 0, let url = fileTreeOutlineView.item(atRow: row) as? NSURL else {
+			return
+		}
+		if isFileTreeDirectory(url) {
+			if fileTreeOutlineView.isItemExpanded(url) {
+				fileTreeOutlineView.collapseItem(url)
+			} else {
+				fileTreeOutlineView.expandItem(url)
+			}
+			return
+		}
+		_ = ItsyWorkspaceController.openFile(at: url as URL)
+	}
+
+	private func previewFileTreeSelection() {
+		let row = fileTreeOutlineView.selectedRow
+		guard row >= 0,
+		      let url = fileTreeOutlineView.item(atRow: row) as? NSURL,
+		      !isFileTreeDirectory(url)
+		else {
+			return
+		}
+		preview(url as URL)
+	}
+
+	private func isFileTreeDirectory(_ url: NSURL) -> Bool {
+		let values = try? (url as URL).resourceValues(forKeys: [.isDirectoryKey])
+		return values?.isDirectory == true
+	}
+
+	private func fileTreeTitle(for url: NSURL) -> String {
+		let fileURL = url as URL
+		return fileURL.lastPathComponent.isEmpty ? fileURL.path : fileURL.lastPathComponent
+	}
+
+	private func fileTreeChildren(of url: NSURL) -> [NSURL] {
+		guard isFileTreeDirectory(url) else {
+			return []
+		}
+		if let cached = fileTreeChildCache[url] {
+			return cached
+		}
+		let keys: [URLResourceKey] = [.isDirectoryKey, .isHiddenKey]
+		let contents = (try? FileManager.default.contentsOfDirectory(
+			at: url as URL,
+			includingPropertiesForKeys: keys,
+			options: [.skipsPackageDescendants]
+		)) ?? []
+		let nodes = contents.compactMap { child -> NSURL? in
+			let values = try? child.resourceValues(forKeys: Set(keys))
+			if values?.isHidden == true {
+				return nil
+			}
+			return child as NSURL
+		}
+		let sorted = nodes.sorted { lhs, rhs in
+			let lhsDirectory = isFileTreeDirectory(lhs)
+			let rhsDirectory = isFileTreeDirectory(rhs)
+			if lhsDirectory != rhsDirectory {
+				return lhsDirectory && !rhsDirectory
+			}
+			return fileTreeTitle(for: lhs).localizedStandardCompare(fileTreeTitle(for: rhs)) == .orderedAscending
+		}
+		fileTreeChildCache[url] = sorted
+		return sorted
+	}
+
+	func preview(_ url: URL) {
+		fileTreePreviewURL = url
+		guard let panel = sharedQuickLookPanel() else {
+			return
+		}
+		_ = panel.perform(Self.quickLookDataSourceSelector, with: self)
+		_ = panel.perform(Self.quickLookDelegateSelector, with: self)
+		_ = panel.perform(Self.quickLookReloadSelector)
+		_ = panel.perform(Self.quickLookOrderFrontSelector, with: nil)
+	}
+
+	@objc(numberOfPreviewItemsInPreviewPanel:)
+	func numberOfPreviewItems(in panel: AnyObject) -> Int {
+		fileTreePreviewURL == nil ? 0 : 1
+	}
+
+	@objc(previewPanel:previewItemAtIndex:)
+	func previewPanel(_ panel: AnyObject, previewItemAt index: Int) -> AnyObject? {
+		fileTreePreviewURL as NSURL?
+	}
+
+	private func sharedQuickLookPanel() -> NSObject? {
+		ensureQuickLookLoaded()
+		guard let panelClass = NSClassFromString("QLPreviewPanel") as AnyObject?,
+		      panelClass.responds(to: Self.quickLookPanelSelector)
+		else {
+			return nil
+		}
+		return panelClass.perform(Self.quickLookPanelSelector)?.takeUnretainedValue() as? NSObject
+	}
+
+	private func ensureQuickLookLoaded() {
+		guard Self.quickLookHandle == nil, NSClassFromString("QLPreviewPanel") == nil else {
+			return
+		}
+		for path in Self.quickLookFrameworkPaths {
+			if let handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL) {
+				Self.quickLookHandle = handle
+				return
+			}
 		}
 	}
 
@@ -1221,7 +1407,7 @@ final class EditorWindowController: NSWindowController {
 	}
 }
 
-extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate {
+extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	func windowDidBecomeKey(_ notification: Notification) {
 		ItsyTabCoordinator.refresh()
 	}
@@ -1239,5 +1425,50 @@ extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate {
 			return
 		}
 		findStateDidChange()
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+		if let url = item as? NSURL {
+			return fileTreeChildren(of: url).count
+		}
+		return fileTreeRootURL == nil ? 0 : 1
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+		if let url = item as? NSURL {
+			return fileTreeChildren(of: url)[index]
+		}
+		guard let fileTreeRootURL else {
+			preconditionFailure("root node requested before workspace root was set")
+		}
+		return fileTreeRootURL
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+		(item as? NSURL).map(isFileTreeDirectory(_:)) == true
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+		guard let url = item as? NSURL else {
+			return nil
+		}
+		let identifier = NSUserInterfaceItemIdentifier("FileTreeCell")
+		let cell = outlineView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+		cell.identifier = identifier
+		let textField = cell.textField ?? NSTextField(labelWithString: "")
+		textField.lineBreakMode = .byTruncatingMiddle
+		textField.font = .systemFont(ofSize: 12)
+		textField.stringValue = fileTreeTitle(for: url)
+		if textField.superview == nil {
+			textField.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(textField)
+			NSLayoutConstraint.activate([
+				textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+				textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
+				textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+			])
+			cell.textField = textField
+		}
+		return cell
 	}
 }

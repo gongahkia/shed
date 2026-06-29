@@ -21,10 +21,14 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Pico</string>
 	<key>CFBundleExecutable</key>
 	<string>Pico</string>
 	<key>CFBundleIdentifier</key>
 	<string>dev.pico.editor</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>Pico</string>
 	<key>CFBundlePackageType</key>
@@ -33,8 +37,14 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 	<string>0.1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>13.0</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
 </dict>
 </plist>
 PLIST

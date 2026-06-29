@@ -27,6 +27,17 @@ consumes that response and then prints event lines.
 - `subscribe-events`
 - `version`
 
+## Directional window operations
+
+`focus` accepts `next`/`previous` and spatial `left`/`right`/`up`/`down`. Spatial directions choose the
+nearest visible tiled window whose center is in that direction, using the latest layout placement when
+available and the captured window frame otherwise.
+
+`move-window` and `swap` operate on the focused tiled window in the active display/tag set. `move-window`
+re-inserts the focused window before or after the directional target; `swap` exchanges the focused window
+with that target. If no focused window or no directional target exists, the response is a structured error.
+`state` responses include `layoutOrder` for windows that have been explicitly reordered.
+
 ## Schema
 
 The schema block below is tested against the Swift IPC constants. Breaking wire changes must bump

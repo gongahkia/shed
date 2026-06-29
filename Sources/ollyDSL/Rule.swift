@@ -282,6 +282,7 @@ public extension Config {
             displayID: state.displayID,
             tagMask: apply.tags?.rawValue ?? state.tagMask,
             isFloating: apply.floating ?? state.isFloating,
+            layoutOrder: state.layoutOrder,
             frame: state.frame,
             title: state.title,
             role: state.role,

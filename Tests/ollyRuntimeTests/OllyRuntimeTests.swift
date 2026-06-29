@@ -5,7 +5,7 @@ import ollyDSL
 import ollyIPC
 import ollyKit
 import ollyLayouts
-import ollyRuntime
+@testable import ollyRuntime
 
 final class OllyRuntimeTests: XCTestCase {
     func testRuntimeServesDefaultStateWhenConfigIsMissing() async throws {
@@ -87,11 +87,54 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
-    func testUnimplementedCommandsReturnStructuredErrors() async throws {
-        try await withRuntime { _, socketPath, _ in
-            let response = try send(.moveWindow(.init(direction: .left)), to: socketPath)
+    func testMoveWindowReordersFocusedWindowByLinearDirection() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300)),
+                (3, 2, CGRect(x: 600, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(2)
+
+            let response = try send(.moveWindow(.init(direction: .right, displayID: displayID)), to: socketPath)
+            XCTAssertEqual(response.status, .success)
+
+            let snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.map(\.windowID), [1, 3, 2])
+            XCTAssertEqual(snapshot.windows.map(\.layoutOrder), [0, 1, 2])
+        }
+    }
+
+    func testSwapWindowUsesSpatialDirectionalTarget() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300)),
+                (3, 2, CGRect(x: 0, y: 300, width: 300, height: 300)),
+                (4, 3, CGRect(x: 300, y: 300, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(.swap(.init(direction: .downward, displayID: displayID)), to: socketPath)
+            XCTAssertEqual(response.status, .success)
+
+            let snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.map(\.windowID), [3, 2, 1, 4])
+            XCTAssertEqual(snapshot.windows.map(\.layoutOrder), [0, 1, 2, 3])
+        }
+    }
+
+    func testMoveWindowAtEdgeReturnsStructuredDirectionalError() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(.moveWindow(.init(direction: .left, displayID: displayID)), to: socketPath)
             XCTAssertEqual(response.status, .error)
-            XCTAssertEqual(response.error?.code, "not_implemented")
+            XCTAssertEqual(response.error?.code, "missing_directional_target")
         }
     }
 }
@@ -129,6 +172,27 @@ private func stateSnapshot(from response: IPCResponseEnvelope) throws -> IPCStat
 
 private func tag(_ value: Int) throws -> IPCTagIndex {
     try IPCTagIndex(validating: value)
+}
+
+private func seedWindows(
+    _ runtime: OllyRuntime,
+    displayID: DisplayID,
+    windows: [(WindowID, Int, CGRect)]
+) async {
+    for (id, layoutOrder, frame) in windows {
+        await runtime.upsertRuntimeWindow(
+            WindowState(
+                id: id,
+                processID: 42,
+                displayID: displayID,
+                tagMask: 1,
+                isFloating: false,
+                layoutOrder: layoutOrder,
+                frame: frame
+            ),
+            element: nil
+        )
+    }
 }
 
 private struct RuntimeFixture {

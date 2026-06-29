@@ -18,7 +18,7 @@ public enum GridLayoutPolicy: Codable, Equatable, Sendable {
     }
 }
 
-/// Deterministic grid layout that auto-packs windows by AX window ID.
+/// Deterministic grid layout that auto-packs windows by layout order, then AX window ID.
 public struct GridLayoutEngine: LayoutEngine {
     public struct Config: Codable, Equatable, Sendable {
         public let policy: GridLayoutPolicy
@@ -45,7 +45,7 @@ public struct GridLayoutEngine: LayoutEngine {
             return []
         }
 
-        let sortedWindows = windows.sorted { $0.windowID < $1.windowID }
+        let sortedWindows = windows.sorted(by: WindowSnapshot.precedes)
         let dimensions = dimensions(for: sortedWindows.count)
         return sortedWindows.enumerated().map { index, window in
             Placement(

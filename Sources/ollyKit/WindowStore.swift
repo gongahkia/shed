@@ -10,10 +10,37 @@ public struct WindowState: Equatable, Sendable {
     public let displayID: DisplayID?
     public let tagMask: UInt64
     public let isFloating: Bool
+    public let layoutOrder: Int?
     public let frame: CGRect
     public let title: String?
     public let role: String?
     public let subrole: String?
+
+    public init(
+        id: WindowID,
+        processID: pid_t,
+        bundleID: String? = nil,
+        displayID: DisplayID? = nil,
+        tagMask: UInt64 = 0,
+        isFloating: Bool = false,
+        layoutOrder: Int? = nil,
+        frame: CGRect,
+        title: String? = nil,
+        role: String? = nil,
+        subrole: String? = nil
+    ) {
+        self.id = id
+        self.processID = processID
+        self.bundleID = bundleID
+        self.displayID = displayID
+        self.tagMask = tagMask
+        self.isFloating = isFloating
+        self.layoutOrder = layoutOrder
+        self.frame = frame
+        self.title = title
+        self.role = role
+        self.subrole = subrole
+    }
 
     public init(
         id: WindowID,
@@ -27,16 +54,19 @@ public struct WindowState: Equatable, Sendable {
         role: String? = nil,
         subrole: String? = nil
     ) {
-        self.id = id
-        self.processID = processID
-        self.bundleID = bundleID
-        self.displayID = displayID
-        self.tagMask = tagMask
-        self.isFloating = isFloating
-        self.frame = frame
-        self.title = title
-        self.role = role
-        self.subrole = subrole
+        self.init(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            layoutOrder: nil,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
     }
 }
 
@@ -60,7 +90,7 @@ public actor WindowStore {
     }
 
     public func allWindows() -> [WindowState] {
-        windowsByID.values.sorted { $0.id < $1.id }
+        windowsByID.values.sorted(by: Self.precedes)
     }
 
     public func state(for id: WindowID) -> WindowState? {
@@ -132,7 +162,7 @@ public actor WindowStore {
     }
 
     private func states(for ids: Set<WindowID>?) -> [WindowState] {
-        (ids ?? []).compactMap { windowsByID[$0] }.sorted { $0.id < $1.id }
+        (ids ?? []).compactMap { windowsByID[$0] }.sorted(by: Self.precedes)
     }
 
     private func publish(_ delta: WindowStoreDelta) {
@@ -166,5 +196,14 @@ public actor WindowStore {
             let bit = UInt64(1) << UInt64(index)
             return tagMask & bit == 0 ? nil : UInt8(index)
         }
+    }
+
+    private static func precedes(_ lhs: WindowState, _ rhs: WindowState) -> Bool {
+        let lhsOrder = lhs.layoutOrder ?? Int(lhs.id)
+        let rhsOrder = rhs.layoutOrder ?? Int(rhs.id)
+        guard lhsOrder == rhsOrder else {
+            return lhsOrder < rhsOrder
+        }
+        return lhs.id < rhs.id
     }
 }

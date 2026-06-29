@@ -54,4 +54,27 @@ final class WindowStoreTests: XCTestCase {
         XCTAssertEqual(processWindows, [])
         XCTAssertEqual(count, 0)
     }
+
+    func testQueriesUseLayoutOrderBeforeWindowID() async {
+        let store = WindowStore()
+        await store.upsert(window(id: 20, layoutOrder: 2))
+        await store.upsert(window(id: 10, layoutOrder: 0))
+        await store.upsert(window(id: 30, layoutOrder: 1))
+
+        let windows = await store.windows(onDisplay: 99)
+
+        XCTAssertEqual(windows.map(\.id), [10, 30, 20])
+    }
+
+    private func window(id: WindowID, layoutOrder: Int) -> WindowState {
+        WindowState(
+            id: id,
+            processID: 42,
+            displayID: 99,
+            tagMask: 0b1,
+            isFloating: false,
+            layoutOrder: layoutOrder,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100)
+        )
+    }
 }

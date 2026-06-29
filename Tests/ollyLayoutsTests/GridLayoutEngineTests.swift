@@ -46,6 +46,23 @@ final class GridLayoutEngineTests: XCTestCase {
         )
     }
 
+    func testExplicitLayoutOrderOverridesWindowIDOrder() {
+        let engine = GridLayoutEngine()
+
+        let placements = engine.arrange(
+            windows: [
+                WindowSnapshot(windowID: 10, frame: .zero, layoutOrder: 1),
+                WindowSnapshot(windowID: 1, frame: .zero, layoutOrder: 2),
+                WindowSnapshot(windowID: 20, frame: .zero, layoutOrder: 0)
+            ],
+            in: CGRect(x: 0, y: 0, width: 900, height: 300),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.windowID), [20, 10, 1])
+        XCTAssertEqual(placements.map(\.zOrder), [0, 1, 2])
+    }
+
     func testFixedColumnsPolicyKeepsConfiguredColumnCount() {
         let engine = GridLayoutEngine(config: GridLayoutEngine.Config(policy: .fixedCols(2)))
 

@@ -49,6 +49,10 @@ extension OllyRuntime {
         return IPCStateSnapshot(displays: displays, windows: windows, focusedWindowID: focusedWindowID)
     }
 
+    func setFocusedWindow(_ windowID: WindowID?) {
+        focusedWindowID = windowID
+    }
+
     func switchTag(_ command: IPCTagCommand) async throws {
         let displayID = try selectedDisplay(command.displayID).requiredID()
         let tag = try Tag(index: Int(command.tag.rawValue))
@@ -131,7 +135,7 @@ extension OllyRuntime {
         guard let display = displayProvider().first(where: { $0.id == displayID }) else {
             throw OllyRuntimeError.displayUnavailable
         }
-        _ = try await engineHost.arrange(display: display, safeZones: await safeZones())
+        _ = try await engineHost.arrange(display: display, safeZones: await safeZones(), focus: focusedWindowID)
     }
 
     func arrangeAllDisplays() async throws {

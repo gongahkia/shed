@@ -39,6 +39,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case displayUnavailable
     case engineUnavailable(LayoutEngineID)
     case missingFocusedWindow
+    case missingDirectionalTarget(IPCDirection)
     case notImplemented(String)
     case unsupportedAXCommand(String)
 
@@ -50,6 +51,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "engine unavailable: \(engineID.rawValue)"
         case .missingFocusedWindow:
             return "no focused window"
+        case let .missingDirectionalTarget(direction):
+            return "no window in direction: \(direction.rawValue)"
         case let .notImplemented(command):
             return "\(command) is not implemented"
         case let .unsupportedAXCommand(command):
@@ -65,6 +68,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "engine_unavailable"
         case .missingFocusedWindow:
             return "missing_focused_window"
+        case .missingDirectionalTarget:
+            return "missing_directional_target"
         case .notImplemented:
             return "not_implemented"
         case .unsupportedAXCommand:
@@ -295,10 +300,12 @@ public actor OllyRuntime {
         case let .focus(command):
             try await focus(command)
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "focus changed")))
-        case .moveWindow:
-            throw OllyRuntimeError.notImplemented("move-window")
-        case .swap:
-            throw OllyRuntimeError.notImplemented("swap")
+        case let .moveWindow(command):
+            try await moveWindow(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window moved")))
+        case let .swap(command):
+            try await swapWindow(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window swapped")))
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))

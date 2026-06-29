@@ -12,28 +12,44 @@ extension OllyRuntime {
         guard AXPermission.isTrusted else {
             throw OllyRuntimeError.unsupportedAXCommand("focus")
         }
-        guard command.direction == .next || command.direction == .previous else {
-            throw OllyRuntimeError.notImplemented("directional focus")
-        }
         let displayID = try selectedDisplay(command.displayID).requiredID()
         let windows = await visibleWindows(displayID: displayID)
         guard !windows.isEmpty else {
             throw OllyRuntimeError.missingFocusedWindow
         }
-        let ids = windows.map(\.id)
-        let currentIndex = focusedWindowID.flatMap { ids.firstIndex(of: $0) } ?? -1
-        let delta = command.direction == .previous ? -1 : 1
-        let nextIndex = (currentIndex + delta + ids.count) % ids.count
-        focusedWindowID = ids[nextIndex]
-        if let target = windowTargets.target(for: windows[nextIndex]) {
+        let nextID: WindowID
+        if command.direction == .next || command.direction == .previous {
+            nextID = wrappingFocusTarget(direction: command.direction, windows: windows)
+        } else {
+            let sourceID = try focusedWindowID.requiredFocusedWindow()
+            nextID = try await directionalTarget(
+                for: command,
+                displayID: displayID,
+                windows: windows,
+                focusedWindowID: sourceID
+            )
+        }
+        focusedWindowID = nextID
+        if let window = windows.first(where: { $0.id == nextID }),
+           let target = windowTargets.target(for: window) {
             AXUIElementSetAttributeValue(target.axElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
         }
+        let activeTags = await tagStore.activeTags(on: displayID)
         await focusStack.recordFocus(
-            windowID: ids[nextIndex],
+            windowID: nextID,
             displayID: displayID,
-            tagMask: await tagStore.activeTags(on: displayID).rawValue
+            tagMask: activeTags.rawValue
         )
-        await eventHub.publish(.focus(IPCFocusEvent(focusedWindowID: ids[nextIndex], displayID: displayID)))
+        await eventHub.publish(
+            .focus(IPCFocusEvent(focusedWindowID: nextID, displayID: displayID, tagMask: activeTags.rawValue))
+        )
+    }
+
+    private func wrappingFocusTarget(direction: IPCDirection, windows: [WindowState]) -> WindowID {
+        let ids = windows.map(\.id)
+        let currentIndex = focusedWindowID.flatMap { ids.firstIndex(of: $0) } ?? -1
+        let delta = direction == .previous ? -1 : 1
+        return ids[(currentIndex + delta + ids.count) % ids.count]
     }
 
     func visibleWindows(displayID: DisplayID) async -> [WindowState] {

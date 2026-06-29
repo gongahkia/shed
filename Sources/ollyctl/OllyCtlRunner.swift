@@ -149,7 +149,8 @@ struct OllyCtlRunner {
             let title = window.title.map { " \"\($0)\"" } ?? ""
             let bundle = window.bundleID.map { " bundle \($0)" } ?? ""
             let floating = window.isFloating ? " floating" : ""
-            return "window \(window.windowID): pid \(window.processID)\(bundle)\(floating)\(title)"
+            let order = window.layoutOrder.map { " order \($0)" } ?? ""
+            return "window \(window.windowID): pid \(window.processID)\(bundle)\(floating)\(order)\(title)"
         }
         return (displays + windows).isEmpty ? "no state" : (displays + windows).joined(separator: "\n")
     }

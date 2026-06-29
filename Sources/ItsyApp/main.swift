@@ -29,7 +29,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private weak var openRecentMenu: NSMenu?
 	private lazy var commandRegistry = makeCommandRegistry()
 	private var commandPalettePanel: NSPanel?
-	private var commandPaletteInputField: ItsyActionTextField?
+	private var commandPaletteInputField: NSTextField?
 	private var commandPaletteTableView: NSTableView?
 	private var commandPaletteCancelHandler: (() -> Void)?
 	private var commandPaletteRunText: ((String) -> Void)?
@@ -40,7 +40,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsStatusLabel: NSTextField?
 	private var projectFindPanel: NSPanel?
-	private var projectFindInputField: ItsyActionTextField?
+	private var projectFindInputField: NSTextField?
 	private var projectFindStatusLabel: NSTextField?
 	private var projectFindTableView: NSTableView?
 	private var projectFindMatches: [ProjectFindMatch] = []
@@ -142,7 +142,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			self?.commandPalettePanel?.close()
 			completion(text)
 		}
-		commandPaletteInputField?.onCancel = { [weak self] in self?.cancelCommandPalette() }
 		setCommandPaletteCommandLine(":")
 		centerCommandPalette(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
@@ -154,7 +153,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let panel = makeCommandPalettePanelIfNeeded()
 		commandPaletteCancelHandler = nil
 		commandPaletteRunText = nil
-		commandPaletteInputField?.onCancel = { [weak self] in self?.closeCommandPalette() }
 		setCommandPaletteItems(commandRegistry.commands)
 		centerCommandPalette(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
@@ -194,15 +192,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		contentView.layer?.borderWidth = 1
 		contentView.layer?.borderColor = NSColor.separatorColor.cgColor
 
-		let inputField = ItsyActionTextField(frame: .zero)
+		let inputField = NSTextField(frame: .zero)
 		inputField.placeholderString = L10n.string("Command")
 		inputField.font = .systemFont(ofSize: 18)
 		inputField.isBordered = false
 		inputField.focusRingType = .none
 		inputField.backgroundColor = .clear
 		inputField.translatesAutoresizingMaskIntoConstraints = false
-		inputField.onConfirm = { [weak self] in self?.runCommandPaletteSelection() }
-		inputField.onMoveSelection = { [weak self] delta in self?.moveCommandPaletteSelection(delta) }
 		inputField.delegate = self
 		contentView.addSubview(inputField)
 
@@ -464,13 +460,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		contentView.wantsLayer = true
 		contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 
-		let queryField = ItsyActionTextField(frame: .zero)
+		let queryField = NSTextField(frame: .zero)
 		queryField.placeholderString = L10n.string("Find in project")
 		queryField.font = .systemFont(ofSize: 15)
 		queryField.isBordered = true
 		queryField.focusRingType = .default
 		queryField.translatesAutoresizingMaskIntoConstraints = false
-		queryField.onCancel = { [weak self] in self?.closeProjectFind() }
 		queryField.delegate = self
 		contentView.addSubview(queryField)
 
@@ -896,6 +891,36 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		} else if field === commandPaletteInputField {
 			filterCommandPaletteItems()
 		}
+	}
+
+	func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+		if control === commandPaletteInputField {
+			switch commandSelector {
+			case #selector(NSResponder.insertNewline(_:)):
+				runCommandPaletteSelection()
+				return true
+			case #selector(NSResponder.cancelOperation(_:)):
+				if commandPaletteAcceptsRawText {
+					cancelCommandPalette()
+				} else {
+					closeCommandPalette()
+				}
+				return true
+			case #selector(NSResponder.moveUp(_:)):
+				moveCommandPaletteSelection(-1)
+				return true
+			case #selector(NSResponder.moveDown(_:)):
+				moveCommandPaletteSelection(1)
+				return true
+			default:
+				return false
+			}
+		}
+		if control === projectFindInputField, commandSelector == #selector(NSResponder.cancelOperation(_:)) {
+			closeProjectFind()
+			return true
+		}
+		return false
 	}
 
 	func numberOfRows(in tableView: NSTableView) -> Int {

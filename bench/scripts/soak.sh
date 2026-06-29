@@ -3,16 +3,16 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/../.." && pwd)"
-duration="${PICO_SOAK_DURATION:-3600}"
-interval="${PICO_SOAK_INTERVAL:-60}"
-settle="${PICO_SOAK_SETTLE:-60}"
-file_count="${PICO_SOAK_FILES:-50}"
-workspace="${PICO_SOAK_WORKSPACE:-/tmp/pico-soak-workspace}"
+duration="${ITSY_SOAK_DURATION:-3600}"
+interval="${ITSY_SOAK_INTERVAL:-60}"
+settle="${ITSY_SOAK_SETTLE:-60}"
+file_count="${ITSY_SOAK_FILES:-50}"
+workspace="${ITSY_SOAK_WORKSPACE:-/tmp/itsy-soak-workspace}"
 results_dir="$repo_dir/bench/results"
-date_stamp="${PICO_SOAK_DATE:-$(date +%F)}"
-csv_out="${PICO_SOAK_CSV:-$results_dir/soak-$date_stamp.csv}"
-json_out="${PICO_SOAK_JSON:-$results_dir/soak-$date_stamp.json}"
-app_dir="$repo_dir/Pico.app"
+date_stamp="${ITSY_SOAK_DATE:-$(date +%F)}"
+csv_out="${ITSY_SOAK_CSV:-$results_dir/soak-$date_stamp.csv}"
+json_out="${ITSY_SOAK_JSON:-$results_dir/soak-$date_stamp.json}"
+app_dir="$repo_dir/Itsy.app"
 files="$(mktemp)"
 pid=""
 
@@ -30,7 +30,7 @@ trap cleanup EXIT
 (cd "$repo_dir" && swift build -c release >/dev/null && bench/scripts/make_app.sh >/dev/null)
 rm -rf "$workspace"
 mkdir -p "$workspace" "$results_dir"
-rsync -a --delete --exclude .git --exclude .build --exclude Pico.app --exclude bench/traces "$repo_dir/" "$workspace/"
+rsync -a --delete --exclude .git --exclude .build --exclude Itsy.app --exclude bench/traces "$repo_dir/" "$workspace/"
 git -C "$repo_dir" ls-files | rg '\.(swift|md|sh|json|toml|ts)$' | head -"$file_count" > "$files"
 
 actual_count="$(wc -l < "$files" | tr -d ' ')"
@@ -41,24 +41,24 @@ fi
 
 /usr/bin/open -n "$app_dir" --args "$workspace" --profile=plain
 for _ in $(seq 1 100); do
-	pid="$(pgrep -n -x Pico || true)"
+	pid="$(pgrep -n -x Itsy || true)"
 	[[ -n "$pid" ]] && break
 	sleep 0.1
 done
 if [[ -z "$pid" ]]; then
-	echo "Pico did not launch" >&2
+	echo "Itsy did not launch" >&2
 	exit 1
 fi
 
 for _ in $(seq 1 100); do
-	window_count="$(osascript -e 'tell application "System Events" to count windows of process "Pico"' 2>/dev/null || echo 0)"
+	window_count="$(osascript -e 'tell application "System Events" to count windows of process "Itsy"' 2>/dev/null || echo 0)"
 	[[ "$window_count" -gt 0 ]] && break
 	sleep 0.1
 done
 
 opened=0
 while IFS= read -r rel; do
-	/usr/bin/open -b dev.pico.editor "$workspace/$rel"
+	/usr/bin/open -b dev.itsy.editor "$workspace/$rel"
 	sleep 0.12
 	osascript -e 'tell application "System Events" to keystroke "x"' >/dev/null
 	opened=$((opened + 1))
@@ -66,7 +66,7 @@ while IFS= read -r rel; do
 done < "$files"
 
 sleep "$settle"
-window_count="$(osascript -e 'tell application "System Events" to count windows of process "Pico"' 2>/dev/null || echo 0)"
+window_count="$(osascript -e 'tell application "System Events" to count windows of process "Itsy"' 2>/dev/null || echo 0)"
 baseline_rss="$(ps -o rss= -p "$pid" | tr -d ' ')"
 start_time="$(date +%s)"
 end_time=$((start_time + duration))

@@ -35,8 +35,8 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ## Phase 2 — Empty-app cold-start spike
 
-x 2026-06-28 +Phase2-ColdStart @bench id:031 est:1h dep:020,030 Run `picobench measure --app Pico.app --warmup-purge` 20×, target <100 ms. Record in `bench/results/spike-empty-$(date +%F).md`. If >150 ms, investigate.
-x 2026-06-28 +Phase2-ColdStart @perf id:032 est:3h dep:031 If id:031 exceeds 150 ms: set `DYLD_PRINT_STATISTICS_DETAILS=1`, capture launch trace via `xcrun xctrace record --template 'App Launch' --launch Pico.app`. Identify worst offenders. Document findings in `bench/notes/coldstart-audit.md`. Remediation candidates: link `-dead_strip`, set `OTHER_SWIFT_FLAGS=-Osize`, kill any `@_cdecl` init, remove unused `import Foundation` chains.
+x 2026-06-28 +Phase2-ColdStart @bench id:031 est:1h dep:020,030 Run `itsybench measure --app Itsy.app --warmup-purge` 20×, target <100 ms. Record in `bench/results/spike-empty-$(date +%F).md`. If >150 ms, investigate.
+x 2026-06-28 +Phase2-ColdStart @perf id:032 est:3h dep:031 If id:031 exceeds 150 ms: set `DYLD_PRINT_STATISTICS_DETAILS=1`, capture launch trace via `xcrun xctrace record --template 'App Launch' --launch Itsy.app`. Identify worst offenders. Document findings in `bench/notes/coldstart-audit.md`. Remediation candidates: link `-dead_strip`, set `OTHER_SWIFT_FLAGS=-Osize`, kill any `@_cdecl` init, remove unused `import Foundation` chains.
 x 2026-06-28 +Phase2-ColdStart @perf id:033 est:2h dep:032 Add `bench/scripts/dyld_audit.sh`: runs binary with `DYLD_PRINT_STATISTICS=1`+`DYLD_PRINT_STATISTICS_DETAILS=1`, parses output, asserts rebase fixup count <2000. Wire into CI as a warning (not failure) gate.
 
 ---
@@ -62,9 +62,9 @@ x 2026-06-28 +Phase4-Buffer @buffer id:064 est:4h dep:063 Bring rope random inse
 
 ## Phase 6 — Tree-sitter syntax
 
-x 2026-06-28 +Phase6-Syntax @treesitter id:102 est:4h dep:100,101 `Sources/PicoSyntax/Parser.swift`: Swift wrapper for `TSParser`, `TSTree`, `TSNode`. API: `Parser(language: Language)`, `parse(_ rope: Rope, oldTree: Tree?) -> Tree`, uses `TSInput` callback streaming from rope chunks (avoid full-string materialization). Test: parse `large.ts` (100k lines) in <300 ms initial, incremental edit reparse <5 ms.
+x 2026-06-28 +Phase6-Syntax @treesitter id:102 est:4h dep:100,101 `Sources/ItsySyntax/Parser.swift`: Swift wrapper for `TSParser`, `TSTree`, `TSNode`. API: `Parser(language: Language)`, `parse(_ rope: Rope, oldTree: Tree?) -> Tree`, uses `TSInput` callback streaming from rope chunks (avoid full-string materialization). Test: parse `large.ts` (100k lines) in <300 ms initial, incremental edit reparse <5 ms.
 x 2026-06-28 +Phase6-Syntax @treesitter id:103 est:3h dep:102 Highlight queries: load `.scm` files from each grammar's `queries/highlights.scm`. Walk tree via `TSQuery` + `TSQueryCursor`. Output `[(range: Range<Int>, capture: String)]`. Test: TS keywords/strings/comments highlighted correctly.
-x 2026-06-28 +Phase6-Syntax @treesitter id:104 est:3h dep:103 Theme: `~/.config/pico/theme.toml` maps capture names → color (hex). Bundle default `default-dark.toml` (Solarized-ish) and `default-light.toml`. Apply to glyph rendering via per-glyph color in `ShapedGlyph`.
+x 2026-06-28 +Phase6-Syntax @treesitter id:104 est:3h dep:103 Theme: `~/.config/itsy/theme.toml` maps capture names → color (hex). Bundle default `default-dark.toml` (Solarized-ish) and `default-light.toml`. Apply to glyph rendering via per-glyph color in `ShapedGlyph`.
 x 2026-06-28 +Phase6-Syntax @treesitter id:105 est:3h dep:104 Lazy grammar loading: do NOT init parsers at launch. On `open(file:)`, detect language via file extension, then `dlopen` is N/A (we statically linked); but defer `TSParser` allocation + grammar bind until first parse. Verify cold-start unaffected with all grammars linked.
 x 2026-06-28 +Phase6-Syntax @treesitter id:106 est:3h dep:082,103 Incremental reparse on edit: editor commands emit `TSInputEdit` → `Parser.edit(tree, edit)` → `Parser.parse(rope, oldTree)`. Highlight diff applied to dirty line range. Acceptance: typing in middle of 100k-line file maintains <16 ms frame time.
 
@@ -126,26 +126,26 @@ x 2026-06-28 +Phase14-Splits @appkit id:262 est:2h dep:260 Save/restore pane lay
 
 ## Phase 15 — Hardening + regression bench
 
-x 2026-06-29 +Phase15-Hardening @ci id:280 est:3h dep:021 Add `bench/scripts/regression.sh`: runs full bench against current `pico` build, compares to `bench/results/baseline-pico-current.json`, fails if any KPI worse by >5%. Wire into CI on PRs.
-x 2026-06-29 +Phase15-Hardening @perf id:281 est:4h dep:047 Memory leak audit: `xcrun leaks --atExit -- ./pico --bench-exit-on-ready`. Fix all. Document in `bench/notes/leak-audit.md`.
+x 2026-06-29 +Phase15-Hardening @ci id:280 est:3h dep:021 Add `bench/scripts/regression.sh`: runs full bench against current `itsy` build, compares to `bench/results/baseline-itsy-current.json`, fails if any KPI worse by >5%. Wire into CI on PRs.
+x 2026-06-29 +Phase15-Hardening @perf id:281 est:4h dep:047 Memory leak audit: `xcrun leaks --atExit -- ./itsy --bench-exit-on-ready`. Fix all. Document in `bench/notes/leak-audit.md`.
 x 2026-06-29 +Phase15-Hardening @perf id:282 est:3h dep:281 Instruments Allocations trace: open `large.ts`, scroll, edit; identify alloc hotspots. Target zero per-frame allocs in render path.
 x 2026-06-29 +Phase15-Hardening @perf id:283 est:2h dep:032 Final dyld audit: re-run `dyld_audit.sh` after all phases, expect <2000 rebases. If grown, identify cause (Swift reference types are #1 suspect — see [Emerge tools post](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)).
-x 2026-06-29 +Phase15-Hardening @bench id:284 est:2h dep:280 Re-run full baseline bench. Commit `bench/results/release-candidate.md`. Verify pico beats Zed on cold-start KPI on M-series. If not, do not ship.
+x 2026-06-29 +Phase15-Hardening @bench id:284 est:2h dep:280 Re-run full baseline bench. Commit `bench/results/release-candidate.md`. Verify itsy beats Zed on cold-start KPI on M-series. If not, do not ship.
 x 2026-06-29 +Phase15-Hardening @qa id:285 est:4h dep:047 Soak test: open repo as workspace, open 50 files across tabs, edit each, keep running for 1 h. No crashes, RSS growth <10%.
 
 ---
 
 ## Phase 16 — Packaging + release
 
-x 2026-06-29 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`: bundle id `dev.pico.editor` (or final-name), version 0.1.0, `LSApplicationCategoryType=public.app-category.developer-tools`, `NSAppleEventsUsageDescription` (none, but document), high-resolution capable.
-(A) 2026-06-28 +Phase16-Release @release id:301 est:2h dep:300 Code signing: Developer ID Application cert. Build: `codesign --sign "Developer ID Application: <name>" --options runtime --timestamp Pico.app`. Document in `bench/notes/codesign.md`.
-(A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Pico.dmg --apple-id ... --wait` → `xcrun stapler staple Pico.dmg`. Script in `scripts/notarize.sh`.
+x 2026-06-29 +Phase16-Release @release id:300 est:3h dep:030 Final `Info.plist`: bundle id `dev.itsy.editor` (or final-name), version 0.1.0, `LSApplicationCategoryType=public.app-category.developer-tools`, `NSAppleEventsUsageDescription` (none, but document), high-resolution capable.
+(A) 2026-06-28 +Phase16-Release @release id:301 est:2h dep:300 Code signing: Developer ID Application cert. Build: `codesign --sign "Developer ID Application: <name>" --options runtime --timestamp Itsy.app`. Document in `bench/notes/codesign.md`.
+(A) 2026-06-28 +Phase16-Release @release id:302 est:2h dep:301 Notarization: `xcrun notarytool submit Itsy.dmg --apple-id ... --wait` → `xcrun stapler staple Itsy.dmg`. Script in `scripts/notarize.sh`.
 (A) 2026-06-28 +Phase16-Release @release id:303 est:2h dep:301 Build DMG via `create-dmg` (brew). Background image optional. Script in `scripts/make_dmg.sh`.
-x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with pico vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
+x 2026-06-29 +Phase16-Release @release id:304 est:3h dep:284 Update `README.md`: bench table with itsy vs Zed/Sublime/VSCode (use latest `bench/results/`), screenshots, install via DMG, install via `brew install --cask <name>`. Link NORTHSTAR.md.
 (A) 2026-06-28 +Phase16-Release @release id:305 est:3h dep:303 GitHub Release workflow: `.github/workflows/release.yml` triggered on tag `v*.*.*`. Builds release, signs, notarizes, stapes, uploads DMG + SHA256.
 (B) 2026-06-28 +Phase16-Release @release id:306 est:3h dep:305 Sparkle integration: vendor Sparkle XPC service, point at `https://<host>/appcast.xml`. Defer publishing infra to v0.2 if no host yet.
 (B) 2026-06-28 +Phase16-Release @release id:307 est:3h dep:304 Submit Homebrew cask: open PR against `homebrew/homebrew-cask` per their docs.
-(C) 2026-06-28 +Phase16-Release @release id:308 est:2h dep:304 Pick a final name (NORTHSTAR.md "codename pico"). Decide via short list, register a domain if available. Rebrand bundle id, repo name, README.
+(C) 2026-06-28 +Phase16-Release @release id:308 est:2h dep:304 Pick a final name (NORTHSTAR.md "codename itsy"). Decide via short list, register a domain if available. Rebrand bundle id, repo name, README.
 
 ---
 
@@ -155,7 +155,7 @@ x 2026-06-29 +XCut @docs id:400 est:2h Architecture diagram (NORTHSTAR.md has AS
 x 2026-06-29 +XCut @docs id:401 est:1h `docs/keymap-reference.md` auto-generated from the three TOML profiles (write a tiny Swift script `scripts/gen_keymap_docs.swift`).
 x 2026-06-29 +XCut @i18n id:402 est:2h Localization: pin `en` only for v0.1. Use `String(localized:)` for all user-visible strings so future locales are mechanical.
 x 2026-06-29 +XCut @a11y id:403 est:3h VoiceOver: implement `accessibilityLabel`, `accessibilityRole`, `accessibilityValue` on `MetalTextView` per `NSAccessibilityElement` protocol. At minimum: read current line.
-x 2026-06-29 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/pico/themes/*.toml`.
+x 2026-06-29 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/itsy/themes/*.toml`.
 
 ---
 

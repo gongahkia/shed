@@ -4,7 +4,7 @@
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
 - **Tooling:** `hyperfine --warmup 0 --runs 20 --prepare 'sudo purge'` per cmd.
 - **Cold-start measurement:** Each editor under test gets a `--bench-exit-on-ready` shim:
-  - For `pico`: native flag — print timestamp on `applicationDidFinishLaunching` + first paint, then `NSApp.terminate`.
+  - For `itsy`: native flag — print timestamp on `applicationDidFinishLaunching` + first paint, then `NSApp.terminate`.
   - For Zed/Sublime/VSCode/CodeEdit: external observer (Swift CLI using Accessibility API `AXObserver` to detect first window-visible event), records timestamp, then `kill -TERM`.
 - **Corpus** (checked into `bench/corpus/`):
   - `small.ts` (1 kLOC)
@@ -13,14 +13,14 @@
   - `cold.empty` (no file)
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
-- **Regression gate:** PR CI runs the harness against `pico` only; fails if any KPI regresses >5% vs `main` baseline.
+- **Regression gate:** PR CI runs the harness against `itsy` only; fails if any KPI regresses >5% vs `main` baseline.
 
 ## CLI
 
 ```sh
-picobench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
-picobench rss --pid <pid>
-picobench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
+itsybench measure --app <path> [--args <arg>] [--new-instance] [--warmup-purge]
+itsybench rss --pid <pid>
+itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
@@ -36,7 +36,7 @@ Installed Homebrew casks:
 Baseline command:
 
 ```sh
-PICO_BASELINE_PURGE=0 bench/scripts/run_baseline.sh
+ITSY_BASELINE_PURGE=0 bench/scripts/run_baseline.sh
 ```
 
 `sudo purge` was unavailable non-interactively (`sudo: a password is required`), so this baseline records no-purge cold starts.

@@ -5,21 +5,21 @@
 id:301 requires a Developer ID Application signature with hardened runtime:
 
 ```sh
-codesign --force --sign "Developer ID Application: <name>" --options runtime --timestamp Pico.app
+codesign --force --sign "Developer ID Application: <name>" --options runtime --timestamp Itsy.app
 ```
 
 ## Script
 
-`scripts/codesign.sh` signs `Pico.app` with:
+`scripts/codesign.sh` signs `Itsy.app` with:
 
 - `--options runtime`
 - `--timestamp`
-- a detected `Developer ID Application:` identity, or `PICO_CODESIGN_IDENTITY`
+- a detected `Developer ID Application:` identity, or `ITSY_CODESIGN_IDENTITY`
 
 Validation steps in the script:
 
-- `codesign --verify --deep --strict --verbose=2 Pico.app`
-- `codesign -dvvv --entitlements :- Pico.app`
+- `codesign --verify --deep --strict --verbose=2 Itsy.app`
+- `codesign -dvvv --entitlements :- Itsy.app`
 
 ## Local status
 
@@ -35,7 +35,7 @@ Running `scripts/codesign.sh` currently fails fast with:
 
 ```text
 expected exactly one Developer ID Application identity; found 0
-set PICO_CODESIGN_IDENTITY='Developer ID Application: <name> (<team>)'
+set ITSY_CODESIGN_IDENTITY='Developer ID Application: <name> (<team>)'
 ```
 
 ## Notes

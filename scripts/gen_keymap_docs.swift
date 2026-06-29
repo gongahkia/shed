@@ -13,7 +13,7 @@ struct ModeBindings {
 
 let repo = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let profiles = ["plain", "vim", "emacs"]
-let resourceDir = repo.appendingPathComponent("Sources/PicoKeymap/Resources")
+let resourceDir = repo.appendingPathComponent("Sources/ItsyKeymap/Resources")
 let outputURL = repo.appendingPathComponent("docs/keymap-reference.md")
 
 func stripComment(_ line: String) -> String {
@@ -144,7 +144,7 @@ func title(_ value: String) -> String {
 var output = """
 # Keymap Reference
 
-Generated from `Sources/PicoKeymap/Resources/keys.*.toml`.
+Generated from `Sources/ItsyKeymap/Resources/keys.*.toml`.
 
 Regenerate:
 
@@ -159,7 +159,7 @@ for profile in profiles {
 	let modes = try parseProfile(profile)
 	let total = modes.reduce(0) { $0 + $1.bindings.count }
 	output += "## \(title(profile))\n\n"
-	output += "- Source: `Sources/PicoKeymap/Resources/keys.\(profile).toml`\n"
+	output += "- Source: `Sources/ItsyKeymap/Resources/keys.\(profile).toml`\n"
 	output += "- Bindings: `\(total)`\n\n"
 	for mode in modes {
 		output += "### mode.\(mode.name)\n\n"

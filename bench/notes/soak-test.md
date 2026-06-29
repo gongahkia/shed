@@ -2,16 +2,16 @@
 
 ## 2026-06-29 aborted run
 
-- Command shape: disposable `/tmp/pico-soak-workspace`, open repo as workspace, open 50 tracked source/doc files, edit each via `System Events`, sample RSS.
+- Command shape: disposable `/tmp/itsy-soak-workspace`, open repo as workspace, open 50 tracked source/doc files, edit each via `System Events`, sample RSS.
 - Result: aborted at 240 s after user reported laptop slowdown.
-- Process cleanup: verified no remaining `Pico`, `PicoBench`, or `xctrace` processes after abort.
+- Process cleanup: verified no remaining `Itsy`, `ItsyBench`, or `xctrace` processes after abort.
 - Observed RSS samples before abort: `471984`, `1008032`, `1049520`, `571040`, `925584` KB.
 - Failure: peak RSS growth exceeded 10%.
 
 ## Fix under test
 
 - Cause: opening files as tabs was creating one `EditorWindowController` and `MetalTextView` per document.
-- Change: `PicoDocumentController` and `PicoTabCoordinator` now reuse the active editor window when selecting/opening documents.
+- Change: `ItsyDocumentController` and `ItsyTabCoordinator` now reuse the active editor window when selecting/opening documents.
 - Short probe after fix: 20 files opened/edited, `windows_after=1`, RSS `114000 -> 127424` KB.
 - Short probe after fix: 50 files opened/edited, `windows_after=1`, RSS `92432 -> 126400` KB.
 - UI overflow fix: `TabBarView` now contains its tabs in a horizontal `NSScrollView`.
@@ -19,8 +19,8 @@
 
 ## Full gate
 
-- Harness rule: open/edit 50 files, wait `PICO_SOAK_SETTLE` (`60` s default), then measure RSS for `PICO_SOAK_DURATION` (`3600` s default).
-- Pass rule: exactly one Pico window and `peak_growth_percent < 10`.
+- Harness rule: open/edit 50 files, wait `ITSY_SOAK_SETTLE` (`60` s default), then measure RSS for `ITSY_SOAK_DURATION` (`3600` s default).
+- Pass rule: exactly one Itsy window and `peak_growth_percent < 10`.
 - Full id:285 gate: pass.
 - Result file: `bench/results/soak-2026-06-29.json`.
 - CSV file: `bench/results/soak-2026-06-29.csv`.
@@ -32,4 +32,4 @@
 - Final RSS: `59584` KB.
 - Peak growth: `6.846444040799217%`.
 - Final growth: `-47.96702528992595%`.
-- Process cleanup: verified no remaining `Pico`, `PicoBench`, or `xctrace` processes after completion.
+- Process cleanup: verified no remaining `Itsy`, `ItsyBench`, or `xctrace` processes after completion.

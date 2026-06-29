@@ -3,8 +3,8 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/../.." && pwd)"
-app_dir="${APP_DIR:-$repo_dir/Pico.app}"
-binary="$repo_dir/.build/release/PicoApp"
+app_dir="${APP_DIR:-$repo_dir/Itsy.app}"
+binary="$repo_dir/.build/release/ItsyApp"
 
 if [[ ! -x "$binary" ]]; then
 	(cd "$repo_dir" && swift build -c release)
@@ -12,8 +12,8 @@ fi
 
 rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS"
-cp "$binary" "$app_dir/Contents/MacOS/Pico"
-chmod +x "$app_dir/Contents/MacOS/Pico"
+cp "$binary" "$app_dir/Contents/MacOS/Itsy"
+chmod +x "$app_dir/Contents/MacOS/Itsy"
 cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -22,15 +22,15 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Pico</string>
+	<string>Itsy</string>
 	<key>CFBundleExecutable</key>
-	<string>Pico</string>
+	<string>Itsy</string>
 	<key>CFBundleIdentifier</key>
-	<string>dev.pico.editor</string>
+	<string>dev.itsy.editor</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Pico</string>
+	<string>Itsy</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

@@ -1,10 +1,10 @@
-# Pico
+# Itsy
 
 macOS-native code editor targeting instant launch, low RSS, and modal editing.
 
 [![status](https://img.shields.io/badge/status-pre--release-orange.svg)](#)
 
-![Pico editor window](docs/screenshots/pico-main.png)
+![Itsy editor window](docs/screenshots/itsy-main.png)
 
 ## Status
 
@@ -22,7 +22,7 @@ See [TODO.md](TODO.md) for remaining work.
 ```sh
 swift build -c release
 bench/scripts/make_app.sh
-open Pico.app
+open Itsy.app
 ```
 
 ## Install
@@ -32,19 +32,19 @@ Local unsigned app build:
 ```sh
 swift build -c release
 bench/scripts/make_app.sh
-cp -R Pico.app /Applications/Pico.app
+cp -R Itsy.app /Applications/Itsy.app
 ```
 
 Release DMG install, after id:301-id:303 are complete:
 
 ```sh
-open Pico-0.1.0.dmg
+open Itsy-0.1.0.dmg
 ```
 
 Homebrew cask install, after a cask is published:
 
 ```sh
-brew install --cask pico
+brew install --cask itsy
 ```
 
 ## Bench
@@ -55,17 +55,17 @@ Environment: Apple M3, macOS 26.5.1 25F80, AC power, 20 runs, no `sudo purge`.
 
 | App | Version/source | Runs | Mean startup ms | Min startup ms | Max startup ms | Mean RSS KB | Status |
 |---|---|---:|---:|---:|---:|---:|---|
-| Pico | local `Pico.app` | 20 | 272.661 | 237.908 | 326.350 | 86467 | misses `<150 ms` target |
+| Itsy | local `Itsy.app` | 20 | 272.661 | 237.908 | 326.350 | 86467 | misses `<150 ms` target |
 | Zed | 1.8.2, committed baseline | 20 | 470.856 | 330.977 | 679.386 | 182062 | stale baseline; current rerun blocked by running Zed session |
 | Sublime Text | not installed locally | - | - | - | - | - | not measured |
 | VSCode | not installed locally | - | - | - | - | - | not measured |
 | CodeEdit | not installed locally | - | - | - | - | - | not measured |
 
-Against the committed same-version Zed baseline, Pico is `42.1%` faster on mean startup and uses `52.5%` less RSS at first-window measurement. Current Zed superiority cannot be verified without closing the user's running Zed session.
+Against the committed same-version Zed baseline, Itsy is `42.1%` faster on mean startup and uses `52.5%` less RSS at first-window measurement. Current Zed superiority cannot be verified without closing the user's running Zed session.
 
 ## Scope
 
-Pico is intentionally narrow:
+Itsy is intentionally narrow:
 
 - AppKit shell, Metal text view, Swift rope buffer.
 - Built-in plain/vim/emacs keymap profiles.

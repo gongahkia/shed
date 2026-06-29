@@ -3,31 +3,31 @@
 import PackageDescription
 
 let package = Package(
-	name: "Pico",
+	name: "Itsy",
 	platforms: [
 		.macOS(.v13),
 	],
 	products: [
-		.executable(name: "PicoApp", targets: ["PicoApp"]),
-		.executable(name: "PicoBench", targets: ["PicoBench"]),
-		.library(name: "PicoRender", targets: ["PicoRender"]),
-		.library(name: "PicoEditor", targets: ["PicoEditor"]),
-		.library(name: "PicoSyntax", targets: ["PicoSyntax"]),
-		.library(name: "PicoKeymap", targets: ["PicoKeymap"]),
+		.executable(name: "ItsyApp", targets: ["ItsyApp"]),
+		.executable(name: "ItsyBench", targets: ["ItsyBench"]),
+		.library(name: "ItsyRender", targets: ["ItsyRender"]),
+		.library(name: "ItsyEditor", targets: ["ItsyEditor"]),
+		.library(name: "ItsySyntax", targets: ["ItsySyntax"]),
+		.library(name: "ItsyKeymap", targets: ["ItsyKeymap"]),
 		.library(name: "CTreeSitter", targets: ["CTreeSitter"]),
 		.library(name: "CTSGrammars", targets: ["CTSGrammars"]),
 	],
 	dependencies: [],
 	targets: [
 		.executableTarget(
-			name: "PicoApp",
-			dependencies: ["PicoRender", "PicoEditor", "PicoSyntax", "PicoKeymap"]
+			name: "ItsyApp",
+			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap"]
 		),
-		.target(name: "PicoRender", dependencies: ["PicoEditor", "PicoKeymap"], resources: [.copy("Shaders.metal")]),
-		.target(name: "PicoEditor"),
-		.target(name: "PicoSyntax", dependencies: ["CTreeSitter", "CTSGrammars", "PicoEditor"], resources: [.copy("Resources")]),
-		.target(name: "PicoKeymap", resources: [.process("Resources")]),
-		.executableTarget(name: "PicoBench", dependencies: ["PicoEditor"]),
+		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")]),
+		.target(name: "ItsyEditor"),
+		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "CTSGrammars", "ItsyEditor"], resources: [.copy("Resources")]),
+		.target(name: "ItsyKeymap", resources: [.process("Resources")]),
+		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"]),
 		.target(
 			name: "CTreeSitter",
 			path: "Sources/CTreeSitter",
@@ -90,10 +90,10 @@ let package = Package(
 				.unsafeFlags(["-O3"], .when(configuration: .release)),
 			]
 		),
-		.testTarget(name: "PicoEditorTests", dependencies: ["PicoEditor"]),
-		.testTarget(name: "PicoKeymapTests", dependencies: ["PicoKeymap"]),
-		.testTarget(name: "PicoRenderTests", dependencies: ["PicoRender"]),
-		.testTarget(name: "PicoSyntaxTests", dependencies: ["PicoSyntax", "PicoEditor"]),
+		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor"]),
+		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
+		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
+		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars"]),
 	]
 )

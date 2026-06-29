@@ -4,7 +4,7 @@
 
 ```sh
 swift build -c release
-.build/release/PicoBench rope
+.build/release/ItsyBench rope
 ```
 
 ## Result
@@ -27,6 +27,6 @@ Output:
 
 ## Notes
 
-- `PicoBench rope --ops <count> --slice-length <bytes>` now runs this bench.
+- `ItsyBench rope --ops <count> --slice-length <bytes>` now runs this bench.
 - The rope no longer materializes the whole buffer for insert/remove/slice; edits mutate by rebuilding only the affected B-tree path and leaf.
 - id064 adds a repeated-ASCII fast path for single-byte repeated text, avoiding per-edit leaf copies for the benchmark shape.

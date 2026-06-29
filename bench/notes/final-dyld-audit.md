@@ -4,13 +4,13 @@
 
 - `swift build -c release`
 - `bench/scripts/dyld_audit.sh`
-- `dyld_info -fixups .build/release/PicoApp`
-- `dyld_info -symbolic_fixups .build/release/PicoApp`
-- `otool -l .build/release/PicoApp`
+- `dyld_info -fixups .build/release/ItsyApp`
+- `dyld_info -symbolic_fixups .build/release/ItsyApp`
+- `otool -l .build/release/ItsyApp`
 
 ## Result
 
-- `DYLD_PRINT_STATISTICS=1 DYLD_PRINT_STATISTICS_DETAILS=1 .build/release/PicoApp --bench-exit-on-ready` emits no rebase fixup count in this local environment.
+- `DYLD_PRINT_STATISTICS=1 DYLD_PRINT_STATISTICS_DETAILS=1 .build/release/ItsyApp --bench-exit-on-ready` emits no rebase fixup count in this local environment.
 - `bench/scripts/dyld_audit.sh` now falls back to static chained-fixup counting with `dyld_info -fixups`.
 - Static rebase fixups: `8137`; target: `<2000`; result: fail.
 - Static bind fixups: `1011`.
@@ -31,7 +31,7 @@
 ## Cause
 
 - [Inference] The growth above the `<2000` target is dominated by Swift/ObjC metadata and generated parser metadata, not hand-written mutable globals.
-- Evidence: `dyld_info -symbolic_fixups` shows Swift type metadata rebases for `PicoEditor`, `PicoRender`, `PicoSyntax`, `PicoKeymap`, and `PicoApp` types, plus repeated tree-sitter symbol/name metadata rebases.
+- Evidence: `dyld_info -symbolic_fixups` shows Swift type metadata rebases for `ItsyEditor`, `ItsyRender`, `ItsySyntax`, `ItsyKeymap`, and `ItsyApp` types, plus repeated tree-sitter symbol/name metadata rebases.
 - Evidence: ObjC metadata sections account for at least `2757` rebases: `__objc_const`, `__objc_selrefs`, `__objc_data`, `__objc_classlist`, `__objc_protolist`, and `__objc_protorefs`.
 - The TODO-linked Emerge writeup says Swift classes on Apple platforms produce ObjC metadata and rebase work, including for pure Swift classes: https://www.emergetools.com/blog/posts/SwiftReferenceTypes
 

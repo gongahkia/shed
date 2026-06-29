@@ -2,11 +2,11 @@
 .swiftpm/
 *.xcodeproj/
 DerivedData/
-Pico.app/
+Itsy.app/
 bench/traces/*.trace/
 bench/corpus/huge.log
 bench/results/*.json
-!bench/results/baseline-pico-current.json
+!bench/results/baseline-itsy-current.json
 !.gitkeep
 !.gitignore
 !*.md

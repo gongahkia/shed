@@ -2,8 +2,8 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-app_dir="${PICO_APP_DIR:-$repo_dir/Pico.app}"
-identity="${PICO_CODESIGN_IDENTITY:-}"
+app_dir="${ITSY_APP_DIR:-$repo_dir/Itsy.app}"
+identity="${ITSY_CODESIGN_IDENTITY:-}"
 
 if [[ ! -d "$app_dir" ]]; then
 	(cd "$repo_dir" && bench/scripts/make_app.sh >/dev/null)
@@ -16,7 +16,7 @@ if [[ -z "$identity" ]]; then
 	done < <(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application:[^"]*\)".*/\1/p')
 	if [[ "${#identities[@]}" -ne 1 ]]; then
 		echo "expected exactly one Developer ID Application identity; found ${#identities[@]}" >&2
-		echo "set PICO_CODESIGN_IDENTITY='Developer ID Application: <name> (<team>)'" >&2
+		echo "set ITSY_CODESIGN_IDENTITY='Developer ID Application: <name> (<team>)'" >&2
 		exit 1
 	fi
 	identity="${identities[0]}"

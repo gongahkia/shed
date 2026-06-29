@@ -71,7 +71,7 @@ Itsy is intentionally narrow:
 - Built-in plain/vim/emacs keymap profiles.
 - Tree-sitter syntax highlighting for common code formats.
 - LSP protocol core is in progress; no integrated LSP UI yet.
-- Git status/diff command core is in progress; no integrated Git UI yet.
+- Git status/diff core and a minimal changes panel are in progress.
 - No Electron, terminal, plugin runtime, collaboration, or telemetry.
 
 ## Formatting

@@ -6,6 +6,7 @@ Pico.app/
 bench/traces/*.trace/
 bench/corpus/huge.log
 bench/results/*.json
+!bench/results/baseline-pico-current.json
 !.gitkeep
 !.gitignore
 !*.md

@@ -11,6 +11,8 @@ public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
     case moveToDisplay = "move-to-display"
     case swap
     case toggleFloating = "toggle-floating"
+    case manualPreselect = "manual-preselect"
+    case bspTree = "bsp-tree"
     case switchTag = "switch-tag"
     case moveToTag = "move-to-tag"
     case toggleTag = "toggle-tag"
@@ -177,6 +179,8 @@ public enum IPCCommand: Equatable, Sendable {
     case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
     case toggleFloating(IPCFloatingCommand)
+    case manualPreselect(IPCManualPreselectCommand)
+    case bspTree(IPCBSPTreeCommand)
     case switchTag(IPCTagCommand)
     case moveToTag(IPCMoveToTagCommand)
     case toggleTag(IPCTagCommand)
@@ -207,6 +211,10 @@ public enum IPCCommand: Equatable, Sendable {
             return .swap
         case .toggleFloating:
             return .toggleFloating
+        case .manualPreselect:
+            return .manualPreselect
+        case .bspTree:
+            return .bspTree
         case .switchTag:
             return .switchTag
         case .moveToTag:
@@ -263,6 +271,10 @@ extension IPCCommand: Codable {
             self = .toggleFloating(
                 try container.decodeIfPresent(IPCFloatingCommand.self, forKey: .arguments) ?? .init()
             )
+        case .manualPreselect:
+            self = .manualPreselect(try container.decodeRequired(IPCManualPreselectCommand.self, forKey: .arguments))
+        case .bspTree:
+            self = .bspTree(try container.decodeRequired(IPCBSPTreeCommand.self, forKey: .arguments))
         case .switchTag, .toggleTag, .tagAdd, .tagRemove:
             self = try Self.decodeTagCommand(name, from: container)
         case .moveToTag:
@@ -303,6 +315,10 @@ extension IPCCommand: Codable {
         case let .moveToDisplay(command):
             try container.encode(command, forKey: .arguments)
         case let .toggleFloating(command):
+            try container.encode(command, forKey: .arguments)
+        case let .manualPreselect(command):
+            try container.encode(command, forKey: .arguments)
+        case let .bspTree(command):
             try container.encode(command, forKey: .arguments)
         case let .switchTag(command), let .toggleTag(command), let .tagAdd(command), let .tagRemove(command):
             try container.encode(command, forKey: .arguments)

@@ -20,6 +20,8 @@ consumes that response and then prints event lines.
 - `move-to-display`
 - `swap`
 - `toggle-floating`
+- `manual-preselect`
+- `bsp-tree`
 - `switch-tag`
 - `move-to-tag`
 - `toggle-tag`
@@ -48,6 +50,8 @@ layout order by stable window identity and restores it on later window discovery
 `list-windows` and `list-displays` return scoped `state` payloads for scripts that need stable query
 commands instead of parsing the full runtime state. `toggle-floating` changes whether a window participates
 in tiling, and `move-to-display` updates Olly's display assignment before re-arranging the affected displays.
+`manual-preselect` and `bsp-tree` expose engine tree controls for manual/BSP layouts; both return structured
+`unsupported_engine_command` errors when the active engine does not match the requested tree operation.
 
 ## Schema
 
@@ -87,6 +91,8 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "move-to-display",
         "swap",
         "toggle-floating",
+        "manual-preselect",
+        "bsp-tree",
         "switch-tag",
         "move-to-tag",
         "toggle-tag",
@@ -120,6 +126,40 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "tag",
         "window"
       ]
+    },
+    "manualPreselectDirection": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right",
+        "up",
+        "down"
+      ]
+    },
+    "bspTreeAction": {
+      "type": "string",
+      "enum": [
+        "rotateChildren",
+        "flipAxis",
+        "balanceTree"
+      ]
+    },
+    "bspContainerPath": {
+      "type": "object",
+      "required": [
+        "indexes"
+      ],
+      "properties": {
+        "indexes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "tagIndex": {
       "type": "integer",
@@ -261,6 +301,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "arguments": {
               "$ref": "#/$defs/floatingArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "manual-preselect"
+            },
+            "arguments": {
+              "$ref": "#/$defs/manualPreselectArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "bsp-tree"
+            },
+            "arguments": {
+              "$ref": "#/$defs/bspTreeArguments"
             }
           }
         },
@@ -449,6 +509,43 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "floating": {
           "type": "boolean"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "manualPreselectArguments": {
+      "type": "object",
+      "required": [
+        "direction"
+      ],
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/manualPreselectDirection"
+        },
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "bspTreeArguments": {
+      "type": "object",
+      "required": [
+        "action",
+        "path"
+      ],
+      "properties": {
+        "action": {
+          "$ref": "#/$defs/bspTreeAction"
+        },
+        "path": {
+          "$ref": "#/$defs/bspContainerPath"
         },
         "displayID": {
           "$ref": "#/$defs/displayID"

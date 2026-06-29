@@ -43,6 +43,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case missingDirectionalTarget(IPCDirection)
     case axOperationFailed(String, AXError)
     case unsupportedAXCommand(String)
+    case unsupportedEngineCommand(command: String, engineID: LayoutEngineID)
 
     public var description: String {
         switch self {
@@ -60,6 +61,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "\(operation) failed: \(error)"
         case let .unsupportedAXCommand(command):
             return "\(command) requires Accessibility permission"
+        case let .unsupportedEngineCommand(command, engineID):
+            return "\(command) is unavailable for engine \(engineID.rawValue)"
         }
     }
 
@@ -79,6 +82,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "ax_operation_failed"
         case .unsupportedAXCommand:
             return "ax_unavailable"
+        case .unsupportedEngineCommand:
+            return "unsupported_engine_command"
         }
     }
 }
@@ -257,7 +262,7 @@ public actor OllyRuntime {
             return try await queryResponse(for: request, connection: connection)
         case .switchTag, .toggleTag, .tagAdd, .tagRemove, .moveToTag, .moveToDisplay:
             return try await tagResponse(for: request)
-        case .setEngine, .cycleEngine:
+        case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .reload, .restoreWindows:
             return try await controlResponse(for: request)
@@ -326,6 +331,12 @@ public actor OllyRuntime {
         case let .cycleEngine(command):
             try await cycleEngine(command)
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "engine cycled")))
+        case let .manualPreselect(command):
+            try await manualPreselect(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "manual preselected")))
+        case let .bspTree(command):
+            try await mutateBSPTree(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "bsp tree changed")))
         default:
             preconditionFailure("invalid engine command")
         }

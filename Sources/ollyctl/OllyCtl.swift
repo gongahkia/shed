@@ -24,6 +24,8 @@ struct OllyCtl: ParsableCommand {
             ToggleTag.self,
             SetEngine.self,
             CycleEngine.self,
+            ManualPreselect.self,
+            BSPTree.self,
             TagAdd.self,
             TagRemove.self,
             Reload.self,

@@ -158,3 +158,8 @@ Current section distribution:
 
 - Replaced the trivial `NSViewController` subclass for editor panes with a value wrapper around a plain `NSViewController` and `MetalTextView`.
 - Static rebase fixups after editor-pane controller cleanup: `2582`; target remains `<2000`; result remains fail.
+
+## Project find panel subclass cleanup
+
+- Replaced the custom project-find panel subclass with a plain titled `NSPanel`; local verification showed that configuration already reports `canBecomeKey == true`.
+- Static rebase fixups after project-find panel subclass cleanup: `2566`; target remains `<2000`; result remains fail.

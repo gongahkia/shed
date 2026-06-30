@@ -144,6 +144,7 @@ enum ItsyWorkspaceController {
 		for controller in controllers.allObjects {
 			controller.setGitSnapshot(gitSnapshot)
 		}
+		ItsyGitHunkGutterCoordinator.applyAll()
 	}
 
 	private static func loadGitStatus() {

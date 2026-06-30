@@ -130,6 +130,8 @@ private enum GitCommitDraftStore {
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
+	private weak var gitGutterIndexMenuItem: NSMenuItem?
+	private weak var gitGutterHeadMenuItem: NSMenuItem?
 	private lazy var commandRegistry = makeCommandRegistry()
 	private var commandPalettePanel: NSPanel?
 	private var commandPaletteInputField: NSTextField?
@@ -298,6 +300,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		NSApp.keyWindow?.performClose(sender)
+	}
+
+	@objc private func useGitGutterIndex(_: Any?) {
+		ItsyGitHunkGutterCoordinator.setMode(.index)
+		refreshGitGutterMenuItems()
+	}
+
+	@objc private func useGitGutterHead(_: Any?) {
+		ItsyGitHunkGutterCoordinator.setMode(.head)
+		refreshGitGutterMenuItems()
+	}
+
+	private func refreshGitGutterMenuItems() {
+		let mode = ItsyGitHunkGutterCoordinator.currentMode
+		gitGutterIndexMenuItem?.state = mode == .index ? .on : .off
+		gitGutterHeadMenuItem?.state = mode == .head ? .on : .off
 	}
 
 	@objc private func toggleCommandPalette(_ sender: Any?) {
@@ -2853,6 +2871,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let fileItem = NSMenuItem()
 		let editItem = NSMenuItem()
 		let navigateItem = NSMenuItem()
+		let viewItem = NSMenuItem()
 		let gitItem = NSMenuItem()
 		let taskItem = NSMenuItem()
 		let problemItem = NSMenuItem()
@@ -2861,6 +2880,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		mainMenu.addItem(fileItem)
 		mainMenu.addItem(editItem)
 		mainMenu.addItem(navigateItem)
+		mainMenu.addItem(viewItem)
 		mainMenu.addItem(gitItem)
 		mainMenu.addItem(taskItem)
 		mainMenu.addItem(problemItem)
@@ -2921,6 +2941,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		outlineItem.keyEquivalentModifierMask = [.command, .option]
 		outlineItem.target = self
 		navigateItem.submenu = navigateMenu
+
+		let viewMenu = NSMenu(title: L10n.string("View"))
+		let gitGutterIndexItem = viewMenu.addItem(
+			withTitle: L10n.string("Git Gutter: Compare to Index"),
+			action: #selector(useGitGutterIndex(_:)),
+			keyEquivalent: ""
+		)
+		gitGutterIndexItem.target = self
+		let gitGutterHeadItem = viewMenu.addItem(
+			withTitle: L10n.string("Git Gutter: Compare to HEAD"),
+			action: #selector(useGitGutterHead(_:)),
+			keyEquivalent: ""
+		)
+		gitGutterHeadItem.target = self
+		gitGutterIndexMenuItem = gitGutterIndexItem
+		gitGutterHeadMenuItem = gitGutterHeadItem
+		refreshGitGutterMenuItems()
+		viewItem.submenu = viewMenu
 
 		let gitMenu = NSMenu(title: L10n.string("Git"))
 		let gitChangesItem = gitMenu.addItem(withTitle: L10n.string("Git Changes"), action: #selector(showGitChanges(_:)), keyEquivalent: "")

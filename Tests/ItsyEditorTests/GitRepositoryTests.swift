@@ -130,11 +130,13 @@ import Testing
 
 	_ = try repository.diff(path: "Sources/App.swift")
 	_ = try repository.diff(path: "Sources/App.swift", staged: true)
+	_ = try repository.diffAgainstHead(path: "Sources/App.swift")
 	_ = try repository.conflictBlob(path: "Sources/App.swift", stage: 2)
 
 	#expect(runner.recordedArguments == [
 		["diff", "--no-color", "--", "Sources/App.swift"],
 		["diff", "--no-color", "--cached", "--", "Sources/App.swift"],
+		["diff", "--no-color", "HEAD", "--", "Sources/App.swift"],
 		["show", ":2:Sources/App.swift"],
 	])
 }

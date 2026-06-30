@@ -36,6 +36,7 @@ extension OllyRuntime {
         }
         let error = AXUIElementSetAttributeValue(target.axElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
         guard error == .success else {
+            await handleAXReadWriteError(error)
             throw OllyRuntimeError.axOperationFailed("focus", error)
         }
         await setFocusedWindow(nextID, displayID: displayID, publish: true)
@@ -56,6 +57,9 @@ extension OllyRuntime {
     }
 
     func startApplicationObservation() {
+        guard applicationObservationTask == nil else {
+            return
+        }
         let task = Task { [weak self, applicationMonitor] in
             for await event in applicationMonitor.events() {
                 guard let self, !Task.isCancelled else {
@@ -64,10 +68,11 @@ extension OllyRuntime {
                 await self.handle(applicationEvent: event)
             }
         }
+        applicationObservationTask = task
         tasks.append(task)
     }
 
-    func startAXObservation(for application: Application) {
+    func startAXObservation(for application: Application) async {
         applicationsByProcessID[application.processID] = application
         guard axObserversByProcessID[application.processID] == nil else {
             return
@@ -85,6 +90,11 @@ extension OllyRuntime {
                 }
             }
             tasks.append(task)
+        } catch let error as AXObserverBridgeError {
+            lastError = "AX observer failed for pid \(application.processID): \(error)"
+            if let axError = error.axError {
+                await handleAXReadWriteError(axError)
+            }
         } catch {
             lastError = "AX observer failed for pid \(application.processID): \(error)"
         }
@@ -103,7 +113,7 @@ extension OllyRuntime {
         switch applicationEvent {
         case let .launched(application):
             await refreshWindows(for: application)
-            startAXObservation(for: application)
+            await startAXObservation(for: application)
         case let .terminated(application):
             let windows = await windowStore.windows(forProcessID: application.processID)
             for window in windows {
@@ -120,13 +130,13 @@ extension OllyRuntime {
     func refreshAllWindows() async {
         for application in applicationMonitor.runningApplications() {
             await refreshWindows(for: application)
-            startAXObservation(for: application)
+            await startAXObservation(for: application)
         }
     }
 
     func refreshWindows(for application: Application) async {
         applicationsByProcessID[application.processID] = application
-        for element in axWindows(for: application.axElement) {
+        for element in await axWindows(for: application.axElement) {
             await refreshWindowElement(element, application: application)
         }
     }
@@ -153,7 +163,7 @@ extension OllyRuntime {
 
     func refreshFocusedWindowFromSystem() async {
         guard let application = frontmostApplication(),
-              let element = focusedWindowElement(for: application.axElement) else {
+              let element = await focusedWindowElement(for: application.axElement) else {
             return
         }
         await refreshFocusedWindow(element: element, application: application)
@@ -220,7 +230,7 @@ extension OllyRuntime {
             await refreshFocusedWindow(element: event.element, application: application)
             return
         }
-        guard let focusedElement = focusedWindowElement(for: application.axElement) else {
+        guard let focusedElement = await focusedWindowElement(for: application.axElement) else {
             return
         }
         await refreshFocusedWindow(element: focusedElement, application: application)
@@ -257,10 +267,11 @@ extension OllyRuntime {
         return state.withLayoutOrder(layoutOrder)
     }
 
-    private func focusedWindowElement(for applicationElement: AXUIElement) -> AXUIElement? {
+    private func focusedWindowElement(for applicationElement: AXUIElement) async -> AXUIElement? {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(applicationElement, kAXFocusedWindowAttribute as CFString, &value)
         guard error == .success, let value else {
+            await handleAXReadWriteError(error)
             return nil
         }
         return unsafeBitCast(value, to: AXUIElement.self)
@@ -272,10 +283,11 @@ extension OllyRuntime {
         }
     }
 
-    func axWindows(for applicationElement: AXUIElement) -> [AXUIElement] {
+    func axWindows(for applicationElement: AXUIElement) async -> [AXUIElement] {
         var value: CFTypeRef?
         let error = AXUIElementCopyAttributeValue(applicationElement, kAXWindowsAttribute as CFString, &value)
         guard error == .success else {
+            await handleAXReadWriteError(error)
             return []
         }
         return value as? [AXUIElement] ?? []
@@ -318,6 +330,19 @@ extension OllyRuntime {
             return TagSet(try Tag(index: 0))
         } catch {
             fatalError("failed to create default tag: \(error)")
+        }
+    }
+}
+
+private extension AXObserverBridgeError {
+    var axError: AXError? {
+        switch self {
+        case let .observerCreateFailed(error):
+            return error
+        case let .addNotificationFailed(_, error):
+            return error
+        case .streamContinuationUnavailable:
+            return nil
         }
     }
 }

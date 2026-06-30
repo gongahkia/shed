@@ -36,6 +36,8 @@ actor RuntimeEventHub {
 private extension IPCEvent {
     var kind: IPCEventKind {
         switch self {
+        case .axPermission:
+            return .axPermission
         case .engine:
             return .engine
         case .focus:

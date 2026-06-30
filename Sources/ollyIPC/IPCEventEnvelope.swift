@@ -2,6 +2,18 @@ import Foundation
 import ollyLayouts
 import ollyKit
 
+public struct IPCAXPermissionEvent: Codable, Equatable, Sendable {
+    public let status: String
+
+    public init(status: String) {
+        self.status = status
+    }
+
+    public init(status: AXPermissionStatus) {
+        self.status = status.wireValue
+    }
+}
+
 public struct IPCFocusEvent: Codable, Equatable, Sendable {
     public let focusedWindowID: WindowID?
     public let displayID: DisplayID?
@@ -15,6 +27,7 @@ public struct IPCFocusEvent: Codable, Equatable, Sendable {
 }
 
 public enum IPCEvent: Codable, Equatable, Sendable {
+    case axPermission(IPCAXPermissionEvent)
     case engine(EngineEvent)
     case focus(IPCFocusEvent)
 }

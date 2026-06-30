@@ -36,6 +36,8 @@ public actor WindowMover {
     private var pendingMoves: [DisplayID: [WindowMoveKey: PendingMove]] = [:]
     private var flushTasks: [DisplayID: Task<Void, Never>] = [:]
     private var lastFrames: [WindowMoveKey: CGRect] = [:]
+    private var isPaused = false
+    private var axErrorHandler: (@Sendable (AXError) -> Void)?
 
     public init(
         frameDelayNanoseconds: UInt64 = 16_666_667,
@@ -77,6 +79,9 @@ public actor WindowMover {
     }
 
     public func setPosition(_ position: CGPoint, for target: WindowMoveTarget) {
+        guard !isPaused else {
+            return
+        }
         let key = WindowMoveKey(target: target)
         var move = pendingMove(for: key) ?? PendingMove(key: key, target: target)
         move.position = position
@@ -93,6 +98,9 @@ public actor WindowMover {
     }
 
     public func setSize(_ size: CGSize, for target: WindowMoveTarget) {
+        guard !isPaused else {
+            return
+        }
         let key = WindowMoveKey(target: target)
         var move = pendingMove(for: key) ?? PendingMove(key: key, target: target)
         move.size = size
@@ -107,6 +115,27 @@ public actor WindowMover {
         for displayID in pendingMoves.keys.sorted() {
             await flushPending(displayID: displayID)
         }
+    }
+
+    public func flushAndPause() async {
+        isPaused = true
+        flushTasks.values.forEach { $0.cancel() }
+        flushTasks.removeAll()
+        let moves = pendingMoves
+            .flatMap { $0.value.values }
+            .sorted { $0.key.rawValue < $1.key.rawValue }
+        pendingMoves.removeAll()
+        for move in moves {
+            await apply(move)
+        }
+    }
+
+    public func resume() {
+        isPaused = false
+    }
+
+    public func setAXErrorHandler(_ handler: (@Sendable (AXError) -> Void)?) {
+        axErrorHandler = handler
     }
 
     private func pendingMove(for key: WindowMoveKey) -> PendingMove? {
@@ -150,6 +179,9 @@ public actor WindowMover {
         let delay = frameDelayNanoseconds
         flushTasks[displayID] = Task { [weak self] in
             try? await Task.sleep(nanoseconds: delay)
+            guard !Task.isCancelled else {
+                return
+            }
             await self?.flushPending(displayID: displayID)
         }
     }
@@ -190,6 +222,8 @@ public actor WindowMover {
                 }
                 if result == .success {
                     frame = (frame ?? CGRect(origin: position, size: .zero)).withOrigin(position)
+                } else {
+                    reportAXError(result)
                 }
             }
         }
@@ -214,6 +248,8 @@ public actor WindowMover {
             }
             if result == .success {
                 frame = (frame ?? CGRect(origin: .zero, size: size)).withSize(size)
+            } else {
+                reportAXError(result)
             }
         }
 
@@ -235,6 +271,13 @@ public actor WindowMover {
             }
         }
         return lastError
+    }
+
+    private func reportAXError(_ error: AXError) {
+        guard error.isAXPermissionRevocationSignal else {
+            return
+        }
+        axErrorHandler?(error)
     }
 
     private func displayID(containing point: CGPoint) -> DisplayID? {
@@ -346,27 +389,5 @@ private final class SystemAXWindowMoveClient: AXWindowMoveClient {
             return nil
         }
         return unsafeBitCast(value, to: AXValue.self)
-    }
-}
-
-private extension CGRect {
-    func withOrigin(_ origin: CGPoint) -> CGRect {
-        CGRect(origin: origin, size: size)
-    }
-
-    func withSize(_ size: CGSize) -> CGRect {
-        CGRect(origin: origin, size: size)
-    }
-}
-
-private extension CGPoint {
-    func isWithin(_ threshold: CGFloat, of other: CGPoint) -> Bool {
-        abs(x - other.x) < threshold && abs(y - other.y) < threshold
-    }
-}
-
-private extension CGSize {
-    func isWithin(_ threshold: CGFloat, of other: CGSize) -> Bool {
-        abs(width - other.width) < threshold && abs(height - other.height) < threshold
     }
 }

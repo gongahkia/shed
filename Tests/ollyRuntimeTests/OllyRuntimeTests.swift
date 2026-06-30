@@ -89,6 +89,37 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testAXPermissionChangePublishesEventAndRunsHook() async throws {
+        let recorder = PermissionRecorder()
+        try await withRuntime { runtime, socketPath, _ in
+            await runtime.replaceConfigForTest(Config {
+                Hooks {
+                    onAXPermissionChanged { context in
+                        recorder.record(context.status.wireValue)
+                    }
+                }
+            })
+            await runtime.setAXPermissionStatusForTest(.trusted)
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                command: .subscribeEvents(.init(eventKinds: [.axPermission]))
+            )))
+            XCTAssertEqual(
+                try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status,
+                .success
+            )
+
+            await runtime.handleAXPermissionChange(.missing)
+
+            let event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            XCTAssertEqual(event.event, .axPermission(IPCAXPermissionEvent(status: .missing)))
+            XCTAssertEqual(recorder.events, ["missing"])
+        }
+    }
+
     func testMoveWindowReordersFocusedWindowByLinearDirection() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -480,6 +511,18 @@ private extension OllyRuntime {
     func replaceConfigForTest(_ config: Config) async {
         await configStore.replace(with: config)
     }
+
+    func setAXPermissionStatusForTest(_ status: AXPermissionStatus?) {
+        axPermissionStatus = status
+    }
+}
+
+private final class PermissionRecorder: @unchecked Sendable {
+    private(set) var events: [String] = []
+
+    func record(_ event: String) {
+        events.append(event)
+    }
 }
 
 private func seedWindows(
@@ -543,7 +586,13 @@ private struct RuntimeFixture {
             recoveryJournal: WindowRecoveryJournal(
                 stateURL: directoryURL.appendingPathComponent("recovery.json")
             ),
-            scanAXOnStart: false
+            scanAXOnStart: false,
+            axPermissionStream: {
+                AsyncStream { continuation in
+                    continuation.finish()
+                }
+            },
+            presentAXOnboarding: {}
         )
     }
 

@@ -238,6 +238,7 @@ public struct HookDeclaration: Codable, Equatable, Sendable {
     public let tagSwitchHandler: TagSwitchHookHandler?
     public let displayChangeHandler: DisplayChangeHookHandler?
     public let windowAppearedHandler: WindowAppearedHookHandler?
+    public let axPermissionHandler: AXPermissionHookHandler?
 
     public init(
         label: String,
@@ -245,7 +246,8 @@ public struct HookDeclaration: Codable, Equatable, Sendable {
         rawHandler: RawDSLBlock<Void>? = nil,
         tagSwitchHandler: TagSwitchHookHandler? = nil,
         displayChangeHandler: DisplayChangeHookHandler? = nil,
-        windowAppearedHandler: WindowAppearedHookHandler? = nil
+        windowAppearedHandler: WindowAppearedHookHandler? = nil,
+        axPermissionHandler: AXPermissionHookHandler? = nil
     ) {
         precondition(!label.isEmpty)
         self.label = label
@@ -254,6 +256,7 @@ public struct HookDeclaration: Codable, Equatable, Sendable {
         self.tagSwitchHandler = tagSwitchHandler
         self.displayChangeHandler = displayChangeHandler
         self.windowAppearedHandler = windowAppearedHandler
+        self.axPermissionHandler = axPermissionHandler
     }
 
     public static func raw(_ label: String = "raw", _ body: @escaping RawDSLHandler) -> HookDeclaration {
@@ -274,6 +277,10 @@ public struct HookDeclaration: Codable, Equatable, Sendable {
 
     public func runWindowAppeared(context: WindowAppearedHookContext) {
         windowAppearedHandler?(context)
+    }
+
+    public func runAXPermissionChanged(context: AXPermissionHookContext) {
+        axPermissionHandler?(context)
     }
 
     public static func == (lhs: HookDeclaration, rhs: HookDeclaration) -> Bool {
@@ -329,6 +336,10 @@ public struct Hooks: Codable, Equatable, Sendable {
 
     public func runWindowAppeared(context: WindowAppearedHookContext) {
         declarations.forEach { $0.runWindowAppeared(context: context) }
+    }
+
+    public func runAXPermissionChanged(context: AXPermissionHookContext) {
+        declarations.forEach { $0.runAXPermissionChanged(context: context) }
     }
 }
 

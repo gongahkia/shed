@@ -38,6 +38,7 @@ public enum IPCDirection: String, CaseIterable, Codable, Equatable, Sendable {
 }
 
 public enum IPCEventKind: String, CaseIterable, Codable, Equatable, Sendable {
+    case axPermission
     case display
     case engine
     case focus

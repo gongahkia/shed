@@ -128,6 +128,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
     "eventKind": {
       "type": "string",
       "enum": [
+        "axPermission",
         "display",
         "engine",
         "focus",
@@ -1126,6 +1127,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
     "event": {
       "type": "object",
       "properties": {
+        "axPermission": {
+          "$ref": "#/$defs/axPermissionEvent"
+        },
         "engine": {
           "$ref": "#/$defs/engineEvent"
         },
@@ -1134,6 +1138,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         }
       },
       "oneOf": [
+        {
+          "required": [
+            "axPermission"
+          ]
+        },
         {
           "required": [
             "engine"
@@ -1150,6 +1159,22 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
     "engineEvent": {
       "type": "object",
       "additionalProperties": true
+    },
+    "axPermissionEvent": {
+      "type": "object",
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "trusted",
+            "missing"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "focusEvent": {
       "type": "object",
@@ -1209,4 +1234,10 @@ Focus event line:
 
 ```json
 {"version":1,"event":{"focus":{"focusedWindowID":42,"displayID":1,"tagMask":1}}}
+```
+
+AX permission event line:
+
+```json
+{"version":1,"event":{"axPermission":{"status":"missing"}}}
 ```

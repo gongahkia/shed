@@ -82,6 +82,9 @@ final class RawDSLTests: XCTestCase {
             onWindowAppeared { context in
                 recorder.record(context.window.bundleID)
             }
+            onAXPermissionChanged { context in
+                recorder.record(context.status.wireValue)
+            }
         }
 
         hooks.runTagSwitch(
@@ -97,13 +100,20 @@ final class RawDSLTests: XCTestCase {
                 window: WindowState(id: 4, processID: 40, bundleID: "com.example.App", frame: .zero)
             )
         )
+        hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .missing))
 
         let data = try JSONEncoder().encode(hooks)
         let decoded = try JSONDecoder().decode(Hooks.self, from: data)
 
-        XCTAssertEqual(recorder.events, ["tag:2", "display:3", "com.example.App"])
-        XCTAssertEqual(decoded.declarations.map(\.label), ["onTagSwitch", "display.trace", "onWindowAppeared"])
-        XCTAssertEqual(decoded.declarations.map(\.kind), [.tagSwitch, .displayChange, .windowAppeared])
+        XCTAssertEqual(recorder.events, ["tag:2", "display:3", "com.example.App", "missing"])
+        XCTAssertEqual(
+            decoded.declarations.map(\.label),
+            ["onTagSwitch", "display.trace", "onWindowAppeared", "onAXPermissionChanged"]
+        )
+        XCTAssertEqual(
+            decoded.declarations.map(\.kind),
+            [.tagSwitch, .displayChange, .windowAppeared, .axPermissionChanged]
+        )
         XCTAssertEqual(decoded, hooks)
         XCTAssertNil(decoded.declarations.first?.tagSwitchHandler)
     }

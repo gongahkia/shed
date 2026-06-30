@@ -123,7 +123,9 @@ public final class AXObserverBridge {
             registeredNotifications.append(notification)
         }
 
-        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(newObserver), .commonModes)
+        Self.onMainThread {
+            CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(newObserver), .commonModes)
+        }
     }
 
     private func stop(finishStream: Bool) {
@@ -133,7 +135,9 @@ public final class AXObserverBridge {
                     AXObserverRemoveNotification(observer, observedElement, notification.axName)
                 }
             }
-            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+            Self.onMainThread {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .commonModes)
+            }
         }
 
         observer = nil
@@ -157,6 +161,14 @@ public final class AXObserverBridge {
                 rawNotificationName: rawNotificationName
             )
         )
+    }
+
+    private static func onMainThread(_ work: @escaping () -> Void) {
+        if Thread.isMainThread {
+            work()
+        } else {
+            DispatchQueue.main.sync(execute: work)
+        }
     }
 }
 

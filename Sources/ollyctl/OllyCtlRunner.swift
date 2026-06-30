@@ -92,6 +92,8 @@ struct OllyCtlRunner {
 
     private func renderEvent(_ envelope: IPCEventEnvelope) -> String {
         switch envelope.event {
+        case let .axPermission(event):
+            return "ax-permission \(event.status)"
         case let .engine(event):
             return renderEngineEvent(event)
         case let .focus(event):
@@ -188,7 +190,8 @@ func parseEventKinds(_ rawValues: [String]) throws -> [IPCEventKind] {
 
     return try rawValues.map { rawValue in
         guard let kind = IPCEventKind(rawValue: rawValue) else {
-            throw ValidationError("event kind must be one of: display, engine, focus, tag, window")
+            let values = IPCEventKind.allCases.map(\.rawValue).joined(separator: ", ")
+            throw ValidationError("event kind must be one of: \(values)")
         }
         return kind
     }

@@ -119,10 +119,14 @@ public actor OllyRuntime {
     let dispatcher: TagDispatcher
     let engineHost: EngineHost
     private let registry: LayoutEngineRegistry
+    let axPermissionStream: @Sendable () -> AsyncStream<AXPermissionStatus>
+    let presentAXOnboarding: @MainActor @Sendable () async -> Void
     private var server: UnixDomainSocketServer?
     var applicationsByProcessID: [pid_t: Application] = [:]
     var axObserversByProcessID: [pid_t: AXObserverBridge] = [:]
     var tasks: [Task<Void, Never>] = []
+    var applicationObservationTask: Task<Void, Never>?
+    var axPermissionStatus: AXPermissionStatus?
     var focusedWindowID: WindowID?
     var lastError: String?
 
@@ -134,7 +138,11 @@ public actor OllyRuntime {
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         statePersistence: WindowTagPersistence = WindowTagPersistence(),
         recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
-        scanAXOnStart: Bool = true
+        scanAXOnStart: Bool = true,
+        axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
+            OllyRuntime.defaultAXPermissionStream,
+        presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
+            OllyRuntime.defaultAXOnboarding
     ) {
         self.socketPath = socketPath
         self.configLoader = configLoader
@@ -144,6 +152,8 @@ public actor OllyRuntime {
         self.statePersistence = statePersistence
         self.recoveryJournal = recoveryJournal
         self.scanAXOnStart = scanAXOnStart
+        self.axPermissionStream = axPermissionStream
+        self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
         self.registry = Self.makeRegistry()
@@ -188,6 +198,9 @@ public actor OllyRuntime {
         }
         try await loadConfig(useDefaultWhenMissing: true)
         await initializeDisplays()
+        await windowMover.setAXErrorHandler { [weak self] error in Task { await self?.handleAXReadWriteError(error) } }
+        axPermissionStatus = AXPermission.status(prompt: false)
+        startAXPermissionObservation()
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
             startApplicationObservation()
@@ -206,6 +219,8 @@ public actor OllyRuntime {
     public func stop() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        applicationObservationTask = nil
+        await windowMover.setAXErrorHandler(nil)
         stopAXObservers()
         _ = await restoreJournaledWindows()
         server?.stop()

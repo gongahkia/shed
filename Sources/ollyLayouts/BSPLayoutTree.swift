@@ -34,6 +34,7 @@ public enum BSPLayoutTreeError: Error, Equatable, Sendable {
     case duplicateWindow(WindowID)
     case missingContainer(BSPContainerPath)
     case missingWindow(WindowID)
+    case missingSplit(WindowID, BSPSplitAxis)
     case notSplitContainer(BSPContainerPath)
 }
 
@@ -254,7 +255,7 @@ public indirect enum BSPNode: Codable, Equatable, Sendable {
         ratio: CGFloat,
         bounds: CGRect
     ) -> (first: CGRect, second: CGRect) {
-        let ratio = min(max(ratio, 0.05), 0.95)
+        let ratio = clampedRatio(ratio)
         switch axis {
         case .horizontal:
             let width = floor(bounds.width * ratio)
@@ -277,6 +278,10 @@ public indirect enum BSPNode: Codable, Equatable, Sendable {
         bounds: CGRect
     ) -> (first: CGRect, second: CGRect) {
         BSPNode.childFrames(axis: axis, ratio: ratio, bounds: bounds)
+    }
+
+    private static func clampedRatio(_ ratio: CGFloat) -> CGFloat {
+        min(max(ratio, 0.05), 0.95)
     }
 }
 

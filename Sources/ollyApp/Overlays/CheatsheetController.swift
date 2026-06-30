@@ -56,6 +56,8 @@ enum CheatsheetCatalog {
             return .swap
         case .move:
             return .move
+        case .resize, .split:
+            return .move
         case .switchTag, .toggleTag, .moveWindowToTag:
             return .tag
         case .setEngine, .cycleEngine:
@@ -94,6 +96,10 @@ enum CheatsheetCatalog {
             return "\(prefix) \(direction.rawValue)"
         case let .move(direction):
             return "\(prefix) \(direction.rawValue)"
+        case let .resize(direction, points):
+            return "Resize \(direction.rawValue) \(Int(points))pt"
+        case let .split(direction, ratio):
+            return "Split \(direction.rawValue) \(Int(ratio * 100))%"
         default:
             return prefix
         }

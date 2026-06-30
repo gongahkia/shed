@@ -127,6 +127,65 @@ final class BSPLayoutEngineTests: XCTestCase {
         )
     }
 
+    func testResizingSplitChangesFocusedChildRatio() throws {
+        let tree = BSPLayoutTree(
+            root: .split(axis: .horizontal, first: .window(id: 1), second: .window(id: 2))
+        )
+        let resizedTree = try tree.resizingSplit(
+            containing: 1,
+            axis: .horizontal,
+            focusedChild: .first,
+            ratio: 0.7
+        )
+        let engine = BSPLayoutEngine(config: BSPLayoutEngine.Config(tree: resizedTree))
+
+        let placements = engine.arrange(
+            windows: snapshots(1, 2),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(
+            placements,
+            [
+                Placement(windowID: 1, frame: CGRect(x: 0, y: 0, width: 560, height: 600), zOrder: 0),
+                Placement(windowID: 2, frame: CGRect(x: 560, y: 0, width: 240, height: 600), zOrder: 1)
+            ]
+        )
+    }
+
+    func testResizingSplitUsesNearestMatchingAncestor() throws {
+        let tree = BSPLayoutTree(
+            root: .split(
+                axis: .horizontal,
+                first: .window(id: 1),
+                second: .split(axis: .vertical, first: .window(id: 2), second: .window(id: 3))
+            )
+        )
+        let resizedTree = try tree.resizingSplit(
+            containing: 2,
+            axis: .vertical,
+            focusedChild: .first,
+            ratio: 0.75
+        )
+        let engine = BSPLayoutEngine(config: BSPLayoutEngine.Config(tree: resizedTree))
+
+        let placements = engine.arrange(
+            windows: snapshots(1, 2, 3),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(
+            placements,
+            [
+                Placement(windowID: 1, frame: CGRect(x: 0, y: 0, width: 400, height: 600), zOrder: 0),
+                Placement(windowID: 2, frame: CGRect(x: 400, y: 0, width: 400, height: 450), zOrder: 1),
+                Placement(windowID: 3, frame: CGRect(x: 400, y: 450, width: 400, height: 150), zOrder: 2)
+            ]
+        )
+    }
+
     func testFactoryBuildsEngine() throws {
         let factory = BSPLayoutEngineFactory()
         let tree = BSPLayoutTree(root: .window(id: 1))

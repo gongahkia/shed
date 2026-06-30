@@ -190,6 +190,10 @@ public extension WindowState {
         copy(tagMask: tagMask)
     }
 
+    func withFrame(_ frame: CGRect) -> WindowState {
+        copy(frame: frame)
+    }
+
     private func copy(
         displayID: DisplayID?? = nil,
         tagMask: UInt64? = nil,
@@ -199,7 +203,8 @@ public extension WindowState {
         isFullscreen: Bool? = nil,
         isOffSpace: Bool? = nil,
         engineOverride: LayoutEngineID?? = nil,
-        layoutOrder: Int?? = nil
+        layoutOrder: Int?? = nil,
+        frame: CGRect? = nil
     ) -> WindowState {
         WindowState(
             id: id,
@@ -214,7 +219,7 @@ public extension WindowState {
             isOffSpace: isOffSpace ?? self.isOffSpace,
             engineOverride: engineOverride ?? self.engineOverride,
             layoutOrder: layoutOrder ?? self.layoutOrder,
-            frame: frame,
+            frame: frame ?? self.frame,
             title: title,
             role: role,
             subrole: subrole

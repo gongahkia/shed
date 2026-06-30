@@ -1,5 +1,6 @@
 // swiftlint:disable identifier_name
 import Carbon.HIToolbox
+import CoreGraphics
 import Foundation
 import ollyCore
 import ollyKit
@@ -133,6 +134,8 @@ public enum Action: Codable, Equatable, Sendable {
     case focus(Direction)
     case swap(Direction)
     case move(Direction)
+    case resize(Direction, points: CGFloat)
+    case split(Direction, ratio: CGFloat)
     case switchTag(Int)
     case toggleTag(Int)
     case moveWindowToTag(Int)

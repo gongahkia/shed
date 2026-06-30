@@ -27,17 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.4 Window-resize keyboard bindings
-
-**Goal:** Bind `Action.resize(Direction, points: CGFloat)` and `Action.split(Direction, ratio: CGFloat)` to keys.
-
-**Files to modify:**
-- `Sources/ollyDSL/Keybind.swift:130-142` — add `Action.resize(Direction, points: CGFloat)` and `Action.split(Direction, ratio: CGFloat)`.
-- `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift` — implement via `WindowMover.setSize`.
-- For BSP engine: `Action.split` re-balances the binary tree node containing the focused window.
-
----
-
 ### M4.5 Focus-follows-mouse (optional)
 
 **Goal:** Sloppy-focus toggle.

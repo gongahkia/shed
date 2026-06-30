@@ -60,8 +60,8 @@ extension OllyRuntime {
 
     private func run(_ action: Action, displayID: DisplayID?, config: Config) async throws {
         switch action {
-        case .focus, .swap, .move:
-            try await runDirectionalAction(action, displayID: displayID)
+        case .focus, .swap, .move, .resize, .split:
+            try await runWindowAction(action, displayID: displayID)
         case .switchTag, .toggleTag, .moveWindowToTag:
             try await runTagAction(action, displayID: displayID)
         case let .setEngine(engineID):
@@ -83,7 +83,7 @@ extension OllyRuntime {
         }
     }
 
-    private func runDirectionalAction(_ action: Action, displayID: DisplayID?) async throws {
+    private func runWindowAction(_ action: Action, displayID: DisplayID?) async throws {
         switch action {
         case let .focus(direction):
             try await focus(IPCDirectionalCommand(direction: direction.ipcDirection, displayID: displayID))
@@ -91,6 +91,10 @@ extension OllyRuntime {
             try await swapWindow(IPCDirectionalCommand(direction: direction.ipcDirection, displayID: displayID))
         case let .move(direction):
             try await moveWindow(IPCDirectionalCommand(direction: direction.ipcDirection, displayID: displayID))
+        case let .resize(direction, points):
+            try await resizeFocusedWindow(direction, points: points, displayID: displayID)
+        case let .split(direction, ratio):
+            try await splitFocusedWindow(direction, ratio: ratio, displayID: displayID)
         default:
             throw OllyRuntimeError.unsupportedGestureAction(String(describing: action))
         }

@@ -9,6 +9,7 @@ public final class FocusInputAttribution: @unchecked Sendable {
     private var runLoopSource: CFRunLoopSource?
     private var healthTimer: DispatchSourceTimer?
     private var recentInputTimesByProcessID: [pid_t: Date] = [:]
+    private var mouseMoveSubscribers: [UUID: AsyncStream<CGPoint>.Continuation] = [:]
 
     public init() {}
 
@@ -38,6 +39,20 @@ public final class FocusInputAttribution: @unchecked Sendable {
         }
     }
 
+    public func mouseMoves() -> AsyncStream<CGPoint> {
+        let id = UUID()
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { [weak self] continuation in
+            self?.queue.async {
+                self?.mouseMoveSubscribers[id] = continuation
+            }
+            continuation.onTermination = { [weak self] _ in
+                self?.queue.async {
+                    self?.mouseMoveSubscribers[id] = nil
+                }
+            }
+        }
+    }
+
     public func hasRecentInput(pid: pid_t, within interval: TimeInterval = 0.25) -> Bool {
         queue.sync {
             recentInputTimesByProcessID[pid].map { Date().timeIntervalSince($0) < interval } ?? false
@@ -46,7 +61,13 @@ public final class FocusInputAttribution: @unchecked Sendable {
 
     public func recordInput(pid: pid_t, at date: Date = Date()) {
         queue.sync {
-            recentInputTimesByProcessID[pid] = date
+            recordInputOnQueue(pid: pid, at: date)
+        }
+    }
+
+    func recordMouseMove(location: CGPoint) {
+        queue.sync {
+            publishMouseMoveOnQueue(location)
         }
     }
 
@@ -54,7 +75,9 @@ public final class FocusInputAttribution: @unchecked Sendable {
         guard tap == nil else {
             return
         }
-        let mask = (1 << CGEventType.leftMouseDown.rawValue) | (1 << CGEventType.keyDown.rawValue)
+        let mask = (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << CGEventType.mouseMoved.rawValue)
         let ref = Unmanaged.passUnretained(self).toOpaque()
         guard let port = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
@@ -100,6 +123,16 @@ public final class FocusInputAttribution: @unchecked Sendable {
         }
     }
 
+    private func recordInputOnQueue(pid: pid_t, at date: Date) {
+        recentInputTimesByProcessID[pid] = date
+    }
+
+    private func publishMouseMoveOnQueue(_ location: CGPoint) {
+        for subscriber in mouseMoveSubscribers.values {
+            subscriber.yield(location)
+        }
+    }
+
     private static let eventTapCallback: CGEventTapCallBack = { _, type, event, refcon in
         guard let refcon else {
             return Unmanaged.passUnretained(event)
@@ -113,8 +146,18 @@ public final class FocusInputAttribution: @unchecked Sendable {
             }
             return nil
         }
+        if type == .mouseMoved {
+            let location = event.location
+            attribution.queue.async {
+                attribution.publishMouseMoveOnQueue(location)
+            }
+            return Unmanaged.passUnretained(event)
+        }
         let pid = pid_t(event.getIntegerValueField(.eventTargetUnixProcessID))
-        attribution.recordInput(pid: pid)
+        let date = Date()
+        attribution.queue.async {
+            attribution.recordInputOnQueue(pid: pid, at: date)
+        }
         return Unmanaged.passUnretained(event)
     }
 }

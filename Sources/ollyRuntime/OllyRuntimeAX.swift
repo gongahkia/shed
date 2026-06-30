@@ -34,11 +34,7 @@ extension OllyRuntime {
               let target = windowTargets.target(for: window) else {
             throw OllyRuntimeError.axOperationFailed("focus", .invalidUIElement)
         }
-        let error = AXUIElementSetAttributeValue(target.axElement, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-        guard error == .success else {
-            await handleAXReadWriteError(error)
-            throw OllyRuntimeError.axOperationFailed("focus", error)
-        }
+        try await setAXFocus(target, operation: "focus")
         await setFocusedWindow(nextID, displayID: displayID, publish: true)
     }
 

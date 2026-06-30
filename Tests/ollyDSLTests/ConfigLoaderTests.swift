@@ -25,6 +25,7 @@ final class ConfigLoaderTests: XCTestCase {
             }
             FocusPolicy {
                 allowStealingFor("com.apple.Terminal")
+                followsMouse(delay: 100.ms)
                 maxEventsPerSecond(20)
             }
             Session {
@@ -44,6 +45,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.hooks, Hooks())
         XCTAssertEqual(config.nativeSpace, NativeSpace())
         XCTAssertEqual(config.focusPolicy.allowedBundleIDs, ["com.apple.Terminal"])
+        XCTAssertEqual(config.focusPolicy.followsMouseDelay?.milliseconds, 100)
         XCTAssertEqual(config.focusPolicy.maxEventsPerSecond, 20)
         XCTAssertTrue(config.session.restoreOnLaunch)
     }

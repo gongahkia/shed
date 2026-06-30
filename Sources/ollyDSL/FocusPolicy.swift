@@ -4,6 +4,7 @@
 /// See also: `FocusPolicy`, `FocusPolicyBuilder`.
 public enum FocusPolicyDirective: Equatable, Sendable {
     case allowStealingFor(String)
+    case followsMouse(delay: AnimationDuration)
     case maxEventsPerSecond(Int)
     case minHumanIntervalMilliseconds(Int)
 }
@@ -14,27 +15,33 @@ public enum FocusPolicyDirective: Equatable, Sendable {
 /// See also: `FocusPolicyBuilder`, `ConfigSection`.
 public struct FocusPolicy: Codable, Equatable, Sendable {
     public let allowedBundleIDs: [String]
+    public let followsMouseDelay: AnimationDuration?
     public let maxEventsPerSecond: Int
     public let minHumanIntervalMilliseconds: Int
 
     public init(
         allowedBundleIDs: [String] = [],
+        followsMouseDelay: AnimationDuration? = nil,
         maxEventsPerSecond: Int = 20,
         minHumanIntervalMilliseconds: Int = 80
     ) {
         self.allowedBundleIDs = allowedBundleIDs.sorted()
+        self.followsMouseDelay = followsMouseDelay
         self.maxEventsPerSecond = max(1, maxEventsPerSecond)
         self.minHumanIntervalMilliseconds = max(0, minHumanIntervalMilliseconds)
     }
 
     public init(@FocusPolicyBuilder _ build: () -> [FocusPolicyDirective]) {
         var allowedBundleIDs: [String] = []
+        var followsMouseDelay: AnimationDuration?
         var maxEventsPerSecond = 20
         var minHumanIntervalMilliseconds = 80
         for directive in build() {
             switch directive {
             case let .allowStealingFor(bundleID):
                 allowedBundleIDs.append(bundleID)
+            case let .followsMouse(delay):
+                followsMouseDelay = delay
             case let .maxEventsPerSecond(value):
                 maxEventsPerSecond = value
             case let .minHumanIntervalMilliseconds(value):
@@ -43,6 +50,7 @@ public struct FocusPolicy: Codable, Equatable, Sendable {
         }
         self.init(
             allowedBundleIDs: allowedBundleIDs,
+            followsMouseDelay: followsMouseDelay,
             maxEventsPerSecond: maxEventsPerSecond,
             minHumanIntervalMilliseconds: minHumanIntervalMilliseconds
         )
@@ -77,6 +85,14 @@ public enum FocusPolicyBuilder {
 /// See also: `FocusPolicy`, `maxEventsPerSecond(_:)`.
 public func allowStealingFor(_ bundleID: String) -> FocusPolicyDirective {
     FocusPolicyDirective.allowStealingFor(bundleID)
+}
+
+/// Purpose: Enables sloppy focus after the pointer rests over a managed window.
+/// Parameters: Pass the debounce delay, commonly with `.ms`.
+/// Example: `followsMouse(delay: 100.ms)`
+/// See also: `FocusPolicy`, `minHumanIntervalMilliseconds(_:)`.
+public func followsMouse(delay: AnimationDuration = 100.ms) -> FocusPolicyDirective {
+    FocusPolicyDirective.followsMouse(delay: delay)
 }
 
 /// Purpose: Sets the maximum accepted programmatic focus changes per second.

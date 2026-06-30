@@ -69,5 +69,6 @@ extension OllyRuntime {
         try? await scratchpads.upsert(config.scratchpads.entries)
         await focusRateLimiter.update(settings: config.focusPolicy.rateLimitSettings)
         await hookDispatcher.update(config.hooks)
+        configureFocusFollowsMouse()
     }
 }

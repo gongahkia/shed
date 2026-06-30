@@ -86,3 +86,26 @@ import Testing
 		]),
 	])
 }
+
+@Test func diffPatchBuilderBuildsSingleHunkPatchWithFileHeaders() {
+	let hunk = DiffHunk(oldStart: 7, oldCount: 2, newStart: 7, newCount: 2, lines: [
+		.context("same"),
+		.remove("old"),
+		.add("new"),
+	])
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
+
+	let patch = DiffPatchBuilder.patch(file: file, hunk: hunk)
+
+	#expect(patch == """
+	diff --git a/file.txt b/file.txt
+	index 1111111..2222222 100644
+	--- a/file.txt
+	+++ b/file.txt
+	@@ -7,2 +7,2 @@
+	 same
+	-old
+	+new
+
+	""")
+}

@@ -21,6 +21,7 @@ import Testing
 		DiffFile(
 			oldPath: "Sources/App.swift",
 			newPath: "Sources/App.swift",
+			indexLine: "index 1111111..2222222 100644",
 			hunks: [
 				DiffHunk(
 					oldStart: 1,
@@ -85,6 +86,7 @@ import Testing
 
 	#expect(file.oldPath == "Sources/Old.swift")
 	#expect(file.newPath == "Sources/New.swift")
+	#expect(file.indexLine == nil)
 	#expect(file.oldMode == "100644")
 	#expect(file.newMode == "100755")
 	#expect(file.hunks == [
@@ -99,4 +101,20 @@ import Testing
 			]
 		),
 	])
+}
+
+@Test func unifiedDiffParserKeepsIndexHeaderForPatchSynthesis() throws {
+	let diff = """
+	diff --git a/file.txt b/file.txt
+	index 1111111..2222222 100644
+	--- a/file.txt
+	+++ b/file.txt
+	@@ -1 +1 @@
+	-old
+	+new
+	"""
+
+	let file = try #require(try UnifiedDiffParser.parse(diff).first)
+
+	#expect(file.indexLine == "index 1111111..2222222 100644")
 }

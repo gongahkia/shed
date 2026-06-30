@@ -169,6 +169,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitSideOldDiffView: MetalTextView?
 	private var gitSideNewDiffView: MetalTextView?
 	private var gitSideBySideSplitView: NSSplitView?
+	private var gitHunkTableView: NSTableView?
+	private struct GitDiffHunkItem {
+		var fileIndex: Int
+		var hunkIndex: Int
+		var title: String
+		var isStaged: Bool
+	}
 	private var gitDraftRootURL: URL?
 	private var gitDraftBeforeHistory: GitCommitDraft?
 	private var gitRecentCommitMessages: [GitCommitDraft] = []
@@ -177,6 +184,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitRootURL: URL?
 	private var gitDiffFiles: [DiffFile] = []
 	private var gitDiffPath: String?
+	private var gitHunkItems: [GitDiffHunkItem] = []
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
@@ -964,25 +972,51 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		sideSplitView.dividerStyle = .thin
 		sideSplitView.addArrangedSubview(oldView)
 		sideSplitView.addArrangedSubview(newView)
+		let diffContentView = NSView()
+		let hunkTableView = NSTableView()
+		let hunkColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("hunk"))
+		hunkColumn.title = L10n.string("Hunks")
+		hunkColumn.resizingMask = .autoresizingMask
+		hunkTableView.addTableColumn(hunkColumn)
+		hunkTableView.headerView = nil
+		hunkTableView.rowHeight = 50
+		hunkTableView.dataSource = self
+		hunkTableView.delegate = self
+		let hunkScrollView = NSScrollView()
+		hunkScrollView.documentView = hunkTableView
+		hunkScrollView.hasVerticalScroller = true
+		hunkScrollView.drawsBackground = false
+		let bodySplitView = NSSplitView()
+		bodySplitView.isVertical = true
+		bodySplitView.dividerStyle = .thin
+		bodySplitView.addArrangedSubview(hunkScrollView)
+		bodySplitView.addArrangedSubview(diffContentView)
 		header.translatesAutoresizingMaskIntoConstraints = false
 		unifiedView.translatesAutoresizingMaskIntoConstraints = false
 		sideSplitView.translatesAutoresizingMaskIntoConstraints = false
+		bodySplitView.translatesAutoresizingMaskIntoConstraints = false
 		container.addSubview(header)
-		container.addSubview(unifiedView)
-		container.addSubview(sideSplitView)
+		container.addSubview(bodySplitView)
+		diffContentView.addSubview(unifiedView)
+		diffContentView.addSubview(sideSplitView)
 		NSLayoutConstraint.activate([
 			header.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
 			header.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
 			header.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
 			modeControl.widthAnchor.constraint(equalToConstant: 136),
-			unifiedView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-			unifiedView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-			unifiedView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
-			unifiedView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-			sideSplitView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-			sideSplitView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-			sideSplitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
-			sideSplitView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			bodySplitView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			bodySplitView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			bodySplitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			bodySplitView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			hunkScrollView.widthAnchor.constraint(equalToConstant: 122),
+			unifiedView.leadingAnchor.constraint(equalTo: diffContentView.leadingAnchor),
+			unifiedView.trailingAnchor.constraint(equalTo: diffContentView.trailingAnchor),
+			unifiedView.topAnchor.constraint(equalTo: diffContentView.topAnchor),
+			unifiedView.bottomAnchor.constraint(equalTo: diffContentView.bottomAnchor),
+			sideSplitView.leadingAnchor.constraint(equalTo: diffContentView.leadingAnchor),
+			sideSplitView.trailingAnchor.constraint(equalTo: diffContentView.trailingAnchor),
+			sideSplitView.topAnchor.constraint(equalTo: diffContentView.topAnchor),
+			sideSplitView.bottomAnchor.constraint(equalTo: diffContentView.bottomAnchor),
 			oldView.widthAnchor.constraint(equalTo: newView.widthAnchor),
 		])
 		sideSplitView.isHidden = true
@@ -992,6 +1026,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		gitSideOldDiffView = oldView
 		gitSideNewDiffView = newView
 		gitSideBySideSplitView = sideSplitView
+		gitHunkTableView = hunkTableView
 		return container
 	}
 
@@ -1126,17 +1161,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		do {
 			let files: [DiffFile]
 			let label: String
+			let isStagedDiff: Bool
 			if entry.kind == .untracked {
 				let contents = try String(contentsOf: gitRootURL.appendingPathComponent(entry.path), encoding: .utf8)
 				files = [DiffTextRenderer.newFile(path: entry.path, contents: contents)]
 				label = L10n.string("untracked")
+				isStagedDiff = false
 			} else {
 				let staged = entry.isStaged && !entry.isUnstaged
 				files = try GitRepository(root: gitRootURL).diffFiles(path: entry.path, staged: staged)
 				label = staged ? L10n.string("staged") : L10n.string("unstaged")
+				isStagedDiff = staged
 			}
 			gitDiffFiles = files
 			gitDiffPath = entry.path
+			setGitHunkItems(files: files, isStaged: isStagedDiff)
 			gitDiffStatusLabel?.textColor = .secondaryLabelColor
 			gitDiffStatusLabel?.stringValue = files.flatMap(\.hunks).isEmpty ? L10n.string("No text diff") : "\(entry.path) (\(label))"
 			renderGitDiff()
@@ -1149,6 +1188,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func setGitDiffMessage(_ message: String, isError: Bool = false) {
 		gitDiffFiles = []
+		gitHunkItems = []
+		gitHunkTableView?.reloadData()
 		gitDiffStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
 		gitDiffStatusLabel?.stringValue = message
 		let document = RenderedDiffDocument(text: "\(message)\n", lines: [
@@ -1157,6 +1198,40 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffPath)
 		applyGitDiff(document, to: gitSideOldDiffView, path: gitDiffPath)
 		applyGitDiff(document, to: gitSideNewDiffView, path: gitDiffPath)
+	}
+
+	private func setGitHunkItems(files: [DiffFile], isStaged: Bool) {
+		gitHunkItems = files.enumerated().flatMap { fileIndex, file in
+			file.hunks.enumerated().map { hunkIndex, hunk in
+				let title = "\(file.newPath ?? file.oldPath ?? "file"):\(hunk.oldStart)->\(hunk.newStart)"
+				return GitDiffHunkItem(fileIndex: fileIndex, hunkIndex: hunkIndex, title: title, isStaged: isStaged)
+			}
+		}
+		gitHunkTableView?.reloadData()
+	}
+
+	@objc private func applyGitHunk(_ sender: NSButton) {
+		guard let gitRootURL, sender.tag >= 0, sender.tag < gitHunkItems.count else {
+			return
+		}
+		let item = gitHunkItems[sender.tag]
+		guard item.fileIndex < gitDiffFiles.count, item.hunkIndex < gitDiffFiles[item.fileIndex].hunks.count else {
+			return
+		}
+		let file = gitDiffFiles[item.fileIndex]
+		let hunk = file.hunks[item.hunkIndex]
+		do {
+			let repository = GitRepository(root: gitRootURL)
+			if item.isStaged {
+				try repository.unstage(hunk: hunk, in: file)
+			} else {
+				try repository.stage(hunk: hunk, in: file)
+			}
+			refreshGitChanges(nil)
+		} catch {
+			gitDiffStatusLabel?.textColor = .systemRed
+			gitDiffStatusLabel?.stringValue = String(describing: error)
+		}
 	}
 
 	private func renderGitDiff() {
@@ -2403,6 +2478,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === gitTableView {
 			return gitEntries.count
 		}
+		if tableView === gitHunkTableView {
+			return gitHunkItems.count
+		}
 		if tableView === taskTableView {
 			return workspaceTasks.count
 		}
@@ -2471,6 +2549,31 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 				])
 				cell.textField = textField
 			}
+			return cell
+		}
+		if tableView === gitHunkTableView {
+			let item = gitHunkItems[row]
+			let cell = NSTableCellView()
+			let button = NSButton(title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"), target: self, action: #selector(applyGitHunk(_:)))
+			button.bezelStyle = .rounded
+			button.font = .systemFont(ofSize: 10)
+			button.tag = row
+			let label = NSTextField(labelWithString: item.title)
+			label.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
+			label.textColor = .secondaryLabelColor
+			label.lineBreakMode = .byTruncatingMiddle
+			let stack = NSStackView(views: [button, label])
+			stack.orientation = .vertical
+			stack.alignment = .leading
+			stack.spacing = 3
+			stack.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(stack)
+			NSLayoutConstraint.activate([
+				stack.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
+				stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -6),
+				stack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				button.widthAnchor.constraint(equalToConstant: 104),
+			])
 			return cell
 		}
 		if tableView === taskTableView {

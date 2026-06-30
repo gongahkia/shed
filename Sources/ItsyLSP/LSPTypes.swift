@@ -108,6 +108,48 @@ public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPTextEdit: Codable, Equatable, Sendable {
+	public var range: LSPRange
+	public var newText: String
+
+	public init(range: LSPRange, newText: String) {
+		self.range = range
+		self.newText = newText
+	}
+}
+
+public struct LSPFormattingOptions: Codable, Equatable, Sendable {
+	public var tabSize: Int
+	public var insertSpaces: Bool
+
+	public init(tabSize: Int = 4, insertSpaces: Bool = false) {
+		self.tabSize = tabSize
+		self.insertSpaces = insertSpaces
+	}
+}
+
+public struct LSPDocumentFormattingParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var options: LSPFormattingOptions
+
+	public init(textDocument: LSPTextDocumentIdentifier, options: LSPFormattingOptions) {
+		self.textDocument = textDocument
+		self.options = options
+	}
+}
+
+public struct LSPDocumentRangeFormattingParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var range: LSPRange
+	public var options: LSPFormattingOptions
+
+	public init(textDocument: LSPTextDocumentIdentifier, range: LSPRange, options: LSPFormattingOptions) {
+		self.textDocument = textDocument
+		self.range = range
+		self.options = options
+	}
+}
+
 public struct LSPConfigurationItem: Codable, Equatable, Sendable {
 	public var scopeUri: String?
 	public var section: String?

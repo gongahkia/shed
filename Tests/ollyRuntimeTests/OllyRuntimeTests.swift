@@ -1375,6 +1375,61 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testDispatchGestureResizeChangesFocusedWindowSize() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Gestures {
+                    fourFingerHorizontal(.action(.resize(.right, points: 40)))
+                }
+            })
+            try await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 200))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(
+                .dispatchGesture(.init(trigger: .fourFingerHorizontal, motion: .right, displayID: displayID)),
+                to: socketPath
+            )
+
+            XCTAssertEqual(response.status, .success)
+            let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.frame, IPCFrame(x: 0, y: 0, width: 340, height: 200))
+        }
+    }
+
+    func testDispatchGestureSplitUpdatesBSPRatio() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Gestures {
+                    fourFingerHorizontal(.action(.split(.right, ratio: 0.75)))
+                }
+            })
+            XCTAssertEqual(
+                try send(.setEngine(.init(engineID: BSPLayoutEngine.engineID, displayID: displayID)), to: socketPath).status,
+                .success
+            )
+            try await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 200)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 200))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(
+                .dispatchGesture(.init(trigger: .fourFingerHorizontal, motion: .right, displayID: displayID)),
+                to: socketPath
+            )
+            let rawConfig = await runtime.configForTest(engineID: BSPLayoutEngine.engineID)
+            let config = try XCTUnwrap(rawConfig as? BSPLayoutEngine.Config)
+
+            XCTAssertEqual(response.status, .success)
+            XCTAssertEqual(
+                config.tree.root,
+                .split(axis: .horizontal, ratio: 0.75, first: .window(id: 1), second: .window(id: 2))
+            )
+        }
+    }
+
     func testDispatchGestureSwitchesTagsFromConfiguredGestures() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await runtime.replaceConfigForTest(Config {

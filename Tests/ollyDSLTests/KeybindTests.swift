@@ -38,6 +38,21 @@ final class KeybindTests: XCTestCase {
         XCTAssertEqual(keybinds.bindings.map(\.action), [.showGridOverlay, .showOverlay(.grid)])
     }
 
+    func testResizeAndSplitActionsAreStorableInKeybinds() throws {
+        let resize = Keybind(KeyChord([.option], .rightArrow), do: .resize(.right, points: 40))
+        let split = Keybind(KeyChord([.option, .shift], .rightArrow), do: .split(.right, ratio: 0.65))
+        let keybinds = Keybinds {
+            resize
+            split
+        }
+
+        let data = try JSONEncoder().encode(keybinds)
+        let decoded = try JSONDecoder().decode(Keybinds.self, from: data)
+        let actions: [Action] = [.resize(.right, points: 40), .split(.right, ratio: 0.65)]
+
+        XCTAssertEqual(decoded.bindings.map(\.action), actions)
+    }
+
     func testCarbonRegistrationsUseSequentialIDsAndCarbonFlags() {
         let keybinds = Keybinds {
             Keybind(KeyChord([.command, .shift], .space), do: .reload)

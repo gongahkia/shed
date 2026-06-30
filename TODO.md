@@ -27,37 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.7 Crash telemetry (opt-in, self-hosted)
-
-**Goal:** Local crash capture; opt-in upload via `ollyctl telemetry flush`. No background phone-home.
-
-**Research summary (PLCrashReporter):**
-- `https://github.com/microsoft/plcrashreporter` — minimum macOS 11.5; SwiftPM-installable; lightweight; signal-safe; open-source.
-- Alternative: hand-rolled `NSSetUncaughtExceptionHandler` + `signal(SIGSEGV/SIGABRT, ...)` + `backtrace`/`backtrace_symbols`. Swift function names come out mangled — demangle later via `swift demangle` for symbolication.
-- Sentry SDK is feature-rich but heavy (~20MB framework size) and the privacy posture out of the box includes window titles in breadcrumbs.
-
-**Decision:** Use PLCrashReporter for the signal-safe crash capture core (best-of-class for the niche), but ship our own writer/uploader rather than hooking Sentry's HTTP pipeline. Output local-only JSON; upload is explicit `ollyctl telemetry flush`.
-
-**Files to add:**
-- `Sources/ollyDiagnostics/CrashTelemetry.swift` — install PLCrashReporter on startup if `Telemetry.enabled`; on next launch detect pending report; write JSON to `~/Library/Logs/Olly/<ts>.crash.json` with timestamp, signal/exception, top-30 mangled frames, version, configHash, display count, tag count. **No window titles, no bundle IDs by default** (when `scrubbedBundleIDs: true`).
-- `Sources/ollyDSL/Telemetry.swift` — `Telemetry { enabled(false); endpoint(nil); scrubbedBundleIDs(true) }`.
-- `Sources/ollyctl/OllyCtlTelemetryCommands.swift` — `ollyctl telemetry status` / `enable` / `disable` / `flush`.
-
-**Files to modify:**
-- `Sources/ollyctl/OllyCtlDoctor.swift:124-340` — add a doctor check `telemetryCheck()` warning if pending crash reports exist and telemetry is disabled.
-- `Sources/ollyApp/OllyApp.swift` — call `CrashTelemetry.install(enabled: config.telemetry.enabled)` early.
-
-**Privacy:**
-- Default `enabled: false`.
-- Report includes: timestamp, signal/exception name, top-30 frames (mangled Swift symbols), olly version, DSL version, count of displays, count of tags. Nothing user-specific.
-- Upload requires explicit `ollyctl telemetry flush`. Endpoint user-configurable.
-
-**Refs:**
-- https://github.com/microsoft/plcrashreporter
-- https://swiftpackageindex.com/microsoft/plcrashreporter
-
----
-
 ### M4.8 Settings export/import
 
 **Goal:** Single-file round-trip of `Config.swift` from the menu bar; share-with-coworker workflow.

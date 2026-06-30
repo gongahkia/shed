@@ -113,6 +113,16 @@ import Testing
 	}
 }
 
+@Test func gitRepositoryReadsRecentCommitMessagesAsNulSeparatedBodies() throws {
+	let runner = RecordingGitRunner(output: "Summary one\n\nBody one\u{0}\nSummary two\u{0}")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	let messages = try repository.recentCommitMessages(limit: 10)
+
+	#expect(messages == ["Summary one\n\nBody one", "Summary two"])
+	#expect(runner.recordedArguments == [["log", "-10", "--format=%B%x00"]])
+}
+
 private final class TemporaryGitFixture {
 	let root: URL
 
@@ -141,6 +151,11 @@ private final class TemporaryGitFixture {
 private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 	private let lock = NSLock()
 	private var arguments: [[String]] = []
+	private let output: String
+
+	init(output: String = "") {
+		self.output = output
+	}
 
 	var recordedArguments: [[String]] {
 		lock.lock()
@@ -153,6 +168,6 @@ private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 		lock.lock()
 		self.arguments.append(arguments)
 		lock.unlock()
-		return ""
+		return output
 	}
 }

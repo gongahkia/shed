@@ -24,6 +24,7 @@ public struct LineShaper {
 	public func shape(
 		_ line: String,
 		font: CTFont,
+		rasterFont: CTFont? = nil,
 		atlas: inout GlyphAtlas,
 		colorForRange: (Range<Int>) -> SIMD4<Float> = { _ in SIMD4<Float>(1, 1, 1, 1) }
 	) throws -> [ShapedGlyph] {
@@ -34,6 +35,7 @@ public struct LineShaper {
 		let attributed = NSAttributedString(string: line, attributes: [kCTFontAttributeName as NSAttributedString.Key: font])
 		let ctLine = CTLineCreateWithAttributedString(attributed)
 		let runs = CTLineGetGlyphRuns(ctLine) as NSArray
+		let atlasFont = rasterFont ?? font
 		var shaped: [ShapedGlyph] = []
 		for case let run as CTRun in runs {
 			let glyphCount = CTRunGetGlyphCount(run)
@@ -45,7 +47,7 @@ public struct LineShaper {
 			let stringIndices = copyStringIndices(run, count: glyphCount)
 			shaped.reserveCapacity(shaped.count + glyphCount)
 			for index in 0 ..< glyphCount {
-				let entry = try atlas.entry(for: glyphs[index], font: font)
+				let entry = try atlas.entry(for: glyphs[index], font: atlasFont)
 				let uv = atlasUV(for: entry, atlas: atlas)
 				let utf16Start = max(0, min(stringIndices[index], utf8Offsets.count - 1))
 				let utf16End = index + 1 < stringIndices.count ? max(utf16Start, min(stringIndices[index + 1], utf8Offsets.count - 1)) : utf8Offsets.count - 1

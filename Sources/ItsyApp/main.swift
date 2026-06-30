@@ -3,6 +3,7 @@ import Dispatch
 import Foundation
 import ItsyEditor
 import ItsyKeymap
+import ItsyRender
 import ItsySyntax
 
 private func recordBenchStage(_ name: String) {
@@ -160,12 +161,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitSignoffButton: NSButton?
 	private var gitAmendButton: NSButton?
 	private var gitComposerStatusLabel: NSTextField?
+	private enum GitDiffMode { case unified, sideBySide }
+	private var gitDiffMode: GitDiffMode = .unified
+	private var gitDiffModeControl: NSSegmentedControl?
+	private var gitDiffStatusLabel: NSTextField?
+	private var gitUnifiedDiffView: MetalTextView?
+	private var gitSideOldDiffView: MetalTextView?
+	private var gitSideNewDiffView: MetalTextView?
+	private var gitSideBySideSplitView: NSSplitView?
 	private var gitDraftRootURL: URL?
 	private var gitDraftBeforeHistory: GitCommitDraft?
 	private var gitRecentCommitMessages: [GitCommitDraft] = []
 	private var gitRecentCommitIndex: Int?
 	private var gitEntries: [GitStatusEntry] = []
 	private var gitRootURL: URL?
+	private var gitDiffFiles: [DiffFile] = []
+	private var gitDiffPath: String?
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
@@ -853,7 +864,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return panel
 		}
 		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 620, height: 420),
+			contentRect: NSRect(x: 0, y: 0, width: 980, height: 560),
 			styleMask: [.titled, .closable, .resizable, .utilityWindow],
 			backing: .buffered,
 			defer: false
@@ -895,16 +906,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		tableView.delegate = self
 		tableView.target = self
 		tableView.doubleAction = #selector(openSelectedGitEntry(_:))
-		let scrollView = NSScrollView()
-		scrollView.documentView = tableView
-		scrollView.hasVerticalScroller = true
-		scrollView.drawsBackground = false
+		let listScrollView = NSScrollView()
+		listScrollView.documentView = tableView
+		listScrollView.hasVerticalScroller = true
+		listScrollView.drawsBackground = false
+		let diffPane = makeGitDiffPane()
+		let splitView = NSSplitView()
+		splitView.isVertical = true
+		splitView.dividerStyle = .thin
+		splitView.addArrangedSubview(listScrollView)
+		splitView.addArrangedSubview(diffPane)
 		composer.translatesAutoresizingMaskIntoConstraints = false
 		header.translatesAutoresizingMaskIntoConstraints = false
-		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		splitView.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(composer)
 		contentView.addSubview(header)
-		contentView.addSubview(scrollView)
+		contentView.addSubview(splitView)
 		NSLayoutConstraint.activate([
 			composer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			composer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
@@ -912,13 +929,70 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
 			header.topAnchor.constraint(equalTo: composer.bottomAnchor, constant: 10),
-			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
-			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+			splitView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			splitView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			splitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+			splitView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+			listScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
+			listScrollView.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
+			diffPane.widthAnchor.constraint(greaterThanOrEqualToConstant: 420),
 		])
 		gitStatusLabel = statusLabel
 		gitTableView = tableView
+	}
+
+	private func makeGitDiffPane() -> NSView {
+		let container = NSView()
+		let titleLabel = NSTextField(labelWithString: L10n.string("Diff"))
+		titleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 11)
+		statusLabel.textColor = .secondaryLabelColor
+		let modeControl = NSSegmentedControl(labels: [L10n.string("Unified"), L10n.string("Side")], trackingMode: .selectOne, target: self, action: #selector(changeGitDiffMode(_:)))
+		modeControl.selectedSegment = 0
+		modeControl.segmentStyle = .rounded
+		let header = NSStackView(views: [titleLabel, statusLabel, modeControl])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.spacing = 8
+		header.distribution = .fill
+		let unifiedView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 360))
+		let oldView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 360))
+		let newView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 360))
+		let sideSplitView = NSSplitView()
+		sideSplitView.isVertical = true
+		sideSplitView.dividerStyle = .thin
+		sideSplitView.addArrangedSubview(oldView)
+		sideSplitView.addArrangedSubview(newView)
+		header.translatesAutoresizingMaskIntoConstraints = false
+		unifiedView.translatesAutoresizingMaskIntoConstraints = false
+		sideSplitView.translatesAutoresizingMaskIntoConstraints = false
+		container.addSubview(header)
+		container.addSubview(unifiedView)
+		container.addSubview(sideSplitView)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+			header.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+			header.topAnchor.constraint(equalTo: container.topAnchor, constant: 8),
+			modeControl.widthAnchor.constraint(equalToConstant: 136),
+			unifiedView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			unifiedView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			unifiedView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			unifiedView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			sideSplitView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			sideSplitView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			sideSplitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			sideSplitView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			oldView.widthAnchor.constraint(equalTo: newView.widthAnchor),
+		])
+		sideSplitView.isHidden = true
+		gitDiffModeControl = modeControl
+		gitDiffStatusLabel = statusLabel
+		gitUnifiedDiffView = unifiedView
+		gitSideOldDiffView = oldView
+		gitSideNewDiffView = newView
+		gitSideBySideSplitView = sideSplitView
+		return container
 	}
 
 	private func makeGitComposerView() -> NSView {
@@ -993,8 +1067,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func centerGitPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
 		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
-		let width = min(680, max(520, hostFrame.width - 100))
-		let height = min(460, max(280, hostFrame.height - 120))
+		let width = min(1100, max(860, hostFrame.width - 100))
+		let height = min(660, max(420, hostFrame.height - 120))
 		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
 		panel.setFrame(frame, display: true)
 	}
@@ -1029,7 +1103,149 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		if !entries.isEmpty {
 			gitTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 		}
+		updateSelectedGitDiff()
 		updateGitComposerState()
+	}
+
+	@objc private func changeGitDiffMode(_ sender: Any?) {
+		gitDiffMode = gitDiffModeControl?.selectedSegment == 1 ? .sideBySide : .unified
+		renderGitDiff()
+	}
+
+	private func updateSelectedGitDiff() {
+		guard let tableView = gitTableView,
+		      let gitRootURL,
+		      tableView.selectedRow >= 0,
+		      tableView.selectedRow < gitEntries.count
+		else {
+			gitDiffPath = nil
+			setGitDiffMessage(L10n.string("No file selected"))
+			return
+		}
+		let entry = gitEntries[tableView.selectedRow]
+		do {
+			let files: [DiffFile]
+			let label: String
+			if entry.kind == .untracked {
+				let contents = try String(contentsOf: gitRootURL.appendingPathComponent(entry.path), encoding: .utf8)
+				files = [DiffTextRenderer.newFile(path: entry.path, contents: contents)]
+				label = L10n.string("untracked")
+			} else {
+				let staged = entry.isStaged && !entry.isUnstaged
+				files = try GitRepository(root: gitRootURL).diffFiles(path: entry.path, staged: staged)
+				label = staged ? L10n.string("staged") : L10n.string("unstaged")
+			}
+			gitDiffFiles = files
+			gitDiffPath = entry.path
+			gitDiffStatusLabel?.textColor = .secondaryLabelColor
+			gitDiffStatusLabel?.stringValue = files.flatMap(\.hunks).isEmpty ? L10n.string("No text diff") : "\(entry.path) (\(label))"
+			renderGitDiff()
+		} catch {
+			gitDiffFiles = []
+			gitDiffPath = entry.path
+			setGitDiffMessage(String(describing: error), isError: true)
+		}
+	}
+
+	private func setGitDiffMessage(_ message: String, isError: Bool = false) {
+		gitDiffFiles = []
+		gitDiffStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
+		gitDiffStatusLabel?.stringValue = message
+		let document = RenderedDiffDocument(text: "\(message)\n", lines: [
+			RenderedDiffLine(kind: .header, fullRange: 0 ..< message.utf8.count),
+		])
+		applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffPath)
+		applyGitDiff(document, to: gitSideOldDiffView, path: gitDiffPath)
+		applyGitDiff(document, to: gitSideNewDiffView, path: gitDiffPath)
+	}
+
+	private func renderGitDiff() {
+		let hasSideBySide = gitDiffMode == .sideBySide
+		gitUnifiedDiffView?.isHidden = hasSideBySide
+		gitSideBySideSplitView?.isHidden = !hasSideBySide
+		guard !gitDiffFiles.isEmpty else {
+			return
+		}
+		switch gitDiffMode {
+		case .unified:
+			applyGitDiff(DiffTextRenderer.unified(files: gitDiffFiles), to: gitUnifiedDiffView, path: gitDiffPath)
+		case .sideBySide:
+			let rendered = DiffTextRenderer.sideBySide(files: gitDiffFiles)
+			applyGitDiff(rendered.old, to: gitSideOldDiffView, path: gitDiffFiles.first?.oldPath ?? gitDiffPath)
+			applyGitDiff(rendered.new, to: gitSideNewDiffView, path: gitDiffFiles.first?.newPath ?? gitDiffPath)
+		}
+	}
+
+	private func applyGitDiff(_ document: RenderedDiffDocument, to view: MetalTextView?, path: String?) {
+		view?.editor = Editor(text: document.text)
+		view?.highlightSpans = gitDiffHighlightSpans(for: document, path: path)
+	}
+
+	private func gitDiffHighlightSpans(for document: RenderedDiffDocument, path: String?) -> [TextHighlightSpan] {
+		var spans = document.lines.compactMap { line -> TextHighlightSpan? in
+			guard !line.fullRange.isEmpty, let color = gitDiffColor(for: line.kind) else {
+				return nil
+			}
+			return TextHighlightSpan(range: line.fullRange, color: color)
+		}
+		spans += syntaxHighlightSpans(for: document, path: path)
+		return spans
+	}
+
+	private func gitDiffColor(for kind: RenderedDiffLineKind) -> SIMD4<Float>? {
+		switch kind {
+		case .header:
+			return SIMD4<Float>(0.56, 0.62, 0.70, 1)
+		case .addition:
+			return SIMD4<Float>(0.28, 0.78, 0.46, 1)
+		case .removal:
+			return SIMD4<Float>(0.93, 0.37, 0.37, 1)
+		case .context, .blank:
+			return nil
+		}
+	}
+
+	private func syntaxHighlightSpans(for document: RenderedDiffDocument, path: String?) -> [TextHighlightSpan] {
+		guard let path,
+		      let gitRootURL,
+		      let language = SyntaxPipeline.language(forFileURL: gitRootURL.appendingPathComponent(path)),
+		      let theme = try? SyntaxTheme.loadUserOrDefault()
+		else {
+			return []
+		}
+		var source = ""
+		var mappings: [(source: Range<Int>, rendered: Range<Int>)] = []
+		for line in document.lines {
+			guard let content = line.content, let contentRange = line.contentRange else {
+				continue
+			}
+			let start = source.utf8.count
+			source += content
+			let end = source.utf8.count
+			mappings.append((start ..< end, contentRange))
+			source += "\n"
+		}
+		guard !source.isEmpty else {
+			return []
+		}
+		do {
+			var pipeline = SyntaxPipeline(language: language)
+			let tree = try pipeline.parse(Rope(source))
+			return try pipeline.highlights(in: tree).flatMap { span -> [TextHighlightSpan] in
+				mappings.compactMap { mapping -> TextHighlightSpan? in
+					let lower = max(span.range.lowerBound, mapping.source.lowerBound)
+					let upper = min(span.range.upperBound, mapping.source.upperBound)
+					guard lower < upper, let color = theme.color(for: span.capture) else {
+						return nil
+					}
+					let renderedLower = mapping.rendered.lowerBound + lower - mapping.source.lowerBound
+					let renderedUpper = mapping.rendered.lowerBound + upper - mapping.source.lowerBound
+					return TextHighlightSpan(range: renderedLower ..< renderedUpper, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
+				}
+			}
+		} catch {
+			return []
+		}
 	}
 
 	@objc private func updateGitComposerStateAction(_ sender: Any?) {
@@ -2197,6 +2413,13 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			return commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : commandPaletteFilteredItems.count
 		}
 		return 0
+	}
+
+	func tableViewSelectionDidChange(_ notification: Notification) {
+		guard let tableView = notification.object as? NSTableView, tableView === gitTableView else {
+			return
+		}
+		updateSelectedGitDiff()
 	}
 
 	func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {

@@ -634,6 +634,8 @@ final class EditorWindowController: NSWindowController {
 	private let findCaseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
 	private let findWholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
 	private let findCloseButton = NSButton(title: L10n.string("X"), target: nil, action: nil)
+	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
+	private let statusBarLabel = NSTextField(labelWithString: "")
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
@@ -668,7 +670,10 @@ final class EditorWindowController: NSWindowController {
 			wholeWordButton: findWholeWordButton,
 			closeButton: findCloseButton
 		)
+		Self.configureStatusBarView(statusBarView, label: statusBarLabel)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
+		statusBarView.setContentHuggingPriority(.required, for: .vertical)
+		statusBarView.isHidden = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
@@ -687,6 +692,7 @@ final class EditorWindowController: NSWindowController {
 		])
 		editorStack.addArrangedSubview(tabBarView)
 		editorStack.addArrangedSubview(editorContainer)
+		editorStack.addArrangedSubview(statusBarView)
 
 		let splitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 		splitView.isVertical = true
@@ -789,6 +795,16 @@ final class EditorWindowController: NSWindowController {
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
 		gitSnapshot = snapshot
 		fileTreeOutlineView.reloadData()
+	}
+
+	func setIndexingStatus(_ text: String?) {
+		if let text, !text.isEmpty {
+			statusBarLabel.stringValue = text
+			statusBarView.isHidden = false
+		} else {
+			statusBarLabel.stringValue = ""
+			statusBarView.isHidden = true
+		}
 	}
 
 	@objc private func doubleClickFileTree(_ sender: Any?) {
@@ -1095,6 +1111,22 @@ final class EditorWindowController: NSWindowController {
 			stack.topAnchor.constraint(equalTo: findBarView.topAnchor),
 			stack.bottomAnchor.constraint(equalTo: findBarView.bottomAnchor),
 			findBarView.heightAnchor.constraint(equalToConstant: 38),
+		])
+	}
+
+	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField) {
+		statusBarView.wantsLayer = true
+		statusBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		label.font = .systemFont(ofSize: 11)
+		label.textColor = .secondaryLabelColor
+		label.lineBreakMode = .byTruncatingTail
+		label.translatesAutoresizingMaskIntoConstraints = false
+		statusBarView.addSubview(label)
+		NSLayoutConstraint.activate([
+			label.leadingAnchor.constraint(equalTo: statusBarView.leadingAnchor, constant: 10),
+			label.trailingAnchor.constraint(lessThanOrEqualTo: statusBarView.trailingAnchor, constant: -10),
+			label.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
+			statusBarView.heightAnchor.constraint(equalToConstant: 20),
 		])
 	}
 

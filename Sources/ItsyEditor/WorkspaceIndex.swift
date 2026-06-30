@@ -79,11 +79,27 @@ public struct WorkspaceIndex: Equatable, Sendable {
 }
 
 public enum WorkspaceIndexer {
-	public static func build(root: URL, maxFileBytes: Int = 1_000_000, fileManager: FileManager = .default) -> WorkspaceIndex {
+	public static func build(
+		root: URL,
+		maxFileBytes: Int = 1_000_000,
+		fileManager: FileManager = .default,
+		progress: ((_ processed: Int, _ total: Int) -> Void)? = nil
+	) -> WorkspaceIndex {
 		let matcher = GitIgnoreMatcher(root: root, fileManager: fileManager)
 		let files = ProjectFind.searchableFiles(root: root, matcher: matcher, maxFileBytes: maxFileBytes, fileManager: fileManager)
-		let indexedFiles = files.compactMap { file -> WorkspaceIndexedFile? in
-			indexedFile(at: file, root: root, maxFileBytes: maxFileBytes, fileManager: fileManager)
+		let total = files.count
+		progress?(0, total)
+		var indexedFiles: [WorkspaceIndexedFile] = []
+		indexedFiles.reserveCapacity(total)
+		let reportEvery = max(1, total / 40)
+		for (offset, file) in files.enumerated() {
+			if let indexed = indexedFile(at: file, root: root, maxFileBytes: maxFileBytes, fileManager: fileManager) {
+				indexedFiles.append(indexed)
+			}
+			let processed = offset + 1
+			if processed == total || processed % reportEvery == 0 {
+				progress?(processed, total)
+			}
 		}
 		return WorkspaceIndex(root: root, files: indexedFiles)
 	}

@@ -49,20 +49,36 @@ enum ItsyWorkspaceController {
 		guard let root = rootURL else {
 			workspaceIndex = nil
 			gitIgnoreMatcher = nil
+			broadcastIndexingStatus(nil)
 			return
 		}
 		indexGeneration &+= 1
 		let generation = indexGeneration
+		broadcastIndexingStatus(L10n.string("Indexing…"))
 		DispatchQueue.global(qos: .utility).async {
 			let matcher = GitIgnoreMatcher(root: root)
-			let index = WorkspaceIndexer.build(root: root)
+			let index = WorkspaceIndexer.build(root: root) { processed, total in
+				DispatchQueue.main.async {
+					guard generation == indexGeneration, total > 0 else {
+						return
+					}
+					broadcastIndexingStatus(L10n.string("Indexing \(processed)/\(total)"))
+				}
+			}
 			DispatchQueue.main.async {
 				guard generation == indexGeneration else {
 					return
 				}
 				workspaceIndex = index
 				gitIgnoreMatcher = matcher
+				broadcastIndexingStatus(nil)
 			}
+		}
+	}
+
+	private static func broadcastIndexingStatus(_ status: String?) {
+		for controller in controllers.allObjects {
+			controller.setIndexingStatus(status)
 		}
 	}
 

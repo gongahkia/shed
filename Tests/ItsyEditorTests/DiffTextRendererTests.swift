@@ -1,3 +1,4 @@
+import Foundation
 import ItsyEditor
 import Testing
 
@@ -108,4 +109,83 @@ import Testing
 	+new
 
 	""")
+}
+
+@Test func diffPatchBuilderBuildsSelectedLinePatchForStaging() throws {
+	let hunk = DiffHunk(oldStart: 1, oldCount: 5, newStart: 1, newCount: 5, lines: [
+		.context("one"),
+		.remove("two"),
+		.add("two changed"),
+		.context("three"),
+		.remove("four"),
+		.add("four changed"),
+		.context("five"),
+	])
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
+
+	let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 1 ..< 3), operation: .stage)
+
+	#expect(patch == """
+	diff --git a/file.txt b/file.txt
+	index 1111111..2222222 100644
+	--- a/file.txt
+	+++ b/file.txt
+	@@ -1,5 +1,5 @@
+	 one
+	-two
+	+two changed
+	 three
+	 four
+	 five
+
+	""")
+}
+
+@Test func diffPatchBuilderBuildsSelectedLinePatchForReverseUnstaging() throws {
+	let hunk = DiffHunk(oldStart: 1, oldCount: 5, newStart: 1, newCount: 5, lines: [
+		.context("one"),
+		.remove("two"),
+		.add("two changed"),
+		.context("three"),
+		.remove("four"),
+		.add("four changed"),
+		.context("five"),
+	])
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
+
+	let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 4 ..< 6), operation: .unstage)
+
+	#expect(patch == """
+	diff --git a/file.txt b/file.txt
+	index 1111111..2222222 100644
+	--- a/file.txt
+	+++ b/file.txt
+	@@ -1,5 +1,5 @@
+	 one
+	 two changed
+	 three
+	-four
+	+four changed
+	 five
+
+	""")
+}
+
+@Test func diffPatchBuilderRejectsInvalidLineSelections() throws {
+	let hunk = DiffHunk(oldStart: 1, oldCount: 2, newStart: 1, newCount: 2, lines: [
+		.context("same"),
+		.remove("old"),
+		.add("new"),
+	])
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", hunks: [hunk])
+
+	#expect(throws: DiffPatchBuilderError.emptySelection) {
+		_ = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(), operation: .stage)
+	}
+	#expect(throws: DiffPatchBuilderError.nonContiguousSelection) {
+		_ = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet([1, 3]), operation: .stage)
+	}
+	#expect(throws: DiffPatchBuilderError.selectionIncludesContext) {
+		_ = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integer: 0), operation: .stage)
+	}
 }

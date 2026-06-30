@@ -189,6 +189,7 @@ public final class MetalTextView: NSView {
 	private var killRing = KillRing()
 	private var lastYankRange: Range<Int>?
 	private var optionDragAnchor: Int?
+	private var mouseSelectionAnchor: Int?
 	private var lastAccessibilityValue: String?
 
 	public override init(frame frameRect: NSRect) {
@@ -437,19 +438,25 @@ public final class MetalTextView: NSView {
 	public override func mouseDown(with event: NSEvent) {
 		window?.makeFirstResponder(self)
 		if let marker = gutterMarker(forMouseEvent: event) {
+			mouseSelectionAnchor = nil
 			gutterDecorator?.gutterMarkerClicked(marker, in: self)
 			return
 		}
 		if event.modifierFlags.contains(.command) {
+			mouseSelectionAnchor = nil
 			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
 			return
 		}
 		if event.modifierFlags.contains(.option) {
+			mouseSelectionAnchor = nil
 			optionDragAnchor = utf8Offset(forMouseEvent: event)
 			updateColumnCursors(anchor: optionDragAnchor ?? 0, head: optionDragAnchor ?? 0)
 			return
 		}
-		super.mouseDown(with: event)
+		let offset = utf8Offset(forMouseEvent: event)
+		mouseSelectionAnchor = offset
+		editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
+		syncEditorState()
 	}
 
 	public override func mouseDragged(with event: NSEvent) {
@@ -457,11 +464,17 @@ public final class MetalTextView: NSView {
 			updateColumnCursors(anchor: optionDragAnchor, head: utf8Offset(forMouseEvent: event))
 			return
 		}
+		if let mouseSelectionAnchor {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: mouseSelectionAnchor, head: utf8Offset(forMouseEvent: event))))
+			syncEditorState()
+			return
+		}
 		super.mouseDragged(with: event)
 	}
 
 	public override func mouseUp(with event: NSEvent) {
 		optionDragAnchor = nil
+		mouseSelectionAnchor = nil
 		super.mouseUp(with: event)
 	}
 

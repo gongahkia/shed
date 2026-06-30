@@ -211,17 +211,25 @@ import Testing
 	])
 	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
 	let patch = DiffPatchBuilder.patch(file: file, hunk: hunk)
+	let linePatch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 0 ..< 2), operation: .stage)
+	let reverseLinePatch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 0 ..< 2), operation: .unstage)
 
 	try repository.stage(hunk: hunk, in: file)
 	try repository.unstage(hunk: hunk, in: file)
+	try repository.stage(lineIndexes: IndexSet(integersIn: 0 ..< 2), in: hunk, file: file)
+	try repository.unstage(lineIndexes: IndexSet(integersIn: 0 ..< 2), in: hunk, file: file)
 
 	#expect(runner.recordedArguments == [
 		["apply", "--cached", "--check", "-"],
 		["apply", "--cached", "-"],
 		["apply", "--cached", "--check", "--reverse", "-"],
 		["apply", "--cached", "--reverse", "-"],
+		["apply", "--cached", "--check", "-"],
+		["apply", "--cached", "-"],
+		["apply", "--cached", "--check", "--reverse", "-"],
+		["apply", "--cached", "--reverse", "-"],
 	])
-	#expect(runner.recordedInputs == [patch, patch, patch, patch])
+	#expect(runner.recordedInputs == [patch, patch, patch, patch, linePatch, linePatch, reverseLinePatch, reverseLinePatch])
 }
 
 @Test func gitRepositoryStagesSingleWorkingTreeHunk() throws {
@@ -254,6 +262,78 @@ import Testing
 	#expect(staged.contains("+line two"))
 	#expect(!staged.contains("+line fifteen"))
 	#expect(unstaged.contains("+line fifteen"))
+}
+
+@Test func gitRepositoryStagesSelectedWorkingTreeLines() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\nthree\nfour\nfive\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "one\ntwo changed\nthree\nfour changed\nfive\n")
+
+	let file = try #require(try repository.diffFiles(path: "file.txt").first)
+	let hunk = try #require(file.hunks.first)
+	let selected = lineIndexes(in: hunk, containing: ["two", "two changed"])
+
+	try repository.stage(lineIndexes: selected, in: hunk, file: file)
+	let staged = try repository.diff(path: "file.txt", staged: true)
+	let unstaged = try repository.diff(path: "file.txt")
+
+	#expect(staged.contains("+two changed"))
+	#expect(!staged.contains("+four changed"))
+	#expect(unstaged.contains("+four changed"))
+	#expect(!unstaged.contains("+two changed"))
+}
+
+@Test func gitRepositoryUnstagesSelectedIndexLines() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\nthree\nfour\nfive\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "one\ntwo changed\nthree\nfour changed\nfive\n")
+	try repository.stage(paths: ["file.txt"])
+
+	let file = try #require(try repository.diffFiles(path: "file.txt", staged: true).first)
+	let hunk = try #require(file.hunks.first)
+	let selected = lineIndexes(in: hunk, containing: ["two", "two changed"])
+
+	try repository.unstage(lineIndexes: selected, in: hunk, file: file)
+	let staged = try repository.diff(path: "file.txt", staged: true)
+	let unstaged = try repository.diff(path: "file.txt")
+
+	#expect(!staged.contains("+two changed"))
+	#expect(staged.contains("+four changed"))
+	#expect(unstaged.contains("+two changed"))
+	#expect(!unstaged.contains("+four changed"))
+}
+
+private func lineIndexes(in hunk: DiffHunk, containing values: Set<String>) -> IndexSet {
+	var indexes = IndexSet()
+	for (index, line) in hunk.lines.enumerated() {
+		switch line {
+		case .context:
+			continue
+		case .add(let content), .remove(let content):
+			if values.contains(content) {
+				indexes.insert(index)
+			}
+		}
+	}
+	return indexes
 }
 
 private final class TemporaryGitFixture {

@@ -180,6 +180,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		var title: String
 		var isStaged: Bool
 	}
+	private struct GitDiffLineItem {
+		var fileIndex: Int
+		var hunkIndex: Int
+		var lineIndex: Int
+		var range: Range<Int>
+	}
+	private enum GitLineSelectionError: Error {
+		case unifiedModeRequired
+		case noChangedLinesSelected
+	}
 	private var gitDraftRootURL: URL?
 	private var gitDraftBeforeHistory: GitCommitDraft?
 	private var gitRecentCommitMessages: [GitCommitDraft] = []
@@ -189,6 +199,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitDiffFiles: [DiffFile] = []
 	private var gitDiffPath: String?
 	private var gitHunkItems: [GitDiffHunkItem] = []
+	private var gitUnifiedLineItems: [GitDiffLineItem] = []
 	private var gitRemoteProcess: Process?
 	private var gitRemoteLog = ""
 	private var taskPanel: NSPanel?
@@ -990,7 +1001,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		hunkColumn.resizingMask = .autoresizingMask
 		hunkTableView.addTableColumn(hunkColumn)
 		hunkTableView.headerView = nil
-		hunkTableView.rowHeight = 50
+		hunkTableView.rowHeight = 70
 		hunkTableView.dataSource = self
 		hunkTableView.delegate = self
 		let hunkScrollView = NSScrollView()
@@ -1019,7 +1030,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			bodySplitView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 			bodySplitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
 			bodySplitView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-			hunkScrollView.widthAnchor.constraint(equalToConstant: 122),
+			hunkScrollView.widthAnchor.constraint(equalToConstant: 136),
 			unifiedView.leadingAnchor.constraint(equalTo: diffContentView.leadingAnchor),
 			unifiedView.trailingAnchor.constraint(equalTo: diffContentView.trailingAnchor),
 			unifiedView.topAnchor.constraint(equalTo: diffContentView.topAnchor),
@@ -1489,6 +1500,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private func setGitDiffMessage(_ message: String, isError: Bool = false) {
 		gitDiffFiles = []
 		gitHunkItems = []
+		gitUnifiedLineItems = []
 		gitHunkTableView?.reloadData()
 		gitDiffStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
 		gitDiffStatusLabel?.stringValue = message
@@ -1534,21 +1546,106 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 	}
 
+	@objc private func applyGitSelectedLines(_ sender: NSButton) {
+		guard let gitRootURL, sender.tag >= 0, sender.tag < gitHunkItems.count else {
+			return
+		}
+		let item = gitHunkItems[sender.tag]
+		guard item.fileIndex < gitDiffFiles.count, item.hunkIndex < gitDiffFiles[item.fileIndex].hunks.count else {
+			return
+		}
+		let file = gitDiffFiles[item.fileIndex]
+		let hunk = file.hunks[item.hunkIndex]
+		do {
+			let lineIndexes = try selectedGitLineIndexes(for: item)
+			let repository = GitRepository(root: gitRootURL)
+			if item.isStaged {
+				try repository.unstage(lineIndexes: lineIndexes, in: hunk, file: file)
+			} else {
+				try repository.stage(lineIndexes: lineIndexes, in: hunk, file: file)
+			}
+			refreshGitChanges(nil)
+		} catch {
+			gitDiffStatusLabel?.textColor = .systemRed
+			gitDiffStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
 	private func renderGitDiff() {
 		let hasSideBySide = gitDiffMode == .sideBySide
 		gitUnifiedDiffView?.isHidden = hasSideBySide
 		gitSideBySideSplitView?.isHidden = !hasSideBySide
 		guard !gitDiffFiles.isEmpty else {
+			gitUnifiedLineItems = []
 			return
 		}
 		switch gitDiffMode {
 		case .unified:
-			applyGitDiff(DiffTextRenderer.unified(files: gitDiffFiles), to: gitUnifiedDiffView, path: gitDiffPath)
+			let document = DiffTextRenderer.unified(files: gitDiffFiles)
+			gitUnifiedLineItems = unifiedGitDiffLineItems(files: gitDiffFiles, document: document)
+			applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffPath)
 		case .sideBySide:
+			gitUnifiedLineItems = []
 			let rendered = DiffTextRenderer.sideBySide(files: gitDiffFiles)
 			applyGitDiff(rendered.old, to: gitSideOldDiffView, path: gitDiffFiles.first?.oldPath ?? gitDiffPath)
 			applyGitDiff(rendered.new, to: gitSideNewDiffView, path: gitDiffFiles.first?.newPath ?? gitDiffPath)
 		}
+	}
+
+	private func unifiedGitDiffLineItems(files: [DiffFile], document: RenderedDiffDocument) -> [GitDiffLineItem] {
+		var items: [GitDiffLineItem] = []
+		var renderedLine = 0
+		for (fileIndex, file) in files.enumerated() {
+			renderedLine += 1
+			if file.isNewFile, file.newMode != nil {
+				renderedLine += 1
+			}
+			if file.isDeletedFile, file.oldMode != nil {
+				renderedLine += 1
+			}
+			if file.indexLine != nil {
+				renderedLine += 1
+			}
+			renderedLine += 2
+			for (hunkIndex, hunk) in file.hunks.enumerated() {
+				renderedLine += 1
+				for lineIndex in hunk.lines.indices {
+					if renderedLine < document.lines.count {
+						items.append(GitDiffLineItem(
+							fileIndex: fileIndex,
+							hunkIndex: hunkIndex,
+							lineIndex: lineIndex,
+							range: document.lines[renderedLine].fullRange
+						))
+					}
+					renderedLine += 1
+				}
+			}
+		}
+		return items
+	}
+
+	private func selectedGitLineIndexes(for item: GitDiffHunkItem) throws -> IndexSet {
+		guard gitDiffMode == .unified else {
+			throw GitLineSelectionError.unifiedModeRequired
+		}
+		guard let selection = gitUnifiedDiffView?.editor.selections.primary else {
+			throw GitLineSelectionError.noChangedLinesSelected
+		}
+		let selectedItems = gitUnifiedLineItems.filter { lineItem in
+			guard lineItem.fileIndex == item.fileIndex, lineItem.hunkIndex == item.hunkIndex else {
+				return false
+			}
+			if selection.isCaret {
+				return lineItem.range.contains(selection.head) || lineItem.range.upperBound == selection.head
+			}
+			return lineItem.range.overlaps(selection.range)
+		}
+		let indexes = IndexSet(selectedItems.map(\.lineIndex))
+		guard !indexes.isEmpty else {
+			throw GitLineSelectionError.noChangedLinesSelected
+		}
+		return indexes
 	}
 
 	private func applyGitDiff(_ document: RenderedDiffDocument, to view: MetalTextView?, path: String?) {
@@ -2877,25 +2974,30 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === gitHunkTableView {
 			let item = gitHunkItems[row]
 			let cell = NSTableCellView()
-			let button = NSButton(title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"), target: self, action: #selector(applyGitHunk(_:)))
-			button.bezelStyle = .rounded
-			button.font = .systemFont(ofSize: 10)
-			button.tag = row
+			let hunkButton = NSButton(title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"), target: self, action: #selector(applyGitHunk(_:)))
+			hunkButton.bezelStyle = .rounded
+			hunkButton.font = .systemFont(ofSize: 10)
+			hunkButton.tag = row
+			let lineButton = NSButton(title: item.isStaged ? L10n.string("Unstage Lines") : L10n.string("Stage Lines"), target: self, action: #selector(applyGitSelectedLines(_:)))
+			lineButton.bezelStyle = .rounded
+			lineButton.font = .systemFont(ofSize: 10)
+			lineButton.tag = row
 			let label = NSTextField(labelWithString: item.title)
 			label.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
 			label.textColor = .secondaryLabelColor
 			label.lineBreakMode = .byTruncatingMiddle
-			let stack = NSStackView(views: [button, label])
+			let stack = NSStackView(views: [hunkButton, lineButton, label])
 			stack.orientation = .vertical
 			stack.alignment = .leading
-			stack.spacing = 3
+			stack.spacing = 2
 			stack.translatesAutoresizingMaskIntoConstraints = false
 			cell.addSubview(stack)
 			NSLayoutConstraint.activate([
 				stack.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 6),
 				stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -6),
 				stack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-				button.widthAnchor.constraint(equalToConstant: 104),
+				hunkButton.widthAnchor.constraint(equalToConstant: 118),
+				lineButton.widthAnchor.constraint(equalToConstant: 118),
 			])
 			return cell
 		}

@@ -390,6 +390,16 @@ public struct GitRepository: Sendable {
 		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: true)
 	}
 
+	public func stage(lineIndexes: IndexSet, in hunk: DiffHunk, file: DiffFile) throws {
+		let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: lineIndexes, operation: .stage)
+		try applyCachedPatch(patch, reverse: false)
+	}
+
+	public func unstage(lineIndexes: IndexSet, in hunk: DiffHunk, file: DiffFile) throws {
+		let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: lineIndexes, operation: .unstage)
+		try applyCachedPatch(patch, reverse: true)
+	}
+
 	public func switchBranch(_ name: String, stashingDirtyChanges: Bool = false) throws {
 		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !name.isEmpty else {

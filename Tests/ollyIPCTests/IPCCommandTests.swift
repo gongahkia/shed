@@ -87,6 +87,10 @@ final class IPCCommandTests: XCTestCase {
             .reload(IPCReloadCommand()),
             .restoreWindows(IPCRestoreWindowsCommand()),
             .setSpacePolicy(IPCSetSpacePolicyCommand(policy: .followWindow)),
+            .setFocusPolicy(IPCSetFocusPolicyCommand(
+                allowedBundleIDs: ["com.apple.Terminal"],
+                maxEventsPerSecond: 10
+            )),
             .subscribeEvents(IPCSubscribeEventsCommand(eventKinds: [.engine, .focus], replayCurrentState: true)),
             .version(IPCVersionCommand())
         ] + IPCCommandName.reservedV2.map { .reserved(IPCReservedCommand(name: $0)) }

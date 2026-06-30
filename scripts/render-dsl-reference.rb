@@ -14,6 +14,7 @@ source_order = {
   "Animation.swift" => "Animation",
   "ConfigDiagnostics.swift" => "Config Diagnostics",
   "Config.swift" => "Config",
+  "FocusPolicy.swift" => "Focus Policy",
   "Hooks.swift" => "Hooks",
   "Keybind.swift" => "Keybinds",
   "NamedTag.swift" => "Workspaces",

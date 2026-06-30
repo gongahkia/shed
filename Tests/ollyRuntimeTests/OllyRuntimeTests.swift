@@ -365,6 +365,95 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testAXFocusBurstPublishesFocusBlockedEvent() async throws {
+        let element = AXUIElementCreateApplication(9876)
+        let attributes = WindowAttributesScript([
+            WindowAttributes(
+                title: "Noisy 1",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: CGRect(x: 0, y: 0, width: 300, height: 300),
+                processID: 9876,
+                windowID: 77
+            ),
+            WindowAttributes(
+                title: "Noisy 2",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: CGRect(x: 20, y: 20, width: 300, height: 300),
+                processID: 9876,
+                windowID: 88
+            )
+        ])
+        let snapshotCache = WindowSnapshotCache { _, _ in try attributes.next() }
+        let attribution = FocusInputAttribution()
+
+        try await withRuntime(snapshotCache: snapshotCache, focusInputAttribution: attribution) { runtime, socketPath, _ in
+            await runtime.registerApplicationForTest(processID: 9876, bundleID: "com.example.Noisy")
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                command: .subscribeEvents(.init(eventKinds: [.focusBlocked]))
+            )))
+            XCTAssertEqual(
+                try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status,
+                .success
+            )
+
+            for _ in 0..<2 {
+                await runtime.handle(axEvent: AXNotificationEvent(
+                    processID: 9876,
+                    element: element,
+                    notification: .focusedWindowChanged,
+                    rawNotificationName: AXNotification.focusedWindowChanged.rawValue
+                ))
+            }
+
+            let event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            XCTAssertEqual(event.event, .focusBlocked(IPCFocusBlockedEvent(
+                processID: 9876,
+                bundleID: "com.example.Noisy"
+            )))
+        }
+    }
+
+    func testAXFocusPolicyAllowlistBypassesFocusRateLimit() async throws {
+        let element = AXUIElementCreateApplication(9876)
+        let snapshotCache = WindowSnapshotCache { _, _ in
+            WindowAttributes(
+                title: "Terminal",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: CGRect(x: 0, y: 0, width: 300, height: 300),
+                processID: 9876,
+                windowID: 77
+            )
+        }
+
+        try await withRuntime(snapshotCache: snapshotCache) { runtime, socketPath, displayID in
+            await runtime.registerApplicationForTest(processID: 9876, bundleID: "com.apple.Terminal")
+            await runtime.replaceConfigForTest(Config {
+                FocusPolicy {
+                    allowStealingFor("com.apple.Terminal")
+                }
+            })
+
+            for _ in 0..<2 {
+                await runtime.handle(axEvent: AXNotificationEvent(
+                    processID: 9876,
+                    element: element,
+                    notification: .focusedWindowChanged,
+                    rawNotificationName: AXNotification.focusedWindowChanged.rawValue
+                ))
+            }
+
+            let snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.focusedWindowID, 77)
+        }
+    }
+
     func testAXWindowMovedFeedsDragSessionFromSnapshot() async throws {
         let element = AXUIElementCreateApplication(9876)
         let frame = CGRect(x: 40, y: 50, width: 320, height: 240)
@@ -861,6 +950,7 @@ private func withRuntime(
     dragSession: AXDragSession = AXDragSession(),
     axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
     activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
+    focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
     fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
     extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
@@ -871,6 +961,7 @@ private func withRuntime(
         dragSession: dragSession,
         axSubroleReader: axSubroleReader,
         activeSpaceWindowIDs: activeSpaceWindowIDs,
+        focusInputAttribution: focusInputAttribution,
         fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
     )
     do {
@@ -911,14 +1002,19 @@ private extension OllyRuntime {
     func replaceConfigForTest(_ config: Config) async {
         await configStore.replace(with: config)
         nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
+        focusPolicy = config.focusPolicy
+        await focusRateLimiter.update(settings: FocusRateLimitSettings(
+            maxEventsPerSecond: config.focusPolicy.maxEventsPerSecond,
+            minHumanIntervalMilliseconds: config.focusPolicy.minHumanIntervalMilliseconds
+        ))
     }
 
     func setAXPermissionStatusForTest(_ status: AXPermissionStatus?) {
         axPermissionStatus = status
     }
 
-    func registerApplicationForTest(processID: pid_t) {
-        applicationsByProcessID[processID] = Application(processID: processID)
+    func registerApplicationForTest(processID: pid_t, bundleID: String? = nil) {
+        applicationsByProcessID[processID] = Application(processID: processID, bundleIdentifier: bundleID)
     }
 }
 
@@ -939,6 +1035,24 @@ private actor SubroleScript {
 
     func next() -> String? {
         values.isEmpty ? nil : values.removeFirst()
+    }
+}
+
+private final class WindowAttributesScript: @unchecked Sendable {
+    private let lock = NSLock()
+    private var values: [WindowAttributes]
+
+    init(_ values: [WindowAttributes]) {
+        self.values = values
+    }
+
+    func next() throws -> WindowAttributes {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !values.isEmpty else {
+            throw RuntimeTestError.unexpectedResponse
+        }
+        return values.removeFirst()
     }
 }
 
@@ -1014,6 +1128,7 @@ private struct RuntimeFixture {
         dragSession: AXDragSession = AXDragSession(),
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
+        focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000
     ) -> OllyRuntime {
         OllyRuntime(
@@ -1039,6 +1154,7 @@ private struct RuntimeFixture {
             },
             axSubroleReader: axSubroleReader,
             activeSpaceWindowIDs: activeSpaceWindowIDs,
+            focusInputAttribution: focusInputAttribution,
             fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,
             presentAXOnboarding: {}
         )

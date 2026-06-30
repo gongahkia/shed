@@ -51,6 +51,8 @@ private extension IPCEvent {
             return .engine
         case .focus:
             return .focus
+        case .focusBlocked:
+            return .focusBlocked
         case .fullscreen:
             return .fullscreen
         case .space:

@@ -41,6 +41,7 @@ extension OllyRuntime {
 
     private func handleAXRevoke() async {
         stopAXObservers()
+        focusInputAttribution.stop()
         await windowMover.flushAndPause()
         await publishRuntimeEvent(.axPermission(IPCAXPermissionEvent(status: .missing)))
         let hooks = await configStore.current().hooks
@@ -56,6 +57,7 @@ extension OllyRuntime {
         await refreshAllWindows()
         startApplicationObservation()
         startNativeSpaceObservation()
+        focusInputAttribution.start()
         for display in displayProvider() {
             try? await applyAndArrange(displayID: display.id)
         }

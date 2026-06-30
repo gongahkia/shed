@@ -54,6 +54,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let gestures: Gestures
     public let hooks: Hooks
     public let nativeSpace: NativeSpace
+    public let focusPolicy: FocusPolicy
 
     public init(
         version: DSLVersion = .v1,
@@ -66,7 +67,8 @@ public struct Config: Codable, Equatable, Sendable {
         animation: Animation = Animation(),
         gestures: Gestures = Gestures(),
         hooks: Hooks = Hooks(),
-        nativeSpace: NativeSpace = NativeSpace()
+        nativeSpace: NativeSpace = NativeSpace(),
+        focusPolicy: FocusPolicy = FocusPolicy()
     ) {
         self.version = version
         self.keybinds = keybinds
@@ -79,6 +81,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.gestures = gestures
         self.hooks = hooks
         self.nativeSpace = nativeSpace
+        self.focusPolicy = focusPolicy
     }
 
     public init(version: DSLVersion = .v1, @ConfigBuilder _ build: () -> [ConfigSection]) {
@@ -99,7 +102,8 @@ public struct Config: Codable, Equatable, Sendable {
             animation: try container.decodeIfPresent(Animation.self, forKey: .animation) ?? Animation(),
             gestures: try container.decodeIfPresent(Gestures.self, forKey: .gestures) ?? Gestures(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks(),
-            nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace()
+            nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace(),
+            focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy()
         )
     }
 
@@ -114,7 +118,7 @@ public struct Config: Codable, Equatable, Sendable {
         var animation = Animation()
         var gestures = Gestures()
         var hooks = Hooks()
-        var nativeSpace = NativeSpace()
+        var nativeSpace = NativeSpace(); var focusPolicy = FocusPolicy()
 
         for section in sections {
             switch section {
@@ -138,6 +142,8 @@ public struct Config: Codable, Equatable, Sendable {
                 hooks = value
             case let .nativeSpace(value):
                 nativeSpace = value
+            case let .focusPolicy(value):
+                focusPolicy = value
             }
         }
 
@@ -152,7 +158,8 @@ public struct Config: Codable, Equatable, Sendable {
             animation: animation,
             gestures: gestures,
             hooks: hooks,
-            nativeSpace: nativeSpace
+            nativeSpace: nativeSpace,
+            focusPolicy: focusPolicy
         )
     }
 }
@@ -222,6 +229,7 @@ public enum ConfigBuilder {
     public static func buildExpression(_ expression: NativeSpace) -> [ConfigSection] {
         [.nativeSpace(expression)]
     }
+
 }
 
 /// Purpose: Wraps each top-level DSL section so `ConfigBuilder` can merge defaults deterministically.
@@ -239,6 +247,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case gestures(Gestures)
     case hooks(Hooks)
     case nativeSpace(NativeSpace)
+    case focusPolicy(FocusPolicy)
 }
 
 /// Purpose: Declares one raw or typed lifecycle hook callback.

@@ -77,6 +77,8 @@ window at its current frame. Other per-window engine overrides are rejected as `
 `isFullscreen` marks windows temporarily excluded from tag engines while native fullscreen owns their Space.
 `isOffSpace` marks managed windows that are absent from the active native Space but still tracked.
 `set-space-policy` accepts `follow-window`, `rehome`, or `unmanage`; `follow-window` is the default.
+`set-focus-policy` updates focus-stealing controls. Omitted fields keep their current values; a provided
+`allowedBundleIDs` array replaces the allowlist.
 `snap-window` places a window in a safe-layout display zone and makes it floating by default so the next
 tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
 DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
@@ -576,6 +578,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "set-focus-policy"
+            },
+            "arguments": {
+              "$ref": "#/$defs/setFocusPolicyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "subscribe-events"
             },
             "arguments": {
@@ -857,6 +869,28 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       "properties": {
         "policy": {
           "$ref": "#/$defs/nativeSpacePolicy"
+        }
+      },
+      "additionalProperties": false
+    },
+    "setFocusPolicyArguments": {
+      "type": "object",
+      "properties": {
+        "allowedBundleIDs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "maxEventsPerSecond": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "minHumanIntervalMilliseconds": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -1316,6 +1350,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "focus": {
           "$ref": "#/$defs/focusEvent"
         },
+        "focusBlocked": {
+          "$ref": "#/$defs/focusBlockedEvent"
+        },
         "fullscreen": {
           "$ref": "#/$defs/fullscreenEvent"
         },
@@ -1337,6 +1374,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "required": [
             "focus"
+          ]
+        },
+        {
+          "required": [
+            "focusBlocked"
           ]
         },
         {
@@ -1391,6 +1433,28 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "tagMask": {
           "type": "integer",
           "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "focusBlockedEvent": {
+      "type": "object",
+      "required": [
+        "processID",
+        "reason"
+      ],
+      "properties": {
+        "processID": {
+          "type": "integer"
+        },
+        "bundleID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string"
         }
       },
       "additionalProperties": false
@@ -1473,6 +1537,18 @@ Focus event line:
 
 ```json
 {"version":1,"event":{"focus":{"focusedWindowID":42,"displayID":1,"tagMask":1}}}
+```
+
+Set focus policy command:
+
+```json
+{"version":2,"command":{"name":"set-focus-policy","arguments":{"allowedBundleIDs":["com.apple.Terminal"],"maxEventsPerSecond":20,"minHumanIntervalMilliseconds":80}}}
+```
+
+Focus blocked event line:
+
+```json
+{"version":2,"event":{"focusBlocked":{"processID":1234,"bundleID":"com.example.Noisy","reason":"rate-limited"}}}
 ```
 
 AX permission event line:

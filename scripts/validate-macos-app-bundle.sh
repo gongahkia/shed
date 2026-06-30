@@ -24,6 +24,8 @@ short_version="$(plist_value CFBundleShortVersionString)"
 bundle_version="$(plist_value CFBundleVersion)"
 min_system="$(plist_value LSMinimumSystemVersion)"
 package_type="$(plist_value CFBundlePackageType)"
+apple_events_usage="$(plist_value NSAppleEventsUsageDescription)"
+input_monitoring_usage="$(plist_value NSInputMonitoringUsageDescription)"
 
 if [[ "$package_type" != "APPL" ]]; then
     echo "CFBundlePackageType must be APPL, got $package_type" >&2
@@ -32,6 +34,11 @@ fi
 
 if [[ -z "$bundle_id" || -z "$short_version" || -z "$bundle_version" || -z "$min_system" ]]; then
     echo "required Info.plist metadata is empty" >&2
+    exit 1
+fi
+
+if [[ -z "$apple_events_usage" || -z "$input_monitoring_usage" ]]; then
+    echo "required privacy usage descriptions are empty" >&2
     exit 1
 fi
 

@@ -100,6 +100,9 @@ struct OllyCtlRunner {
             return renderEngineEvent(event)
         case let .focus(event):
             return renderFocusEvent(event)
+        case let .focusBlocked(event):
+            let bundle = event.bundleID.map { " bundle \($0)" } ?? ""
+            return "focus-blocked pid \(event.processID)\(bundle)"
         case let .fullscreen(event):
             let state = event.didEnter ? "entered" : "exited"
             return "fullscreen \(state) window \(event.windowID)"

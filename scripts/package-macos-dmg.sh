@@ -48,6 +48,10 @@ cat >"$APP_BUNDLE/Contents/Info.plist" <<PLIST
     <true/>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright (c) 2026 Olly contributors</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Olly uses Apple Events-compatible automation context while coordinating macOS window focus.</string>
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>Olly reads keyboard and mouse timing to distinguish user-initiated focus from focus stealing.</string>
 </dict>
 </plist>
 PLIST

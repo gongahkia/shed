@@ -49,6 +49,7 @@
 "Cmd-T" = "nav.gotoSymbolWorkspace"
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
 "Cmd-Opt-7" = "view.outline"
+"Ctrl-Space" = "lsp.completion"
 "i" = "mode.insert"
 "/" = "vim.searchForward"
 "Shift-/" = "vim.searchBackward"
@@ -128,4 +129,5 @@
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
 "Cmd-Opt-7" = "view.outline"
 "Esc" = "mode.normal"
+"Ctrl-Space" = "lsp.completion"
 "jk" = "mode.normal"

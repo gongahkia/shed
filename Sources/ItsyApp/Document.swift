@@ -3,8 +3,17 @@ import Darwin
 import Dispatch
 import Foundation
 import ItsyEditor
+import ItsyLSP
 import ItsyRender
 import ItsySyntax
+
+private struct LSPClientNotificationSink: LSPNotificationSink {
+	let client: LSPProcessClient
+
+	func send(method: String, params: LSPAny) async throws {
+		try await client.sendNotification(method: method, params: params)
+	}
+}
 
 final class ItsyDocumentController: NSDocumentController {
 	override init() {
@@ -620,6 +629,7 @@ struct EditorPaneCoordinator {
 
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
+	private static let completionLSPManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
 	private static let quickLookPanelSelector = NSSelectorFromString("sharedPreviewPanel")
 	private static let quickLookDataSourceSelector = NSSelectorFromString("setDataSource:")
 	private static let quickLookDelegateSelector = NSSelectorFromString("setDelegate:")
@@ -660,6 +670,10 @@ final class EditorWindowController: NSWindowController {
 	private var findMatches: [Range<Int>] = []
 	private var selectedFindMatchIndex: Int?
 	private var incrementalFindDirection: Int?
+	private var completionPopup: CompletionPopupController?
+	private var completionRequestGeneration = 0
+	private var completionSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
+	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 
 	init(document: ItsyDocument) {
 		let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -737,6 +751,7 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	deinit {
+		completionPopup?.dismiss()
 		if let fileTreeKeyMonitor {
 			NSEvent.removeMonitor(fileTreeKeyMonitor)
 		}
@@ -1283,6 +1298,10 @@ final class EditorWindowController: NSWindowController {
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
 		}
+		view.completionRequested = { [weak self, weak view] trigger in
+			self?.requestCompletion(triggerCharacter: trigger, in: view) ?? false
+		}
+		installCompletionTriggersIfKnown(for: view, document: document)
 		view.exCommandRequested = { [weak self] command in
 			self?.performExCommand(command) ?? false
 		}
@@ -1397,10 +1416,179 @@ final class EditorWindowController: NSWindowController {
 			startIncrementalSearch(direction: -1)
 		case "edit.selectAllFindMatches":
 			selectAllFindMatches()
+		case "lsp.completion":
+			return requestCompletion(triggerCharacter: nil, in: editorView)
 		default:
 			return false
 		}
 		return true
+	}
+
+	@discardableResult
+	private func requestCompletion(triggerCharacter: String?, forIncomplete: Bool = false, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = targetView.editor.text
+		let cursorOffset = targetView.editor.selections.primary.head
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
+		let context = completionContext(triggerCharacter: triggerCharacter, forIncomplete: forIncomplete)
+		completionRequestGeneration += 1
+		let generation = completionRequestGeneration
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await self.ensureCompletionSession(for: fileURL)
+				try await self.syncCompletionDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let params = LSPCompletionParams(
+					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
+					position: position,
+					context: context
+				)
+				let response = try await session.client.sendRequest(
+					method: LSPMethod.textDocumentCompletion,
+					params: try LSPAny(encoding: params)
+				)
+				let result = try LSPCompletionResult(result: response.result)
+				await MainActor.run { [weak self, weak targetView] in
+					guard let self, let targetView, generation == self.completionRequestGeneration else {
+						return
+					}
+					self.showCompletionPopup(result: result, in: targetView)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.completionRequestGeneration else {
+						return
+					}
+					self.completionPopup?.dismiss()
+					NSLog("completion failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func completionContext(triggerCharacter: String?, forIncomplete: Bool) -> LSPCompletionContext {
+		if forIncomplete {
+			return LSPCompletionContext(triggerKind: .triggerForIncompleteCompletions)
+		}
+		if let triggerCharacter {
+			return LSPCompletionContext(triggerKind: .triggerCharacter, triggerCharacter: triggerCharacter)
+		}
+		return LSPCompletionContext(triggerKind: .invoked)
+	}
+
+	private func ensureCompletionSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
+		guard let key = await Self.completionLSPManager.sessionKey(for: url) else {
+			throw LSPManagerError.noConfigForDocument
+		}
+		let client = try await Self.completionLSPManager.ensureClient(for: url)
+		if await Self.completionLSPManager.status(of: key) != .running {
+			do {
+				try client.start()
+			} catch LSPProcessClientError.alreadyStarted {}
+			do {
+				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot)
+				let result = try await client.initialize(params)
+				let triggers = (try? LSPInitializeResult(result: result).capabilities.completionProvider?.triggerCharacters).map(Set.init) ?? []
+				await Self.completionLSPManager.markRunning(key)
+				await MainActor.run { [weak self] in
+					self?.setCompletionTriggerCharacters(triggers, for: key)
+				}
+			} catch {
+				await Self.completionLSPManager.markFailed(key)
+				await MainActor.run { [weak self] in
+					self?.completionSyncCoordinators[key] = nil
+				}
+				throw error
+			}
+		}
+		return (client, key)
+	}
+
+	private func syncCompletionDocument(client: LSPProcessClient, key: LSPSessionKey, url: URL, content: String) async throws {
+		let coordinator = await MainActor.run {
+			self.completionSyncCoordinator(for: key, client: client)
+		}
+		if await coordinator.currentVersion(for: url) == nil {
+			try await coordinator.didOpen(url: url, languageID: key.languageID, content: content)
+		} else {
+			await coordinator.didChange(url: url, content: content)
+			await coordinator.flushPendingChange(for: url)
+		}
+	}
+
+	private func completionSyncCoordinator(for key: LSPSessionKey, client: LSPProcessClient) -> LSPDocumentSyncCoordinator {
+		if let coordinator = completionSyncCoordinators[key] {
+			return coordinator
+		}
+		let coordinator = LSPDocumentSyncCoordinator(sink: LSPClientNotificationSink(client: client), debounceMillis: 0)
+		completionSyncCoordinators[key] = coordinator
+		return coordinator
+	}
+
+	private func setCompletionTriggerCharacters(_ characters: Set<String>, for key: LSPSessionKey) {
+		completionTriggerCharactersBySession[key] = characters
+		for pane in paneCoordinator.panes {
+			pane.editorView.completionTriggerCharacters = characters
+		}
+	}
+
+	private func installCompletionTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {
+		view.completionTriggerCharacters = []
+		guard let fileURL = document.fileURL else {
+			return
+		}
+		Task { [weak self, weak view] in
+			guard let self, let key = await Self.completionLSPManager.sessionKey(for: fileURL) else {
+				return
+			}
+			await MainActor.run { [weak self, weak view] in
+				view?.completionTriggerCharacters = self?.completionTriggerCharactersBySession[key] ?? []
+			}
+		}
+	}
+
+	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView) {
+		let popup = completionPopup ?? CompletionPopupController()
+		completionPopup = popup
+		popup.show(
+			result: result,
+			relativeTo: window,
+			editorView: targetView,
+			requestAgain: { [weak self, weak targetView] in
+				_ = self?.requestCompletion(triggerCharacter: nil, forIncomplete: true, in: targetView)
+			},
+			accept: { [weak self, weak targetView] item in
+				guard let self, let targetView else {
+					return
+				}
+				self.acceptCompletion(item, in: targetView)
+			}
+		)
+	}
+
+	private func acceptCompletion(_ item: LSPCompletionItem, in targetView: MetalTextView) {
+		guard let application = LSPCompletionApply.application(
+			for: item,
+			in: targetView.editor.text,
+			cursorOffset: targetView.editor.selections.primary.head
+		) else {
+			return
+		}
+		targetView.replaceUTF8Range(
+			application.replacementRange,
+			with: application.replacementText,
+			selectUTF8Ranges: application.selectionRanges
+		)
+		focusEditor()
 	}
 
 	private func performExCommand(_ command: String) -> Bool {

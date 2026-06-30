@@ -80,4 +80,52 @@ public enum LSPTextEditApply {
 		_ = lineStart
 		return index
 	}
+
+	public static func utf8Range(for range: LSPRange, in text: String) -> Range<Int>? {
+		guard
+			let lowerUTF16 = utf16Offset(line: range.start.line, character: range.start.character, in: text),
+			let upperUTF16 = utf16Offset(line: range.end.line, character: range.end.character, in: text)
+		else {
+			return nil
+		}
+		let lower = utf8Offset(forUTF16Offset: lowerUTF16, in: text)
+		let upper = utf8Offset(forUTF16Offset: upperUTF16, in: text)
+		guard upper >= lower else {
+			return nil
+		}
+		return lower ..< upper
+	}
+
+	public static func utf16Position(forUTF8Offset target: Int, in text: String) -> LSPPosition {
+		let clamped = min(max(target, 0), text.utf8.count)
+		var utf8 = 0
+		var line = 0
+		var character = 0
+		for scalar in text.unicodeScalars {
+			guard utf8 < clamped else {
+				break
+			}
+			utf8 += String(scalar).utf8.count
+			if scalar.value == 10 {
+				line += 1
+				character = 0
+			} else {
+				character += String(scalar).utf16.count
+			}
+		}
+		return LSPPosition(line: line, character: character)
+	}
+
+	private static func utf8Offset(forUTF16Offset target: Int, in text: String) -> Int {
+		var utf8 = 0
+		var utf16 = 0
+		for character in text {
+			if utf16 >= target {
+				break
+			}
+			utf8 += String(character).utf8.count
+			utf16 += String(character).utf16.count
+		}
+		return utf8
+	}
 }

@@ -83,6 +83,70 @@ import Testing
 	#expect(decoded == message)
 }
 
+@Test func completionParamsEncodeContextAndResultDecodesList() throws {
+	let params = LSPCompletionParams(
+		textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift"),
+		position: LSPPosition(line: 2, character: 8),
+		context: LSPCompletionContext(triggerKind: .triggerCharacter, triggerCharacter: ".")
+	)
+	let value = try LSPAny(encoding: params)
+
+	#expect(value == .object([
+		"textDocument": .object(["uri": .string("file:///tmp/main.swift")]),
+		"position": .object(["line": .int(2), "character": .int(8)]),
+		"context": .object(["triggerKind": .int(2), "triggerCharacter": .string(".")]),
+	]))
+
+	let data = Data(#"""
+	{
+	  "isIncomplete": false,
+	  "items": [
+	    {
+	      "label": "print",
+	      "detail": "Swift.print",
+	      "documentation": { "kind": "markdown", "value": "prints" },
+	      "filterText": "print",
+	      "insertText": "print($1)",
+	      "insertTextFormat": 2
+	    }
+	  ]
+	}
+	"""#.utf8)
+	let result = try LSPCompletionResult(decoding: data)
+
+	#expect(result.isIncomplete == false)
+	#expect(result.items == [
+		LSPCompletionItem(
+			label: "print",
+			detail: "Swift.print",
+			documentation: .object(["kind": .string("markdown"), "value": .string("prints")]),
+			filterText: "print",
+			insertText: "print($1)",
+			insertTextFormat: .snippet
+		),
+	])
+}
+
+@Test func initializeResultDecodesCompletionTriggerCharacters() throws {
+	let result = try LSPInitializeResult(result: .object([
+		"capabilities": .object([
+			"completionProvider": .object([
+				"triggerCharacters": .array([.string("."), .string(":")]),
+			]),
+		]),
+	]))
+
+	#expect(result.capabilities.completionProvider?.triggerCharacters == [".", ":"])
+}
+
+@Test func completionResultDecodesItemArrayAndNull() throws {
+	let items = try LSPCompletionResult(decoding: Data(#"[{"label":"map","insertText":"map"}]"#.utf8))
+	let none = try LSPCompletionResult(decoding: Data("null".utf8))
+
+	#expect(items.items == [LSPCompletionItem(label: "map", insertText: "map")])
+	#expect(none.items.isEmpty)
+}
+
 @Test func didChangeParamsEncodeFullDocumentChange() throws {
 	let params = LSPDidChangeTextDocumentParams(
 		textDocument: LSPVersionedTextDocumentIdentifier(uri: "file:///tmp/main.ts", version: 2),

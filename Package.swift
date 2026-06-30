@@ -30,7 +30,7 @@ let package = Package(
 	targets: [
 		.executableTarget(
 			name: "ItsyApp",
-			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap"],
+			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP"],
 			swiftSettings: releaseSwiftSettings
 		),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),

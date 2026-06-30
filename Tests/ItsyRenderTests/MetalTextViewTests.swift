@@ -50,6 +50,36 @@ import Testing
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func replacingUTF8RangeAppliesSelectionAndChangeCallback() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abc")
+	var changedText: String?
+	view.editorDidChange = { editor in
+		changedText = editor.text
+	}
+
+	view.replaceUTF8Range(1 ..< 2, with: "XYZ", selectUTF8Ranges: [2 ..< 4])
+
+	#expect(view.editor.text == "aXYZc")
+	#expect(changedText == "aXYZc")
+	#expect(view.editor.selections.primary == Selection(anchor: 2, head: 4))
+}
+
+@Test func completionTriggerCharacterRequestsCompletionAfterEdit() {
+	let view = MetalTextView(frame: .zero)
+	view.completionTriggerCharacters = ["."]
+	var trigger: String?
+	view.completionRequested = { value in
+		trigger = value
+		return true
+	}
+
+	#expect(view.handleKey(characters: ".", charactersIgnoringModifiers: ".", keyCode: 0))
+
+	#expect(view.editor.text == ".")
+	#expect(trigger == ".")
+}
+
 @Test func commandDSelectsCurrentWordThenAddsNextMatch() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "foo bar foo foo")

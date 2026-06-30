@@ -108,6 +108,175 @@ public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public enum LSPCompletionTriggerKind: Int, Codable, Equatable, Sendable {
+	case invoked = 1
+	case triggerCharacter = 2
+	case triggerForIncompleteCompletions = 3
+}
+
+public struct LSPCompletionContext: Codable, Equatable, Sendable {
+	public var triggerKind: LSPCompletionTriggerKind
+	public var triggerCharacter: String?
+
+	public init(triggerKind: LSPCompletionTriggerKind, triggerCharacter: String? = nil) {
+		self.triggerKind = triggerKind
+		self.triggerCharacter = triggerCharacter
+	}
+}
+
+public struct LSPCompletionParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+	public var context: LSPCompletionContext?
+
+	public init(
+		textDocument: LSPTextDocumentIdentifier,
+		position: LSPPosition,
+		context: LSPCompletionContext? = nil
+	) {
+		self.textDocument = textDocument
+		self.position = position
+		self.context = context
+	}
+}
+
+public enum LSPInsertTextFormat: Int, Codable, Equatable, Sendable {
+	case plainText = 1
+	case snippet = 2
+}
+
+public struct LSPCompletionItem: Codable, Equatable, Sendable {
+	public var label: String
+	public var detail: String?
+	public var documentation: LSPAny?
+	public var sortText: String?
+	public var filterText: String?
+	public var insertText: String?
+	public var insertTextFormat: LSPInsertTextFormat?
+	public var textEdit: LSPTextEdit?
+	public var data: LSPAny?
+
+	public init(
+		label: String,
+		detail: String? = nil,
+		documentation: LSPAny? = nil,
+		sortText: String? = nil,
+		filterText: String? = nil,
+		insertText: String? = nil,
+		insertTextFormat: LSPInsertTextFormat? = nil,
+		textEdit: LSPTextEdit? = nil,
+		data: LSPAny? = nil
+	) {
+		self.label = label
+		self.detail = detail
+		self.documentation = documentation
+		self.sortText = sortText
+		self.filterText = filterText
+		self.insertText = insertText
+		self.insertTextFormat = insertTextFormat
+		self.textEdit = textEdit
+		self.data = data
+	}
+}
+
+public struct LSPCompletionList: Codable, Equatable, Sendable {
+	public var isIncomplete: Bool
+	public var items: [LSPCompletionItem]
+
+	public init(isIncomplete: Bool, items: [LSPCompletionItem]) {
+		self.isIncomplete = isIncomplete
+		self.items = items
+	}
+}
+
+public enum LSPCompletionResult: Equatable, Sendable {
+	case list(LSPCompletionList)
+	case items([LSPCompletionItem])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let list = try? decoder.decode(LSPCompletionList.self, from: data) {
+			self = .list(list)
+			return
+		}
+		if let items = try? decoder.decode([LSPCompletionItem].self, from: data) {
+			self = items.isEmpty ? .none : .items(items)
+			return
+		}
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var items: [LSPCompletionItem] {
+		switch self {
+		case let .list(list):
+			return list.items
+		case let .items(items):
+			return items
+		case .none:
+			return []
+		}
+	}
+
+	public var isIncomplete: Bool {
+		guard case let .list(list) = self else {
+			return false
+		}
+		return list.isIncomplete
+	}
+}
+
+private struct LSPNull: Codable, Equatable {
+	init() {}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		guard container.decodeNil() else {
+			throw DecodingError.typeMismatch(
+				LSPNull.self,
+				DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Expected null")
+			)
+		}
+	}
+}
+
+public struct LSPCompletionOptions: Codable, Equatable, Sendable {
+	public var triggerCharacters: [String]?
+
+	public init(triggerCharacters: [String]? = nil) {
+		self.triggerCharacters = triggerCharacters
+	}
+}
+
+public struct LSPServerCapabilities: Codable, Equatable, Sendable {
+	public var completionProvider: LSPCompletionOptions?
+
+	public init(completionProvider: LSPCompletionOptions? = nil) {
+		self.completionProvider = completionProvider
+	}
+}
+
+public struct LSPInitializeResult: Codable, Equatable, Sendable {
+	public var capabilities: LSPServerCapabilities
+
+	public init(capabilities: LSPServerCapabilities) {
+		self.capabilities = capabilities
+	}
+
+	public init(result: LSPAny, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result)
+		self = try decoder.decode(LSPInitializeResult.self, from: data)
+	}
+}
+
 public enum LSPSymbolKind: Int, Codable, Equatable, Sendable {
 	case file = 1
 	case module = 2

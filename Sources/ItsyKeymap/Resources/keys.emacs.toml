@@ -25,6 +25,7 @@
 "Cmd-T" = "nav.gotoSymbolWorkspace"
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
 "Cmd-Opt-7" = "view.outline"
+"Ctrl-Space" = "lsp.completion"
 "C-s" = "emacs.isearchForward"
 "C-r" = "emacs.isearchBackward"
 "C-x C-s" = "file.save"

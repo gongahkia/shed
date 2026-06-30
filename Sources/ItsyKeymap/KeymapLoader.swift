@@ -128,6 +128,8 @@ public enum KeymapLoader {
 			return "escape"
 		case "return", "enter":
 			return "return"
+		case "space":
+			return "space"
 		case "tab":
 			return "tab"
 		case "delete", "backspace":

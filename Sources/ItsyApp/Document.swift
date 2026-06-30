@@ -1421,6 +1421,12 @@ final class EditorWindowController: NSWindowController {
 	private func installPane(_ pane: EditorPane, document: ItsyDocument) {
 		let view = pane.editorView
 		document.attach(view)
+		let preferences = EditorPreferences.load()
+		view.configureEditorAppearance(
+			fontName: preferences.fontName,
+			fontSize: preferences.fontSize,
+			showsLineNumbers: preferences.showLineNumbers
+		)
 		view.keymapEngine = ItsyAppKeymap.makeEngine()
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
@@ -1444,6 +1450,16 @@ final class EditorWindowController: NSWindowController {
 		}
 		view.exCommandLineRequested = { [weak self] completion in
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
+		}
+	}
+
+	func applyEditorPreferences(_ preferences: EditorPreferences) {
+		for pane in paneCoordinator.panes {
+			pane.editorView.configureEditorAppearance(
+				fontName: preferences.fontName,
+				fontSize: preferences.fontSize,
+				showsLineNumbers: preferences.showLineNumbers
+			)
 		}
 	}
 
@@ -2265,22 +2281,37 @@ extension EditorWindowController: NSWindowDelegate, NSTextFieldDelegate, NSOutli
 		guard let url = item as? NSURL else {
 			return nil
 		}
-		let identifier = NSUserInterfaceItemIdentifier("FileTreeCell")
+		let identifier = NSUserInterfaceItemIdentifier("FileTreeIconCell")
 		let cell = outlineView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
 		cell.identifier = identifier
+		let imageView = cell.imageView ?? NSImageView()
+		imageView.image = NSWorkspace.shared.icon(forFile: (url as URL).path)
+		imageView.image?.size = NSSize(width: 16, height: 16)
+		imageView.imageScaling = .scaleProportionallyDown
 		let textField = cell.textField ?? NSTextField(labelWithString: "")
 		textField.lineBreakMode = .byTruncatingMiddle
 		textField.font = .systemFont(ofSize: 12)
 		textField.stringValue = fileTreeTitle(for: url)
+		if imageView.superview == nil {
+			imageView.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(imageView)
+			cell.imageView = imageView
+		}
 		if textField.superview == nil {
 			textField.translatesAutoresizingMaskIntoConstraints = false
 			cell.addSubview(textField)
+			cell.textField = textField
+		}
+		if cell.constraints.isEmpty {
 			NSLayoutConstraint.activate([
-				textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+				imageView.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+				imageView.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				imageView.widthAnchor.constraint(equalToConstant: 16),
+				imageView.heightAnchor.constraint(equalToConstant: 16),
+				textField.leadingAnchor.constraint(equalTo: imageView.trailingAnchor, constant: 6),
 				textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
 				textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
 			])
-			cell.textField = textField
 		}
 		return cell
 	}

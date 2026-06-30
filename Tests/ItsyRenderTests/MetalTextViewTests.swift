@@ -31,6 +31,24 @@ import Testing
 	#expect(view.clearColor.blue == 1.0)
 }
 
+@Test func editorAppearanceConfigurationUpdatesFontAndLineNumbers() throws {
+	let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "a\nb\n")
+	let plain = view.textGlyphInstances(scale: 2)
+	let plainFirst = try #require(plain.first)
+
+	view.configureEditorAppearance(fontName: "Monaco", fontSize: 16, showsLineNumbers: true)
+	let numbered = view.textGlyphInstances(scale: 2)
+
+	#expect(view.textFontPointSize == 16)
+	#expect(view.showLineNumbers)
+	#expect(numbered.count > plain.count)
+	let numberGlyph = try #require(numbered.first)
+	let textGlyph = try #require(numbered.dropFirst().first)
+	#expect(numberGlyph.screenOrigin.x < textGlyph.screenOrigin.x)
+	#expect(textGlyph.screenOrigin.x > plainFirst.screenOrigin.x)
+}
+
 @Test func textViewExposesCurrentLineToAccessibility() throws {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "alpha\nbeta\n")

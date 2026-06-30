@@ -147,6 +147,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var commandPaletteFilteredSymbols: [WorkspaceSymbol] = []
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
+	private var settingsFontPopup: NSPopUpButton?
+	private var settingsFontSizeField: NSTextField?
+	private var settingsFontSizeStepper: NSStepper?
+	private var settingsLineNumbersButton: NSButton?
 	private var settingsStatusLabel: NSTextField?
 	private var projectFindPanel: NSPanel?
 	private var projectFindInputField: NSTextField?
@@ -629,6 +633,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
+				Command(id: "view.zoomIn", title: L10n.string("Zoom In"), defaultKey: "Cmd-+") { [weak self] in
+					self?.zoomIn(nil)
+				},
+				Command(id: "view.zoomOut", title: L10n.string("Zoom Out"), defaultKey: "Cmd--") { [weak self] in
+					self?.zoomOut(nil)
+				},
+				Command(id: "view.resetZoom", title: L10n.string("Reset Zoom"), defaultKey: "Cmd-0") { [weak self] in
+					self?.resetZoom(nil)
+				},
 				Command(id: "nav.gotoSymbolWorkspace", title: L10n.string("Go to Symbol in Workspace"), defaultKey: "Cmd-T") { [weak self] in
 					self?.showWorkspaceSymbolPalette(nil)
 				},
@@ -710,6 +723,35 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func performEditorMotion(_ motion: Motion) {
 		activeEditorWindowController()?.performEditorMotion(motion)
+	}
+
+	@objc private func zoomIn(_ sender: Any?) {
+		saveAndApplyEditorPreferences(EditorPreferences.load().zoomed(by: 1))
+	}
+
+	@objc private func zoomOut(_ sender: Any?) {
+		saveAndApplyEditorPreferences(EditorPreferences.load().zoomed(by: -1))
+	}
+
+	@objc private func resetZoom(_ sender: Any?) {
+		saveAndApplyEditorPreferences(EditorPreferences.load().resetZoom())
+	}
+
+	private func saveAndApplyEditorPreferences(_ preferences: EditorPreferences) {
+		preferences.save()
+		syncSettingsEditorControls(preferences)
+		applyEditorPreferencesToOpenWindows(preferences)
+	}
+
+	private func applyEditorPreferencesToOpenWindows(_ preferences: EditorPreferences = EditorPreferences.load()) {
+		for document in documentController.documents {
+			for controller in document.windowControllers {
+				(controller as? EditorWindowController)?.applyEditorPreferences(preferences)
+			}
+		}
+		gitUnifiedDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
+		gitSideOldDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
+		gitSideNewDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
 	}
 
 	@objc private func toggleFindBar(_ sender: Any?) {
@@ -1023,6 +1065,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let unifiedView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 640, height: 360))
 		let oldView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 360))
 		let newView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 360))
+		let preferences = EditorPreferences.load()
+		for view in [unifiedView, oldView, newView] {
+			view.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
+		}
 		let sideSplitView = NSSplitView()
 		sideSplitView.isVertical = true
 		sideSplitView.dividerStyle = .thin
@@ -2940,7 +2986,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 420, height: 148))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 246))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -2956,16 +3002,61 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func configureSettings(_ contentView: NSView) {
-		let label = NSTextField(labelWithString: L10n.string("Theme"))
-		label.font = .systemFont(ofSize: 13, weight: .semibold)
-		label.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(label)
+		let themeLabel = settingsLabel("Theme")
+		contentView.addSubview(themeLabel)
 
 		let themePopup = NSPopUpButton(frame: .zero, pullsDown: false)
 		themePopup.target = self
 		themePopup.action = #selector(settingsThemeDidChange(_:))
 		themePopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(themePopup)
+
+		let fontLabel = settingsLabel("Font")
+		contentView.addSubview(fontLabel)
+
+		let fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		fontPopup.target = self
+		fontPopup.action = #selector(settingsFontDidChange(_:))
+		fontPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(fontPopup)
+
+		let sizeLabel = settingsLabel("Size")
+		contentView.addSubview(sizeLabel)
+
+		let sizeField = NSTextField(frame: .zero)
+		sizeField.alignment = .right
+		sizeField.target = self
+		sizeField.action = #selector(settingsFontSizeDidChange(_:))
+		sizeField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(sizeField)
+
+		let sizeStepper = NSStepper()
+		sizeStepper.minValue = Double(EditorPreferences.minFontSize)
+		sizeStepper.maxValue = Double(EditorPreferences.maxFontSize)
+		sizeStepper.increment = 1
+		sizeStepper.target = self
+		sizeStepper.action = #selector(settingsFontSizeDidChange(_:))
+		sizeStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(sizeStepper)
+
+		let lineNumbersButton = NSButton(checkboxWithTitle: L10n.string("Show Line Numbers"), target: self, action: #selector(settingsLineNumbersDidChange(_:)))
+		lineNumbersButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(lineNumbersButton)
+
+		let zoomOutButton = NSButton(title: L10n.string("Zoom Out"), target: self, action: #selector(zoomOut(_:)))
+		zoomOutButton.bezelStyle = .rounded
+		zoomOutButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(zoomOutButton)
+
+		let resetZoomButton = NSButton(title: L10n.string("Reset Zoom"), target: self, action: #selector(resetZoom(_:)))
+		resetZoomButton.bezelStyle = .rounded
+		resetZoomButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(resetZoomButton)
+
+		let zoomInButton = NSButton(title: L10n.string("Zoom In"), target: self, action: #selector(zoomIn(_:)))
+		zoomInButton.bezelStyle = .rounded
+		zoomInButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(zoomInButton)
 
 		let reloadButton = NSButton(title: L10n.string("Reload Themes"), target: self, action: #selector(reloadSettingsThemes(_:)))
 		reloadButton.bezelStyle = .rounded
@@ -2980,20 +3071,53 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		contentView.addSubview(statusLabel)
 
 		NSLayoutConstraint.activate([
-			label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-			label.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
-			label.widthAnchor.constraint(equalToConstant: 80),
-			themePopup.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 12),
+			themeLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+			themeLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 24),
+			themeLabel.widthAnchor.constraint(equalToConstant: 92),
+			themePopup.leadingAnchor.constraint(equalTo: themeLabel.trailingAnchor, constant: 12),
 			themePopup.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-			themePopup.centerYAnchor.constraint(equalTo: label.centerYAnchor),
+			themePopup.centerYAnchor.constraint(equalTo: themeLabel.centerYAnchor),
+			fontLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			fontLabel.topAnchor.constraint(equalTo: themeLabel.bottomAnchor, constant: 22),
+			fontLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			fontPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			fontPopup.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
+			fontPopup.centerYAnchor.constraint(equalTo: fontLabel.centerYAnchor),
+			sizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			sizeLabel.topAnchor.constraint(equalTo: fontLabel.bottomAnchor, constant: 22),
+			sizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			sizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			sizeField.widthAnchor.constraint(equalToConstant: 72),
+			sizeField.centerYAnchor.constraint(equalTo: sizeLabel.centerYAnchor),
+			sizeStepper.leadingAnchor.constraint(equalTo: sizeField.trailingAnchor, constant: 8),
+			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
+			lineNumbersButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			lineNumbersButton.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			zoomOutButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			zoomOutButton.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			resetZoomButton.leadingAnchor.constraint(equalTo: zoomOutButton.trailingAnchor, constant: 8),
+			resetZoomButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
+			zoomInButton.leadingAnchor.constraint(equalTo: resetZoomButton.trailingAnchor, constant: 8),
+			zoomInButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
 			reloadButton.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
-			reloadButton.topAnchor.constraint(equalTo: themePopup.bottomAnchor, constant: 18),
-			statusLabel.leadingAnchor.constraint(equalTo: label.leadingAnchor),
+			reloadButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
+			statusLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			statusLabel.trailingAnchor.constraint(equalTo: reloadButton.leadingAnchor, constant: -12),
-			statusLabel.centerYAnchor.constraint(equalTo: reloadButton.centerYAnchor),
+			statusLabel.topAnchor.constraint(equalTo: zoomOutButton.bottomAnchor, constant: 16),
 		])
 		settingsThemePopup = themePopup
+		settingsFontPopup = fontPopup
+		settingsFontSizeField = sizeField
+		settingsFontSizeStepper = sizeStepper
+		settingsLineNumbersButton = lineNumbersButton
 		settingsStatusLabel = statusLabel
+	}
+
+	private func settingsLabel(_ title: String.LocalizationValue) -> NSTextField {
+		let label = NSTextField(labelWithString: L10n.string(title))
+		label.font = .systemFont(ofSize: 13, weight: .semibold)
+		label.translatesAutoresizingMaskIntoConstraints = false
+		return label
 	}
 
 	private func refreshSettingsThemes() {
@@ -3012,7 +3136,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		} else if let item = themePopup.itemArray.first {
 			themePopup.select(item)
 		}
+		refreshSettingsEditorControls()
 		setDefaultSettingsStatus()
+	}
+
+	private func refreshSettingsEditorControls() {
+		let preferences = EditorPreferences.load()
+		settingsFontPopup?.removeAllItems()
+		for fontName in EditorPreferences.fontNames {
+			settingsFontPopup?.addItem(withTitle: fontName)
+			settingsFontPopup?.lastItem?.representedObject = fontName
+		}
+		syncSettingsEditorControls(preferences)
+	}
+
+	private func syncSettingsEditorControls(_ preferences: EditorPreferences) {
+		if let item = settingsFontPopup?.itemArray.first(where: { $0.representedObject as? String == preferences.fontName }) {
+			settingsFontPopup?.select(item)
+		}
+		settingsFontSizeField?.doubleValue = Double(preferences.fontSize)
+		settingsFontSizeStepper?.doubleValue = Double(preferences.fontSize)
+		settingsLineNumbersButton?.state = preferences.showLineNumbers ? .on : .off
 	}
 
 	private func setDefaultSettingsStatus() {
@@ -3037,6 +3181,32 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			settingsStatusLabel?.textColor = .systemRed
 			settingsStatusLabel?.stringValue = L10n.string("Failed to load selected theme")
 		}
+	}
+
+	@objc private func settingsFontDidChange(_ sender: Any?) {
+		guard let fontName = settingsFontPopup?.selectedItem?.representedObject as? String else {
+			return
+		}
+		var preferences = EditorPreferences.load()
+		preferences.fontName = fontName
+		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsFontSizeDidChange(_ sender: Any?) {
+		var preferences = EditorPreferences.load()
+		if sender as? NSStepper === settingsFontSizeStepper {
+			preferences.fontSize = CGFloat(settingsFontSizeStepper?.doubleValue ?? Double(preferences.fontSize))
+		} else {
+			preferences.fontSize = CGFloat(settingsFontSizeField?.doubleValue ?? Double(preferences.fontSize))
+		}
+		preferences.fontSize = EditorPreferences.clampedFontSize(preferences.fontSize)
+		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsLineNumbersDidChange(_ sender: Any?) {
+		var preferences = EditorPreferences.load()
+		preferences.showLineNumbers = settingsLineNumbersButton?.state == .on
+		saveAndApplyEditorPreferences(preferences)
 	}
 
 	private func reloadSyntaxThemes() {
@@ -3182,6 +3352,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		navigateItem.submenu = navigateMenu
 
 		let viewMenu = NSMenu(title: L10n.string("View"))
+		let zoomInItem = viewMenu.addItem(withTitle: L10n.string("Zoom In"), action: #selector(zoomIn(_:)), keyEquivalent: "+")
+		zoomInItem.target = self
+		let zoomOutItem = viewMenu.addItem(withTitle: L10n.string("Zoom Out"), action: #selector(zoomOut(_:)), keyEquivalent: "-")
+		zoomOutItem.target = self
+		let resetZoomItem = viewMenu.addItem(withTitle: L10n.string("Reset Zoom"), action: #selector(resetZoom(_:)), keyEquivalent: "0")
+		resetZoomItem.target = self
+		viewMenu.addItem(.separator())
 		let gitGutterIndexItem = viewMenu.addItem(
 			withTitle: L10n.string("Git Gutter: Compare to Index"),
 			action: #selector(useGitGutterIndex(_:)),

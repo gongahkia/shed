@@ -101,7 +101,9 @@ public final class MetalTextView: NSView {
 	private static var recordedBenchStages: Set<String> = []
 	private static let maxCachedShapedLines = 512
 	private static let defaultFontSize: CGFloat = 14.95
+	private static let defaultFontName = "Menlo"
 	private static let defaultTextColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
+	private static let lineNumberTextColor = SIMD4<Float>(0.68, 0.70, 0.74, 1.0)
 	private static let cursorColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 
 	var clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0) {
@@ -151,9 +153,28 @@ public final class MetalTextView: NSView {
 	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
 	private var highlightRevision = 0
 	private var markedRangeUTF8: Range<Int>?
-	private let textFont = MetalTextView.makeDefaultTextFont()
+	private var textFont = MetalTextView.makeDefaultTextFont()
 	private let gutterWidth: CGFloat = 24
-	private let textInset = CGPoint(x: 30, y: 6)
+	private let baseTextInset = CGPoint(x: 30, y: 6)
+	private var textInset: CGPoint {
+		CGPoint(x: showLineNumbers ? lineNumberTextInsetX : baseTextInset.x, y: baseTextInset.y)
+	}
+	private var lineNumberTextInsetX: CGFloat {
+		let digits = max(2, String(max(lineCount, 1)).count)
+		return gutterWidth + CGFloat(digits) * textFontAdvance + 18
+	}
+	private var lineNumberRightEdge: CGFloat {
+		textInset.x - 12
+	}
+	public var showLineNumbers = false {
+		didSet {
+			guard oldValue != showLineNumbers else {
+				return
+			}
+			lineShapeCache.removeAll(keepingCapacity: true)
+			syncEditorState()
+		}
+	}
 	public var topContentInset: CGFloat = 0 {
 		didSet { syncEditorState() }
 	}
@@ -166,6 +187,9 @@ public final class MetalTextView: NSView {
 	var textFontPostScriptName: String {
 		CTFontCopyPostScriptName(textFont) as String
 	}
+	public var textFontPointSize: CGFloat {
+		CTFontGetSize(textFont)
+	}
 	var textFontAdvance: CGFloat {
 		var glyph: CGGlyph = 0
 		var character = UniChar(77)
@@ -174,9 +198,30 @@ public final class MetalTextView: NSView {
 		CTFontGetAdvancesForGlyphs(textFont, .default, &glyph, &advance, 1)
 		return advance.width
 	}
+
+	public func configureEditorAppearance(fontName: String, fontSize: CGFloat, showsLineNumbers: Bool) {
+		let nextFont = Self.makeTextFont(name: fontName, size: fontSize)
+		let currentName = CTFontCopyPostScriptName(textFont) as String
+		let nextName = CTFontCopyPostScriptName(nextFont) as String
+		let fontChanged = currentName != nextName || CTFontGetSize(textFont) != CTFontGetSize(nextFont)
+		if fontChanged {
+			textFont = nextFont
+			lineHeight = ceil(CTFontGetAscent(nextFont) + CTFontGetDescent(nextFont) + CTFontGetLeading(nextFont) + 2)
+			glyphAtlas = nil
+			glyphAtlasRenderingMode = nil
+			glyphAtlasScaleKey = nil
+			lineShapeCache.removeAll(keepingCapacity: true)
+		}
+		showLineNumbers = showsLineNumbers
+		syncEditorState()
+	}
+
 	var lineCount: Int = 0 {
 		didSet {
 			topLineIndex = min(topLineIndex, max(0, lineCount - 1))
+			if showLineNumbers {
+				lineShapeCache.removeAll(keepingCapacity: true)
+			}
 			markDirty()
 		}
 	}
@@ -1791,6 +1836,9 @@ public final class MetalTextView: NSView {
 				continue
 			}
 			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			if showLineNumbers {
+				appendLineNumberGlyphInstances(lineIndex: lineIndex, y: y, scale: scale, shaper: shaper, into: &instances)
+			}
 			for glyph in glyphs {
 				let pixelX = ((glyph.originX - xOffset) * scale).rounded()
 				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
@@ -1824,13 +1872,45 @@ public final class MetalTextView: NSView {
 		return cached
 	}
 
+	private func appendLineNumberGlyphInstances(lineIndex: Int, y: CGFloat, scale: CGFloat, shaper: LineShaper, into instances: inout [MetalGlyphInstance]) {
+		let label = "\(lineIndex + 1)"
+		let baseX = lineNumberRightEdge - typographicWidth(label)
+		guard let glyphs = shapeGlyphs(line: label, baseX: baseX, scale: scale, shaper: shaper, color: Self.lineNumberTextColor) else {
+			return
+		}
+		for glyph in glyphs {
+			let pixelX = (glyph.originX * scale).rounded()
+			let pixelY = ((y + glyph.originYOffset) * scale).rounded()
+			instances.append(MetalGlyphInstance(
+				screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
+				size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
+				atlasUV: glyph.atlasUV,
+				color: glyph.color
+			))
+		}
+	}
+
 	private func shapeCachedGlyphs(line: String, lineRange: Range<Int>, scale: CGFloat, shaper: LineShaper) -> [CachedLineGlyph]? {
+		shapeGlyphs(line: line, baseX: textInset.x, scale: scale, shaper: shaper) { [weak self] range in
+			self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? Self.defaultTextColor
+		}
+	}
+
+	private func shapeGlyphs(line: String, baseX: CGFloat, scale: CGFloat, shaper: LineShaper, color: SIMD4<Float>) -> [CachedLineGlyph]? {
+		shapeGlyphs(line: line, baseX: baseX, scale: scale, shaper: shaper) { _ in color }
+	}
+
+	private func shapeGlyphs(
+		line: String,
+		baseX: CGFloat,
+		scale: CGFloat,
+		shaper: LineShaper,
+		colorForRange: (Range<Int>) -> SIMD4<Float>
+	) -> [CachedLineGlyph]? {
 		try? withGlyphAtlas { atlas in
 			let rasterScale = max(scale, 1)
 			let rasterFont = scaledTextFont(scale: rasterScale)
-			let shaped = try shaper.shape(line, font: textFont, rasterFont: rasterFont, atlas: &atlas, colorForRange: { [weak self] range in
-				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? Self.defaultTextColor
-			})
+			let shaped = try shaper.shape(line, font: textFont, rasterFont: rasterFont, atlas: &atlas, colorForRange: colorForRange)
 			let fontHeight = CTFontGetAscent(rasterFont) + CTFontGetDescent(rasterFont) + CTFontGetLeading(rasterFont)
 			let baselineY = max(0, lineHeight * rasterScale - fontHeight) / 2 + CTFontGetAscent(rasterFont)
 			var cached: [CachedLineGlyph] = []
@@ -1839,7 +1919,7 @@ public final class MetalTextView: NSView {
 				let entry = try atlas.entry(for: glyph.glyphID, font: rasterFont)
 				let padding = CGFloat(entry.padding)
 				cached.append(CachedLineGlyph(
-					originX: textInset.x + glyph.x + (entry.bounds.origin.x - padding) / rasterScale,
+					originX: baseX + glyph.x + (entry.bounds.origin.x - padding) / rasterScale,
 					originYOffset: (baselineY - entry.bounds.maxY - padding) / rasterScale,
 					width: CGFloat(entry.width) / rasterScale,
 					height: CGFloat(entry.height) / rasterScale,
@@ -2205,7 +2285,12 @@ public final class MetalTextView: NSView {
 	}
 
 	private static func makeDefaultTextFont() -> CTFont {
-		let font = NSFont(name: "Menlo", size: defaultFontSize) ?? NSFont.monospacedSystemFont(ofSize: defaultFontSize, weight: .regular)
+		makeTextFont(name: defaultFontName, size: defaultFontSize)
+	}
+
+	private static func makeTextFont(name: String, size: CGFloat) -> CTFont {
+		let clampedSize = min(max(size, 6), 72)
+		let font = NSFont(name: name, size: clampedSize) ?? NSFont(name: defaultFontName, size: clampedSize) ?? NSFont.monospacedSystemFont(ofSize: clampedSize, weight: .regular)
 		return CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
 	}
 

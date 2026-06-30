@@ -60,7 +60,6 @@ public extension IPCCommandName {
         .macroList,
         .macroDelete,
         .runRawAction,
-        .setSpacePolicy,
         .setFocusPolicy,
         .telemetryStatus,
         .telemetryFlush,

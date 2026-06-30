@@ -66,6 +66,23 @@ final class NativeSpaceInvariantTests: XCTestCase {
         XCTAssertEqual(unmanagedWindowIDs, [2])
     }
 
+    func testDriftCanFollowWindowOffSpace() async {
+        let store = WindowStore()
+        await store.upsert(window(id: 1))
+        await store.upsert(window(id: 2))
+        let invariant = NativeSpaceInvariant(
+            windowStore: store,
+            spaceProvider: FixedNativeSpaceProvider(spaceIDs: [1: NativeSpaceID(rawValue: 9), 2: NativeSpaceID(rawValue: 10)])
+        )
+
+        let result = await invariant.verify()
+        let followedWindow = await store.state(for: 2)
+
+        XCTAssertEqual(result.offSpaceWindowIDs, [2])
+        XCTAssertEqual(result.unmanagedWindowIDs, [])
+        XCTAssertEqual(followedWindow?.isOffSpace, true)
+    }
+
     func testPublicProviderReportsUnknownSpace() async {
         let store = WindowStore()
         await store.upsert(window(id: 1))

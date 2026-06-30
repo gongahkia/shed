@@ -86,6 +86,7 @@ final class IPCCommandTests: XCTestCase {
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),
             .restoreWindows(IPCRestoreWindowsCommand()),
+            .setSpacePolicy(IPCSetSpacePolicyCommand(policy: .followWindow)),
             .subscribeEvents(IPCSubscribeEventsCommand(eventKinds: [.engine, .focus], replayCurrentState: true)),
             .version(IPCVersionCommand())
         ] + IPCCommandName.reservedV2.map { .reserved(IPCReservedCommand(name: $0)) }

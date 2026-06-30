@@ -75,6 +75,8 @@ in tiling, and `move-to-display` updates Olly's display assignment before re-arr
 `engineOverride` reports a per-window layout opt-out; currently `.floating` means the tag engine leaves that
 window at its current frame. Other per-window engine overrides are rejected as `unsupported_engine_command`.
 `isFullscreen` marks windows temporarily excluded from tag engines while native fullscreen owns their Space.
+`isOffSpace` marks managed windows that are absent from the active native Space but still tracked.
+`set-space-policy` accepts `follow-window`, `rehome`, or `unmanage`; `follow-window` is the default.
 `snap-window` places a window in a safe-layout display zone and makes it floating by default so the next
 tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
 DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
@@ -232,6 +234,23 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "rotateChildren",
         "flipAxis",
         "balanceTree"
+      ]
+    },
+    "nativeSpacePolicy": {
+      "type": "string",
+      "enum": [
+        "follow-window",
+        "rehome",
+        "unmanage"
+      ]
+    },
+    "spaceDriftAction": {
+      "type": "string",
+      "enum": [
+        "marked-off-space",
+        "returned",
+        "rehomed",
+        "unmanaged"
       ]
     },
     "bspContainerPath": {
@@ -547,6 +566,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "set-space-policy"
+            },
+            "arguments": {
+              "$ref": "#/$defs/setSpacePolicyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "subscribe-events"
             },
             "arguments": {
@@ -820,6 +849,18 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       },
       "additionalProperties": false
     },
+    "setSpacePolicyArguments": {
+      "type": "object",
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "$ref": "#/$defs/nativeSpacePolicy"
+        }
+      },
+      "additionalProperties": false
+    },
     "subscribeEventsArguments": {
       "type": "object",
       "required": [
@@ -1072,6 +1113,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "isSticky",
         "isPinned",
         "isFullscreen",
+        "isOffSpace",
         "frame"
       ],
       "properties": {
@@ -1113,6 +1155,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "type": "boolean"
         },
         "isFullscreen": {
+          "type": "boolean"
+        },
+        "isOffSpace": {
           "type": "boolean"
         },
         "engineOverride": {
@@ -1273,6 +1318,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "fullscreen": {
           "$ref": "#/$defs/fullscreenEvent"
+        },
+        "space": {
+          "$ref": "#/$defs/spaceEvent"
         }
       },
       "oneOf": [
@@ -1294,6 +1342,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "required": [
             "fullscreen"
+          ]
+        },
+        {
+          "required": [
+            "space"
           ]
         }
       ],
@@ -1357,6 +1410,33 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         }
       },
       "additionalProperties": false
+    },
+    "spaceEvent": {
+      "type": "object",
+      "required": [
+        "windowID",
+        "fromDisplayID",
+        "action"
+      ],
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "fromDisplayID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/displayID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "action": {
+          "$ref": "#/$defs/spaceDriftAction"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
@@ -1405,4 +1485,10 @@ Fullscreen event line:
 
 ```json
 {"version":2,"event":{"fullscreen":{"windowID":42,"didEnter":true}}}
+```
+
+Space drift event line:
+
+```json
+{"version":2,"event":{"space":{"windowID":42,"fromDisplayID":1,"action":"marked-off-space"}}}
 ```

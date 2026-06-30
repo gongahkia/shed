@@ -23,6 +23,7 @@ final class IPCSchemaDocumentationTests: XCTestCase {
             ["restoredCount", "skippedCount", "failedCount"]
         )
         XCTAssertNotNil(windowProperties["layoutOrder"])
+        XCTAssertNotNil(windowProperties["isOffSpace"])
     }
 
     private func documentedSchema() throws -> [String: Any] {

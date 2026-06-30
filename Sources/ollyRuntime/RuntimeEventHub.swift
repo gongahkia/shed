@@ -53,6 +53,8 @@ private extension IPCEvent {
             return .focus
         case .fullscreen:
             return .fullscreen
+        case .space:
+            return .space
         }
     }
 }

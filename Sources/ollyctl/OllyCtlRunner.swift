@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import ollyCore
 import ollyIPC
 import ollyLayouts
 
@@ -102,6 +103,8 @@ struct OllyCtlRunner {
         case let .fullscreen(event):
             let state = event.didEnter ? "entered" : "exited"
             return "fullscreen \(state) window \(event.windowID)"
+        case let .space(event):
+            return "space \(event.action.rawValue) window \(event.windowID)"
         }
     }
 
@@ -157,8 +160,9 @@ struct OllyCtlRunner {
             let title = window.title.map { " \"\($0)\"" } ?? ""
             let bundle = window.bundleID.map { " bundle \($0)" } ?? ""
             let floating = window.isFloating ? " floating" : ""
+            let offSpace = window.isOffSpace ? " off-space" : ""
             let order = window.layoutOrder.map { " order \($0)" } ?? ""
-            return "window \(window.windowID): pid \(window.processID)\(bundle)\(floating)\(order)\(title)"
+            return "window \(window.windowID): pid \(window.processID)\(bundle)\(floating)\(offSpace)\(order)\(title)"
         }
         return (displays + windows).isEmpty ? "no state" : (displays + windows).joined(separator: "\n")
     }
@@ -199,4 +203,11 @@ func parseEventKinds(_ rawValues: [String]) throws -> [IPCEventKind] {
         }
         return kind
     }
+}
+
+func parseSpacePolicy(_ rawValue: String) throws -> NativeSpaceDriftPolicy {
+    guard let policy = NativeSpaceDriftPolicy(rawValue: rawValue) else {
+        throw ValidationError("space policy must be one of: follow-window, rehome, unmanage")
+    }
+    return policy
 }

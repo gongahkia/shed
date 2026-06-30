@@ -53,6 +53,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let animation: Animation
     public let gestures: Gestures
     public let hooks: Hooks
+    public let nativeSpace: NativeSpace
 
     public init(
         version: DSLVersion = .v1,
@@ -64,7 +65,8 @@ public struct Config: Codable, Equatable, Sendable {
         safeZones: SafeZones = SafeZones(),
         animation: Animation = Animation(),
         gestures: Gestures = Gestures(),
-        hooks: Hooks = Hooks()
+        hooks: Hooks = Hooks(),
+        nativeSpace: NativeSpace = NativeSpace()
     ) {
         self.version = version
         self.keybinds = keybinds
@@ -76,6 +78,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.animation = animation
         self.gestures = gestures
         self.hooks = hooks
+        self.nativeSpace = nativeSpace
     }
 
     public init(version: DSLVersion = .v1, @ConfigBuilder _ build: () -> [ConfigSection]) {
@@ -95,10 +98,12 @@ public struct Config: Codable, Equatable, Sendable {
             safeZones: try container.decodeIfPresent(SafeZones.self, forKey: .safeZones) ?? SafeZones(),
             animation: try container.decodeIfPresent(Animation.self, forKey: .animation) ?? Animation(),
             gestures: try container.decodeIfPresent(Gestures.self, forKey: .gestures) ?? Gestures(),
-            hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks()
+            hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks(),
+            nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace()
         )
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private init(version: DSLVersion, sections: [ConfigSection]) {
         var keybinds = Keybinds()
         var rules = Rules()
@@ -109,6 +114,7 @@ public struct Config: Codable, Equatable, Sendable {
         var animation = Animation()
         var gestures = Gestures()
         var hooks = Hooks()
+        var nativeSpace = NativeSpace()
 
         for section in sections {
             switch section {
@@ -130,6 +136,8 @@ public struct Config: Codable, Equatable, Sendable {
                 gestures = value
             case let .hooks(value):
                 hooks = value
+            case let .nativeSpace(value):
+                nativeSpace = value
             }
         }
 
@@ -143,7 +151,8 @@ public struct Config: Codable, Equatable, Sendable {
             safeZones: safeZones,
             animation: animation,
             gestures: gestures,
-            hooks: hooks
+            hooks: hooks,
+            nativeSpace: nativeSpace
         )
     }
 }
@@ -209,6 +218,10 @@ public enum ConfigBuilder {
     public static func buildExpression(_ expression: Hooks) -> [ConfigSection] {
         [.hooks(expression)]
     }
+
+    public static func buildExpression(_ expression: NativeSpace) -> [ConfigSection] {
+        [.nativeSpace(expression)]
+    }
 }
 
 /// Purpose: Wraps each top-level DSL section so `ConfigBuilder` can merge defaults deterministically.
@@ -225,6 +238,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case animation(Animation)
     case gestures(Gestures)
     case hooks(Hooks)
+    case nativeSpace(NativeSpace)
 }
 
 /// Purpose: Declares one raw or typed lifecycle hook callback.

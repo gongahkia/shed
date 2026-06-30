@@ -76,6 +76,7 @@ final class WindowStoreTests: XCTestCase {
             isSticky: true,
             isPinned: false,
             isFullscreen: true,
+            isOffSpace: true,
             engineOverride: LayoutEngineID(rawValue: "floating"),
             layoutOrder: 4,
             frame: CGRect(x: 0, y: 0, width: 100, height: 100)
@@ -85,7 +86,9 @@ final class WindowStoreTests: XCTestCase {
         XCTAssertTrue(state.withPinned(true).isPinned)
         XCTAssertTrue(state.withTagMask(2).isFloating)
         XCTAssertTrue(state.withTagMask(2).isFullscreen)
+        XCTAssertTrue(state.withTagMask(2).isOffSpace)
         XCTAssertFalse(state.withFullscreen(false).isFullscreen)
+        XCTAssertFalse(state.withOffSpace(false).isOffSpace)
         XCTAssertEqual(state.withTagMask(2).engineOverride, LayoutEngineID(rawValue: "floating"))
         XCTAssertEqual(state.withEngineOverride(nil).layoutOrder, 4)
         XCTAssertNil(state.withEngineOverride(nil).engineOverride)

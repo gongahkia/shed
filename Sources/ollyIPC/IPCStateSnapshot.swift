@@ -89,6 +89,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public let isSticky: Bool
     public let isPinned: Bool
     public let isFullscreen: Bool
+    public let isOffSpace: Bool
     public let engineOverride: LayoutEngineID?
     public let layoutOrder: Int?
     public let frame: IPCFrame
@@ -106,6 +107,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         case isSticky
         case isPinned
         case isFullscreen
+        case isOffSpace
         case engineOverride
         case layoutOrder
         case frame
@@ -124,6 +126,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         isSticky: Bool = false,
         isPinned: Bool = false,
         isFullscreen: Bool = false,
+        isOffSpace: Bool = false,
         engineOverride: LayoutEngineID? = nil,
         layoutOrder: Int? = nil,
         frame: IPCFrame,
@@ -140,6 +143,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.isSticky = isSticky
         self.isPinned = isPinned
         self.isFullscreen = isFullscreen
+        self.isOffSpace = isOffSpace
         self.engineOverride = engineOverride
         self.layoutOrder = layoutOrder
         self.frame = frame
@@ -160,6 +164,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isSticky: try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false,
             isPinned: try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false,
             isFullscreen: try container.decodeIfPresent(Bool.self, forKey: .isFullscreen) ?? false,
+            isOffSpace: try container.decodeIfPresent(Bool.self, forKey: .isOffSpace) ?? false,
             engineOverride: try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineOverride),
             layoutOrder: try container.decodeIfPresent(Int.self, forKey: .layoutOrder),
             frame: try container.decode(IPCFrame.self, forKey: .frame),
@@ -180,6 +185,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isSticky: state.isSticky,
             isPinned: state.isPinned,
             isFullscreen: state.isFullscreen,
+            isOffSpace: state.isOffSpace,
             engineOverride: state.engineOverride,
             layoutOrder: state.layoutOrder,
             frame: IPCFrame(state.frame),

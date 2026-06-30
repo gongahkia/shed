@@ -50,11 +50,14 @@ Space so virtual tag switches can be implemented by moving and parking windows.
 
 Current public provider behavior is conservative and public-only: olly does not call private SkyLight/CGS
 Spaces APIs. The default provider reports `unsupportedNativeSpaces` instead of guessing.
+At runtime, olly uses `CGWindowListCopyWindowInfo(.optionOnScreenOnly)` as a public active-Space
+presence heuristic and keeps absent managed windows in state as `isOffSpace`.
 
 Drift policy:
 
 | Policy | Behavior |
 |---|---|
+| `.followWindow` | Keep drifted windows managed, set `isOffSpace`, and skip layout until the window returns. |
 | `.unmanage` | Remove drifted windows from olly management and leave macOS in control. |
 | `.rehome` | Ask the platform layer to move the window back to the baseline Space. |
 
@@ -84,12 +87,12 @@ against the remaining active display bounds. `OffscreenParking` tests cover this
 | App expose thumbnails | Parked windows may not map cleanly to native Space thumbnails. | Native windows remain in their Space. |
 | Fullscreen apps | Out of scope for v0.x; macOS owns native fullscreen. | Fullscreen apps create native Spaces. |
 | Per-Space wallpapers/focus modes | Not represented. | Owned by macOS. |
-| Cross-Space window moves | Detected as drift when observable; otherwise unmanaged. | Native operation. |
+| Cross-Space window moves | Marked `isOffSpace` when observable; optional policies can rehome or unmanage. | Native operation. |
 | Crash recovery | `restore-windows` uses the recovery journal to move parked windows back when AX targets are still known. | macOS keeps native Space assignment. |
 
 ## Verification
 
-- `NativeSpaceInvariantTests` cover verified, drifted, rehome, unmanage, unsupported, and unknown-space cases.
+- `NativeSpaceInvariantTests` cover verified, drifted, follow-window, rehome, unmanage, unsupported, and unknown-space cases.
 - `OffscreenParkingTests` cover active `CGDisplayBounds` avoidance and display-unplug recompute.
 - `TagDispatcherTests` cover display-scoped apply and offscreen parking through a display provider.
 - `OllyRuntimeAXAcceptanceTests` are opt-in: set `OLLY_RUN_AX_ACCEPTANCE=1` and grant Accessibility trust.

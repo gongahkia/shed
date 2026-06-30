@@ -455,6 +455,43 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testNativeSpaceVerifierMarksAndReturnsOffSpaceWindow() async throws {
+        let activeSpaceProbe = ActiveSpaceProbe([])
+        try await withRuntime(activeSpaceWindowIDs: { activeSpaceProbe.current() }) { runtime, socketPath, displayID in
+            await runtime.registerApplicationForTest(processID: 42)
+            let eventStream = await runtime.runtimeEventBus.subscribe()
+            var events = eventStream.makeAsyncIterator()
+            try await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
+            ])
+
+            await runtime.verifyNativeSpaces()
+
+            var snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isOffSpace, true)
+            guard case let .space(marked)? = await events.next() else {
+                XCTFail("expected space event")
+                return
+            }
+            XCTAssertEqual(marked, IPCSpaceDriftEvent(
+                windowID: 1,
+                fromDisplayID: displayID,
+                action: .markedOffSpace
+            ))
+
+            activeSpaceProbe.set([1])
+            await runtime.verifyNativeSpaces()
+
+            snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isOffSpace, false)
+            guard case let .space(returned)? = await events.next() else {
+                XCTFail("expected return space event")
+                return
+            }
+            XCTAssertEqual(returned, IPCSpaceDriftEvent(windowID: 1, fromDisplayID: displayID, action: .returned))
+        }
+    }
+
     func testSwapWindowUsesSpatialDirectionalTarget() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             try await seedWindows(runtime, displayID: displayID, windows: [
@@ -823,6 +860,7 @@ private func withRuntime(
     snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
     dragSession: AXDragSession = AXDragSession(),
     axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+    activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
     fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
     extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
@@ -832,6 +870,7 @@ private func withRuntime(
         snapshotCache: snapshotCache,
         dragSession: dragSession,
         axSubroleReader: axSubroleReader,
+        activeSpaceWindowIDs: activeSpaceWindowIDs,
         fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
     )
     do {
@@ -871,10 +910,15 @@ private extension OllyRuntime {
 
     func replaceConfigForTest(_ config: Config) async {
         await configStore.replace(with: config)
+        nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
     }
 
     func setAXPermissionStatusForTest(_ status: AXPermissionStatus?) {
         axPermissionStatus = status
+    }
+
+    func registerApplicationForTest(processID: pid_t) {
+        applicationsByProcessID[processID] = Application(processID: processID)
     }
 }
 
@@ -895,6 +939,27 @@ private actor SubroleScript {
 
     func next() -> String? {
         values.isEmpty ? nil : values.removeFirst()
+    }
+}
+
+private final class ActiveSpaceProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var ids: Set<WindowID>?
+
+    init(_ ids: Set<WindowID>?) {
+        self.ids = ids
+    }
+
+    func current() -> Set<WindowID>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return ids
+    }
+
+    func set(_ ids: Set<WindowID>?) {
+        lock.lock()
+        self.ids = ids
+        lock.unlock()
     }
 }
 
@@ -948,6 +1013,7 @@ private struct RuntimeFixture {
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         dragSession: AXDragSession = AXDragSession(),
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000
     ) -> OllyRuntime {
         OllyRuntime(
@@ -972,6 +1038,7 @@ private struct RuntimeFixture {
                 }
             },
             axSubroleReader: axSubroleReader,
+            activeSpaceWindowIDs: activeSpaceWindowIDs,
             fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,
             presentAXOnboarding: {}
         )

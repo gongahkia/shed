@@ -9,7 +9,8 @@ public struct NativeSpaceID: Codable, Equatable, Hashable, RawRepresentable, Sen
     }
 }
 
-public enum NativeSpaceDriftPolicy: Equatable, Sendable {
+public enum NativeSpaceDriftPolicy: String, Codable, Equatable, Sendable {
+    case followWindow = "follow-window"
     case rehome
     case unmanage
 }
@@ -25,10 +26,11 @@ public struct NativeSpaceInvariantResult: Equatable, Sendable {
     public let issues: [NativeSpaceInvariantIssue]
     public let rehomedWindowIDs: [WindowID]
     public let unmanagedWindowIDs: [WindowID]
+    public let offSpaceWindowIDs: [WindowID]
     public let isProviderSupported: Bool
 
     public var isVerified: Bool {
-        isProviderSupported && expectedSpaceID != nil && issues.isEmpty
+        isProviderSupported && expectedSpaceID != nil && issues.isEmpty && offSpaceWindowIDs.isEmpty
     }
 
     public init(
@@ -36,12 +38,14 @@ public struct NativeSpaceInvariantResult: Equatable, Sendable {
         issues: [NativeSpaceInvariantIssue],
         rehomedWindowIDs: [WindowID],
         unmanagedWindowIDs: [WindowID],
+        offSpaceWindowIDs: [WindowID] = [],
         isProviderSupported: Bool = true
     ) {
         self.expectedSpaceID = expectedSpaceID
         self.issues = issues
         self.rehomedWindowIDs = rehomedWindowIDs
         self.unmanagedWindowIDs = unmanagedWindowIDs
+        self.offSpaceWindowIDs = offSpaceWindowIDs
         self.isProviderSupported = isProviderSupported
     }
 }
@@ -82,7 +86,7 @@ public actor NativeSpaceInvariant {
     public init(
         windowStore: WindowStore,
         spaceProvider: WindowNativeSpaceProviding = PublicWindowNativeSpaceProvider(),
-        driftPolicy: NativeSpaceDriftPolicy = .unmanage,
+        driftPolicy: NativeSpaceDriftPolicy = .followWindow,
         rehomeWindow: @escaping NativeSpaceRehomeHandler = { _, _ in false },
         unmanageWindow: @escaping NativeSpaceUnmanageHandler = { _ in }
     ) {
@@ -106,9 +110,8 @@ public actor NativeSpaceInvariant {
         }
 
         var baseline = expectedSpaceID
-        var issues: [NativeSpaceInvariantIssue] = []
-        var rehomedWindowIDs: [WindowID] = []
-        var unmanagedWindowIDs: [WindowID] = []
+        var issues: [NativeSpaceInvariantIssue] = [], rehomedWindowIDs: [WindowID] = []
+        var unmanagedWindowIDs: [WindowID] = [], offSpaceWindowIDs: [WindowID] = []
 
         for window in windows {
             guard let spaceID = await spaceProvider.nativeSpaceID(for: window) else {
@@ -122,11 +125,17 @@ public actor NativeSpaceInvariant {
             }
 
             guard spaceID != expected else {
+                if window.isOffSpace {
+                    await windowStore.upsert(window.withOffSpace(false))
+                }
                 continue
             }
 
             issues.append(.drifted(windowID: window.id, expected: expected, actual: spaceID))
             switch driftPolicy {
+            case .followWindow:
+                await windowStore.upsert(window.withOffSpace(true))
+                offSpaceWindowIDs.append(window.id)
             case .rehome:
                 if await rehomeWindow(window, expected) {
                     rehomedWindowIDs.append(window.id)
@@ -142,7 +151,8 @@ public actor NativeSpaceInvariant {
             expectedSpaceID: baseline,
             issues: issues,
             rehomedWindowIDs: rehomedWindowIDs,
-            unmanagedWindowIDs: unmanagedWindowIDs
+            unmanagedWindowIDs: unmanagedWindowIDs,
+            offSpaceWindowIDs: offSpaceWindowIDs
         )
     }
 }

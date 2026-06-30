@@ -26,6 +26,18 @@ public struct IPCFocusEvent: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCFocusBlockedEvent: Codable, Equatable, Sendable {
+    public let processID: Int32
+    public let bundleID: String?
+    public let reason: String
+
+    public init(processID: pid_t, bundleID: String?, reason: String = "rate-limited") {
+        self.processID = Int32(processID)
+        self.bundleID = bundleID
+        self.reason = reason
+    }
+}
+
 public struct IPCFullscreenEvent: Codable, Equatable, Sendable {
     public let windowID: WindowID
     public let didEnter: Bool
@@ -59,6 +71,7 @@ public enum IPCEvent: Codable, Equatable, Sendable {
     case axPermission(IPCAXPermissionEvent)
     case engine(EngineEvent)
     case focus(IPCFocusEvent)
+    case focusBlocked(IPCFocusBlockedEvent)
     case fullscreen(IPCFullscreenEvent)
     case space(IPCSpaceDriftEvent)
 }

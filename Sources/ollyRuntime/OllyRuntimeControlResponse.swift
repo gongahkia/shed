@@ -26,9 +26,8 @@ extension OllyRuntime {
         case let .restoreWindows(command):
             let info = await restoreWindows(command)
             return .ok(id: request.id, result: .restoredWindows(info))
-        case let .setSpacePolicy(command):
-            await setSpacePolicy(command)
-            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "space policy set")))
+        case .setSpacePolicy, .setFocusPolicy:
+            return await policyResponse(for: request)
         default:
             preconditionFailure("invalid control command")
         }
@@ -47,6 +46,19 @@ extension OllyRuntime {
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "pinned toggled")))
         default:
             preconditionFailure("invalid window flag command")
+        }
+    }
+
+    private func policyResponse(for request: IPCRequestEnvelope) async -> IPCResponseEnvelope {
+        switch request.command {
+        case let .setSpacePolicy(command):
+            await setSpacePolicy(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "space policy set")))
+        case let .setFocusPolicy(command):
+            await setFocusPolicy(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "focus policy set")))
+        default:
+            preconditionFailure("invalid policy command")
         }
     }
 }

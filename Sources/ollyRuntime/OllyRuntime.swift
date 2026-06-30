@@ -91,6 +91,7 @@ public actor OllyRuntime {
     public let dragSession: AXDragSession
     let fullscreenTracker = FullscreenTracker()
     let windowTargets = RuntimeWindowTargets()
+    let focusRateLimiter = FocusRateLimiter()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
     let windowMover: WindowMover
@@ -102,6 +103,7 @@ public actor OllyRuntime {
     let axSubroleReader: AXSubroleReader
     let activeSpaceWindowIDs: ActiveSpaceWindowIDProvider
     let nativeSpaceChangeStream: NativeSpaceChangeStreamProvider
+    let focusInputAttribution: FocusInputAttribution
     let presentAXOnboarding: @MainActor @Sendable () async -> Void
     let fullscreenDebounceNanoseconds: UInt64
     let nativeSpaceDebounceNanoseconds: UInt64
@@ -114,6 +116,7 @@ public actor OllyRuntime {
     var nativeSpaceVerificationTask: Task<Void, Never>?
     var axPermissionStatus: AXPermissionStatus?
     var nativeSpaceDriftPolicy: NativeSpaceDriftPolicy = .followWindow
+    var focusPolicy = FocusPolicy()
     var focusedWindowID: WindowID?
     var lastError: String?
     var fullscreenTasksByWindowID: [WindowID: Task<Void, Never>] = [:]
@@ -134,6 +137,7 @@ public actor OllyRuntime {
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         nativeSpaceChangeStream: @escaping NativeSpaceChangeStreamProvider = OllyRuntime.defaultNativeSpaceChangeStream,
+        focusInputAttribution: FocusInputAttribution = .shared,
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
         nativeSpaceDebounceNanoseconds: UInt64 = 2_000_000_000,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
@@ -149,6 +153,7 @@ public actor OllyRuntime {
         self.activeSpaceWindowIDs = activeSpaceWindowIDs
         self.nativeSpaceChangeStream = nativeSpaceChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
+        self.focusInputAttribution = focusInputAttribution
         self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
@@ -203,6 +208,7 @@ public actor OllyRuntime {
             await refreshAllWindows()
             startApplicationObservation()
             startNativeSpaceObservation()
+            focusInputAttribution.start()
             await refreshFocusedWindowFromSystem()
         }
         let server = UnixDomainSocketServer(socketPath: socketPath) { [weak self] connection, line in
@@ -225,6 +231,7 @@ public actor OllyRuntime {
         nativeSpaceObservationTask = nil
         nativeSpaceVerificationTask?.cancel()
         nativeSpaceVerificationTask = nil
+        focusInputAttribution.stop()
         await windowMover.setAXErrorHandler(nil)
         stopAXObservers()
         _ = await restoreJournaledWindows()
@@ -295,7 +302,7 @@ public actor OllyRuntime {
         case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow,
-             .dispatchGesture, .reload, .restoreWindows, .setSpacePolicy:
+             .dispatchGesture, .reload, .restoreWindows, .setSpacePolicy, .setFocusPolicy:
             return try await controlResponse(for: request)
         case let .reserved(command):
             return .failure(
@@ -390,5 +397,4 @@ public actor OllyRuntime {
             preconditionFailure("invalid engine command")
         }
     }
-
 }

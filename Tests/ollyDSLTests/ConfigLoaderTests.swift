@@ -22,6 +22,10 @@ final class ConfigLoaderTests: XCTestCase {
             NativeSpace {
                 driftPolicy(.followWindow)
             }
+            FocusPolicy {
+                allowStealingFor("com.apple.Terminal")
+                maxEventsPerSecond(20)
+            }
         }
 
         XCTAssertEqual(config.keybinds, Keybinds())
@@ -34,6 +38,8 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.gestures, Gestures())
         XCTAssertEqual(config.hooks, Hooks())
         XCTAssertEqual(config.nativeSpace, NativeSpace())
+        XCTAssertEqual(config.focusPolicy.allowedBundleIDs, ["com.apple.Terminal"])
+        XCTAssertEqual(config.focusPolicy.maxEventsPerSecond, 20)
     }
 
     func testConfigDecodingDefaultsMissingSections() throws {

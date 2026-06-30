@@ -292,6 +292,9 @@ extension OllyRuntime {
               let displayID = window.displayID else {
             return
         }
+        guard await shouldAcceptFocusChange(processID: application.processID, bundleID: window.bundleID) else {
+            return
+        }
         await setFocusedWindow(windowID, displayID: displayID, tagMask: window.tagMask, publish: true)
     }
 
@@ -383,18 +386,6 @@ extension OllyRuntime {
             return TagSet(try Tag(index: 0))
         } catch {
             fatalError("failed to create default tag: \(error)")
-        }
-    }
-}
-private extension AXObserverBridgeError {
-    var axError: AXError? {
-        switch self {
-        case let .observerCreateFailed(error):
-            return error
-        case let .addNotificationFailed(_, error):
-            return error
-        case .streamContinuationUnavailable:
-            return nil
         }
     }
 }

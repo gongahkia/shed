@@ -11,10 +11,14 @@ extension OllyRuntime {
             let loaded = try configLoader.load()
             await configStore.replace(with: loaded.config)
             nativeSpaceDriftPolicy = loaded.config.nativeSpace.driftPolicy
+            focusPolicy = loaded.config.focusPolicy
+            await focusRateLimiter.update(settings: loaded.config.focusPolicy.rateLimitSettings)
         } catch ConfigLoaderError.missingSource where useDefaultWhenMissing {
             let config = Config()
             await configStore.replace(with: config)
             nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
+            focusPolicy = config.focusPolicy
+            await focusRateLimiter.update(settings: config.focusPolicy.rateLimitSettings)
         }
     }
 

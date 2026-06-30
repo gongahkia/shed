@@ -188,6 +188,62 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Hooks { onDisplayChange { context in _ = context.change } }`
 - See also: `Hooks`, `HookDeclaration`.
 
+## Focus Policy
+
+### FocusPolicyDirective
+
+`enum FocusPolicyDirective`
+
+- Purpose: Represents one focus-stealing policy builder directive.
+- Parameters: Use allowlist, rate-limit, or human-interval builder helpers.
+- Example: `allowStealingFor("com.apple.Terminal")`
+- See also: `FocusPolicy`, `FocusPolicyBuilder`.
+
+### FocusPolicy
+
+`struct FocusPolicy`
+
+- Purpose: Configures programmatic focus-stealing throttles and bundle allowlists.
+- Parameters: Provide allowed bundle IDs, events per second, and minimum human interval in milliseconds.
+- Example: `FocusPolicy { allowStealingFor("com.apple.Terminal"); maxEventsPerSecond(20) }`
+- See also: `FocusPolicyBuilder`, `ConfigSection`.
+
+### FocusPolicyBuilder
+
+`@resultBuilder enum FocusPolicyBuilder`
+
+- Purpose: Builds focus-stealing policy directives inside `FocusPolicy { ... }`.
+- Parameters: Accepts focus-policy directive expressions.
+- Example: `FocusPolicy { allowStealingFor("com.apple.Terminal") }`
+- See also: `FocusPolicy`, `FocusPolicyDirective`.
+
+### allowStealingFor(_:)
+
+`func allowStealingFor(_ bundleID: String) -> FocusPolicyDirective`
+
+- Purpose: Allows a trusted bundle ID to bypass focus-stealing throttles.
+- Parameters: Pass one app bundle identifier.
+- Example: `allowStealingFor("com.apple.Terminal")`
+- See also: `FocusPolicy`, `maxEventsPerSecond(_:)`.
+
+### maxEventsPerSecond(_:)
+
+`func maxEventsPerSecond(_ value: Int) -> FocusPolicyDirective`
+
+- Purpose: Sets the maximum accepted programmatic focus changes per second.
+- Parameters: Pass a positive event count.
+- Example: `maxEventsPerSecond(20)`
+- See also: `FocusPolicy`, `minHumanIntervalMilliseconds(_:)`.
+
+### minHumanIntervalMilliseconds(_:)
+
+`func minHumanIntervalMilliseconds(_ value: Int) -> FocusPolicyDirective`
+
+- Purpose: Sets the minimum interval treated as human-paced focus activity.
+- Parameters: Pass a non-negative interval in milliseconds.
+- Example: `minHumanIntervalMilliseconds(80)`
+- See also: `FocusPolicy`, `maxEventsPerSecond(_:)`.
+
 ## Hooks
 
 ### HookKind

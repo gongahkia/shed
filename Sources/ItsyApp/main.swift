@@ -36,6 +36,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var commandPaletteItems: [Command] = []
 	private var commandPaletteFilteredItems: [Command] = []
 	private var commandPaletteAcceptsRawText = false
+	private enum CommandPaletteSymbolScope { case workspace }
+	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
+	private var commandPaletteSymbols: [WorkspaceSymbol] = []
+	private var commandPaletteFilteredSymbols: [WorkspaceSymbol] = []
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsStatusLabel: NSTextField?
@@ -274,6 +278,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func setCommandPaletteItems(_ items: [Command]) {
 		commandPaletteAcceptsRawText = false
+		commandPaletteSymbolScope = nil
+		commandPaletteSymbols = []
+		commandPaletteFilteredSymbols = []
 		commandPaletteItems = items
 		commandPaletteInputField?.stringValue = ""
 		commandPaletteInputField?.placeholderString = L10n.string("Command")
@@ -283,6 +290,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func setCommandPaletteCommandLine(_ value: String) {
 		commandPaletteAcceptsRawText = true
+		commandPaletteSymbolScope = nil
+		commandPaletteSymbols = []
+		commandPaletteFilteredSymbols = []
 		commandPaletteItems = []
 		commandPaletteFilteredItems = []
 		commandPaletteInputField?.placeholderString = ""
@@ -300,7 +310,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		guard !commandPaletteAcceptsRawText else {
 			return
 		}
-		let query = commandPaletteInputField?.stringValue.lowercased() ?? ""
+		let raw = commandPaletteInputField?.stringValue ?? ""
+		if raw.hasPrefix("@") {
+			if commandPaletteSymbolScope != .workspace {
+				commandPaletteSymbols = ItsyWorkspaceController.currentWorkspaceIndex?.symbols ?? []
+				commandPaletteSymbolScope = .workspace
+			}
+			let query = String(raw.dropFirst()).lowercased()
+			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(commandPaletteSymbols, query: query, includeUnmatched: query.isEmpty) { "\($0.name) \($0.relativePath)" }
+			commandPaletteFilteredItems = []
+			commandPaletteTableView?.reloadData()
+			if !commandPaletteFilteredSymbols.isEmpty {
+				commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+			}
+			return
+		}
+		if commandPaletteSymbolScope != nil {
+			commandPaletteSymbolScope = nil
+			commandPaletteSymbols = []
+			commandPaletteFilteredSymbols = []
+		}
+		let query = raw.lowercased()
 		commandPaletteFilteredItems = FuzzyMatcher.ranked(commandPaletteItems, query: query, includeUnmatched: false, by: \.title)
 		commandPaletteTableView?.reloadData()
 		if !commandPaletteFilteredItems.isEmpty {
@@ -309,11 +339,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func moveCommandPaletteSelection(_ delta: Int) {
-		guard !commandPaletteAcceptsRawText, !commandPaletteFilteredItems.isEmpty, let tableView = commandPaletteTableView else {
+		guard !commandPaletteAcceptsRawText, let tableView = commandPaletteTableView else {
+			return
+		}
+		let count = commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : commandPaletteFilteredItems.count
+		guard count > 0 else {
 			return
 		}
 		let current = tableView.selectedRow >= 0 ? tableView.selectedRow : 0
-		let next = min(max(current + delta, 0), commandPaletteFilteredItems.count - 1)
+		let next = min(max(current + delta, 0), count - 1)
 		tableView.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
 		tableView.scrollRowToVisible(next)
 	}
@@ -321,6 +355,21 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private func runCommandPaletteSelection() {
 		if commandPaletteAcceptsRawText {
 			commandPaletteRunText?(commandPaletteInputField?.stringValue ?? "")
+			return
+		}
+		if commandPaletteSymbolScope != nil {
+			guard
+				let tableView = commandPaletteTableView,
+				tableView.selectedRow >= 0,
+				tableView.selectedRow < commandPaletteFilteredSymbols.count,
+				let root = ItsyWorkspaceController.currentRootURL
+			else {
+				return
+			}
+			let symbol = commandPaletteFilteredSymbols[tableView.selectedRow]
+			closeCommandPalette()
+			let url = root.appendingPathComponent(symbol.relativePath)
+			documentController.openDocument(at: url, line: symbol.line, column: symbol.column)
 			return
 		}
 		guard let tableView = commandPaletteTableView, tableView.selectedRow >= 0, tableView.selectedRow < commandPaletteFilteredItems.count else {
@@ -1500,7 +1549,7 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			return workspaceProblems.count
 		}
 		if tableView === commandPaletteTableView {
-			return commandPaletteFilteredItems.count
+			return commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : commandPaletteFilteredItems.count
 		}
 		return 0
 	}
@@ -1513,7 +1562,12 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			let textField = cell.textField ?? NSTextField(labelWithString: "")
 			textField.font = .systemFont(ofSize: 13)
 			textField.lineBreakMode = .byTruncatingTail
-			textField.stringValue = commandPaletteFilteredItems[row].title
+			if commandPaletteSymbolScope != nil {
+				let symbol = commandPaletteFilteredSymbols[row]
+				textField.stringValue = "\(symbol.name) · \(symbol.kind.rawValue) — \(symbol.relativePath):\(symbol.line)"
+			} else {
+				textField.stringValue = commandPaletteFilteredItems[row].title
+			}
 			if textField.superview == nil {
 				textField.translatesAutoresizingMaskIntoConstraints = false
 				cell.addSubview(textField)

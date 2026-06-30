@@ -22,8 +22,9 @@ import Testing
 
 @Test func editorDefaultsToLightMonacoRendering() {
 	let view = MetalTextView(frame: .zero)
-	let expectedFont = NSFont(name: "Monaco", size: 14) ?? NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+	let expectedFont = NSFont(name: "Monaco", size: 15) ?? NSFont.monospacedSystemFont(ofSize: 15, weight: .regular)
 	#expect(view.textFontPostScriptName == expectedFont.fontName)
+	#expect(abs((view.textFontAdvance * 2).rounded() - view.textFontAdvance * 2) < 0.01)
 	#expect(view.clearColor.red == 1.0)
 	#expect(view.clearColor.green == 1.0)
 	#expect(view.clearColor.blue == 1.0)
@@ -64,7 +65,7 @@ import Testing
 	view.editor = Editor(text: "abc\ndef\nghi\n")
 	let down = try #require(NSEvent.mouseEvent(
 		with: .leftMouseDown,
-		location: NSPoint(x: 30, y: 23),
+		location: NSPoint(x: 30, y: 27),
 		modifierFlags: [],
 		timestamp: 0,
 		windowNumber: 0,
@@ -75,7 +76,7 @@ import Testing
 	))
 	let drag = try #require(NSEvent.mouseEvent(
 		with: .leftMouseDragged,
-		location: NSPoint(x: 30, y: 40),
+		location: NSPoint(x: 30, y: 47),
 		modifierFlags: [],
 		timestamp: 0,
 		windowNumber: 0,

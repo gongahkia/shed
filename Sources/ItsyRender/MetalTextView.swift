@@ -100,7 +100,7 @@ public final class MetalTextView: NSView {
 	private static let benchStageLock = NSLock()
 	private static var recordedBenchStages: Set<String> = []
 	private static let maxCachedShapedLines = 512
-	private static let defaultFontSize: CGFloat = 14
+	private static let defaultFontSize: CGFloat = 15
 	private static let defaultTextColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 	private static let cursorColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 
@@ -160,11 +160,19 @@ public final class MetalTextView: NSView {
 	private(set) var topLineIndex = 0
 	private(set) var xOffset: CGFloat = 0
 	private(set) var displayLinkRefreshRate: Double?
-	var lineHeight: CGFloat = 17 {
+	var lineHeight: CGFloat = 20 {
 		didSet { markDirty() }
 	}
 	var textFontPostScriptName: String {
 		CTFontCopyPostScriptName(textFont) as String
+	}
+	var textFontAdvance: CGFloat {
+		var glyph: CGGlyph = 0
+		var character = UniChar(77)
+		CTFontGetGlyphsForCharacters(textFont, &character, &glyph, 1)
+		var advance = CGSize.zero
+		CTFontGetAdvancesForGlyphs(textFont, .default, &glyph, &advance, 1)
+		return advance.width
 	}
 	var lineCount: Int = 0 {
 		didSet {
@@ -2125,8 +2133,8 @@ public final class MetalTextView: NSView {
 			return samplerState
 		}
 		let descriptor = MTLSamplerDescriptor()
-		descriptor.minFilter = .nearest
-		descriptor.magFilter = .nearest
+		descriptor.minFilter = .linear
+		descriptor.magFilter = .linear
 		samplerState = metalDevice?.makeSamplerState(descriptor: descriptor)
 		return samplerState
 	}

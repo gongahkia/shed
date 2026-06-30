@@ -27,15 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.8 Settings export/import
-
-**Goal:** Single-file round-trip of `Config.swift` from the menu bar; share-with-coworker workflow.
-
-**Files to modify:**
-- `Sources/ollyApp/SettingsWindowController.swift` — add "Export Config..." and "Import Config..." menu items invoking `NSSavePanel` / `NSOpenPanel`. Reuse `ConfigTemplate`.
-
----
-
 ### M4.9 In-app error log + diagnostic bundle
 
 **Goal:** "Last 5 errors" tab in Settings; "Copy diagnostic bundle" produces a zip.

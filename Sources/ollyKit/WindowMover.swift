@@ -138,6 +138,10 @@ public actor WindowMover {
         axErrorHandler = handler
     }
 
+    public func lastFrame(for target: WindowMoveTarget) -> CGRect? {
+        lastFrames[WindowMoveKey(target: target)]
+    }
+
     private func pendingMove(for key: WindowMoveKey) -> PendingMove? {
         for moves in pendingMoves.values {
             if let move = moves[key] {

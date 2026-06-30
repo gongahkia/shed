@@ -167,6 +167,41 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testAXWindowMovedFeedsDragSessionFromSnapshot() async throws {
+        let element = AXUIElementCreateApplication(9876)
+        let frame = CGRect(x: 40, y: 50, width: 320, height: 240)
+        let snapshotCache = WindowSnapshotCache { _, _ in
+            WindowAttributes(
+                title: "Docs",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: frame,
+                processID: 9876,
+                windowID: 88
+            )
+        }
+        let dragSession = AXDragSession(
+            endDelayNanoseconds: 10_000_000_000,
+            mouseProvider: { CGPoint(x: 7, y: 8) }
+        )
+
+        try await withRuntime(snapshotCache: snapshotCache, dragSession: dragSession) { runtime, _, _ in
+            let stream = await dragSession.subscribe()
+            var iterator = stream.makeAsyncIterator()
+
+            await runtime.handle(axEvent: AXNotificationEvent(
+                processID: 9876,
+                element: element,
+                notification: .windowMoved,
+                rawNotificationName: AXNotification.windowMoved.rawValue
+            ))
+
+            let event = await iterator.next()
+            XCTAssertEqual(event, .started(88, frame, CGPoint(x: 7, y: 8)))
+            await dragSession.endActiveSession()
+        }
+    }
+
     func testSwapWindowUsesSpatialDirectionalTarget() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await seedWindows(runtime, displayID: displayID, windows: [
@@ -468,11 +503,12 @@ final class OllyRuntimeTests: XCTestCase {
 
 private func withRuntime(
     snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
+    dragSession: AXDragSession = AXDragSession(),
     extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
 ) async throws {
     let fixture = try RuntimeFixture(extraDisplays: extraDisplays)
-    let runtime = fixture.makeRuntime(snapshotCache: snapshotCache)
+    let runtime = fixture.makeRuntime(snapshotCache: snapshotCache, dragSession: dragSession)
     do {
         try await runtime.start()
         try await body(runtime, fixture.socketPath, fixture.display.id)
@@ -571,7 +607,10 @@ private struct RuntimeFixture {
         displays = [display] + extraDisplays
     }
 
-    func makeRuntime(snapshotCache: WindowSnapshotCache = WindowSnapshotCache()) -> OllyRuntime {
+    func makeRuntime(
+        snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
+        dragSession: AXDragSession = AXDragSession()
+    ) -> OllyRuntime {
         OllyRuntime(
             socketPath: socketPath,
             configLoader: ConfigLoader(
@@ -587,6 +626,7 @@ private struct RuntimeFixture {
                 stateURL: directoryURL.appendingPathComponent("recovery.json")
             ),
             scanAXOnStart: false,
+            dragSession: dragSession,
             axPermissionStream: {
                 AsyncStream { continuation in
                     continuation.finish()

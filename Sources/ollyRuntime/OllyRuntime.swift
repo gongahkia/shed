@@ -84,6 +84,7 @@ public actor OllyRuntime {
     let configStore = RuntimeConfigStore()
     let eventHub = RuntimeEventHub()
     public let runtimeEventBus: RuntimeEventBus
+    public let dragSession: AXDragSession
     let windowTargets = RuntimeWindowTargets()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
@@ -113,6 +114,7 @@ public actor OllyRuntime {
         recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
         scanAXOnStart: Bool = true,
         runtimeEventBus: RuntimeEventBus = RuntimeEventBus(),
+        dragSession: AXDragSession = AXDragSession(),
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
@@ -127,6 +129,7 @@ public actor OllyRuntime {
         self.recoveryJournal = recoveryJournal
         self.scanAXOnStart = scanAXOnStart
         self.runtimeEventBus = runtimeEventBus
+        self.dragSession = dragSession
         self.axPermissionStream = axPermissionStream
         self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()

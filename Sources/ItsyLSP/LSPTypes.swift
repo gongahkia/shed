@@ -108,6 +108,48 @@ public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPPrepareRenameParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+
+	public init(textDocument: LSPTextDocumentIdentifier, position: LSPPosition) {
+		self.textDocument = textDocument
+		self.position = position
+	}
+}
+
+public struct LSPRenameParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+	public var newName: String
+
+	public init(textDocument: LSPTextDocumentIdentifier, position: LSPPosition, newName: String) {
+		self.textDocument = textDocument
+		self.position = position
+		self.newName = newName
+	}
+}
+
+public struct LSPTextDocumentEdit: Codable, Equatable, Sendable {
+	public var textDocument: LSPVersionedTextDocumentIdentifier
+	public var edits: [LSPTextEdit]
+
+	public init(textDocument: LSPVersionedTextDocumentIdentifier, edits: [LSPTextEdit]) {
+		self.textDocument = textDocument
+		self.edits = edits
+	}
+}
+
+public struct LSPWorkspaceEdit: Codable, Equatable, Sendable {
+	public var changes: [String: [LSPTextEdit]]?
+	public var documentChanges: [LSPTextDocumentEdit]?
+
+	public init(changes: [String: [LSPTextEdit]]? = nil, documentChanges: [LSPTextDocumentEdit]? = nil) {
+		self.changes = changes
+		self.documentChanges = documentChanges
+	}
+}
+
 public struct LSPLocation: Codable, Equatable, Sendable {
 	public var uri: String
 	public var range: LSPRange

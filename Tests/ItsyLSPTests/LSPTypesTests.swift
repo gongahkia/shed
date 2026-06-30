@@ -200,6 +200,40 @@ import Testing
 	]))
 }
 
+@Test func referencesParamsEncodeContextAndResultDecodesLocations() throws {
+	let params = LSPReferenceParams(
+		textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift"),
+		position: LSPPosition(line: 3, character: 4),
+		context: LSPReferenceContext(includeDeclaration: true)
+	)
+	let value = try LSPAny(encoding: params)
+	let result = try LSPReferencesResult(decoding: Data(#"""
+	[
+	  {
+	    "uri": "file:///tmp/main.swift",
+	    "range": {
+	      "start": { "line": 3, "character": 4 },
+	      "end": { "line": 3, "character": 9 }
+	    }
+	  }
+	]
+	"""#.utf8))
+	let none = try LSPReferencesResult(decoding: Data("null".utf8))
+
+	#expect(value == .object([
+		"textDocument": .object(["uri": .string("file:///tmp/main.swift")]),
+		"position": .object(["line": .int(3), "character": .int(4)]),
+		"context": .object(["includeDeclaration": .bool(true)]),
+	]))
+	#expect(result.locations == [
+		LSPLocation(
+			uri: "file:///tmp/main.swift",
+			range: LSPRange(start: LSPPosition(line: 3, character: 4), end: LSPPosition(line: 3, character: 9))
+		),
+	])
+	#expect(none.locations.isEmpty)
+}
+
 @Test func completionResultDecodesItemArrayAndNull() throws {
 	let items = try LSPCompletionResult(decoding: Data(#"[{"label":"map","insertText":"map"}]"#.utf8))
 	let none = try LSPCompletionResult(decoding: Data("null".utf8))

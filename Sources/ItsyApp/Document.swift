@@ -675,6 +675,8 @@ final class EditorWindowController: NSWindowController {
 	private var hoverPopover: NSPopover?
 	private var hoverTimer: Timer?
 	private var hoverRequestGeneration = 0
+	private var referencesRequestGeneration = 0
+	private var referencesPanelController: ReferencesPanelController?
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
@@ -1430,10 +1432,17 @@ final class EditorWindowController: NSWindowController {
 		case "lsp.hover":
 			let offset = editorView.editor.selections.primary.head
 			return requestHover(at: offset, positioningRect: editorView.positioningRectForUTF8Offset(offset), in: editorView)
+		case "lsp.references":
+			return findAllReferences(nil)
 		default:
 			return false
 		}
 		return true
+	}
+
+	@discardableResult
+	func findAllReferences(_: Any?) -> Bool {
+		requestReferences(at: editorView.editor.selections.primary.head, in: editorView)
 	}
 
 	@discardableResult
@@ -1716,6 +1725,75 @@ final class EditorWindowController: NSWindowController {
 		popover.contentViewController = HoverTooltipViewController(hover: hover)
 		popover.show(relativeTo: positioningRect, of: targetView, preferredEdge: .maxY)
 		hoverPopover = popover
+	}
+
+	@discardableResult
+	private func requestReferences(at offset: Int, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = targetView.editor.text
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
+		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
+		referencesRequestGeneration += 1
+		let generation = referencesRequestGeneration
+		let panel = referencesPanelController ?? ReferencesPanelController()
+		referencesPanelController = panel
+		panel.showLoading(relativeTo: window)
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let params = LSPReferenceParams(
+					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
+					position: position,
+					context: LSPReferenceContext(includeDeclaration: true)
+				)
+				let response = try await session.client.sendRequest(
+					method: LSPMethod.textDocumentReferences,
+					params: try LSPAny(encoding: params)
+				)
+				let result = try LSPReferencesResult(result: response.result)
+				let snapshot = LSPReferencesSnapshot(
+					locations: result.locations,
+					rootURL: rootURL,
+					currentFileURL: fileURL,
+					currentText: content
+				)
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.referencesRequestGeneration else {
+						return
+					}
+					self.showReferences(snapshot)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.referencesRequestGeneration else {
+						return
+					}
+					self.referencesPanelController?.show(error: error, relativeTo: self.window)
+				}
+			}
+		}
+		return true
+	}
+
+	private func showReferences(_ snapshot: LSPReferencesSnapshot) {
+		let panel = referencesPanelController ?? ReferencesPanelController()
+		referencesPanelController = panel
+		panel.show(snapshot: snapshot, relativeTo: window) { entry in
+			guard let controller = NSDocumentController.shared as? ItsyDocumentController else {
+				return
+			}
+			_ = controller.openDocument(at: entry.url, line: entry.line, column: entry.column)
+		}
 	}
 
 	private func closeHoverPopover() {

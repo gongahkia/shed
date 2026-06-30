@@ -153,6 +153,26 @@ public struct LSPTextDocumentPositionParams: Codable, Equatable, Sendable {
 
 public typealias LSPHoverParams = LSPTextDocumentPositionParams
 
+public struct LSPReferenceContext: Codable, Equatable, Sendable {
+	public var includeDeclaration: Bool
+
+	public init(includeDeclaration: Bool) {
+		self.includeDeclaration = includeDeclaration
+	}
+}
+
+public struct LSPReferenceParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+	public var context: LSPReferenceContext
+
+	public init(textDocument: LSPTextDocumentIdentifier, position: LSPPosition, context: LSPReferenceContext) {
+		self.textDocument = textDocument
+		self.position = position
+		self.context = context
+	}
+}
+
 public enum LSPInsertTextFormat: Int, Codable, Equatable, Sendable {
 	case plainText = 1
 	case snippet = 2
@@ -697,6 +717,31 @@ public enum LSPDefinitionResult: Equatable, Sendable {
 		case .none:
 			return []
 		}
+	}
+}
+
+public enum LSPReferencesResult: Equatable, Sendable {
+	case locations([LSPLocation])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let locations = try? decoder.decode([LSPLocation].self, from: data), !locations.isEmpty {
+			self = .locations(locations)
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var locations: [LSPLocation] {
+		guard case let .locations(locations) = self else {
+			return []
+		}
+		return locations
 	}
 }
 

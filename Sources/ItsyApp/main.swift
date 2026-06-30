@@ -36,7 +36,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var commandPaletteItems: [Command] = []
 	private var commandPaletteFilteredItems: [Command] = []
 	private var commandPaletteAcceptsRawText = false
-	private enum CommandPaletteSymbolScope { case workspace }
+	private enum CommandPaletteSymbolScope { case workspace, file }
 	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
 	private var commandPaletteSymbols: [WorkspaceSymbol] = []
 	private var commandPaletteFilteredSymbols: [WorkspaceSymbol] = []
@@ -306,18 +306,39 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		commandPaletteInputField?.currentEditor()?.selectedRange = NSRange(location: commandPaletteInputField?.stringValue.count ?? 0, length: 0)
 	}
 
+	private func symbolsForCommandPaletteScope(_ scope: CommandPaletteSymbolScope) -> [WorkspaceSymbol] {
+		guard let index = ItsyWorkspaceController.currentWorkspaceIndex else {
+			return []
+		}
+		switch scope {
+		case .workspace:
+			return index.symbols
+		case .file:
+			guard let url = (activeDocument() as? ItsyDocument)?.fileURL,
+			      let relative = index.relativePath(for: url)
+			else {
+				return []
+			}
+			return index.symbolsForFile(relativePath: relative)
+		}
+	}
+
 	private func filterCommandPaletteItems() {
 		guard !commandPaletteAcceptsRawText else {
 			return
 		}
 		let raw = commandPaletteInputField?.stringValue ?? ""
-		if raw.hasPrefix("@") {
-			if commandPaletteSymbolScope != .workspace {
-				commandPaletteSymbols = ItsyWorkspaceController.currentWorkspaceIndex?.symbols ?? []
-				commandPaletteSymbolScope = .workspace
+		if raw.hasPrefix("@") || raw.hasPrefix("#") {
+			let scope: CommandPaletteSymbolScope = raw.hasPrefix("@") ? .workspace : .file
+			if commandPaletteSymbolScope != scope {
+				commandPaletteSymbols = symbolsForCommandPaletteScope(scope)
+				commandPaletteSymbolScope = scope
 			}
 			let query = String(raw.dropFirst()).lowercased()
-			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(commandPaletteSymbols, query: query, includeUnmatched: query.isEmpty) { "\($0.name) \($0.relativePath)" }
+			let keyPath: (WorkspaceSymbol) -> String = scope == .workspace
+				? { "\($0.name) \($0.relativePath)" }
+				: { $0.name }
+			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(commandPaletteSymbols, query: query, includeUnmatched: query.isEmpty, by: keyPath)
 			commandPaletteFilteredItems = []
 			commandPaletteTableView?.reloadData()
 			if !commandPaletteFilteredSymbols.isEmpty {
@@ -1562,9 +1583,14 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			let textField = cell.textField ?? NSTextField(labelWithString: "")
 			textField.font = .systemFont(ofSize: 13)
 			textField.lineBreakMode = .byTruncatingTail
-			if commandPaletteSymbolScope != nil {
+			if let scope = commandPaletteSymbolScope {
 				let symbol = commandPaletteFilteredSymbols[row]
-				textField.stringValue = "\(symbol.name) · \(symbol.kind.rawValue) — \(symbol.relativePath):\(symbol.line)"
+				switch scope {
+				case .workspace:
+					textField.stringValue = "\(symbol.name) · \(symbol.kind.rawValue) — \(symbol.relativePath):\(symbol.line)"
+				case .file:
+					textField.stringValue = "\(symbol.name) · \(symbol.kind.rawValue) — line \(symbol.line)"
+				}
 			} else {
 				textField.stringValue = commandPaletteFilteredItems[row].title
 			}

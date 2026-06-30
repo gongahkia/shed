@@ -46,6 +46,28 @@ import Testing
 	#expect(index.searchSymbols(query: "openproj", limit: 1).map(\.name) == ["openProject"])
 }
 
+@Test func workspaceIndexScopesSymbolsAndPathsByActiveFile() throws {
+	let fixture = try TemporaryWorkspaceIndexFixture()
+	try fixture.write("Sources/Foo.swift", """
+	struct Foo {
+		func runFoo() {}
+	}
+	""")
+	try fixture.write("Sources/Bar.swift", """
+	struct Bar {
+		func runBar() {}
+	}
+	""")
+
+	let index = WorkspaceIndexer.build(root: fixture.root)
+	let fooURL = fixture.root.appendingPathComponent("Sources/Foo.swift")
+
+	#expect(index.relativePath(for: fooURL) == "Sources/Foo.swift")
+	#expect(index.relativePath(for: URL(fileURLWithPath: "/elsewhere/Foo.swift")) == nil)
+	#expect(index.symbolsForFile(relativePath: "Sources/Foo.swift").map(\.name) == ["Foo", "runFoo"])
+	#expect(index.symbolsForFile(relativePath: "Sources/Missing.swift").isEmpty)
+}
+
 private final class TemporaryWorkspaceIndexFixture {
 	let root: URL
 

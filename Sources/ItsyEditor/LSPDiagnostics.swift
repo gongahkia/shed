@@ -38,19 +38,37 @@ public actor LSPDiagnosticsAggregator {
 		problemsByURI[uri] ?? []
 	}
 
-	public static func toWorkspaceProblem(_ diagnostic: LSPDiagnostic, uri: String, root: URL, source: String? = nil) -> WorkspaceProblem? {
+	public static func toWorkspaceProblem(
+		_ diagnostic: LSPDiagnostic,
+		uri: String,
+		root: URL,
+		source: String? = nil
+	) -> WorkspaceProblem? {
 		guard let path = relativePath(forURI: uri, root: root) else {
 			return nil
 		}
 		let lineOneBased = max(1, diagnostic.range.start.line + 1)
 		let columnOneBased = max(1, diagnostic.range.start.character + 1)
+		let related = diagnostic.relatedInformation?.compactMap {
+			item -> WorkspaceProblemRelatedInformation? in
+			guard let relatedPath = relativePath(forURI: item.location.uri, root: root) else {
+				return nil
+			}
+			return WorkspaceProblemRelatedInformation(
+				path: relatedPath,
+				line: max(1, item.location.range.start.line + 1),
+				column: max(1, item.location.range.start.character + 1),
+				message: item.message
+			)
+		} ?? []
 		return WorkspaceProblem(
 			path: path,
 			line: lineOneBased,
 			column: columnOneBased,
 			severity: mapSeverity(diagnostic.severity),
 			message: diagnostic.message,
-			source: source ?? diagnostic.source ?? "lsp"
+			source: source ?? diagnostic.source ?? "lsp",
+			relatedInformation: related
 		)
 	}
 

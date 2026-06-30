@@ -53,6 +53,42 @@ import Testing
 	#expect(snapshot.problems[0].message == "missing return")
 }
 
+@Test func lspDiagnosticsMapsRelatedInformationToWorkspaceProblems() async {
+	let root = URL(fileURLWithPath: "/tmp/itsy-diag")
+	let aggregator = LSPDiagnosticsAggregator(root: root)
+	await aggregator.ingest(LSPPublishDiagnosticsParams(
+		uri: "file:///tmp/itsy-diag/Sources/App.swift",
+		diagnostics: [
+			LSPDiagnostic(
+				range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 3)),
+				severity: .error,
+				message: "bad call",
+				relatedInformation: [
+					LSPDiagnosticRelatedInformation(
+						location: LSPLocation(
+							uri: "file:///tmp/itsy-diag/Sources/Helper.swift",
+							range: LSPRange(start: LSPPosition(line: 4, character: 6), end: LSPPosition(line: 4, character: 11))
+						),
+						message: "declared here"
+					),
+					LSPDiagnosticRelatedInformation(
+						location: LSPLocation(
+							uri: "file:///elsewhere/Other.swift",
+							range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 1))
+						),
+						message: "outside"
+					),
+				]
+			),
+		]
+	))
+
+	let problem = await aggregator.snapshot().problems[0]
+	#expect(problem.relatedInformation == [
+		WorkspaceProblemRelatedInformation(path: "Sources/Helper.swift", line: 5, column: 7, message: "declared here"),
+	])
+}
+
 @Test func lspDiagnosticsAggregatorRemovesEntryWhenEmptyDiagnosticsArrive() async {
 	let root = URL(fileURLWithPath: "/tmp/itsy-diag")
 	let aggregator = LSPDiagnosticsAggregator(root: root)

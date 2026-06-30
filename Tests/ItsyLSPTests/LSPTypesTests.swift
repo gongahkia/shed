@@ -16,7 +16,19 @@ import Testing
 	      "severity": 1,
 	      "code": "E001",
 	      "source": "swift",
-	      "message": "expected expression"
+	      "message": "expected expression",
+	      "relatedInformation": [
+	        {
+	          "location": {
+	            "uri": "file:///tmp/helper.swift",
+	            "range": {
+	              "start": { "line": 1, "character": 2 },
+	              "end": { "line": 1, "character": 8 }
+	            }
+	          },
+	          "message": "declared here"
+	        }
+	      ]
 	    }
 	  ]
 	}
@@ -27,11 +39,23 @@ import Testing
 	#expect(params.uri == "file:///tmp/main.swift")
 	#expect(params.version == 7)
 	let diagnostic = try #require(params.diagnostics.first)
-	#expect(diagnostic.range == LSPRange(start: LSPPosition(line: 2, character: 4), end: LSPPosition(line: 2, character: 10)))
+	#expect(diagnostic.range == LSPRange(
+		start: LSPPosition(line: 2, character: 4),
+		end: LSPPosition(line: 2, character: 10)
+	))
 	#expect(diagnostic.severity == .error)
 	#expect(diagnostic.code == .string("E001"))
 	#expect(diagnostic.source == "swift")
 	#expect(diagnostic.message == "expected expression")
+	#expect(diagnostic.relatedInformation == [
+		LSPDiagnosticRelatedInformation(
+			location: LSPLocation(
+				uri: "file:///tmp/helper.swift",
+				range: LSPRange(start: LSPPosition(line: 1, character: 2), end: LSPPosition(line: 1, character: 8))
+			),
+			message: "declared here"
+		),
+	])
 }
 
 @Test func didOpenNotificationEncodesTextDocumentPayload() throws {

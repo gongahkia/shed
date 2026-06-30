@@ -23,6 +23,26 @@ public struct TextHighlightSpan: Sendable, Equatable {
 	}
 }
 
+public struct GutterMarker: Sendable, Equatable {
+	public var id: String
+	public var line: Int
+	public var severity: WorkspaceProblemSeverity
+	public var message: String
+
+	public init(id: String, line: Int, severity: WorkspaceProblemSeverity, message: String) {
+		self.id = id
+		self.line = line
+		self.severity = severity
+		self.message = message
+	}
+}
+
+public protocol GutterDecorator: AnyObject {
+	func gutterMarkers(in lineRange: Range<Int>, for view: MetalTextView) -> [GutterMarker]
+	func gutterMarkerClicked(_ marker: GutterMarker, in view: MetalTextView)
+	func gutterPopoverViewController(for marker: GutterMarker, in view: MetalTextView) -> NSViewController?
+}
+
 struct MetalViewportUniforms {
 	var size: SIMD2<Float>
 }
@@ -70,10 +90,20 @@ public final class MetalTextView: NSView {
 	private var selectionRects: [CGRect] = []
 	private var findMatchRanges: [Range<Int>] = []
 	private var findMatchRects: [CGRect] = []
+	private var gutterMarkerRects: [(marker: GutterMarker, rect: CGRect)] = []
+	private var gutterTrackingArea: NSTrackingArea?
+	private var gutterPopover: NSPopover?
+	private var hoveredGutterMarkerID: String?
 	public var highlightSpans: [TextHighlightSpan] = [] {
 		didSet {
 			highlightRevision += 1
 			lineShapeCache.removeAll(keepingCapacity: true)
+			markDirty()
+		}
+	}
+	public weak var gutterDecorator: GutterDecorator? {
+		didSet {
+			refreshGutterMarkerRects()
 			markDirty()
 		}
 	}
@@ -91,7 +121,8 @@ public final class MetalTextView: NSView {
 	private var highlightRevision = 0
 	private var markedRangeUTF8: Range<Int>?
 	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
-	private let textInset = CGPoint(x: 8, y: 6)
+	private let gutterWidth: CGFloat = 24
+	private let textInset = CGPoint(x: 30, y: 6)
 	public var topContentInset: CGFloat = 0 {
 		didSet { syncEditorState() }
 	}
@@ -219,7 +250,23 @@ public final class MetalTextView: NSView {
 	public override func setFrameSize(_ newSize: NSSize) {
 		super.setFrameSize(newSize)
 		updateDrawableSize()
+		refreshGutterMarkerRects()
 		markDirty()
+	}
+
+	public override func updateTrackingAreas() {
+		if let gutterTrackingArea {
+			removeTrackingArea(gutterTrackingArea)
+		}
+		let area = NSTrackingArea(
+			rect: bounds,
+			options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved, .mouseEnteredAndExited],
+			owner: self,
+			userInfo: nil
+		)
+		addTrackingArea(area)
+		gutterTrackingArea = area
+		super.updateTrackingAreas()
 	}
 
 	public override func viewDidChangeBackingProperties() {
@@ -236,6 +283,7 @@ public final class MetalTextView: NSView {
 	}
 
 	deinit {
+		closeGutterPopover()
 		stopDisplayLink()
 		stopCursorBlinkTimer()
 	}
@@ -296,6 +344,7 @@ public final class MetalTextView: NSView {
 			xOffset = max(0, xOffset + deltaX)
 		}
 		refreshFindMatchRects()
+		refreshGutterMarkerRects()
 		markDirty()
 	}
 
@@ -359,6 +408,10 @@ public final class MetalTextView: NSView {
 
 	public override func mouseDown(with event: NSEvent) {
 		window?.makeFirstResponder(self)
+		if let marker = gutterMarker(forMouseEvent: event) {
+			gutterDecorator?.gutterMarkerClicked(marker, in: self)
+			return
+		}
 		if event.modifierFlags.contains(.command) {
 			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
 			return
@@ -382,6 +435,18 @@ public final class MetalTextView: NSView {
 	public override func mouseUp(with event: NSEvent) {
 		optionDragAnchor = nil
 		super.mouseUp(with: event)
+	}
+
+	public override func mouseMoved(with event: NSEvent) {
+		guard let marker = gutterMarker(forMouseEvent: event), let rect = gutterMarkerRect(for: marker.id) else {
+			closeGutterPopover()
+			return
+		}
+		showGutterPopover(for: marker, relativeTo: rect)
+	}
+
+	public override func mouseExited(with event: NSEvent) {
+		closeGutterPopover()
 	}
 
 	public override func keyDown(with event: NSEvent) {
@@ -1581,6 +1646,12 @@ public final class MetalTextView: NSView {
 		return instances
 	}
 
+	func gutterOverlayInstances(scale: CGFloat) -> [MetalGlyphInstance] {
+		var instances: [MetalGlyphInstance] = []
+		appendGutterOverlayInstances(scale: scale, into: &instances)
+		return instances
+	}
+
 	func textGlyphInstances(scale: CGFloat) -> [MetalGlyphInstance] {
 		var instances: [MetalGlyphInstance] = []
 		appendTextGlyphInstances(scale: scale, into: &instances)
@@ -1679,6 +1750,25 @@ public final class MetalTextView: NSView {
 		}
 	}
 
+	private func appendGutterOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		for item in gutterMarkerRects {
+			instances.append(solidInstance(rect: item.rect, scale: scale, color: gutterColor(for: item.marker.severity)))
+		}
+	}
+
+	private func gutterColor(for severity: WorkspaceProblemSeverity) -> SIMD4<Float> {
+		switch severity {
+		case .error:
+			return SIMD4<Float>(0.95, 0.25, 0.22, 1.0)
+		case .warning:
+			return SIMD4<Float>(0.95, 0.68, 0.18, 1.0)
+		case .info:
+			return SIMD4<Float>(0.24, 0.56, 0.96, 1.0)
+		case .hint:
+			return SIMD4<Float>(0.58, 0.62, 0.68, 1.0)
+		}
+	}
+
 	private func textColor(for range: Range<Int>) -> SIMD4<Float> {
 		guard let span = highlightSpans.last(where: { $0.range.overlaps(range) }) else {
 			return SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
@@ -1724,6 +1814,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		let scale = layer.contentsScale
+		renderGutterInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderFindMatchInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderSelectionInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderText(encoder: encoder, drawableSize: layer.drawableSize, scale: scale)
@@ -1823,6 +1914,12 @@ public final class MetalTextView: NSView {
 	private func renderFindMatchInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
 		solidInstanceScratch.removeAll(keepingCapacity: true)
 		appendFindMatchOverlayInstances(scale: scale, into: &solidInstanceScratch)
+		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
+	}
+
+	private func renderGutterInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
+		solidInstanceScratch.removeAll(keepingCapacity: true)
+		appendGutterOverlayInstances(scale: scale, into: &solidInstanceScratch)
 		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
 	}
 
@@ -1992,6 +2089,7 @@ public final class MetalTextView: NSView {
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
 		refreshFindMatchRects()
+		refreshGutterMarkerRects()
 		refreshAccessibilityValue()
 		markDirty()
 	}
@@ -2026,6 +2124,76 @@ public final class MetalTextView: NSView {
 	private func refreshFindMatchRects() {
 		findMatchRects = findMatchRanges.flatMap { rects(forUTF8Range: $0) }
 		markDirty()
+	}
+
+	private func refreshGutterMarkerRects() {
+		guard let gutterDecorator, !visibleLineRange.isEmpty else {
+			gutterMarkerRects = []
+			closeGutterPopover()
+			return
+		}
+		let markers = gutterDecorator.gutterMarkers(in: visibleLineRange, for: self)
+			.filter { visibleLineRange.contains($0.line) }
+			.sorted {
+				if $0.line != $1.line {
+					return $0.line < $1.line
+				}
+				return $0.id < $1.id
+			}
+		var slotsByLine: [Int: Int] = [:]
+		gutterMarkerRects = markers.map { marker in
+			let slot = slotsByLine[marker.line, default: 0]
+			slotsByLine[marker.line] = slot + 1
+			let lineY = topContentInset + textInset.y + CGFloat(marker.line - topLineIndex) * lineHeight
+			let markerHeight = min(12, max(6, lineHeight - 5))
+			let markerWidth: CGFloat = 4
+			let x = max(3, gutterWidth - 7 - CGFloat(slot % 3) * 6)
+			let rect = CGRect(
+				x: x,
+				y: lineY + max(2, (lineHeight - markerHeight) / 2),
+				width: markerWidth,
+				height: markerHeight
+			)
+			return (marker, rect)
+		}
+		if let hoveredGutterMarkerID, !gutterMarkerRects.contains(where: { $0.marker.id == hoveredGutterMarkerID }) {
+			closeGutterPopover()
+		}
+	}
+
+	func gutterMarker(atLocalPoint point: NSPoint) -> GutterMarker? {
+		gutterMarkerRects.first { $0.rect.insetBy(dx: -3, dy: -2).contains(point) }?.marker
+	}
+
+	private func gutterMarker(forMouseEvent event: NSEvent) -> GutterMarker? {
+		gutterMarker(atLocalPoint: convert(event.locationInWindow, from: nil))
+	}
+
+	private func gutterMarkerRect(for id: String) -> CGRect? {
+		gutterMarkerRects.first { $0.marker.id == id }?.rect
+	}
+
+	private func showGutterPopover(for marker: GutterMarker, relativeTo rect: CGRect) {
+		guard hoveredGutterMarkerID != marker.id || gutterPopover?.isShown != true else {
+			return
+		}
+		closeGutterPopover()
+		guard let controller = gutterDecorator?.gutterPopoverViewController(for: marker, in: self) else {
+			return
+		}
+		let popover = NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = controller
+		popover.show(relativeTo: rect, of: self, preferredEdge: .maxX)
+		gutterPopover = popover
+		hoveredGutterMarkerID = marker.id
+	}
+
+	private func closeGutterPopover() {
+		gutterPopover?.close()
+		gutterPopover = nil
+		hoveredGutterMarkerID = nil
 	}
 
 	private func rects(forUTF8Range range: Range<Int>) -> [CGRect] {

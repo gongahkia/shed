@@ -1436,6 +1436,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		if !workspaceProblems.isEmpty {
 			problemsTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 		}
+		ItsyProblemGutterCoordinator.setProblems(
+			root: problemsRootURL,
+			problems: workspaceProblems,
+			selectProblem: { [weak self] index in
+				self?.focusProblem(index: index)
+			},
+			openRelated: { [weak self] related in
+				self?.openRelatedProblemLocation(related)
+			}
+		)
 	}
 
 	private func refreshProblemsStatus() {
@@ -1452,7 +1462,32 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		else {
 			return
 		}
-		_ = documentController.openDocument(at: problemsRootURL.appendingPathComponent(workspaceProblems[tableView.selectedRow].path))
+		let problem = workspaceProblems[tableView.selectedRow]
+		let url = problemsRootURL.appendingPathComponent(problem.path)
+		_ = documentController.openDocument(at: url, line: problem.line, column: problem.column ?? 1)
+		if let document = documentController.document(for: url) as? ItsyDocument {
+			ItsyProblemGutterCoordinator.apply(to: document)
+		}
+	}
+
+	private func focusProblem(index: Int) {
+		guard index >= 0, index < workspaceProblems.count else {
+			return
+		}
+		showProblems(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		problemsTableView?.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false)
+		problemsTableView?.scrollRowToVisible(index)
+		problemsPanel?.makeKeyAndOrderFront(nil)
+	}
+
+	private func openRelatedProblemLocation(_ related: WorkspaceProblemRelatedInformation) {
+		guard let problemsRootURL else {
+			return
+		}
+		_ = documentController.openDocument(at: problemsRootURL.appendingPathComponent(related.path), line: related.line, column: related.column ?? 1)
+		if let document = documentController.document(for: problemsRootURL.appendingPathComponent(related.path)) as? ItsyDocument {
+			ItsyProblemGutterCoordinator.apply(to: document)
+		}
 	}
 
 	private func problemTitle(_ problem: WorkspaceProblem) -> String {

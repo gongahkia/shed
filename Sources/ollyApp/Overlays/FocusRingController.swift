@@ -158,6 +158,10 @@ final class FocusRingView: NSView {
         layer = CALayer()
         layer?.addSublayer(shapeLayer)
         shapeLayer.fillColor = NSColor.clear.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.unknown)
+        setAccessibilityLabel("Focus ring")
+        setAccessibilityHidden(true)
     }
 
     required init?(coder: NSCoder) {
@@ -207,7 +211,7 @@ private extension FocusRingColor {
         case .systemYellow:
             return .systemYellow
         case .white:
-            return .white
+            return .labelColor
         }
     }
 }

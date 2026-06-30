@@ -70,3 +70,54 @@ final class WindowRecoveryJournalTests: XCTestCase {
         )
     }
 }
+
+final class WindowRecoveryJournalMigrationTests: XCTestCase {
+    func testV1JournalMigratesToV2DefaultsAndWritesBack() async throws {
+        let stateURL = temporaryStateURL()
+        try FileManager.default.createDirectory(
+            at: stateURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(
+            """
+            {
+              "version" : 1,
+              "entries" : [
+                {
+                  "windowID" : 7,
+                  "processID" : 42,
+                  "bundleID" : "com.example.App",
+                  "title" : "window 7",
+                  "role" : "AXWindow",
+                  "subrole" : "AXStandardWindow",
+                  "displayID" : 1,
+                  "tagMask" : 1,
+                  "originalFrame" : { "x" : 10, "y" : 20, "width" : 300, "height" : 200 },
+                  "parkedFrame" : { "x" : -32000, "y" : -32000, "width" : 300, "height" : 200 },
+                  "updatedAt" : "2026-06-30T00:00:00Z"
+                }
+              ]
+            }
+            """.utf8
+        ).write(to: stateURL)
+        let journal = WindowRecoveryJournal(stateURL: stateURL)
+
+        let state = try await journal.load()
+        let entry = try XCTUnwrap(state.entries.first)
+        let migratedJSON = try String(contentsOf: stateURL, encoding: .utf8)
+
+        XCTAssertEqual(state.version, 2)
+        XCTAssertFalse(entry.isSticky)
+        XCTAssertFalse(entry.isFullscreen)
+        XCTAssertNil(entry.engineOverride)
+        XCTAssertTrue(migratedJSON.contains("\"version\" : 2"))
+        XCTAssertTrue(migratedJSON.contains("\"isSticky\" : false"))
+        XCTAssertTrue(migratedJSON.contains("\"isFullscreen\" : false"))
+    }
+
+    private func temporaryStateURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("recovery.json")
+    }
+}

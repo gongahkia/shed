@@ -21,7 +21,7 @@ final class WindowTagPersistenceTests: XCTestCase {
         let json = try String(contentsOf: stateURL, encoding: .utf8)
 
         XCTAssertEqual(loaded.rules, [rule])
-        XCTAssertTrue(json.contains("\"version\" : 1"))
+        XCTAssertTrue(json.contains("\"version\" : 2"))
         XCTAssertTrue(json.contains("\"tags\" : 2"))
         XCTAssertTrue(json.contains("\"layoutOrders\""))
     }
@@ -106,6 +106,51 @@ final class WindowTagPersistenceTests: XCTestCase {
         XCTAssertThrowsError(
             try WindowTagRule(processID: 42, bundleID: nil, titleRegex: "[", tags: [])
         )
+    }
+
+    private func temporaryStateURL() -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("state.json")
+    }
+}
+
+final class WindowTagPersistenceMigrationTests: XCTestCase {
+    func testV1StateMigratesToV2DefaultsAndWritesBack() async throws {
+        let stateURL = temporaryStateURL()
+        try FileManager.default.createDirectory(
+            at: stateURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try Data(
+            """
+            {
+              "version" : 1,
+              "rules" : [
+                {
+                  "processID" : 42,
+                  "bundleID" : "com.example.App",
+                  "titleRegex" : "^Docs",
+                  "tags" : 2
+                }
+              ],
+              "layoutOrders" : []
+            }
+            """.utf8
+        ).write(to: stateURL)
+        let persistence = WindowTagPersistence(stateURL: stateURL)
+
+        let state = try await persistence.load()
+        let rule = try XCTUnwrap(state.rules.first)
+        let migratedJSON = try String(contentsOf: stateURL, encoding: .utf8)
+
+        XCTAssertEqual(state.version, 2)
+        XCTAssertFalse(rule.isSticky)
+        XCTAssertFalse(rule.isPinned)
+        XCTAssertNil(rule.engineOverride)
+        XCTAssertTrue(migratedJSON.contains("\"version\" : 2"))
+        XCTAssertTrue(migratedJSON.contains("\"isSticky\" : false"))
+        XCTAssertTrue(migratedJSON.contains("\"isPinned\" : false"))
     }
 
     private func temporaryStateURL() -> URL {

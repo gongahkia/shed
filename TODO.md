@@ -21,28 +21,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M0 — Foundations
 
-### M0.5 Persistence migrations (v1 → v2)
-
-**Goal:** Codable migrations for the on-disk state files that will gain new fields in M1..M3.
-
-**Files to modify:**
-- `Sources/ollyCore/WindowTagPersistence.swift:133-203` — bump `WindowTagPersistenceState.version` 1→2; add `isSticky/isPinned/engineOverride` fields with `decodeIfPresent` defaults of `false / false / nil`.
-- `Sources/ollyCore/WindowRecoveryJournal.swift:86-107` — bump `WindowRecoveryJournalState.version` 1→2; add `isSticky/isFullscreen/engineOverride`.
-- New files on disk: `~/.config/olly/scratchpads.json` (M3.6), `~/.config/olly/macros/<name>.json` (M2.5), `~/.config/olly/crashes/<ts>.json` (M4.crashTelemetry).
-- Reuse `Sources/ollyDSL/ConfigMigration.swift:37-105` migrator pattern.
-
-**Gotchas:**
-- `JSONDecoder.decode(_:from:)` with `decodeIfPresent` only works if the optional is at the property level. For new required fields, default at decode site (not as `Optional`).
-- Migrations are one-shot: write back the v2 representation after a successful v1 decode so subsequent loads are direct.
-
-**Test plan:**
-- Round-trip: write v1 JSON manually, decode into v2 struct with defaults; assert equality with explicit-v2 reference.
-
-**Acceptance:**
-- `swift test Tests/ollyCoreTests` includes `WindowTagPersistenceMigrationTests` and `WindowRecoveryJournalMigrationTests`.
-
----
-
 ## M1 — Reliability spine (yabai-class WM)
 
 ### M1.1 Per-display-per-tag engine binding finish

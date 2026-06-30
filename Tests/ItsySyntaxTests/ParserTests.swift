@@ -97,6 +97,16 @@ import Testing
 	#expect(selected == (try SyntaxTheme.loadDefaultLight()))
 }
 
+@Test func syntaxThemeDefaultsToBundledLight() throws {
+	let suiteName = "dev.itsy.editor.tests.theme.default.\(UUID().uuidString)"
+	let defaults = try #require(UserDefaults(suiteName: suiteName))
+	defer { defaults.removePersistentDomain(forName: suiteName) }
+
+	let selected = try SyntaxTheme.loadSelectedOrDefault(defaults: defaults)
+	#expect(SyntaxTheme.defaultChoiceID == "bundled:default-light")
+	#expect(selected == (try SyntaxTheme.loadDefaultLight()))
+}
+
 @Test func syntaxPipelineDetectsLanguageAndAllocatesParserLazily() throws {
 	let url = URL(fileURLWithPath: "/tmp/example.ts")
 	let language = try #require(SyntaxPipeline.language(forFileURL: url))

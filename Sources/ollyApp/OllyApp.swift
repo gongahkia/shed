@@ -44,6 +44,8 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     ) { [weak self] snapshot in
         self?.renderRuntimeSnapshot(snapshot)
     }
+    private let changelogStore = ChangelogVersionStore()
+    private var changelogController: ChangelogWindowController?
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
     private var isTerminating = false
 
@@ -71,6 +73,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
         startRuntime()
+        showChangelogIfNeeded()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -178,6 +181,24 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
             let snapshot = await runtime.menuSnapshot()
             await self?.renderRuntimeSnapshot(snapshot)
         }
+    }
+
+    private func showChangelogIfNeeded() {
+        guard firstRunController == nil, onboardingController == nil else {
+            return
+        }
+        let version = Self.appVersion()
+        guard changelogStore.shouldShow(version: version),
+              let markdown = ChangelogResources.loadMarkdown() else {
+            return
+        }
+        let controller = ChangelogWindowController(markdown: markdown, version: version)
+        controller.onClose = { [weak self] in
+            self?.changelogStore.markShown(version: version)
+            self?.changelogController = nil
+        }
+        changelogController = controller
+        controller.showModal()
     }
 
     @MainActor private func renderRuntimeSnapshot(_ snapshot: OllyRuntimeMenuSnapshot) {

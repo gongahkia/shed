@@ -27,16 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.14 In-app changelog viewer
-
-**Goal:** Show `CHANGELOG.md` on first launch after upgrade.
-
-**Files to modify:**
-- Bundle `CHANGELOG.md` as a resource in `Sources/ollyApp/Resources/`.
-- In `OllyApp.applicationDidFinishLaunching`, compare current version against `UserDefaults["olly.lastShownChangelogVersion"]`; if differ, show modal with rendered Markdown (`NSAttributedString` from Markdown).
-
----
-
 ## D — Mass distribution (deferred until M0..M4 land)
 
 ### D.1 Developer ID code signing

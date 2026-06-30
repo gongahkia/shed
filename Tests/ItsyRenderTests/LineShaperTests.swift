@@ -14,7 +14,11 @@ import Testing
 	#expect(glyphs.count == 5)
 	#expect(glyphs.allSatisfy { $0.glyphID != 0 })
 	#expect(glyphs.allSatisfy { $0.atlasUV.u0 >= 0 && $0.atlasUV.u1 <= 1 && $0.atlasUV.v0 >= 0 && $0.atlasUV.v1 <= 1 })
-	#expect(glyphs.allSatisfy { $0.atlasUV.u0 > 0 && $0.atlasUV.v0 > 0 })
+	let firstEntry = try atlas.entry(for: glyphs[0].glyphID, font: font)
+	#expect(glyphs[0].atlasUV.u0 == CGFloat(firstEntry.textureX) / CGFloat(atlas.texture.width))
+	#expect(glyphs[0].atlasUV.v0 == CGFloat(firstEntry.textureY) / CGFloat(atlas.texture.height))
+	#expect(glyphs[0].atlasUV.u1 == CGFloat(firstEntry.textureX + firstEntry.width) / CGFloat(atlas.texture.width))
+	#expect(glyphs[0].atlasUV.v1 == CGFloat(firstEntry.textureY + firstEntry.height) / CGFloat(atlas.texture.height))
 }
 
 @Test func lineShaperShapes100LineBufferWithinBudget() throws {

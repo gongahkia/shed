@@ -11,6 +11,7 @@ public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> Strin
 public typealias DisplayChangeStreamProvider = @Sendable () -> AsyncStream<DisplayChange>
 public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
 public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
+public typealias TagApplicationLauncher = @Sendable (String) async throws -> Void
 public typealias ScratchpadApplicationLauncher = @Sendable (String) async throws -> Void
 public typealias ScratchpadFocusHandler = @Sendable (WindowState) async throws -> Void
 public typealias ReduceMotionValueProvider = @MainActor @Sendable () -> Bool
@@ -43,6 +44,7 @@ public actor OllyRuntime {
     let scratchpads: ScratchpadRegistry
     let windowMover: WindowMover
     let scratchpadParker: WindowParker
+    let tagApplicationLauncher: TagApplicationLauncher
     let scratchpadApplicationLauncher: ScratchpadApplicationLauncher
     let scratchpadFocusWindow: ScratchpadFocusHandler?
     let reduceMotionState: ReduceMotionState
@@ -101,6 +103,8 @@ public actor OllyRuntime {
         reduceMotionChangeStream: @escaping ReduceMotionChangeStreamProvider =
             OllyRuntime.defaultReduceMotionChangeStream,
         focusInputAttribution: FocusInputAttribution = .shared,
+        tagApplicationLauncher: @escaping TagApplicationLauncher =
+            { try await OllyRuntime.defaultTagApplicationLauncher($0) },
         scratchpadApplicationLauncher: @escaping ScratchpadApplicationLauncher =
             { try await OllyRuntime.defaultScratchpadApplicationLauncher($0) },
         scratchpadMoveWindow: TagWindowMoveHandler? = nil,
@@ -123,6 +127,7 @@ public actor OllyRuntime {
         self.reduceMotionChangeStream = reduceMotionChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.focusInputAttribution = focusInputAttribution
+        self.tagApplicationLauncher = tagApplicationLauncher
         self.scratchpadApplicationLauncher = scratchpadApplicationLauncher
         self.scratchpadFocusWindow = scratchpadFocusWindow
         self.presentAXOnboarding = presentAXOnboarding; self.windowMover = WindowMover()

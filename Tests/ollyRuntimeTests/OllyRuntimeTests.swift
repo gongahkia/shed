@@ -41,6 +41,55 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testSwitchTagLaunchesConfiguredAppWhenNoBundleWindowExists() async throws {
+        let launches = ApplicationLaunchRecorder()
+        try await withRuntime(tagApplicationLauncher: { bundleID in await launches.record(bundleID) }) { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Workspaces {
+                    Tag.named("main")
+                    Tag.named("code").launch("com.microsoft.VSCode")
+                }
+            })
+            await runtime.initializeDisplays()
+
+            let switched = try send(.switchTag(.init(tag: tag(1), displayID: displayID)), to: socketPath)
+            let launchedBundleIDs = await launches.bundleIDs
+
+            XCTAssertEqual(switched.status, .success)
+            XCTAssertEqual(launchedBundleIDs, ["com.microsoft.VSCode"])
+        }
+    }
+
+    func testSwitchTagSkipsConfiguredLaunchWhenBundleWindowExists() async throws {
+        let launches = ApplicationLaunchRecorder()
+        try await withRuntime(tagApplicationLauncher: { bundleID in await launches.record(bundleID) }) { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Workspaces {
+                    Tag.named("main")
+                    Tag.named("code").launch("com.microsoft.VSCode")
+                }
+            })
+            await runtime.initializeDisplays()
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 10,
+                    processID: 42,
+                    bundleID: "com.microsoft.VSCode",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 0, width: 100, height: 100)
+                ),
+                element: nil
+            )
+
+            let switched = try send(.switchTag(.init(tag: tag(1), displayID: displayID)), to: socketPath)
+            let launchedBundleIDs = await launches.bundleIDs
+
+            XCTAssertEqual(switched.status, .success)
+            XCTAssertEqual(launchedBundleIDs, [])
+        }
+    }
+
     func testUnqualifiedSwitchTagTargetsFocusedWindowDisplay() async throws {
         let secondaryDisplay = Display(
             id: 77,
@@ -1382,6 +1431,7 @@ private func withRuntime(
     displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
     activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
     focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
+    tagApplicationLauncher: @escaping TagApplicationLauncher = { _ in },
     fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
     extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
@@ -1394,6 +1444,7 @@ private func withRuntime(
         displayChangeStream: displayChangeStream,
         activeSpaceWindowIDs: activeSpaceWindowIDs,
         focusInputAttribution: focusInputAttribution,
+        tagApplicationLauncher: tagApplicationLauncher,
         fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
     )
     do {
@@ -1480,6 +1531,14 @@ private final class HookRecorder: @unchecked Sendable {
         lock.lock()
         storedEvents.append(event)
         lock.unlock()
+    }
+}
+
+private actor ApplicationLaunchRecorder {
+    private(set) var bundleIDs: [String] = []
+
+    func record(_ bundleID: String) {
+        bundleIDs.append(bundleID)
     }
 }
 
@@ -1587,6 +1646,7 @@ private struct RuntimeFixture {
         displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
+        tagApplicationLauncher: @escaping TagApplicationLauncher = { _ in },
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000
     ) -> OllyRuntime {
         OllyRuntime(
@@ -1617,6 +1677,7 @@ private struct RuntimeFixture {
             displayChangeStream: displayChangeStream,
             activeSpaceWindowIDs: activeSpaceWindowIDs,
             focusInputAttribution: focusInputAttribution,
+            tagApplicationLauncher: tagApplicationLauncher,
             fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,
             presentAXOnboarding: {}
         )

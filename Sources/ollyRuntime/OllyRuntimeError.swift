@@ -16,6 +16,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case macroUnavailable(String)
     case macroPersistenceFailed(String)
     case ruleUnavailable(UUID)
+    case applicationLaunchFailed(String)
     case scratchpadUnavailable(String)
     case scratchpadLaunchFailed(String)
     case unsupportedGestureAction(String)
@@ -49,6 +50,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "macro persistence failed: \(message)"
         case let .ruleUnavailable(ruleID):
             return "rule unavailable: \(ruleID.uuidString)"
+        case let .applicationLaunchFailed(bundleID):
+            return "application launch failed: \(bundleID)"
         case let .scratchpadUnavailable(name):
             return "scratchpad unavailable: \(name)"
         case let .scratchpadLaunchFailed(bundleID):
@@ -90,6 +93,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "macro_persistence_failed"
         case .ruleUnavailable:
             return "rule_unavailable"
+        case .applicationLaunchFailed:
+            return "application_launch_failed"
         case .scratchpadUnavailable:
             return "scratchpad_unavailable"
         case .scratchpadLaunchFailed:

@@ -18,17 +18,30 @@ public enum WorkspacesError: Error, Equatable, Sendable {
 public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     public let name: String
     public let engineID: LayoutEngineID?
+    public let launchBundleIDs: [String]
     public let rawHandler: RawDSLBlock<Void>?
 
-    public init(_ name: StaticString, engineID: LayoutEngineID? = nil, rawHandler: RawDSLBlock<Void>? = nil) {
+    public init(
+        _ name: StaticString,
+        engineID: LayoutEngineID? = nil,
+        launchBundleIDs: [String] = [],
+        rawHandler: RawDSLBlock<Void>? = nil
+    ) {
         self.name = String(describing: name)
         self.engineID = engineID
+        self.launchBundleIDs = launchBundleIDs
         self.rawHandler = rawHandler
     }
 
-    init(uncheckedName name: String, engineID: LayoutEngineID? = nil, rawHandler: RawDSLBlock<Void>? = nil) {
+    init(
+        uncheckedName name: String,
+        engineID: LayoutEngineID? = nil,
+        launchBundleIDs: [String] = [],
+        rawHandler: RawDSLBlock<Void>? = nil
+    ) {
         self.name = name
         self.engineID = engineID
+        self.launchBundleIDs = launchBundleIDs
         self.rawHandler = rawHandler
     }
 
@@ -42,7 +55,21 @@ public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     }
 
     public func engine(_ engineID: LayoutEngineID) -> NamedTagDeclaration {
-        NamedTagDeclaration(uncheckedName: name, engineID: engineID, rawHandler: rawHandler)
+        NamedTagDeclaration(
+            uncheckedName: name,
+            engineID: engineID,
+            launchBundleIDs: launchBundleIDs,
+            rawHandler: rawHandler
+        )
+    }
+
+    public func launch(_ bundleID: String) -> NamedTagDeclaration {
+        NamedTagDeclaration(
+            uncheckedName: name,
+            engineID: engineID,
+            launchBundleIDs: launchBundleIDs + [bundleID],
+            rawHandler: rawHandler
+        )
     }
 
     public func runRaw(context: RawDSLContext) {
@@ -50,19 +77,21 @@ public struct NamedTagDeclaration: Codable, Equatable, Sendable {
     }
 
     public static func == (lhs: NamedTagDeclaration, rhs: NamedTagDeclaration) -> Bool {
-        lhs.name == rhs.name && lhs.engineID == rhs.engineID
+        lhs.name == rhs.name && lhs.engineID == rhs.engineID && lhs.launchBundleIDs == rhs.launchBundleIDs
     }
 
     enum CodingKeys: String, CodingKey {
         case name
         case engineID
+        case launchBundleIDs
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             uncheckedName: try container.decode(String.self, forKey: .name),
-            engineID: try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineID)
+            engineID: try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineID),
+            launchBundleIDs: try container.decodeIfPresent([String].self, forKey: .launchBundleIDs) ?? []
         )
     }
 
@@ -70,6 +99,7 @@ public struct NamedTagDeclaration: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
         try container.encodeIfPresent(engineID, forKey: .engineID)
+        try container.encodeIfPresent(launchBundleIDs.nonEmpty, forKey: .launchBundleIDs)
     }
 }
 
@@ -96,6 +126,18 @@ public struct WorkspaceEngineBinding: Codable, Equatable, Sendable {
         self.displayID = displayID
         self.tag = tag
         self.engineID = engineID
+    }
+}
+
+public struct WorkspaceLaunchBinding: Codable, Equatable, Sendable {
+    public let displayID: DisplayID?
+    public let tag: Tag
+    public let bundleID: String
+
+    public init(displayID: DisplayID? = nil, tag: Tag, bundleID: String) {
+        self.displayID = displayID
+        self.tag = tag
+        self.bundleID = bundleID
     }
 }
 
@@ -144,15 +186,18 @@ public func display(
 public struct Workspaces: Codable, Equatable, Sendable {
     public let tags: [NamedTag]
     public let engineBindings: [WorkspaceEngineBinding]
+    public let launchBindings: [WorkspaceLaunchBinding]
     public let displayAssignments: [WorkspaceDisplayAssignment]
 
     public init(
         _ tags: [NamedTag] = [],
         engineBindings: [WorkspaceEngineBinding] = [],
+        launchBindings: [WorkspaceLaunchBinding] = [],
         displayAssignments: [WorkspaceDisplayAssignment] = []
     ) {
         self.tags = tags
         self.engineBindings = engineBindings
+        self.launchBindings = launchBindings
         self.displayAssignments = displayAssignments
     }
 
@@ -173,6 +218,7 @@ public struct Workspaces: Codable, Equatable, Sendable {
         self.init(
             resolved.tags,
             engineBindings: resolved.engineBindings,
+            launchBindings: resolved.launchBindings,
             displayAssignments: resolved.displayAssignments
         )
     }
@@ -201,6 +247,14 @@ public struct Workspaces: Codable, Equatable, Sendable {
         }
     }
 
+    public func launchBundleIDs(for tag: Tag, on displayID: DisplayID) -> [String] {
+        let bundles = launchBindings
+            .filter { ($0.displayID == nil || $0.displayID == displayID) && $0.tag == tag }
+            .map(\.bundleID)
+        var seen = Set<String>()
+        return bundles.filter { seen.insert($0).inserted }
+    }
+
     public func initialTags(on displayID: DisplayID) -> TagSet? {
         let tags = displayAssignments
             .filter { $0.displayID == displayID }
@@ -211,6 +265,7 @@ public struct Workspaces: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case tags
         case engineBindings
+        case launchBindings
         case displayAssignments
     }
 
@@ -221,6 +276,10 @@ public struct Workspaces: Codable, Equatable, Sendable {
             engineBindings: try container.decodeIfPresent(
                 [WorkspaceEngineBinding].self,
                 forKey: .engineBindings
+            ) ?? [],
+            launchBindings: try container.decodeIfPresent(
+                [WorkspaceLaunchBinding].self,
+                forKey: .launchBindings
             ) ?? [],
             displayAssignments: try container.decodeIfPresent(
                 [WorkspaceDisplayAssignment].self,
@@ -233,12 +292,14 @@ public struct Workspaces: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(tags, forKey: .tags)
         try container.encode(engineBindings, forKey: .engineBindings)
+        try container.encode(launchBindings, forKey: .launchBindings)
         try container.encode(displayAssignments, forKey: .displayAssignments)
     }
 
     private struct WorkspaceResolution {
         var tags: [NamedTag] = []
         var engineBindings: [WorkspaceEngineBinding] = []
+        var launchBindings: [WorkspaceLaunchBinding] = []
         var displayAssignments: [WorkspaceDisplayAssignment] = []
     }
 
@@ -256,6 +317,7 @@ public struct Workspaces: Codable, Equatable, Sendable {
                 if let engineID = tagDeclaration.engineID {
                     resolution.engineBindings.append(WorkspaceEngineBinding(tag: tag, engineID: engineID))
                 }
+                appendLaunchBindings(tagDeclaration.launchBundleIDs, tag: tag, displayID: nil, to: &resolution)
             case let .display(displayDeclaration):
                 var seenDisplayNames = Set<String>()
                 var displayTags: [Tag] = []
@@ -274,6 +336,12 @@ public struct Workspaces: Codable, Equatable, Sendable {
                             )
                         )
                     }
+                    appendLaunchBindings(
+                        tagDeclaration.launchBundleIDs,
+                        tag: tag,
+                        displayID: displayDeclaration.displayID,
+                        to: &resolution
+                    )
                 }
                 if !displayTags.isEmpty {
                     resolution.displayAssignments.append(
@@ -301,66 +369,23 @@ public struct Workspaces: Codable, Equatable, Sendable {
         tags.append(NamedTag(name: declaration.name, tag: tag))
         return tag
     }
-}
 
-/// Purpose: Builds named tag declarations inside `Workspaces { ... }`.
-/// Parameters: Accepts `NamedTagDeclaration` expressions, arrays, and conditionals.
-/// Example: `Workspaces { Tag.named("chat") }`
-/// See also: `Workspaces`, `NamedTagDeclaration`.
-@resultBuilder
-public enum WorkspacesBuilder {
-    public static func buildBlock(_ components: [WorkspaceDeclaration]...) -> [WorkspaceDeclaration] {
-        components.flatMap { $0 }
-    }
-
-    public static func buildOptional(_ component: [WorkspaceDeclaration]?) -> [WorkspaceDeclaration] {
-        component ?? []
-    }
-
-    public static func buildEither(first component: [WorkspaceDeclaration]) -> [WorkspaceDeclaration] {
-        component
-    }
-
-    public static func buildEither(second component: [WorkspaceDeclaration]) -> [WorkspaceDeclaration] {
-        component
-    }
-
-    public static func buildArray(_ components: [[WorkspaceDeclaration]]) -> [WorkspaceDeclaration] {
-        components.flatMap { $0 }
-    }
-
-    public static func buildExpression(_ expression: NamedTagDeclaration) -> [WorkspaceDeclaration] {
-        [.tag(expression)]
-    }
-
-    public static func buildExpression(_ expression: DisplayWorkspaceDeclaration) -> [WorkspaceDeclaration] {
-        [.display(expression)]
+    private static func appendLaunchBindings(
+        _ bundleIDs: [String],
+        tag: Tag,
+        displayID: DisplayID?,
+        to resolution: inout WorkspaceResolution
+    ) {
+        for bundleID in bundleIDs {
+            resolution.launchBindings.append(
+                WorkspaceLaunchBinding(displayID: displayID, tag: tag, bundleID: bundleID)
+            )
+        }
     }
 }
 
-@resultBuilder
-public enum DisplayWorkspacesBuilder {
-    public static func buildBlock(_ components: [NamedTagDeclaration]...) -> [NamedTagDeclaration] {
-        components.flatMap { $0 }
-    }
-
-    public static func buildOptional(_ component: [NamedTagDeclaration]?) -> [NamedTagDeclaration] {
-        component ?? []
-    }
-
-    public static func buildEither(first component: [NamedTagDeclaration]) -> [NamedTagDeclaration] {
-        component
-    }
-
-    public static func buildEither(second component: [NamedTagDeclaration]) -> [NamedTagDeclaration] {
-        component
-    }
-
-    public static func buildArray(_ components: [[NamedTagDeclaration]]) -> [NamedTagDeclaration] {
-        components.flatMap { $0 }
-    }
-
-    public static func buildExpression(_ expression: NamedTagDeclaration) -> [NamedTagDeclaration] {
-        [expression]
+private extension Array {
+    var nonEmpty: [Element]? {
+        isEmpty ? nil : self
     }
 }

@@ -37,6 +37,35 @@ final class NamedTagTests: XCTestCase {
         XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 42), .bsp)
     }
 
+    func testTagDeclarationCanCarryLaunchBundleID() throws {
+        let config = Config {
+            Workspaces {
+                Tag.named("code").launch("com.microsoft.VSCode")
+            }
+        }
+        let tag = try XCTUnwrap(config.workspaces.tag(named: "code"))
+
+        XCTAssertEqual(config.workspaces.launchBundleIDs(for: tag, on: 42), ["com.microsoft.VSCode"])
+    }
+
+    func testDisplayLaunchBindingsAreDisplayScoped() throws {
+        let config = Config {
+            Workspaces {
+                Tag.named("code").launch("com.example.Global")
+                display(1) {
+                    Tag.named("code").launch("com.example.Display")
+                }
+            }
+        }
+        let tag = try XCTUnwrap(config.workspaces.tag(named: "code"))
+
+        XCTAssertEqual(
+            config.workspaces.launchBundleIDs(for: tag, on: 1),
+            ["com.example.Global", "com.example.Display"]
+        )
+        XCTAssertEqual(config.workspaces.launchBundleIDs(for: tag, on: 2), ["com.example.Global"])
+    }
+
     func testDisplayWorkspaceDeclarationsShareTagsAndOverrideGlobalBindings() throws {
         let config = Config {
             Workspaces {

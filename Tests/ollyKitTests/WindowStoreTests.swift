@@ -30,6 +30,25 @@ final class WindowStoreTests: XCTestCase {
         XCTAssertEqual(count, 1)
     }
 
+    func testQueriesByBundleID() async {
+        let store = WindowStore()
+        let state = WindowState(
+            id: 7,
+            processID: 42,
+            bundleID: "com.example.App",
+            displayID: 99,
+            tagMask: 0b1010,
+            frame: CGRect(x: 1, y: 2, width: 3, height: 4)
+        )
+
+        await store.upsert(state)
+        let matching = await store.windows(forBundleID: "com.example.App")
+        let missing = await store.windows(forBundleID: "com.example.Missing")
+
+        XCTAssertEqual(matching, [state])
+        XCTAssertEqual(missing, [])
+    }
+
     func testRemoveEmitsDeltaAndUpdatesIndexes() async throws {
         let store = WindowStore()
         let state = WindowState(

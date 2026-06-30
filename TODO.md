@@ -27,40 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.1 App-launch on tag switch
-
-**Goal:** When user switches to tag "code" and no VSCode window exists, launch VSCode.
-
-**Files to modify:**
-- `Sources/ollyDSL/NamedTag.swift` — add `.launch(_ bundleID: String)` modifier on `NamedTagDeclaration`.
-- `Sources/ollyRuntime/OllyRuntimeCommands.swift:103` (`switchTag`) — after activating the tag, check `windowStore.windowsForBundle(_:)`; if empty, call `NSWorkspace.shared.openApplication`.
-
-**Modern launch API** (deprecated `launchApplication(_:)` replacement):
-```swift
-func launch(bundleID: String, activate: Bool = false) async -> NSRunningApplication? {
-    let ws = NSWorkspace.shared
-    guard let url = ws.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
-    let cfg = NSWorkspace.OpenConfiguration()
-    cfg.activates = activate
-    cfg.addsToRecentItems = false
-    cfg.createsNewApplicationInstance = false
-    do { return try await ws.openApplication(at: url, configuration: cfg) }
-    catch { return nil }
-}
-```
-
-**Gotchas:**
-- `cfg.activates = true` will steal focus. Default `false` for olly's tag-switch use case; let the runtime's own focus logic decide.
-- Apps may self-activate via `NSApp.activate(ignoringOtherApps: true)` in their own `applicationDidFinishLaunching` — can't prevent from launcher side.
-
-**Test plan:**
-- Unit: mock `NSWorkspace` open call; verify launch invoked when no windows exist for tagged bundle.
-
-**Refs:**
-- https://developer.apple.com/documentation/appkit/nsworkspace/3172700-openapplication
-
----
-
 ### M4.2 Session restore on reboot
 
 **Goal:** On launch, restore last-known window placements.

@@ -92,6 +92,7 @@ extension OllyRuntime {
         let activeTags = TagSet(tag)
         await setActiveTags(activeTags, on: displayID)
         await rewritePinnedWindows(on: displayID, to: activeTags)
+        try await launchConfiguredApps(for: tag, on: displayID)
         try await applyAndArrange(displayID: displayID)
     }
 

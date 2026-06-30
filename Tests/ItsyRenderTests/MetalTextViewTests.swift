@@ -50,6 +50,38 @@ import Testing
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func mouseDragSelectsTextRange() throws {
+	let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\ndef\nghi\n")
+	let down = try #require(NSEvent.mouseEvent(
+		with: .leftMouseDown,
+		location: NSPoint(x: 30, y: 23),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: 0,
+		context: nil,
+		eventNumber: 1,
+		clickCount: 1,
+		pressure: 0
+	))
+	let drag = try #require(NSEvent.mouseEvent(
+		with: .leftMouseDragged,
+		location: NSPoint(x: 30, y: 40),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: 0,
+		context: nil,
+		eventNumber: 2,
+		clickCount: 1,
+		pressure: 0
+	))
+
+	view.mouseDown(with: down)
+	view.mouseDragged(with: drag)
+
+	#expect(view.editor.selections.primary == Selection(anchor: 4, head: 8))
+}
+
 @Test func replacingUTF8RangeAppliesSelectionAndChangeCallback() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "abc")

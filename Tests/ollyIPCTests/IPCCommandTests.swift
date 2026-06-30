@@ -89,6 +89,11 @@ final class IPCCommandTests: XCTestCase {
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),
             .restoreWindows(IPCRestoreWindowsCommand()),
+            .macroStart(IPCMacroStartCommand(name: "workflow1")),
+            .macroStop(IPCMacroStopCommand()),
+            .macroRun(IPCMacroRunCommand(name: "workflow1")),
+            .macroList(IPCMacroListCommand()),
+            .macroDelete(IPCMacroDeleteCommand(name: "workflow1")),
             .runRawAction(IPCRunRawActionCommand(label: "safari")),
             .setSpacePolicy(IPCSetSpacePolicyCommand(policy: .followWindow)),
             .setFocusPolicy(IPCSetFocusPolicyCommand(
@@ -106,6 +111,26 @@ final class IPCCommandTests: XCTestCase {
 
             XCTAssertEqual(decoded, command)
             XCTAssertTrue(json.contains(command.name.rawValue))
+        }
+    }
+
+    func testMacroResultsRoundTrip() throws {
+        let info = IPCMacroInfo(
+            name: "workflow1",
+            createdAt: Date(timeIntervalSince1970: 0),
+            recordedDurationMs: 25,
+            commandCount: 2
+        )
+        let results: [IPCCommandResult] = [
+            .macro(info),
+            .macros(IPCMacroListInfo(macros: [info]))
+        ]
+
+        for result in results {
+            let data = try JSONEncoder().encode(result)
+            let decoded = try JSONDecoder().decode(IPCCommandResult.self, from: data)
+
+            XCTAssertEqual(decoded, result)
         }
     }
 

@@ -483,6 +483,71 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testMacroRecordStopPersistsCommandsAndReplayRunsThem() async throws {
+        let fixture = try RuntimeFixture()
+        let runtime = fixture.makeRuntime()
+        do {
+            try await runtime.start()
+            let displayID = fixture.display.id
+
+            XCTAssertEqual(
+                try send(.macroStart(.init(name: "workflow1")), to: fixture.socketPath).status,
+                .success
+            )
+            XCTAssertEqual(try send(.macroList(.init()), to: fixture.socketPath).status, .success)
+            XCTAssertEqual(
+                try send(.switchTag(.init(tag: tag(2), displayID: displayID)), to: fixture.socketPath).status,
+                .success
+            )
+
+            let stopped = try send(.macroStop(.init()), to: fixture.socketPath)
+            guard case let .macro(info)? = stopped.result else {
+                return XCTFail("expected macro info")
+            }
+            XCTAssertEqual(info.name, "workflow1")
+            XCTAssertEqual(info.commandCount, 1)
+
+            let macroURL = fixture.directoryURL
+                .appendingPathComponent("macros", isDirectory: true)
+                .appendingPathComponent("workflow1.json")
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            let persisted = try decoder.decode(MacroRecording.self, from: Data(contentsOf: macroURL))
+            XCTAssertEqual(persisted.commands, [.switchTag(.init(tag: try tag(2), displayID: displayID))])
+
+            XCTAssertEqual(
+                try send(.switchTag(.init(tag: tag(0), displayID: displayID)), to: fixture.socketPath).status,
+                .success
+            )
+            XCTAssertEqual(
+                try send(.macroRun(.init(name: "workflow1")), to: fixture.socketPath).status,
+                .success
+            )
+
+            let display = try XCTUnwrap(
+                try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: fixture.socketPath)).displays.first
+            )
+            XCTAssertEqual(display.activeTags.map(\.rawValue), [2])
+            await runtime.stop()
+            fixture.cleanup()
+        } catch {
+            await runtime.stop()
+            fixture.cleanup()
+            throw error
+        }
+    }
+
+    func testMacroStartRejectsConcurrentRecording() async throws {
+        try await withRuntime { _, socketPath, _ in
+            XCTAssertEqual(try send(.macroStart(.init(name: "one")), to: socketPath).status, .success)
+
+            let response = try send(.macroStart(.init(name: "two")), to: socketPath)
+
+            XCTAssertEqual(response.status, .error)
+            XCTAssertEqual(response.error?.code, "macro_already_recording")
+        }
+    }
+
     func testRunRawActionCommandEmitsRawActionEvent() async throws {
         try await withRuntime { runtime, socketPath, _ in
             await runtime.replaceConfigForTest(Config {
@@ -1521,6 +1586,9 @@ private struct RuntimeFixture {
             ),
             recoveryJournal: WindowRecoveryJournal(
                 stateURL: directoryURL.appendingPathComponent("recovery.json")
+            ),
+            macroRecorder: MacroRecorder(
+                directoryURL: directoryURL.appendingPathComponent("macros", isDirectory: true)
             ),
             scanAXOnStart: false,
             dragSession: dragSession,

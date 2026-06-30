@@ -2,6 +2,7 @@ import Foundation
 import ollyDSL
 import ollyIPC
 import ollyLayouts
+import ollyRuntime
 
 struct CommandPaletteAction: Equatable {
     let id: String
@@ -13,9 +14,11 @@ struct CommandPaletteAction: Equatable {
 
 struct CommandPaletteActionCatalog {
     private let shellActions: [ShellAction]
+    private let macroDirectory: URL
 
-    init(config: Config? = nil) {
+    init(config: Config? = nil, macroDirectory: URL = MacroRecorder.defaultDirectory) {
         self.shellActions = config?.commandPaletteShellActions ?? []
+        self.macroDirectory = macroDirectory
     }
 
     func actions() -> [CommandPaletteAction] {
@@ -32,6 +35,7 @@ struct CommandPaletteActionCatalog {
         actions.append(contentsOf: bspTreeActions())
         actions.append(contentsOf: tagActions())
         actions.append(contentsOf: engineActions())
+        actions.append(contentsOf: macroActions())
         actions.append(contentsOf: rawActions())
         return actions
     }
@@ -176,6 +180,18 @@ struct CommandPaletteActionCatalog {
                 .runRawAction(IPCRunRawActionCommand(label: shellAction.label))
             )
         }
+    }
+
+    private func macroActions() -> [CommandPaletteAction] {
+        (try? MacroRecorder.macroInfos(in: macroDirectory))?.map { macro in
+            action(
+                "macro-\(macro.name)",
+                "Run Macro: \(macro.name)",
+                "\(macro.commandCount) commands",
+                ["macro", "replay", macro.name],
+                .macroRun(IPCMacroRunCommand(name: macro.name))
+            )
+        } ?? []
     }
 
     private func snapActions() -> [CommandPaletteAction] {

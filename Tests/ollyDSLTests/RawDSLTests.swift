@@ -42,6 +42,15 @@ final class RawDSLTests: XCTestCase {
         XCTAssertEqual(decoded, keybind)
     }
 
+    func testMacroActionSerializesName() throws {
+        let keybind = Keybind(KeyChord([.command], .m), do: .macro("workflow1"))
+
+        let data = try JSONEncoder().encode(keybind)
+        let decoded = try JSONDecoder().decode(Keybind.self, from: data)
+
+        XCTAssertEqual(decoded.action, .macro("workflow1"))
+    }
+
     func testRawRuleEngineWorkspaceAndHooksReceiveContext() {
         let recorder = RawInvocationRecorder()
         let rule = Rule.raw(

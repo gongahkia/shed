@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import ollyCore
 import ollyKit
 
@@ -96,6 +97,11 @@ public enum IPCCommand: Equatable, Sendable {
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
     case restoreWindows(IPCRestoreWindowsCommand)
+    case macroStart(IPCMacroStartCommand)
+    case macroStop(IPCMacroStopCommand)
+    case macroRun(IPCMacroRunCommand)
+    case macroList(IPCMacroListCommand)
+    case macroDelete(IPCMacroDeleteCommand)
     case runRawAction(IPCRunRawActionCommand)
     case setSpacePolicy(IPCSetSpacePolicyCommand)
     case setFocusPolicy(IPCSetFocusPolicyCommand)
@@ -157,6 +163,16 @@ public enum IPCCommand: Equatable, Sendable {
             return .reload
         case .restoreWindows:
             return .restoreWindows
+        case .macroStart:
+            return .macroStart
+        case .macroStop:
+            return .macroStop
+        case .macroRun:
+            return .macroRun
+        case .macroList:
+            return .macroList
+        case .macroDelete:
+            return .macroDelete
         case .runRawAction:
             return .runRawAction
         case .setSpacePolicy:
@@ -216,9 +232,9 @@ extension IPCCommand: Codable {
         case .reload:
             self = .reload(try container.decodeIfPresent(IPCReloadCommand.self, forKey: .arguments) ?? .init())
         case .restoreWindows:
-            self = .restoreWindows(
-                try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init()
-            )
+            self = try Self.decodeRestoreWindows(from: container)
+        case .macroStart, .macroStop, .macroRun, .macroList, .macroDelete:
+            self = try Self.decodeMacroCommand(name, from: container)
         case .runRawAction:
             self = .runRawAction(try container.decodeRequired(IPCRunRawActionCommand.self, forKey: .arguments))
         case .setSpacePolicy:
@@ -282,6 +298,30 @@ extension IPCCommand: Codable {
         }
     }
 
+    private static func decodeMacroCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        switch name {
+        case .macroStart:
+            return .macroStart(try container.decodeRequired(IPCMacroStartCommand.self, forKey: .arguments))
+        case .macroStop:
+            return .macroStop(try container.decodeIfPresent(IPCMacroStopCommand.self, forKey: .arguments) ?? .init())
+        case .macroRun:
+            return .macroRun(try container.decodeRequired(IPCMacroRunCommand.self, forKey: .arguments))
+        case .macroList:
+            return .macroList(try container.decodeIfPresent(IPCMacroListCommand.self, forKey: .arguments) ?? .init())
+        default:
+            return .macroDelete(try container.decodeRequired(IPCMacroDeleteCommand.self, forKey: .arguments))
+        }
+    }
+
+    private static func decodeRestoreWindows(
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        .restoreWindows(try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init())
+    }
+
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -329,6 +369,16 @@ extension IPCCommand: Codable {
         case let .reload(command):
             try container.encode(command, forKey: .arguments)
         case let .restoreWindows(command):
+            try container.encode(command, forKey: .arguments)
+        case let .macroStart(command):
+            try container.encode(command, forKey: .arguments)
+        case let .macroStop(command):
+            try container.encode(command, forKey: .arguments)
+        case let .macroRun(command):
+            try container.encode(command, forKey: .arguments)
+        case let .macroList(command):
+            try container.encode(command, forKey: .arguments)
+        case let .macroDelete(command):
             try container.encode(command, forKey: .arguments)
         case let .runRawAction(command):
             try container.encode(command, forKey: .arguments)

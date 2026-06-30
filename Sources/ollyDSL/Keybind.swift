@@ -125,7 +125,7 @@ public enum Direction: String, Codable, Equatable, Sendable {
 }
 
 /// Purpose: Declares the command performed when a keybind fires.
-/// Parameters: Select a case and provide its associated direction, tag, engine, or raw command.
+/// Parameters: Select a case and provide its associated direction, tag, engine, macro, or raw command.
 /// Example: `Action.setEngine(BSPLayoutEngine.engineID)`
 /// See also: `Keybind`, `Direction`.
 public enum Action: Codable, Equatable, Sendable {
@@ -139,6 +139,7 @@ public enum Action: Codable, Equatable, Sendable {
     case cycleEngine
     case reload
     case noop
+    case macro(String)
     case shell(ShellAction)
     case raw(String)
 }

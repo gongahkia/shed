@@ -10,6 +10,11 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case missingFocusedWindow
     case missingDirectionalTarget(IPCDirection)
     case gestureUnbound(trigger: String, motion: String)
+    case invalidMacroName(String)
+    case macroAlreadyRecording
+    case macroNotRecording
+    case macroUnavailable(String)
+    case macroPersistenceFailed(String)
     case ruleUnavailable(UUID)
     case unsupportedGestureAction(String)
     case axOperationFailed(String, AXError)
@@ -30,6 +35,16 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "no window in direction: \(direction.rawValue)"
         case let .gestureUnbound(trigger, motion):
             return "no gesture binding for \(trigger) \(motion)"
+        case let .invalidMacroName(name):
+            return "invalid macro name: \(name)"
+        case .macroAlreadyRecording:
+            return "macro recording already active"
+        case .macroNotRecording:
+            return "no macro recording active"
+        case let .macroUnavailable(name):
+            return "macro unavailable: \(name)"
+        case let .macroPersistenceFailed(message):
+            return "macro persistence failed: \(message)"
         case let .ruleUnavailable(ruleID):
             return "rule unavailable: \(ruleID.uuidString)"
         case let .unsupportedGestureAction(action):
@@ -57,6 +72,16 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "missing_directional_target"
         case .gestureUnbound:
             return "gesture_unbound"
+        case .invalidMacroName:
+            return "invalid_macro_name"
+        case .macroAlreadyRecording:
+            return "macro_already_recording"
+        case .macroNotRecording:
+            return "macro_not_recording"
+        case .macroUnavailable:
+            return "macro_unavailable"
+        case .macroPersistenceFailed:
+            return "macro_persistence_failed"
         case .ruleUnavailable:
             return "rule_unavailable"
         case .unsupportedGestureAction:

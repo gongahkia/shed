@@ -37,12 +37,12 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 ## Scope — IN (post-v0.1)
 - LSP / code completion / hover / diagnostics via external language-server processes
 - Debugger / DAP via external debug-adapter processes
-- Integrated terminal as a lazy process-boundary shell panel
+- PTY-backed integrated terminal with bounded scrollback and VT/xterm-compatible screen handling for long-running CLI/TUI tools
 - Extension marketplace, plugin runtime, and agent-hosting experiments only through process-boundary integrations
 - Git UI for status, diff viewing, commit composition, branch ops, hunk staging, conflict viewing, and stash management
 
 ## Scope — OUT (v0.x, possibly forever)
-- Full PTY/VT100 terminal emulator with curses/TUI parity
+- iTerm/Terminal.app feature parity beyond common VT/xterm CLI/TUI behavior
 - AI assistance
 - Collaboration / multiplayer
 - Linux/Windows ports
@@ -136,7 +136,7 @@ Modules (SwiftPM targets):
 - Configurability beyond keys + theme + tab width. Itsy is opinionated.
 - Web. Itsy does not render HTML preview, not even for Markdown.
 - Sync. No cloud, no settings sync, no telemetry pings.
-- Terminal parity with iTerm/Terminal.app. The built-in terminal stays lazy and process-boundary.
+- Terminal parity with iTerm/Terminal.app. The built-in terminal stays lazy, process-boundary, and bounded in scrollback/RAM.
 
 ## Definition of done (v1.0)
 - All KPIs met or stretch met for ≥3 of 8.

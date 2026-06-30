@@ -14,6 +14,7 @@ public actor WindowStore {
     private var idsByProcessID: [pid_t: Set<WindowID>] = [:]
     private var idsByDisplayID: [DisplayID: Set<WindowID>] = [:]
     private var idsByTagIndex: [UInt8: Set<WindowID>] = [:]
+    private var idsByBundleID: [String: Set<WindowID>] = [:]
     private var subscribers: [UUID: AsyncStream<WindowStoreDelta>.Continuation] = [:]
 
     public init() {}
@@ -40,6 +41,10 @@ public actor WindowStore {
 
     public func windows(withTagIndex tagIndex: UInt8) -> [WindowState] {
         states(for: idsByTagIndex[tagIndex])
+    }
+
+    public func windows(forBundleID bundleID: String) -> [WindowState] {
+        states(for: idsByBundleID[bundleID])
     }
 
     public func windows(intersectingTagMask tagMask: UInt64) -> [WindowState] {
@@ -112,11 +117,15 @@ public actor WindowStore {
         idsByProcessID.removeAll(keepingCapacity: true)
         idsByDisplayID.removeAll(keepingCapacity: true)
         idsByTagIndex.removeAll(keepingCapacity: true)
+        idsByBundleID.removeAll(keepingCapacity: true)
 
         for state in windowsByID.values {
             idsByProcessID[state.processID, default: []].insert(state.id)
             if let displayID = state.displayID {
                 idsByDisplayID[displayID, default: []].insert(state.id)
+            }
+            if let bundleID = state.bundleID {
+                idsByBundleID[bundleID, default: []].insert(state.id)
             }
             for tagIndex in Self.tagIndices(in: state.tagMask) {
                 idsByTagIndex[tagIndex, default: []].insert(state.id)

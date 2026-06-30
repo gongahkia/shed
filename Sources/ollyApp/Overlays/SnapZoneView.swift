@@ -136,7 +136,7 @@ final class SnapZoneView: NSView {
         layer?.masksToBounds = false
         setAccessibilityElement(true)
         setAccessibilityRole(.layoutArea)
-        setAccessibilityLabel("Snap zones")
+        setAccessibilityLabel(L10n.s("Snap zones", "snap overlay accessibility label"))
     }
 
     required init?(coder: NSCoder) {
@@ -234,25 +234,25 @@ private extension IPCSnapPosition {
     var accessibilityLabel: String {
         switch self {
         case .leftHalf:
-            return "Snap left half"
+            return L10n.s("Snap left half", "snap zone left half accessibility label")
         case .rightHalf:
-            return "Snap right half"
+            return L10n.s("Snap right half", "snap zone right half accessibility label")
         case .topHalf:
-            return "Snap top half"
+            return L10n.s("Snap top half", "snap zone top half accessibility label")
         case .bottomHalf:
-            return "Snap bottom half"
+            return L10n.s("Snap bottom half", "snap zone bottom half accessibility label")
         case .topLeft:
-            return "Snap top left"
+            return L10n.s("Snap top left", "snap zone top left accessibility label")
         case .topRight:
-            return "Snap top right"
+            return L10n.s("Snap top right", "snap zone top right accessibility label")
         case .bottomLeft:
-            return "Snap bottom left"
+            return L10n.s("Snap bottom left", "snap zone bottom left accessibility label")
         case .bottomRight:
-            return "Snap bottom right"
+            return L10n.s("Snap bottom right", "snap zone bottom right accessibility label")
         case .center:
-            return "Snap center"
+            return L10n.s("Snap center", "snap zone center accessibility label")
         case .maximize:
-            return "Maximize"
+            return L10n.s("Maximize", "snap zone maximize accessibility label")
         }
     }
 }

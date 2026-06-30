@@ -118,8 +118,13 @@ final class UserNotificationHotKeyConflictNotifier: HotKeyConflictNotifier {
 
     private static func add(_ collision: HotKeyCollision, center: UNUserNotificationCenter) {
         let content = UNMutableNotificationContent()
-        content.title = "Olly hotkey collision"
-        content.body = "\(collision.chord) also belongs to \(collision.externalOwner.rawValue)"
+        content.title = L10n.s("Olly hotkey collision", "hotkey collision notification title")
+        content.body = L10n.f(
+            "%@ also belongs to %@",
+            "hotkey collision notification body",
+            collision.chord.description,
+            collision.externalOwner.rawValue
+        )
         let request = UNNotificationRequest(
             identifier: "dev.olly.hotkey.\(UUID().uuidString)",
             content: content,

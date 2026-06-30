@@ -15,7 +15,7 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Olly Setup"
+        window.title = L10n.s("Olly Setup", "AX onboarding window title")
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
@@ -63,16 +63,19 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func titleLabel() -> NSTextField {
-        let label = NSTextField(labelWithString: "Grant Accessibility permission")
+        let label = NSTextField(labelWithString: L10n.s(
+            "Grant Accessibility permission",
+            "AX onboarding title"
+        ))
         label.font = .boldSystemFont(ofSize: 20)
         return label
     }
 
     private func bodyLabel() -> NSTextField {
-        let label = NSTextField(wrappingLabelWithString: """
+        let label = NSTextField(wrappingLabelWithString: L10n.s("""
         Olly needs Accessibility permission before it can inspect, focus, move, or resize windows. Open \
         System Settings, enable Olly in Privacy & Security > Accessibility, then return and refresh.
-        """)
+        """, "AX onboarding body"))
         label.preferredMaxLayoutWidth = 460
         return label
     }
@@ -83,7 +86,7 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
         stack.alignment = .leading
         stack.spacing = 6
 
-        let caption = NSTextField(labelWithString: "Deeplink")
+        let caption = NSTextField(labelWithString: L10n.s("Deeplink", "AX deep link label"))
         caption.font = .boldSystemFont(ofSize: NSFont.smallSystemFontSize)
 
         let field = NSTextField(labelWithString: AXPermission.accessibilitySettingsDeepLink)
@@ -103,10 +106,10 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
         stack.alignment = .centerY
         stack.spacing = 10
 
-        stack.addArrangedSubview(button("Open System Settings", #selector(openSettings)))
-        stack.addArrangedSubview(button("Copy Deeplink", #selector(copyDeepLink)))
-        stack.addArrangedSubview(button("Refresh", #selector(refreshStatus)))
-        stack.addArrangedSubview(button("Quit", #selector(quit)))
+        stack.addArrangedSubview(button(L10n.s("Open System Settings", "AX settings button"), #selector(openSettings)))
+        stack.addArrangedSubview(button(L10n.s("Copy Deeplink", "AX copy deep link button"), #selector(copyDeepLink)))
+        stack.addArrangedSubview(button(L10n.s("Refresh", "AX refresh button"), #selector(refreshStatus)))
+        stack.addArrangedSubview(button(L10n.s("Quit", "AX quit button"), #selector(quit)))
         return stack
     }
 
@@ -129,7 +132,10 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
         if AXPermission.status(prompt: false) == .trusted {
             complete()
         } else {
-            statusLabel.stringValue = "Waiting for Accessibility permission..."
+            statusLabel.stringValue = L10n.s(
+                "Waiting for Accessibility permission...",
+                "AX permission pending status"
+            )
         }
     }
 
@@ -139,7 +145,7 @@ final class AXOnboardingWindowController: NSWindowController, NSWindowDelegate {
 
     private func complete() {
         didGrantPermission = true
-        statusLabel.stringValue = "Accessibility permission granted."
+        statusLabel.stringValue = L10n.s("Accessibility permission granted.", "AX permission granted status")
         onPermissionGranted?()
         close()
     }

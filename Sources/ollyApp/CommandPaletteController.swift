@@ -103,7 +103,7 @@ final class CommandPaletteController: NSWindowController {
     }
 
     private func configureSearchField() {
-        searchField.placeholderString = "Search olly actions"
+        searchField.placeholderString = L10n.s("Search olly actions", "command palette search placeholder")
         searchField.font = .systemFont(ofSize: 20)
         searchField.delegate = self
         searchField.onCancel = { [weak self] in self?.hide() }
@@ -150,7 +150,7 @@ final class CommandPaletteController: NSWindowController {
         }
 
         let action = filteredActions[row]
-        statusLabel.stringValue = "Running \(action.title)..."
+        statusLabel.stringValue = L10n.f("Running %@...", "command palette running status", action.title)
         executor.execute(action) { [weak self] result in
             DispatchQueue.main.async {
                 self?.handleExecutionResult(result)
@@ -253,7 +253,7 @@ final class CommandPaletteRowView: NSTableCellView {
     func configure(title: String, detail: String) {
         titleLabel.stringValue = title
         detailLabel.stringValue = detail
-        setAccessibilityLabel("\(title), \(detail)")
+        setAccessibilityLabel(L10n.f("%@, %@", "command palette row accessibility label", title, detail))
     }
 
     private func configure() {

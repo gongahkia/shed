@@ -14,8 +14,8 @@ final class SettingsWindowController: NSWindowController {
     let statusLabel = NSTextField(labelWithString: "")
     let errorTextView = NSTextView()
     private let profilePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let createConfigButton = NSButton(title: "Create Config", target: nil, action: nil)
-    private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
+    private let createConfigButton = NSButton(title: L10n.s("Create Config", "create"), target: nil, action: nil)
+    private let reloadButton = NSButton(title: L10n.s("Reload", "reload"), target: nil, action: nil)
     private let cooperativeAppsTableView = NSTableView()
     private var cooperativeAppsRows: [IPCCooperativeAppInfo] = []
     private var playgroundController: ConfigPlaygroundWindowController?
@@ -69,7 +69,7 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private func configureWindow(_ window: NSWindow) {
-        window.title = "Olly Settings"
+        window.title = L10n.s("Olly Settings", "settings window title")
         window.isReleasedWhenClosed = false
     }
 
@@ -77,20 +77,20 @@ final class SettingsWindowController: NSWindowController {
         let tabView = NSTabView()
         tabView.translatesAutoresizingMaskIntoConstraints = false
         let configTab = NSTabViewItem(identifier: "config")
-        configTab.label = "Config"
+        configTab.label = L10n.s("Config", "settings config tab")
         configTab.view = makeConfigView()
         let cooperativeTab = NSTabViewItem(identifier: "cooperative-apps")
-        cooperativeTab.label = "Cooperative Apps"
+        cooperativeTab.label = L10n.s("Cooperative Apps", "settings cooperative apps tab")
         cooperativeTab.view = makeCooperativeAppsView()
         let keybindsController = SettingsKeybindsController()
         self.keybindsController = keybindsController
         let keybindsTab = NSTabViewItem(identifier: "keybinds")
-        keybindsTab.label = "Keybinds"
+        keybindsTab.label = L10n.s("Keybinds", "settings keybinds tab")
         keybindsTab.view = keybindsController.makeView()
         let errorsController = SettingsErrorLogController(runtime: runtime)
         errorLogController = errorsController
         let errorsTab = NSTabViewItem(identifier: "errors")
-        errorsTab.label = "Errors"
+        errorsTab.label = L10n.s("Errors", "settings errors tab")
         errorsTab.view = errorsController.makeView()
         tabView.addTabViewItem(configTab)
         tabView.addTabViewItem(cooperativeTab)
@@ -111,14 +111,14 @@ final class SettingsWindowController: NSWindowController {
         root.edgeInsets = NSEdgeInsets(top: 18, left: 18, bottom: 18, right: 18)
         root.translatesAutoresizingMaskIntoConstraints = false
 
-        let titleLabel = NSTextField(labelWithString: "Config.swift")
+        let titleLabel = NSTextField(labelWithString: L10n.s("Config.swift", "settings config title"))
         titleLabel.font = .systemFont(ofSize: 20, weight: .semibold)
         pathLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         pathLabel.textColor = .secondaryLabelColor
         pathLabel.lineBreakMode = .byTruncatingMiddle
         statusLabel.font = .systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
-        statusLabel.stringValue = "No reload run yet"
+        statusLabel.stringValue = L10n.s("No reload run yet", "settings initial reload status")
 
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
@@ -126,15 +126,15 @@ final class SettingsWindowController: NSWindowController {
         configureProfilePopUp()
         createConfigButton.target = self
         createConfigButton.action = #selector(createConfig)
-        buttonRow.addArrangedSubview(button("Open in Editor", #selector(openConfig)))
+        buttonRow.addArrangedSubview(button(L10n.s("Open in Editor", "open config"), #selector(openConfig)))
         buttonRow.addArrangedSubview(createConfigButton)
         buttonRow.addArrangedSubview(profilePopUp)
         reloadButton.target = self
         reloadButton.action = #selector(reloadConfig)
         buttonRow.addArrangedSubview(reloadButton)
-        buttonRow.addArrangedSubview(button("Export Config...", #selector(exportConfig)))
-        buttonRow.addArrangedSubview(button("Import Config...", #selector(importConfig)))
-        buttonRow.addArrangedSubview(button("Playground...", #selector(openPlayground)))
+        buttonRow.addArrangedSubview(button(L10n.s("Export Config...", "export config"), #selector(exportConfig)))
+        buttonRow.addArrangedSubview(button(L10n.s("Import Config...", "import config"), #selector(importConfig)))
+        buttonRow.addArrangedSubview(button(L10n.s("Playground...", "playground"), #selector(openPlayground)))
         buttonRow.addArrangedSubview(NSView())
 
         let errorScrollView = makeErrorScrollView()
@@ -155,7 +155,7 @@ final class SettingsWindowController: NSWindowController {
         errorTextView.isEditable = false
         errorTextView.isSelectable = true
         errorTextView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-        errorTextView.string = "Last compile error appears here."
+        errorTextView.string = L10n.s("Last compile error appears here.", "settings compile error placeholder")
         errorTextView.textColor = .secondaryLabelColor
         errorTextView.drawsBackground = false
 
@@ -185,7 +185,7 @@ final class SettingsWindowController: NSWindowController {
         do {
             try ensureConfigExists(profile: selectedProfile())
             NSWorkspace.shared.open(sourceURL)
-            statusLabel.stringValue = "Opened Config.swift"
+            statusLabel.stringValue = L10n.s("Opened Config.swift", "settings opened config status")
             refreshCreateConfigButton()
         } catch {
             showError(error)
@@ -195,7 +195,7 @@ final class SettingsWindowController: NSWindowController {
     @objc private func createConfig() {
         do {
             try ensureConfigExists(profile: selectedProfile())
-            statusLabel.stringValue = "Created \(selectedProfile().displayName) config"
+            statusLabel.stringValue = L10n.f("Created %@ config", "created", selectedProfile().displayName)
             errorTextView.string = ""
         } catch {
             showError(error)
@@ -205,7 +205,7 @@ final class SettingsWindowController: NSWindowController {
 
     @objc private func reloadConfig() {
         reloadButton.isEnabled = false
-        statusLabel.stringValue = "Reloading..."
+        statusLabel.stringValue = L10n.s("Reloading...", "settings reload in progress status")
         reloadQueue.async { [weak self] in
             guard let self else {
                 return
@@ -237,12 +237,12 @@ final class SettingsWindowController: NSWindowController {
     private func handleReloadEvent(_ event: ConfigReloadEvent) {
         switch event {
         case let .reloaded(config):
-            let source = config.didCompile ? "compiled" : "cache"
-            statusLabel.stringValue = "Reloaded from \(source)"
+            let source = config.didCompile ? L10n.s("compiled", "source") : L10n.s("cache", "source")
+            statusLabel.stringValue = L10n.f("Reloaded from %@", "settings reload success status", source)
             errorTextView.string = ""
             refreshCooperativeApps()
         case let .failed(failure):
-            statusLabel.stringValue = "Reload failed"
+            statusLabel.stringValue = L10n.s("Reload failed", "settings reload failed status")
             errorTextView.textColor = .labelColor
             errorTextView.string = failure.message
         }
@@ -275,11 +275,10 @@ final class SettingsWindowController: NSWindowController {
     }
 
     func showError(_ error: Error) {
-        statusLabel.stringValue = "Settings action failed"
+        statusLabel.stringValue = L10n.s("Settings action failed", "settings action failed status")
         errorTextView.textColor = .labelColor
         errorTextView.string = String(describing: error)
     }
-
 }
 
 private extension SettingsWindowController {
@@ -293,7 +292,10 @@ private extension SettingsWindowController {
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 8
-        buttonRow.addArrangedSubview(button("Refresh", #selector(refreshCooperativeAppsFromButton)))
+        buttonRow.addArrangedSubview(button(
+            L10n.s("Refresh", "refresh apps"),
+            #selector(refreshCooperativeAppsFromButton)
+        ))
         buttonRow.addArrangedSubview(NSView())
 
         configureCooperativeAppsTable()
@@ -325,9 +327,9 @@ private extension SettingsWindowController {
 
     func cooperativeAppsColumns() -> [NSTableColumn] {
         [
-            ("bundleID", "Bundle ID", 290),
-            ("behavior", "Behavior", 150),
-            ("windows", "Windows", 70)
+            ("bundleID", L10n.s("Bundle ID", "cooperative apps bundle column"), 290),
+            ("behavior", L10n.s("Behavior", "cooperative apps behavior column"), 150),
+            ("windows", L10n.s("Windows", "cooperative apps windows column"), 70)
         ].map { identifier, title, width in
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title

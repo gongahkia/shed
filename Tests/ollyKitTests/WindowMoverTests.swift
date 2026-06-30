@@ -87,6 +87,8 @@ final class WindowMoverTests: XCTestCase {
 
         XCTAssertEqual(client.positions, [CGPoint(x: 40, y: 50)])
         XCTAssertEqual(client.sizes, [CGSize(width: 500, height: 320)])
+        let lastFrame = await mover.lastFrame(for: target)
+        XCTAssertEqual(lastFrame, CGRect(x: 40, y: 50, width: 500, height: 320))
     }
 
     func testFlushAndPauseDrainsPendingMovesAndRejectsWritesUntilResume() async {

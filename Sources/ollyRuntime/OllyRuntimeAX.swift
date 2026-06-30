@@ -117,6 +117,7 @@ extension OllyRuntime {
         case let .terminated(application):
             let windows = await windowStore.windows(forProcessID: application.processID)
             for window in windows {
+                await dragSession.end(windowID: window.id)
                 await windowStore.remove(id: window.id)
                 await focusStack.remove(windowID: window.id)
                 windowTargets.remove(windowID: window.id)
@@ -147,13 +148,19 @@ extension OllyRuntime {
         }
         await snapshotCache.invalidate(for: event)
         switch event.notification {
-        case .focusedWindowChanged, .mainWindowChanged, .applicationActivated:
+        case .focusedWindowChanged, .mainWindowChanged:
+            await dragSession.endActiveSession()
+            await refreshFocusedWindow(from: event)
+        case .applicationActivated:
             await refreshFocusedWindow(from: event)
         case .windowCreated:
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshWindowElement(event.element, application: application)
             await refreshWindows(for: application)
-        case .windowMoved, .windowResized:
+        case .windowMoved:
+            let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
+            await refreshMovedWindowElement(event.element, application: application)
+        case .windowResized:
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshWindowElement(event.element, application: application)
         case .uiElementDestroyed:
@@ -207,6 +214,31 @@ extension OllyRuntime {
               let windowID = snapshot.attributes.windowID else {
             return
         }
+        await refreshWindowSnapshot(snapshot, windowID: windowID, element: element, application: application)
+    }
+
+    private func refreshMovedWindowElement(_ element: AXUIElement, application: Application) async {
+        guard let snapshot = try? await snapshotCache.snapshot(for: element),
+              let windowID = snapshot.attributes.windowID else {
+            return
+        }
+        let frame = snapshot.attributes.frame
+        let target = WindowMoveTarget(
+            id: windowID,
+            axElement: element,
+            displayID: displayID(for: frame)
+        )
+        let ourLastFrame = await windowMover.lastFrame(for: target)
+        await dragSession.feed(windowID: windowID, frame: frame, ourLastFrame: ourLastFrame)
+        await refreshWindowSnapshot(snapshot, windowID: windowID, element: element, application: application)
+    }
+
+    private func refreshWindowSnapshot(
+        _ snapshot: WindowSnapshotCache.Snapshot,
+        windowID: WindowID,
+        element: AXUIElement,
+        application: Application
+    ) async {
         let displayID = displayID(for: snapshot.attributes.frame)
         let baseState = WindowState(
             id: windowID,
@@ -250,6 +282,7 @@ extension OllyRuntime {
         guard let windowID = windowTargets.windowID(for: element) else {
             return
         }
+        await dragSession.end(windowID: windowID)
         await windowStore.remove(id: windowID)
         await focusStack.remove(windowID: windowID)
         windowTargets.remove(windowID: windowID)

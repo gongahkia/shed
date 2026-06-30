@@ -17,6 +17,29 @@ public struct GitBranchStatus: Equatable, Sendable {
 	}
 }
 
+public enum GitBranchKind: Equatable, Sendable {
+	case local
+	case remote
+}
+
+public struct GitBranch: Equatable, Sendable {
+	public var name: String
+	public var upstream: String?
+	public var isCurrent: Bool
+	public var committerDateRelative: String
+	public var refname: String
+	public var kind: GitBranchKind
+
+	public init(name: String, upstream: String? = nil, isCurrent: Bool = false, committerDateRelative: String = "", refname: String = "", kind: GitBranchKind = .local) {
+		self.name = name
+		self.upstream = upstream
+		self.isCurrent = isCurrent
+		self.committerDateRelative = committerDateRelative
+		self.refname = refname
+		self.kind = kind
+	}
+}
+
 public enum GitStatusEntryKind: Equatable, Sendable {
 	case ordinary
 	case renamed
@@ -189,6 +212,37 @@ public enum GitCommitError: Error, Equatable, Sendable {
 	case emptySummary
 }
 
+public enum GitBranchError: Error, Equatable, Sendable {
+	case emptyName
+}
+
+public enum GitBranchParser {
+	public static func parse(_ output: String) -> [GitBranch] {
+		output.split(separator: "\0", omittingEmptySubsequences: true).compactMap { rawRecord in
+			let record = rawRecord.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !record.isEmpty else {
+				return nil
+			}
+			let fields = record.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+			guard fields.count >= 5 else {
+				return nil
+			}
+			let refname = fields[4]
+			if refname.hasSuffix("/HEAD") {
+				return nil
+			}
+			return GitBranch(
+				name: fields[0],
+				upstream: fields[1].isEmpty ? nil : fields[1],
+				isCurrent: fields[2] == "*",
+				committerDateRelative: fields[3],
+				refname: refname,
+				kind: refname.hasPrefix("refs/remotes/") ? .remote : .local
+			)
+		}
+	}
+}
+
 public struct ProcessGitCommandRunner: GitCommandRunning {
 	public var executableURL: URL
 
@@ -286,6 +340,16 @@ public struct GitRepository: Sendable {
 		GitWorkspaceSnapshot(root: root, status: try status())
 	}
 
+	public func branches() throws -> [GitBranch] {
+		let output = try runner.runGit(arguments: [
+			"for-each-ref",
+			"--format=%(refname:short)%09%(upstream:short)%09%(HEAD)%09%(committerdate:relative)%09%(refname)%00",
+			"refs/heads",
+			"refs/remotes",
+		], root: root)
+		return GitBranchParser.parse(output)
+	}
+
 	public func diff(path: String, staged: Bool = false) throws -> String {
 		var arguments = ["diff", "--no-color"]
 		if staged {
@@ -319,6 +383,34 @@ public struct GitRepository: Sendable {
 
 	public func unstage(hunk: DiffHunk, in file: DiffFile) throws {
 		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: true)
+	}
+
+	public func switchBranch(_ name: String) throws {
+		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !name.isEmpty else {
+			throw GitBranchError.emptyName
+		}
+		_ = try runner.runGit(arguments: ["switch", name], root: root)
+	}
+
+	public func createBranch(named name: String, from startPoint: String? = nil) throws {
+		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !name.isEmpty else {
+			throw GitBranchError.emptyName
+		}
+		var arguments = ["switch", "-c", name]
+		if let startPoint, !startPoint.isEmpty {
+			arguments.append(startPoint)
+		}
+		_ = try runner.runGit(arguments: arguments, root: root)
+	}
+
+	public func deleteBranch(_ name: String, force: Bool = false) throws {
+		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !name.isEmpty else {
+			throw GitBranchError.emptyName
+		}
+		_ = try runner.runGit(arguments: ["branch", force ? "-D" : "-d", name], root: root)
 	}
 
 	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {

@@ -136,6 +136,42 @@ import Testing
 	])
 }
 
+@Test func gitBranchParserReadsNulSeparatedForEachRefRows() {
+	let output = "main\torigin/main\t*\t2 hours ago\trefs/heads/main\u{0}\norigin/feature\t\t \t1 day ago\trefs/remotes/origin/feature\u{0}\norigin\t\t \t1 day ago\trefs/remotes/origin/HEAD\u{0}"
+
+	let branches = GitBranchParser.parse(output)
+
+	#expect(branches == [
+		GitBranch(name: "main", upstream: "origin/main", isCurrent: true, committerDateRelative: "2 hours ago", refname: "refs/heads/main", kind: .local),
+		GitBranch(name: "origin/feature", upstream: nil, isCurrent: false, committerDateRelative: "1 day ago", refname: "refs/remotes/origin/feature", kind: .remote),
+	])
+}
+
+@Test func gitRepositoryRunsBranchListAndActions() throws {
+	let runner = RecordingGitRunner(output: "main\torigin/main\t*\t2 hours ago\trefs/heads/main\u{0}")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	let branches = try repository.branches()
+	try repository.switchBranch("feature")
+	try repository.createBranch(named: "topic", from: "origin/topic")
+	try repository.deleteBranch("topic")
+	try repository.deleteBranch("topic", force: true)
+
+	#expect(branches.first?.name == "main")
+	#expect(runner.recordedArguments == [
+		[
+			"for-each-ref",
+			"--format=%(refname:short)%09%(upstream:short)%09%(HEAD)%09%(committerdate:relative)%09%(refname)%00",
+			"refs/heads",
+			"refs/remotes",
+		],
+		["switch", "feature"],
+		["switch", "-c", "topic", "origin/topic"],
+		["branch", "-d", "topic"],
+		["branch", "-D", "topic"],
+	])
+}
+
 @Test func gitRepositoryStageAndUnstageHunkValidateBeforeApplyingPatch() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)

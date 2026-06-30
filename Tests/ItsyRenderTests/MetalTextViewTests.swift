@@ -154,6 +154,18 @@ import Testing
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "a")
 }
 
+@Test func hoverCandidateMapsLocalPointToTextOffsetAndRect() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\n")
+	view.lineHeight = 20
+
+	let candidate = view.hoverCandidate(atLocalPoint: NSPoint(x: 31, y: 7))
+
+	#expect(candidate.offset == 0)
+	#expect(candidate.positioningRect.origin.x == 30)
+	#expect(candidate.positioningRect.height == 20)
+}
+
 @Test func keyHandlingEditsEditorAndMarksDirty() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	_ = view.consumeDirtyForDisplayLink()

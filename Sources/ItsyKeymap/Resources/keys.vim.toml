@@ -50,6 +50,7 @@
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
 "Cmd-Opt-7" = "view.outline"
 "Ctrl-Space" = "lsp.completion"
+"Shift-K" = "lsp.hover"
 "i" = "mode.insert"
 "/" = "vim.searchForward"
 "Shift-/" = "vim.searchBackward"

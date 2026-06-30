@@ -140,6 +140,18 @@ public struct LSPCompletionParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPTextDocumentPositionParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+
+	public init(textDocument: LSPTextDocumentIdentifier, position: LSPPosition) {
+		self.textDocument = textDocument
+		self.position = position
+	}
+}
+
+public typealias LSPHoverParams = LSPTextDocumentPositionParams
+
 public enum LSPInsertTextFormat: Int, Codable, Equatable, Sendable {
 	case plainText = 1
 	case snippet = 2
@@ -186,6 +198,131 @@ public struct LSPCompletionList: Codable, Equatable, Sendable {
 	public init(isIncomplete: Bool, items: [LSPCompletionItem]) {
 		self.isIncomplete = isIncomplete
 		self.items = items
+	}
+}
+
+public enum LSPMarkupKind: String, Codable, Equatable, Sendable {
+	case plaintext
+	case markdown
+}
+
+public struct LSPMarkupContent: Codable, Equatable, Sendable {
+	public var kind: LSPMarkupKind
+	public var value: String
+
+	public init(kind: LSPMarkupKind, value: String) {
+		self.kind = kind
+		self.value = value
+	}
+}
+
+public enum LSPMarkedString: Equatable, Sendable {
+	case string(String)
+	case languageString(language: String, value: String)
+
+	private enum CodingKeys: String, CodingKey {
+		case language
+		case value
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(String.self) {
+			self = .string(value)
+			return
+		}
+		let object = try decoder.container(keyedBy: CodingKeys.self)
+		self = .languageString(
+			language: try object.decode(String.self, forKey: .language),
+			value: try object.decode(String.self, forKey: .value)
+		)
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		switch self {
+		case let .string(value):
+			var container = encoder.singleValueContainer()
+			try container.encode(value)
+		case let .languageString(language, value):
+			var container = encoder.container(keyedBy: CodingKeys.self)
+			try container.encode(language, forKey: .language)
+			try container.encode(value, forKey: .value)
+		}
+	}
+}
+
+extension LSPMarkedString: Codable {}
+
+public enum LSPHoverContents: Equatable, Sendable {
+	case markup(LSPMarkupContent)
+	case markedStrings([LSPMarkedString])
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let markup = try? container.decode(LSPMarkupContent.self) {
+			self = .markup(markup)
+			return
+		}
+		if let items = try? container.decode([LSPMarkedString].self) {
+			self = .markedStrings(items)
+			return
+		}
+		self = .markedStrings([try container.decode(LSPMarkedString.self)])
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .markup(markup):
+			try container.encode(markup)
+		case let .markedStrings(items):
+			if items.count == 1, let item = items.first {
+				try container.encode(item)
+			} else {
+				try container.encode(items)
+			}
+		}
+	}
+}
+
+extension LSPHoverContents: Codable {}
+
+public struct LSPHover: Codable, Equatable, Sendable {
+	public var contents: LSPHoverContents
+	public var range: LSPRange?
+
+	public init(contents: LSPHoverContents, range: LSPRange? = nil) {
+		self.contents = contents
+		self.range = range
+	}
+}
+
+public enum LSPHoverResult: Equatable, Sendable {
+	case hover(LSPHover)
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let hover = try? decoder.decode(LSPHover.self, from: data) {
+			self = .hover(hover)
+			return
+		}
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var hover: LSPHover? {
+		guard case let .hover(value) = self else {
+			return nil
+		}
+		return value
 	}
 }
 

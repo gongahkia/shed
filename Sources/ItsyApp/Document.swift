@@ -629,7 +629,7 @@ struct EditorPaneCoordinator {
 
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
-	private static let completionLSPManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
+	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
 	private static let quickLookPanelSelector = NSSelectorFromString("sharedPreviewPanel")
 	private static let quickLookDataSourceSelector = NSSelectorFromString("setDataSource:")
 	private static let quickLookDelegateSelector = NSSelectorFromString("setDelegate:")
@@ -672,7 +672,10 @@ final class EditorWindowController: NSWindowController {
 	private var incrementalFindDirection: Int?
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
-	private var completionSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
+	private var hoverPopover: NSPopover?
+	private var hoverTimer: Timer?
+	private var hoverRequestGeneration = 0
+	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 
 	init(document: ItsyDocument) {
@@ -752,6 +755,8 @@ final class EditorWindowController: NSWindowController {
 
 	deinit {
 		completionPopup?.dismiss()
+		hoverTimer?.invalidate()
+		hoverPopover?.close()
 		if let fileTreeKeyMonitor {
 			NSEvent.removeMonitor(fileTreeKeyMonitor)
 		}
@@ -1302,6 +1307,9 @@ final class EditorWindowController: NSWindowController {
 			self?.requestCompletion(triggerCharacter: trigger, in: view) ?? false
 		}
 		installCompletionTriggersIfKnown(for: view, document: document)
+		view.hoverCandidateChanged = { [weak self, weak view] candidate in
+			self?.scheduleHover(candidate, in: view)
+		}
 		view.exCommandRequested = { [weak self] command in
 			self?.performExCommand(command) ?? false
 		}
@@ -1418,6 +1426,9 @@ final class EditorWindowController: NSWindowController {
 			selectAllFindMatches()
 		case "lsp.completion":
 			return requestCompletion(triggerCharacter: nil, in: editorView)
+		case "lsp.hover":
+			let offset = editorView.editor.selections.primary.head
+			return requestHover(at: offset, positioningRect: editorView.positioningRectForUTF8Offset(offset), in: editorView)
 		default:
 			return false
 		}
@@ -1444,8 +1455,8 @@ final class EditorWindowController: NSWindowController {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureCompletionSession(for: fileURL)
-				try await self.syncCompletionDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let params = LSPCompletionParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -1485,12 +1496,12 @@ final class EditorWindowController: NSWindowController {
 		return LSPCompletionContext(triggerKind: .invoked)
 	}
 
-	private func ensureCompletionSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
-		guard let key = await Self.completionLSPManager.sessionKey(for: url) else {
+	private func ensureLSPSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
+		guard let key = await Self.lspManager.sessionKey(for: url) else {
 			throw LSPManagerError.noConfigForDocument
 		}
-		let client = try await Self.completionLSPManager.ensureClient(for: url)
-		if await Self.completionLSPManager.status(of: key) != .running {
+		let client = try await Self.lspManager.ensureClient(for: url)
+		if await Self.lspManager.status(of: key) != .running {
 			do {
 				try client.start()
 			} catch LSPProcessClientError.alreadyStarted {}
@@ -1498,14 +1509,14 @@ final class EditorWindowController: NSWindowController {
 				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot)
 				let result = try await client.initialize(params)
 				let triggers = (try? LSPInitializeResult(result: result).capabilities.completionProvider?.triggerCharacters).map(Set.init) ?? []
-				await Self.completionLSPManager.markRunning(key)
+				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
 					self?.setCompletionTriggerCharacters(triggers, for: key)
 				}
 			} catch {
-				await Self.completionLSPManager.markFailed(key)
+				await Self.lspManager.markFailed(key)
 				await MainActor.run { [weak self] in
-					self?.completionSyncCoordinators[key] = nil
+					self?.lspSyncCoordinators[key] = nil
 				}
 				throw error
 			}
@@ -1513,9 +1524,9 @@ final class EditorWindowController: NSWindowController {
 		return (client, key)
 	}
 
-	private func syncCompletionDocument(client: LSPProcessClient, key: LSPSessionKey, url: URL, content: String) async throws {
+	private func syncLSPDocument(client: LSPProcessClient, key: LSPSessionKey, url: URL, content: String) async throws {
 		let coordinator = await MainActor.run {
-			self.completionSyncCoordinator(for: key, client: client)
+			self.lspSyncCoordinator(for: key, client: client)
 		}
 		if await coordinator.currentVersion(for: url) == nil {
 			try await coordinator.didOpen(url: url, languageID: key.languageID, content: content)
@@ -1525,12 +1536,12 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
-	private func completionSyncCoordinator(for key: LSPSessionKey, client: LSPProcessClient) -> LSPDocumentSyncCoordinator {
-		if let coordinator = completionSyncCoordinators[key] {
+	private func lspSyncCoordinator(for key: LSPSessionKey, client: LSPProcessClient) -> LSPDocumentSyncCoordinator {
+		if let coordinator = lspSyncCoordinators[key] {
 			return coordinator
 		}
 		let coordinator = LSPDocumentSyncCoordinator(sink: LSPClientNotificationSink(client: client), debounceMillis: 0)
-		completionSyncCoordinators[key] = coordinator
+		lspSyncCoordinators[key] = coordinator
 		return coordinator
 	}
 
@@ -1547,7 +1558,7 @@ final class EditorWindowController: NSWindowController {
 			return
 		}
 		Task { [weak self, weak view] in
-			guard let self, let key = await Self.completionLSPManager.sessionKey(for: fileURL) else {
+			guard let self, let key = await Self.lspManager.sessionKey(for: fileURL) else {
 				return
 			}
 			await MainActor.run { [weak self, weak view] in
@@ -1589,6 +1600,130 @@ final class EditorWindowController: NSWindowController {
 			selectUTF8Ranges: application.selectionRanges
 		)
 		focusEditor()
+	}
+
+	private func scheduleHover(_ candidate: TextHoverCandidate?, in targetView: MetalTextView?) {
+		hoverTimer?.invalidate()
+		hoverTimer = nil
+		guard
+			let candidate,
+			let targetView,
+			let offset = identifierOffset(in: targetView.editor.text, near: candidate.offset)
+		else {
+			closeHoverPopover()
+			return
+		}
+		let rect = targetView.positioningRectForUTF8Offset(offset)
+		hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self, weak targetView] _ in
+			_ = self?.requestHover(at: offset, positioningRect: rect, in: targetView)
+		}
+	}
+
+	@discardableResult
+	private func requestHover(at offset: Int, positioningRect: NSRect, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = targetView.editor.text
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
+		hoverRequestGeneration += 1
+		let generation = hoverRequestGeneration
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let params = LSPHoverParams(
+					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
+					position: position
+				)
+				let response = try await session.client.sendRequest(
+					method: LSPMethod.textDocumentHover,
+					params: try LSPAny(encoding: params)
+				)
+				let result = try LSPHoverResult(result: response.result)
+				await MainActor.run { [weak self, weak targetView] in
+					guard let self, let targetView, generation == self.hoverRequestGeneration else {
+						return
+					}
+					self.showHoverPopover(result: result, positioningRect: positioningRect, in: targetView)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.hoverRequestGeneration else {
+						return
+					}
+					self.closeHoverPopover()
+					NSLog("hover failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func showHoverPopover(result: LSPHoverResult, positioningRect: NSRect, in targetView: MetalTextView) {
+		guard let hover = result.hover else {
+			closeHoverPopover()
+			return
+		}
+		closeHoverPopover()
+		let popover = NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = HoverTooltipViewController(hover: hover)
+		popover.show(relativeTo: positioningRect, of: targetView, preferredEdge: .maxY)
+		hoverPopover = popover
+	}
+
+	private func closeHoverPopover() {
+		hoverPopover?.close()
+		hoverPopover = nil
+	}
+
+	private func identifierOffset(in text: String, near offset: Int) -> Int? {
+		let clamped = min(max(offset, 0), text.utf8.count)
+		let index = stringIndex(in: text, utf8Offset: clamped)
+		if index < text.endIndex, isIdentifierCharacter(text[index]) {
+			return clamped
+		}
+		guard index > text.startIndex else {
+			return nil
+		}
+		let previous = text.index(before: index)
+		guard isIdentifierCharacter(text[previous]) else {
+			return nil
+		}
+		return utf8Offset(in: text, for: previous)
+	}
+
+	private func isIdentifierCharacter(_ character: Character) -> Bool {
+		character == "_" || character.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
+	}
+
+	private func stringIndex(in text: String, utf8Offset target: Int) -> String.Index {
+		let clamped = min(max(target, 0), text.utf8.count)
+		var index = text.startIndex
+		var offset = 0
+		while index < text.endIndex, offset < clamped {
+			let next = text.index(after: index)
+			let nextOffset = offset + String(text[index]).utf8.count
+			guard nextOffset <= clamped else {
+				break
+			}
+			offset = nextOffset
+			index = next
+		}
+		return index
+	}
+
+	private func utf8Offset(in text: String, for target: String.Index) -> Int {
+		text.utf8.distance(from: text.utf8.startIndex, to: target.samePosition(in: text.utf8) ?? text.utf8.endIndex)
 	}
 
 	private func performExCommand(_ command: String) -> Bool {

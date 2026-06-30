@@ -224,6 +224,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var taskOutputTextView: NSTextView?
 	private var workspaceTasks: [WorkspaceTask] = []
 	private var taskRunGeneration = 0
+	private var terminalPanel: NSPanel?
+	private var terminalStatusLabel: NSTextField?
+	private var terminalOutputTextView: NSTextView?
+	private var terminalInputField: NSTextField?
+	private var terminalSession: ItsyTerminalSession?
 	private var problemsPanel: NSPanel?
 	private var problemsStatusLabel: NSTextField?
 	private var problemsTableView: NSTableView?
@@ -271,6 +276,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		NSApp.activate(ignoringOtherApps: true)
 		recordBenchStage("app_activated")
+	}
+
+	func applicationWillTerminate(_ notification: Notification) {
+		terminalSession?.terminate()
 	}
 
 	func application(_ sender: NSApplication, openFile filename: String) -> Bool {
@@ -689,6 +698,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					},
 					Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
 						self?.refreshTasks(nil)
+					},
+					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
+						self?.showTerminal(nil)
 					},
 					Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
 						self?.showProblems(nil)
@@ -2621,6 +2633,210 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		"\(task.label)  [\(task.source.rawValue)]"
 	}
 
+	@objc private func showTerminal(_ sender: Any?) {
+		toggleTerminal(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleTerminal(relativeTo hostWindow: NSWindow?) {
+		if terminalPanel?.isVisible == true {
+			terminalPanel?.close()
+			return
+		}
+		showTerminal(relativeTo: hostWindow)
+	}
+
+	private func showTerminal(relativeTo hostWindow: NSWindow?) {
+		let panel = makeTerminalPanelIfNeeded()
+		centerTerminalPanel(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		startTerminalIfNeeded(clear: terminalOutputTextView?.string.isEmpty ?? true)
+		terminalPanel?.makeFirstResponder(terminalInputField)
+	}
+
+	private func makeTerminalPanelIfNeeded() -> NSPanel {
+		if let panel = terminalPanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 760, height: 420),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Terminal")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureTerminalView(contentView)
+		terminalPanel = panel
+		return panel
+	}
+
+	private func configureTerminalView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 12)
+		statusLabel.textColor = .secondaryLabelColor
+		statusLabel.lineBreakMode = .byTruncatingMiddle
+		let clearButton = NSButton(title: L10n.string("Clear"), target: self, action: #selector(clearTerminal(_:)))
+		let restartButton = NSButton(title: L10n.string("Restart"), target: self, action: #selector(restartTerminal(_:)))
+		let buttonStack = NSStackView(views: [clearButton, restartButton])
+		buttonStack.orientation = .horizontal
+		buttonStack.spacing = 8
+		let header = NSStackView(views: [statusLabel, buttonStack])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.distribution = .fill
+		header.spacing = 12
+		let outputTextView = NSTextView()
+		outputTextView.isEditable = false
+		outputTextView.isSelectable = true
+		outputTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+		outputTextView.string = ""
+		outputTextView.textColor = .textColor
+		outputTextView.backgroundColor = .textBackgroundColor
+		let outputScrollView = NSScrollView()
+		outputScrollView.documentView = outputTextView
+		outputScrollView.hasVerticalScroller = true
+		outputScrollView.hasHorizontalScroller = true
+		outputScrollView.drawsBackground = true
+		let inputField = NSTextField()
+		inputField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+		inputField.placeholderString = L10n.string("Type a shell command")
+		inputField.target = self
+		inputField.action = #selector(submitTerminalInput(_:))
+		header.translatesAutoresizingMaskIntoConstraints = false
+		outputScrollView.translatesAutoresizingMaskIntoConstraints = false
+		inputField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(header)
+		contentView.addSubview(outputScrollView)
+		contentView.addSubview(inputField)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+			outputScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			outputScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			outputScrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			inputField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
+			inputField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+			inputField.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+			outputScrollView.bottomAnchor.constraint(equalTo: inputField.topAnchor, constant: -8),
+		])
+		terminalStatusLabel = statusLabel
+		terminalOutputTextView = outputTextView
+		terminalInputField = inputField
+	}
+
+	private func centerTerminalPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(820, max(560, hostFrame.width - 120))
+		let height = min(500, max(320, hostFrame.height - 160))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	private func startTerminalIfNeeded(clear: Bool = false) {
+		guard terminalSession?.isRunning != true else {
+			updateTerminalStatus()
+			return
+		}
+		if clear {
+			terminalOutputTextView?.string = ""
+		}
+		let session = ItsyTerminalSession(currentDirectoryURL: terminalWorkingDirectory())
+		session.onOutput = { [weak self] text in
+			DispatchQueue.main.async {
+				self?.appendTerminalOutput(text)
+			}
+		}
+		session.onExit = { [weak self] status in
+			DispatchQueue.main.async {
+				self?.terminalStatusLabel?.textColor = .systemRed
+				self?.terminalStatusLabel?.stringValue = L10n.string("Shell exited \(status)")
+			}
+		}
+		do {
+			try session.start()
+			terminalSession = session
+			updateTerminalStatus()
+			appendTerminalOutput("Started \(terminalShellName()) in \(session.currentDirectoryURL.path)\n")
+		} catch {
+			terminalStatusLabel?.textColor = .systemRed
+			terminalStatusLabel?.stringValue = String(describing: error)
+			appendTerminalOutput("Failed to start shell: \(error)\n")
+		}
+	}
+
+	@objc private func submitTerminalInput(_ sender: Any?) {
+		guard let inputField = terminalInputField else {
+			return
+		}
+		startTerminalIfNeeded()
+		let command = inputField.stringValue
+		inputField.stringValue = ""
+		appendTerminalOutput("$ \(command)\n")
+		terminalSession?.sendLine(command)
+	}
+
+	@objc private func clearTerminal(_ sender: Any?) {
+		terminalOutputTextView?.string = ""
+	}
+
+	@objc private func restartTerminal(_ sender: Any?) {
+		terminalSession?.terminate()
+		terminalSession = nil
+		terminalOutputTextView?.string = ""
+		startTerminalIfNeeded(clear: true)
+		terminalPanel?.makeFirstResponder(terminalInputField)
+	}
+
+	private func updateTerminalStatus() {
+		terminalStatusLabel?.textColor = .secondaryLabelColor
+		terminalStatusLabel?.stringValue = L10n.string("\(terminalShellName()) · \(terminalSession?.currentDirectoryURL.path ?? terminalWorkingDirectory().path)")
+	}
+
+	private func terminalWorkingDirectory() -> URL {
+		if let root = ItsyWorkspaceController.currentRootURL {
+			return root
+		}
+		if let url = activeDocument()?.fileURL {
+			return url.deletingLastPathComponent()
+		}
+		return URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+	}
+
+	private func terminalShellName() -> String {
+		let shellPath = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
+		return URL(fileURLWithPath: shellPath).lastPathComponent
+	}
+
+	private func appendTerminalOutput(_ text: String) {
+		guard let textView = terminalOutputTextView else {
+			return
+		}
+		let cleaned = sanitizeTerminalOutput(text)
+		let attributes: [NSAttributedString.Key: Any] = [
+			.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+			.foregroundColor: NSColor.textColor,
+		]
+		textView.textStorage?.append(NSAttributedString(string: cleaned, attributes: attributes))
+		textView.scrollRangeToVisible(NSRange(location: textView.string.utf16.count, length: 0))
+	}
+
+	private func sanitizeTerminalOutput(_ text: String) -> String {
+		var cleaned = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
+		if let regex = Self.ansiEscapeRegex {
+			let range = NSRange(cleaned.startIndex ..< cleaned.endIndex, in: cleaned)
+			cleaned = regex.stringByReplacingMatches(in: cleaned, range: range, withTemplate: "")
+		}
+		return cleaned
+	}
+
+	private static let ansiEscapeRegex: NSRegularExpression? = {
+		let escape = NSRegularExpression.escapedPattern(for: "\u{001B}")
+		return try? NSRegularExpression(pattern: "\(escape)\\[[0-?]*[ -/]*[@-~]")
+	}()
+
 	@objc private func showProblems(_ sender: Any?) {
 		toggleProblems(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
@@ -3293,6 +3509,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let viewItem = NSMenuItem()
 		let gitItem = NSMenuItem()
 		let taskItem = NSMenuItem()
+		let terminalItem = NSMenuItem()
 		let problemItem = NSMenuItem()
 		let commandItem = NSMenuItem()
 		mainMenu.addItem(appItem)
@@ -3302,6 +3519,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		mainMenu.addItem(viewItem)
 		mainMenu.addItem(gitItem)
 		mainMenu.addItem(taskItem)
+		mainMenu.addItem(terminalItem)
 		mainMenu.addItem(problemItem)
 		mainMenu.addItem(commandItem)
 
@@ -3414,6 +3632,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let taskRefreshItem = taskMenu.addItem(withTitle: L10n.string("Refresh Tasks"), action: #selector(refreshTasks(_:)), keyEquivalent: "")
 		taskRefreshItem.target = self
 		taskItem.submenu = taskMenu
+
+		let terminalMenu = NSMenu(title: L10n.string("Terminal"))
+		let terminalShowItem = terminalMenu.addItem(withTitle: L10n.string("Terminal"), action: #selector(showTerminal(_:)), keyEquivalent: "`")
+		terminalShowItem.keyEquivalentModifierMask = [.command, .shift]
+		terminalShowItem.target = self
+		terminalItem.submenu = terminalMenu
 
 		let problemMenu = NSMenu(title: L10n.string("Problems"))
 		let problemShowItem = problemMenu.addItem(withTitle: L10n.string("Problems"), action: #selector(showProblems(_:)), keyEquivalent: "M")

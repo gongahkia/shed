@@ -108,6 +108,29 @@ public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPConfigurationItem: Codable, Equatable, Sendable {
+	public var scopeUri: String?
+	public var section: String?
+
+	public init(scopeUri: String? = nil, section: String? = nil) {
+		self.scopeUri = scopeUri
+		self.section = section
+	}
+}
+
+public struct LSPConfigurationParams: Codable, Equatable, Sendable {
+	public var items: [LSPConfigurationItem]
+
+	public init(items: [LSPConfigurationItem]) {
+		self.items = items
+	}
+}
+
+public extension LSPMethod {
+	static let workspaceConfiguration = "workspace/configuration"
+	static let workspaceApplyEdit = "workspace/applyEdit"
+}
+
 public enum LSPDiagnosticSeverity: Int, Codable, Equatable, Sendable {
 	case error = 1
 	case warning = 2

@@ -21,6 +21,6 @@
 - No UI for breakpoints, call stack, scopes, variables, or console output.
 - No adapter-specific launch/attach schema.
 
-## Next
+## Next slice
 
-Mirror the proven `ItsyLSP` process transport/session shape for DAP, then wire breakpoint toggles and a minimal call-stack/variables panel.
+Current TODO has no Phase 18/19/20 DAP task id. Next DAP slice should be a new post-Phase20 TODO for process transport/session lifecycle, breakpoints, call stack, variables, and launch/attach schema.

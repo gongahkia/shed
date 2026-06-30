@@ -26,6 +26,6 @@
 - No Tree-sitter/LSP-backed symbol provider.
 - No persistence across launches.
 
-## Next
+## Next slice
 
-Wire `WorkspaceIndex` to the workspace root, expose a command-palette `Go to Symbol in Workspace` action, then replace regex extraction with language-server or Tree-sitter providers where available.
+Phase18 ids id:600-id:606 cover workspace/file symbol palette, symbol keybindings, Outline panel/persistence, incremental FSEvents refresh, and indexing status. Phase18 ids id:607-id:608 are the LSP-backed symbol-provider follow-up, tied to Phase19 LSP lifecycle availability.

@@ -25,4 +25,6 @@
 
 ## Next slice
 
-Add a diff viewer and commit workflow, then expand branch/switch/fetch/pull/push/stash/conflict operations.
+Phase20 ids id:670-id:681 now cover unified diff parsing, diff viewer, hunk/line staging, commit composer/history, branch/switch, fetch/pull/push, conflicts, gutter hunk indicators, and stash management.
+
+Next Git slice should be post-id:681 polish/backlog only; current Phase20 Git TODO is complete.

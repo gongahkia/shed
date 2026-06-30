@@ -40,6 +40,38 @@ private final class OutlineSymbolNode: NSObject {
 	}
 }
 
+private enum OutlineCollapseStore {
+	private static var fileURL: URL {
+		let home = FileManager.default.homeDirectoryForCurrentUser
+		return home
+			.appendingPathComponent(".config", isDirectory: true)
+			.appendingPathComponent("itsy", isDirectory: true)
+			.appendingPathComponent("outline-state.json")
+	}
+
+	static func load() -> [String: Set<String>] {
+		guard
+			let data = try? Data(contentsOf: fileURL),
+			let raw = try? JSONDecoder().decode([String: [String]].self, from: data)
+		else {
+			return [:]
+		}
+		return raw.mapValues(Set.init).filter { key, _ in
+			URL(string: key).map { FileManager.default.fileExists(atPath: $0.path) } ?? false
+		}
+	}
+
+	static func save(_ state: [String: Set<String>]) {
+		let url = fileURL
+		try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+		let raw = state.mapValues { Array($0).sorted() }
+		guard let data = try? JSONEncoder().encode(raw) else {
+			return
+		}
+		try? data.write(to: url, options: .atomic)
+	}
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
@@ -86,6 +118,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var outlineOutlineView: NSOutlineView?
 	private var outlineKindNodes: [OutlineKindNode] = []
 	private var outlineWindowObserver: NSObjectProtocol?
+	private var outlineCollapseStateByURL: [String: Set<String>] = OutlineCollapseStore.load()
+	private var outlineActiveURLKey: String?
+	private var outlineSuppressPersist = false
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -1318,11 +1353,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			let relative = index.relativePath(for: url)
 		else {
 			outlineKindNodes = []
+			outlineActiveURLKey = nil
 			outlineStatusLabel?.stringValue = L10n.string("No active file")
 			outlineOutlineView?.reloadData()
 			return
 		}
 		let symbols = index.symbolsForFile(relativePath: relative)
+		outlineActiveURLKey = url.absoluteString
 		if symbols.isEmpty {
 			outlineKindNodes = []
 			outlineStatusLabel?.stringValue = "\(relative) — \(L10n.string("No symbols in this file"))"
@@ -1342,9 +1379,40 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		outlineStatusLabel?.stringValue = "\(relative) — \(symbols.count) \(L10n.string("symbols"))"
 		outlineOutlineView?.reloadData()
-		for kindNode in outlineKindNodes {
-			outlineOutlineView?.expandItem(kindNode)
+		applyOutlineCollapseState()
+	}
+
+	private func applyOutlineCollapseState() {
+		let collapsedKinds = outlineActiveURLKey.flatMap { outlineCollapseStateByURL[$0] } ?? []
+		outlineSuppressPersist = true
+		defer {
+			outlineSuppressPersist = false
 		}
+		for kindNode in outlineKindNodes {
+			if collapsedKinds.contains(kindNode.kind.rawValue) {
+				outlineOutlineView?.collapseItem(kindNode)
+			} else {
+				outlineOutlineView?.expandItem(kindNode)
+			}
+		}
+	}
+
+	fileprivate func recordOutlineCollapseChange() {
+		guard !outlineSuppressPersist, let key = outlineActiveURLKey else {
+			return
+		}
+		var collapsed: Set<String> = []
+		for kindNode in outlineKindNodes {
+			if outlineOutlineView?.isItemExpanded(kindNode) == false {
+				collapsed.insert(kindNode.kind.rawValue)
+			}
+		}
+		if collapsed.isEmpty {
+			outlineCollapseStateByURL.removeValue(forKey: key)
+		} else {
+			outlineCollapseStateByURL[key] = collapsed
+		}
+		OutlineCollapseStore.save(outlineCollapseStateByURL)
 	}
 
 	@objc private func openSelectedOutlineSymbol(_ sender: Any?) {
@@ -1934,6 +2002,20 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 
 	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
 		item is OutlineKindNode
+	}
+
+	func outlineViewItemDidExpand(_ notification: Notification) {
+		guard (notification.object as? NSOutlineView) === outlineOutlineView else {
+			return
+		}
+		recordOutlineCollapseChange()
+	}
+
+	func outlineViewItemDidCollapse(_ notification: Notification) {
+		guard (notification.object as? NSOutlineView) === outlineOutlineView else {
+			return
+		}
+		recordOutlineCollapseChange()
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {

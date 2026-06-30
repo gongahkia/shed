@@ -31,16 +31,7 @@ public extension BinaryFloatingPoint {
     }
 }
 
-/// Purpose: Selects the timing curve for layout animations.
-/// Parameters: Choose a named curve.
-/// Example: `AnimationCurve.easeOut`
-/// See also: `Animation`, `curve(_:)`.
-public enum AnimationCurve: String, Codable, Equatable, Sendable {
-    case linear
-    case easeIn
-    case easeOut
-    case easeInOut
-}
+public typealias AnimationCurve = ollyKit.AnimationCurve
 
 /// Purpose: Selects how animation respects macOS Reduce Motion.
 /// Parameters: Choose system-respecting, always-on, or always-off animation behavior.

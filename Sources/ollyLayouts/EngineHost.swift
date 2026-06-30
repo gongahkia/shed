@@ -41,7 +41,7 @@ public struct EngineHostWakeRestoreResult: Equatable, Sendable {
 }
 
 public typealias LayoutEngineConfigProvider = (LayoutEngineID) async -> Any?
-public typealias EngineHostPlacementHandler = (WindowState, Placement) async -> Void
+public typealias EngineHostPlacementHandler = (LayoutEngineID, WindowState, Placement) async -> Void
 public typealias EngineEventPublisher = (EngineEvent) async -> Void
 
 public actor EngineHost {
@@ -75,6 +75,26 @@ public actor EngineHost {
         windowStore: WindowStore,
         tagStore: TagStore,
         registry: LayoutEngineRegistry,
+        configProvider: @escaping LayoutEngineConfigProvider,
+        applyPlacement: @escaping (WindowState, Placement) async -> Void,
+        publishEvent: @escaping EngineEventPublisher = { _ in }
+    ) {
+        self.init(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: configProvider,
+            applyPlacement: { _, window, placement in
+                await applyPlacement(window, placement)
+            },
+            publishEvent: publishEvent
+        )
+    }
+
+    public init(
+        windowStore: WindowStore,
+        tagStore: TagStore,
+        registry: LayoutEngineRegistry,
         windowMover: WindowMover,
         configProvider: @escaping LayoutEngineConfigProvider,
         targetResolver: @escaping WindowMoveTargetResolver,
@@ -85,7 +105,7 @@ public actor EngineHost {
             tagStore: tagStore,
             registry: registry,
             configProvider: configProvider,
-            applyPlacement: { window, placement in
+            applyPlacement: { _, window, placement in
                 guard let target = targetResolver(window) else {
                     return
                 }
@@ -141,7 +161,7 @@ public actor EngineHost {
 
         let start = ContinuousClock.now
         for item in snapshot.placements {
-            await applyPlacement(item.window, item.placement)
+            await applyPlacement(snapshot.engineID, item.window, item.placement)
         }
         return EngineHostWakeRestoreResult(
             displayID: displayID,
@@ -193,7 +213,7 @@ public actor EngineHost {
 
         for placement in placementArena.placements {
             if let window = windowsByID[placement.windowID] {
-                await applyPlacement(window, placement)
+                await applyPlacement(engine.id, window, placement)
             }
             previousPlacementsByWindowID[placement.windowID] = placement
         }

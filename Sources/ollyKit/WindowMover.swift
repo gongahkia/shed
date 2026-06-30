@@ -23,20 +23,23 @@ public struct WindowMoveTarget {
 }
 
 public actor WindowMover {
-    private static let defaultFrameDelayNanoseconds: UInt64 = 16_666_667
+    static let defaultFrameDelayNanoseconds: UInt64 = 16_666_667
 
     private let client: AXWindowMoveClient
     private let displayMonitor: DisplayMonitor
     private let usesDisplayLink: Bool
-    private let frameDelayNanoseconds: UInt64
+    let frameDelayNanoseconds: UInt64
     private let retryDelayNanoseconds: UInt64
     private let maxRetries: Int
     private let noOpThreshold: CGFloat
     private var displayLinkCoordinator: DisplayLinkFlushCoordinator?
     private var pendingMoves: [DisplayID: [WindowMoveKey: PendingMove]] = [:]
     private var flushTasks: [DisplayID: Task<Void, Never>] = [:]
+    var animationTasks: [WindowMoveKey: Task<Void, Never>] = [:]
+    var animationIDs: [WindowMoveKey: Int] = [:]
+    var nextAnimationID = 0
     private var lastFrames: [WindowMoveKey: CGRect] = [:]
-    private var isPaused = false
+    var isPaused = false
     private var axErrorHandler: (@Sendable (AXError) -> Void)?
 
     public init(
@@ -74,15 +77,18 @@ public actor WindowMover {
         self.displayLinkCoordinator = nil
     }
 
-    public func setPosition(_ position: CGPoint, for window: WindowRef) {
-        setPosition(position, for: WindowMoveTarget(window: window))
+    public func setPosition(_ position: CGPoint, for target: WindowMoveTarget) {
+        setPosition(position, for: target, cancelsAnimation: true)
     }
 
-    public func setPosition(_ position: CGPoint, for target: WindowMoveTarget) {
+    func setPosition(_ position: CGPoint, for target: WindowMoveTarget, cancelsAnimation: Bool) {
         guard !isPaused else {
             return
         }
         let key = WindowMoveKey(target: target)
+        if cancelsAnimation {
+            cancelAnimation(for: key)
+        }
         var move = pendingMove(for: key) ?? PendingMove(key: key, target: target)
         move.position = position
         let displayID = target.displayID
@@ -93,15 +99,18 @@ public actor WindowMover {
         scheduleFlush(for: displayID)
     }
 
-    public func setSize(_ size: CGSize, for window: WindowRef) {
-        setSize(size, for: WindowMoveTarget(window: window))
+    public func setSize(_ size: CGSize, for target: WindowMoveTarget) {
+        setSize(size, for: target, cancelsAnimation: true)
     }
 
-    public func setSize(_ size: CGSize, for target: WindowMoveTarget) {
+    func setSize(_ size: CGSize, for target: WindowMoveTarget, cancelsAnimation: Bool) {
         guard !isPaused else {
             return
         }
         let key = WindowMoveKey(target: target)
+        if cancelsAnimation {
+            cancelAnimation(for: key)
+        }
         var move = pendingMove(for: key) ?? PendingMove(key: key, target: target)
         move.size = size
         let displayID = target.displayID ?? pendingDisplayID(for: key) ?? defaultDisplayID()
@@ -119,6 +128,7 @@ public actor WindowMover {
 
     public func flushAndPause() async {
         isPaused = true
+        cancelAnimations()
         flushTasks.values.forEach { $0.cancel() }
         flushTasks.removeAll()
         let moves = pendingMoves
@@ -294,7 +304,7 @@ public actor WindowMover {
     }
 }
 
-private struct WindowMoveKey: Hashable {
+struct WindowMoveKey: Hashable {
     let rawValue: Int
 
     init(target: WindowMoveTarget) {

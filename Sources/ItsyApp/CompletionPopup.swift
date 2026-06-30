@@ -15,6 +15,12 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 	private var lastPrefix = ""
 	private var requestAgain: (() -> Void)?
 	private var acceptItem: ((LSPCompletionItem) -> Void)?
+	private var resolveItem: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
+	private var resolvedItemsByKey: [String: LSPCompletionItem] = [:]
+	private var pendingResolveKeys = Set<String>()
+	private var resolveTimer: Timer?
+	private var resolveGeneration = 0
+	private var detailPopover: NSPopover?
 
 	override init() {
 		panel = NSPanel(
@@ -36,11 +42,17 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 		relativeTo hostWindow: NSWindow?,
 		editorView: MetalTextView,
 		requestAgain: @escaping () -> Void,
+		resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?,
 		accept: @escaping (LSPCompletionItem) -> Void
 	) {
+		if !panel.isVisible {
+			resolvedItemsByKey = [:]
+			pendingResolveKeys = []
+		}
 		self.hostWindow = hostWindow
 		self.editorView = editorView
 		self.requestAgain = requestAgain
+		resolveItem = resolve
 		acceptItem = accept
 		allItems = result.items
 		isIncomplete = result.isIncomplete
@@ -62,12 +74,17 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 
 	func dismiss() {
 		removeKeyMonitor()
+		cancelResolveTimer()
+		closeDetailPopover()
 		panel.parent?.removeChildWindow(panel)
 		panel.orderOut(nil)
 		allItems = []
 		filteredItems = []
 		requestAgain = nil
+		resolveItem = nil
 		acceptItem = nil
+		resolvedItemsByKey = [:]
+		pendingResolveKeys = []
 	}
 
 	func numberOfRows(in _: NSTableView) -> Int {
@@ -94,10 +111,14 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 			])
 			cell.textField = label
 		}
-		let item = filteredItems[row]
+		let item = displayItem(for: filteredItems[row])
 		label.stringValue = item.detail.map { "\(item.label)  \($0)" } ?? item.label
 		cell.toolTip = item.detail
 		return cell
+	}
+
+	func tableViewSelectionDidChange(_: Notification) {
+		scheduleResolveForSelection()
 	}
 
 	private func configurePanel() {
@@ -211,6 +232,7 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 		if !filteredItems.isEmpty {
 			tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 			tableView.scrollRowToVisible(0)
+			scheduleResolveForSelection()
 		}
 	}
 
@@ -229,9 +251,161 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 		guard row >= 0, row < filteredItems.count else {
 			return
 		}
-		let item = filteredItems[row]
+		let item = displayItem(for: filteredItems[row])
 		dismiss()
 		acceptItem?(item)
+	}
+
+	private func scheduleResolveForSelection() {
+		cancelResolveTimer()
+		let row = tableView.selectedRow
+		guard row >= 0, row < filteredItems.count else {
+			closeDetailPopover()
+			return
+		}
+		let item = filteredItems[row]
+		let key = cacheKey(for: item)
+		if let resolved = resolvedItemsByKey[key] {
+			showDetail(for: resolved, row: row)
+			return
+		}
+		if item.documentation != nil || item.detail != nil {
+			showDetail(for: item, row: row)
+		} else {
+			closeDetailPopover()
+		}
+		guard let resolveItem, !pendingResolveKeys.contains(key) else {
+			return
+		}
+		resolveGeneration += 1
+		let generation = resolveGeneration
+		resolveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
+			guard let self, generation == resolveGeneration, panel.isVisible else {
+				return
+			}
+			pendingResolveKeys.insert(key)
+			resolveItem(item) { [weak self] resolved in
+				DispatchQueue.main.async { [weak self] in
+					guard let self else {
+						return
+					}
+					pendingResolveKeys.remove(key)
+					storeResolvedItem(resolved, forKey: key)
+				}
+			}
+		}
+	}
+
+	private func storeResolvedItem(_ item: LSPCompletionItem, forKey key: String) {
+		guard panel.isVisible else {
+			return
+		}
+		resolvedItemsByKey[key] = item
+		if let row = filteredItems.firstIndex(where: { cacheKey(for: $0) == key }) {
+			tableView.reloadData(forRowIndexes: IndexSet(integer: row), columnIndexes: IndexSet(integer: 0))
+		}
+		let row = tableView.selectedRow
+		guard row >= 0, row < filteredItems.count, cacheKey(for: filteredItems[row]) == key else {
+			return
+		}
+		showDetail(for: item, row: row)
+	}
+
+	private func showDetail(for item: LSPCompletionItem, row: Int) {
+		guard panel.isVisible, let hover = completionDetailHover(for: item) else {
+			closeDetailPopover()
+			return
+		}
+		let popover = detailPopover ?? NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = HoverTooltipViewController(hover: hover)
+		detailPopover = popover
+		let rect = tableView.rect(ofRow: row)
+		if popover.isShown {
+			popover.close()
+		}
+		popover.show(relativeTo: rect, of: tableView, preferredEdge: .maxX)
+	}
+
+	private func completionDetailHover(for item: LSPCompletionItem) -> LSPHover? {
+		guard let documentation = Self.documentationMarkup(for: item) else {
+			guard let detail = item.detail, !detail.isEmpty else {
+				return nil
+			}
+			return LSPHover(contents: .markup(LSPMarkupContent(kind: .markdown, value: "```text\n\(detail)\n```")))
+		}
+		guard let detail = item.detail, !detail.isEmpty else {
+			return LSPHover(contents: .markup(documentation))
+		}
+		let value = "```text\n\(detail)\n```\n\n\(documentation.value)"
+		return LSPHover(contents: .markup(LSPMarkupContent(kind: .markdown, value: value)))
+	}
+
+	private func closeDetailPopover() {
+		detailPopover?.close()
+		detailPopover = nil
+	}
+
+	private func cancelResolveTimer() {
+		resolveTimer?.invalidate()
+		resolveTimer = nil
+		resolveGeneration += 1
+	}
+
+	private func displayItem(for item: LSPCompletionItem) -> LSPCompletionItem {
+		resolvedItemsByKey[cacheKey(for: item)] ?? item
+	}
+
+	private func cacheKey(for item: LSPCompletionItem) -> String {
+		if let data = item.data {
+			return "data:\(Self.stableKey(for: data))"
+		}
+		return [
+			"label:\(Self.cacheComponent(item.label))",
+			"detail:\(Self.cacheComponent(item.detail ?? ""))",
+			"sort:\(Self.cacheComponent(item.sortText ?? ""))",
+			"filter:\(Self.cacheComponent(item.filterText ?? ""))",
+		].joined(separator: "|")
+	}
+
+	private static func documentationMarkup(for item: LSPCompletionItem) -> LSPMarkupContent? {
+		guard let documentation = item.documentation else {
+			return nil
+		}
+		if case let .string(value) = documentation {
+			return LSPMarkupContent(kind: .markdown, value: value)
+		}
+		guard
+			let data = try? JSONEncoder().encode(documentation),
+			let content = try? JSONDecoder().decode(LSPMarkupContent.self, from: data)
+		else {
+			return nil
+		}
+		return content
+	}
+
+	private static func stableKey(for value: LSPAny) -> String {
+		switch value {
+		case .null:
+			"n"
+		case let .bool(value):
+			"b:\(value)"
+		case let .int(value):
+			"i:\(value)"
+		case let .double(value):
+			"d:\(value)"
+		case let .string(value):
+			"s:\(cacheComponent(value))"
+		case let .array(items):
+			"a:[\(items.map(stableKey).joined(separator: ","))]"
+		case let .object(object):
+			"o:{\(object.keys.sorted().map { "\(cacheComponent($0))=\(stableKey(for: object[$0]!))" }.joined(separator: ","))}"
+		}
+	}
+
+	private static func cacheComponent(_ value: String) -> String {
+		"\(value.utf8.count):\(value)"
 	}
 
 	@objc private func acceptDoubleClick(_: Any?) {

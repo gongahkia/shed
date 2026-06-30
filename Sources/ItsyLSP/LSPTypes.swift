@@ -10,6 +10,7 @@ public enum LSPMethod {
 	public static let textDocumentDidClose = "textDocument/didClose"
 	public static let textDocumentPublishDiagnostics = "textDocument/publishDiagnostics"
 	public static let textDocumentCompletion = "textDocument/completion"
+	public static let completionItemResolve = "completionItem/resolve"
 	public static let textDocumentHover = "textDocument/hover"
 	public static let textDocumentDefinition = "textDocument/definition"
 	public static let textDocumentReferences = "textDocument/references"
@@ -188,6 +189,23 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 		self.insertTextFormat = insertTextFormat
 		self.textEdit = textEdit
 		self.data = data
+	}
+
+	public init(
+		resolveResult result: LSPAny?,
+		encoder: JSONEncoder = JSONEncoder(),
+		decoder: JSONDecoder = JSONDecoder()
+	) throws {
+		let data = try encoder.encode(result ?? .null)
+		self = try decoder.decode(LSPCompletionItem.self, from: data)
+	}
+
+	public func mergingResolvedFields(from resolved: LSPCompletionItem) -> LSPCompletionItem {
+		var item = resolved
+		if let data {
+			item.data = data
+		}
+		return item
 	}
 }
 
@@ -387,9 +405,11 @@ private struct LSPNull: Codable, Equatable {
 
 public struct LSPCompletionOptions: Codable, Equatable, Sendable {
 	public var triggerCharacters: [String]?
+	public var resolveProvider: Bool?
 
-	public init(triggerCharacters: [String]? = nil) {
+	public init(triggerCharacters: [String]? = nil, resolveProvider: Bool? = nil) {
 		self.triggerCharacters = triggerCharacters
+		self.resolveProvider = resolveProvider
 	}
 }
 

@@ -81,6 +81,13 @@ public struct GitStatusEntry: Equatable, Sendable {
 		return Self.isChanged(worktreeStatus)
 	}
 
+	public var isConflict: Bool {
+		guard kind == .unmerged, let indexStatus, let worktreeStatus else {
+			return false
+		}
+		return ["UU", "AA", "DU", "UD"].contains("\(indexStatus)\(worktreeStatus)")
+	}
+
 	private static func isChanged(_ status: Character?) -> Bool {
 		guard let status else {
 			return false
@@ -366,6 +373,10 @@ public struct GitRepository: Sendable {
 
 	public func diffFiles(path: String, staged: Bool = false) throws -> [DiffFile] {
 		try UnifiedDiffParser.parse(diff(path: path, staged: staged))
+	}
+
+	public func conflictBlob(path: String, stage: Int) throws -> String {
+		try runner.runGit(arguments: ["show", ":\(stage):\(path)"], root: root)
 	}
 
 	public func stage(paths: [String]) throws {

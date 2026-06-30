@@ -202,6 +202,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitUnifiedLineItems: [GitDiffLineItem] = []
 	private var gitRemoteProcess: Process?
 	private var gitRemoteLog = ""
+	private var gitConflictPanel: NSPanel?
+	private var gitConflictRootURL: URL?
+	private var gitConflictPath: String?
+	private var gitConflictMergedTextView: NSTextView?
+	private var gitConflictRegionStack: NSStackView?
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
@@ -1885,7 +1890,220 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		else {
 			return
 		}
-		_ = documentController.openDocument(at: gitRootURL.appendingPathComponent(gitEntries[tableView.selectedRow].path))
+		let entry = gitEntries[tableView.selectedRow]
+		if entry.isConflict {
+			showGitConflict(entry: entry, root: gitRootURL)
+			return
+		}
+		_ = documentController.openDocument(at: gitRootURL.appendingPathComponent(entry.path))
+	}
+
+	private func showGitConflict(entry: GitStatusEntry, root: URL) {
+		let repository = GitRepository(root: root)
+		let base = (try? repository.conflictBlob(path: entry.path, stage: 1)) ?? ""
+		let ours = (try? repository.conflictBlob(path: entry.path, stage: 2)) ?? ""
+		let theirs = (try? repository.conflictBlob(path: entry.path, stage: 3)) ?? ""
+		let mergedURL = root.appendingPathComponent(entry.path)
+		let merged = (try? String(contentsOf: mergedURL, encoding: .utf8)) ?? ""
+		gitConflictPanel?.close()
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 980, height: 760),
+			styleMask: [.titled, .closable, .resizable],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Resolve Conflict")
+		panel.isFloatingPanel = false
+		let contentView = NSView()
+		let titleLabel = NSTextField(labelWithString: entry.path)
+		titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+		let sourceSplit = NSSplitView()
+		sourceSplit.isVertical = true
+		sourceSplit.dividerStyle = .thin
+		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Ours (:2)"), text: ours, isEditable: false).view)
+		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Base (:1)"), text: base, isEditable: false).view)
+		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Theirs (:3)"), text: theirs, isEditable: false).view)
+		let mergedPane = makeGitConflictPane(title: L10n.string("Merged result"), text: merged, isEditable: true)
+		let regionStack = NSStackView()
+		regionStack.orientation = .vertical
+		regionStack.alignment = .leading
+		regionStack.spacing = 6
+		let regionScrollView = NSScrollView()
+		regionScrollView.documentView = regionStack
+		regionScrollView.hasVerticalScroller = true
+		regionScrollView.drawsBackground = false
+		let saveButton = NSButton(title: L10n.string("Save and Add"), target: self, action: #selector(saveGitConflict(_:)))
+		let closeButton = NSButton(title: L10n.string("Close"), target: self, action: #selector(closeGitConflict(_:)))
+		let footer = NSStackView(views: [saveButton, closeButton])
+		footer.orientation = .horizontal
+		footer.alignment = .centerY
+		footer.spacing = 8
+		let stack = NSStackView(views: [titleLabel, sourceSplit, mergedPane.view, regionScrollView, footer])
+		stack.orientation = .vertical
+		stack.alignment = .leading
+		stack.spacing = 10
+		stack.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(stack)
+		NSLayoutConstraint.activate([
+			stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+			sourceSplit.widthAnchor.constraint(equalTo: stack.widthAnchor),
+			sourceSplit.heightAnchor.constraint(equalToConstant: 180),
+			mergedPane.view.widthAnchor.constraint(equalTo: stack.widthAnchor),
+			mergedPane.view.heightAnchor.constraint(equalToConstant: 300),
+			regionScrollView.widthAnchor.constraint(equalTo: stack.widthAnchor),
+			regionScrollView.heightAnchor.constraint(equalToConstant: 140),
+		])
+		panel.contentView = contentView
+		gitConflictPanel = panel
+		gitConflictRootURL = root
+		gitConflictPath = entry.path
+		gitConflictMergedTextView = mergedPane.textView
+		gitConflictRegionStack = regionStack
+		refreshGitConflictRegions()
+		panel.center()
+		panel.makeKeyAndOrderFront(nil)
+	}
+
+	private func makeGitConflictPane(title: String, text: String, isEditable: Bool) -> (view: NSView, textView: NSTextView) {
+		let container = NSView()
+		let label = NSTextField(labelWithString: title)
+		label.font = .systemFont(ofSize: 11, weight: .semibold)
+		let scrollView = NSScrollView()
+		let textView = NSTextView()
+		textView.isEditable = isEditable
+		textView.isSelectable = true
+		textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+		textView.string = text
+		scrollView.documentView = textView
+		scrollView.hasVerticalScroller = true
+		scrollView.hasHorizontalScroller = true
+		label.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		container.addSubview(label)
+		container.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			label.topAnchor.constraint(equalTo: container.topAnchor),
+			scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 4),
+			scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+		])
+		return (container, textView)
+	}
+
+	private func refreshGitConflictRegions() {
+		guard let stack = gitConflictRegionStack, let textView = gitConflictMergedTextView else {
+			return
+		}
+		for view in stack.arrangedSubviews {
+			stack.removeArrangedSubview(view)
+			view.removeFromSuperview()
+		}
+		let regions = GitConflictParser.parse(textView.string)
+		if regions.isEmpty {
+			let label = NSTextField(labelWithString: L10n.string("No conflict markers remain"))
+			label.textColor = .secondaryLabelColor
+			stack.addArrangedSubview(label)
+			return
+		}
+		for (index, region) in regions.enumerated() {
+			let label = NSTextField(labelWithString: L10n.string("Region \(index + 1), lines \(region.startLine + 1)-\(region.endLine)"))
+			label.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+			let ours = NSButton(title: L10n.string("Accept Ours"), target: self, action: #selector(acceptGitConflictOurs(_:)))
+			let theirs = NSButton(title: L10n.string("Accept Theirs"), target: self, action: #selector(acceptGitConflictTheirs(_:)))
+			let both = NSButton(title: L10n.string("Accept Both"), target: self, action: #selector(acceptGitConflictBoth(_:)))
+			let edit = NSButton(title: L10n.string("Edit Manually"), target: self, action: #selector(editGitConflictManually(_:)))
+			for button in [ours, theirs, both, edit] {
+				button.bezelStyle = .rounded
+				button.font = .systemFont(ofSize: 11)
+				button.tag = index
+			}
+			let row = NSStackView(views: [label, ours, theirs, both, edit])
+			row.orientation = .horizontal
+			row.alignment = .centerY
+			row.spacing = 8
+			stack.addArrangedSubview(row)
+		}
+	}
+
+	private func applyGitConflictResolution(_ resolution: GitConflictResolution, sender: NSButton) {
+		guard let textView = gitConflictMergedTextView else {
+			return
+		}
+		textView.string = GitConflictParser.resolvedText(textView.string, regionIndex: sender.tag, resolution: resolution)
+		refreshGitConflictRegions()
+	}
+
+	@objc private func acceptGitConflictOurs(_ sender: NSButton) {
+		applyGitConflictResolution(.ours, sender: sender)
+	}
+
+	@objc private func acceptGitConflictTheirs(_ sender: NSButton) {
+		applyGitConflictResolution(.theirs, sender: sender)
+	}
+
+	@objc private func acceptGitConflictBoth(_ sender: NSButton) {
+		applyGitConflictResolution(.both, sender: sender)
+	}
+
+	@objc private func editGitConflictManually(_ sender: NSButton) {
+		guard let textView = gitConflictMergedTextView else {
+			return
+		}
+		let regions = GitConflictParser.parse(textView.string)
+		guard sender.tag >= 0, sender.tag < regions.count else {
+			return
+		}
+		textView.setSelectedRange(nsRangeForLines(regions[sender.tag].startLine ..< regions[sender.tag].endLine, in: textView.string))
+		gitConflictPanel?.makeFirstResponder(textView)
+	}
+
+	@objc private func saveGitConflict(_ sender: Any?) {
+		guard let root = gitConflictRootURL, let path = gitConflictPath, let textView = gitConflictMergedTextView else {
+			return
+		}
+		do {
+			try textView.string.write(to: root.appendingPathComponent(path), atomically: true, encoding: .utf8)
+			try GitRepository(root: root).stage(paths: [path])
+			gitConflictPanel?.close()
+			refreshGitChanges(nil)
+		} catch {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	@objc private func closeGitConflict(_ sender: Any?) {
+		gitConflictPanel?.close()
+	}
+
+	private func nsRangeForLines(_ lineRange: Range<Int>, in text: String) -> NSRange {
+		let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+		var offset = 0
+		var start = 0
+		var end = 0
+		for index in 0 ... lines.count {
+			if index == lineRange.lowerBound {
+				start = offset
+			}
+			if index == lineRange.upperBound {
+				end = offset
+				break
+			}
+			guard index < lines.count else {
+				break
+			}
+			offset += lines[index].utf16.count
+			if index < lines.count - 1 {
+				offset += 1
+			}
+		}
+		return NSRange(location: start, length: max(0, end - start))
 	}
 
 	private func gitEntryTitle(_ entry: GitStatusEntry) -> String {
@@ -1896,9 +2114,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private func gitEntryStatus(_ entry: GitStatusEntry) -> String {
 		if entry.kind == .untracked {
 			return "??"
-		}
-		if entry.kind == .unmerged {
-			return "UU"
 		}
 		let index = entry.indexStatus.map(String.init) ?? "."
 		let worktree = entry.worktreeStatus.map(String.init) ?? "."

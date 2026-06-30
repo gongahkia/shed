@@ -385,24 +385,36 @@ public struct GitRepository: Sendable {
 		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: true)
 	}
 
-	public func switchBranch(_ name: String) throws {
+	public func switchBranch(_ name: String, stashingDirtyChanges: Bool = false) throws {
 		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !name.isEmpty else {
 			throw GitBranchError.emptyName
 		}
+		if stashingDirtyChanges {
+			try stashForBranch(name)
+		}
 		_ = try runner.runGit(arguments: ["switch", name], root: root)
+		if stashingDirtyChanges {
+			try popStash()
+		}
 	}
 
-	public func createBranch(named name: String, from startPoint: String? = nil) throws {
+	public func createBranch(named name: String, from startPoint: String? = nil, stashingDirtyChanges: Bool = false) throws {
 		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !name.isEmpty else {
 			throw GitBranchError.emptyName
+		}
+		if stashingDirtyChanges {
+			try stashForBranch(name)
 		}
 		var arguments = ["switch", "-c", name]
 		if let startPoint, !startPoint.isEmpty {
 			arguments.append(startPoint)
 		}
 		_ = try runner.runGit(arguments: arguments, root: root)
+		if stashingDirtyChanges {
+			try popStash()
+		}
 	}
 
 	public func deleteBranch(_ name: String, force: Bool = false) throws {
@@ -411,6 +423,18 @@ public struct GitRepository: Sendable {
 			throw GitBranchError.emptyName
 		}
 		_ = try runner.runGit(arguments: ["branch", force ? "-D" : "-d", name], root: root)
+	}
+
+	public func stashForBranch(_ name: String) throws {
+		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !name.isEmpty else {
+			throw GitBranchError.emptyName
+		}
+		_ = try runner.runGit(arguments: ["stash", "push", "-u", "-m", "itsy-autostash-\(name)"], root: root)
+	}
+
+	public func popStash() throws {
+		_ = try runner.runGit(arguments: ["stash", "pop"], root: root)
 	}
 
 	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {

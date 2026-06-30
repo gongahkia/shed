@@ -117,6 +117,9 @@ public actor TagDispatcher {
         if window.isSticky || window.isPinned {
             return true
         }
+        if window.subrole == "AXDialog" {
+            return true
+        }
         return TagSet(rawValue: window.tagMask).intersects(visibleTags)
     }
 

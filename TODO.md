@@ -27,18 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.3 Quit-on-tag-switch dialog protection
-
-**Goal:** Don't park `AXDialog` subrole windows (especially destructive-op confirmation dialogs) offscreen during tag switch.
-
-**Files to modify:**
-- `Sources/ollyCore/TagDispatcher.swift:shouldShow` — add branch: if `WindowState.subrole == "AXDialog"`, never park (keep visible regardless of tag).
-
-**Test plan:**
-- Snapshot: dialog window on tag 1; switch to tag 2; assert dialog still visible.
-
----
-
 ### M4.4 Window-resize keyboard bindings
 
 **Goal:** Bind `Action.resize(Direction, points: CGFloat)` and `Action.split(Direction, ratio: CGFloat)` to keys.

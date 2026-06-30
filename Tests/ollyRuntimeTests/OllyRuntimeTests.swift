@@ -41,6 +41,33 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testSwitchTagKeepsDialogWindowVisibleAcrossTags() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            let inactive = try Tag(index: 1)
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 40,
+                    processID: 42,
+                    displayID: displayID,
+                    tagMask: TagSet(inactive).rawValue,
+                    frame: CGRect(x: 0, y: 0, width: 300, height: 200),
+                    title: "confirm",
+                    role: "AXWindow",
+                    subrole: "AXDialog"
+                ),
+                element: nil
+            )
+
+            let switched = try send(.switchTag(.init(tag: tag(2), displayID: displayID)), to: socketPath)
+            let parkedIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            let snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+
+            XCTAssertEqual(switched.status, .success)
+            XCTAssertTrue(parkedIDs.isEmpty)
+            XCTAssertEqual(snapshot.windows.map(\.windowID), [40])
+        }
+    }
+
     func testSwitchTagLaunchesConfiguredAppWhenNoBundleWindowExists() async throws {
         let launches = ApplicationLaunchRecorder()
         try await withRuntime(tagApplicationLauncher: { bundleID in await launches.record(bundleID) }) { runtime, socketPath, displayID in

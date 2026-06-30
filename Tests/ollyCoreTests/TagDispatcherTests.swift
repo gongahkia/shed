@@ -138,6 +138,28 @@ final class TagDispatcherTests: XCTestCase {
         XCTAssertTrue(recordedWindowIDs.isEmpty)
     }
 
+    func testApplyDoesNotHideDialogWindowWithoutActiveTags() async throws {
+        let active = try Tag(index: 0)
+        let inactive = try Tag(index: 1)
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(active))
+        let recorder = TagMoveRecorder()
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
+
+        await windowStore.upsert(window(
+            id: 1,
+            displayID: 7,
+            tagMask: TagSet(inactive).rawValue,
+            subrole: "AXDialog"
+        ))
+
+        let moves = await dispatcher.apply(displayID: 7)
+        let recordedWindowIDs = await recorder.windowIDs
+
+        XCTAssertTrue(moves.isEmpty)
+        XCTAssertTrue(recordedWindowIDs.isEmpty)
+    }
+
     func testApplySkipsOffSpaceWindow() async throws {
         let active = try Tag(index: 0)
         let inactive = try Tag(index: 1)
@@ -192,6 +214,7 @@ final class TagDispatcherTests: XCTestCase {
         isSticky: Bool = false,
         isFullscreen: Bool = false,
         isOffSpace: Bool = false,
+        subrole: String? = nil,
         frame: CGRect = CGRect(x: 0, y: 0, width: 100, height: 100)
     ) -> WindowState {
         WindowState(
@@ -202,7 +225,8 @@ final class TagDispatcherTests: XCTestCase {
             isSticky: isSticky,
             isFullscreen: isFullscreen,
             isOffSpace: isOffSpace,
-            frame: frame
+            frame: frame,
+            subrole: subrole
         )
     }
 

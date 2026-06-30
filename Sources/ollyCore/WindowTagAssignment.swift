@@ -15,7 +15,7 @@ public actor WindowTagAssignment {
     @discardableResult
     public func assign(window windowID: WindowID, tags: TagSet) async throws -> WindowState {
         let state = try await state(for: windowID)
-        let updated = copy(state, tagMask: tags.rawValue)
+        let updated = state.withTagMask(tags.rawValue)
         await windowStore.upsert(updated)
         return updated
     }
@@ -25,7 +25,7 @@ public actor WindowTagAssignment {
         let state = try await state(for: windowID)
         let tags = TagSet(rawValue: state.tagMask)
         let updatedTags = tags.contains(tag) ? tags.removing(tag) : tags.inserting(tag)
-        let updated = copy(state, tagMask: updatedTags.rawValue)
+        let updated = state.withTagMask(updatedTags.rawValue)
         await windowStore.upsert(updated)
         return updated
     }
@@ -34,6 +34,22 @@ public actor WindowTagAssignment {
     public func move(window windowID: WindowID, toDisplay displayID: DisplayID) async throws -> WindowState {
         let state = try await state(for: windowID)
         let updated = state.withDisplayID(displayID)
+        await windowStore.upsert(updated)
+        return updated
+    }
+
+    @discardableResult
+    public func setSticky(window windowID: WindowID, sticky: Bool) async throws -> WindowState {
+        let state = try await state(for: windowID)
+        let updated = state.withSticky(sticky)
+        await windowStore.upsert(updated)
+        return updated
+    }
+
+    @discardableResult
+    public func setPinned(window windowID: WindowID, pinned: Bool) async throws -> WindowState {
+        let state = try await state(for: windowID)
+        let updated = state.withPinned(pinned)
         await windowStore.upsert(updated)
         return updated
     }
@@ -53,19 +69,4 @@ public actor WindowTagAssignment {
         return state
     }
 
-    private func copy(_ state: WindowState, tagMask: UInt64) -> WindowState {
-        WindowState(
-            id: state.id,
-            processID: state.processID,
-            bundleID: state.bundleID,
-            displayID: state.displayID,
-            tagMask: tagMask,
-            isFloating: state.isFloating,
-            layoutOrder: state.layoutOrder,
-            frame: state.frame,
-            title: state.title,
-            role: state.role,
-            subrole: state.subrole
-        )
-    }
 }

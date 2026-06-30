@@ -65,13 +65,9 @@ public struct IPCTagCommand: Codable, Equatable, Sendable {
     }
 }
 
-public struct IPCReloadCommand: Codable, Equatable, Sendable {
-    public init() {}
-}
+public struct IPCReloadCommand: Codable, Equatable, Sendable { public init() {} }
 
-public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable {
-    public init() {}
-}
+public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable { public init() {} }
 
 public struct IPCSubscribeEventsCommand: Codable, Equatable, Sendable {
     public let eventKinds: [IPCEventKind]
@@ -132,6 +128,8 @@ public enum IPCCommand: Equatable, Sendable {
     case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
     case toggleFloating(IPCFloatingCommand)
+    case toggleSticky(IPCStickyCommand)
+    case togglePinned(IPCPinnedCommand)
     case snapWindow(IPCSnapWindowCommand)
     case dispatchGesture(IPCDispatchGestureCommand)
     case manualPreselect(IPCManualPreselectCommand)
@@ -167,6 +165,10 @@ public enum IPCCommand: Equatable, Sendable {
             return .swap
         case .toggleFloating:
             return .toggleFloating
+        case .toggleSticky:
+            return .toggleSticky
+        case .togglePinned:
+            return .togglePinned
         case .snapWindow:
             return .snapWindow
         case .dispatchGesture:
@@ -224,14 +226,8 @@ extension IPCCommand: Codable {
             self = try Self.decodeQueryCommand(name, from: container)
         case .focus, .moveWindow, .swap:
             self = try Self.decodeDirectionalCommand(name, from: container)
-        case .moveToDisplay:
-            self = .moveToDisplay(try container.decodeRequired(IPCMoveToDisplayCommand.self, forKey: .arguments))
-        case .toggleFloating:
-            self = .toggleFloating(
-                try container.decodeIfPresent(IPCFloatingCommand.self, forKey: .arguments) ?? .init()
-            )
-        case .snapWindow:
-            self = .snapWindow(try container.decodeRequired(IPCSnapWindowCommand.self, forKey: .arguments))
+        case .moveToDisplay, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow:
+            self = try Self.decodeWindowCommand(name, from: container)
         case .dispatchGesture:
             self = .dispatchGesture(try container.decodeRequired(IPCDispatchGestureCommand.self, forKey: .arguments))
         case .manualPreselect:
@@ -281,6 +277,27 @@ extension IPCCommand: Codable {
         }
     }
 
+    private static func decodeWindowCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        switch name {
+        case .moveToDisplay:
+            return .moveToDisplay(try container.decodeRequired(IPCMoveToDisplayCommand.self, forKey: .arguments))
+        case .toggleFloating:
+            let command = try container.decodeIfPresent(IPCFloatingCommand.self, forKey: .arguments) ?? .init()
+            return .toggleFloating(command)
+        case .toggleSticky:
+            let command = try container.decodeIfPresent(IPCStickyCommand.self, forKey: .arguments) ?? .init()
+            return .toggleSticky(command)
+        case .togglePinned:
+            let command = try container.decodeIfPresent(IPCPinnedCommand.self, forKey: .arguments) ?? .init()
+            return .togglePinned(command)
+        default:
+            return .snapWindow(try container.decodeRequired(IPCSnapWindowCommand.self, forKey: .arguments))
+        }
+    }
+
     // swiftlint:disable:next cyclomatic_complexity
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -298,6 +315,10 @@ extension IPCCommand: Codable {
         case let .moveToDisplay(command):
             try container.encode(command, forKey: .arguments)
         case let .toggleFloating(command):
+            try container.encode(command, forKey: .arguments)
+        case let .toggleSticky(command):
+            try container.encode(command, forKey: .arguments)
+        case let .togglePinned(command):
             try container.encode(command, forKey: .arguments)
         case let .snapWindow(command):
             try container.encode(command, forKey: .arguments)

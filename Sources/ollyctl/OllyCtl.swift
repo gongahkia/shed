@@ -19,6 +19,8 @@ struct OllyCtl: ParsableCommand {
             MoveToDisplay.self,
             Swap.self,
             ToggleFloating.self,
+            ToggleSticky.self,
+            TogglePinned.self,
             SnapWindow.self,
             DispatchGesture.self,
             SwitchTag.self,

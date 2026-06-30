@@ -66,6 +66,8 @@ final class IPCCommandTests: XCTestCase {
             .moveToDisplay(IPCMoveToDisplayCommand(displayID: 2, windowID: 42)),
             .swap(IPCDirectionalCommand(direction: .right)),
             .toggleFloating(IPCFloatingCommand(windowID: 42, floating: true, displayID: 1)),
+            .toggleSticky(IPCStickyCommand(windowID: 42, sticky: true, displayID: 1)),
+            .togglePinned(IPCPinnedCommand(windowID: 42, pinned: true, displayID: 1)),
             .snapWindow(IPCSnapWindowCommand(position: .topRight, windowID: 42, displayID: 1)),
             .dispatchGesture(IPCDispatchGestureCommand(
                 trigger: .fourFingerHorizontal,

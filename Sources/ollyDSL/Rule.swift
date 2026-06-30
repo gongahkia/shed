@@ -148,15 +148,31 @@ public struct RuleApply: Codable, Equatable, Sendable {
     public let tags: TagSet?
     public let engineOverride: LayoutEngineID?
     public let floating: Bool?
+    public let sticky: Bool?
+    public let pinned: Bool?
 
-    public init(tags: TagSet? = nil, engine: LayoutEngineID? = nil, floating: Bool? = nil) {
+    public init(
+        tags: TagSet? = nil,
+        engine: LayoutEngineID? = nil,
+        floating: Bool? = nil,
+        sticky: Bool? = nil,
+        pinned: Bool? = nil
+    ) {
         self.tags = tags
         self.engineOverride = engine
         self.floating = floating
+        self.sticky = sticky
+        self.pinned = pinned
     }
 
     @available(*, unavailable, message: "unknown-engine-id: use a typed LayoutEngineID such as .bsp")
-    public init(tags: TagSet? = nil, engine: String, floating: Bool? = nil) {
+    public init(
+        tags: TagSet? = nil,
+        engine: String,
+        floating: Bool? = nil,
+        sticky: Bool? = nil,
+        pinned: Bool? = nil
+    ) {
         fatalError()
     }
 
@@ -164,7 +180,9 @@ public struct RuleApply: Codable, Equatable, Sendable {
         RuleApply(
             tags: override.tags ?? tags,
             engine: override.engineOverride ?? engineOverride,
-            floating: override.floating ?? floating
+            floating: override.floating ?? floating,
+            sticky: override.sticky ?? sticky,
+            pinned: override.pinned ?? pinned
         )
     }
 }
@@ -282,6 +300,8 @@ public extension Config {
             displayID: state.displayID,
             tagMask: apply.tags?.rawValue ?? state.tagMask,
             isFloating: apply.floating ?? state.isFloating,
+            isSticky: apply.sticky ?? state.isSticky,
+            isPinned: apply.pinned ?? state.isPinned,
             layoutOrder: state.layoutOrder,
             frame: state.frame,
             title: state.title,

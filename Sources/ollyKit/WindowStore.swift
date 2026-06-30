@@ -10,11 +10,43 @@ public struct WindowState: Equatable, Sendable {
     public let displayID: DisplayID?
     public let tagMask: UInt64
     public let isFloating: Bool
+    public let isSticky: Bool
+    public let isPinned: Bool
     public let layoutOrder: Int?
     public let frame: CGRect
     public let title: String?
     public let role: String?
     public let subrole: String?
+
+    public init(
+        id: WindowID,
+        processID: pid_t,
+        bundleID: String? = nil,
+        displayID: DisplayID? = nil,
+        tagMask: UInt64 = 0,
+        isFloating: Bool = false,
+        isSticky: Bool = false,
+        isPinned: Bool = false,
+        layoutOrder: Int? = nil,
+        frame: CGRect,
+        title: String? = nil,
+        role: String? = nil,
+        subrole: String? = nil
+    ) {
+        self.id = id
+        self.processID = processID
+        self.bundleID = bundleID
+        self.displayID = displayID
+        self.tagMask = tagMask
+        self.isFloating = isFloating
+        self.isSticky = isSticky
+        self.isPinned = isPinned
+        self.layoutOrder = layoutOrder
+        self.frame = frame
+        self.title = title
+        self.role = role
+        self.subrole = subrole
+    }
 
     public init(
         id: WindowID,
@@ -29,17 +61,52 @@ public struct WindowState: Equatable, Sendable {
         role: String? = nil,
         subrole: String? = nil
     ) {
-        self.id = id
-        self.processID = processID
-        self.bundleID = bundleID
-        self.displayID = displayID
-        self.tagMask = tagMask
-        self.isFloating = isFloating
-        self.layoutOrder = layoutOrder
-        self.frame = frame
-        self.title = title
-        self.role = role
-        self.subrole = subrole
+        self.init(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            isSticky: false,
+            isPinned: false,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
+
+    public init(
+        id: WindowID,
+        processID: pid_t,
+        bundleID: String? = nil,
+        displayID: DisplayID? = nil,
+        tagMask: UInt64 = 0,
+        isFloating: Bool = false,
+        isSticky: Bool = false,
+        isPinned: Bool = false,
+        frame: CGRect,
+        title: String? = nil,
+        role: String? = nil,
+        subrole: String? = nil
+    ) {
+        self.init(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
+            layoutOrder: nil,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
     }
 
     public init(
@@ -61,6 +128,8 @@ public struct WindowState: Equatable, Sendable {
             displayID: displayID,
             tagMask: tagMask,
             isFloating: isFloating,
+            isSticky: false,
+            isPinned: false,
             layoutOrder: nil,
             frame: frame,
             title: title,
@@ -77,6 +146,8 @@ public struct WindowState: Equatable, Sendable {
             displayID: displayID,
             tagMask: tagMask,
             isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
             layoutOrder: layoutOrder,
             frame: frame,
             title: title,
@@ -93,6 +164,8 @@ public struct WindowState: Equatable, Sendable {
             displayID: displayID,
             tagMask: tagMask,
             isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
             layoutOrder: layoutOrder,
             frame: frame,
             title: title,
@@ -109,6 +182,62 @@ public struct WindowState: Equatable, Sendable {
             displayID: displayID,
             tagMask: tagMask,
             isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
+
+    public func withSticky(_ isSticky: Bool) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
+
+    public func withPinned(_ isPinned: Bool) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
+            layoutOrder: layoutOrder,
+            frame: frame,
+            title: title,
+            role: role,
+            subrole: subrole
+        )
+    }
+
+    public func withTagMask(_ tagMask: UInt64) -> WindowState {
+        WindowState(
+            id: id,
+            processID: processID,
+            bundleID: bundleID,
+            displayID: displayID,
+            tagMask: tagMask,
+            isFloating: isFloating,
+            isSticky: isSticky,
+            isPinned: isPinned,
             layoutOrder: layoutOrder,
             frame: frame,
             title: title,

@@ -23,38 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M1 — Reliability spine (yabai-class WM)
 
-### M1.2 Sticky / pinned per-tag windows
-
-**Goal:**
-- **Sticky** — window visible on every tag of every display.
-- **Pinned** — window stays on its display's current tag through tag switches (its `tagMask` is dynamically rewritten to the newly-active set).
-
-**Files to modify:**
-- `Sources/ollyKit/WindowStore.swift:6-118` — extend `WindowState` with `isSticky: Bool`, `isPinned: Bool`; add `withSticky(_:)`, `withPinned(_:)` copy helpers.
-- `Sources/ollyCore/TagDispatcher.swift:111-113` — extend `shouldShow`:
-```swift
-private func shouldShow(_ w: WindowState, activeTags: TagSet) -> Bool {
-    if w.isSticky || w.isPinned { return true }
-    return TagSet(rawValue: w.tagMask).intersects(activeTags)
-}
-```
-- `Sources/ollyRuntime/OllyRuntimeCommands.swift:103-117` — in `switchTag`/`toggleTag`, before `applyAndArrange`, rewrite `tagMask` for every pinned window on the affected display.
-- `Sources/ollyCore/WindowTagPersistence.swift:133-181` — extend `WindowTagRule` (covered by M0.5 migration).
-- `Sources/ollyDSL/Rule.swift:147-170` — add `sticky: Bool?`, `pinned: Bool?` to `RuleApply`; propagate through `merging` and `resolvedWindowState:268-291`.
-
-**IPC additions:**
-- Commands: `toggle-sticky`, `toggle-pinned`.
-- `IPCWindowState` (`Sources/ollyIPC/IPCStateSnapshot.swift:82-135`) gains `isSticky`, `isPinned`.
-
-**Test plan:**
-- Snapshot (`Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots`): three-tag scenario; window pinned to display 1; switch from tag 1 to tag 2; assert `tagMask` is rewritten to tag 2's bit and window stays unparked.
-- Unit: `TagDispatcher.apply` does not emit a hide for sticky windows even when their `tagMask` is 0.
-
-**Acceptance:**
-- `ollyctl toggle-sticky --windowID=N` round-trip flips visibility behaviour as described.
-
----
-
 ### M1.3 Workspace decouple across monitors
 
 **Goal:** Match the AeroSpace model — one global pool of tags (workspaces), each display independently picks which tag(s) it shows.

@@ -397,6 +397,41 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testToggleStickyUpdatesFocusedWindow() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            XCTAssertEqual(try send(.toggleSticky(.init()), to: socketPath).status, .success)
+            var snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isSticky, true)
+
+            let command = IPCStickyCommand(windowID: 1, sticky: false, displayID: displayID)
+            XCTAssertEqual(try send(.toggleSticky(command), to: socketPath).status, .success)
+            snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isSticky, false)
+        }
+    }
+
+    func testPinnedWindowTagMaskRewritesOnTagSwitch() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            XCTAssertEqual(try send(.togglePinned(.init(displayID: displayID)), to: socketPath).status, .success)
+            XCTAssertEqual(try send(.switchTag(.init(tag: tag(2), displayID: displayID)), to: socketPath).status, .success)
+
+            let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
+            let window = try XCTUnwrap(snapshot.windows.first)
+            XCTAssertEqual(window.tags.map(\.rawValue), [2])
+            XCTAssertEqual(window.isPinned, true)
+        }
+    }
+
     func testMoveToDisplayUpdatesWindowDisplay() async throws {
         let secondaryDisplay = Display(
             id: 99,

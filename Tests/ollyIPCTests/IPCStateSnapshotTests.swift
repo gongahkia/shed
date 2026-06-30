@@ -20,6 +20,8 @@ final class IPCStateSnapshotTests: XCTestCase {
             displayID: 9,
             tagMask: tagSet.rawValue,
             isFloating: true,
+            isSticky: true,
+            isPinned: true,
             layoutOrder: 4,
             frame: CGRect(x: 10, y: 20, width: 300, height: 400),
             title: "Editor",
@@ -35,9 +37,36 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertEqual(ipcState.displayID, 9)
         XCTAssertEqual(ipcState.tags.map(\.rawValue), [1, 3])
         XCTAssertTrue(ipcState.isFloating)
+        XCTAssertTrue(ipcState.isSticky)
+        XCTAssertTrue(ipcState.isPinned)
         XCTAssertEqual(ipcState.layoutOrder, 4)
         XCTAssertEqual(ipcState.frame, IPCFrame(x: 10, y: 20, width: 300, height: 400))
         XCTAssertEqual(ipcState.title, "Editor")
+    }
+
+    func testWindowStateDecodesMissingStickyPinnedAsFalse() throws {
+        let json = """
+        {
+          "windowID": 77,
+          "processID": 123,
+          "bundleID": "com.example.Editor",
+          "displayID": 9,
+          "tags": [1, 3],
+          "isFloating": true,
+          "layoutOrder": 4,
+          "frame": {"x": 10, "y": 20, "width": 300, "height": 400},
+          "title": "Editor",
+          "role": "AXWindow",
+          "subrole": "AXStandardWindow"
+        }
+        """
+
+        let ipcState = try JSONDecoder().decode(IPCWindowState.self, from: Data(json.utf8))
+
+        XCTAssertEqual(ipcState.windowID, 77)
+        XCTAssertTrue(ipcState.isFloating)
+        XCTAssertFalse(ipcState.isSticky)
+        XCTAssertFalse(ipcState.isPinned)
     }
 
     func testDisplayStateConvertsToIPCShape() throws {

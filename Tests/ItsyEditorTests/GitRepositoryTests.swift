@@ -152,6 +152,21 @@ import Testing
 	])
 }
 
+@Test func gitStashParserReadsFormattedRows() {
+	let output = """
+	stash@{0}|2026-06-30 10:11:12 +0800|WIP on main: one
+	stash@{1}|2026-06-29 09:00:00 +0800|message with | pipe
+	invalid
+	"""
+
+	let entries = GitStashParser.parse(output)
+
+	#expect(entries == [
+		GitStashEntry(ref: "stash@{0}", date: "2026-06-30 10:11:12 +0800", message: "WIP on main: one"),
+		GitStashEntry(ref: "stash@{1}", date: "2026-06-29 09:00:00 +0800", message: "message with | pipe"),
+	])
+}
+
 @Test func gitRepositoryRunsBranchListAndActions() throws {
 	let runner = RecordingGitRunner(output: "main\torigin/main\t*\t2 hours ago\trefs/heads/main\u{0}")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
@@ -175,6 +190,39 @@ import Testing
 		["branch", "-d", "topic"],
 		["branch", "-D", "topic"],
 	])
+}
+
+@Test func gitRepositoryRunsStashListAndActions() throws {
+	let runner = RecordingGitRunner(output: "stash@{0}|2026-06-30 10:11:12 +0800|work\n")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	let entries = try repository.stashes()
+	try repository.stash(message: " work in progress ")
+	try repository.applyStash(" stash@{0} ")
+	try repository.popStash("stash@{0}")
+	try repository.dropStash("stash@{0}")
+
+	#expect(entries == [
+		GitStashEntry(ref: "stash@{0}", date: "2026-06-30 10:11:12 +0800", message: "work"),
+	])
+	#expect(runner.recordedArguments == [
+		["stash", "list", "--format=%gd|%ai|%s"],
+		["stash", "push", "-u", "-m", "work in progress"],
+		["stash", "apply", "stash@{0}"],
+		["stash", "pop", "stash@{0}"],
+		["stash", "drop", "stash@{0}"],
+	])
+}
+
+@Test func gitRepositoryRejectsEmptyStashInputs() {
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: RecordingGitRunner())
+
+	#expect(throws: GitStashError.emptyMessage) {
+		try repository.stash(message: "  ")
+	}
+	#expect(throws: GitStashError.emptyRef) {
+		try repository.applyStash("  ")
+	}
 }
 
 @Test func gitRepositoryStashesAroundBranchSwitchAndCreateWhenRequested() throws {

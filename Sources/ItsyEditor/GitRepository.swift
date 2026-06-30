@@ -223,6 +223,35 @@ public enum GitBranchError: Error, Equatable, Sendable {
 	case emptyName
 }
 
+public struct GitStashEntry: Equatable, Sendable {
+	public var ref: String
+	public var date: String
+	public var message: String
+
+	public init(ref: String, date: String, message: String) {
+		self.ref = ref
+		self.date = date
+		self.message = message
+	}
+}
+
+public enum GitStashError: Error, Equatable, Sendable {
+	case emptyMessage
+	case emptyRef
+}
+
+public enum GitStashParser {
+	public static func parse(_ output: String) -> [GitStashEntry] {
+		output.split(whereSeparator: \.isNewline).compactMap { rawLine in
+			let fields = rawLine.split(separator: "|", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
+			guard fields.count == 3, !fields[0].isEmpty else {
+				return nil
+			}
+			return GitStashEntry(ref: fields[0], date: fields[1], message: fields[2])
+		}
+	}
+}
+
 public enum GitBranchParser {
 	public static func parse(_ output: String) -> [GitBranch] {
 		output.split(separator: "\0", omittingEmptySubsequences: true).compactMap { rawRecord in
@@ -488,8 +517,36 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["stash", "push", "-u", "-m", "itsy-autostash-\(name)"], root: root)
 	}
 
+	public func stashes() throws -> [GitStashEntry] {
+		let output = try runner.runGit(arguments: ["stash", "list", "--format=%gd|%ai|%s"], root: root)
+		return GitStashParser.parse(output)
+	}
+
+	public func stash(message: String) throws {
+		let message = message.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !message.isEmpty else {
+			throw GitStashError.emptyMessage
+		}
+		_ = try runner.runGit(arguments: ["stash", "push", "-u", "-m", message], root: root)
+	}
+
+	public func applyStash(_ ref: String) throws {
+		let ref = try validatedStashRef(ref)
+		_ = try runner.runGit(arguments: ["stash", "apply", ref], root: root)
+	}
+
 	public func popStash() throws {
 		_ = try runner.runGit(arguments: ["stash", "pop"], root: root)
+	}
+
+	public func popStash(_ ref: String) throws {
+		let ref = try validatedStashRef(ref)
+		_ = try runner.runGit(arguments: ["stash", "pop", ref], root: root)
+	}
+
+	public func dropStash(_ ref: String) throws {
+		let ref = try validatedStashRef(ref)
+		_ = try runner.runGit(arguments: ["stash", "drop", ref], root: root)
 	}
 
 	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {
@@ -517,6 +574,14 @@ public struct GitRepository: Sendable {
 		return output.split(separator: "\0", omittingEmptySubsequences: true)
 			.map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
 			.filter { !$0.isEmpty }
+	}
+
+	private func validatedStashRef(_ ref: String) throws -> String {
+		let ref = ref.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !ref.isEmpty else {
+			throw GitStashError.emptyRef
+		}
+		return ref
 	}
 
 	private func applyCachedPatch(_ patch: String, reverse: Bool) throws {

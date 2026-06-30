@@ -20,7 +20,8 @@ let package = Package(
         .library(name: "ollyRuntime", targets: ["ollyRuntime"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2")
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.8.2"),
+        .package(url: "https://github.com/microsoft/plcrashreporter", from: "1.12.2")
     ],
     targets: [
         .target(name: "ollyKit", exclude: ["README.md"]),
@@ -28,11 +29,22 @@ let package = Package(
         .target(name: "ollyLayouts", dependencies: ["ollyCore", "ollyKit"], exclude: ["README.md"]),
         .target(name: "ollyDSL", dependencies: ["ollyCore", "ollyKit", "ollyLayouts"], exclude: ["README.md"]),
         .target(name: "ollyIPC", dependencies: ["ollyKit", "ollyCore", "ollyLayouts"], exclude: ["README.md"]),
-        .target(name: "ollyDiagnostics"),
+        .target(
+            name: "ollyDiagnostics",
+            dependencies: [.product(name: "CrashReporter", package: "PLCrashReporter")]
+        ),
         .target(name: "ollyRuntime", dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC"]),
         .executableTarget(
             name: "ollyApp",
-            dependencies: ["ollyKit", "ollyCore", "ollyLayouts", "ollyDSL", "ollyIPC", "ollyRuntime"],
+            dependencies: [
+                "ollyKit",
+                "ollyCore",
+                "ollyLayouts",
+                "ollyDSL",
+                "ollyIPC",
+                "ollyRuntime",
+                "ollyDiagnostics"
+            ],
             exclude: ["README.md"]
         ),
         .executableTarget(
@@ -41,6 +53,7 @@ let package = Package(
                 "ollyDSL",
                 "ollyIPC",
                 "ollyLayouts",
+                "ollyDiagnostics",
                 .product(name: "ArgumentParser", package: "swift-argument-parser")
             ],
             exclude: ["README.md"]

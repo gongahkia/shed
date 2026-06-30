@@ -59,6 +59,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let scratchpads: Scratchpads
     public let session: Session
     public let permissions: Permissions
+    public let telemetry: Telemetry
 
     public init(
         version: DSLVersion = .v1,
@@ -76,7 +77,8 @@ public struct Config: Codable, Equatable, Sendable {
         focusPolicy: FocusPolicy = FocusPolicy(),
         scratchpads: Scratchpads = Scratchpads(),
         session: Session = Session(),
-        permissions: Permissions = Permissions()
+        permissions: Permissions = Permissions(),
+        telemetry: Telemetry = Telemetry()
     ) {
         self.version = version
         self.keybinds = keybinds
@@ -94,6 +96,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.scratchpads = scratchpads
         self.session = session
         self.permissions = permissions
+        self.telemetry = telemetry
     }
 
     public init(version: DSLVersion = .v1, @ConfigBuilder _ build: () -> [ConfigSection]) {
@@ -119,7 +122,8 @@ public struct Config: Codable, Equatable, Sendable {
             focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy(),
             scratchpads: try container.decodeIfPresent(Scratchpads.self, forKey: .scratchpads) ?? Scratchpads(),
             session: try container.decodeIfPresent(Session.self, forKey: .session) ?? Session(),
-            permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions) ?? Permissions()
+            permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions) ?? Permissions(),
+            telemetry: try container.decodeIfPresent(Telemetry.self, forKey: .telemetry) ?? Telemetry()
         )
     }
 
@@ -130,6 +134,7 @@ public struct Config: Codable, Equatable, Sendable {
         var animation = Animation(); var gestures = Gestures(); var hooks = Hooks()
         var nativeSpace = NativeSpace(); var focusRing = FocusRing(); var focusPolicy = FocusPolicy()
         var scratchpads = Scratchpads(); var session = Session(); var permissions = Permissions()
+        var telemetry = Telemetry()
 
         for section in sections {
             switch section {
@@ -163,6 +168,8 @@ public struct Config: Codable, Equatable, Sendable {
                 session = value
             case let .permissions(value):
                 permissions = value
+            case let .telemetry(value):
+                telemetry = value
             }
         }
 
@@ -182,7 +189,8 @@ public struct Config: Codable, Equatable, Sendable {
             focusPolicy: focusPolicy,
             scratchpads: scratchpads,
             session: session,
-            permissions: permissions
+            permissions: permissions,
+            telemetry: telemetry
         )
     }
 }
@@ -283,4 +291,5 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case scratchpads(Scratchpads)
     case session(Session)
     case permissions(Permissions)
+    case telemetry(Telemetry)
 }

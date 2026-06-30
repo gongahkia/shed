@@ -4,6 +4,7 @@ public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Send
     case acknowledged
     case cooperativeApps = "cooperative-apps"
     case restoredWindows = "restored-windows"
+    case ruleExplanation = "rule-explanation"
     case state
     case subscribed
     case version
@@ -80,6 +81,7 @@ public enum IPCCommandResult: Equatable, Sendable {
     case acknowledged(IPCAcknowledgement)
     case cooperativeApps(IPCCooperativeAppsInfo)
     case restoredWindows(IPCRestoreWindowsInfo)
+    case ruleExplanation(IPCRuleExplanation)
     case state(IPCStateSnapshot)
     case subscribed(IPCSubscriptionInfo)
     case version(IPCVersionInfo)
@@ -92,6 +94,8 @@ public enum IPCCommandResult: Equatable, Sendable {
             return .cooperativeApps
         case .restoredWindows:
             return .restoredWindows
+        case .ruleExplanation:
+            return .ruleExplanation
         case .state:
             return .state
         case .subscribed:
@@ -119,6 +123,8 @@ extension IPCCommandResult: Codable {
             self = .cooperativeApps(try container.decode(IPCCooperativeAppsInfo.self, forKey: .payload))
         case .restoredWindows:
             self = .restoredWindows(try container.decode(IPCRestoreWindowsInfo.self, forKey: .payload))
+        case .ruleExplanation:
+            self = .ruleExplanation(try container.decode(IPCRuleExplanation.self, forKey: .payload))
         case .state:
             self = .state(try container.decode(IPCStateSnapshot.self, forKey: .payload))
         case .subscribed:
@@ -138,6 +144,8 @@ extension IPCCommandResult: Codable {
         case let .cooperativeApps(payload):
             try container.encode(payload, forKey: .payload)
         case let .restoredWindows(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .ruleExplanation(payload):
             try container.encode(payload, forKey: .payload)
         case let .state(payload):
             try container.encode(payload, forKey: .payload)

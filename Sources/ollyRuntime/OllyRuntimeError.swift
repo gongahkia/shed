@@ -1,4 +1,5 @@
 import ApplicationServices
+import Foundation
 import ollyIPC
 import ollyKit
 
@@ -9,6 +10,7 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
     case missingFocusedWindow
     case missingDirectionalTarget(IPCDirection)
     case gestureUnbound(trigger: String, motion: String)
+    case ruleUnavailable(UUID)
     case unsupportedGestureAction(String)
     case axOperationFailed(String, AXError)
     case unsupportedAXCommand(String)
@@ -28,6 +30,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "no window in direction: \(direction.rawValue)"
         case let .gestureUnbound(trigger, motion):
             return "no gesture binding for \(trigger) \(motion)"
+        case let .ruleUnavailable(ruleID):
+            return "rule unavailable: \(ruleID.uuidString)"
         case let .unsupportedGestureAction(action):
             return "gesture action is unsupported: \(action)"
         case let .axOperationFailed(operation, error):
@@ -53,6 +57,8 @@ public enum OllyRuntimeError: Error, CustomStringConvertible {
             return "missing_directional_target"
         case .gestureUnbound:
             return "gesture_unbound"
+        case .ruleUnavailable:
+            return "rule_unavailable"
         case .unsupportedGestureAction:
             return "unsupported_gesture_action"
         case .axOperationFailed:

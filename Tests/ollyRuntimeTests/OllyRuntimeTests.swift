@@ -176,6 +176,89 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testExplainWindowReturnsRuleTracesAndFinalApply() async throws {
+        let first = Rule(
+            match: RuleMatch(bundleID: "com.example.Other"),
+            apply: RuleApply(engine: .floating)
+        )
+        let second = Rule(
+            match: RuleMatch(bundleID: "com.example.App", titleRegex: "^Build", role: "AXWindow"),
+            apply: RuleApply(engine: .floating, floating: false)
+        )
+        let third = Rule(match: subrole("AXDialog"), apply: RuleApply(floating: true))
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Rules {
+                    first
+                    second
+                    third
+                }
+            })
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    bundleID: "com.example.App",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 0, width: 200, height: 80),
+                    title: "Build Log",
+                    role: "AXWindow"
+                ),
+                element: nil
+            )
+
+            let response = try send(.explainWindow(.init(windowID: 1)), to: socketPath)
+
+            guard case let .ruleExplanation(explanation)? = response.result else {
+                return XCTFail("expected rule explanation")
+            }
+            XCTAssertEqual(explanation.windowID, 1)
+            XCTAssertEqual(explanation.traces.map(\.ruleID), [first.id, second.id, third.id])
+            XCTAssertEqual(explanation.traces.map(\.matched), [false, true, false])
+            XCTAssertEqual(explanation.traces[0].bundleIDMatched, false)
+            XCTAssertEqual(explanation.traces[1].titleMatched, true)
+            XCTAssertEqual(explanation.traces[2].predicateMatched, false)
+            XCTAssertEqual(explanation.finalApply.engineOverride, .floating)
+            XCTAssertEqual(explanation.finalApply.floating, false)
+        }
+    }
+
+    func testExplainRuleUsesFocusedWindowAndFiltersTrace() async throws {
+        let rule = Rule(
+            match: RuleMatch(bundleID: "com.example.App"),
+            apply: RuleApply(engine: .floating, floating: false)
+        )
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Rules {
+                    rule
+                }
+            })
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    bundleID: "com.example.App",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 0, width: 200, height: 80)
+                ),
+                element: nil
+            )
+            await runtime.setFocusedWindow(1)
+
+            let response = try send(.explainRule(.init(ruleID: rule.id)), to: socketPath)
+
+            guard case let .ruleExplanation(explanation)? = response.result else {
+                return XCTFail("expected rule explanation")
+            }
+            XCTAssertEqual(explanation.ruleID, rule.id)
+            XCTAssertEqual(explanation.traces.map(\.ruleID), [rule.id])
+            XCTAssertEqual(explanation.traces.map(\.matched), [true])
+        }
+    }
+
     func testCooperativeHideOnSwitchSetsLayoutOrderAndLeavesVisibleWindowsEmpty() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await runtime.replaceConfigForTest(Config {

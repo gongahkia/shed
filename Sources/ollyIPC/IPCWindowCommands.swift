@@ -1,3 +1,4 @@
+import Foundation
 import ollyKit
 
 public struct IPCWindowQueryCommand: Codable, Equatable, Sendable {
@@ -20,6 +21,22 @@ public struct IPCDisplayQueryCommand: Codable, Equatable, Sendable {
 
 public struct IPCListCooperativeAppsCommand: Codable, Equatable, Sendable {
     public init() {}
+}
+
+public struct IPCExplainWindowCommand: Codable, Equatable, Sendable {
+    public let windowID: WindowID?
+
+    public init(windowID: WindowID? = nil) {
+        self.windowID = windowID
+    }
+}
+
+public struct IPCExplainRuleCommand: Codable, Equatable, Sendable {
+    public let ruleID: UUID
+
+    public init(ruleID: UUID) {
+        self.ruleID = ruleID
+    }
 }
 
 public struct IPCCooperativeAppInfo: Codable, Equatable, Sendable {

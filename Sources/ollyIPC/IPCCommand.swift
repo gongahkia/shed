@@ -75,6 +75,8 @@ public enum IPCCommand: Equatable, Sendable {
     case listWindows(IPCWindowQueryCommand)
     case listDisplays(IPCDisplayQueryCommand)
     case listCooperativeApps(IPCListCooperativeAppsCommand)
+    case explainWindow(IPCExplainWindowCommand)
+    case explainRule(IPCExplainRuleCommand)
     case moveWindow(IPCDirectionalCommand)
     case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
@@ -113,6 +115,10 @@ public enum IPCCommand: Equatable, Sendable {
             return .listDisplays
         case .listCooperativeApps:
             return .listCooperativeApps
+        case .explainWindow:
+            return .explainWindow
+        case .explainRule:
+            return .explainRule
         case .moveWindow:
             return .moveWindow
         case .moveToDisplay:
@@ -184,8 +190,10 @@ extension IPCCommand: Codable {
         }
 
         switch name {
-        case .state, .listWindows, .listDisplays, .listCooperativeApps:
+        case .state, .listWindows, .listDisplays, .listCooperativeApps, .explainWindow:
             self = try Self.decodeQueryCommand(name, from: container)
+        case .explainRule:
+            self = .explainRule(try container.decodeRequired(IPCExplainRuleCommand.self, forKey: .arguments))
         case .focus, .moveWindow, .swap:
             self = try Self.decodeDirectionalCommand(name, from: container)
         case .moveToDisplay, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow:
@@ -244,6 +252,10 @@ extension IPCCommand: Codable {
             return .listCooperativeApps(
                 try container.decodeIfPresent(IPCListCooperativeAppsCommand.self, forKey: .arguments) ?? .init()
             )
+        case .explainWindow:
+            return .explainWindow(
+                try container.decodeIfPresent(IPCExplainWindowCommand.self, forKey: .arguments) ?? .init()
+            )
         default:
             return .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
         }
@@ -283,6 +295,10 @@ extension IPCCommand: Codable {
         case let .listDisplays(command):
             try container.encode(command, forKey: .arguments)
         case let .listCooperativeApps(command):
+            try container.encode(command, forKey: .arguments)
+        case let .explainWindow(command):
+            try container.encode(command, forKey: .arguments)
+        case let .explainRule(command):
             try container.encode(command, forKey: .arguments)
         case let .focus(command), let .moveWindow(command), let .swap(command):
             try container.encode(command, forKey: .arguments)

@@ -54,6 +54,13 @@ struct CommandPaletteActionCatalog {
                 .listDisplays(IPCDisplayQueryCommand())
             ),
             action(
+                "explain-focused-window",
+                "Explain Focused Window",
+                "Trace rule matches for the focused window",
+                ["inspect", "rules"],
+                .explainWindow(IPCExplainWindowCommand())
+            ),
+            action(
                 "toggle-floating",
                 "Toggle Floating",
                 "Toggle focused window tiling",

@@ -1103,6 +1103,71 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testRestoreOnLaunchRestoresJournaledTargetsWhenEnabled() async throws {
+        try await withRuntime { runtime, _, displayID in
+            let window = WindowState(
+                id: 90,
+                processID: getpid(),
+                displayID: displayID,
+                tagMask: 1,
+                isFloating: false,
+                layoutOrder: 0,
+                frame: CGRect(x: 10, y: 20, width: 300, height: 200),
+                title: "journaled",
+                role: "AXWindow",
+                subrole: "AXStandardWindow"
+            )
+            try await runtime.upsertRuntimeWindow(
+                window,
+                element: AXUIElementCreateApplication(getpid())
+            )
+            try await runtime.recoveryJournal.record(
+                window: window,
+                parkedFrame: CGRect(x: -10_000, y: -10_000, width: 300, height: 200)
+            )
+            await runtime.replaceConfigForTest(Config {
+                Session {
+                    restoreOnLaunch(true)
+                }
+            })
+
+            await runtime.restoreWindowsOnLaunchIfEnabled()
+
+            let remainingIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            XCTAssertTrue(remainingIDs.isEmpty)
+        }
+    }
+
+    func testRestoreOnLaunchDefaultsOff() async throws {
+        try await withRuntime { runtime, _, displayID in
+            let window = WindowState(
+                id: 91,
+                processID: getpid(),
+                displayID: displayID,
+                tagMask: 1,
+                isFloating: false,
+                layoutOrder: 0,
+                frame: CGRect(x: 10, y: 20, width: 300, height: 200),
+                title: "journaled",
+                role: "AXWindow",
+                subrole: "AXStandardWindow"
+            )
+            try await runtime.upsertRuntimeWindow(
+                window,
+                element: AXUIElementCreateApplication(getpid())
+            )
+            try await runtime.recoveryJournal.record(
+                window: window,
+                parkedFrame: CGRect(x: -10_000, y: -10_000, width: 300, height: 200)
+            )
+
+            await runtime.restoreWindowsOnLaunchIfEnabled()
+
+            let remainingIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            XCTAssertEqual(remainingIDs, [91])
+        }
+    }
+
     func testListWindowsAndDisplaysReturnScopedState() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             try await seedWindows(runtime, displayID: displayID, windows: [

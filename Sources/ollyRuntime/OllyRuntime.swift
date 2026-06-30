@@ -186,6 +186,7 @@ public actor OllyRuntime {
         startReduceMotionObservation()
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
+            await restoreWindowsOnLaunchIfEnabled()
             startApplicationObservation()
             startNativeSpaceObservation()
             focusInputAttribution.start()

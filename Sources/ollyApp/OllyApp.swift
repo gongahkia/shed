@@ -27,6 +27,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private lazy var focusRingController = FocusRingController(runtime: runtime)
     private lazy var dragSnapOverlayController = DragSnapOverlayController(runtime: runtime)
     private lazy var gridOverlayController = GridOverlayController(runtime: runtime)
+    private lazy var cheatsheetController = CheatsheetController(runtime: runtime)
     private lazy var settingsWindowController = SettingsWindowController(runtime: runtime)
     private lazy var runtimeEventStatusController = RuntimeEventStatusController(
         runtime: runtime
@@ -53,6 +54,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         focusRingController.start()
         dragSnapOverlayController.start()
         gridOverlayController.start()
+        cheatsheetController.start()
         runtimeEventStatusController.start()
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
@@ -68,6 +70,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         focusRingController.stop()
         dragSnapOverlayController.stop()
         gridOverlayController.stop()
+        cheatsheetController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         Task { [runtime, weak self] in
@@ -84,6 +87,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         focusRingController.stop()
         dragSnapOverlayController.stop()
         gridOverlayController.stop()
+        cheatsheetController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         statusController?.remove()

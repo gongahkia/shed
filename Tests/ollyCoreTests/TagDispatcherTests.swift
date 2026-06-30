@@ -75,6 +75,31 @@ final class TagDispatcherTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [2])
     }
 
+    func testApplyDoesNotParkWindowWhenTagIsActiveOnAnotherDisplay() async throws {
+        let one = try Tag(index: 1)
+        let two = try Tag(index: 2)
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: [])
+        let recorder = TagMoveRecorder()
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
+
+        await tagStore.setActiveTags(TagSet(one), on: 1)
+        await tagStore.setActiveTags(TagSet(two), on: 2)
+        await windowStore.upsert(window(id: 1, displayID: 2, tagMask: TagSet(one).rawValue))
+
+        let moves = await dispatcher.apply(displayID: 2)
+        let recordedWindowIDs = await recorder.windowIDs
+
+        XCTAssertTrue(moves.isEmpty)
+        XCTAssertTrue(recordedWindowIDs.isEmpty)
+
+        await tagStore.setActiveTags(TagSet(two), on: 1)
+        let hiddenMoves = await dispatcher.apply(displayID: 2)
+
+        XCTAssertEqual(hiddenMoves.map(\.windowID), [1])
+        XCTAssertEqual(hiddenMoves.first?.reason, .hide)
+    }
+
     func testApplyDoesNotHideStickyWindowWithoutActiveTags() async throws {
         let active = try Tag(index: 0)
         let windowStore = WindowStore()

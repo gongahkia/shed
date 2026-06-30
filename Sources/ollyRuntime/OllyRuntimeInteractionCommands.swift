@@ -104,7 +104,7 @@ extension OllyRuntime {
     }
 
     private func scrollColumns(_ direction: Direction, displayID requestedDisplayID: DisplayID?) async throws {
-        let displayID = try selectedDisplay(requestedDisplayID).requiredID()
+        let displayID = try await selectedDisplayID(requestedDisplayID)
         let windows = await visibleWindows(displayID: displayID)
         let sourceID = try focusedWindowID.requiredFocusedWindow()
         guard windows.contains(where: { $0.id == sourceID }) else {
@@ -126,7 +126,7 @@ extension OllyRuntime {
         displayID requestedDisplayID: DisplayID?,
         config: Config
     ) async throws {
-        let displayID = try selectedDisplay(requestedDisplayID).requiredID()
+        let displayID = try await selectedDisplayID(requestedDisplayID)
         let nextTag = try await nextGestureTag(direction: direction, displayID: displayID, config: config)
         await tagStore.setActiveTags(TagSet(nextTag), on: displayID)
         try await applyAndArrange(displayID: displayID)

@@ -109,6 +109,16 @@ public struct DisplayWorkspaceDeclaration: Equatable, Sendable {
     }
 }
 
+public struct WorkspaceDisplayAssignment: Codable, Equatable, Sendable {
+    public let displayID: DisplayID
+    public let tags: [Tag]
+
+    public init(displayID: DisplayID, tags: [Tag]) {
+        self.displayID = displayID
+        self.tags = tags
+    }
+}
+
 public enum WorkspaceDeclaration: Equatable, Sendable {
     case tag(NamedTagDeclaration)
     case display(DisplayWorkspaceDeclaration)
@@ -134,10 +144,16 @@ public func display(
 public struct Workspaces: Codable, Equatable, Sendable {
     public let tags: [NamedTag]
     public let engineBindings: [WorkspaceEngineBinding]
+    public let displayAssignments: [WorkspaceDisplayAssignment]
 
-    public init(_ tags: [NamedTag] = [], engineBindings: [WorkspaceEngineBinding] = []) {
+    public init(
+        _ tags: [NamedTag] = [],
+        engineBindings: [WorkspaceEngineBinding] = [],
+        displayAssignments: [WorkspaceDisplayAssignment] = []
+    ) {
         self.tags = tags
         self.engineBindings = engineBindings
+        self.displayAssignments = displayAssignments
     }
 
     public init(@WorkspacesBuilder _ build: () -> [WorkspaceDeclaration]) {
@@ -154,7 +170,11 @@ public struct Workspaces: Codable, Equatable, Sendable {
 
     public init(validating declarations: [WorkspaceDeclaration]) throws {
         let resolved = try Self.resolve(declarations)
-        self.init(resolved.tags, engineBindings: resolved.engineBindings)
+        self.init(
+            resolved.tags,
+            engineBindings: resolved.engineBindings,
+            displayAssignments: resolved.displayAssignments
+        )
     }
 
     public func tag(named name: String) -> Tag? {
@@ -181,9 +201,17 @@ public struct Workspaces: Codable, Equatable, Sendable {
         }
     }
 
+    public func initialTags(on displayID: DisplayID) -> TagSet? {
+        let tags = displayAssignments
+            .filter { $0.displayID == displayID }
+            .flatMap(\.tags)
+        return tags.isEmpty ? nil : TagSet(tags)
+    }
+
     private enum CodingKeys: String, CodingKey {
         case tags
         case engineBindings
+        case displayAssignments
     }
 
     public init(from decoder: Decoder) throws {
@@ -193,6 +221,10 @@ public struct Workspaces: Codable, Equatable, Sendable {
             engineBindings: try container.decodeIfPresent(
                 [WorkspaceEngineBinding].self,
                 forKey: .engineBindings
+            ) ?? [],
+            displayAssignments: try container.decodeIfPresent(
+                [WorkspaceDisplayAssignment].self,
+                forKey: .displayAssignments
             ) ?? []
         )
     }
@@ -201,34 +233,40 @@ public struct Workspaces: Codable, Equatable, Sendable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(tags, forKey: .tags)
         try container.encode(engineBindings, forKey: .engineBindings)
+        try container.encode(displayAssignments, forKey: .displayAssignments)
     }
 
-    private static func resolve(
-        _ declarations: [WorkspaceDeclaration]
-    ) throws -> (tags: [NamedTag], engineBindings: [WorkspaceEngineBinding]) {
-        var tagsByName: [String: Tag] = [:]
-        var seenNames = Set<String>()
+    private struct WorkspaceResolution {
         var tags: [NamedTag] = []
         var engineBindings: [WorkspaceEngineBinding] = []
+        var displayAssignments: [WorkspaceDisplayAssignment] = []
+    }
+
+    private static func resolve(_ declarations: [WorkspaceDeclaration]) throws -> WorkspaceResolution {
+        var tagsByName: [String: Tag] = [:]
+        var seenNames = Set<String>()
+        var resolution = WorkspaceResolution()
         for declaration in declarations {
             switch declaration {
             case let .tag(tagDeclaration):
                 guard seenNames.insert(tagDeclaration.name).inserted else {
                     throw WorkspacesError.duplicateTagName(tagDeclaration.name)
                 }
-                let tag = try resolveTag(tagDeclaration, tagsByName: &tagsByName, tags: &tags)
+                let tag = try resolveTag(tagDeclaration, tagsByName: &tagsByName, tags: &resolution.tags)
                 if let engineID = tagDeclaration.engineID {
-                    engineBindings.append(WorkspaceEngineBinding(tag: tag, engineID: engineID))
+                    resolution.engineBindings.append(WorkspaceEngineBinding(tag: tag, engineID: engineID))
                 }
             case let .display(displayDeclaration):
                 var seenDisplayNames = Set<String>()
+                var displayTags: [Tag] = []
                 for tagDeclaration in displayDeclaration.declarations {
                     guard seenDisplayNames.insert(tagDeclaration.name).inserted else {
                         throw WorkspacesError.duplicateTagName(tagDeclaration.name)
                     }
-                    let tag = try resolveTag(tagDeclaration, tagsByName: &tagsByName, tags: &tags)
+                    let tag = try resolveTag(tagDeclaration, tagsByName: &tagsByName, tags: &resolution.tags)
+                    displayTags.append(tag)
                     if let engineID = tagDeclaration.engineID {
-                        engineBindings.append(
+                        resolution.engineBindings.append(
                             WorkspaceEngineBinding(
                                 displayID: displayDeclaration.displayID,
                                 tag: tag,
@@ -237,9 +275,14 @@ public struct Workspaces: Codable, Equatable, Sendable {
                         )
                     }
                 }
+                if !displayTags.isEmpty {
+                    resolution.displayAssignments.append(
+                        WorkspaceDisplayAssignment(displayID: displayDeclaration.displayID, tags: displayTags)
+                    )
+                }
             }
         }
-        return (tags, engineBindings)
+        return resolution
     }
 
     private static func resolveTag(

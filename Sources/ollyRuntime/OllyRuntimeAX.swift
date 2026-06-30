@@ -13,7 +13,7 @@ extension OllyRuntime {
         guard AXPermission.isTrusted else {
             throw OllyRuntimeError.unsupportedAXCommand("focus")
         }
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let windows = await visibleWindows(displayID: displayID)
         guard !windows.isEmpty else {
             throw OllyRuntimeError.missingFocusedWindow

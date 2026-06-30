@@ -55,6 +55,26 @@ final class NamedTagTests: XCTestCase {
         XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 1), .bsp)
         XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 2), .tabbed)
         XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 3), .floating)
+        XCTAssertEqual(config.workspaces.initialTags(on: 1), TagSet(tag))
+        XCTAssertEqual(config.workspaces.initialTags(on: 2), TagSet(tag))
+        XCTAssertNil(config.workspaces.initialTags(on: 3))
+    }
+
+    func testDisplayWorkspaceDeclarationsCaptureInitialTagSets() throws {
+        let config = Config {
+            Workspaces {
+                display(1) {
+                    Tag.named("web")
+                    Tag.named("code")
+                }
+                display(2) {
+                    Tag.named("chat")
+                }
+            }
+        }
+
+        XCTAssertEqual(config.workspaces.initialTags(on: 1)?.tags.map(\.index), [0, 1])
+        XCTAssertEqual(config.workspaces.initialTags(on: 2)?.tags.map(\.index), [2])
     }
 
     func testDuplicateNamesThrow() {

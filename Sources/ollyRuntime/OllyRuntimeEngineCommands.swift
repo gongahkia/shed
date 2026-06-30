@@ -5,7 +5,7 @@ import ollyLayouts
 
 extension OllyRuntime {
     func manualPreselect(_ command: IPCManualPreselectCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let engineID = try await activeEngineID(on: displayID)
         guard engineID == ManualLayoutEngine.engineID else {
             throw OllyRuntimeError.unsupportedEngineCommand(
@@ -32,7 +32,7 @@ extension OllyRuntime {
     }
 
     func mutateBSPTree(_ command: IPCBSPTreeCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let engineID = try await activeEngineID(on: displayID)
         guard engineID == BSPLayoutEngine.engineID else {
             throw OllyRuntimeError.unsupportedEngineCommand(

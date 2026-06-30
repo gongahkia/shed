@@ -23,45 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M1 — Reliability spine (yabai-class WM)
 
-### M1.3 Workspace decouple across monitors
-
-**Goal:** Match the AeroSpace model — one global pool of tags (workspaces), each display independently picks which tag(s) it shows.
-
-**Research summary (AeroSpace model):**
-- Workspaces are shared between monitors; each workspace has exactly one assigned monitor at a time.
-- Different monitors **cannot** display the same workspace simultaneously.
-- `workspace-to-monitor-force-assignment` in TOML config pins workspaces to monitors.
-- Off-workspace windows are parked outside visible area (bottom-right or -left corner) — requires monitor arrangement with free corner.
-
-**Olly translation:** Already 90% wired — `DisplayTagState.activeTags` is per-display (`Sources/ollyCore/TagStore.swift:14-31`). Missing pieces:
-
-**Files to modify:**
-- `Sources/ollyCore/TagStore.swift:67-95` — add helper `func anyDisplayHasTagActive(_ tag: Tag) -> Bool` and `func globallyVisibleTagSet() async -> TagSet` (OR over all displays).
-- `Sources/ollyCore/TagDispatcher.swift:shouldShow` — a window is parked only if **no** display where it could live has its tag active.
-- `Sources/ollyCore/OffscreenParking.swift:38-49` — `origin(forSize:avoiding:)` currently unions every display's frame; verify it still correctly parks in the global negative-coord area (the AeroSpace pattern).
-- `Sources/ollyRuntime/OllyRuntimeCommands.swift:147-159` — `moveToDisplay` already arranges both source and dest; add `applyAndArrange` (dispatch + park step) for both.
-- Add `focusedDisplayID()` helper that reads focused window's display so unqualified DSL keybinds (`switchTag(2)` without `--displayID`) target the focused display.
-
-**DSL changes:**
-- Extend `Workspaces { display(1) { Tag.named("web") } display(2) { Tag.named("chat") } }` initial assignments — `Sources/ollyDSL/NamedTag.swift`.
-
-**Gotchas (from AeroSpace experience):**
-- If you preserve the "one tag per display at a time" invariant, swapping a tag from monitor A to monitor B implicitly swaps whatever was on B back to A.
-- Without that invariant (allow the same tag on multiple displays simultaneously), arrangement gets tricky because the layout engine state is per-display-per-tag. Olly's `tagToEngine` is already per-display, so allow multi-display visibility.
-
-**Test plan:**
-- Unit: extend `Tests/ollyCoreTests` for three displays with overlapping `activeTags`; assert `globallyVisibleTagSet()` correctness and per-display dispatch independence.
-- Snapshot: cross-display `applyAndArrange` flip; window parked only when tag inactive on **both** displays.
-
-**Acceptance:**
-- On a real 2-display Mac: `ollyctl switch-tag 1 --displayID=A` does not perturb display B; `ollyctl move-to-display B` followed by `ollyctl switch-tag 1 --displayID=B` shows the window on B without losing it on A.
-
-**Refs:**
-- https://nikitabobko.github.io/AeroSpace/guide
-- https://github.com/nikitabobko/AeroSpace/blob/main/docs/config-examples/default-config.toml
-
----
-
 ### M1.4 Per-window engine override (floating-only)
 
 **Goal:** A single window opts out of its tag's engine (e.g., Slack always floats inside a BSP tag).

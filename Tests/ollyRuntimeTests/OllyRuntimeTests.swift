@@ -41,6 +41,31 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testUnqualifiedSwitchTagTargetsFocusedWindowDisplay() async throws {
+        let secondaryDisplay = Display(
+            id: 77,
+            frame: CGRect(x: 1440, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 1440, y: 0, width: 1440, height: 860),
+            scaleFactor: 2,
+            localizedName: "Second Display",
+            isMain: false
+        )
+        try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, primaryDisplayID in
+            await seedWindows(runtime, displayID: secondaryDisplay.id, windows: [
+                (1, 0, CGRect(x: 1440, y: 0, width: 300, height: 300))
+            ])
+            await runtime.setFocusedWindow(1)
+
+            XCTAssertEqual(try send(.switchTag(.init(tag: tag(2))), to: socketPath).status, .success)
+
+            let displays = try stateSnapshot(from: send(.state(.init()), to: socketPath)).displays
+            let primary = try XCTUnwrap(displays.first { $0.displayID == primaryDisplayID })
+            let secondary = try XCTUnwrap(displays.first { $0.displayID == secondaryDisplay.id })
+            XCTAssertEqual(primary.activeTags.map(\.rawValue), [0])
+            XCTAssertEqual(secondary.activeTags.map(\.rawValue), [2])
+        }
+    }
+
     func testSetAndCycleEngineUpdateTagEngineBinding() async throws {
         try await withRuntime { _, socketPath, displayID in
             let set = try send(
@@ -79,6 +104,47 @@ final class OllyRuntimeTests: XCTestCase {
             let display = try XCTUnwrap(try stateSnapshot(from: send(.state(.init()), to: socketPath)).displays.first)
             XCTAssertEqual(display.tagEngines.first { $0.tag.rawValue == 0 }?.engineID, FloatingLayoutEngine.engineID)
             XCTAssertEqual(display.tagEngines.first { $0.tag.rawValue == 1 }?.engineID, MasterStackLayoutEngine.engineID)
+        }
+    }
+
+    func testDisplayWorkspaceInitialTagsInitializePerDisplay() async throws {
+        let secondDisplay = Display(
+            id: 77,
+            frame: CGRect(x: 1440, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 1440, y: 0, width: 1440, height: 860),
+            scaleFactor: 2,
+            localizedName: "Second Display",
+            isMain: false
+        )
+        let fixture = try RuntimeFixture(extraDisplays: [secondDisplay])
+        let runtime = fixture.makeRuntime()
+        let config = Config {
+            Workspaces {
+                display(fixture.display.id) {
+                    Tag.named("web")
+                }
+                display(secondDisplay.id) {
+                    Tag.named("chat")
+                }
+            }
+        }
+
+        do {
+            try await runtime.start()
+            await runtime.replaceConfigForTest(config)
+            await runtime.initializeDisplays()
+
+            let displays = try stateSnapshot(from: send(.state(.init()), to: fixture.socketPath)).displays
+            let primary = try XCTUnwrap(displays.first { $0.displayID == fixture.display.id })
+            let secondary = try XCTUnwrap(displays.first { $0.displayID == secondDisplay.id })
+            XCTAssertEqual(primary.activeTags.map(\.rawValue), [0])
+            XCTAssertEqual(secondary.activeTags.map(\.rawValue), [1])
+            await runtime.stop()
+            fixture.cleanup()
+        } catch {
+            await runtime.stop()
+            fixture.cleanup()
+            throw error
         }
     }
 
@@ -452,6 +518,36 @@ final class OllyRuntimeTests: XCTestCase {
             XCTAssertEqual(response.status, .success)
             let snapshot = try stateSnapshot(from: send(.listWindows(.init(windowID: 1)), to: socketPath))
             XCTAssertEqual(snapshot.windows.first?.displayID, 99)
+        }
+    }
+
+    func testMoveToDisplayDispatchesParkingForDestination() async throws {
+        let secondaryDisplay = Display(
+            id: 99,
+            frame: CGRect(x: 1440, y: 0, width: 1200, height: 900),
+            visibleFrame: CGRect(x: 1440, y: 0, width: 1200, height: 860),
+            scaleFactor: 2,
+            localizedName: "Secondary",
+            isMain: false
+        )
+        try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, displayID in
+            let inactive = try Tag(index: 1)
+            await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    displayID: displayID,
+                    tagMask: TagSet(inactive).rawValue,
+                    frame: CGRect(x: 0, y: 0, width: 300, height: 300)
+                ),
+                element: nil
+            )
+            await runtime.setFocusedWindow(1)
+
+            XCTAssertEqual(try send(.moveToDisplay(.init(displayID: 99)), to: socketPath).status, .success)
+
+            let parkedIDs = try await runtime.recoveryState().entries.map(\.windowID)
+            XCTAssertEqual(parkedIDs, [1])
         }
     }
 

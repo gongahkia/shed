@@ -40,7 +40,7 @@ extension OllyRuntime {
         _ command: IPCDirectionalCommand,
         operation: WindowReorderOperation
     ) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let windows = await visibleWindows(displayID: displayID)
         let sourceID = try focusedWindowID.requiredFocusedWindow()
         guard windows.contains(where: { $0.id == sourceID }) else {

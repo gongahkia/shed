@@ -27,20 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.5 Focus-follows-mouse (optional)
-
-**Goal:** Sloppy-focus toggle.
-
-**Files to modify:**
-- Reuse `CGEventTap` infra from M1.7 (`Sources/ollyKit/FocusInputAttribution.swift`).
-- New DSL: `FocusPolicy { followsMouse(delay: 100.ms) }`.
-
-**Gotchas:**
-- On `.mouseMoved` events, find window under cursor via `CGWindowListCopyWindowInfo` + bounds check; focus only if delay elapsed.
-- `.mouseMoved` is high-frequency — debounce and offload from tap callback.
-
----
-
 ### M4.6 First-run wizard
 
 **Goal:** Six-step setup for new users: welcome → AX → display profile → preset → cheatsheet → done.

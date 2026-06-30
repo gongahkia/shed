@@ -7,16 +7,6 @@ import ollyIPC
 import ollyKit
 import ollyLayouts
 
-public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> String?
-public typealias DisplayChangeStreamProvider = @Sendable () -> AsyncStream<DisplayChange>
-public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
-public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
-public typealias TagApplicationLauncher = @Sendable (String) async throws -> Void
-public typealias ScratchpadApplicationLauncher = @Sendable (String) async throws -> Void
-public typealias ScratchpadFocusHandler = @Sendable (WindowState) async throws -> Void
-public typealias ReduceMotionValueProvider = @MainActor @Sendable () -> Bool
-public typealias ReduceMotionChangeStreamProvider = @Sendable () -> AsyncStream<Void>
-
 // swiftlint:disable:next type_body_length
 public actor OllyRuntime {
     let socketPath: IPCSocketPath
@@ -58,7 +48,8 @@ public actor OllyRuntime {
     let displayChangeStream: DisplayChangeStreamProvider
     let activeSpaceWindowIDs: ActiveSpaceWindowIDProvider
     let nativeSpaceChangeStream: NativeSpaceChangeStreamProvider
-    let focusInputAttribution: FocusInputAttribution
+    let focusInputAttribution: FocusInputAttribution; let mouseMoveStream: MouseMoveStreamProvider
+    let windowUnderPointCandidates: WindowUnderPointCandidateProvider; let axWindowFocusSetter: AXWindowFocusSetter
     let presentAXOnboarding: @MainActor @Sendable () async -> Void
     let fullscreenDebounceNanoseconds: UInt64
     let nativeSpaceDebounceNanoseconds: UInt64
@@ -70,6 +61,7 @@ public actor OllyRuntime {
     var displayObservationTask: Task<Void, Never>?
     var nativeSpaceObservationTask: Task<Void, Never>?
     var reduceMotionObservationTask: Task<Void, Never>?
+    var focusFollowsMouseTask: Task<Void, Never>?; var focusFollowsMouseDebounceTask: Task<Void, Never>?
     var nativeSpaceVerificationTask: Task<Void, Never>?
     var axPermissionStatus: AXPermissionStatus?
     var nativeSpaceDriftPolicy: NativeSpaceDriftPolicy = .followWindow
@@ -103,6 +95,10 @@ public actor OllyRuntime {
         reduceMotionChangeStream: @escaping ReduceMotionChangeStreamProvider =
             OllyRuntime.defaultReduceMotionChangeStream,
         focusInputAttribution: FocusInputAttribution = .shared,
+        mouseMoveStream: MouseMoveStreamProvider? = nil,
+        windowUnderPointCandidates: @escaping WindowUnderPointCandidateProvider =
+            { WindowUnderPointResolver.systemCandidates() },
+        axWindowFocusSetter: @escaping AXWindowFocusSetter = { await OllyRuntime.defaultAXWindowFocusSetter($0) },
         tagApplicationLauncher: @escaping TagApplicationLauncher =
             { try await OllyRuntime.defaultTagApplicationLauncher($0) },
         scratchpadApplicationLauncher: @escaping ScratchpadApplicationLauncher =
@@ -127,6 +123,9 @@ public actor OllyRuntime {
         self.reduceMotionChangeStream = reduceMotionChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.focusInputAttribution = focusInputAttribution
+        self.mouseMoveStream = mouseMoveStream ?? { focusInputAttribution.mouseMoves() }
+        self.windowUnderPointCandidates = windowUnderPointCandidates
+        self.axWindowFocusSetter = axWindowFocusSetter
         self.tagApplicationLauncher = tagApplicationLauncher
         self.scratchpadApplicationLauncher = scratchpadApplicationLauncher
         self.scratchpadFocusWindow = scratchpadFocusWindow
@@ -213,6 +212,8 @@ public actor OllyRuntime {
         nativeSpaceObservationTask?.cancel()
         nativeSpaceObservationTask = nil
         reduceMotionObservationTask?.cancel(); reduceMotionObservationTask = nil
+        focusFollowsMouseTask?.cancel(); focusFollowsMouseTask = nil
+        focusFollowsMouseDebounceTask?.cancel(); focusFollowsMouseDebounceTask = nil
         nativeSpaceVerificationTask?.cancel()
         nativeSpaceVerificationTask = nil
         focusInputAttribution.stop()

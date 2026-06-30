@@ -895,6 +895,47 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testFocusFollowsMouseFocusesWindowUnderCursor() async throws {
+        let mouseMoves = MouseMoveProbe()
+        let focusedTargets = FocusTargetRecorder()
+        let candidates = [
+            WindowUnderPointCandidate(
+                windowID: 2,
+                processID: 42,
+                layer: 0,
+                bounds: CGRect(x: 300, y: 0, width: 300, height: 200)
+            )
+        ]
+
+        try await withRuntime(
+            mouseMoveStream: { mouseMoves.stream() },
+            windowUnderPointCandidates: { candidates },
+            axWindowFocusSetter: { target in
+                await focusedTargets.record(target.id)
+                return .success
+            }
+        ) { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                FocusPolicy {
+                    followsMouse(delay: 0.ms)
+                }
+            })
+            try await seedWindows(runtime, displayID: displayID, windows: [
+                (1, 0, CGRect(x: 0, y: 0, width: 300, height: 200)),
+                (2, 1, CGRect(x: 300, y: 0, width: 300, height: 200))
+            ])
+            await runtime.setWindowTargetForTest(2, displayID: displayID)
+
+            mouseMoves.send(CGPoint(x: 350, y: 50))
+            try await waitForFocusedWindow(2, in: runtime)
+
+            let snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            let focusedIDs = await focusedTargets.ids
+            XCTAssertEqual(snapshot.focusedWindowID, 2)
+            XCTAssertEqual(focusedIDs, [2])
+        }
+    }
+
     func testWindowAppearedAndClosedHooksRunFromAXLifecycle() async throws {
         let recorder = HookRecorder()
         let element = AXUIElementCreateApplication(9876)
@@ -1578,6 +1619,10 @@ private func withRuntime(
     displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
     activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
     focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
+    mouseMoveStream: MouseMoveStreamProvider? = nil,
+    windowUnderPointCandidates: @escaping WindowUnderPointCandidateProvider =
+        { WindowUnderPointResolver.systemCandidates() },
+    axWindowFocusSetter: @escaping AXWindowFocusSetter = { await OllyRuntime.defaultAXWindowFocusSetter($0) },
     tagApplicationLauncher: @escaping TagApplicationLauncher = { _ in },
     fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
     extraDisplays: [Display] = [],
@@ -1591,6 +1636,9 @@ private func withRuntime(
         displayChangeStream: displayChangeStream,
         activeSpaceWindowIDs: activeSpaceWindowIDs,
         focusInputAttribution: focusInputAttribution,
+        mouseMoveStream: mouseMoveStream,
+        windowUnderPointCandidates: windowUnderPointCandidates,
+        axWindowFocusSetter: axWindowFocusSetter,
         tagApplicationLauncher: tagApplicationLauncher,
         fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
     )
@@ -1649,6 +1697,7 @@ private extension OllyRuntime {
             maxEventsPerSecond: config.focusPolicy.maxEventsPerSecond,
             minHumanIntervalMilliseconds: config.focusPolicy.minHumanIntervalMilliseconds
         ))
+        configureFocusFollowsMouse()
     }
 
     func windowStateForTest(_ id: WindowID) async -> WindowState? {
@@ -1659,9 +1708,66 @@ private extension OllyRuntime {
         axPermissionStatus = status
     }
 
+    func focusedWindowForTest() -> WindowID? {
+        focusedWindowID
+    }
+
+    func setWindowTargetForTest(_ id: WindowID, displayID: DisplayID) {
+        let target = WindowMoveTarget(
+            id: id,
+            axElement: AXUIElementCreateApplication(42),
+            displayID: displayID
+        )
+        windowTargets.set(target, for: id)
+    }
+
     func registerApplicationForTest(processID: pid_t, bundleID: String? = nil) {
         applicationsByProcessID[processID] = Application(processID: processID, bundleIdentifier: bundleID)
     }
+}
+
+private final class MouseMoveProbe: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: AsyncStream<CGPoint>.Continuation?
+
+    func stream() -> AsyncStream<CGPoint> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            lock.lock()
+            self.continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    func send(_ point: CGPoint) {
+        lock.lock()
+        let continuation = continuation
+        lock.unlock()
+        continuation?.yield(point)
+    }
+}
+
+private actor FocusTargetRecorder {
+    private var values: [WindowID?] = []
+
+    var ids: [WindowID?] {
+        values
+    }
+
+    func record(_ id: WindowID?) {
+        values.append(id)
+    }
+}
+
+private func waitForFocusedWindow(_ windowID: WindowID, in runtime: OllyRuntime) async throws {
+    let deadline = Date().addingTimeInterval(1)
+    while Date() < deadline {
+        if await runtime.focusedWindowForTest() == windowID {
+            return
+        }
+        try await Task.sleep(nanoseconds: 10_000_000)
+    }
+    XCTFail("timed out waiting for focused window \(windowID)")
+    throw RuntimeTestError.unexpectedResponse
 }
 
 private final class HookRecorder: @unchecked Sendable {
@@ -1793,6 +1899,10 @@ private struct RuntimeFixture {
         displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
+        mouseMoveStream: MouseMoveStreamProvider? = nil,
+        windowUnderPointCandidates: @escaping WindowUnderPointCandidateProvider =
+            { WindowUnderPointResolver.systemCandidates() },
+        axWindowFocusSetter: @escaping AXWindowFocusSetter = { await OllyRuntime.defaultAXWindowFocusSetter($0) },
         tagApplicationLauncher: @escaping TagApplicationLauncher = { _ in },
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000
     ) -> OllyRuntime {
@@ -1824,6 +1934,9 @@ private struct RuntimeFixture {
             displayChangeStream: displayChangeStream,
             activeSpaceWindowIDs: activeSpaceWindowIDs,
             focusInputAttribution: focusInputAttribution,
+            mouseMoveStream: mouseMoveStream,
+            windowUnderPointCandidates: windowUnderPointCandidates,
+            axWindowFocusSetter: axWindowFocusSetter,
             tagApplicationLauncher: tagApplicationLauncher,
             fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,
             presentAXOnboarding: {}

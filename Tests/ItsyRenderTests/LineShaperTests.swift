@@ -14,6 +14,7 @@ import Testing
 	#expect(glyphs.count == 5)
 	#expect(glyphs.allSatisfy { $0.glyphID != 0 })
 	#expect(glyphs.allSatisfy { $0.atlasUV.u0 >= 0 && $0.atlasUV.u1 <= 1 && $0.atlasUV.v0 >= 0 && $0.atlasUV.v1 <= 1 })
+	#expect(glyphs.allSatisfy { $0.atlasUV.u0 > 0 && $0.atlasUV.v0 > 0 })
 }
 
 @Test func lineShaperShapes100LineBufferWithinBudget() throws {

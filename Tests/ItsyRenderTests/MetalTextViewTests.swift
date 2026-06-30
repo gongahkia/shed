@@ -80,6 +80,27 @@ import Testing
 	#expect(trigger == ".")
 }
 
+@Test func signatureHelpTriggerAndCloseCharactersNotifyAfterEdit() {
+	let view = MetalTextView(frame: .zero)
+	view.signatureHelpTriggerCharacters = ["(", ","]
+	var trigger: String?
+	var dismissCount = 0
+	view.signatureHelpRequested = { value in
+		trigger = value
+		return true
+	}
+	view.signatureHelpDismissRequested = {
+		dismissCount += 1
+	}
+
+	#expect(view.handleKey(characters: "(", charactersIgnoringModifiers: "(", keyCode: 0))
+	#expect(trigger == "(")
+	#expect(view.handleKey(characters: ")", charactersIgnoringModifiers: ")", keyCode: 0))
+	#expect(dismissCount == 1)
+	_ = view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53)
+	#expect(dismissCount == 2)
+}
+
 @Test func commandDSelectsCurrentWordThenAddsNextMatch() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "foo bar foo foo")

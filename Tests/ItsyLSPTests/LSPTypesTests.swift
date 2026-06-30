@@ -134,11 +134,15 @@ import Testing
 				"triggerCharacters": .array([.string("."), .string(":")]),
 				"resolveProvider": .bool(true),
 			]),
+			"signatureHelpProvider": .object([
+				"triggerCharacters": .array([.string("("), .string(",")]),
+			]),
 		]),
 	]))
 
 	#expect(result.capabilities.completionProvider?.triggerCharacters == [".", ":"])
 	#expect(result.capabilities.completionProvider?.resolveProvider == true)
+	#expect(result.capabilities.signatureHelpProvider?.triggerCharacters == ["(", ","])
 }
 
 @Test func completionItemResolveDecodesMarkupAndPreservesData() throws {
@@ -198,6 +202,44 @@ import Testing
 		.string("plain"),
 		.languageString(language: "swift", value: "let x = 1"),
 	]))
+}
+
+@Test func signatureHelpParamsEncodeContextAndResultDecodesActiveParameter() throws {
+	let params = LSPSignatureHelpParams(
+		textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift"),
+		position: LSPPosition(line: 4, character: 10),
+		context: LSPSignatureHelpContext(triggerKind: .triggerCharacter, triggerCharacter: "(", isRetrigger: false)
+	)
+	let value = try LSPAny(encoding: params)
+	let result = try LSPSignatureHelpResult(decoding: Data(#"""
+	{
+	  "signatures": [
+	    {
+	      "label": "print(_:separator:terminator:)",
+	      "parameters": [
+	        { "label": [6, 7] },
+	        { "label": "separator:" }
+	      ],
+	      "activeParameter": 1
+	    }
+	  ],
+	  "activeSignature": 0
+	}
+	"""#.utf8))
+
+	#expect(LSPMethod.textDocumentSignatureHelp == "textDocument/signatureHelp")
+	#expect(value == .object([
+		"textDocument": .object(["uri": .string("file:///tmp/main.swift")]),
+		"position": .object(["line": .int(4), "character": .int(10)]),
+		"context": .object([
+			"triggerKind": .int(2),
+			"triggerCharacter": .string("("),
+			"isRetrigger": .bool(false),
+		]),
+	]))
+	#expect(result.help?.activeSignature == 0)
+	#expect(result.help?.signatures.first?.activeParameter == 1)
+	#expect(result.help?.signatures.first?.parameters?.first?.label == .offsets(start: 6, end: 7))
 }
 
 @Test func referencesParamsEncodeContextAndResultDecodesLocations() throws {

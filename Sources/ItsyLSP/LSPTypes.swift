@@ -12,6 +12,7 @@ public enum LSPMethod {
 	public static let textDocumentCompletion = "textDocument/completion"
 	public static let completionItemResolve = "completionItem/resolve"
 	public static let textDocumentHover = "textDocument/hover"
+	public static let textDocumentSignatureHelp = "textDocument/signatureHelp"
 	public static let textDocumentDefinition = "textDocument/definition"
 	public static let textDocumentReferences = "textDocument/references"
 	public static let textDocumentRename = "textDocument/rename"
@@ -152,6 +153,114 @@ public struct LSPTextDocumentPositionParams: Codable, Equatable, Sendable {
 }
 
 public typealias LSPHoverParams = LSPTextDocumentPositionParams
+
+public enum LSPSignatureHelpTriggerKind: Int, Codable, Equatable, Sendable {
+	case invoked = 1
+	case triggerCharacter = 2
+	case contentChange = 3
+}
+
+public struct LSPSignatureHelpContext: Codable, Equatable, Sendable {
+	public var triggerKind: LSPSignatureHelpTriggerKind
+	public var triggerCharacter: String?
+	public var isRetrigger: Bool
+	public var activeSignatureHelp: LSPSignatureHelp?
+
+	public init(
+		triggerKind: LSPSignatureHelpTriggerKind,
+		triggerCharacter: String? = nil,
+		isRetrigger: Bool = false,
+		activeSignatureHelp: LSPSignatureHelp? = nil
+	) {
+		self.triggerKind = triggerKind
+		self.triggerCharacter = triggerCharacter
+		self.isRetrigger = isRetrigger
+		self.activeSignatureHelp = activeSignatureHelp
+	}
+}
+
+public struct LSPSignatureHelpParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var position: LSPPosition
+	public var context: LSPSignatureHelpContext?
+
+	public init(textDocument: LSPTextDocumentIdentifier, position: LSPPosition, context: LSPSignatureHelpContext? = nil) {
+		self.textDocument = textDocument
+		self.position = position
+		self.context = context
+	}
+}
+
+public enum LSPParameterLabel: Equatable, Sendable {
+	case string(String)
+	case offsets(start: Int, end: Int)
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(String.self) {
+			self = .string(value)
+			return
+		}
+		let offsets = try container.decode([Int].self)
+		guard offsets.count == 2 else {
+			throw DecodingError.dataCorruptedError(in: container, debugDescription: "parameter label offsets require two integers")
+		}
+		self = .offsets(start: offsets[0], end: offsets[1])
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .string(value):
+			try container.encode(value)
+		case let .offsets(start, end):
+			try container.encode([start, end])
+		}
+	}
+}
+
+extension LSPParameterLabel: Codable {}
+
+public struct LSPParameterInformation: Codable, Equatable, Sendable {
+	public var label: LSPParameterLabel
+	public var documentation: LSPAny?
+
+	public init(label: LSPParameterLabel, documentation: LSPAny? = nil) {
+		self.label = label
+		self.documentation = documentation
+	}
+}
+
+public struct LSPSignatureInformation: Codable, Equatable, Sendable {
+	public var label: String
+	public var documentation: LSPAny?
+	public var parameters: [LSPParameterInformation]?
+	public var activeParameter: Int?
+
+	public init(
+		label: String,
+		documentation: LSPAny? = nil,
+		parameters: [LSPParameterInformation]? = nil,
+		activeParameter: Int? = nil
+	) {
+		self.label = label
+		self.documentation = documentation
+		self.parameters = parameters
+		self.activeParameter = activeParameter
+	}
+}
+
+public struct LSPSignatureHelp: Codable, Equatable, Sendable {
+	public var signatures: [LSPSignatureInformation]
+	public var activeSignature: Int?
+	public var activeParameter: Int?
+
+	public init(signatures: [LSPSignatureInformation], activeSignature: Int? = nil, activeParameter: Int? = nil) {
+		self.signatures = signatures
+		self.activeSignature = activeSignature
+		self.activeParameter = activeParameter
+	}
+}
 
 public struct LSPReferenceContext: Codable, Equatable, Sendable {
 	public var includeDeclaration: Bool
@@ -364,6 +473,31 @@ public enum LSPHoverResult: Equatable, Sendable {
 	}
 }
 
+public enum LSPSignatureHelpResult: Equatable, Sendable {
+	case help(LSPSignatureHelp)
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let help = try? decoder.decode(LSPSignatureHelp.self, from: data), !help.signatures.isEmpty {
+			self = .help(help)
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var help: LSPSignatureHelp? {
+		guard case let .help(value) = self else {
+			return nil
+		}
+		return value
+	}
+}
+
 public enum LSPCompletionResult: Equatable, Sendable {
 	case list(LSPCompletionList)
 	case items([LSPCompletionItem])
@@ -433,11 +567,23 @@ public struct LSPCompletionOptions: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPSignatureHelpOptions: Codable, Equatable, Sendable {
+	public var triggerCharacters: [String]?
+	public var retriggerCharacters: [String]?
+
+	public init(triggerCharacters: [String]? = nil, retriggerCharacters: [String]? = nil) {
+		self.triggerCharacters = triggerCharacters
+		self.retriggerCharacters = retriggerCharacters
+	}
+}
+
 public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 	public var completionProvider: LSPCompletionOptions?
+	public var signatureHelpProvider: LSPSignatureHelpOptions?
 
-	public init(completionProvider: LSPCompletionOptions? = nil) {
+	public init(completionProvider: LSPCompletionOptions? = nil, signatureHelpProvider: LSPSignatureHelpOptions? = nil) {
 		self.completionProvider = completionProvider
+		self.signatureHelpProvider = signatureHelpProvider
 	}
 }
 

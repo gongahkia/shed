@@ -159,11 +159,14 @@ public final class MetalTextView: NSView {
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
 	public var completionRequested: ((String?) -> Bool)?
+	public var signatureHelpRequested: ((String?) -> Bool)?
+	public var signatureHelpDismissRequested: (() -> Void)?
 	public var hoverCandidateChanged: ((TextHoverCandidate?) -> Void)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var keymapEngine = KeymapEngine()
 	public var completionTriggerCharacters: Set<String> = []
+	public var signatureHelpTriggerCharacters: Set<String> = []
 	private var pendingCharacterMotion: CharacterMotion?
 	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
 	private var pendingOperator: VimOperator?
@@ -492,6 +495,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func keyDown(with event: NSEvent) {
+		if event.keyCode == 53 {
+			signatureHelpDismissRequested?()
+		}
 		if handlePendingMacroRegister(event) {
 			return
 		}
@@ -534,6 +540,9 @@ public final class MetalTextView: NSView {
 		keyCode: UInt16,
 		modifierFlags: NSEvent.ModifierFlags = []
 	) -> Bool {
+		if keyCode == 53 {
+			signatureHelpDismissRequested?()
+		}
 		let event = NSEvent.keyEvent(
 			with: .keyDown,
 			location: .zero,
@@ -1677,8 +1686,16 @@ public final class MetalTextView: NSView {
 		syncEditorState()
 		if didEdit {
 			editorDidChange?(editor)
-			if let characters, characters.count == 1, completionTriggerCharacters.contains(characters) {
-				_ = completionRequested?(characters)
+			if let characters, characters.count == 1 {
+				if completionTriggerCharacters.contains(characters) {
+					_ = completionRequested?(characters)
+				}
+				if signatureHelpTriggerCharacters.contains(characters) {
+					_ = signatureHelpRequested?(characters)
+				}
+				if characters == ")" {
+					signatureHelpDismissRequested?()
+				}
 			}
 		}
 		return true

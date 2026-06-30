@@ -46,6 +46,20 @@ public struct WorkspaceIndex: Equatable, Sendable {
 		files.flatMap(\.symbols)
 	}
 
+	public func symbolsForFile(relativePath: String) -> [WorkspaceSymbol] {
+		files.first(where: { $0.relativePath == relativePath })?.symbols ?? []
+	}
+
+	public func relativePath(for url: URL) -> String? {
+		let resolved = url.standardizedFileURL.path
+		let rootPath = root.standardizedFileURL.path
+		let prefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
+		guard resolved.hasPrefix(prefix) else {
+			return nil
+		}
+		return String(resolved.dropFirst(prefix.count))
+	}
+
 	public func searchFiles(query: String, limit: Int = 50) -> [String] {
 		guard limit > 0 else {
 			return []

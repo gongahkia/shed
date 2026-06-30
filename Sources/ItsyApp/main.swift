@@ -106,6 +106,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitPanel: NSPanel?
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
+	private var gitSummaryField: NSTextField?
+	private var gitBodyTextView: NSTextView?
+	private var gitCommitButton: NSButton?
+	private var gitSignoffButton: NSButton?
+	private var gitAmendButton: NSButton?
+	private var gitComposerStatusLabel: NSTextField?
 	private var gitEntries: [GitStatusEntry] = []
 	private var gitRootURL: URL?
 	private var taskPanel: NSPanel?
@@ -810,6 +816,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func configureGitView(_ contentView: NSView) {
+		let composer = makeGitComposerView()
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
@@ -840,14 +847,19 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		scrollView.documentView = tableView
 		scrollView.hasVerticalScroller = true
 		scrollView.drawsBackground = false
+		composer.translatesAutoresizingMaskIntoConstraints = false
 		header.translatesAutoresizingMaskIntoConstraints = false
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(composer)
 		contentView.addSubview(header)
 		contentView.addSubview(scrollView)
 		NSLayoutConstraint.activate([
+			composer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			composer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			composer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
 			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			header.topAnchor.constraint(equalTo: composer.bottomAnchor, constant: 10),
 			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
@@ -855,6 +867,76 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		])
 		gitStatusLabel = statusLabel
 		gitTableView = tableView
+	}
+
+	private func makeGitComposerView() -> NSView {
+		let container = NSView()
+		let summaryField = NSTextField()
+		summaryField.placeholderString = L10n.string("Summary 50")
+		summaryField.font = .systemFont(ofSize: 12)
+		summaryField.delegate = self
+		let summaryHint = NSTextField(labelWithString: L10n.string("50"))
+		summaryHint.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+		summaryHint.textColor = .secondaryLabelColor
+		let summaryRow = NSStackView(views: [summaryField, summaryHint])
+		summaryRow.orientation = .horizontal
+		summaryRow.alignment = .centerY
+		summaryRow.spacing = 8
+		let bodyTextView = NSTextView()
+		bodyTextView.font = .systemFont(ofSize: 12)
+		bodyTextView.isRichText = false
+		bodyTextView.allowsUndo = true
+		bodyTextView.delegate = self
+		bodyTextView.textContainerInset = NSSize(width: 4, height: 4)
+		bodyTextView.textContainer?.widthTracksTextView = true
+		bodyTextView.isHorizontallyResizable = false
+		bodyTextView.isVerticallyResizable = true
+		let bodyScrollView = NSScrollView()
+		bodyScrollView.documentView = bodyTextView
+		bodyScrollView.hasVerticalScroller = true
+		bodyScrollView.borderType = .bezelBorder
+		let bodyHint = NSTextField(labelWithString: L10n.string("Body 72"))
+		bodyHint.font = .monospacedDigitSystemFont(ofSize: 11, weight: .regular)
+		bodyHint.textColor = .secondaryLabelColor
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 11)
+		statusLabel.textColor = .secondaryLabelColor
+		let signoffButton = NSButton(checkboxWithTitle: L10n.string("--signoff"), target: self, action: #selector(updateGitComposerStateAction(_:)))
+		let amendButton = NSButton(checkboxWithTitle: L10n.string("--amend"), target: self, action: #selector(updateGitComposerStateAction(_:)))
+		let commitButton = NSButton(title: L10n.string("Commit"), target: self, action: #selector(commitGitChanges(_:)))
+		let footer = NSStackView(views: [statusLabel, signoffButton, amendButton, commitButton])
+		footer.orientation = .horizontal
+		footer.alignment = .centerY
+		footer.spacing = 8
+		footer.distribution = .fill
+		[summaryRow, bodyHint, bodyScrollView, footer].forEach {
+			$0.translatesAutoresizingMaskIntoConstraints = false
+			container.addSubview($0)
+		}
+		NSLayoutConstraint.activate([
+			summaryHint.widthAnchor.constraint(equalToConstant: 28),
+			summaryRow.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			summaryRow.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			summaryRow.topAnchor.constraint(equalTo: container.topAnchor),
+			bodyHint.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			bodyHint.topAnchor.constraint(equalTo: summaryRow.bottomAnchor, constant: 6),
+			bodyScrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			bodyScrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			bodyScrollView.topAnchor.constraint(equalTo: bodyHint.bottomAnchor, constant: 4),
+			bodyScrollView.heightAnchor.constraint(equalToConstant: 74),
+			footer.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			footer.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			footer.topAnchor.constraint(equalTo: bodyScrollView.bottomAnchor, constant: 8),
+			footer.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+		])
+		gitSummaryField = summaryField
+		gitBodyTextView = bodyTextView
+		gitCommitButton = commitButton
+		gitSignoffButton = signoffButton
+		gitAmendButton = amendButton
+		gitComposerStatusLabel = statusLabel
+		updateGitComposerState()
+		return container
 	}
 
 	private func centerGitPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -893,6 +975,44 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		gitTableView?.reloadData()
 		if !entries.isEmpty {
 			gitTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+		updateGitComposerState()
+	}
+
+	@objc private func updateGitComposerStateAction(_ sender: Any?) {
+		updateGitComposerState()
+	}
+
+	private func updateGitComposerState() {
+		let stagedCount = gitEntries.filter(\.isStaged).count
+		let summary = gitSummaryField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+		gitComposerStatusLabel?.stringValue = L10n.string("\(stagedCount) staged files")
+		gitCommitButton?.isEnabled = gitRootURL != nil && stagedCount > 0 && !summary.isEmpty
+	}
+
+	@objc private func commitGitChanges(_ sender: Any?) {
+		guard let gitRootURL else {
+			updateGitComposerState()
+			return
+		}
+		let summary = gitSummaryField?.stringValue ?? ""
+		let body = gitBodyTextView?.string ?? ""
+		guard gitEntries.contains(where: \.isStaged), !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+			updateGitComposerState()
+			return
+		}
+		do {
+			try GitRepository(root: gitRootURL).commit(
+				summary: summary,
+				body: body,
+				signoff: gitSignoffButton?.state == .on,
+				amend: gitAmendButton?.state == .on
+			)
+			gitSummaryField?.stringValue = ""
+			gitBodyTextView?.string = ""
+			refreshGitChanges(nil)
+		} catch {
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
 		}
 	}
 
@@ -1820,7 +1940,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
-extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate {
+extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDataSource, NSTableViewDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	func menuNeedsUpdate(_ menu: NSMenu) {
 		guard menu === openRecentMenu else {
 			return
@@ -1860,10 +1980,16 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			searchProjectFind(query: field.stringValue)
 		} else if field === commandPaletteInputField {
 			filterCommandPaletteItems()
+		} else if field === gitSummaryField {
+			updateGitComposerState()
 		}
 	}
 
 	func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+		if control === gitSummaryField, commandSelector == #selector(NSResponder.insertNewline(_:)), currentEventHasCommandModifier() {
+			commitGitChanges(nil)
+			return true
+		}
 		if control === commandPaletteInputField {
 			switch commandSelector {
 			case #selector(NSResponder.insertNewline(_:)):
@@ -1891,6 +2017,25 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			return true
 		}
 		return false
+	}
+
+	func textDidChange(_ notification: Notification) {
+		guard let textView = notification.object as? NSTextView, textView === gitBodyTextView else {
+			return
+		}
+		updateGitComposerState()
+	}
+
+	func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+		if textView === gitBodyTextView, commandSelector == #selector(NSResponder.insertNewline(_:)), currentEventHasCommandModifier() {
+			commitGitChanges(nil)
+			return true
+		}
+		return false
+	}
+
+	private func currentEventHasCommandModifier() -> Bool {
+		NSApp.currentEvent?.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) == true
 	}
 
 	func numberOfRows(in tableView: NSTableView) -> Int {

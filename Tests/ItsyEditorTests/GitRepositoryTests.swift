@@ -88,6 +88,31 @@ import Testing
 	#expect(root.standardizedFileURL.path == fixture.root.standardizedFileURL.path)
 }
 
+@Test func gitRepositoryCommitBuildsSeparateMessageArguments() throws {
+	let runner = RecordingGitRunner()
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	try repository.commit(summary: " Add composer ", body: "\nBody line\n", signoff: true, amend: true)
+
+	#expect(runner.recordedArguments == [[
+		"commit",
+		"--signoff",
+		"--amend",
+		"-m",
+		"Add composer",
+		"-m",
+		"Body line",
+	]])
+}
+
+@Test func gitRepositoryCommitRejectsEmptySummary() {
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: RecordingGitRunner())
+
+	#expect(throws: GitCommitError.emptySummary) {
+		try repository.commit(summary: "  ")
+	}
+}
+
 private final class TemporaryGitFixture {
 	let root: URL
 
@@ -110,5 +135,24 @@ private final class TemporaryGitFixture {
 	@discardableResult
 	func git(_ arguments: [String]) throws -> String {
 		try ProcessGitCommandRunner().runGit(arguments: arguments, root: root)
+	}
+}
+
+private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
+	private let lock = NSLock()
+	private var arguments: [[String]] = []
+
+	var recordedArguments: [[String]] {
+		lock.lock()
+		let value = arguments
+		lock.unlock()
+		return value
+	}
+
+	func runGit(arguments: [String], root: URL) throws -> String {
+		lock.lock()
+		self.arguments.append(arguments)
+		lock.unlock()
+		return ""
 	}
 }

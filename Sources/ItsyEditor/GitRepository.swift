@@ -183,6 +183,10 @@ public enum GitCommandError: Error, Equatable, Sendable {
 	case invalidOutput
 }
 
+public enum GitCommitError: Error, Equatable, Sendable {
+	case emptySummary
+}
+
 public struct ProcessGitCommandRunner: GitCommandRunning {
 	public var executableURL: URL
 
@@ -285,6 +289,26 @@ public struct GitRepository: Sendable {
 			return
 		}
 		_ = try runner.runGit(arguments: ["restore", "--staged", "--"] + paths, root: root)
+	}
+
+	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {
+		let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !summary.isEmpty else {
+			throw GitCommitError.emptySummary
+		}
+		let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+		var arguments = ["commit"]
+		if signoff {
+			arguments.append("--signoff")
+		}
+		if amend {
+			arguments.append("--amend")
+		}
+		arguments += ["-m", summary]
+		if !body.isEmpty {
+			arguments += ["-m", body]
+		}
+		_ = try runner.runGit(arguments: arguments, root: root)
 	}
 
 	public static func discoverRoot(containing url: URL, runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL {

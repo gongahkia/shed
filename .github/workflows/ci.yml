@@ -22,6 +22,8 @@ jobs:
         run: swift build -c release
       - name: Test
         run: swift test
+      - name: LSP smoke
+        run: swift test --filter ItsyLSPSmokeTests
       - name: Bench smoke
         run: .build/release/ItsyBench --smoke --runs 1
       - name: Regression bench

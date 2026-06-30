@@ -20,6 +20,7 @@ final class SettingsWindowController: NSWindowController {
     private var cooperativeAppsRows: [IPCCooperativeAppInfo] = []
     private var playgroundController: ConfigPlaygroundWindowController?
     private var errorLogController: SettingsErrorLogController?
+    private var keybindsController: SettingsKeybindsController?
 
     init(
         runtime: OllyRuntime? = nil,
@@ -81,6 +82,11 @@ final class SettingsWindowController: NSWindowController {
         let cooperativeTab = NSTabViewItem(identifier: "cooperative-apps")
         cooperativeTab.label = "Cooperative Apps"
         cooperativeTab.view = makeCooperativeAppsView()
+        let keybindsController = SettingsKeybindsController()
+        self.keybindsController = keybindsController
+        let keybindsTab = NSTabViewItem(identifier: "keybinds")
+        keybindsTab.label = "Keybinds"
+        keybindsTab.view = keybindsController.makeView()
         let errorsController = SettingsErrorLogController(runtime: runtime)
         errorLogController = errorsController
         let errorsTab = NSTabViewItem(identifier: "errors")
@@ -88,6 +94,7 @@ final class SettingsWindowController: NSWindowController {
         errorsTab.view = errorsController.makeView()
         tabView.addTabViewItem(configTab)
         tabView.addTabViewItem(cooperativeTab)
+        tabView.addTabViewItem(keybindsTab)
         tabView.addTabViewItem(errorsTab)
         window?.contentView = tabView
 

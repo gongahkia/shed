@@ -5,33 +5,57 @@ import UserNotifications
 import ollyDSL
 
 final class HotKeyStartupDiagnostics {
-    private let loader: ConfigLoader
+    private let loadConfig: () throws -> Config
     private let detector: HotKeyCollisionDetector
     private let notifier: HotKeyConflictNotifier
+    private let store: HotKeyDiagnosticsStore
     private let logger = Logger(subsystem: "dev.olly.ollyApp", category: "HotKeys")
 
-    init(
+    convenience init(
         loader: ConfigLoader = HotKeyStartupDiagnostics.defaultLoader(),
         detector: HotKeyCollisionDetector = .live(),
-        notifier: HotKeyConflictNotifier = UserNotificationHotKeyConflictNotifier()
+        notifier: HotKeyConflictNotifier = UserNotificationHotKeyConflictNotifier(),
+        store: HotKeyDiagnosticsStore = .shared
     ) {
-        self.loader = loader
+        self.init(
+            loadConfig: { try loader.load().config },
+            detector: detector,
+            notifier: notifier,
+            store: store
+        )
+    }
+
+    init(
+        loadConfig: @escaping () throws -> Config,
+        detector: HotKeyCollisionDetector = .live(),
+        notifier: HotKeyConflictNotifier = UserNotificationHotKeyConflictNotifier(),
+        store: HotKeyDiagnosticsStore = .shared
+    ) {
+        self.loadConfig = loadConfig
         self.detector = detector
         self.notifier = notifier
+        self.store = store
     }
 
     func run() {
         do {
-            let config = try loader.load().config
-            let report = detector.report(for: config.keybinds)
+            let report = try scan()
+            store.update(report)
             logSourceErrors(report.sourceErrors)
             logCollisions(report.collisions)
             notifier.notify(collisions: report.collisions)
         } catch ConfigLoaderError.missingSource {
+            store.clear()
             logger.info("Skipping hotkey collision scan: no Config.swift")
         } catch {
+            store.clear()
             logger.error("Skipping hotkey collision scan: \(String(describing: error), privacy: .public)")
         }
+    }
+
+    func scan() throws -> HotKeyCollisionReport {
+        let config = try loadConfig()
+        return detector.report(for: config.keybinds)
     }
 
     private static func defaultLoader() -> ConfigLoader {

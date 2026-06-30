@@ -155,6 +155,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitPanel: NSPanel?
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
+	private var gitBranchButton: NSButton?
+	private var gitBranchPopover: NSPopover?
+	private var gitBranchTableView: NSTableView?
+	private var gitBranches: [GitBranch] = []
 	private var gitSummaryField: NSTextField?
 	private var gitBodyTextView: NSTextView?
 	private var gitCommitButton: NSButton?
@@ -891,10 +895,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
+		let branchButton = NSButton(title: L10n.string("Branch"), target: self, action: #selector(showGitBranches(_:)))
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
 		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
 		let unstageButton = NSButton(title: L10n.string("Unstage"), target: self, action: #selector(unstageSelectedGitEntries(_:)))
-		let buttonStack = NSStackView(views: [refreshButton, stageButton, unstageButton])
+		let buttonStack = NSStackView(views: [branchButton, refreshButton, stageButton, unstageButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -947,6 +952,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		])
 		gitStatusLabel = statusLabel
 		gitTableView = tableView
+		gitBranchButton = branchButton
 	}
 
 	private func makeGitDiffPane() -> NSView {
@@ -1108,32 +1114,177 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.setFrame(frame, display: true)
 	}
 
+	@objc private func showGitBranches(_ sender: NSButton) {
+		guard gitRootURL != nil else {
+			return
+		}
+		let popover = makeGitBranchPopover()
+		refreshGitBranches()
+		popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+	}
+
+	private func makeGitBranchPopover() -> NSPopover {
+		let popover = NSPopover()
+		popover.behavior = .transient
+		let controller = NSViewController()
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 360))
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("branch"))
+		column.title = L10n.string("Branches")
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowHeight = 54
+		tableView.dataSource = self
+		tableView.delegate = self
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		controller.view = contentView
+		popover.contentViewController = controller
+		gitBranchPopover = popover
+		gitBranchTableView = tableView
+		return popover
+	}
+
+	private func refreshGitBranches() {
+		guard let gitRootURL else {
+			gitBranches = []
+			gitBranchTableView?.reloadData()
+			return
+		}
+		do {
+			gitBranches = try GitRepository(root: gitRootURL).branches()
+			gitBranchTableView?.reloadData()
+			if let current = gitBranches.first(where: \.isCurrent) {
+				gitBranchButton?.title = current.name
+			}
+		} catch {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	@objc private func switchGitBranch(_ sender: NSButton) {
+		guard let gitRootURL, sender.tag >= 0, sender.tag < gitBranches.count else {
+			return
+		}
+		do {
+			try GitRepository(root: gitRootURL).switchBranch(gitBranches[sender.tag].name)
+			gitBranchPopover?.close()
+			refreshGitChanges(nil)
+		} catch {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	@objc private func createGitBranchFromRow(_ sender: NSButton) {
+		guard let gitRootURL, sender.tag >= 0, sender.tag < gitBranches.count else {
+			return
+		}
+		let source = gitBranches[sender.tag]
+		guard let name = promptGitBranchName(defaultName: "") else {
+			return
+		}
+		do {
+			try GitRepository(root: gitRootURL).createBranch(named: name, from: source.name)
+			gitBranchPopover?.close()
+			refreshGitChanges(nil)
+		} catch {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	@objc private func deleteGitBranchFromRow(_ sender: NSButton) {
+		guard let gitRootURL, sender.tag >= 0, sender.tag < gitBranches.count else {
+			return
+		}
+		let branch = gitBranches[sender.tag]
+		do {
+			try GitRepository(root: gitRootURL).deleteBranch(branch.name)
+			refreshGitBranches()
+			refreshGitChanges(nil)
+		} catch {
+			guard confirmForceDeleteBranch(branch.name, error: error) else {
+				gitStatusLabel?.textColor = .systemRed
+				gitStatusLabel?.stringValue = String(describing: error)
+				return
+			}
+			do {
+				try GitRepository(root: gitRootURL).deleteBranch(branch.name, force: true)
+				refreshGitBranches()
+				refreshGitChanges(nil)
+			} catch {
+				gitStatusLabel?.textColor = .systemRed
+				gitStatusLabel?.stringValue = String(describing: error)
+			}
+		}
+	}
+
+	private func promptGitBranchName(defaultName: String) -> String? {
+		let field = NSTextField(string: defaultName)
+		field.placeholderString = L10n.string("branch-name")
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Create Branch")
+		alert.accessoryView = field
+		alert.addButton(withTitle: L10n.string("Create"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		guard alert.runModal() == .alertFirstButtonReturn else {
+			return nil
+		}
+		let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+		return name.isEmpty ? nil : name
+	}
+
+	private func confirmForceDeleteBranch(_ name: String, error: Error) -> Bool {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = L10n.string("Force Delete Branch?")
+		alert.informativeText = "\(name)\n\(String(describing: error))"
+		alert.addButton(withTitle: L10n.string("Force Delete"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		return alert.runModal() == .alertFirstButtonReturn
+	}
+
 	@objc private func refreshGitChanges(_ sender: Any?) {
 		guard let root = ItsyWorkspaceController.currentRootURL else {
-			setGitEntries([], root: nil, status: L10n.string("Open a folder first"), isError: true)
+			setGitEntries([], root: nil, status: L10n.string("Open a folder first"), isError: true, branchLabel: nil)
 			return
 		}
 		guard let gitRoot = try? GitRepository.discoverRoot(containing: root) else {
-			setGitEntries([], root: nil, status: L10n.string("Not a Git repository"), isError: true)
+			setGitEntries([], root: nil, status: L10n.string("Not a Git repository"), isError: true, branchLabel: nil)
 			ItsyWorkspaceController.refreshGitStatus()
 			return
 		}
 		do {
 			let snapshot = try GitRepository(root: gitRoot).snapshot()
 			let status = "\(snapshot.branchLabel) - \(snapshot.status.stagedCount) staged, \(snapshot.status.unstagedCount) unstaged"
-			setGitEntries(snapshot.status.entries, root: gitRoot, status: status, isError: false)
+			setGitEntries(snapshot.status.entries, root: gitRoot, status: status, isError: false, branchLabel: snapshot.branchLabel)
 			ItsyWorkspaceController.refreshGitStatus()
 		} catch {
-			setGitEntries([], root: gitRoot, status: String(describing: error), isError: true)
+			setGitEntries([], root: gitRoot, status: String(describing: error), isError: true, branchLabel: nil)
 		}
 	}
 
-	private func setGitEntries(_ entries: [GitStatusEntry], root: URL?, status: String, isError: Bool) {
+	private func setGitEntries(_ entries: [GitStatusEntry], root: URL?, status: String, isError: Bool, branchLabel: String?) {
 		syncGitDraftRoot(root)
 		gitEntries = entries
 		gitRootURL = root
 		gitStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
 		gitStatusLabel?.stringValue = status
+		gitBranchButton?.title = branchLabel ?? L10n.string("Branch")
+		gitBranchButton?.isEnabled = root != nil
 		gitTableView?.reloadData()
 		if !entries.isEmpty {
 			gitTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -1392,7 +1543,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			setGitComposerDraft(GitCommitDraft(summary: "", body: ""), persist: true)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
 		}
 	}
 
@@ -1448,7 +1599,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			try GitRepository(root: gitRootURL).stage(paths: paths)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
 		}
 	}
 
@@ -1464,7 +1615,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			try GitRepository(root: gitRootURL).unstage(paths: paths)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
+			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
 		}
 	}
 
@@ -1506,6 +1657,17 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let index = entry.indexStatus.map(String.init) ?? "."
 		let worktree = entry.worktreeStatus.map(String.init) ?? "."
 		return index + worktree
+	}
+
+	private func branchTitle(_ branch: GitBranch) -> String {
+		let marker = branch.isCurrent ? "* " : ""
+		let kind = branch.kind == .remote ? "remote" : "local"
+		return "\(marker)\(branch.name)  \(kind)"
+	}
+
+	private func branchDetail(_ branch: GitBranch) -> String {
+		let upstream = branch.upstream.map { "upstream \($0)" } ?? "no upstream"
+		return "\(upstream) - \(branch.committerDateRelative)"
 	}
 
 	@objc private func showTasks(_ sender: Any?) {
@@ -2478,6 +2640,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === gitTableView {
 			return gitEntries.count
 		}
+		if tableView === gitBranchTableView {
+			return gitBranches.count
+		}
 		if tableView === gitHunkTableView {
 			return gitHunkItems.count
 		}
@@ -2573,6 +2738,48 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 				stack.trailingAnchor.constraint(lessThanOrEqualTo: cell.trailingAnchor, constant: -6),
 				stack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
 				button.widthAnchor.constraint(equalToConstant: 104),
+			])
+			return cell
+		}
+		if tableView === gitBranchTableView {
+			let branch = gitBranches[row]
+			let cell = NSTableCellView()
+			let title = NSTextField(labelWithString: branchTitle(branch))
+			title.font = .systemFont(ofSize: 12, weight: branch.isCurrent ? .semibold : .regular)
+			title.lineBreakMode = .byTruncatingMiddle
+			let detail = NSTextField(labelWithString: branchDetail(branch))
+			detail.font = .systemFont(ofSize: 10)
+			detail.textColor = .secondaryLabelColor
+			detail.lineBreakMode = .byTruncatingMiddle
+			let textStack = NSStackView(views: [title, detail])
+			textStack.orientation = .vertical
+			textStack.alignment = .leading
+			textStack.spacing = 2
+			let switchButton = NSButton(title: L10n.string("Switch"), target: self, action: #selector(switchGitBranch(_:)))
+			let createButton = NSButton(title: L10n.string("Create"), target: self, action: #selector(createGitBranchFromRow(_:)))
+			let deleteButton = NSButton(title: L10n.string("Delete"), target: self, action: #selector(deleteGitBranchFromRow(_:)))
+			[switchButton, createButton, deleteButton].forEach {
+				$0.bezelStyle = .rounded
+				$0.font = .systemFont(ofSize: 10)
+				$0.tag = row
+			}
+			switchButton.isEnabled = branch.kind == .local && !branch.isCurrent
+			deleteButton.isEnabled = branch.kind == .local && !branch.isCurrent
+			let buttonStack = NSStackView(views: [switchButton, createButton, deleteButton])
+			buttonStack.orientation = .horizontal
+			buttonStack.spacing = 6
+			let rowStack = NSStackView(views: [textStack, buttonStack])
+			rowStack.orientation = .horizontal
+			rowStack.alignment = .centerY
+			rowStack.spacing = 10
+			rowStack.distribution = .fill
+			rowStack.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(rowStack)
+			NSLayoutConstraint.activate([
+				rowStack.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+				rowStack.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+				rowStack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				buttonStack.widthAnchor.constraint(equalToConstant: 190),
 			])
 			return cell
 		}

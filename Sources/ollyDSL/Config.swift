@@ -54,6 +54,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let gestures: Gestures
     public let hooks: Hooks
     public let nativeSpace: NativeSpace
+    public let focusRing: FocusRing
     public let focusPolicy: FocusPolicy
     public let permissions: Permissions
 
@@ -69,6 +70,7 @@ public struct Config: Codable, Equatable, Sendable {
         gestures: Gestures = Gestures(),
         hooks: Hooks = Hooks(),
         nativeSpace: NativeSpace = NativeSpace(),
+        focusRing: FocusRing = FocusRing(),
         focusPolicy: FocusPolicy = FocusPolicy(),
         permissions: Permissions = Permissions()
     ) {
@@ -83,6 +85,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.gestures = gestures
         self.hooks = hooks
         self.nativeSpace = nativeSpace
+        self.focusRing = focusRing
         self.focusPolicy = focusPolicy
         self.permissions = permissions
     }
@@ -106,17 +109,19 @@ public struct Config: Codable, Equatable, Sendable {
             gestures: try container.decodeIfPresent(Gestures.self, forKey: .gestures) ?? Gestures(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks(),
             nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace(),
+            focusRing: try container.decodeIfPresent(FocusRing.self, forKey: .focusRing) ?? FocusRing(),
             focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy(),
             permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions) ?? Permissions()
         )
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     private init(version: DSLVersion, sections: [ConfigSection]) {
         var keybinds = Keybinds(); var rules = Rules(); var workspaces = Workspaces()
         var engines = Engines(); var cooperativeApps = CooperativeApps(); var safeZones = SafeZones()
         var animation = Animation(); var gestures = Gestures(); var hooks = Hooks()
-        var nativeSpace = NativeSpace(); var focusPolicy = FocusPolicy(); var permissions = Permissions()
+        var nativeSpace = NativeSpace(); var focusRing = FocusRing(); var focusPolicy = FocusPolicy()
+        var permissions = Permissions()
 
         for section in sections {
             switch section {
@@ -140,6 +145,8 @@ public struct Config: Codable, Equatable, Sendable {
                 hooks = value
             case let .nativeSpace(value):
                 nativeSpace = value
+            case let .focusRing(value):
+                focusRing = value
             case let .focusPolicy(value):
                 focusPolicy = value
             case let .permissions(value):
@@ -159,6 +166,7 @@ public struct Config: Codable, Equatable, Sendable {
             gestures: gestures,
             hooks: hooks,
             nativeSpace: nativeSpace,
+            focusRing: focusRing,
             focusPolicy: focusPolicy,
             permissions: permissions
         )
@@ -252,6 +260,7 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case gestures(Gestures)
     case hooks(Hooks)
     case nativeSpace(NativeSpace)
+    case focusRing(FocusRing)
     case focusPolicy(FocusPolicy)
     case permissions(Permissions)
 }

@@ -15,6 +15,7 @@ source_order = {
   "ConfigDiagnostics.swift" => "Config Diagnostics",
   "Config.swift" => "Config",
   "NativeSpace.swift" => "Native Space",
+  "FocusRing.swift" => "Focus Ring",
   "FocusPolicy.swift" => "Focus Policy",
   "Permissions.swift" => "Permissions",
   "Hooks.swift" => "Hooks",

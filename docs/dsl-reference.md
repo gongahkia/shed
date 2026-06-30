@@ -181,6 +181,71 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `driftPolicy(.followWindow)`
 - See also: `NativeSpace`, `NativeSpaceDriftPolicy`.
 
+## Focus Ring
+
+### FocusRingColor
+
+`enum FocusRingColor`
+
+- Purpose: Names system colors supported by the focus-ring overlay.
+- Parameters: Choose a semantic system color.
+- Example: `FocusRingColor.systemBlue`
+- See also: `FocusRing`, `color(_:)`.
+
+### FocusRingSetting
+
+`enum FocusRingSetting`
+
+- Purpose: Represents one focus-ring builder setting.
+- Parameters: Use `color`, `width`, `cornerRadius`, or `reduceMotion`.
+- Example: `color(.systemBlue)`
+- See also: `FocusRing`, `FocusRingBuilder`.
+
+### FocusRing
+
+`struct FocusRing`
+
+- Purpose: Configures the focused-window ring overlay.
+- Parameters: Provide ring color, stroke width, corner radius, and Reduce Motion policy.
+- Example: `FocusRing { color(.systemBlue); width(2) }`
+- See also: `FocusRingBuilder`, `ConfigSection`.
+
+### FocusRingBuilder
+
+`@resultBuilder enum FocusRingBuilder`
+
+- Purpose: Builds focus-ring settings inside `FocusRing { ... }`.
+- Parameters: Accepts focus-ring setting expressions, arrays, and conditionals.
+- Example: `FocusRing { color(.systemBlue); width(2) }`
+- See also: `FocusRing`, `FocusRingSetting`.
+
+### color(_:)
+
+`func color(_ value: FocusRingColor) -> FocusRingSetting`
+
+- Purpose: Declares a focus-ring color setting.
+- Parameters: Pass a supported system color.
+- Example: `color(.systemBlue)`
+- See also: `FocusRing`, `FocusRingSetting`.
+
+### width(_:)
+
+`func width(_ value: CGFloat) -> FocusRingSetting`
+
+- Purpose: Declares focus-ring stroke width in points.
+- Parameters: Pass a non-negative width.
+- Example: `width(2)`
+- See also: `FocusRing`, `FocusRingSetting`.
+
+### cornerRadius(_:)
+
+`func cornerRadius(_ value: CGFloat) -> FocusRingSetting`
+
+- Purpose: Declares focus-ring corner radius in points.
+- Parameters: Pass a non-negative radius.
+- Example: `cornerRadius(8)`
+- See also: `FocusRing`, `FocusRingSetting`.
+
 ## Focus Policy
 
 ### FocusPolicyDirective
@@ -521,15 +586,6 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Select a case and provide its associated direction, tag, engine, macro, or raw command.
 - Example: `Action.setEngine(BSPLayoutEngine.engineID)`
 - See also: `Keybind`, `Direction`.
-
-### macro(_:)
-
-`case macro(String)`
-
-- Purpose: Replays a recorded IPC macro by name.
-- Parameters: Pass the macro name stored under `~/.config/olly/macros`.
-- Example: `Keybind(KeyChord([.command], .m), do: .macro("workflow1"))`
-- See also: `Keybind`, `Action`.
 
 ### Keybind
 

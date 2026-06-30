@@ -25,36 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.1 Focus-ring overlay in-process
-
-**Goal:** Native focus ring without requiring JankyBorders.
-
-**Research summary:**
-- JankyBorders pattern: per-window borderless overlay sized to managed window's frame + N px outset, level `.floating`, click-through, with a `CAShapeLayer` stroke. Reposition on every `kAXWindowMoved`/`kAXWindowResized` notification with explicit `setFrame` (no animation to avoid lag). JankyBorders does not use AX for the rendering itself — uses a separate fast path.
-
-**Files to add:**
-- `Sources/ollyApp/Overlays/FocusRingController.swift` — subscribes to `IPCEvent.focus`; reads focused window's frame; renders one `OverlayPanel` per managed window.
-- `Sources/ollyDSL/FocusRing.swift` — `FocusRing { color(.systemBlue); width(2); cornerRadius(8); reduceMotion(.respectSystem) }`. Hook into `ConfigBuilder` and `ConfigSection` mirroring `Animation` (`Sources/ollyDSL/Config.swift:127`).
-
-**Files to modify:**
-- `Sources/ollyKit/WindowMover.swift:277` (`SystemAXWindowMoveClient.frame(for:)`) — refactor into public helper `AXFrameReader` so the focus ring shares the AX-frame read path.
-
-**Implementation hint:**
-- One overlay panel per focused window (singular at a time). On focus change, animate the panel from old window's frame to new window's frame using `NSAnimationContext.runAnimationGroup`; honour reduce-motion by setting `duration = 0`.
-- Use `CAShapeLayer` with `strokeColor` = `FocusRing.color.cgColor`, `lineWidth` = `FocusRing.width`, `path` = `CGPath(roundedRect: bounds, ...)`.
-
-**Test plan:**
-- Unit: `FocusRing` DSL decode round-trips through JSON (`Tests/ollyDSLTests/FocusRingTests.swift`).
-- UI smoke: assert panel frame matches focused window frame within 16ms tick.
-
-**Acceptance:**
-- `FocusRing { color(.systemBlue); width(2) }` in Config produces a visible 2px ring around the focused window.
-
-**Refs:**
-- https://github.com/FelixKratz/JankyBorders
-
----
-
 ### M3.2 Drag-to-snap preview overlay
 
 **Goal:** On window drag, show a translucent overlay with snap-target zones; on release, snap to the hovered zone.

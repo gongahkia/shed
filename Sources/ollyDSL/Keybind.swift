@@ -2,6 +2,7 @@
 import Carbon.HIToolbox
 import Foundation
 import ollyCore
+import ollyKit
 
 /// Purpose: Represents command, shift, option, and control modifiers for DSL key chords.
 /// Parameters: Use predefined flags or initialize from a raw Carbon-compatible bit mask.

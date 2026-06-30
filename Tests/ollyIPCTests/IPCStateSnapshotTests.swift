@@ -22,6 +22,7 @@ final class IPCStateSnapshotTests: XCTestCase {
             isFloating: true,
             isSticky: true,
             isPinned: true,
+            engineOverride: LayoutEngineID(rawValue: "floating"),
             layoutOrder: 4,
             frame: CGRect(x: 10, y: 20, width: 300, height: 400),
             title: "Editor",
@@ -39,6 +40,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertTrue(ipcState.isFloating)
         XCTAssertTrue(ipcState.isSticky)
         XCTAssertTrue(ipcState.isPinned)
+        XCTAssertEqual(ipcState.engineOverride, LayoutEngineID(rawValue: "floating"))
         XCTAssertEqual(ipcState.layoutOrder, 4)
         XCTAssertEqual(ipcState.frame, IPCFrame(x: 10, y: 20, width: 300, height: 400))
         XCTAssertEqual(ipcState.title, "Editor")
@@ -67,6 +69,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertTrue(ipcState.isFloating)
         XCTAssertFalse(ipcState.isSticky)
         XCTAssertFalse(ipcState.isPinned)
+        XCTAssertNil(ipcState.engineOverride)
     }
 
     func testDisplayStateConvertsToIPCShape() throws {

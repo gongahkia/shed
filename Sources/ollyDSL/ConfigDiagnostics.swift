@@ -1,4 +1,5 @@
 import Foundation
+import ollyKit
 
 /// Purpose: Names stable DSL compile-time diagnostic categories.
 /// Parameters: Use the case matching the reported config error.

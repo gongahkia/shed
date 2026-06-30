@@ -1,5 +1,6 @@
 import ollyCore
 import ollyDSL
+import ollyKit
 
 public func ollyConfig() -> Config {
     Config(version: .v1) {

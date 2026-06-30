@@ -88,6 +88,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public let isFloating: Bool
     public let isSticky: Bool
     public let isPinned: Bool
+    public let engineOverride: LayoutEngineID?
     public let layoutOrder: Int?
     public let frame: IPCFrame
     public let title: String?
@@ -103,6 +104,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         case isFloating
         case isSticky
         case isPinned
+        case engineOverride
         case layoutOrder
         case frame
         case title
@@ -119,6 +121,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         isFloating: Bool = false,
         isSticky: Bool = false,
         isPinned: Bool = false,
+        engineOverride: LayoutEngineID? = nil,
         layoutOrder: Int? = nil,
         frame: IPCFrame,
         title: String? = nil,
@@ -133,6 +136,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.isFloating = isFloating
         self.isSticky = isSticky
         self.isPinned = isPinned
+        self.engineOverride = engineOverride
         self.layoutOrder = layoutOrder
         self.frame = frame
         self.title = title
@@ -151,6 +155,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isFloating: try container.decode(Bool.self, forKey: .isFloating),
             isSticky: try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false,
             isPinned: try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false,
+            engineOverride: try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineOverride),
             layoutOrder: try container.decodeIfPresent(Int.self, forKey: .layoutOrder),
             frame: try container.decode(IPCFrame.self, forKey: .frame),
             title: try container.decodeIfPresent(String.self, forKey: .title),
@@ -169,6 +174,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isFloating: state.isFloating,
             isSticky: state.isSticky,
             isPinned: state.isPinned,
+            engineOverride: state.engineOverride,
             layoutOrder: state.layoutOrder,
             frame: IPCFrame(state.frame),
             title: state.title,

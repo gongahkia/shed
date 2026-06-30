@@ -248,6 +248,29 @@ final class RuleTests: XCTestCase {
         XCTAssertTrue(resolved.isPinned)
     }
 
+    func testConfigResolvesEngineOverrideWindowState() {
+        let state = WindowState(
+            id: 9,
+            processID: 42,
+            bundleID: "com.tinyspeck.slackmacgap",
+            displayID: 1,
+            frame: .zero
+        )
+        let config = Config {
+            Rules {
+                Rule(
+                    match: RuleMatch(bundleID: "com.tinyspeck.slackmacgap"),
+                    apply: RuleApply(engine: .floating)
+                )
+            }
+        }
+
+        let resolved = config.resolvedWindowState(for: state)
+
+        XCTAssertEqual(resolved.engineOverride, .floating)
+        XCTAssertFalse(resolved.isFloating)
+    }
+
     func testRuleApplyMergesStickyPinnedOverrides() {
         let base = RuleApply(sticky: false, pinned: true)
         let override = RuleApply(sticky: true)

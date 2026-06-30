@@ -1,4 +1,5 @@
 import XCTest
+import ollyKit
 @testable import ollyCore
 
 final class LayoutEnginePolicyTests: XCTestCase {

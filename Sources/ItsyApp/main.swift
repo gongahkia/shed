@@ -24,6 +24,12 @@ private func recordBenchStage(_ name: String) {
 	_ = try? handle.write(contentsOf: Data(line.utf8))
 }
 
+private func exitForBenchReady() {
+	let ns = DispatchTime.now().uptimeNanoseconds
+	FileHandle.standardOutput.write(Data("READY \(ns)\n".utf8))
+	exit(0)
+}
+
 private final class OutlineKindNode: NSObject {
 	let kind: WorkspaceSymbolKind
 	let symbols: [OutlineSymbolNode]
@@ -150,6 +156,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		recordBenchStage("main_menu_installed")
 		openInitialDocument()
 		recordBenchStage("initial_document_opened")
+		if CommandLine.arguments.contains("--bench-exit-after-initial-document") {
+			exitForBenchReady()
+		}
 		NSApp.activate(ignoringOtherApps: true)
 		recordBenchStage("app_activated")
 	}
@@ -2089,9 +2098,7 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 }
 
 if CommandLine.arguments.contains("--bench-exit-on-ready") {
-	let ns = DispatchTime.now().uptimeNanoseconds
-	FileHandle.standardOutput.write(Data("READY \(ns)\n".utf8))
-	exit(0)
+	exitForBenchReady()
 }
 
 recordBenchStage("process_start")

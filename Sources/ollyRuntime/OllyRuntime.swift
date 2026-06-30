@@ -7,34 +7,6 @@ import ollyIPC
 import ollyKit
 import ollyLayouts
 
-public struct OllyRuntimeMenuSnapshot: Equatable, Sendable {
-    public let displayName: String
-    public let displayID: DisplayID?
-    public let activeTags: [UInt8]
-    public let currentEngineID: LayoutEngineID
-    public let axStatus: AXPermissionStatus
-    public let isIPCServerRunning: Bool
-    public let lastError: String?
-
-    public init(
-        displayName: String,
-        displayID: DisplayID?,
-        activeTags: [UInt8],
-        currentEngineID: LayoutEngineID,
-        axStatus: AXPermissionStatus,
-        isIPCServerRunning: Bool,
-        lastError: String?
-    ) {
-        self.displayName = displayName
-        self.displayID = displayID
-        self.activeTags = activeTags
-        self.currentEngineID = currentEngineID
-        self.axStatus = axStatus
-        self.isIPCServerRunning = isIPCServerRunning
-        self.lastError = lastError
-    }
-}
-
 public enum OllyRuntimeError: Error, CustomStringConvertible {
     case displayUnavailable
     case engineUnavailable(LayoutEngineID)
@@ -111,6 +83,7 @@ public actor OllyRuntime {
     let focusStack = FocusStack()
     let configStore = RuntimeConfigStore()
     let eventHub = RuntimeEventHub()
+    public let runtimeEventBus: RuntimeEventBus
     let windowTargets = RuntimeWindowTargets()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
@@ -139,6 +112,7 @@ public actor OllyRuntime {
         statePersistence: WindowTagPersistence = WindowTagPersistence(),
         recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
         scanAXOnStart: Bool = true,
+        runtimeEventBus: RuntimeEventBus = RuntimeEventBus(),
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
@@ -152,6 +126,7 @@ public actor OllyRuntime {
         self.statePersistence = statePersistence
         self.recoveryJournal = recoveryJournal
         self.scanAXOnStart = scanAXOnStart
+        self.runtimeEventBus = runtimeEventBus
         self.axPermissionStream = axPermissionStream
         self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()
@@ -186,8 +161,10 @@ public actor OllyRuntime {
                 await windowMover.setPosition(placement.frame.origin, for: displayTarget)
                 await windowMover.setSize(placement.frame.size, for: displayTarget)
             },
-            publishEvent: { [eventHub] event in
-                await eventHub.publish(.engine(event))
+            publishEvent: { [eventHub, runtimeEventBus] event in
+                let ipcEvent = IPCEvent.engine(event)
+                await eventHub.publish(ipcEvent)
+                await runtimeEventBus.publish(ipcEvent)
             }
         )
     }

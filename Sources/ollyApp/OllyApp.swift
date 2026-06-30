@@ -25,6 +25,11 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let settingsWindowController = SettingsWindowController()
     private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
     private let runtime = OllyRuntime()
+    private lazy var runtimeEventStatusController = RuntimeEventStatusController(
+        runtime: runtime
+    ) { [weak self] snapshot in
+        self?.renderRuntimeSnapshot(snapshot)
+    }
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
     private var isTerminating = false
 
@@ -42,6 +47,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         )
         statusController?.install()
         installOverviewMode()
+        runtimeEventStatusController.start()
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
         startRuntime()
@@ -53,6 +59,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
             return .terminateNow
         }
         isTerminating = true
+        runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         Task { [runtime, weak self] in
             await runtime.stop()
@@ -65,6 +72,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         statusController?.remove()
     }
@@ -72,10 +80,14 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private func installOverviewMode() {
         let monitor = OverviewKeyHoldMonitor(
             onActivate: { [weak overviewController] in
-                overviewController?.show()
+                Task { @MainActor in
+                    overviewController?.show()
+                }
             },
             onDeactivate: { [weak overviewController] in
-                overviewController?.hide()
+                Task { @MainActor in
+                    overviewController?.hide()
+                }
             }
         )
         monitor.install()

@@ -16,6 +16,7 @@ final class OverviewModeController {
         self.snapshotProvider = snapshotProvider
     }
 
+    @MainActor
     func show() {
         guard overlayWindows.isEmpty else {
             return
@@ -33,20 +34,22 @@ final class OverviewModeController {
 
         for window in overlayWindows {
             window.orderFrontRegardless()
-            fade(window, to: 1)
+            OverlayPanelHost.fade(window, to: 1)
         }
     }
 
+    @MainActor
     func hide() {
         let windows = overlayWindows
         overlayWindows.removeAll()
         for window in windows {
-            fade(window, to: 0) {
+            OverlayPanelHost.fade(window, to: 0) {
                 window.close()
             }
         }
     }
 
+    @MainActor
     private func makeOverlayWindow(
         screen: NSScreen,
         display: Display,
@@ -68,25 +71,20 @@ final class OverviewModeController {
             display: display,
             windows: windows.filter { $0.displayID == display.id },
             onFocus: { [weak self] snapshot in
-                self?.focus(snapshot)
-                self?.hide()
+                Task { @MainActor in
+                    self?.focus(snapshot)
+                    self?.hide()
+                }
             }
         )
         return window
     }
 
+    @MainActor
     private func focus(_ snapshot: OverviewWindowSnapshot) {
         NSRunningApplication(processIdentifier: snapshot.processID)?.activate()
     }
 
-    private func fade(_ window: NSWindow, to alpha: CGFloat, completion: (() -> Void)? = nil) {
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
-            window.animator().alphaValue = alpha
-        } completionHandler: {
-            completion?()
-        }
-    }
 }
 
 final class OverviewKeyHoldMonitor {

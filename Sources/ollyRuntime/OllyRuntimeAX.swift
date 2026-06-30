@@ -255,7 +255,7 @@ extension OllyRuntime {
         windowTargets.remove(windowID: windowID)
         if focusedWindowID == windowID {
             focusedWindowID = nil
-            await eventHub.publish(.focus(IPCFocusEvent(focusedWindowID: nil)))
+            await publishRuntimeEvent(.focus(IPCFocusEvent(focusedWindowID: nil)))
         }
     }
 

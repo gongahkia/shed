@@ -90,13 +90,15 @@ extension OllyRuntime {
                 activeTags = await tagStore.activeTags(on: displayID).rawValue
             }
             await focusStack.recordFocus(windowID: windowID, displayID: displayID, tagMask: activeTags)
-            await eventHub.publish(
+            await publishRuntimeEvent(
                 .focus(IPCFocusEvent(focusedWindowID: windowID, displayID: displayID, tagMask: activeTags))
             )
         } else {
-            await eventHub.publish(
-                .focus(IPCFocusEvent(focusedWindowID: windowID, displayID: displayID, tagMask: tagMask))
-            )
+            await publishRuntimeEvent(.focus(IPCFocusEvent(
+                focusedWindowID: windowID,
+                displayID: displayID,
+                tagMask: tagMask
+            )))
         }
     }
 

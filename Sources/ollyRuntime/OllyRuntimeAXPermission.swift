@@ -42,7 +42,7 @@ extension OllyRuntime {
     private func handleAXRevoke() async {
         stopAXObservers()
         await windowMover.flushAndPause()
-        await eventHub.publish(.axPermission(IPCAXPermissionEvent(status: .missing)))
+        await publishRuntimeEvent(.axPermission(IPCAXPermissionEvent(status: .missing)))
         let hooks = await configStore.current().hooks
         hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .missing))
         let presentOnboarding = presentAXOnboarding
@@ -58,7 +58,7 @@ extension OllyRuntime {
         for display in displayProvider() {
             try? await applyAndArrange(displayID: display.id)
         }
-        await eventHub.publish(.axPermission(IPCAXPermissionEvent(status: .trusted)))
+        await publishRuntimeEvent(.axPermission(IPCAXPermissionEvent(status: .trusted)))
         let hooks = await configStore.current().hooks
         hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .trusted))
     }

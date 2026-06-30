@@ -23,7 +23,7 @@ extension OllyRuntime {
             try tree.reconciled(with: windowIDs).preselect(command.direction, for: windowID)
         }
         let path = updatedTree.path(to: windowID) ?? .root
-        await eventHub.publish(.engine(.manualPreselected(ManualPreselectedEvent(
+        await publishRuntimeEvent(.engine(.manualPreselected(ManualPreselectedEvent(
             windowID: windowID,
             path: path,
             direction: command.direction
@@ -58,7 +58,7 @@ extension OllyRuntime {
                 return reconciled.balancing(in: bounds)
             }
         }
-        await eventHub.publish(.engine(.bspTreeChanged(BSPTreeChangedEvent(
+        await publishRuntimeEvent(.engine(.bspTreeChanged(BSPTreeChangedEvent(
             action: command.action,
             path: command.path
         ))))

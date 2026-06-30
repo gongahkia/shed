@@ -99,8 +99,11 @@ public final class MetalTextView: NSView {
 	private static let benchStageLock = NSLock()
 	private static var recordedBenchStages: Set<String> = []
 	private static let maxCachedShapedLines = 512
+	private static let defaultFontSize: CGFloat = 14
+	private static let defaultTextColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
+	private static let cursorColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 
-	var clearColor = MTLClearColor(red: 0.08, green: 0.09, blue: 0.10, alpha: 1.0) {
+	var clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0) {
 		didSet { needsDisplay = true }
 	}
 
@@ -146,7 +149,7 @@ public final class MetalTextView: NSView {
 	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
 	private var highlightRevision = 0
 	private var markedRangeUTF8: Range<Int>?
-	private let textFont = CTFontCreateWithName("Menlo" as CFString, 14, nil)
+	private let textFont = MetalTextView.makeDefaultTextFont()
 	private let gutterWidth: CGFloat = 24
 	private let textInset = CGPoint(x: 30, y: 6)
 	public var topContentInset: CGFloat = 0 {
@@ -157,6 +160,9 @@ public final class MetalTextView: NSView {
 	private(set) var displayLinkRefreshRate: Double?
 	var lineHeight: CGFloat = 17 {
 		didSet { markDirty() }
+	}
+	var textFontPostScriptName: String {
+		CTFontCopyPostScriptName(textFont) as String
 	}
 	var lineCount: Int = 0 {
 		didSet {
@@ -1805,7 +1811,7 @@ public final class MetalTextView: NSView {
 	private func shapeCachedGlyphs(line: String, lineRange: Range<Int>, shaper: LineShaper) -> [CachedLineGlyph]? {
 		try? withGlyphAtlas { atlas in
 			let shaped = try shaper.shape(line, font: textFont, atlas: &atlas, colorForRange: { [weak self] range in
-				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? Self.defaultTextColor
 			})
 			var cached: [CachedLineGlyph] = []
 			cached.reserveCapacity(shaped.count)
@@ -1878,14 +1884,14 @@ public final class MetalTextView: NSView {
 
 	private func textColor(for range: Range<Int>) -> SIMD4<Float> {
 		guard let span = highlightSpans.last(where: { $0.range.overlaps(range) }) else {
-			return SIMD4<Float>(0.86, 0.88, 0.90, 1.0)
+			return Self.defaultTextColor
 		}
 		return span.color
 	}
 
 	private func appendCursorOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		if cursorBlinkVisible, let cursorRect {
-			instances.append(solidInstance(rect: cursorRect, scale: scale, color: SIMD4<Float>(0.92, 0.94, 0.96, 1.0)))
+			instances.append(solidInstance(rect: cursorRect, scale: scale, color: Self.cursorColor))
 		}
 	}
 
@@ -2095,6 +2101,13 @@ public final class MetalTextView: NSView {
 		descriptor.vertexFunction = library.makeFunction(name: "glyph_vertex")
 		descriptor.fragmentFunction = library.makeFunction(name: "glyph_fragment")
 		descriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+		descriptor.colorAttachments[0].isBlendingEnabled = true
+		descriptor.colorAttachments[0].rgbBlendOperation = .add
+		descriptor.colorAttachments[0].alphaBlendOperation = .add
+		descriptor.colorAttachments[0].sourceRGBBlendFactor = .one
+		descriptor.colorAttachments[0].sourceAlphaBlendFactor = .one
+		descriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+		descriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
 		renderPipeline = try? metalDevice.makeRenderPipelineState(descriptor: descriptor)
 		return renderPipeline
 	}
@@ -2164,6 +2177,11 @@ public final class MetalTextView: NSView {
 
 	private func glyphRenderingMode(scale: CGFloat) -> GlyphAtlas.RenderingMode {
 		scale < 2 ? .subpixel : .grayscale
+	}
+
+	private static func makeDefaultTextFont() -> CTFont {
+		let font = NSFont(name: "Monaco", size: defaultFontSize) ?? NSFont.monospacedSystemFont(ofSize: defaultFontSize, weight: .regular)
+		return CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
 	}
 
 	private func currentDisplayID() -> CGDirectDisplayID? {

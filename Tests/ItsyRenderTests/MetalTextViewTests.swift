@@ -20,6 +20,15 @@ import Testing
 	#expect(!layer.wantsExtendedDynamicRangeContent)
 }
 
+@Test func editorDefaultsToLightMonacoRendering() {
+	let view = MetalTextView(frame: .zero)
+	let expectedFont = NSFont(name: "Monaco", size: 14) ?? NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
+	#expect(view.textFontPostScriptName == expectedFont.fontName)
+	#expect(view.clearColor.red == 1.0)
+	#expect(view.clearColor.green == 1.0)
+	#expect(view.clearColor.blue == 1.0)
+}
+
 @Test func textViewExposesCurrentLineToAccessibility() throws {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "alpha\nbeta\n")

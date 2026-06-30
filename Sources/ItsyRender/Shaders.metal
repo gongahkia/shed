@@ -59,6 +59,6 @@ fragment half4 glyph_fragment(
 	const float4 coverage = uniforms.atlasMode == 0 ? float4(1.0) : atlas.sample(atlasSampler, in.atlasUV);
 	const float alpha = uniforms.atlasMode == 2 ? max(max(coverage.r, coverage.g), coverage.b) : coverage.r;
 	const float3 rgb = uniforms.atlasMode == 2 ? in.color.rgb * coverage.rgb : in.color.rgb * coverage.r;
-	const float4 color = float4(rgb, in.color.a * alpha);
+	const float4 color = float4(rgb * in.color.a, in.color.a * alpha);
 	return half4(color);
 }

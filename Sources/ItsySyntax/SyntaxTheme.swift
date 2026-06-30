@@ -43,7 +43,7 @@ public struct SyntaxTheme: Sendable, Equatable {
 	public var colors: [String: SyntaxColor]
 	public static let selectedThemeDefaultsKey = "dev.itsy.editor.syntaxTheme"
 	public static let userThemeDirectoryName = "themes"
-	public static let defaultChoiceID = "bundled:default-dark"
+	public static let defaultChoiceID = "bundled:default-light"
 
 	public init(colors: [String: SyntaxColor]) {
 		self.colors = colors
@@ -88,7 +88,7 @@ public struct SyntaxTheme: Sendable, Equatable {
 		if fileManager.fileExists(atPath: url.path) {
 			return try parse(String(contentsOf: url, encoding: .utf8))
 		}
-		return try loadDefaultDark()
+		return try loadDefaultLight()
 	}
 
 	public static func availableChoices(fileManager: FileManager = .default) -> [SyntaxThemeChoice] {

@@ -241,10 +241,16 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private func ensureConfigExists(profile: ConfigTemplateProfile) throws {
+        try Self.ensureConfigExists(profile: profile, sourceURL: sourceURL, fileManager: fileManager)
+    }
+
+    static func ensureConfigExists(
+        profile: ConfigTemplateProfile,
+        sourceURL: URL = ConfigLoader.defaultSourceURL(),
+        fileManager: FileManager = .default
+    ) throws {
         try fileManager.createDirectory(at: sourceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard !fileManager.fileExists(atPath: sourceURL.path) else {
-            return
-        }
+        guard !fileManager.fileExists(atPath: sourceURL.path) else { return }
         try profile.source.write(to: sourceURL, atomically: true, encoding: .utf8)
     }
 

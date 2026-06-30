@@ -161,6 +161,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitBranchPopover: NSPopover?
 	private var gitBranchTableView: NSTableView?
 	private var gitBranches: [GitBranch] = []
+	private var gitStashPanel: NSPanel?
+	private var gitStashStatusLabel: NSTextField?
+	private var gitStashTableView: NSTableView?
+	private var gitStashEntries: [GitStashEntry] = []
+	private var gitStashRootURL: URL?
 	private var gitSummaryField: NSTextField?
 	private var gitBodyTextView: NSTextView?
 	private var gitCommitButton: NSButton?
@@ -659,6 +664,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 					},
 					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
 						self?.refreshGitChanges(nil)
+					},
+					Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
+						self?.showGitStashes(nil)
+					},
+					Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"), defaultKey: "Cmd-Shift-S") { [weak self] in
+						self?.stashCurrentGitChanges(nil)
 					},
 					Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
 						self?.showTasks(nil)
@@ -1320,6 +1331,234 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		alert.addButton(withTitle: L10n.string("Stash and Switch"))
 		alert.addButton(withTitle: L10n.string("Cancel"))
 		return alert.runModal() == .alertFirstButtonReturn
+	}
+
+	@objc private func showGitStashes(_: Any?) {
+		let panel = makeGitStashPanelIfNeeded()
+		centerGitStashPanel(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		refreshGitStashes(nil)
+	}
+
+	private func makeGitStashPanelIfNeeded() -> NSPanel {
+		if let panel = gitStashPanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 760, height: 420),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Stashes")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureGitStashView(contentView)
+		gitStashPanel = panel
+		return panel
+	}
+
+	private func configureGitStashView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 12)
+		statusLabel.textColor = .secondaryLabelColor
+		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitStashes(_:)))
+		let stashButton = NSButton(title: L10n.string("Stash Current Changes..."), target: self, action: #selector(stashCurrentGitChanges(_:)))
+		let buttonStack = NSStackView(views: [refreshButton, stashButton])
+		buttonStack.orientation = .horizontal
+		buttonStack.spacing = 8
+		let header = NSStackView(views: [statusLabel, buttonStack])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.distribution = .fill
+		header.spacing = 12
+		let tableView = NSTableView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("stash"))
+		column.title = L10n.string("Stashes")
+		column.resizingMask = .autoresizingMask
+		tableView.addTableColumn(column)
+		tableView.headerView = nil
+		tableView.rowHeight = 56
+		tableView.dataSource = self
+		tableView.delegate = self
+		let scrollView = NSScrollView()
+		scrollView.documentView = tableView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		header.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(header)
+		contentView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		gitStashStatusLabel = statusLabel
+		gitStashTableView = tableView
+	}
+
+	private func centerGitStashPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = min(820, max(620, hostFrame.width - 100))
+		let height = min(520, max(320, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	@objc private func refreshGitStashes(_: Any?) {
+		guard let root = currentGitRootURL() else {
+			setGitStashes([], root: nil, status: L10n.string("Open a Git repository first"), isError: true)
+			return
+		}
+		do {
+			let entries = try GitRepository(root: root).stashes()
+			let count = entries.count == 1 ? L10n.string("1 stash") : L10n.string("\(entries.count) stashes")
+			setGitStashes(entries, root: root, status: "\(root.path) - \(count)", isError: false)
+		} catch {
+			setGitStashes([], root: root, status: String(describing: error), isError: true)
+		}
+	}
+
+	private func setGitStashes(_ entries: [GitStashEntry], root: URL?, status: String, isError: Bool) {
+		gitStashEntries = entries
+		gitStashRootURL = root
+		setGitStashStatus(status, isError: isError)
+		gitStashTableView?.reloadData()
+		if !entries.isEmpty {
+			gitStashTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	private func setGitStashStatus(_ status: String, isError: Bool) {
+		gitStashStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
+		gitStashStatusLabel?.stringValue = status
+	}
+
+	private func currentGitRootURL() -> URL? {
+		if let root = ItsyWorkspaceController.currentRootURL,
+		   let gitRoot = try? GitRepository.discoverRoot(containing: root) {
+			return gitRoot
+		}
+		if let fileURL = (activeDocument() as? ItsyDocument)?.fileURL,
+		   let gitRoot = try? GitRepository.discoverRoot(containing: fileURL) {
+			return gitRoot
+		}
+		if let gitRootURL {
+			return gitRootURL
+		}
+		return nil
+	}
+
+	@objc private func stashCurrentGitChanges(_: Any?) {
+		guard let root = currentGitRootURL() else {
+			showGitStashAlert(title: L10n.string("Stash failed"), message: L10n.string("Open a Git repository first"))
+			return
+		}
+		guard let message = promptGitStashMessage() else {
+			return
+		}
+		do {
+			try GitRepository(root: root).stash(message: message)
+			refreshGitStateAfterStashChange(status: L10n.string("Stash saved"))
+		} catch {
+			setGitStashStatus(String(describing: error), isError: true)
+			showGitStashAlert(title: L10n.string("Stash failed"), message: String(describing: error))
+		}
+	}
+
+	private func promptGitStashMessage() -> String? {
+		let field = NSTextField(string: "")
+		field.placeholderString = L10n.string("stash message")
+		field.frame = NSRect(x: 0, y: 0, width: 360, height: 24)
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Stash Current Changes")
+		alert.informativeText = L10n.string("Message")
+		alert.accessoryView = field
+		alert.addButton(withTitle: L10n.string("Stash"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		guard alert.runModal() == .alertFirstButtonReturn else {
+			return nil
+		}
+		let message = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+		return message.isEmpty ? nil : message
+	}
+
+	@objc private func applyGitStashFromRow(_ sender: NSButton) {
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Apply")) { repository, entry in
+			try repository.applyStash(entry.ref)
+		}
+	}
+
+	@objc private func popGitStashFromRow(_ sender: NSButton) {
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Pop")) { repository, entry in
+			try repository.popStash(entry.ref)
+		}
+	}
+
+	@objc private func dropGitStashFromRow(_ sender: NSButton) {
+		guard sender.tag >= 0, sender.tag < gitStashEntries.count else {
+			return
+		}
+		let entry = gitStashEntries[sender.tag]
+		guard confirmDropGitStash(entry) else {
+			return
+		}
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Drop")) { repository, entry in
+			try repository.dropStash(entry.ref)
+		}
+	}
+
+	private func runGitStashEntryAction(
+		row: Int,
+		title: String,
+		action: (GitRepository, GitStashEntry) throws -> Void
+	) {
+		guard let root = gitStashRootURL, row >= 0, row < gitStashEntries.count else {
+			return
+		}
+		let entry = gitStashEntries[row]
+		do {
+			try action(GitRepository(root: root), entry)
+			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
+		} catch {
+			setGitStashStatus(String(describing: error), isError: true)
+		}
+	}
+
+	private func confirmDropGitStash(_ entry: GitStashEntry) -> Bool {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = L10n.string("Drop Stash?")
+		alert.informativeText = "\(entry.ref)\n\(entry.message)"
+		alert.addButton(withTitle: L10n.string("Drop"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		return alert.runModal() == .alertFirstButtonReturn
+	}
+
+	private func refreshGitStateAfterStashChange(status: String) {
+		refreshGitStashes(nil)
+		setGitStashStatus(status, isError: false)
+		if ItsyWorkspaceController.currentRootURL != nil {
+			refreshGitChanges(nil)
+		} else {
+			ItsyWorkspaceController.refreshGitStatus()
+		}
+	}
+
+	private func showGitStashAlert(title: String, message: String) {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = title
+		alert.informativeText = message
+		alert.addButton(withTitle: L10n.string("OK"))
+		alert.runModal()
 	}
 
 	@objc private func fetchGitRemote(_ sender: Any?) {
@@ -2913,7 +3152,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		closeItem.target = self
 		fileMenu.addItem(.separator())
 		fileMenu.addItem(withTitle: L10n.string("Save"), action: #selector(NSDocument.save(_:)), keyEquivalent: "s")
-		fileMenu.addItem(withTitle: L10n.string("Save As..."), action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "S")
+		fileMenu.addItem(withTitle: L10n.string("Save As..."), action: #selector(NSDocument.saveAs(_:)), keyEquivalent: "")
 		fileItem.submenu = fileMenu
 
 		let editMenu = NSMenu(title: L10n.string("Edit"))
@@ -2965,6 +3204,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		gitChangesItem.target = self
 		let gitRefreshItem = gitMenu.addItem(withTitle: L10n.string("Refresh Git Status"), action: #selector(refreshGitChanges(_:)), keyEquivalent: "")
 		gitRefreshItem.target = self
+		gitMenu.addItem(.separator())
+		let gitStashesItem = gitMenu.addItem(withTitle: L10n.string("Stashes"), action: #selector(showGitStashes(_:)), keyEquivalent: "")
+		gitStashesItem.target = self
+		let gitStashCurrentItem = gitMenu.addItem(withTitle: L10n.string("Stash Current Changes..."), action: #selector(stashCurrentGitChanges(_:)), keyEquivalent: "S")
+		gitStashCurrentItem.keyEquivalentModifierMask = [.command, .shift]
+		gitStashCurrentItem.target = self
 		gitMenu.addItem(.separator())
 		let gitFetchItem = gitMenu.addItem(withTitle: L10n.string("Fetch"), action: #selector(fetchGitRemote(_:)), keyEquivalent: "")
 		gitFetchItem.target = self
@@ -3151,6 +3396,9 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		if tableView === gitBranchTableView {
 			return gitBranches.count
 		}
+		if tableView === gitStashTableView {
+			return gitStashEntries.count
+		}
 		if tableView === gitHunkTableView {
 			return gitHunkItems.count
 		}
@@ -3293,6 +3541,46 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 				rowStack.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
 				rowStack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
 				buttonStack.widthAnchor.constraint(equalToConstant: 190),
+			])
+			return cell
+		}
+		if tableView === gitStashTableView {
+			let entry = gitStashEntries[row]
+			let cell = NSTableCellView()
+			let title = NSTextField(labelWithString: "\(entry.ref)  \(entry.message)")
+			title.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+			title.lineBreakMode = .byTruncatingMiddle
+			let detail = NSTextField(labelWithString: entry.date)
+			detail.font = .systemFont(ofSize: 10)
+			detail.textColor = .secondaryLabelColor
+			detail.lineBreakMode = .byTruncatingTail
+			let textStack = NSStackView(views: [title, detail])
+			textStack.orientation = .vertical
+			textStack.alignment = .leading
+			textStack.spacing = 2
+			let applyButton = NSButton(title: L10n.string("Apply"), target: self, action: #selector(applyGitStashFromRow(_:)))
+			let popButton = NSButton(title: L10n.string("Pop"), target: self, action: #selector(popGitStashFromRow(_:)))
+			let dropButton = NSButton(title: L10n.string("Drop"), target: self, action: #selector(dropGitStashFromRow(_:)))
+			[applyButton, popButton, dropButton].forEach {
+				$0.bezelStyle = .rounded
+				$0.font = .systemFont(ofSize: 10)
+				$0.tag = row
+			}
+			let buttonStack = NSStackView(views: [applyButton, popButton, dropButton])
+			buttonStack.orientation = .horizontal
+			buttonStack.spacing = 6
+			let rowStack = NSStackView(views: [textStack, buttonStack])
+			rowStack.orientation = .horizontal
+			rowStack.alignment = .centerY
+			rowStack.spacing = 10
+			rowStack.distribution = .fill
+			rowStack.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(rowStack)
+			NSLayoutConstraint.activate([
+				rowStack.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+				rowStack.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+				rowStack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+				buttonStack.widthAnchor.constraint(equalToConstant: 156),
 			])
 			return cell
 		}

@@ -25,67 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.5 Live Alt-Tab / exposé preview switcher
-
-**Goal:** Show all windows on current tag as a thumbnail grid.
-
-**Research summary (CGWindowListCreateImage → ScreenCaptureKit migration):**
-- `CGWindowListCreateImage` is **obsoleted in macOS 15.0**, deprecated in macOS 14. Compiler will fail with `'CGWindowListCreateImage' is unavailable: obsoleted in macOS 15.0`.
-- Recommended successor: `SCScreenshotManager.captureImage(contentFilter:configuration:)` from ScreenCaptureKit (macOS 14+).
-- Difference: `CGWindowListCreateImage` returns image at captured-window size; `SCScreenshotManager` returns image at the **configured** size — set `SCStreamConfiguration.width/height` explicitly.
-- **Permission**: both APIs require Screen Recording TCC (`kTCCServiceScreenCapture`). First call surfaces prompt. AX trust does NOT cover screen capture.
-- AltTab moved to SCK on macOS 14+ in commit [`7821d7c`](https://github.com/lwouis/alt-tab-macos/commit/7821d7c). Performance: 200ms total for 10 windows captured eagerly was painful; cache eagerly with TTL.
-
-**Files to add:**
-- `Sources/ollyApp/Overlays/AltTabSwitcherController.swift`
-- `Sources/ollyApp/Overlays/WindowThumbnailView.swift` — `NSImageView` backed by cache.
-- `Sources/ollyKit/WindowThumbnailCache.swift` — `actor` caching `CGImage` per `WindowID` with TTL (250ms default).
-
-**Implementation snippet (SCK path):**
-```swift
-@available(macOS 14.0, *)
-func captureSCK(windowID: CGWindowID, width: Int, height: Int) async throws -> CGImage? {
-    let content = try await SCShareableContent.current
-    guard let win = content.windows.first(where: { $0.windowID == windowID }) else { return nil }
-    let filter = SCContentFilter(desktopIndependentWindow: win)
-    let cfg = SCStreamConfiguration()
-    cfg.width = width; cfg.height = height; cfg.showsCursor = false
-    return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: cfg)
-}
-```
-
-Fallback for macOS 13 (CGWindowListCreateImage still works there):
-```swift
-func captureCG(windowID: CGWindowID) -> CGImage? {
-    CGWindowListCreateImage(.null, .optionIncludingWindow, windowID,
-                            [.boundsIgnoreFraming, .nominalResolution])
-}
-```
-
-**Performance bounds:**
-- Cap visible thumbnails at 50; >50 windows switch to list view.
-- Selected + neighbouring thumbnails recapture at 30 Hz via `CADisplayLink`; others 15 Hz.
-- Adaptive: if `windowStore.count > 60`, halve to 8 Hz.
-
-**Permission UX:**
-- Set `NSScreenCaptureUsageDescription` in Info.plist.
-- On first launch of AltTab, prompt via SCK's natural TCC trigger; if denied, fall back to a list view with no thumbnails.
-
-**Test plan:**
-- Snapshot: grid layout adapts to N=1..16 windows.
-- Performance (`Sources/PerfBench`): thumbnail generation for 20 windows ≤ 80ms total.
-
-**Acceptance:**
-- `ollyctl show-overlay alt-tab` opens a thumbnail grid of windows on current tag; arrow + enter focuses the chosen window.
-
-**Refs:**
-- https://developer.apple.com/forums/thread/740493
-- https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager
-- https://github.com/lwouis/alt-tab-macos/commit/7821d7c
-- https://github.com/lwouis/alt-tab-macos/issues/45
-
----
-
 ### M3.6 Scratchpad windows
 
 **Goal:** Designated windows toggle visible/hidden independent of tags.

@@ -253,10 +253,13 @@ final class CommandPaletteRowView: NSTableCellView {
     func configure(title: String, detail: String) {
         titleLabel.stringValue = title
         detailLabel.stringValue = detail
+        setAccessibilityLabel("\(title), \(detail)")
     }
 
     private func configure() {
         wantsLayer = true
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
         titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         titleLabel.textColor = .labelColor
         titleLabel.lineBreakMode = .byTruncatingTail

@@ -12,7 +12,10 @@ final class AltTabSwitcherView: NSView {
         self.thumbnailCache = thumbnailCache
         super.init(frame: .zero)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.black.withAlphaComponent(0.48).cgColor
+        layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.72).cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.list)
+        setAccessibilityLabel("Alt-Tab windows")
     }
 
     required init?(coder: NSCoder) {
@@ -34,6 +37,15 @@ final class AltTabSwitcherView: NSView {
         case .list:
             configureList(windows: windows, selectedID: selectedID)
         }
+        let children: [NSView]
+        switch mode {
+        case .grid:
+            children = thumbnailViews
+        case .list:
+            children = listRows
+        }
+        setAccessibilityChildren(children)
+        setAccessibilityChildrenInNavigationOrder(children.map { $0 as any NSAccessibilityElementProtocol })
     }
 
     func resetContent() {
@@ -42,6 +54,8 @@ final class AltTabSwitcherView: NSView {
         thumbnailViews = []
         listRows = []
         itemCount = 0
+        setAccessibilityChildren([])
+        setAccessibilityChildrenInNavigationOrder([any NSAccessibilityElementProtocol]())
     }
 
     private func configureGrid(windows: [WindowState], selectedID: WindowID?, reduceMotion: Bool) {
@@ -116,6 +130,9 @@ final class WindowThumbnailView: NSView {
         reduceMotion: Bool
     ) {
         titleLabel.stringValue = window.altTabTitle
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(window.altTabTitle)
         layer?.borderWidth = isSelected ? 3 : 1
         layer?.borderColor = (isSelected ? NSColor.controlAccentColor : NSColor.separatorColor).cgColor
         if isSelected, !reduceMotion {
@@ -187,6 +204,9 @@ final class AltTabListRowView: NSView {
     func configure(window: WindowState, isSelected: Bool) {
         titleLabel.stringValue = window.altTabTitle
         detailLabel.stringValue = window.bundleID ?? ""
+        setAccessibilityElement(true)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel([window.altTabTitle, window.bundleID].compactMap { $0 }.joined(separator: ", "))
         layer?.backgroundColor = (isSelected ? NSColor.selectedContentBackgroundColor : NSColor.windowBackgroundColor)
             .withAlphaComponent(0.92)
             .cgColor

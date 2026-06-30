@@ -27,22 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.11 Dark/light parity + accessibility audit
-
-**Goal:** Every new overlay uses semantic colors (`NSColor.labelColor`, `NSColor.controlAccentColor`) — no hardcoded `.white`. Every overlay sets `accessibilityRole`, `accessibilityLabel`, `setAccessibilityElement(true)`.
-
-**Files to modify:**
-- `Sources/ollyApp/OverviewModeController.swift:234` (`OverviewView.drawHeader`) — current hardcoded `.white` becomes `.labelColor`.
-- Audit every new overlay file from M3 before merge.
-
-**A11y per overlay:**
-- Drag-snap overlay: role `.layoutArea`, per-zone children with role `.button`.
-- Focus ring: role `.staticText` or `.unknown` (decoration only); set `accessibilityIsHidden = true`.
-- Alt-Tab: role `.list`, per-thumbnail children role `.button`, label = window title.
-- Cheatsheet: role `.list`, per-row children role `.staticText`.
-
----
-
 ### M4.12 Localized strings strategy
 
 **Goal:** Pull every user-visible string into `Localizable.strings` (English-only locale now); unblock community translations.

@@ -122,6 +122,7 @@ enum SnapZoneResolver {
 @MainActor
 final class SnapZoneView: NSView {
     private var zoneLayers: [IPCSnapPosition: CALayer] = [:]
+    private var zoneAccessibilityElements: [NSAccessibilityElement] = []
     private var highlighted: IPCSnapPosition?
 
     var activeLayerCount: Int {
@@ -133,6 +134,9 @@ final class SnapZoneView: NSView {
         wantsLayer = true
         layer = CALayer()
         layer?.masksToBounds = false
+        setAccessibilityElement(true)
+        setAccessibilityRole(.layoutArea)
+        setAccessibilityLabel("Snap zones")
     }
 
     required init?(coder: NSCoder) {
@@ -162,6 +166,7 @@ final class SnapZoneView: NSView {
         if animateHighlight, self.highlighted != highlighted {
             animate(layer: highlighted.flatMap { zoneLayers[$0] })
         }
+        updateAccessibility(zones: zones)
         self.highlighted = highlighted
     }
 
@@ -201,9 +206,20 @@ final class SnapZoneView: NSView {
             return NSColor.systemBlue.withAlphaComponent(0.9)
         }
         if position == .maximize {
-            return NSColor.white.withAlphaComponent(0.12)
+            return NSColor.separatorColor.withAlphaComponent(0.18)
         }
-        return NSColor.white.withAlphaComponent(0.28)
+        return NSColor.separatorColor.withAlphaComponent(0.42)
+    }
+
+    private func updateAccessibility(zones: [SnapZone]) {
+        zoneAccessibilityElements = zones.map { zone in
+            let element = NSAccessibilityElement()
+            element.setAccessibilityRole(.button)
+            element.setAccessibilityLabel(zone.position.accessibilityLabel)
+            element.setAccessibilityFrameInParentSpace(zone.frame.integral)
+            return element
+        }
+        setAccessibilityChildren(zoneAccessibilityElements)
     }
 }
 
@@ -213,5 +229,30 @@ private extension IPCSnapPosition {
             return 10
         }
         return self == .maximize ? 0 : 1
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .leftHalf:
+            return "Snap left half"
+        case .rightHalf:
+            return "Snap right half"
+        case .topHalf:
+            return "Snap top half"
+        case .bottomHalf:
+            return "Snap bottom half"
+        case .topLeft:
+            return "Snap top left"
+        case .topRight:
+            return "Snap top right"
+        case .bottomLeft:
+            return "Snap bottom left"
+        case .bottomRight:
+            return "Snap bottom right"
+        case .center:
+            return "Snap center"
+        case .maximize:
+            return "Maximize"
+        }
     }
 }

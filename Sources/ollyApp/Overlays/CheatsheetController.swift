@@ -358,11 +358,17 @@ final class CheatsheetView: NSView {
                 stack.addArrangedSubview(row)
             }
         }
+        let rows = stack.arrangedSubviews.compactMap { $0 as? CommandPaletteRowView }
+        setAccessibilityChildren(rows)
+        setAccessibilityChildrenInNavigationOrder(rows.map { $0 as any NSAccessibilityElementProtocol })
     }
 
     private func configure() {
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.list)
+        setAccessibilityLabel("Keybinds")
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical

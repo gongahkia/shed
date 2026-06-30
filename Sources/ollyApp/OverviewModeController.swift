@@ -203,6 +203,9 @@ final class OverviewView: NSView {
         self.onFocus = onFocus
         super.init(frame: .zero)
         wantsLayer = true
+        setAccessibilityElement(true)
+        setAccessibilityRole(.layoutArea)
+        setAccessibilityLabel("Overview")
     }
 
     @available(*, unavailable)
@@ -215,7 +218,7 @@ final class OverviewView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.black.withAlphaComponent(0.58).setFill()
+        NSColor.windowBackgroundColor.withAlphaComponent(0.86).setFill()
         bounds.fill()
         drawHeader()
         drawTags()
@@ -235,7 +238,7 @@ final class OverviewView: NSView {
             at: CGPoint(x: 28, y: 26),
             withAttributes: [
                 .font: NSFont.boldSystemFont(ofSize: 22),
-                .foregroundColor: NSColor.white
+                .foregroundColor: NSColor.labelColor
             ]
         )
     }
@@ -243,13 +246,13 @@ final class OverviewView: NSView {
     private func drawTags() {
         let rect = CGRect(x: 28, y: 64, width: 34, height: 24)
         let path = NSBezierPath(roundedRect: rect, xRadius: 6, yRadius: 6)
-        NSColor.systemBlue.withAlphaComponent(0.88).setFill()
+        NSColor.controlAccentColor.withAlphaComponent(0.88).setFill()
         path.fill()
         "1".draw(
             in: rect.insetBy(dx: 12, dy: 3),
             withAttributes: [
                 .font: NSFont.boldSystemFont(ofSize: 14),
-                .foregroundColor: NSColor.white
+                .foregroundColor: NSColor.selectedMenuItemTextColor
             ]
         )
     }
@@ -284,7 +287,7 @@ final class OverviewView: NSView {
         let path = NSBezierPath(roundedRect: rect, xRadius: 8, yRadius: 8)
         NSColor.windowBackgroundColor.withAlphaComponent(0.92).setFill()
         path.fill()
-        NSColor.white.withAlphaComponent(0.25).setStroke()
+        NSColor.separatorColor.withAlphaComponent(0.4).setStroke()
         path.stroke()
 
         snapshot.title.draw(

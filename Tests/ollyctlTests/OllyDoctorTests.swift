@@ -59,6 +59,24 @@ final class OllyDoctorTests: XCTestCase {
         XCTAssertTrue(try report.renderJSON().contains("\"overallStatus\" : \"warning\""))
     }
 
+    func testDoctorWarnsWhenCrashReportsArePendingAndTelemetryDisabled() {
+        let doctor = makeDoctor(
+            telemetry: {
+                DoctorTelemetrySummary(
+                    enabled: false,
+                    pendingReportCount: 2,
+                    logDirectory: URL(fileURLWithPath: "/tmp/olly-crashes")
+                )
+            }
+        )
+
+        let report = doctor.run()
+
+        XCTAssertEqual(report.overallStatus, .warning)
+        XCTAssertEqual(report.check(id: "telemetry")?.status, .warning)
+        XCTAssertTrue(report.check(id: "telemetry")?.summary.contains("2 pending") == true)
+    }
+
     func testDoctorReportsAllGreenWhenRequiredChecksPass() {
         let doctor = makeDoctor()
 
@@ -103,6 +121,13 @@ final class OllyDoctorTests: XCTestCase {
                 observedWindowCount: 1,
                 inspectedAXWindows: true
             )
+        },
+        telemetry: @escaping () -> DoctorTelemetrySummary = {
+            DoctorTelemetrySummary(
+                enabled: false,
+                pendingReportCount: 0,
+                logDirectory: URL(fileURLWithPath: "/tmp/olly-crashes")
+            )
         }
     ) -> OllyDoctor {
         OllyDoctor(
@@ -113,7 +138,8 @@ final class OllyDoctorTests: XCTestCase {
             hotKeyReport: hotKeyReport,
             displayProvider: { displays },
             ipcProbe: ipcProbe,
-            compatibilitySummary: compatibility
+            compatibilitySummary: compatibility,
+            telemetrySummary: telemetry
         )
     }
 }

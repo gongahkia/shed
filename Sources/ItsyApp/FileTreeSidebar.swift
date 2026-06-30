@@ -6,9 +6,19 @@ enum ItsyWorkspaceController {
 	private static let controllers = NSHashTable<EditorWindowController>.weakObjects()
 	private static var rootURL: URL?
 	private static var gitSnapshot: GitWorkspaceSnapshot?
+	private static var workspaceIndex: WorkspaceIndex?
+	private static var indexGeneration = 0
 
 	static var currentRootURL: URL? {
 		rootURL
+	}
+
+	static var currentWorkspaceIndex: WorkspaceIndex? {
+		workspaceIndex
+	}
+
+	static func searchWorkspaceSymbols(query: String, limit: Int = 50) -> [WorkspaceSymbol] {
+		workspaceIndex?.searchSymbols(query: query, limit: limit) ?? []
 	}
 
 	static func install(documentController: ItsyDocumentController) {
@@ -27,6 +37,25 @@ enum ItsyWorkspaceController {
 		for controller in controllers.allObjects {
 			controller.setWorkspaceRootURL(url)
 			controller.setGitSnapshot(gitSnapshot)
+		}
+		rebuildWorkspaceIndex()
+	}
+
+	static func rebuildWorkspaceIndex() {
+		guard let root = rootURL else {
+			workspaceIndex = nil
+			return
+		}
+		indexGeneration &+= 1
+		let generation = indexGeneration
+		DispatchQueue.global(qos: .utility).async {
+			let index = WorkspaceIndexer.build(root: root)
+			DispatchQueue.main.async {
+				guard generation == indexGeneration else {
+					return
+				}
+				workspaceIndex = index
+			}
 		}
 	}
 

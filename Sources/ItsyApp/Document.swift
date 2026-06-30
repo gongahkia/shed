@@ -25,23 +25,34 @@ final class ItsyDocumentController: NSDocumentController {
 
 	@discardableResult
 	func openDocument(at url: URL) -> Bool {
+		openDocument(at: url, line: nil, column: nil)
+	}
+
+	@discardableResult
+	func openDocument(at url: URL, line: Int?, column: Int?) -> Bool {
 		let typeName = defaultType ?? "public.data"
-		if let document = document(for: url) as? ItsyDocument {
+		let document: ItsyDocument
+		if let existing = self.document(for: url) as? ItsyDocument {
+			document = existing
 			showDocument(document)
 			noteRecentDocumentIfNeeded(document)
-			return true
-		}
-		do {
-			guard let document = try makeDocument(withContentsOf: url, ofType: typeName) as? ItsyDocument else {
+		} else {
+			do {
+				guard let made = try makeDocument(withContentsOf: url, ofType: typeName) as? ItsyDocument else {
+					return false
+				}
+				document = made
+				addDocument(document)
+				showDocument(document)
+			} catch {
+				NSLog("failed to open \(url.path): \(error)")
 				return false
 			}
-			addDocument(document)
-			showDocument(document)
-			return true
-		} catch {
-			NSLog("failed to open \(url.path): \(error)")
-			return false
 		}
+		if let line {
+			document.jumpTo(line: line, column: column ?? 1)
+		}
+		return true
 	}
 
 	func showDocument(_ document: ItsyDocument) {
@@ -199,6 +210,22 @@ final class ItsyDocument: NSDocument {
 	func restoreHandoffCursorOffset(_ offset: Int) {
 		let clamped = min(max(offset, 0), editor.rope.length)
 		editor.setSelection(SelectionSet(primary: Selection(anchor: clamped, head: clamped)))
+		for view in editorViews {
+			view.editor = editor
+		}
+		updateHandoffActivity()
+	}
+
+	func jumpTo(line: Int, column: Int) {
+		let zeroLine = max(0, line - 1)
+		let zeroColumn = max(0, column - 1)
+		let rope = editor.rope
+		guard zeroLine < rope.lineCount else {
+			return
+		}
+		let lineRange = rope.lineRange(zeroLine)
+		let offset = min(lineRange.upperBound, lineRange.lowerBound + zeroColumn)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
 		for view in editorViews {
 			view.editor = editor
 		}

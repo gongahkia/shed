@@ -317,6 +317,78 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testRunRawActionCommandEmitsRawActionEvent() async throws {
+        try await withRuntime { runtime, socketPath, _ in
+            await runtime.replaceConfigForTest(Config {
+                Permissions {
+                    shellExec(.allowAll)
+                }
+                Keybinds {
+                    Keybind(KeyChord([.command], .b), do: .shell("printf ipc", label: "echo"))
+                }
+            })
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                command: .subscribeEvents(.init(eventKinds: [.rawAction]))
+            )))
+            XCTAssertEqual(try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status, .success)
+
+            XCTAssertEqual(try send(.runRawAction(.init(label: "echo")), to: socketPath).status, .success)
+            let event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            guard case let .rawAction(payload) = event.event else {
+                return XCTFail("expected raw action event")
+            }
+            XCTAssertEqual(payload.label, "echo")
+            XCTAssertEqual(payload.status, .completed)
+            XCTAssertEqual(payload.exit, 0)
+            XCTAssertEqual(payload.stdoutHead, "ipc")
+        }
+    }
+
+    func testRawGestureLabelRunsShellAction() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Permissions {
+                    shellExec(.allowAll)
+                }
+                Keybinds {
+                    Keybind(KeyChord([.command], .b), do: .shell("printf gesture", label: "gesture.echo"))
+                }
+                Gestures {
+                    fourFingerHorizontal(.action(.raw("gesture.echo")))
+                }
+            })
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                command: .subscribeEvents(.init(eventKinds: [.rawAction]))
+            )))
+            XCTAssertEqual(try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status, .success)
+
+            XCTAssertEqual(
+                try send(.dispatchGesture(.init(
+                    trigger: .fourFingerHorizontal,
+                    motion: .left,
+                    displayID: displayID
+                )), to: socketPath).status,
+                .success
+            )
+            let event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            guard case let .rawAction(payload) = event.event else {
+                return XCTFail("expected raw action event")
+            }
+            XCTAssertEqual(payload.label, "gesture.echo")
+            XCTAssertEqual(payload.status, .completed)
+            XCTAssertEqual(payload.exit, 0)
+            XCTAssertEqual(payload.stdoutHead, "gesture")
+        }
+    }
+
     func testAXPermissionChangePublishesEventAndRunsHook() async throws {
         let recorder = HookRecorder()
         try await withRuntime { runtime, socketPath, _ in

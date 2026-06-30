@@ -106,6 +106,9 @@ struct OllyCtlRunner {
         case let .fullscreen(event):
             let state = event.didEnter ? "entered" : "exited"
             return "fullscreen \(state) window \(event.windowID)"
+        case let .rawAction(event):
+            let exit = event.exit.map { " exit \($0)" } ?? ""
+            return "raw-action \(event.label) \(event.status.rawValue)\(exit)"
         case let .space(event):
             return "space \(event.action.rawValue) window \(event.windowID)"
         }

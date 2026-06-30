@@ -23,9 +23,8 @@ extension OllyRuntime {
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))
-        case let .restoreWindows(command):
-            let info = await restoreWindows(command)
-            return .ok(id: request.id, result: .restoredWindows(info))
+        case .restoreWindows, .runRawAction:
+            return await rawControlResponse(for: request)
         case .setSpacePolicy, .setFocusPolicy:
             return await policyResponse(for: request)
         default:
@@ -59,6 +58,19 @@ extension OllyRuntime {
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "focus policy set")))
         default:
             preconditionFailure("invalid policy command")
+        }
+    }
+
+    private func rawControlResponse(for request: IPCRequestEnvelope) async -> IPCResponseEnvelope {
+        switch request.command {
+        case let .restoreWindows(command):
+            let info = await restoreWindows(command)
+            return .ok(id: request.id, result: .restoredWindows(info))
+        case let .runRawAction(command):
+            await runRawAction(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "raw action dispatched")))
+        default:
+            preconditionFailure("invalid raw control command")
         }
     }
 }

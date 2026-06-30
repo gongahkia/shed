@@ -38,9 +38,9 @@ public enum DSLVersion: Codable, Equatable, Sendable {
     }
 }
 
-/// Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, gesture, and hook sections.
+/// Purpose: Top-level olly DSL document composed from all config sections.
 /// Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-/// Example: `Config { Workspaces { Tag.named("web") }; Gestures { fourFingerVertical(.switchTags) } }`
+/// Example: `Config { Permissions { shellExec(.off) }; Gestures { fourFingerVertical(.switchTags) } }`
 /// See also: `ConfigBuilder`, `ConfigSection`.
 public struct Config: Codable, Equatable, Sendable {
     public let version: DSLVersion
@@ -55,6 +55,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let hooks: Hooks
     public let nativeSpace: NativeSpace
     public let focusPolicy: FocusPolicy
+    public let permissions: Permissions
 
     public init(
         version: DSLVersion = .v1,
@@ -68,7 +69,8 @@ public struct Config: Codable, Equatable, Sendable {
         gestures: Gestures = Gestures(),
         hooks: Hooks = Hooks(),
         nativeSpace: NativeSpace = NativeSpace(),
-        focusPolicy: FocusPolicy = FocusPolicy()
+        focusPolicy: FocusPolicy = FocusPolicy(),
+        permissions: Permissions = Permissions()
     ) {
         self.version = version
         self.keybinds = keybinds
@@ -82,6 +84,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.hooks = hooks
         self.nativeSpace = nativeSpace
         self.focusPolicy = focusPolicy
+        self.permissions = permissions
     }
 
     public init(version: DSLVersion = .v1, @ConfigBuilder _ build: () -> [ConfigSection]) {
@@ -103,22 +106,17 @@ public struct Config: Codable, Equatable, Sendable {
             gestures: try container.decodeIfPresent(Gestures.self, forKey: .gestures) ?? Gestures(),
             hooks: try container.decodeIfPresent(Hooks.self, forKey: .hooks) ?? Hooks(),
             nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace(),
-            focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy()
+            focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy(),
+            permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions) ?? Permissions()
         )
     }
 
     // swiftlint:disable:next cyclomatic_complexity
     private init(version: DSLVersion, sections: [ConfigSection]) {
-        var keybinds = Keybinds()
-        var rules = Rules()
-        var workspaces = Workspaces()
-        var engines = Engines()
-        var cooperativeApps = CooperativeApps()
-        var safeZones = SafeZones()
-        var animation = Animation()
-        var gestures = Gestures()
-        var hooks = Hooks()
-        var nativeSpace = NativeSpace(); var focusPolicy = FocusPolicy()
+        var keybinds = Keybinds(); var rules = Rules(); var workspaces = Workspaces()
+        var engines = Engines(); var cooperativeApps = CooperativeApps(); var safeZones = SafeZones()
+        var animation = Animation(); var gestures = Gestures(); var hooks = Hooks()
+        var nativeSpace = NativeSpace(); var focusPolicy = FocusPolicy(); var permissions = Permissions()
 
         for section in sections {
             switch section {
@@ -144,6 +142,8 @@ public struct Config: Codable, Equatable, Sendable {
                 nativeSpace = value
             case let .focusPolicy(value):
                 focusPolicy = value
+            case let .permissions(value):
+                permissions = value
             }
         }
 
@@ -159,7 +159,8 @@ public struct Config: Codable, Equatable, Sendable {
             gestures: gestures,
             hooks: hooks,
             nativeSpace: nativeSpace,
-            focusPolicy: focusPolicy
+            focusPolicy: focusPolicy,
+            permissions: permissions
         )
     }
 }
@@ -230,6 +231,10 @@ public enum ConfigBuilder {
         [.nativeSpace(expression)]
     }
 
+    public static func buildExpression(_ expression: Permissions) -> [ConfigSection] {
+        [.permissions(expression)]
+    }
+
 }
 
 /// Purpose: Wraps each top-level DSL section so `ConfigBuilder` can merge defaults deterministically.
@@ -248,4 +253,5 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case hooks(Hooks)
     case nativeSpace(NativeSpace)
     case focusPolicy(FocusPolicy)
+    case permissions(Permissions)
 }

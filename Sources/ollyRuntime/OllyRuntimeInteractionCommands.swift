@@ -52,13 +52,13 @@ extension OllyRuntime {
         case let .switchTags(direction):
             try await switchGestureTag(direction, displayID: displayID, config: config)
         case let .action(action):
-            try await run(action, displayID: displayID)
+            try await run(action, displayID: displayID, config: config)
         case .noop:
             return
         }
     }
 
-    private func run(_ action: Action, displayID: DisplayID?) async throws {
+    private func run(_ action: Action, displayID: DisplayID?, config: Config) async throws {
         switch action {
         case .focus, .swap, .move:
             try await runDirectionalAction(action, displayID: displayID)
@@ -72,8 +72,10 @@ extension OllyRuntime {
             try await reloadConfig()
         case .noop:
             return
+        case let .shell(shellAction):
+            await runRawAction(shellAction, displayID: displayID, event: "gesture", config: config)
         case let .raw(label):
-            throw OllyRuntimeError.unsupportedGestureAction("raw(\(label))")
+            await runRawAction(label: label, displayID: displayID, event: "gesture", config: config)
         }
     }
 

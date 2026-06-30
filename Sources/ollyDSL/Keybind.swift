@@ -139,6 +139,7 @@ public enum Action: Codable, Equatable, Sendable {
     case cycleEngine
     case reload
     case noop
+    case shell(ShellAction)
     case raw(String)
 }
 

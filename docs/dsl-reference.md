@@ -129,9 +129,9 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 `struct Config`
 
-- Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, gesture, and hook sections.
+- Purpose: Top-level olly DSL document composed from all config sections.
 - Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-- Example: `Config { Workspaces { Tag.named("web") }; Gestures { fourFingerVertical(.switchTags) } }`
+- Example: `Config { Permissions { shellExec(.off) }; Gestures { fourFingerVertical(.switchTags) } }`
 - See also: `ConfigBuilder`, `ConfigSection`.
 
 ### ConfigBuilder
@@ -236,6 +236,53 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Pass a non-negative interval in milliseconds.
 - Example: `minHumanIntervalMilliseconds(80)`
 - See also: `FocusPolicy`, `maxEventsPerSecond(_:)`.
+
+## Permissions
+
+### ShellExecPolicy
+
+`enum ShellExecPolicy`
+
+- Purpose: Controls whether shell-backed raw actions may execute.
+- Parameters: Choose `.off`, `.allowAll`, or `.allow(["label"])`.
+- Example: `shellExec(.allow(["safari"]))`
+- See also: `Permissions`, `Action.shell`.
+
+### PermissionsDirective
+
+`enum PermissionsDirective`
+
+- Purpose: Declares one permission setting inside `Permissions`.
+- Parameters: Use `shellExec` to configure raw shell execution.
+- Example: `PermissionsDirective.shellExec(.off)`
+- See also: `Permissions`, `PermissionsBuilder`.
+
+### Permissions
+
+`struct Permissions`
+
+- Purpose: Groups runtime permission settings for unsafe extension points.
+- Parameters: Pass a shell execution policy directly or use `@PermissionsBuilder`.
+- Example: `Permissions { shellExec(.allowAll) }`
+- See also: `ShellExecPolicy`, `Config`.
+
+### PermissionsBuilder
+
+`@resultBuilder enum PermissionsBuilder`
+
+- Purpose: Builds permission declarations inside `Permissions { ... }`.
+- Parameters: Accepts permission directives, arrays, and conditionals.
+- Example: `Permissions { shellExec(.off) }`
+- See also: `Permissions`, `PermissionsDirective`.
+
+### shellExec(_:)
+
+`func shellExec(_ policy: ShellExecPolicy) -> PermissionsDirective`
+
+- Purpose: Declares shell execution policy for raw actions.
+- Parameters: Pass `.off`, `.allowAll`, or `.allow(["label"])`.
+- Example: `shellExec(.allowAll)`
+- See also: `Permissions`, `ShellExecPolicy`.
 
 ## Hooks
 
@@ -501,6 +548,42 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Accepts `Keybind` expressions, arrays, and conditionals.
 - Example: `Keybinds { Keybind(KeyChord([.command], .space), do: .noop) }`
 - See also: `Keybinds`, `Keybind`.
+
+### ShellAction
+
+`struct ShellAction`
+
+- Purpose: Stores an explicit shell command for a raw action.
+- Parameters: Pass the command, label, optional timeout, and optional working directory.
+- Example: `ShellAction("open -a Safari", label: "safari")`
+- See also: `Action`, `Permissions`.
+
+### shell(_:label:timeoutMs:cwd:)
+
+`static func shell(_ command: String, label: String? = nil, timeoutMs: Int? = nil, cwd: String? = nil) -> Action`
+
+- Purpose: Declares a shell command action executed through the raw-action runtime.
+- Parameters: Pass the shell command, optional label, timeout in milliseconds, and working directory.
+- Example: `Action.shell("open -a Safari", label: "safari")`
+- See also: `ShellAction`, `Permissions`.
+
+### shellActions
+
+`var shellActions: [ShellAction] { get }`
+
+- Purpose: Lists configured shell actions in keybind and gesture sections.
+- Parameters: No parameters; returns shell actions in declaration order.
+- Example: `config.shellActions.map(\.label)`
+- See also: `Action`, `Keybinds`.
+
+### shellAction(label:)
+
+`func shellAction(label: String) -> ShellAction?`
+
+- Purpose: Looks up the last configured shell action with a raw-action label.
+- Parameters: Pass the label used by `Action.shell` or `Action.raw`.
+- Example: `config.shellAction(label: "safari")`
+- See also: `ShellAction`, `Permissions`.
 
 ## Workspaces
 

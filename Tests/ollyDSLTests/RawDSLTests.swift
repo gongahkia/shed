@@ -5,6 +5,27 @@ import ollyKit
 @testable import ollyDSL
 
 final class RawDSLTests: XCTestCase {
+    func testDefaultPermissionsDisableShellExec() {
+        XCTAssertEqual(Config().permissions.shellExec, .off)
+    }
+
+    func testShellActionSerializesCommandAndLabel() throws {
+        let config = Config {
+            Permissions {
+                shellExec(.allow(["safari"]))
+            }
+            Keybinds {
+                Keybind(KeyChord([.command], .b), do: .shell("open -a Safari", label: "safari"))
+            }
+        }
+
+        let data = try JSONEncoder().encode(config)
+        let decoded = try JSONDecoder().decode(Config.self, from: data)
+
+        XCTAssertEqual(decoded.permissions.shellExec, .allow(["safari"]))
+        XCTAssertEqual(decoded.shellAction(label: "safari")?.command, "open -a Safari")
+    }
+
     func testRawKeybindStoresHandlerAndEncodesStableLabel() throws {
         let recorder = RawInvocationRecorder()
         let keybind = Keybind.raw(KeyChord([.command], .r), label: "reload") { context in

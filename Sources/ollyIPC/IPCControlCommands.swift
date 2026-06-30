@@ -4,6 +4,14 @@ public struct IPCReloadCommand: Codable, Equatable, Sendable { public init() {} 
 
 public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable { public init() {} }
 
+public struct IPCRunRawActionCommand: Codable, Equatable, Sendable {
+    public let label: String
+
+    public init(label: String) {
+        self.label = label
+    }
+}
+
 public struct IPCSetSpacePolicyCommand: Codable, Equatable, Sendable {
     public let policy: NativeSpaceDriftPolicy
 

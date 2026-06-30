@@ -27,16 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.9 In-app error log + diagnostic bundle
-
-**Goal:** "Last 5 errors" tab in Settings; "Copy diagnostic bundle" produces a zip.
-
-**Files to modify:**
-- `Sources/ollyRuntime/OllyRuntime.swift:127` — surface `lastError` history (ring buffer of size 5).
-- `Sources/ollyApp/SettingsWindowController.swift` — add tab reading from `RuntimeEventBus` + the new history; bundle action produces `~/Library/Logs/Olly/<ts>-diagnostic.zip` containing recent journals.
-
----
-
 ### M4.10 Keybind conflict warnings UI
 
 **Goal:** Surface keybind collisions detected by existing `Sources/ollyApp/HotKeyStartupDiagnostics.swift:23` in the Settings → Keybinds tab.

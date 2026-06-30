@@ -99,6 +99,16 @@ public struct IPCSpaceDriftEvent: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCRuntimeErrorEvent: Codable, Equatable, Sendable {
+    public let timestamp: Date
+    public let message: String
+
+    public init(timestamp: Date = Date(), message: String) {
+        self.timestamp = timestamp
+        self.message = message
+    }
+}
+
 public enum IPCEvent: Codable, Equatable, Sendable {
     case axPermission(IPCAXPermissionEvent)
     case engine(EngineEvent)
@@ -106,6 +116,7 @@ public enum IPCEvent: Codable, Equatable, Sendable {
     case focusBlocked(IPCFocusBlockedEvent)
     case fullscreen(IPCFullscreenEvent)
     case rawAction(IPCRawActionEvent)
+    case runtimeError(IPCRuntimeErrorEvent)
     case space(IPCSpaceDriftEvent)
 }
 

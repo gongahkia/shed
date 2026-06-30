@@ -126,6 +126,8 @@ struct OllyCtlRunner {
         case let .rawAction(event):
             let exit = event.exit.map { " exit \($0)" } ?? ""
             return "raw-action \(event.label) \(event.status.rawValue)\(exit)"
+        case let .runtimeError(event):
+            return "runtime-error \(event.message)"
         case let .space(event):
             return "space \(event.action.rawValue) window \(event.windowID)"
         }

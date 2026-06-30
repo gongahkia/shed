@@ -77,6 +77,7 @@ public enum IPCEventKind: String, CaseIterable, Codable, Equatable, Sendable {
     case fullscreen
     case macro
     case rawAction
+    case runtimeError
     case space
     case tag
     case window

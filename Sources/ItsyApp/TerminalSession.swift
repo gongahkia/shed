@@ -28,6 +28,28 @@ final class ItsyTerminalSession {
 			resize(columns: columns, rows: rows)
 			return
 		}
+		let shellCString = strdup(shellURL.path)
+		let cwdCString = strdup(currentDirectoryURL.path)
+		let loginCString = strdup("-il")
+		var environment = ProcessInfo.processInfo.environment
+		environment["INSIDE_ITSY_TERMINAL"] = "1"
+		environment["TERM"] = "xterm-256color"
+		environment["COLORTERM"] = "truecolor"
+		environment["LC_CTYPE"] = environment["LC_CTYPE"] ?? "UTF-8"
+		let envStorage = environment.map { strdup("\($0.key)=\($0.value)") }
+		defer {
+			free(shellCString)
+			free(cwdCString)
+			free(loginCString)
+			for value in envStorage {
+				free(value)
+			}
+		}
+		guard let shellCString, let cwdCString, let loginCString, !envStorage.contains(where: { $0 == nil }) else {
+			throw POSIXError(.ENOMEM)
+		}
+		var argv: [UnsafeMutablePointer<CChar>?] = [shellCString, loginCString, nil]
+		var envp: [UnsafeMutablePointer<CChar>?] = envStorage + [nil]
 		var master: Int32 = -1
 		var size = winsize(
 			ws_row: UInt16(max(1, rows)),
@@ -35,12 +57,19 @@ final class ItsyTerminalSession {
 			ws_xpixel: 0,
 			ws_ypixel: 0
 		)
-		let pid = forkpty(&master, nil, nil, &size)
+		let pid = argv.withUnsafeMutableBufferPointer { argvBuffer in
+			envp.withUnsafeMutableBufferPointer { envBuffer in
+				let pid = forkpty(&master, nil, nil, &size)
+				if pid == 0 {
+					_ = chdir(cwdCString)
+					execve(shellCString, argvBuffer.baseAddress, envBuffer.baseAddress)
+					_exit(127)
+				}
+				return pid
+			}
+		}
 		guard pid >= 0 else {
 			throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
-		}
-		if pid == 0 {
-			childMain()
 		}
 		masterFD = master
 		childPID = pid
@@ -134,22 +163,6 @@ final class ItsyTerminalSession {
 			Darwin.close(masterFD)
 			masterFD = -1
 		}
-	}
-
-	private func childMain() -> Never {
-		_ = currentDirectoryURL.path.withCString { chdir($0) }
-		setenv("INSIDE_ITSY_TERMINAL", "1", 1)
-		setenv("TERM", "xterm-256color", 1)
-		setenv("COLORTERM", "truecolor", 1)
-		setenv("LC_CTYPE", "UTF-8", 0)
-		var argv: [UnsafeMutablePointer<CChar>?] = [strdup(shellURL.path), strdup("-il"), nil]
-		let executable = argv[0]
-		argv.withUnsafeMutableBufferPointer { buffer in
-			if let executable {
-				execv(executable, buffer.baseAddress)
-			}
-		}
-		_exit(127)
 	}
 
 	private static func exitCode(fromWaitStatus status: Int32) -> Int32 {

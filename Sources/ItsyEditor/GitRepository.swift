@@ -311,6 +311,13 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: arguments, root: root)
 	}
 
+	public func recentCommitMessages(limit: Int = 10) throws -> [String] {
+		let output = try runner.runGit(arguments: ["log", "-\(max(1, limit))", "--format=%B%x00"], root: root)
+		return output.split(separator: "\0", omittingEmptySubsequences: true)
+			.map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+			.filter { !$0.isEmpty }
+	}
+
 	public static func discoverRoot(containing url: URL, runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL {
 		let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
 		let root = values?.isDirectory == true ? url : url.deletingLastPathComponent()

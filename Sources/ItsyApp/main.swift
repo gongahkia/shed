@@ -78,6 +78,54 @@ private enum OutlineCollapseStore {
 	}
 }
 
+private struct GitCommitDraft: Codable, Equatable {
+	var summary: String
+	var body: String
+}
+
+private enum GitCommitDraftStore {
+	private static var fileURL: URL {
+		let home = FileManager.default.homeDirectoryForCurrentUser
+		return home
+			.appendingPathComponent(".config", isDirectory: true)
+			.appendingPathComponent("itsy", isDirectory: true)
+			.appendingPathComponent("commit-drafts.json")
+	}
+
+	static func load(for root: URL) -> GitCommitDraft {
+		loadAll()[key(for: root)] ?? GitCommitDraft(summary: "", body: "")
+	}
+
+	static func save(_ draft: GitCommitDraft, for root: URL) {
+		var all = loadAll()
+		if draft.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			all.removeValue(forKey: key(for: root))
+		} else {
+			all[key(for: root)] = draft
+		}
+		let url = fileURL
+		try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+		guard let data = try? JSONEncoder().encode(all) else {
+			return
+		}
+		try? data.write(to: url, options: .atomic)
+	}
+
+	private static func loadAll() -> [String: GitCommitDraft] {
+		guard
+			let data = try? Data(contentsOf: fileURL),
+			let drafts = try? JSONDecoder().decode([String: GitCommitDraft].self, from: data)
+		else {
+			return [:]
+		}
+		return drafts
+	}
+
+	private static func key(for root: URL) -> String {
+		root.standardizedFileURL.path
+	}
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
@@ -112,6 +160,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitSignoffButton: NSButton?
 	private var gitAmendButton: NSButton?
 	private var gitComposerStatusLabel: NSTextField?
+	private var gitDraftRootURL: URL?
+	private var gitDraftBeforeHistory: GitCommitDraft?
+	private var gitRecentCommitMessages: [GitCommitDraft] = []
+	private var gitRecentCommitIndex: Int?
 	private var gitEntries: [GitStatusEntry] = []
 	private var gitRootURL: URL?
 	private var taskPanel: NSPanel?
@@ -968,6 +1020,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 
 	private func setGitEntries(_ entries: [GitStatusEntry], root: URL?, status: String, isError: Bool) {
+		syncGitDraftRoot(root)
 		gitEntries = entries
 		gitRootURL = root
 		gitStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
@@ -981,6 +1034,43 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	@objc private func updateGitComposerStateAction(_ sender: Any?) {
 		updateGitComposerState()
+	}
+
+	private func syncGitDraftRoot(_ root: URL?) {
+		if gitDraftRootURL?.standardizedFileURL.path == root?.standardizedFileURL.path {
+			return
+		}
+		persistGitCommitDraft()
+		gitDraftRootURL = root
+		gitRecentCommitMessages = []
+		gitRecentCommitIndex = nil
+		gitDraftBeforeHistory = nil
+		setGitComposerDraft(root.map { GitCommitDraftStore.load(for: $0) } ?? GitCommitDraft(summary: "", body: ""), persist: false)
+	}
+
+	private func currentGitCommitDraft() -> GitCommitDraft {
+		GitCommitDraft(summary: gitSummaryField?.stringValue ?? "", body: gitBodyTextView?.string ?? "")
+	}
+
+	private func setGitComposerDraft(_ draft: GitCommitDraft, persist: Bool) {
+		gitSummaryField?.stringValue = draft.summary
+		gitBodyTextView?.string = draft.body
+		if persist {
+			persistGitCommitDraft()
+		}
+		updateGitComposerState()
+	}
+
+	private func persistGitCommitDraft() {
+		guard let root = gitDraftRootURL else {
+			return
+		}
+		GitCommitDraftStore.save(currentGitCommitDraft(), for: root)
+	}
+
+	private func clearGitCommitHistorySelection() {
+		gitRecentCommitIndex = nil
+		gitDraftBeforeHistory = nil
 	}
 
 	private func updateGitComposerState() {
@@ -1008,12 +1098,51 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				signoff: gitSignoffButton?.state == .on,
 				amend: gitAmendButton?.state == .on
 			)
-			gitSummaryField?.stringValue = ""
-			gitBodyTextView?.string = ""
+			setGitComposerDraft(GitCommitDraft(summary: "", body: ""), persist: true)
 			refreshGitChanges(nil)
 		} catch {
 			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true)
 		}
+	}
+
+	private func showPreviousGitCommitMessage() -> Bool {
+		guard let gitRootURL, gitSummaryField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true || gitRecentCommitIndex != nil else {
+			return false
+		}
+		if gitRecentCommitIndex == nil {
+			gitDraftBeforeHistory = currentGitCommitDraft()
+			do {
+				gitRecentCommitMessages = try GitRepository(root: gitRootURL).recentCommitMessages().map(commitDraft(from:))
+			} catch {
+				gitComposerStatusLabel?.stringValue = String(describing: error)
+				return true
+			}
+		}
+		guard !gitRecentCommitMessages.isEmpty else {
+			gitComposerStatusLabel?.stringValue = L10n.string("No recent commits")
+			return true
+		}
+		let nextIndex = ((gitRecentCommitIndex ?? -1) + 1) % gitRecentCommitMessages.count
+		gitRecentCommitIndex = nextIndex
+		setGitComposerDraft(gitRecentCommitMessages[nextIndex], persist: false)
+		return true
+	}
+
+	private func restoreGitCommitDraftFromHistory() -> Bool {
+		guard gitRecentCommitIndex != nil else {
+			return false
+		}
+		let draft = gitDraftBeforeHistory ?? GitCommitDraft(summary: "", body: "")
+		clearGitCommitHistorySelection()
+		setGitComposerDraft(draft, persist: true)
+		return true
+	}
+
+	private func commitDraft(from message: String) -> GitCommitDraft {
+		var lines = message.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+		let summary = lines.isEmpty ? "" : lines.removeFirst()
+		let body = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+		return GitCommitDraft(summary: summary, body: body)
 	}
 
 	@objc private func stageSelectedGitEntries(_ sender: Any?) {
@@ -1981,14 +2110,25 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		} else if field === commandPaletteInputField {
 			filterCommandPaletteItems()
 		} else if field === gitSummaryField {
+			clearGitCommitHistorySelection()
+			persistGitCommitDraft()
 			updateGitComposerState()
 		}
 	}
 
 	func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-		if control === gitSummaryField, commandSelector == #selector(NSResponder.insertNewline(_:)), currentEventHasCommandModifier() {
-			commitGitChanges(nil)
-			return true
+		if control === gitSummaryField {
+			switch commandSelector {
+			case #selector(NSResponder.insertNewline(_:)) where currentEventHasCommandModifier():
+				commitGitChanges(nil)
+				return true
+			case #selector(NSResponder.moveUp(_:)):
+				return showPreviousGitCommitMessage()
+			case #selector(NSResponder.moveDown(_:)):
+				return restoreGitCommitDraftFromHistory()
+			default:
+				break
+			}
 		}
 		if control === commandPaletteInputField {
 			switch commandSelector {
@@ -2023,6 +2163,8 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 		guard let textView = notification.object as? NSTextView, textView === gitBodyTextView else {
 			return
 		}
+		clearGitCommitHistorySelection()
+		persistGitCommitDraft()
 		updateGitComposerState()
 	}
 

@@ -189,6 +189,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var gitDiffFiles: [DiffFile] = []
 	private var gitDiffPath: String?
 	private var gitHunkItems: [GitDiffHunkItem] = []
+	private var gitRemoteProcess: Process?
+	private var gitRemoteLog = ""
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
@@ -896,10 +898,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
 		let branchButton = NSButton(title: L10n.string("Branch"), target: self, action: #selector(showGitBranches(_:)))
+		let fetchButton = NSButton(title: L10n.string("Fetch"), target: self, action: #selector(fetchGitRemote(_:)))
+		let pullButton = NSButton(title: L10n.string("Pull"), target: self, action: #selector(pullGitRemote(_:)))
+		let pushButton = NSButton(title: L10n.string("Push"), target: self, action: #selector(pushGitRemote(_:)))
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
 		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
 		let unstageButton = NSButton(title: L10n.string("Unstage"), target: self, action: #selector(unstageSelectedGitEntries(_:)))
-		let buttonStack = NSStackView(views: [branchButton, refreshButton, stageButton, unstageButton])
+		let buttonStack = NSStackView(views: [branchButton, fetchButton, pullButton, pushButton, refreshButton, stageButton, unstageButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -1281,6 +1286,124 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		alert.addButton(withTitle: L10n.string("Stash and Switch"))
 		alert.addButton(withTitle: L10n.string("Cancel"))
 		return alert.runModal() == .alertFirstButtonReturn
+	}
+
+	@objc private func fetchGitRemote(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		let repository = GitRepository(root: gitRootURL)
+		runGitRemoteOperation(title: L10n.string("Fetch"), arguments: repository.fetchArguments())
+	}
+
+	@objc private func pullGitRemote(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		let repository = GitRepository(root: gitRootURL)
+		runGitRemoteOperation(title: L10n.string("Pull"), arguments: repository.pullArguments())
+	}
+
+	@objc private func pullGitRemoteRebase(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		let repository = GitRepository(root: gitRootURL)
+		runGitRemoteOperation(title: L10n.string("Pull Rebase"), arguments: repository.pullArguments(mode: .rebase))
+	}
+
+	@objc private func pushGitRemote(_ sender: Any?) {
+		guard let gitRootURL else {
+			return
+		}
+		do {
+			let repository = GitRepository(root: gitRootURL)
+			runGitRemoteOperation(title: L10n.string("Push"), arguments: try repository.pushArguments())
+		} catch {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	private func runGitRemoteOperation(title: String, arguments: [String]) {
+		guard let gitRootURL, gitRemoteProcess == nil else {
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = L10n.string("Git remote command already running")
+			return
+		}
+		let process = Process()
+		process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+		process.arguments = arguments
+		process.currentDirectoryURL = gitRootURL
+		let stdout = Pipe()
+		let stderr = Pipe()
+		process.standardOutput = stdout
+		process.standardError = stderr
+		gitRemoteProcess = process
+		gitRemoteLog = "$ git \(arguments.joined(separator: " "))\n"
+		gitStatusLabel?.textColor = .secondaryLabelColor
+		gitStatusLabel?.stringValue = "\(title)..."
+		let appendOutput: (Data) -> Void = { [weak self] data in
+			guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+				return
+			}
+			DispatchQueue.main.async {
+				guard let self else {
+					return
+				}
+				self.gitRemoteLog += text
+				let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
+				if !line.isEmpty {
+					self.gitStatusLabel?.textColor = .secondaryLabelColor
+					self.gitStatusLabel?.stringValue = line
+				}
+			}
+		}
+		stdout.fileHandleForReading.readabilityHandler = { handle in appendOutput(handle.availableData) }
+		stderr.fileHandleForReading.readabilityHandler = { handle in appendOutput(handle.availableData) }
+		process.terminationHandler = { [weak self] process in
+			DispatchQueue.main.async {
+				stdout.fileHandleForReading.readabilityHandler = nil
+				stderr.fileHandleForReading.readabilityHandler = nil
+				guard let self else {
+					return
+				}
+				self.gitRemoteProcess = nil
+				if process.terminationStatus == 0 {
+					self.gitStatusLabel?.textColor = .secondaryLabelColor
+					self.gitStatusLabel?.stringValue = "\(title) complete"
+					self.refreshGitChanges(nil)
+				} else {
+					self.gitStatusLabel?.textColor = .systemRed
+					self.gitStatusLabel?.stringValue = "\(title) failed"
+					self.showGitRemoteFailure(title: title)
+				}
+			}
+		}
+		do {
+			try process.run()
+		} catch {
+			gitRemoteProcess = nil
+			gitStatusLabel?.textColor = .systemRed
+			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	private func showGitRemoteFailure(title: String) {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = "\(title) failed"
+		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 640, height: 260))
+		let textView = NSTextView(frame: scrollView.bounds)
+		textView.isEditable = false
+		textView.isSelectable = true
+		textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+		textView.string = gitRemoteLog
+		scrollView.documentView = textView
+		scrollView.hasVerticalScroller = true
+		alert.accessoryView = scrollView
+		alert.addButton(withTitle: L10n.string("OK"))
+		alert.runModal()
 	}
 
 	@objc private func refreshGitChanges(_ sender: Any?) {
@@ -2492,6 +2615,15 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		gitChangesItem.target = self
 		let gitRefreshItem = gitMenu.addItem(withTitle: L10n.string("Refresh Git Status"), action: #selector(refreshGitChanges(_:)), keyEquivalent: "")
 		gitRefreshItem.target = self
+		gitMenu.addItem(.separator())
+		let gitFetchItem = gitMenu.addItem(withTitle: L10n.string("Fetch"), action: #selector(fetchGitRemote(_:)), keyEquivalent: "")
+		gitFetchItem.target = self
+		let gitPullItem = gitMenu.addItem(withTitle: L10n.string("Pull"), action: #selector(pullGitRemote(_:)), keyEquivalent: "")
+		gitPullItem.target = self
+		let gitPullRebaseItem = gitMenu.addItem(withTitle: L10n.string("Pull Rebase"), action: #selector(pullGitRemoteRebase(_:)), keyEquivalent: "")
+		gitPullRebaseItem.target = self
+		let gitPushItem = gitMenu.addItem(withTitle: L10n.string("Push"), action: #selector(pushGitRemote(_:)), keyEquivalent: "")
+		gitPushItem.target = self
 		gitItem.submenu = gitMenu
 
 		let taskMenu = NSMenu(title: L10n.string("Tasks"))

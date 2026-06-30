@@ -159,6 +159,7 @@
 "No reload run yet" = "No reload run yet";
 "No-op" = "No-op";
 "Olly" = "Olly";
+"Olly Changelog" = "Olly Changelog";
 "Olly Action" = "Olly Action";
 "Olly First Run" = "Olly First Run";
 "Olly Settings" = "Olly Settings";
@@ -306,9 +307,11 @@
 "Validate" = "Validate";
 "Validating..." = "Validating...";
 "Validation output appears here." = "Validation output appears here.";
+"Version %@" = "Version %@";
 "Waiting for Accessibility permission..." = "Waiting for Accessibility permission...";
 "Waiting for permission..." = "Waiting for permission...";
 "Welcome" = "Welcome";
+"What's New in Olly" = "What's New in Olly";
 "Windows" = "Windows";
 "Writing diagnostic bundle..." = "Writing diagnostic bundle...";
 "cache" = "cache";

@@ -1,6 +1,7 @@
 import ArgumentParser
 import Foundation
 import ollyCore
+import ollyDiagnostics
 import ollyDSL
 import ollyIPC
 import ollyKit
@@ -43,6 +44,7 @@ struct OllyCtl: ParsableCommand {
             SetSpacePolicy.self,
             SetFocusPolicy.self,
             Doctor.self,
+            TelemetryCommands.self,
             SubscribeEvents.self,
             Events.self,
             InitConfig.self,

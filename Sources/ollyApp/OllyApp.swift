@@ -1,10 +1,17 @@
 import AppKit
 import Foundation
+import OSLog
 import ollyCore
+import ollyDiagnostics
 import ollyDSL
 import ollyKit
 import ollyLayouts
 import ollyRuntime
+
+private let crashTelemetryLogger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "olly",
+    category: "CrashTelemetry"
+)
 
 @main
 enum OllyApp {
@@ -41,6 +48,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installCrashTelemetry()
         statusController = OllyStatusMenuController(
             onOpenSettings: { [weak self] in
                 self?.settingsWindowController.show()
@@ -178,5 +186,37 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
 
     @MainActor private func renderRuntimeError(_ message: String) {
         statusController?.apply(error: message)
+    }
+
+    private func installCrashTelemetry() {
+        let loaded = try? ConfigLoader().load()
+        let config = loaded?.config ?? Config()
+        let userSettings = CrashTelemetryUserSettingsStore().read()
+        let settings = CrashTelemetryRuntimeSettings(
+            configEnabled: config.telemetry.enabled,
+            configEndpoint: config.telemetry.endpoint,
+            configScrubbedBundleIDs: config.telemetry.scrubbedBundleIDs,
+            userSettings: userSettings
+        )
+        let context = CrashTelemetryContext(
+            appVersion: Self.appVersion(),
+            dslVersion: config.version.rawValue,
+            configHash: loaded?.contentHash,
+            displayCount: DisplayMonitor().displays().count,
+            tagCount: config.workspaces.tags.count,
+            scrubbedBundleIDs: settings.scrubbedBundleIDs
+        )
+        do {
+            _ = try CrashTelemetry.install(settings: settings, context: context)
+        } catch {
+            crashTelemetryLogger.error("install failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private static func appVersion() -> String {
+        let info = Bundle.main.infoDictionary
+        return (info?["CFBundleShortVersionString"] as? String)
+            ?? (info?["CFBundleVersion"] as? String)
+            ?? "dev"
     }
 }

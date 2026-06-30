@@ -67,7 +67,8 @@ public actor OllyRuntime {
     var nativeSpaceDriftPolicy: NativeSpaceDriftPolicy = .followWindow
     var focusPolicy = FocusPolicy()
     var focusedWindowID: WindowID?
-    var lastError: String?
+    var errorHistory = RuntimeErrorHistory(limit: 5)
+    var lastError: String? { didSet { recordLastError(lastError) } }
     var fullscreenTasksByWindowID: [WindowID: Task<Void, Never>] = [:]
 
     // swiftlint:disable:next function_body_length

@@ -19,6 +19,7 @@ final class SettingsWindowController: NSWindowController {
     private let cooperativeAppsTableView = NSTableView()
     private var cooperativeAppsRows: [IPCCooperativeAppInfo] = []
     private var playgroundController: ConfigPlaygroundWindowController?
+    private var errorLogController: SettingsErrorLogController?
 
     init(
         runtime: OllyRuntime? = nil,
@@ -80,8 +81,14 @@ final class SettingsWindowController: NSWindowController {
         let cooperativeTab = NSTabViewItem(identifier: "cooperative-apps")
         cooperativeTab.label = "Cooperative Apps"
         cooperativeTab.view = makeCooperativeAppsView()
+        let errorsController = SettingsErrorLogController(runtime: runtime)
+        errorLogController = errorsController
+        let errorsTab = NSTabViewItem(identifier: "errors")
+        errorsTab.label = "Errors"
+        errorsTab.view = errorsController.makeView()
         tabView.addTabViewItem(configTab)
         tabView.addTabViewItem(cooperativeTab)
+        tabView.addTabViewItem(errorsTab)
         window?.contentView = tabView
 
         NSLayoutConstraint.activate([

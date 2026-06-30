@@ -194,6 +194,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "fullscreen",
         "macro",
         "rawAction",
+        "runtimeError",
         "space",
         "tag",
         "window"
@@ -1886,6 +1887,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "rawAction": {
           "$ref": "#/$defs/rawActionEvent"
         },
+        "runtimeError": {
+          "$ref": "#/$defs/runtimeErrorEvent"
+        },
         "space": {
           "$ref": "#/$defs/spaceEvent"
         }
@@ -1919,6 +1923,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "required": [
             "rawAction"
+          ]
+        },
+        {
+          "required": [
+            "runtimeError"
           ]
         },
         {
@@ -2044,6 +2053,23 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "elapsedMs": {
           "type": "integer",
           "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "runtimeErrorEvent": {
+      "type": "object",
+      "required": [
+        "timestamp",
+        "message"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "message": {
+          "type": "string"
         }
       },
       "additionalProperties": false

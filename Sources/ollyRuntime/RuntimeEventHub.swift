@@ -57,6 +57,8 @@ private extension IPCEvent {
             return .fullscreen
         case .rawAction:
             return .rawAction
+        case .runtimeError:
+            return .runtimeError
         case .space:
             return .space
         }

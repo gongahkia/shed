@@ -54,4 +54,20 @@ final class RuntimeEventBusTests: XCTestCase {
 
         XCTAssertEqual(value, .grid)
     }
+
+    func testRuntimeErrorHistoryKeepsLastFiveNewestFirst() {
+        var history = RuntimeErrorHistory(limit: 5)
+
+        for index in 0..<7 {
+            _ = history.append("error \(index)", timestamp: Date(timeIntervalSince1970: Double(index)))
+        }
+
+        XCTAssertEqual(history.records.map(\.message), [
+            "error 6",
+            "error 5",
+            "error 4",
+            "error 3",
+            "error 2"
+        ])
+    }
 }

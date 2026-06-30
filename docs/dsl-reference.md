@@ -518,9 +518,18 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 `enum Action`
 
 - Purpose: Declares the command performed when a keybind fires.
-- Parameters: Select a case and provide its associated direction, tag, engine, or raw command.
+- Parameters: Select a case and provide its associated direction, tag, engine, macro, or raw command.
 - Example: `Action.setEngine(BSPLayoutEngine.engineID)`
 - See also: `Keybind`, `Direction`.
+
+### macro(_:)
+
+`case macro(String)`
+
+- Purpose: Replays a recorded IPC macro by name.
+- Parameters: Pass the macro name stored under `~/.config/olly/macros`.
+- Example: `Keybind(KeyChord([.command], .m), do: .macro("workflow1"))`
+- See also: `Keybind`, `Action`.
 
 ### Keybind
 

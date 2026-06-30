@@ -65,6 +65,8 @@ struct OllyCtlRunner {
             return payload.message ?? "ok"
         case let .cooperativeApps(info):
             return renderCooperativeApps(info)
+        case .macro, .macros:
+            return renderMacroResult(result)
         case let .restoredWindows(info):
             return "restored \(info.restoredCount), skipped \(info.skippedCount), failed \(info.failedCount)"
         case let .ruleExplanation(explanation):
@@ -152,6 +154,28 @@ struct OllyCtlRunner {
         return info.apps.map { app in
             "\(app.bundleID) \(app.behavior) windows \(app.detectedWindowCount)"
         }.joined(separator: "\n")
+    }
+
+    private func renderMacro(_ info: IPCMacroInfo) -> String {
+        "macro \(info.name): \(info.commandCount) commands, \(info.recordedDurationMs)ms"
+    }
+
+    private func renderMacroResult(_ result: IPCCommandResult) -> String {
+        switch result {
+        case let .macro(info):
+            return renderMacro(info)
+        case let .macros(info):
+            return renderMacros(info)
+        default:
+            preconditionFailure("invalid macro result")
+        }
+    }
+
+    private func renderMacros(_ info: IPCMacroListInfo) -> String {
+        guard !info.macros.isEmpty else {
+            return "no macros"
+        }
+        return info.macros.map(renderMacro).joined(separator: "\n")
     }
 
     private func renderPrimarySwapped(_ payload: MasterSwappedEvent) -> String {

@@ -3,6 +3,8 @@ import Foundation
 public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Sendable {
     case acknowledged
     case cooperativeApps = "cooperative-apps"
+    case macro
+    case macros
     case restoredWindows = "restored-windows"
     case ruleExplanation = "rule-explanation"
     case state
@@ -80,6 +82,8 @@ public struct IPCVersionInfo: Codable, Equatable, Sendable {
 public enum IPCCommandResult: Equatable, Sendable {
     case acknowledged(IPCAcknowledgement)
     case cooperativeApps(IPCCooperativeAppsInfo)
+    case macro(IPCMacroInfo)
+    case macros(IPCMacroListInfo)
     case restoredWindows(IPCRestoreWindowsInfo)
     case ruleExplanation(IPCRuleExplanation)
     case state(IPCStateSnapshot)
@@ -92,6 +96,10 @@ public enum IPCCommandResult: Equatable, Sendable {
             return .acknowledged
         case .cooperativeApps:
             return .cooperativeApps
+        case .macro:
+            return .macro
+        case .macros:
+            return .macros
         case .restoredWindows:
             return .restoredWindows
         case .ruleExplanation:
@@ -121,6 +129,10 @@ extension IPCCommandResult: Codable {
             self = .acknowledged(try container.decode(IPCAcknowledgement.self, forKey: .payload))
         case .cooperativeApps:
             self = .cooperativeApps(try container.decode(IPCCooperativeAppsInfo.self, forKey: .payload))
+        case .macro:
+            self = .macro(try container.decode(IPCMacroInfo.self, forKey: .payload))
+        case .macros:
+            self = .macros(try container.decode(IPCMacroListInfo.self, forKey: .payload))
         case .restoredWindows:
             self = .restoredWindows(try container.decode(IPCRestoreWindowsInfo.self, forKey: .payload))
         case .ruleExplanation:
@@ -142,6 +154,10 @@ extension IPCCommandResult: Codable {
         case let .acknowledged(payload):
             try container.encode(payload, forKey: .payload)
         case let .cooperativeApps(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .macro(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .macros(payload):
             try container.encode(payload, forKey: .payload)
         case let .restoredWindows(payload):
             try container.encode(payload, forKey: .payload)

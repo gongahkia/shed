@@ -72,6 +72,8 @@ extension OllyRuntime {
             try await reloadConfig()
         case .noop:
             return
+        case let .macro(name):
+            _ = try await runMacro(name: name)
         case let .shell(shellAction):
             await runRawAction(shellAction, displayID: displayID, event: "gesture", config: config)
         case let .raw(label):

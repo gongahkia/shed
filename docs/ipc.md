@@ -87,6 +87,8 @@ runtime action.
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
 `explain-window` returns every rule trace for a window; `explain-rule` returns one rule trace for the focused
 window.
+`macro-start`, `macro-stop`, `macro-run`, `macro-list`, and `macro-delete` record/replay IPC commands.
+Macros are persisted as `~/.config/olly/macros/<name>.json`; macro commands themselves are not recorded.
 `run-raw-action` executes a configured shell action by label when the loaded DSL permissions allow it, then
 emits a `rawAction` event with status, exit code, elapsed time, and stdout/stderr heads.
 `list-cooperative-apps` reports resolved cooperative app bundle IDs, behaviors, and currently detected
@@ -617,6 +619,56 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "macro-start"
+            },
+            "arguments": {
+              "$ref": "#/$defs/macroNameArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macro-stop"
+            },
+            "arguments": {
+              "$ref": "#/$defs/emptyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macro-run"
+            },
+            "arguments": {
+              "$ref": "#/$defs/macroNameArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macro-list"
+            },
+            "arguments": {
+              "$ref": "#/$defs/emptyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macro-delete"
+            },
+            "arguments": {
+              "$ref": "#/$defs/macroNameArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "run-raw-action"
             },
             "arguments": {
@@ -920,6 +972,23 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       },
       "additionalProperties": false
     },
+    "macroName": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$",
+      "minLength": 1
+    },
+    "macroNameArguments": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/macroName"
+        }
+      },
+      "additionalProperties": false
+    },
     "runRawActionArguments": {
       "type": "object",
       "required": [
@@ -1059,6 +1128,8 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "enum": [
             "acknowledged",
             "cooperative-apps",
+            "macro",
+            "macros",
             "restored-windows",
             "rule-explanation",
             "state",
@@ -1088,6 +1159,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "payload": {
               "$ref": "#/$defs/cooperativeAppsPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macro"
+            },
+            "payload": {
+              "$ref": "#/$defs/macroPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "macros"
+            },
+            "payload": {
+              "$ref": "#/$defs/macrosPayload"
             }
           }
         },
@@ -1322,6 +1413,53 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "$ref": "#/$defs/cooperativeBehavior"
         },
         "detectedWindowCount": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "macroPayload": {
+      "$ref": "#/$defs/macroInfo"
+    },
+    "macrosPayload": {
+      "type": "object",
+      "required": [
+        "macros"
+      ],
+      "properties": {
+        "macros": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/macroInfo"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "macroInfo": {
+      "type": "object",
+      "required": [
+        "name",
+        "createdAt",
+        "recordedDurationMs",
+        "commandCount"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/macroName"
+        },
+        "createdAt": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "recordedDurationMs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "commandCount": {
           "type": "integer",
           "minimum": 0
         }
@@ -1918,4 +2056,10 @@ Explain window response:
 
 ```json
 {"version":2,"status":"ok","result":{"name":"rule-explanation","payload":{"windowID":42,"ruleID":null,"traces":[{"ruleID":"11111111-2222-3333-8444-555555555555","matched":true,"bundleIDMatched":true,"titleMatched":null,"roleMatched":null,"subroleMatched":null,"predicateMatched":null}],"finalApply":{"tagMask":null,"engineOverride":{"rawValue":"floating"},"floating":true,"sticky":null,"pinned":null}}}}
+```
+
+Macro list response:
+
+```json
+{"version":2,"status":"ok","result":{"name":"macros","payload":{"macros":[{"name":"workflow1","createdAt":"2026-06-30T05:00:00Z","recordedDurationMs":250,"commandCount":3}]}}}
 ```

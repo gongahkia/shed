@@ -32,6 +32,7 @@ public actor OllyRuntime {
     let focusRateLimiter = FocusRateLimiter()
     let hookDispatcher = HookDispatcher()
     let rawActionExecutor = RawActionExecutor()
+    let macroRecorder: MacroRecorder
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
     let windowMover: WindowMover
@@ -71,6 +72,7 @@ public actor OllyRuntime {
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         statePersistence: WindowTagPersistence = WindowTagPersistence(),
         recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
+        macroRecorder: MacroRecorder = MacroRecorder(),
         scanAXOnStart: Bool = true,
         runtimeEventBus: RuntimeEventBus = RuntimeEventBus(),
         dragSession: AXDragSession = AXDragSession(),
@@ -88,7 +90,7 @@ public actor OllyRuntime {
     ) {
         self.socketPath = socketPath; self.configLoader = configLoader
         self.displayProvider = displayProvider; self.applicationMonitor = applicationMonitor
-        self.snapshotCache = snapshotCache; self.statePersistence = statePersistence
+        self.snapshotCache = snapshotCache; self.statePersistence = statePersistence; self.macroRecorder = macroRecorder
         self.recoveryJournal = recoveryJournal; self.scanAXOnStart = scanAXOnStart
         self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession
         self.axPermissionStream = axPermissionStream
@@ -213,6 +215,7 @@ public actor OllyRuntime {
     private func handle(line: Data, connection: UnixDomainSocketServerConnection) async {
         do {
             let request = try JSONDecoder().decode(IPCRequestEnvelope.self, from: line)
+            await macroRecorder.record(request.command)
             let response = try await response(for: request, connection: connection)
             if let response {
                 try connection.sendLine(JSONEncoder().encode(response))
@@ -248,6 +251,8 @@ public actor OllyRuntime {
             return try await tagResponse(for: request)
         case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
+        case .macroStart, .macroStop, .macroRun, .macroList, .macroDelete:
+            return try await macroResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow,
              .dispatchGesture, .reload, .restoreWindows, .runRawAction, .setSpacePolicy, .setFocusPolicy:
             return try await controlResponse(for: request)

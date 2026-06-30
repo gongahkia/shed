@@ -52,11 +52,6 @@ public extension IPCCommandName {
         .scratchpadToggle,
         .scratchpadList,
         .scratchpadRemove,
-        .macroStart,
-        .macroStop,
-        .macroRun,
-        .macroList,
-        .macroDelete,
         .telemetryStatus,
         .telemetryFlush,
         .showOverlay

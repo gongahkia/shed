@@ -21,39 +21,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M0 — Foundations
 
-## M2 — Hackability surface wire-up
-
-### M2.5 Macro recorder + replay
-
-**Goal:** Record an ordered sequence of IPC commands; persist to disk; replay on demand; bindable via DSL.
-
-**Files to add:**
-- `Sources/ollyRuntime/MacroRecorder.swift` — `actor` with `start(name:)`, `stop()`, `run(name:)`. Records every `IPCRequestEnvelope` flowing through `OllyRuntime.handle(line:connection:)` (`Sources/ollyRuntime/OllyRuntime.swift:240`) except the macro commands themselves.
-- Persistence: `~/.config/olly/macros/<name>.json` — `{ name, createdAt, recordedDurationMs, commandCount, commands: [IPCCommand] }`.
-- `Sources/ollyctl/OllyCtlMacroCommands.swift` — `ollyctl macro record start <name>` / `stop` / `run <name>` / `list` / `delete <name>`.
-
-**Files to modify:**
-- `Sources/ollyRuntime/OllyRuntime.swift:240` (`handle(line:connection:)`) — split: if recording, append the request to the recorder before dispatching.
-- `Sources/ollyDSL/Keybind.swift:130-142` — add `Action.macro(String)` case.
-- `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift` — handle `.macro(name)` by delegating to `MacroRecorder.run(name:)`.
-- `Sources/ollyApp/CommandPaletteActions.swift` — discover macros from disk; surface as palette entries.
-
-**IPC additions:** `macro-start`, `macro-stop`, `macro-run`, `macro-list`, `macro-delete`.
-
-**Gotchas:**
-- Macro recording stalls the IPC pipeline if the recorder is slow — keep `append` O(1) (in-memory deque, flush on `stop`).
-- Concurrent recording: starting a second recording while one is active should reject with `IPCErrorPayload(code: "macro_already_recording")`.
-- Mostly side-effect-free macros (window operations) replay deterministically; macros containing `tag-add`/`tag-remove` against per-display state should serialize the `displayID` at record time.
-
-**Test plan:**
-- Record 3 commands, stop, reload, replay; assert state changes match.
-- Snapshot the on-disk JSON for schema stability.
-
-**Acceptance:**
-- `ollyctl macro record start workflow1` then issue a series of commands then `ollyctl macro record stop`; then `ollyctl macro run workflow1` replays them in order.
-
----
-
 ## M3 — Snap & glance UX
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).

@@ -36,6 +36,9 @@ public struct WindowRecoveryEntry: Codable, Equatable, Sendable {
     public let subrole: String?
     public let displayID: DisplayID?
     public let tagMask: UInt64
+    public let isSticky: Bool
+    public let isFullscreen: Bool
+    public let engineOverride: LayoutEngineID?
     public let originalFrame: WindowRecoveryFrame
     public let parkedFrame: WindowRecoveryFrame
     public let updatedAt: Date
@@ -49,6 +52,9 @@ public struct WindowRecoveryEntry: Codable, Equatable, Sendable {
         subrole: String?,
         displayID: DisplayID?,
         tagMask: UInt64,
+        isSticky: Bool = false,
+        isFullscreen: Bool = false,
+        engineOverride: LayoutEngineID? = nil,
         originalFrame: CGRect,
         parkedFrame: CGRect,
         updatedAt: Date = Date()
@@ -61,6 +67,9 @@ public struct WindowRecoveryEntry: Codable, Equatable, Sendable {
         self.subrole = subrole
         self.displayID = displayID
         self.tagMask = tagMask
+        self.isSticky = isSticky
+        self.isFullscreen = isFullscreen
+        self.engineOverride = engineOverride
         self.originalFrame = WindowRecoveryFrame(originalFrame)
         self.parkedFrame = WindowRecoveryFrame(parkedFrame)
         self.updatedAt = updatedAt
@@ -84,10 +93,12 @@ public struct WindowRecoveryEntry: Codable, Equatable, Sendable {
 }
 
 public struct WindowRecoveryJournalState: Codable, Equatable, Sendable {
+    public static let currentVersion = 2
+
     public var version: Int
     public var entries: [WindowRecoveryEntry]
 
-    public init(version: Int = 1, entries: [WindowRecoveryEntry] = []) {
+    public init(version: Int = Self.currentVersion, entries: [WindowRecoveryEntry] = []) {
         self.version = version
         self.entries = entries
     }
@@ -103,6 +114,67 @@ public struct WindowRecoveryJournalState: Codable, Equatable, Sendable {
 
     public mutating func remove(windowID: WindowID) {
         entries.removeAll { $0.windowID == windowID }
+    }
+
+    mutating func migrateToCurrentVersion() {
+        if version < Self.currentVersion {
+            version = Self.currentVersion
+        }
+    }
+}
+
+extension WindowRecoveryEntry {
+    private enum CodingKeys: String, CodingKey {
+        case windowID
+        case processID
+        case bundleID
+        case title
+        case role
+        case subrole
+        case displayID
+        case tagMask
+        case isSticky
+        case isFullscreen
+        case engineOverride
+        case originalFrame
+        case parkedFrame
+        case updatedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        windowID = try container.decode(WindowID.self, forKey: .windowID)
+        processID = try container.decode(pid_t.self, forKey: .processID)
+        bundleID = try container.decodeIfPresent(String.self, forKey: .bundleID)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        role = try container.decodeIfPresent(String.self, forKey: .role)
+        subrole = try container.decodeIfPresent(String.self, forKey: .subrole)
+        displayID = try container.decodeIfPresent(DisplayID.self, forKey: .displayID)
+        tagMask = try container.decode(UInt64.self, forKey: .tagMask)
+        isSticky = try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false
+        isFullscreen = try container.decodeIfPresent(Bool.self, forKey: .isFullscreen) ?? false
+        engineOverride = try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineOverride)
+        originalFrame = try container.decode(WindowRecoveryFrame.self, forKey: .originalFrame)
+        parkedFrame = try container.decode(WindowRecoveryFrame.self, forKey: .parkedFrame)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(windowID, forKey: .windowID)
+        try container.encode(processID, forKey: .processID)
+        try container.encodeIfPresent(bundleID, forKey: .bundleID)
+        try container.encodeIfPresent(title, forKey: .title)
+        try container.encodeIfPresent(role, forKey: .role)
+        try container.encodeIfPresent(subrole, forKey: .subrole)
+        try container.encodeIfPresent(displayID, forKey: .displayID)
+        try container.encode(tagMask, forKey: .tagMask)
+        try container.encode(isSticky, forKey: .isSticky)
+        try container.encode(isFullscreen, forKey: .isFullscreen)
+        try container.encodeIfPresent(engineOverride, forKey: .engineOverride)
+        try container.encode(originalFrame, forKey: .originalFrame)
+        try container.encode(parkedFrame, forKey: .parkedFrame)
+        try container.encode(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -134,7 +206,13 @@ public actor WindowRecoveryJournal {
             return WindowRecoveryJournalState()
         }
         let data = try Data(contentsOf: stateURL)
-        return try decoder.decode(WindowRecoveryJournalState.self, from: data)
+        var state = try decoder.decode(WindowRecoveryJournalState.self, from: data)
+        let originalVersion = state.version
+        state.migrateToCurrentVersion()
+        if state.version != originalVersion {
+            try save(state)
+        }
+        return state
     }
 
     public func save(_ state: WindowRecoveryJournalState) throws {

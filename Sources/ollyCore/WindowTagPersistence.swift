@@ -10,12 +10,18 @@ public struct WindowTagRule: Equatable, Sendable {
     public let bundleID: String?
     public let titleRegex: String
     public let tags: TagSet
+    public let isSticky: Bool
+    public let isPinned: Bool
+    public let engineOverride: LayoutEngineID?
 
     public init(
         processID: pid_t,
         bundleID: String?,
         titleRegex: String,
-        tags: TagSet
+        tags: TagSet,
+        isSticky: Bool = false,
+        isPinned: Bool = false,
+        engineOverride: LayoutEngineID? = nil
     ) throws {
         do {
             _ = try NSRegularExpression(pattern: titleRegex)
@@ -27,6 +33,9 @@ public struct WindowTagRule: Equatable, Sendable {
         self.bundleID = bundleID
         self.titleRegex = titleRegex
         self.tags = tags
+        self.isSticky = isSticky
+        self.isPinned = isPinned
+        self.engineOverride = engineOverride
     }
 
     public static func exactTitleRule(
@@ -111,6 +120,9 @@ extension WindowTagRule: Codable {
         case bundleID
         case titleRegex
         case tags
+        case isSticky
+        case isPinned
+        case engineOverride
     }
 
     public init(from decoder: Decoder) throws {
@@ -119,6 +131,9 @@ extension WindowTagRule: Codable {
         bundleID = try container.decodeIfPresent(String.self, forKey: .bundleID)
         titleRegex = try container.decode(String.self, forKey: .titleRegex)
         tags = TagSet(rawValue: try container.decode(UInt64.self, forKey: .tags))
+        isSticky = try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false
+        isPinned = try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false
+        engineOverride = try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineOverride)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -127,16 +142,21 @@ extension WindowTagRule: Codable {
         try container.encodeIfPresent(bundleID, forKey: .bundleID)
         try container.encode(titleRegex, forKey: .titleRegex)
         try container.encode(tags.rawValue, forKey: .tags)
+        try container.encode(isSticky, forKey: .isSticky)
+        try container.encode(isPinned, forKey: .isPinned)
+        try container.encodeIfPresent(engineOverride, forKey: .engineOverride)
     }
 }
 
 public struct WindowTagPersistenceState: Codable, Equatable, Sendable {
+    public static let currentVersion = 2
+
     public var version: Int
     public var rules: [WindowTagRule]
     public var layoutOrders: [WindowLayoutOrderRule]
 
     public init(
-        version: Int = 1,
+        version: Int = Self.currentVersion,
         rules: [WindowTagRule] = [],
         layoutOrders: [WindowLayoutOrderRule] = []
     ) {
@@ -200,6 +220,12 @@ extension WindowTagPersistenceState {
         try container.encode(rules, forKey: .rules)
         try container.encode(layoutOrders, forKey: .layoutOrders)
     }
+
+    mutating func migrateToCurrentVersion() {
+        if version < Self.currentVersion {
+            version = Self.currentVersion
+        }
+    }
 }
 
 public actor WindowTagPersistence {
@@ -229,7 +255,13 @@ public actor WindowTagPersistence {
         }
 
         let data = try Data(contentsOf: stateURL)
-        return try decoder.decode(WindowTagPersistenceState.self, from: data)
+        var state = try decoder.decode(WindowTagPersistenceState.self, from: data)
+        let originalVersion = state.version
+        state.migrateToCurrentVersion()
+        if state.version != originalVersion {
+            try save(state)
+        }
+        return state
     }
 
     public func save(_ state: WindowTagPersistenceState) throws {

@@ -507,6 +507,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				Command(id: "view.outline", title: L10n.string("Outline"), defaultKey: "Cmd-Opt-7") { [weak self] in
 					self?.showOutline(nil)
 				},
+				Command(id: "lsp.references", title: L10n.string("Find All References"), defaultKey: "Shift-F12") { [weak self] in
+					_ = self?.activeEditorWindowController()?.findAllReferences(nil)
+				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},

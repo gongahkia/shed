@@ -51,6 +51,7 @@
 "Cmd-Opt-7" = "view.outline"
 "Ctrl-Space" = "lsp.completion"
 "Shift-K" = "lsp.hover"
+"gr" = "lsp.references"
 "i" = "mode.insert"
 "/" = "vim.searchForward"
 "Shift-/" = "vim.searchBackward"

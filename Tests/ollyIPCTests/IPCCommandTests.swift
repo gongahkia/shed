@@ -31,7 +31,27 @@ final class IPCCommandTests: XCTestCase {
                 "reload",
                 "restore-windows",
                 "subscribe-events",
-                "version"
+                "version",
+                "scratchpad-add",
+                "scratchpad-toggle",
+                "scratchpad-list",
+                "scratchpad-remove",
+                "toggle-sticky",
+                "toggle-pinned",
+                "explain-window",
+                "explain-rule",
+                "macro-start",
+                "macro-stop",
+                "macro-run",
+                "macro-list",
+                "macro-delete",
+                "run-raw-action",
+                "set-space-policy",
+                "set-focus-policy",
+                "telemetry-status",
+                "telemetry-flush",
+                "show-overlay",
+                "list-cooperative-apps"
             ]
         )
     }
@@ -65,7 +85,7 @@ final class IPCCommandTests: XCTestCase {
             .restoreWindows(IPCRestoreWindowsCommand()),
             .subscribeEvents(IPCSubscribeEventsCommand(eventKinds: [.engine, .focus], replayCurrentState: true)),
             .version(IPCVersionCommand())
-        ]
+        ] + IPCCommandName.reservedV2.map { .reserved(IPCReservedCommand(name: $0)) }
 
         for command in commands {
             let data = try JSONEncoder().encode(command)

@@ -306,7 +306,11 @@ extension OllyRuntime {
         return safeZones.calculator()
     }
 
-    func replayCurrentState(to connection: UnixDomainSocketServerConnection, kinds: [IPCEventKind]) async {
+    func replayCurrentState(
+        to connection: UnixDomainSocketServerConnection,
+        kinds: [IPCEventKind],
+        protocolVersion: Int
+    ) async {
         guard Set(kinds).contains(.focus) else {
             return
         }
@@ -321,7 +325,7 @@ extension OllyRuntime {
                 mask | (UInt64(1) << UInt64(tag.rawValue))
             }
         ))
-        if let data = try? JSONEncoder().encode(IPCEventEnvelope(event: event)) {
+        if let data = try? JSONEncoder().encode(IPCEventEnvelope(version: protocolVersion, event: event)) {
             connection.sendLine(data)
         }
     }

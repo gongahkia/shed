@@ -30,6 +30,32 @@ final class IPCEnvelopeTests: XCTestCase {
         XCTAssertEqual(decoded.status, .success)
     }
 
+    func testVersionInfoReportsSupportedEventKinds() {
+        let info = IPCVersionInfo()
+
+        XCTAssertEqual(info.protocolVersion, 2)
+        XCTAssertEqual(info.supportedEventKinds, IPCEventKind.allCases)
+    }
+
+    func testVersionInfoDecodesV1PayloadWithoutSupportedEventKinds() throws {
+        let data = Data(#"{"protocolVersion":1,"supportedCommands":["state","version"]}"#.utf8)
+
+        let info = try JSONDecoder().decode(IPCVersionInfo.self, from: data)
+
+        XCTAssertEqual(info.protocolVersion, 1)
+        XCTAssertEqual(info.supportedEventKinds, IPCEventKind.v1Cases)
+    }
+
+    func testSubscribeEventsDecodesMissingSupportedEventKinds() throws {
+        let data = Data(#"{"eventKinds":["focus"],"replayCurrentState":true}"#.utf8)
+
+        let command = try JSONDecoder().decode(IPCSubscribeEventsCommand.self, from: data)
+
+        XCTAssertEqual(command.eventKinds, [.focus])
+        XCTAssertEqual(command.supportedEventKinds, IPCEventKind.allCases)
+        XCTAssertTrue(command.replayCurrentState)
+    }
+
     func testRestoreWindowsResponseRoundTrips() throws {
         let envelope = IPCResponseEnvelope.ok(
             id: "request-restore",

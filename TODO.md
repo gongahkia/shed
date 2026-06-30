@@ -21,30 +21,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M0 — Foundations
 
-### M0.4 IPC v2 schema bump + version negotiation
-
-**Goal:** Single coordinated bump `OllyIPC.protocolVersion: 1 → 2` (`Sources/ollyIPC/OllyIPC.swift:7`) covering every new command/event introduced across M0..M4.
-
-**Files to modify:**
-- `Sources/ollyIPC/OllyIPC.swift:7` — `static let protocolVersion = 2`.
-- `Sources/ollyIPC/IPCCommand.swift:5-29` — add new cases to `IPCCommandName`: `scratchpadAdd/Toggle/List/Remove`, `toggleSticky`, `togglePinned`, `explainWindow`, `explainRule`, `macroStart/Stop/Run/List/Delete`, `runRawAction`, `setSpacePolicy`, `setFocusPolicy`, `telemetryStatus/Flush`, `showOverlay`, `listCooperativeApps`.
-- `Sources/ollyIPC/IPCEventEnvelope.swift` — extend `IPCEventKind` enum with `axPermission`, `fullscreen`, `space`, `rawAction`, `macro`, `engineChange`, `config`, `focusBlocked`.
-- Add `IPCVersionInfo.supportedEventKinds: [IPCEventKind]` field; client sends list of kinds it understands; server filters unknown.
-
-**Gotchas:**
-- `Sources/ollyctl/OllyCtlDoctor.swift:272-281` already detects version mismatches via doctor — emits warning; verify warning text references the new v2.
-- Old (v1) clients sending v1 commands continue to work; new commands fail on v1 clients with the existing `IPCErrorPayload(code: "unknown_command", ...)`.
-
-**Test plan:**
-- IPC integration: round-trip every new command name through the codec; assert encode-decode equality.
-- Mixed-version: a v1 client + v2 daemon test — daemon emits new event kinds; client sees them as unknown and drops gracefully.
-
-**Acceptance:**
-- `ollyctl version --json` reports `{ "protocolVersion": 2, "supportedEventKinds": [...] }`.
-- `swift test` passes including new round-trip cases.
-
----
-
 ### M0.5 Persistence migrations (v1 → v2)
 
 **Goal:** Codable migrations for the on-disk state files that will gain new fields in M1..M3.

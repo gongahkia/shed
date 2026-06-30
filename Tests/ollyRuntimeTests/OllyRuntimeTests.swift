@@ -89,6 +89,34 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testV1EventSubscriptionFiltersV2OnlyEventKinds() async throws {
+        try await withRuntime { _, socketPath, _ in
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                version: 1,
+                command: .subscribeEvents(IPCSubscribeEventsCommand(eventKinds: [.focus, .space, .config]))
+            )))
+
+            let response = try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine())
+            guard case let .subscribed(info)? = response.result else {
+                return XCTFail("expected subscription response")
+            }
+            XCTAssertEqual(info.eventKinds, [.focus])
+        }
+    }
+
+    func testReservedV2CommandReturnsUnknownCommand() async throws {
+        try await withRuntime { _, socketPath, _ in
+            let response = try send(.reserved(IPCReservedCommand(name: .scratchpadList)), to: socketPath)
+
+            XCTAssertEqual(response.status, .error)
+            XCTAssertEqual(response.error?.code, "unknown_command")
+        }
+    }
+
     func testAXPermissionChangePublishesEventAndRunsHook() async throws {
         let recorder = PermissionRecorder()
         try await withRuntime { runtime, socketPath, _ in

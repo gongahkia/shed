@@ -39,13 +39,39 @@ public struct IPCRestoreWindowsInfo: Codable, Equatable, Sendable {
 public struct IPCVersionInfo: Codable, Equatable, Sendable {
     public let protocolVersion: Int
     public let supportedCommands: [IPCCommandName]
+    public let supportedEventKinds: [IPCEventKind]
+
+    private enum CodingKeys: String, CodingKey {
+        case protocolVersion
+        case supportedCommands
+        case supportedEventKinds
+    }
 
     public init(
         protocolVersion: Int = OllyIPC.protocolVersion,
-        supportedCommands: [IPCCommandName] = OllyIPC.supportedCommandNames
+        supportedCommands: [IPCCommandName] = OllyIPC.supportedCommandNames,
+        supportedEventKinds: [IPCEventKind] = OllyIPC.supportedEventKinds
     ) {
         self.protocolVersion = protocolVersion
         self.supportedCommands = supportedCommands
+        self.supportedEventKinds = supportedEventKinds
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        protocolVersion = try container.decode(Int.self, forKey: .protocolVersion)
+        supportedCommands = try container.decode([IPCCommandName].self, forKey: .supportedCommands)
+        supportedEventKinds = try container.decodeIfPresent(
+            [IPCEventKind].self,
+            forKey: .supportedEventKinds
+        ) ?? OllyIPC.supportedEventKinds(forProtocolVersion: protocolVersion)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(protocolVersion, forKey: .protocolVersion)
+        try container.encode(supportedCommands, forKey: .supportedCommands)
+        try container.encode(supportedEventKinds, forKey: .supportedEventKinds)
     }
 }
 

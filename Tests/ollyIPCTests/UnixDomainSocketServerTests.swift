@@ -82,7 +82,10 @@ final class UnixDomainSocketServerTests: XCTestCase {
         try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(command: .subscribeEvents(.init()))))
 
         XCTAssertEqual(try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status, .success)
-        XCTAssertEqual(try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine()).version, 1)
+        XCTAssertEqual(
+            try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine()).version,
+            OllyIPC.protocolVersion
+        )
     }
 
     private func temporarySocketPath() -> IPCSocketPath {

@@ -1,6 +1,6 @@
 # IPC Protocol
 
-Status: v1. Schema version: `1`.
+Status: v2. Schema version: `2`.
 
 Olly IPC uses a Unix-domain socket and newline-delimited JSON. The default socket is
 `$XDG_RUNTIME_DIR/olly.sock`; on macOS without `XDG_RUNTIME_DIR`, olly falls back to
@@ -35,6 +35,26 @@ consumes that response and then prints event lines.
 - `restore-windows`
 - `subscribe-events`
 - `version`
+- `scratchpad-add`
+- `scratchpad-toggle`
+- `scratchpad-list`
+- `scratchpad-remove`
+- `toggle-sticky`
+- `toggle-pinned`
+- `explain-window`
+- `explain-rule`
+- `macro-start`
+- `macro-stop`
+- `macro-run`
+- `macro-list`
+- `macro-delete`
+- `run-raw-action`
+- `set-space-policy`
+- `set-focus-policy`
+- `telemetry-status`
+- `telemetry-flush`
+- `show-overlay`
+- `list-cooperative-apps`
 
 ## Directional window operations
 
@@ -61,15 +81,15 @@ runtime action.
 
 ## Schema
 
-The schema block below is tested against the Swift IPC constants. v1 changes are additive only;
+The schema block below is tested against the Swift IPC constants. v2 changes are additive only;
 breaking wire changes must bump `protocolVersion`, `$id`, and this document.
 
 <!-- ipc-schema:start -->
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://olly.dev/schemas/ipc.v1.json",
-  "title": "olly IPC JSON line protocol v1",
+  "$id": "https://olly.dev/schemas/ipc.v2.json",
+  "title": "olly IPC JSON line protocol v2",
   "oneOf": [
     {
       "$ref": "#/$defs/requestEnvelope"
@@ -84,7 +104,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
   "$defs": {
     "protocolVersion": {
       "type": "integer",
-      "const": 1
+      "const": 2
     },
     "commandName": {
       "type": "string",
@@ -111,7 +131,27 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "reload",
         "restore-windows",
         "subscribe-events",
-        "version"
+        "version",
+        "scratchpad-add",
+        "scratchpad-toggle",
+        "scratchpad-list",
+        "scratchpad-remove",
+        "toggle-sticky",
+        "toggle-pinned",
+        "explain-window",
+        "explain-rule",
+        "macro-start",
+        "macro-stop",
+        "macro-run",
+        "macro-list",
+        "macro-delete",
+        "run-raw-action",
+        "set-space-policy",
+        "set-focus-policy",
+        "telemetry-status",
+        "telemetry-flush",
+        "show-overlay",
+        "list-cooperative-apps"
       ]
     },
     "direction": {
@@ -129,9 +169,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       "type": "string",
       "enum": [
         "axPermission",
+        "config",
         "display",
         "engine",
+        "engineChange",
         "focus",
+        "focusBlocked",
+        "fullscreen",
+        "macro",
+        "rawAction",
+        "space",
         "tag",
         "window"
       ]
@@ -731,6 +778,13 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           },
           "uniqueItems": true
         },
+        "supportedEventKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eventKind"
+          },
+          "uniqueItems": true
+        },
         "replayCurrentState": {
           "type": "boolean"
         }
@@ -898,7 +952,8 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       "type": "object",
       "required": [
         "protocolVersion",
-        "supportedCommands"
+        "supportedCommands",
+        "supportedEventKinds"
       ],
       "properties": {
         "protocolVersion": {
@@ -908,6 +963,12 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "type": "array",
           "items": {
             "$ref": "#/$defs/commandName"
+          }
+        },
+        "supportedEventKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/eventKind"
           }
         }
       },

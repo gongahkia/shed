@@ -675,10 +675,13 @@ final class EditorWindowController: NSWindowController {
 	private var hoverPopover: NSPopover?
 	private var hoverTimer: Timer?
 	private var hoverRequestGeneration = 0
+	private var signatureHelpPopover: NSPopover?
+	private var signatureHelpRequestGeneration = 0
 	private var referencesRequestGeneration = 0
 	private var referencesPanelController: ReferencesPanelController?
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
+	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 
 	init(document: ItsyDocument) {
@@ -760,6 +763,7 @@ final class EditorWindowController: NSWindowController {
 		completionPopup?.dismiss()
 		hoverTimer?.invalidate()
 		hoverPopover?.close()
+		signatureHelpPopover?.close()
 		if let fileTreeKeyMonitor {
 			NSEvent.removeMonitor(fileTreeKeyMonitor)
 		}
@@ -1309,7 +1313,14 @@ final class EditorWindowController: NSWindowController {
 		view.completionRequested = { [weak self, weak view] trigger in
 			self?.requestCompletion(triggerCharacter: trigger, in: view) ?? false
 		}
+		view.signatureHelpRequested = { [weak self, weak view] trigger in
+			self?.requestSignatureHelp(triggerCharacter: trigger, in: view) ?? false
+		}
+		view.signatureHelpDismissRequested = { [weak self] in
+			self?.closeSignatureHelpPopover()
+		}
 		installCompletionTriggersIfKnown(for: view, document: document)
+		installSignatureHelpTriggersIfKnown(for: view, document: document)
 		view.hoverCandidateChanged = { [weak self, weak view] candidate in
 			self?.scheduleHover(candidate, in: view)
 		}
@@ -1518,12 +1529,15 @@ final class EditorWindowController: NSWindowController {
 			do {
 				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot)
 				let result = try await client.initialize(params)
-				let completionProvider = try? LSPInitializeResult(result: result).capabilities.completionProvider
+				let capabilities = try? LSPInitializeResult(result: result).capabilities
+				let completionProvider = capabilities?.completionProvider
 				let triggers = completionProvider?.triggerCharacters.map(Set.init) ?? []
 				let resolveProvider = completionProvider?.resolveProvider ?? false
+				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
 					self?.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
+					self?.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
 				}
 			} catch {
 				await Self.lspManager.markFailed(key)
@@ -1565,6 +1579,13 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
+	private func setSignatureHelpTriggerCharacters(_ characters: Set<String>, for key: LSPSessionKey) {
+		signatureHelpTriggerCharactersBySession[key] = characters
+		for pane in paneCoordinator.panes {
+			pane.editorView.signatureHelpTriggerCharacters = characters
+		}
+	}
+
 	private func installCompletionTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {
 		view.completionTriggerCharacters = []
 		guard let fileURL = document.fileURL else {
@@ -1576,6 +1597,21 @@ final class EditorWindowController: NSWindowController {
 			}
 			await MainActor.run { [weak self, weak view] in
 				view?.completionTriggerCharacters = self?.completionTriggerCharactersBySession[key] ?? []
+			}
+		}
+	}
+
+	private func installSignatureHelpTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {
+		view.signatureHelpTriggerCharacters = []
+		guard let fileURL = document.fileURL else {
+			return
+		}
+		Task { [weak self, weak view] in
+			guard let self, let key = await Self.lspManager.sessionKey(for: fileURL) else {
+				return
+			}
+			await MainActor.run { [weak self, weak view] in
+				view?.signatureHelpTriggerCharacters = self?.signatureHelpTriggerCharactersBySession[key] ?? []
 			}
 		}
 	}
@@ -1728,6 +1764,83 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	@discardableResult
+	private func requestSignatureHelp(triggerCharacter: String?, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = targetView.editor.text
+		let cursorOffset = targetView.editor.selections.primary.head
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
+		let context = signatureHelpContext(triggerCharacter: triggerCharacter)
+		signatureHelpRequestGeneration += 1
+		let generation = signatureHelpRequestGeneration
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let params = LSPSignatureHelpParams(
+					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
+					position: position,
+					context: context
+				)
+				let response = try await session.client.sendRequest(
+					method: LSPMethod.textDocumentSignatureHelp,
+					params: try LSPAny(encoding: params)
+				)
+				let result = try LSPSignatureHelpResult(result: response.result)
+				await MainActor.run { [weak self, weak targetView] in
+					guard let self, let targetView, generation == self.signatureHelpRequestGeneration else {
+						return
+					}
+					self.showSignatureHelpPopover(result: result, in: targetView)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.signatureHelpRequestGeneration else {
+						return
+					}
+					self.closeSignatureHelpPopover()
+					NSLog("signature help failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func signatureHelpContext(triggerCharacter: String?) -> LSPSignatureHelpContext {
+		if let triggerCharacter {
+			return LSPSignatureHelpContext(
+				triggerKind: .triggerCharacter,
+				triggerCharacter: triggerCharacter,
+				isRetrigger: signatureHelpPopover?.isShown == true
+			)
+		}
+		return LSPSignatureHelpContext(triggerKind: .invoked, isRetrigger: signatureHelpPopover?.isShown == true)
+	}
+
+	private func showSignatureHelpPopover(result: LSPSignatureHelpResult, in targetView: MetalTextView) {
+		guard let help = result.help else {
+			closeSignatureHelpPopover()
+			return
+		}
+		closeSignatureHelpPopover()
+		let cursorOffset = targetView.editor.selections.primary.head
+		let popover = NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = SignatureHelpViewController(help: help)
+		popover.show(relativeTo: targetView.positioningRectForUTF8Offset(cursorOffset), of: targetView, preferredEdge: .maxY)
+		signatureHelpPopover = popover
+	}
+
+	@discardableResult
 	private func requestReferences(at offset: Int, in targetView: MetalTextView?) -> Bool {
 		guard
 			let document = document as? ItsyDocument,
@@ -1799,6 +1912,12 @@ final class EditorWindowController: NSWindowController {
 	private func closeHoverPopover() {
 		hoverPopover?.close()
 		hoverPopover = nil
+	}
+
+	private func closeSignatureHelpPopover() {
+		signatureHelpRequestGeneration += 1
+		signatureHelpPopover?.close()
+		signatureHelpPopover = nil
 	}
 
 	private func identifierOffset(in text: String, near offset: Int) -> Int? {

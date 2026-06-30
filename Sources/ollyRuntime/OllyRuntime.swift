@@ -271,6 +271,14 @@ public actor OllyRuntime {
             return try await engineResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .snapWindow, .dispatchGesture, .reload, .restoreWindows:
             return try await controlResponse(for: request)
+        case let .reserved(command):
+            return .failure(
+                id: request.id,
+                error: IPCErrorPayload(
+                    code: "unknown_command",
+                    message: "command is reserved but not implemented: \(command.name.rawValue)"
+                )
+            )
         }
     }
 
@@ -288,16 +296,26 @@ public actor OllyRuntime {
         case .version:
             return .ok(id: request.id, result: .version(IPCVersionInfo()))
         case let .subscribeEvents(command):
-            let id = await eventHub.subscribe(connection: connection, kinds: command.eventKinds)
+            let eventKinds = command.negotiatedEventKinds(forProtocolVersion: request.version)
+            let eventProtocolVersion = min(max(request.version, 1), OllyIPC.protocolVersion)
+            let id = await eventHub.subscribe(
+                connection: connection,
+                kinds: eventKinds,
+                protocolVersion: eventProtocolVersion
+            )
             connection.onClose { [eventHub] in
                 Task {
                     await eventHub.unsubscribe(id)
                 }
             }
             if command.replayCurrentState {
-                await replayCurrentState(to: connection, kinds: command.eventKinds)
+                await replayCurrentState(
+                    to: connection,
+                    kinds: eventKinds,
+                    protocolVersion: eventProtocolVersion
+                )
             }
-            return .ok(id: request.id, result: .subscribed(IPCSubscriptionInfo(eventKinds: command.eventKinds)))
+            return .ok(id: request.id, result: .subscribed(IPCSubscriptionInfo(eventKinds: eventKinds)))
         default:
             preconditionFailure("invalid query command")
         }

@@ -70,7 +70,8 @@ struct OllyCtlRunner {
             return "subscribed: \(info.eventKinds.map(\.rawValue).joined(separator: ", "))"
         case let .version(info):
             let commands = info.supportedCommands.map(\.rawValue).joined(separator: ", ")
-            return "ipc v\(info.protocolVersion)\ncommands: \(commands)"
+            let events = info.supportedEventKinds.map(\.rawValue).joined(separator: ", ")
+            return "ipc v\(info.protocolVersion)\ncommands: \(commands)\nevents: \(events)"
         }
     }
 

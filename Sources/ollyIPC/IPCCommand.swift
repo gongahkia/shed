@@ -1,50 +1,5 @@
-import Foundation
 import ollyCore
 import ollyKit
-
-public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
-    case state
-    case focus
-    case listWindows = "list-windows"
-    case listDisplays = "list-displays"
-    case moveWindow = "move-window"
-    case moveToDisplay = "move-to-display"
-    case swap
-    case toggleFloating = "toggle-floating"
-    case snapWindow = "snap-window"
-    case dispatchGesture = "dispatch-gesture"
-    case manualPreselect = "manual-preselect"
-    case bspTree = "bsp-tree"
-    case switchTag = "switch-tag"
-    case moveToTag = "move-to-tag"
-    case toggleTag = "toggle-tag"
-    case setEngine = "set-engine"
-    case cycleEngine = "cycle-engine"
-    case tagAdd = "tag-add"
-    case tagRemove = "tag-remove"
-    case reload
-    case restoreWindows = "restore-windows"
-    case subscribeEvents = "subscribe-events"
-    case version
-}
-
-public enum IPCDirection: String, CaseIterable, Codable, Equatable, Sendable {
-    case upward = "up"
-    case downward = "down"
-    case left
-    case right
-    case next
-    case previous
-}
-
-public enum IPCEventKind: String, CaseIterable, Codable, Equatable, Sendable {
-    case axPermission
-    case display
-    case engine
-    case focus
-    case tag
-    case window
-}
 
 public struct IPCStateCommand: Codable, Equatable, Sendable {
     public let displayID: DisplayID?
@@ -118,14 +73,47 @@ public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable {
 
 public struct IPCSubscribeEventsCommand: Codable, Equatable, Sendable {
     public let eventKinds: [IPCEventKind]
+    public let supportedEventKinds: [IPCEventKind]
     public let replayCurrentState: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case eventKinds
+        case supportedEventKinds
+        case replayCurrentState
+    }
 
     public init(
         eventKinds: [IPCEventKind] = IPCEventKind.allCases,
+        supportedEventKinds: [IPCEventKind] = IPCEventKind.allCases,
         replayCurrentState: Bool = false
     ) {
         self.eventKinds = eventKinds
+        self.supportedEventKinds = supportedEventKinds
         self.replayCurrentState = replayCurrentState
+    }
+
+    public func negotiatedEventKinds(forProtocolVersion version: Int) -> [IPCEventKind] {
+        let clientKinds = Set(supportedEventKinds)
+        let protocolKinds = Set(OllyIPC.supportedEventKinds(forProtocolVersion: version))
+        let supportedKinds = clientKinds.intersection(protocolKinds)
+        return eventKinds.filter { supportedKinds.contains($0) }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        eventKinds = try container.decodeIfPresent([IPCEventKind].self, forKey: .eventKinds) ?? IPCEventKind.allCases
+        supportedEventKinds = try container.decodeIfPresent(
+            [IPCEventKind].self,
+            forKey: .supportedEventKinds
+        ) ?? IPCEventKind.allCases
+        replayCurrentState = try container.decodeIfPresent(Bool.self, forKey: .replayCurrentState) ?? false
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(eventKinds, forKey: .eventKinds)
+        try container.encode(supportedEventKinds, forKey: .supportedEventKinds)
+        try container.encode(replayCurrentState, forKey: .replayCurrentState)
     }
 }
 
@@ -157,6 +145,7 @@ public enum IPCCommand: Equatable, Sendable {
     case restoreWindows(IPCRestoreWindowsCommand)
     case subscribeEvents(IPCSubscribeEventsCommand)
     case version(IPCVersionCommand)
+    case reserved(IPCReservedCommand)
 
     public var name: IPCCommandName {
         switch self {
@@ -206,6 +195,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .subscribeEvents
         case .version:
             return .version
+        case let .reserved(command):
+            return command.name
         }
     }
 }
@@ -221,17 +212,14 @@ extension IPCCommand: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let name = try container.decode(IPCCommandName.self, forKey: .name)
 
+        guard !name.isReservedV2 else {
+            self = .reserved(IPCReservedCommand(name: name))
+            return
+        }
+
         switch name {
-        case .state:
-            self = .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
-        case .listWindows:
-            self = .listWindows(
-                try container.decodeIfPresent(IPCWindowQueryCommand.self, forKey: .arguments) ?? .init()
-            )
-        case .listDisplays:
-            self = .listDisplays(
-                try container.decodeIfPresent(IPCDisplayQueryCommand.self, forKey: .arguments) ?? .init()
-            )
+        case .state, .listWindows, .listDisplays:
+            self = try Self.decodeQueryCommand(name, from: container)
         case .focus, .moveWindow, .swap:
             self = try Self.decodeDirectionalCommand(name, from: container)
         case .moveToDisplay:
@@ -268,6 +256,26 @@ extension IPCCommand: Codable {
             self = .subscribeEvents(command)
         case .version:
             self = .version(try container.decodeIfPresent(IPCVersionCommand.self, forKey: .arguments) ?? .init())
+        default:
+            self = .reserved(IPCReservedCommand(name: name))
+        }
+    }
+
+    private static func decodeQueryCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        switch name {
+        case .listWindows:
+            return .listWindows(
+                try container.decodeIfPresent(IPCWindowQueryCommand.self, forKey: .arguments) ?? .init()
+            )
+        case .listDisplays:
+            return .listDisplays(
+                try container.decodeIfPresent(IPCDisplayQueryCommand.self, forKey: .arguments) ?? .init()
+            )
+        default:
+            return .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
         }
     }
 
@@ -313,6 +321,8 @@ extension IPCCommand: Codable {
             try container.encode(command, forKey: .arguments)
         case let .version(command):
             try container.encode(command, forKey: .arguments)
+        case .reserved:
+            break
         }
     }
 

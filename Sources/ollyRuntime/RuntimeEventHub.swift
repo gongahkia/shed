@@ -6,16 +6,22 @@ actor RuntimeEventHub {
     private struct Subscriber {
         let connection: UnixDomainSocketServerConnection
         let kinds: Set<IPCEventKind>
+        let protocolVersion: Int
     }
 
     private var subscribers: [UUID: Subscriber] = [:]
 
     func subscribe(
         connection: UnixDomainSocketServerConnection,
-        kinds: [IPCEventKind]
+        kinds: [IPCEventKind],
+        protocolVersion: Int
     ) -> UUID {
         let id = connection.id
-        subscribers[id] = Subscriber(connection: connection, kinds: Set(kinds))
+        subscribers[id] = Subscriber(
+            connection: connection,
+            kinds: Set(kinds),
+            protocolVersion: protocolVersion
+        )
         return id
     }
 
@@ -24,10 +30,13 @@ actor RuntimeEventHub {
     }
 
     func publish(_ event: IPCEvent) {
-        guard let data = try? JSONEncoder().encode(IPCEventEnvelope(event: event)) else {
-            return
-        }
         for subscriber in subscribers.values where subscriber.kinds.contains(event.kind) {
+            guard let data = try? JSONEncoder().encode(IPCEventEnvelope(
+                version: subscriber.protocolVersion,
+                event: event
+            )) else {
+                continue
+            }
             subscriber.connection.sendLine(data)
         }
     }

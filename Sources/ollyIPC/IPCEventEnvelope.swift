@@ -36,7 +36,7 @@ public struct IPCEventEnvelope: Codable, Equatable, Sendable {
     public let version: Int
     public let event: IPCEvent
 
-    public init(version: Int = 1, event: IPCEvent) {
+    public init(version: Int = OllyIPC.protocolVersion, event: IPCEvent) {
         precondition(version > 0)
         self.version = version
         self.event = event

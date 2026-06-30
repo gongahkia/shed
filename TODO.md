@@ -195,7 +195,7 @@ x 2026-06-29 +XCut @i18n id:402 est:2h Localization: pin `en` only for v0.1. Use
 x 2026-06-29 +XCut @a11y id:403 est:3h VoiceOver: implement `accessibilityLabel`, `accessibilityRole`, `accessibilityValue` on `MetalTextView` per `NSAccessibilityElement` protocol. At minimum: read current line.
 x 2026-06-29 +XCut @themes id:404 est:2h Theme picker UI in Settings. Themes live in `~/.config/itsy/themes/*.toml`.
 x 2026-06-30 +XCut @docs id:411 est:30m dep:410 Update `README.md` feature matrix and benchmark table to reflect new scope (LSP, DAP-WIP, Git UI, Extensions tasks-only). Regenerate `docs/keymap-reference.md` once Phase 18 + Phase 19 new bindings land (id:602, id:629, etc.) via existing `scripts/gen_keymap_docs.swift`.
-(C) +XCut @docs id:412 est:30m Update `bench/notes/lsp-gap.md`, `bench/notes/dap-gap.md`, `bench/notes/extension-gap.md`, `bench/notes/git-gap.md`, `bench/notes/workspace-index-gap.md`, `bench/notes/problems-gap.md` "Next slice" sections to reference the new Phase 18 / Phase 19 / Phase 20 task ids so the gap docs stay in sync with TODO.md.
+x 2026-06-30 +XCut @docs id:412 est:30m Update `bench/notes/lsp-gap.md`, `bench/notes/dap-gap.md`, `bench/notes/extension-gap.md`, `bench/notes/git-gap.md`, `bench/notes/workspace-index-gap.md`, `bench/notes/problems-gap.md` "Next slice" sections to reference the new Phase 18 / Phase 19 / Phase 20 task ids so the gap docs stay in sync with TODO.md.
 
 ---
 

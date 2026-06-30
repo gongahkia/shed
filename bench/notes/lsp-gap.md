@@ -24,4 +24,6 @@
 
 ## Next slice
 
-Attach open/change/close document sync to the editor model, then surface diagnostics outside the renderer.
+Phase 19 is the current LSP reference: id:620-id:625 cover registry, manager, document sync, diagnostics/gutter diagnostics, and capabilities; id:626-id:634 cover completion, hover, definition, references, rename, code actions, formatting, and signature help; id:635-id:637 cover workspace configuration, cold-start budget, and smoke QA.
+
+Next LSP slice should be post-Phase19 server-specific polish/QA, not the old document-sync-first path.

@@ -20,4 +20,4 @@
 
 ## Next slice
 
-Add command-palette contribution metadata and a trust model before any executable extension host.
+Current TODO keeps extensions tasks-only via id:411; no Phase18/19/20 task id adds command/menu contributions, trust/sandboxing, or an executable host. Next extension slice should be a new post-Phase20 TODO for command-palette contribution metadata plus trust model before host work.

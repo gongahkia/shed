@@ -20,4 +20,4 @@
 
 ## Next slice
 
-Bridge `ItsyLSP` publish-diagnostics events into the shared problem model, then add gutter/inline rendering.
+Phase19 id:623 replaced the old LSP diagnostics bridge slice; id:624 is the gutter diagnostics follow-up. Next problem slice should be post-Phase19 UX: next/previous navigation, matcher config, and inline rendering if still desired.

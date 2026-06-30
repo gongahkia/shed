@@ -24,6 +24,7 @@ import Testing
 	#expect(status.entries[2] == GitStatusEntry(kind: .renamed, indexStatus: "R", worktreeStatus: ".", path: "Sources/New.swift", originalPath: "Sources/Old.swift"))
 	#expect(status.entries[3] == GitStatusEntry(kind: .unmerged, indexStatus: "U", worktreeStatus: "U", path: "conflict.txt"))
 	#expect(status.entries[4] == GitStatusEntry(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: "scratch notes.txt"))
+	#expect(status.entries[3].isConflict)
 	#expect(status.stagedCount == 3)
 	#expect(status.unstagedCount == 3)
 }
@@ -129,10 +130,12 @@ import Testing
 
 	_ = try repository.diff(path: "Sources/App.swift")
 	_ = try repository.diff(path: "Sources/App.swift", staged: true)
+	_ = try repository.conflictBlob(path: "Sources/App.swift", stage: 2)
 
 	#expect(runner.recordedArguments == [
 		["diff", "--no-color", "--", "Sources/App.swift"],
 		["diff", "--no-color", "--cached", "--", "Sources/App.swift"],
+		["show", ":2:Sources/App.swift"],
 	])
 }
 
@@ -319,6 +322,38 @@ import Testing
 	#expect(staged.contains("+four changed"))
 	#expect(unstaged.contains("+two changed"))
 	#expect(!unstaged.contains("+four changed"))
+}
+
+@Test func gitRepositoryReadsConflictStageBlobsFromRealRepo() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.git(["checkout", "-b", "feature"])
+	try fixture.write("file.txt", "theirs\n")
+	try fixture.git(["commit", "-am", "feature"])
+	try fixture.git(["checkout", "main"])
+	try fixture.write("file.txt", "ours\n")
+	try fixture.git(["commit", "-am", "main"])
+	_ = try? fixture.git(["merge", "feature"])
+
+	let status = try repository.status()
+	let entry = try #require(status.entries.first)
+	let merged = try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8)
+
+	#expect(entry.isConflict)
+	#expect(try repository.conflictBlob(path: "file.txt", stage: 1) == "base\n")
+	#expect(try repository.conflictBlob(path: "file.txt", stage: 2) == "ours\n")
+	#expect(try repository.conflictBlob(path: "file.txt", stage: 3) == "theirs\n")
+	#expect(GitConflictParser.parse(merged).count == 1)
 }
 
 private func lineIndexes(in hunk: DiffHunk, containing values: Set<String>) -> IndexSet {

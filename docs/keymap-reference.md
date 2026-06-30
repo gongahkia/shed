@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `20`
+- Bindings: `21`
 
 ### mode.insert
 
@@ -37,11 +37,12 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Shift-F` | `edit.findInProject` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Cmd-Opt-7` | `view.outline` |
 
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `121`
+- Bindings: `124`
 
 ### mode.normal
 
@@ -96,6 +97,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Opt-Down` | `pane.focusDown` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Cmd-Opt-7` | `view.outline` |
 | `i` | `mode.insert` |
 | `/` | `vim.searchForward` |
 | `Shift-/` | `vim.searchBackward` |
@@ -117,6 +119,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Opt-Down` | `pane.focusDown` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Cmd-Opt-7` | `view.outline` |
 | `Esc` | `mode.normal` |
 | `h` | `editor.moveLeft` |
 | `j` | `editor.moveDown` |
@@ -181,13 +184,14 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Opt-Down` | `pane.focusDown` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Cmd-Opt-7` | `view.outline` |
 | `Esc` | `mode.normal` |
 | `jk` | `mode.normal` |
 
 ## Emacs
 
 - Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
-- Bindings: `35`
+- Bindings: `36`
 
 ### mode.emacs
 
@@ -218,6 +222,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Opt-Down` | `pane.focusDown` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Cmd-Opt-7` | `view.outline` |
 | `C-s` | `emacs.isearchForward` |
 | `C-r` | `emacs.isearchBackward` |
 | `C-x C-s` | `file.save` |

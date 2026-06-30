@@ -19,3 +19,4 @@
 "Cmd-Shift-F" = "edit.findInProject"
 "Cmd-T" = "nav.gotoSymbolWorkspace"
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
+"Cmd-Opt-7" = "view.outline"

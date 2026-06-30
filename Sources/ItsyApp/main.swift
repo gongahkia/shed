@@ -24,6 +24,22 @@ private func recordBenchStage(_ name: String) {
 	_ = try? handle.write(contentsOf: Data(line.utf8))
 }
 
+private final class OutlineKindNode: NSObject {
+	let kind: WorkspaceSymbolKind
+	let symbols: [OutlineSymbolNode]
+	init(kind: WorkspaceSymbolKind, symbols: [OutlineSymbolNode]) {
+		self.kind = kind
+		self.symbols = symbols
+	}
+}
+
+private final class OutlineSymbolNode: NSObject {
+	let symbol: WorkspaceSymbol
+	init(_ symbol: WorkspaceSymbol) {
+		self.symbol = symbol
+	}
+}
+
 private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var openRecentMenu: NSMenu?
@@ -65,6 +81,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var problemsTableView: NSTableView?
 	private var workspaceProblems: [WorkspaceProblem] = []
 	private var problemsRootURL: URL?
+	private var outlinePanel: NSPanel?
+	private var outlineStatusLabel: NSTextField?
+	private var outlineOutlineView: NSOutlineView?
+	private var outlineKindNodes: [OutlineKindNode] = []
+	private var outlineWindowObserver: NSObjectProtocol?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -447,6 +468,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				},
 				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.showFileSymbolPalette(nil)
+				},
+				Command(id: "view.outline", title: L10n.string("Outline"), defaultKey: "Cmd-Opt-7") { [weak self] in
+					self?.showOutline(nil)
 				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
@@ -1170,6 +1194,172 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.setFrame(frame, display: true)
 	}
 
+	@objc private func showOutline(_ sender: Any?) {
+		toggleOutline(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+	}
+
+	private func toggleOutline(relativeTo hostWindow: NSWindow?) {
+		if outlinePanel?.isVisible == true {
+			closeOutline()
+			return
+		}
+		showOutline(relativeTo: hostWindow)
+	}
+
+	private func closeOutline() {
+		outlinePanel?.close()
+	}
+
+	private func showOutline(relativeTo hostWindow: NSWindow?) {
+		let panel = makeOutlinePanelIfNeeded()
+		centerOutlinePanel(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		installOutlineWindowObserverIfNeeded()
+		refreshOutline()
+	}
+
+	private func makeOutlinePanelIfNeeded() -> NSPanel {
+		if let panel = outlinePanel {
+			return panel
+		}
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 320, height: 460),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Outline")
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		panel.contentView = contentView
+		configureOutlineView(contentView)
+		outlinePanel = panel
+		return panel
+	}
+
+	private func configureOutlineView(_ contentView: NSView) {
+		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.font = .systemFont(ofSize: 11)
+		statusLabel.textColor = .secondaryLabelColor
+		statusLabel.lineBreakMode = .byTruncatingMiddle
+		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshOutlineAction(_:)))
+		let header = NSStackView(views: [statusLabel, refreshButton])
+		header.orientation = .horizontal
+		header.alignment = .centerY
+		header.distribution = .fill
+		header.spacing = 8
+		let outlineView = NSOutlineView()
+		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("outline"))
+		column.title = L10n.string("Symbols")
+		column.resizingMask = .autoresizingMask
+		outlineView.addTableColumn(column)
+		outlineView.outlineTableColumn = column
+		outlineView.headerView = nil
+		outlineView.rowSizeStyle = .small
+		outlineView.indentationPerLevel = 14
+		outlineView.dataSource = self
+		outlineView.delegate = self
+		outlineView.target = self
+		outlineView.doubleAction = #selector(openSelectedOutlineSymbol(_:))
+		let scrollView = NSScrollView()
+		scrollView.documentView = outlineView
+		scrollView.hasVerticalScroller = true
+		scrollView.drawsBackground = false
+		header.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(header)
+		contentView.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		outlineStatusLabel = statusLabel
+		outlineOutlineView = outlineView
+	}
+
+	private func centerOutlinePanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
+		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
+		let width = CGFloat(360)
+		let height = min(560, max(360, hostFrame.height - 120))
+		let frame = NSRect(x: hostFrame.maxX - width - 24, y: hostFrame.midY - height / 2, width: width, height: height)
+		panel.setFrame(frame, display: true)
+	}
+
+	private func installOutlineWindowObserverIfNeeded() {
+		guard outlineWindowObserver == nil else {
+			return
+		}
+		outlineWindowObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] notification in
+			guard
+				let self,
+				self.outlinePanel?.isVisible == true,
+				let window = notification.object as? NSWindow,
+				window !== self.outlinePanel
+			else {
+				return
+			}
+			self.refreshOutline()
+		}
+	}
+
+	@objc private func refreshOutlineAction(_ sender: Any?) {
+		refreshOutline()
+	}
+
+	private func refreshOutline() {
+		guard
+			let url = (activeDocument() as? ItsyDocument)?.fileURL,
+			let index = ItsyWorkspaceController.currentWorkspaceIndex,
+			let relative = index.relativePath(for: url)
+		else {
+			outlineKindNodes = []
+			outlineStatusLabel?.stringValue = L10n.string("No active file")
+			outlineOutlineView?.reloadData()
+			return
+		}
+		let symbols = index.symbolsForFile(relativePath: relative)
+		if symbols.isEmpty {
+			outlineKindNodes = []
+			outlineStatusLabel?.stringValue = "\(relative) — \(L10n.string("No symbols in this file"))"
+			outlineOutlineView?.reloadData()
+			return
+		}
+		var grouped: [WorkspaceSymbolKind: [OutlineSymbolNode]] = [:]
+		for symbol in symbols {
+			grouped[symbol.kind, default: []].append(OutlineSymbolNode(symbol))
+		}
+		let order: [WorkspaceSymbolKind] = [.type, .function, .method, .variable]
+		outlineKindNodes = order.compactMap { kind in
+			guard let nodes = grouped[kind], !nodes.isEmpty else {
+				return nil
+			}
+			return OutlineKindNode(kind: kind, symbols: nodes)
+		}
+		outlineStatusLabel?.stringValue = "\(relative) — \(symbols.count) \(L10n.string("symbols"))"
+		outlineOutlineView?.reloadData()
+		for kindNode in outlineKindNodes {
+			outlineOutlineView?.expandItem(kindNode)
+		}
+	}
+
+	@objc private func openSelectedOutlineSymbol(_ sender: Any?) {
+		guard
+			let outlineView = outlineOutlineView,
+			outlineView.clickedRow >= 0,
+			let node = outlineView.item(atRow: outlineView.clickedRow) as? OutlineSymbolNode,
+			let root = ItsyWorkspaceController.currentRootURL
+		else {
+			return
+		}
+		let url = root.appendingPathComponent(node.symbol.relativePath)
+		documentController.openDocument(at: url, line: node.symbol.line, column: node.symbol.column)
+	}
+
 	private func setProblems(_ snapshot: WorkspaceProblemSnapshot) {
 		workspaceProblems = snapshot.problems
 		problemsRootURL = snapshot.root
@@ -1449,6 +1639,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		gotoWorkspaceSymbolItem.target = self
 		let gotoFileSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in File"), action: #selector(showFileSymbolPalette(_:)), keyEquivalent: "O")
 		gotoFileSymbolItem.target = self
+		let outlineItem = navigateMenu.addItem(withTitle: L10n.string("Outline"), action: #selector(showOutline(_:)), keyEquivalent: "7")
+		outlineItem.keyEquivalentModifierMask = [.command, .option]
+		outlineItem.target = self
 		navigateItem.submenu = navigateMenu
 
 		let gitMenu = NSMenu(title: L10n.string("Git"))
@@ -1512,7 +1705,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	}
 }
 
-extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	func menuNeedsUpdate(_ menu: NSMenu) {
 		guard menu === openRecentMenu else {
 			return
@@ -1712,6 +1905,61 @@ extension AppDelegate: NSMenuDelegate, NSWindowDelegate, NSTextFieldDelegate, NS
 			NSLayoutConstraint.activate([
 				textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
 				textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+				textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+			])
+			cell.textField = textField
+		}
+		return cell
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+		guard outlineView === outlineOutlineView else {
+			return 0
+		}
+		if let kindNode = item as? OutlineKindNode {
+			return kindNode.symbols.count
+		}
+		if item == nil {
+			return outlineKindNodes.count
+		}
+		return 0
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+		if let kindNode = item as? OutlineKindNode {
+			return kindNode.symbols[index]
+		}
+		return outlineKindNodes[index]
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+		item is OutlineKindNode
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, viewFor tableColumn: NSTableColumn?, item: Any) -> NSView? {
+		guard outlineView === outlineOutlineView else {
+			return nil
+		}
+		let identifier = NSUserInterfaceItemIdentifier("OutlineCell")
+		let cell = outlineView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+		cell.identifier = identifier
+		let textField = cell.textField ?? NSTextField(labelWithString: "")
+		textField.lineBreakMode = .byTruncatingTail
+		if let kindNode = item as? OutlineKindNode {
+			textField.font = .boldSystemFont(ofSize: 12)
+			textField.stringValue = "\(kindNode.kind.rawValue.uppercased()) · \(kindNode.symbols.count)"
+		} else if let symbolNode = item as? OutlineSymbolNode {
+			textField.font = .systemFont(ofSize: 12)
+			textField.stringValue = "\(symbolNode.symbol.name)  \(symbolNode.symbol.line)"
+		} else {
+			textField.stringValue = ""
+		}
+		if textField.superview == nil {
+			textField.translatesAutoresizingMaskIntoConstraints = false
+			cell.addSubview(textField)
+			NSLayoutConstraint.activate([
+				textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 2),
+				textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -2),
 				textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
 			])
 			cell.textField = textField

@@ -66,6 +66,7 @@ extension OllyRuntime {
         await configStore.replace(with: config)
         nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
         focusPolicy = config.focusPolicy
+        try? await scratchpads.upsert(config.scratchpads.entries)
         await focusRateLimiter.update(settings: config.focusPolicy.rateLimitSettings)
         await hookDispatcher.update(config.hooks)
     }

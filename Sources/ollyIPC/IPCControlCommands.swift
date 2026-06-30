@@ -5,6 +5,80 @@ public struct IPCReloadCommand: Codable, Equatable, Sendable { public init() {} 
 
 public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable { public init() {} }
 
+public struct IPCScratchpadAddCommand: Codable, Equatable, Sendable {
+    public let name: String
+    public let bundleID: String?
+    public let titleRegex: String?
+    public let role: String?
+
+    public init(name: String, bundleID: String? = nil, titleRegex: String? = nil, role: String? = nil) {
+        self.name = name
+        self.bundleID = bundleID
+        self.titleRegex = titleRegex
+        self.role = role
+    }
+}
+
+public struct IPCScratchpadToggleCommand: Codable, Equatable, Sendable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+public struct IPCScratchpadListCommand: Codable, Equatable, Sendable { public init() {} }
+
+public struct IPCScratchpadRemoveCommand: Codable, Equatable, Sendable {
+    public let name: String
+
+    public init(name: String) {
+        self.name = name
+    }
+}
+
+public struct IPCScratchpadInfo: Codable, Equatable, Sendable {
+    public let name: String
+    public let bundleID: String?
+    public let titleRegex: String?
+    public let role: String?
+    public let lastVisibleFrame: WindowRecoveryFrame?
+    public let isVisible: Bool
+
+    public init(entry: ScratchpadEntry) {
+        self.name = entry.name
+        self.bundleID = entry.bundleID
+        self.titleRegex = entry.titleRegex
+        self.role = entry.role
+        self.lastVisibleFrame = entry.lastVisibleFrame
+        self.isVisible = entry.isVisible
+    }
+
+    public init(
+        name: String,
+        bundleID: String? = nil,
+        titleRegex: String? = nil,
+        role: String? = nil,
+        lastVisibleFrame: WindowRecoveryFrame? = nil,
+        isVisible: Bool = true
+    ) {
+        self.name = name
+        self.bundleID = bundleID
+        self.titleRegex = titleRegex
+        self.role = role
+        self.lastVisibleFrame = lastVisibleFrame
+        self.isVisible = isVisible
+    }
+}
+
+public struct IPCScratchpadListInfo: Codable, Equatable, Sendable {
+    public let scratchpads: [IPCScratchpadInfo]
+
+    public init(scratchpads: [IPCScratchpadInfo]) {
+        self.scratchpads = scratchpads
+    }
+}
+
 public struct IPCMacroStartCommand: Codable, Equatable, Sendable {
     public let name: String
 

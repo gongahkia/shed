@@ -21,6 +21,8 @@ extension OllyRuntime {
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))
         case .restoreWindows, .runRawAction:
             return await rawControlResponse(for: request)
+        case .scratchpadAdd, .scratchpadToggle, .scratchpadRemove:
+            return try await scratchpadResponse(for: request)
         case .setSpacePolicy, .setFocusPolicy:
             return await policyResponse(for: request)
         default:

@@ -7,6 +7,7 @@ public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Send
     case macros
     case restoredWindows = "restored-windows"
     case ruleExplanation = "rule-explanation"
+    case scratchpads
     case state
     case subscribed
     case version
@@ -86,6 +87,7 @@ public enum IPCCommandResult: Equatable, Sendable {
     case macros(IPCMacroListInfo)
     case restoredWindows(IPCRestoreWindowsInfo)
     case ruleExplanation(IPCRuleExplanation)
+    case scratchpads(IPCScratchpadListInfo)
     case state(IPCStateSnapshot)
     case subscribed(IPCSubscriptionInfo)
     case version(IPCVersionInfo)
@@ -104,6 +106,8 @@ public enum IPCCommandResult: Equatable, Sendable {
             return .restoredWindows
         case .ruleExplanation:
             return .ruleExplanation
+        case .scratchpads:
+            return .scratchpads
         case .state:
             return .state
         case .subscribed:
@@ -137,6 +141,8 @@ extension IPCCommandResult: Codable {
             self = .restoredWindows(try container.decode(IPCRestoreWindowsInfo.self, forKey: .payload))
         case .ruleExplanation:
             self = .ruleExplanation(try container.decode(IPCRuleExplanation.self, forKey: .payload))
+        case .scratchpads:
+            self = .scratchpads(try container.decode(IPCScratchpadListInfo.self, forKey: .payload))
         case .state:
             self = .state(try container.decode(IPCStateSnapshot.self, forKey: .payload))
         case .subscribed:
@@ -162,6 +168,8 @@ extension IPCCommandResult: Codable {
         case let .restoredWindows(payload):
             try container.encode(payload, forKey: .payload)
         case let .ruleExplanation(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .scratchpads(payload):
             try container.encode(payload, forKey: .payload)
         case let .state(payload):
             try container.encode(payload, forKey: .payload)

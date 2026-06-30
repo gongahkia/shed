@@ -193,6 +193,8 @@ public actor WindowRecoveryJournal {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private var cachedState: WindowRecoveryJournalState?
+    private var didCreateDirectory = false
 
     public init(stateURL: URL = WindowRecoveryJournal.defaultStateURL, fileManager: FileManager = .default) {
         self.stateURL = stateURL
@@ -205,8 +207,13 @@ public actor WindowRecoveryJournal {
     }
 
     public func load() throws -> WindowRecoveryJournalState {
+        if let cachedState {
+            return cachedState
+        }
         guard fileManager.fileExists(atPath: stateURL.path) else {
-            return WindowRecoveryJournalState()
+            let state = WindowRecoveryJournalState()
+            cachedState = state
+            return state
         }
         let data = try Data(contentsOf: stateURL)
         var state = try decoder.decode(WindowRecoveryJournalState.self, from: data)
@@ -214,15 +221,20 @@ public actor WindowRecoveryJournal {
         state.migrateToCurrentVersion()
         if state.version != originalVersion {
             try save(state)
+        } else {
+            cachedState = state
         }
         return state
     }
 
     public func save(_ state: WindowRecoveryJournalState) throws {
-        let directoryURL = stateURL.deletingLastPathComponent()
-        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        if !didCreateDirectory {
+            try fileManager.createDirectory(at: stateURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            didCreateDirectory = true
+        }
         let data = try encoder.encode(state)
         try data.write(to: stateURL, options: [.atomic])
+        cachedState = state
     }
 
     public func record(window: WindowState, parkedFrame: CGRect) throws {

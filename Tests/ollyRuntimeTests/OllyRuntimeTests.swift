@@ -476,7 +476,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testReservedV2CommandReturnsUnknownCommand() async throws {
         try await withRuntime { _, socketPath, _ in
-            let response = try send(.reserved(IPCReservedCommand(name: .scratchpadList)), to: socketPath)
+            let response = try send(.reserved(IPCReservedCommand(name: .telemetryStatus)), to: socketPath)
 
             XCTAssertEqual(response.status, .error)
             XCTAssertEqual(response.error?.code, "unknown_command")

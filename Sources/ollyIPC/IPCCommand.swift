@@ -98,6 +98,10 @@ public enum IPCCommand: Equatable, Sendable {
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
     case restoreWindows(IPCRestoreWindowsCommand)
+    case scratchpadAdd(IPCScratchpadAddCommand)
+    case scratchpadToggle(IPCScratchpadToggleCommand)
+    case scratchpadList(IPCScratchpadListCommand)
+    case scratchpadRemove(IPCScratchpadRemoveCommand)
     case macroStart(IPCMacroStartCommand)
     case macroStop(IPCMacroStopCommand)
     case macroRun(IPCMacroRunCommand)
@@ -166,6 +170,14 @@ public enum IPCCommand: Equatable, Sendable {
             return .reload
         case .restoreWindows:
             return .restoreWindows
+        case .scratchpadAdd:
+            return .scratchpadAdd
+        case .scratchpadToggle:
+            return .scratchpadToggle
+        case .scratchpadList:
+            return .scratchpadList
+        case .scratchpadRemove:
+            return .scratchpadRemove
         case .macroStart:
             return .macroStart
         case .macroStop:
@@ -198,7 +210,7 @@ extension IPCCommand: Codable {
         case arguments
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let name = try container.decode(IPCCommandName.self, forKey: .name)
@@ -236,6 +248,8 @@ extension IPCCommand: Codable {
             self = .reload(try container.decodeIfPresent(IPCReloadCommand.self, forKey: .arguments) ?? .init())
         case .restoreWindows:
             self = try Self.decodeRestoreWindows(from: container)
+        case .scratchpadAdd, .scratchpadToggle, .scratchpadList, .scratchpadRemove:
+            self = try Self.decodeScratchpadCommand(name, from: container)
         case .macroStart, .macroStop, .macroRun, .macroList, .macroDelete:
             self = try Self.decodeMacroCommand(name, from: container)
         case .runRawAction:
@@ -337,6 +351,23 @@ extension IPCCommand: Codable {
         .restoreWindows(try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init())
     }
 
+    private static func decodeScratchpadCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        switch name {
+        case .scratchpadAdd:
+            return .scratchpadAdd(try container.decodeRequired(IPCScratchpadAddCommand.self, forKey: .arguments))
+        case .scratchpadToggle:
+            return .scratchpadToggle(try container.decodeRequired(IPCScratchpadToggleCommand.self, forKey: .arguments))
+        case .scratchpadList:
+            let command = try container.decodeIfPresent(IPCScratchpadListCommand.self, forKey: .arguments) ?? .init()
+            return .scratchpadList(command)
+        default:
+            return .scratchpadRemove(try container.decodeRequired(IPCScratchpadRemoveCommand.self, forKey: .arguments))
+        }
+    }
+
     // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -386,6 +417,14 @@ extension IPCCommand: Codable {
         case let .reload(command):
             try container.encode(command, forKey: .arguments)
         case let .restoreWindows(command):
+            try container.encode(command, forKey: .arguments)
+        case let .scratchpadAdd(command):
+            try container.encode(command, forKey: .arguments)
+        case let .scratchpadToggle(command):
+            try container.encode(command, forKey: .arguments)
+        case let .scratchpadList(command):
+            try container.encode(command, forKey: .arguments)
+        case let .scratchpadRemove(command):
             try container.encode(command, forKey: .arguments)
         case let .macroStart(command):
             try container.encode(command, forKey: .arguments)

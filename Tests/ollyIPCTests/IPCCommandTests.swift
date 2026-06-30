@@ -90,6 +90,14 @@ final class IPCCommandTests: XCTestCase {
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),
             .restoreWindows(IPCRestoreWindowsCommand()),
+            .scratchpadAdd(IPCScratchpadAddCommand(
+                name: "term",
+                bundleID: "com.apple.Terminal",
+                titleRegex: "Scratch"
+            )),
+            .scratchpadToggle(IPCScratchpadToggleCommand(name: "term")),
+            .scratchpadList(IPCScratchpadListCommand()),
+            .scratchpadRemove(IPCScratchpadRemoveCommand(name: "term")),
             .macroStart(IPCMacroStartCommand(name: "workflow1")),
             .macroStop(IPCMacroStopCommand()),
             .macroRun(IPCMacroRunCommand(name: "workflow1")),
@@ -133,6 +141,21 @@ final class IPCCommandTests: XCTestCase {
 
             XCTAssertEqual(decoded, result)
         }
+    }
+
+    func testScratchpadResultsRoundTrip() throws {
+        let info = IPCScratchpadInfo(
+            name: "term",
+            bundleID: "com.apple.Terminal",
+            titleRegex: "Scratch",
+            isVisible: false
+        )
+        let result = IPCCommandResult.scratchpads(IPCScratchpadListInfo(scratchpads: [info]))
+
+        let data = try JSONEncoder().encode(result)
+        let decoded = try JSONDecoder().decode(IPCCommandResult.self, from: data)
+
+        XCTAssertEqual(decoded, result)
     }
 
     func testRequiredArgumentsAreRejectedWhenMissing() {

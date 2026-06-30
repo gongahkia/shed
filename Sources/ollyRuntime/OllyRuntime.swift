@@ -11,6 +11,8 @@ public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> Strin
 public typealias DisplayChangeStreamProvider = @Sendable () -> AsyncStream<DisplayChange>
 public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
 public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
+public typealias ScratchpadApplicationLauncher = @Sendable (String) async throws -> Void
+public typealias ScratchpadFocusHandler = @Sendable (WindowState) async throws -> Void
 
 // swiftlint:disable:next type_body_length
 public actor OllyRuntime {
@@ -36,7 +38,11 @@ public actor OllyRuntime {
     let macroRecorder: MacroRecorder
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
+    let scratchpads: ScratchpadRegistry
     let windowMover: WindowMover
+    let scratchpadParker: WindowParker
+    let scratchpadApplicationLauncher: ScratchpadApplicationLauncher
+    let scratchpadFocusWindow: ScratchpadFocusHandler?
     let assignment: WindowTagAssignment
     let dispatcher: TagDispatcher
     let engineHost: EngineHost
@@ -65,6 +71,7 @@ public actor OllyRuntime {
     var lastError: String?
     var fullscreenTasksByWindowID: [WindowID: Task<Void, Never>] = [:]
 
+    // swiftlint:disable:next function_body_length
     public init(
         socketPath: IPCSocketPath = .resolved(),
         configLoader: ConfigLoader = ConfigLoader(),
@@ -73,6 +80,7 @@ public actor OllyRuntime {
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         statePersistence: WindowTagPersistence = WindowTagPersistence(),
         recoveryJournal: WindowRecoveryJournal = WindowRecoveryJournal(),
+        scratchpads: ScratchpadRegistry = ScratchpadRegistry(),
         macroRecorder: MacroRecorder = MacroRecorder(),
         scanAXOnStart: Bool = true,
         runtimeEventBus: RuntimeEventBus = RuntimeEventBus(),
@@ -85,6 +93,10 @@ public actor OllyRuntime {
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         nativeSpaceChangeStream: @escaping NativeSpaceChangeStreamProvider = OllyRuntime.defaultNativeSpaceChangeStream,
         focusInputAttribution: FocusInputAttribution = .shared,
+        scratchpadApplicationLauncher: @escaping ScratchpadApplicationLauncher =
+            { try await OllyRuntime.defaultScratchpadApplicationLauncher($0) },
+        scratchpadMoveWindow: TagWindowMoveHandler? = nil,
+        scratchpadFocusWindow: ScratchpadFocusHandler? = nil,
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
         nativeSpaceDebounceNanoseconds: UInt64 = 2_000_000_000,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
@@ -93,7 +105,7 @@ public actor OllyRuntime {
         self.socketPath = socketPath; self.configLoader = configLoader
         self.displayProvider = displayProvider; self.applicationMonitor = applicationMonitor
         self.snapshotCache = snapshotCache; self.statePersistence = statePersistence; self.macroRecorder = macroRecorder
-        self.recoveryJournal = recoveryJournal; self.scanAXOnStart = scanAXOnStart
+        self.recoveryJournal = recoveryJournal; self.scratchpads = scratchpads; self.scanAXOnStart = scanAXOnStart
         self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession; self.overlayRequests = overlayRequests
         self.axPermissionStream = axPermissionStream
         self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
@@ -101,8 +113,15 @@ public actor OllyRuntime {
         self.nativeSpaceChangeStream = nativeSpaceChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.focusInputAttribution = focusInputAttribution
-        self.presentAXOnboarding = presentAXOnboarding
-        self.windowMover = WindowMover()
+        self.scratchpadApplicationLauncher = scratchpadApplicationLauncher
+        self.scratchpadFocusWindow = scratchpadFocusWindow
+        self.presentAXOnboarding = presentAXOnboarding; self.windowMover = WindowMover()
+        self.scratchpadParker = Self.makeScratchpadParker(
+            displayProvider: displayProvider,
+            moveWindow: scratchpadMoveWindow,
+            windowMover: windowMover,
+            windowTargets: windowTargets
+        )
         self.assignment = WindowTagAssignment(windowStore: windowStore)
         self.registry = Self.makeRegistry()
         self.dispatcher = TagDispatcher(
@@ -246,7 +265,7 @@ public actor OllyRuntime {
         connection: UnixDomainSocketServerConnection
     ) async throws -> IPCResponseEnvelope? {
         switch request.command {
-        case .state, .listWindows, .listDisplays, .listCooperativeApps, .explainWindow, .explainRule,
+        case .state, .listWindows, .listDisplays, .listCooperativeApps, .explainWindow, .explainRule, .scratchpadList,
              .version, .subscribeEvents:
             return try await queryResponse(for: request, connection: connection)
         case .switchTag, .toggleTag, .tagAdd, .tagRemove, .moveToTag, .moveToDisplay:
@@ -256,7 +275,8 @@ public actor OllyRuntime {
         case .macroStart, .macroStop, .macroRun, .macroList, .macroDelete:
             return try await macroResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow, .showOverlay,
-             .dispatchGesture, .reload, .restoreWindows, .runRawAction, .setSpacePolicy, .setFocusPolicy:
+             .dispatchGesture, .reload, .restoreWindows, .scratchpadAdd, .scratchpadToggle, .scratchpadRemove,
+             .runRawAction, .setSpacePolicy, .setFocusPolicy:
             return try await controlResponse(for: request)
         case let .reserved(command):
             return .failure(
@@ -269,6 +289,7 @@ public actor OllyRuntime {
         }
     }
 
+    // swiftlint:disable:next cyclomatic_complexity
     private func queryResponse(
         for request: IPCRequestEnvelope,
         connection: UnixDomainSocketServerConnection
@@ -286,6 +307,8 @@ public actor OllyRuntime {
             return .ok(id: request.id, result: .ruleExplanation(try await explainWindow(command)))
         case let .explainRule(command):
             return .ok(id: request.id, result: .ruleExplanation(try await explainRule(command)))
+        case .scratchpadList:
+            return .ok(id: request.id, result: .scratchpads(try await scratchpadListInfo()))
         case .version:
             return .ok(id: request.id, result: .version(IPCVersionInfo()))
         case let .subscribeEvents(command):

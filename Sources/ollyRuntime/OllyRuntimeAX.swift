@@ -201,6 +201,7 @@ extension OllyRuntime {
         }
         if previous == nil {
             await hookDispatcher.windowAppeared(WindowAppearedHookContext(window: resolved))
+            await parkHiddenScratchpadIfNeeded(resolved)
         }
         if previous?.isOffSpace == true && !resolved.isOffSpace {
             await publishRuntimeEvent(.space(IPCSpaceDriftEvent(
@@ -389,7 +390,6 @@ extension OllyRuntime {
             fatalError("failed to create built-in layout registry: \(error)")
         }
     }
-
     static var defaultActiveTags: TagSet {
         do {
             return TagSet(try Tag(index: 0))

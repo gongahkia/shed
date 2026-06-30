@@ -123,6 +123,19 @@ import Testing
 	#expect(runner.recordedArguments == [["log", "-10", "--format=%B%x00"]])
 }
 
+@Test func gitRepositoryDiffUsesNoColorAndCachedMode() throws {
+	let runner = RecordingGitRunner(output: "")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	_ = try repository.diff(path: "Sources/App.swift")
+	_ = try repository.diff(path: "Sources/App.swift", staged: true)
+
+	#expect(runner.recordedArguments == [
+		["diff", "--no-color", "--", "Sources/App.swift"],
+		["diff", "--no-color", "--cached", "--", "Sources/App.swift"],
+	])
+}
+
 private final class TemporaryGitFixture {
 	let root: URL
 

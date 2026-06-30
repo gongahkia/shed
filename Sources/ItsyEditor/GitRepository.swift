@@ -269,12 +269,16 @@ public struct GitRepository: Sendable {
 	}
 
 	public func diff(path: String, staged: Bool = false) throws -> String {
-		var arguments = ["diff"]
+		var arguments = ["diff", "--no-color"]
 		if staged {
 			arguments.append("--cached")
 		}
 		arguments += ["--", path]
 		return try runner.runGit(arguments: arguments, root: root)
+	}
+
+	public func diffFiles(path: String, staged: Bool = false) throws -> [DiffFile] {
+		try UnifiedDiffParser.parse(diff(path: path, staged: staged))
 	}
 
 	public func stage(paths: [String]) throws {

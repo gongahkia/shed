@@ -2,6 +2,7 @@ import Foundation
 
 public enum IPCCommandResultName: String, CaseIterable, Codable, Equatable, Sendable {
     case acknowledged
+    case cooperativeApps = "cooperative-apps"
     case restoredWindows = "restored-windows"
     case state
     case subscribed
@@ -77,6 +78,7 @@ public struct IPCVersionInfo: Codable, Equatable, Sendable {
 
 public enum IPCCommandResult: Equatable, Sendable {
     case acknowledged(IPCAcknowledgement)
+    case cooperativeApps(IPCCooperativeAppsInfo)
     case restoredWindows(IPCRestoreWindowsInfo)
     case state(IPCStateSnapshot)
     case subscribed(IPCSubscriptionInfo)
@@ -86,6 +88,8 @@ public enum IPCCommandResult: Equatable, Sendable {
         switch self {
         case .acknowledged:
             return .acknowledged
+        case .cooperativeApps:
+            return .cooperativeApps
         case .restoredWindows:
             return .restoredWindows
         case .state:
@@ -111,6 +115,8 @@ extension IPCCommandResult: Codable {
         switch name {
         case .acknowledged:
             self = .acknowledged(try container.decode(IPCAcknowledgement.self, forKey: .payload))
+        case .cooperativeApps:
+            self = .cooperativeApps(try container.decode(IPCCooperativeAppsInfo.self, forKey: .payload))
         case .restoredWindows:
             self = .restoredWindows(try container.decode(IPCRestoreWindowsInfo.self, forKey: .payload))
         case .state:
@@ -128,6 +134,8 @@ extension IPCCommandResult: Codable {
 
         switch self {
         case let .acknowledged(payload):
+            try container.encode(payload, forKey: .payload)
+        case let .cooperativeApps(payload):
             try container.encode(payload, forKey: .payload)
         case let .restoredWindows(payload):
             try container.encode(payload, forKey: .payload)

@@ -212,7 +212,7 @@ SafeZones {
 
 ```swift
 CooperativeApps {
-    CooperativeApp("com.example.CustomOverlay")
+    CooperativeApp("com.example.CustomOverlay", behavior: .floatAndReserveSpace)
 }
 ```
 

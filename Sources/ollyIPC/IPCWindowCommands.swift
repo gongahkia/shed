@@ -18,6 +18,30 @@ public struct IPCDisplayQueryCommand: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCListCooperativeAppsCommand: Codable, Equatable, Sendable {
+    public init() {}
+}
+
+public struct IPCCooperativeAppInfo: Codable, Equatable, Sendable {
+    public let bundleID: String
+    public let behavior: String
+    public let detectedWindowCount: Int
+
+    public init(bundleID: String, behavior: String, detectedWindowCount: Int = 0) {
+        self.bundleID = bundleID
+        self.behavior = behavior
+        self.detectedWindowCount = detectedWindowCount
+    }
+}
+
+public struct IPCCooperativeAppsInfo: Codable, Equatable, Sendable {
+    public let apps: [IPCCooperativeAppInfo]
+
+    public init(apps: [IPCCooperativeAppInfo]) {
+        self.apps = apps
+    }
+}
+
 public struct IPCMoveToDisplayCommand: Codable, Equatable, Sendable {
     public let displayID: DisplayID
     public let windowID: WindowID?

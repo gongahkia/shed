@@ -1,3 +1,14 @@
+/// Purpose: Names how olly should treat a cooperative app's windows at runtime.
+/// Parameters: Choose float-only, hide-on-switch, reserve-space, or dock-aware behavior.
+/// Example: `CooperativeBehavior.floatAndReserveSpace`
+/// See also: `CooperativeApps`, `CooperativeApp`.
+public enum CooperativeBehavior: String, Codable, Equatable, Sendable {
+    case floatOnly
+    case floatAndHideOnSwitch
+    case floatAndReserveSpace
+    case dockAware
+}
+
 /// Purpose: Chooses whether configured cooperative apps extend or replace olly's default allowlist.
 /// Parameters: Use `.extend` to add bundle IDs or `.replace` to ignore defaults.
 /// Example: `CooperativeApps(mode: .replace, bundleIDs: ["com.example.Overlay"])`
@@ -8,19 +19,34 @@ public enum CooperativeAppsMode: String, Codable, Equatable, Sendable {
 }
 
 /// Purpose: Declares one app bundle ID that olly should avoid tiling by default.
-/// Parameters: Pass a non-empty bundle identifier string.
-/// Example: `CooperativeApp("com.felixkratz.SketchyBar")`
+/// Parameters: Pass a non-empty bundle identifier string and optional cooperative behavior.
+/// Example: `CooperativeApp("com.felixkratz.SketchyBar", behavior: .floatAndReserveSpace)`
 /// See also: `CooperativeApps`, `CooperativeAppBuilder`.
 public struct CooperativeApp: Codable, Equatable, ExpressibleByStringLiteral, Sendable {
     public let bundleID: String
+    public let behavior: CooperativeBehavior
 
-    public init(_ bundleID: String) {
+    public init(_ bundleID: String, behavior: CooperativeBehavior = .floatOnly) {
         precondition(!bundleID.isEmpty)
         self.bundleID = bundleID
+        self.behavior = behavior
     }
 
     public init(stringLiteral value: String) {
         self.init(value)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case bundleID
+        case behavior
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            try container.decode(String.self, forKey: .bundleID),
+            behavior: try container.decodeIfPresent(CooperativeBehavior.self, forKey: .behavior) ?? .floatOnly
+        )
     }
 }
 
@@ -76,20 +102,30 @@ public struct CooperativeApps: Codable, Equatable, Sendable {
     }
 
     public var resolvedBundleIDs: Set<String> {
-        let configured = Set(apps.map(\.bundleID))
-        switch mode {
-        case .extend:
-            return Set(Self.defaultBundleIDs).union(configured)
-        case .replace:
-            return configured
+        Set(resolvedApps.map(\.bundleID))
+    }
+
+    public var resolvedApps: [CooperativeApp] {
+        var resolved = mode == .extend ? Self.defaultBundleIDs.map(CooperativeApp.init) : []
+        for app in apps {
+            if let index = resolved.firstIndex(where: { $0.bundleID == app.bundleID }) {
+                resolved[index] = app
+            } else {
+                resolved.append(app)
+            }
         }
+        return resolved
+    }
+
+    public func behavior(for bundleID: String?) -> CooperativeBehavior? {
+        guard let bundleID else {
+            return nil
+        }
+        return resolvedApps.first { $0.bundleID == bundleID }?.behavior
     }
 
     public func contains(bundleID: String?) -> Bool {
-        guard let bundleID else {
-            return false
-        }
-        return resolvedBundleIDs.contains(bundleID)
+        behavior(for: bundleID) != nil
     }
 }
 

@@ -54,12 +54,12 @@ public struct SafeZones: Codable, Equatable, Sendable {
         self.init(notchPadding: notchPadding, reserves: reserves)
     }
 
-    public func calculator() -> SafeZoneCalculator {
+    public func calculator(dynamicReserves: [SafeZoneReserve] = []) -> SafeZoneCalculator {
         SafeZoneCalculator(
             notchPadding: notchPadding,
             userReserves: reserves.map {
                 SafeZoneReserve(displayID: $0.displayID, kind: .user, rect: $0.rect)
-            }
+            } + dynamicReserves
         )
     }
 }

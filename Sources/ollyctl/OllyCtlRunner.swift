@@ -63,6 +63,8 @@ struct OllyCtlRunner {
         switch result {
         case let .acknowledged(payload):
             return payload.message ?? "ok"
+        case let .cooperativeApps(info):
+            return renderCooperativeApps(info)
         case let .restoredWindows(info):
             return "restored \(info.restoredCount), skipped \(info.skippedCount), failed \(info.failedCount)"
         case let .state(snapshot):
@@ -139,6 +141,15 @@ struct OllyCtlRunner {
         case let .niriColumnWidthChanged(payload):
             return "engine niri-column-width \(payload.columnIndex) \(payload.widthPreset.rawValue)"
         }
+    }
+
+    private func renderCooperativeApps(_ info: IPCCooperativeAppsInfo) -> String {
+        guard !info.apps.isEmpty else {
+            return "no cooperative apps"
+        }
+        return info.apps.map { app in
+            "\(app.bundleID) \(app.behavior) windows \(app.detectedWindowCount)"
+        }.joined(separator: "\n")
     }
 
     private func renderPrimarySwapped(_ payload: MasterSwappedEvent) -> String {

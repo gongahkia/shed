@@ -48,7 +48,7 @@ public func ollyConfig() -> Config {
         }
 
         CooperativeApps {
-            CooperativeApp("com.example.CustomOverlay")
+            CooperativeApp("com.example.CustomOverlay", behavior: .floatAndReserveSpace)
             CooperativeApp("com.monuk7735.mew.notch")
         }
 

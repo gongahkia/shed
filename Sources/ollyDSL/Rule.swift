@@ -277,7 +277,7 @@ public struct Rules: Codable, Equatable, Sendable {
 public extension Config {
     func resolvedApply(for context: RuleContext) -> RuleApply {
         var apply = rules.resolvedApply(for: context)
-        if cooperativeApps.contains(bundleID: context.bundleID) {
+        if cooperativeApps.behavior(for: context.bundleID) != nil {
             apply = apply.merging(RuleApply(floating: true))
         }
         return apply

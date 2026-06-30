@@ -14,6 +14,7 @@ struct OllyCtl: ParsableCommand {
             State.self,
             ListWindows.self,
             ListDisplays.self,
+            ListCooperativeApps.self,
             Focus.self,
             MoveWindow.self,
             MoveToDisplay.self,

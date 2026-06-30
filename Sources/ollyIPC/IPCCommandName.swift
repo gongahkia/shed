@@ -61,8 +61,7 @@ public extension IPCCommandName {
         .macroDelete,
         .telemetryStatus,
         .telemetryFlush,
-        .showOverlay,
-        .listCooperativeApps
+        .showOverlay
     ]
 
     var isReservedV2: Bool {

@@ -22,9 +22,9 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private var onboardingController: AXOnboardingWindowController?
     private let overviewController = OverviewModeController()
     private let commandPaletteController = CommandPaletteController()
-    private let settingsWindowController = SettingsWindowController()
     private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
     private let runtime = OllyRuntime()
+    private lazy var settingsWindowController = SettingsWindowController(runtime: runtime)
     private lazy var runtimeEventStatusController = RuntimeEventStatusController(
         runtime: runtime
     ) { [weak self] snapshot in

@@ -46,4 +46,25 @@ final class SafeZoneDSLTests: XCTestCase {
         XCTAssertEqual(result.layoutFrame, CGRect(x: 0, y: 0, width: 800, height: 500))
         XCTAssertEqual(result.reserves.map(\.kind), [.user])
     }
+
+    func testSafeZonesBuildCalculatorWithDynamicReserves() {
+        let display = Display(
+            id: 1,
+            frame: CGRect(x: 0, y: 0, width: 800, height: 600),
+            visibleFrame: CGRect(x: 0, y: 0, width: 800, height: 600),
+            scaleFactor: 2,
+            localizedName: "Display",
+            isMain: true
+        )
+        let reserve = SafeZoneReserve(
+            displayID: 1,
+            kind: .cooperativeApp,
+            rect: CGRect(x: 0, y: 540, width: 800, height: 60)
+        )
+
+        let result = SafeZones().calculator(dynamicReserves: [reserve]).result(for: display)
+
+        XCTAssertEqual(result.layoutFrame, CGRect(x: 0, y: 0, width: 800, height: 540))
+        XCTAssertEqual(result.reserves.map(\.kind), [.cooperativeApp])
+    }
 }

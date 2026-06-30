@@ -150,6 +150,89 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testCooperativeReserveSpaceInjectsSafeZoneReserve() async throws {
+        try await withRuntime { runtime, _, displayID in
+            await runtime.replaceConfigForTest(Config {
+                CooperativeApps(mode: .replace) {
+                    CooperativeApp("com.example.Bar", behavior: .floatAndReserveSpace)
+                }
+            })
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    bundleID: "com.example.Bar",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 820, width: 1440, height: 80)
+                ),
+                element: nil
+            )
+
+            let result = await runtime.safeZones().result(for: testDisplay(displayID))
+
+            XCTAssertEqual(result.layoutFrame, CGRect(x: 0, y: 0, width: 1440, height: 820))
+            XCTAssertTrue(result.reserves.contains { $0.kind == .cooperativeApp })
+        }
+    }
+
+    func testCooperativeHideOnSwitchSetsLayoutOrderAndLeavesVisibleWindowsEmpty() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                CooperativeApps(mode: .replace) {
+                    CooperativeApp("com.example.Overlay", behavior: .floatAndHideOnSwitch)
+                }
+            })
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    bundleID: "com.example.Overlay",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 0, width: 200, height: 80)
+                ),
+                element: nil
+            )
+
+            let layoutOrder = await runtime.windowStateForTest(1)?.layoutOrder
+            XCTAssertEqual(layoutOrder, Int.max)
+            XCTAssertEqual(try send(.switchTag(.init(tag: tag(1), displayID: displayID)), to: socketPath).status, .success)
+            let visibleWindows = await runtime.visibleWindows(displayID: displayID)
+            XCTAssertTrue(visibleWindows.isEmpty)
+        }
+    }
+
+    func testListCooperativeAppsReturnsResolvedBehaviorsAndDetectedWindows() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                CooperativeApps(mode: .replace) {
+                    CooperativeApp("com.example.Bar", behavior: .dockAware)
+                }
+            })
+            try await runtime.upsertRuntimeWindow(
+                WindowState(
+                    id: 1,
+                    processID: 42,
+                    bundleID: "com.example.Bar",
+                    displayID: displayID,
+                    tagMask: 1,
+                    frame: CGRect(x: 0, y: 820, width: 1440, height: 80)
+                ),
+                element: nil
+            )
+
+            let response = try send(.listCooperativeApps(.init()), to: socketPath)
+
+            guard case let .cooperativeApps(info)? = response.result else {
+                return XCTFail("expected cooperative apps info")
+            }
+            XCTAssertEqual(info.apps, [
+                IPCCooperativeAppInfo(bundleID: "com.example.Bar", behavior: "dockAware", detectedWindowCount: 1)
+            ])
+        }
+    }
+
     func testCycleEngineCanTargetExplicitTag() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await runtime.replaceConfigForTest(Config {
@@ -1179,6 +1262,17 @@ private func tag(_ value: Int) throws -> IPCTagIndex {
     try IPCTagIndex(validating: value)
 }
 
+private func testDisplay(_ displayID: DisplayID) -> Display {
+    Display(
+        id: displayID,
+        frame: CGRect(x: 0, y: 0, width: 1440, height: 900),
+        visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 860),
+        scaleFactor: 2,
+        localizedName: "Test Display",
+        isMain: true
+    )
+}
+
 private extension OllyRuntime {
     func configForTest(engineID: LayoutEngineID) async -> Any? {
         await configStore.config(for: engineID)
@@ -1193,6 +1287,10 @@ private extension OllyRuntime {
             maxEventsPerSecond: config.focusPolicy.maxEventsPerSecond,
             minHumanIntervalMilliseconds: config.focusPolicy.minHumanIntervalMilliseconds
         ))
+    }
+
+    func windowStateForTest(_ id: WindowID) async -> WindowState? {
+        await windowStore.state(for: id)
     }
 
     func setAXPermissionStatusForTest(_ status: AXPermissionStatus?) {

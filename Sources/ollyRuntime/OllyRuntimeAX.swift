@@ -215,7 +215,10 @@ extension OllyRuntime {
         let config = await configStore.current()
         let current = await windowStore.state(for: state.id)
         let base = state.withFullscreen(current?.isFullscreen ?? state.isFullscreen)
-        let resolved = config.resolvedWindowState(for: base)
+        var resolved = config.resolvedWindowState(for: base)
+        if config.cooperativeApps.behavior(for: resolved.bundleID) == .floatAndHideOnSwitch {
+            resolved = resolved.withLayoutOrder(Int.max)
+        }
         if let engineOverride = resolved.engineOverride,
            engineOverride != FloatingLayoutEngine.engineID {
             throw OllyRuntimeError.unsupportedEngineCommand(

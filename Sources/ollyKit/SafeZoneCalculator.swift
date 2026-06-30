@@ -18,6 +18,7 @@ public struct DisplaySafeAreaInsets: Codable, Equatable, Sendable {
 public enum SafeZoneKind: String, Codable, Equatable, Sendable {
     case menuBar
     case notch
+    case cooperativeApp
     case user
     case visibleFrame
 }
@@ -178,7 +179,7 @@ public struct SafeZoneCalculator: Sendable {
             reserves.append(SafeZoneReserve(displayID: displayID, kind: .visibleFrame, rect: rawFrame))
         }
         reserves.append(contentsOf: userReserves.map { reserve in
-            SafeZoneReserve(displayID: reserve.displayID, kind: .user, rect: reserve.rect.standardized)
+            SafeZoneReserve(displayID: reserve.displayID, kind: reserve.kind, rect: reserve.rect.standardized)
         })
         return reserves
     }

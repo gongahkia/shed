@@ -1,8 +1,11 @@
 import AppKit
 import Foundation
 import ollyDSL
+import ollyIPC
+import ollyRuntime
 
 final class SettingsWindowController: NSWindowController {
+    private let runtime: OllyRuntime?
     private let sourceURL: URL
     private let reloader: ConfigReloader
     private let fileManager: FileManager
@@ -13,13 +16,17 @@ final class SettingsWindowController: NSWindowController {
     private let profilePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
     private let createConfigButton = NSButton(title: "Create Config", target: nil, action: nil)
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
+    private let cooperativeAppsTableView = NSTableView()
+    private var cooperativeAppsRows: [IPCCooperativeAppInfo] = []
     private var playgroundController: ConfigPlaygroundWindowController?
 
     init(
+        runtime: OllyRuntime? = nil,
         sourceURL: URL = ConfigLoader.defaultSourceURL(),
         reloader: ConfigReloader? = nil,
         fileManager: FileManager = .default
     ) {
+        self.runtime = runtime
         self.sourceURL = sourceURL
         self.fileManager = fileManager
         self.reloader = reloader ?? ConfigReloader(loader: Self.defaultLoader(sourceURL: sourceURL))
@@ -42,6 +49,7 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         pathLabel.stringValue = sourceURL.path
         refreshCreateConfigButton()
+        refreshCooperativeApps()
         window?.center()
         window?.makeKeyAndOrderFront(nil)
         NSApplication.shared.activate(ignoringOtherApps: true)
@@ -64,6 +72,25 @@ final class SettingsWindowController: NSWindowController {
     }
 
     private func configureContent() {
+        let tabView = NSTabView()
+        tabView.translatesAutoresizingMaskIntoConstraints = false
+        let configTab = NSTabViewItem(identifier: "config")
+        configTab.label = "Config"
+        configTab.view = makeConfigView()
+        let cooperativeTab = NSTabViewItem(identifier: "cooperative-apps")
+        cooperativeTab.label = "Cooperative Apps"
+        cooperativeTab.view = makeCooperativeAppsView()
+        tabView.addTabViewItem(configTab)
+        tabView.addTabViewItem(cooperativeTab)
+        window?.contentView = tabView
+
+        NSLayoutConstraint.activate([
+            tabView.widthAnchor.constraint(greaterThanOrEqualToConstant: 560),
+            tabView.heightAnchor.constraint(greaterThanOrEqualToConstant: 360)
+        ])
+    }
+
+    private func makeConfigView() -> NSView {
         let root = NSStackView()
         root.orientation = .vertical
         root.spacing = 12
@@ -100,12 +127,12 @@ final class SettingsWindowController: NSWindowController {
         root.addArrangedSubview(buttonRow)
         root.addArrangedSubview(statusLabel)
         root.addArrangedSubview(errorScrollView)
-        window?.contentView = root
 
         NSLayoutConstraint.activate([
             root.widthAnchor.constraint(greaterThanOrEqualToConstant: 560),
             errorScrollView.heightAnchor.constraint(equalToConstant: 240)
         ])
+        return root
     }
 
     private func makeErrorScrollView() -> NSScrollView {
@@ -197,6 +224,7 @@ final class SettingsWindowController: NSWindowController {
             let source = config.didCompile ? "compiled" : "cache"
             statusLabel.stringValue = "Reloaded from \(source)"
             errorTextView.string = ""
+            refreshCooperativeApps()
         case let .failed(failure):
             statusLabel.stringValue = "Reload failed"
             errorTextView.textColor = .labelColor
@@ -230,4 +258,119 @@ final class SettingsWindowController: NSWindowController {
         errorTextView.string = String(describing: error)
     }
 
+}
+
+private extension SettingsWindowController {
+    func makeCooperativeAppsView() -> NSView {
+        let root = NSStackView()
+        root.orientation = .vertical
+        root.spacing = 10
+        root.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        root.translatesAutoresizingMaskIntoConstraints = false
+
+        let buttonRow = NSStackView()
+        buttonRow.orientation = .horizontal
+        buttonRow.spacing = 8
+        buttonRow.addArrangedSubview(button("Refresh", #selector(refreshCooperativeAppsFromButton)))
+        buttonRow.addArrangedSubview(NSView())
+
+        configureCooperativeAppsTable()
+        let scrollView = NSScrollView()
+        scrollView.documentView = cooperativeAppsTableView
+        scrollView.hasVerticalScroller = true
+        scrollView.borderType = .bezelBorder
+
+        root.addArrangedSubview(buttonRow)
+        root.addArrangedSubview(scrollView)
+        NSLayoutConstraint.activate([
+            root.widthAnchor.constraint(greaterThanOrEqualToConstant: 560),
+            scrollView.heightAnchor.constraint(equalToConstant: 300)
+        ])
+        return root
+    }
+
+    func configureCooperativeAppsTable() {
+        guard cooperativeAppsTableView.tableColumns.isEmpty else {
+            return
+        }
+        for column in cooperativeAppsColumns() {
+            cooperativeAppsTableView.addTableColumn(column)
+        }
+        cooperativeAppsTableView.headerView = NSTableHeaderView()
+        cooperativeAppsTableView.dataSource = self
+        cooperativeAppsTableView.delegate = self
+    }
+
+    func cooperativeAppsColumns() -> [NSTableColumn] {
+        [
+            ("bundleID", "Bundle ID", 290),
+            ("behavior", "Behavior", 150),
+            ("windows", "Windows", 70)
+        ].map { identifier, title, width in
+            let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
+            column.title = title
+            column.width = CGFloat(width)
+            return column
+        }
+    }
+
+    @objc func refreshCooperativeAppsFromButton() {
+        refreshCooperativeApps()
+    }
+
+    func refreshCooperativeApps() {
+        guard let runtime else {
+            cooperativeAppsRows = []
+            cooperativeAppsTableView.reloadData()
+            return
+        }
+        Task { [weak self, runtime] in
+            let info = await runtime.cooperativeAppsInfo()
+            await MainActor.run {
+                self?.cooperativeAppsRows = info.apps
+                self?.cooperativeAppsTableView.reloadData()
+            }
+        }
+    }
+}
+
+extension SettingsWindowController: NSTableViewDataSource, NSTableViewDelegate {
+    func numberOfRows(in tableView: NSTableView) -> Int {
+        tableView == cooperativeAppsTableView ? cooperativeAppsRows.count : 0
+    }
+
+    func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+        guard tableView == cooperativeAppsTableView,
+              cooperativeAppsRows.indices.contains(row),
+              let identifier = tableColumn?.identifier else {
+            return nil
+        }
+        let value = cooperativeAppsValue(row: cooperativeAppsRows[row], identifier: identifier.rawValue)
+        let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
+        cell.identifier = identifier
+        cell.textField = cell.textField ?? NSTextField(labelWithString: "")
+        cell.textField?.stringValue = value
+        cell.textField?.lineBreakMode = .byTruncatingTail
+        if cell.textField?.superview == nil, let textField = cell.textField {
+            textField.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(textField)
+            NSLayoutConstraint.activate([
+                textField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
+                textField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
+                textField.centerYAnchor.constraint(equalTo: cell.centerYAnchor)
+            ])
+        }
+        return cell
+    }
+
+    private func cooperativeAppsValue(row: IPCCooperativeAppInfo, identifier: String) -> String {
+        switch identifier {
+        case "behavior":
+            return row.behavior
+        case "windows":
+            return String(row.detectedWindowCount)
+        default:
+            return row.bundleID
+        }
+    }
 }

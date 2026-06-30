@@ -1040,6 +1040,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 ## Cooperative Apps
 
+### CooperativeBehavior
+
+`enum CooperativeBehavior`
+
+- Purpose: Names how olly should treat a cooperative app's windows at runtime.
+- Parameters: Choose float-only, hide-on-switch, reserve-space, or dock-aware behavior.
+- Example: `CooperativeBehavior.floatAndReserveSpace`
+- See also: `CooperativeApps`, `CooperativeApp`.
+
 ### CooperativeAppsMode
 
 `enum CooperativeAppsMode`
@@ -1054,8 +1063,8 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 `struct CooperativeApp`
 
 - Purpose: Declares one app bundle ID that olly should avoid tiling by default.
-- Parameters: Pass a non-empty bundle identifier string.
-- Example: `CooperativeApp("com.felixkratz.SketchyBar")`
+- Parameters: Pass a non-empty bundle identifier string and optional cooperative behavior.
+- Example: `CooperativeApp("com.felixkratz.SketchyBar", behavior: .floatAndReserveSpace)`
 - See also: `CooperativeApps`, `CooperativeAppBuilder`.
 
 ### CooperativeApps

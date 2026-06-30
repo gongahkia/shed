@@ -74,6 +74,7 @@ public enum IPCCommand: Equatable, Sendable {
     case focus(IPCDirectionalCommand)
     case listWindows(IPCWindowQueryCommand)
     case listDisplays(IPCDisplayQueryCommand)
+    case listCooperativeApps(IPCListCooperativeAppsCommand)
     case moveWindow(IPCDirectionalCommand)
     case moveToDisplay(IPCMoveToDisplayCommand)
     case swap(IPCDirectionalCommand)
@@ -110,6 +111,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .listWindows
         case .listDisplays:
             return .listDisplays
+        case .listCooperativeApps:
+            return .listCooperativeApps
         case .moveWindow:
             return .moveWindow
         case .moveToDisplay:
@@ -181,7 +184,7 @@ extension IPCCommand: Codable {
         }
 
         switch name {
-        case .state, .listWindows, .listDisplays:
+        case .state, .listWindows, .listDisplays, .listCooperativeApps:
             self = try Self.decodeQueryCommand(name, from: container)
         case .focus, .moveWindow, .swap:
             self = try Self.decodeDirectionalCommand(name, from: container)
@@ -237,6 +240,10 @@ extension IPCCommand: Codable {
             return .listDisplays(
                 try container.decodeIfPresent(IPCDisplayQueryCommand.self, forKey: .arguments) ?? .init()
             )
+        case .listCooperativeApps:
+            return .listCooperativeApps(
+                try container.decodeIfPresent(IPCListCooperativeAppsCommand.self, forKey: .arguments) ?? .init()
+            )
         default:
             return .state(try container.decodeIfPresent(IPCStateCommand.self, forKey: .arguments) ?? .init())
         }
@@ -274,6 +281,8 @@ extension IPCCommand: Codable {
         case let .listWindows(command):
             try container.encode(command, forKey: .arguments)
         case let .listDisplays(command):
+            try container.encode(command, forKey: .arguments)
+        case let .listCooperativeApps(command):
             try container.encode(command, forKey: .arguments)
         case let .focus(command), let .moveWindow(command), let .swap(command):
             try container.encode(command, forKey: .arguments)

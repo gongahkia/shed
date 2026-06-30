@@ -23,38 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M2 — Hackability surface wire-up
 
-### M2.3 Wire `CooperativeApps` runtime behaviors
-
-**Goal:** Today `Sources/ollyDSL/CooperativeApps.swift` is intent-only — `Config.resolvedApply` (`Sources/ollyDSL/Rule.swift:259-266`) auto-floats cooperative app windows. Add three more behaviors that the runtime actually executes.
-
-**New behaviors:**
-```swift
-public enum CooperativeBehavior: String, Codable, Sendable {
-    case floatOnly             // existing default
-    case floatAndHideOnSwitch  // park off-screen when tag inactive
-    case floatAndReserveSpace  // contribute frame to safe zones
-    case dockAware             // shrink layout frame to its outer rect
-}
-```
-
-**Files to modify:**
-- `Sources/ollyDSL/CooperativeApps.swift` — extend `CooperativeApp.init(_ bundleID: String, behavior: CooperativeBehavior = .floatOnly)`.
-- `Sources/ollyKit/SafeZoneCalculator.swift` — accept dynamic `SafeZoneReserve`s sourced from cooperative-app AX frames; merge into `safeZones()` (`Sources/ollyRuntime/OllyRuntimeCommands.swift:302`). Throttle live AX frame reads via `Sources/ollyKit/WindowSnapshotCache.swift` to ≤1 Hz.
-- `Sources/ollyRuntime/OllyRuntimeAX.swift:168` (`upsertRuntimeWindow`) — for `floatAndHideOnSwitch` bundles, set `WindowState.layoutOrder = .max` so dispatcher hides when tag inactive.
-
-**IPC additions:** `list-cooperative-apps` returns resolved bundle IDs + behaviors.
-
-**App-shell:** Settings → "Cooperative apps" tab listing the resolved set with current detected matches.
-
-**Test plan:**
-- DSL: a config with `floatAndReserveSpace` injects a `SafeZoneReserve` into the calculator; verify via `SafeZoneCalculator.result(for:)`.
-- Runtime: a `floatAndHideOnSwitch` cooperative app does not appear in `visibleWindows(displayID:)` after a tag switch.
-
-**Acceptance:**
-- `CooperativeApp("com.felixkratz.SketchyBar", behavior: .floatAndReserveSpace)` causes managed-window layout to leave SketchyBar's frame untiled.
-
----
-
 ### M2.4 Rule preview inspector
 
 **Goal:** `ollyctl explain-window <id>` and `ollyctl explain-rule <id>` produce a traced match log showing which rule(s) matched a window and why.

@@ -241,7 +241,7 @@ public actor OllyRuntime {
         connection: UnixDomainSocketServerConnection
     ) async throws -> IPCResponseEnvelope? {
         switch request.command {
-        case .state, .listWindows, .listDisplays, .version, .subscribeEvents:
+        case .state, .listWindows, .listDisplays, .listCooperativeApps, .version, .subscribeEvents:
             return try await queryResponse(for: request, connection: connection)
         case .switchTag, .toggleTag, .tagAdd, .tagRemove, .moveToTag, .moveToDisplay:
             return try await tagResponse(for: request)
@@ -272,6 +272,8 @@ public actor OllyRuntime {
             return .ok(id: request.id, result: .state(await windowListSnapshot(command)))
         case let .listDisplays(command):
             return .ok(id: request.id, result: .state(await displayListSnapshot(command)))
+        case .listCooperativeApps:
+            return .ok(id: request.id, result: .cooperativeApps(await cooperativeAppsInfo()))
         case .version:
             return .ok(id: request.id, result: .version(IPCVersionInfo()))
         case let .subscribeEvents(command):

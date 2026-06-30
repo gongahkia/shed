@@ -1,6 +1,12 @@
 import AppKit
 import CoreServices
 import ItsyEditor
+import OSLog
+
+private let workspaceLogger = Logger(
+	subsystem: Bundle.main.bundleIdentifier ?? "dev.itsy.editor",
+	category: "Workspace"
+)
 
 enum ItsyWorkspaceController {
 	private static weak var documentController: ItsyDocumentController?
@@ -35,6 +41,7 @@ enum ItsyWorkspaceController {
 	}
 
 	static func openWorkspace(at url: URL) {
+		workspaceLogger.info("Opening workspace: \(url.lastPathComponent, privacy: .public)")
 		rootURL = url
 		loadGitStatus()
 		for controller in controllers.allObjects {
@@ -97,6 +104,7 @@ enum ItsyWorkspaceController {
 				let cfString = unsafeBitCast(pointer, to: CFString.self)
 				urls.append(URL(fileURLWithPath: cfString as String))
 			}
+			workspaceLogger.debug("Workspace index event count: \(urls.count, privacy: .public)")
 			DispatchQueue.main.async {
 				ItsyWorkspaceController.applyIndexFileChanges(urls)
 			}
@@ -108,13 +116,19 @@ enum ItsyWorkspaceController {
 			paths,
 			FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
 			0.2,
-			UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer)
+			indexWatcherFlags
 		) else {
+			workspaceLogger.error("Failed to start workspace index watcher")
 			return
 		}
 		FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
 		FSEventStreamStart(stream)
 		indexWatcher = stream
+		workspaceLogger.info("Started workspace index watcher")
+	}
+
+	private static var indexWatcherFlags: UInt32 {
+		UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
 	}
 
 	private static func stopIndexWatcher() {
@@ -136,7 +150,12 @@ enum ItsyWorkspaceController {
 	}
 
 	static func openFile(at url: URL) -> Bool {
-		documentController?.openDocument(at: url) ?? false
+		workspaceLogger.info("Opening workspace file: \(url.lastPathComponent, privacy: .public)")
+		let didOpen = documentController?.openDocument(at: url) ?? false
+		if !didOpen {
+			workspaceLogger.error("Failed to open workspace file: \(url.lastPathComponent, privacy: .public)")
+		}
+		return didOpen
 	}
 
 	static func refreshGitStatus() {

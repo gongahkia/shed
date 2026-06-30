@@ -169,15 +169,27 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		focusCommandPaletteInput()
 	}
 
-	private func showCommandPalette(relativeTo hostWindow: NSWindow?) {
+	private func showCommandPalette(relativeTo hostWindow: NSWindow?, prefill: String? = nil) {
 		let panel = makeCommandPalettePanelIfNeeded()
 		commandPaletteCancelHandler = nil
 		commandPaletteRunText = nil
 		setCommandPaletteItems(commandRegistry.commands)
+		if let prefill, !prefill.isEmpty {
+			commandPaletteInputField?.stringValue = prefill
+			filterCommandPaletteItems()
+		}
 		centerCommandPalette(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
 		focusCommandPaletteInput()
+	}
+
+	@objc private func showWorkspaceSymbolPalette(_ sender: Any?) {
+		showCommandPalette(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow, prefill: "@")
+	}
+
+	@objc private func showFileSymbolPalette(_ sender: Any?) {
+		showCommandPalette(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow, prefill: "#")
 	}
 
 	private func makeCommandPalettePanelIfNeeded() -> NSPanel {
@@ -429,6 +441,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 				},
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
+				},
+				Command(id: "nav.gotoSymbolWorkspace", title: L10n.string("Go to Symbol in Workspace"), defaultKey: "Cmd-T") { [weak self] in
+					self?.showWorkspaceSymbolPalette(nil)
+				},
+				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"), defaultKey: "Cmd-Shift-O") { [weak self] in
+					self?.showFileSymbolPalette(nil)
 				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
@@ -1366,6 +1384,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let appItem = NSMenuItem()
 		let fileItem = NSMenuItem()
 		let editItem = NSMenuItem()
+		let navigateItem = NSMenuItem()
 		let gitItem = NSMenuItem()
 		let taskItem = NSMenuItem()
 		let problemItem = NSMenuItem()
@@ -1373,6 +1392,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		mainMenu.addItem(appItem)
 		mainMenu.addItem(fileItem)
 		mainMenu.addItem(editItem)
+		mainMenu.addItem(navigateItem)
 		mainMenu.addItem(gitItem)
 		mainMenu.addItem(taskItem)
 		mainMenu.addItem(problemItem)
@@ -1389,10 +1409,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let newItem = fileMenu.addItem(withTitle: L10n.string("New"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
 		newItem.target = documentController
 		let newTabItem = fileMenu.addItem(withTitle: L10n.string("New Tab"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "t")
+		newTabItem.keyEquivalentModifierMask = [.command, .option]
 		newTabItem.target = documentController
 		let openItem = fileMenu.addItem(withTitle: L10n.string("Open..."), action: #selector(NSDocumentController.openDocument(_:)), keyEquivalent: "o")
 		openItem.target = documentController
-		let openFolderItem = fileMenu.addItem(withTitle: L10n.string("Open Folder..."), action: #selector(openFolder(_:)), keyEquivalent: "O")
+		let openFolderItem = fileMenu.addItem(withTitle: L10n.string("Open Folder..."), action: #selector(openFolder(_:)), keyEquivalent: "o")
+		openFolderItem.keyEquivalentModifierMask = [.command, .option]
 		openFolderItem.target = self
 		let openRecentItem = fileMenu.addItem(withTitle: L10n.string("Open Recent"), action: nil, keyEquivalent: "")
 		let openRecentMenu = NSMenu(title: L10n.string("Open Recent"))
@@ -1421,6 +1443,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			findInProjectItem.keyEquivalentModifierMask = [.command, .shift]
 			findInProjectItem.target = self
 			editItem.submenu = editMenu
+
+		let navigateMenu = NSMenu(title: L10n.string("Navigate"))
+		let gotoWorkspaceSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in Workspace"), action: #selector(showWorkspaceSymbolPalette(_:)), keyEquivalent: "t")
+		gotoWorkspaceSymbolItem.target = self
+		let gotoFileSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in File"), action: #selector(showFileSymbolPalette(_:)), keyEquivalent: "O")
+		gotoFileSymbolItem.target = self
+		navigateItem.submenu = navigateMenu
 
 		let gitMenu = NSMenu(title: L10n.string("Git"))
 		let gitChangesItem = gitMenu.addItem(withTitle: L10n.string("Git Changes"), action: #selector(showGitChanges(_:)), keyEquivalent: "")

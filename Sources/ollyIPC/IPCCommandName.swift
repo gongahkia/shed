@@ -59,7 +59,6 @@ public extension IPCCommandName {
         .macroRun,
         .macroList,
         .macroDelete,
-        .runRawAction,
         .telemetryStatus,
         .telemetryFlush,
         .showOverlay,

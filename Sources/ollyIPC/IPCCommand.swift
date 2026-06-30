@@ -93,6 +93,7 @@ public enum IPCCommand: Equatable, Sendable {
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
     case restoreWindows(IPCRestoreWindowsCommand)
+    case runRawAction(IPCRunRawActionCommand)
     case setSpacePolicy(IPCSetSpacePolicyCommand)
     case setFocusPolicy(IPCSetFocusPolicyCommand)
     case subscribeEvents(IPCSubscribeEventsCommand)
@@ -147,6 +148,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .reload
         case .restoreWindows:
             return .restoreWindows
+        case .runRawAction:
+            return .runRawAction
         case .setSpacePolicy:
             return .setSpacePolicy
         case .setFocusPolicy:
@@ -205,6 +208,8 @@ extension IPCCommand: Codable {
             self = .restoreWindows(
                 try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init()
             )
+        case .runRawAction:
+            self = .runRawAction(try container.decodeRequired(IPCRunRawActionCommand.self, forKey: .arguments))
         case .setSpacePolicy:
             self = .setSpacePolicy(try container.decodeRequired(IPCSetSpacePolicyCommand.self, forKey: .arguments))
         case .setFocusPolicy:
@@ -258,7 +263,7 @@ extension IPCCommand: Codable {
         }
     }
 
-    // swiftlint:disable:next cyclomatic_complexity
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(name, forKey: .name)
@@ -299,6 +304,8 @@ extension IPCCommand: Codable {
         case let .reload(command):
             try container.encode(command, forKey: .arguments)
         case let .restoreWindows(command):
+            try container.encode(command, forKey: .arguments)
+        case let .runRawAction(command):
             try container.encode(command, forKey: .arguments)
         case let .setSpacePolicy(command):
             try container.encode(command, forKey: .arguments)

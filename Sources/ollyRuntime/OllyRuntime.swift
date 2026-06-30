@@ -14,7 +14,7 @@ public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<V
 
 // swiftlint:disable:next type_body_length
 public actor OllyRuntime {
-    private let socketPath: IPCSocketPath
+    let socketPath: IPCSocketPath
     let configLoader: ConfigLoader
     let displayProvider: @Sendable () -> [Display]
     private let scanAXOnStart: Bool
@@ -31,6 +31,7 @@ public actor OllyRuntime {
     let windowTargets = RuntimeWindowTargets()
     let focusRateLimiter = FocusRateLimiter()
     let hookDispatcher = HookDispatcher()
+    let rawActionExecutor = RawActionExecutor()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
     let windowMover: WindowMover
@@ -247,7 +248,7 @@ public actor OllyRuntime {
         case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow,
-             .dispatchGesture, .reload, .restoreWindows, .setSpacePolicy, .setFocusPolicy:
+             .dispatchGesture, .reload, .restoreWindows, .runRawAction, .setSpacePolicy, .setFocusPolicy:
             return try await controlResponse(for: request)
         case let .reserved(command):
             return .failure(

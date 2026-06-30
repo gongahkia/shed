@@ -80,4 +80,21 @@ final class IPCEventEnvelopeTests: XCTestCase {
         XCTAssertEqual(line.last, 0x0A)
         XCTAssertEqual(decoded, envelope)
     }
+
+    func testRawActionEventEnvelopeRoundTripsAsNewlineDelimitedJSON() throws {
+        let envelope = IPCEventEnvelope(event: .rawAction(IPCRawActionEvent(
+            label: "safari",
+            status: .completed,
+            exit: 0,
+            stdoutHead: "ok",
+            stderrHead: "",
+            elapsedMs: 12
+        )))
+
+        let line = try envelope.newlineDelimitedJSON()
+        let decoded = try JSONDecoder().decode(IPCEventEnvelope.self, from: Data(line.dropLast()))
+
+        XCTAssertEqual(line.last, 0x0A)
+        XCTAssertEqual(decoded, envelope)
+    }
 }

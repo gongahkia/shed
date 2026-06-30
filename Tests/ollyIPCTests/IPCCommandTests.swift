@@ -86,6 +86,7 @@ final class IPCCommandTests: XCTestCase {
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),
             .restoreWindows(IPCRestoreWindowsCommand()),
+            .runRawAction(IPCRunRawActionCommand(label: "safari")),
             .setSpacePolicy(IPCSetSpacePolicyCommand(policy: .followWindow)),
             .setFocusPolicy(IPCSetFocusPolicyCommand(
                 allowedBundleIDs: ["com.apple.Terminal"],

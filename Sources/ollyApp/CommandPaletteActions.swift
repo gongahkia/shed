@@ -1,4 +1,5 @@
 import Foundation
+import ollyDSL
 import ollyIPC
 import ollyLayouts
 
@@ -11,6 +12,12 @@ struct CommandPaletteAction: Equatable {
 }
 
 struct CommandPaletteActionCatalog {
+    private let shellActions: [ShellAction]
+
+    init(config: Config? = nil) {
+        self.shellActions = config?.commandPaletteShellActions ?? []
+    }
+
     func actions() -> [CommandPaletteAction] {
         var actions = baseActions()
         actions.append(contentsOf: directionalActions(prefix: "focus", title: "Focus", command: IPCCommand.focus))
@@ -25,6 +32,7 @@ struct CommandPaletteActionCatalog {
         actions.append(contentsOf: bspTreeActions())
         actions.append(contentsOf: tagActions())
         actions.append(contentsOf: engineActions())
+        actions.append(contentsOf: rawActions())
         return actions
     }
 
@@ -151,6 +159,18 @@ struct CommandPaletteActionCatalog {
         }
     }
 
+    private func rawActions() -> [CommandPaletteAction] {
+        shellActions.map { shellAction in
+            action(
+                "raw-action-\(shellAction.label)",
+                "Run \(shellAction.label)",
+                shellAction.command,
+                ["raw", "shell", shellAction.label],
+                .runRawAction(IPCRunRawActionCommand(label: shellAction.label))
+            )
+        }
+    }
+
     private func snapActions() -> [CommandPaletteAction] {
         [
             ("left-half", "Snap Left Half", IPCSnapPosition.leftHalf),
@@ -222,6 +242,12 @@ struct CommandPaletteActionCatalog {
         _ command: IPCCommand
     ) -> CommandPaletteAction {
         CommandPaletteAction(id: id, title: title, detail: detail, keywords: keywords, command: command)
+    }
+}
+
+private extension Config {
+    var commandPaletteShellActions: [ShellAction] {
+        shellActions.filter { permissions.shellExec.allows(label: $0.label) }
     }
 }
 

@@ -85,6 +85,8 @@ DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon an
 runtime action.
 `manual-preselect` and `bsp-tree` expose engine tree controls for manual/BSP layouts; both return structured
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
+`run-raw-action` executes a configured shell action by label when the loaded DSL permissions allow it, then
+emits a `rawAction` event with status, exit code, elapsed time, and stdout/stderr heads.
 
 ## Schema
 
@@ -253,6 +255,15 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "returned",
         "rehomed",
         "unmanaged"
+      ]
+    },
+    "rawActionStatus": {
+      "type": "string",
+      "enum": [
+        "completed",
+        "denied",
+        "failed",
+        "timed-out"
       ]
     },
     "bspContainerPath": {
@@ -568,6 +579,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "run-raw-action"
+            },
+            "arguments": {
+              "$ref": "#/$defs/runRawActionArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "set-space-policy"
             },
             "arguments": {
@@ -857,6 +878,19 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "displayID": {
           "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "runRawActionArguments": {
+      "type": "object",
+      "required": [
+        "label"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false
@@ -1356,6 +1390,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "fullscreen": {
           "$ref": "#/$defs/fullscreenEvent"
         },
+        "rawAction": {
+          "$ref": "#/$defs/rawActionEvent"
+        },
         "space": {
           "$ref": "#/$defs/spaceEvent"
         }
@@ -1384,6 +1421,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "required": [
             "fullscreen"
+          ]
+        },
+        {
+          "required": [
+            "rawAction"
           ]
         },
         {
@@ -1471,6 +1513,44 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "didEnter": {
           "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "rawActionEvent": {
+      "type": "object",
+      "required": [
+        "label",
+        "status",
+        "exit",
+        "stdoutHead",
+        "stderrHead",
+        "elapsedMs"
+      ],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/rawActionStatus"
+        },
+        "exit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "stdoutHead": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "stderrHead": {
+          "type": "string",
+          "maxLength": 4096
+        },
+        "elapsedMs": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -1567,4 +1647,10 @@ Space drift event line:
 
 ```json
 {"version":2,"event":{"space":{"windowID":42,"fromDisplayID":1,"action":"marked-off-space"}}}
+```
+
+Raw action event line:
+
+```json
+{"version":2,"event":{"rawAction":{"label":"safari","status":"completed","exit":0,"stdoutHead":"","stderrHead":"","elapsedMs":18}}}
 ```

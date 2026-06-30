@@ -48,6 +48,38 @@ public struct IPCFullscreenEvent: Codable, Equatable, Sendable {
     }
 }
 
+public enum IPCRawActionStatus: String, Codable, Equatable, Sendable {
+    case completed
+    case denied
+    case failed
+    case timedOut = "timed-out"
+}
+
+public struct IPCRawActionEvent: Codable, Equatable, Sendable {
+    public let label: String
+    public let status: IPCRawActionStatus
+    public let exit: Int32?
+    public let stdoutHead: String
+    public let stderrHead: String
+    public let elapsedMs: Int
+
+    public init(
+        label: String,
+        status: IPCRawActionStatus = .completed,
+        exit: Int32? = nil,
+        stdoutHead: String = "",
+        stderrHead: String = "",
+        elapsedMs: Int = 0
+    ) {
+        self.label = label
+        self.status = status
+        self.exit = exit
+        self.stdoutHead = stdoutHead
+        self.stderrHead = stderrHead
+        self.elapsedMs = elapsedMs
+    }
+}
+
 public enum IPCSpaceDriftAction: String, Codable, Equatable, Sendable {
     case markedOffSpace = "marked-off-space"
     case returned
@@ -73,6 +105,7 @@ public enum IPCEvent: Codable, Equatable, Sendable {
     case focus(IPCFocusEvent)
     case focusBlocked(IPCFocusBlockedEvent)
     case fullscreen(IPCFullscreenEvent)
+    case rawAction(IPCRawActionEvent)
     case space(IPCSpaceDriftEvent)
 }
 

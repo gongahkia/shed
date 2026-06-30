@@ -34,6 +34,7 @@ struct OllyCtl: ParsableCommand {
             TagRemove.self,
             Reload.self,
             RestoreWindows.self,
+            RunRawAction.self,
             SetSpacePolicy.self,
             SetFocusPolicy.self,
             Doctor.self,

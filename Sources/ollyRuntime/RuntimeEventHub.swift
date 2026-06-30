@@ -55,6 +55,8 @@ private extension IPCEvent {
             return .focusBlocked
         case .fullscreen:
             return .fullscreen
+        case .rawAction:
+            return .rawAction
         case .space:
             return .space
         }

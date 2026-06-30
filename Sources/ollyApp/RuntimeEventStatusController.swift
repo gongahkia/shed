@@ -40,7 +40,7 @@ final class RuntimeEventStatusController {
 
     private static func shouldRefreshStatus(for event: IPCEvent) -> Bool {
         switch event {
-        case .axPermission, .engine, .focus, .focusBlocked, .fullscreen, .space:
+        case .axPermission, .engine, .focus, .focusBlocked, .fullscreen, .rawAction, .space:
             return true
         }
     }

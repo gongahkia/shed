@@ -250,6 +250,10 @@ public final class MetalTextView: NSView {
 		true
 	}
 
+	public override var isFlipped: Bool {
+		true
+	}
+
 	public override func isAccessibilityElement() -> Bool {
 		true
 	}

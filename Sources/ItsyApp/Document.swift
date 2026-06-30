@@ -677,6 +677,7 @@ final class EditorWindowController: NSWindowController {
 	private var hoverRequestGeneration = 0
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
+	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 
 	init(document: ItsyDocument) {
 		let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -1471,7 +1472,7 @@ final class EditorWindowController: NSWindowController {
 					guard let self, let targetView, generation == self.completionRequestGeneration else {
 						return
 					}
-					self.showCompletionPopup(result: result, in: targetView)
+					self.showCompletionPopup(result: result, in: targetView, sessionKey: session.key)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
@@ -1508,10 +1509,12 @@ final class EditorWindowController: NSWindowController {
 			do {
 				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot)
 				let result = try await client.initialize(params)
-				let triggers = (try? LSPInitializeResult(result: result).capabilities.completionProvider?.triggerCharacters).map(Set.init) ?? []
+				let completionProvider = try? LSPInitializeResult(result: result).capabilities.completionProvider
+				let triggers = completionProvider?.triggerCharacters.map(Set.init) ?? []
+				let resolveProvider = completionProvider?.resolveProvider ?? false
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
-					self?.setCompletionTriggerCharacters(triggers, for: key)
+					self?.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 				}
 			} catch {
 				await Self.lspManager.markFailed(key)
@@ -1545,8 +1548,9 @@ final class EditorWindowController: NSWindowController {
 		return coordinator
 	}
 
-	private func setCompletionTriggerCharacters(_ characters: Set<String>, for key: LSPSessionKey) {
+	private func setCompletionCapabilities(triggerCharacters characters: Set<String>, resolveProvider: Bool, for key: LSPSessionKey) {
 		completionTriggerCharactersBySession[key] = characters
+		completionResolveEnabledBySession[key] = resolveProvider
 		for pane in paneCoordinator.panes {
 			pane.editorView.completionTriggerCharacters = characters
 		}
@@ -1567,9 +1571,17 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
-	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView) {
+	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView, sessionKey: LSPSessionKey) {
 		let popup = completionPopup ?? CompletionPopupController()
 		completionPopup = popup
+		let resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
+		if completionResolveEnabledBySession[sessionKey] == true {
+			resolve = { [weak self] item, completion in
+				self?.requestCompletionResolve(item, completion: completion)
+			}
+		} else {
+			resolve = nil
+		}
 		popup.show(
 			result: result,
 			relativeTo: window,
@@ -1577,6 +1589,7 @@ final class EditorWindowController: NSWindowController {
 			requestAgain: { [weak self, weak targetView] in
 				_ = self?.requestCompletion(triggerCharacter: nil, forIncomplete: true, in: targetView)
 			},
+			resolve: resolve,
 			accept: { [weak self, weak targetView] item in
 				guard let self, let targetView else {
 					return
@@ -1584,6 +1597,30 @@ final class EditorWindowController: NSWindowController {
 				self.acceptCompletion(item, in: targetView)
 			}
 		)
+	}
+
+	private func requestCompletionResolve(_ item: LSPCompletionItem, completion: @escaping (LSPCompletionItem) -> Void) {
+		guard let document = document as? ItsyDocument, let fileURL = document.fileURL else {
+			return
+		}
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				let response = try await session.client.sendRequest(
+					method: LSPMethod.completionItemResolve,
+					params: try LSPAny(encoding: item)
+				)
+				let resolved = item.mergingResolvedFields(from: try LSPCompletionItem(resolveResult: response.result))
+				await MainActor.run {
+					completion(resolved)
+				}
+			} catch {
+				NSLog("completion resolve failed: \(error)")
+			}
+		}
 	}
 
 	private func acceptCompletion(_ item: LSPCompletionItem, in targetView: MetalTextView) {

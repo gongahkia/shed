@@ -132,11 +132,43 @@ import Testing
 		"capabilities": .object([
 			"completionProvider": .object([
 				"triggerCharacters": .array([.string("."), .string(":")]),
+				"resolveProvider": .bool(true),
 			]),
 		]),
 	]))
 
 	#expect(result.capabilities.completionProvider?.triggerCharacters == [".", ":"])
+	#expect(result.capabilities.completionProvider?.resolveProvider == true)
+}
+
+@Test func completionItemResolveDecodesMarkupAndPreservesData() throws {
+	let original = LSPCompletionItem(
+		label: "print",
+		insertText: "print($1)",
+		insertTextFormat: .snippet,
+		data: .object(["id": .int(42)])
+	)
+	let params = try LSPAny(encoding: original)
+
+	let resolved = try LSPCompletionItem(resolveResult: .object([
+		"label": .string("print"),
+		"detail": .string("Swift.print"),
+		"documentation": .object(["kind": .string("markdown"), "value": .string("prints a value")]),
+		"insertText": .string("print($1)"),
+		"insertTextFormat": .int(2),
+		"data": .object(["id": .int(999)]),
+	]))
+	let merged = original.mergingResolvedFields(from: resolved)
+
+	#expect(LSPMethod.completionItemResolve == "completionItem/resolve")
+	#expect(params == .object([
+		"label": .string("print"),
+		"insertText": .string("print($1)"),
+		"insertTextFormat": .int(2),
+		"data": .object(["id": .int(42)]),
+	]))
+	#expect(merged.data == .object(["id": .int(42)]))
+	#expect(merged.documentation == .object(["kind": .string("markdown"), "value": .string("prints a value")]))
 }
 
 @Test func hoverResultDecodesMarkupAndMarkedStrings() throws {

@@ -27,15 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.13 CLI completions + manpage
-
-**Goal:** `ollyctl --completions zsh|bash|fish` and `ollyctl manpage`.
-
-**Files to add:**
-- `Sources/ollyctl/CompletionGenerator.swift` — walks the argparse spec and emits shell completions. (If using `swift-argument-parser`, it has built-in completion generation.)
-
----
-
 ### M4.14 In-app changelog viewer
 
 **Goal:** Show `CHANGELOG.md` on first launch after upgrade.

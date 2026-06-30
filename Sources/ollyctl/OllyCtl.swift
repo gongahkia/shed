@@ -47,11 +47,28 @@ struct OllyCtl: ParsableCommand {
             TelemetryCommands.self,
             SubscribeEvents.self,
             Events.self,
+            Manpage.self,
             InitConfig.self,
             MigrateConfig.self,
             Version.self
         ]
     )
+
+    @Option(
+        name: .customLong("completions"),
+        help: ArgumentHelp(
+            "Print completion script for zsh, bash, or fish.",
+            valueName: "shell"
+        )
+    )
+    var completions: CompletionShellName?
+
+    mutating func run() throws {
+        guard let completions else {
+            throw CleanExit.helpRequest(self)
+        }
+        print(OllyCtlCompletionGenerator.script(for: completions))
+    }
 }
 
 struct ClientOptions: ParsableArguments {

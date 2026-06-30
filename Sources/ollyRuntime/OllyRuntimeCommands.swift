@@ -336,8 +336,9 @@ extension OllyRuntime {
     }
 
     func safeZones() async -> SafeZoneCalculator {
-        let safeZones = await configStore.current().safeZones
-        return safeZones.calculator()
+        let config = await configStore.current()
+        let reserves = await cooperativeSafeZoneReserves(config: config)
+        return config.safeZones.calculator(dynamicReserves: reserves)
     }
 
     func replayCurrentState(

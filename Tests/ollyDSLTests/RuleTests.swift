@@ -56,6 +56,28 @@ final class RuleTests: XCTestCase {
         XCTAssertTrue(apps.contains(bundleID: "com.example.OnlyOverlay"))
     }
 
+    func testCooperativeAppsStoreBehaviorsAndOverrideDefaults() throws {
+        let apps = CooperativeApps {
+            CooperativeApp("com.felixkratz.SketchyBar", behavior: .floatAndReserveSpace)
+            CooperativeApp("com.example.Dock", behavior: .dockAware)
+        }
+
+        let data = try JSONEncoder().encode(apps)
+        let decoded = try JSONDecoder().decode(CooperativeApps.self, from: data)
+
+        XCTAssertEqual(decoded.behavior(for: "com.felixkratz.SketchyBar"), .floatAndReserveSpace)
+        XCTAssertEqual(decoded.behavior(for: "com.example.Dock"), .dockAware)
+        XCTAssertEqual(decoded.behavior(for: "org.hammerspoon.Hammerspoon"), .floatOnly)
+    }
+
+    func testCooperativeAppDecodingDefaultsMissingBehaviorToFloatOnly() throws {
+        let data = Data(#"{"bundleID":"com.example.Legacy"}"#.utf8)
+
+        let app = try JSONDecoder().decode(CooperativeApp.self, from: data)
+
+        XCTAssertEqual(app, CooperativeApp("com.example.Legacy"))
+    }
+
     func testCooperativeAppsYamlMirrorsDefaults() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

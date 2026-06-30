@@ -91,7 +91,7 @@ Users extend defaults:
 
 ```swift
 CooperativeApps {
-    CooperativeApp("com.example.CustomOverlay")
+    CooperativeApp("com.example.CustomOverlay", behavior: .floatAndReserveSpace)
 }
 ```
 

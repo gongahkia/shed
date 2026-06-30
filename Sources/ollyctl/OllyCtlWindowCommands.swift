@@ -41,6 +41,20 @@ struct ListDisplays: ParsableCommand {
     }
 }
 
+struct ListCooperativeApps: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "list-cooperative-apps",
+        abstract: "List resolved cooperative apps."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    func run() throws {
+        try OllyCtlRunner(options: options).send(.listCooperativeApps(IPCListCooperativeAppsCommand()))
+    }
+}
+
 struct MoveToDisplay: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "move-to-display",

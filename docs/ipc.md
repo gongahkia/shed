@@ -87,6 +87,8 @@ runtime action.
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
 `run-raw-action` executes a configured shell action by label when the loaded DSL permissions allow it, then
 emits a `rawAction` event with status, exit code, elapsed time, and stdout/stderr heads.
+`list-cooperative-apps` reports resolved cooperative app bundle IDs, behaviors, and currently detected
+window counts.
 
 ## Schema
 
@@ -579,6 +581,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "list-cooperative-apps"
+            },
+            "arguments": {
+              "$ref": "#/$defs/emptyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "run-raw-action"
             },
             "arguments": {
@@ -999,6 +1011,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "type": "string",
           "enum": [
             "acknowledged",
+            "cooperative-apps",
             "restored-windows",
             "state",
             "subscribed",
@@ -1017,6 +1030,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "payload": {
               "$ref": "#/$defs/acknowledgementPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "cooperative-apps"
+            },
+            "payload": {
+              "$ref": "#/$defs/cooperativeAppsPayload"
             }
           }
         },
@@ -1071,6 +1094,52 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             "string",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "cooperativeBehavior": {
+      "type": "string",
+      "enum": [
+        "floatOnly",
+        "floatAndHideOnSwitch",
+        "floatAndReserveSpace",
+        "dockAware"
+      ]
+    },
+    "cooperativeAppsPayload": {
+      "type": "object",
+      "required": [
+        "apps"
+      ],
+      "properties": {
+        "apps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cooperativeAppInfo"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "cooperativeAppInfo": {
+      "type": "object",
+      "required": [
+        "bundleID",
+        "behavior",
+        "detectedWindowCount"
+      ],
+      "properties": {
+        "bundleID": {
+          "type": "string",
+          "minLength": 1
+        },
+        "behavior": {
+          "$ref": "#/$defs/cooperativeBehavior"
+        },
+        "detectedWindowCount": {
+          "type": "integer",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -1653,4 +1722,10 @@ Raw action event line:
 
 ```json
 {"version":2,"event":{"rawAction":{"label":"safari","status":"completed","exit":0,"stdoutHead":"","stderrHead":"","elapsedMs":18}}}
+```
+
+List cooperative apps response:
+
+```json
+{"version":2,"status":"ok","result":{"name":"cooperative-apps","payload":{"apps":[{"bundleID":"com.apple.finder","behavior":"floatOnly","detectedWindowCount":1}]}}}
 ```

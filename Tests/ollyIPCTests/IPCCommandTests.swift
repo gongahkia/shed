@@ -63,6 +63,7 @@ final class IPCCommandTests: XCTestCase {
             .focus(IPCDirectionalCommand(direction: .left, displayID: 1)),
             .listWindows(IPCWindowQueryCommand(windowID: 42, displayID: 1)),
             .listDisplays(IPCDisplayQueryCommand(displayID: 1)),
+            .listCooperativeApps(IPCListCooperativeAppsCommand()),
             .moveWindow(IPCDirectionalCommand(direction: .downward)),
             .moveToDisplay(IPCMoveToDisplayCommand(displayID: 2, windowID: 42)),
             .swap(IPCDirectionalCommand(direction: .right)),

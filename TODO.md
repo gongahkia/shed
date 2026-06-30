@@ -27,19 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.2 Session restore on reboot
-
-**Goal:** On launch, restore last-known window placements.
-
-**Files to modify:**
-- `Sources/ollyRuntime/OllyRuntime.swift:185` (`start()`) — after first window scan, invoke existing `restoreJournaledWindows` (used by IPC `restoreWindows` at `Sources/ollyRuntime/OllyRuntimeCommands.swift:210-258`).
-- New DSL `Session { restoreOnLaunch(true) }` — new file `Sources/ollyDSL/Session.swift`.
-
-**Acceptance:**
-- After reboot, on first olly launch, managed windows return to their last placements.
-
----
-
 ### M4.3 Quit-on-tag-switch dialog protection
 
 **Goal:** Don't park `AXDialog` subrole windows (especially destructive-op confirmation dialogs) offscreen during tag switch.

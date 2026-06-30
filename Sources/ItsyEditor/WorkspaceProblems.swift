@@ -7,6 +7,20 @@ public enum WorkspaceProblemSeverity: String, Codable, Equatable, Sendable {
 	case hint
 }
 
+public struct WorkspaceProblemRelatedInformation: Codable, Equatable, Sendable {
+	public var path: String
+	public var line: Int
+	public var column: Int?
+	public var message: String
+
+	public init(path: String, line: Int, column: Int? = nil, message: String) {
+		self.path = path
+		self.line = line
+		self.column = column
+		self.message = message
+	}
+}
+
 public struct WorkspaceProblem: Codable, Equatable, Sendable {
 	public var path: String
 	public var line: Int
@@ -14,14 +28,48 @@ public struct WorkspaceProblem: Codable, Equatable, Sendable {
 	public var severity: WorkspaceProblemSeverity
 	public var message: String
 	public var source: String?
+	public var relatedInformation: [WorkspaceProblemRelatedInformation]
 
-	public init(path: String, line: Int, column: Int? = nil, severity: WorkspaceProblemSeverity, message: String, source: String? = nil) {
+	public init(
+		path: String,
+		line: Int,
+		column: Int? = nil,
+		severity: WorkspaceProblemSeverity,
+		message: String,
+		source: String? = nil,
+		relatedInformation: [WorkspaceProblemRelatedInformation] = []
+	) {
 		self.path = path
 		self.line = line
 		self.column = column
 		self.severity = severity
 		self.message = message
 		self.source = source
+		self.relatedInformation = relatedInformation
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case path
+		case line
+		case column
+		case severity
+		case message
+		case source
+		case relatedInformation
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		path = try container.decode(String.self, forKey: .path)
+		line = try container.decode(Int.self, forKey: .line)
+		column = try container.decodeIfPresent(Int.self, forKey: .column)
+		severity = try container.decode(WorkspaceProblemSeverity.self, forKey: .severity)
+		message = try container.decode(String.self, forKey: .message)
+		source = try container.decodeIfPresent(String.self, forKey: .source)
+		relatedInformation = try container.decodeIfPresent(
+			[WorkspaceProblemRelatedInformation].self,
+			forKey: .relatedInformation
+		) ?? []
 	}
 }
 

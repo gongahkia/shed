@@ -106,6 +106,24 @@ import Testing
 	#expect(view.xOffset == 0)
 }
 
+@Test func gutterDecoratorBuildsVisibleSeverityMarkers() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "0\n1\n2\n3\n4\n5\n6\n")
+	view.lineHeight = 20
+	let decorator = TestGutterDecorator(markers: [
+		GutterMarker(id: "a", line: 2, severity: .error, message: "bad"),
+		GutterMarker(id: "b", line: 20, severity: .warning, message: "far"),
+	])
+	view.gutterDecorator = decorator
+
+	let instances = view.gutterOverlayInstances(scale: 2)
+	#expect(instances.count == 1)
+	#expect(instances[0].color == SIMD4<Float>(0.95, 0.25, 0.22, 1.0))
+
+	let point = NSPoint(x: CGFloat(instances[0].screenOrigin.x) / 2 + 1, y: CGFloat(instances[0].screenOrigin.y) / 2 + 1)
+	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "a")
+}
+
 @Test func keyHandlingEditsEditorAndMarksDirty() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	_ = view.consumeDirtyForDisplayLink()
@@ -206,6 +224,24 @@ import Testing
 	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
 	#expect(view.editor.text == "x")
 	#expect(view.keymapEngine.mode == .normal)
+}
+
+private final class TestGutterDecorator: GutterDecorator {
+	private let markers: [GutterMarker]
+
+	init(markers: [GutterMarker]) {
+		self.markers = markers
+	}
+
+	func gutterMarkers(in lineRange: Range<Int>, for _: MetalTextView) -> [GutterMarker] {
+		markers.filter { lineRange.contains($0.line) }
+	}
+
+	func gutterMarkerClicked(_: GutterMarker, in _: MetalTextView) {}
+
+	func gutterPopoverViewController(for _: GutterMarker, in _: MetalTextView) -> NSViewController? {
+		nil
+	}
 }
 
 @Test func vimMacroReplaySkipsRecursiveReplay() {

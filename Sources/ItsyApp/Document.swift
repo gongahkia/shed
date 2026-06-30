@@ -11,12 +11,14 @@ final class ItsyDocumentController: NSDocumentController {
 		super.init()
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
+		ItsyProblemGutterCoordinator.install(documentController: self)
 	}
 
 	required init?(coder: NSCoder) {
 		super.init(coder: coder)
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
+		ItsyProblemGutterCoordinator.install(documentController: self)
 	}
 
 	override var defaultType: String? {
@@ -194,12 +196,19 @@ final class ItsyDocument: NSDocument {
 		view.closeRequested = { [weak self] in
 			self?.close()
 		}
+		ItsyProblemGutterCoordinator.apply(to: self)
 		restartFileWatcher()
 		updateHandoffActivity()
 	}
 
 	func detach(_ view: MetalTextView) {
 		editorViews.removeAll { $0 === view }
+	}
+
+	func setGutterDecorator(_ decorator: GutterDecorator?) {
+		for view in editorViews {
+			view.gutterDecorator = decorator
+		}
 	}
 
 	func reloadSyntaxTheme() {

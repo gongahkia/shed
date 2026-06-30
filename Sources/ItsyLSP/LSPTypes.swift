@@ -476,12 +476,31 @@ public struct LSPDiagnostic: Codable, Equatable, Sendable {
 	public var code: LSPDiagnosticCode?
 	public var source: String?
 	public var message: String
+	public var relatedInformation: [LSPDiagnosticRelatedInformation]?
 
-	public init(range: LSPRange, severity: LSPDiagnosticSeverity? = nil, code: LSPDiagnosticCode? = nil, source: String? = nil, message: String) {
+	public init(
+		range: LSPRange,
+		severity: LSPDiagnosticSeverity? = nil,
+		code: LSPDiagnosticCode? = nil,
+		source: String? = nil,
+		message: String,
+		relatedInformation: [LSPDiagnosticRelatedInformation]? = nil
+	) {
 		self.range = range
 		self.severity = severity
 		self.code = code
 		self.source = source
+		self.message = message
+		self.relatedInformation = relatedInformation
+	}
+}
+
+public struct LSPDiagnosticRelatedInformation: Codable, Equatable, Sendable {
+	public var location: LSPLocation
+	public var message: String
+
+	public init(location: LSPLocation, message: String) {
+		self.location = location
 		self.message = message
 	}
 }

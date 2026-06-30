@@ -27,26 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.6 First-run wizard
-
-**Goal:** Six-step setup for new users: welcome → AX → display profile → preset → cheatsheet → done.
-
-**Files to add:**
-- `Sources/ollyApp/Onboarding/FirstRunWindowController.swift` — `NSViewController` panels swapped inside an `NSWindow`.
-
-**Steps:**
-1. **Welcome + privacy summary.**
-2. **AX permission** — reuse `Sources/ollyApp/AXOnboardingWindowController.swift:48`.
-3. **Display profile detection** — read displays via `DisplayMonitor().displays()`; show notch / menu-bar / dock heights via `SafeZoneCalculator.result(for:)` (`Sources/ollyKit/SafeZoneCalculator.swift:70`); generated `SafeZones { notchPadding(...) }` snippet.
-4. **Preset profile picker** — reuse `ConfigTemplate.swift` / `ConfigTemplateProfile.allCases` (used at `Sources/ollyApp/SettingsWindowController.swift:132`). Profiles: `starter`, `minimal`, `niri`, `bsp`, `ultrawide`.
-5. **Keybind cheatsheet preview** — reuse M3.4's view.
-6. **Done** — write starter `Config.swift` via existing `ensureConfigExists(profile:)` (`Sources/ollyApp/SettingsWindowController.swift:215`).
-
-**Files to modify:**
-- `Sources/ollyApp/OllyApp.swift:85` — call new controller instead of bare AX onboarding when `!ConfigLoader.defaultSourceURL().exists`.
-
----
-
 ### M4.7 Crash telemetry (opt-in, self-hosted)
 
 **Goal:** Local crash capture; opt-in upload via `ollyctl telemetry flush`. No background phone-home.

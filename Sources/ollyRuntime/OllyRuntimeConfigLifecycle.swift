@@ -13,7 +13,7 @@ extension OllyRuntime {
         }
     }
 
-    func reloadConfig() async throws {
+    public func reloadConfig() async throws {
         let previousConfig = await configStore.current()
         do {
             try await loadConfig(useDefaultWhenMissing: true)

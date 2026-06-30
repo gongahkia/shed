@@ -25,41 +25,12 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.2 Drag-to-snap preview overlay
-
-**Goal:** On window drag, show a translucent overlay with snap-target zones; on release, snap to the hovered zone.
-
-**Files to add:**
-- `Sources/ollyApp/Overlays/DragSnapOverlayController.swift` — subscribes to `AXDragSession` (M0.3); computes zones from `SafeZoneCalculator.layoutFrame(for:)` (`Sources/ollyKit/SafeZoneCalculator.swift:104`).
-- `Sources/ollyApp/Overlays/SnapZoneView.swift` — `NSView` with one `CALayer` per zone; hover highlight via `CABasicAnimation`.
-
-**Files to modify:**
-- `Sources/ollyDSL/SafeZones.swift` — add `customZone(name: "leftQuarter", rect:, on:)` to DSL builder.
-
-**Zones (built-in):** left-half, right-half, top-half, bottom-half, top-left, top-right, bottom-left, bottom-right, center, maximize. (Same set as existing `IPCSnapPosition` in `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift:177`.)
-
-**Snap commit:** synthesise `IPCSnapWindowCommand`; frame math is already in `IPCSnapPosition.frame(in:current:)` (`Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift:177-227`).
-
-**Gotchas:**
-- AX doesn't emit a true "drag started" event — derived heuristically by M0.3 from `kAXWindowMoved` debounce. False positives (programmatic moves from olly itself) filtered by `WindowMover.lastFrames` check.
-- The overlay must be click-through (`ignoresMouseEvents = true`) during drag so it doesn't intercept the drag.
-
-**Test plan:**
-- Unit: `SnapZoneResolver.zone(for: mousePoint, in: layoutFrame)` returns correct `IPCSnapPosition` for boundary cases.
-- Manual UI: drag a window over each zone; assert overlay highlights and snap commits on release.
-- Soak: 1000× drag cycles in `Sources/SoakHarness/SoakHarness.swift`; assert `OverlayPanelHost.activeCount == 0` after each.
-
-**Acceptance:**
-- Dragging a window to the left edge shows a left-half preview; releasing snaps the window to the left half.
-
----
-
 ### M3.3 Grid overlay hotkey
 
 **Goal:** `cmd+?` shows current snap-zone grid as an overlay; arrow-key navigate; enter snaps.
 
 **Files to add:**
-- `Sources/ollyApp/Overlays/GridOverlayController.swift` — reuses `SnapZoneView` from M3.2.
+- `Sources/ollyApp/Overlays/GridOverlayController.swift` — reuses `SnapZoneView`.
 
 **Files to modify:**
 - `Sources/ollyApp/OllyApp.swift:applicationDidFinishLaunching` — register hotkey via `NSEvent.addLocalMonitorForEvents` (or surface as DSL-bindable `Action.showGridOverlay`).

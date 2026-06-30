@@ -33,6 +33,10 @@ final class OverlayPanelHost {
         panels.count
     }
 
+    var activePanels: [DisplayID: OverlayPanel] {
+        panels
+    }
+
     func panel(for displayID: DisplayID) -> OverlayPanel? {
         panels[displayID]
     }

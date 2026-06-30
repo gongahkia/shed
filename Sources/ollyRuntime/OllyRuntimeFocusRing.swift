@@ -1,5 +1,6 @@
 import CoreGraphics
 import ollyDSL
+import ollyIPC
 import ollyKit
 
 public extension OllyRuntime {
@@ -13,5 +14,20 @@ public extension OllyRuntime {
             return frame
         }
         return await windowStore.state(for: windowID)?.frame
+    }
+
+    func snapLayoutFrame(for displayID: DisplayID) async -> CGRect? {
+        guard let display = displayProvider().first(where: { $0.id == displayID }) else {
+            return nil
+        }
+        return await safeZones().layoutFrame(for: display)
+    }
+
+    func displayID(containing point: CGPoint) -> DisplayID? {
+        displayProvider().first { $0.frame.contains(point) }?.id
+    }
+
+    func snapWindowFromOverlay(_ command: IPCSnapWindowCommand) async throws {
+        try await snapWindow(command)
     }
 }

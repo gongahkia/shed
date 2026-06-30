@@ -4,15 +4,18 @@ import ollyKit
 @testable import ollyDSL
 
 final class SafeZoneDSLTests: XCTestCase {
-    func testSafeZonesCollectNotchPaddingAndReserves() {
+    func testSafeZonesCollectNotchPaddingReservesAndCustomZones() {
         let rect = CGRect(x: 0, y: 900, width: 1512, height: 82)
+        let customRect = CGRect(x: 0, y: 0, width: 378, height: 982)
         let safeZones = SafeZones {
             notchPadding(16)
             reserve(rect: rect, on: 42)
+            customZone(name: "leftQuarter", rect: customRect, on: 42)
         }
 
         XCTAssertEqual(safeZones.notchPadding, 16)
         XCTAssertEqual(safeZones.reserves, [SafeZoneReservation(rect: rect, displayID: 42)])
+        XCTAssertEqual(safeZones.customZones, [CustomSnapZone(name: "leftQuarter", rect: customRect, displayID: 42)])
     }
 
     func testConfigStoresSafeZoneSection() {
@@ -24,6 +27,14 @@ final class SafeZoneDSLTests: XCTestCase {
         }
 
         XCTAssertEqual(config.safeZones.reserves, [SafeZoneReservation(rect: rect, displayID: 1)])
+    }
+
+    func testSafeZonesDecodeMissingCustomZonesAsEmpty() throws {
+        let data = Data(#"{"notchPadding":20,"reserves":[]}"#.utf8)
+        let safeZones = try JSONDecoder().decode(SafeZones.self, from: data)
+
+        XCTAssertEqual(safeZones.notchPadding, 20)
+        XCTAssertTrue(safeZones.customZones.isEmpty)
     }
 
     func testSafeZonesBuildCalculator() {

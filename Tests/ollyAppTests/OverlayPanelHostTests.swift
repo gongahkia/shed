@@ -2,6 +2,7 @@ import AppKit
 import XCTest
 import ollyDSL
 import ollyIPC
+import ollyKit
 import ollyRuntime
 @testable import ollyApp
 
@@ -52,5 +53,31 @@ final class OverlayPanelHostTests: XCTestCase {
         await controller.handle(.focus(IPCFocusEvent(focusedWindowID: 42)))
 
         XCTAssertEqual(controller.currentPanelFrame, frame)
+    }
+
+    @MainActor
+    func testDragSnapControllerHighlightsAndCleansUpPanels() async throws {
+        guard let screen = NSScreen.screens.first,
+              let displayID = DisplayMonitor.displayID(for: screen) else {
+            throw XCTSkip("no screen available")
+        }
+        let host = OverlayPanelHost(notificationCenter: NotificationCenter())
+        let runtime = OllyRuntime()
+        var committed: IPCSnapWindowCommand?
+        let controller = DragSnapOverlayController(
+            runtime: runtime,
+            overlayHost: host,
+            layoutFrameProvider: { _ in screen.frame },
+            displayIDProvider: { _, _ in displayID },
+            snapCommit: { command in committed = command },
+            reduceMotionProvider: { true }
+        )
+
+        await controller.handle(.started(99, screen.frame, CGPoint(x: screen.frame.minX + 8, y: screen.frame.midY)))
+        await controller.handle(.ended(99, screen.frame))
+        try await Task.sleep(nanoseconds: 25_000_000)
+
+        XCTAssertEqual(committed, IPCSnapWindowCommand(position: .leftHalf, windowID: 99, displayID: displayID))
+        XCTAssertEqual(controller.activeOverlayCount, 0)
     }
 }

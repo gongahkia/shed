@@ -1076,22 +1076,31 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `SafeZoneReservation(rect: CGRect(x: 0, y: 0, width: 100, height: 40), displayID: 1)`
 - See also: `reserve(rect:on:)`, `SafeZones`.
 
+### CustomSnapZone
+
+`struct CustomSnapZone`
+
+- Purpose: Declares one named snap preview rectangle on a display.
+- Parameters: Pass a stable name, rectangle, and target display ID.
+- Example: `CustomSnapZone(name: "leftQuarter", rect: rect, displayID: 1)`
+- See also: `customZone(name:rect:on:)`, `SafeZones`.
+
 ### SafeZoneDeclaration
 
 `enum SafeZoneDeclaration`
 
 - Purpose: Represents one safe-zone DSL declaration before it is folded into `SafeZones`.
-- Parameters: Use `.notchPadding` or `.reserve`.
-- Example: `SafeZoneDeclaration.notchPadding(24)`
+- Parameters: Use `.notchPadding`, `.reserve`, or `.customZone`.
+- Example: `SafeZoneDeclaration.customZone(CustomSnapZone(name: "leftQuarter", rect: rect, displayID: 1))`
 - See also: `SafeZones`, `SafeZoneBuilder`.
 
 ### SafeZones
 
 `struct SafeZones`
 
-- Purpose: Configures display regions excluded from tiled placements.
-- Parameters: Provide notch padding and user reserve rectangles or use `@SafeZoneBuilder`.
-- Example: `SafeZones { notchPadding(16); reserve(rect: rect, on: displayID) }`
+- Purpose: Configures display regions excluded from tiled placements and named snap preview zones.
+- Parameters: Provide notch padding, reserve rectangles, custom zones, or use `@SafeZoneBuilder`.
+- Example: `SafeZones { notchPadding(16); customZone(name: "leftQuarter", rect: rect, on: displayID) }`
 - See also: `SafeZoneReservation`, `SafeZoneCalculator`.
 
 ### notchPadding(_:)
@@ -1111,6 +1120,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Pass the rectangle and display ID to reserve.
 - Example: `SafeZones { reserve(rect: CGRect(x: 0, y: 0, width: 200, height: 40), on: 1) }`
 - See also: `SafeZones`, `notchPadding(_:)`.
+
+### customZone(name:rect:on:)
+
+`func customZone(name: String, rect: CGRect, on displayID: DisplayID) -> SafeZoneDeclaration`
+
+- Purpose: Declares a named snap preview zone on a display.
+- Parameters: Pass the name, rectangle, and display ID for the custom zone.
+- Example: `SafeZones { customZone(name: "leftQuarter", rect: CGRect(x: 0, y: 0, width: 200, height: 800), on: 1) }`
+- See also: `SafeZones`, `CustomSnapZone`.
 
 ### SafeZoneBuilder
 

@@ -219,7 +219,15 @@ SafeZones {
 }
 ```
 
-## 21. Cooperative Overlay App
+## 21. Add A Custom Snap Zone
+
+```swift
+SafeZones {
+    customZone(name: "leftQuarter", rect: CGRect(x: 0, y: 0, width: 378, height: 982), on: 1)
+}
+```
+
+## 22. Cooperative Overlay App
 
 ```swift
 CooperativeApps {
@@ -227,7 +235,7 @@ CooperativeApps {
 }
 ```
 
-## 22. Replace Cooperative Defaults
+## 23. Replace Cooperative Defaults
 
 ```swift
 CooperativeApps(mode: .replace) {
@@ -235,7 +243,7 @@ CooperativeApps(mode: .replace) {
 }
 ```
 
-## 23. Raw Keybind Escape Hatch
+## 24. Raw Keybind Escape Hatch
 
 ```swift
 Keybinds {
@@ -245,7 +253,7 @@ Keybinds {
 }
 ```
 
-## 24. Raw Rule Escape Hatch
+## 25. Raw Rule Escape Hatch
 
 ```swift
 Rules {
@@ -255,7 +263,7 @@ Rules {
 }
 ```
 
-## 25. Raw Engine Declaration
+## 26. Raw Engine Declaration
 
 ```swift
 Engines {

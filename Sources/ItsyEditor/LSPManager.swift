@@ -53,11 +53,16 @@ public actor LSPManager {
 	}
 
 	public static let defaultClientFactory: ClientFactory = { config, root in
-		LSPProcessClient(
-			executableURL: URL(fileURLWithPath: config.command),
-			arguments: config.args,
-			currentDirectoryURL: root
-		)
+		let executableURL: URL
+		let arguments: [String]
+		if config.command.hasPrefix("/") {
+			executableURL = URL(fileURLWithPath: config.command)
+			arguments = config.args
+		} else {
+			executableURL = URL(fileURLWithPath: "/usr/bin/env")
+			arguments = [config.command] + config.args
+		}
+		return LSPProcessClient(executableURL: executableURL, arguments: arguments, currentDirectoryURL: root)
 	}
 
 	public func sessionKey(for url: URL) -> LSPSessionKey? {

@@ -20,3 +20,4 @@
 "Cmd-T" = "nav.gotoSymbolWorkspace"
 "Cmd-Shift-O" = "nav.gotoSymbolFile"
 "Cmd-Opt-7" = "view.outline"
+"Ctrl-Space" = "lsp.completion"

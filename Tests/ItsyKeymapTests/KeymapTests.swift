@@ -141,6 +141,7 @@ import Testing
 		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 124)) == .command("pane.focusRight"))
 		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 126)) == .command("pane.focusUp"))
 		#expect(engine.handle(try keyEvent("", modifiers: [.command, .option], keyCode: 125)) == .command("pane.focusDown"))
+		#expect(engine.handle(try keyEvent(" ", modifiers: [.control], keyCode: 49)) == .command("lsp.completion"))
 	}
 }
 

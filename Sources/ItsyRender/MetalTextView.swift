@@ -148,9 +148,11 @@ public final class MetalTextView: NSView {
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
+	public var completionRequested: ((String?) -> Bool)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var keymapEngine = KeymapEngine()
+	public var completionTriggerCharacters: Set<String> = []
 	private var pendingCharacterMotion: CharacterMotion?
 	private var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
 	private var pendingOperator: VimOperator?
@@ -364,6 +366,18 @@ public final class MetalTextView: NSView {
 		}
 		editor.setSelection(SelectionSet(primary: primary, secondaries: Array(selections.dropFirst())))
 		syncEditorState()
+	}
+
+	public func replaceUTF8Range(_ range: Range<Int>, with text: String, selectUTF8Ranges ranges: [Range<Int>] = []) {
+		let lower = min(max(range.lowerBound, 0), editor.rope.length)
+		let upper = min(max(range.upperBound, lower), editor.rope.length)
+		replace(range: lower ..< upper, with: text)
+		if !ranges.isEmpty {
+			selectUTF8Ranges(ranges)
+		} else {
+			syncEditorState()
+		}
+		editorDidChange?(editor)
 	}
 
 	func toggleAdditionalCursor(at offset: Int) {
@@ -1635,6 +1649,9 @@ public final class MetalTextView: NSView {
 		syncEditorState()
 		if didEdit {
 			editorDidChange?(editor)
+			if let characters, characters.count == 1, completionTriggerCharacters.contains(characters) {
+				_ = completionRequested?(characters)
+			}
 		}
 		return true
 	}

@@ -49,6 +49,8 @@ public struct Key: Sendable, Hashable {
 			return "delete"
 		case 53:
 			return "escape"
+		case 49:
+			return "space"
 		case 123:
 			return "left"
 		case 124:

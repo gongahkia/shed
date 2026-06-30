@@ -116,6 +116,28 @@ final class TagDispatcherTests: XCTestCase {
         XCTAssertTrue(recordedWindowIDs.isEmpty)
     }
 
+    func testApplyDoesNotHideFullscreenWindowWithoutActiveTags() async throws {
+        let active = try Tag(index: 0)
+        let inactive = try Tag(index: 1)
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(active))
+        let recorder = TagMoveRecorder()
+        let dispatcher = emptyDisplayDispatcher(windowStore: windowStore, tagStore: tagStore, recorder: recorder)
+
+        await windowStore.upsert(window(
+            id: 1,
+            displayID: 7,
+            tagMask: TagSet(inactive).rawValue,
+            isFullscreen: true
+        ))
+
+        let moves = await dispatcher.apply(displayID: 7)
+        let recordedWindowIDs = await recorder.windowIDs
+
+        XCTAssertTrue(moves.isEmpty)
+        XCTAssertTrue(recordedWindowIDs.isEmpty)
+    }
+
     func testApplyParksInactiveWindowOutsideProvidedDisplays() async throws {
         let active = try Tag(index: 0)
         let inactive = try Tag(index: 1)
@@ -146,9 +168,18 @@ final class TagDispatcherTests: XCTestCase {
         displayID: DisplayID,
         tagMask: UInt64,
         isSticky: Bool = false,
+        isFullscreen: Bool = false,
         frame: CGRect = CGRect(x: 0, y: 0, width: 100, height: 100)
     ) -> WindowState {
-        WindowState(id: id, processID: 42, displayID: displayID, tagMask: tagMask, isSticky: isSticky, frame: frame)
+        WindowState(
+            id: id,
+            processID: 42,
+            displayID: displayID,
+            tagMask: tagMask,
+            isSticky: isSticky,
+            isFullscreen: isFullscreen,
+            frame: frame
+        )
     }
 
     private func emptyDisplayDispatcher(

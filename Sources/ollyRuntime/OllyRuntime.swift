@@ -7,6 +7,8 @@ import ollyIPC
 import ollyKit
 import ollyLayouts
 
+public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> String?
+
 public enum OllyRuntimeError: Error, CustomStringConvertible {
     case displayUnavailable
     case engineUnavailable(LayoutEngineID)
@@ -85,6 +87,7 @@ public actor OllyRuntime {
     let eventHub = RuntimeEventHub()
     public let runtimeEventBus: RuntimeEventBus
     public let dragSession: AXDragSession
+    let fullscreenTracker = FullscreenTracker()
     let windowTargets = RuntimeWindowTargets()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
@@ -94,7 +97,9 @@ public actor OllyRuntime {
     let engineHost: EngineHost
     private let registry: LayoutEngineRegistry
     let axPermissionStream: @Sendable () -> AsyncStream<AXPermissionStatus>
+    let axSubroleReader: AXSubroleReader
     let presentAXOnboarding: @MainActor @Sendable () async -> Void
+    let fullscreenDebounceNanoseconds: UInt64
     private var server: UnixDomainSocketServer?
     var applicationsByProcessID: [pid_t: Application] = [:]
     var axObserversByProcessID: [pid_t: AXObserverBridge] = [:]
@@ -103,6 +108,7 @@ public actor OllyRuntime {
     var axPermissionStatus: AXPermissionStatus?
     var focusedWindowID: WindowID?
     var lastError: String?
+    var fullscreenTasksByWindowID: [WindowID: Task<Void, Never>] = [:]
 
     public init(
         socketPath: IPCSocketPath = .resolved(),
@@ -117,6 +123,8 @@ public actor OllyRuntime {
         dragSession: AXDragSession = AXDragSession(),
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
+        axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
             OllyRuntime.defaultAXOnboarding
     ) {
@@ -128,9 +136,9 @@ public actor OllyRuntime {
         self.statePersistence = statePersistence
         self.recoveryJournal = recoveryJournal
         self.scanAXOnStart = scanAXOnStart
-        self.runtimeEventBus = runtimeEventBus
-        self.dragSession = dragSession
+        self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession
         self.axPermissionStream = axPermissionStream
+        self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
         self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
@@ -199,6 +207,8 @@ public actor OllyRuntime {
     public func stop() async {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
+        fullscreenTasksByWindowID.values.forEach { $0.cancel() }
+        fullscreenTasksByWindowID.removeAll()
         applicationObservationTask = nil
         await windowMover.setAXErrorHandler(nil)
         stopAXObservers()

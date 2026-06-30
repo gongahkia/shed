@@ -99,6 +99,9 @@ struct OllyCtlRunner {
             return renderEngineEvent(event)
         case let .focus(event):
             return renderFocusEvent(event)
+        case let .fullscreen(event):
+            let state = event.didEnter ? "entered" : "exited"
+            return "fullscreen \(state) window \(event.windowID)"
         }
     }
 

@@ -52,7 +52,7 @@ extension OllyRuntime {
     func visibleWindows(displayID: DisplayID) async -> [WindowState] {
         let activeTags = await tagStore.activeTags(on: displayID)
         return await windowStore.windows(onDisplay: displayID).filter {
-            !$0.isFloating && TagSet(rawValue: $0.tagMask).intersects(activeTags)
+            !$0.isFloating && !$0.isFullscreen && TagSet(rawValue: $0.tagMask).intersects(activeTags)
         }
     }
 
@@ -118,6 +118,9 @@ extension OllyRuntime {
             let windows = await windowStore.windows(forProcessID: application.processID)
             for window in windows {
                 await dragSession.end(windowID: window.id)
+                fullscreenTasksByWindowID[window.id]?.cancel()
+                fullscreenTasksByWindowID[window.id] = nil
+                _ = await fullscreenTracker.exit(window.id)
                 await windowStore.remove(id: window.id)
                 await focusStack.remove(windowID: window.id)
                 windowTargets.remove(windowID: window.id)
@@ -163,6 +166,7 @@ extension OllyRuntime {
         case .windowResized:
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshWindowElement(event.element, application: application)
+            await scheduleFullscreenProbe(element: event.element)
         case .uiElementDestroyed:
             break
         }
@@ -195,7 +199,9 @@ extension OllyRuntime {
 
     private func resolvedRuntimeWindowState(_ state: WindowState) async throws -> WindowState {
         let config = await configStore.current()
-        let resolved = config.resolvedWindowState(for: state)
+        let current = await windowStore.state(for: state.id)
+        let base = state.withFullscreen(current?.isFullscreen ?? state.isFullscreen)
+        let resolved = config.resolvedWindowState(for: base)
         if let engineOverride = resolved.engineOverride,
            engineOverride != FloatingLayoutEngine.engineID {
             throw OllyRuntimeError.unsupportedEngineCommand(
@@ -284,6 +290,9 @@ extension OllyRuntime {
             return
         }
         await dragSession.end(windowID: windowID)
+        fullscreenTasksByWindowID[windowID]?.cancel()
+        fullscreenTasksByWindowID[windowID] = nil
+        _ = await fullscreenTracker.exit(windowID)
         await windowStore.remove(id: windowID)
         await focusStack.remove(windowID: windowID)
         windowTargets.remove(windowID: windowID)

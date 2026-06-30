@@ -22,6 +22,7 @@ final class IPCStateSnapshotTests: XCTestCase {
             isFloating: true,
             isSticky: true,
             isPinned: true,
+            isFullscreen: true,
             engineOverride: LayoutEngineID(rawValue: "floating"),
             layoutOrder: 4,
             frame: CGRect(x: 10, y: 20, width: 300, height: 400),
@@ -40,6 +41,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertTrue(ipcState.isFloating)
         XCTAssertTrue(ipcState.isSticky)
         XCTAssertTrue(ipcState.isPinned)
+        XCTAssertTrue(ipcState.isFullscreen)
         XCTAssertEqual(ipcState.engineOverride, LayoutEngineID(rawValue: "floating"))
         XCTAssertEqual(ipcState.layoutOrder, 4)
         XCTAssertEqual(ipcState.frame, IPCFrame(x: 10, y: 20, width: 300, height: 400))
@@ -69,6 +71,7 @@ final class IPCStateSnapshotTests: XCTestCase {
         XCTAssertTrue(ipcState.isFloating)
         XCTAssertFalse(ipcState.isSticky)
         XCTAssertFalse(ipcState.isPinned)
+        XCTAssertFalse(ipcState.isFullscreen)
         XCTAssertNil(ipcState.engineOverride)
     }
 

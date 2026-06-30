@@ -10,6 +10,7 @@ public struct WindowState: Equatable, Sendable {
     public let isFloating: Bool
     public let isSticky: Bool
     public let isPinned: Bool
+    public let isFullscreen: Bool
     public let engineOverride: LayoutEngineID?
     public let layoutOrder: Int?
     public let frame: CGRect
@@ -26,6 +27,7 @@ public struct WindowState: Equatable, Sendable {
         isFloating: Bool = false,
         isSticky: Bool = false,
         isPinned: Bool = false,
+        isFullscreen: Bool = false,
         engineOverride: LayoutEngineID? = nil,
         layoutOrder: Int? = nil,
         frame: CGRect,
@@ -41,6 +43,7 @@ public struct WindowState: Equatable, Sendable {
         self.isFloating = isFloating
         self.isSticky = isSticky
         self.isPinned = isPinned
+        self.isFullscreen = isFullscreen
         self.engineOverride = engineOverride
         self.layoutOrder = layoutOrder
         self.frame = frame
@@ -71,6 +74,7 @@ public struct WindowState: Equatable, Sendable {
             isFloating: isFloating,
             isSticky: false,
             isPinned: false,
+            isFullscreen: false,
             engineOverride: nil,
             layoutOrder: layoutOrder,
             frame: frame,
@@ -89,6 +93,7 @@ public struct WindowState: Equatable, Sendable {
         isFloating: Bool = false,
         isSticky: Bool = false,
         isPinned: Bool = false,
+        isFullscreen: Bool = false,
         engineOverride: LayoutEngineID? = nil,
         frame: CGRect,
         title: String? = nil,
@@ -104,6 +109,7 @@ public struct WindowState: Equatable, Sendable {
             isFloating: isFloating,
             isSticky: isSticky,
             isPinned: isPinned,
+            isFullscreen: isFullscreen,
             engineOverride: engineOverride,
             layoutOrder: nil,
             frame: frame,
@@ -162,6 +168,10 @@ public extension WindowState {
         copy(isPinned: isPinned)
     }
 
+    func withFullscreen(_ isFullscreen: Bool) -> WindowState {
+        copy(isFullscreen: isFullscreen)
+    }
+
     func withEngineOverride(_ engineOverride: LayoutEngineID?) -> WindowState {
         copy(engineOverride: engineOverride)
     }
@@ -176,6 +186,7 @@ public extension WindowState {
         isFloating: Bool? = nil,
         isSticky: Bool? = nil,
         isPinned: Bool? = nil,
+        isFullscreen: Bool? = nil,
         engineOverride: LayoutEngineID?? = nil,
         layoutOrder: Int?? = nil
     ) -> WindowState {
@@ -188,6 +199,7 @@ public extension WindowState {
             isFloating: isFloating ?? self.isFloating,
             isSticky: isSticky ?? self.isSticky,
             isPinned: isPinned ?? self.isPinned,
+            isFullscreen: isFullscreen ?? self.isFullscreen,
             engineOverride: engineOverride ?? self.engineOverride,
             layoutOrder: layoutOrder ?? self.layoutOrder,
             frame: frame,

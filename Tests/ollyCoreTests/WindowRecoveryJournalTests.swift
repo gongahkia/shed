@@ -21,6 +21,7 @@ final class WindowRecoveryJournalTests: XCTestCase {
             id: 7,
             frame: CGRect(x: 30, y: 40, width: 320, height: 220),
             isSticky: true,
+            isFullscreen: true,
             engineOverride: LayoutEngineID(rawValue: "floating")
         )
 
@@ -32,6 +33,7 @@ final class WindowRecoveryJournalTests: XCTestCase {
         XCTAssertEqual(state.entries.first?.originalFrame.cgRect, second.frame)
         XCTAssertEqual(state.entries.first?.parkedFrame.cgRect.origin.x, -33_000)
         XCTAssertEqual(state.entries.first?.isSticky, true)
+        XCTAssertEqual(state.entries.first?.isFullscreen, true)
         XCTAssertEqual(state.entries.first?.engineOverride, LayoutEngineID(rawValue: "floating"))
 
         try await journal.remove(windowID: 7)
@@ -67,6 +69,7 @@ final class WindowRecoveryJournalTests: XCTestCase {
         id: WindowID,
         frame: CGRect,
         isSticky: Bool = false,
+        isFullscreen: Bool = false,
         engineOverride: LayoutEngineID? = nil
     ) -> WindowState {
         WindowState(
@@ -76,6 +79,7 @@ final class WindowRecoveryJournalTests: XCTestCase {
             displayID: 1,
             tagMask: 1,
             isSticky: isSticky,
+            isFullscreen: isFullscreen,
             engineOverride: engineOverride,
             frame: frame,
             title: "window \(id)",

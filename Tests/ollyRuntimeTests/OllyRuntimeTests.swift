@@ -400,6 +400,61 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testWindowResizeFullscreenProbePublishesTransitions() async throws {
+        let element = AXUIElementCreateApplication(9876)
+        let subroles = SubroleScript([OllyRuntime.fullscreenWindowSubrole, "AXStandardWindow"])
+        let snapshotCache = WindowSnapshotCache { _, _ in
+            WindowAttributes(
+                title: "Safari",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: CGRect(x: 0, y: 0, width: 1440, height: 860),
+                processID: 9876,
+                windowID: 77
+            )
+        }
+
+        try await withRuntime(
+            snapshotCache: snapshotCache,
+            axSubroleReader: { _ in await subroles.next() },
+            fullscreenDebounceNanoseconds: 1
+        ) { runtime, socketPath, displayID in
+            let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
+            defer {
+                stream.close()
+            }
+            try stream.sendLine(try JSONEncoder().encode(IPCRequestEnvelope(
+                command: .subscribeEvents(.init(eventKinds: [.fullscreen]))
+            )))
+            XCTAssertEqual(
+                try JSONDecoder().decode(IPCResponseEnvelope.self, from: try stream.readLine()).status,
+                .success
+            )
+
+            await runtime.handle(axEvent: AXNotificationEvent(
+                processID: 9876,
+                element: element,
+                notification: .windowResized,
+                rawNotificationName: AXNotification.windowResized.rawValue
+            ))
+            var event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            XCTAssertEqual(event.event, .fullscreen(IPCFullscreenEvent(windowID: 77, didEnter: true)))
+            var snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isFullscreen, true)
+
+            await runtime.handle(axEvent: AXNotificationEvent(
+                processID: 9876,
+                element: element,
+                notification: .windowResized,
+                rawNotificationName: AXNotification.windowResized.rawValue
+            ))
+            event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
+            XCTAssertEqual(event.event, .fullscreen(IPCFullscreenEvent(windowID: 77, didEnter: false)))
+            snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
+            XCTAssertEqual(snapshot.windows.first?.isFullscreen, false)
+        }
+    }
+
     func testSwapWindowUsesSpatialDirectionalTarget() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             try await seedWindows(runtime, displayID: displayID, windows: [
@@ -767,11 +822,18 @@ final class OllyRuntimeTests: XCTestCase {
 private func withRuntime(
     snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
     dragSession: AXDragSession = AXDragSession(),
+    axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+    fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
     extraDisplays: [Display] = [],
     _ body: (OllyRuntime, IPCSocketPath, DisplayID) async throws -> Void
 ) async throws {
     let fixture = try RuntimeFixture(extraDisplays: extraDisplays)
-    let runtime = fixture.makeRuntime(snapshotCache: snapshotCache, dragSession: dragSession)
+    let runtime = fixture.makeRuntime(
+        snapshotCache: snapshotCache,
+        dragSession: dragSession,
+        axSubroleReader: axSubroleReader,
+        fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
+    )
     do {
         try await runtime.start()
         try await body(runtime, fixture.socketPath, fixture.display.id)
@@ -824,6 +886,18 @@ private final class PermissionRecorder: @unchecked Sendable {
     }
 }
 
+private actor SubroleScript {
+    private var values: [String?]
+
+    init(_ values: [String?]) {
+        self.values = values
+    }
+
+    func next() -> String? {
+        values.isEmpty ? nil : values.removeFirst()
+    }
+}
+
 private func seedWindows(
     _ runtime: OllyRuntime,
     displayID: DisplayID,
@@ -872,7 +946,9 @@ private struct RuntimeFixture {
 
     func makeRuntime(
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
-        dragSession: AXDragSession = AXDragSession()
+        dragSession: AXDragSession = AXDragSession(),
+        axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        fullscreenDebounceNanoseconds: UInt64 = 100_000_000
     ) -> OllyRuntime {
         OllyRuntime(
             socketPath: socketPath,
@@ -895,6 +971,8 @@ private struct RuntimeFixture {
                     continuation.finish()
                 }
             },
+            axSubroleReader: axSubroleReader,
+            fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,
             presentAXOnboarding: {}
         )
     }

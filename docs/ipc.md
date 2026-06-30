@@ -74,6 +74,7 @@ commands instead of parsing the full runtime state. `toggle-floating` changes wh
 in tiling, and `move-to-display` updates Olly's display assignment before re-arranging the affected displays.
 `engineOverride` reports a per-window layout opt-out; currently `.floating` means the tag engine leaves that
 window at its current frame. Other per-window engine overrides are rejected as `unsupported_engine_command`.
+`isFullscreen` marks windows temporarily excluded from tag engines while native fullscreen owns their Space.
 `snap-window` places a window in a safe-layout display zone and makes it floating by default so the next
 tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
 DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
@@ -1070,6 +1071,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "isFloating",
         "isSticky",
         "isPinned",
+        "isFullscreen",
         "frame"
       ],
       "properties": {
@@ -1108,6 +1110,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "type": "boolean"
         },
         "isPinned": {
+          "type": "boolean"
+        },
+        "isFullscreen": {
           "type": "boolean"
         },
         "engineOverride": {
@@ -1265,6 +1270,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "focus": {
           "$ref": "#/$defs/focusEvent"
+        },
+        "fullscreen": {
+          "$ref": "#/$defs/fullscreenEvent"
         }
       },
       "oneOf": [
@@ -1281,6 +1289,11 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "required": [
             "focus"
+          ]
+        },
+        {
+          "required": [
+            "fullscreen"
           ]
         }
       ],
@@ -1328,6 +1341,22 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         }
       },
       "additionalProperties": false
+    },
+    "fullscreenEvent": {
+      "type": "object",
+      "required": [
+        "windowID",
+        "didEnter"
+      ],
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "didEnter": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
     }
   }
 }
@@ -1370,4 +1399,10 @@ AX permission event line:
 
 ```json
 {"version":1,"event":{"axPermission":{"status":"missing"}}}
+```
+
+Fullscreen event line:
+
+```json
+{"version":2,"event":{"fullscreen":{"windowID":42,"didEnter":true}}}
 ```

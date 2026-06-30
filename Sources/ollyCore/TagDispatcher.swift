@@ -110,6 +110,9 @@ public actor TagDispatcher {
     }
 
     private func shouldShow(_ window: WindowState, visibleTags: TagSet) -> Bool {
+        if window.isFullscreen {
+            return true
+        }
         if window.isSticky || window.isPinned {
             return true
         }

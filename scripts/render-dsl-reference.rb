@@ -26,6 +26,7 @@ source_order = {
   "Gestures.swift" => "Gestures",
   "RulePredicate.swift" => "Rule Predicates",
   "Rule.swift" => "Rules",
+  "RuleExplanation.swift" => "Rules",
   "SafeZones.swift" => "Safe Zones",
   "CooperativeApps.swift" => "Cooperative Apps",
   "RawDSL.swift" => "Raw Escape Hatches"

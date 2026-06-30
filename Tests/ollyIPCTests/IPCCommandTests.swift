@@ -64,6 +64,8 @@ final class IPCCommandTests: XCTestCase {
             .listWindows(IPCWindowQueryCommand(windowID: 42, displayID: 1)),
             .listDisplays(IPCDisplayQueryCommand(displayID: 1)),
             .listCooperativeApps(IPCListCooperativeAppsCommand()),
+            .explainWindow(IPCExplainWindowCommand(windowID: 42)),
+            .explainRule(IPCExplainRuleCommand(ruleID: UUID())),
             .moveWindow(IPCDirectionalCommand(direction: .downward)),
             .moveToDisplay(IPCMoveToDisplayCommand(displayID: 2, windowID: 42)),
             .swap(IPCDirectionalCommand(direction: .right)),

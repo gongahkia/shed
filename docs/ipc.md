@@ -85,6 +85,8 @@ DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon an
 runtime action.
 `manual-preselect` and `bsp-tree` expose engine tree controls for manual/BSP layouts; both return structured
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
+`explain-window` returns every rule trace for a window; `explain-rule` returns one rule trace for the focused
+window.
 `run-raw-action` executes a configured shell action by label when the loaded DSL permissions allow it, then
 emits a `rawAction` event with status, exit code, elapsed time, and stdout/stderr heads.
 `list-cooperative-apps` reports resolved cooperative app bundle IDs, behaviors, and currently detected
@@ -297,6 +299,10 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
     "displayID": {
       "type": "integer",
       "minimum": 0
+    },
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
     },
     "layoutEngineID": {
       "type": "object",
@@ -585,6 +591,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "arguments": {
               "$ref": "#/$defs/emptyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "explain-window"
+            },
+            "arguments": {
+              "$ref": "#/$defs/explainWindowArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "explain-rule"
+            },
+            "arguments": {
+              "$ref": "#/$defs/explainRuleArguments"
             }
           }
         },
@@ -907,6 +933,27 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
       },
       "additionalProperties": false
     },
+    "explainWindowArguments": {
+      "type": "object",
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "explainRuleArguments": {
+      "type": "object",
+      "required": [
+        "ruleID"
+      ],
+      "properties": {
+        "ruleID": {
+          "$ref": "#/$defs/uuid"
+        }
+      },
+      "additionalProperties": false
+    },
     "setSpacePolicyArguments": {
       "type": "object",
       "required": [
@@ -1013,6 +1060,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             "acknowledged",
             "cooperative-apps",
             "restored-windows",
+            "rule-explanation",
             "state",
             "subscribed",
             "version"
@@ -1050,6 +1098,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "payload": {
               "$ref": "#/$defs/restoredWindowsPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "rule-explanation"
+            },
+            "payload": {
+              "$ref": "#/$defs/ruleExplanationPayload"
             }
           }
         },
@@ -1094,6 +1152,132 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             "string",
             "null"
           ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleApply": {
+      "type": "object",
+      "properties": {
+        "tagMask": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "engineOverride": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/layoutEngineID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "floating": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sticky": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "pinned": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleMatchTrace": {
+      "type": "object",
+      "required": [
+        "ruleID",
+        "matched"
+      ],
+      "properties": {
+        "ruleID": {
+          "$ref": "#/$defs/uuid"
+        },
+        "matched": {
+          "type": "boolean"
+        },
+        "bundleIDMatched": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "titleMatched": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "roleMatched": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "subroleMatched": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "predicateMatched": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "ruleExplanationPayload": {
+      "type": "object",
+      "required": [
+        "traces",
+        "finalApply"
+      ],
+      "properties": {
+        "windowID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/windowID"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ruleID": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "traces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ruleMatchTrace"
+          }
+        },
+        "finalApply": {
+          "$ref": "#/$defs/ruleApply"
         }
       },
       "additionalProperties": false
@@ -1728,4 +1912,10 @@ List cooperative apps response:
 
 ```json
 {"version":2,"status":"ok","result":{"name":"cooperative-apps","payload":{"apps":[{"bundleID":"com.apple.finder","behavior":"floatOnly","detectedWindowCount":1}]}}}
+```
+
+Explain window response:
+
+```json
+{"version":2,"status":"ok","result":{"name":"rule-explanation","payload":{"windowID":42,"ruleID":null,"traces":[{"ruleID":"11111111-2222-3333-8444-555555555555","matched":true,"bundleIDMatched":true,"titleMatched":null,"roleMatched":null,"subroleMatched":null,"predicateMatched":null}],"finalApply":{"tagMask":null,"engineOverride":{"rawValue":"floating"},"floating":true,"sticky":null,"pinned":null}}}}
 ```

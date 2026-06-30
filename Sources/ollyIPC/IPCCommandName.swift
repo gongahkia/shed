@@ -52,8 +52,6 @@ public extension IPCCommandName {
         .scratchpadToggle,
         .scratchpadList,
         .scratchpadRemove,
-        .explainWindow,
-        .explainRule,
         .macroStart,
         .macroStop,
         .macroRun,

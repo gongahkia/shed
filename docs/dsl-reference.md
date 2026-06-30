@@ -982,6 +982,24 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Rules { Rule(match: RuleMatch(subrole: "AXSystemDialog"), apply: RuleApply(floating: true)) }`
 - See also: `Rules`, `Rule`.
 
+### RuleMatchTrace
+
+`struct RuleMatchTrace`
+
+- Purpose: Records how one rule matched or rejected a window context.
+- Parameters: Stores the rule ID and optional per-field booleans for configured match clauses.
+- Example: `trace.bundleIDMatched == true`
+- See also: `RuleExplanation`, `Rules`.
+
+### RuleExplanation
+
+`struct RuleExplanation`
+
+- Purpose: Explains rule matching in declaration order and the final merged apply payload.
+- Parameters: Stores every rule trace plus the cumulative `RuleApply`.
+- Example: `rules.resolvedExplanation(for: context).traces`
+- See also: `RuleMatchTrace`, `Rules`.
+
 ## Safe Zones
 
 ### SafeZoneReservation

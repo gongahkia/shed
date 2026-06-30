@@ -23,29 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M2 — Hackability surface wire-up
 
-### M2.4 Rule preview inspector
-
-**Goal:** `ollyctl explain-window <id>` and `ollyctl explain-rule <id>` produce a traced match log showing which rule(s) matched a window and why.
-
-**Files to modify:**
-- `Sources/ollyDSL/Rule.swift` — add `Rule.id: UUID` (stable hash of `(match, apply, label)`).
-- `Sources/ollyDSL/Rule.swift:85` — refactor `RuleMatch.matches(_:)` → `match(_:) -> RuleMatchTrace?` returning `nil` when not matched.
-- Add `RuleMatchTrace { ruleID: UUID; bundleIDMatched: Bool?; titleMatched: Bool?; roleMatched: Bool?; subroleMatched: Bool?; predicateMatched: Bool? }`.
-- Add `Rules.resolvedExplanation(for context:) -> RuleExplanation { traces: [RuleMatchTrace]; finalApply: RuleApply }`.
-- `Sources/ollyIPC/IPCCommand.swift` — new commands `explainWindow(windowID:)`, `explainRule(ruleID:)`; result type `IPCRuleExplanation`.
-- `Sources/ollyRuntime/OllyRuntimeCommands.swift` — implement; reuse `Config.resolvedApply` path with the explanation API.
-- New: `Sources/ollyctl/OllyCtlExplainCommands.swift` — argparse subcommands; pretty-print + `--json` mode.
-- `Sources/ollyApp/CommandPaletteActions.swift` — "Explain focused window" entry.
-
-**Test plan:**
-- Fixture config with 5 rules; verify trace contains entries in declaration order with correct booleans (`Tests/ollyDSLTests/RuleExplanationTests.swift`).
-- Golden test for `ollyctl explain-window --json` shape (`Tests/ollyctlTests/`).
-
-**Acceptance:**
-- `ollyctl explain-window <id>` outputs a human-readable trace listing each rule attempted and the final applied state.
-
----
-
 ### M2.5 Macro recorder + replay
 
 **Goal:** Record an ordered sequence of IPC commands; persist to disk; replay on demand; bindable via DSL.

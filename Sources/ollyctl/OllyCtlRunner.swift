@@ -67,6 +67,8 @@ struct OllyCtlRunner {
             return renderCooperativeApps(info)
         case let .restoredWindows(info):
             return "restored \(info.restoredCount), skipped \(info.skippedCount), failed \(info.failedCount)"
+        case let .ruleExplanation(explanation):
+            return OllyCtlRuleExplanationRenderer().render(explanation)
         case let .state(snapshot):
             return renderState(snapshot)
         case let .subscribed(info):

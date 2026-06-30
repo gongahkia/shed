@@ -4,6 +4,38 @@ import AppKit
 public enum AXPermissionStatus: Equatable, Sendable {
     case trusted
     case missing
+
+    public var wireValue: String {
+        switch self {
+        case .trusted:
+            return "trusted"
+        case .missing:
+            return "missing"
+        }
+    }
+}
+
+public protocol AXPermissionStatusProviding: Sendable {
+    func currentAXPermissionStatus() -> AXPermissionStatus
+}
+
+public struct SystemAXPermissionStatusProvider: AXPermissionStatusProviding {
+    public init() {}
+
+    public func currentAXPermissionStatus() -> AXPermissionStatus {
+        AXPermission.status(prompt: false)
+    }
+}
+
+public extension AXError {
+    var isAXPermissionRevocationSignal: Bool {
+        switch self {
+        case .apiDisabled, .cannotComplete:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 public enum AXPermission {
@@ -30,6 +62,29 @@ public enum AXPermission {
     public static func refresh() async -> AXPermissionStatus {
         await Task.yield()
         return status(prompt: false)
+    }
+
+    public static func permissionStream(
+        interval: TimeInterval = 2,
+        provider: AXPermissionStatusProviding = SystemAXPermissionStatusProvider()
+    ) -> AsyncStream<AXPermissionStatus> {
+        AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            let queue = DispatchQueue(label: "olly.ax.permission.poll")
+            let timer = DispatchSource.makeTimerSource(queue: queue)
+            var lastStatus = provider.currentAXPermissionStatus()
+            let interval = max(interval, 0.01)
+            timer.schedule(deadline: .now() + interval, repeating: interval)
+            timer.setEventHandler {
+                let nextStatus = provider.currentAXPermissionStatus()
+                guard nextStatus != lastStatus else {
+                    return
+                }
+                lastStatus = nextStatus
+                continuation.yield(nextStatus)
+            }
+            continuation.onTermination = { _ in timer.cancel() }
+            timer.resume()
+        }
     }
 
     @MainActor

@@ -33,4 +33,14 @@ final class IPCEventEnvelopeTests: XCTestCase {
         XCTAssertEqual(line.last, 0x0A)
         XCTAssertEqual(decoded, envelope)
     }
+
+    func testAXPermissionEventEnvelopeRoundTripsAsNewlineDelimitedJSON() throws {
+        let envelope = IPCEventEnvelope(event: .axPermission(IPCAXPermissionEvent(status: .missing)))
+
+        let line = try envelope.newlineDelimitedJSON()
+        let decoded = try JSONDecoder().decode(IPCEventEnvelope.self, from: Data(line.dropLast()))
+
+        XCTAssertEqual(line.last, 0x0A)
+        XCTAssertEqual(decoded, envelope)
+    }
 }

@@ -7,6 +7,7 @@ import ollyKit
 /// Example: `HookKind.tagSwitch`
 /// See also: `HookDeclaration`, `Hooks`.
 public enum HookKind: String, Codable, Equatable, Sendable {
+    case axPermissionChanged
     case raw
     case tagSwitch
     case displayChange
@@ -53,9 +54,18 @@ public struct WindowAppearedHookContext: Equatable, Sendable {
     }
 }
 
+public struct AXPermissionHookContext: Equatable, Sendable {
+    public let status: AXPermissionStatus
+
+    public init(status: AXPermissionStatus) {
+        self.status = status
+    }
+}
+
 public typealias TagSwitchHookHandler = @Sendable (TagSwitchHookContext) -> Void
 public typealias DisplayChangeHookHandler = @Sendable (DisplayChangeHookContext) -> Void
 public typealias WindowAppearedHookHandler = @Sendable (WindowAppearedHookContext) -> Void
+public typealias AXPermissionHookHandler = @Sendable (AXPermissionHookContext) -> Void
 
 /// Purpose: Declares a typed hook for tag switches.
 /// Parameters: Provide an optional stable label and a handler receiving `TagSwitchHookContext`.
@@ -85,4 +95,11 @@ public func onWindowAppeared(
     _ body: @escaping WindowAppearedHookHandler
 ) -> HookDeclaration {
     HookDeclaration(label: label, kind: .windowAppeared, windowAppearedHandler: body)
+}
+
+public func onAXPermissionChanged(
+    _ label: String = "onAXPermissionChanged",
+    _ body: @escaping AXPermissionHookHandler
+) -> HookDeclaration {
+    HookDeclaration(label: label, kind: .axPermissionChanged, axPermissionHandler: body)
 }

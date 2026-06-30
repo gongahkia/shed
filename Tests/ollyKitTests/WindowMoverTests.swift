@@ -88,6 +88,46 @@ final class WindowMoverTests: XCTestCase {
         XCTAssertEqual(client.positions, [CGPoint(x: 40, y: 50)])
         XCTAssertEqual(client.sizes, [CGSize(width: 500, height: 320)])
     }
+
+    func testFlushAndPauseDrainsPendingMovesAndRejectsWritesUntilResume() async {
+        let client = FakeAXWindowMoveClient()
+        let mover = WindowMover(client: client, frameDelayNanoseconds: 1_000_000_000)
+        let target = WindowMoveTarget(id: 1, axElement: AXUIElementCreateApplication(getpid()))
+
+        await mover.setPosition(CGPoint(x: 10, y: 20), for: target)
+        await mover.flushAndPause()
+        await mover.setPosition(CGPoint(x: 30, y: 40), for: target)
+        await mover.flushNow()
+        await mover.resume()
+        await mover.setPosition(CGPoint(x: 50, y: 60), for: target)
+        await mover.flushNow()
+
+        XCTAssertEqual(client.positions, [CGPoint(x: 10, y: 20), CGPoint(x: 50, y: 60)])
+    }
+
+    func testReportsAXPermissionRevocationWriteFailure() async {
+        let client = FakeAXWindowMoveClient()
+        client.positionResults = [.cannotComplete]
+        let recorder = AXErrorRecorder()
+        let mover = WindowMover(client: client, frameDelayNanoseconds: 1_000_000_000, maxRetries: 0)
+        let target = WindowMoveTarget(id: 1, axElement: AXUIElementCreateApplication(getpid()))
+
+        await mover.setAXErrorHandler { error in
+            recorder.record(error)
+        }
+        await mover.setPosition(CGPoint(x: 10, y: 20), for: target)
+        await mover.flushNow()
+
+        XCTAssertEqual(recorder.errors, [.cannotComplete])
+    }
+}
+
+private final class AXErrorRecorder: @unchecked Sendable {
+    private(set) var errors: [AXError] = []
+
+    func record(_ error: AXError) {
+        errors.append(error)
+    }
 }
 
 private final class FakeAXWindowMoveClient: AXWindowMoveClient {

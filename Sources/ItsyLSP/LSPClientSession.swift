@@ -62,6 +62,18 @@ public actor LSPClientSession {
 		try writeNotificationUnchecked(method: method, params: params)
 	}
 
+	public func respond(to id: JSONRPCID, result: LSPAny) throws {
+		try requireState([.running, .initializing])
+		let message = JSONRPCMessage.response(JSONRPCResponseMessage(id: id, result: result))
+		try transport.write(LSPMessageFramer.frame(message: message))
+	}
+
+	public func respond(to id: JSONRPCID, error: JSONRPCError) throws {
+		try requireState([.running, .initializing])
+		let message = JSONRPCMessage.response(JSONRPCResponseMessage(id: id, error: error))
+		try transport.write(LSPMessageFramer.frame(message: message))
+	}
+
 	public func shutdown() async throws {
 		try requireState([.running])
 		state = .shuttingDown

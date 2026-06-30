@@ -379,10 +379,10 @@ public final class MetalTextView: NSView {
 	func scroll(deltaX: CGFloat, deltaY: CGFloat) {
 		if deltaY != 0, lineCount > 0 {
 			let lineDelta = Int((deltaY / max(lineHeight, 1)).rounded(.toNearestOrAwayFromZero))
-			topLineIndex = min(max(topLineIndex + lineDelta, 0), max(0, lineCount - 1))
+			topLineIndex = min(max(topLineIndex - lineDelta, 0), max(0, lineCount - 1))
 		}
 		if deltaX != 0 {
-			xOffset = max(0, xOffset + deltaX)
+			xOffset = max(0, xOffset - deltaX)
 		}
 		refreshFindMatchRects()
 		refreshGutterMarkerRects()
@@ -1824,9 +1824,10 @@ public final class MetalTextView: NSView {
 			cached.reserveCapacity(shaped.count)
 			for glyph in shaped {
 				let entry = try atlas.entry(for: glyph.glyphID, font: rasterFont)
+				let padding = CGFloat(entry.padding)
 				cached.append(CachedLineGlyph(
-					originX: textInset.x + glyph.x + entry.bounds.origin.x / rasterScale,
-					originYOffset: -entry.bounds.origin.y / rasterScale,
+					originX: textInset.x + glyph.x + (entry.bounds.origin.x - padding) / rasterScale,
+					originYOffset: (-entry.bounds.origin.y - padding) / rasterScale,
 					width: CGFloat(entry.width) / rasterScale,
 					height: CGFloat(entry.height) / rasterScale,
 					atlasUV: SIMD4<Float>(
@@ -2124,8 +2125,8 @@ public final class MetalTextView: NSView {
 			return samplerState
 		}
 		let descriptor = MTLSamplerDescriptor()
-		descriptor.minFilter = .linear
-		descriptor.magFilter = .linear
+		descriptor.minFilter = .nearest
+		descriptor.magFilter = .nearest
 		samplerState = metalDevice?.makeSamplerState(descriptor: descriptor)
 		return samplerState
 	}

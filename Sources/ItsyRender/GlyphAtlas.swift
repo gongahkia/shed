@@ -11,6 +11,7 @@ public struct GlyphAtlasEntry: Sendable {
 	public let height: Int
 	public let advance: CGSize
 	public let bounds: CGRect
+	public let padding: Int
 
 	public var textureRegion: MTLRegion {
 		MTLRegionMake2D(textureX, textureY, width, height)
@@ -106,7 +107,8 @@ public struct GlyphAtlas {
 			width: bitmap.width,
 			height: bitmap.height,
 			advance: bitmap.advance,
-			bounds: bitmap.bounds
+			bounds: bitmap.bounds,
+			padding: bitmap.padding
 		)
 		entries[key] = entry
 		return entry
@@ -150,17 +152,25 @@ struct GlyphBitmap: Equatable {
 	let bytesPerRow: Int
 	let advance: CGSize
 	let bounds: CGRect
+	let padding: Int
 }
 
 enum GlyphRasterizer {
 	static func rasterize(glyph: CGGlyph, font: CTFont, padding: Int = 1, renderingMode: GlyphAtlas.RenderingMode = .grayscale) throws -> GlyphBitmap {
 		var glyph = glyph
-		var bounds = CTFontGetBoundingRectsForGlyphs(font, .default, &glyph, nil, 1)
-		if bounds.isNull || bounds.isEmpty {
+		let rawBounds = CTFontGetBoundingRectsForGlyphs(font, .default, &glyph, nil, 1)
+		let bounds: CGRect
+		if rawBounds.isNull || rawBounds.isEmpty {
 			bounds = CGRect(x: 0, y: 0, width: 1, height: 1)
+		} else {
+			let minX = floor(rawBounds.minX)
+			let minY = floor(rawBounds.minY)
+			let maxX = ceil(rawBounds.maxX)
+			let maxY = ceil(rawBounds.maxY)
+			bounds = CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
 		}
-		let width = max(1, Int(ceil(bounds.width)) + padding * 2)
-		let height = max(1, Int(ceil(bounds.height)) + padding * 2)
+		let width = max(1, Int(bounds.width) + padding * 2)
+		let height = max(1, Int(bounds.height) + padding * 2)
 		let bytesPerRow = width * renderingMode.bytesPerPixel
 		var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
 		let colorSpace = renderingMode == .subpixel ? CGColorSpaceCreateDeviceRGB() : CGColorSpaceCreateDeviceGray()
@@ -200,6 +210,6 @@ enum GlyphRasterizer {
 		}
 		var advance = CGSize.zero
 		CTFontGetAdvancesForGlyphs(font, .default, &glyph, &advance, 1)
-		return GlyphBitmap(width: width, height: height, pixels: pixels, bytesPerRow: bytesPerRow, advance: advance, bounds: bounds)
+		return GlyphBitmap(width: width, height: height, pixels: pixels, bytesPerRow: bytesPerRow, advance: advance, bounds: bounds, padding: padding)
 	}
 }

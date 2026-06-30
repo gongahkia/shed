@@ -61,13 +61,13 @@ public struct LineShaper {
 	private func atlasUV(for entry: GlyphAtlasEntry, atlas: GlyphAtlas) -> AtlasUV {
 		let textureWidth = CGFloat(atlas.texture.width)
 		let textureHeight = CGFloat(atlas.texture.height)
-		let u0 = CGFloat(entry.textureX) / textureWidth
-		let v0 = CGFloat(entry.textureY) / textureHeight
+		let u0 = (CGFloat(entry.textureX) + 0.5) / textureWidth
+		let v0 = (CGFloat(entry.textureY) + 0.5) / textureHeight
 		return AtlasUV(
 			u0: u0,
 			v0: v0,
-			u1: u0 + CGFloat(entry.width) / textureWidth,
-			v1: v0 + CGFloat(entry.height) / textureHeight
+			u1: (CGFloat(entry.textureX + entry.width) - 0.5) / textureWidth,
+			v1: (CGFloat(entry.textureY + entry.height) - 0.5) / textureHeight
 		)
 	}
 }

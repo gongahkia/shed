@@ -20,10 +20,11 @@ import Testing
 	#expect(!layer.wantsExtendedDynamicRangeContent)
 }
 
-@Test func editorDefaultsToLightMonacoRendering() {
+@Test func editorDefaultsToLightMenloRendering() {
 	let view = MetalTextView(frame: .zero)
-	let expectedFont = NSFont(name: "Monaco", size: 15) ?? NSFont.monospacedSystemFont(ofSize: 15, weight: .regular)
+	let expectedFont = NSFont(name: "Menlo", size: 14.95) ?? NSFont.monospacedSystemFont(ofSize: 14.95, weight: .regular)
 	#expect(view.textFontPostScriptName == expectedFont.fontName)
+	#expect(abs(view.textFontAdvance.rounded() - view.textFontAdvance) < 0.01)
 	#expect(abs((view.textFontAdvance * 2).rounded() - view.textFontAdvance * 2) < 0.01)
 	#expect(view.clearColor.red == 1.0)
 	#expect(view.clearColor.green == 1.0)

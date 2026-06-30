@@ -100,7 +100,7 @@ public final class MetalTextView: NSView {
 	private static let benchStageLock = NSLock()
 	private static var recordedBenchStages: Set<String> = []
 	private static let maxCachedShapedLines = 512
-	private static let defaultFontSize: CGFloat = 15
+	private static let defaultFontSize: CGFloat = 14.95
 	private static let defaultTextColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 	private static let cursorColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 
@@ -1788,11 +1788,10 @@ public final class MetalTextView: NSView {
 			}
 			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
 			for glyph in glyphs {
+				let pixelX = ((glyph.originX - xOffset) * scale).rounded()
+				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
 				instances.append(MetalGlyphInstance(
-					screenOrigin: SIMD2<Float>(
-						Float((glyph.originX - xOffset) * scale),
-						Float((y + glyph.originYOffset) * scale)
-					),
+					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
 					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
 					atlasUV: glyph.atlasUV,
 					color: glyph.color
@@ -2196,11 +2195,11 @@ public final class MetalTextView: NSView {
 	}
 
 	private func glyphRenderingMode(scale: CGFloat) -> GlyphAtlas.RenderingMode {
-		scale < 2 ? .subpixel : .grayscale
+		.grayscale
 	}
 
 	private static func makeDefaultTextFont() -> CTFont {
-		let font = NSFont(name: "Monaco", size: defaultFontSize) ?? NSFont.monospacedSystemFont(ofSize: defaultFontSize, weight: .regular)
+		let font = NSFont(name: "Menlo", size: defaultFontSize) ?? NSFont.monospacedSystemFont(ofSize: defaultFontSize, weight: .regular)
 		return CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
 	}
 

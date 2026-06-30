@@ -52,7 +52,7 @@ extension OllyRuntime {
     func visibleWindows(displayID: DisplayID) async -> [WindowState] {
         let activeTags = await tagStore.activeTags(on: displayID)
         return await windowStore.windows(onDisplay: displayID).filter {
-            !$0.isFloating && !$0.isFullscreen && TagSet(rawValue: $0.tagMask).intersects(activeTags)
+            !$0.isFloating && !$0.isFullscreen && !$0.isOffSpace && TagSet(rawValue: $0.tagMask).intersects(activeTags)
         }
     }
 
@@ -160,9 +160,11 @@ extension OllyRuntime {
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshWindowElement(event.element, application: application)
             await refreshWindows(for: application)
+            scheduleNativeSpaceVerification()
         case .windowMoved:
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshMovedWindowElement(event.element, application: application)
+            scheduleNativeSpaceVerification()
         case .windowResized:
             let application = applicationsByProcessID[event.processID] ?? Application(processID: event.processID)
             await refreshWindowElement(event.element, application: application)
@@ -188,12 +190,20 @@ extension OllyRuntime {
 
     func upsertRuntimeWindow(_ state: WindowState, element: AXUIElement?) async throws {
         let resolved = try await resolvedRuntimeWindowState(state)
+        let previous = await windowStore.state(for: resolved.id)
         await windowStore.upsert(resolved)
         if let element {
             windowTargets.set(
                 WindowMoveTarget(id: resolved.id, axElement: element, displayID: resolved.displayID),
                 for: resolved.id
             )
+        }
+        if previous?.isOffSpace == true && !resolved.isOffSpace {
+            await publishRuntimeEvent(.space(IPCSpaceDriftEvent(
+                windowID: resolved.id,
+                fromDisplayID: previous?.displayID,
+                action: .returned
+            )))
         }
     }
 
@@ -376,7 +386,6 @@ extension OllyRuntime {
         }
     }
 }
-
 private extension AXObserverBridgeError {
     var axError: AXError? {
         switch self {
@@ -387,14 +396,5 @@ private extension AXObserverBridgeError {
         case .streamContinuationUnavailable:
             return nil
         }
-    }
-}
-
-extension CGRect {
-    var area: CGFloat {
-        guard !isNull else {
-            return 0
-        }
-        return width * height
     }
 }

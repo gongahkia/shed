@@ -65,10 +65,6 @@ public struct IPCTagCommand: Codable, Equatable, Sendable {
     }
 }
 
-public struct IPCReloadCommand: Codable, Equatable, Sendable { public init() {} }
-
-public struct IPCRestoreWindowsCommand: Codable, Equatable, Sendable { public init() {} }
-
 public struct IPCSubscribeEventsCommand: Codable, Equatable, Sendable {
     public let eventKinds: [IPCEventKind]
     public let supportedEventKinds: [IPCEventKind]
@@ -143,6 +139,7 @@ public enum IPCCommand: Equatable, Sendable {
     case tagRemove(IPCTagCommand)
     case reload(IPCReloadCommand)
     case restoreWindows(IPCRestoreWindowsCommand)
+    case setSpacePolicy(IPCSetSpacePolicyCommand)
     case subscribeEvents(IPCSubscribeEventsCommand)
     case version(IPCVersionCommand)
     case reserved(IPCReservedCommand)
@@ -195,6 +192,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .reload
         case .restoreWindows:
             return .restoreWindows
+        case .setSpacePolicy:
+            return .setSpacePolicy
         case .subscribeEvents:
             return .subscribeEvents
         case .version:
@@ -249,6 +248,8 @@ extension IPCCommand: Codable {
             self = .restoreWindows(
                 try container.decodeIfPresent(IPCRestoreWindowsCommand.self, forKey: .arguments) ?? .init()
             )
+        case .setSpacePolicy:
+            self = .setSpacePolicy(try container.decodeRequired(IPCSetSpacePolicyCommand.self, forKey: .arguments))
         case .subscribeEvents:
             let command = try container.decodeIfPresent(IPCSubscribeEventsCommand.self, forKey: .arguments) ?? .init()
             self = .subscribeEvents(command)
@@ -340,6 +341,8 @@ extension IPCCommand: Codable {
             try container.encode(command, forKey: .arguments)
         case let .restoreWindows(command):
             try container.encode(command, forKey: .arguments)
+        case let .setSpacePolicy(command):
+            try container.encode(command, forKey: .arguments)
         case let .subscribeEvents(command):
             try container.encode(command, forKey: .arguments)
         case let .version(command):
@@ -381,7 +384,6 @@ extension IPCCommand: Codable {
         }
     }
 }
-
 private extension KeyedDecodingContainer {
     func decodeRequired<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
         guard contains(key) else {

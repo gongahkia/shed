@@ -93,6 +93,9 @@ public actor TagDispatcher {
         var moves: [TagDispatchMove] = []
 
         for window in windows {
+            guard !window.isOffSpace else {
+                continue
+            }
             if shouldShow(window, visibleTags: visibleTags) {
                 if let move = await show(window) {
                     moves.append(move)

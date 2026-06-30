@@ -131,7 +131,7 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 - Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, gesture, and hook sections.
 - Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-- Example: `Config { Workspaces { Tag.named("web") }; Gestures { fourFingerVertical(.switchTags) } }`
+- Example: `Config { Workspaces { Tag.named("web") }; NativeSpace { driftPolicy(.followWindow) } }`
 - See also: `ConfigBuilder`, `ConfigSection`.
 
 ### ConfigBuilder
@@ -151,6 +151,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Use one case per section, such as `.keybinds(Keybinds())`.
 - Example: `ConfigSection.engines(Engines { .bsp })`
 - See also: `Config`, `ConfigBuilder`.
+
+### NativeSpace
+
+`struct NativeSpace`
+
+- Purpose: Configures native Mission Control Space drift handling.
+- Parameters: Use `driftPolicy(.followWindow)`, `.rehome`, or `.unmanage`.
+- Example: `NativeSpace { driftPolicy(.followWindow) }`
+- See also: `ConfigSection`, `NativeSpaceDriftPolicy`.
 
 ### HookDeclaration
 
@@ -828,4 +837,3 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Provide a stable label and closure receiving `RawDSLContext`.
 - Example: `RawDSLBlock("trace") { context in _ = context.event }`
 - See also: `RawDSLContext`, `HookDeclaration`.
-

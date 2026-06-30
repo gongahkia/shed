@@ -10,8 +10,11 @@ extension OllyRuntime {
         do {
             let loaded = try configLoader.load()
             await configStore.replace(with: loaded.config)
+            nativeSpaceDriftPolicy = loaded.config.nativeSpace.driftPolicy
         } catch ConfigLoaderError.missingSource where useDefaultWhenMissing {
-            await configStore.replace(with: Config())
+            let config = Config()
+            await configStore.replace(with: config)
+            nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
         }
     }
 
@@ -226,6 +229,11 @@ extension OllyRuntime {
     func restoreWindows(_ command: IPCRestoreWindowsCommand) async -> IPCRestoreWindowsInfo {
         _ = command
         return await restoreJournaledWindows()
+    }
+
+    func setSpacePolicy(_ command: IPCSetSpacePolicyCommand) async {
+        nativeSpaceDriftPolicy = command.policy
+        scheduleNativeSpaceVerification()
     }
 
     func restoreJournaledWindows() async -> IPCRestoreWindowsInfo {

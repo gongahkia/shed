@@ -8,6 +8,8 @@ import ollyKit
 import ollyLayouts
 
 public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> String?
+public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
+public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
 
 public enum OllyRuntimeError: Error, CustomStringConvertible {
     case displayUnavailable
@@ -98,14 +100,20 @@ public actor OllyRuntime {
     private let registry: LayoutEngineRegistry
     let axPermissionStream: @Sendable () -> AsyncStream<AXPermissionStatus>
     let axSubroleReader: AXSubroleReader
+    let activeSpaceWindowIDs: ActiveSpaceWindowIDProvider
+    let nativeSpaceChangeStream: NativeSpaceChangeStreamProvider
     let presentAXOnboarding: @MainActor @Sendable () async -> Void
     let fullscreenDebounceNanoseconds: UInt64
+    let nativeSpaceDebounceNanoseconds: UInt64
     private var server: UnixDomainSocketServer?
     var applicationsByProcessID: [pid_t: Application] = [:]
     var axObserversByProcessID: [pid_t: AXObserverBridge] = [:]
     var tasks: [Task<Void, Never>] = []
     var applicationObservationTask: Task<Void, Never>?
+    var nativeSpaceObservationTask: Task<Void, Never>?
+    var nativeSpaceVerificationTask: Task<Void, Never>?
     var axPermissionStatus: AXPermissionStatus?
+    var nativeSpaceDriftPolicy: NativeSpaceDriftPolicy = .followWindow
     var focusedWindowID: WindowID?
     var lastError: String?
     var fullscreenTasksByWindowID: [WindowID: Task<Void, Never>] = [:]
@@ -124,21 +132,23 @@ public actor OllyRuntime {
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
+        nativeSpaceChangeStream: @escaping NativeSpaceChangeStreamProvider = OllyRuntime.defaultNativeSpaceChangeStream,
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
+        nativeSpaceDebounceNanoseconds: UInt64 = 2_000_000_000,
         presentAXOnboarding: @escaping @MainActor @Sendable () async -> Void =
             OllyRuntime.defaultAXOnboarding
     ) {
-        self.socketPath = socketPath
-        self.configLoader = configLoader
-        self.displayProvider = displayProvider
-        self.applicationMonitor = applicationMonitor
-        self.snapshotCache = snapshotCache
-        self.statePersistence = statePersistence
-        self.recoveryJournal = recoveryJournal
-        self.scanAXOnStart = scanAXOnStart
+        self.socketPath = socketPath; self.configLoader = configLoader
+        self.displayProvider = displayProvider; self.applicationMonitor = applicationMonitor
+        self.snapshotCache = snapshotCache; self.statePersistence = statePersistence
+        self.recoveryJournal = recoveryJournal; self.scanAXOnStart = scanAXOnStart
         self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession
         self.axPermissionStream = axPermissionStream
         self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
+        self.activeSpaceWindowIDs = activeSpaceWindowIDs
+        self.nativeSpaceChangeStream = nativeSpaceChangeStream
+        self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.presentAXOnboarding = presentAXOnboarding
         self.windowMover = WindowMover()
         self.assignment = WindowTagAssignment(windowStore: windowStore)
@@ -192,6 +202,7 @@ public actor OllyRuntime {
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
             startApplicationObservation()
+            startNativeSpaceObservation()
             await refreshFocusedWindowFromSystem()
         }
         let server = UnixDomainSocketServer(socketPath: socketPath) { [weak self] connection, line in
@@ -210,6 +221,10 @@ public actor OllyRuntime {
         fullscreenTasksByWindowID.values.forEach { $0.cancel() }
         fullscreenTasksByWindowID.removeAll()
         applicationObservationTask = nil
+        nativeSpaceObservationTask?.cancel()
+        nativeSpaceObservationTask = nil
+        nativeSpaceVerificationTask?.cancel()
+        nativeSpaceVerificationTask = nil
         await windowMover.setAXErrorHandler(nil)
         stopAXObservers()
         _ = await restoreJournaledWindows()
@@ -280,7 +295,7 @@ public actor OllyRuntime {
         case .setEngine, .cycleEngine, .manualPreselect, .bspTree:
             return try await engineResponse(for: request)
         case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow,
-             .dispatchGesture, .reload, .restoreWindows:
+             .dispatchGesture, .reload, .restoreWindows, .setSpacePolicy:
             return try await controlResponse(for: request)
         case let .reserved(command):
             return .failure(

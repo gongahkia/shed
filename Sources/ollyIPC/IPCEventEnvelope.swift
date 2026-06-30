@@ -36,11 +36,31 @@ public struct IPCFullscreenEvent: Codable, Equatable, Sendable {
     }
 }
 
+public enum IPCSpaceDriftAction: String, Codable, Equatable, Sendable {
+    case markedOffSpace = "marked-off-space"
+    case returned
+    case rehomed
+    case unmanaged
+}
+
+public struct IPCSpaceDriftEvent: Codable, Equatable, Sendable {
+    public let windowID: WindowID
+    public let fromDisplayID: DisplayID?
+    public let action: IPCSpaceDriftAction
+
+    public init(windowID: WindowID, fromDisplayID: DisplayID?, action: IPCSpaceDriftAction) {
+        self.windowID = windowID
+        self.fromDisplayID = fromDisplayID
+        self.action = action
+    }
+}
+
 public enum IPCEvent: Codable, Equatable, Sendable {
     case axPermission(IPCAXPermissionEvent)
     case engine(EngineEvent)
     case focus(IPCFocusEvent)
     case fullscreen(IPCFullscreenEvent)
+    case space(IPCSpaceDriftEvent)
 }
 
 public struct IPCEventEnvelope: Codable, Equatable, Sendable {

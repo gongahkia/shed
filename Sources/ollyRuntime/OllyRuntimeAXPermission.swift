@@ -55,6 +55,7 @@ extension OllyRuntime {
         await windowMover.resume()
         await refreshAllWindows()
         startApplicationObservation()
+        startNativeSpaceObservation()
         for display in displayProvider() {
             try? await applyAndArrange(displayID: display.id)
         }

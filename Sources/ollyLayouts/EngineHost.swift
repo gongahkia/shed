@@ -169,6 +169,7 @@ public actor EngineHost {
         let windows = await windowStore.windows(onDisplay: displayID).filter {
             !$0.isFloating
                 && !$0.isFullscreen
+                && !$0.isOffSpace
                 && $0.engineOverride != FloatingLayoutEngine.engineID
                 && TagSet(rawValue: $0.tagMask).intersects(tagState.activeTags)
         }

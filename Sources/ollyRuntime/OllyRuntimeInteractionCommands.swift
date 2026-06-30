@@ -167,6 +167,7 @@ private extension WindowState {
             isSticky: isSticky,
             isPinned: isPinned,
             isFullscreen: isFullscreen,
+            isOffSpace: isOffSpace,
             engineOverride: engineOverride,
             layoutOrder: layoutOrder,
             frame: frame,

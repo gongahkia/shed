@@ -303,6 +303,7 @@ public extension Config {
             isSticky: apply.sticky ?? state.isSticky,
             isPinned: apply.pinned ?? state.isPinned,
             isFullscreen: state.isFullscreen,
+            isOffSpace: state.isOffSpace,
             engineOverride: apply.engineOverride ?? state.engineOverride,
             layoutOrder: state.layoutOrder,
             frame: state.frame,

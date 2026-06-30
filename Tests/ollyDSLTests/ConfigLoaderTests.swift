@@ -1,4 +1,5 @@
 import XCTest
+import ollyCore
 @testable import ollyDSL
 
 final class ConfigLoaderTests: XCTestCase {
@@ -18,6 +19,9 @@ final class ConfigLoaderTests: XCTestCase {
             Animation()
             Gestures()
             Hooks()
+            NativeSpace {
+                driftPolicy(.followWindow)
+            }
         }
 
         XCTAssertEqual(config.keybinds, Keybinds())
@@ -29,6 +33,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.animation, Animation())
         XCTAssertEqual(config.gestures, Gestures())
         XCTAssertEqual(config.hooks, Hooks())
+        XCTAssertEqual(config.nativeSpace, NativeSpace())
     }
 
     func testConfigDecodingDefaultsMissingSections() throws {

@@ -26,6 +26,9 @@ extension OllyRuntime {
         case let .restoreWindows(command):
             let info = await restoreWindows(command)
             return .ok(id: request.id, result: .restoredWindows(info))
+        case let .setSpacePolicy(command):
+            await setSpacePolicy(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "space policy set")))
         default:
             preconditionFailure("invalid control command")
         }

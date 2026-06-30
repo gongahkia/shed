@@ -23,53 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M1 — Reliability spine (yabai-class WM)
 
-### M1.6 Mission Control / native Spaces awareness
-
-**Goal:** When user moves a managed window to another native Space via Mission Control, the runtime gracefully handles it.
-
-**Research summary:**
-- Public APIs available:
-  - `NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.activeSpaceDidChangeNotification, ...)` fires on any Space change. Does NOT identify which Space.
-  - `NSWindow.isOnActiveSpace` — useful for `NSWindow`s the app owns, not arbitrary AX-managed windows.
-  - `CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)` returns windows on current Space only across all displays. Windows on inactive Spaces are absent.
-  - Space identifiers require private CGS APIs (`CGSCopyManagedDisplaySpaces`) — out of scope.
-- Off-Space detection heuristic: managed `WindowID` returns `AXError.invalidUIElement` on next AX read **OR** is absent from `CGWindowListCopyWindowInfo(.optionOnScreenOnly)` despite the app process still running.
-- `NativeSpaceInvariant` (`Sources/ollyCore/NativeSpaceInvariant.swift:75-148`) already detects drift; `PublicWindowNativeSpaceProvider.isSupported == false` (line 60-70) because Space enumeration requires private CGS.
-
-**Design:** Extend `NativeSpaceDriftPolicy` enum with `.followWindow` (new default):
-```swift
-public enum NativeSpaceDriftPolicy { case rehome, unmanage, followWindow }
-```
-- `.followWindow`: keep window in `WindowStore`; mark `WindowState.isOffSpace = true`; skip arrangement until AX events show it again (will fire `kAXFocusedWindowChangedNotification` on return to that Space).
-- `.unmanage`: existing — remove from store.
-- `.rehome`: best-effort; only effective when the AX element still resolves on current Space. Document as fragile.
-
-**Files to modify:**
-- `Sources/ollyCore/NativeSpaceInvariant.swift:12-15` — extend enum.
-- `Sources/ollyCore/NativeSpaceInvariant.swift:128-138` — add `.followWindow` branch.
-- `Sources/ollyKit/WindowStore.swift:6-118` — add `isOffSpace: Bool` + `withOffSpace(_:)`.
-- `Sources/ollyRuntime/OllyRuntime.swift` — wire `NativeSpaceInvariant` in `init` (today it's instantiated but never observed continuously); subscribe to `NSWorkspace.activeSpaceDidChangeNotification` and debounce-verify (2s coalesce) after `windowMoved`/`windowCreated`.
-- `Sources/ollyDSL/NativeSpace.swift` (new) — `NativeSpace { driftPolicy(.followWindow) }` section.
-- Add `case nativeSpace(NativeSpace)` to `ConfigSection` in `Sources/ollyDSL/Config.swift:218-228`.
-
-**IPC additions:**
-- Command `set-space-policy <policy>`.
-- Event kind `space` with payload `IPCSpaceDriftEvent(windowID, fromDisplayID, action)`.
-
-**Test plan:**
-- Unit: parameterised over the three policies; mock `WindowNativeSpaceProviding` returns drift; assert correct handler is called.
-- Manual AX acceptance: drag managed window through Mission Control to another Space; verify no error log spam; window reappears clean on return.
-
-**Acceptance:**
-- Default behavior on Space-move: window stays in `state --json` but with `isOffSpace: true` until user returns to its Space.
-
-**Refs:**
-- https://developer.apple.com/documentation/appkit/nsworkspace/1532430-activespacedidchangenotification
-- https://developer.apple.com/documentation/appkit/nswindow/1419707-isonactivespace
-- https://github.com/tmandry/Swindler/commit/34df45c98014
-
----
-
 ### M1.7 Focus-stealing prevention
 
 **Goal:** Throttle programmatic focus changes from apps (Electron installers, IDEs) that fire faster than human input.

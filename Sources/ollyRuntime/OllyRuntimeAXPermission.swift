@@ -44,8 +44,7 @@ extension OllyRuntime {
         focusInputAttribution.stop()
         await windowMover.flushAndPause()
         await publishRuntimeEvent(.axPermission(IPCAXPermissionEvent(status: .missing)))
-        let hooks = await configStore.current().hooks
-        hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .missing))
+        await hookDispatcher.axPermissionChanged(AXPermissionHookContext(status: .missing))
         let presentOnboarding = presentAXOnboarding
         Task { @MainActor in
             await presentOnboarding()
@@ -62,8 +61,7 @@ extension OllyRuntime {
             try? await applyAndArrange(displayID: display.id)
         }
         await publishRuntimeEvent(.axPermission(IPCAXPermissionEvent(status: .trusted)))
-        let hooks = await configStore.current().hooks
-        hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .trusted))
+        await hookDispatcher.axPermissionChanged(AXPermissionHookContext(status: .trusted))
     }
 
     func handleAXReadWriteError(_ error: AXError) async {

@@ -131,7 +131,7 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 
 - Purpose: Top-level olly DSL document composed from keybind, rule, workspace, engine, gesture, and hook sections.
 - Parameters: Pass section values directly or use `@ConfigBuilder` to compose them.
-- Example: `Config { Workspaces { Tag.named("web") }; NativeSpace { driftPolicy(.followWindow) } }`
+- Example: `Config { Workspaces { Tag.named("web") }; Gestures { fourFingerVertical(.switchTags) } }`
 - See also: `ConfigBuilder`, `ConfigSection`.
 
 ### ConfigBuilder
@@ -152,6 +152,8 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `ConfigSection.engines(Engines { .bsp })`
 - See also: `Config`, `ConfigBuilder`.
 
+## Native Space
+
 ### NativeSpace
 
 `struct NativeSpace`
@@ -161,32 +163,23 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `NativeSpace { driftPolicy(.followWindow) }`
 - See also: `ConfigSection`, `NativeSpaceDriftPolicy`.
 
-### HookDeclaration
+### NativeSpaceBuilder
 
-`struct HookDeclaration`
+`@resultBuilder enum NativeSpaceBuilder`
 
-- Purpose: Declares one raw or typed lifecycle hook callback.
-- Parameters: Provide a stable label, hook kind, and optional in-memory closure.
-- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
-- See also: `Hooks`, `RawDSLContext`.
+- Purpose: Builds native Space drift settings inside `NativeSpace { ... }`.
+- Parameters: Accepts native Space expressions, using the last declaration when repeated.
+- Example: `NativeSpace { driftPolicy(.rehome) }`
+- See also: `NativeSpace`, `driftPolicy(_:)`.
 
-### Hooks
+### driftPolicy(_:)
 
-`struct Hooks`
+`func driftPolicy(_ policy: NativeSpaceDriftPolicy) -> NativeSpace`
 
-- Purpose: Groups raw and typed lifecycle hook declarations.
-- Parameters: Pass hook declarations directly or use `@HookBuilder`.
-- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
-- See also: `HookDeclaration`, `ConfigSection`.
-
-### HookBuilder
-
-`@resultBuilder enum HookBuilder`
-
-- Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
-- Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
-- Example: `Hooks { onDisplayChange { context in _ = context.change } }`
-- See also: `Hooks`, `HookDeclaration`.
+- Purpose: Declares a native Space drift handling policy.
+- Parameters: Pass a `NativeSpaceDriftPolicy`.
+- Example: `driftPolicy(.followWindow)`
+- See also: `NativeSpace`, `NativeSpaceDriftPolicy`.
 
 ## Focus Policy
 
@@ -251,7 +244,7 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 `enum HookKind`
 
 - Purpose: Names the lifecycle event kind represented by a hook declaration.
-- Parameters: Choose raw, tag switch, display change, or window appeared.
+- Parameters: Choose raw, tag switch, display change, window, engine, fullscreen, config, or AX permission hooks.
 - Example: `HookKind.tagSwitch`
 - See also: `HookDeclaration`, `Hooks`.
 
@@ -282,6 +275,51 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `WindowAppearedHookContext(window: window)`
 - See also: `onWindowAppeared(_:_:)`, `Hooks`.
 
+### WindowClosedHookContext
+
+`struct WindowClosedHookContext`
+
+- Purpose: Carries typed context for window-closed lifecycle hooks.
+- Parameters: Provide the `WindowState` that closed.
+- Example: `WindowClosedHookContext(window: window)`
+- See also: `onWindowClosed(_:_:)`, `Hooks`.
+
+### ConfigReloadHookContext
+
+`struct ConfigReloadHookContext`
+
+- Purpose: Carries typed context for config-reload lifecycle hooks.
+- Parameters: Provide previous and current config values plus the source URL when available.
+- Example: `ConfigReloadHookContext(previous: old, current: new, sourceURL: url)`
+- See also: `onConfigReload(_:_:)`, `Hooks`.
+
+### EngineChangeHookContext
+
+`struct EngineChangeHookContext`
+
+- Purpose: Carries typed context for engine-change lifecycle hooks.
+- Parameters: Provide display ID, tag, previous engine ID, and current engine ID.
+- Example: `EngineChangeHookContext(displayID: 1, tag: tag, previousEngineID: old, currentEngineID: new)`
+- See also: `onEngineChange(_:_:)`, `Hooks`.
+
+### FullscreenHookContext
+
+`struct FullscreenHookContext`
+
+- Purpose: Carries typed context for fullscreen lifecycle hooks.
+- Parameters: Provide the affected window and whether it entered fullscreen.
+- Example: `FullscreenHookContext(window: window, didEnter: true)`
+- See also: `onFullscreenEnter(_:_:)`, `onFullscreenExit(_:_:)`.
+
+### AXPermissionHookContext
+
+`struct AXPermissionHookContext`
+
+- Purpose: Carries typed context for AX permission lifecycle hooks.
+- Parameters: Provide the latest Accessibility permission status.
+- Example: `AXPermissionHookContext(status: .trusted)`
+- See also: `onAXPermissionChanged(_:_:)`, `Hooks`.
+
 ### onTagSwitch(_:_:)
 
 `func onTagSwitch(_ label: String = "onTagSwitch", _ body: @escaping TagSwitchHookHandler) -> HookDeclaration`
@@ -308,6 +346,87 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Parameters: Provide an optional stable label and a handler receiving `WindowAppearedHookContext`.
 - Example: `onWindowAppeared { context in _ = context.window.bundleID }`
 - See also: `WindowAppearedHookContext`, `Hooks`.
+
+### onWindowClosed(_:_:)
+
+`func onWindowClosed(_ label: String = "onWindowClosed", _ body: @escaping WindowClosedHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for closed windows.
+- Parameters: Provide an optional stable label and a handler receiving `WindowClosedHookContext`.
+- Example: `onWindowClosed { context in _ = context.window.id }`
+- See also: `WindowClosedHookContext`, `Hooks`.
+
+### onConfigReload(_:_:)
+
+`func onConfigReload(_ label: String = "onConfigReload", _ body: @escaping ConfigReloadHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for config reloads.
+- Parameters: Provide an optional stable label and a handler receiving `ConfigReloadHookContext`.
+- Example: `onConfigReload { context in _ = context.current.version }`
+- See also: `ConfigReloadHookContext`, `Hooks`.
+
+### onEngineChange(_:_:)
+
+`func onEngineChange(_ label: String = "onEngineChange", _ body: @escaping EngineChangeHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for engine changes.
+- Parameters: Provide an optional stable label and a handler receiving `EngineChangeHookContext`.
+- Example: `onEngineChange { context in _ = context.currentEngineID }`
+- See also: `EngineChangeHookContext`, `Hooks`.
+
+### onFullscreenEnter(_:_:)
+
+`func onFullscreenEnter(_ label: String = "onFullscreenEnter", _ body: @escaping FullscreenHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for fullscreen entry.
+- Parameters: Provide an optional stable label and a handler receiving `FullscreenHookContext`.
+- Example: `onFullscreenEnter { context in _ = context.window.id }`
+- See also: `FullscreenHookContext`, `onFullscreenExit(_:_:)`.
+
+### onFullscreenExit(_:_:)
+
+`func onFullscreenExit(_ label: String = "onFullscreenExit", _ body: @escaping FullscreenHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for fullscreen exit.
+- Parameters: Provide an optional stable label and a handler receiving `FullscreenHookContext`.
+- Example: `onFullscreenExit { context in _ = context.window.id }`
+- See also: `FullscreenHookContext`, `onFullscreenEnter(_:_:)`.
+
+### onAXPermissionChanged(_:_:)
+
+`func onAXPermissionChanged(_ label: String = "onAXPermissionChanged", _ body: @escaping AXPermissionHookHandler) -> HookDeclaration`
+
+- Purpose: Declares a typed hook for Accessibility permission changes.
+- Parameters: Provide an optional stable label and a handler receiving `AXPermissionHookContext`.
+- Example: `onAXPermissionChanged { context in _ = context.status }`
+- See also: `AXPermissionHookContext`, `Hooks`.
+
+### HookDeclaration
+
+`struct HookDeclaration`
+
+- Purpose: Declares one raw or typed lifecycle hook callback.
+- Parameters: Provide a stable label, hook kind, and optional in-memory closure.
+- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
+- See also: `Hooks`, `RawDSLContext`.
+
+### Hooks
+
+`struct Hooks`
+
+- Purpose: Groups raw and typed lifecycle hook declarations.
+- Parameters: Pass hook declarations directly or use `@HookBuilder`.
+- Example: `Hooks { onTagSwitch { context in _ = context.activeTags } }`
+- See also: `HookDeclaration`, `ConfigSection`.
+
+### HookBuilder
+
+`@resultBuilder enum HookBuilder`
+
+- Purpose: Builds lifecycle hook declarations inside `Hooks { ... }`.
+- Parameters: Accepts `HookDeclaration` expressions, arrays, and conditionals.
+- Example: `Hooks { onDisplayChange { context in _ = context.change } }`
+- See also: `Hooks`, `HookDeclaration`.
 
 ## Keybinds
 

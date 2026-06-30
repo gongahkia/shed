@@ -6,34 +6,6 @@ import ollyKit
 import ollyLayouts
 
 extension OllyRuntime {
-    func loadConfig(useDefaultWhenMissing: Bool) async throws {
-        do {
-            let loaded = try configLoader.load()
-            await configStore.replace(with: loaded.config)
-            nativeSpaceDriftPolicy = loaded.config.nativeSpace.driftPolicy
-            focusPolicy = loaded.config.focusPolicy
-            await focusRateLimiter.update(settings: loaded.config.focusPolicy.rateLimitSettings)
-        } catch ConfigLoaderError.missingSource where useDefaultWhenMissing {
-            let config = Config()
-            await configStore.replace(with: config)
-            nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
-            focusPolicy = config.focusPolicy
-            await focusRateLimiter.update(settings: config.focusPolicy.rateLimitSettings)
-        }
-    }
-
-    func reloadConfig() async throws {
-        do {
-            try await loadConfig(useDefaultWhenMissing: true)
-            await initializeDisplays()
-            try await reapplyRulesToStoredWindows()
-            try await arrangeAllDisplays()
-        } catch {
-            lastError = String(describing: error)
-            throw error
-        }
-    }
-
     func initializeDisplays() async {
         let workspaces = await configStore.current().workspaces
         let engineID = await configStore.availableEngineIDs().first ?? FloatingLayoutEngine.engineID
@@ -118,7 +90,7 @@ extension OllyRuntime {
         let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let activeTags = TagSet(tag)
-        await tagStore.setActiveTags(activeTags, on: displayID)
+        await setActiveTags(activeTags, on: displayID)
         await rewritePinnedWindows(on: displayID, to: activeTags)
         try await applyAndArrange(displayID: displayID)
     }
@@ -129,7 +101,7 @@ extension OllyRuntime {
         let current = await tagStore.activeTags(on: displayID)
         let updated = current.contains(tag) ? current.removing(tag) : current.inserting(tag)
         let activeTags = updated.isEmpty ? TagSet(tag) : updated
-        await tagStore.setActiveTags(activeTags, on: displayID)
+        await setActiveTags(activeTags, on: displayID)
         await rewritePinnedWindows(on: displayID, to: activeTags)
         try await applyAndArrange(displayID: displayID)
     }
@@ -138,7 +110,7 @@ extension OllyRuntime {
         let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let updated = await tagStore.activeTags(on: displayID).inserting(tag)
-        await tagStore.setActiveTags(updated, on: displayID)
+        await setActiveTags(updated, on: displayID)
         try await applyAndArrange(displayID: displayID)
     }
 
@@ -147,7 +119,7 @@ extension OllyRuntime {
         let tag = try Tag(index: Int(command.tag.rawValue))
         let current = await tagStore.activeTags(on: displayID)
         let updated = current.removing(tag)
-        await tagStore.setActiveTags(updated.isEmpty ? TagSet(tag) : updated, on: displayID)
+        await setActiveTags(updated.isEmpty ? TagSet(tag) : updated, on: displayID)
         try await applyAndArrange(displayID: displayID)
     }
 
@@ -187,7 +159,14 @@ extension OllyRuntime {
         } else {
             tag = try await firstActiveTag(on: displayID)
         }
+        let previousEngineID = await tagStore.engine(for: tag, on: displayID)
         await tagStore.bindEngine(command.engineID, to: tag, on: displayID)
+        await publishEngineChangeHook(
+            displayID: displayID,
+            tag: tag,
+            previousEngineID: previousEngineID,
+            currentEngineID: command.engineID
+        )
         try await arrange(displayID: displayID)
     }
 
@@ -207,7 +186,14 @@ extension OllyRuntime {
         let currentIndex = engineIDs.firstIndex(of: current) ?? 0
         let delta = command.reverse ? -1 : 1
         let nextIndex = (currentIndex + delta + engineIDs.count) % engineIDs.count
-        await tagStore.bindEngine(engineIDs[nextIndex], to: tag, on: displayID)
+        let nextEngineID = engineIDs[nextIndex]
+        await tagStore.bindEngine(nextEngineID, to: tag, on: displayID)
+        await publishEngineChangeHook(
+            displayID: displayID,
+            tag: tag,
+            previousEngineID: current,
+            currentEngineID: nextEngineID
+        )
         try await arrange(displayID: displayID)
     }
 

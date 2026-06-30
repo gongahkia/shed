@@ -128,7 +128,7 @@ extension OllyRuntime {
     ) async throws {
         let displayID = try await selectedDisplayID(requestedDisplayID)
         let nextTag = try await nextGestureTag(direction: direction, displayID: displayID, config: config)
-        await tagStore.setActiveTags(TagSet(nextTag), on: displayID)
+        await setActiveTags(TagSet(nextTag), on: displayID)
         try await applyAndArrange(displayID: displayID)
     }
 

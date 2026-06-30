@@ -117,6 +117,7 @@ extension OllyRuntime {
         case let .terminated(application):
             let windows = await windowStore.windows(forProcessID: application.processID)
             for window in windows {
+                await hookDispatcher.windowClosed(WindowClosedHookContext(window: window))
                 await dragSession.end(windowID: window.id)
                 fullscreenTasksByWindowID[window.id]?.cancel()
                 fullscreenTasksByWindowID[window.id] = nil
@@ -197,6 +198,9 @@ extension OllyRuntime {
                 WindowMoveTarget(id: resolved.id, axElement: element, displayID: resolved.displayID),
                 for: resolved.id
             )
+        }
+        if previous == nil {
+            await hookDispatcher.windowAppeared(WindowAppearedHookContext(window: resolved))
         }
         if previous?.isOffSpace == true && !resolved.isOffSpace {
             await publishRuntimeEvent(.space(IPCSpaceDriftEvent(
@@ -299,7 +303,8 @@ extension OllyRuntime {
     }
 
     private func removeWindow(for element: AXUIElement) async {
-        guard let windowID = windowTargets.windowID(for: element) else {
+        guard let windowID = windowTargets.windowID(for: element),
+              let window = await windowStore.state(for: windowID) else {
             return
         }
         await dragSession.end(windowID: windowID)
@@ -307,6 +312,7 @@ extension OllyRuntime {
         fullscreenTasksByWindowID[windowID] = nil
         _ = await fullscreenTracker.exit(windowID)
         await windowStore.remove(id: windowID)
+        await hookDispatcher.windowClosed(WindowClosedHookContext(window: window))
         await focusStack.remove(windowID: windowID)
         windowTargets.remove(windowID: windowID)
         if focusedWindowID == windowID {

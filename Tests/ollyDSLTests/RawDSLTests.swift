@@ -85,7 +85,23 @@ final class RawDSLTests: XCTestCase {
             onAXPermissionChanged { context in
                 recorder.record(context.status.wireValue)
             }
+            onWindowClosed { context in
+                recorder.record("closed:\(context.window.id)")
+            }
+            onConfigReload { context in
+                recorder.record("reload:\(context.current.version.rawValue)")
+            }
+            onEngineChange { context in
+                recorder.record("engine:\(context.currentEngineID.rawValue)")
+            }
+            onFullscreenEnter { context in
+                recorder.record("enter:\(context.window.id):\(context.didEnter)")
+            }
+            onFullscreenExit { context in
+                recorder.record("exit:\(context.window.id):\(context.didEnter)")
+            }
         }
+        let window = WindowState(id: 4, processID: 40, bundleID: "com.example.App", frame: .zero)
 
         hooks.runTagSwitch(
             context: TagSwitchHookContext(displayID: 1, previousTags: [], activeTags: TagSet(rawValue: 2))
@@ -95,24 +111,60 @@ final class RawDSLTests: XCTestCase {
                 change: DisplayChange(displayID: 3, flags: CGDisplayChangeSummaryFlags(), displays: [])
             )
         )
-        hooks.runWindowAppeared(
-            context: WindowAppearedHookContext(
-                window: WindowState(id: 4, processID: 40, bundleID: "com.example.App", frame: .zero)
-            )
-        )
+        hooks.runWindowAppeared(context: WindowAppearedHookContext(window: window))
         hooks.runAXPermissionChanged(context: AXPermissionHookContext(status: .missing))
+        hooks.runWindowClosed(context: WindowClosedHookContext(window: window))
+        hooks.runConfigReload(context: ConfigReloadHookContext(previous: Config(), current: Config(), sourceURL: nil))
+        hooks.runEngineChange(context: EngineChangeHookContext(
+            displayID: 1,
+            tag: try Tag(index: 0),
+            previousEngineID: nil,
+            currentEngineID: LayoutEngineID(rawValue: "next")
+        ))
+        hooks.runFullscreenEnter(context: FullscreenHookContext(window: window, didEnter: true))
+        hooks.runFullscreenExit(context: FullscreenHookContext(window: window, didEnter: false))
 
         let data = try JSONEncoder().encode(hooks)
         let decoded = try JSONDecoder().decode(Hooks.self, from: data)
 
-        XCTAssertEqual(recorder.events, ["tag:2", "display:3", "com.example.App", "missing"])
+        XCTAssertEqual(recorder.events, [
+            "tag:2",
+            "display:3",
+            "com.example.App",
+            "missing",
+            "closed:4",
+            "reload:v1",
+            "engine:next",
+            "enter:4:true",
+            "exit:4:false"
+        ])
         XCTAssertEqual(
             decoded.declarations.map(\.label),
-            ["onTagSwitch", "display.trace", "onWindowAppeared", "onAXPermissionChanged"]
+            [
+                "onTagSwitch",
+                "display.trace",
+                "onWindowAppeared",
+                "onAXPermissionChanged",
+                "onWindowClosed",
+                "onConfigReload",
+                "onEngineChange",
+                "onFullscreenEnter",
+                "onFullscreenExit"
+            ]
         )
         XCTAssertEqual(
             decoded.declarations.map(\.kind),
-            [.tagSwitch, .displayChange, .windowAppeared, .axPermissionChanged]
+            [
+                .tagSwitch,
+                .displayChange,
+                .windowAppeared,
+                .axPermissionChanged,
+                .windowClosed,
+                .configReload,
+                .engineChange,
+                .fullscreenEnter,
+                .fullscreenExit
+            ]
         )
         XCTAssertEqual(decoded, hooks)
         XCTAssertNil(decoded.declarations.first?.tagSwitchHandler)

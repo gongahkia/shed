@@ -83,20 +83,60 @@ public enum WorkspaceIndexer {
 		let matcher = GitIgnoreMatcher(root: root, fileManager: fileManager)
 		let files = ProjectFind.searchableFiles(root: root, matcher: matcher, maxFileBytes: maxFileBytes, fileManager: fileManager)
 		let indexedFiles = files.compactMap { file -> WorkspaceIndexedFile? in
-			guard
-				let data = try? Data(contentsOf: file, options: .mappedIfSafe),
-				!data.contains(0),
-				let text = String(data: data, encoding: .utf8)
-			else {
-				return nil
-			}
-			let relativePath = ProjectFind.relativePath(for: file, root: root)
-			return WorkspaceIndexedFile(
-				relativePath: relativePath,
-				symbols: symbols(in: text, relativePath: relativePath)
-			)
+			indexedFile(at: file, root: root, maxFileBytes: maxFileBytes, fileManager: fileManager)
 		}
 		return WorkspaceIndex(root: root, files: indexedFiles)
+	}
+
+	public static func indexedFile(at url: URL, root: URL, maxFileBytes: Int = 1_000_000, fileManager: FileManager = .default) -> WorkspaceIndexedFile? {
+		guard
+			let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+			data.count <= maxFileBytes,
+			!data.contains(0),
+			let text = String(data: data, encoding: .utf8)
+		else {
+			return nil
+		}
+		let relativePath = ProjectFind.relativePath(for: url, root: root)
+		return WorkspaceIndexedFile(
+			relativePath: relativePath,
+			symbols: symbols(in: text, relativePath: relativePath)
+		)
+	}
+
+	public static func reindex(
+		_ index: inout WorkspaceIndex,
+		changedURLs: [URL],
+		matcher: GitIgnoreMatcher,
+		maxFileBytes: Int = 1_000_000,
+		fileManager: FileManager = .default
+	) {
+		for url in changedURLs {
+			guard let relative = index.relativePath(for: url) else {
+				continue
+			}
+			let isDirectory: Bool = {
+				var value: ObjCBool = false
+				let exists = fileManager.fileExists(atPath: url.path, isDirectory: &value)
+				return exists && value.boolValue
+			}()
+			if isDirectory {
+				continue
+			}
+			if matcher.ignores(relativePath: relative, isDirectory: false) {
+				index.files.removeAll { $0.relativePath == relative }
+				continue
+			}
+			if let updated = indexedFile(at: url, root: index.root, maxFileBytes: maxFileBytes, fileManager: fileManager) {
+				if let position = index.files.firstIndex(where: { $0.relativePath == relative }) {
+					index.files[position] = updated
+				} else {
+					index.files.append(updated)
+				}
+			} else {
+				index.files.removeAll { $0.relativePath == relative }
+			}
+		}
 	}
 
 	static func symbols(in text: String, relativePath: String) -> [WorkspaceSymbol] {

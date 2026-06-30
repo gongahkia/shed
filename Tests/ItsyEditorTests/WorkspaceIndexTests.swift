@@ -46,6 +46,45 @@ import Testing
 	#expect(index.searchSymbols(query: "openproj", limit: 1).map(\.name) == ["openProject"])
 }
 
+@Test func workspaceIndexerReindexUpdatesAddsAndRemovesFiles() throws {
+	let fixture = try TemporaryWorkspaceIndexFixture()
+	try fixture.write(".gitignore", "ignored/\n")
+	try fixture.write("Sources/Foo.swift", """
+	struct Foo {
+		func runFoo() {}
+	}
+	""")
+
+	var index = WorkspaceIndexer.build(root: fixture.root)
+	let matcher = GitIgnoreMatcher(root: fixture.root)
+	#expect(index.symbolsForFile(relativePath: "Sources/Foo.swift").map(\.name) == ["Foo", "runFoo"])
+
+	try fixture.write("Sources/Foo.swift", """
+	struct Foo {
+		func runFoo() {}
+		func extraStep() {}
+	}
+	""")
+	let fooURL = fixture.root.appendingPathComponent("Sources/Foo.swift")
+	WorkspaceIndexer.reindex(&index, changedURLs: [fooURL], matcher: matcher)
+	#expect(index.symbolsForFile(relativePath: "Sources/Foo.swift").map(\.name) == ["Foo", "runFoo", "extraStep"])
+
+	try fixture.write("Sources/Bar.swift", "struct Bar {}\n")
+	let barURL = fixture.root.appendingPathComponent("Sources/Bar.swift")
+	WorkspaceIndexer.reindex(&index, changedURLs: [barURL], matcher: matcher)
+	#expect(index.symbolsForFile(relativePath: "Sources/Bar.swift").map(\.name) == ["Bar"])
+
+	try FileManager.default.removeItem(at: fooURL)
+	WorkspaceIndexer.reindex(&index, changedURLs: [fooURL], matcher: matcher)
+	#expect(index.symbolsForFile(relativePath: "Sources/Foo.swift").isEmpty)
+	#expect(!index.files.map(\.relativePath).contains("Sources/Foo.swift"))
+
+	try fixture.write("ignored/Hidden.swift", "struct Hidden {}\n")
+	let hiddenURL = fixture.root.appendingPathComponent("ignored/Hidden.swift")
+	WorkspaceIndexer.reindex(&index, changedURLs: [hiddenURL], matcher: matcher)
+	#expect(!index.files.map(\.relativePath).contains("ignored/Hidden.swift"))
+}
+
 @Test func workspaceIndexScopesSymbolsAndPathsByActiveFile() throws {
 	let fixture = try TemporaryWorkspaceIndexFixture()
 	try fixture.write("Sources/Foo.swift", """

@@ -78,7 +78,7 @@ final class IPCCommandTests: XCTestCase {
             .moveToTag(IPCMoveToTagCommand(tag: try tag(2), windowID: 42)),
             .toggleTag(IPCTagCommand(tag: try tag(6))),
             .setEngine(IPCSetEngineCommand(engineID: LayoutEngineID(rawValue: "bsp"), tag: try tag(3))),
-            .cycleEngine(IPCCycleEngineCommand(reverse: true, displayID: 1)),
+            .cycleEngine(IPCCycleEngineCommand(reverse: true, tag: try tag(2), displayID: 1)),
             .tagAdd(IPCTagCommand(tag: try tag(4), displayID: 2)),
             .tagRemove(IPCTagCommand(tag: try tag(5))),
             .reload(IPCReloadCommand()),

@@ -219,7 +219,7 @@ public actor OllyRuntime {
         }
         let activeTags = tagState?.activeTags.tags.map(\.index) ?? [0]
         let engineID = tagState.flatMap { state in
-            state.activeTags.tags.compactMap { state.tagToEngine[$0] }.first
+            LayoutEnginePolicy.resolvedEngineID(activeTags: state.activeTags, tagToEngine: state.tagToEngine)
         } ?? FloatingLayoutEngine.engineID
         return OllyRuntimeMenuSnapshot(
             displayName: display?.localizedName ?? "No display",

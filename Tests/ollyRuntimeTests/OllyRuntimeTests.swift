@@ -60,6 +60,75 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testCycleEngineCanTargetExplicitTag() async throws {
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Engines {
+                    EngineDeclaration.floating
+                    EngineDeclaration.masterStack
+                }
+            })
+            await runtime.initializeDisplays()
+
+            XCTAssertEqual(try send(.tagAdd(.init(tag: tag(1), displayID: displayID)), to: socketPath).status, .success)
+            XCTAssertEqual(
+                try send(.cycleEngine(.init(tag: tag(1), displayID: displayID)), to: socketPath).status,
+                .success
+            )
+
+            let display = try XCTUnwrap(try stateSnapshot(from: send(.state(.init()), to: socketPath)).displays.first)
+            XCTAssertEqual(display.tagEngines.first { $0.tag.rawValue == 0 }?.engineID, FloatingLayoutEngine.engineID)
+            XCTAssertEqual(display.tagEngines.first { $0.tag.rawValue == 1 }?.engineID, MasterStackLayoutEngine.engineID)
+        }
+    }
+
+    func testDisplayWorkspaceEngineBindingsInitializePerDisplay() async throws {
+        let secondDisplay = Display(
+            id: 77,
+            frame: CGRect(x: 1440, y: 0, width: 1440, height: 900),
+            visibleFrame: CGRect(x: 1440, y: 0, width: 1440, height: 860),
+            scaleFactor: 2,
+            localizedName: "Second Display",
+            isMain: false
+        )
+        let fixture = try RuntimeFixture(extraDisplays: [secondDisplay])
+        let runtime = fixture.makeRuntime()
+        let config = Config {
+            Engines {
+                EngineDeclaration.floating
+                EngineDeclaration.bsp
+                EngineDeclaration.tabbed
+            }
+            Workspaces {
+                display(fixture.display.id) {
+                    Tag.named("web").engine(.bsp)
+                }
+                display(secondDisplay.id) {
+                    Tag.named("web").engine(.tabbed)
+                }
+            }
+        }
+
+        do {
+            try await runtime.start()
+            await runtime.replaceConfigForTest(config)
+            await runtime.initializeDisplays()
+
+            let displays = try stateSnapshot(from: send(.state(.init()), to: fixture.socketPath)).displays
+            let primary = try XCTUnwrap(displays.first { $0.displayID == fixture.display.id })
+            let secondary = try XCTUnwrap(displays.first { $0.displayID == secondDisplay.id })
+
+            XCTAssertEqual(primary.tagEngines.first { $0.tag.rawValue == 0 }?.engineID, BSPLayoutEngine.engineID)
+            XCTAssertEqual(secondary.tagEngines.first { $0.tag.rawValue == 0 }?.engineID, TabbedLayoutEngine.engineID)
+            await runtime.stop()
+            fixture.cleanup()
+        } catch {
+            await runtime.stop()
+            fixture.cleanup()
+            throw error
+        }
+    }
+
     func testSubscribeEventsReceivesEngineEventAfterArrangeCommand() async throws {
         try await withRuntime { _, socketPath, displayID in
             let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()

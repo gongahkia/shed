@@ -66,7 +66,10 @@ extension OllyRuntime {
     }
 
     func activeEngineID(on displayID: DisplayID) async throws -> LayoutEngineID {
-        let tag = try await firstActiveTag(on: displayID)
-        return await tagStore.engine(for: tag, on: displayID) ?? FloatingLayoutEngine.engineID
+        let state = await tagStore.state(for: displayID)
+        return LayoutEnginePolicy.resolvedEngineID(
+            activeTags: state.activeTags,
+            tagToEngine: state.tagToEngine
+        ) ?? FloatingLayoutEngine.engineID
     }
 }

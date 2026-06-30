@@ -743,6 +743,9 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "reverse": {
           "type": "boolean"
         },
+        "tag": {
+          "$ref": "#/$defs/tagIndex"
+        },
         "displayID": {
           "$ref": "#/$defs/displayID"
         }

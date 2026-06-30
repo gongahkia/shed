@@ -28,12 +28,16 @@ extension OllyRuntime {
     }
 
     func initializeDisplays() async {
+        let workspaces = await configStore.current().workspaces
         let engineID = await configStore.availableEngineIDs().first ?? FloatingLayoutEngine.engineID
         for display in displayProvider() {
             let state = await tagStore.state(for: display.id)
             let tags = state.activeTags.isEmpty ? Self.defaultActiveTags : state.activeTags
             await tagStore.setActiveTags(tags, on: display.id)
-            for tag in tags.tags where await tagStore.engine(for: tag, on: display.id) == nil {
+            await bindInitialWorkspaceEngines(workspaces, on: display.id)
+            for tag in tags.tags
+                where await tagStore.engine(for: tag, on: display.id) == nil
+                && workspaces.engineBinding(for: tag, on: display.id) == nil {
                 await tagStore.bindEngine(engineID, to: tag, on: display.id)
             }
         }
@@ -190,7 +194,12 @@ extension OllyRuntime {
 
     func cycleEngine(_ command: IPCCycleEngineCommand) async throws {
         let displayID = try selectedDisplay(command.displayID).requiredID()
-        let tag = try await firstActiveTag(on: displayID)
+        let tag: Tag
+        if let requestedTag = command.tag {
+            tag = try Tag(index: Int(requestedTag.rawValue))
+        } else {
+            tag = try await firstActiveTag(on: displayID)
+        }
         let engineIDs = await configStore.availableEngineIDs()
         guard !engineIDs.isEmpty else {
             throw OllyRuntimeError.engineUnavailable(FloatingLayoutEngine.engineID)
@@ -201,6 +210,12 @@ extension OllyRuntime {
         let nextIndex = (currentIndex + delta + engineIDs.count) % engineIDs.count
         await tagStore.bindEngine(engineIDs[nextIndex], to: tag, on: displayID)
         try await arrange(displayID: displayID)
+    }
+
+    func bindInitialWorkspaceEngines(_ workspaces: Workspaces, on displayID: DisplayID) async {
+        for binding in workspaces.engineBindings(on: displayID) {
+            await tagStore.bindEngine(binding.engineID, to: binding.tag, on: displayID)
+        }
     }
 
     func applyAndArrange(displayID: DisplayID) async throws {

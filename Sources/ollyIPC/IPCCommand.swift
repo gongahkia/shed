@@ -45,10 +45,12 @@ public struct IPCSetEngineCommand: Codable, Equatable, Sendable {
 
 public struct IPCCycleEngineCommand: Codable, Equatable, Sendable {
     public let reverse: Bool
+    public let tag: IPCTagIndex?
     public let displayID: DisplayID?
 
-    public init(reverse: Bool = false, displayID: DisplayID? = nil) {
+    public init(reverse: Bool = false, tag: IPCTagIndex? = nil, displayID: DisplayID? = nil) {
         self.reverse = reverse
+        self.tag = tag
         self.displayID = displayID
     }
 }

@@ -23,32 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M1 — Reliability spine (yabai-class WM)
 
-### M1.1 Per-display-per-tag engine binding finish
-
-**Goal:** Same tag can bind to different engines on different displays. Today 90% wired (`TagStore.tagToEngine` keyed `[Tag: LayoutEngineID]` per display at `Sources/ollyCore/TagStore.swift:14-31`) but three latent bugs prevent end-to-end use.
-
-**Bugs to fix:**
-1. `cycleEngine` (`Sources/ollyRuntime/OllyRuntimeCommands.swift:189-202`) accepts no `tag` — extend `IPCCycleEngineCommand` with optional `tag: IPCTagIndex?`.
-2. `EngineHost.resolveEngine` (`Sources/ollyLayouts/EngineHost.swift:253-260`) returns first match in iteration order. Make policy explicit: lowest active tag-index wins. Add `Sources/ollyCore/LayoutEnginePolicy.swift` documenting and centralising this.
-3. `initializeDisplays` (`Sources/ollyRuntime/OllyRuntimeCommands.swift:30-40`) overwrites DSL-specified bindings. Only bind if `tagStore.engine(for:, on:)` returns nil **and** no DSL initial binding exists.
-
-**DSL changes:**
-- `Sources/ollyDSL/NamedTag.swift` — add `.engine(_:)` modifier on `NamedTagDeclaration` and per-display containers (also used by M1.3).
-```swift
-Workspaces {
-    display(1) { Tag.named("web").engine(.bsp) }
-    display(2) { Tag.named("code").engine(.tabbed) }
-}
-```
-
-**Test plan:**
-- IPC integration: `ollyctl set-engine --tag=1 --displayID=A --engine=bsp` then same for display B with `--engine=grid`; assert `state --json` reports different `tagEngines` per display.
-
-**Acceptance:**
-- Multi-display Mac with tag 0 active on both displays: each display can show a different engine.
-
----
-
 ### M1.2 Sticky / pinned per-tag windows
 
 **Goal:**

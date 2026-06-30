@@ -251,10 +251,11 @@ public actor EngineHost {
     }
 
     private func resolveEngine(for tagState: DisplayTagState) async throws -> AnyLayoutEngine {
-        for tag in tagState.activeTags.tags {
-            if let engineID = tagState.tagToEngine[tag] {
-                return try await makeEngine(id: engineID)
-            }
+        if let engineID = LayoutEnginePolicy.resolvedEngineID(
+            activeTags: tagState.activeTags,
+            tagToEngine: tagState.tagToEngine
+        ) {
+            return try await makeEngine(id: engineID)
         }
         return AnyLayoutEngine(FloatingLayoutEngine())
     }

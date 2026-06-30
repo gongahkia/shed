@@ -160,7 +160,6 @@ x 2026-06-29 +Phase17-Native @handoff id:503 est:2h Handoff `NSUserActivity` per
 
 ## Phase 18 — Workspace symbol navigation UI
 
-(A) +Phase18-SymbolNav @nav id:602 est:1h Bind Cmd-T → "Go to symbol in workspace" (opens palette pre-filled with `@`). Bind Cmd-Shift-O → "Go to symbol in file" (pre-filled with `#`). Add corresponding items under Navigate menu. Update `docs/keymap-reference.md` via existing generator.
 (B) +Phase18-SymbolNav @ui id:603 est:3h Add Outline sidebar panel using `NSOutlineView`. Data source: `WorkspaceIndex.symbolsForFile(activeDocURL)`, grouped by kind (class/struct/func/var/const) at the top level, symbol children nested. Single-click selects + highlights matching range; double-click jumps. Updates on document save and active-document change. Toggle via View → Outline (Cmd-Opt-7). Show empty-state "No symbols in this file" when extractor returns 0.
 (B) +Phase18-SymbolNav @ui id:604 est:2h dep:603 Persist per-document outline collapse state in `~/.config/itsy/outline-state.json` (URL → [collapsed-kind-keys]). Restore on document open. Prune entries for missing files on app launch.
 (B) +Phase18-SymbolNav @perf id:605 est:2h Incremental `WorkspaceIndex` refresh via FSEvents (`DispatchSource.makeFileSystemObjectSource` or `FSEventStreamCreate`). Watch workspace root, debounce 200 ms, re-extract symbols only for changed files. No full rescan after initial. Skip paths matching existing `.gitignore` filter.

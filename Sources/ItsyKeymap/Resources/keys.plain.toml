@@ -17,3 +17,5 @@
 "Cmd-Ctrl-G" = "edit.selectAllFindMatches"
 "Cmd-D" = "editor.addNextSelection"
 "Cmd-Shift-F" = "edit.findInProject"
+"Cmd-T" = "nav.gotoSymbolWorkspace"
+"Cmd-Shift-O" = "nav.gotoSymbolFile"

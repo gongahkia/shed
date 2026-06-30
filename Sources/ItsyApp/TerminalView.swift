@@ -1,9 +1,10 @@
 import AppKit
 import Foundation
+import ItsyConfig
 
 final class ItsyTerminalView: NSView {
 	private let emulator = ItsyTerminalEmulator()
-	private let font = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
+	private var font = NSFont.monospacedSystemFont(ofSize: CGFloat(ItsySettings.TerminalSettings.defaultFontSize), weight: .regular)
 	private var characterSize = CGSize(width: 7, height: 15)
 	private var scrollbackOffset = 0
 	var onInput: ((Data) -> Void)?
@@ -51,6 +52,14 @@ final class ItsyTerminalView: NSView {
 		emulator.clearScrollback()
 		scrollbackOffset = 0
 		needsDisplay = true
+	}
+
+	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+		let settings = ItsySettings(terminal: settings).normalized().terminal
+		font = NSFont.monospacedSystemFont(ofSize: CGFloat(settings.fontSize), weight: .regular)
+		emulator.setMaxScrollbackLines(settings.scrollbackLines)
+		measureCharacterSize()
+		syncSize()
 	}
 
 	override func setFrameSize(_ newSize: NSSize) {
@@ -119,6 +128,10 @@ final class ItsyTerminalView: NSView {
 	private func commonInit() {
 		wantsLayer = true
 		layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+		measureCharacterSize()
+	}
+
+	private func measureCharacterSize() {
 		let sample = ("M" as NSString).size(withAttributes: [.font: font])
 		characterSize = CGSize(width: ceil(sample.width), height: ceil(font.ascender - font.descender + font.leading + 2))
 	}

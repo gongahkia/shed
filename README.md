@@ -17,6 +17,10 @@ Pre-release. Do not ship the current release candidate.
 See [NORTHSTAR.md](NORTHSTAR.md) for scope, KPIs, architecture, and non-goals.
 See [TODO.md](TODO.md) for remaining work.
 
+## Config
+
+Itsy reads user settings from `~/.config/itsy/settings.toml`; see [docs/settings.md](docs/settings.md).
+
 ## Build
 
 ```sh
@@ -72,7 +76,7 @@ Itsy is intentionally narrow:
 |---|---|---|
 | Native editor | AppKit shell, Metal text view, Swift rope buffer, split panes, tabs, file tree, lazy PTY terminal | No Electron, collaboration, or telemetry |
 | Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings | Named Vim marks deferred |
-| Syntax/themes | Tree-sitter parsing/highlighting for bundled grammars and local theme files | Additional grammars/themes are incremental |
+| Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.toml` editor/theme/terminal prefs | Additional grammars/themes are incremental |
 | LSP | Lazy external server sessions, document sync, diagnostics gutter, completion/resolve, hover, references panel, signature help, workspace edits/config, smoke/bench coverage | Full LSP surface is incomplete |
 | DAP | Protocol types and message framing | No integrated debugger UI |
 | Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |

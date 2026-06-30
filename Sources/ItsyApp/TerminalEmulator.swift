@@ -19,7 +19,7 @@ final class ItsyTerminalEmulator {
 
 	private(set) var columns: Int
 	private(set) var rows: Int
-	private let maxScrollbackLines: Int
+	private var maxScrollbackLines: Int
 	private var screen: [[Character]]
 	private var normalScreen: [[Character]] = []
 	private var history: [String] = []
@@ -72,6 +72,13 @@ final class ItsyTerminalEmulator {
 
 	func clearScrollback() {
 		history.removeAll(keepingCapacity: true)
+	}
+
+	func setMaxScrollbackLines(_ lines: Int) {
+		maxScrollbackLines = max(0, lines)
+		if history.count > maxScrollbackLines {
+			history.removeFirst(history.count - maxScrollbackLines)
+		}
 	}
 
 	func feed(_ data: Data) {

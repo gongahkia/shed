@@ -1,6 +1,7 @@
 import AppKit
 import Dispatch
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import ItsyKeymap
 import ItsyRender
@@ -151,7 +152,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var settingsFontSizeField: NSTextField?
 	private var settingsFontSizeStepper: NSStepper?
 	private var settingsLineNumbersButton: NSButton?
+	private var settingsTerminalFontSizeField: NSTextField?
+	private var settingsTerminalFontSizeStepper: NSStepper?
+	private var settingsTerminalScrollbackField: NSTextField?
 	private var settingsStatusLabel: NSTextField?
+	private let settingsStore: ItsySettingsStore
+	private var appSettings: ItsySettings
+	private var settingsWarnings: [ItsySettingsWarning]
 	private var projectFindPanel: NSPanel?
 	private var projectFindInputField: NSTextField?
 	private var projectFindStatusLabel: NSTextField?
@@ -243,7 +250,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var outlineSuppressPersist = false
 
 	init(documentController: ItsyDocumentController) {
+		let store = ItsySettingsStore()
+		let loadedSettings = store.load(fallback: Self.legacySettingsFromDefaults())
 		self.documentController = documentController
+		settingsStore = store
+		appSettings = loadedSettings.settings
+		settingsWarnings = loadedSettings.warnings
+		Self.mirrorSettingsToDefaults(appSettings)
 		recordBenchStage("delegate_init")
 		do {
 			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
@@ -261,6 +274,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			self.showExCommand(relativeTo: window, completion: completion)
 			return true
 		}
+	}
+
+	private static func legacySettingsFromDefaults(_ defaults: UserDefaults = .standard) -> ItsySettings {
+		var settings = EditorPreferences.legacySettings(defaults: defaults)
+		if let themeID = defaults.string(forKey: SyntaxTheme.selectedThemeDefaultsKey), !themeID.isEmpty {
+			settings.theme.id = themeID
+		}
+		return settings
+	}
+
+	private static func mirrorSettingsToDefaults(_ settings: ItsySettings, defaults: UserDefaults = .standard) {
+		let settings = settings.normalized()
+		defaults.set(settings.editor.font, forKey: EditorPreferences.fontNameKey)
+		defaults.set(settings.editor.fontSize, forKey: EditorPreferences.fontSizeKey)
+		defaults.set(settings.editor.lineNumbers, forKey: EditorPreferences.showLineNumbersKey)
+		defaults.set(settings.theme.id, forKey: SyntaxTheme.selectedThemeDefaultsKey)
 	}
 
 	func applicationDidFinishLaunching(_ notification: Notification) {
@@ -750,8 +779,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 	private func saveAndApplyEditorPreferences(_ preferences: EditorPreferences) {
 		preferences.save()
+		preferences.apply(to: &appSettings)
+		saveAppSettings()
 		syncSettingsEditorControls(preferences)
 		applyEditorPreferencesToOpenWindows(preferences)
+	}
+
+	private func saveAppSettings() {
+		do {
+			try settingsStore.save(appSettings)
+			settingsWarnings.removeAll()
+			Self.mirrorSettingsToDefaults(appSettings)
+			setDefaultSettingsStatus()
+		} catch {
+			settingsStatusLabel?.textColor = .systemRed
+			settingsStatusLabel?.stringValue = L10n.string("Failed to save settings: \(String(describing: error))")
+		}
 	}
 
 	private func applyEditorPreferencesToOpenWindows(_ preferences: EditorPreferences = EditorPreferences.load()) {
@@ -2693,6 +2736,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		terminalView.onResize = { [weak self] columns, rows in
 			self?.terminalSession?.resize(columns: columns, rows: rows)
 		}
+		terminalView.applyTerminalSettings(appSettings.terminal)
 		header.translatesAutoresizingMaskIntoConstraints = false
 		terminalView.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(header)
@@ -2708,6 +2752,10 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		])
 		terminalStatusLabel = statusLabel
 		self.terminalView = terminalView
+	}
+
+	private func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+		terminalView?.applyTerminalSettings(settings)
 	}
 
 	private func centerTerminalPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -3144,7 +3192,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 314))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 430))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -3207,6 +3255,46 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		lineNumbersButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(lineNumbersButton)
 
+		let terminalFontSizeLabel = settingsLabel("Terminal Size")
+		contentView.addSubview(terminalFontSizeLabel)
+
+		let terminalFontSizeField = NSTextField(frame: .zero)
+		terminalFontSizeField.alignment = .right
+		let terminalSizeFormatter = NumberFormatter()
+		terminalSizeFormatter.minimum = NSNumber(value: ItsySettings.TerminalSettings.minFontSize)
+		terminalSizeFormatter.maximum = NSNumber(value: ItsySettings.TerminalSettings.maxFontSize)
+		terminalSizeFormatter.minimumFractionDigits = 0
+		terminalSizeFormatter.maximumFractionDigits = 1
+		terminalFontSizeField.formatter = terminalSizeFormatter
+		terminalFontSizeField.target = self
+		terminalFontSizeField.action = #selector(settingsTerminalFontSizeDidChange(_:))
+		terminalFontSizeField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(terminalFontSizeField)
+
+		let terminalFontSizeStepper = NSStepper()
+		terminalFontSizeStepper.minValue = ItsySettings.TerminalSettings.minFontSize
+		terminalFontSizeStepper.maxValue = ItsySettings.TerminalSettings.maxFontSize
+		terminalFontSizeStepper.increment = 1
+		terminalFontSizeStepper.target = self
+		terminalFontSizeStepper.action = #selector(settingsTerminalFontSizeDidChange(_:))
+		terminalFontSizeStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(terminalFontSizeStepper)
+
+		let scrollbackLabel = settingsLabel("Scrollback")
+		contentView.addSubview(scrollbackLabel)
+
+		let scrollbackField = NSTextField(frame: .zero)
+		scrollbackField.alignment = .right
+		let scrollbackFormatter = NumberFormatter()
+		scrollbackFormatter.minimum = NSNumber(value: ItsySettings.TerminalSettings.minScrollbackLines)
+		scrollbackFormatter.maximum = NSNumber(value: ItsySettings.TerminalSettings.maxScrollbackLines)
+		scrollbackFormatter.allowsFloats = false
+		scrollbackField.formatter = scrollbackFormatter
+		scrollbackField.target = self
+		scrollbackField.action = #selector(settingsTerminalScrollbackDidChange(_:))
+		scrollbackField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(scrollbackField)
+
 		let zoomOutButton = NSButton(title: L10n.string("Zoom Out"), target: self, action: #selector(zoomOut(_:)))
 		zoomOutButton.bezelStyle = .rounded
 		zoomOutButton.translatesAutoresizingMaskIntoConstraints = false
@@ -3223,11 +3311,11 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		zoomStack.orientation = .horizontal
 		zoomStack.alignment = .centerY
 		zoomStack.spacing = 8
-		zoomStack.distribution = .gravityAreas
+		zoomStack.distribution = .fillEqually
 		zoomStack.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(zoomStack)
 
-		let reloadButton = NSButton(title: L10n.string("Reload Themes"), target: self, action: #selector(reloadSettingsThemes(_:)))
+		let reloadButton = NSButton(title: L10n.string("Reload Settings"), target: self, action: #selector(reloadSettings(_:)))
 		reloadButton.bezelStyle = .rounded
 		reloadButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(reloadButton)
@@ -3262,9 +3350,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
 			lineNumbersButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			lineNumbersButton.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			terminalFontSizeLabel.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			terminalFontSizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			terminalFontSizeField.widthAnchor.constraint(equalToConstant: 72),
+			terminalFontSizeField.centerYAnchor.constraint(equalTo: terminalFontSizeLabel.centerYAnchor),
+			terminalFontSizeStepper.leadingAnchor.constraint(equalTo: terminalFontSizeField.trailingAnchor, constant: 8),
+			terminalFontSizeStepper.centerYAnchor.constraint(equalTo: terminalFontSizeField.centerYAnchor),
+			scrollbackLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			scrollbackLabel.topAnchor.constraint(equalTo: terminalFontSizeField.bottomAnchor, constant: 22),
+			scrollbackLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			scrollbackField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			scrollbackField.widthAnchor.constraint(equalToConstant: 112),
+			scrollbackField.centerYAnchor.constraint(equalTo: scrollbackLabel.centerYAnchor),
 			zoomStack.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			zoomStack.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
-			zoomStack.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			zoomStack.topAnchor.constraint(equalTo: scrollbackField.bottomAnchor, constant: 18),
+			zoomStack.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
 			reloadButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			reloadButton.topAnchor.constraint(equalTo: zoomStack.bottomAnchor, constant: 16),
 			reloadButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
@@ -3278,6 +3380,9 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		settingsFontSizeField = sizeField
 		settingsFontSizeStepper = sizeStepper
 		settingsLineNumbersButton = lineNumbersButton
+		settingsTerminalFontSizeField = terminalFontSizeField
+		settingsTerminalFontSizeStepper = terminalFontSizeStepper
+		settingsTerminalScrollbackField = scrollbackField
 		settingsStatusLabel = statusLabel
 	}
 
@@ -3293,23 +3398,23 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		let choices = SyntaxTheme.availableChoices()
-		let selectedID = UserDefaults.standard.string(forKey: SyntaxTheme.selectedThemeDefaultsKey) ?? SyntaxTheme.defaultChoiceID
 		themePopup.removeAllItems()
 		for choice in choices {
 			themePopup.addItem(withTitle: choice.displayName)
 			themePopup.lastItem?.representedObject = choice.id
 		}
-		if let item = themePopup.itemArray.first(where: { $0.representedObject as? String == selectedID }) {
+		if let item = themePopup.itemArray.first(where: { $0.representedObject as? String == appSettings.theme.id }) {
 			themePopup.select(item)
 		} else if let item = themePopup.itemArray.first {
 			themePopup.select(item)
 		}
 		refreshSettingsEditorControls()
+		refreshSettingsTerminalControls()
 		setDefaultSettingsStatus()
 	}
 
 	private func refreshSettingsEditorControls() {
-		let preferences = EditorPreferences.load()
+		let preferences = EditorPreferences(settings: appSettings.editor)
 		settingsFontPopup?.removeAllItems()
 		for fontName in EditorPreferences.availableFontNames() {
 			settingsFontPopup?.addItem(withTitle: EditorPreferences.fontDisplayName(for: fontName))
@@ -3327,13 +3432,32 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		settingsLineNumbersButton?.state = preferences.showLineNumbers ? .on : .off
 	}
 
-	private func setDefaultSettingsStatus() {
-		settingsStatusLabel?.textColor = .secondaryLabelColor
-		settingsStatusLabel?.stringValue = L10n.string("Custom themes: ~/.config/itsy/themes/*.toml")
+	private func refreshSettingsTerminalControls() {
+		let terminal = appSettings.normalized().terminal
+		settingsTerminalFontSizeField?.doubleValue = terminal.fontSize
+		settingsTerminalFontSizeStepper?.doubleValue = terminal.fontSize
+		settingsTerminalScrollbackField?.integerValue = terminal.scrollbackLines
 	}
 
-	@objc private func reloadSettingsThemes(_ sender: Any?) {
+	private func setDefaultSettingsStatus() {
+		if let warning = settingsWarnings.first {
+			settingsStatusLabel?.textColor = .systemOrange
+			settingsStatusLabel?.stringValue = L10n.string("Settings warning: \(warning.description)")
+		} else {
+			settingsStatusLabel?.textColor = .secondaryLabelColor
+			settingsStatusLabel?.stringValue = L10n.string("Config: ~/.config/itsy/settings.toml")
+		}
+	}
+
+	@objc private func reloadSettings(_ sender: Any?) {
+		let result = settingsStore.load(fallback: Self.legacySettingsFromDefaults())
+		appSettings = result.settings
+		settingsWarnings = result.warnings
+		Self.mirrorSettingsToDefaults(appSettings)
 		refreshSettingsThemes()
+		applyEditorPreferencesToOpenWindows(EditorPreferences(settings: appSettings.editor))
+		applyTerminalSettings(appSettings.terminal)
+		reloadSyntaxThemes()
 	}
 
 	@objc private func settingsThemeDidChange(_ sender: Any?) {
@@ -3342,8 +3466,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		}
 		do {
 			_ = try SyntaxTheme.loadChoice(id: id)
-			UserDefaults.standard.set(id, forKey: SyntaxTheme.selectedThemeDefaultsKey)
-			setDefaultSettingsStatus()
+			appSettings.theme.id = id
+			saveAppSettings()
 			reloadSyntaxThemes()
 		} catch {
 			settingsStatusLabel?.textColor = .systemRed
@@ -3375,6 +3499,26 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		var preferences = EditorPreferences.load()
 		preferences.showLineNumbers = settingsLineNumbersButton?.state == .on
 		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsTerminalFontSizeDidChange(_ sender: Any?) {
+		if sender as? NSStepper === settingsTerminalFontSizeStepper {
+			appSettings.terminal.fontSize = settingsTerminalFontSizeStepper?.doubleValue ?? appSettings.terminal.fontSize
+		} else {
+			appSettings.terminal.fontSize = settingsTerminalFontSizeField?.doubleValue ?? appSettings.terminal.fontSize
+		}
+		appSettings = appSettings.normalized()
+		saveAppSettings()
+		refreshSettingsTerminalControls()
+		applyTerminalSettings(appSettings.terminal)
+	}
+
+	@objc private func settingsTerminalScrollbackDidChange(_ sender: Any?) {
+		appSettings.terminal.scrollbackLines = settingsTerminalScrollbackField?.integerValue ?? appSettings.terminal.scrollbackLines
+		appSettings = appSettings.normalized()
+		saveAppSettings()
+		refreshSettingsTerminalControls()
+		applyTerminalSettings(appSettings.terminal)
 	}
 
 	private func reloadSyntaxThemes() {

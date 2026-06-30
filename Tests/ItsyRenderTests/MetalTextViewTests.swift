@@ -66,7 +66,7 @@ import Testing
 	view.editor = Editor(text: "abc\ndef\nghi\n")
 	let down = try #require(NSEvent.mouseEvent(
 		with: .leftMouseDown,
-		location: NSPoint(x: 30, y: 27),
+		location: NSPoint(x: 30, y: 73),
 		modifierFlags: [],
 		timestamp: 0,
 		windowNumber: 0,
@@ -77,7 +77,7 @@ import Testing
 	))
 	let drag = try #require(NSEvent.mouseEvent(
 		with: .leftMouseDragged,
-		location: NSPoint(x: 30, y: 47),
+		location: NSPoint(x: 30, y: 53),
 		modifierFlags: [],
 		timestamp: 0,
 		windowNumber: 0,
@@ -93,7 +93,7 @@ import Testing
 	#expect(view.editor.selections.primary == Selection(anchor: 4, head: 8))
 }
 
-@Test func mouseDragUsesTopDownWindowCoordinates() throws {
+@MainActor @Test func mouseDragUsesTopDownWindowCoordinates() throws {
 	let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 100), styleMask: [], backing: .buffered, defer: false)
 	let view = MetalTextView(frame: window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\ndef\nghi\n")

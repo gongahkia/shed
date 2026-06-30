@@ -51,7 +51,7 @@ final class OllyRuntimeTests: XCTestCase {
             isMain: false
         )
         try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, primaryDisplayID in
-            await seedWindows(runtime, displayID: secondaryDisplay.id, windows: [
+            try await seedWindows(runtime, displayID: secondaryDisplay.id, windows: [
                 (1, 0, CGRect(x: 1440, y: 0, width: 300, height: 300))
             ])
             await runtime.setFocusedWindow(1)
@@ -82,6 +82,41 @@ final class OllyRuntimeTests: XCTestCase {
 
             display = try XCTUnwrap(try stateSnapshot(from: send(.state(.init()), to: socketPath)).displays.first)
             XCTAssertEqual(display.tagEngines.first?.engineID, FloatingLayoutEngine.engineID)
+        }
+    }
+
+    func testRuntimeRejectsNonFloatingWindowEngineOverride() async throws {
+        try await withRuntime { runtime, _, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Rules {
+                    Rule(
+                        match: RuleMatch(bundleID: "com.example.App"),
+                        apply: RuleApply(engine: .bsp)
+                    )
+                }
+            })
+
+            do {
+                try await runtime.upsertRuntimeWindow(
+                    WindowState(
+                        id: 1,
+                        processID: 42,
+                        bundleID: "com.example.App",
+                        displayID: displayID,
+                        tagMask: 1,
+                        frame: .zero
+                    ),
+                    element: nil
+                )
+                XCTFail("expected unsupported engine command")
+            } catch let error as OllyRuntimeError {
+                guard case let .unsupportedEngineCommand(command, engineID) = error else {
+                    XCTFail("expected unsupported engine command")
+                    return
+                }
+                XCTAssertEqual(command, "rule-engine-override")
+                XCTAssertEqual(engineID, BSPLayoutEngine.engineID)
+            }
         }
     }
 
@@ -285,7 +320,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testMoveWindowReordersFocusedWindowByLinearDirection() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300)),
                 (3, 2, CGRect(x: 600, y: 0, width: 300, height: 300))
@@ -367,7 +402,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testSwapWindowUsesSpatialDirectionalTarget() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300)),
                 (3, 2, CGRect(x: 0, y: 300, width: 300, height: 300)),
@@ -386,7 +421,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testMoveWindowAtEdgeReturnsStructuredDirectionalError() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -400,7 +435,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testRestoreWindowsReportsSkippedTargetsFromRecoveryJournal() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -426,7 +461,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testListWindowsAndDisplaysReturnScopedState() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -446,7 +481,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testToggleFloatingUpdatesFocusedWindow() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -465,7 +500,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testToggleStickyUpdatesFocusedWindow() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
             ])
             await runtime.setFocusedWindow(1)
@@ -483,7 +518,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testPinnedWindowTagMaskRewritesOnTagSwitch() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
             ])
             await runtime.setFocusedWindow(1)
@@ -508,7 +543,7 @@ final class OllyRuntimeTests: XCTestCase {
             isMain: false
         )
         try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300))
             ])
             await runtime.setFocusedWindow(1)
@@ -532,7 +567,7 @@ final class OllyRuntimeTests: XCTestCase {
         )
         try await withRuntime(extraDisplays: [secondaryDisplay]) { runtime, socketPath, displayID in
             let inactive = try Tag(index: 1)
-            await runtime.upsertRuntimeWindow(
+            try await runtime.upsertRuntimeWindow(
                 WindowState(
                     id: 1,
                     processID: 42,
@@ -553,7 +588,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testSnapWindowUsesSafeLayoutBoundsAndFloatsWindow() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 100, y: 100, width: 320, height: 240))
             ])
             await runtime.setFocusedWindow(1)
@@ -570,7 +605,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testSnapWindowCanKeepWindowTiled() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 200, height: 100))
             ])
             await runtime.setFocusedWindow(1)
@@ -619,7 +654,7 @@ final class OllyRuntimeTests: XCTestCase {
                     fourFingerHorizontal(.scrollColumns)
                 }
             })
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -650,7 +685,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testManualPreselectMutatesManualTree() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -673,7 +708,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testBSPTreeCommandMutatesBSPTree() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 300, y: 0, width: 300, height: 300))
             ])
@@ -694,7 +729,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testSpatialTargetPrefersPerpendicularOverlapBeforeNearestCenter() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 200, y: 200, width: 100, height: 100)),
                 (2, 1, CGRect(x: 100, y: 450, width: 100, height: 100)),
                 (3, 2, CGRect(x: 80, y: 210, width: 100, height: 80))
@@ -711,7 +746,7 @@ final class OllyRuntimeTests: XCTestCase {
 
     func testSpatialTargetIgnoresHiddenLayoutPlacements() async throws {
         try await withRuntime { runtime, socketPath, displayID in
-            await seedWindows(runtime, displayID: displayID, windows: [
+            try await seedWindows(runtime, displayID: displayID, windows: [
                 (1, 0, CGRect(x: 0, y: 0, width: 300, height: 300)),
                 (2, 1, CGRect(x: 0, y: 300, width: 300, height: 300))
             ])
@@ -793,9 +828,9 @@ private func seedWindows(
     _ runtime: OllyRuntime,
     displayID: DisplayID,
     windows: [(WindowID, Int, CGRect)]
-) async {
+) async throws {
     for (id, layoutOrder, frame) in windows {
-        await runtime.upsertRuntimeWindow(
+        try await runtime.upsertRuntimeWindow(
             WindowState(
                 id: id,
                 processID: 42,

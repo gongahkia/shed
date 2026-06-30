@@ -17,7 +17,12 @@ final class WindowRecoveryJournalTests: XCTestCase {
         let stateURL = temporaryStateURL()
         let journal = WindowRecoveryJournal(stateURL: stateURL)
         let first = window(id: 7, frame: CGRect(x: 10, y: 20, width: 300, height: 200))
-        let second = window(id: 7, frame: CGRect(x: 30, y: 40, width: 320, height: 220))
+        let second = window(
+            id: 7,
+            frame: CGRect(x: 30, y: 40, width: 320, height: 220),
+            isSticky: true,
+            engineOverride: LayoutEngineID(rawValue: "floating")
+        )
 
         try await journal.record(window: first, parkedFrame: CGRect(x: -32_000, y: -32_000, width: 300, height: 200))
         try await journal.record(window: second, parkedFrame: CGRect(x: -33_000, y: -33_000, width: 320, height: 220))
@@ -26,6 +31,8 @@ final class WindowRecoveryJournalTests: XCTestCase {
         XCTAssertEqual(state.entries.map(\.windowID), [7])
         XCTAssertEqual(state.entries.first?.originalFrame.cgRect, second.frame)
         XCTAssertEqual(state.entries.first?.parkedFrame.cgRect.origin.x, -33_000)
+        XCTAssertEqual(state.entries.first?.isSticky, true)
+        XCTAssertEqual(state.entries.first?.engineOverride, LayoutEngineID(rawValue: "floating"))
 
         try await journal.remove(windowID: 7)
         state = try await journal.load()
@@ -56,13 +63,20 @@ final class WindowRecoveryJournalTests: XCTestCase {
             .appendingPathComponent("recovery.json")
     }
 
-    private func window(id: WindowID, frame: CGRect) -> WindowState {
+    private func window(
+        id: WindowID,
+        frame: CGRect,
+        isSticky: Bool = false,
+        engineOverride: LayoutEngineID? = nil
+    ) -> WindowState {
         WindowState(
             id: id,
             processID: 42,
             bundleID: "com.example.App",
             displayID: 1,
             tagMask: 1,
+            isSticky: isSticky,
+            engineOverride: engineOverride,
             frame: frame,
             title: "window \(id)",
             role: "AXWindow",

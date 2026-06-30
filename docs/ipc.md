@@ -72,6 +72,8 @@ layout order by stable window identity and restores it on later window discovery
 `list-windows` and `list-displays` return scoped `state` payloads for scripts that need stable query
 commands instead of parsing the full runtime state. `toggle-floating` changes whether a window participates
 in tiling, and `move-to-display` updates Olly's display assignment before re-arranging the affected displays.
+`engineOverride` reports a per-window layout opt-out; currently `.floating` means the tag engine leaves that
+window at its current frame. Other per-window engine overrides are rejected as `unsupported_engine_command`.
 `snap-window` places a window in a safe-layout display zone and makes it floating by default so the next
 tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
 DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
@@ -1107,6 +1109,12 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "isPinned": {
           "type": "boolean"
+        },
+        "engineOverride": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "layoutOrder": {
           "type": [

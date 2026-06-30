@@ -103,6 +103,37 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [1])
     }
 
+    func testArrangeExcludesFloatingEngineOverrides() async throws {
+        let tag = try Tag(index: 1)
+        let engineID = LayoutEngineID(rawValue: "fixed")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet(tag))
+        let registry = try LayoutEngineRegistry(factories: [AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: engineID))])
+        let recorder = EngineHostPlacementRecorder()
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { window, placement in
+                await recorder.record(windowID: window.id, placement: placement)
+            }
+        )
+        await tagStore.bindEngine(engineID, to: tag, on: 1)
+        await windowStore.upsert(window(id: 1, tagMask: TagSet(tag).rawValue))
+        await windowStore.upsert(window(
+            id: 2,
+            tagMask: TagSet(tag).rawValue,
+            engineOverride: FloatingLayoutEngine.engineID
+        ))
+
+        let result = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
+        let recordedWindowIDs = await recorder.windowIDs
+
+        XCTAssertEqual(result.placements.map(\.windowID), [1])
+        XCTAssertEqual(recordedWindowIDs, [1])
+    }
+
     func testArrangeUsesUnionOfActiveTags() async throws {
         let one = try Tag(index: 1)
         let two = try Tag(index: 2)
@@ -302,6 +333,7 @@ final class EngineHostTests: XCTestCase {
         id: WindowID,
         tagMask: UInt64,
         isFloating: Bool = false,
+        engineOverride: LayoutEngineID? = nil,
         frame: CGRect = CGRect(x: 0, y: 0, width: 100, height: 100)
     ) -> WindowState {
         WindowState(
@@ -310,6 +342,7 @@ final class EngineHostTests: XCTestCase {
             displayID: 1,
             tagMask: tagMask,
             isFloating: isFloating,
+            engineOverride: engineOverride,
             frame: frame
         )
     }

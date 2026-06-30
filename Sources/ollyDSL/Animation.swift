@@ -1,5 +1,6 @@
 import Foundation
 import ollyCore
+import ollyKit
 
 /// Purpose: Stores an animation duration in milliseconds.
 /// Parameters: Provide a non-negative millisecond value directly or via `.ms`.

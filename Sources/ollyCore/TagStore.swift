@@ -1,16 +1,6 @@
 import Foundation
 import ollyKit
 
-public struct LayoutEngineID: Codable, Hashable, RawRepresentable, Sendable {
-    public let rawValue: String
-
-    public init(rawValue: String) {
-        precondition(!rawValue.isEmpty)
-        self.rawValue = rawValue
-    }
-
-}
-
 public struct DisplayTagState: Equatable, Sendable {
     public let displayID: DisplayID
     public var activeTags: TagSet

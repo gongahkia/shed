@@ -19,7 +19,7 @@ extension OllyRuntime {
         do {
             try await loadConfig(useDefaultWhenMissing: true)
             await initializeDisplays()
-            await reapplyRulesToStoredWindows()
+            try await reapplyRulesToStoredWindows()
             try await arrangeAllDisplays()
         } catch {
             lastError = String(describing: error)

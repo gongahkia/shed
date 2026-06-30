@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 import ollyCore
 import ollyIPC
+import ollyKit
 import ollyLayouts
 
 final class IPCCommandTests: XCTestCase {

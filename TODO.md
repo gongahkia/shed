@@ -23,28 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M1 — Reliability spine (yabai-class WM)
 
-### M1.4 Per-window engine override (floating-only)
-
-**Goal:** A single window opts out of its tag's engine (e.g., Slack always floats inside a BSP tag).
-
-**Scope decision:** Support **floating-only override** initially. True multi-engine composition (spiral-inside-bsp for one window only) requires layered-arrangement design that is out of M1 scope; reject other overrides with `OllyRuntimeError.unsupportedEngineCommand`.
-
-**Files to modify:**
-- `Sources/ollyKit/WindowStore.swift:6-118` — add `engineOverride: LayoutEngineID?` to `WindowState`. Note: `LayoutEngineID` lives in ollyCore (`Sources/ollyCore/TagStore.swift:4-12`); move it to ollyKit (it's pure `RawRepresentable<String>`) and verify no `Package.swift` cycle.
-- `Sources/ollyDSL/Rule.swift:268-291` — propagate `engineOverride` into the rebuilt `WindowState` via `resolvedWindowState`.
-- `Sources/ollyLayouts/EngineHost.swift:161-215` — in `arrangeWithSignpost`, exclude `engineOverride != nil && engineOverride == .floating` windows from the tag-engine arrange pass; treat them as floating (keep their frame).
-
-**IPC additions:**
-- Surface `engineOverride` on `IPCWindowState`.
-
-**Test plan:**
-- Snapshot: BSP tag with three windows + one rule `engine: .floating` for Slack; assert Slack frame unchanged while the other two tile.
-
-**Acceptance:**
-- `Rule(match: RuleMatch(bundleID: "com.tinyspeck.slackmacgap"), apply: RuleApply(engine: .floating))` causes Slack to skip layout regardless of tag's engine.
-
----
-
 ### M1.5 Fullscreen-app handling
 
 **Goal:** Detect macOS native fullscreen enter/exit; unmanage during fullscreen; rehome on exit preserving tag membership.

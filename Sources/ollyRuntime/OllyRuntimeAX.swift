@@ -176,24 +176,14 @@ extension OllyRuntime {
         await refreshFocusedWindow(element: element, application: application)
     }
 
-    func reapplyRulesToStoredWindows() async {
+    func reapplyRulesToStoredWindows() async throws {
         for window in await windowStore.allWindows() {
-            await upsertRuntimeWindow(window, element: windowTargets.target(for: window)?.axElement)
+            try await upsertRuntimeWindow(window, element: windowTargets.target(for: window)?.axElement)
         }
     }
 
-    func upsertRuntimeWindow(_ state: WindowState, element: AXUIElement?) async {
-        let config = await configStore.current()
-        let apply = config.resolvedApply(
-            for: RuleContext(
-                bundleID: state.bundleID,
-                title: state.title,
-                role: state.role,
-                subrole: state.subrole,
-                windowSize: state.frame.size
-            )
-        )
-        let resolved = await restoredLayoutOrder(config.resolvedWindowState(for: state))
+    func upsertRuntimeWindow(_ state: WindowState, element: AXUIElement?) async throws {
+        let resolved = try await resolvedRuntimeWindowState(state)
         await windowStore.upsert(resolved)
         if let element {
             windowTargets.set(
@@ -201,12 +191,19 @@ extension OllyRuntime {
                 for: resolved.id
             )
         }
-        if let engineID = apply.engineOverride,
-           let displayID = resolved.displayID {
-            for tag in TagSet(rawValue: resolved.tagMask).tags {
-                await tagStore.bindEngine(engineID, to: tag, on: displayID)
-            }
+    }
+
+    private func resolvedRuntimeWindowState(_ state: WindowState) async throws -> WindowState {
+        let config = await configStore.current()
+        let resolved = config.resolvedWindowState(for: state)
+        if let engineOverride = resolved.engineOverride,
+           engineOverride != FloatingLayoutEngine.engineID {
+            throw OllyRuntimeError.unsupportedEngineCommand(
+                command: "rule-engine-override",
+                engineID: engineOverride
+            )
         }
+        return await restoredLayoutOrder(resolved)
     }
 
     private func refreshWindowElement(_ element: AXUIElement, application: Application) async {
@@ -252,7 +249,11 @@ extension OllyRuntime {
             role: snapshot.attributes.role,
             subrole: snapshot.attributes.subrole
         )
-        await upsertRuntimeWindow(baseState, element: element)
+        do {
+            try await upsertRuntimeWindow(baseState, element: element)
+        } catch {
+            lastError = String(describing: error)
+        }
     }
 
     private func refreshFocusedWindow(from event: AXNotificationEvent) async {

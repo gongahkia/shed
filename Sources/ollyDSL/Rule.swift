@@ -302,6 +302,7 @@ public extension Config {
             isFloating: apply.floating ?? state.isFloating,
             isSticky: apply.sticky ?? state.isSticky,
             isPinned: apply.pinned ?? state.isPinned,
+            engineOverride: apply.engineOverride ?? state.engineOverride,
             layoutOrder: state.layoutOrder,
             frame: state.frame,
             title: state.title,

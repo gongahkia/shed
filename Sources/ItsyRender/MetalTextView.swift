@@ -2150,7 +2150,8 @@ public final class MetalTextView: NSView {
 
 	private func ensureGlyphAtlas(scale: CGFloat) -> Bool {
 		let renderingMode = glyphRenderingMode(scale: scale)
-		if glyphAtlas != nil, glyphAtlasRenderingMode == renderingMode {
+		let scaleKey = Self.scaleKey(for: scale)
+		if glyphAtlas != nil, glyphAtlasRenderingMode == renderingMode, glyphAtlasScaleKey == scaleKey {
 			return true
 		}
 		guard let metalDevice, let atlas = try? GlyphAtlas(device: metalDevice, renderingMode: renderingMode) else {
@@ -2158,6 +2159,7 @@ public final class MetalTextView: NSView {
 		}
 		glyphAtlas = atlas
 		glyphAtlasRenderingMode = renderingMode
+		glyphAtlasScaleKey = scaleKey
 		return true
 	}
 
@@ -2174,11 +2176,13 @@ public final class MetalTextView: NSView {
 	private func resetGlyphCacheForCurrentScale() {
 		let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
 		let mode = glyphRenderingMode(scale: scale)
-		guard glyphAtlasRenderingMode != mode else {
+		let scaleKey = Self.scaleKey(for: scale)
+		guard glyphAtlasRenderingMode != mode || glyphAtlasScaleKey != scaleKey else {
 			return
 		}
 		glyphAtlas = nil
 		glyphAtlasRenderingMode = nil
+		glyphAtlasScaleKey = nil
 		lineShapeCache.removeAll(keepingCapacity: true)
 	}
 
@@ -2189,6 +2193,14 @@ public final class MetalTextView: NSView {
 	private static func makeDefaultTextFont() -> CTFont {
 		let font = NSFont(name: "Monaco", size: defaultFontSize) ?? NSFont.monospacedSystemFont(ofSize: defaultFontSize, weight: .regular)
 		return CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
+	}
+
+	private func scaledTextFont(scale: CGFloat) -> CTFont {
+		CTFontCreateCopyWithAttributes(textFont, CTFontGetSize(textFont) * scale, nil, nil)
+	}
+
+	private static func scaleKey(for scale: CGFloat) -> Int {
+		Int((scale * 100).rounded())
 	}
 
 	private func currentDisplayID() -> CGDirectDisplayID? {

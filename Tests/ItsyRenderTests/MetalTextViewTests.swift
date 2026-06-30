@@ -285,6 +285,17 @@ import Testing
 	#expect(wide.size.x > narrow.size.x)
 }
 
+@Test func descendersDoNotShiftGlyphBaseline() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "pa\n")
+	let glyphs = view.textGlyphInstances(scale: 2)
+	#expect(glyphs.count == 2)
+	let p = try #require(glyphs.first)
+	let a = try #require(glyphs.dropFirst().first)
+	#expect(abs(p.screenOrigin.y - a.screenOrigin.y) <= 1)
+	#expect(p.size.y > a.size.y)
+}
+
 @Test func keymapProfileChangesTextHandlingWithoutRecompile() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [

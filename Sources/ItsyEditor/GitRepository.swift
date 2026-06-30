@@ -176,11 +176,13 @@ public enum GitStatusParser {
 
 public protocol GitCommandRunning: Sendable {
 	func runGit(arguments: [String], root: URL) throws -> String
+	func runGit(arguments: [String], input: String, root: URL) throws -> String
 }
 
 public enum GitCommandError: Error, Equatable, Sendable {
 	case failed(status: Int32, stderr: String)
 	case invalidOutput
+	case stdinUnsupported
 }
 
 public enum GitCommitError: Error, Equatable, Sendable {
@@ -195,15 +197,31 @@ public struct ProcessGitCommandRunner: GitCommandRunning {
 	}
 
 	public func runGit(arguments: [String], root: URL) throws -> String {
+		try runGitProcess(arguments: arguments, input: nil, root: root)
+	}
+
+	public func runGit(arguments: [String], input: String, root: URL) throws -> String {
+		try runGitProcess(arguments: arguments, input: input, root: root)
+	}
+
+	private func runGitProcess(arguments: [String], input: String?, root: URL) throws -> String {
 		let process = Process()
 		process.executableURL = executableURL
 		process.arguments = arguments
 		process.currentDirectoryURL = root
 		let stdout = Pipe()
 		let stderr = Pipe()
+		let stdin = input.map { _ in Pipe() }
 		process.standardOutput = stdout
 		process.standardError = stderr
+		if let stdin {
+			process.standardInput = stdin
+		}
 		try process.run()
+		if let input, let stdin {
+			try stdin.fileHandleForWriting.write(contentsOf: Data(input.utf8))
+			try stdin.fileHandleForWriting.close()
+		}
 		let stdoutBox = GitCommandDataBox()
 		let stderrBox = GitCommandDataBox()
 		let readers = DispatchGroup()
@@ -295,6 +313,14 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["restore", "--staged", "--"] + paths, root: root)
 	}
 
+	public func stage(hunk: DiffHunk, in file: DiffFile) throws {
+		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: false)
+	}
+
+	public func unstage(hunk: DiffHunk, in file: DiffFile) throws {
+		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: true)
+	}
+
 	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {
 		let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !summary.isEmpty else {
@@ -320,6 +346,21 @@ public struct GitRepository: Sendable {
 		return output.split(separator: "\0", omittingEmptySubsequences: true)
 			.map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
 			.filter { !$0.isEmpty }
+	}
+
+	private func applyCachedPatch(_ patch: String, reverse: Bool) throws {
+		var checkArguments = ["apply", "--cached", "--check"]
+		if reverse {
+			checkArguments.append("--reverse")
+		}
+		checkArguments.append("-")
+		_ = try runner.runGit(arguments: checkArguments, input: patch, root: root)
+		var applyArguments = ["apply", "--cached"]
+		if reverse {
+			applyArguments.append("--reverse")
+		}
+		applyArguments.append("-")
+		_ = try runner.runGit(arguments: applyArguments, input: patch, root: root)
 	}
 
 	public static func discoverRoot(containing url: URL, runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL {

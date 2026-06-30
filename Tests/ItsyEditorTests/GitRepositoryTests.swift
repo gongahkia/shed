@@ -136,6 +136,60 @@ import Testing
 	])
 }
 
+@Test func gitRepositoryStageAndUnstageHunkValidateBeforeApplyingPatch() throws {
+	let runner = RecordingGitRunner(output: "")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+	let hunk = DiffHunk(oldStart: 1, oldCount: 1, newStart: 1, newCount: 1, lines: [
+		.remove("old"),
+		.add("new"),
+	])
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
+	let patch = DiffPatchBuilder.patch(file: file, hunk: hunk)
+
+	try repository.stage(hunk: hunk, in: file)
+	try repository.unstage(hunk: hunk, in: file)
+
+	#expect(runner.recordedArguments == [
+		["apply", "--cached", "--check", "-"],
+		["apply", "--cached", "-"],
+		["apply", "--cached", "--check", "--reverse", "-"],
+		["apply", "--cached", "--reverse", "-"],
+	])
+	#expect(runner.recordedInputs == [patch, patch, patch, patch])
+}
+
+@Test func gitRepositoryStagesSingleWorkingTreeHunk() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	let initial = (1 ... 20).map { "line \($0)" }.joined(separator: "\n") + "\n"
+	var modified = (1 ... 20).map { "line \($0)" }
+	modified[1] = "line two"
+	modified[14] = "line fifteen"
+
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", initial)
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", modified.joined(separator: "\n") + "\n")
+
+	let files = try repository.diffFiles(path: "file.txt")
+	let file = try #require(files.first)
+	let hunk = try #require(file.hunks.first)
+
+	try repository.stage(hunk: hunk, in: file)
+	let staged = try repository.diff(path: "file.txt", staged: true)
+	let unstaged = try repository.diff(path: "file.txt")
+
+	#expect(staged.contains("+line two"))
+	#expect(!staged.contains("+line fifteen"))
+	#expect(unstaged.contains("+line fifteen"))
+}
+
 private final class TemporaryGitFixture {
 	let root: URL
 
@@ -164,6 +218,7 @@ private final class TemporaryGitFixture {
 private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 	private let lock = NSLock()
 	private var arguments: [[String]] = []
+	private var inputs: [String?] = []
 	private let output: String
 
 	init(output: String = "") {
@@ -177,9 +232,25 @@ private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 		return value
 	}
 
+	var recordedInputs: [String] {
+		lock.lock()
+		let value = inputs.compactMap { $0 }
+		lock.unlock()
+		return value
+	}
+
 	func runGit(arguments: [String], root: URL) throws -> String {
+		try runGit(arguments: arguments, input: nil, root: root)
+	}
+
+	func runGit(arguments: [String], input: String, root: URL) throws -> String {
+		try runGit(arguments: arguments, input: Optional(input), root: root)
+	}
+
+	private func runGit(arguments: [String], input: String?, root: URL) throws -> String {
 		lock.lock()
 		self.arguments.append(arguments)
+		self.inputs.append(input)
 		lock.unlock()
 		return output
 	}

@@ -3,6 +3,7 @@ import Foundation
 public struct DiffFile: Equatable, Sendable {
 	public var oldPath: String?
 	public var newPath: String?
+	public var indexLine: String?
 	public var oldMode: String?
 	public var newMode: String?
 	public var isNewFile: Bool
@@ -12,6 +13,7 @@ public struct DiffFile: Equatable, Sendable {
 	public init(
 		oldPath: String?,
 		newPath: String?,
+		indexLine: String? = nil,
 		oldMode: String? = nil,
 		newMode: String? = nil,
 		isNewFile: Bool = false,
@@ -20,6 +22,7 @@ public struct DiffFile: Equatable, Sendable {
 	) {
 		self.oldPath = oldPath
 		self.newPath = newPath
+		self.indexLine = indexLine
 		self.oldMode = oldMode
 		self.newMode = newMode
 		self.isNewFile = isNewFile
@@ -152,7 +155,9 @@ public enum UnifiedDiffParser {
 	}
 
 	private static func applyExtendedHeader(_ line: String, to file: inout DiffFile?) {
-		if line.hasPrefix("new file mode ") {
+		if line.hasPrefix("index ") {
+			file?.indexLine = line
+		} else if line.hasPrefix("new file mode ") {
 			file?.isNewFile = true
 			file?.newMode = String(line.dropFirst("new file mode ".count))
 		} else if line.hasPrefix("deleted file mode ") {

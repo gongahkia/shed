@@ -100,6 +100,14 @@ public struct LSPDidChangeTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+
+	public init(textDocument: LSPTextDocumentIdentifier) {
+		self.textDocument = textDocument
+	}
+}
+
 public enum LSPDiagnosticSeverity: Int, Codable, Equatable, Sendable {
 	case error = 1
 	case warning = 2

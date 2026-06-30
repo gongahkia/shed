@@ -160,8 +160,6 @@ x 2026-06-29 +Phase17-Native @handoff id:503 est:2h Handoff `NSUserActivity` per
 
 ## Phase 18 — Workspace symbol navigation UI
 
-(C) +Phase18-SymbolNav @lsp id:607 est:3h dep:625 When `ItsyLSP` is connected for the active document's language, prefer `textDocument/documentSymbol` over regex extraction. Request hierarchical response (`DocumentSymbol[]`) since we advertise `hierarchicalDocumentSymbolSupport=true` (id:625). Fall back to `WorkspaceIndex` regex extractor on timeout >300 ms or `null` response. Cache per-document, invalidate on `didChange`. ref:https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol
-(C) +Phase18-SymbolNav @lsp id:608 est:2h dep:625 When `ItsyLSP` is connected, prefer `workspace/symbol` over `WorkspaceIndex` for @-search. Fall back to `WorkspaceIndex` if no server registered for workspace's primary language or query returns `null`. Merge results if both succeed (LSP first, regex de-duped behind).
 
 ---
 

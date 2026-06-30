@@ -1178,8 +1178,13 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		guard let gitRootURL, sender.tag >= 0, sender.tag < gitBranches.count else {
 			return
 		}
+		let branch = gitBranches[sender.tag]
 		do {
-			try GitRepository(root: gitRootURL).switchBranch(gitBranches[sender.tag].name)
+			let repository = GitRepository(root: gitRootURL)
+			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: branch.name, repository: repository) else {
+				return
+			}
+			try repository.switchBranch(branch.name, stashingDirtyChanges: shouldStash)
 			gitBranchPopover?.close()
 			refreshGitChanges(nil)
 		} catch {
@@ -1197,13 +1202,24 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			return
 		}
 		do {
-			try GitRepository(root: gitRootURL).createBranch(named: name, from: source.name)
+			let repository = GitRepository(root: gitRootURL)
+			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: name, repository: repository) else {
+				return
+			}
+			try repository.createBranch(named: name, from: source.name, stashingDirtyChanges: shouldStash)
 			gitBranchPopover?.close()
 			refreshGitChanges(nil)
 		} catch {
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
 		}
+	}
+
+	private func shouldStashBeforeBranchChange(targetBranch: String, repository: GitRepository) throws -> Bool? {
+		guard try repository.status().hasChanges else {
+			return false
+		}
+		return confirmStashAndSwitch(targetBranch) ? true : nil
 	}
 
 	@objc private func deleteGitBranchFromRow(_ sender: NSButton) {
@@ -1253,6 +1269,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		alert.messageText = L10n.string("Force Delete Branch?")
 		alert.informativeText = "\(name)\n\(String(describing: error))"
 		alert.addButton(withTitle: L10n.string("Force Delete"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		return alert.runModal() == .alertFirstButtonReturn
+	}
+
+	private func confirmStashAndSwitch(_ branch: String) -> Bool {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = L10n.string("Working Tree Dirty")
+		alert.informativeText = L10n.string("Stash current changes and switch to \(branch)?")
+		alert.addButton(withTitle: L10n.string("Stash and Switch"))
 		alert.addButton(withTitle: L10n.string("Cancel"))
 		return alert.runModal() == .alertFirstButtonReturn
 	}

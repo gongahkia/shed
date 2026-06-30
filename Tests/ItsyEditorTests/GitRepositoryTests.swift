@@ -172,6 +172,23 @@ import Testing
 	])
 }
 
+@Test func gitRepositoryStashesAroundBranchSwitchAndCreateWhenRequested() throws {
+	let runner = RecordingGitRunner(output: "")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	try repository.switchBranch("feature", stashingDirtyChanges: true)
+	try repository.createBranch(named: "topic", from: "origin/topic", stashingDirtyChanges: true)
+
+	#expect(runner.recordedArguments == [
+		["stash", "push", "-u", "-m", "itsy-autostash-feature"],
+		["switch", "feature"],
+		["stash", "pop"],
+		["stash", "push", "-u", "-m", "itsy-autostash-topic"],
+		["switch", "-c", "topic", "origin/topic"],
+		["stash", "pop"],
+	])
+}
+
 @Test func gitRepositoryStageAndUnstageHunkValidateBeforeApplyingPatch() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)

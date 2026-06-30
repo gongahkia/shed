@@ -27,6 +27,13 @@ public extension OllyRuntime {
         displayProvider().first { $0.frame.contains(point) }?.id
     }
 
+    func snapTargetDisplayID() async -> DisplayID? {
+        if let focusedDisplayID = await focusedDisplayID() {
+            return focusedDisplayID
+        }
+        return selectedDisplay(nil)?.id
+    }
+
     func snapWindowFromOverlay(_ command: IPCSnapWindowCommand) async throws {
         try await snapWindow(command)
     }

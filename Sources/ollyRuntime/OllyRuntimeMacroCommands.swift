@@ -48,6 +48,8 @@ extension OllyRuntime {
             try await togglePinned(payload)
         case let .snapWindow(payload):
             try await snapWindow(payload)
+        case let .showOverlay(payload):
+            await showOverlay(payload)
         case let .dispatchGesture(payload):
             try await dispatchGesture(payload)
         case let .switchTag(payload):

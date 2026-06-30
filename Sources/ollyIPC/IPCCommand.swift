@@ -85,6 +85,7 @@ public enum IPCCommand: Equatable, Sendable {
     case toggleSticky(IPCStickyCommand)
     case togglePinned(IPCPinnedCommand)
     case snapWindow(IPCSnapWindowCommand)
+    case showOverlay(IPCShowOverlayCommand)
     case dispatchGesture(IPCDispatchGestureCommand)
     case manualPreselect(IPCManualPreselectCommand)
     case bspTree(IPCBSPTreeCommand)
@@ -139,6 +140,8 @@ public enum IPCCommand: Equatable, Sendable {
             return .togglePinned
         case .snapWindow:
             return .snapWindow
+        case .showOverlay:
+            return .showOverlay
         case .dispatchGesture:
             return .dispatchGesture
         case .manualPreselect:
@@ -214,8 +217,8 @@ extension IPCCommand: Codable {
             self = try Self.decodeDirectionalCommand(name, from: container)
         case .moveToDisplay, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow:
             self = try Self.decodeWindowCommand(name, from: container)
-        case .dispatchGesture:
-            self = .dispatchGesture(try container.decodeRequired(IPCDispatchGestureCommand.self, forKey: .arguments))
+        case .showOverlay, .dispatchGesture:
+            self = try Self.decodeInteractionCommand(name, from: container)
         case .manualPreselect:
             self = .manualPreselect(try container.decodeRequired(IPCManualPreselectCommand.self, forKey: .arguments))
         case .bspTree:
@@ -298,6 +301,18 @@ extension IPCCommand: Codable {
         }
     }
 
+    private static func decodeInteractionCommand(
+        _ name: IPCCommandName,
+        from container: KeyedDecodingContainer<CodingKeys>
+    ) throws -> IPCCommand {
+        switch name {
+        case .showOverlay:
+            return .showOverlay(try container.decodeRequired(IPCShowOverlayCommand.self, forKey: .arguments))
+        default:
+            return .dispatchGesture(try container.decodeRequired(IPCDispatchGestureCommand.self, forKey: .arguments))
+        }
+    }
+
     private static func decodeMacroCommand(
         _ name: IPCCommandName,
         from container: KeyedDecodingContainer<CodingKeys>
@@ -351,6 +366,8 @@ extension IPCCommand: Codable {
         case let .togglePinned(command):
             try container.encode(command, forKey: .arguments)
         case let .snapWindow(command):
+            try container.encode(command, forKey: .arguments)
+        case let .showOverlay(command):
             try container.encode(command, forKey: .arguments)
         case let .dispatchGesture(command):
             try container.encode(command, forKey: .arguments)

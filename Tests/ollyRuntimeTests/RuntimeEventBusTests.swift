@@ -40,4 +40,18 @@ final class RuntimeEventBusTests: XCTestCase {
         let finalCount = await bus.activeSubscriberCount
         XCTAssertEqual(finalCount, 0)
     }
+
+    func testOverlayRequestBusPublishesToSubscriber() async {
+        let bus = RuntimeOverlayRequestBus()
+        let stream = await bus.subscribe()
+        let task = Task {
+            var iterator = stream.makeAsyncIterator()
+            return await iterator.next()
+        }
+
+        await bus.publish(.grid)
+        let value = await task.value
+
+        XCTAssertEqual(value, .grid)
+    }
 }

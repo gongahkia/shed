@@ -22,4 +22,14 @@ final class OllyInteractionCommandTests: XCTestCase {
         XCTAssertThrowsError(try parseGestureTrigger("pinch"))
         XCTAssertThrowsError(try parseGestureMotion("down"))
     }
+
+    func testOverlayParserAcceptsDocumentedValues() throws {
+        XCTAssertEqual(try parseOverlayKind("grid"), .grid)
+        XCTAssertEqual(try parseOverlayKind("cheatsheet"), .cheatsheet)
+        XCTAssertEqual(try parseOverlayKind("alt-tab"), .altTab)
+    }
+
+    func testOverlayParserRejectsUnknownValue() {
+        XCTAssertThrowsError(try parseOverlayKind("altTab"))
+    }
 }

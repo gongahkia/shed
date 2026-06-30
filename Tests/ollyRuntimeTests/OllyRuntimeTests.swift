@@ -1218,6 +1218,22 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testShowOverlayPublishesOverlayRequest() async throws {
+        try await withRuntime { runtime, socketPath, _ in
+            let stream = await runtime.overlayRequests.subscribe()
+            let task = Task {
+                var iterator = stream.makeAsyncIterator()
+                return await iterator.next()
+            }
+
+            let response = try send(.showOverlay(.init(kind: .grid)), to: socketPath)
+            let value = await task.value
+
+            XCTAssertEqual(response.status, .success)
+            XCTAssertEqual(value, .grid)
+        }
+    }
+
     func testDispatchGestureSwitchesTagsFromConfiguredGestures() async throws {
         try await withRuntime { runtime, socketPath, displayID in
             await runtime.replaceConfigForTest(Config {

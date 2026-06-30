@@ -370,3 +370,11 @@ Workspaces {
     Tag.named("ops")
 }
 ```
+
+## 34. Grid Overlay Keybind
+
+```swift
+Keybinds {
+    Keybind(KeyChord([.command, .shift], .slash), do: .showGridOverlay)
+}
+```

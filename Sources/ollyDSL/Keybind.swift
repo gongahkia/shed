@@ -88,6 +88,7 @@ public extension Key {
     static let eight = Key(rawValue: UInt32(kVK_ANSI_8))
     static let nine = Key(rawValue: UInt32(kVK_ANSI_9))
     static let space = Key(rawValue: UInt32(kVK_Space))
+    static let slash = Key(rawValue: UInt32(kVK_ANSI_Slash))
     static let tab = Key(rawValue: UInt32(kVK_Tab))
     static let `return` = Key(rawValue: UInt32(kVK_Return))
     static let escape = Key(rawValue: UInt32(kVK_Escape))
@@ -139,9 +140,23 @@ public enum Action: Codable, Equatable, Sendable {
     case cycleEngine
     case reload
     case noop
+    case showGridOverlay
+    case showAltTab
+    case showCheatsheet
+    case showOverlay(OverlayActionKind)
     case macro(String)
     case shell(ShellAction)
     case raw(String)
+}
+
+/// Purpose: Names overlays that can be opened from keybinds and commands.
+/// Parameters: Choose `.grid`, `.cheatsheet`, or `.altTab`.
+/// Example: `Action.showOverlay(.grid)`
+/// See also: `Action`, `Keybind`.
+public enum OverlayActionKind: String, Codable, Equatable, Sendable {
+    case grid
+    case cheatsheet
+    case altTab = "alt-tab"
 }
 
 public extension Action {

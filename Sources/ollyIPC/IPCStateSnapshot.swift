@@ -88,6 +88,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public let isFloating: Bool
     public let isSticky: Bool
     public let isPinned: Bool
+    public let isFullscreen: Bool
     public let engineOverride: LayoutEngineID?
     public let layoutOrder: Int?
     public let frame: IPCFrame
@@ -104,6 +105,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         case isFloating
         case isSticky
         case isPinned
+        case isFullscreen
         case engineOverride
         case layoutOrder
         case frame
@@ -121,6 +123,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         isFloating: Bool = false,
         isSticky: Bool = false,
         isPinned: Bool = false,
+        isFullscreen: Bool = false,
         engineOverride: LayoutEngineID? = nil,
         layoutOrder: Int? = nil,
         frame: IPCFrame,
@@ -136,6 +139,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.isFloating = isFloating
         self.isSticky = isSticky
         self.isPinned = isPinned
+        self.isFullscreen = isFullscreen
         self.engineOverride = engineOverride
         self.layoutOrder = layoutOrder
         self.frame = frame
@@ -155,6 +159,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isFloating: try container.decode(Bool.self, forKey: .isFloating),
             isSticky: try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false,
             isPinned: try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false,
+            isFullscreen: try container.decodeIfPresent(Bool.self, forKey: .isFullscreen) ?? false,
             engineOverride: try container.decodeIfPresent(LayoutEngineID.self, forKey: .engineOverride),
             layoutOrder: try container.decodeIfPresent(Int.self, forKey: .layoutOrder),
             frame: try container.decode(IPCFrame.self, forKey: .frame),
@@ -174,6 +179,7 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             isFloating: state.isFloating,
             isSticky: state.isSticky,
             isPinned: state.isPinned,
+            isFullscreen: state.isFullscreen,
             engineOverride: state.engineOverride,
             layoutOrder: state.layoutOrder,
             frame: IPCFrame(state.frame),

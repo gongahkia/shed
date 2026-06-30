@@ -86,6 +86,7 @@ public struct WindowRecoveryEntry: Codable, Equatable, Sendable {
             displayID: window.displayID,
             tagMask: window.tagMask,
             isSticky: window.isSticky,
+            isFullscreen: window.isFullscreen,
             engineOverride: window.engineOverride,
             originalFrame: window.frame,
             parkedFrame: parkedFrame,

@@ -43,4 +43,14 @@ final class IPCEventEnvelopeTests: XCTestCase {
         XCTAssertEqual(line.last, 0x0A)
         XCTAssertEqual(decoded, envelope)
     }
+
+    func testFullscreenEventEnvelopeRoundTripsAsNewlineDelimitedJSON() throws {
+        let envelope = IPCEventEnvelope(event: .fullscreen(IPCFullscreenEvent(windowID: 42, didEnter: true)))
+
+        let line = try envelope.newlineDelimitedJSON()
+        let decoded = try JSONDecoder().decode(IPCEventEnvelope.self, from: Data(line.dropLast()))
+
+        XCTAssertEqual(line.last, 0x0A)
+        XCTAssertEqual(decoded, envelope)
+    }
 }

@@ -26,10 +26,21 @@ public struct IPCFocusEvent: Codable, Equatable, Sendable {
     }
 }
 
+public struct IPCFullscreenEvent: Codable, Equatable, Sendable {
+    public let windowID: WindowID
+    public let didEnter: Bool
+
+    public init(windowID: WindowID, didEnter: Bool) {
+        self.windowID = windowID
+        self.didEnter = didEnter
+    }
+}
+
 public enum IPCEvent: Codable, Equatable, Sendable {
     case axPermission(IPCAXPermissionEvent)
     case engine(EngineEvent)
     case focus(IPCFocusEvent)
+    case fullscreen(IPCFullscreenEvent)
 }
 
 public struct IPCEventEnvelope: Codable, Equatable, Sendable {

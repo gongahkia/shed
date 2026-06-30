@@ -166,6 +166,7 @@ private extension WindowState {
             isFloating: makeFloating ? true : isFloating,
             isSticky: isSticky,
             isPinned: isPinned,
+            isFullscreen: isFullscreen,
             engineOverride: engineOverride,
             layoutOrder: layoutOrder,
             frame: frame,

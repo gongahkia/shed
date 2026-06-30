@@ -27,19 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.10 Keybind conflict warnings UI
-
-**Goal:** Surface keybind collisions detected by existing `Sources/ollyApp/HotKeyStartupDiagnostics.swift:23` in the Settings → Keybinds tab.
-
-**Research summary:**
-- Carbon `RegisterEventHotKey` returns `OSStatus` — check for `eventHotKeyExistsErr` (-9878). Same key combo cannot be registered twice within the same app.
-- `Sources/ollyApp/HotKeyStartupDiagnostics.swift:23` already detects collisions and posts a `UNNotification` — extend the data path to also populate a model the Settings tab reads.
-
-**Refs:**
-- https://github.com/soffes/HotKey/blob/main/Sources/HotKey/HotKeysController.swift
-
----
-
 ### M4.11 Dark/light parity + accessibility audit
 
 **Goal:** Every new overlay uses semantic colors (`NSColor.labelColor`, `NSColor.controlAccentColor`) — no hardcoded `.white`. Every overlay sets `accessibilityRole`, `accessibilityLabel`, `setAccessibilityElement(true)`.

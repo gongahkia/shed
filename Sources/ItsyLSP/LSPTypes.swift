@@ -108,6 +108,66 @@ public struct LSPDidCloseTextDocumentParams: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPLocation: Codable, Equatable, Sendable {
+	public var uri: String
+	public var range: LSPRange
+
+	public init(uri: String, range: LSPRange) {
+		self.uri = uri
+		self.range = range
+	}
+}
+
+public struct LSPLocationLink: Codable, Equatable, Sendable {
+	public var originSelectionRange: LSPRange?
+	public var targetUri: String
+	public var targetRange: LSPRange
+	public var targetSelectionRange: LSPRange
+
+	public init(originSelectionRange: LSPRange? = nil, targetUri: String, targetRange: LSPRange, targetSelectionRange: LSPRange) {
+		self.originSelectionRange = originSelectionRange
+		self.targetUri = targetUri
+		self.targetRange = targetRange
+		self.targetSelectionRange = targetSelectionRange
+	}
+}
+
+public enum LSPDefinitionResult: Equatable, Sendable {
+	case single(LSPLocation)
+	case multiple([LSPLocation])
+	case linked([LSPLocationLink])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let location = try? decoder.decode(LSPLocation.self, from: data) {
+			self = .single(location)
+			return
+		}
+		if let array = try? decoder.decode([LSPLocation].self, from: data), !array.isEmpty {
+			self = .multiple(array)
+			return
+		}
+		if let links = try? decoder.decode([LSPLocationLink].self, from: data), !links.isEmpty {
+			self = .linked(links)
+			return
+		}
+		self = .none
+	}
+
+	public var locations: [LSPLocation] {
+		switch self {
+		case let .single(location):
+			return [location]
+		case let .multiple(locations):
+			return locations
+		case let .linked(links):
+			return links.map { LSPLocation(uri: $0.targetUri, range: $0.targetSelectionRange) }
+		case .none:
+			return []
+		}
+	}
+}
+
 public struct LSPTextEdit: Codable, Equatable, Sendable {
 	public var range: LSPRange
 	public var newText: String

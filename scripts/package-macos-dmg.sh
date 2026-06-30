@@ -52,6 +52,8 @@ cat >"$APP_BUNDLE/Contents/Info.plist" <<PLIST
     <string>Olly uses Apple Events-compatible automation context while coordinating macOS window focus.</string>
     <key>NSInputMonitoringUsageDescription</key>
     <string>Olly reads keyboard and mouse timing to distinguish user-initiated focus from focus stealing.</string>
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Olly captures window thumbnails for the Alt-Tab preview switcher.</string>
 </dict>
 </plist>
 PLIST

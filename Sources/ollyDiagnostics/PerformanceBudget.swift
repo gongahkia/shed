@@ -220,6 +220,12 @@ public enum PerformanceBudgetCatalog {
                 metric: .p95,
                 limit: 50,
                 reason: "recovery journal I/O should stay bounded"
+            ),
+            PerformanceBudget(
+                scenarioName: "thumbnail-generation-20-windows",
+                metric: .p95,
+                limit: 80,
+                reason: "thumbnail cache generation should stay bounded"
             )
         ]
     }

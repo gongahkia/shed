@@ -83,6 +83,7 @@ enum PerfBenchError: Error, CustomStringConvertible {
     case invalidValue(String, String)
     case unknownArgument(String)
     case budgetFailed(failed: Int, missing: Int)
+    case thumbnailImageUnavailable
 
     var description: String {
         switch self {
@@ -99,6 +100,8 @@ enum PerfBenchError: Error, CustomStringConvertible {
             return "unknown argument \(argument)"
         case let .budgetFailed(failed, missing):
             return "performance budget failed: \(failed) failed, \(missing) missing"
+        case .thumbnailImageUnavailable:
+            return "thumbnail image unavailable"
         }
     }
 }
@@ -132,6 +135,7 @@ struct BenchmarkRunner {
             try await measure("state-snapshot-\(options.windowCount)-windows", runStateSnapshotProxy),
             try await measure("tag-switch-\(options.windowCount)-windows", runTagSwitch),
             try await measure("recovery-journal-\(options.windowCount)-windows", runRecoveryJournal),
+            try await measure("thumbnail-generation-20-windows", runThumbnailGeneration),
             try await measure("wake-from-sleep-proxy", runWakeFromSleepProxy),
             try await measure("soak-\(options.soakEvents)-events", runSoak)
         ]
@@ -293,6 +297,19 @@ struct BenchmarkRunner {
             }
         }
         sink.consume(await store.count)
+    }
+
+    private func runThumbnailGeneration() async throws {
+        let image = try PerfBenchImageFactory.thumbnail()
+        let cache = WindowThumbnailCache(
+            ttl: 0.25,
+            capture: { _, _ in image },
+            availability: { true }
+        )
+        for windowID in 1...20 {
+            _ = try await cache.image(for: WindowID(windowID), size: CGSize(width: 240, height: 160))
+        }
+        sink.consume(await cache.cachedImage(for: 1) == nil ? 0 : 1)
     }
 
     private func windows(count: Int, active: Tag, inactive: Tag) -> [WindowState] {

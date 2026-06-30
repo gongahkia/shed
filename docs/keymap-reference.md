@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `21`
+- Bindings: `22`
 
 ### mode.insert
 
@@ -38,11 +38,12 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Space` | `lsp.completion` |
 
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `124`
+- Bindings: `128`
 
 ### mode.normal
 
@@ -98,6 +99,9 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Space` | `lsp.completion` |
+| `Shift-K` | `lsp.hover` |
+| `gr` | `lsp.references` |
 | `i` | `mode.insert` |
 | `/` | `vim.searchForward` |
 | `Shift-/` | `vim.searchBackward` |
@@ -186,12 +190,13 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
 | `Esc` | `mode.normal` |
+| `Ctrl-Space` | `lsp.completion` |
 | `jk` | `mode.normal` |
 
 ## Emacs
 
 - Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
-- Bindings: `36`
+- Bindings: `37`
 
 ### mode.emacs
 
@@ -223,6 +228,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Space` | `lsp.completion` |
 | `C-s` | `emacs.isearchForward` |
 | `C-r` | `emacs.isearchBackward` |
 | `C-x C-s` | `file.save` |

@@ -6,13 +6,13 @@ import ollyRuntime
 
 final class SettingsWindowController: NSWindowController {
     private let runtime: OllyRuntime?
-    private let sourceURL: URL
+    let sourceURL: URL
     private let reloader: ConfigReloader
-    private let fileManager: FileManager
+    let fileManager: FileManager
     private let reloadQueue = DispatchQueue(label: "dev.olly.app.settings.reload", qos: .userInitiated)
     private let pathLabel = NSTextField(labelWithString: "")
-    private let statusLabel = NSTextField(labelWithString: "")
-    private let errorTextView = NSTextView()
+    let statusLabel = NSTextField(labelWithString: "")
+    let errorTextView = NSTextView()
     private let profilePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
     private let createConfigButton = NSButton(title: "Create Config", target: nil, action: nil)
     private let reloadButton = NSButton(title: "Reload", target: nil, action: nil)
@@ -118,6 +118,8 @@ final class SettingsWindowController: NSWindowController {
         reloadButton.target = self
         reloadButton.action = #selector(reloadConfig)
         buttonRow.addArrangedSubview(reloadButton)
+        buttonRow.addArrangedSubview(button("Export Config...", #selector(exportConfig)))
+        buttonRow.addArrangedSubview(button("Import Config...", #selector(importConfig)))
         buttonRow.addArrangedSubview(button("Playground...", #selector(openPlayground)))
         buttonRow.addArrangedSubview(NSView())
 
@@ -232,7 +234,7 @@ final class SettingsWindowController: NSWindowController {
         }
     }
 
-    private func selectedProfile() -> ConfigTemplateProfile {
+    func selectedProfile() -> ConfigTemplateProfile {
         guard let rawValue = profilePopUp.selectedItem?.representedObject as? String,
               let profile = try? ConfigTemplateProfile(name: rawValue) else {
             return .defaultProfile
@@ -254,11 +256,11 @@ final class SettingsWindowController: NSWindowController {
         try profile.source.write(to: sourceURL, atomically: true, encoding: .utf8)
     }
 
-    private func refreshCreateConfigButton() {
+    func refreshCreateConfigButton() {
         createConfigButton.isEnabled = !fileManager.fileExists(atPath: sourceURL.path)
     }
 
-    private func showError(_ error: Error) {
+    func showError(_ error: Error) {
         statusLabel.stringValue = "Settings action failed"
         errorTextView.textColor = .labelColor
         errorTextView.string = String(describing: error)

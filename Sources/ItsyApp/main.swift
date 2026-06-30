@@ -226,8 +226,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private var taskRunGeneration = 0
 	private var terminalPanel: NSPanel?
 	private var terminalStatusLabel: NSTextField?
-	private var terminalOutputTextView: NSTextView?
-	private var terminalInputField: NSTextField?
+	private var terminalView: ItsyTerminalView?
 	private var terminalSession: ItsyTerminalSession?
 	private var problemsPanel: NSPanel?
 	private var problemsStatusLabel: NSTextField?
@@ -2649,8 +2648,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let panel = makeTerminalPanelIfNeeded()
 		centerTerminalPanel(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
-		startTerminalIfNeeded(clear: terminalOutputTextView?.string.isEmpty ?? true)
-		terminalPanel?.makeFirstResponder(terminalInputField)
+		startTerminalIfNeeded()
+		terminalPanel?.makeFirstResponder(terminalView)
 	}
 
 	private func makeTerminalPanelIfNeeded() -> NSPanel {
@@ -2687,44 +2686,28 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		header.alignment = .centerY
 		header.distribution = .fill
 		header.spacing = 12
-		let outputTextView = NSTextView()
-		outputTextView.isEditable = false
-		outputTextView.isSelectable = true
-		outputTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-		outputTextView.string = ""
-		outputTextView.textColor = .textColor
-		outputTextView.backgroundColor = .textBackgroundColor
-		let outputScrollView = NSScrollView()
-		outputScrollView.documentView = outputTextView
-		outputScrollView.hasVerticalScroller = true
-		outputScrollView.hasHorizontalScroller = true
-		outputScrollView.drawsBackground = true
-		let inputField = NSTextField()
-		inputField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-		inputField.placeholderString = L10n.string("Type a shell command")
-		inputField.target = self
-		inputField.action = #selector(submitTerminalInput(_:))
+		let terminalView = ItsyTerminalView()
+		terminalView.onInput = { [weak self] data in
+			self?.terminalSession?.send(data)
+		}
+		terminalView.onResize = { [weak self] columns, rows in
+			self?.terminalSession?.resize(columns: columns, rows: rows)
+		}
 		header.translatesAutoresizingMaskIntoConstraints = false
-		outputScrollView.translatesAutoresizingMaskIntoConstraints = false
-		inputField.translatesAutoresizingMaskIntoConstraints = false
+		terminalView.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(header)
-		contentView.addSubview(outputScrollView)
-		contentView.addSubview(inputField)
+		contentView.addSubview(terminalView)
 		NSLayoutConstraint.activate([
 			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
 			header.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
-			outputScrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-			outputScrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-			outputScrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
-			inputField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-			inputField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-			inputField.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
-			outputScrollView.bottomAnchor.constraint(equalTo: inputField.topAnchor, constant: -8),
+			terminalView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			terminalView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			terminalView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+			terminalView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 		])
 		terminalStatusLabel = statusLabel
-		terminalOutputTextView = outputTextView
-		terminalInputField = inputField
+		self.terminalView = terminalView
 	}
 
 	private func centerTerminalPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -2735,18 +2718,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		panel.setFrame(frame, display: true)
 	}
 
-	private func startTerminalIfNeeded(clear: Bool = false) {
+	private func startTerminalIfNeeded() {
 		guard terminalSession?.isRunning != true else {
 			updateTerminalStatus()
 			return
 		}
-		if clear {
-			terminalOutputTextView?.string = ""
-		}
+		let size = terminalView?.terminalSize ?? (columns: 80, rows: 24)
 		let session = ItsyTerminalSession(currentDirectoryURL: terminalWorkingDirectory())
-		session.onOutput = { [weak self] text in
+		session.onOutput = { [weak self] data in
 			DispatchQueue.main.async {
-				self?.appendTerminalOutput(text)
+				self?.terminalView?.ingest(data)
 			}
 		}
 		session.onExit = { [weak self] status in
@@ -2756,38 +2737,26 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			}
 		}
 		do {
-			try session.start()
+			try session.start(columns: size.columns, rows: size.rows)
 			terminalSession = session
 			updateTerminalStatus()
-			appendTerminalOutput("Started \(terminalShellName()) in \(session.currentDirectoryURL.path)\n")
 		} catch {
 			terminalStatusLabel?.textColor = .systemRed
 			terminalStatusLabel?.stringValue = String(describing: error)
-			appendTerminalOutput("Failed to start shell: \(error)\n")
+			terminalView?.ingest(Data("failed to start shell: \(error)\r\n".utf8))
 		}
-	}
-
-	@objc private func submitTerminalInput(_ sender: Any?) {
-		guard let inputField = terminalInputField else {
-			return
-		}
-		startTerminalIfNeeded()
-		let command = inputField.stringValue
-		inputField.stringValue = ""
-		appendTerminalOutput("$ \(command)\n")
-		terminalSession?.sendLine(command)
 	}
 
 	@objc private func clearTerminal(_ sender: Any?) {
-		terminalOutputTextView?.string = ""
+		terminalView?.clearScrollback()
 	}
 
 	@objc private func restartTerminal(_ sender: Any?) {
 		terminalSession?.terminate()
 		terminalSession = nil
-		terminalOutputTextView?.string = ""
-		startTerminalIfNeeded(clear: true)
-		terminalPanel?.makeFirstResponder(terminalInputField)
+		terminalView?.reset()
+		startTerminalIfNeeded()
+		terminalPanel?.makeFirstResponder(terminalView)
 	}
 
 	private func updateTerminalStatus() {
@@ -2809,33 +2778,6 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let shellPath = ProcessInfo.processInfo.environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
 		return URL(fileURLWithPath: shellPath).lastPathComponent
 	}
-
-	private func appendTerminalOutput(_ text: String) {
-		guard let textView = terminalOutputTextView else {
-			return
-		}
-		let cleaned = sanitizeTerminalOutput(text)
-		let attributes: [NSAttributedString.Key: Any] = [
-			.font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
-			.foregroundColor: NSColor.textColor,
-		]
-		textView.textStorage?.append(NSAttributedString(string: cleaned, attributes: attributes))
-		textView.scrollRangeToVisible(NSRange(location: textView.string.utf16.count, length: 0))
-	}
-
-	private func sanitizeTerminalOutput(_ text: String) -> String {
-		var cleaned = text.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
-		if let regex = Self.ansiEscapeRegex {
-			let range = NSRange(cleaned.startIndex ..< cleaned.endIndex, in: cleaned)
-			cleaned = regex.stringByReplacingMatches(in: cleaned, range: range, withTemplate: "")
-		}
-		return cleaned
-	}
-
-	private static let ansiEscapeRegex: NSRegularExpression? = {
-		let escape = NSRegularExpression.escapedPattern(for: "\u{001B}")
-		return try? NSRegularExpression(pattern: "\(escape)\\[[0-?]*[ -/]*[@-~]")
-	}()
 
 	@objc private func showProblems(_ sender: Any?) {
 		toggleProblems(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)

@@ -17,7 +17,7 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 2. **Cold start is the headline KPI.** Every dep, every framework link, every static initializer is a budget item. <150 ms cold or it doesn't ship.
 3. **Modal editing is built-in, not a plugin.** Plain, vim, and emacs profiles ship in v0.1. Keymap engine is core, not a layer.
 4. **Open anything.** 1 GB log file must scroll at 60 fps. Rope buffer + Metal renderer. No file-size limits.
-5. **Boring on purpose.** No in-process AI runtime, no integrated terminal, no collaboration, no telemetry. Agent hosting via ACP protocol is allowed as a process-boundary integration.
+5. **Boring on purpose.** No in-process AI runtime, no collaboration, no telemetry. The integrated terminal is lazy and process-boundary only. Agent hosting via ACP protocol is allowed as a process-boundary integration.
 6. **Process boundary for language tooling.** Language servers and debug adapters via process boundary only. No in-process plugin host through v1.0.
 7. **Reads as a single codebase.** A new contributor should grok the whole tree in a day. Keep first-party app/support code under 30 kLOC through v1.0; current `tokei` source-only code is 14,341 LOC and source+scripts+bench code is 15,267 LOC with vendored grammars/upstream excluded.
 
@@ -37,11 +37,12 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 ## Scope — IN (post-v0.1)
 - LSP / code completion / hover / diagnostics via external language-server processes
 - Debugger / DAP via external debug-adapter processes
+- Integrated terminal as a lazy process-boundary shell panel
 - Extension marketplace, plugin runtime, and agent-hosting experiments only through process-boundary integrations
 - Git UI for status, diff viewing, commit composition, branch ops, hunk staging, conflict viewing, and stash management
 
 ## Scope — OUT (v0.x, possibly forever)
-- Integrated terminal
+- Full PTY/VT100 terminal emulator with curses/TUI parity
 - AI assistance
 - Collaboration / multiplayer
 - Linux/Windows ports
@@ -135,6 +136,7 @@ Modules (SwiftPM targets):
 - Configurability beyond keys + theme + tab width. Itsy is opinionated.
 - Web. Itsy does not render HTML preview, not even for Markdown.
 - Sync. No cloud, no settings sync, no telemetry pings.
+- Terminal parity with iTerm/Terminal.app. The built-in terminal stays lazy and process-boundary.
 
 ## Definition of done (v1.0)
 - All KPIs met or stretch met for ≥3 of 8.

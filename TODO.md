@@ -25,53 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.6 Scratchpad windows
-
-**Goal:** Designated windows toggle visible/hidden independent of tags.
-
-**Files to add:**
-- `Sources/ollyCore/ScratchpadRegistry.swift` — `actor` persisting `[ScratchpadEntry]` to `~/.config/olly/scratchpads.json`.
-- `Sources/ollyDSL/Scratchpad.swift` — `Scratchpads { Scratchpad("term") { bundleID("com.apple.Terminal"); titleRegex("Scratch") } }`.
-- `Sources/ollyRuntime/OllyRuntimeScratchpadCommands.swift` — modeled on `OllyRuntimeInteractionCommands.swift`.
-
-**Data model:**
-```swift
-public struct ScratchpadEntry: Codable, Equatable, Sendable {
-    public let name: String
-    public let bundleID: String?
-    public let titleRegex: String?
-    public let role: String?
-    public let lastVisibleFrame: WindowRecoveryFrame?
-    public let isVisible: Bool
-}
-```
-
-**Files to modify:**
-- `Sources/ollyDSL/Config.swift:218-228` — add `case scratchpads(Scratchpads)` to `ConfigSection`.
-- `Sources/ollyRuntime/OllyRuntime.swift:102-183` — add `let scratchpads: ScratchpadRegistry` actor.
-- `Sources/ollyRuntime/OllyRuntimeAX.swift:127-152` (`windowCreated`) — check `scratchpads.matchingEntry(for:)`; if visible flag is false, immediately park.
-- `Sources/ollyCore/TagDispatcher.swift:111-135` — extract `hide(_)`/`show(_)` to reusable `WindowParker` API.
-
-**Toggle behaviour:**
-1. Resolve `WindowID` from `ScratchpadEntry` predicate via `windowStore.allWindows().filter`.
-2. If matching window is parked: `windowMover.setPosition/Size` to `lastVisibleFrame ?? display.frame.center` then raise focus via `AXUIElementSetAttributeValue(..., kAXFocusedAttribute)`.
-3. If visible: capture frame, set offscreen via `OffscreenParking.frame(for:avoiding:)` (`Sources/ollyCore/OffscreenParking.swift:51-57`); persist.
-
-**IPC additions:** `scratchpad-add`, `scratchpad-toggle <name>`, `scratchpad-list`, `scratchpad-remove <name>`.
-
-**Gotchas:**
-- For lazy-launch apps (Terminal, scratch app not yet open), use `NSWorkspace.shared.openApplication(at:configuration:)` (modern replacement for deprecated `launchApplication`) and only then park.
-- Without `OLLY_ENABLE_PRIVATE_AX_WINDOW_ID`, `WindowID` fallback in `Sources/ollyKit/WindowRef.swift:115-149` requires `kCGWindowName == title`; for browsers/etc that rename windows dynamically, this can misidentify — document the limitation.
-
-**Test plan:**
-- Unit: `ScratchpadRegistry` round-trip persistence; toggle state machine without AX.
-- AX acceptance: register a synthetic `NSWindow` as a scratchpad, exercise toggle.
-
-**Acceptance:**
-- `ollyctl scratchpad-add --name=term --bundle=com.apple.Terminal` + `ollyctl scratchpad-toggle --name=term` shows/hides Terminal independent of tag.
-
----
-
 ### M3.7 Animated layout transitions
 
 **Goal:** Interpolate AX `setPosition`/`setSize` writes over `Animation.duration` using `AnimationCurve`. Honour Reduce Motion.

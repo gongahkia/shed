@@ -76,6 +76,14 @@ extension OllyRuntime {
             try await reloadConfig()
         case let .restoreWindows(payload):
             _ = await restoreWindows(payload)
+        case let .scratchpadAdd(payload):
+            _ = try await addScratchpad(payload)
+        case let .scratchpadToggle(payload):
+            _ = try await toggleScratchpad(payload)
+        case .scratchpadList:
+            _ = try await scratchpadListInfo()
+        case let .scratchpadRemove(payload):
+            _ = try await removeScratchpad(payload)
         case let .runRawAction(payload):
             await runRawAction(payload)
         case let .setSpacePolicy(payload):

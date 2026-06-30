@@ -69,6 +69,15 @@ struct OllyCtlRunner {
             return renderMacroResult(result)
         case let .restoredWindows(info):
             return "restored \(info.restoredCount), skipped \(info.skippedCount), failed \(info.failedCount)"
+        case let .scratchpads(info):
+            return renderScratchpads(info)
+        default:
+            return renderStructuredResult(result)
+        }
+    }
+
+    private func renderStructuredResult(_ result: IPCCommandResult) -> String {
+        switch result {
         case let .ruleExplanation(explanation):
             return OllyCtlRuleExplanationRenderer().render(explanation)
         case let .state(snapshot):
@@ -79,6 +88,8 @@ struct OllyCtlRunner {
             let commands = info.supportedCommands.map(\.rawValue).joined(separator: ", ")
             let events = info.supportedEventKinds.map(\.rawValue).joined(separator: ", ")
             return "ipc v\(info.protocolVersion)\ncommands: \(commands)\nevents: \(events)"
+        default:
+            preconditionFailure("invalid structured result")
         }
     }
 
@@ -176,6 +187,19 @@ struct OllyCtlRunner {
             return "no macros"
         }
         return info.macros.map(renderMacro).joined(separator: "\n")
+    }
+
+    private func renderScratchpads(_ info: IPCScratchpadListInfo) -> String {
+        guard !info.scratchpads.isEmpty else {
+            return "no scratchpads"
+        }
+        return info.scratchpads.map { scratchpad in
+            let bundle = scratchpad.bundleID.map { " bundle \($0)" } ?? ""
+            let title = scratchpad.titleRegex.map { " title-regex \($0)" } ?? ""
+            let role = scratchpad.role.map { " role \($0)" } ?? ""
+            let state = scratchpad.isVisible ? "visible" : "hidden"
+            return "scratchpad \(scratchpad.name): \(state)\(bundle)\(title)\(role)"
+        }.joined(separator: "\n")
     }
 
     private func renderPrimarySwapped(_ payload: MasterSwappedEvent) -> String {

@@ -21,11 +21,7 @@ public actor TagDispatcher {
 
     private let windowStore: WindowStore
     private let tagStore: TagStore
-    private let offscreenParking: OffscreenParking
-    private let displayProvider: TagDisplayProvider
-    private let moveWindow: TagWindowMoveHandler
-    private var parkedWindowIDs: Set<WindowID> = []
-    private var visibleFramesByWindowID: [WindowID: CGRect] = [:]
+    private let windowParker: WindowParker
 
     public init(
         windowStore: WindowStore,
@@ -51,9 +47,11 @@ public actor TagDispatcher {
     ) {
         self.windowStore = windowStore
         self.tagStore = tagStore
-        self.offscreenParking = offscreenParking
-        self.displayProvider = displayProvider
-        self.moveWindow = moveWindow
+        self.windowParker = WindowParker(
+            offscreenParking: offscreenParking,
+            displayProvider: displayProvider,
+            moveWindow: moveWindow
+        )
     }
 
     public init(
@@ -108,8 +106,8 @@ public actor TagDispatcher {
         return moves
     }
 
-    public func isParked(windowID: WindowID) -> Bool {
-        parkedWindowIDs.contains(windowID)
+    public func isParked(windowID: WindowID) async -> Bool {
+        await windowParker.isParked(windowID: windowID)
     }
 
     private func shouldShow(_ window: WindowState, visibleTags: TagSet) -> Bool {
@@ -123,24 +121,16 @@ public actor TagDispatcher {
     }
 
     private func hide(_ window: WindowState) async -> TagDispatchMove? {
-        guard !parkedWindowIDs.contains(window.id) else {
+        guard let move = await windowParker.park(window) else {
             return nil
         }
-
-        parkedWindowIDs.insert(window.id)
-        visibleFramesByWindowID[window.id] = window.frame
-        let frame = offscreenParking.frame(for: window, avoiding: await displayProvider())
-        await moveWindow(window, frame)
-        return TagDispatchMove(windowID: window.id, targetFrame: frame, reason: .hide)
+        return TagDispatchMove(windowID: move.windowID, targetFrame: move.targetFrame, reason: .hide)
     }
 
     private func show(_ window: WindowState) async -> TagDispatchMove? {
-        guard parkedWindowIDs.remove(window.id) != nil else {
+        guard let move = await windowParker.unpark(window) else {
             return nil
         }
-
-        let frame = visibleFramesByWindowID.removeValue(forKey: window.id) ?? window.frame
-        await moveWindow(window, frame)
-        return TagDispatchMove(windowID: window.id, targetFrame: frame, reason: .show)
+        return TagDispatchMove(windowID: move.windowID, targetFrame: move.targetFrame, reason: .show)
     }
 }

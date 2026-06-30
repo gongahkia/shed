@@ -48,10 +48,6 @@ public enum IPCCommandName: String, CaseIterable, Codable, Equatable, Sendable {
 
 public extension IPCCommandName {
     static let reservedV2: [IPCCommandName] = [
-        .scratchpadAdd,
-        .scratchpadToggle,
-        .scratchpadList,
-        .scratchpadRemove,
         .telemetryStatus,
         .telemetryFlush
     ]

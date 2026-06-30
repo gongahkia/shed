@@ -1163,6 +1163,7 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             "macros",
             "restored-windows",
             "rule-explanation",
+            "scratchpads",
             "state",
             "subscribed",
             "version"
@@ -1230,6 +1231,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "payload": {
               "$ref": "#/$defs/ruleExplanationPayload"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "scratchpads"
+            },
+            "payload": {
+              "$ref": "#/$defs/scratchpadsPayload"
             }
           }
         },
@@ -1464,6 +1475,66 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "items": {
             "$ref": "#/$defs/macroInfo"
           }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scratchpadsPayload": {
+      "type": "object",
+      "required": [
+        "scratchpads"
+      ],
+      "properties": {
+        "scratchpads": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scratchpadInfo"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "scratchpadInfo": {
+      "type": "object",
+      "required": [
+        "name",
+        "isVisible"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bundleID": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "titleRegex": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "role": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lastVisibleFrame": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/frame"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "isVisible": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false

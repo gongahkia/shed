@@ -56,6 +56,7 @@ public struct Config: Codable, Equatable, Sendable {
     public let nativeSpace: NativeSpace
     public let focusRing: FocusRing
     public let focusPolicy: FocusPolicy
+    public let scratchpads: Scratchpads
     public let permissions: Permissions
 
     public init(
@@ -72,6 +73,7 @@ public struct Config: Codable, Equatable, Sendable {
         nativeSpace: NativeSpace = NativeSpace(),
         focusRing: FocusRing = FocusRing(),
         focusPolicy: FocusPolicy = FocusPolicy(),
+        scratchpads: Scratchpads = Scratchpads(),
         permissions: Permissions = Permissions()
     ) {
         self.version = version
@@ -87,6 +89,7 @@ public struct Config: Codable, Equatable, Sendable {
         self.nativeSpace = nativeSpace
         self.focusRing = focusRing
         self.focusPolicy = focusPolicy
+        self.scratchpads = scratchpads
         self.permissions = permissions
     }
 
@@ -111,6 +114,7 @@ public struct Config: Codable, Equatable, Sendable {
             nativeSpace: try container.decodeIfPresent(NativeSpace.self, forKey: .nativeSpace) ?? NativeSpace(),
             focusRing: try container.decodeIfPresent(FocusRing.self, forKey: .focusRing) ?? FocusRing(),
             focusPolicy: try container.decodeIfPresent(FocusPolicy.self, forKey: .focusPolicy) ?? FocusPolicy(),
+            scratchpads: try container.decodeIfPresent(Scratchpads.self, forKey: .scratchpads) ?? Scratchpads(),
             permissions: try container.decodeIfPresent(Permissions.self, forKey: .permissions) ?? Permissions()
         )
     }
@@ -121,7 +125,7 @@ public struct Config: Codable, Equatable, Sendable {
         var engines = Engines(); var cooperativeApps = CooperativeApps(); var safeZones = SafeZones()
         var animation = Animation(); var gestures = Gestures(); var hooks = Hooks()
         var nativeSpace = NativeSpace(); var focusRing = FocusRing(); var focusPolicy = FocusPolicy()
-        var permissions = Permissions()
+        var scratchpads = Scratchpads(); var permissions = Permissions()
 
         for section in sections {
             switch section {
@@ -149,6 +153,8 @@ public struct Config: Codable, Equatable, Sendable {
                 focusRing = value
             case let .focusPolicy(value):
                 focusPolicy = value
+            case let .scratchpads(value):
+                scratchpads = value
             case let .permissions(value):
                 permissions = value
             }
@@ -168,6 +174,7 @@ public struct Config: Codable, Equatable, Sendable {
             nativeSpace: nativeSpace,
             focusRing: focusRing,
             focusPolicy: focusPolicy,
+            scratchpads: scratchpads,
             permissions: permissions
         )
     }
@@ -239,6 +246,10 @@ public enum ConfigBuilder {
         [.nativeSpace(expression)]
     }
 
+    public static func buildExpression(_ expression: Scratchpads) -> [ConfigSection] {
+        [.scratchpads(expression)]
+    }
+
     public static func buildExpression(_ expression: Permissions) -> [ConfigSection] {
         [.permissions(expression)]
     }
@@ -262,5 +273,6 @@ public enum ConfigSection: Codable, Equatable, Sendable {
     case nativeSpace(NativeSpace)
     case focusRing(FocusRing)
     case focusPolicy(FocusPolicy)
+    case scratchpads(Scratchpads)
     case permissions(Permissions)
 }

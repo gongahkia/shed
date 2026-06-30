@@ -176,6 +176,102 @@ public struct LSPSymbolInformation: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPCommand: Codable, Equatable, Sendable {
+	public var title: String
+	public var command: String
+	public var arguments: [LSPAny]?
+
+	public init(title: String, command: String, arguments: [LSPAny]? = nil) {
+		self.title = title
+		self.command = command
+		self.arguments = arguments
+	}
+}
+
+public enum LSPCodeActionKind: String, Codable, Equatable, Sendable {
+	case empty = ""
+	case quickFix = "quickfix"
+	case refactor = "refactor"
+	case refactorExtract = "refactor.extract"
+	case refactorInline = "refactor.inline"
+	case refactorRewrite = "refactor.rewrite"
+	case source = "source"
+	case sourceOrganizeImports = "source.organizeImports"
+	case sourceFixAll = "source.fixAll"
+}
+
+public struct LSPCodeAction: Codable, Equatable, Sendable {
+	public var title: String
+	public var kind: LSPCodeActionKind?
+	public var diagnostics: [LSPDiagnostic]?
+	public var isPreferred: Bool?
+	public var edit: LSPWorkspaceEdit?
+	public var command: LSPCommand?
+
+	public init(
+		title: String,
+		kind: LSPCodeActionKind? = nil,
+		diagnostics: [LSPDiagnostic]? = nil,
+		isPreferred: Bool? = nil,
+		edit: LSPWorkspaceEdit? = nil,
+		command: LSPCommand? = nil
+	) {
+		self.title = title
+		self.kind = kind
+		self.diagnostics = diagnostics
+		self.isPreferred = isPreferred
+		self.edit = edit
+		self.command = command
+	}
+}
+
+public struct LSPCodeActionContext: Codable, Equatable, Sendable {
+	public var diagnostics: [LSPDiagnostic]
+	public var only: [LSPCodeActionKind]?
+
+	public init(diagnostics: [LSPDiagnostic], only: [LSPCodeActionKind]? = nil) {
+		self.diagnostics = diagnostics
+		self.only = only
+	}
+}
+
+public struct LSPCodeActionParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var range: LSPRange
+	public var context: LSPCodeActionContext
+
+	public init(textDocument: LSPTextDocumentIdentifier, range: LSPRange, context: LSPCodeActionContext) {
+		self.textDocument = textDocument
+		self.range = range
+		self.context = context
+	}
+}
+
+public enum LSPCodeActionResponse: Equatable, Sendable {
+	case actions([LSPCodeAction])
+	case commands([LSPCommand])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let actions = try? decoder.decode([LSPCodeAction].self, from: data), !actions.isEmpty {
+			self = .actions(actions)
+			return
+		}
+		if let commands = try? decoder.decode([LSPCommand].self, from: data), !commands.isEmpty {
+			self = .commands(commands)
+			return
+		}
+		self = .none
+	}
+
+	public func filteredQuickFixes() -> [LSPCodeAction] {
+		guard case let .actions(list) = self else {
+			return []
+		}
+		return list.filter { $0.kind == .quickFix || $0.kind == nil }
+	}
+}
+
 public struct LSPPrepareRenameParams: Codable, Equatable, Sendable {
 	public var textDocument: LSPTextDocumentIdentifier
 	public var position: LSPPosition

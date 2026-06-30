@@ -26,6 +26,18 @@ final class KeybindTests: XCTestCase {
         XCTAssertEqual(config.keybinds.bindings, [reload])
     }
 
+    func testOverlayActionsAreStorableInKeybinds() {
+        let grid = Keybind(KeyChord([.command, .shift], .slash), do: .showGridOverlay)
+        let explicit = Keybind(KeyChord([.command], .space), do: .showOverlay(.grid))
+
+        let keybinds = Keybinds {
+            grid
+            explicit
+        }
+
+        XCTAssertEqual(keybinds.bindings.map(\.action), [.showGridOverlay, .showOverlay(.grid)])
+    }
+
     func testCarbonRegistrationsUseSequentialIDsAndCarbonFlags() {
         let keybinds = Keybinds {
             Keybind(KeyChord([.command, .shift], .space), do: .reload)

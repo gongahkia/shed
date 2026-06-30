@@ -53,8 +53,7 @@ public extension IPCCommandName {
         .scratchpadList,
         .scratchpadRemove,
         .telemetryStatus,
-        .telemetryFlush,
-        .showOverlay
+        .telemetryFlush
     ]
 
     var isReservedV2: Bool {

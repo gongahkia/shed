@@ -73,6 +73,7 @@ final class IPCCommandTests: XCTestCase {
             .toggleSticky(IPCStickyCommand(windowID: 42, sticky: true, displayID: 1)),
             .togglePinned(IPCPinnedCommand(windowID: 42, pinned: true, displayID: 1)),
             .snapWindow(IPCSnapWindowCommand(position: .topRight, windowID: 42, displayID: 1)),
+            .showOverlay(IPCShowOverlayCommand(kind: .grid)),
             .dispatchGesture(IPCDispatchGestureCommand(
                 trigger: .fourFingerHorizontal,
                 motion: .left,

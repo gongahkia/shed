@@ -72,6 +72,8 @@ extension OllyRuntime {
             try await reloadConfig()
         case .noop:
             return
+        case .showGridOverlay, .showAltTab, .showCheatsheet, .showOverlay:
+            await showOverlay(for: action)
         case let .macro(name):
             _ = try await runMacro(name: name)
         case let .shell(shellAction):
@@ -147,6 +149,34 @@ extension OllyRuntime {
         let delta = direction == .previous || direction == .left || direction == .up ? -1 : 1
         let nextIndex = (currentIndex + delta + orderedTags.count) % orderedTags.count
         return orderedTags[nextIndex]
+    }
+
+    private func showOverlay(for action: Action) async {
+        switch action {
+        case .showGridOverlay:
+            await showOverlay(IPCShowOverlayCommand(kind: .grid))
+        case .showAltTab:
+            await showOverlay(IPCShowOverlayCommand(kind: .altTab))
+        case .showCheatsheet:
+            await showOverlay(IPCShowOverlayCommand(kind: .cheatsheet))
+        case let .showOverlay(kind):
+            await showOverlay(IPCShowOverlayCommand(kind: kind.ipcKind))
+        default:
+            return
+        }
+    }
+}
+
+private extension OverlayActionKind {
+    var ipcKind: IPCOverlayKind {
+        switch self {
+        case .grid:
+            return .grid
+        case .cheatsheet:
+            return .cheatsheet
+        case .altTab:
+            return .altTab
+        }
     }
 }
 

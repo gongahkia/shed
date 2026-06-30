@@ -83,6 +83,7 @@ window at its current frame. Other per-window engine overrides are rejected as `
 tiling arrange does not immediately overwrite the user placement. `dispatch-gesture` resolves a configured
 DSL gesture binding for external tools such as BetterTouchTool or Hammerspoon and executes the resulting
 runtime action.
+`show-overlay` opens an interactive app overlay; `grid` displays snap zones and commits with Enter.
 `manual-preselect` and `bsp-tree` expose engine tree controls for manual/BSP layouts; both return structured
 `unsupported_engine_command` errors when the active engine does not match the requested tree operation.
 `explain-window` returns every rule trace for a window; `explain-rule` returns one rule trace for the focused
@@ -211,6 +212,14 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "bottom-right",
         "center",
         "maximize"
+      ]
+    },
+    "overlayKind": {
+      "type": "string",
+      "enum": [
+        "grid",
+        "cheatsheet",
+        "alt-tab"
       ]
     },
     "gestureTrigger": {
@@ -463,6 +472,16 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
             },
             "arguments": {
               "$ref": "#/$defs/snapWindowArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "show-overlay"
+            },
+            "arguments": {
+              "$ref": "#/$defs/showOverlayArguments"
             }
           }
         },
@@ -846,6 +865,18 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         },
         "makeFloating": {
           "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "showOverlayArguments": {
+      "type": "object",
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/overlayKind"
         }
       },
       "additionalProperties": false

@@ -32,6 +32,20 @@ public struct IPCSnapWindowCommand: Codable, Equatable, Sendable {
     }
 }
 
+public enum IPCOverlayKind: String, CaseIterable, Codable, Equatable, Sendable {
+    case grid
+    case cheatsheet
+    case altTab = "alt-tab"
+}
+
+public struct IPCShowOverlayCommand: Codable, Equatable, Sendable {
+    public let kind: IPCOverlayKind
+
+    public init(kind: IPCOverlayKind) {
+        self.kind = kind
+    }
+}
+
 public enum IPCGestureTrigger: String, CaseIterable, Codable, Equatable, Sendable {
     case fourFingerHorizontal
     case fourFingerVertical

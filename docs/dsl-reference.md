@@ -587,6 +587,15 @@ Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.
 - Example: `Action.setEngine(BSPLayoutEngine.engineID)`
 - See also: `Keybind`, `Direction`.
 
+### OverlayActionKind
+
+`enum OverlayActionKind`
+
+- Purpose: Names overlays that can be opened from keybinds and commands.
+- Parameters: Choose `.grid`, `.cheatsheet`, or `.altTab`.
+- Example: `Action.showOverlay(.grid)`
+- See also: `Action`, `Keybind`.
+
 ### Keybind
 
 `struct Keybind`

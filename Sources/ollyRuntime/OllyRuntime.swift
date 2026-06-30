@@ -27,6 +27,7 @@ public actor OllyRuntime {
     let eventHub = RuntimeEventHub()
     public let runtimeEventBus: RuntimeEventBus
     public let dragSession: AXDragSession
+    public let overlayRequests: RuntimeOverlayRequestBus
     let fullscreenTracker = FullscreenTracker()
     let windowTargets = RuntimeWindowTargets()
     let focusRateLimiter = FocusRateLimiter()
@@ -76,6 +77,7 @@ public actor OllyRuntime {
         scanAXOnStart: Bool = true,
         runtimeEventBus: RuntimeEventBus = RuntimeEventBus(),
         dragSession: AXDragSession = AXDragSession(),
+        overlayRequests: RuntimeOverlayRequestBus = RuntimeOverlayRequestBus(),
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
@@ -92,7 +94,7 @@ public actor OllyRuntime {
         self.displayProvider = displayProvider; self.applicationMonitor = applicationMonitor
         self.snapshotCache = snapshotCache; self.statePersistence = statePersistence; self.macroRecorder = macroRecorder
         self.recoveryJournal = recoveryJournal; self.scanAXOnStart = scanAXOnStart
-        self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession
+        self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession; self.overlayRequests = overlayRequests
         self.axPermissionStream = axPermissionStream
         self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
         self.displayChangeStream = displayChangeStream; self.activeSpaceWindowIDs = activeSpaceWindowIDs
@@ -253,7 +255,7 @@ public actor OllyRuntime {
             return try await engineResponse(for: request)
         case .macroStart, .macroStop, .macroRun, .macroList, .macroDelete:
             return try await macroResponse(for: request)
-        case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow,
+        case .focus, .moveWindow, .swap, .toggleFloating, .toggleSticky, .togglePinned, .snapWindow, .showOverlay,
              .dispatchGesture, .reload, .restoreWindows, .runRawAction, .setSpacePolicy, .setFocusPolicy:
             return try await controlResponse(for: request)
         case let .reserved(command):

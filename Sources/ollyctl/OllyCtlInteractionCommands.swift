@@ -62,12 +62,37 @@ struct DispatchGesture: ParsableCommand {
     }
 }
 
+struct ShowOverlay: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "show-overlay",
+        abstract: "Show an interactive overlay."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Argument(help: "Overlay: grid, cheatsheet, or alt-tab.")
+    var kind: String
+
+    func run() throws {
+        try OllyCtlRunner(options: options).send(.showOverlay(IPCShowOverlayCommand(kind: try parseOverlayKind(kind))))
+    }
+}
+
 func parseSnapPosition(_ rawValue: String) throws -> IPCSnapPosition {
     guard let position = IPCSnapPosition(rawValue: rawValue) else {
         let values = IPCSnapPosition.allCases.map(\.rawValue).joined(separator: ", ")
         throw ValidationError("position must be one of: \(values)")
     }
     return position
+}
+
+func parseOverlayKind(_ rawValue: String) throws -> IPCOverlayKind {
+    guard let kind = IPCOverlayKind(rawValue: rawValue) else {
+        let values = IPCOverlayKind.allCases.map(\.rawValue).joined(separator: ", ")
+        throw ValidationError("overlay must be one of: \(values)")
+    }
+    return kind
 }
 
 func parseGestureTrigger(_ rawValue: String) throws -> IPCGestureTrigger {

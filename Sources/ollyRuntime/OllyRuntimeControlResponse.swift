@@ -14,12 +14,8 @@ extension OllyRuntime {
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window swapped")))
         case .toggleFloating, .toggleSticky, .togglePinned:
             return try await windowFlagResponse(for: request)
-        case let .snapWindow(command):
-            try await snapWindow(command)
-            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window snapped")))
-        case let .dispatchGesture(command):
-            try await dispatchGesture(command)
-            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "gesture dispatched")))
+        case .snapWindow, .showOverlay, .dispatchGesture:
+            return try await interactionResponse(for: request)
         case .reload:
             try await reloadConfig()
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "config reloaded")))
@@ -45,6 +41,22 @@ extension OllyRuntime {
             return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "pinned toggled")))
         default:
             preconditionFailure("invalid window flag command")
+        }
+    }
+
+    private func interactionResponse(for request: IPCRequestEnvelope) async throws -> IPCResponseEnvelope {
+        switch request.command {
+        case let .snapWindow(command):
+            try await snapWindow(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "window snapped")))
+        case let .showOverlay(command):
+            await showOverlay(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "overlay shown")))
+        case let .dispatchGesture(command):
+            try await dispatchGesture(command)
+            return .ok(id: request.id, result: .acknowledged(IPCAcknowledgement(message: "gesture dispatched")))
+        default:
+            preconditionFailure("invalid interaction command")
         }
     }
 

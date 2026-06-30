@@ -26,6 +26,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let runtime = OllyRuntime()
     private lazy var focusRingController = FocusRingController(runtime: runtime)
     private lazy var dragSnapOverlayController = DragSnapOverlayController(runtime: runtime)
+    private lazy var gridOverlayController = GridOverlayController(runtime: runtime)
     private lazy var settingsWindowController = SettingsWindowController(runtime: runtime)
     private lazy var runtimeEventStatusController = RuntimeEventStatusController(
         runtime: runtime
@@ -51,6 +52,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         installOverviewMode()
         focusRingController.start()
         dragSnapOverlayController.start()
+        gridOverlayController.start()
         runtimeEventStatusController.start()
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
@@ -65,6 +67,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         isTerminating = true
         focusRingController.stop()
         dragSnapOverlayController.stop()
+        gridOverlayController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         Task { [runtime, weak self] in
@@ -80,6 +83,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         focusRingController.stop()
         dragSnapOverlayController.stop()
+        gridOverlayController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         statusController?.remove()

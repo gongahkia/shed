@@ -25,27 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.3 Grid overlay hotkey
-
-**Goal:** `cmd+?` shows current snap-zone grid as an overlay; arrow-key navigate; enter snaps.
-
-**Files to add:**
-- `Sources/ollyApp/Overlays/GridOverlayController.swift` — reuses `SnapZoneView`.
-
-**Files to modify:**
-- `Sources/ollyApp/OllyApp.swift:applicationDidFinishLaunching` — register hotkey via `NSEvent.addLocalMonitorForEvents` (or surface as DSL-bindable `Action.showGridOverlay`).
-- `Sources/ollyDSL/Keybind.swift:130` — add `.showGridOverlay`, `.showAltTab`, `.showCheatsheet`, `.showOverlay(kind)`.
-- `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift` — handle new actions.
-- `Sources/ollyIPC/IPCCommand.swift` — new IPC command `show-overlay <kind>`.
-
-**Test plan:**
-- UI: simulate `cmd+?`; assert one panel per screen; arrow keys advance selection; enter dispatches `snap-window`.
-
-**Acceptance:**
-- Hitting `cmd+?` shows the grid; navigating with arrows + enter snaps the focused window.
-
----
-
 ### M3.4 In-app cheatsheet (`cmd+/`)
 
 **Goal:** Transient panel listing all bindings from `Config.keybinds`.
@@ -54,7 +33,7 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 - `Sources/ollyApp/Overlays/CheatsheetController.swift` — reads `Config.keybinds.bindings` (`Sources/ollyDSL/Keybind.swift:206`); groups by category (focus, swap, move, tag, engine, snap, custom).
 
 **Files to modify:**
-- `Sources/ollyApp/OllyApp.swift` — register `cmd+/` (DSL-bindable as M3.3's `Action.showCheatsheet`).
+- `Sources/ollyApp/OllyApp.swift` — register `cmd+/` (DSL-bindable as `Action.showCheatsheet`).
 - Reuse `CommandPaletteRowView` (`Sources/ollyApp/CommandPaletteController.swift:234`) for visual parity.
 
 **Test plan:**

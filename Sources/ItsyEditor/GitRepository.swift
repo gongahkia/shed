@@ -243,6 +243,11 @@ public enum GitBranchParser {
 	}
 }
 
+public enum GitPullMode: Equatable, Sendable {
+	case ffOnly
+	case rebase
+}
+
 public struct ProcessGitCommandRunner: GitCommandRunning {
 	public var executableURL: URL
 
@@ -423,6 +428,27 @@ public struct GitRepository: Sendable {
 			throw GitBranchError.emptyName
 		}
 		_ = try runner.runGit(arguments: ["branch", force ? "-D" : "-d", name], root: root)
+	}
+
+	public func fetchArguments() -> [String] {
+		["fetch", "--all", "--prune"]
+	}
+
+	public func pullArguments(mode: GitPullMode = .ffOnly) -> [String] {
+		switch mode {
+		case .ffOnly:
+			return ["pull", "--ff-only"]
+		case .rebase:
+			return ["pull", "--rebase"]
+		}
+	}
+
+	public func pushArguments() throws -> [String] {
+		let branch = try status().branch
+		if let head = branch.head, branch.upstream == nil {
+			return ["push", "--set-upstream", "origin", head]
+		}
+		return ["push"]
 	}
 
 	public func stashForBranch(_ name: String) throws {

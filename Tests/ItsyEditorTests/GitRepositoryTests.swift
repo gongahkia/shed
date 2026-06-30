@@ -189,6 +189,19 @@ import Testing
 	])
 }
 
+@Test func gitRepositoryBuildsRemoteOperationArguments() throws {
+	let newBranchRunner = RecordingGitRunner(output: "# branch.head feature\n# branch.oid abc123\n")
+	let trackingRunner = RecordingGitRunner(output: "# branch.head main\n# branch.upstream origin/main\n# branch.oid abc123\n")
+	let newBranchRepository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: newBranchRunner)
+	let trackingRepository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: trackingRunner)
+
+	#expect(newBranchRepository.fetchArguments() == ["fetch", "--all", "--prune"])
+	#expect(newBranchRepository.pullArguments() == ["pull", "--ff-only"])
+	#expect(newBranchRepository.pullArguments(mode: .rebase) == ["pull", "--rebase"])
+	#expect(try newBranchRepository.pushArguments() == ["push", "--set-upstream", "origin", "feature"])
+	#expect(try trackingRepository.pushArguments() == ["push"])
+}
+
 @Test func gitRepositoryStageAndUnstageHunkValidateBeforeApplyingPatch() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)

@@ -13,6 +13,8 @@ public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
 public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
 public typealias ScratchpadApplicationLauncher = @Sendable (String) async throws -> Void
 public typealias ScratchpadFocusHandler = @Sendable (WindowState) async throws -> Void
+public typealias ReduceMotionValueProvider = @MainActor @Sendable () -> Bool
+public typealias ReduceMotionChangeStreamProvider = @Sendable () -> AsyncStream<Void>
 
 // swiftlint:disable:next type_body_length
 public actor OllyRuntime {
@@ -43,6 +45,8 @@ public actor OllyRuntime {
     let scratchpadParker: WindowParker
     let scratchpadApplicationLauncher: ScratchpadApplicationLauncher
     let scratchpadFocusWindow: ScratchpadFocusHandler?
+    let reduceMotionState: ReduceMotionState
+    let reduceMotionChangeStream: ReduceMotionChangeStreamProvider
     let assignment: WindowTagAssignment
     let dispatcher: TagDispatcher
     let engineHost: EngineHost
@@ -63,6 +67,7 @@ public actor OllyRuntime {
     var applicationObservationTask: Task<Void, Never>?
     var displayObservationTask: Task<Void, Never>?
     var nativeSpaceObservationTask: Task<Void, Never>?
+    var reduceMotionObservationTask: Task<Void, Never>?
     var nativeSpaceVerificationTask: Task<Void, Never>?
     var axPermissionStatus: AXPermissionStatus?
     var nativeSpaceDriftPolicy: NativeSpaceDriftPolicy = .followWindow
@@ -92,6 +97,9 @@ public actor OllyRuntime {
         displayChangeStream: @escaping DisplayChangeStreamProvider = OllyRuntime.defaultDisplayChangeStream,
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         nativeSpaceChangeStream: @escaping NativeSpaceChangeStreamProvider = OllyRuntime.defaultNativeSpaceChangeStream,
+        reduceMotionProvider: @escaping ReduceMotionValueProvider = OllyRuntime.defaultReduceMotionProvider,
+        reduceMotionChangeStream: @escaping ReduceMotionChangeStreamProvider =
+            OllyRuntime.defaultReduceMotionChangeStream,
         focusInputAttribution: FocusInputAttribution = .shared,
         scratchpadApplicationLauncher: @escaping ScratchpadApplicationLauncher =
             { try await OllyRuntime.defaultScratchpadApplicationLauncher($0) },
@@ -111,6 +119,8 @@ public actor OllyRuntime {
         self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
         self.displayChangeStream = displayChangeStream; self.activeSpaceWindowIDs = activeSpaceWindowIDs
         self.nativeSpaceChangeStream = nativeSpaceChangeStream
+        self.reduceMotionState = ReduceMotionState(provider: reduceMotionProvider)
+        self.reduceMotionChangeStream = reduceMotionChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.focusInputAttribution = focusInputAttribution
         self.scratchpadApplicationLauncher = scratchpadApplicationLauncher
@@ -133,6 +143,13 @@ public actor OllyRuntime {
                 windowTargets.target(for: window)
             }
         )
+        let placementApplier = RuntimeLayoutPlacementApplier(
+            windowMover: windowMover,
+            windowTargets: windowTargets,
+            recoveryJournal: recoveryJournal,
+            configStore: configStore,
+            reduceMotionState: reduceMotionState
+        )
         self.engineHost = EngineHost(
             windowStore: windowStore,
             tagStore: tagStore,
@@ -140,18 +157,8 @@ public actor OllyRuntime {
             configProvider: { [configStore] engineID in
                 await configStore.config(for: engineID)
             },
-            applyPlacement: { [windowMover, windowTargets, recoveryJournal] window, placement in
-                if placement.hidden {
-                    try? await recoveryJournal.record(window: window, parkedFrame: placement.frame)
-                } else {
-                    try? await recoveryJournal.remove(windowID: window.id)
-                }
-                guard let target = windowTargets.target(for: window) else {
-                    return
-                }
-                let displayTarget = target.withFallbackDisplayID(window.displayID)
-                await windowMover.setPosition(placement.frame.origin, for: displayTarget)
-                await windowMover.setSize(placement.frame.size, for: displayTarget)
+            applyPlacement: { engineID, window, placement in
+                await placementApplier.apply(engineID: engineID, window: window, placement: placement)
             },
             publishEvent: { [eventHub, runtimeEventBus] event in
                 let ipcEvent = IPCEvent.engine(event)
@@ -171,6 +178,7 @@ public actor OllyRuntime {
         axPermissionStatus = AXPermission.status(prompt: false)
         startAXPermissionObservation()
         startDisplayObservation()
+        startReduceMotionObservation()
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
             startApplicationObservation()
@@ -198,6 +206,7 @@ public actor OllyRuntime {
         displayObservationTask = nil
         nativeSpaceObservationTask?.cancel()
         nativeSpaceObservationTask = nil
+        reduceMotionObservationTask?.cancel(); reduceMotionObservationTask = nil
         nativeSpaceVerificationTask?.cancel()
         nativeSpaceVerificationTask = nil
         focusInputAttribution.stop()

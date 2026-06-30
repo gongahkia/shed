@@ -122,6 +122,43 @@ final class WindowMoverTests: XCTestCase {
 
         XCTAssertEqual(recorder.errors, [.cannotComplete])
     }
+
+    func testInterpolatesEaseOutAnimationFrames() {
+        let frames = WindowFrameAnimation.frames(
+            from: CGRect(x: 0, y: 0, width: 100, height: 100),
+            to: CGRect(x: 200, y: 200, width: 400, height: 400),
+            duration: 0.2,
+            frameInterval: 0.05,
+            curve: .easeOut
+        )
+
+        XCTAssertEqual(frames.count, 4)
+        XCTAssertEqual(frames[0].elapsed, 0.05, accuracy: 0.0001)
+        assertFrame(frames[0].frame, equals: CGRect(x: 87.5, y: 87.5, width: 231.25, height: 231.25))
+        assertFrame(frames[1].frame, equals: CGRect(x: 150, y: 150, width: 325, height: 325))
+        assertFrame(frames[2].frame, equals: CGRect(x: 187.5, y: 187.5, width: 381.25, height: 381.25))
+    }
+
+    func testZeroDurationAnimatedFrameIssuesOneWrite() async {
+        let client = FakeAXWindowMoveClient()
+        client.frame = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let mover = WindowMover(client: client, frameDelayNanoseconds: 1_000_000_000)
+        let target = WindowMoveTarget(id: 1, axElement: AXUIElementCreateApplication(getpid()))
+        let end = CGRect(x: 200, y: 200, width: 400, height: 400)
+
+        await mover.setFrameAnimated(from: client.frame ?? .zero, to: end, duration: 0, curve: .easeOut, for: target)
+        await mover.flushNow()
+
+        XCTAssertEqual(client.positions, [end.origin])
+        XCTAssertEqual(client.sizes, [end.size])
+    }
+
+    private func assertFrame(_ actual: CGRect, equals expected: CGRect, file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(actual.origin.x, expected.origin.x, accuracy: 1, file: file, line: line)
+        XCTAssertEqual(actual.origin.y, expected.origin.y, accuracy: 1, file: file, line: line)
+        XCTAssertEqual(actual.size.width, expected.size.width, accuracy: 1, file: file, line: line)
+        XCTAssertEqual(actual.size.height, expected.size.height, accuracy: 1, file: file, line: line)
+    }
 }
 
 private final class AXErrorRecorder: @unchecked Sendable {

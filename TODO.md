@@ -25,37 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.7 Animated layout transitions
-
-**Goal:** Interpolate AX `setPosition`/`setSize` writes over `Animation.duration` using `AnimationCurve`. Honour Reduce Motion.
-
-**Research summary:**
-- `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion: Bool` and `NSWorkspace.accessibilityDisplayOptionsDidChangeNotification` — subscribe at startup, cache value, invalidate on notification.
-- Read once at animation start (don't poll mid-animation); apply `duration = 0` rather than skipping animator API to keep code path uniform.
-
-**Files to modify:**
-- `Sources/ollyKit/WindowMover.swift` — add `setFrameAnimated(from: CGRect, to: CGRect, duration: TimeInterval, curve: AnimationCurve, for: WindowMoveTarget)`. Schedule N intermediate frames via existing `Sources/ollyKit/WindowMoveDisplayLink.swift`. Expose `lastFrame(for: WindowMoveTarget) -> CGRect?` from the private dict at line 38.
-- `Sources/ollyLayouts/EngineHost.swift` — in `applyPlacement` (constructor at `Sources/ollyRuntime/OllyRuntime.swift:166`), look up the per-engine `Animation` from `Config.animation(for: engineID)` (`Sources/ollyDSL/Animation.swift:160`) and call `setFrameAnimated` instead of immediate `setPosition`/`setSize`.
-
-**Reduce Motion:**
-- Short-circuit to one-frame write if `ReduceMotionPolicy.respectSystem` and `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion == true`, or if policy is `.neverAnimate`.
-
-**Electron caveat:**
-- Many Electron apps snap to discrete sizes and ignore intermediate AX writes; result is one jump at the end. Detect Electron via existing `Sources/ollyKit/ElectronWorkaround.swift` and fall back to instant write.
-
-**Test plan:**
-- Unit: given start `(0,0,100,100)` → end `(200,200,400,400)` over 200ms with `easeOut`; verify intermediate frames at t=50,100,150ms match `easeOut(t)` interpolation within 1px.
-- Integration: with `reduceMotion(.respectSystem)` + mocked `accessibilityDisplayShouldReduceMotion = true`, only one write is issued.
-- PerfBench: 18-engine arrange under animation ≤ 2× the non-animated baseline (`.perf-baseline.json`).
-
-**Acceptance:**
-- A tag switch from BSP to Grid visibly animates window frames over ~150ms; turning on System Settings → Accessibility → Reduce Motion eliminates the animation.
-
-**Refs:**
-- https://developer.apple.com/documentation/appkit/nsworkspace/1525481-accessibilitydisplayshouldreduce
-
----
-
 ## M4 — Product polish
 
 ### M4.1 App-launch on tag switch

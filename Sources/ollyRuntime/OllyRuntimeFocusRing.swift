@@ -8,6 +8,10 @@ public extension OllyRuntime {
         await configStore.current().focusRing
     }
 
+    func keybinds() async -> Keybinds {
+        await configStore.current().keybinds
+    }
+
     func frameForWindow(_ windowID: WindowID) async -> CGRect? {
         if let target = windowTargets.target(for: windowID),
            let frame = AXFrameReader().frame(for: target.axElement) {

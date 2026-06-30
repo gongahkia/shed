@@ -247,8 +247,12 @@ final class CommandPaletteRowView: NSTableCellView {
     }
 
     func configure(with action: CommandPaletteAction) {
-        titleLabel.stringValue = action.title
-        detailLabel.stringValue = action.detail
+        configure(title: action.title, detail: action.detail)
+    }
+
+    func configure(title: String, detail: String) {
+        titleLabel.stringValue = title
+        detailLabel.stringValue = detail
     }
 
     private func configure() {

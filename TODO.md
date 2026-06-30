@@ -25,25 +25,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); honour `NSWorkspace.shared.accessibilityDisplayShouldReduceMotion`; subscribe via `RuntimeEventBus` (M0.2).
 
-### M3.4 In-app cheatsheet (`cmd+/`)
-
-**Goal:** Transient panel listing all bindings from `Config.keybinds`.
-
-**Files to add:**
-- `Sources/ollyApp/Overlays/CheatsheetController.swift` — reads `Config.keybinds.bindings` (`Sources/ollyDSL/Keybind.swift:206`); groups by category (focus, swap, move, tag, engine, snap, custom).
-
-**Files to modify:**
-- `Sources/ollyApp/OllyApp.swift` — register `cmd+/` (DSL-bindable as `Action.showCheatsheet`).
-- Reuse `CommandPaletteRowView` (`Sources/ollyApp/CommandPaletteController.swift:234`) for visual parity.
-
-**Test plan:**
-- Unit: a config with 12 bindings groups into expected buckets and renders all 12 rows.
-
-**Acceptance:**
-- `cmd+/` opens a panel listing every keybind from Config.
-
----
-
 ### M3.5 Live Alt-Tab / exposé preview switcher
 
 **Goal:** Show all windows on current tag as a thumbnail grid.

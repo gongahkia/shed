@@ -85,6 +85,36 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testTagSwitchAndEngineChangeHooksRunFromCommands() async throws {
+        let recorder = HookRecorder()
+        try await withRuntime { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Engines {
+                    EngineDeclaration.floating
+                    EngineDeclaration.masterStack
+                }
+                Hooks {
+                    onTagSwitch { context in
+                        recorder.record("tag:\(context.previousTags.rawValue)->\(context.activeTags.rawValue)")
+                    }
+                    onEngineChange { context in
+                        let previous = context.previousEngineID?.rawValue ?? "nil"
+                        recorder.record("engine:\(previous)->\(context.currentEngineID.rawValue)")
+                    }
+                }
+            })
+            await runtime.initializeDisplays()
+
+            XCTAssertEqual(try send(.switchTag(.init(tag: tag(2), displayID: displayID)), to: socketPath).status, .success)
+            XCTAssertEqual(
+                try send(.setEngine(.init(engineID: MasterStackLayoutEngine.engineID, displayID: displayID)), to: socketPath).status,
+                .success
+            )
+
+            XCTAssertEqual(recorder.events, ["tag:1->4", "engine:nil->master-stack"])
+        }
+    }
+
     func testRuntimeRejectsNonFloatingWindowEngineOverride() async throws {
         try await withRuntime { runtime, _, displayID in
             await runtime.replaceConfigForTest(Config {
@@ -288,7 +318,7 @@ final class OllyRuntimeTests: XCTestCase {
     }
 
     func testAXPermissionChangePublishesEventAndRunsHook() async throws {
-        let recorder = PermissionRecorder()
+        let recorder = HookRecorder()
         try await withRuntime { runtime, socketPath, _ in
             await runtime.replaceConfigForTest(Config {
                 Hooks {
@@ -315,6 +345,38 @@ final class OllyRuntimeTests: XCTestCase {
             let event = try JSONDecoder().decode(IPCEventEnvelope.self, from: try stream.readLine())
             XCTAssertEqual(event.event, .axPermission(IPCAXPermissionEvent(status: .missing)))
             XCTAssertEqual(recorder.events, ["missing"])
+        }
+    }
+
+    func testConfigReloadAndDisplayChangeHooksRun() async throws {
+        let recorder = HookRecorder()
+        try await withRuntime { runtime, _, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Hooks {
+                    onConfigReload { context in
+                        recorder.record("reload:\(context.current.version.rawValue):\(context.sourceURL?.lastPathComponent ?? "-")")
+                    }
+                    onDisplayChange { context in
+                        recorder.record("display:\(context.change.displayID)")
+                    }
+                }
+            })
+
+            try await runtime.reloadConfig()
+            await runtime.replaceConfigForTest(Config {
+                Hooks {
+                    onDisplayChange { context in
+                        recorder.record("display:\(context.change.displayID)")
+                    }
+                }
+            })
+            await runtime.handleDisplayChange(DisplayChange(
+                displayID: displayID,
+                flags: CGDisplayChangeSummaryFlags(),
+                displays: []
+            ))
+
+            XCTAssertEqual(recorder.events, ["reload:v1:missing.swift", "display:\(displayID)"])
         }
     }
 
@@ -454,6 +516,43 @@ final class OllyRuntimeTests: XCTestCase {
         }
     }
 
+    func testWindowAppearedAndClosedHooksRunFromAXLifecycle() async throws {
+        let recorder = HookRecorder()
+        let element = AXUIElementCreateApplication(9876)
+        let snapshotCache = WindowSnapshotCache { _, _ in
+            WindowAttributes(
+                title: "Docs",
+                role: "AXWindow",
+                subrole: "AXStandardWindow",
+                frame: CGRect(x: 0, y: 0, width: 300, height: 300),
+                processID: 9876,
+                windowID: 77
+            )
+        }
+
+        try await withRuntime(snapshotCache: snapshotCache) { runtime, _, _ in
+            await runtime.replaceConfigForTest(Config {
+                Hooks {
+                    onWindowAppeared { context in
+                        recorder.record("appeared:\(context.window.id)")
+                    }
+                    onWindowClosed { context in
+                        recorder.record("closed:\(context.window.id)")
+                    }
+                }
+            })
+            await runtime.handle(axEvent: AXNotificationEvent(
+                processID: 9876,
+                element: element,
+                notification: .windowCreated,
+                rawNotificationName: AXNotification.windowCreated.rawValue
+            ))
+            await runtime.handle(applicationEvent: .terminated(Application(processID: 9876)))
+
+            XCTAssertEqual(recorder.events, ["appeared:77", "closed:77"])
+        }
+    }
+
     func testAXWindowMovedFeedsDragSessionFromSnapshot() async throws {
         let element = AXUIElementCreateApplication(9876)
         let frame = CGRect(x: 40, y: 50, width: 320, height: 240)
@@ -490,6 +589,7 @@ final class OllyRuntimeTests: XCTestCase {
     }
 
     func testWindowResizeFullscreenProbePublishesTransitions() async throws {
+        let recorder = HookRecorder()
         let element = AXUIElementCreateApplication(9876)
         let subroles = SubroleScript([OllyRuntime.fullscreenWindowSubrole, "AXStandardWindow"])
         let snapshotCache = WindowSnapshotCache { _, _ in
@@ -508,6 +608,16 @@ final class OllyRuntimeTests: XCTestCase {
             axSubroleReader: { _ in await subroles.next() },
             fullscreenDebounceNanoseconds: 1
         ) { runtime, socketPath, displayID in
+            await runtime.replaceConfigForTest(Config {
+                Hooks {
+                    onFullscreenEnter { context in
+                        recorder.record("fullscreen:\(context.window.id):\(context.didEnter)")
+                    }
+                    onFullscreenExit { context in
+                        recorder.record("fullscreen:\(context.window.id):\(context.didEnter)")
+                    }
+                }
+            })
             let stream = try UnixDomainSocketClient(socketPath: socketPath, timeout: 1).openLineStream()
             defer {
                 stream.close()
@@ -541,6 +651,7 @@ final class OllyRuntimeTests: XCTestCase {
             XCTAssertEqual(event.event, .fullscreen(IPCFullscreenEvent(windowID: 77, didEnter: false)))
             snapshot = try stateSnapshot(from: send(.state(.init(displayID: displayID)), to: socketPath))
             XCTAssertEqual(snapshot.windows.first?.isFullscreen, false)
+            XCTAssertEqual(recorder.events, ["fullscreen:77:true", "fullscreen:77:false"])
         }
     }
 
@@ -949,6 +1060,7 @@ private func withRuntime(
     snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
     dragSession: AXDragSession = AXDragSession(),
     axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+    displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
     activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
     focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
     fullscreenDebounceNanoseconds: UInt64 = 100_000_000,
@@ -960,6 +1072,7 @@ private func withRuntime(
         snapshotCache: snapshotCache,
         dragSession: dragSession,
         axSubroleReader: axSubroleReader,
+        displayChangeStream: displayChangeStream,
         activeSpaceWindowIDs: activeSpaceWindowIDs,
         focusInputAttribution: focusInputAttribution,
         fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds
@@ -1003,6 +1116,7 @@ private extension OllyRuntime {
         await configStore.replace(with: config)
         nativeSpaceDriftPolicy = config.nativeSpace.driftPolicy
         focusPolicy = config.focusPolicy
+        await hookDispatcher.update(config.hooks)
         await focusRateLimiter.update(settings: FocusRateLimitSettings(
             maxEventsPerSecond: config.focusPolicy.maxEventsPerSecond,
             minHumanIntervalMilliseconds: config.focusPolicy.minHumanIntervalMilliseconds
@@ -1018,11 +1132,20 @@ private extension OllyRuntime {
     }
 }
 
-private final class PermissionRecorder: @unchecked Sendable {
-    private(set) var events: [String] = []
+private final class HookRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedEvents: [String] = []
+
+    var events: [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedEvents
+    }
 
     func record(_ event: String) {
-        events.append(event)
+        lock.lock()
+        storedEvents.append(event)
+        lock.unlock()
     }
 }
 
@@ -1127,6 +1250,7 @@ private struct RuntimeFixture {
         snapshotCache: WindowSnapshotCache = WindowSnapshotCache(),
         dragSession: AXDragSession = AXDragSession(),
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        displayChangeStream: @escaping DisplayChangeStreamProvider = { AsyncStream { $0.finish() } },
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         focusInputAttribution: FocusInputAttribution = FocusInputAttribution(),
         fullscreenDebounceNanoseconds: UInt64 = 100_000_000
@@ -1153,6 +1277,7 @@ private struct RuntimeFixture {
                 }
             },
             axSubroleReader: axSubroleReader,
+            displayChangeStream: displayChangeStream,
             activeSpaceWindowIDs: activeSpaceWindowIDs,
             focusInputAttribution: focusInputAttribution,
             fullscreenDebounceNanoseconds: fullscreenDebounceNanoseconds,

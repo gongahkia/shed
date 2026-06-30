@@ -1,5 +1,6 @@
 import ApplicationServices
 import Foundation
+import ollyDSL
 import ollyIPC
 import ollyKit
 
@@ -58,6 +59,7 @@ extension OllyRuntime {
         }
         await windowStore.upsert(updated)
         await publishRuntimeEvent(.fullscreen(IPCFullscreenEvent(windowID: windowID, didEnter: isFullscreen)))
+        await hookDispatcher.fullscreen(FullscreenHookContext(window: updated, didEnter: isFullscreen))
         if let displayID = updated.displayID {
             try? await applyAndArrange(displayID: displayID)
         }

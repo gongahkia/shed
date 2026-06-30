@@ -14,8 +14,10 @@ source_order = {
   "Animation.swift" => "Animation",
   "ConfigDiagnostics.swift" => "Config Diagnostics",
   "Config.swift" => "Config",
+  "NativeSpace.swift" => "Native Space",
   "FocusPolicy.swift" => "Focus Policy",
   "Hooks.swift" => "Hooks",
+  "HookDeclarations.swift" => "Hooks",
   "Keybind.swift" => "Keybinds",
   "NamedTag.swift" => "Workspaces",
   "EngineDSL.swift" => "Engines",
@@ -75,8 +77,8 @@ symbols.sort_by! { |symbol| [source_order.keys.index(symbol[:basename]), symbol[
 content = +"# olly DSL Reference\n\n"
 content << "Generated from the `ollyDSL` DocC symbol graph. Do not edit by hand.\n\n"
 
-symbols.group_by { |symbol| symbol[:basename] }.each do |basename, group|
-  content << "## #{source_order.fetch(basename)}\n\n"
+symbols.group_by { |symbol| source_order.fetch(symbol[:basename]) }.each do |section, group|
+  content << "## #{section}\n\n"
   group.each do |symbol|
     content << "### #{symbol[:title]}\n\n"
     content << "`#{symbol[:declaration]}`\n\n"
@@ -87,4 +89,4 @@ symbols.group_by { |symbol| symbol[:basename] }.each do |basename, group|
   end
 end
 
-File.write(output_path, content)
+File.write(output_path, "#{content.rstrip}\n")

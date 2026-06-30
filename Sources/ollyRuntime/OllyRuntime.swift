@@ -8,71 +8,9 @@ import ollyKit
 import ollyLayouts
 
 public typealias AXSubroleReader = @Sendable (AXUIElement) async throws -> String?
+public typealias DisplayChangeStreamProvider = @Sendable () -> AsyncStream<DisplayChange>
 public typealias ActiveSpaceWindowIDProvider = @Sendable () -> Set<WindowID>?
 public typealias NativeSpaceChangeStreamProvider = @Sendable () -> AsyncStream<Void>
-
-public enum OllyRuntimeError: Error, CustomStringConvertible {
-    case displayUnavailable
-    case engineUnavailable(LayoutEngineID)
-    case windowUnavailable(WindowID)
-    case missingFocusedWindow
-    case missingDirectionalTarget(IPCDirection)
-    case gestureUnbound(trigger: String, motion: String)
-    case unsupportedGestureAction(String)
-    case axOperationFailed(String, AXError)
-    case unsupportedAXCommand(String)
-    case unsupportedEngineCommand(command: String, engineID: LayoutEngineID)
-
-    public var description: String {
-        switch self {
-        case .displayUnavailable:
-            return "display unavailable"
-        case let .engineUnavailable(engineID):
-            return "engine unavailable: \(engineID.rawValue)"
-        case let .windowUnavailable(windowID):
-            return "window unavailable: \(windowID)"
-        case .missingFocusedWindow:
-            return "no focused window"
-        case let .missingDirectionalTarget(direction):
-            return "no window in direction: \(direction.rawValue)"
-        case let .gestureUnbound(trigger, motion):
-            return "no gesture binding for \(trigger) \(motion)"
-        case let .unsupportedGestureAction(action):
-            return "gesture action is unsupported: \(action)"
-        case let .axOperationFailed(operation, error):
-            return "\(operation) failed: \(error)"
-        case let .unsupportedAXCommand(command):
-            return "\(command) requires Accessibility permission"
-        case let .unsupportedEngineCommand(command, engineID):
-            return "\(command) is unavailable for engine \(engineID.rawValue)"
-        }
-    }
-
-    var code: String {
-        switch self {
-        case .displayUnavailable:
-            return "display_unavailable"
-        case .engineUnavailable:
-            return "engine_unavailable"
-        case .windowUnavailable:
-            return "window_unavailable"
-        case .missingFocusedWindow:
-            return "missing_focused_window"
-        case .missingDirectionalTarget:
-            return "missing_directional_target"
-        case .gestureUnbound:
-            return "gesture_unbound"
-        case .unsupportedGestureAction:
-            return "unsupported_gesture_action"
-        case .axOperationFailed:
-            return "ax_operation_failed"
-        case .unsupportedAXCommand:
-            return "ax_unavailable"
-        case .unsupportedEngineCommand:
-            return "unsupported_engine_command"
-        }
-    }
-}
 
 // swiftlint:disable:next type_body_length
 public actor OllyRuntime {
@@ -92,6 +30,7 @@ public actor OllyRuntime {
     let fullscreenTracker = FullscreenTracker()
     let windowTargets = RuntimeWindowTargets()
     let focusRateLimiter = FocusRateLimiter()
+    let hookDispatcher = HookDispatcher()
     let statePersistence: WindowTagPersistence
     let recoveryJournal: WindowRecoveryJournal
     let windowMover: WindowMover
@@ -101,6 +40,7 @@ public actor OllyRuntime {
     private let registry: LayoutEngineRegistry
     let axPermissionStream: @Sendable () -> AsyncStream<AXPermissionStatus>
     let axSubroleReader: AXSubroleReader
+    let displayChangeStream: DisplayChangeStreamProvider
     let activeSpaceWindowIDs: ActiveSpaceWindowIDProvider
     let nativeSpaceChangeStream: NativeSpaceChangeStreamProvider
     let focusInputAttribution: FocusInputAttribution
@@ -112,6 +52,7 @@ public actor OllyRuntime {
     var axObserversByProcessID: [pid_t: AXObserverBridge] = [:]
     var tasks: [Task<Void, Never>] = []
     var applicationObservationTask: Task<Void, Never>?
+    var displayObservationTask: Task<Void, Never>?
     var nativeSpaceObservationTask: Task<Void, Never>?
     var nativeSpaceVerificationTask: Task<Void, Never>?
     var axPermissionStatus: AXPermissionStatus?
@@ -135,6 +76,7 @@ public actor OllyRuntime {
         axPermissionStream: @escaping @Sendable () -> AsyncStream<AXPermissionStatus> =
             OllyRuntime.defaultAXPermissionStream,
         axSubroleReader: @escaping AXSubroleReader = OllyRuntime.defaultAXSubroleReader,
+        displayChangeStream: @escaping DisplayChangeStreamProvider = OllyRuntime.defaultDisplayChangeStream,
         activeSpaceWindowIDs: @escaping ActiveSpaceWindowIDProvider = OllyRuntime.defaultActiveSpaceWindowIDs,
         nativeSpaceChangeStream: @escaping NativeSpaceChangeStreamProvider = OllyRuntime.defaultNativeSpaceChangeStream,
         focusInputAttribution: FocusInputAttribution = .shared,
@@ -150,7 +92,7 @@ public actor OllyRuntime {
         self.runtimeEventBus = runtimeEventBus; self.dragSession = dragSession
         self.axPermissionStream = axPermissionStream
         self.axSubroleReader = axSubroleReader; self.fullscreenDebounceNanoseconds = fullscreenDebounceNanoseconds
-        self.activeSpaceWindowIDs = activeSpaceWindowIDs
+        self.displayChangeStream = displayChangeStream; self.activeSpaceWindowIDs = activeSpaceWindowIDs
         self.nativeSpaceChangeStream = nativeSpaceChangeStream
         self.nativeSpaceDebounceNanoseconds = nativeSpaceDebounceNanoseconds
         self.focusInputAttribution = focusInputAttribution
@@ -204,6 +146,7 @@ public actor OllyRuntime {
         await windowMover.setAXErrorHandler { [weak self] error in Task { await self?.handleAXReadWriteError(error) } }
         axPermissionStatus = AXPermission.status(prompt: false)
         startAXPermissionObservation()
+        startDisplayObservation()
         if scanAXOnStart, AXPermission.isTrusted {
             await refreshAllWindows()
             startApplicationObservation()
@@ -227,6 +170,8 @@ public actor OllyRuntime {
         fullscreenTasksByWindowID.values.forEach { $0.cancel() }
         fullscreenTasksByWindowID.removeAll()
         applicationObservationTask = nil
+        displayObservationTask?.cancel()
+        displayObservationTask = nil
         nativeSpaceObservationTask?.cancel()
         nativeSpaceObservationTask = nil
         nativeSpaceVerificationTask?.cancel()

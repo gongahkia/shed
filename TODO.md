@@ -23,57 +23,6 @@ Verification command after each task: `./scripts/bootstrap-dev.sh && swiftlint l
 
 ## M2 — Hackability surface wire-up
 
-### M2.1 Wire `Hooks` to runtime
-
-**Goal:** `Hooks.declarations` (`Sources/ollyDSL/Hooks.swift:9-87`) currently codable but never invoked. Wire to runtime; add `onWindowClosed`, `onConfigReload`, `onEngineChange`, `onFullscreenEnter/Exit`, `onAXPermissionChanged`.
-
-**Files to modify/add:**
-- `Sources/ollyDSL/Hooks.swift` — add `HookKind` cases and context structs:
-  - `WindowClosedHookContext(window: WindowState)`
-  - `ConfigReloadHookContext(previous: Config, current: Config, sourceURL: URL?)`
-  - `EngineChangeHookContext(displayID, tag, previousEngineID, currentEngineID)`
-  - `FullscreenHookContext(window: WindowState, didEnter: Bool)`
-  - `AXPermissionHookContext(status: AXPermissionStatus)`
-- `Sources/ollyDSL/Config.swift:234-333` — extend `HookDeclaration` with handler fields + `runX` methods.
-- New `Sources/ollyRuntime/HookDispatcher.swift` actor; instantiated from `configStore.current().hooks`; refresh on `reloadConfig`.
-
-**Invocation sites:**
-| Hook | Site |
-|---|---|
-| `onTagSwitch` | `Sources/ollyRuntime/OllyRuntimeCommands.swift:103` (`switchTag`), `:110` (`toggleTag`), `:119` (`addTag`), `:127` (`removeTag`); gesture path `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift:124` |
-| `onDisplayChange` | New task subscribed to `DisplayMonitor.changes()` (`Sources/ollyKit/DisplayMonitor.swift:86`) — runtime today does not observe; this also fixes a latent reliability gap |
-| `onWindowAppeared` | `Sources/ollyRuntime/OllyRuntimeAX.swift:195` (`refreshWindowElement`) on `WindowStore.upsert` returning `.added` |
-| `onWindowClosed` | `Sources/ollyRuntime/OllyRuntimeAX.swift:239` (`removeWindow`) and `:107` (terminated-app branch) |
-| `onConfigReload` | `Sources/ollyRuntime/OllyRuntimeCommands.swift:18` (`reloadConfig`); capture `previousConfig` first |
-| `onEngineChange` | `Sources/ollyRuntime/OllyRuntimeCommands.swift:174` (`setEngine`), `:189` (`cycleEngine`); capture `previousEngineID` around `tagStore.bindEngine` |
-| `onFullscreenEnter/Exit` | From M1.5's `FullscreenTracker.enter`/`exit` |
-| `onAXPermissionChanged` | From M0.1's `handleAXRevoke`/`handleAXGrant` |
-
-**Implementation:**
-```swift
-public actor HookDispatcher {
-    private var hooks: Hooks
-    public init(hooks: Hooks) { self.hooks = hooks }
-    public func update(_ hooks: Hooks) { self.hooks = hooks }
-    public func tagSwitch(_ ctx: TagSwitchHookContext) async { for h in hooks.declarations where h.kind == .onTagSwitch { await h.runTagSwitch(context: ctx) } }
-    // ... one method per hook kind
-}
-```
-
-**Gotchas:**
-- Hook closures may throw; wrap in a logging supervisor — never let a hook crash the runtime.
-- Hooks run async; do not block IPC handling. If a hook is long-running, fire-and-forget via `Task.detached`.
-- Some hooks (e.g., `onTagSwitch`) fire frequently; document that hook authors must not assume serial execution or low latency.
-
-**Test plan:**
-- Unit: each new builder func produces a `HookDeclaration` with correct kind (`Tests/ollyDSLTests/HooksTests.swift`).
-- Runtime: create runtime with a config containing a counter-incrementing hook; drive lifecycle action; assert counter increments.
-
-**Acceptance:**
-- A user `onTagSwitch { ctx in NSLog("from %d to %d", ctx.previousTags.rawValue, ctx.currentTags.rawValue) }` actually logs on tag switch.
-
----
-
 ### M2.2 Wire `Action.raw(String)` → shell-exec keybind
 
 **Goal:** Today `Sources/ollyRuntime/OllyRuntimeInteractionCommands.swift:76` throws `unsupportedGestureAction("raw(\(label))")`. Wire shell execution with allowlist policy.

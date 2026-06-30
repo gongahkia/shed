@@ -1827,6 +1827,8 @@ public final class MetalTextView: NSView {
 			let shaped = try shaper.shape(line, font: textFont, rasterFont: rasterFont, atlas: &atlas, colorForRange: { [weak self] range in
 				self?.textColor(for: (range.lowerBound + lineRange.lowerBound) ..< (range.upperBound + lineRange.lowerBound)) ?? Self.defaultTextColor
 			})
+			let fontHeight = CTFontGetAscent(rasterFont) + CTFontGetDescent(rasterFont) + CTFontGetLeading(rasterFont)
+			let baselineY = max(0, lineHeight * rasterScale - fontHeight) / 2 + CTFontGetAscent(rasterFont)
 			var cached: [CachedLineGlyph] = []
 			cached.reserveCapacity(shaped.count)
 			for glyph in shaped {
@@ -1834,7 +1836,7 @@ public final class MetalTextView: NSView {
 				let padding = CGFloat(entry.padding)
 				cached.append(CachedLineGlyph(
 					originX: textInset.x + glyph.x + (entry.bounds.origin.x - padding) / rasterScale,
-					originYOffset: (-entry.bounds.origin.y - padding) / rasterScale,
+					originYOffset: (baselineY - entry.bounds.maxY - padding) / rasterScale,
 					width: CGFloat(entry.width) / rasterScale,
 					height: CGFloat(entry.height) / rasterScale,
 					atlasUV: SIMD4<Float>(

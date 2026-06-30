@@ -235,11 +235,14 @@ struct CycleEngine: ParsableCommand {
     @Flag(help: "Cycle in reverse order.")
     var reverse = false
 
+    @Option(help: "Tag index in 0..<64; active tag is used when omitted.")
+    var tag: Int?
+
     @Option(help: "Target display ID.")
     var displayID: DisplayID?
 
     func run() throws {
-        let command = IPCCycleEngineCommand(reverse: reverse, displayID: displayID)
+        let command = IPCCycleEngineCommand(reverse: reverse, tag: try tag.map(parseTag), displayID: displayID)
         try OllyCtlRunner(options: options).send(.cycleEngine(command))
     }
 }

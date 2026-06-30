@@ -134,6 +134,32 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(recordedWindowIDs, [1, 2, 3])
     }
 
+    func testArrangeUsesLowestActiveTagEngineBinding() async throws {
+        let lowerTag = try Tag(index: 1)
+        let higherTag = try Tag(index: 3)
+        let lowerEngineID = LayoutEngineID(rawValue: "lower")
+        let higherEngineID = LayoutEngineID(rawValue: "higher")
+        let windowStore = WindowStore()
+        let tagStore = TagStore(defaultActiveTags: TagSet([higherTag, lowerTag]))
+        let registry = try LayoutEngineRegistry(factories: [
+            AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: lowerEngineID)),
+            AnyLayoutEngineFactory(FixedLayoutEngineFactory(id: higherEngineID))
+        ])
+        let host = EngineHost(
+            windowStore: windowStore,
+            tagStore: tagStore,
+            registry: registry,
+            configProvider: { _ in FixedLayoutEngine.Config(width: 320) },
+            applyPlacement: { _, _ in }
+        )
+        await tagStore.bindEngine(higherEngineID, to: higherTag, on: 1)
+        await tagStore.bindEngine(lowerEngineID, to: lowerTag, on: 1)
+
+        let result = try await host.arrange(displayID: 1, bounds: CGRect(x: 0, y: 0, width: 800, height: 600))
+
+        XCTAssertEqual(result.engineID, lowerEngineID)
+    }
+
     func testArrangeWithDisplayUsesSafeZoneLayoutFrame() async throws {
         let tag = try Tag(index: 1)
         let engineID = LayoutEngineID(rawValue: "fixed")

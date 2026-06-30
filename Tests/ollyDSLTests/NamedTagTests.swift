@@ -26,6 +26,37 @@ final class NamedTagTests: XCTestCase {
         XCTAssertEqual(config.workspaces.tag(named: "code"), try Tag(index: 1))
     }
 
+    func testTagDeclarationCanCarryGlobalEngineBinding() throws {
+        let config = Config {
+            Workspaces {
+                Tag.named("code").engine(.bsp)
+            }
+        }
+        let tag = try XCTUnwrap(config.workspaces.tag(named: "code"))
+
+        XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 42), .bsp)
+    }
+
+    func testDisplayWorkspaceDeclarationsShareTagsAndOverrideGlobalBindings() throws {
+        let config = Config {
+            Workspaces {
+                Tag.named("web").engine(.floating)
+                display(1) {
+                    Tag.named("web").engine(.bsp)
+                }
+                display(2) {
+                    Tag.named("web").engine(.tabbed)
+                }
+            }
+        }
+        let tag = try XCTUnwrap(config.workspaces.tag(named: "web"))
+
+        XCTAssertEqual(config.workspaces.tags, [NamedTag(name: "web", tag: tag)])
+        XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 1), .bsp)
+        XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 2), .tabbed)
+        XCTAssertEqual(config.workspaces.engineBinding(for: tag, on: 3), .floating)
+    }
+
     func testDuplicateNamesThrow() {
         XCTAssertThrowsError(
             try Workspaces(validating: [

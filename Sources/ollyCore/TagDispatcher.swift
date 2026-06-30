@@ -87,12 +87,13 @@ public actor TagDispatcher {
     }
 
     private func applyWithSignpost(displayID: DisplayID) async -> [TagDispatchMove] {
-        let activeTags = await tagStore.activeTags(on: displayID)
+        _ = await tagStore.activeTags(on: displayID)
+        let visibleTags = await tagStore.globallyVisibleTagSet()
         let windows = await windowStore.windows(onDisplay: displayID)
         var moves: [TagDispatchMove] = []
 
         for window in windows {
-            if shouldShow(window, activeTags: activeTags) {
+            if shouldShow(window, visibleTags: visibleTags) {
                 if let move = await show(window) {
                     moves.append(move)
                 }
@@ -108,11 +109,11 @@ public actor TagDispatcher {
         parkedWindowIDs.contains(windowID)
     }
 
-    private func shouldShow(_ window: WindowState, activeTags: TagSet) -> Bool {
+    private func shouldShow(_ window: WindowState, visibleTags: TagSet) -> Bool {
         if window.isSticky || window.isPinned {
             return true
         }
-        return TagSet(rawValue: window.tagMask).intersects(activeTags)
+        return TagSet(rawValue: window.tagMask).intersects(visibleTags)
     }
 
     private func hide(_ window: WindowState) async -> TagDispatchMove? {

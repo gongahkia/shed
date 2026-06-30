@@ -102,6 +102,16 @@ public actor TagStore {
         stateRef(for: displayID).activeTags
     }
 
+    public func anyDisplayHasTagActive(_ tag: Tag) -> Bool {
+        statesByDisplayID.values.contains { $0.activeTags.contains(tag) }
+    }
+
+    public func globallyVisibleTagSet() -> TagSet {
+        statesByDisplayID.values.reduce(into: TagSet()) { result, state in
+            result.formUnion(state.activeTags)
+        }
+    }
+
     public func mruHistory(on displayID: DisplayID) -> [TagSet] {
         stateRef(for: displayID).mruHistory
     }

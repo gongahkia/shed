@@ -32,7 +32,8 @@ extension OllyRuntime {
         let engineID = await configStore.availableEngineIDs().first ?? FloatingLayoutEngine.engineID
         for display in displayProvider() {
             let state = await tagStore.state(for: display.id)
-            let tags = state.activeTags.isEmpty ? Self.defaultActiveTags : state.activeTags
+            let tags = workspaces.initialTags(on: display.id)
+                ?? (state.activeTags.isEmpty ? Self.defaultActiveTags : state.activeTags)
             await tagStore.setActiveTags(tags, on: display.id)
             await bindInitialWorkspaceEngines(workspaces, on: display.id)
             for tag in tags.tags
@@ -107,7 +108,7 @@ extension OllyRuntime {
     }
 
     func switchTag(_ command: IPCTagCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let activeTags = TagSet(tag)
         await tagStore.setActiveTags(activeTags, on: displayID)
@@ -116,7 +117,7 @@ extension OllyRuntime {
     }
 
     func toggleTag(_ command: IPCTagCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let current = await tagStore.activeTags(on: displayID)
         let updated = current.contains(tag) ? current.removing(tag) : current.inserting(tag)
@@ -127,7 +128,7 @@ extension OllyRuntime {
     }
 
     func addTag(_ command: IPCTagCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let updated = await tagStore.activeTags(on: displayID).inserting(tag)
         await tagStore.setActiveTags(updated, on: displayID)
@@ -135,7 +136,7 @@ extension OllyRuntime {
     }
 
     func removeTag(_ command: IPCTagCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag = try Tag(index: Int(command.tag.rawValue))
         let current = await tagStore.activeTags(on: displayID)
         let updated = current.removing(tag)
@@ -164,7 +165,7 @@ extension OllyRuntime {
         let state = try await assignment.move(window: windowID, toDisplay: displayID)
         try await statePersistence.upsertLayoutOrders(for: [state])
         for arrangeDisplayID in Set([previousDisplayID, state.displayID].compactMap { $0 }) {
-            try await arrange(displayID: arrangeDisplayID)
+            try await applyAndArrange(displayID: arrangeDisplayID)
         }
     }
 
@@ -172,7 +173,7 @@ extension OllyRuntime {
         guard await configStore.config(for: command.engineID) != nil else {
             throw OllyRuntimeError.engineUnavailable(command.engineID)
         }
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag: Tag
         if let requestedTag = command.tag {
             tag = try Tag(index: Int(requestedTag.rawValue))
@@ -184,7 +185,7 @@ extension OllyRuntime {
     }
 
     func cycleEngine(_ command: IPCCycleEngineCommand) async throws {
-        let displayID = try selectedDisplay(command.displayID).requiredID()
+        let displayID = try await selectedDisplayID(command.displayID)
         let tag: Tag
         if let requestedTag = command.tag {
             tag = try Tag(index: Int(requestedTag.rawValue))
@@ -305,6 +306,28 @@ extension OllyRuntime {
             return displays.first { $0.id == displayID }
         }
         return displays.first(where: \.isMain) ?? displays.first
+    }
+
+    func selectedDisplayID(_ displayID: DisplayID?) async throws -> DisplayID {
+        if let displayID {
+            guard displayProvider().contains(where: { $0.id == displayID }) else {
+                throw OllyRuntimeError.displayUnavailable
+            }
+            return displayID
+        }
+        if let focusedDisplayID = await focusedDisplayID(),
+           displayProvider().contains(where: { $0.id == focusedDisplayID }) {
+            return focusedDisplayID
+        }
+        return try selectedDisplay(nil).requiredID()
+    }
+
+    func focusedDisplayID() async -> DisplayID? {
+        guard let focusedWindowID,
+              let window = await windowStore.state(for: focusedWindowID) else {
+            return nil
+        }
+        return window.displayID
     }
 
     func firstActiveTag(on displayID: DisplayID) async throws -> Tag {

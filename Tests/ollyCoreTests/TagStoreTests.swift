@@ -47,6 +47,26 @@ final class TagStoreTests: XCTestCase {
         XCTAssertNil(removedEngineID)
     }
 
+    func testGlobalVisibleTagsUnionActiveTagsAcrossDisplays() async throws {
+        let one = try Tag(index: 1)
+        let two = try Tag(index: 2)
+        let three = try Tag(index: 3)
+        let store = TagStore()
+
+        await store.setActiveTags(TagSet([one, three]), on: 1)
+        await store.setActiveTags(TagSet(two), on: 2)
+
+        let hasOne = await store.anyDisplayHasTagActive(one)
+        let hasTwo = await store.anyDisplayHasTagActive(two)
+        let hasFour = await store.anyDisplayHasTagActive(try Tag(index: 4))
+        let globalTags = await store.globallyVisibleTagSet()
+
+        XCTAssertTrue(hasOne)
+        XCTAssertTrue(hasTwo)
+        XCTAssertFalse(hasFour)
+        XCTAssertEqual(globalTags, TagSet([one, two, three]))
+    }
+
     func testAllStatesAreSortedByDisplayIDAndRemovable() async throws {
         let one = try Tag(index: 1)
         let store = TagStore()

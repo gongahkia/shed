@@ -17,6 +17,7 @@ let package = Package(
 	products: [
 		.executable(name: "ItsyApp", targets: ["ItsyApp"]),
 		.executable(name: "ItsyBench", targets: ["ItsyBench"]),
+		.library(name: "ItsyConfig", type: .static, targets: ["ItsyConfig"]),
 		.library(name: "ItsyRender", type: .static, targets: ["ItsyRender"]),
 		.library(name: "ItsyEditor", type: .static, targets: ["ItsyEditor"]),
 		.library(name: "ItsySyntax", type: .static, targets: ["ItsySyntax"]),
@@ -30,9 +31,10 @@ let package = Package(
 	targets: [
 		.executableTarget(
 			name: "ItsyApp",
-			dependencies: ["ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP"],
+			dependencies: ["ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP"],
 			swiftSettings: releaseSwiftSettings
 		),
+		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyEditor", dependencies: ["ItsyLSP"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
@@ -103,6 +105,7 @@ let package = Package(
 			]
 		),
 		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyLSP"]),
+		.testTarget(name: "ItsyConfigTests", dependencies: ["ItsyConfig"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
 		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor", "CTSGrammars"]),

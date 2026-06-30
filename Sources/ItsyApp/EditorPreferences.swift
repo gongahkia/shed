@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ItsyConfig
 
 struct EditorPreferences: Equatable {
 	static let fontNameKey = "dev.itsy.editor.fontName"
@@ -15,17 +16,35 @@ struct EditorPreferences: Equatable {
 	var fontSize: CGFloat
 	var showLineNumbers: Bool
 
-	static func load(defaults: UserDefaults = .standard) -> EditorPreferences {
-		let storedName = defaults.string(forKey: fontNameKey) ?? defaultFontName
-		let fontNames = availableFontNames()
-		let fontName = fontNames.contains(storedName) ? storedName : resolvedDefaultFontName()
-		let storedSize = defaults.double(forKey: fontSizeKey)
-		let size = storedSize > 0 ? CGFloat(storedSize) : defaultFontSize
-		return EditorPreferences(
+	init(fontName: String, fontSize: CGFloat, showLineNumbers: Bool) {
+		self.fontName = fontName
+		self.fontSize = fontSize
+		self.showLineNumbers = showLineNumbers
+	}
+
+	init(settings: ItsySettings.EditorSettings) {
+		let fontNames = Self.availableFontNames()
+		let fontName = fontNames.contains(settings.font) ? settings.font : Self.resolvedDefaultFontName()
+		self.init(
 			fontName: fontName,
-			fontSize: clampedFontSize(size),
-			showLineNumbers: defaults.bool(forKey: showLineNumbersKey)
+			fontSize: Self.clampedFontSize(CGFloat(settings.fontSize)),
+			showLineNumbers: settings.lineNumbers
 		)
+	}
+
+	static func load(defaults: UserDefaults = .standard, settingsStore: ItsySettingsStore = ItsySettingsStore()) -> EditorPreferences {
+		let settings = settingsStore.load(fallback: legacySettings(defaults: defaults)).settings
+		return EditorPreferences(settings: settings.editor)
+	}
+
+	static func legacySettings(defaults: UserDefaults = .standard) -> ItsySettings {
+		var settings = ItsySettings.default
+		let storedName = defaults.string(forKey: fontNameKey) ?? defaultFontName
+		settings.editor.font = storedName
+		let storedSize = defaults.double(forKey: fontSizeKey)
+		settings.editor.fontSize = storedSize > 0 ? storedSize : Double(defaultFontSize)
+		settings.editor.lineNumbers = defaults.bool(forKey: showLineNumbersKey)
+		return settings
 	}
 
 	func save(defaults: UserDefaults = .standard) {
@@ -40,6 +59,12 @@ struct EditorPreferences: Equatable {
 
 	func resetZoom() -> EditorPreferences {
 		EditorPreferences(fontName: fontName, fontSize: Self.defaultFontSize, showLineNumbers: showLineNumbers)
+	}
+
+	func apply(to settings: inout ItsySettings) {
+		settings.editor.font = fontName
+		settings.editor.fontSize = Double(Self.clampedFontSize(fontSize))
+		settings.editor.lineNumbers = showLineNumbers
 	}
 
 	static func clampedFontSize(_ value: CGFloat) -> CGFloat {

@@ -29,6 +29,7 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 - Multi-cursor + column select
 - Split panes (horizontal / vertical, arbitrary depth)
 - Keymap engine + 3 profiles: plain (macOS-standard), vim (normal/insert/visual/operator-pending), emacs (chord-based)
+- Small user settings file (`~/.config/itsy/settings.toml`) for editor/theme/terminal prefs
 - Custom keybind config (`~/.config/itsy/keys.toml`)
 - Undo/redo (rope snapshots + per-edit deltas)
 - Native macOS integration: Services menu, Quick Look, Versions/AutoSave, Handoff, dark mode, Retina
@@ -133,7 +134,7 @@ Modules (SwiftPM targets):
 
 ## Non-goals (durable)
 - In-process plugin ecosystem through v1.0. Process-boundary integrations must stay lazy and cold-start-neutral.
-- Configurability beyond keys + theme + tab width. Itsy is opinionated.
+- Configurability beyond bounded editor/theme/terminal settings and keymaps. Itsy is opinionated.
 - Web. Itsy does not render HTML preview, not even for Markdown.
 - Sync. No cloud, no settings sync, no telemetry pings.
 - Terminal parity with iTerm/Terminal.app. The built-in terminal stays lazy, process-boundary, and bounded in scrollback/RAM.

@@ -207,6 +207,24 @@ import Testing
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "a")
 }
 
+@Test func gutterDecoratorBuildsBetweenLineCaretMarkers() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "0\n1\n2\n")
+	view.lineHeight = 20
+	let color = SIMD4<Float>(0.95, 0.25, 0.22, 1.0)
+	let decorator = TestGutterDecorator(markers: [
+		GutterMarker(id: "deleted", line: 1, severity: .error, message: "gone", color: color, placement: .betweenLines),
+	])
+	view.gutterDecorator = decorator
+
+	let instances = view.gutterOverlayInstances(scale: 2)
+
+	#expect(instances.count == 3)
+	#expect(instances.allSatisfy { $0.color == color })
+	let point = NSPoint(x: CGFloat(instances[0].screenOrigin.x) / 2 + 1, y: CGFloat(instances[0].screenOrigin.y) / 2 + 1)
+	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "deleted")
+}
+
 @Test func hoverCandidateMapsLocalPointToTextOffsetAndRect() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\n")

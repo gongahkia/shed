@@ -28,13 +28,29 @@ public struct GutterMarker: Sendable, Equatable {
 	public var line: Int
 	public var severity: WorkspaceProblemSeverity
 	public var message: String
+	public var color: SIMD4<Float>?
+	public var placement: GutterMarkerPlacement
 
-	public init(id: String, line: Int, severity: WorkspaceProblemSeverity, message: String) {
+	public init(
+		id: String,
+		line: Int,
+		severity: WorkspaceProblemSeverity,
+		message: String,
+		color: SIMD4<Float>? = nil,
+		placement: GutterMarkerPlacement = .line
+	) {
 		self.id = id
 		self.line = line
 		self.severity = severity
 		self.message = message
+		self.color = color
+		self.placement = placement
 	}
+}
+
+public enum GutterMarkerPlacement: Sendable, Equatable {
+	case line
+	case betweenLines
 }
 
 public protocol GutterDecorator: AnyObject {
@@ -1827,7 +1843,23 @@ public final class MetalTextView: NSView {
 
 	private func appendGutterOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		for item in gutterMarkerRects {
-			instances.append(solidInstance(rect: item.rect, scale: scale, color: gutterColor(for: item.marker.severity)))
+			let color = item.marker.color ?? gutterColor(for: item.marker.severity)
+			if item.marker.placement == .betweenLines {
+				appendGutterCaretInstances(rect: item.rect, scale: scale, color: color, into: &instances)
+			} else {
+				instances.append(solidInstance(rect: item.rect, scale: scale, color: color))
+			}
+		}
+	}
+
+	private func appendGutterCaretInstances(rect: CGRect, scale: CGFloat, color: SIMD4<Float>, into instances: inout [MetalGlyphInstance]) {
+		let slices = [
+			CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 2),
+			CGRect(x: rect.minX + 1, y: rect.minY + 2, width: rect.width - 2, height: 2),
+			CGRect(x: rect.minX + 3, y: rect.minY + 4, width: rect.width - 6, height: 2),
+		]
+		for slice in slices where slice.width > 0 {
+			instances.append(solidInstance(rect: slice, scale: scale, color: color))
 		}
 	}
 
@@ -2205,6 +2237,7 @@ public final class MetalTextView: NSView {
 		guard let gutterDecorator, !visibleLineRange.isEmpty else {
 			gutterMarkerRects = []
 			closeGutterPopover()
+			markDirty()
 			return
 		}
 		let markers = gutterDecorator.gutterMarkers(in: visibleLineRange, for: self)
@@ -2220,9 +2253,18 @@ public final class MetalTextView: NSView {
 			let slot = slotsByLine[marker.line, default: 0]
 			slotsByLine[marker.line] = slot + 1
 			let lineY = topContentInset + textInset.y + CGFloat(marker.line - topLineIndex) * lineHeight
+			let x = max(3, gutterWidth - 7 - CGFloat(slot % 3) * 6)
+			if marker.placement == .betweenLines {
+				let rect = CGRect(
+					x: x - 2,
+					y: max(topContentInset + 1, lineY - 3),
+					width: 8,
+					height: 6
+				)
+				return (marker, rect)
+			}
 			let markerHeight = min(12, max(6, lineHeight - 5))
 			let markerWidth: CGFloat = 4
-			let x = max(3, gutterWidth - 7 - CGFloat(slot % 3) * 6)
 			let rect = CGRect(
 				x: x,
 				y: lineY + max(2, (lineHeight - markerHeight) / 2),
@@ -2234,6 +2276,7 @@ public final class MetalTextView: NSView {
 		if let hoveredGutterMarkerID, !gutterMarkerRects.contains(where: { $0.marker.id == hoveredGutterMarkerID }) {
 			closeGutterPopover()
 		}
+		markDirty()
 	}
 
 	func gutterMarker(atLocalPoint point: NSPoint) -> GutterMarker? {

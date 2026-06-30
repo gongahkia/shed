@@ -371,8 +371,16 @@ public struct GitRepository: Sendable {
 		return try runner.runGit(arguments: arguments, root: root)
 	}
 
+	public func diffAgainstHead(path: String) throws -> String {
+		try runner.runGit(arguments: ["diff", "--no-color", "HEAD", "--", path], root: root)
+	}
+
 	public func diffFiles(path: String, staged: Bool = false) throws -> [DiffFile] {
 		try UnifiedDiffParser.parse(diff(path: path, staged: staged))
+	}
+
+	public func diffFilesAgainstHead(path: String) throws -> [DiffFile] {
+		try UnifiedDiffParser.parse(diffAgainstHead(path: path))
 	}
 
 	public func conflictBlob(path: String, stage: Int) throws -> String {

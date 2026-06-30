@@ -21,6 +21,7 @@ final class ItsyDocumentController: NSDocumentController {
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
 		ItsyProblemGutterCoordinator.install(documentController: self)
+		ItsyGitHunkGutterCoordinator.install(documentController: self)
 	}
 
 	required init?(coder: NSCoder) {
@@ -28,6 +29,7 @@ final class ItsyDocumentController: NSDocumentController {
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
 		ItsyProblemGutterCoordinator.install(documentController: self)
+		ItsyGitHunkGutterCoordinator.install(documentController: self)
 	}
 
 	override var defaultType: String? {
@@ -123,6 +125,10 @@ final class ItsyDocument: NSDocument {
 	private var syntaxTheme: SyntaxTheme?
 	private var syntaxTree: Tree?
 	private var handoffActivity: NSUserActivity?
+	private var problemGutterDecorator: GutterDecorator?
+	private var gitGutterDecorator: GutterDecorator?
+	private var activeGutterDecorator: GutterDecorator?
+	private var gitHunkRefreshWorkItem: DispatchWorkItem?
 	private var syntaxHighlightSpans: [HighlightSpan] = []
 	private let fileWatcherQueue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
 	private var fileWatchSource: DispatchSourceFileSystemObject?
@@ -180,6 +186,11 @@ final class ItsyDocument: NSDocument {
 		addWindowController(controller)
 	}
 
+	override func save(_ sender: Any?) {
+		super.save(sender)
+		scheduleGitHunkGutterRefresh()
+	}
+
 	func attach(_ view: MetalTextView) {
 		if !editorViews.contains(where: { $0 === view }) {
 			editorViews.append(view)
@@ -206,6 +217,7 @@ final class ItsyDocument: NSDocument {
 			self?.close()
 		}
 		ItsyProblemGutterCoordinator.apply(to: self)
+		ItsyGitHunkGutterCoordinator.apply(to: self)
 		restartFileWatcher()
 		updateHandoffActivity()
 	}
@@ -215,8 +227,64 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func setGutterDecorator(_ decorator: GutterDecorator?) {
+		problemGutterDecorator = decorator
+		refreshGutterDecorators()
+	}
+
+	func setGitGutterDecorator(_ decorator: GutterDecorator?) {
+		gitGutterDecorator = decorator
+		refreshGutterDecorators()
+	}
+
+	private func refreshGutterDecorators() {
+		let decorators = [problemGutterDecorator, gitGutterDecorator].compactMap { $0 }
+		switch decorators.count {
+		case 0:
+			activeGutterDecorator = nil
+		case 1:
+			activeGutterDecorator = decorators[0]
+		default:
+			activeGutterDecorator = CompositeGutterDecorator(decorators: decorators)
+		}
 		for view in editorViews {
-			view.gutterDecorator = decorator
+			view.gutterDecorator = activeGutterDecorator
+		}
+	}
+
+	func scheduleGitHunkGutterRefresh() {
+		gitHunkRefreshWorkItem?.cancel()
+		let workItem = DispatchWorkItem { [weak self] in
+			self?.updateGitHunkGutter()
+		}
+		gitHunkRefreshWorkItem = workItem
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+	}
+
+	func updateGitHunkGutter() {
+		guard
+			let fileURL,
+			let gitRoot = try? GitRepository.discoverRoot(containing: fileURL),
+			let relativePath = LSPDiagnosticsAggregator.relativePath(forURI: fileURL.absoluteString, root: gitRoot)
+		else {
+			setGitGutterDecorator(nil)
+			return
+		}
+		do {
+			let repository = GitRepository(root: gitRoot)
+			let files: [DiffFile]
+			switch ItsyGitHunkGutterCoordinator.currentMode {
+			case .index:
+				files = try repository.diffFiles(path: relativePath)
+			case .head:
+				files = try repository.diffFilesAgainstHead(path: relativePath)
+			}
+			let indicators = GitHunkIndicatorBuilder.indicators(files: files)
+			setGitGutterDecorator(indicators.isEmpty ? nil : GitHunkGutterDecorator(
+				indicators: indicators,
+				mode: ItsyGitHunkGutterCoordinator.currentMode
+			))
+		} catch {
+			setGitGutterDecorator(nil)
 		}
 	}
 
@@ -425,6 +493,53 @@ final class ItsyDocument: NSDocument {
 		} catch {
 			presentError(error)
 		}
+	}
+}
+
+private final class CompositeGutterDecorator: GutterDecorator {
+	private let decorators: [GutterDecorator]
+
+	init(decorators: [GutterDecorator]) {
+		self.decorators = decorators
+	}
+
+	func gutterMarkers(in lineRange: Range<Int>, for view: MetalTextView) -> [GutterMarker] {
+		decorators.enumerated().flatMap { decoratorIndex, decorator in
+			decorator.gutterMarkers(in: lineRange, for: view).map { marker in
+				GutterMarker(
+					id: "\(decoratorIndex):\(marker.id)",
+					line: marker.line,
+					severity: marker.severity,
+					message: marker.message,
+					color: marker.color,
+					placement: marker.placement
+				)
+			}
+		}
+	}
+
+	func gutterMarkerClicked(_ marker: GutterMarker, in view: MetalTextView) {
+		guard let routed = routedMarker(from: marker) else {
+			return
+		}
+		decorators[routed.index].gutterMarkerClicked(routed.marker, in: view)
+	}
+
+	func gutterPopoverViewController(for marker: GutterMarker, in view: MetalTextView) -> NSViewController? {
+		guard let routed = routedMarker(from: marker) else {
+			return nil
+		}
+		return decorators[routed.index].gutterPopoverViewController(for: routed.marker, in: view)
+	}
+
+	private func routedMarker(from marker: GutterMarker) -> (index: Int, marker: GutterMarker)? {
+		let parts = marker.id.split(separator: ":", maxSplits: 1).map(String.init)
+		guard parts.count == 2, let index = Int(parts[0]), decorators.indices.contains(index) else {
+			return nil
+		}
+		var routed = marker
+		routed.id = parts[1]
+		return (index, routed)
 	}
 }
 

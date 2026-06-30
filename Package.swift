@@ -63,6 +63,7 @@ let package = Package(
         .testTarget(
             name: "ollyRuntimeTests",
             dependencies: ["ollyRuntime", "ollyDSL", "ollyIPC", "ollyKit", "ollyLayouts"]
-        )
+        ),
+        .testTarget(name: "ollyAppTests", dependencies: ["ollyApp"])
     ]
 )

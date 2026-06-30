@@ -225,6 +225,39 @@ final class RuleTests: XCTestCase {
         XCTAssertEqual(resolved.bundleID, "com.felixkratz.SketchyBar")
     }
 
+    func testConfigResolvesStickyPinnedWindowState() {
+        let state = WindowState(
+            id: 9,
+            processID: 42,
+            bundleID: "com.example.App",
+            displayID: 1,
+            frame: .zero
+        )
+        let config = Config {
+            Rules {
+                Rule(
+                    match: RuleMatch(bundleID: "com.example.App"),
+                    apply: RuleApply(sticky: true, pinned: true)
+                )
+            }
+        }
+
+        let resolved = config.resolvedWindowState(for: state)
+
+        XCTAssertTrue(resolved.isSticky)
+        XCTAssertTrue(resolved.isPinned)
+    }
+
+    func testRuleApplyMergesStickyPinnedOverrides() {
+        let base = RuleApply(sticky: false, pinned: true)
+        let override = RuleApply(sticky: true)
+
+        let merged = base.merging(override)
+
+        XCTAssertEqual(merged.sticky, true)
+        XCTAssertEqual(merged.pinned, true)
+    }
+
     func testRulesResolveLaterMatchesOverEarlierMatches() {
         let rules = Rules {
             Rule(match: RuleMatch(bundleID: "com.example.App"), apply: RuleApply(engine: .bsp))

@@ -109,7 +109,9 @@ extension OllyRuntime {
     func switchTag(_ command: IPCTagCommand) async throws {
         let displayID = try selectedDisplay(command.displayID).requiredID()
         let tag = try Tag(index: Int(command.tag.rawValue))
-        await tagStore.setActiveTags(TagSet(tag), on: displayID)
+        let activeTags = TagSet(tag)
+        await tagStore.setActiveTags(activeTags, on: displayID)
+        await rewritePinnedWindows(on: displayID, to: activeTags)
         try await applyAndArrange(displayID: displayID)
     }
 
@@ -118,7 +120,9 @@ extension OllyRuntime {
         let tag = try Tag(index: Int(command.tag.rawValue))
         let current = await tagStore.activeTags(on: displayID)
         let updated = current.contains(tag) ? current.removing(tag) : current.inserting(tag)
-        await tagStore.setActiveTags(updated.isEmpty ? TagSet(tag) : updated, on: displayID)
+        let activeTags = updated.isEmpty ? TagSet(tag) : updated
+        await tagStore.setActiveTags(activeTags, on: displayID)
+        await rewritePinnedWindows(on: displayID, to: activeTags)
         try await applyAndArrange(displayID: displayID)
     }
 
@@ -164,19 +168,6 @@ extension OllyRuntime {
         }
     }
 
-    func toggleFloating(_ command: IPCFloatingCommand) async throws {
-        let windowID = try command.windowID ?? focusedWindowID.requiredFocusedWindow()
-        guard let current = await windowStore.state(for: windowID) else {
-            throw OllyRuntimeError.windowUnavailable(windowID)
-        }
-        let floating = command.floating ?? !current.isFloating
-        let state = try await assignment.setFloating(window: windowID, floating: floating)
-        let displayID = command.displayID ?? state.displayID ?? selectedDisplay(nil)?.id
-        if let displayID {
-            try await arrange(displayID: displayID)
-        }
-    }
-
     func setEngine(_ command: IPCSetEngineCommand) async throws {
         guard await configStore.config(for: command.engineID) != nil else {
             throw OllyRuntimeError.engineUnavailable(command.engineID)
@@ -215,6 +206,13 @@ extension OllyRuntime {
     func bindInitialWorkspaceEngines(_ workspaces: Workspaces, on displayID: DisplayID) async {
         for binding in workspaces.engineBindings(on: displayID) {
             await tagStore.bindEngine(binding.engineID, to: binding.tag, on: displayID)
+        }
+    }
+
+    func rewritePinnedWindows(on displayID: DisplayID, to activeTags: TagSet) async {
+        for window in await windowStore.windows(onDisplay: displayID)
+            where window.isPinned && window.tagMask != activeTags.rawValue {
+            await windowStore.upsert(window.withTagMask(activeTags.rawValue))
         }
     }
 

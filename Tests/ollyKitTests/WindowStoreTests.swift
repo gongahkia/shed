@@ -66,6 +66,26 @@ final class WindowStoreTests: XCTestCase {
         XCTAssertEqual(windows.map(\.id), [10, 30, 20])
     }
 
+    func testWindowStateCopyHelpersPreserveFlags() {
+        let state = WindowState(
+            id: 7,
+            processID: 42,
+            displayID: 99,
+            tagMask: 1,
+            isFloating: true,
+            isSticky: true,
+            isPinned: false,
+            layoutOrder: 4,
+            frame: CGRect(x: 0, y: 0, width: 100, height: 100)
+        )
+
+        XCTAssertTrue(state.withPinned(true).isSticky)
+        XCTAssertTrue(state.withPinned(true).isPinned)
+        XCTAssertTrue(state.withTagMask(2).isFloating)
+        XCTAssertEqual(state.withTagMask(2).tagMask, 2)
+        XCTAssertFalse(state.withSticky(false).isSticky)
+    }
+
     private func window(id: WindowID, layoutOrder: Int) -> WindowState {
         WindowState(
             id: id,

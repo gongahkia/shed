@@ -39,3 +39,27 @@ public struct IPCFloatingCommand: Codable, Equatable, Sendable {
         self.displayID = displayID
     }
 }
+
+public struct IPCStickyCommand: Codable, Equatable, Sendable {
+    public let windowID: WindowID?
+    public let sticky: Bool?
+    public let displayID: DisplayID?
+
+    public init(windowID: WindowID? = nil, sticky: Bool? = nil, displayID: DisplayID? = nil) {
+        self.windowID = windowID
+        self.sticky = sticky
+        self.displayID = displayID
+    }
+}
+
+public struct IPCPinnedCommand: Codable, Equatable, Sendable {
+    public let windowID: WindowID?
+    public let pinned: Bool?
+    public let displayID: DisplayID?
+
+    public init(windowID: WindowID? = nil, pinned: Bool? = nil, displayID: DisplayID? = nil) {
+        self.windowID = windowID
+        self.pinned = pinned
+        self.displayID = displayID
+    }
+}

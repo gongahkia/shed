@@ -109,7 +109,10 @@ public actor TagDispatcher {
     }
 
     private func shouldShow(_ window: WindowState, activeTags: TagSet) -> Bool {
-        TagSet(rawValue: window.tagMask).intersects(activeTags)
+        if window.isSticky || window.isPinned {
+            return true
+        }
+        return TagSet(rawValue: window.tagMask).intersects(activeTags)
     }
 
     private func hide(_ window: WindowState) async -> TagDispatchMove? {

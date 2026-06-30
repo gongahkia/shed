@@ -86,11 +86,29 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
     public let displayID: DisplayID?
     public let tags: [IPCTagIndex]
     public let isFloating: Bool
+    public let isSticky: Bool
+    public let isPinned: Bool
     public let layoutOrder: Int?
     public let frame: IPCFrame
     public let title: String?
     public let role: String?
     public let subrole: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case windowID
+        case processID
+        case bundleID
+        case displayID
+        case tags
+        case isFloating
+        case isSticky
+        case isPinned
+        case layoutOrder
+        case frame
+        case title
+        case role
+        case subrole
+    }
 
     public init(
         windowID: WindowID,
@@ -99,6 +117,8 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         displayID: DisplayID? = nil,
         tags: [IPCTagIndex] = [],
         isFloating: Bool = false,
+        isSticky: Bool = false,
+        isPinned: Bool = false,
         layoutOrder: Int? = nil,
         frame: IPCFrame,
         title: String? = nil,
@@ -111,11 +131,32 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
         self.displayID = displayID
         self.tags = tags
         self.isFloating = isFloating
+        self.isSticky = isSticky
+        self.isPinned = isPinned
         self.layoutOrder = layoutOrder
         self.frame = frame
         self.title = title
         self.role = role
         self.subrole = subrole
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            windowID: try container.decode(WindowID.self, forKey: .windowID),
+            processID: try container.decode(Int32.self, forKey: .processID),
+            bundleID: try container.decodeIfPresent(String.self, forKey: .bundleID),
+            displayID: try container.decodeIfPresent(DisplayID.self, forKey: .displayID),
+            tags: try container.decode([IPCTagIndex].self, forKey: .tags),
+            isFloating: try container.decode(Bool.self, forKey: .isFloating),
+            isSticky: try container.decodeIfPresent(Bool.self, forKey: .isSticky) ?? false,
+            isPinned: try container.decodeIfPresent(Bool.self, forKey: .isPinned) ?? false,
+            layoutOrder: try container.decodeIfPresent(Int.self, forKey: .layoutOrder),
+            frame: try container.decode(IPCFrame.self, forKey: .frame),
+            title: try container.decodeIfPresent(String.self, forKey: .title),
+            role: try container.decodeIfPresent(String.self, forKey: .role),
+            subrole: try container.decodeIfPresent(String.self, forKey: .subrole)
+        )
     }
 
     public init(state: WindowState) {
@@ -126,6 +167,8 @@ public struct IPCWindowState: Codable, Equatable, Sendable {
             displayID: state.displayID,
             tags: IPCTagIndex.indices(in: TagSet(rawValue: state.tagMask)),
             isFloating: state.isFloating,
+            isSticky: state.isSticky,
+            isPinned: state.isPinned,
             layoutOrder: state.layoutOrder,
             frame: IPCFrame(state.frame),
             title: state.title,

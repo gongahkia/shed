@@ -85,3 +85,51 @@ struct ToggleFloating: ParsableCommand {
         try OllyCtlRunner(options: options).send(.toggleFloating(command))
     }
 }
+
+struct ToggleSticky: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "toggle-sticky",
+        abstract: "Toggle or set a window's sticky state."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Option(help: "Window ID; focused window is used when omitted.")
+    var windowID: WindowID?
+
+    @Option(help: "Target display ID for dispatch and arrange; inferred when omitted.")
+    var displayID: DisplayID?
+
+    @Option(help: "Set true or false instead of toggling.")
+    var sticky: Bool?
+
+    func run() throws {
+        let command = IPCStickyCommand(windowID: windowID, sticky: sticky, displayID: displayID)
+        try OllyCtlRunner(options: options).send(.toggleSticky(command))
+    }
+}
+
+struct TogglePinned: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "toggle-pinned",
+        abstract: "Toggle or set a window's pinned state."
+    )
+
+    @OptionGroup
+    var options: ClientOptions
+
+    @Option(help: "Window ID; focused window is used when omitted.")
+    var windowID: WindowID?
+
+    @Option(help: "Target display ID for tag rewrite and arrange; inferred when omitted.")
+    var displayID: DisplayID?
+
+    @Option(help: "Set true or false instead of toggling.")
+    var pinned: Bool?
+
+    func run() throws {
+        let command = IPCPinnedCommand(windowID: windowID, pinned: pinned, displayID: displayID)
+        try OllyCtlRunner(options: options).send(.togglePinned(command))
+    }
+}

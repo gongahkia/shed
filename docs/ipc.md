@@ -394,6 +394,26 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         {
           "properties": {
             "name": {
+              "const": "toggle-sticky"
+            },
+            "arguments": {
+              "$ref": "#/$defs/stickyArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
+              "const": "toggle-pinned"
+            },
+            "arguments": {
+              "$ref": "#/$defs/pinnedArguments"
+            }
+          }
+        },
+        {
+          "properties": {
+            "name": {
               "const": "snap-window"
             },
             "arguments": {
@@ -615,6 +635,36 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           "$ref": "#/$defs/windowID"
         },
         "floating": {
+          "type": "boolean"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stickyArguments": {
+      "type": "object",
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "sticky": {
+          "type": "boolean"
+        },
+        "displayID": {
+          "$ref": "#/$defs/displayID"
+        }
+      },
+      "additionalProperties": false
+    },
+    "pinnedArguments": {
+      "type": "object",
+      "properties": {
+        "windowID": {
+          "$ref": "#/$defs/windowID"
+        },
+        "pinned": {
           "type": "boolean"
         },
         "displayID": {
@@ -1016,6 +1066,8 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
         "processID",
         "tags",
         "isFloating",
+        "isSticky",
+        "isPinned",
         "frame"
       ],
       "properties": {
@@ -1048,6 +1100,12 @@ breaking wire changes must bump `protocolVersion`, `$id`, and this document.
           }
         },
         "isFloating": {
+          "type": "boolean"
+        },
+        "isSticky": {
+          "type": "boolean"
+        },
+        "isPinned": {
           "type": "boolean"
         },
         "layoutOrder": {

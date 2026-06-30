@@ -157,7 +157,7 @@ public struct CrashTelemetryStatusSnapshot: Equatable, Sendable {
     }
 }
 
-public struct CrashTelemetryFlushResult: Equatable, Sendable {
+public struct CrashTelemetryFlushResult: Codable, Equatable, Sendable {
     public let sentCount: Int
     public let failedCount: Int
     public let errors: [String]
@@ -263,7 +263,9 @@ public enum CrashTelemetry {
         let rawDirectory = logDirectory.appendingPathComponent("pending", isDirectory: true)
         try fileManager.createDirectory(at: rawDirectory, withIntermediateDirectories: true)
         let config = PLCrashReporterConfig(basePath: rawDirectory.path)
-        let reporter = PLCrashReporter(configuration: config)
+        guard let reporter = PLCrashReporter(configuration: config) else {
+            throw CrashTelemetryError.uploadFailed("failed to initialize PLCrashReporter")
+        }
         let wroteReportURL = try writePendingReportIfNeeded(
             reporter: reporter,
             fallbackContext: context,
@@ -271,10 +273,7 @@ public enum CrashTelemetry {
             fileManager: fileManager
         )
         reporter.customData = try JSONEncoder().encode(context)
-        var error: NSError?
-        guard reporter.enableCrashReporterAndReturnError(&error) else {
-            throw error ?? CrashTelemetryError.uploadFailed("failed to enable PLCrashReporter")
-        }
+        try reporter.enableAndReturnError()
         retainReporter(reporter)
         return CrashTelemetryInstallResult(enabled: true, wroteReportURL: wroteReportURL)
     }
@@ -370,15 +369,10 @@ public enum CrashTelemetry {
         guard reporter.hasPendingCrashReport() else {
             return nil
         }
-        var error: NSError?
-        guard let data = reporter.loadPendingCrashReportDataAndReturnError(&error) else {
-            throw error ?? CrashTelemetryError.uploadFailed("failed to load pending crash report")
-        }
+        let data = try reporter.loadPendingCrashReportDataAndReturnError()
         let report = try makeReport(from: data, fallbackContext: fallbackContext)
         let url = try write(report: report, to: logDirectory, fileManager: fileManager)
-        guard reporter.purgePendingCrashReportAndReturnError(&error) else {
-            throw error ?? CrashTelemetryError.uploadFailed("failed to purge pending crash report")
-        }
+        try reporter.purgePendingCrashReportAndReturnError()
         return url
     }
 
@@ -386,10 +380,7 @@ public enum CrashTelemetry {
         from data: Data,
         fallbackContext: CrashTelemetryContext
     ) throws -> CrashTelemetryReport {
-        var error: NSError?
-        guard let crashReport = PLCrashReport(data: data, error: &error) else {
-            throw error ?? CrashTelemetryError.uploadFailed("failed to decode pending crash report")
-        }
+        let crashReport = try PLCrashReport(data: data)
         let context = context(from: crashReport.customData) ?? fallbackContext
         return CrashTelemetryReport(
             timestamp: crashReport.systemInfo.timestamp as Date? ?? Date(),

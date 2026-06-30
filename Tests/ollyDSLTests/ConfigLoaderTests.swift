@@ -31,6 +31,11 @@ final class ConfigLoaderTests: XCTestCase {
             Session {
                 restoreOnLaunch(true)
             }
+            Telemetry {
+                enabled(true)
+                endpoint("https://crashes.example.test/olly")
+                scrubbedBundleIDs(true)
+            }
         }
 
         XCTAssertEqual(config.keybinds, Keybinds())
@@ -48,6 +53,9 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.focusPolicy.followsMouseDelay?.milliseconds, 100)
         XCTAssertEqual(config.focusPolicy.maxEventsPerSecond, 20)
         XCTAssertTrue(config.session.restoreOnLaunch)
+        XCTAssertTrue(config.telemetry.enabled)
+        XCTAssertEqual(config.telemetry.endpoint, "https://crashes.example.test/olly")
+        XCTAssertTrue(config.telemetry.scrubbedBundleIDs)
     }
 
     func testConfigDecodingDefaultsMissingSections() throws {

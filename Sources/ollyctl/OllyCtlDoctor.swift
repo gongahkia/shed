@@ -1,5 +1,6 @@
 import ArgumentParser
 import Foundation
+import ollyDiagnostics
 import ollyDSL
 import ollyIPC
 import ollyKit
@@ -119,6 +120,12 @@ struct DoctorCompatibilitySummary: Equatable {
     let inspectedAXWindows: Bool
 }
 
+struct DoctorTelemetrySummary: Equatable {
+    let enabled: Bool
+    let pendingReportCount: Int
+    let logDirectory: URL
+}
+
 struct DoctorConfigResult: Equatable {
     let config: Config
     let didCompile: Bool
@@ -133,6 +140,7 @@ struct OllyDoctor {
     let displayProvider: () -> [Display]
     let ipcProbe: () throws -> DoctorIPCProbe
     let compatibilitySummary: (AXPermissionStatus) -> DoctorCompatibilitySummary
+    let telemetrySummary: () -> DoctorTelemetrySummary
 
     static func live(socketPath: IPCSocketPath, configURL: URL) -> OllyDoctor {
         OllyDoctor(
@@ -146,7 +154,8 @@ struct OllyDoctor {
             hotKeyReport: { HotKeyCollisionDetector.live().report(for: $0.keybinds) },
             displayProvider: { DisplayMonitor().displays() },
             ipcProbe: { try Self.probeIPC(socketPath: socketPath) },
-            compatibilitySummary: Self.compatibilitySummary
+            compatibilitySummary: Self.compatibilitySummary,
+            telemetrySummary: { Self.telemetrySummary(configURL: configURL) }
         )
     }
 
@@ -159,6 +168,7 @@ struct OllyDoctor {
             ipcCheck(),
             compatibilityCheck(currentAXStatus)
         ]
+        checks.append(telemetryCheck())
         checks.append(hotKeyCheck())
         return DoctorReport(checks: checks)
     }
@@ -316,6 +326,30 @@ struct OllyDoctor {
         )
     }
 
+    private func telemetryCheck() -> DoctorCheck {
+        let summary = telemetrySummary()
+        if summary.pendingReportCount > 0 && !summary.enabled {
+            return DoctorCheck(
+                id: "telemetry",
+                title: "Telemetry",
+                status: .warning,
+                summary: "\(summary.pendingReportCount) pending crash report(s), telemetry disabled",
+                detail: summary.logDirectory.path
+            )
+        }
+        if summary.pendingReportCount > 0 {
+            return DoctorCheck(
+                id: "telemetry",
+                title: "Telemetry",
+                status: .passed,
+                summary: "\(summary.pendingReportCount) pending crash report(s)",
+                detail: "run `ollyctl telemetry flush`"
+            )
+        }
+        let state = summary.enabled ? "enabled" : "disabled"
+        return DoctorCheck(id: "telemetry", title: "Telemetry", status: .passed, summary: "\(state), no pending reports")
+    }
+
     private static func probeIPC(socketPath: IPCSocketPath) throws -> DoctorIPCProbe {
         let version = try response(.version(IPCVersionCommand()), socketPath: socketPath).versionPayload()
         let state = try response(.state(IPCStateCommand()), socketPath: socketPath).statePayload()
@@ -335,6 +369,24 @@ struct OllyDoctor {
             throw OllyCtlError("\(error.code): \(error.message)")
         }
         return envelope
+    }
+
+    private static func telemetrySummary(configURL: URL) -> DoctorTelemetrySummary {
+        let userSettings = CrashTelemetryUserSettingsStore().read()
+        let loaded = try? ConfigLoader(sourceURL: configURL).load()
+        let config = loaded?.config ?? Config()
+        let settings = CrashTelemetryRuntimeSettings(
+            configEnabled: config.telemetry.enabled,
+            configEndpoint: config.telemetry.endpoint,
+            configScrubbedBundleIDs: config.telemetry.scrubbedBundleIDs,
+            userSettings: userSettings
+        )
+        let snapshot = CrashTelemetry.status(settings: settings)
+        return DoctorTelemetrySummary(
+            enabled: snapshot.enabled,
+            pendingReportCount: snapshot.pendingReportCount,
+            logDirectory: snapshot.logDirectory
+        )
     }
 
 }

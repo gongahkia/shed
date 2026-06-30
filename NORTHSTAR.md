@@ -17,9 +17,9 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 2. **Cold start is the headline KPI.** Every dep, every framework link, every static initializer is a budget item. <150 ms cold or it doesn't ship.
 3. **Modal editing is built-in, not a plugin.** Plain, vim, and emacs profiles ship in v0.1. Keymap engine is core, not a layer.
 4. **Open anything.** 1 GB log file must scroll at 60 fps. Rope buffer + Metal renderer. No file-size limits.
-5. **Boring on purpose.** No AI, no collab, no terminal, no marketplace, no telemetry. Forever.
-6. **One binary, no daemons.** No language servers, no extension hosts, no helper processes in v0.x.
-7. **Reads as a single codebase.** A new contributor should grok the whole tree in a day. <15 kLOC target through v1.0.
+5. **Boring on purpose.** No in-process AI runtime, no integrated terminal, no collaboration, no telemetry. Agent hosting via ACP protocol is allowed as a process-boundary integration.
+6. **Process boundary for language tooling.** Language servers and debug adapters via process boundary only. No in-process plugin host through v1.0.
+7. **Reads as a single codebase.** A new contributor should grok the whole tree in a day. Keep first-party app/support code under 30 kLOC through v1.0; current `tokei` source-only code is 14,341 LOC and source+scripts+bench code is 15,267 LOC with vendored grammars/upstream excluded.
 
 ## Scope — IN (v0.1 → v1.0)
 - Rope-backed text buffer (Swift native impl)
@@ -34,14 +34,16 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 - Native macOS integration: Services menu, Quick Look, Versions/AutoSave, Handoff, dark mode, Retina
 - Notarized .dmg distribution + Homebrew cask
 
+## Scope — IN (post-v0.1)
+- LSP / code completion / hover / diagnostics via external language-server processes
+- Debugger / DAP via external debug-adapter processes
+- Extension marketplace, plugin runtime, and agent-hosting experiments only through process-boundary integrations
+- Git UI for status, diff viewing, commit composition, branch ops, hunk staging, conflict viewing, and stash management
+
 ## Scope — OUT (v0.x, possibly forever)
-- LSP / code completion / hover / diagnostics
 - Integrated terminal
-- Debugger / DAP
-- Extension marketplace, plugin runtime
 - AI assistance
 - Collaboration / multiplayer
-- Git UI (use the terminal)
 - Linux/Windows ports
 - iOS/iPadOS
 - Telemetry (none, ever)
@@ -53,11 +55,15 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 | Cold start (click → editable) | <150 ms | <100 ms | M-series, sudo purge between runs, Hyperfine 20 runs |
 | Idle RAM (1 small file open) | <30 MB | <20 MB | RSS via `ps -o rss=` |
 | RAM w/ 100k-line .ts file | <80 MB | <50 MB | Includes tree-sitter parser arena |
+| RSS delta per active LSP server | <150 MB | <100 MB | sourcekit-lsp on a Swift workspace |
+| Time from didOpen to first publishDiagnostics | <5 s | <2 s | Lazy LSP spawn must not affect launch |
 | 1 GB file open | <500 ms | <300 ms | First page visible, full parse async |
 | Scroll FPS on 10M-line file | 60 fps | 120 fps (ProMotion) | sustained, vsync-locked |
 | Keystroke → glyph | <8 ms | <5 ms | Measured via Quartz Display Link timestamp |
 | Binary size (.app uncompressed) | <15 MB | <8 MB | Including all grammars |
-| Total LOC (Swift+C grammars excl.) | <15 kLOC | <10 kLOC | `tokei` count |
+| Total first-party LOC (vendored grammars/upstream/corpus excl.) | <30 kLOC | <25 kLOC | Current: 18,973 code incl. tests; 15,267 code source+scripts+bench; 14,341 source-only |
+
+Current release blocker: cold start is still above the `<150 ms` v0.1 gate. The latest committed release-candidate mean is 272.661 ms, and `bench/notes/coldstart-audit.md` keeps this as a release blocker independent of post-v0.1 feature work.
 
 ## Benchmark protocol (frozen)
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
@@ -125,7 +131,7 @@ Modules (SwiftPM targets):
 5. **Two-person-decade scope.** Mitigation: ruthless OUT list above; cut anything that doesn't move a KPI.
 
 ## Non-goals (durable)
-- Plugin ecosystem. Itsy is what ships; extension would betray the cold-start KPI.
+- In-process plugin ecosystem through v1.0. Process-boundary integrations must stay lazy and cold-start-neutral.
 - Configurability beyond keys + theme + tab width. Itsy is opinionated.
 - Web. Itsy does not render HTML preview, not even for Markdown.
 - Sync. No cloud, no settings sync, no telemetry pings.

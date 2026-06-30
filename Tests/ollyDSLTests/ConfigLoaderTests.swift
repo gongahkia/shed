@@ -17,6 +17,7 @@ final class ConfigLoaderTests: XCTestCase {
             CooperativeApps()
             SafeZones()
             Animation()
+            FocusRing()
             Gestures()
             Hooks()
             NativeSpace {
@@ -35,6 +36,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertEqual(config.cooperativeApps, CooperativeApps())
         XCTAssertEqual(config.safeZones, SafeZones())
         XCTAssertEqual(config.animation, Animation())
+        XCTAssertEqual(config.focusRing, FocusRing())
         XCTAssertEqual(config.gestures, Gestures())
         XCTAssertEqual(config.hooks, Hooks())
         XCTAssertEqual(config.nativeSpace, NativeSpace())

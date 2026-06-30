@@ -24,6 +24,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let commandPaletteController = CommandPaletteController()
     private let hotKeyDiagnostics = HotKeyStartupDiagnostics()
     private let runtime = OllyRuntime()
+    private lazy var focusRingController = FocusRingController(runtime: runtime)
     private lazy var settingsWindowController = SettingsWindowController(runtime: runtime)
     private lazy var runtimeEventStatusController = RuntimeEventStatusController(
         runtime: runtime
@@ -47,6 +48,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         )
         statusController?.install()
         installOverviewMode()
+        focusRingController.start()
         runtimeEventStatusController.start()
         hotKeyDiagnostics.run()
         showOnboardingIfNeeded()
@@ -59,6 +61,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
             return .terminateNow
         }
         isTerminating = true
+        focusRingController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         Task { [runtime, weak self] in
@@ -72,6 +75,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        focusRingController.stop()
         runtimeEventStatusController.stop()
         overviewKeyMonitor?.remove()
         statusController?.remove()

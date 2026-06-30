@@ -1,4 +1,8 @@
+import AppKit
 import XCTest
+import ollyDSL
+import ollyIPC
+import ollyRuntime
 @testable import ollyApp
 
 final class OverlayPanelHostTests: XCTestCase {
@@ -25,5 +29,28 @@ final class OverlayPanelHostTests: XCTestCase {
         XCTAssertTrue(registry.isActive(.commandPalette))
         registry.unregister(.commandPalette)
         XCTAssertTrue(registry.active.isEmpty)
+    }
+
+    @MainActor
+    func testFocusRingControllerShowsPanelAtFocusedWindowFrame() async throws {
+        guard let screen = NSScreen.screens.first else {
+            throw XCTSkip("no screen available")
+        }
+        let runtime = OllyRuntime()
+        let frame = CGRect(x: screen.frame.midX - 120, y: screen.frame.midY - 80, width: 240, height: 160)
+        let controller = FocusRingController(
+            runtime: runtime,
+            screenProvider: { [screen] in [screen] },
+            frameProvider: { _ in frame },
+            focusRingProvider: { FocusRing(width: 2, reduceMotion: .neverAnimate) },
+            reduceMotionProvider: { true }
+        )
+        defer {
+            controller.stop()
+        }
+
+        await controller.handle(.focus(IPCFocusEvent(focusedWindowID: 42)))
+
+        XCTAssertEqual(controller.currentPanelFrame, frame)
     }
 }

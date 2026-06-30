@@ -168,7 +168,18 @@ Animation {
 }
 ```
 
-## 15. Four-Finger Column Scroll
+## 15. Focus Ring
+
+```swift
+FocusRing {
+    color(.systemBlue)
+    width(2)
+    cornerRadius(8)
+    reduceMotion(.respectSystem)
+}
+```
+
+## 16. Four-Finger Column Scroll
 
 ```swift
 Gestures {
@@ -176,7 +187,7 @@ Gestures {
 }
 ```
 
-## 16. Four-Finger Tag Switching
+## 17. Four-Finger Tag Switching
 
 ```swift
 Gestures {
@@ -184,7 +195,7 @@ Gestures {
 }
 ```
 
-## 17. Gesture Bound To Existing Action
+## 18. Gesture Bound To Existing Action
 
 ```swift
 Gestures {
@@ -192,7 +203,7 @@ Gestures {
 }
 ```
 
-## 18. Safe Zone For Notch
+## 19. Safe Zone For Notch
 
 ```swift
 SafeZones {
@@ -200,7 +211,7 @@ SafeZones {
 }
 ```
 
-## 19. Reserve A Custom Bar
+## 20. Reserve A Custom Bar
 
 ```swift
 SafeZones {
@@ -208,7 +219,7 @@ SafeZones {
 }
 ```
 
-## 20. Cooperative Overlay App
+## 21. Cooperative Overlay App
 
 ```swift
 CooperativeApps {
@@ -216,7 +227,7 @@ CooperativeApps {
 }
 ```
 
-## 21. Replace Cooperative Defaults
+## 22. Replace Cooperative Defaults
 
 ```swift
 CooperativeApps(mode: .replace) {
@@ -224,7 +235,7 @@ CooperativeApps(mode: .replace) {
 }
 ```
 
-## 22. Raw Keybind Escape Hatch
+## 23. Raw Keybind Escape Hatch
 
 ```swift
 Keybinds {
@@ -234,7 +245,7 @@ Keybinds {
 }
 ```
 
-## 23. Raw Rule Escape Hatch
+## 24. Raw Rule Escape Hatch
 
 ```swift
 Rules {
@@ -244,7 +255,7 @@ Rules {
 }
 ```
 
-## 24. Raw Engine Declaration
+## 25. Raw Engine Declaration
 
 ```swift
 Engines {
@@ -254,7 +265,7 @@ Engines {
 }
 ```
 
-## 25. Plugin Author Engine ID
+## 26. Plugin Author Engine ID
 
 ```swift
 Engines {
@@ -268,7 +279,7 @@ Rules {
 }
 ```
 
-## 26. Parent Bundle Predicate
+## 27. Parent Bundle Predicate
 
 ```swift
 Rules {
@@ -279,7 +290,7 @@ Rules {
 }
 ```
 
-## 27. Window Size Predicate
+## 28. Window Size Predicate
 
 ```swift
 Rules {
@@ -290,7 +301,7 @@ Rules {
 }
 ```
 
-## 28. Multiple Tags For One App
+## 29. Multiple Tags For One App
 
 ```swift
 Rules {
@@ -301,7 +312,7 @@ Rules {
 }
 ```
 
-## 29. Ultrawide Three-Column Layout
+## 30. Ultrawide Three-Column Layout
 
 ```swift
 Engines {
@@ -313,7 +324,7 @@ Rules {
 }
 ```
 
-## 30. Master-Stack Heavy Workflow
+## 31. Master-Stack Heavy Workflow
 
 ```swift
 Engines {
@@ -325,7 +336,7 @@ Keybinds {
 }
 ```
 
-## 31. Cycle Built-In Engines
+## 32. Cycle Built-In Engines
 
 ```swift
 Engines {
@@ -339,7 +350,7 @@ Keybinds {
 }
 ```
 
-## 32. Named Tag Grid
+## 33. Named Tag Grid
 
 ```swift
 Workspaces {

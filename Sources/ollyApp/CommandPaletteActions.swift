@@ -264,7 +264,13 @@ struct CommandPaletteActionCatalog {
         _ keywords: [String],
         _ command: IPCCommand
     ) -> CommandPaletteAction {
-        CommandPaletteAction(id: id, title: title, detail: detail, keywords: keywords, command: command)
+        CommandPaletteAction(
+            id: id,
+            title: L10n.s(title, "command palette action title"),
+            detail: L10n.s(detail, "command palette action detail"),
+            keywords: keywords,
+            command: command
+        )
     }
 }
 
@@ -301,7 +307,7 @@ struct CommandPaletteExecutor {
             if let error = response.error {
                 return .failure("\(error.code): \(error.message)")
             }
-            return response.status == .success ? .success : .failure("command failed")
+            return response.status == .success ? .success : .failure(L10n.s("command failed", "command failure"))
         } catch {
             return .failure(String(describing: error))
         }

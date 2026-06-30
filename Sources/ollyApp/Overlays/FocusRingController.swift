@@ -160,7 +160,7 @@ final class FocusRingView: NSView {
         shapeLayer.fillColor = NSColor.clear.cgColor
         setAccessibilityElement(true)
         setAccessibilityRole(.unknown)
-        setAccessibilityLabel("Focus ring")
+        setAccessibilityLabel(L10n.s("Focus ring", "focus ring accessibility label"))
         setAccessibilityHidden(true)
     }
 

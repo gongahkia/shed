@@ -3,26 +3,6 @@ import Foundation
 import ollyDSL
 import ollyKit
 
-enum FirstRunStep: Int, CaseIterable {
-    case welcome
-    case accessibility
-    case display
-    case preset
-    case cheatsheet
-    case done
-
-    var title: String {
-        switch self {
-        case .welcome: return "Welcome"
-        case .accessibility: return "Accessibility"
-        case .display: return "Displays"
-        case .preset: return "Preset"
-        case .cheatsheet: return "Keybinds"
-        case .done: return "Done"
-        }
-    }
-}
-
 final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
     typealias AXStatusProvider = () -> AXPermissionStatus
     typealias DisplayProvider = () -> [Display]
@@ -57,7 +37,7 @@ final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Olly First Run"
+        window.title = L10n.s("Olly First Run", "first-run window title")
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
@@ -121,7 +101,12 @@ private extension FirstRunWindowController {
 
     private func progressLabel() -> NSTextField {
         let index = (FirstRunStep.allCases.firstIndex(of: step) ?? 0) + 1
-        let label = NSTextField(labelWithString: "Step \(index) of \(FirstRunStep.allCases.count)")
+        let label = NSTextField(labelWithString: L10n.f(
+            "Step %d of %d",
+            "first-run progress label",
+            index,
+            FirstRunStep.allCases.count
+        ))
         label.textColor = .secondaryLabelColor
         label.font = .systemFont(ofSize: 12, weight: .medium)
         return label
@@ -145,17 +130,17 @@ private extension FirstRunWindowController {
     }
 
     private func welcomeView() -> NSView {
-        textView("""
+        textView(L10n.s("""
         Olly controls windows through public Accessibility APIs only. Setup will request permission, detect display \
         safe zones, create a starter Config.swift, and show the keybinds from the chosen preset.
-        """)
+        """, "first-run welcome body"))
     }
 
     private func accessibilityView() -> NSView {
         let stack = verticalStack(spacing: 10)
-        stack.addArrangedSubview(textView("""
+        stack.addArrangedSubview(textView(L10n.s("""
         Enable Olly in Privacy & Security > Accessibility so it can inspect, focus, move, and resize windows.
-        """))
+        """, "first-run accessibility body")))
         stack.addArrangedSubview(deepLinkField())
         stack.addArrangedSubview(axButtonRow())
         stack.addArrangedSubview(NSTextField(labelWithString: axStatusText))
@@ -166,7 +151,10 @@ private extension FirstRunWindowController {
         let stack = verticalStack(spacing: 10)
         let displays = displayProvider()
         if displays.isEmpty {
-            stack.addArrangedSubview(textView("No displays were reported by AppKit. Olly will use defaults."))
+            stack.addArrangedSubview(textView(L10n.s(
+                "No displays were reported by AppKit. Olly will use defaults.",
+                "first-run no displays body"
+            )))
         }
         for display in displays {
             stack.addArrangedSubview(displayRow(display))
@@ -181,7 +169,11 @@ private extension FirstRunWindowController {
 
     private func presetView() -> NSView {
         let stack = verticalStack(spacing: 12)
-        stack.addArrangedSubview(textView("Choose the starting config profile to write to \(sourceURL.path)."))
+        stack.addArrangedSubview(textView(L10n.f(
+            "Choose the starting config profile to write to %@.",
+            "first-run preset body",
+            sourceURL.path
+        )))
         stack.addArrangedSubview(profilePopUp)
         stack.addArrangedSubview(textView(selectedProfile.summary))
         return stack
@@ -195,19 +187,19 @@ private extension FirstRunWindowController {
     }
 
     private func doneView() -> NSView {
-        textView("""
-        Setup is ready to write \(selectedProfile.displayName) to Config.swift. You can edit or reload it from \
+        textView(L10n.f("""
+        Setup is ready to write %@ to Config.swift. You can edit or reload it from \
         the menu bar after this window closes.
-        """)
+        """, "first-run done body", selectedProfile.displayName))
     }
 
     private func buttonRow() -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
         row.spacing = 8
-        row.addArrangedSubview(button("Back", #selector(back), enabled: step.rawValue > 0))
+        row.addArrangedSubview(button(L10n.s("Back", "back"), #selector(back), enabled: step.rawValue > 0))
         row.addArrangedSubview(NSView())
-        let nextTitle = step == .done ? "Finish" : "Continue"
+        let nextTitle = step == .done ? L10n.s("Finish", "finish") : L10n.s("Continue", "continue")
         let canContinue = step != .accessibility || axStatusProvider() == .trusted
         row.addArrangedSubview(button(nextTitle, #selector(next), enabled: canContinue))
         return row
@@ -215,7 +207,13 @@ private extension FirstRunWindowController {
 
     private func displayRow(_ display: Display) -> NSView {
         let result = safeZoneCalculator.result(for: display)
-        let title = "\(display.localizedName) \(Int(display.frame.width))x\(Int(display.frame.height))"
+        let title = L10n.f(
+            "%@ %dx%d",
+            "first-run display title",
+            display.localizedName,
+            Int(display.frame.width),
+            Int(display.frame.height)
+        )
         let detail = reserveSummary(result)
         let stack = verticalStack(spacing: 4)
         let titleLabel = NSTextField(labelWithString: title)
@@ -227,10 +225,16 @@ private extension FirstRunWindowController {
 
     private func reserveSummary(_ result: SafeZoneResult) -> String {
         guard !result.reserves.isEmpty else {
-            return "No menu bar, notch, or dock reserves detected."
+            return L10n.s("No menu bar, notch, or dock reserves detected.", "first-run no safe zone reserves")
         }
         return result.reserves.map { reserve in
-            "\(reserve.kind.rawValue): \(Int(reserve.rect.width))x\(Int(reserve.rect.height))pt"
+            L10n.f(
+                "%@: %dx%dpt",
+                "first-run safe zone reserve summary",
+                reserve.kind.rawValue,
+                Int(reserve.rect.width),
+                Int(reserve.rect.height)
+            )
         }.joined(separator: ", ")
     }
 
@@ -246,9 +250,9 @@ private extension FirstRunWindowController {
         let row = NSStackView()
         row.orientation = .horizontal
         row.spacing = 8
-        row.addArrangedSubview(button("Open System Settings", #selector(openSettings)))
-        row.addArrangedSubview(button("Copy Deeplink", #selector(copyDeepLink)))
-        row.addArrangedSubview(button("Refresh", #selector(refreshAXStatus)))
+        row.addArrangedSubview(button(L10n.s("Open System Settings", "open AX"), #selector(openSettings)))
+        row.addArrangedSubview(button(L10n.s("Copy Deeplink", "copy link"), #selector(copyDeepLink)))
+        row.addArrangedSubview(button(L10n.s("Refresh", "first-run AX refresh button"), #selector(refreshAXStatus)))
         return row
     }
 
@@ -366,7 +370,9 @@ private extension FirstRunWindowController {
 
     private func updateAXStatusText() {
         let trusted = axStatusProvider() == .trusted
-        axStatusText = trusted ? "Accessibility permission granted." : "Waiting for permission..."
+        axStatusText = trusted
+            ? L10n.s("Accessibility permission granted.", "first-run AX granted status")
+            : L10n.s("Waiting for permission...", "first-run AX waiting status")
     }
 }
 

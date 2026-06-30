@@ -41,12 +41,12 @@ final class OllyStatusMenuController: NSObject {
         if let button = statusItem.button {
             button.image = NSImage(
                 systemSymbolName: "rectangle.3.group",
-                accessibilityDescription: "Olly"
+                accessibilityDescription: L10n.s("Olly", "status bar item accessibility label")
             )
             button.imagePosition = .imageOnly
-            button.toolTip = "Olly"
+            button.toolTip = L10n.s("Olly", "status bar item tooltip")
         } else {
-            statusItem.button?.title = "Olly"
+            statusItem.button?.title = L10n.s("Olly", "status bar item fallback title")
         }
     }
 
@@ -69,7 +69,7 @@ final class OllyStatusMenuController: NSObject {
         let displays = displayMonitor.displays()
         let activeDisplay = displays.first(where: \.isMain) ?? displays.first
         return OllyMenuState(
-            displayName: activeDisplay?.localizedName ?? "No display",
+            displayName: activeDisplay?.localizedName ?? L10n.s("No display", "status menu missing display"),
             displayID: activeDisplay?.id,
             activeTags: [0],
             currentEngineID: FloatingLayoutEngine.engineID,
@@ -82,22 +82,22 @@ final class OllyStatusMenuController: NSObject {
     private func rebuildMenu() {
         let menu = NSMenu()
         menu.autoenablesItems = false
-        menu.addItem(disabledItem("Display: \(state.displayLabel)"))
-        menu.addItem(disabledItem("Tags: \(state.tagLabel)"))
-        menu.addItem(disabledItem("Engine: \(state.currentEngineID.rawValue)"))
-        menu.addItem(disabledItem("AX: \(state.axLabel)"))
-        menu.addItem(disabledItem("IPC: \(state.ipcLabel)"))
+        menu.addItem(disabledItem(L10n.f("Display: %@", "status menu display row", state.displayLabel)))
+        menu.addItem(disabledItem(L10n.f("Tags: %@", "status menu tags row", state.tagLabel)))
+        menu.addItem(disabledItem(L10n.f("Engine: %@", "status menu engine row", state.currentEngineID.rawValue)))
+        menu.addItem(disabledItem(L10n.f("AX: %@", "status menu AX row", state.axLabel)))
+        menu.addItem(disabledItem(L10n.f("IPC: %@", "status menu IPC row", state.ipcLabel)))
         if let error = state.lastErrorLabel {
-            menu.addItem(disabledItem("Error: \(error)"))
+            menu.addItem(disabledItem(L10n.f("Error: %@", "status menu error row", error)))
         }
         menu.addItem(.separator())
-        menu.addItem(actionItem("Refresh Status", #selector(refreshStatus)))
-        menu.addItem(actionItem("Settings...", #selector(openSettings)))
-        menu.addItem(actionItem("Command Palette...", #selector(openCommandPalette)))
-        menu.addItem(actionItem("Open Config.swift", #selector(openConfig)))
-        menu.addItem(actionItem("Copy `ollyctl state`", #selector(copyStateCommand)))
+        menu.addItem(actionItem(L10n.s("Refresh Status", "status menu refresh item"), #selector(refreshStatus)))
+        menu.addItem(actionItem(L10n.s("Settings...", "status menu settings item"), #selector(openSettings)))
+        menu.addItem(actionItem(L10n.s("Command Palette...", "palette item"), #selector(openCommandPalette)))
+        menu.addItem(actionItem(L10n.s("Open Config.swift", "status menu open config item"), #selector(openConfig)))
+        menu.addItem(actionItem(L10n.s("Copy `ollyctl state`", "copy state item"), #selector(copyStateCommand)))
         menu.addItem(.separator())
-        menu.addItem(actionItem("Quit Olly", #selector(quit)))
+        menu.addItem(actionItem(L10n.s("Quit Olly", "status menu quit item"), #selector(quit)))
         statusItem.menu = menu
     }
 
@@ -176,7 +176,7 @@ struct OllyMenuState: Equatable {
     }
 
     static let `default` = OllyMenuState(
-        displayName: "No display",
+        displayName: L10n.s("No display", "status menu missing display"),
         displayID: nil,
         activeTags: [0],
         currentEngineID: FloatingLayoutEngine.engineID,
@@ -223,14 +223,14 @@ struct OllyMenuState: Equatable {
     var axLabel: String {
         switch axStatus {
         case .trusted:
-            return "Trusted"
+            return L10n.s("Trusted", "AX trusted status")
         case .missing:
-            return "Missing"
+            return L10n.s("Missing", "AX missing status")
         }
     }
 
     var ipcLabel: String {
-        isIPCServerRunning ? "Running" : "Stopped"
+        isIPCServerRunning ? L10n.s("Running", "IPC running status") : L10n.s("Stopped", "IPC stopped status")
     }
 
     var lastErrorLabel: String? {

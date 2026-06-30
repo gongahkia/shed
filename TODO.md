@@ -27,17 +27,6 @@ All overlays inherit from `Sources/ollyApp/Overlays/OverlayPanel.swift` (M0.2); 
 
 ## M4 — Product polish
 
-### M4.12 Localized strings strategy
-
-**Goal:** Pull every user-visible string into `Localizable.strings` (English-only locale now); unblock community translations.
-
-**Files to modify:**
-- `Sources/ollyApp/OllyApp.swift`, `Sources/ollyApp/SettingsWindowController.swift`, `Sources/ollyApp/AXOnboardingWindowController.swift`, all new M3 overlays.
-- Add `NSLocalizedString("key", comment: "context")` wraps.
-- Place strings in `Sources/ollyApp/Resources/en.lproj/Localizable.strings`.
-
----
-
 ### M4.13 CLI completions + manpage
 
 **Goal:** `ollyctl --completions zsh|bash|fish` and `ollyctl manpage`.

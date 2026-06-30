@@ -3,6 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "olly",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14)
     ],
@@ -45,7 +46,8 @@ let package = Package(
                 "ollyRuntime",
                 "ollyDiagnostics"
             ],
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "ollyctl",

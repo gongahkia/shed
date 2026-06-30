@@ -7,7 +7,7 @@ extension SettingsWindowController {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "Config.swift"
         panel.canCreateDirectories = true
-        panel.message = "Export the current Olly Config.swift."
+        panel.message = L10n.s("Export the current Olly Config.swift.", "config export panel message")
         let profile = selectedProfile()
         guard let window else {
             finishExport(response: panel.runModal(), url: panel.url, profile: profile)
@@ -23,7 +23,7 @@ extension SettingsWindowController {
         panel.canChooseFiles = true
         panel.canChooseDirectories = false
         panel.allowsMultipleSelection = false
-        panel.message = "Import an Olly Config.swift."
+        panel.message = L10n.s("Import an Olly Config.swift.", "config import panel message")
         guard let window else {
             finishImport(response: panel.runModal(), url: panel.url)
             return
@@ -64,7 +64,7 @@ extension SettingsWindowController {
                 destinationURL: url,
                 fileManager: fileManager
             )
-            statusLabel.stringValue = "Exported Config.swift"
+            statusLabel.stringValue = L10n.s("Exported Config.swift", "config export success status")
             errorTextView.string = ""
             refreshCreateConfigButton()
         } catch {
@@ -76,7 +76,7 @@ extension SettingsWindowController {
         guard response == .OK, let url else { return }
         do {
             try Self.importConfig(from: url, to: sourceURL, fileManager: fileManager)
-            statusLabel.stringValue = "Imported Config.swift"
+            statusLabel.stringValue = L10n.s("Imported Config.swift", "config import success status")
             errorTextView.string = ""
             refreshCreateConfigButton()
         } catch {

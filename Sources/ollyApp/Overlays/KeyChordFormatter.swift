@@ -8,31 +8,31 @@ enum KeyChordFormatter {
 
     private static func modifierLabels(_ modifiers: KeyModifiers) -> [String] {
         [
-            modifiers.contains(.command) ? "cmd" : nil,
-            modifiers.contains(.shift) ? "shift" : nil,
-            modifiers.contains(.option) ? "opt" : nil,
-            modifiers.contains(.control) ? "ctrl" : nil
+            modifiers.contains(.command) ? L10n.s("cmd", "key chord command modifier") : nil,
+            modifiers.contains(.shift) ? L10n.s("shift", "key chord shift modifier") : nil,
+            modifiers.contains(.option) ? L10n.s("opt", "key chord option modifier") : nil,
+            modifiers.contains(.control) ? L10n.s("ctrl", "key chord control modifier") : nil
         ].compactMap { $0 }
     }
 
     private static func keyLabel(_ key: Key) -> String {
         switch Int(key.rawValue) {
         case kVK_Space:
-            return "space"
+            return L10n.s("space", "key chord space key")
         case kVK_Tab:
-            return "tab"
+            return L10n.s("tab", "key chord tab key")
         case kVK_Return:
-            return "return"
+            return L10n.s("return", "key chord return key")
         case kVK_Escape:
-            return "esc"
+            return L10n.s("esc", "key chord escape key")
         case kVK_LeftArrow:
-            return "left"
+            return L10n.s("left", "key chord left arrow")
         case kVK_RightArrow:
-            return "right"
+            return L10n.s("right", "key chord right arrow")
         case kVK_UpArrow:
-            return "up"
+            return L10n.s("up", "key chord up arrow")
         case kVK_DownArrow:
-            return "down"
+            return L10n.s("down", "key chord down arrow")
         case kVK_ANSI_Slash:
             return "/"
         default:

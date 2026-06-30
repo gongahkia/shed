@@ -31,8 +31,8 @@ final class SettingsErrorLogController {
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 8
-        buttonRow.addArrangedSubview(button("Refresh", #selector(refreshFromButton)))
-        buttonRow.addArrangedSubview(button("Copy Diagnostic Bundle", #selector(copyDiagnosticBundle)))
+        buttonRow.addArrangedSubview(button(L10n.s("Refresh", "refresh"), #selector(refreshFromButton)))
+        buttonRow.addArrangedSubview(button(L10n.s("Copy Diagnostic Bundle", "copy"), #selector(copyDiagnosticBundle)))
         buttonRow.addArrangedSubview(NSView())
 
         textView.isEditable = false
@@ -81,10 +81,10 @@ final class SettingsErrorLogController {
 
     @objc private func copyDiagnosticBundle() {
         guard let runtime else {
-            textView.string = "Runtime not available."
+            textView.string = L10n.s("Runtime not available.", "settings errors missing runtime status")
             return
         }
-        textView.string = "Writing diagnostic bundle..."
+        textView.string = L10n.s("Writing diagnostic bundle...", "settings errors writing bundle status")
         Task { [weak self, runtime] in
             let errors = await runtime.recentErrors()
             self?.writeBundle(errors: errors)
@@ -93,7 +93,7 @@ final class SettingsErrorLogController {
 
     private func refresh() {
         guard let runtime else {
-            textView.string = "Runtime not available."
+            textView.string = L10n.s("Runtime not available.", "settings errors missing runtime status")
             return
         }
         Task { [weak self, runtime] in
@@ -105,7 +105,7 @@ final class SettingsErrorLogController {
     private func render(_ errors: [RuntimeErrorRecord]) {
         guard !errors.isEmpty else {
             textView.textColor = .secondaryLabelColor
-            textView.string = "No runtime errors recorded."
+            textView.string = L10n.s("No runtime errors recorded.", "settings errors empty status")
             return
         }
         textView.textColor = .labelColor
@@ -118,10 +118,14 @@ final class SettingsErrorLogController {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(url.path, forType: .string)
             textView.textColor = .labelColor
-            textView.string = "Diagnostic bundle copied:\n\(url.path)"
+            textView.string = L10n.f("Diagnostic bundle copied:\n%@", "settings errors bundle copied status", url.path)
         } catch {
             textView.textColor = .labelColor
-            textView.string = "Diagnostic bundle failed:\n\(String(describing: error))"
+            textView.string = L10n.f(
+                "Diagnostic bundle failed:\n%@",
+                "settings errors bundle failed status",
+                String(describing: error)
+            )
         }
     }
 

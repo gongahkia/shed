@@ -11,7 +11,7 @@ final class ConfigPlaygroundWindowController: NSWindowController {
     private let compileQueue = DispatchQueue(label: "dev.olly.app.config-playground.compile", qos: .userInitiated)
     private let sourceTextView = NSTextView()
     private let diagnosticTextView = NSTextView()
-    private let validateButton = NSButton(title: "Validate", target: nil, action: nil)
+    private let validateButton = NSButton(title: L10n.s("Validate", "validate"), target: nil, action: nil)
 
     init(
         sourceURL: URL,
@@ -44,7 +44,7 @@ final class ConfigPlaygroundWindowController: NSWindowController {
     }
 
     private func configureWindow(_ window: NSWindow) {
-        window.title = "Config Playground"
+        window.title = L10n.s("Config Playground", "config playground window title")
         window.isReleasedWhenClosed = false
     }
 
@@ -61,12 +61,12 @@ final class ConfigPlaygroundWindowController: NSWindowController {
         validateButton.target = self
         validateButton.action = #selector(validate)
         buttonRow.addArrangedSubview(validateButton)
-        buttonRow.addArrangedSubview(button("Close", #selector(closeSheet)))
+        buttonRow.addArrangedSubview(button(L10n.s("Close", "config playground close button"), #selector(closeSheet)))
         buttonRow.addArrangedSubview(NSView())
 
         let sourceScrollView = makeSourceScrollView()
         let diagnosticScrollView = makeDiagnosticScrollView()
-        root.addArrangedSubview(label("Config.swift Playground", size: 18, weight: .semibold))
+        root.addArrangedSubview(label(L10n.s("Config.swift Playground", "title"), size: 18, weight: .semibold))
         root.addArrangedSubview(sourceScrollView)
         root.addArrangedSubview(buttonRow)
         root.addArrangedSubview(diagnosticScrollView)
@@ -93,7 +93,7 @@ final class ConfigPlaygroundWindowController: NSWindowController {
         diagnosticTextView.isSelectable = true
         diagnosticTextView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
         diagnosticTextView.textColor = .secondaryLabelColor
-        diagnosticTextView.string = "Validation output appears here."
+        diagnosticTextView.string = L10n.s("Validation output appears here.", "config playground output placeholder")
         return scrollView(for: diagnosticTextView)
     }
 
@@ -129,10 +129,10 @@ final class ConfigPlaygroundWindowController: NSWindowController {
     @objc private func validate() {
         validateButton.isEnabled = false
         diagnosticTextView.textColor = .secondaryLabelColor
-        diagnosticTextView.string = "Validating..."
+        diagnosticTextView.string = L10n.s("Validating...", "config playground validating status")
         let source = sourceTextView.string
         compileQueue.async { [weak self] in
-            let result = self?.validateSource(source) ?? "Playground closed"
+            let result = self?.validateSource(source) ?? L10n.s("Playground closed", "config playground closed status")
             DispatchQueue.main.async {
                 self?.validateButton.isEnabled = true
                 self?.diagnosticTextView.textColor = .labelColor
@@ -162,7 +162,7 @@ final class ConfigPlaygroundWindowController: NSWindowController {
                 moduleSearchPaths: moduleSearchPaths
             )
             _ = try loader.load()
-            return "Config compiled and loaded."
+            return L10n.s("Config compiled and loaded.", "config playground success status")
         } catch let ConfigLoaderError.compileFailed(_, _, output) {
             return ConfigDiagnosticFormatter.render(compilerOutput: output, source: source)
         } catch {

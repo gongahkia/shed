@@ -155,7 +155,7 @@ struct OverviewSnapshotProvider {
                   let frame = frameValue(info[kCGWindowBounds as String]) else {
                 return nil
             }
-            let title = (info[kCGWindowName as String] as? String) ?? "Untitled"
+            let title = (info[kCGWindowName as String] as? String) ?? L10n.s("Untitled", "fallback window title")
             return OverviewWindowSnapshot(
                 windowID: windowID,
                 processID: processID,
@@ -205,7 +205,7 @@ final class OverviewView: NSView {
         wantsLayer = true
         setAccessibilityElement(true)
         setAccessibilityRole(.layoutArea)
-        setAccessibilityLabel("Overview")
+        setAccessibilityLabel(L10n.s("Overview", "overview accessibility label"))
     }
 
     @available(*, unavailable)
@@ -233,7 +233,7 @@ final class OverviewView: NSView {
     }
 
     private func drawHeader() {
-        let text = "\(display.localizedName) - floating"
+        let text = L10n.f("%@ - floating", "overview display title", display.localizedName)
         text.draw(
             at: CGPoint(x: 28, y: 26),
             withAttributes: [

@@ -15,7 +15,7 @@ final class AltTabSwitcherView: NSView {
         layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.72).cgColor
         setAccessibilityElement(true)
         setAccessibilityRole(.list)
-        setAccessibilityLabel("Alt-Tab windows")
+        setAccessibilityLabel(L10n.s("Alt-Tab windows", "alt-tab overlay accessibility label"))
     }
 
     required init?(coder: NSCoder) {
@@ -233,6 +233,6 @@ final class AltTabListRowView: NSView {
 
 private extension WindowState {
     var altTabTitle: String {
-        title?.isEmpty == false ? title ?? "" : bundleID ?? "window \(id)"
+        title?.isEmpty == false ? title ?? "" : bundleID ?? L10n.f("window %@", "fallback window title", "\(id)")
     }
 }

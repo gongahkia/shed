@@ -18,7 +18,7 @@ enum CheatsheetCategory: String, CaseIterable, Comparable {
     }
 
     var title: String {
-        rawValue.capitalized
+        L10n.s(rawValue.capitalized, "cheatsheet category title")
     }
 
     private static func order(_ category: CheatsheetCategory) -> Int {
@@ -72,17 +72,17 @@ enum CheatsheetCatalog {
     private static func title(for action: Action) -> String {
         switch category(for: action) {
         case .focus:
-            return directionalTitle("Focus", action)
+            return directionalTitle(L10n.s("Focus", "cheatsheet focus prefix"), action)
         case .swap:
-            return directionalTitle("Swap", action)
+            return directionalTitle(L10n.s("Swap", "cheatsheet swap prefix"), action)
         case .move:
-            return directionalTitle("Move", action)
+            return directionalTitle(L10n.s("Move", "cheatsheet move prefix"), action)
         case .tag:
             return tagTitle(action)
         case .engine:
             return engineTitle(action)
         case .snap:
-            return "Show grid overlay"
+            return L10n.s("Show grid overlay", "cheatsheet grid overlay action")
         case .custom:
             return customTitle(action)
         }
@@ -91,15 +91,15 @@ enum CheatsheetCatalog {
     private static func directionalTitle(_ prefix: String, _ action: Action) -> String {
         switch action {
         case let .focus(direction):
-            return "\(prefix) \(direction.rawValue)"
+            return L10n.f("%@ %@", "cheatsheet directional action", prefix, direction.rawValue)
         case let .swap(direction):
-            return "\(prefix) \(direction.rawValue)"
+            return L10n.f("%@ %@", "cheatsheet directional action", prefix, direction.rawValue)
         case let .move(direction):
-            return "\(prefix) \(direction.rawValue)"
+            return L10n.f("%@ %@", "cheatsheet directional action", prefix, direction.rawValue)
         case let .resize(direction, points):
-            return "Resize \(direction.rawValue) \(Int(points))pt"
+            return L10n.f("Resize %@ %dpt", "cheatsheet resize action", direction.rawValue, Int(points))
         case let .split(direction, ratio):
-            return "Split \(direction.rawValue) \(Int(ratio * 100))%"
+            return L10n.f("Split %@ %d%%", "cheatsheet split action", direction.rawValue, Int(ratio * 100))
         default:
             return prefix
         }
@@ -108,45 +108,45 @@ enum CheatsheetCatalog {
     private static func tagTitle(_ action: Action) -> String {
         switch action {
         case let .switchTag(index):
-            return "Switch tag \(index)"
+            return L10n.f("Switch tag %d", "cheatsheet switch tag action", index)
         case let .toggleTag(index):
-            return "Toggle tag \(index)"
+            return L10n.f("Toggle tag %d", "cheatsheet toggle tag action", index)
         case let .moveWindowToTag(index):
-            return "Move window to tag \(index)"
+            return L10n.f("Move window to tag %d", "cheatsheet move to tag action", index)
         default:
-            return "Tag"
+            return L10n.s("Tag", "cheatsheet generic tag action")
         }
     }
 
     private static func engineTitle(_ action: Action) -> String {
         switch action {
         case let .setEngine(engineID):
-            return "Set engine \(engineID.rawValue)"
+            return L10n.f("Set engine %@", "cheatsheet set engine action", engineID.rawValue)
         case .cycleEngine:
-            return "Cycle engine"
+            return L10n.s("Cycle engine", "cheatsheet cycle engine action")
         default:
-            return "Engine"
+            return L10n.s("Engine", "cheatsheet generic engine action")
         }
     }
 
     private static func customTitle(_ action: Action) -> String {
         switch action {
         case .reload:
-            return "Reload config"
+            return L10n.s("Reload config", "cheatsheet reload action")
         case .noop:
-            return "No-op"
+            return L10n.s("No-op", "cheatsheet no-op action")
         case .showAltTab, .showOverlay(.altTab):
-            return "Show alt-tab overlay"
+            return L10n.s("Show alt-tab overlay", "cheatsheet alt-tab action")
         case .showCheatsheet, .showOverlay(.cheatsheet):
-            return "Show cheatsheet"
+            return L10n.s("Show cheatsheet", "cheatsheet show cheatsheet action")
         case let .macro(name):
-            return "Run macro \(name)"
+            return L10n.f("Run macro %@", "cheatsheet macro action", name)
         case let .shell(action):
-            return "Run \(action.label)"
+            return L10n.f("Run %@", "cheatsheet shell action", action.label)
         case let .raw(label):
-            return "Run \(label)"
+            return L10n.f("Run %@", "cheatsheet raw action", label)
         default:
-            return "Custom"
+            return L10n.s("Custom", "cheatsheet custom action")
         }
     }
 }
@@ -308,7 +308,7 @@ final class CheatsheetPanel: NSPanel {
             backing: .buffered,
             defer: false
         )
-        title = "Keybinds"
+        title = L10n.s("Keybinds", "cheatsheet window title")
         isOpaque = false
         backgroundColor = .windowBackgroundColor
         hasShadow = true
@@ -368,7 +368,7 @@ final class CheatsheetView: NSView {
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         setAccessibilityElement(true)
         setAccessibilityRole(.list)
-        setAccessibilityLabel("Keybinds")
+        setAccessibilityLabel(L10n.s("Keybinds", "cheatsheet accessibility label"))
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical

@@ -23,15 +23,15 @@ enum SettingsKeybindDiagnosticsRenderer {
 
     static func status(from report: HotKeyCollisionReport?) -> String {
         guard let report else {
-            return "No hotkey scan has run yet."
+            return L10n.s("No hotkey scan has run yet.", "settings keybinds no scan status")
         }
         switch report.collisions.count {
         case 0:
-            return "No keybind conflicts detected."
+            return L10n.s("No keybind conflicts detected.", "settings keybinds no conflicts status")
         case 1:
-            return "1 keybind conflict detected."
+            return L10n.s("1 keybind conflict detected.", "settings keybinds one conflict status")
         default:
-            return "\(report.collisions.count) keybind conflicts detected."
+            return L10n.f("%d keybind conflicts detected.", "conflict count", report.collisions.count)
         }
     }
 
@@ -40,7 +40,7 @@ enum SettingsKeybindDiagnosticsRenderer {
             return ""
         }
         guard !report.sourceErrors.isEmpty else {
-            return "No scanner source errors."
+            return L10n.s("No scanner source errors.", "settings keybinds no source errors status")
         }
         return report.sourceErrors.map { error in
             "\(error.owner.rawValue): \(error.detail)"
@@ -75,7 +75,7 @@ final class SettingsKeybindsController: NSObject {
         let buttonRow = NSStackView()
         buttonRow.orientation = .horizontal
         buttonRow.spacing = 8
-        buttonRow.addArrangedSubview(button("Refresh", #selector(refreshFromButton)))
+        buttonRow.addArrangedSubview(button(L10n.s("Refresh", "refresh"), #selector(refreshFromButton)))
         buttonRow.addArrangedSubview(NSView())
 
         statusLabel.font = .systemFont(ofSize: 12)
@@ -105,7 +105,7 @@ final class SettingsKeybindsController: NSObject {
     }
 
     private func scan() {
-        statusLabel.stringValue = "Scanning keybinds..."
+        statusLabel.stringValue = L10n.s("Scanning keybinds...", "settings keybinds scanning status")
         scanQueue.async { [diagnostics, store, weak self] in
             do {
                 let report = try diagnostics.scan()
@@ -153,7 +153,7 @@ final class SettingsKeybindsController: NSObject {
     private func render(error: Error) {
         rows = []
         statusLabel.textColor = .labelColor
-        statusLabel.stringValue = "Hotkey scan failed."
+        statusLabel.stringValue = L10n.s("Hotkey scan failed.", "settings keybinds scan failed status")
         sourceErrorsTextView.string = String(describing: error)
         tableView.reloadData()
     }
@@ -175,10 +175,10 @@ final class SettingsKeybindsController: NSObject {
 
     private func columns() -> [NSTableColumn] {
         [
-            ("chord", "Chord", 100),
-            ("action", "Olly Action", 140),
-            ("owner", "Conflicts With", 150),
-            ("detail", "Detail", 170)
+            ("chord", L10n.s("Chord", "settings keybinds chord column"), 100),
+            ("action", L10n.s("Olly Action", "settings keybinds action column"), 140),
+            ("owner", L10n.s("Conflicts With", "settings keybinds conflict owner column"), 150),
+            ("detail", L10n.s("Detail", "settings keybinds detail column"), 170)
         ].map { identifier, title, width in
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(identifier))
             column.title = title

@@ -43,6 +43,16 @@ public protocol GutterDecorator: AnyObject {
 	func gutterPopoverViewController(for marker: GutterMarker, in view: MetalTextView) -> NSViewController?
 }
 
+public struct TextHoverCandidate: Sendable, Equatable {
+	public var offset: Int
+	public var positioningRect: NSRect
+
+	public init(offset: Int, positioningRect: NSRect) {
+		self.offset = offset
+		self.positioningRect = positioningRect
+	}
+}
+
 struct MetalViewportUniforms {
 	var size: SIMD2<Float>
 }
@@ -149,6 +159,7 @@ public final class MetalTextView: NSView {
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
 	public var completionRequested: ((String?) -> Bool)?
+	public var hoverCandidateChanged: ((TextHoverCandidate?) -> Void)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var keymapEngine = KeymapEngine()
@@ -452,15 +463,32 @@ public final class MetalTextView: NSView {
 	}
 
 	public override func mouseMoved(with event: NSEvent) {
-		guard let marker = gutterMarker(forMouseEvent: event), let rect = gutterMarkerRect(for: marker.id) else {
-			closeGutterPopover()
+		if let marker = gutterMarker(forMouseEvent: event), let rect = gutterMarkerRect(for: marker.id) {
+			hoverCandidateChanged?(nil)
+			showGutterPopover(for: marker, relativeTo: rect)
 			return
 		}
-		showGutterPopover(for: marker, relativeTo: rect)
+		closeGutterPopover()
+		guard event.modifierFlags.contains(.command) else {
+			hoverCandidateChanged?(nil)
+			return
+		}
+		let offset = utf8Offset(forMouseEvent: event)
+		hoverCandidateChanged?(TextHoverCandidate(offset: offset, positioningRect: rectForUTF8Offset(offset)))
 	}
 
 	public override func mouseExited(with event: NSEvent) {
+		hoverCandidateChanged?(nil)
 		closeGutterPopover()
+	}
+
+	public func positioningRectForUTF8Offset(_ offset: Int) -> NSRect {
+		rectForUTF8Offset(offset)
+	}
+
+	public func hoverCandidate(atLocalPoint point: NSPoint) -> TextHoverCandidate {
+		let offset = utf8Offset(forLocalPoint: point)
+		return TextHoverCandidate(offset: offset, positioningRect: rectForUTF8Offset(offset))
 	}
 
 	public override func keyDown(with event: NSEvent) {

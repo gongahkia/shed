@@ -139,6 +139,35 @@ import Testing
 	#expect(result.capabilities.completionProvider?.triggerCharacters == [".", ":"])
 }
 
+@Test func hoverResultDecodesMarkupAndMarkedStrings() throws {
+	let markup = try LSPHoverResult(decoding: Data(#"""
+	{
+	  "contents": { "kind": "markdown", "value": "### Title\nbody" },
+	  "range": {
+	    "start": { "line": 1, "character": 2 },
+	    "end": { "line": 1, "character": 6 }
+	  }
+	}
+	"""#.utf8))
+	let legacy = try LSPHoverResult(decoding: Data(#"""
+	{
+	  "contents": [
+	    "plain",
+	    { "language": "swift", "value": "let x = 1" }
+	  ]
+	}
+	"""#.utf8))
+
+	#expect(markup.hover == LSPHover(
+		contents: .markup(LSPMarkupContent(kind: .markdown, value: "### Title\nbody")),
+		range: LSPRange(start: LSPPosition(line: 1, character: 2), end: LSPPosition(line: 1, character: 6))
+	))
+	#expect(legacy.hover?.contents == .markedStrings([
+		.string("plain"),
+		.languageString(language: "swift", value: "let x = 1"),
+	]))
+}
+
 @Test func completionResultDecodesItemArrayAndNull() throws {
 	let items = try LSPCompletionResult(decoding: Data(#"[{"label":"map","insertText":"map"}]"#.utf8))
 	let none = try LSPCompletionResult(decoding: Data("null".utf8))

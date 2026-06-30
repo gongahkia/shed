@@ -2986,7 +2986,7 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 246))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 314))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -3025,6 +3025,12 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		let sizeField = NSTextField(frame: .zero)
 		sizeField.alignment = .right
+		let sizeFormatter = NumberFormatter()
+		sizeFormatter.minimum = NSNumber(value: Double(EditorPreferences.minFontSize))
+		sizeFormatter.maximum = NSNumber(value: Double(EditorPreferences.maxFontSize))
+		sizeFormatter.minimumFractionDigits = 0
+		sizeFormatter.maximumFractionDigits = 1
+		sizeField.formatter = sizeFormatter
 		sizeField.target = self
 		sizeField.action = #selector(settingsFontSizeDidChange(_:))
 		sizeField.translatesAutoresizingMaskIntoConstraints = false
@@ -3046,17 +3052,22 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 		let zoomOutButton = NSButton(title: L10n.string("Zoom Out"), target: self, action: #selector(zoomOut(_:)))
 		zoomOutButton.bezelStyle = .rounded
 		zoomOutButton.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(zoomOutButton)
 
 		let resetZoomButton = NSButton(title: L10n.string("Reset Zoom"), target: self, action: #selector(resetZoom(_:)))
 		resetZoomButton.bezelStyle = .rounded
 		resetZoomButton.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(resetZoomButton)
 
 		let zoomInButton = NSButton(title: L10n.string("Zoom In"), target: self, action: #selector(zoomIn(_:)))
 		zoomInButton.bezelStyle = .rounded
 		zoomInButton.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(zoomInButton)
+
+		let zoomStack = NSStackView(views: [zoomOutButton, resetZoomButton, zoomInButton])
+		zoomStack.orientation = .horizontal
+		zoomStack.alignment = .centerY
+		zoomStack.spacing = 8
+		zoomStack.distribution = .gravityAreas
+		zoomStack.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(zoomStack)
 
 		let reloadButton = NSButton(title: L10n.string("Reload Themes"), target: self, action: #selector(reloadSettingsThemes(_:)))
 		reloadButton.bezelStyle = .rounded
@@ -3093,17 +3104,16 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
 			lineNumbersButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			lineNumbersButton.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
-			zoomOutButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			zoomOutButton.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
-			resetZoomButton.leadingAnchor.constraint(equalTo: zoomOutButton.trailingAnchor, constant: 8),
-			resetZoomButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
-			zoomInButton.leadingAnchor.constraint(equalTo: resetZoomButton.trailingAnchor, constant: 8),
-			zoomInButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
-			reloadButton.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
-			reloadButton.centerYAnchor.constraint(equalTo: zoomOutButton.centerYAnchor),
+			zoomStack.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			zoomStack.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			zoomStack.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			reloadButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			reloadButton.topAnchor.constraint(equalTo: zoomStack.bottomAnchor, constant: 16),
+			reloadButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
 			statusLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			statusLabel.trailingAnchor.constraint(equalTo: reloadButton.leadingAnchor, constant: -12),
-			statusLabel.topAnchor.constraint(equalTo: zoomOutButton.bottomAnchor, constant: 16),
+			statusLabel.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
+			statusLabel.topAnchor.constraint(equalTo: reloadButton.bottomAnchor, constant: 16),
+			statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
 		])
 		settingsThemePopup = themePopup
 		settingsFontPopup = fontPopup
@@ -3143,8 +3153,8 @@ private final class AppDelegate: NSObject, NSApplicationDelegate {
 	private func refreshSettingsEditorControls() {
 		let preferences = EditorPreferences.load()
 		settingsFontPopup?.removeAllItems()
-		for fontName in EditorPreferences.fontNames {
-			settingsFontPopup?.addItem(withTitle: fontName)
+		for fontName in EditorPreferences.availableFontNames() {
+			settingsFontPopup?.addItem(withTitle: EditorPreferences.fontDisplayName(for: fontName))
 			settingsFontPopup?.lastItem?.representedObject = fontName
 		}
 		syncSettingsEditorControls(preferences)

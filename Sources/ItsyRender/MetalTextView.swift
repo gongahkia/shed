@@ -119,8 +119,8 @@ public final class MetalTextView: NSView {
 	private var cursorBlinkVisible = true
 	private var cursorBlinkTimer: Timer?
 	private var selectionRects: [CGRect] = []
-	private var findMatchRanges: [Range<Int>] = []
-	private var findMatchRects: [CGRect] = []
+	var findMatchRanges: [Range<Int>] = []
+	var findMatchRects: [CGRect] = []
 	private var gutterTrackingArea: NSTrackingArea?
 	private var gutterPopover: NSPopover?
 	private var hoveredGutterMarkerID: String?
@@ -148,7 +148,7 @@ public final class MetalTextView: NSView {
 	private var instanceBuffer: MTLBuffer?
 	private var instanceBufferCapacity = 0
 	private var textInstanceScratch: [MetalGlyphInstance] = []
-	private var solidInstanceScratch: [MetalGlyphInstance] = []
+	var solidInstanceScratch: [MetalGlyphInstance] = []
 	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
 	private var highlightRevision = 0
 	var markedRangeUTF8: Range<Int>?
@@ -427,11 +427,6 @@ public final class MetalTextView: NSView {
 	func setSelectionRects(_ rects: [CGRect]) {
 		selectionRects = rects
 		markDirty()
-	}
-
-	public func setFindMatchRanges(_ ranges: [Range<Int>]) {
-		findMatchRanges = ranges
-		refreshFindMatchRects()
 	}
 
 	var visibleLineRange: Range<Int> {
@@ -876,12 +871,6 @@ public final class MetalTextView: NSView {
 		}
 	}
 
-	private func appendFindMatchOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
-		for rect in findMatchRects {
-			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34)))
-		}
-	}
-
 	private func textColor(for range: Range<Int>) -> SIMD4<Float> {
 		guard let span = highlightSpans.last(where: { $0.range.overlaps(range) }) else {
 			return Self.defaultTextColor
@@ -1003,7 +992,7 @@ public final class MetalTextView: NSView {
 		}
 	}
 
-	private func renderSolidInstances(_ instances: [MetalGlyphInstance], encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
+	func renderSolidInstances(_ instances: [MetalGlyphInstance], encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
 		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), let atlas = makeSolidAtlasTexture() else {
 			return
 		}
@@ -1021,12 +1010,6 @@ public final class MetalTextView: NSView {
 			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
 			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
 		}
-	}
-
-	private func renderFindMatchInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
-		solidInstanceScratch.removeAll(keepingCapacity: true)
-		appendFindMatchOverlayInstances(scale: scale, into: &solidInstanceScratch)
-		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
 	}
 
 	private func renderSelectionInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
@@ -1256,11 +1239,6 @@ public final class MetalTextView: NSView {
 		}
 	}
 
-	private func refreshFindMatchRects() {
-		findMatchRects = findMatchRanges.flatMap { rects(forUTF8Range: $0) }
-		markDirty()
-	}
-
 	private func refreshGutterMarkerRects() {
 		guard let gutterDecorator, !visibleLineRange.isEmpty else {
 			gutterView.markerLayouts = []
@@ -1344,36 +1322,6 @@ public final class MetalTextView: NSView {
 		hoveredGutterMarkerID = nil
 	}
 
-	private func rects(forUTF8Range range: Range<Int>) -> [CGRect] {
-		guard !range.isEmpty else {
-			return []
-		}
-		let startLine = editor.rope.line(forOffset: range.lowerBound)
-		let endLine = editor.rope.line(forOffset: range.upperBound)
-		guard startLine < visibleLineRange.upperBound, endLine >= visibleLineRange.lowerBound else {
-			return []
-		}
-		return (startLine ... endLine).compactMap { line -> CGRect? in
-			guard visibleLineRange.contains(line) else {
-				return nil
-			}
-			let lineRange = editor.rope.lineRange(line)
-			let lower = max(range.lowerBound, lineRange.lowerBound)
-			let upper = min(range.upperBound, lineRange.upperBound)
-			guard lower < upper else {
-				return nil
-			}
-			let before = editor.rope.slice(lineRange.lowerBound ..< lower)
-			let selected = editor.rope.slice(lower ..< upper)
-			return CGRect(
-				x: textInset.x + typographicWidth(before) - xOffset,
-				y: topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight,
-				width: max(2, typographicWidth(selected)),
-				height: lineHeight
-			)
-		}
-	}
-
 	func typographicWidth(_ text: String) -> CGFloat {
 		guard !text.isEmpty else {
 			return 0
@@ -1409,7 +1357,7 @@ public final class MetalTextView: NSView {
 	}
 }
 
-private func solidInstance(rect: CGRect, scale: CGFloat, color: SIMD4<Float>) -> MetalGlyphInstance {
+func solidInstance(rect: CGRect, scale: CGFloat, color: SIMD4<Float>) -> MetalGlyphInstance {
 	MetalGlyphInstance(
 		screenOrigin: SIMD2<Float>(Float(rect.minX * scale), Float(rect.minY * scale)),
 		size: SIMD2<Float>(Float(rect.width * scale), Float(rect.height * scale)),

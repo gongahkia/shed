@@ -83,6 +83,40 @@ import Testing
 	#expect(symbols.map(\.name) == ["AppShell"])
 }
 
+@Test func clientDocumentSymbolSendsTypedRequest() async throws {
+	let (session, transport) = try await initializedSession()
+	let task = Task {
+		try await session.documentSymbol(textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/App.swift")).documentSymbols
+	}
+
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.textDocumentDocumentSymbol,
+		params: .object(["textDocument": .object(["uri": .string("file:///tmp/App.swift")])])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .array([
+			.object([
+				"name": .string("AppShell"),
+				"kind": .int(23),
+				"range": .object([
+					"start": .object(["line": .int(0), "character": .int(0)]),
+					"end": .object(["line": .int(1), "character": .int(1)]),
+				]),
+				"selectionRange": .object([
+					"start": .object(["line": .int(0), "character": .int(7)]),
+					"end": .object(["line": .int(0), "character": .int(15)]),
+				]),
+			]),
+		])
+	))))
+
+	let symbols = try await task.value
+	#expect(symbols.map(\.name) == ["AppShell"])
+}
+
 @Test func clientReturnsServerNotificationsAsEvents() async throws {
 	let (session, _) = try await initializedSession()
 	let diagnostics = JSONRPCMessage.notification(JSONRPCNotificationMessage(

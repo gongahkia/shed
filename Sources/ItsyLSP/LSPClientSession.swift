@@ -65,6 +65,14 @@ public actor LSPClientSession {
 		return try LSPWorkspaceSymbolResult(result: response.result)
 	}
 
+	public func documentSymbol(textDocument: LSPTextDocumentIdentifier) async throws -> LSPDocumentSymbolResult {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentDocumentSymbol,
+			params: try LSPAny(encoding: LSPDocumentSymbolParams(textDocument: textDocument))
+		)
+		return try LSPDocumentSymbolResult(result: response.result)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) throws {
 		try requireState([.running])
 		try writeNotificationUnchecked(method: method, params: params)

@@ -14,6 +14,7 @@ public enum LSPMethod {
 	public static let textDocumentHover = "textDocument/hover"
 	public static let textDocumentSignatureHelp = "textDocument/signatureHelp"
 	public static let textDocumentDefinition = "textDocument/definition"
+	public static let textDocumentDocumentSymbol = "textDocument/documentSymbol"
 	public static let textDocumentReferences = "textDocument/references"
 	public static let textDocumentRename = "textDocument/rename"
 	public static let textDocumentCodeAction = "textDocument/codeAction"
@@ -153,6 +154,14 @@ public struct LSPTextDocumentPositionParams: Codable, Equatable, Sendable {
 }
 
 public typealias LSPHoverParams = LSPTextDocumentPositionParams
+
+public struct LSPDocumentSymbolParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+
+	public init(textDocument: LSPTextDocumentIdentifier) {
+		self.textDocument = textDocument
+	}
+}
 
 public enum LSPSignatureHelpTriggerKind: Int, Codable, Equatable, Sendable {
 	case invoked = 1
@@ -787,6 +796,43 @@ public enum LSPWorkspaceSymbolResult: Equatable, Sendable {
 		case .none:
 			return []
 		}
+	}
+}
+
+public enum LSPDocumentSymbolResult: Equatable, Sendable {
+	case documentSymbols([LSPDocumentSymbol])
+	case symbolInformation([LSPSymbolInformation])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let documentSymbols = try? decoder.decode([LSPDocumentSymbol].self, from: data) {
+			self = .documentSymbols(documentSymbols)
+			return
+		}
+		if let symbolInformation = try? decoder.decode([LSPSymbolInformation].self, from: data) {
+			self = .symbolInformation(symbolInformation)
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var documentSymbols: [LSPDocumentSymbol] {
+		guard case let .documentSymbols(documentSymbols) = self else {
+			return []
+		}
+		return documentSymbols
+	}
+
+	public var symbolInformation: [LSPSymbolInformation] {
+		guard case let .symbolInformation(symbolInformation) = self else {
+			return []
+		}
+		return symbolInformation
 	}
 }
 

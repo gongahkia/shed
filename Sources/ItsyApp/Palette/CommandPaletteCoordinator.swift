@@ -9,6 +9,7 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private let commandRegistryProvider: () -> CommandRegistry
 	private let activeDocumentProvider: () -> NSDocument?
 	private let workspaceSymbolProvider: @MainActor (String) async throws -> [WorkspaceSymbol]
+	private let fileSymbolProvider: @MainActor () async throws -> [WorkspaceSymbol]?
 	private var commandPalettePanel: NSPanel?
 	private var commandPaletteInputField: NSTextField?
 	private var commandPaletteTableView: NSTableView?
@@ -19,20 +20,23 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private var commandPaletteAcceptsRawText = false
 	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
 	private var commandPaletteBaseSymbols: [WorkspaceSymbol] = []
-	private var commandPaletteLSPSymbols: [WorkspaceSymbol] = []
+	private var commandPaletteLSPSymbols: [WorkspaceSymbol]?
 	private var commandPaletteFilteredSymbols: [WorkspaceSymbol] = []
 	private var commandPaletteSymbolGeneration = 0
+	private var commandPaletteFileSymbolsRequested = false
 
 	init(
 		documentController: ItsyDocumentController,
 		commandRegistryProvider: @escaping () -> CommandRegistry,
 		activeDocumentProvider: @escaping () -> NSDocument?,
-		workspaceSymbolProvider: @escaping @MainActor (String) async throws -> [WorkspaceSymbol] = { _ in [] }
+		workspaceSymbolProvider: @escaping @MainActor (String) async throws -> [WorkspaceSymbol] = { _ in [] },
+		fileSymbolProvider: @escaping @MainActor () async throws -> [WorkspaceSymbol]? = { nil }
 	) {
 		self.documentController = documentController
 		self.commandRegistryProvider = commandRegistryProvider
 		self.activeDocumentProvider = activeDocumentProvider
 		self.workspaceSymbolProvider = workspaceSymbolProvider
+		self.fileSymbolProvider = fileSymbolProvider
 	}
 
 	func installBridge() {
@@ -201,9 +205,10 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		commandPaletteAcceptsRawText = false
 		commandPaletteSymbolScope = nil
 		commandPaletteBaseSymbols = []
-		commandPaletteLSPSymbols = []
+		commandPaletteLSPSymbols = nil
 		commandPaletteFilteredSymbols = []
 		commandPaletteSymbolGeneration += 1
+		commandPaletteFileSymbolsRequested = false
 		commandPaletteItems = items
 		commandPaletteInputField?.stringValue = ""
 		commandPaletteInputField?.placeholderString = L10n.string("Command")
@@ -215,9 +220,10 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		commandPaletteAcceptsRawText = true
 		commandPaletteSymbolScope = nil
 		commandPaletteBaseSymbols = []
-		commandPaletteLSPSymbols = []
+		commandPaletteLSPSymbols = nil
 		commandPaletteFilteredSymbols = []
 		commandPaletteSymbolGeneration += 1
+		commandPaletteFileSymbolsRequested = false
 		commandPaletteItems = []
 		commandPaletteFilteredItems = []
 		commandPaletteInputField?.placeholderString = ""
@@ -257,14 +263,18 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 			let scope: CommandPaletteSymbolScope = raw.hasPrefix("@") ? .workspace : .file
 			if commandPaletteSymbolScope != scope {
 				commandPaletteBaseSymbols = symbolsForCommandPaletteScope(scope)
-				commandPaletteLSPSymbols = []
+				commandPaletteLSPSymbols = nil
 				commandPaletteSymbolScope = scope
 				commandPaletteSymbolGeneration += 1
+				commandPaletteFileSymbolsRequested = false
 			}
 			let query = String(raw.dropFirst())
 			if scope == .workspace {
-				commandPaletteLSPSymbols = []
+				commandPaletteLSPSymbols = nil
 				requestWorkspaceSymbols(query: query)
+			} else if commandPaletteFileSymbolsRequested == false {
+				commandPaletteFileSymbolsRequested = true
+				requestFileSymbols()
 			}
 			applyCommandPaletteSymbolFilter(scope: scope, query: query)
 			commandPaletteFilteredItems = []
@@ -273,9 +283,10 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		if commandPaletteSymbolScope != nil {
 			commandPaletteSymbolScope = nil
 			commandPaletteBaseSymbols = []
-			commandPaletteLSPSymbols = []
+			commandPaletteLSPSymbols = nil
 			commandPaletteFilteredSymbols = []
 			commandPaletteSymbolGeneration += 1
+			commandPaletteFileSymbolsRequested = false
 		}
 		let query = raw.lowercased()
 		commandPaletteFilteredItems = FuzzyMatcher.ranked(commandPaletteItems, query: query, includeUnmatched: false, by: \.title)
@@ -311,18 +322,56 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		}
 	}
 
+	private func requestFileSymbols() {
+		commandPaletteSymbolGeneration += 1
+		let generation = commandPaletteSymbolGeneration
+		let provider = fileSymbolProvider
+		Task { [weak self] in
+			let symbols: [WorkspaceSymbol]?
+			do {
+				symbols = try await provider()
+			} catch {
+				return
+			}
+			await MainActor.run { [weak self] in
+				guard
+					let self,
+					generation == self.commandPaletteSymbolGeneration,
+					self.commandPaletteSymbolScope == .file,
+					self.commandPaletteInputField?.stringValue.hasPrefix("#") == true
+				else {
+					return
+				}
+				guard let symbols else {
+					return
+				}
+				self.commandPaletteLSPSymbols = symbols
+				let raw = self.commandPaletteInputField?.stringValue ?? ""
+				let currentQuery = String(raw.dropFirst())
+				self.applyCommandPaletteSymbolFilter(scope: .file, query: currentQuery)
+			}
+		}
+	}
+
 	private func applyCommandPaletteSymbolFilter(scope: CommandPaletteSymbolScope, query: String) {
 		let fuzzyQuery = query.lowercased()
 		let keyPath: (WorkspaceSymbol) -> String = scope == .workspace
 			? { "\($0.name) \($0.relativePath)" }
 			: { $0.name }
 		switch scope {
-		case .workspace where !commandPaletteLSPSymbols.isEmpty:
-			let lspSymbols = Array(commandPaletteLSPSymbols.prefix(100))
+		case .workspace where commandPaletteLSPSymbols != nil:
+			let lspSymbols = Array((commandPaletteLSPSymbols ?? []).prefix(100))
 			let lspKeys = Set(lspSymbols.map(symbolRangeKey(_:)))
 			let fallback = commandPaletteBaseSymbols.filter { !lspKeys.contains(symbolRangeKey($0)) }
 			commandPaletteFilteredSymbols = lspSymbols + FuzzyMatcher.ranked(
 				fallback,
+				query: fuzzyQuery,
+				includeUnmatched: fuzzyQuery.isEmpty,
+				by: keyPath
+			)
+		case .file where commandPaletteLSPSymbols != nil:
+			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(
+				commandPaletteLSPSymbols ?? [],
 				query: fuzzyQuery,
 				includeUnmatched: fuzzyQuery.isEmpty,
 				by: keyPath

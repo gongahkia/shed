@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(A) 2026-07-01 +Phase21-Refactor @refactor id:803 est:2h dep:802 Move `OutlineKindNode`, `OutlineSymbolNode`, `OutlineCollapseStore`, `GitCommitDraft`, `GitCommitDraftStore` from `App/AppDelegate.swift` into `Sources/ItsyApp/Outline/` and `Sources/ItsyApp/Git/`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:804 est:2h dep:802 Move all `@objc private func toggle*/show*/refresh*` for Git into `GitCoordinator`; wire menu actions to coordinator via `NSApp.sendAction(_:to:from:)`. Delete duplicated Git state from `AppDelegate`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:805 est:2h dep:802 Same treatment for Command Palette (see `main.swift:367..649`): move all palette state + view construction + filter/run into `CommandPaletteCoordinator`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:806 est:2h dep:802 Same treatment for Project Find (see `main.swift:811..993`).

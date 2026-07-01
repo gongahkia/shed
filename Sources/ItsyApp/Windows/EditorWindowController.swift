@@ -6,6 +6,17 @@ import ItsyLSP
 import ItsyRender
 import ItsySyntax
 
+private struct LSPStatusEntry {
+	var key: LSPSessionKey
+	var status: String
+	var server: String
+	var pid: Int32?
+	var startDate: Date?
+	var lastError: String
+	var url: URL?
+	var client: LSPProcessClient?
+}
+
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
@@ -43,6 +54,7 @@ final class EditorWindowController: NSWindowController {
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var lspMissingBannerGeneration = 0
+	private var lspStatusGeneration = 0
 	private var indexingStatusText: String?
 	private var lspCrashStatusText: String?
 	private var lspRestartKey: LSPSessionKey?
@@ -104,6 +116,7 @@ final class EditorWindowController: NSWindowController {
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
 		refreshLSPMissingBanner(for: document)
+		refreshLSPStatus(for: document)
 		ItsyWorkspaceController.register(self)
 		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
@@ -254,18 +267,26 @@ final class EditorWindowController: NSWindowController {
 		ItsyTabCoordinator.closeDocument(tabID)
 	}
 
-	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField) {
+	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField, lspButton: NSButton) {
 		statusBarView.wantsLayer = true
 		statusBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		label.font = .systemFont(ofSize: 11)
 		label.textColor = .secondaryLabelColor
 		label.lineBreakMode = .byTruncatingTail
 		label.translatesAutoresizingMaskIntoConstraints = false
+		lspButton.isHidden = true
+		lspButton.bezelStyle = .rounded
+		lspButton.controlSize = .small
+		lspButton.font = .systemFont(ofSize: 11)
+		lspButton.translatesAutoresizingMaskIntoConstraints = false
 		statusBarView.addSubview(label)
+		statusBarView.addSubview(lspButton)
 		NSLayoutConstraint.activate([
 			label.leadingAnchor.constraint(equalTo: statusBarView.leadingAnchor, constant: 10),
-			label.trailingAnchor.constraint(lessThanOrEqualTo: statusBarView.trailingAnchor, constant: -10),
+			label.trailingAnchor.constraint(lessThanOrEqualTo: lspButton.leadingAnchor, constant: -8),
 			label.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
+			lspButton.trailingAnchor.constraint(equalTo: statusBarView.trailingAnchor, constant: -10),
+			lspButton.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
 			statusBarView.heightAnchor.constraint(equalToConstant: 20),
 		])
 	}
@@ -282,8 +303,8 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func configureLSPStatusRestart() {
-		let recognizer = NSClickGestureRecognizer(target: self, action: #selector(restartLSPFromStatusBar(_:)))
-		statusBarView.addGestureRecognizer(recognizer)
+		lspStatusButton.target = self
+		lspStatusButton.action = #selector(showLSPStatusPanel(_:))
 	}
 
 	private func refreshLSPMissingBanner(for document: ItsyDocument) {
@@ -319,6 +340,10 @@ final class EditorWindowController: NSWindowController {
 	private func handleLSPRequestError(_ error: Error) {
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
 			showLSPMissingBanner(missingBinary)
+		} else if case let LSPManagerError.serverDisabled(key) = error {
+			setLSPStatus(key: key, status: "disabled", client: nil, lastError: lspStatusEntries[key]?.lastError, url: lspStatusEntries[key]?.url)
+		} else if case LSPManagerError.retryLimitExceeded = error, let key = activeLSPKey {
+			setLSPStatus(key: key, status: "disabled", client: nil, lastError: lspStatusEntries[key]?.lastError, url: lspStatusEntries[key]?.url)
 		}
 	}
 
@@ -341,19 +366,18 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func refreshStatusBar() {
+		refreshLSPStatusPill()
 		if let text = lspCrashStatusText ?? indexingStatusText {
 			statusBarLabel.stringValue = text
-			statusBarView.isHidden = false
 		} else {
 			statusBarLabel.stringValue = ""
-			statusBarView.isHidden = true
 		}
+		statusBarView.isHidden = statusBarLabel.stringValue.isEmpty && lspStatusButton.isHidden
 	}
 
 	private func showLSPCrashStatus(key: LSPSessionKey, url: URL, reason: LSPSessionFailureReason) {
-		lspRestartKey = key
-		lspRestartURL = url
-		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status)) - click to restart")
+		setLSPStatus(key: key, status: "crashed", client: nil, lastError: reason.stderrTail, url: url)
+		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status))")
 		refreshStatusBar()
 	}
 
@@ -367,10 +391,27 @@ final class EditorWindowController: NSWindowController {
 		refreshStatusBar()
 	}
 
-	@objc private func restartLSPFromStatusBar(_ sender: NSClickGestureRecognizer) {
-		guard let key = lspRestartKey, let url = lspRestartURL else {
+	@objc private func showLSPStatusPanel(_ sender: NSButton) {
+		guard let snapshot = currentLSPStatusSnapshot() else {
 			return
 		}
+		let panel = lspStatusPanel ?? LSPStatusPanel()
+		panel.restartRequested = { [weak self] key in
+			self?.restartLSPFromStatusPanel(key)
+		}
+		panel.stopRequested = { [weak self] key in
+			self?.stopLSPFromStatusPanel(key)
+		}
+		lspStatusPanel = panel
+		panel.show(snapshot: snapshot, relativeTo: window)
+	}
+
+	private func restartLSPFromStatusPanel(_ key: LSPSessionKey) {
+		guard let url = lspStatusEntries[key]?.url ?? lspRestartURL else {
+			return
+		}
+		lspRestartKey = key
+		lspRestartURL = url
 		Task { [weak self] in
 			await Self.lspManager.enableSession(key)
 			await MainActor.run { [weak self] in
@@ -380,6 +421,104 @@ final class EditorWindowController: NSWindowController {
 				self.restartLSPSession(for: url)
 			}
 		}
+	}
+
+	private func stopLSPFromStatusPanel(_ key: LSPSessionKey) {
+		let entry = lspStatusEntries[key]
+		let client = entry?.client
+		let supervisor = lspSupervisors[key]
+		lspSyncCoordinators[key] = nil
+		lspSupervisorTasks[key]?.cancel()
+		lspSupervisorTasks[key] = nil
+		lspSupervisors[key] = nil
+		Task {
+			await supervisor?.stop()
+			client?.terminate()
+			await Self.lspManager.markFailed(key)
+		}
+		setLSPStatus(key: key, status: "idle", client: nil, lastError: entry?.lastError, url: entry?.url)
+	}
+
+	private func refreshLSPStatus(for document: ItsyDocument) {
+		lspStatusGeneration += 1
+		let generation = lspStatusGeneration
+		guard let fileURL = document.fileURL else {
+			activeLSPKey = nil
+			refreshStatusBar()
+			return
+		}
+		Task { [weak self] in
+			let key = await Self.lspManager.sessionKey(for: fileURL)
+			await MainActor.run { [weak self] in
+				guard let self else {
+					return
+				}
+				guard generation == self.lspStatusGeneration else {
+					return
+				}
+				self.activeLSPKey = key
+				if let key, self.lspStatusEntries[key] == nil {
+					self.setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
+				} else {
+					self.refreshStatusBar()
+				}
+			}
+		}
+	}
+
+	private func setLSPStatus(
+		key: LSPSessionKey,
+		status: String,
+		client: LSPProcessClient?,
+		lastError: String?,
+		url: URL?
+	) {
+		let existing = lspStatusEntries[key]
+		let clearsClient = status == "idle" || status == "crashed" || status == "disabled"
+		lspStatusEntries[key] = LSPStatusEntry(
+			key: key,
+			status: status,
+			server: client.map(Self.serverName(for:)) ?? existing?.server ?? key.languageID,
+			pid: client?.processIdentifier ?? existing?.pid,
+			startDate: client?.startDate ?? existing?.startDate,
+			lastError: lastError ?? existing?.lastError ?? "",
+			url: url ?? existing?.url,
+			client: client ?? (clearsClient ? nil : existing?.client)
+		)
+		activeLSPKey = key
+		if status == "crashed" || status == "disabled" {
+			lspRestartKey = key
+			lspRestartURL = url ?? existing?.url
+		}
+		refreshStatusBar()
+	}
+
+	private func refreshLSPStatusPill() {
+		guard let key = activeLSPKey, let entry = lspStatusEntries[key] else {
+			lspStatusButton.isHidden = true
+			return
+		}
+		lspStatusButton.title = L10n.string("LSP: \(entry.key.languageID) \(entry.status)")
+		lspStatusButton.toolTip = L10n.string("LSP status")
+		lspStatusButton.isHidden = false
+	}
+
+	private func currentLSPStatusSnapshot() -> LSPStatusPanelSnapshot? {
+		guard let key = activeLSPKey, let entry = lspStatusEntries[key] else {
+			return nil
+		}
+		return LSPStatusPanelSnapshot(
+			key: entry.key,
+			status: entry.status,
+			server: entry.server,
+			pid: entry.pid,
+			startDate: entry.startDate,
+			lastError: entry.lastError
+		)
+	}
+
+	private static func serverName(for client: LSPProcessClient) -> String {
+		([client.executableURL.path] + client.arguments).joined(separator: " ")
 	}
 
 	override func windowDidLoad() {
@@ -415,6 +554,7 @@ final class EditorWindowController: NSWindowController {
 			installPane(pane, document: newDocument)
 		}
 		refreshLSPMissingBanner(for: newDocument)
+		refreshLSPStatus(for: newDocument)
 		window?.title = newDocument.fileURL?.lastPathComponent ?? newDocument.displayName
 		window?.representedURL = newDocument.fileURL
 		showWindow(nil)
@@ -443,6 +583,7 @@ final class EditorWindowController: NSWindowController {
 			installPane(pane, document: document)
 		}
 		refreshLSPMissingBanner(for: document)
+		refreshLSPStatus(for: document)
 		focusEditor()
 	}
 
@@ -696,6 +837,9 @@ final class EditorWindowController: NSWindowController {
 		}
 		let client = try await Self.lspManager.ensureClient(for: url)
 		if await Self.lspManager.status(of: key) != .running {
+			await MainActor.run { [weak self] in
+				self?.setLSPStatus(key: key, status: "starting", client: client, lastError: nil, url: url)
+			}
 			do {
 				try client.start()
 			} catch LSPProcessClientError.alreadyStarted {}
@@ -713,6 +857,7 @@ final class EditorWindowController: NSWindowController {
 						return
 					}
 					self.installLSPSupervisor(for: key, client: client, url: url)
+					self.setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
 					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
 					self.clearLSPCrashStatus(for: key)
@@ -726,7 +871,11 @@ final class EditorWindowController: NSWindowController {
 			}
 		}
 		await MainActor.run { [weak self] in
-			self?.installLSPSupervisor(for: key, client: client, url: url)
+			guard let self else {
+				return
+			}
+			self.installLSPSupervisor(for: key, client: client, url: url)
+			self.setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
 		}
 		return (client, key)
 	}

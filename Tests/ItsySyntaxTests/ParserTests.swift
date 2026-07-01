@@ -96,7 +96,9 @@ import Testing
 		"markup.bold", "markup.italic", "markup.raw", "markup.quote",
 	]
 	#expect(Set(SyntaxTheme.standardCaptures).isSuperset(of: required))
+	let standardCaptures = Set(SyntaxTheme.standardCaptures)
 	for theme in [try SyntaxTheme.loadDefaultDark(), try SyntaxTheme.loadDefaultLight()] {
+		#expect(Set(theme.colors.keys).isSuperset(of: standardCaptures))
 		for capture in SyntaxTheme.standardCaptures {
 			#expect(theme.color(for: capture) != nil)
 		}

@@ -278,7 +278,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8 grammars.
 
-(A) 2026-07-01 +Phase26-Syntax @syntax id:1104 est:3h dep:1103 Update the bundled 2 themes with values for every new capture. Missing captures should fall through to a parent (`keyword.control` → `keyword`) via a `capture-fallthrough` table.
 (B) 2026-07-01 +Phase26-Syntax @syntax id:1105 est:4h dep:1104 Add 8 more bundled themes matching the capture set: `bundled:solarized-light`, `bundled:solarized-dark`, `bundled:gruvbox-light`, `bundled:gruvbox-dark`, `bundled:nord`, `bundled:catppuccin-mocha`, `bundled:catppuccin-latte`, `bundled:tokyo-night`. Each is a `.toml` in `Sources/ItsySyntax/Resources/themes/`. Attribution + license in a top-of-file comment.
 (A) 2026-07-01 +Phase26-Syntax @syntax id:1106 est:2h dep:1105 Settings window: theme popup populated from bundled + user themes (glob `~/.config/itsy/themes/*.toml`). Persist selection to `settings.toml`.
 (B) 2026-07-01 +Phase26-Syntax @syntax id:1107 est:2h dep:1102 Update `Sources/ItsyBench/main.swift` `smoke` cmd to open a `.swift` / `.zig` / `.bash` / `.sql` sample and assert non-empty highlight-span output. Prevents grammar-drop regressions.

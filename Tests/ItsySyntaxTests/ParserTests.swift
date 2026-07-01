@@ -118,6 +118,42 @@ import Testing
 	#expect(!tree.rootNode.hasError)
 }
 
+@Test func syntaxPipelineDetectsNewGrammarFiletypes() throws {
+	let cases: [(String, Language)] = [
+		("/tmp/run.sh", .bash),
+		("/tmp/build.zig", .zig),
+		("/tmp/main.swift", .swift),
+		("/tmp/query.sql", .sql),
+		("/tmp/Dockerfile", .dockerfile),
+		("/tmp/Dockerfile.dev", .dockerfile),
+		("/tmp/app.dart", .dart),
+		("/tmp/Main.kt", .kotlin),
+		("/tmp/app.exs", .elixir),
+	]
+	for (path, language) in cases {
+		#expect(SyntaxPipeline.language(forFileURL: URL(fileURLWithPath: path)) == language)
+	}
+}
+
+@Test func parserLoadsNewGrammarSymbols() throws {
+	let cases: [(Language, String)] = [
+		(.bash, "echo hi\n"),
+		(.zig, "const x: i32 = 1;\n"),
+		(.swift, "let x = 1\n"),
+		(.sql, "select 1;\n"),
+		(.dockerfile, "FROM scratch\n"),
+		(.dart, "void main() {}\n"),
+		(.kotlin, "fun main() {}\n"),
+		(.elixir, "x = 1\n"),
+	]
+	for (language, source) in cases {
+		let rope = Rope(source)
+		let tree = try Parser(language: language).parse(rope)
+		#expect(tree.rootNode.byteRange == 0 ..< rope.length)
+		#expect(!tree.rootNode.hasError)
+	}
+}
+
 @Test func syntaxPipelineIncrementalMiddleEditFitsFrameBudget() throws {
 	var editor = Editor(text: largeTypeScriptLineSetWithMiddleLine())
 	var pipeline = SyntaxPipeline(language: .typescript)

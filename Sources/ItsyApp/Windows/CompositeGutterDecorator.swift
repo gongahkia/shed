@@ -17,7 +17,8 @@ final class CompositeGutterDecorator: GutterDecorator {
 					severity: marker.severity,
 					message: marker.message,
 					color: marker.color,
-					placement: marker.placement
+					placement: marker.placement,
+					shape: marker.shape
 				)
 			}
 		}
@@ -28,6 +29,27 @@ final class CompositeGutterDecorator: GutterDecorator {
 			return
 		}
 		decorators[routed.index].gutterMarkerClicked(routed.marker, in: view)
+	}
+
+	func gutterMarkerRightClicked(_ marker: GutterMarker, in view: MetalTextView, event: NSEvent) -> Bool {
+		guard let routed = routedMarker(from: marker) else {
+			return false
+		}
+		return decorators[routed.index].gutterMarkerRightClicked(routed.marker, in: view, event: event)
+	}
+
+	func gutterLineClicked(_ line: Int, in view: MetalTextView) -> Bool {
+		for decorator in decorators where decorator.gutterLineClicked(line, in: view) {
+			return true
+		}
+		return false
+	}
+
+	func gutterLineRightClicked(_ line: Int, in view: MetalTextView, event: NSEvent) -> Bool {
+		for decorator in decorators where decorator.gutterLineRightClicked(line, in: view, event: event) {
+			return true
+		}
+		return false
 	}
 
 	func gutterPopoverViewController(for marker: GutterMarker, in view: MetalTextView) -> NSViewController? {

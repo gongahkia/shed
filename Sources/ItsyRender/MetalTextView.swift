@@ -31,6 +31,7 @@ public struct GutterMarker: Sendable, Equatable {
 	public var message: String
 	public var color: SIMD4<Float>?
 	public var placement: GutterMarkerPlacement
+	public var shape: GutterMarkerShape
 
 	public init(
 		id: String,
@@ -38,7 +39,8 @@ public struct GutterMarker: Sendable, Equatable {
 		severity: WorkspaceProblemSeverity,
 		message: String,
 		color: SIMD4<Float>? = nil,
-		placement: GutterMarkerPlacement = .line
+		placement: GutterMarkerPlacement = .line,
+		shape: GutterMarkerShape = .bar
 	) {
 		self.id = id
 		self.line = line
@@ -46,6 +48,7 @@ public struct GutterMarker: Sendable, Equatable {
 		self.message = message
 		self.color = color
 		self.placement = placement
+		self.shape = shape
 	}
 }
 
@@ -54,10 +57,32 @@ public enum GutterMarkerPlacement: Sendable, Equatable {
 	case betweenLines
 }
 
+public enum GutterMarkerShape: Sendable, Equatable {
+	case bar
+	case dot
+}
+
 public protocol GutterDecorator: AnyObject {
 	func gutterMarkers(in lineRange: Range<Int>, for view: MetalTextView) -> [GutterMarker]
 	func gutterMarkerClicked(_ marker: GutterMarker, in view: MetalTextView)
+	func gutterMarkerRightClicked(_ marker: GutterMarker, in view: MetalTextView, event: NSEvent) -> Bool
+	func gutterLineClicked(_ line: Int, in view: MetalTextView) -> Bool
+	func gutterLineRightClicked(_ line: Int, in view: MetalTextView, event: NSEvent) -> Bool
 	func gutterPopoverViewController(for marker: GutterMarker, in view: MetalTextView) -> NSViewController?
+}
+
+public extension GutterDecorator {
+	func gutterMarkerRightClicked(_ marker: GutterMarker, in view: MetalTextView, event: NSEvent) -> Bool {
+		false
+	}
+
+	func gutterLineClicked(_ line: Int, in view: MetalTextView) -> Bool {
+		false
+	}
+
+	func gutterLineRightClicked(_ line: Int, in view: MetalTextView, event: NSEvent) -> Bool {
+		false
+	}
 }
 
 public struct TextHoverCandidate: Sendable, Equatable {
@@ -536,6 +561,12 @@ public final class MetalTextView: NSView {
 			gutterDecorator?.gutterMarkerClicked(marker, in: self)
 			return
 		}
+		if let line = gutterLine(forMouseEvent: event),
+		   gutterDecorator?.gutterLineClicked(line, in: self) == true
+		{
+			mouseSelectionAnchor = nil
+			return
+		}
 		if event.modifierFlags.contains(.command) {
 			mouseSelectionAnchor = nil
 			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
@@ -570,6 +601,22 @@ public final class MetalTextView: NSView {
 		optionDragAnchor = nil
 		mouseSelectionAnchor = nil
 		super.mouseUp(with: event)
+	}
+
+	public override func rightMouseDown(with event: NSEvent) {
+		if let marker = gutterMarker(forMouseEvent: event),
+		   gutterDecorator?.gutterMarkerRightClicked(marker, in: self, event: event) == true
+		{
+			mouseSelectionAnchor = nil
+			return
+		}
+		if let line = gutterLine(forMouseEvent: event),
+		   gutterDecorator?.gutterLineRightClicked(line, in: self, event: event) == true
+		{
+			mouseSelectionAnchor = nil
+			return
+		}
+		super.rightMouseDown(with: event)
 	}
 
 	public override func mouseMoved(with event: NSEvent) {
@@ -1323,6 +1370,16 @@ public final class MetalTextView: NSView {
 				)
 				return GutterMarkerLayout(marker: marker, rect: rect)
 			}
+			if marker.shape == .dot {
+				let size = min(10, max(7, lineHeight - 8))
+				let rect = CGRect(
+					x: max(3, x - size / 2),
+					y: lineY + max(2, (lineHeight - size) / 2),
+					width: size,
+					height: size
+				)
+				return GutterMarkerLayout(marker: marker, rect: rect)
+			}
 			let markerHeight = min(12, max(6, lineHeight - 5))
 			let markerWidth: CGFloat = 4
 			let rect = CGRect(
@@ -1346,6 +1403,16 @@ public final class MetalTextView: NSView {
 
 	private func gutterMarker(forMouseEvent event: NSEvent) -> GutterMarker? {
 		gutterMarker(atLocalPoint: convert(event.locationInWindow, from: nil))
+	}
+
+	private func gutterLine(forMouseEvent event: NSEvent) -> Int? {
+		let point = convert(event.locationInWindow, from: nil)
+		guard point.x >= 0, point.x <= gutterViewWidth, lineHeight > 0 else {
+			return nil
+		}
+		let relativeY = point.y - topContentInset - textInset.y
+		let line = topLineIndex + Int(floor(relativeY / lineHeight))
+		return visibleLineRange.contains(line) ? line : nil
 	}
 
 	private func gutterMarkerRect(for id: String) -> CGRect? {

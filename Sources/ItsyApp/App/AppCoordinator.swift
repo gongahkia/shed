@@ -219,6 +219,9 @@ final class AppCoordinator: NSObject {
 					Command(id: "debug.callStack", title: L10n.string("Call Stack"), defaultKey: nil) { [weak self] in
 						self?.showDebugCallStack(nil)
 					},
+					Command(id: "debug.variables", title: L10n.string("Variables"), defaultKey: nil) { [weak self] in
+						self?.showDebugVariables(nil)
+					},
 					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
 						self?.showTerminal(nil)
 					},
@@ -316,6 +319,10 @@ final class AppCoordinator: NSObject {
 
 	@objc func showDebugCallStack(_ sender: Any?) {
 		debuggerCoordinator.showCallStack(sender)
+	}
+
+	@objc func showDebugVariables(_ sender: Any?) {
+		debuggerCoordinator.showVariables(sender)
 	}
 
 	@objc func showTerminal(_ sender: Any?) {

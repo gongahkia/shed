@@ -65,11 +65,25 @@ import Testing
 	]))
 	#expect(try await variablesTask.value == [DebugVariable(name: "value", value: "42", type: "Int", variablesReference: 0)])
 
+	let setVariableTask = Task {
+		try await debug.setVariable(variablesReference: 300, name: "value", value: "43")
+	}
+	try await transport.waitForWriteCount(4)
+	let setVariableRequest = try transport.request(at: 3)
+	#expect(setVariableRequest.command == DAPCommand.setVariable)
+	#expect(setVariableRequest.arguments == .object([
+		"name": .string("value"),
+		"value": .string("43"),
+		"variablesReference": .int(300),
+	]))
+	try await respond(client, request: setVariableRequest, body: DAPSetVariableResponseBody(value: "43", type: "Int", variablesReference: 0))
+	#expect(try await setVariableTask.value == DebugVariable(name: "value", value: "43", type: "Int", variablesReference: 0))
+
 	let evaluateTask = Task {
 		try await debug.evaluate(expression: "value", frameID: 99, context: "watch")
 	}
-	try await transport.waitForWriteCount(4)
-	let evaluateRequest = try transport.request(at: 3)
+	try await transport.waitForWriteCount(5)
+	let evaluateRequest = try transport.request(at: 4)
 	#expect(evaluateRequest.command == DAPCommand.evaluate)
 	#expect(evaluateRequest.arguments == .object([
 		"context": .string("watch"),

@@ -181,6 +181,23 @@ public actor DebugSession {
 		}
 	}
 
+	public func setVariable(variablesReference: Int, name: String, value: String) async throws -> DebugVariable {
+		let response = try await client.sendRequest(
+			command: DAPCommand.setVariable,
+			arguments: try DAPAny(encoding: DAPSetVariableArguments(variablesReference: variablesReference, name: name, value: value))
+		)
+		let body = try responseBody(response, as: DAPSetVariableResponseBody.self)
+		return DebugVariable(
+			name: name,
+			value: body.value,
+			type: body.type,
+			variablesReference: body.variablesReference ?? 0,
+			namedVariables: body.namedVariables,
+			indexedVariables: body.indexedVariables,
+			memoryReference: body.memoryReference
+		)
+	}
+
 	public func evaluate(expression: String, frameID: Int? = nil, context: String? = nil) async throws -> DebugValue {
 		let response = try await client.sendRequest(
 			command: DAPCommand.evaluate,

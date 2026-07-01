@@ -7,6 +7,9 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 	private lazy var launchCoordinator = DebugLaunchCoordinator { [weak self] session in
 		self?.debugSessionDidStart(session)
 	}
+	private lazy var variablesCoordinator = DebugVariablesCoordinator { [weak self] in
+		self?.activeSession
+	}
 	private var activeSession: DebugAppSession?
 	private var callStackPanel: NSPanel?
 	private var callStackStatusLabel: NSTextField?
@@ -30,10 +33,15 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		refreshCallStack(nil)
 	}
 
+	@objc func showVariables(_ sender: Any?) {
+		variablesCoordinator.showVariables(sender)
+	}
+
 	func terminate() {
 		callStackGeneration += 1
 		activeSession = nil
 		launchCoordinator.terminate()
+		variablesCoordinator.clear()
 	}
 
 	private func debugSessionDidStart(_ session: DebugAppSession) {
@@ -41,6 +49,7 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		if callStackPanel?.isVisible == true {
 			refreshCallStack(nil)
 		}
+		variablesCoordinator.refreshIfVisible()
 	}
 
 	private func makeCallStackPanelIfNeeded() -> NSPanel {
@@ -220,6 +229,9 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		}
 		Task {
 			await session.debugSession.focus(threadID: node.threadID, frameID: node.frame.id)
+			Task { @MainActor in
+				self.variablesCoordinator.refreshIfVisible()
+			}
 		}
 		openFrameSource(node.frame)
 		setCallStackStatus(frameStatus(node.frame), isError: false)

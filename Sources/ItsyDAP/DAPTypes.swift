@@ -15,6 +15,7 @@ public enum DAPCommand {
 	public static let stackTrace = "stackTrace"
 	public static let scopes = "scopes"
 	public static let variables = "variables"
+	public static let setVariable = "setVariable"
 	public static let continueExecution = "continue"
 	public static let next = "next"
 	public static let stepIn = "stepIn"
@@ -642,6 +643,40 @@ public struct DAPVariablesResponseBody: Codable, Equatable, Sendable {
 
 	public init(variables: [DAPVariable]) {
 		self.variables = variables
+	}
+}
+
+public struct DAPSetVariableArguments: Codable, Equatable, Sendable {
+	public var variablesReference: Int
+	public var name: String
+	public var value: String
+	public var format: DAPValueFormat?
+
+	public init(variablesReference: Int, name: String, value: String, format: DAPValueFormat? = nil) {
+		self.variablesReference = variablesReference
+		self.name = name
+		self.value = value
+		self.format = format
+	}
+}
+
+public struct DAPSetVariableResponseBody: Codable, Equatable, Sendable {
+	public var value: String
+	public var type: String?
+	public var variablesReference: Int?
+	public var namedVariables: Int?
+	public var indexedVariables: Int?
+	public var memoryReference: String?
+	public var valueLocationReference: Int?
+
+	public init(value: String, type: String? = nil, variablesReference: Int? = nil, namedVariables: Int? = nil, indexedVariables: Int? = nil, memoryReference: String? = nil, valueLocationReference: Int? = nil) {
+		self.value = value
+		self.type = type
+		self.variablesReference = variablesReference
+		self.namedVariables = namedVariables
+		self.indexedVariables = indexedVariables
+		self.memoryReference = memoryReference
+		self.valueLocationReference = valueLocationReference
 	}
 }
 

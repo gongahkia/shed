@@ -14,21 +14,29 @@ public enum SyntaxError: Error, Equatable {
 }
 
 public enum Language: Sendable, Equatable, CaseIterable {
+	case bash
 	case c
 	case cpp
 	case css
+	case dart
+	case dockerfile
+	case elixir
 	case go
 	case html
 	case javascript
 	case json
+	case kotlin
 	case markdown
 	case markdownInline
 	case python
 	case rust
+	case sql
+	case swift
 	case toml
 	case tsx
 	case typescript
 	case yaml
+	case zig
 
 	var rawLanguage: OpaquePointer? {
 		GrammarLoader.language(for: self)
@@ -36,12 +44,20 @@ public enum Language: Sendable, Equatable, CaseIterable {
 
 	fileprivate var symbolName: String {
 		switch self {
+		case .bash:
+			return "tree_sitter_bash"
 		case .c:
 			return "tree_sitter_c"
 		case .cpp:
 			return "tree_sitter_cpp"
 		case .css:
 			return "tree_sitter_css"
+		case .dart:
+			return "tree_sitter_dart"
+		case .dockerfile:
+			return "tree_sitter_dockerfile"
+		case .elixir:
+			return "tree_sitter_elixir"
 		case .go:
 			return "tree_sitter_go"
 		case .html:
@@ -50,6 +66,8 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return "tree_sitter_javascript"
 		case .json:
 			return "tree_sitter_json"
+		case .kotlin:
+			return "tree_sitter_kotlin"
 		case .markdown:
 			return "tree_sitter_markdown"
 		case .markdownInline:
@@ -58,6 +76,10 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return "tree_sitter_python"
 		case .rust:
 			return "tree_sitter_rust"
+		case .sql:
+			return "tree_sitter_sql"
+		case .swift:
+			return "tree_sitter_swift"
 		case .toml:
 			return "tree_sitter_toml"
 		case .tsx:
@@ -66,6 +88,8 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return "tree_sitter_typescript"
 		case .yaml:
 			return "tree_sitter_yaml"
+		case .zig:
+			return "tree_sitter_zig"
 		}
 	}
 
@@ -82,12 +106,20 @@ public enum Language: Sendable, Equatable, CaseIterable {
 
 	var queryResourceName: String {
 		switch self {
+		case .bash:
+			return "bash"
 		case .c:
 			return "c"
 		case .cpp:
 			return "cpp"
 		case .css:
 			return "css"
+		case .dart:
+			return "dart"
+		case .dockerfile:
+			return "dockerfile"
+		case .elixir:
+			return "elixir"
 		case .go:
 			return "go"
 		case .html:
@@ -96,6 +128,8 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return "javascript"
 		case .json:
 			return "json"
+		case .kotlin:
+			return "kotlin"
 		case .markdown:
 			return "markdown"
 		case .markdownInline:
@@ -104,12 +138,18 @@ public enum Language: Sendable, Equatable, CaseIterable {
 			return "python"
 		case .rust:
 			return "rust"
+		case .sql:
+			return "sql"
+		case .swift:
+			return "swift"
 		case .toml:
 			return "toml"
 		case .tsx, .typescript:
 			return "typescript"
 		case .yaml:
 			return "yaml"
+		case .zig:
+			return "zig"
 		}
 	}
 }
@@ -461,27 +501,43 @@ public struct SyntaxPipeline {
 	}
 
 	public static func language(forFileURL url: URL) -> Language? {
+		let filename = url.lastPathComponent.lowercased()
+		if filename == "dockerfile" || filename.hasPrefix("dockerfile.") || filename.hasSuffix(".dockerfile") {
+			return .dockerfile
+		}
 		switch url.pathExtension.lowercased() {
+		case "bash", "sh":
+			return .bash
 		case "c", "h":
 			return .c
 		case "cc", "cpp", "cxx", "hpp", "hxx":
 			return .cpp
 		case "css":
 			return .css
+		case "dart":
+			return .dart
 		case "go":
 			return .go
+		case "ex", "exs":
+			return .elixir
 		case "html", "htm":
 			return .html
 		case "js", "mjs", "cjs":
 			return .javascript
 		case "json":
 			return .json
+		case "kt", "kts":
+			return .kotlin
 		case "md", "markdown":
 			return .markdown
 		case "py":
 			return .python
 		case "rs":
 			return .rust
+		case "sql":
+			return .sql
+		case "swift":
+			return .swift
 		case "toml":
 			return .toml
 		case "tsx":
@@ -490,6 +546,8 @@ public struct SyntaxPipeline {
 			return .typescript
 		case "yaml", "yml":
 			return .yaml
+		case "zig", "zon":
+			return .zig
 		default:
 			return nil
 		}

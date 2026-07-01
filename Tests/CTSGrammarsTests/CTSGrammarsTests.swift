@@ -18,6 +18,14 @@ import Testing
 		tree_sitter_tsx(),
 		tree_sitter_typescript(),
 		tree_sitter_yaml(),
+		tree_sitter_bash(),
+		tree_sitter_zig(),
+		tree_sitter_swift(),
+		tree_sitter_sql(),
+		tree_sitter_dockerfile(),
+		tree_sitter_dart(),
+		tree_sitter_kotlin(),
+		tree_sitter_elixir(),
 	]
 	#expect(languages.allSatisfy { $0 != nil })
 }

@@ -22,6 +22,14 @@ const TSLanguage *tree_sitter_toml(void);
 const TSLanguage *tree_sitter_tsx(void);
 const TSLanguage *tree_sitter_typescript(void);
 const TSLanguage *tree_sitter_yaml(void);
+const TSLanguage *tree_sitter_bash(void);
+const TSLanguage *tree_sitter_zig(void);
+const TSLanguage *tree_sitter_swift(void);
+const TSLanguage *tree_sitter_sql(void);
+const TSLanguage *tree_sitter_dockerfile(void);
+const TSLanguage *tree_sitter_dart(void);
+const TSLanguage *tree_sitter_kotlin(void);
+const TSLanguage *tree_sitter_elixir(void);
 
 #ifdef __cplusplus
 }

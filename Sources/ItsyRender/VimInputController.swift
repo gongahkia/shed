@@ -673,11 +673,17 @@ extension MetalTextView {
 		if key.modifiers == .shift, key.value == "=" {
 			return "+"
 		}
+		if key.modifiers == .shift, key.value == "8" {
+			return "*"
+		}
+		if key.modifiers == .shift, key.value == "-" {
+			return "_"
+		}
 		guard key.modifiers.isEmpty, key.value.count == 1 else {
 			return nil
 		}
 		let value = key.value
-		if value == "\"" || value == "+" || value == "0" || ("1" ... "9").contains(value) {
+		if value == "\"" || value == "+" || value == "*" || value == "_" || value == "0" || ("1" ... "9").contains(value) {
 			return value
 		}
 		if value >= "a", value <= "z" {
@@ -755,6 +761,10 @@ extension MetalTextView {
 
 	func writeRegister(_ text: String, operation: RegisterOperation) {
 		let target = pendingRegister ?? "\""
+		defer { pendingRegister = nil }
+		if target == "_" {
+			return
+		}
 		registers["\""] = text
 		if operation == .yank {
 			registers["0"] = text
@@ -764,19 +774,21 @@ extension MetalTextView {
 			}
 			registers["1"] = text
 		}
-		if target == "+" {
+		if target == "+" || target == "*" {
 			NSPasteboard.general.clearContents()
 			NSPasteboard.general.setString(text, forType: .string)
 		} else {
 			registers[target] = text
 		}
-		pendingRegister = nil
 	}
 
 	func readRegister() -> String? {
 		let target = pendingRegister ?? "\""
 		defer { pendingRegister = nil }
-		if target == "+" {
+		if target == "_" {
+			return nil
+		}
+		if target == "+" || target == "*" {
 			return NSPasteboard.general.string(forType: .string)
 		}
 		return registers[target] ?? registers["\""]

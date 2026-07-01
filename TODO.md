@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(B) 2026-07-01 +Phase21-Refactor @refactor id:811 est:3h dep:808 Extract syntax-pipeline lifecycle + syntax theme + dirtyLineRange + refreshSyntaxHighlights from `ItsyDocument` into `Documents/DocumentSyntaxController.swift`. `ItsyDocument` gets a thin `syntax:` handle.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:812 est:3h dep:808 Extract file-watcher lifecycle (`fileWatchSource`, `restartFileWatcher`, `stopFileWatcher`, `pendingExternalChangePrompt`) into `Documents/DocumentFileWatcher.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:813 est:3h dep:808 Extract Git-gutter integration (`gitGutterDecorator`, `updateGitHunkGutter`, `scheduleGitHunkGutterRefresh`) into `Git/DocumentGitGutterController.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:814 est:4h dep:800 Split `MetalTextView.swift` (2752 LOC). Extract in-view vim state machine (`VimOperator`, `VisualMode`, `RegisterOperation`, `RecordedKey`, `TextObject`, `CharacterMotion`, `KeyDispatchResult` and all functions gated on `mode == .normal|.visual|.operatorPending`) into `Sources/ItsyRender/VimInputController.swift`. **Do not** relocate the state into a different module in this task — that ships in Phase 28.

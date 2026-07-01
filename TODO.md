@@ -300,7 +300,6 @@ Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8
 
 Goal: pull vim state out of `MetalTextView` into a testable module with no AppKit deps. This is the follow-up to id:814.
 
-(A) 2026-07-01 +Phase28-Vim @refactor id:1144 est:1h dep:1143 Checkpoint. Publish `bench/notes/vim-phase28.md` with test coverage and behavior parity notes.
 
 ---
 

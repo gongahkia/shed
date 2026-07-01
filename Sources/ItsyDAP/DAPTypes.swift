@@ -6,8 +6,11 @@ public enum DAPCommand {
 	public static let attach = "attach"
 	public static let configurationDone = "configurationDone"
 	public static let disconnect = "disconnect"
+	public static let terminate = "terminate"
 	public static let setBreakpoints = "setBreakpoints"
+	public static let setFunctionBreakpoints = "setFunctionBreakpoints"
 	public static let setExceptionBreakpoints = "setExceptionBreakpoints"
+	public static let setDataBreakpoints = "setDataBreakpoints"
 	public static let threads = "threads"
 	public static let stackTrace = "stackTrace"
 	public static let scopes = "scopes"
@@ -17,6 +20,8 @@ public enum DAPCommand {
 	public static let stepIn = "stepIn"
 	public static let stepOut = "stepOut"
 	public static let pause = "pause"
+	public static let reverseContinue = "reverseContinue"
+	public static let restart = "restart"
 	public static let evaluate = "evaluate"
 }
 
@@ -94,6 +99,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 	public var supportsModulesRequest: Bool?
 	public var supportsRestartRequest: Bool?
 	public var supportsExceptionInfoRequest: Bool?
+	public var supportsExceptionOptions: Bool?
 	public var supportsDelayedStackTraceLoading: Bool?
 	public var supportsLoadedSourcesRequest: Bool?
 	public var supportsLogPoints: Bool?
@@ -101,6 +107,11 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 	public var supportsSetExpression: Bool?
 	public var supportsTerminateRequest: Bool?
 	public var supportsDataBreakpoints: Bool?
+	public var supportsDataBreakpointBytes: Bool?
+	public var supportsValueFormattingOptions: Bool?
+	public var supportsExceptionFilterOptions: Bool?
+	public var supportTerminateDebuggee: Bool?
+	public var supportSuspendDebuggee: Bool?
 	public var supportsReadMemoryRequest: Bool?
 	public var supportsWriteMemoryRequest: Bool?
 	public var supportsDisassembleRequest: Bool?
@@ -125,6 +136,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		supportsModulesRequest: Bool? = nil,
 		supportsRestartRequest: Bool? = nil,
 		supportsExceptionInfoRequest: Bool? = nil,
+		supportsExceptionOptions: Bool? = nil,
 		supportsDelayedStackTraceLoading: Bool? = nil,
 		supportsLoadedSourcesRequest: Bool? = nil,
 		supportsLogPoints: Bool? = nil,
@@ -132,6 +144,11 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		supportsSetExpression: Bool? = nil,
 		supportsTerminateRequest: Bool? = nil,
 		supportsDataBreakpoints: Bool? = nil,
+		supportsDataBreakpointBytes: Bool? = nil,
+		supportsValueFormattingOptions: Bool? = nil,
+		supportsExceptionFilterOptions: Bool? = nil,
+		supportTerminateDebuggee: Bool? = nil,
+		supportSuspendDebuggee: Bool? = nil,
 		supportsReadMemoryRequest: Bool? = nil,
 		supportsWriteMemoryRequest: Bool? = nil,
 		supportsDisassembleRequest: Bool? = nil,
@@ -155,6 +172,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		self.supportsModulesRequest = supportsModulesRequest
 		self.supportsRestartRequest = supportsRestartRequest
 		self.supportsExceptionInfoRequest = supportsExceptionInfoRequest
+		self.supportsExceptionOptions = supportsExceptionOptions
 		self.supportsDelayedStackTraceLoading = supportsDelayedStackTraceLoading
 		self.supportsLoadedSourcesRequest = supportsLoadedSourcesRequest
 		self.supportsLogPoints = supportsLogPoints
@@ -162,6 +180,11 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		self.supportsSetExpression = supportsSetExpression
 		self.supportsTerminateRequest = supportsTerminateRequest
 		self.supportsDataBreakpoints = supportsDataBreakpoints
+		self.supportsDataBreakpointBytes = supportsDataBreakpointBytes
+		self.supportsValueFormattingOptions = supportsValueFormattingOptions
+		self.supportsExceptionFilterOptions = supportsExceptionFilterOptions
+		self.supportTerminateDebuggee = supportTerminateDebuggee
+		self.supportSuspendDebuggee = supportSuspendDebuggee
 		self.supportsReadMemoryRequest = supportsReadMemoryRequest
 		self.supportsWriteMemoryRequest = supportsWriteMemoryRequest
 		self.supportsDisassembleRequest = supportsDisassembleRequest
@@ -170,6 +193,88 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		self.supportsSteppingGranularity = supportsSteppingGranularity
 		self.supportsInstructionBreakpoints = supportsInstructionBreakpoints
 		self.supportsSingleThreadExecutionRequests = supportsSingleThreadExecutionRequests
+	}
+}
+
+public typealias DAPInitializeResponseBody = DAPCapabilities
+
+public struct DAPConfigurationDoneArguments: Codable, Equatable, Sendable {
+	public init() {}
+}
+
+public struct DAPLaunchRequestArguments: Codable, Equatable, Sendable {
+	public var noDebug: Bool?
+	public var restartData: DAPAny?
+	public var program: String?
+	public var args: [String]?
+	public var cwd: String?
+	public var env: [String: String]?
+	public var stopOnEntry: Bool?
+
+	private enum CodingKeys: String, CodingKey {
+		case noDebug
+		case restartData = "__restart"
+		case program
+		case args
+		case cwd
+		case env
+		case stopOnEntry
+	}
+
+	public init(noDebug: Bool? = nil, restartData: DAPAny? = nil, program: String? = nil, args: [String]? = nil, cwd: String? = nil, env: [String: String]? = nil, stopOnEntry: Bool? = nil) {
+		self.noDebug = noDebug
+		self.restartData = restartData
+		self.program = program
+		self.args = args
+		self.cwd = cwd
+		self.env = env
+		self.stopOnEntry = stopOnEntry
+	}
+}
+
+public struct DAPAttachRequestArguments: Codable, Equatable, Sendable {
+	public var restartData: DAPAny?
+	public var pid: Int?
+	public var program: String?
+
+	private enum CodingKeys: String, CodingKey {
+		case restartData = "__restart"
+		case pid
+		case program
+	}
+
+	public init(restartData: DAPAny? = nil, pid: Int? = nil, program: String? = nil) {
+		self.restartData = restartData
+		self.pid = pid
+		self.program = program
+	}
+}
+
+public struct DAPRestartArguments: Codable, Equatable, Sendable {
+	public var arguments: DAPAny?
+
+	public init(arguments: DAPAny? = nil) {
+		self.arguments = arguments
+	}
+}
+
+public struct DAPDisconnectArguments: Codable, Equatable, Sendable {
+	public var restart: Bool?
+	public var terminateDebuggee: Bool?
+	public var suspendDebuggee: Bool?
+
+	public init(restart: Bool? = nil, terminateDebuggee: Bool? = nil, suspendDebuggee: Bool? = nil) {
+		self.restart = restart
+		self.terminateDebuggee = terminateDebuggee
+		self.suspendDebuggee = suspendDebuggee
+	}
+}
+
+public struct DAPTerminateArguments: Codable, Equatable, Sendable {
+	public var restart: Bool?
+
+	public init(restart: Bool? = nil) {
+		self.restart = restart
 	}
 }
 
@@ -273,6 +378,102 @@ public struct DAPSetBreakpointsResponseBody: Codable, Equatable, Sendable {
 	}
 }
 
+public struct DAPFunctionBreakpoint: Codable, Equatable, Sendable {
+	public var name: String
+	public var condition: String?
+	public var hitCondition: String?
+
+	public init(name: String, condition: String? = nil, hitCondition: String? = nil) {
+		self.name = name
+		self.condition = condition
+		self.hitCondition = hitCondition
+	}
+}
+
+public struct DAPSetFunctionBreakpointsArguments: Codable, Equatable, Sendable {
+	public var breakpoints: [DAPFunctionBreakpoint]
+
+	public init(breakpoints: [DAPFunctionBreakpoint]) {
+		self.breakpoints = breakpoints
+	}
+}
+
+public typealias DAPSetFunctionBreakpointsResponseBody = DAPSetBreakpointsResponseBody
+
+public struct DAPExceptionFilterOptions: Codable, Equatable, Sendable {
+	public var filterId: String
+	public var condition: String?
+
+	public init(filterId: String, condition: String? = nil) {
+		self.filterId = filterId
+		self.condition = condition
+	}
+}
+
+public struct DAPExceptionPathSegment: Codable, Equatable, Sendable {
+	public var negate: Bool?
+	public var names: [String]
+
+	public init(negate: Bool? = nil, names: [String]) {
+		self.negate = negate
+		self.names = names
+	}
+}
+
+public struct DAPExceptionOptions: Codable, Equatable, Sendable {
+	public var path: [DAPExceptionPathSegment]?
+	public var breakMode: String
+
+	public init(path: [DAPExceptionPathSegment]? = nil, breakMode: String) {
+		self.path = path
+		self.breakMode = breakMode
+	}
+}
+
+public struct DAPSetExceptionBreakpointsArguments: Codable, Equatable, Sendable {
+	public var filters: [String]
+	public var filterOptions: [DAPExceptionFilterOptions]?
+	public var exceptionOptions: [DAPExceptionOptions]?
+
+	public init(filters: [String], filterOptions: [DAPExceptionFilterOptions]? = nil, exceptionOptions: [DAPExceptionOptions]? = nil) {
+		self.filters = filters
+		self.filterOptions = filterOptions
+		self.exceptionOptions = exceptionOptions
+	}
+}
+
+public struct DAPSetExceptionBreakpointsResponseBody: Codable, Equatable, Sendable {
+	public var breakpoints: [DAPBreakpoint]?
+
+	public init(breakpoints: [DAPBreakpoint]? = nil) {
+		self.breakpoints = breakpoints
+	}
+}
+
+public struct DAPDataBreakpoint: Codable, Equatable, Sendable {
+	public var dataId: String
+	public var accessType: String?
+	public var condition: String?
+	public var hitCondition: String?
+
+	public init(dataId: String, accessType: String? = nil, condition: String? = nil, hitCondition: String? = nil) {
+		self.dataId = dataId
+		self.accessType = accessType
+		self.condition = condition
+		self.hitCondition = hitCondition
+	}
+}
+
+public struct DAPSetDataBreakpointsArguments: Codable, Equatable, Sendable {
+	public var breakpoints: [DAPDataBreakpoint]
+
+	public init(breakpoints: [DAPDataBreakpoint]) {
+		self.breakpoints = breakpoints
+	}
+}
+
+public typealias DAPSetDataBreakpointsResponseBody = DAPSetBreakpointsResponseBody
+
 public struct DAPThread: Codable, Equatable, Sendable {
 	public var id: Int
 	public var name: String
@@ -291,15 +492,47 @@ public struct DAPThreadsResponseBody: Codable, Equatable, Sendable {
 	}
 }
 
+public struct DAPValueFormat: Codable, Equatable, Sendable {
+	public var hex: Bool?
+
+	public init(hex: Bool? = nil) {
+		self.hex = hex
+	}
+}
+
+public struct DAPStackFrameFormat: Codable, Equatable, Sendable {
+	public var hex: Bool?
+	public var parameters: Bool?
+	public var parameterTypes: Bool?
+	public var parameterNames: Bool?
+	public var parameterValues: Bool?
+	public var line: Bool?
+	public var module: Bool?
+	public var includeAll: Bool?
+
+	public init(hex: Bool? = nil, parameters: Bool? = nil, parameterTypes: Bool? = nil, parameterNames: Bool? = nil, parameterValues: Bool? = nil, line: Bool? = nil, module: Bool? = nil, includeAll: Bool? = nil) {
+		self.hex = hex
+		self.parameters = parameters
+		self.parameterTypes = parameterTypes
+		self.parameterNames = parameterNames
+		self.parameterValues = parameterValues
+		self.line = line
+		self.module = module
+		self.includeAll = includeAll
+	}
+}
+
 public struct DAPStackTraceArguments: Codable, Equatable, Sendable {
 	public var threadId: Int
 	public var startFrame: Int?
 	public var levels: Int?
+	public var format: DAPStackFrameFormat?
 
-	public init(threadId: Int, startFrame: Int? = nil, levels: Int? = nil) {
+	public init(threadId: Int, startFrame: Int? = nil, levels: Int? = nil, format: DAPStackFrameFormat? = nil) {
 		self.threadId = threadId
 		self.startFrame = startFrame
 		self.levels = levels
+		self.format = format
 	}
 }
 
@@ -370,12 +603,14 @@ public struct DAPVariablesArguments: Codable, Equatable, Sendable {
 	public var filter: String?
 	public var start: Int?
 	public var count: Int?
+	public var format: DAPValueFormat?
 
-	public init(variablesReference: Int, filter: String? = nil, start: Int? = nil, count: Int? = nil) {
+	public init(variablesReference: Int, filter: String? = nil, start: Int? = nil, count: Int? = nil, format: DAPValueFormat? = nil) {
 		self.variablesReference = variablesReference
 		self.filter = filter
 		self.start = start
 		self.count = count
+		self.format = format
 	}
 }
 
@@ -407,6 +642,62 @@ public struct DAPVariablesResponseBody: Codable, Equatable, Sendable {
 	}
 }
 
+public struct DAPVariablePresentationHint: Codable, Equatable, Sendable {
+	public var kind: String?
+	public var attributes: [String]?
+	public var visibility: String?
+	public var lazy: Bool?
+
+	public init(kind: String? = nil, attributes: [String]? = nil, visibility: String? = nil, lazy: Bool? = nil) {
+		self.kind = kind
+		self.attributes = attributes
+		self.visibility = visibility
+		self.lazy = lazy
+	}
+}
+
+public struct DAPEvaluateArguments: Codable, Equatable, Sendable {
+	public var expression: String
+	public var frameId: Int?
+	public var line: Int?
+	public var column: Int?
+	public var source: DAPSource?
+	public var context: String?
+	public var format: DAPValueFormat?
+
+	public init(expression: String, frameId: Int? = nil, line: Int? = nil, column: Int? = nil, source: DAPSource? = nil, context: String? = nil, format: DAPValueFormat? = nil) {
+		self.expression = expression
+		self.frameId = frameId
+		self.line = line
+		self.column = column
+		self.source = source
+		self.context = context
+		self.format = format
+	}
+}
+
+public struct DAPEvaluateResponseBody: Codable, Equatable, Sendable {
+	public var result: String
+	public var type: String?
+	public var presentationHint: DAPVariablePresentationHint?
+	public var variablesReference: Int
+	public var namedVariables: Int?
+	public var indexedVariables: Int?
+	public var memoryReference: String?
+	public var valueLocationReference: Int?
+
+	public init(result: String, type: String? = nil, presentationHint: DAPVariablePresentationHint? = nil, variablesReference: Int, namedVariables: Int? = nil, indexedVariables: Int? = nil, memoryReference: String? = nil, valueLocationReference: Int? = nil) {
+		self.result = result
+		self.type = type
+		self.presentationHint = presentationHint
+		self.variablesReference = variablesReference
+		self.namedVariables = namedVariables
+		self.indexedVariables = indexedVariables
+		self.memoryReference = memoryReference
+		self.valueLocationReference = valueLocationReference
+	}
+}
+
 public struct DAPContinueArguments: Codable, Equatable, Sendable {
 	public var threadId: Int
 	public var singleThread: Bool?
@@ -422,6 +713,68 @@ public struct DAPContinueResponseBody: Codable, Equatable, Sendable {
 
 	public init(allThreadsContinued: Bool? = nil) {
 		self.allThreadsContinued = allThreadsContinued
+	}
+}
+
+public enum DAPSteppingGranularity {
+	public static let statement = "statement"
+	public static let line = "line"
+	public static let instruction = "instruction"
+}
+
+public struct DAPNextArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var singleThread: Bool?
+	public var granularity: String?
+
+	public init(threadId: Int, singleThread: Bool? = nil, granularity: String? = nil) {
+		self.threadId = threadId
+		self.singleThread = singleThread
+		self.granularity = granularity
+	}
+}
+
+public struct DAPStepInArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var singleThread: Bool?
+	public var targetId: Int?
+	public var granularity: String?
+
+	public init(threadId: Int, singleThread: Bool? = nil, targetId: Int? = nil, granularity: String? = nil) {
+		self.threadId = threadId
+		self.singleThread = singleThread
+		self.targetId = targetId
+		self.granularity = granularity
+	}
+}
+
+public struct DAPStepOutArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var singleThread: Bool?
+	public var granularity: String?
+
+	public init(threadId: Int, singleThread: Bool? = nil, granularity: String? = nil) {
+		self.threadId = threadId
+		self.singleThread = singleThread
+		self.granularity = granularity
+	}
+}
+
+public struct DAPPauseArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+
+	public init(threadId: Int) {
+		self.threadId = threadId
+	}
+}
+
+public struct DAPReverseContinueArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var singleThread: Bool?
+
+	public init(threadId: Int, singleThread: Bool? = nil) {
+		self.threadId = threadId
+		self.singleThread = singleThread
 	}
 }
 

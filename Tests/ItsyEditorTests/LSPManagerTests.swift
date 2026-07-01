@@ -54,7 +54,16 @@ import Testing
 	} catch let error as LSPManagerError {
 		#expect(error == .retryLimitExceeded)
 	}
-	#expect(await manager.status(of: key) == .failed)
+	#expect(await manager.status(of: key) == .disabled)
+	do {
+		_ = try await manager.ensureClient(for: url, now: now.addingTimeInterval(5))
+		Issue.record("expected serverDisabled")
+	} catch let error as LSPManagerError {
+		#expect(error == .serverDisabled(key))
+	}
+	await manager.enableSession(key)
+	_ = try await manager.ensureClient(for: url, now: now.addingTimeInterval(6))
+	#expect(await manager.status(of: key) == .starting)
 }
 
 @Test func lspManagerAllowsRetryAfterWindowExpires() async throws {

@@ -14,6 +14,8 @@ public enum LSPProcessTransportEvent: Equatable, Sendable {
 
 public final class LSPProcessTransport: LSPClientTransport, @unchecked Sendable {
 	public let events: AsyncStream<LSPProcessTransportEvent>
+	public let executableURL: URL
+	public let arguments: [String]
 
 	private let continuation: AsyncStream<LSPProcessTransportEvent>.Continuation
 	private let process: Process
@@ -24,8 +26,11 @@ public final class LSPProcessTransport: LSPClientTransport, @unchecked Sendable 
 	private var started = false
 	private var stopped = false
 	private var finished = false
+	private var startedAt: Date?
 
 	public init(executableURL: URL, arguments: [String] = [], currentDirectoryURL: URL? = nil, environment: [String: String]? = nil) {
+		self.executableURL = executableURL
+		self.arguments = arguments
 		var capturedContinuation: AsyncStream<LSPProcessTransportEvent>.Continuation?
 		events = AsyncStream { continuation in
 			capturedContinuation = continuation
@@ -39,6 +44,21 @@ public final class LSPProcessTransport: LSPClientTransport, @unchecked Sendable 
 		process.standardInput = stdinPipe
 		process.standardOutput = stdoutPipe
 		process.standardError = stderrPipe
+	}
+
+	public var processIdentifier: Int32? {
+		lock.lock()
+		let isStarted = started
+		let isFinished = finished
+		lock.unlock()
+		return isStarted && !isFinished ? process.processIdentifier : nil
+	}
+
+	public var startDate: Date? {
+		lock.lock()
+		let value = startedAt
+		lock.unlock()
+		return value
 	}
 
 	deinit {
@@ -67,6 +87,9 @@ public final class LSPProcessTransport: LSPClientTransport, @unchecked Sendable 
 
 		do {
 			try process.run()
+			lock.lock()
+			startedAt = Date()
+			lock.unlock()
 		} catch {
 			clearHandlers()
 			lock.lock()

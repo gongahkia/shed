@@ -61,6 +61,22 @@ public final class LSPProcessClient: @unchecked Sendable {
 		continuation = capturedContinuation!
 	}
 
+	public var executableURL: URL {
+		transport.executableURL
+	}
+
+	public var arguments: [String] {
+		transport.arguments
+	}
+
+	public var processIdentifier: Int32? {
+		transport.processIdentifier
+	}
+
+	public var startDate: Date? {
+		transport.startDate
+	}
+
 	deinit {
 		pumpTask?.cancel()
 		transport.terminate()

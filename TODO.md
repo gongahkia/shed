@@ -300,7 +300,6 @@ Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8
 
 Goal: pull vim state out of `MetalTextView` into a testable module with no AppKit deps. This is the follow-up to id:814.
 
-(B) 2026-07-01 +Phase28-Vim @keymap id:1143 est:2h dep:1142 Add `ItsyVim` fuzz test: random 500-key sequences on a random buffer must not throw, must leave buffer + selection in a consistent state (via `SelectionSet.validate` from id:963).
 (A) 2026-07-01 +Phase28-Vim @refactor id:1144 est:1h dep:1143 Checkpoint. Publish `bench/notes/vim-phase28.md` with test coverage and behavior parity notes.
 
 ---

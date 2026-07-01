@@ -83,6 +83,44 @@ import Testing
 	#expect(parsed.color(for: "variable.parameter") == parameter)
 }
 
+@Test func syntaxThemeCoversStandardCaptureSetWithFallbacks() throws {
+	let required: Set<String> = [
+		"keyword.control", "keyword.function", "keyword.operator", "keyword.return",
+		"type.builtin", "type.parameter", "function.builtin", "function.macro", "function.method",
+		"variable.builtin", "variable.member", "constant.builtin", "constant.macro",
+		"string.escape", "string.regexp", "string.special", "number.float", "boolean",
+		"character", "character.special", "comment.documentation", "punctuation.bracket",
+		"punctuation.delimiter", "punctuation.special", "operator", "attribute", "tag",
+		"label", "namespace", "module", "property", "field", "parameter", "error",
+		"diff.plus", "diff.minus", "markup.heading", "markup.link", "markup.list",
+		"markup.bold", "markup.italic", "markup.raw", "markup.quote",
+	]
+	#expect(Set(SyntaxTheme.standardCaptures).isSuperset(of: required))
+	for theme in [try SyntaxTheme.loadDefaultDark(), try SyntaxTheme.loadDefaultLight()] {
+		for capture in SyntaxTheme.standardCaptures {
+			#expect(theme.color(for: capture) != nil)
+		}
+	}
+
+	let control = try SyntaxColor(hex: "#222222")
+	let constant = try SyntaxColor(hex: "#333333")
+	let member = try SyntaxColor(hex: "#555555")
+	let heading = try SyntaxColor(hex: "#777777")
+	let parsed = try SyntaxTheme.parse(#"""
+"keyword" = "#111111"
+"keyword.control" = "#222222"
+"constant" = "#333333"
+"variable" = "#444444"
+"variable.member" = "#555555"
+"string" = "#666666"
+"markup.heading" = "#777777"
+"""#)
+	#expect(parsed.color(for: "keyword.return") == control)
+	#expect(parsed.color(for: "boolean") == constant)
+	#expect(parsed.color(for: "field") == member)
+	#expect(parsed.color(for: "text.title") == heading)
+}
+
 @Test func syntaxThemeListsAndLoadsSelectedBundledChoice() throws {
 	let choices = SyntaxTheme.availableChoices()
 	#expect(choices.contains(SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark")))

@@ -11,12 +11,14 @@ public struct PieceTree: Sendable {
 		public var start: Int
 		public var length: Int
 		public var lineFeeds: Int
+		public var graphemes: Int
 
-		public init(buffer: BufferID, start: Int, length: Int, lineFeeds: Int) {
+		public init(buffer: BufferID, start: Int, length: Int, lineFeeds: Int, graphemes: Int? = nil) {
 			self.buffer = buffer
 			self.start = start
 			self.length = length
 			self.lineFeeds = lineFeeds
+			self.graphemes = graphemes ?? length
 		}
 	}
 
@@ -40,7 +42,13 @@ public struct PieceTree: Sendable {
 		if bytes.isEmpty {
 			root = nil
 		} else {
-			let piece = Piece(buffer: .original(0), start: 0, length: bytes.count, lineFeeds: Self.lineFeeds(in: bytes))
+			let piece = Piece(
+				buffer: .original(0),
+				start: 0,
+				length: bytes.count,
+				lineFeeds: Self.lineFeeds(in: bytes),
+				graphemes: Self.graphemes(in: bytes)
+			)
 			root = Self.buildTree(from: [piece])
 		}
 	}
@@ -53,7 +61,13 @@ public struct PieceTree: Sendable {
 			root = nil
 		} else {
 			let lineStarts = LineFeedIndexer.lineStarts(in: mapped.bytes)
-			let piece = Piece(buffer: .original(0), start: 0, length: mapped.count, lineFeeds: lineStarts.count - 1)
+			let piece = Piece(
+				buffer: .original(0),
+				start: 0,
+				length: mapped.count,
+				lineFeeds: lineStarts.count - 1,
+				graphemes: Self.graphemes(in: mapped.bytes)
+			)
 			root = Self.buildTree(from: [piece])
 		}
 	}
@@ -64,6 +78,10 @@ public struct PieceTree: Sendable {
 
 	public var lineCount: Int {
 		(root?.summary.lineFeeds ?? 0) + 1
+	}
+
+	public var graphemeCount: Int {
+		root?.summary.graphemes ?? 0
 	}
 
 	public func substring(_ range: Range<Int>) -> String {
@@ -91,6 +109,14 @@ public struct PieceTree: Sendable {
 			return 0
 		}
 		return lineFeedCount(before: offset, in: root)
+	}
+
+	public func graphemeIndex(forOffset offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard let root else {
+			return 0
+		}
+		return graphemeCount(before: offset, in: root)
 	}
 
 	public func offset(forLine line: Int) -> Int {
@@ -189,7 +215,13 @@ public struct PieceTree: Sendable {
 	private mutating func appendAddPiece(_ bytes: [UInt8]) -> Piece {
 		let index = addBuffers.count
 		addBuffers.append(bytes)
-		return Piece(buffer: .add(index), start: 0, length: bytes.count, lineFeeds: Self.lineFeeds(in: bytes))
+		return Piece(
+			buffer: .add(index),
+			start: 0,
+			length: bytes.count,
+			lineFeeds: Self.lineFeeds(in: bytes),
+			graphemes: Self.graphemes(in: bytes)
+		)
 	}
 
 	private mutating func rebuild(from pieces: [Piece]) {
@@ -221,7 +253,8 @@ public struct PieceTree: Sendable {
 			buffer: piece.buffer,
 			start: piece.start + localRange.lowerBound,
 			length: localRange.count,
-			lineFeeds: lineFeeds(in: piece, localRange: localRange)
+			lineFeeds: lineFeeds(in: piece, localRange: localRange),
+			graphemes: graphemes(in: piece, localRange: localRange)
 		)
 	}
 
@@ -232,6 +265,7 @@ public struct PieceTree: Sendable {
 			if var last = result.last, last.buffer == piece.buffer, last.start + last.length == piece.start {
 				last.length += piece.length
 				last.lineFeeds += piece.lineFeeds
+				last.graphemes += piece.graphemes
 				result[result.count - 1] = last
 			} else {
 				result.append(piece)
@@ -291,6 +325,23 @@ public struct PieceTree: Sendable {
 		return lines + lineFeedCount(before: local - node.piece.length, in: right)
 	}
 
+	private func graphemeCount(before offset: Int, in node: PieceTreeNode) -> Int {
+		let leftBytes = node.left?.summary.bytes ?? 0
+		if offset <= leftBytes, let left = node.left {
+			return graphemeCount(before: offset, in: left)
+		}
+		var graphemes = node.left?.summary.graphemes ?? 0
+		let local = offset - leftBytes
+		if local <= node.piece.length {
+			return graphemes + graphemeIndex(in: node.piece, before: local)
+		}
+		graphemes += node.piece.graphemes
+		guard let right = node.right else {
+			return graphemes
+		}
+		return graphemes + graphemeCount(before: local - node.piece.length, in: right)
+	}
+
 	private func offset(afterLineFeeds target: Int, in node: PieceTreeNode, baseOffset: Int) -> Int? {
 		let leftBytes = node.left?.summary.bytes ?? 0
 		let leftFeeds = node.left?.summary.lineFeeds ?? 0
@@ -338,6 +389,24 @@ public struct PieceTree: Sendable {
 		return count
 	}
 
+	private func graphemes(in piece: Piece, localRange: Range<Int>) -> Int {
+		var count = 0
+		_ = withPieceBytes(piece, localRange) { buffer in
+			count = Self.graphemes(in: buffer)
+			return true
+		}
+		return count
+	}
+
+	private func graphemeIndex(in piece: Piece, before offset: Int) -> Int {
+		var count = 0
+		_ = withPieceBytes(piece, 0 ..< piece.length) { buffer in
+			count = Self.graphemes(in: buffer, before: offset)
+			return true
+		}
+		return count
+	}
+
 	private func byte(in piece: Piece, at localOffset: Int) -> UInt8 {
 		var byte: UInt8 = 0
 		_ = withPieceBytes(piece, localOffset ..< localOffset + 1) { buffer in
@@ -365,6 +434,38 @@ public struct PieceTree: Sendable {
 	private static func lineFeeds(in bytes: [UInt8]) -> Int {
 		bytes.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
 	}
+
+	private static func graphemes(in bytes: [UInt8]) -> Int {
+		bytes.withUnsafeBufferPointer {
+			graphemes(in: $0)
+		}
+	}
+
+	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>) -> Int {
+		if bytes.allSatisfy({ $0 < 128 }) {
+			return bytes.count
+		}
+		return String(decoding: Array(bytes), as: UTF8.self).count
+	}
+
+	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>, before offset: Int) -> Int {
+		precondition((0 ... bytes.count).contains(offset), "grapheme offset out of bounds")
+		if bytes.allSatisfy({ $0 < 128 }) {
+			return offset
+		}
+		let text = String(decoding: Array(bytes), as: UTF8.self)
+		var bytesSeen = 0
+		var graphemes = 0
+		for character in text {
+			let next = bytesSeen + String(character).utf8.count
+			if offset < next {
+				return graphemes
+			}
+			bytesSeen = next
+			graphemes += 1
+		}
+		return graphemes
+	}
 }
 
 private enum PieceTreeOriginalBuffer: Sendable {
@@ -389,21 +490,28 @@ private enum PieceTreeColor: Sendable {
 private struct PieceTreeSummary: Sendable {
 	var bytes: Int
 	var lineFeeds: Int
+	var graphemes: Int
 
-	static let zero = PieceTreeSummary(bytes: 0, lineFeeds: 0)
+	static let zero = PieceTreeSummary(bytes: 0, lineFeeds: 0, graphemes: 0)
 
-	init(bytes: Int, lineFeeds: Int) {
+	init(bytes: Int, lineFeeds: Int, graphemes: Int) {
 		self.bytes = bytes
 		self.lineFeeds = lineFeeds
+		self.graphemes = graphemes
 	}
 
 	init(_ piece: PieceTree.Piece) {
 		bytes = piece.length
 		lineFeeds = piece.lineFeeds
+		graphemes = piece.graphemes
 	}
 
 	static func + (lhs: PieceTreeSummary, rhs: PieceTreeSummary) -> PieceTreeSummary {
-		PieceTreeSummary(bytes: lhs.bytes + rhs.bytes, lineFeeds: lhs.lineFeeds + rhs.lineFeeds)
+		PieceTreeSummary(
+			bytes: lhs.bytes + rhs.bytes,
+			lineFeeds: lhs.lineFeeds + rhs.lineFeeds,
+			graphemes: lhs.graphemes + rhs.graphemes
+		)
 	}
 }
 

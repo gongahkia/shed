@@ -6,12 +6,27 @@ import Testing
 	let tree = PieceTree("alpha\nbeta\ngamma")
 	#expect(tree.length == "alpha\nbeta\ngamma".utf8.count)
 	#expect(tree.lineCount == 3)
+	#expect(tree.graphemeCount == tree.length)
 	#expect(tree.substring(0 ..< 5) == "alpha")
 	#expect(tree.utf8Byte(at: 5) == 10)
 	#expect(tree.line(forOffset: 0) == 0)
 	#expect(tree.line(forOffset: 6) == 1)
 	#expect(tree.offset(forLine: 2) == 11)
 	#expect(tree.lineRange(1) == 6 ..< 10)
+}
+
+@Test func pieceTreeTracksGraphemeSummariesByUTF8Offset() {
+	let text = "aé🇸🇬e\u{301}"
+	var tree = PieceTree(text)
+	tree.insert("👋🏽", at: tree.length)
+	let expected = text + "👋🏽"
+	#expect(tree.graphemeCount == expected.count)
+	var offset = 0
+	for (index, character) in expected.enumerated() {
+		offset += String(character).utf8.count
+		#expect(tree.graphemeIndex(forOffset: offset) == index + 1)
+	}
+	#expect(tree.graphemeIndex(forOffset: 1) == 1)
 }
 
 @Test func pieceTreeInsertSplitsOriginalAndAddsBufferPiece() {
@@ -87,6 +102,7 @@ import Testing
 	}
 	#expect(tree.length == oracle.count)
 	#expect(tree.lineCount == oracle.reduce(1) { $1 == 10 ? $0 + 1 : $0 })
+	#expect(tree.graphemeCount == oracle.count)
 	#expect(Array(tree.substring(0 ..< tree.length).utf8) == oracle)
 }
 
@@ -108,6 +124,7 @@ import Testing
 	}
 	#expect(tree.length == oracle.count)
 	#expect(tree.lineCount == oracle.reduce(1) { $1 == 10 ? $0 + 1 : $0 })
+	#expect(tree.graphemeCount == oracle.count)
 	#expect(Array(tree.substring(0 ..< tree.length).utf8) == oracle)
 }
 

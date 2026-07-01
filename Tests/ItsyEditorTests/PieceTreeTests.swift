@@ -34,6 +34,16 @@ import Testing
 	#expect(tree.offset(forLine: 1) == 3)
 }
 
+@Test func pieceTreeRemoveCoalescesOriginalNeighbors() {
+	var tree = PieceTree("abcdef")
+	tree.insert("XX", at: 3)
+	tree.remove(3 ..< 5)
+	#expect(tree.substring(0 ..< tree.length) == "abcdef")
+	#expect(tree.debugPieces() == [
+		PieceTree.Piece(buffer: .original(0), start: 0, length: 6, lineFeeds: 0),
+	])
+}
+
 @Test func pieceTreeIteratesContiguousByteSpansFromOffset() {
 	var tree = PieceTree("abc")
 	tree.insert("DEF", at: 1)
@@ -74,6 +84,27 @@ import Testing
 		let offset = rng.nextInt(oracle.count + 1)
 		tree.insert([byte], at: offset)
 		oracle.insert(byte, at: offset)
+	}
+	#expect(tree.length == oracle.count)
+	#expect(tree.lineCount == oracle.reduce(1) { $1 == 10 ? $0 + 1 : $0 })
+	#expect(Array(tree.substring(0 ..< tree.length).utf8) == oracle)
+}
+
+@Test func pieceTreeRandomInsertDeletePairsMatchByteOracle() {
+	var rng = PieceTreeTestRNG(0xBEEFED)
+	var tree = PieceTree()
+	var oracle: [UInt8] = []
+	for _ in 0 ..< 100_000 {
+		let byte: UInt8 = rng.nextInt(19) == 0 ? 10 : UInt8(65 + rng.nextInt(26))
+		let insertOffset = rng.nextInt(oracle.count + 1)
+		tree.insert([byte], at: insertOffset)
+		oracle.insert(byte, at: insertOffset)
+		if oracle.count > 256 || rng.nextInt(3) == 0 {
+			let lower = rng.nextInt(oracle.count)
+			let length = min(1 + rng.nextInt(8), oracle.count - lower)
+			tree.remove(lower ..< lower + length)
+			oracle.removeSubrange(lower ..< lower + length)
+		}
 	}
 	#expect(tree.length == oracle.count)
 	#expect(tree.lineCount == oracle.reduce(1) { $1 == 10 ? $0 + 1 : $0 })

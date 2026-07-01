@@ -198,6 +198,56 @@ public actor DebugSession {
 		)
 	}
 
+	@discardableResult
+	public func continueExecution(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.continueExecution,
+			arguments: try DAPAny(encoding: DAPContinueArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func next(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.next,
+			arguments: try DAPAny(encoding: DAPNextArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func stepIn(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.stepIn,
+			arguments: try DAPAny(encoding: DAPStepInArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func stepOut(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.stepOut,
+			arguments: try DAPAny(encoding: DAPStepOutArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func pause(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.pause,
+			arguments: try DAPAny(encoding: DAPPauseArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func restart() async throws -> DAPResponse {
+		try await client.sendRequest(command: DAPCommand.restart)
+	}
+
+	@discardableResult
+	public func terminate() async throws -> DAPResponse {
+		try await client.sendRequest(command: DAPCommand.terminate, arguments: try DAPAny(encoding: DAPTerminateArguments()))
+	}
+
 	public func evaluate(expression: String, frameID: Int? = nil, context: String? = nil) async throws -> DebugValue {
 		let response = try await client.sendRequest(
 			command: DAPCommand.evaluate,

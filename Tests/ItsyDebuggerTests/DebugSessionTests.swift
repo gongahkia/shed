@@ -103,6 +103,33 @@ import Testing
 	#expect(await debug.focusedFrameID == 99)
 }
 
+@Test func debugSessionSendsExecutionControlRequests() async throws {
+	let (debug, client, transport) = makeDebugSession()
+	await debug.focus(threadID: 11, frameID: 99)
+
+	let controls: [(String, @Sendable () async throws -> DAPResponse, DAPAny?)] = [
+		(DAPCommand.continueExecution, { try await debug.continueExecution(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.next, { try await debug.next(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.stepIn, { try await debug.stepIn(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.stepOut, { try await debug.stepOut(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.pause, { try await debug.pause(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.restart, { try await debug.restart() }, nil),
+		(DAPCommand.terminate, { try await debug.terminate() }, .object([:])),
+	]
+
+	for (index, item) in controls.enumerated() {
+		let task = Task {
+			try await item.1()
+		}
+		try await transport.waitForWriteCount(index + 1)
+		let request = try transport.request(at: index)
+		#expect(request.command == item.0)
+		#expect(request.arguments == item.2)
+		try await respond(client, request: request, body: DAPAny.object([:]))
+		_ = try await task.value
+	}
+}
+
 private func makeDebugSession() -> (DebugSession, DAPClientSession, RecordingDAPTransport) {
 	let transport = RecordingDAPTransport()
 	let client = DAPClientSession(transport: transport)

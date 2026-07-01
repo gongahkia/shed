@@ -193,6 +193,21 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		watchesItem.target = actionTarget
 		let consoleItem = debugMenu.addItem(withTitle: L10n.string("Debug Console"), action: #selector(AppCoordinator.showDebugConsole(_:)), keyEquivalent: "")
 		consoleItem.target = actionTarget
+		debugMenu.addItem(.separator())
+		let continueItem = debugMenu.addItem(withTitle: L10n.string("Continue"), action: #selector(AppCoordinator.continueDebug(_:)), keyEquivalent: "")
+		continueItem.target = actionTarget
+		let stepOverItem = debugMenu.addItem(withTitle: L10n.string("Step Over"), action: #selector(AppCoordinator.stepOverDebug(_:)), keyEquivalent: "")
+		stepOverItem.target = actionTarget
+		let stepInItem = debugMenu.addItem(withTitle: L10n.string("Step In"), action: #selector(AppCoordinator.stepInDebug(_:)), keyEquivalent: "")
+		stepInItem.target = actionTarget
+		let stepOutItem = debugMenu.addItem(withTitle: L10n.string("Step Out"), action: #selector(AppCoordinator.stepOutDebug(_:)), keyEquivalent: "")
+		stepOutItem.target = actionTarget
+		let pauseItem = debugMenu.addItem(withTitle: L10n.string("Pause"), action: #selector(AppCoordinator.pauseDebug(_:)), keyEquivalent: "")
+		pauseItem.target = actionTarget
+		let restartItem = debugMenu.addItem(withTitle: L10n.string("Restart"), action: #selector(AppCoordinator.restartDebug(_:)), keyEquivalent: "")
+		restartItem.target = actionTarget
+		let stopItem = debugMenu.addItem(withTitle: L10n.string("Stop"), action: #selector(AppCoordinator.stopDebug(_:)), keyEquivalent: "")
+		stopItem.target = actionTarget
 		debugItem.submenu = debugMenu
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))

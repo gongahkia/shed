@@ -36,7 +36,9 @@
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",
-      "baseline": 10051
+      "baseline": 10051,
+      "limit": 30000.0,
+      "threshold": 0.0
     },
     {
       "name": "lsp_didopen_to_diagnostics_ms",

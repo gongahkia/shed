@@ -319,7 +319,6 @@ Architecture:
 
 (B) 2026-07-01 +Phase30-DAP @dap id:1215 est:3h dep:1204 Exception filters via `setExceptionBreakpoints`. UI in launch-config panel.
 (B) 2026-07-01 +Phase30-DAP @dap id:1216 est:2h dep:1205 Reverse-debug support (LLDB): `stepBack`, `reverseContinue`. UI-gated behind `session.capabilities.supportsStepBack`.
-(A) 2026-07-01 +Phase30-DAP @refactor id:1218 est:1h dep:1217 Checkpoint. Publish `bench/notes/dap-phase30.md`. Update `bench/notes/dap-gap.md` marking gap closed for LLDB-DAP path.
 
 ---
 

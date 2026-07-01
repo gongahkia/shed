@@ -199,7 +199,10 @@ private struct RepeatedASCII: Sendable, Equatable {
 		guard count > 0 else {
 			return ""
 		}
-		return String(repeating: String(decoding: [byte], as: UTF8.self), count: count)
+		return String(unsafeUninitializedCapacity: count) { buffer in
+			buffer.initialize(repeating: byte)
+			return count
+		}
 	}
 
 	func lineRange(_ index: Int) -> Range<Int> {

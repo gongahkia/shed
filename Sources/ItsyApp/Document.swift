@@ -16,22 +16,19 @@ final class ItsyDocument: NSDocument {
 
 	var editor = Editor()
 	private var editorViews: [MetalTextView] = []
-	private var syntaxPipeline: SyntaxPipeline?
-	private var syntaxTheme: SyntaxTheme?
-	private var syntaxTree: Tree?
+	private let syntax = DocumentSyntaxController()
 	private var handoffActivity: NSUserActivity?
 	private var problemGutterDecorator: GutterDecorator?
 	private var gitGutterDecorator: GutterDecorator?
 	private var activeGutterDecorator: GutterDecorator?
 	private var gitHunkRefreshWorkItem: DispatchWorkItem?
-	private var syntaxHighlightSpans: [HighlightSpan] = []
 	private let fileWatcherQueue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
 	private var fileWatchSource: DispatchSourceFileSystemObject?
 	private var pendingExternalChangePrompt = false
 
 	override var fileURL: URL? {
 		didSet {
-			configureSyntaxPipeline()
+			syntax.configure(fileURL: fileURL)
 			updateHandoffActivity()
 			restartFileWatcher()
 		}
@@ -39,6 +36,9 @@ final class ItsyDocument: NSDocument {
 
 	override init() {
 		super.init()
+		syntax.setHighlightSpans = { [weak self] spans in
+			self?.setHighlightSpans(spans)
+		}
 	}
 
 	deinit {
@@ -66,8 +66,8 @@ final class ItsyDocument: NSDocument {
 		for view in editorViews {
 			view.editor = editor
 		}
-		configureSyntaxPipeline()
-		refreshSyntaxHighlights()
+		syntax.configure(fileURL: fileURL)
+		syntax.refresh(editor: editor)
 		updateHandoffActivity()
 		restartFileWatcher()
 	}
@@ -91,8 +91,8 @@ final class ItsyDocument: NSDocument {
 			editorViews.append(view)
 		}
 		view.editor = editor
-		configureSyntaxPipeline()
-		refreshSyntaxHighlights()
+		syntax.configure(fileURL: fileURL)
+		syntax.refresh(editor: editor)
 		view.editorDidChange = { [weak self, weak view] editor in
 			guard let self, let view else {
 				return
@@ -100,7 +100,7 @@ final class ItsyDocument: NSDocument {
 			let oldRope = self.editor.rope
 			let edits = editor.lastEditBatch
 			self.editor = editor
-			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			self.syntax.refresh(editor: editor, edits: edits, oldRope: oldRope)
 			self.updateHandoffActivity()
 			self.syncSiblingEditorViews(source: view, editor: editor)
 			self.updateChangeCount(.changeDone)
@@ -184,8 +184,7 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func reloadSyntaxTheme() {
-		syntaxTheme = nil
-		refreshSyntaxHighlights()
+		syntax.reloadTheme(editor: editor)
 	}
 
 	func restoreHandoffCursorOffset(_ offset: Int) {
@@ -241,74 +240,10 @@ final class ItsyDocument: NSDocument {
 		}
 	}
 
-	private func configureSyntaxPipeline() {
-		guard let url = fileURL, let language = SyntaxPipeline.language(forFileURL: url) else {
-			syntaxPipeline = nil
-			syntaxTree = nil
-			setHighlightSpans([])
-			return
-		}
-		if syntaxPipeline?.language != language {
-			syntaxPipeline = SyntaxPipeline(language: language)
-			syntaxTree = nil
-		}
-	}
-
-	private func refreshSyntaxHighlights(edits: [Edit] = [], oldRope: Rope? = nil) {
-		guard var syntaxPipeline else {
-			setHighlightSpans([])
-			return
-		}
-		defer {
-			self.syntaxPipeline = syntaxPipeline
-		}
-		do {
-			if syntaxTheme == nil {
-				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
-			}
-			let spans: [HighlightSpan]
-			if edits.count == 1, let edit = edits.first, isSingleLineEdit(edit), let oldRope, let tree = syntaxTree {
-				let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
-				tree.edit(inputEdit)
-				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
-				syntaxTree = newTree
-				let dirtyRange = dirtyLineRange(containing: inputEdit.newEndByte)
-				let dirtySpans = try syntaxPipeline.highlights(in: newTree, byteRange: dirtyRange)
-				syntaxHighlightSpans = syntaxHighlightSpans.compactMap { $0.mapped(through: edit) }
-				syntaxHighlightSpans.removeAll { $0.range.overlaps(dirtyRange) }
-				syntaxHighlightSpans += dirtySpans
-				spans = syntaxHighlightSpans
-			} else {
-				let tree = try syntaxPipeline.parse(editor.rope)
-				syntaxTree = tree
-				spans = try syntaxPipeline.highlights(in: tree)
-				syntaxHighlightSpans = spans
-			}
-			let renderedSpans = spans.compactMap { span -> TextHighlightSpan? in
-				guard let color = syntaxTheme?.color(for: span.capture) else {
-					return nil
-				}
-				return TextHighlightSpan(range: span.range, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
-			}
-			setHighlightSpans(renderedSpans)
-		} catch {
-			setHighlightSpans([])
-		}
-	}
-
 	private func setHighlightSpans(_ spans: [TextHighlightSpan]) {
 		for view in editorViews {
 			view.highlightSpans = spans
 		}
-	}
-
-	private func dirtyLineRange(containing offset: Int) -> Range<Int> {
-		let line = editor.rope.line(forOffset: min(offset, editor.rope.length))
-		return editor.rope.lineRange(line)
-	}
-
-	private func isSingleLineEdit(_ edit: Edit) -> Bool {
-		!edit.oldText.utf8.contains(10) && !edit.newText.utf8.contains(10)
 	}
 
 	private func restartFileWatcher() {

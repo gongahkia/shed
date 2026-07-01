@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(B) 2026-07-01 +Phase21-Refactor @refactor id:808 est:3h dep:807 Split `Document.swift` (2318 LOC). Move `ItsyDocumentController` to `Documents/ItsyDocumentController.swift`. Move `EditorPane` + `EditorPaneCoordinator` + `EditorPaneLayout` to `Windows/EditorPane.swift`. Move `EditorWindowController` to `Windows/EditorWindowController.swift`. Move `CompositeGutterDecorator` to `Windows/CompositeGutterDecorator.swift`. Move `LSPClientNotificationSink` to `Windows/LSPBridging.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:809 est:3h dep:808 Extract file-tree logic (sidebar view, child cache, key monitor, preview URL, tabIDs) from `EditorWindowController` into `FileTree/FileTreeSidebarController.swift` under 400 LOC. Owned by `EditorWindowController` via composition.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:810 est:3h dep:808 Extract find bar + regex + match ranges + incremental find from `EditorWindowController` into `Find/FindBarController.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:811 est:3h dep:808 Extract syntax-pipeline lifecycle + syntax theme + dirtyLineRange + refreshSyntaxHighlights from `ItsyDocument` into `Documents/DocumentSyntaxController.swift`. `ItsyDocument` gets a thin `syntax:` handle.

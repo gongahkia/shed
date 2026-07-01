@@ -65,7 +65,7 @@ struct LSPReferencesSnapshot: Equatable {
 	}
 }
 
-final class ReferencesPanelController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private enum Row {
 		case file(path: String, count: Int)
 		case reference(LSPReferenceEntry)

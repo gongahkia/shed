@@ -793,7 +793,7 @@ final class EditorWindowController: NSWindowController {
 	private var signatureHelpPopover: NSPopover?
 	private var signatureHelpRequestGeneration = 0
 	private var referencesRequestGeneration = 0
-	private var referencesPanelController: ReferencesPanelController?
+	private var referencesCoordinator: ReferencesCoordinator?
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
@@ -1985,8 +1985,8 @@ final class EditorWindowController: NSWindowController {
 		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
 		referencesRequestGeneration += 1
 		let generation = referencesRequestGeneration
-		let panel = referencesPanelController ?? ReferencesPanelController()
-		referencesPanelController = panel
+		let panel = referencesCoordinator ?? ReferencesCoordinator()
+		referencesCoordinator = panel
 		panel.showLoading(relativeTo: window)
 		Task { [weak self] in
 			do {
@@ -2022,7 +2022,7 @@ final class EditorWindowController: NSWindowController {
 					guard let self, generation == self.referencesRequestGeneration else {
 						return
 					}
-					self.referencesPanelController?.show(error: error, relativeTo: self.window)
+					self.referencesCoordinator?.show(error: error, relativeTo: self.window)
 				}
 			}
 		}
@@ -2030,8 +2030,8 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func showReferences(_ snapshot: LSPReferencesSnapshot) {
-		let panel = referencesPanelController ?? ReferencesPanelController()
-		referencesPanelController = panel
+		let panel = referencesCoordinator ?? ReferencesCoordinator()
+		referencesCoordinator = panel
 		panel.show(snapshot: snapshot, relativeTo: window) { entry in
 			guard let controller = NSDocumentController.shared as? ItsyDocumentController else {
 				return

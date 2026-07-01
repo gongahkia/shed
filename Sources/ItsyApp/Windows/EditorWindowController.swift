@@ -10,7 +10,8 @@ final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
 	private let fileTreeController = FileTreeSidebarController()
-	private let findBarController = FindBarController()
+	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+	private var findBarController: FindBarController?
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
@@ -37,7 +38,6 @@ final class EditorWindowController: NSWindowController {
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 
 	init(document: ItsyDocument) {
-		let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 		editorStack.orientation = .vertical
 		editorStack.alignment = .width
@@ -51,17 +51,12 @@ final class EditorWindowController: NSWindowController {
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
-		findBarController.view.translatesAutoresizingMaskIntoConstraints = false
 		editorContainer.addSubview(paneCoordinator.view)
-		editorContainer.addSubview(findBarController.view)
 		NSLayoutConstraint.activate([
 			paneCoordinator.view.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
 			paneCoordinator.view.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
 			paneCoordinator.view.topAnchor.constraint(equalTo: editorContainer.topAnchor),
 			paneCoordinator.view.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
-			findBarController.view.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
-			findBarController.view.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
-			findBarController.view.topAnchor.constraint(equalTo: editorContainer.topAnchor),
 		])
 		editorStack.addArrangedSubview(tabBarView)
 		editorStack.addArrangedSubview(editorContainer)
@@ -88,9 +83,6 @@ final class EditorWindowController: NSWindowController {
 		super.init(window: window)
 		fileTreeController.attach(to: window)
 		fileTreeController.openFile = { ItsyWorkspaceController.openFile(at: $0) }
-		findBarController.attach(to: window)
-		findBarController.currentEditorView = { [weak self] in self?.editorView }
-		findBarController.focusEditor = { [weak self] in self?.focusEditor() }
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
@@ -373,6 +365,27 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
+	private func ensureFindBarController() -> FindBarController {
+		if let findBarController {
+			return findBarController
+		}
+		let controller = FindBarController()
+		controller.view.translatesAutoresizingMaskIntoConstraints = false
+		editorContainer.addSubview(controller.view)
+		NSLayoutConstraint.activate([
+			controller.view.leadingAnchor.constraint(equalTo: editorContainer.leadingAnchor),
+			controller.view.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor),
+			controller.view.topAnchor.constraint(equalTo: editorContainer.topAnchor),
+		])
+		if let window {
+			controller.attach(to: window)
+		}
+		controller.currentEditorView = { [weak self] in self?.editorView }
+		controller.focusEditor = { [weak self] in self?.focusEditor() }
+		findBarController = controller
+		return controller
+	}
+
 	private func splitActivePane(vertical: Bool) {
 		guard let document = document as? ItsyDocument else {
 			return
@@ -412,23 +425,23 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	func toggleFindBar() {
-		findBarController.toggle()
+		ensureFindBarController().toggle()
 	}
 
 	func findNext() {
-		findBarController.findNext()
+		ensureFindBarController().findNext()
 	}
 
 	func findPrevious() {
-		findBarController.findPrevious()
+		ensureFindBarController().findPrevious()
 	}
 
 	func startIncrementalSearch(direction: Int) {
-		findBarController.startIncrementalSearch(direction: direction)
+		ensureFindBarController().startIncrementalSearch(direction: direction)
 	}
 
 	func selectAllFindMatches() {
-		findBarController.selectAllMatches()
+		ensureFindBarController().selectAllMatches()
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {

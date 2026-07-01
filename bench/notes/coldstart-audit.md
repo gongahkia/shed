@@ -71,3 +71,55 @@ Status remains fail for the `<150 ms` cold-start target and `<30 MB` idle-RAM ta
 | 5 | 48.993 | 81.225 | 119.485 | 214.146 | 237.057 | 241.158 | 87040 |
 
 Successful-run mean first-window-visible including the first-launch outlier: `338.463 ms`. Warm-run mean excluding run 1: `231.805 ms`.
+
+## 2026-07-01 lazy-link audit
+
+References:
+
+- https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/UsingDynamicLibraries.html
+- https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/dlopen.3.html
+
+Release binary audit:
+
+```sh
+otool -L .build/release/ItsyApp | rg 'WritingToolsUI|AppIntents|ViewBridge|TextInputUI|QuickLook|SwiftUI|UniformTypeIdentifiers'
+```
+
+Output:
+
+```text
+/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib (compatibility version 1.0.0, current version 877.5.1, weak)
+```
+
+Runtime load audit:
+
+```sh
+DYLD_PRINT_APIS=1 .build/release/ItsyApp --bench-exit-after-initial-document
+```
+
+Observed target framework loads before `READY`:
+
+```text
+dlopen("/System/Library/Frameworks/AppIntents.framework/AppIntents", 0x00000101)
+dlopen("/System/Library/PrivateFrameworks/ViewBridge.framework/Versions/A/ViewBridge", 0x00000100)
+dlopen("/System/Library/PrivateFrameworks/WritingToolsUI.framework/WritingToolsUI", 0x00000101)
+dlopen("/System/Library/Frameworks/SwiftUI.framework/SwiftUI", 0x00000101)
+```
+
+`TextInputUI` was not observed in the current runtime trace.
+
+Source audit:
+
+```sh
+rg -n 'WritingToolsUI|AppIntents|ViewBridge|TextInputUI|import SwiftUI'
+```
+
+No app-source import matched these frameworks.
+
+Applied deferrals/opt-outs:
+
+- `FindBarController` is now created on first find action instead of during initial window construction.
+- Menus set `automaticallyInsertsWritingToolsItems = false` on macOS 15.2+.
+- `MetalTextView` exposes `writingToolsBehavior = .none` on macOS 15+.
+
+[Inference] The remaining `WritingToolsUI`, `AppIntents`, `ViewBridge`, and `SwiftUI` loads are AppKit/HIToolbox/text-system runtime loads, not direct Itsy link edges. There is no remaining direct app import of those frameworks to replace with `dlopen`/`dlsym`.

@@ -2,6 +2,18 @@ import AppKit
 import ItsyEditor
 
 extension MetalTextView: NSTextInputClient {
+	@available(macOS 15.0, *)
+	@objc public var writingToolsBehavior: NSWritingToolsBehavior {
+		get { .none }
+		set {}
+	}
+
+	@available(macOS 15.0, *)
+	@objc public var allowedWritingToolsResultOptions: NSWritingToolsResultOptions {
+		get { [] }
+		set {}
+	}
+
 	public func insertText(_ string: Any, replacementRange: NSRange) {
 		lastYankRange = nil
 		let text = plainString(from: string)
@@ -218,4 +230,3 @@ extension MetalTextView: NSTextInputClient {
 		)
 	}
 }
-

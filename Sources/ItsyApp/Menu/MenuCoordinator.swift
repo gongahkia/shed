@@ -47,6 +47,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 
 	func installMainMenu() {
 		let mainMenu = NSMenu()
+		mainMenu.disableAutomaticWritingToolsItems()
 		let appItem = NSMenuItem()
 		let fileItem = NSMenuItem()
 		let editItem = NSMenuItem()
@@ -69,6 +70,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		mainMenu.addItem(commandItem)
 
 		let appMenu = NSMenu()
+		appMenu.disableAutomaticWritingToolsItems()
 		let settingsItem = appMenu.addItem(withTitle: L10n.string("Settings..."), action: #selector(AppCoordinator.showSettings(_:)), keyEquivalent: ",")
 		settingsItem.target = actionTarget
 		appMenu.addItem(.separator())
@@ -76,6 +78,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		appItem.submenu = appMenu
 
 		let fileMenu = NSMenu(title: L10n.string("File"))
+		fileMenu.disableAutomaticWritingToolsItems()
 		let newItem = fileMenu.addItem(withTitle: L10n.string("New"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
 		newItem.target = documentController
 		let newTabItem = fileMenu.addItem(withTitle: L10n.string("New Tab"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "t")
@@ -88,6 +91,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		openFolderItem.target = actionTarget
 		let openRecentItem = fileMenu.addItem(withTitle: L10n.string("Open Recent"), action: nil, keyEquivalent: "")
 		let openRecentMenu = NSMenu(title: L10n.string("Open Recent"))
+		openRecentMenu.disableAutomaticWritingToolsItems()
 		openRecentMenu.delegate = self
 		self.openRecentMenu = openRecentMenu
 		fileMenu.setSubmenu(openRecentMenu, for: openRecentItem)
@@ -99,6 +103,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		fileItem.submenu = fileMenu
 
 		let editMenu = NSMenu(title: L10n.string("Edit"))
+		editMenu.disableAutomaticWritingToolsItems()
 		let findItem = editMenu.addItem(withTitle: L10n.string("Find"), action: #selector(AppCoordinator.toggleFindBar(_:)), keyEquivalent: "f")
 		findItem.target = actionTarget
 		let findNextItem = editMenu.addItem(withTitle: L10n.string("Find Next"), action: #selector(AppCoordinator.findNext(_:)), keyEquivalent: "g")
@@ -115,6 +120,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		editItem.submenu = editMenu
 
 		let navigateMenu = NSMenu(title: L10n.string("Navigate"))
+		navigateMenu.disableAutomaticWritingToolsItems()
 		let gotoWorkspaceSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in Workspace"), action: #selector(AppCoordinator.showWorkspaceSymbolPalette(_:)), keyEquivalent: "t")
 		gotoWorkspaceSymbolItem.target = actionTarget
 		let gotoFileSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in File"), action: #selector(AppCoordinator.showFileSymbolPalette(_:)), keyEquivalent: "O")
@@ -125,6 +131,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		navigateItem.submenu = navigateMenu
 
 		let viewMenu = NSMenu(title: L10n.string("View"))
+		viewMenu.disableAutomaticWritingToolsItems()
 		let zoomInItem = viewMenu.addItem(withTitle: L10n.string("Zoom In"), action: #selector(AppCoordinator.zoomIn(_:)), keyEquivalent: "+")
 		zoomInItem.target = actionTarget
 		let zoomOutItem = viewMenu.addItem(withTitle: L10n.string("Zoom Out"), action: #selector(AppCoordinator.zoomOut(_:)), keyEquivalent: "-")
@@ -150,6 +157,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		viewItem.submenu = viewMenu
 
 		let gitMenu = NSMenu(title: L10n.string("Git"))
+		gitMenu.disableAutomaticWritingToolsItems()
 		addGitItem(to: gitMenu, title: L10n.string("Git Changes"), selector: #selector(GitCoordinator.showGitChanges(_:)))
 		addGitItem(to: gitMenu, title: L10n.string("Refresh Git Status"), selector: #selector(GitCoordinator.refreshGitChanges(_:)))
 		gitMenu.addItem(.separator())
@@ -163,6 +171,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		gitItem.submenu = gitMenu
 
 		let taskMenu = NSMenu(title: L10n.string("Tasks"))
+		taskMenu.disableAutomaticWritingToolsItems()
 		let taskRunItem = taskMenu.addItem(withTitle: L10n.string("Run Task"), action: #selector(AppCoordinator.showTasks(_:)), keyEquivalent: "")
 		taskRunItem.target = actionTarget
 		let taskRefreshItem = taskMenu.addItem(withTitle: L10n.string("Refresh Tasks"), action: #selector(AppCoordinator.refreshTasks(_:)), keyEquivalent: "")
@@ -170,18 +179,21 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		taskItem.submenu = taskMenu
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))
+		terminalMenu.disableAutomaticWritingToolsItems()
 		let terminalShowItem = terminalMenu.addItem(withTitle: L10n.string("Terminal"), action: #selector(AppCoordinator.showTerminal(_:)), keyEquivalent: "`")
 		terminalShowItem.keyEquivalentModifierMask = [.command, .shift]
 		terminalShowItem.target = actionTarget
 		terminalItem.submenu = terminalMenu
 
 		let problemMenu = NSMenu(title: L10n.string("Problems"))
+		problemMenu.disableAutomaticWritingToolsItems()
 		let problemShowItem = problemMenu.addItem(withTitle: L10n.string("Problems"), action: #selector(AppCoordinator.showProblems(_:)), keyEquivalent: "M")
 		problemShowItem.keyEquivalentModifierMask = [.command, .shift]
 		problemShowItem.target = actionTarget
 		problemItem.submenu = problemMenu
 
 		let commandMenu = NSMenu(title: L10n.string("Command"))
+		commandMenu.disableAutomaticWritingToolsItems()
 		let paletteItem = commandMenu.addItem(withTitle: L10n.string("Command Palette"), action: #selector(AppCoordinator.toggleCommandPalette(_:)), keyEquivalent: "P")
 		paletteItem.keyEquivalentModifierMask = [.command, .shift]
 		paletteItem.target = actionTarget
@@ -213,5 +225,13 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		let clearItem = menu.addItem(withTitle: L10n.string("Clear Menu"), action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
 		clearItem.target = documentController
 		clearItem.isEnabled = !urls.isEmpty
+	}
+}
+
+private extension NSMenu {
+	func disableAutomaticWritingToolsItems() {
+		if #available(macOS 15.2, *) {
+			automaticallyInsertsWritingToolsItems = false
+		}
 	}
 }

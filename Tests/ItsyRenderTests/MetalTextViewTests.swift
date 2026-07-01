@@ -293,6 +293,68 @@ import Testing
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "deleted")
 }
 
+@MainActor @Test func gutterDotMarkersAndLineClicksRouteToDecorator() throws {
+	let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 100), styleMask: [], backing: .buffered, defer: false)
+	let view = MetalTextView(frame: window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "0\n1\n2\n3\n")
+	view.lineHeight = 20
+	window.contentView?.addSubview(view)
+	let decorator = TestGutterDecorator(markers: [
+		GutterMarker(id: "breakpoint", line: 1, severity: .error, message: "bp", shape: .dot),
+	])
+	view.gutterDecorator = decorator
+
+	let layout = try #require(view.gutterView.markerLayouts.first)
+	#expect(layout.marker.shape == .dot)
+	#expect(layout.rect.width == layout.rect.height)
+
+	let click = try #require(NSEvent.mouseEvent(
+		with: .leftMouseDown,
+		location: windowPoint(local: NSPoint(x: 10, y: 46), height: window.frame.height),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: window.windowNumber,
+		context: nil,
+		eventNumber: 1,
+		clickCount: 1,
+		pressure: 0
+	))
+	let rightClick = try #require(NSEvent.mouseEvent(
+		with: .rightMouseDown,
+		location: windowPoint(local: NSPoint(x: 10, y: 26), height: window.frame.height),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: window.windowNumber,
+		context: nil,
+		eventNumber: 2,
+		clickCount: 1,
+		pressure: 0
+	))
+	let markerRightClick = try #require(NSEvent.mouseEvent(
+		with: .rightMouseDown,
+		location: windowPoint(local: NSPoint(x: layout.rect.midX, y: layout.rect.midY), height: window.frame.height),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: window.windowNumber,
+		context: nil,
+		eventNumber: 3,
+		clickCount: 1,
+		pressure: 0
+	))
+
+	view.mouseDown(with: click)
+	view.rightMouseDown(with: rightClick)
+	view.rightMouseDown(with: markerRightClick)
+
+	#expect(decorator.clickedLines == [2])
+	#expect(decorator.rightClickedLines == [1])
+	#expect(decorator.rightClickedMarkers == ["breakpoint"])
+}
+
+private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
+	NSPoint(x: point.x, y: height - point.y)
+}
+
 @Test func hoverCandidateMapsLocalPointToTextOffsetAndRect() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\n")
@@ -423,6 +485,9 @@ import Testing
 
 private final class TestGutterDecorator: GutterDecorator {
 	private let markers: [GutterMarker]
+	var clickedLines: [Int] = []
+	var rightClickedLines: [Int] = []
+	var rightClickedMarkers: [String] = []
 
 	init(markers: [GutterMarker]) {
 		self.markers = markers
@@ -433,6 +498,21 @@ private final class TestGutterDecorator: GutterDecorator {
 	}
 
 	func gutterMarkerClicked(_: GutterMarker, in _: MetalTextView) {}
+
+	func gutterMarkerRightClicked(_ marker: GutterMarker, in _: MetalTextView, event _: NSEvent) -> Bool {
+		rightClickedMarkers.append(marker.id)
+		return true
+	}
+
+	func gutterLineClicked(_ line: Int, in _: MetalTextView) -> Bool {
+		clickedLines.append(line)
+		return true
+	}
+
+	func gutterLineRightClicked(_ line: Int, in _: MetalTextView, event _: NSEvent) -> Bool {
+		rightClickedLines.append(line)
+		return true
+	}
 
 	func gutterPopoverViewController(for _: GutterMarker, in _: MetalTextView) -> NSViewController? {
 		nil

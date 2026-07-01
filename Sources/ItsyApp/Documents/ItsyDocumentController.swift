@@ -6,6 +6,7 @@ final class ItsyDocumentController: NSDocumentController {
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
 		ItsyProblemGutterCoordinator.install(documentController: self)
+		ItsyBreakpointGutterCoordinator.install(documentController: self)
 		ItsyGitHunkGutterCoordinator.install(documentController: self)
 	}
 
@@ -14,6 +15,7 @@ final class ItsyDocumentController: NSDocumentController {
 		ItsyTabCoordinator.install(documentController: self)
 		ItsyWorkspaceController.install(documentController: self)
 		ItsyProblemGutterCoordinator.install(documentController: self)
+		ItsyBreakpointGutterCoordinator.install(documentController: self)
 		ItsyGitHunkGutterCoordinator.install(documentController: self)
 	}
 

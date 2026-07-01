@@ -101,7 +101,9 @@ final class GutterView: NSView {
 		for layout in markerLayouts where layout.rect.intersects(dirtyRect) {
 			let color = layout.marker.color ?? Self.markerColor(for: layout.marker.severity)
 			context.setFillColor(Self.cgColor(from: color))
-			if layout.marker.placement == .betweenLines {
+			if layout.marker.shape == .dot {
+				context.fillEllipse(in: layout.rect)
+			} else if layout.marker.placement == .betweenLines {
 				for slice in caretSlices(for: layout.rect) where slice.width > 0 {
 					context.fill(slice)
 				}

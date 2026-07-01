@@ -18,6 +18,7 @@ final class ItsyDocument: NSDocument {
 	private var editorViews: [MetalTextView] = []
 	private let syntax = DocumentSyntaxController()
 	private var handoffActivity: NSUserActivity?
+	private var breakpointGutterDecorator: GutterDecorator?
 	private var problemGutterDecorator: GutterDecorator?
 	private var activeGutterDecorator: GutterDecorator?
 	private let fileWatcher = DocumentFileWatcher()
@@ -28,6 +29,7 @@ final class ItsyDocument: NSDocument {
 			syntax.configure(fileURL: fileURL)
 			updateHandoffActivity()
 			fileWatcher.restart()
+			ItsyBreakpointGutterCoordinator.apply(to: self)
 		}
 	}
 
@@ -130,6 +132,7 @@ final class ItsyDocument: NSDocument {
 			self?.close()
 		}
 		ItsyProblemGutterCoordinator.apply(to: self)
+		ItsyBreakpointGutterCoordinator.apply(to: self)
 		ItsyGitHunkGutterCoordinator.apply(to: self)
 		fileWatcher.restart()
 		updateHandoffActivity()
@@ -144,8 +147,13 @@ final class ItsyDocument: NSDocument {
 		refreshGutterDecorators()
 	}
 
+	func setBreakpointGutterDecorator(_ decorator: GutterDecorator?) {
+		breakpointGutterDecorator = decorator
+		refreshGutterDecorators()
+	}
+
 	private func refreshGutterDecorators() {
-		let decorators = [problemGutterDecorator, gitGutter.decorator].compactMap { $0 }
+		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator].compactMap { $0 }
 		switch decorators.count {
 		case 0:
 			activeGutterDecorator = nil

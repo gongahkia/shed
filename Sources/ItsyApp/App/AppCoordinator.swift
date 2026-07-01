@@ -34,7 +34,7 @@ final class AppCoordinator: NSObject {
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
 	)
 	private lazy var taskCoordinator = TaskCoordinator(problemsCoordinator: problemsCoordinator)
-	private lazy var debugLaunchCoordinator = DebugLaunchCoordinator()
+	private lazy var debuggerCoordinator = DebuggerCoordinator(documentController: documentController)
 	private lazy var terminalCoordinator = TerminalCoordinator(
 		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
@@ -77,7 +77,7 @@ final class AppCoordinator: NSObject {
 	}
 
 	func applicationWillTerminate(_ notification: Notification) {
-		debugLaunchCoordinator.terminate()
+		debuggerCoordinator.terminate()
 		terminalCoordinator.terminate()
 	}
 
@@ -216,6 +216,9 @@ final class AppCoordinator: NSObject {
 					Command(id: "debug.start", title: L10n.string("Start Debugging"), defaultKey: "Cmd-F5") { [weak self] in
 						self?.showDebugLaunchConfigPicker(nil)
 					},
+					Command(id: "debug.callStack", title: L10n.string("Call Stack"), defaultKey: nil) { [weak self] in
+						self?.showDebugCallStack(nil)
+					},
 					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
 						self?.showTerminal(nil)
 					},
@@ -308,7 +311,11 @@ final class AppCoordinator: NSObject {
 	}
 
 	@objc func showDebugLaunchConfigPicker(_ sender: Any?) {
-		debugLaunchCoordinator.showLaunchConfigPicker(sender)
+		debuggerCoordinator.showLaunchConfigPicker(sender)
+	}
+
+	@objc func showDebugCallStack(_ sender: Any?) {
+		debuggerCoordinator.showCallStack(sender)
 	}
 
 	@objc func showTerminal(_ sender: Any?) {

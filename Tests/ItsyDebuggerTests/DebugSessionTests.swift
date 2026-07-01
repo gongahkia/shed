@@ -80,6 +80,15 @@ import Testing
 	#expect(try await evaluateTask.value == DebugValue(result: "42", type: "Int", variablesReference: 0))
 }
 
+@Test func debugSessionFocusUpdatesThreadAndFrame() async {
+	let (debug, _, _) = makeDebugSession()
+
+	await debug.focus(threadID: 7, frameID: 99)
+
+	#expect(await debug.focusedThreadID == 7)
+	#expect(await debug.focusedFrameID == 99)
+}
+
 private func makeDebugSession() -> (DebugSession, DAPClientSession, RecordingDAPTransport) {
 	let transport = RecordingDAPTransport()
 	let client = DAPClientSession(transport: transport)

@@ -139,6 +139,11 @@ public actor DebugSession {
 		return mapped
 	}
 
+	public func focus(threadID: Int, frameID: Int?) {
+		focusedThreadID = threadID
+		focusedFrameID = frameID
+	}
+
 	public func scopes(for frameID: Int) async throws -> [DebugScope] {
 		let response = try await client.sendRequest(
 			command: DAPCommand.scopes,

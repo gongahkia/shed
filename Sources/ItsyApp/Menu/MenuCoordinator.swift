@@ -185,6 +185,8 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		let startDebugItem = debugMenu.addItem(withTitle: L10n.string("Start Debugging"), action: #selector(AppCoordinator.showDebugLaunchConfigPicker(_:)), keyEquivalent: Self.functionKeyEquivalent(NSF5FunctionKey))
 		startDebugItem.keyEquivalentModifierMask = [.command]
 		startDebugItem.target = actionTarget
+		let callStackItem = debugMenu.addItem(withTitle: L10n.string("Call Stack"), action: #selector(AppCoordinator.showDebugCallStack(_:)), keyEquivalent: "")
+		callStackItem.target = actionTarget
 		debugItem.submenu = debugMenu
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))

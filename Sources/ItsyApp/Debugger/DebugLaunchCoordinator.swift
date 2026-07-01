@@ -13,9 +13,11 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 	private var activeSession: DebugAppSession?
 	private var launchGeneration = 0
 	private var suppressSelectionLaunch = false
+	private let onSessionStarted: (DebugAppSession) -> Void
 
-	init(loader: DebugLaunchConfigLoader = DebugLaunchConfigLoader()) {
+	init(loader: DebugLaunchConfigLoader = DebugLaunchConfigLoader(), onSessionStarted: @escaping (DebugAppSession) -> Void = { _ in }) {
 		self.loader = loader
+		self.onSessionStarted = onSessionStarted
 		super.init()
 	}
 
@@ -158,6 +160,7 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 					self.activeSession?.terminate()
 					self.activeSession = session
 					self.setStatus(L10n.string("Running \(configuration.name)"), isError: false)
+					self.onSessionStarted(session)
 				}
 			} catch {
 				Task { @MainActor in
@@ -227,17 +230,19 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 	}
 }
 
-private final class DebugAppSession: @unchecked Sendable {
+final class DebugAppSession: @unchecked Sendable {
 	let debugSession: DebugSession
 	let configuration: DebugLaunchConfiguration
 	let adapter: DebugAdapterConfig
+	let client: DAPClientSession
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
+		self.client = client
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -307,7 +312,7 @@ private final class DebugAppSession: @unchecked Sendable {
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
 			try await client.configurationDone()
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			transport.terminate()

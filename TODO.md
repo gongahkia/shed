@@ -304,7 +304,6 @@ Goal: pull vim state out of `MetalTextView` into a testable module with no AppKi
 
 ## Phase 29 — LSP UX polish
 
-(A) 2026-07-01 +Phase29-LSP @refactor id:1168 est:1h dep:1167 Checkpoint. Publish `bench/notes/lsp-phase29.md`.
 
 ---
 

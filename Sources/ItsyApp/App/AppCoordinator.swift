@@ -14,6 +14,9 @@ final class AppCoordinator: NSObject {
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
 		workspaceSymbolProvider: { [weak self] query in
 			try await self?.activeEditorWindowController()?.workspaceSymbols(matching: query) ?? []
+		},
+		fileSymbolProvider: { [weak self] in
+			try await self?.activeEditorWindowController()?.fileSymbolsFromLSP()
 		}
 	)
 	private lazy var settingsCoordinator = SettingsCoordinator(

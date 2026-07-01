@@ -276,6 +276,64 @@ import Testing
 	#expect(none.locations.isEmpty)
 }
 
+@Test func documentSymbolParamsEncodeAndResultDecodesHierarchyOrFlatList() throws {
+	let params = try LSPAny(encoding: LSPDocumentSymbolParams(textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift")))
+	let hierarchy = try LSPDocumentSymbolResult(decoding: Data(#"""
+	[
+	  {
+	    "name": "AppShell",
+	    "kind": 23,
+	    "range": {
+	      "start": { "line": 0, "character": 0 },
+	      "end": { "line": 4, "character": 1 }
+	    },
+	    "selectionRange": {
+	      "start": { "line": 0, "character": 7 },
+	      "end": { "line": 0, "character": 15 }
+	    },
+	    "children": [
+	      {
+	        "name": "render",
+	        "kind": 12,
+	        "range": {
+	          "start": { "line": 1, "character": 1 },
+	          "end": { "line": 2, "character": 2 }
+	        },
+	        "selectionRange": {
+	          "start": { "line": 1, "character": 6 },
+	          "end": { "line": 1, "character": 12 }
+	        }
+	      }
+	    ]
+	  }
+	]
+	"""#.utf8))
+	let flat = try LSPDocumentSymbolResult(decoding: Data(#"""
+	[
+	  {
+	    "name": "run",
+	    "kind": 12,
+	    "location": {
+	      "uri": "file:///tmp/main.swift",
+	      "range": {
+	        "start": { "line": 2, "character": 5 },
+	        "end": { "line": 2, "character": 8 }
+	      }
+	    }
+	  }
+	]
+	"""#.utf8))
+	let none = try LSPDocumentSymbolResult(decoding: Data("null".utf8))
+
+	#expect(LSPMethod.textDocumentDocumentSymbol == "textDocument/documentSymbol")
+	#expect(params == .object(["textDocument": .object(["uri": .string("file:///tmp/main.swift")])]))
+	#expect(hierarchy.documentSymbols.count == 1)
+	#expect(hierarchy.documentSymbols.first?.children?.first?.name == "render")
+	#expect(flat.symbolInformation.map(\.name) == ["run"])
+	#expect(none.documentSymbols.isEmpty)
+	#expect(none.symbolInformation.isEmpty)
+}
+
 @Test func workspaceSymbolParamsEncodeAndResultDecodesWorkspaceSymbols() throws {
 	let params = try LSPAny(encoding: LSPWorkspaceSymbolParams(query: "App"))
 	let result = try LSPWorkspaceSymbolResult(decoding: Data(#"""

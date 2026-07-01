@@ -33,7 +33,7 @@ let package = Package(
 	targets: [
 		.executableTarget(
 			name: "ItsyApp",
-			dependencies: ["ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP"],
+			dependencies: ["ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP", "ItsyDAP", "ItsyDebugger"],
 			exclude: ["README.md"],
 			swiftSettings: releaseSwiftSettings
 		),

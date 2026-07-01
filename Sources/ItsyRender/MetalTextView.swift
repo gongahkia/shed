@@ -150,6 +150,8 @@ public final class MetalTextView: NSView {
 	private var highlightInstanceScratch: [MetalGlyphInstance] = []
 	var solidInstanceScratch: [MetalGlyphInstance] = []
 	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
+	private(set) var lineShapeCacheHits = 0
+	private(set) var lineShapeCacheMisses = 0
 	private var lineHighlightOverlay: [Int: [TextHighlightSpan]] = [:]
 	private var highlightRevision = 0
 	private var lineHighlightOverlayRevision = -1
@@ -768,6 +770,20 @@ public final class MetalTextView: NSView {
 		lineShapeCache.count
 	}
 
+	var lineShapeCacheLookupCount: Int {
+		lineShapeCacheHits + lineShapeCacheMisses
+	}
+
+	var lineShapeCacheHitRate: Double {
+		let total = lineShapeCacheLookupCount
+		return total == 0 ? 0 : Double(lineShapeCacheHits) / Double(total)
+	}
+
+	func resetLineShapeCacheStats() {
+		lineShapeCacheHits = 0
+		lineShapeCacheMisses = 0
+	}
+
 	private func appendTextGlyphInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		guard ensureGlyphAtlas(scale: scale) else {
 			return
@@ -853,8 +869,10 @@ public final class MetalTextView: NSView {
 		shaper: LineShaper
 	) -> [CachedLineGlyph] {
 		if let cached = lineShapeCache[key] {
+			lineShapeCacheHits += 1
 			return cached
 		}
+		lineShapeCacheMisses += 1
 		let line = editor.rope.slice(lineRange)
 		guard !line.isEmpty, let cached = shapeCachedGlyphs(line: line, scale: scale, shaper: shaper) else {
 			return []

@@ -317,7 +317,6 @@ Architecture:
 - `ItsyDebugger` (new SwiftPM target) hosts orchestration + UI-adjacent state (breakpoints, stack, threads, variables, watches, console).
 - `ItsyApp/Debugger/` hosts the UI (breakpoints gutter, callstack panel, variables tree, watches, debug console, launch config chooser).
 
-(A) 2026-07-01 +Phase30-DAP @debug id:1206 est:3h dep:1205 Breakpoint store. `BreakpointStore` (actor) keyed by `URL`, value is `[SourceBreakpoint]` with line, condition, hitCondition, logMessage. Persist to `~/.config/itsy/breakpoints.json`.
 (A) 2026-07-01 +Phase30-DAP @debug id:1207 est:2h dep:1206 Adapter registry: `.itsy/debug.json` under project root, and `~/.config/itsy/debug.json`. Schema: `{ "adapters": [{ "id": "lldb", "command": "/usr/bin/lldb-dap", "type": "executable", "args": [] }] }`, plus per-workspace launch configs `{ "configurations": [{ "name": "Debug Itsy", "type": "lldb", "request": "launch", "program": ".build/debug/ItsyApp" }] }`. Model in `ItsyDebugger/DebugLaunchConfig.swift`.
 (A) 2026-07-01 +Phase30-DAP @debugui id:1208 est:4h dep:1207 UI: launch-config picker. `Cmd-F5` opens a `NSPanel` populated from `.itsy/debug.json`. Selecting a config starts the session. Bind menu items in `MenuCoordinator`.
 (A) 2026-07-01 +Phase30-DAP @debugui id:1209 est:3h dep:1206 UI: breakpoints in editor gutter. Extend `GutterView` (from id:816) to render breakpoint dots. Click toggles a breakpoint; right-click opens condition/hitCondition/logMessage editor. Persist via `BreakpointStore`.

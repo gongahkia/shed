@@ -125,35 +125,9 @@ public struct PieceTree: Sendable {
 			return
 		}
 		let inserted = appendAddPiece(bytes)
-		var output: [Piece] = []
-		output.reserveCapacity(pieceCount + 1)
-		var cursor = 0
-		var didInsert = false
-		for piece in pieces() {
-			let end = cursor + piece.length
-			if !didInsert, offset <= end {
-				let local = offset - cursor
-				if local == 0 {
-					output.append(inserted)
-					output.append(piece)
-				} else if local == piece.length {
-					output.append(piece)
-					output.append(inserted)
-				} else {
-					output.append(split(piece, 0 ..< local))
-					output.append(inserted)
-					output.append(split(piece, local ..< piece.length))
-				}
-				didInsert = true
-			} else {
-				output.append(piece)
-			}
-			cursor = end
-		}
-		if !didInsert {
-			output.append(inserted)
-		}
-		rebuild(from: coalesced(output))
+		root = PieceTreeNode.insert(inserted, at: offset, into: root, split: split)
+		root?.color = .black
+		root?.recalculate()
 	}
 
 	public mutating func remove(_ range: Range<Int>) {
@@ -226,7 +200,7 @@ public struct PieceTree: Sendable {
 		var root: PieceTreeNode?
 		var offset = 0
 		for piece in pieces where piece.length > 0 {
-			root = PieceTreeNode.insert(piece, at: offset, into: root)
+			root = PieceTreeNode.insertBoundary(piece, at: offset, into: root)
 			root?.color = .black
 			root?.recalculate()
 			offset += piece.length
@@ -459,17 +433,51 @@ private final class PieceTreeNode: @unchecked Sendable {
 		right?.appendPieces(into: &pieces)
 	}
 
-	static func insert(_ piece: PieceTree.Piece, at offset: Int, into node: PieceTreeNode?) -> PieceTreeNode {
+	static func insertBoundary(_ piece: PieceTree.Piece, at offset: Int, into node: PieceTreeNode?) -> PieceTreeNode {
 		guard let node else {
 			return PieceTreeNode(color: .red, piece: piece)
 		}
 		let leftBytes = node.left?.summary.bytes ?? 0
 		if offset <= leftBytes {
-			node.left = insert(piece, at: offset, into: node.left)
+			node.left = insertBoundary(piece, at: offset, into: node.left)
 		} else {
 			let rightOffset = offset - leftBytes - node.piece.length
 			precondition(rightOffset >= 0, "piece insert offset must land on a boundary")
-			node.right = insert(piece, at: rightOffset, into: node.right)
+			node.right = insertBoundary(piece, at: rightOffset, into: node.right)
+		}
+		return balance(node)
+	}
+
+	static func insert(
+		_ piece: PieceTree.Piece,
+		at offset: Int,
+		into node: PieceTreeNode?,
+		split: (PieceTree.Piece, Range<Int>) -> PieceTree.Piece
+	) -> PieceTreeNode {
+		guard let node else {
+			return PieceTreeNode(color: .red, piece: piece)
+		}
+		let leftBytes = node.left?.summary.bytes ?? 0
+		if offset < leftBytes {
+			node.left = insert(piece, at: offset, into: node.left, split: split)
+			return balance(node)
+		}
+		let pieceEnd = leftBytes + node.piece.length
+		if offset > pieceEnd {
+			node.right = insert(piece, at: offset - pieceEnd, into: node.right, split: split)
+			return balance(node)
+		}
+		let local = offset - leftBytes
+		if local == 0 {
+			node.left = insert(piece, at: leftBytes, into: node.left, split: split)
+		} else if local == node.piece.length {
+			node.right = insert(piece, at: 0, into: node.right, split: split)
+		} else {
+			let original = node.piece
+			node.piece = split(original, 0 ..< local)
+			let rightPiece = split(original, local ..< original.length)
+			node.right = insert(rightPiece, at: 0, into: node.right, split: split)
+			node.right = insert(piece, at: 0, into: node.right, split: split)
 		}
 		return balance(node)
 	}

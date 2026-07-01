@@ -271,7 +271,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 ## Phase 25 — Renderer perf + memory realism
 
-(B) 2026-07-01 +Phase25-Render @render id:984 est:2h dep:983 Bench cold-start again post-lazy-link. Target: ≥40 ms improvement on `first_window_visible`. Update `bench/notes/coldstart-audit.md` with delta.
 (B) 2026-07-01 +Phase25-Render @refactor id:1051 est:1h dep:1050,984 Checkpoint. Publish `bench/notes/render-phase25.md`.
 
 ---

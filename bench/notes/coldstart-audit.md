@@ -123,3 +123,49 @@ Applied deferrals/opt-outs:
 - `MetalTextView` exposes `writingToolsBehavior = .none` on macOS 15+.
 
 [Inference] The remaining `WritingToolsUI`, `AppIntents`, `ViewBridge`, and `SwiftUI` loads are AppKit/HIToolbox/text-system runtime loads, not direct Itsy link edges. There is no remaining direct app import of those frameworks to replace with `dlopen`/`dlsym`.
+
+## 2026-07-01 post-lazy-link cold-start bench
+
+Command:
+
+```sh
+bench/scripts/make_app.sh
+.build/release/ItsyBench measure --staged --app Itsy.app --new-instance --timeout-ms 10000
+```
+
+Five-run sample:
+
+| Run | process_start ms | delegate_init ms | app_did_finish_launching ms | main_menu_installed ms | initial_document_opened ms | first_window_visible ms | first_draw ms | RSS KB |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 612.980 | 681.954 | 2460.739 | 2468.996 | 6934.869 | 7011.747 | 7008.510 | 467552 |
+| 2 | 58.760 | 119.235 | 182.829 | 188.531 | 2373.717 | 2453.865 | 2450.120 | 468560 |
+| 3 | 51.237 | 95.911 | 164.029 | 171.562 | 2590.410 | 2676.152 | 2668.753 | 464768 |
+| 4 | 63.140 | 109.215 | 164.877 | 169.445 | 2305.917 | 2370.338 | 2374.371 | 467424 |
+| 5 | 59.414 | 103.490 | 158.255 | 163.173 | 2079.503 | 2156.309 | 2148.670 | 468688 |
+
+Summary:
+
+- Mean first-window-visible: `3333.682 ms`
+- Warm-run mean excluding run 1: `2414.166 ms`
+- Previous warm-run mean in this note: `231.805 ms`
+- Delta vs previous warm-run mean: `+2182.361 ms`
+- Target: `>=40 ms` improvement
+- Status: fail
+
+Direct binary cross-check:
+
+```sh
+ITSY_BENCH_STAGES_PATH=/tmp/itsy-direct-stages.log .build/release/ItsyApp --bench-exit-after-initial-document
+```
+
+Observed stage deltas:
+
+```text
+process_start 0.000
+delegate_init 58.274
+app_did_finish_launching 101.662
+main_menu_installed 107.175
+initial_document_opened 2120.836
+```
+
+[Inference] The post-lazy-link changes did not produce the requested cold-start improvement. The current miss is dominated by the initial document/window construction path after main-menu installation, not direct `otool -L` dependencies.

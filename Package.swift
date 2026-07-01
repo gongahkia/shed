@@ -42,7 +42,7 @@ let package = Package(
 		.target(name: "ItsyKeymap", resources: [.process("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyLSP", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyDAP", swiftSettings: releaseSwiftSettings),
-		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor"], swiftSettings: releaseSwiftSettings),
+		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor", "ItsyRender"], swiftSettings: releaseSwiftSettings),
 		.target(
 			name: "CTreeSitter",
 			path: "Sources/CTreeSitter",

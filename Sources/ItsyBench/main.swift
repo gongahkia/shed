@@ -5,6 +5,7 @@ import Darwin
 import Dispatch
 import Foundation
 import ItsyEditor
+import ItsyRender
 
 private struct LatencyOptions {
 	var pid: Int32
@@ -26,6 +27,11 @@ private struct MeasureOptions {
 private struct RopeOptions {
 	var operations: Int
 	var sliceLength: Int
+}
+
+private struct RenderHighlightCacheOptions {
+	var frames: Int
+	var lineCount: Int
 }
 
 private struct DisplayOptions {
@@ -188,6 +194,9 @@ enum ItsyBenchMain {
 			try printJSON(measure(parseMeasure(Array(args.dropFirst()))))
 		case "rope":
 			try printJSON(rope(parseRope(Array(args.dropFirst()))))
+		case "render-highlight-cache":
+			let options = try parseRenderHighlightCache(Array(args.dropFirst()))
+			try printJSON(runRenderHighlightCacheBenchmark(lineCount: options.lineCount, frames: options.frames))
 		case "rss":
 			let pid = try parsePID(Array(args.dropFirst()))
 			try printJSON(RSSResult(pid: pid, rss_kb: residentSizeKB(pid: pid)))
@@ -370,6 +379,34 @@ enum ItsyBenchMain {
 			}
 		}
 		return RopeOptions(operations: operations, sliceLength: sliceLength)
+	}
+
+	private static func parseRenderHighlightCache(_ args: [String]) throws -> RenderHighlightCacheOptions {
+		var frames = 60
+		var lineCount = 100_000
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--frames":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --frames")
+				}
+				frames = value
+				index = args.index(after: valueIndex)
+			case "--lines":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --lines")
+				}
+				lineCount = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown render-highlight-cache option: \(arg)")
+			}
+		}
+		return RenderHighlightCacheOptions(frames: frames, lineCount: lineCount)
 	}
 
 	private static func display(_ options: DisplayOptions) throws -> DisplayResult {
@@ -772,6 +809,7 @@ enum ItsyBenchMain {
 	usage:
 	  itsybench display [--display <id>]
 	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
+	  itsybench render-highlight-cache [--lines <count>] [--frames <count>]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]

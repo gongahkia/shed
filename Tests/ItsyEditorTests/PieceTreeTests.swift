@@ -64,3 +64,31 @@ import Testing
 		PieceTree.Piece(buffer: .original(0), start: 0, length: tree.length, lineFeeds: 2),
 	])
 }
+
+@Test func pieceTreeRandomInsertsMatchByteOracle() {
+	var rng = PieceTreeTestRNG(0x51A7E)
+	var tree = PieceTree()
+	var oracle: [UInt8] = []
+	for _ in 0 ..< 100_000 {
+		let byte: UInt8 = rng.nextInt(17) == 0 ? 10 : UInt8(97 + rng.nextInt(26))
+		let offset = rng.nextInt(oracle.count + 1)
+		tree.insert([byte], at: offset)
+		oracle.insert(byte, at: offset)
+	}
+	#expect(tree.length == oracle.count)
+	#expect(tree.lineCount == oracle.reduce(1) { $1 == 10 ? $0 + 1 : $0 })
+	#expect(Array(tree.substring(0 ..< tree.length).utf8) == oracle)
+}
+
+private struct PieceTreeTestRNG {
+	private var state: UInt64
+
+	init(_ seed: UInt64) {
+		state = seed
+	}
+
+	mutating func nextInt(_ upperBound: Int) -> Int {
+		state = state &* 6364136223846793005 &+ 1442695040888963407
+		return Int(state % UInt64(upperBound))
+	}
+}

@@ -66,8 +66,8 @@
 	branch = main
 [submodule "Sources/CTSGrammars/grammars/kotlin"]
 	path = Sources/CTSGrammars/grammars/kotlin
-	url = https://github.com/tree-sitter-grammars/tree-sitter-kotlin.git
-	branch = master
+	url = https://github.com/fwcd/tree-sitter-kotlin.git
+	branch = main
 [submodule "Sources/CTSGrammars/grammars/elixir"]
 	path = Sources/CTSGrammars/grammars/elixir
 	url = https://github.com/elixir-lang/tree-sitter-elixir.git

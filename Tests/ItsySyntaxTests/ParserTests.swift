@@ -154,6 +154,12 @@ import Testing
 	}
 }
 
+@Test func highlightQueriesLoadForNewGrammars() throws {
+	for language in [Language.bash, .zig, .swift, .sql, .dockerfile, .dart, .kotlin, .elixir] {
+		_ = try HighlightQuery(language: language)
+	}
+}
+
 @Test func syntaxPipelineIncrementalMiddleEditFitsFrameBudget() throws {
 	var editor = Editor(text: largeTypeScriptLineSetWithMiddleLine())
 	var pipeline = SyntaxPipeline(language: .typescript)

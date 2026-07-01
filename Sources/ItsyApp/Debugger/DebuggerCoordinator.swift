@@ -13,6 +13,9 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 	private lazy var watchesCoordinator = DebugWatchesCoordinator { [weak self] in
 		self?.activeSession
 	}
+	private lazy var consoleCoordinator = DebugConsoleCoordinator { [weak self] in
+		self?.activeSession
+	}
 	private var activeSession: DebugAppSession?
 	private var callStackPanel: NSPanel?
 	private var callStackStatusLabel: NSTextField?
@@ -44,12 +47,17 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		watchesCoordinator.showWatches(sender)
 	}
 
+	@objc func showConsole(_ sender: Any?) {
+		consoleCoordinator.showConsole(sender)
+	}
+
 	func terminate() {
 		callStackGeneration += 1
 		activeSession = nil
 		launchCoordinator.terminate()
 		variablesCoordinator.clear()
 		watchesCoordinator.clear()
+		consoleCoordinator.clear()
 	}
 
 	private func debugSessionDidStart(_ session: DebugAppSession) {
@@ -59,6 +67,7 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		}
 		variablesCoordinator.refreshIfVisible()
 		watchesCoordinator.sessionDidStart(session)
+		consoleCoordinator.sessionDidStart(session)
 	}
 
 	private func makeCallStackPanelIfNeeded() -> NSPanel {

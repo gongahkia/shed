@@ -225,6 +225,9 @@ final class AppCoordinator: NSObject {
 					Command(id: "debug.watches", title: L10n.string("Watches"), defaultKey: nil) { [weak self] in
 						self?.showDebugWatches(nil)
 					},
+					Command(id: "debug.console", title: L10n.string("Debug Console"), defaultKey: nil) { [weak self] in
+						self?.showDebugConsole(nil)
+					},
 					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
 						self?.showTerminal(nil)
 					},
@@ -330,6 +333,10 @@ final class AppCoordinator: NSObject {
 
 	@objc func showDebugWatches(_ sender: Any?) {
 		debuggerCoordinator.showWatches(sender)
+	}
+
+	@objc func showDebugConsole(_ sender: Any?) {
+		debuggerCoordinator.showConsole(sender)
 	}
 
 	@objc func showTerminal(_ sender: Any?) {

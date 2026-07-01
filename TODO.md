@@ -317,7 +317,6 @@ Architecture:
 - `ItsyDebugger` (new SwiftPM target) hosts orchestration + UI-adjacent state (breakpoints, stack, threads, variables, watches, console).
 - `ItsyApp/Debugger/` hosts the UI (breakpoints gutter, callstack panel, variables tree, watches, debug console, launch config chooser).
 
-(A) 2026-07-01 +Phase30-DAP @debugui id:1213 est:3h dep:1204 UI: debug console. `NSTextView` with monospace + ANSI coloring (reuse SGR parser from id:1360). Feed `output` events. Input line sends `evaluate` with `context: "repl"`.
 (A) 2026-07-01 +Phase30-DAP @debugui id:1214 est:2h dep:1210 Toolbar: continue / step-over / step-in / step-out / pause / restart / stop. Bind to menu.
 (B) 2026-07-01 +Phase30-DAP @dap id:1215 est:3h dep:1204 Exception filters via `setExceptionBreakpoints`. UI in launch-config panel.
 (B) 2026-07-01 +Phase30-DAP @dap id:1216 est:2h dep:1205 Reverse-debug support (LLDB): `stepBack`, `reverseContinue`. UI-gated behind `session.capabilities.supportsStepBack`.

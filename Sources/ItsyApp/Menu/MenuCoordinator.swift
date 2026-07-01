@@ -191,6 +191,8 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		variablesItem.target = actionTarget
 		let watchesItem = debugMenu.addItem(withTitle: L10n.string("Watches"), action: #selector(AppCoordinator.showDebugWatches(_:)), keyEquivalent: "")
 		watchesItem.target = actionTarget
+		let consoleItem = debugMenu.addItem(withTitle: L10n.string("Debug Console"), action: #selector(AppCoordinator.showDebugConsole(_:)), keyEquivalent: "")
+		consoleItem.target = actionTarget
 		debugItem.submenu = debugMenu
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))

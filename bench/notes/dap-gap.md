@@ -13,14 +13,19 @@
 - Added request/response/event message models with arbitrary JSON bodies.
 - Added typed core models for initialize capabilities, error responses, source breakpoints, threads, stack frames, scopes, variables, continue, stopped, and output events.
 - Added encoding/decoding and framing tests.
+- Added process transport, client session, lifecycle state, and typed event decoding.
+- Added `ItsyDebugger` session facade for threads, stack frames, scopes, variables, evaluate, `setVariable`, and execution controls.
+- Added persisted breakpoint, launch config, and watch stores.
+- Added AppKit debugger UI for launch configs, breakpoint gutter, call stack, variables, watches, debug console, and controls.
+- Added `bench/scripts/dap_smoke.sh` validating LLDB-DAP launch, breakpoint hit, step-over, and variable read on `bench/corpus/debug-hello.swift`.
+
+## Closed
+
+- LLDB-DAP path is verified for Swift launch -> breakpoint -> step-over -> variable read.
+- Core debugger UI surfaces now exist for Phase 30.
 
 ## Still Missing
 
-- No DAP process transport.
-- No debug session lifecycle state machine.
-- No UI for breakpoints, call stack, scopes, variables, or console output.
-- No adapter-specific launch/attach schema.
-
-## Next slice
-
-Current TODO has no Phase 18/19/20 DAP task id. Next DAP slice should be a new post-Phase20 TODO for process transport/session lifecycle, breakpoints, call stack, variables, and launch/attach schema.
+- Exception filter UI and `setExceptionBreakpoints`.
+- Reverse-debug UI gated on adapter capabilities.
+- App-driven smoke that synchronizes persisted breakpoints into launch before `configurationDone`.

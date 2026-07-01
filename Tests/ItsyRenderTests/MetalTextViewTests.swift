@@ -42,11 +42,10 @@ import Testing
 
 	#expect(view.textFontPointSize == 16)
 	#expect(view.showLineNumbers)
-	#expect(numbered.count > plain.count)
-	let numberGlyph = try #require(numbered.first)
-	let textGlyph = try #require(numbered.dropFirst().first)
-	#expect(numberGlyph.screenOrigin.x < textGlyph.screenOrigin.x)
+	#expect(numbered.count == plain.count)
+	let textGlyph = try #require(numbered.first)
 	#expect(textGlyph.screenOrigin.x > plainFirst.screenOrigin.x)
+	#expect(Array(view.gutterView.visibleLineNumberLabels.prefix(2)) == ["1", "2"])
 }
 
 @Test func textViewExposesCurrentLineToAccessibility() throws {
@@ -266,11 +265,11 @@ import Testing
 	])
 	view.gutterDecorator = decorator
 
-	let instances = view.gutterOverlayInstances(scale: 2)
-	#expect(instances.count == 1)
-	#expect(instances[0].color == SIMD4<Float>(0.95, 0.25, 0.22, 1.0))
+	let layouts = view.gutterView.markerLayouts
+	#expect(layouts.count == 1)
+	#expect(layouts[0].marker.id == "a")
 
-	let point = NSPoint(x: CGFloat(instances[0].screenOrigin.x) / 2 + 1, y: CGFloat(instances[0].screenOrigin.y) / 2 + 1)
+	let point = NSPoint(x: layouts[0].rect.midX, y: layouts[0].rect.midY)
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "a")
 }
 
@@ -284,11 +283,13 @@ import Testing
 	])
 	view.gutterDecorator = decorator
 
-	let instances = view.gutterOverlayInstances(scale: 2)
+	let layouts = view.gutterView.markerLayouts
 
-	#expect(instances.count == 3)
-	#expect(instances.allSatisfy { $0.color == color })
-	let point = NSPoint(x: CGFloat(instances[0].screenOrigin.x) / 2 + 1, y: CGFloat(instances[0].screenOrigin.y) / 2 + 1)
+	#expect(layouts.count == 1)
+	#expect(layouts[0].marker.color == color)
+	#expect(layouts[0].marker.placement == .betweenLines)
+	#expect(layouts[0].rect.height == 6)
+	let point = NSPoint(x: layouts[0].rect.midX, y: layouts[0].rect.midY)
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "deleted")
 }
 

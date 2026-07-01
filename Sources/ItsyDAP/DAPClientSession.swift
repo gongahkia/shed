@@ -167,6 +167,8 @@ public actor DAPClientSession {
 			state = .configuring
 		case DAPEvent.stopped where state != .terminated:
 			state = .stopped
+		case DAPEvent.continued where state != .terminated:
+			state = .running
 		case DAPEvent.exited, DAPEvent.terminated:
 			state = .terminated
 		default:

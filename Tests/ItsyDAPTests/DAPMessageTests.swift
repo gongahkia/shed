@@ -199,6 +199,35 @@ import Testing
 	try expectRoundTrip(DAPReverseContinueArguments(threadId: 1, singleThread: true))
 }
 
+@Test func dapTypedEventDecodesLifecycleAndOutputEvents() throws {
+	#expect(try DAPEventMessage(seq: 1, event: DAPEvent.initialized).typed() == .initialized)
+	#expect(try typedEvent(DAPEvent.stopped, DAPStoppedEventBody(reason: "breakpoint", threadId: 2, allThreadsStopped: true, hitBreakpointIds: [9])) == .stopped(DAPStoppedEventBody(reason: "breakpoint", threadId: 2, allThreadsStopped: true, hitBreakpointIds: [9])))
+	#expect(try typedEvent(DAPEvent.continued, DAPContinuedEventBody(threadId: 2, allThreadsContinued: false)) == .continued(DAPContinuedEventBody(threadId: 2, allThreadsContinued: false)))
+	#expect(try typedEvent(DAPEvent.exited, DAPExitedEventBody(exitCode: 7)) == .exited(DAPExitedEventBody(exitCode: 7)))
+	#expect(try DAPEventMessage(seq: 5, event: DAPEvent.terminated).typed() == .terminated(DAPTerminatedEventBody()))
+	#expect(try typedEvent(DAPEvent.terminated, DAPTerminatedEventBody(restart: .bool(true))) == .terminated(DAPTerminatedEventBody(restart: .bool(true))))
+	#expect(try typedEvent(DAPEvent.thread, DAPThreadEventBody(reason: "started", threadId: 2)) == .thread(DAPThreadEventBody(reason: "started", threadId: 2)))
+	#expect(try typedEvent(DAPEvent.output, DAPOutputEventBody(category: DAPOutputCategory.stderr, output: "warn\n", data: .object(["fd": .int(2)]), locationReference: 4)) == .output(DAPOutputEventBody(category: DAPOutputCategory.stderr, output: "warn\n", data: .object(["fd": .int(2)]), locationReference: 4)))
+}
+
+@Test func dapTypedEventDecodesDebuggerMetadataEvents() throws {
+	let breakpoint = DAPBreakpoint(id: 1, verified: true, line: 12)
+	let module = DAPModule(id: .string("libswift"), name: "libswiftCore.dylib", path: "/usr/lib/libswiftCore.dylib", isOptimized: true, symbolStatus: "loaded")
+	let source = DAPSource(name: "main.swift", path: "/tmp/main.swift")
+	let capabilities = DAPCapabilities(supportsConfigurationDoneRequest: true)
+
+	#expect(try typedEvent(DAPEvent.breakpoint, DAPBreakpointEventBody(reason: "changed", breakpoint: breakpoint)) == .breakpoint(DAPBreakpointEventBody(reason: "changed", breakpoint: breakpoint)))
+	#expect(try typedEvent(DAPEvent.module, DAPModuleEventBody(reason: "new", module: module)) == .module(DAPModuleEventBody(reason: "new", module: module)))
+	#expect(try typedEvent(DAPEvent.loadedSource, DAPLoadedSourceEventBody(reason: "new", source: source)) == .loadedSource(DAPLoadedSourceEventBody(reason: "new", source: source)))
+	#expect(try typedEvent(DAPEvent.process, DAPProcessEventBody(name: "/tmp/app", systemProcessId: 42, isLocalProcess: true, startMethod: "launch", pointerSize: 64)) == .process(DAPProcessEventBody(name: "/tmp/app", systemProcessId: 42, isLocalProcess: true, startMethod: "launch", pointerSize: 64)))
+	#expect(try typedEvent(DAPEvent.capabilities, DAPCapabilitiesEventBody(capabilities: capabilities)) == .capabilities(DAPCapabilitiesEventBody(capabilities: capabilities)))
+	#expect(try typedEvent(DAPEvent.invalidated, DAPInvalidatedEventBody(areas: [DAPInvalidatedArea.stacks, DAPInvalidatedArea.variables], threadId: 2, stackFrameId: 7)) == .invalidated(DAPInvalidatedEventBody(areas: [DAPInvalidatedArea.stacks, DAPInvalidatedArea.variables], threadId: 2, stackFrameId: 7)))
+	#expect(try DAPEventMessage(seq: 9, event: "custom", body: .object(["value": .int(1)])).typed() == .unknown(DAPEventMessage(seq: 9, event: "custom", body: .object(["value": .int(1)]))))
+	#expect(throws: DAPTypedEventError.self) {
+		_ = try DAPEventMessage(seq: 10, event: DAPEvent.stopped).typed()
+	}
+}
+
 @Test func dapErrorResponseBodyDecodesMessage() throws {
 	let body = DAPErrorResponseBody(error: DAPErrorMessage(
 		id: 1001,
@@ -236,6 +265,10 @@ private func eventMessage(from message: DAPMessage) -> DAPEventMessage? {
 		return event
 	}
 	return nil
+}
+
+private func typedEvent<Value: Encodable>(_ name: String, _ body: Value) throws -> DAPTypedEvent {
+	try DAPEventMessage(seq: 1, event: name, body: DAPAny(encoding: body)).typed()
 }
 
 private func expectRoundTrip<Value: Codable & Equatable>(_ value: Value) throws {

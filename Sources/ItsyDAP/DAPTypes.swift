@@ -34,8 +34,11 @@ public enum DAPEvent {
 	public static let thread = "thread"
 	public static let output = "output"
 	public static let breakpoint = "breakpoint"
+	public static let module = "module"
+	public static let loadedSource = "loadedSource"
 	public static let process = "process"
 	public static let capabilities = "capabilities"
+	public static let invalidated = "invalidated"
 }
 
 public struct DAPInitializeRequestArguments: Codable, Equatable, Sendable {
@@ -782,30 +785,256 @@ public struct DAPStoppedEventBody: Codable, Equatable, Sendable {
 	public var reason: String
 	public var description: String?
 	public var threadId: Int?
+	public var preserveFocusHint: Bool?
+	public var text: String?
 	public var allThreadsStopped: Bool?
+	public var hitBreakpointIds: [Int]?
 
-	public init(reason: String, description: String? = nil, threadId: Int? = nil, allThreadsStopped: Bool? = nil) {
+	public init(reason: String, description: String? = nil, threadId: Int? = nil, preserveFocusHint: Bool? = nil, text: String? = nil, allThreadsStopped: Bool? = nil, hitBreakpointIds: [Int]? = nil) {
 		self.reason = reason
 		self.description = description
 		self.threadId = threadId
+		self.preserveFocusHint = preserveFocusHint
+		self.text = text
 		self.allThreadsStopped = allThreadsStopped
+		self.hitBreakpointIds = hitBreakpointIds
+	}
+}
+
+public struct DAPContinuedEventBody: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var allThreadsContinued: Bool?
+
+	public init(threadId: Int, allThreadsContinued: Bool? = nil) {
+		self.threadId = threadId
+		self.allThreadsContinued = allThreadsContinued
+	}
+}
+
+public struct DAPExitedEventBody: Codable, Equatable, Sendable {
+	public var exitCode: Int
+
+	public init(exitCode: Int) {
+		self.exitCode = exitCode
+	}
+}
+
+public struct DAPTerminatedEventBody: Codable, Equatable, Sendable {
+	public var restart: DAPAny?
+
+	public init(restart: DAPAny? = nil) {
+		self.restart = restart
+	}
+}
+
+public struct DAPThreadEventBody: Codable, Equatable, Sendable {
+	public var reason: String
+	public var threadId: Int
+
+	public init(reason: String, threadId: Int) {
+		self.reason = reason
+		self.threadId = threadId
 	}
 }
 
 public struct DAPOutputEventBody: Codable, Equatable, Sendable {
 	public var category: String?
 	public var output: String
+	public var group: String?
 	public var variablesReference: Int?
 	public var source: DAPSource?
 	public var line: Int?
 	public var column: Int?
+	public var data: DAPAny?
+	public var locationReference: Int?
 
-	public init(category: String? = nil, output: String, variablesReference: Int? = nil, source: DAPSource? = nil, line: Int? = nil, column: Int? = nil) {
+	public init(category: String? = nil, output: String, group: String? = nil, variablesReference: Int? = nil, source: DAPSource? = nil, line: Int? = nil, column: Int? = nil, data: DAPAny? = nil, locationReference: Int? = nil) {
 		self.category = category
 		self.output = output
+		self.group = group
 		self.variablesReference = variablesReference
 		self.source = source
 		self.line = line
 		self.column = column
+		self.data = data
+		self.locationReference = locationReference
+	}
+}
+
+public enum DAPOutputCategory {
+	public static let console = "console"
+	public static let stdout = "stdout"
+	public static let stderr = "stderr"
+	public static let important = "important"
+	public static let telemetry = "telemetry"
+}
+
+public struct DAPBreakpointEventBody: Codable, Equatable, Sendable {
+	public var reason: String
+	public var breakpoint: DAPBreakpoint
+
+	public init(reason: String, breakpoint: DAPBreakpoint) {
+		self.reason = reason
+		self.breakpoint = breakpoint
+	}
+}
+
+public struct DAPModule: Codable, Equatable, Sendable {
+	public var id: DAPAny
+	public var name: String
+	public var path: String?
+	public var isOptimized: Bool?
+	public var isUserCode: Bool?
+	public var version: String?
+	public var symbolStatus: String?
+	public var symbolFilePath: String?
+	public var dateTimeStamp: String?
+	public var addressRange: String?
+
+	public init(id: DAPAny, name: String, path: String? = nil, isOptimized: Bool? = nil, isUserCode: Bool? = nil, version: String? = nil, symbolStatus: String? = nil, symbolFilePath: String? = nil, dateTimeStamp: String? = nil, addressRange: String? = nil) {
+		self.id = id
+		self.name = name
+		self.path = path
+		self.isOptimized = isOptimized
+		self.isUserCode = isUserCode
+		self.version = version
+		self.symbolStatus = symbolStatus
+		self.symbolFilePath = symbolFilePath
+		self.dateTimeStamp = dateTimeStamp
+		self.addressRange = addressRange
+	}
+}
+
+public struct DAPModuleEventBody: Codable, Equatable, Sendable {
+	public var reason: String
+	public var module: DAPModule
+
+	public init(reason: String, module: DAPModule) {
+		self.reason = reason
+		self.module = module
+	}
+}
+
+public struct DAPLoadedSourceEventBody: Codable, Equatable, Sendable {
+	public var reason: String
+	public var source: DAPSource
+
+	public init(reason: String, source: DAPSource) {
+		self.reason = reason
+		self.source = source
+	}
+}
+
+public struct DAPProcessEventBody: Codable, Equatable, Sendable {
+	public var name: String
+	public var systemProcessId: Int?
+	public var isLocalProcess: Bool?
+	public var startMethod: String?
+	public var pointerSize: Int?
+
+	public init(name: String, systemProcessId: Int? = nil, isLocalProcess: Bool? = nil, startMethod: String? = nil, pointerSize: Int? = nil) {
+		self.name = name
+		self.systemProcessId = systemProcessId
+		self.isLocalProcess = isLocalProcess
+		self.startMethod = startMethod
+		self.pointerSize = pointerSize
+	}
+}
+
+public struct DAPCapabilitiesEventBody: Codable, Equatable, Sendable {
+	public var capabilities: DAPCapabilities
+
+	public init(capabilities: DAPCapabilities) {
+		self.capabilities = capabilities
+	}
+}
+
+public enum DAPInvalidatedArea {
+	public static let all = "all"
+	public static let stacks = "stacks"
+	public static let threads = "threads"
+	public static let variables = "variables"
+}
+
+public struct DAPInvalidatedEventBody: Codable, Equatable, Sendable {
+	public var areas: [String]?
+	public var threadId: Int?
+	public var stackFrameId: Int?
+
+	public init(areas: [String]? = nil, threadId: Int? = nil, stackFrameId: Int? = nil) {
+		self.areas = areas
+		self.threadId = threadId
+		self.stackFrameId = stackFrameId
+	}
+}
+
+public enum DAPTypedEventError: Error, Equatable, Sendable {
+	case missingBody(String)
+}
+
+public enum DAPTypedEvent: Equatable, Sendable {
+	case initialized
+	case stopped(DAPStoppedEventBody)
+	case continued(DAPContinuedEventBody)
+	case exited(DAPExitedEventBody)
+	case terminated(DAPTerminatedEventBody)
+	case thread(DAPThreadEventBody)
+	case output(DAPOutputEventBody)
+	case breakpoint(DAPBreakpointEventBody)
+	case module(DAPModuleEventBody)
+	case loadedSource(DAPLoadedSourceEventBody)
+	case process(DAPProcessEventBody)
+	case capabilities(DAPCapabilitiesEventBody)
+	case invalidated(DAPInvalidatedEventBody)
+	case unknown(DAPEventMessage)
+
+	public init(message: DAPEventMessage) throws {
+		switch message.event {
+		case DAPEvent.initialized:
+			self = .initialized
+		case DAPEvent.stopped:
+			self = .stopped(try Self.body(message, as: DAPStoppedEventBody.self))
+		case DAPEvent.continued:
+			self = .continued(try Self.body(message, as: DAPContinuedEventBody.self))
+		case DAPEvent.exited:
+			self = .exited(try Self.body(message, as: DAPExitedEventBody.self))
+		case DAPEvent.terminated:
+			if message.body == nil {
+				self = .terminated(DAPTerminatedEventBody())
+			} else {
+				self = .terminated(try Self.body(message, as: DAPTerminatedEventBody.self))
+			}
+		case DAPEvent.thread:
+			self = .thread(try Self.body(message, as: DAPThreadEventBody.self))
+		case DAPEvent.output:
+			self = .output(try Self.body(message, as: DAPOutputEventBody.self))
+		case DAPEvent.breakpoint:
+			self = .breakpoint(try Self.body(message, as: DAPBreakpointEventBody.self))
+		case DAPEvent.module:
+			self = .module(try Self.body(message, as: DAPModuleEventBody.self))
+		case DAPEvent.loadedSource:
+			self = .loadedSource(try Self.body(message, as: DAPLoadedSourceEventBody.self))
+		case DAPEvent.process:
+			self = .process(try Self.body(message, as: DAPProcessEventBody.self))
+		case DAPEvent.capabilities:
+			self = .capabilities(try Self.body(message, as: DAPCapabilitiesEventBody.self))
+		case DAPEvent.invalidated:
+			self = .invalidated(try Self.body(message, as: DAPInvalidatedEventBody.self))
+		default:
+			self = .unknown(message)
+		}
+	}
+
+	private static func body<Value: Decodable>(_ message: DAPEventMessage, as type: Value.Type) throws -> Value {
+		guard let body = message.body else {
+			throw DAPTypedEventError.missingBody(message.event)
+		}
+		return try JSONDecoder().decode(type, from: JSONEncoder().encode(body))
+	}
+}
+
+public extension DAPEventMessage {
+	func typed() throws -> DAPTypedEvent {
+		try DAPTypedEvent(message: self)
 	}
 }

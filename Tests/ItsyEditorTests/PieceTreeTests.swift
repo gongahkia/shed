@@ -1,4 +1,5 @@
 @testable import ItsyEditor
+import Foundation
 import Testing
 
 @Test func pieceTreeTracksLengthLinesAndBytes() {
@@ -42,4 +43,24 @@ import Testing
 		return true
 	}
 	#expect(chunks == ["DEF", "bc"])
+}
+
+@Test func pieceTreeInitializesFromMappedFileAsSingleOriginalPiece() throws {
+	let fileManager = FileManager.default
+	let directory = fileManager.temporaryDirectory.appendingPathComponent("itsy-piecetree-map-\(UUID().uuidString)", isDirectory: true)
+	try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer {
+		try? fileManager.removeItem(at: directory)
+	}
+
+	let url = directory.appendingPathComponent("sample.txt")
+	try Data("alpha\nbeta\ngamma".utf8).write(to: url)
+	let tree = try PieceTree(readingMappedFile: url)
+	#expect(tree.length == "alpha\nbeta\ngamma".utf8.count)
+	#expect(tree.lineCount == 3)
+	#expect(tree.substring(6 ..< 10) == "beta")
+	#expect(tree.offset(forLine: 2) == 11)
+	#expect(tree.debugPieces() == [
+		PieceTree.Piece(buffer: .original(0), start: 0, length: tree.length, lineFeeds: 2),
+	])
 }

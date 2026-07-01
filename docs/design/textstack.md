@@ -1,6 +1,6 @@
 # Text Stack Design
 
-Status: proposed for Phase 22 design lock.
+Status: locked for Phase 22 implementation on 2026-07-01.
 
 ## Goal
 

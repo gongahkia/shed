@@ -1,3 +1,5 @@
+import Foundation
+
 public struct PieceTree: Sendable {
 	public enum BufferID: Equatable, Sendable {
 		case original(Int)
@@ -19,7 +21,7 @@ public struct PieceTree: Sendable {
 	}
 
 	private var root: PieceTreeNode?
-	private var originalBuffers: [[UInt8]]
+	private var originalBuffers: [PieceTreeOriginalBuffer]
 	private var addBuffers: [[UInt8]]
 
 	public init() {
@@ -33,12 +35,25 @@ public struct PieceTree: Sendable {
 	}
 
 	public init(bytes: [UInt8]) {
-		originalBuffers = bytes.isEmpty ? [] : [bytes]
+		originalBuffers = bytes.isEmpty ? [] : [.bytes(bytes)]
 		addBuffers = []
 		if bytes.isEmpty {
 			root = nil
 		} else {
 			let piece = Piece(buffer: .original(0), start: 0, length: bytes.count, lineFeeds: Self.lineFeeds(in: bytes))
+			root = Self.buildTree(from: [piece])
+		}
+	}
+
+	public init(readingMappedFile url: URL) throws {
+		let mapped = try MMapBuffer(url: url)
+		originalBuffers = mapped.count == 0 ? [] : [.mapped(mapped)]
+		addBuffers = []
+		if mapped.count == 0 {
+			root = nil
+		} else {
+			let lineStarts = LineFeedIndexer.lineStarts(in: mapped.bytes)
+			let piece = Piece(buffer: .original(0), start: 0, length: mapped.count, lineFeeds: lineStarts.count - 1)
 			root = Self.buildTree(from: [piece])
 		}
 	}
@@ -375,6 +390,20 @@ public struct PieceTree: Sendable {
 
 	private static func lineFeeds(in bytes: [UInt8]) -> Int {
 		bytes.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+	}
+}
+
+private enum PieceTreeOriginalBuffer: Sendable {
+	case bytes([UInt8])
+	case mapped(MMapBuffer)
+
+	func withUnsafeBufferPointer<T>(_ body: (UnsafeBufferPointer<UInt8>) throws -> T) rethrows -> T {
+		switch self {
+		case let .bytes(bytes):
+			return try bytes.withUnsafeBufferPointer(body)
+		case let .mapped(buffer):
+			return try body(buffer.bytes)
+		}
 	}
 }
 

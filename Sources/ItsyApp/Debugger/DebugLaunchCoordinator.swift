@@ -235,14 +235,16 @@ final class DebugAppSession: @unchecked Sendable {
 	let configuration: DebugLaunchConfiguration
 	let adapter: DebugAdapterConfig
 	let client: DAPClientSession
+	let supportsSetVariable: Bool
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, supportsSetVariable: Bool, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
 		self.client = client
+		self.supportsSetVariable = supportsSetVariable
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -290,7 +292,7 @@ final class DebugAppSession: @unchecked Sendable {
 			let initializedTask = Task {
 				try await waitForFirstEvent(initialized)
 			}
-			try await client.initialize(clientCapabilities: DAPInitializeRequestArguments(
+			let initializeResponse = try await client.initialize(clientCapabilities: DAPInitializeRequestArguments(
 				clientID: "itsy",
 				clientName: "Itsy",
 				adapterID: adapter.id,
@@ -302,6 +304,7 @@ final class DebugAppSession: @unchecked Sendable {
 				supportsProgressReporting: true,
 				supportsInvalidatedEvent: true
 			))
+			let supportsSetVariable = Self.supportsSetVariable(in: initializeResponse)
 			try await waitForInitialized(initializedTask)
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
@@ -312,7 +315,7 @@ final class DebugAppSession: @unchecked Sendable {
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
 			try await client.configurationDone()
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			transport.terminate()
@@ -364,6 +367,16 @@ final class DebugAppSession: @unchecked Sendable {
 			task.cancel()
 			throw error
 		}
+	}
+
+	private static func supportsSetVariable(in response: DAPResponse) -> Bool {
+		guard let body = response.body,
+		      let data = try? JSONEncoder().encode(body),
+		      let capabilities = try? JSONDecoder().decode(DAPCapabilities.self, from: data)
+		else {
+			return false
+		}
+		return capabilities.supportsSetVariable == true
 	}
 
 	private static func resolveExecutable(_ command: String, workspaceRoot: URL) -> URL? {

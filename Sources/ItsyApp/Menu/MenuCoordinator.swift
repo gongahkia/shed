@@ -187,6 +187,8 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		startDebugItem.target = actionTarget
 		let callStackItem = debugMenu.addItem(withTitle: L10n.string("Call Stack"), action: #selector(AppCoordinator.showDebugCallStack(_:)), keyEquivalent: "")
 		callStackItem.target = actionTarget
+		let variablesItem = debugMenu.addItem(withTitle: L10n.string("Variables"), action: #selector(AppCoordinator.showDebugVariables(_:)), keyEquivalent: "")
+		variablesItem.target = actionTarget
 		debugItem.submenu = debugMenu
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))

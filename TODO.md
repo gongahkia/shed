@@ -39,7 +39,7 @@ Blocked / off-target:
 
 Known structural issues (targeted by Phase 21+):
 
-- `Sources/ItsyApp/main.swift` = 4231 LOC, `Document.swift` = 2318 LOC, `MetalTextView.swift` = 2752 LOC. Feature state concentrated in `AppDelegate` (~100 instance vars) and `EditorWindowController`.
+- `Sources/ItsyApp/App/AppDelegate.swift` = 4191 LOC, `Document.swift` = 2318 LOC, `MetalTextView.swift` = 2752 LOC. Feature state concentrated in `AppDelegate` (~100 instance vars) and `EditorWindowController`.
 - `Editor.text` full flatten; `Document.data(ofType:)` full flatten on every save.
 - Rope insert rebuilds the affected leaf as a full `String` then re-splits; each ancestor branch reallocates children. Repeated-ASCII fast path masks this in current benchmarks.
 - `UndoStack.record` snapshots full `textBefore: String` every 32 edits.
@@ -189,9 +189,8 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(A) 2026-07-01 +Phase21-Refactor @refactor id:801 est:2h dep:800 Extract `AppDelegate` from `main.swift` to `Sources/ItsyApp/App/AppDelegate.swift`. `main.swift` retains only `recordBenchStage("process_start")`, `NSApplication.shared`, `documentController`, `appDelegate`, `app.setActivationPolicy(.regular)`, `app.delegate = appDelegate`, `app.run()`. Acceptance: unchanged behavior, `swift test` passes.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:802 est:3h dep:801 Split `AppDelegate` into a shell + coordinators. Introduce `MenuCoordinator`, `CommandPaletteCoordinator`, `ProjectFindCoordinator`, `GitCoordinator`, `TaskCoordinator`, `ProblemsCoordinator`, `OutlineCoordinator`, `TerminalCoordinator`, `SettingsCoordinator`. Each coordinator owns its panel + state, exposes a small handle to the delegate. `AppDelegate` retains only lifecycle callbacks (`applicationDidFinishLaunching`, `applicationWillTerminate`, `application(_:openFile:)`, `application(_:continue:restorationHandler:)`) and registers each coordinator. Target: `AppDelegate` under 200 LOC, ≤10 stored properties.
-(A) 2026-07-01 +Phase21-Refactor @refactor id:803 est:2h dep:802 Move `OutlineKindNode`, `OutlineSymbolNode`, `OutlineCollapseStore`, `GitCommitDraft`, `GitCommitDraftStore` from `main.swift` into `Sources/ItsyApp/Outline/` and `Sources/ItsyApp/Git/`.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:803 est:2h dep:802 Move `OutlineKindNode`, `OutlineSymbolNode`, `OutlineCollapseStore`, `GitCommitDraft`, `GitCommitDraftStore` from `App/AppDelegate.swift` into `Sources/ItsyApp/Outline/` and `Sources/ItsyApp/Git/`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:804 est:2h dep:802 Move all `@objc private func toggle*/show*/refresh*` for Git into `GitCoordinator`; wire menu actions to coordinator via `NSApp.sendAction(_:to:from:)`. Delete duplicated Git state from `AppDelegate`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:805 est:2h dep:802 Same treatment for Command Palette (see `main.swift:367..649`): move all palette state + view construction + filter/run into `CommandPaletteCoordinator`.
 (A) 2026-07-01 +Phase21-Refactor @refactor id:806 est:2h dep:802 Same treatment for Project Find (see `main.swift:811..993`).

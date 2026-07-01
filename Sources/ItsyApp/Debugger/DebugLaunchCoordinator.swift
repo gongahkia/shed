@@ -305,7 +305,6 @@ final class DebugAppSession: @unchecked Sendable {
 				supportsInvalidatedEvent: true
 			))
 			let supportsSetVariable = Self.supportsSetVariable(in: initializeResponse)
-			try await waitForInitialized(initializedTask)
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
 				try await client.launch(arguments: try DAPAny(encoding: launchArguments(for: configuration, workspaceRoot: workspaceRoot)))
@@ -314,6 +313,7 @@ final class DebugAppSession: @unchecked Sendable {
 			default:
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
+			try await waitForInitialized(initializedTask)
 			try await client.configurationDone()
 			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
 		} catch {

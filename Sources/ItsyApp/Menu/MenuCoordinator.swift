@@ -55,6 +55,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		let viewItem = NSMenuItem()
 		let gitItem = NSMenuItem()
 		let taskItem = NSMenuItem()
+		let debugItem = NSMenuItem()
 		let terminalItem = NSMenuItem()
 		let problemItem = NSMenuItem()
 		let commandItem = NSMenuItem()
@@ -65,6 +66,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		mainMenu.addItem(viewItem)
 		mainMenu.addItem(gitItem)
 		mainMenu.addItem(taskItem)
+		mainMenu.addItem(debugItem)
 		mainMenu.addItem(terminalItem)
 		mainMenu.addItem(problemItem)
 		mainMenu.addItem(commandItem)
@@ -178,6 +180,13 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		taskRefreshItem.target = actionTarget
 		taskItem.submenu = taskMenu
 
+		let debugMenu = NSMenu(title: L10n.string("Debug"))
+		debugMenu.disableAutomaticWritingToolsItems()
+		let startDebugItem = debugMenu.addItem(withTitle: L10n.string("Start Debugging"), action: #selector(AppCoordinator.showDebugLaunchConfigPicker(_:)), keyEquivalent: Self.functionKeyEquivalent(NSF5FunctionKey))
+		startDebugItem.keyEquivalentModifierMask = [.command]
+		startDebugItem.target = actionTarget
+		debugItem.submenu = debugMenu
+
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))
 		terminalMenu.disableAutomaticWritingToolsItems()
 		let terminalShowItem = terminalMenu.addItem(withTitle: L10n.string("Terminal"), action: #selector(AppCoordinator.showTerminal(_:)), keyEquivalent: "`")
@@ -225,6 +234,15 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		let clearItem = menu.addItem(withTitle: L10n.string("Clear Menu"), action: #selector(NSDocumentController.clearRecentDocuments(_:)), keyEquivalent: "")
 		clearItem.target = documentController
 		clearItem.isEnabled = !urls.isEmpty
+	}
+}
+
+private extension MenuCoordinator {
+	static func functionKeyEquivalent(_ key: Int) -> String {
+		guard let scalar = UnicodeScalar(key) else {
+			return ""
+		}
+		return String(scalar)
 	}
 }
 

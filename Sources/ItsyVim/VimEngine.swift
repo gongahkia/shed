@@ -37,6 +37,26 @@ public enum VisualMode: Sendable, Equatable {
 	case block
 }
 
+public enum CharacterMotion: Sendable, Equatable {
+	case findForward
+	case findBackward
+	case tillForward
+	case tillBackward
+
+	public var reversed: CharacterMotion {
+		switch self {
+		case .findForward:
+			return .findBackward
+		case .findBackward:
+			return .findForward
+		case .tillForward:
+			return .tillBackward
+		case .tillBackward:
+			return .tillForward
+		}
+	}
+}
+
 public enum VimOperator: Sendable, Equatable {
 	case delete
 	case change
@@ -59,6 +79,26 @@ public struct Position: Sendable, Equatable {
 	}
 }
 
+public struct VimSelection: Sendable, Equatable {
+	public var anchor: Int
+	public var head: Int
+
+	public init(anchor: Int, head: Int) {
+		self.anchor = anchor
+		self.head = head
+	}
+}
+
+public struct SelectionSnapshot: Sendable, Equatable {
+	public var primary: VimSelection
+	public var secondaries: [VimSelection]
+
+	public init(primary: VimSelection, secondaries: [VimSelection] = []) {
+		self.primary = primary
+		self.secondaries = secondaries
+	}
+}
+
 public enum SearchDirection: Sendable, Equatable {
 	case forward
 	case backward
@@ -71,6 +111,25 @@ public struct SearchQuery: Sendable, Equatable {
 	public init(text: String, direction: SearchDirection) {
 		self.text = text
 		self.direction = direction
+	}
+}
+
+public struct RecordedKey: Sendable, Equatable {
+	public var characters: String
+	public var charactersIgnoringModifiers: String
+	public var keyCode: UInt16
+	public var modifierFlags: KeyModifiers
+
+	public init(
+		characters: String,
+		charactersIgnoringModifiers: String,
+		keyCode: UInt16,
+		modifierFlags: KeyModifiers = []
+	) {
+		self.characters = characters
+		self.charactersIgnoringModifiers = charactersIgnoringModifiers
+		self.keyCode = keyCode
+		self.modifierFlags = modifierFlags
 	}
 }
 
@@ -121,17 +180,95 @@ public enum VimAction: Sendable, Equatable {
 	case command(String)
 }
 
+public enum VimCommandAction: Sendable, Equatable {
+	case motion(String)
+	case visualMotion(String)
+	case beginCharacterMotion(CharacterMotion)
+	case repeatCharacterMotion(reversed: Bool)
+	case undo
+	case redo
+	case addNextSelection
+	case beginOperator(VimOperator)
+	case applySelectionOperator(VimOperator)
+	case applyPendingOperatorMotion(String)
+	case applyPendingOperatorTextObject(String)
+	case lineOperator(VimOperator)
+	case jumpBack
+	case macroRecordPrefix
+	case macroReplayPrefix
+	case paste(after: Bool)
+	case exStart
+	case beginVisualMode(VisualMode)
+	case search(String, recordsJump: Bool)
+	case save
+	case close
+	case normalMode
+	case insertMode
+	case emacsMode
+	case handled
+}
+
 public struct VimEngine: Sendable {
-	public private(set) var mode: Mode
-	public private(set) var pendingOperator: VimOperator?
-	public private(set) var pendingCount: Int?
-	public private(set) var register: VimRegister
-	public private(set) var marks: [Character: Position]
-	public private(set) var macros: [Character: [Key]]
-	public private(set) var macroRecording: Character?
-	public private(set) var lastSearch: SearchQuery?
+	private static let motionCommandIDs: [String: String] = [
+		"editor.moveLeft": "editor.moveLeft",
+		"editor.moveRight": "editor.moveRight",
+		"editor.moveDown": "editor.moveDown",
+		"editor.moveUp": "editor.moveUp",
+		"editor.moveWordForward": "editor.moveWordForward",
+		"editor.moveWordBackward": "editor.moveWordBackward",
+		"editor.moveWordEnd": "editor.moveWordEnd",
+		"editor.moveBigWordForward": "editor.moveBigWordForward",
+		"editor.moveBigWordBackward": "editor.moveBigWordBackward",
+		"editor.moveBigWordEnd": "editor.moveBigWordEnd",
+		"editor.moveLineStart": "editor.moveLineStart",
+		"editor.moveLineEnd": "editor.moveLineEnd",
+		"editor.moveBufferStart": "editor.moveBufferStart",
+		"editor.moveBufferEnd": "editor.moveBufferEnd",
+		"editor.moveParagraphForward": "editor.moveParagraphForward",
+		"editor.moveParagraphBackward": "editor.moveParagraphBackward",
+	]
+	private static let textObjectCommandIDs: [String: String] = [
+		"vim.textObject.innerWord": "vim.textObject.innerWord",
+		"vim.textObject.aroundWord": "vim.textObject.aroundWord",
+		"vim.textObject.innerDoubleQuote": "vim.textObject.innerDoubleQuote",
+		"vim.textObject.aroundDoubleQuote": "vim.textObject.aroundDoubleQuote",
+		"vim.textObject.innerSingleQuote": "vim.textObject.innerSingleQuote",
+		"vim.textObject.aroundSingleQuote": "vim.textObject.aroundSingleQuote",
+		"vim.textObject.innerParen": "vim.textObject.innerParen",
+		"vim.textObject.aroundParen": "vim.textObject.aroundParen",
+		"vim.textObject.innerBracket": "vim.textObject.innerBracket",
+		"vim.textObject.aroundBracket": "vim.textObject.aroundBracket",
+		"vim.textObject.innerBrace": "vim.textObject.innerBrace",
+		"vim.textObject.aroundBrace": "vim.textObject.aroundBrace",
+		"vim.textObject.innerParagraph": "vim.textObject.innerParagraph",
+		"vim.textObject.aroundParagraph": "vim.textObject.aroundParagraph",
+	]
+	public var mode: Mode
+	public var pendingCharacterMotion: CharacterMotion?
+	public var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
+	public var pendingOperator: VimOperator?
+	public var pendingOperatorCount: Int
+	public var pendingCount: Int?
+	public var register: VimRegister
+	public var pendingRegister: String?
+	public var registers: [String: String]
+	public var visualAnchor: Int?
+	public var visualHead: Int?
+	public var visualMode: VisualMode?
+	public var jumpBackSelection: SelectionSnapshot?
+	public var marks: [Character: Position]
+	public var macros: [Character: [Key]]
+	public var macroRegisters: [String: [RecordedKey]]
+	public var macroRecording: Character?
+	public var recordingMacroRegister: String?
+	public var currentMacroEvents: [RecordedKey]
+	public var lastSearch: SearchQuery?
+	public var awaitingRegister: Bool
+	public var awaitingMacroRecordRegister: Bool
+	public var awaitingMacroReplayRegister: Bool
+	public var replayingMacro: Bool
+	public var pendingExCommand: String?
 	private var pendingChord: [Key]
-	private var awaitingRegister: Bool
 	private var awaitingMarkSet: Bool
 	private var awaitingMarkJump: Bool
 	private var awaitingMacroRecord: Bool
@@ -148,15 +285,31 @@ public struct VimEngine: Sendable {
 		lastSearch: SearchQuery? = nil
 	) {
 		self.mode = mode
+		self.pendingCharacterMotion = nil
+		self.lastCharacterMotion = nil
 		self.pendingOperator = pendingOperator
+		self.pendingOperatorCount = 1
 		self.pendingCount = pendingCount
 		self.register = register
+		self.pendingRegister = nil
+		self.registers = [:]
+		self.visualAnchor = nil
+		self.visualHead = nil
+		self.visualMode = nil
+		self.jumpBackSelection = nil
 		self.marks = marks
 		self.macros = macros
+		self.macroRegisters = [:]
 		self.macroRecording = macroRecording
+		self.recordingMacroRegister = nil
+		self.currentMacroEvents = []
 		self.lastSearch = lastSearch
+		self.awaitingRegister = false
+		self.awaitingMacroRecordRegister = false
+		self.awaitingMacroReplayRegister = false
+		self.replayingMacro = false
+		self.pendingExCommand = nil
 		pendingChord = []
-		awaitingRegister = false
 		awaitingMarkSet = false
 		awaitingMarkJump = false
 		awaitingMacroRecord = false
@@ -191,6 +344,103 @@ public struct VimEngine: Sendable {
 		case .command:
 			return handleCommand(key)
 		}
+	}
+
+	public mutating func handle(commandID: String, count: Int, hasSelection: Bool) -> VimCommandAction? {
+		if let motion = Self.motionCommandIDs[commandID] {
+			if visualMode != nil {
+				return .visualMotion(motion)
+			}
+			if pendingOperator != nil {
+				return .applyPendingOperatorMotion(motion)
+			}
+			return .motion(motion)
+		}
+		if let textObject = Self.textObjectCommandIDs[commandID], pendingOperator != nil {
+			return .applyPendingOperatorTextObject(textObject)
+		}
+		switch commandID {
+		case "editor.findCharForward":
+			pendingCharacterMotion = .findForward
+			return .handled
+		case "editor.findCharBackward":
+			pendingCharacterMotion = .findBackward
+			return .handled
+		case "editor.tillCharForward":
+			pendingCharacterMotion = .tillForward
+			return .handled
+		case "editor.tillCharBackward":
+			pendingCharacterMotion = .tillBackward
+			return .handled
+		case "editor.repeatCharFind":
+			return .repeatCharacterMotion(reversed: false)
+		case "editor.repeatCharFindReverse":
+			return .repeatCharacterMotion(reversed: true)
+		case "edit.undo":
+			return .undo
+		case "edit.redo":
+			return .redo
+		case "editor.addNextSelection":
+			return .addNextSelection
+		case "vim.operator.delete":
+			return beginOperatorAction(.delete, count: count, hasSelection: hasSelection)
+		case "vim.operator.change":
+			return beginOperatorAction(.change, count: count, hasSelection: hasSelection)
+		case "vim.operator.yank":
+			return beginOperatorAction(.yank, count: count, hasSelection: hasSelection)
+		case "vim.registerPrefix":
+			awaitingRegister = true
+			return .handled
+		case "vim.jumpBack":
+			return .jumpBack
+		case "vim.macro.recordPrefix":
+			return .macroRecordPrefix
+		case "vim.macro.replayPrefix":
+			awaitingMacroReplayRegister = true
+			return .handled
+		case "vim.pasteAfter":
+			return .paste(after: true)
+		case "vim.pasteBefore":
+			return .paste(after: false)
+		case "vim.ex.start":
+			pendingExCommand = ""
+			return .exStart
+		case "vim.visual.char":
+			return .beginVisualMode(.character)
+		case "vim.visual.line":
+			return .beginVisualMode(.line)
+		case "vim.visual.block":
+			return .beginVisualMode(.block)
+		case "vim.operator.line.delete":
+			return .lineOperator(.delete)
+		case "vim.operator.line.change":
+			return .lineOperator(.change)
+		case "vim.operator.line.yank":
+			return .lineOperator(.yank)
+		case "edit.findNext", "edit.findPrevious", "vim.searchForward", "vim.searchBackward":
+			return .search(commandID, recordsJump: mode == .normal)
+		case "file.save":
+			return .save
+		case "file.close":
+			return .close
+		case "mode.normal":
+			return .normalMode
+		case "mode.insert":
+			return .insertMode
+		case "mode.emacs":
+			return .emacsMode
+		default:
+			return nil
+		}
+	}
+
+	private mutating func beginOperatorAction(_ op: VimOperator, count: Int, hasSelection: Bool) -> VimCommandAction {
+		if hasSelection {
+			return .applySelectionOperator(op)
+		}
+		pendingOperator = op
+		pendingOperatorCount = max(1, count)
+		return .beginOperator(op)
 	}
 
 	private mutating func handleNormal(_ key: Key, buffer: BufferQuery) -> [VimAction] {

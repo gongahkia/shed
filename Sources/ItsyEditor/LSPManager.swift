@@ -22,6 +22,7 @@ public enum LSPSessionStatus: Equatable, Sendable {
 public enum LSPManagerError: Error, Equatable, Sendable {
 	case noConfigForDocument
 	case workspaceRootNotFound
+	case missingBinary(LSPServerRegistry.MissingBinary)
 	case retryLimitExceeded
 }
 
@@ -84,7 +85,10 @@ public actor LSPManager {
 	}
 
 	public func ensureClient(for url: URL, now: Date = .init()) throws -> LSPProcessClient {
-		guard let config = registry.config(for: url) else {
+		guard let config = registry.resolvedConfig(for: url) else {
+			if let missingBinary = registry.missingBinary(for: url) {
+				throw LSPManagerError.missingBinary(missingBinary)
+			}
 			throw LSPManagerError.noConfigForDocument
 		}
 		guard let root = registry.discoverWorkspaceRoot(for: url) else {

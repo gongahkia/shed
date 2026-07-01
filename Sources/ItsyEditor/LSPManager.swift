@@ -84,6 +84,10 @@ public actor LSPManager {
 		clients[key]
 	}
 
+	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
+		registry.missingBinary(for: url)
+	}
+
 	public func ensureClient(for url: URL, now: Date = .init()) throws -> LSPProcessClient {
 		guard let config = registry.resolvedConfig(for: url) else {
 			if let missingBinary = registry.missingBinary(for: url) {

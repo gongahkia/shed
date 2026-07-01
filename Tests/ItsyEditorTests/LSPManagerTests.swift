@@ -109,6 +109,22 @@ import Testing
 	#expect(counter.count == 0)
 }
 
+@Test func lspManagerReportsMissingBinaryWithoutSpawning() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/package.json", "{}")
+	try fixture.write("ws/src/app.ts", "")
+	let command = fixture.root.appendingPathComponent("missing-typescript-language-server").path
+	let manager = LSPManager(registry: LSPServerRegistry(configs: [
+		LSPServerConfig(languageId: "typescript", command: command, rootPatterns: ["package.json"])
+	]))
+	let missing = await manager.missingBinary(for: fixture.root.appendingPathComponent("ws/src/app.ts"))
+	#expect(missing == LSPServerRegistry.MissingBinary(
+		languageID: "typescript",
+		command: command,
+		hint: "install `\(command)` and ensure it is executable"
+	))
+}
+
 private final class SpawnCounter: @unchecked Sendable {
 	private let lock = NSLock()
 	private var value = 0

@@ -9,12 +9,14 @@ import ItsySyntax
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
+	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let fileTreeController = FileTreeSidebarController()
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private var findBarController: FindBarController?
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
+	private let lspMissingBanner = LSPMissingBanner()
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private var paneCoordinator = EditorPaneCoordinator()
@@ -36,6 +38,7 @@ final class EditorWindowController: NSWindowController {
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var lspMissingBannerGeneration = 0
 
 	init(document: ItsyDocument) {
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
@@ -46,6 +49,7 @@ final class EditorWindowController: NSWindowController {
 		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
 		Self.configureStatusBarView(statusBarView, label: statusBarLabel)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
+		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.isHidden = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -59,6 +63,7 @@ final class EditorWindowController: NSWindowController {
 			paneCoordinator.view.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
 		])
 		editorStack.addArrangedSubview(tabBarView)
+		editorStack.addArrangedSubview(lspMissingBanner)
 		editorStack.addArrangedSubview(editorContainer)
 		editorStack.addArrangedSubview(statusBarView)
 
@@ -81,11 +86,13 @@ final class EditorWindowController: NSWindowController {
 		window.isRestorable = true
 		window.contentView = splitView
 		super.init(window: window)
+		configureLSPMissingBanner()
 		fileTreeController.attach(to: window)
 		fileTreeController.openFile = { ItsyWorkspaceController.openFile(at: $0) }
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
+		refreshLSPMissingBanner(for: document)
 		ItsyWorkspaceController.register(self)
 		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
@@ -254,6 +261,71 @@ final class EditorWindowController: NSWindowController {
 		])
 	}
 
+	private func configureLSPMissingBanner() {
+		lspMissingBanner.copyRequested = { [weak self] missingBinary in
+			self?.copyLSPInstallCommand(for: missingBinary)
+		}
+		lspMissingBanner.dismissRequested = { [weak self] missingBinary in
+			Self.dismissedLSPMissingCommands.insert(missingBinary.command)
+			self?.lspMissingBanner.hide()
+			self?.focusEditor()
+		}
+	}
+
+	private func refreshLSPMissingBanner(for document: ItsyDocument) {
+		lspMissingBannerGeneration += 1
+		let generation = lspMissingBannerGeneration
+		guard let fileURL = document.fileURL else {
+			lspMissingBanner.hide()
+			return
+		}
+		Task { [weak self] in
+			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
+			await MainActor.run { [weak self] in
+				guard let self, generation == self.lspMissingBannerGeneration else {
+					return
+				}
+				if let missingBinary {
+					self.showLSPMissingBanner(missingBinary)
+				} else {
+					self.lspMissingBanner.hide()
+				}
+			}
+		}
+	}
+
+	private func showLSPMissingBanner(_ missingBinary: LSPServerRegistry.MissingBinary) {
+		if Self.dismissedLSPMissingCommands.contains(missingBinary.command) {
+			lspMissingBanner.hide()
+			return
+		}
+		lspMissingBanner.show(missingBinary: missingBinary)
+	}
+
+	private func handleLSPRequestError(_ error: Error) {
+		if case let LSPManagerError.missingBinary(missingBinary) = error {
+			showLSPMissingBanner(missingBinary)
+		}
+	}
+
+	private func copyLSPInstallCommand(for missingBinary: LSPServerRegistry.MissingBinary) {
+		let pasteboard = NSPasteboard.general
+		pasteboard.clearContents()
+		pasteboard.setString(Self.installCommand(from: missingBinary), forType: .string)
+		focusEditor()
+	}
+
+	private static func installCommand(from missingBinary: LSPServerRegistry.MissingBinary) -> String {
+		let hint = missingBinary.hint
+		guard
+			let start = hint.firstIndex(of: "`"),
+			let end = hint[hint.index(after: start)...].firstIndex(of: "`")
+		else {
+			return missingBinary.command
+		}
+		return String(hint[hint.index(after: start) ..< end])
+	}
+
 	override func windowDidLoad() {
 		super.windowDidLoad()
 		window?.center()
@@ -286,6 +358,7 @@ final class EditorWindowController: NSWindowController {
 		for pane in paneCoordinator.panes {
 			installPane(pane, document: newDocument)
 		}
+		refreshLSPMissingBanner(for: newDocument)
 		window?.title = newDocument.fileURL?.lastPathComponent ?? newDocument.displayName
 		window?.representedURL = newDocument.fileURL
 		showWindow(nil)
@@ -313,6 +386,7 @@ final class EditorWindowController: NSWindowController {
 		for pane in paneCoordinator.restore(layout: layout) {
 			installPane(pane, document: document)
 		}
+		refreshLSPMissingBanner(for: document)
 		focusEditor()
 	}
 
@@ -542,6 +616,7 @@ final class EditorWindowController: NSWindowController {
 						return
 					}
 					self.completionPopup?.dismiss()
+					self.handleLSPRequestError(error)
 					NSLog("completion failed: \(error)")
 				}
 			}
@@ -705,6 +780,9 @@ final class EditorWindowController: NSWindowController {
 					completion(resolved)
 				}
 			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+				}
 				NSLog("completion resolve failed: \(error)")
 			}
 		}
@@ -784,6 +862,7 @@ final class EditorWindowController: NSWindowController {
 						return
 					}
 					self.closeHoverPopover()
+					self.handleLSPRequestError(error)
 					NSLog("hover failed: \(error)")
 				}
 			}
@@ -849,6 +928,7 @@ final class EditorWindowController: NSWindowController {
 						return
 					}
 					self.closeSignatureHelpPopover()
+					self.handleLSPRequestError(error)
 					NSLog("signature help failed: \(error)")
 				}
 			}
@@ -933,6 +1013,7 @@ final class EditorWindowController: NSWindowController {
 					guard let self, generation == self.referencesRequestGeneration else {
 						return
 					}
+					self.handleLSPRequestError(error)
 					self.referencesCoordinator?.show(error: error, relativeTo: self.window)
 				}
 			}

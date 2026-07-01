@@ -325,11 +325,10 @@ import Testing
 	_ = view.textGlyphInstances(scale: 1)
 	let cacheCount = view.lineShapeCacheEntryCount
 	let red = SIMD4<Float>(1, 0, 0, 1)
-	view.highlightSpans = [TextHighlightSpan(range: 0 ..< 1, color: red)]
+	view.highlightSpans = (0 ..< 10_000).map { _ in TextHighlightSpan(range: 0 ..< 1, color: red) }
 	#expect(view.lineShapeCacheEntryCount == cacheCount)
 	let instances = view.textGlyphInstances(scale: 1)
-	let first = try #require(instances.first)
-	#expect(first.color == red)
+	#expect(instances.contains { $0.color == red })
 	#expect(view.lineShapeCacheEntryCount == cacheCount)
 }
 

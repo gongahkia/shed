@@ -271,7 +271,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 ## Phase 25 — Renderer perf + memory realism
 
-(A) 2026-07-01 +Phase25-Render @render id:981 est:2h dep:980 Draw path: emit glyph instances from shape cache, then emit color overlays from highlight overlay in a second pass. Prove independence via test: `MetalTextView` sets 10k highlight spans → `lineShapeCache.count` unchanged after set.
 (A) 2026-07-01 +Phase25-Render @render id:982 est:2h dep:981 Bench: scroll 100k-line file, mutate all highlights per frame for 60 frames; report shape-cache hit rate (should approach 100% for stable text).
 (B) 2026-07-01 +Phase25-Render @render id:983 est:3h Lazy-link deferrable frameworks. Audit release binary with `otool -L` and identify `WritingToolsUI`, `AppIntents`, `ViewBridge`, `TextInputUI` link chains. Replace direct `import` of anything transitively pulling `AppIntents`/`WritingToolsUI` with `dlopen`+`dlsym` at first use. See `bench/notes/coldstart-audit.md` for the top dlopen offenders.
 (B) 2026-07-01 +Phase25-Render @render id:984 est:2h dep:983 Bench cold-start again post-lazy-link. Target: ≥40 ms improvement on `first_window_visible`. Update `bench/notes/coldstart-audit.md` with delta.

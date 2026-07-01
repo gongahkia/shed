@@ -147,6 +147,7 @@ public final class MetalTextView: NSView {
 	private var instanceBuffer: MTLBuffer?
 	private var instanceBufferCapacity = 0
 	private var textInstanceScratch: [MetalGlyphInstance] = []
+	private var highlightInstanceScratch: [MetalGlyphInstance] = []
 	var solidInstanceScratch: [MetalGlyphInstance] = []
 	private var lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]] = [:]
 	private var lineHighlightOverlay: [Int: [TextHighlightSpan]] = [:]
@@ -759,6 +760,7 @@ public final class MetalTextView: NSView {
 	func textGlyphInstances(scale: CGFloat) -> [MetalGlyphInstance] {
 		var instances: [MetalGlyphInstance] = []
 		appendTextGlyphInstances(scale: scale, into: &instances)
+		appendHighlightGlyphInstances(scale: scale, into: &instances)
 		return instances
 	}
 
@@ -791,14 +793,54 @@ public final class MetalTextView: NSView {
 			}
 			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
 			for glyph in glyphs {
-				let absoluteRange = (lineRange.lowerBound + glyph.sourceUTF8Range.lowerBound) ..< (lineRange.lowerBound + glyph.sourceUTF8Range.upperBound)
 				let pixelX = ((textInset.x + glyph.originX - xOffset) * scale).rounded()
 				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
 				instances.append(MetalGlyphInstance(
 					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
 					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
 					atlasUV: glyph.atlasUV,
-					color: textColor(for: absoluteRange, lineIndex: lineIndex, lineRange: lineRange)
+					color: Self.defaultTextColor
+				))
+			}
+		}
+	}
+
+	private func appendHighlightGlyphInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		guard ensureGlyphAtlas(scale: scale) else {
+			return
+		}
+		let shaper = LineShaper()
+		let renderingMode = glyphRenderingMode(scale: scale)
+		let scaleKey = Self.scaleKey(for: scale)
+		let fontName = textFontPostScriptName
+		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
+		for lineIndex in visibleLineRange {
+			let lineRange = editor.rope.lineRange(lineIndex)
+			let key = LineShapeCacheKey(
+				lowerBound: lineRange.lowerBound,
+				upperBound: lineRange.upperBound,
+				fontName: fontName,
+				fontSizeKey: fontSizeKey,
+				renderingMode: renderingMode,
+				scaleKey: scaleKey
+			)
+			let glyphs = cachedGlyphs(for: key, lineRange: lineRange, scale: scale, shaper: shaper)
+			guard !glyphs.isEmpty else {
+				continue
+			}
+			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			for glyph in glyphs {
+				let absoluteRange = (lineRange.lowerBound + glyph.sourceUTF8Range.lowerBound) ..< (lineRange.lowerBound + glyph.sourceUTF8Range.upperBound)
+				guard let color = highlightColor(for: absoluteRange, lineIndex: lineIndex, lineRange: lineRange) else {
+					continue
+				}
+				let pixelX = ((textInset.x + glyph.originX - xOffset) * scale).rounded()
+				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
+				instances.append(MetalGlyphInstance(
+					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
+					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
+					atlasUV: glyph.atlasUV,
+					color: color
 				))
 			}
 		}
@@ -860,9 +902,9 @@ public final class MetalTextView: NSView {
 		}
 	}
 
-	private func textColor(for range: Range<Int>, lineIndex: Int, lineRange: Range<Int>) -> SIMD4<Float> {
+	private func highlightColor(for range: Range<Int>, lineIndex: Int, lineRange: Range<Int>) -> SIMD4<Float>? {
 		guard let span = highlightSpans(forLine: lineIndex, lineRange: lineRange).last(where: { $0.range.overlaps(range) }) else {
-			return Self.defaultTextColor
+			return nil
 		}
 		return span.color
 	}
@@ -1029,12 +1071,19 @@ public final class MetalTextView: NSView {
 	private func renderText(encoder: MTLRenderCommandEncoder, drawableSize: CGSize, scale: CGFloat) {
 		textInstanceScratch.removeAll(keepingCapacity: true)
 		appendTextGlyphInstances(scale: scale, into: &textInstanceScratch)
-		guard !textInstanceScratch.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), ensureGlyphAtlas(scale: scale), let atlas = glyphAtlas else {
+		renderTextInstances(textInstanceScratch, encoder: encoder, drawableSize: drawableSize, scale: scale)
+		highlightInstanceScratch.removeAll(keepingCapacity: true)
+		appendHighlightGlyphInstances(scale: scale, into: &highlightInstanceScratch)
+		renderTextInstances(highlightInstanceScratch, encoder: encoder, drawableSize: drawableSize, scale: scale)
+	}
+
+	private func renderTextInstances(_ instances: [MetalGlyphInstance], encoder: MTLRenderCommandEncoder, drawableSize: CGSize, scale: CGFloat) {
+		guard !instances.isEmpty, let pipeline = makeRenderPipeline(), let sampler = makeSampler(), ensureGlyphAtlas(scale: scale), let atlas = glyphAtlas else {
 			return
 		}
 		var viewport = MetalViewportUniforms(size: SIMD2<Float>(Float(drawableSize.width), Float(drawableSize.height)))
 		var fragment = MetalFragmentUniforms(atlasMode: atlas.renderingMode == .subpixel ? 2 : 1)
-		textInstanceScratch.withUnsafeBytes { bytes in
+		instances.withUnsafeBytes { bytes in
 			guard let base = bytes.baseAddress else {
 				return
 			}
@@ -1044,7 +1093,7 @@ public final class MetalTextView: NSView {
 			encoder.setFragmentTexture(atlas.texture, index: 0)
 			encoder.setFragmentSamplerState(sampler, index: 0)
 			encoder.setFragmentBytes(&fragment, length: MemoryLayout<MetalFragmentUniforms>.stride, index: 0)
-			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: textInstanceScratch.count)
+			encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: instances.count)
 		}
 	}
 

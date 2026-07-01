@@ -19,10 +19,9 @@ final class ItsyDocument: NSDocument {
 	private let syntax = DocumentSyntaxController()
 	private var handoffActivity: NSUserActivity?
 	private var problemGutterDecorator: GutterDecorator?
-	private var gitGutterDecorator: GutterDecorator?
 	private var activeGutterDecorator: GutterDecorator?
-	private var gitHunkRefreshWorkItem: DispatchWorkItem?
 	private let fileWatcher = DocumentFileWatcher()
+	private let gitGutter = DocumentGitGutterController()
 
 	override var fileURL: URL? {
 		didSet {
@@ -51,6 +50,12 @@ final class ItsyDocument: NSDocument {
 		}
 		fileWatcher.reloadFromDisk = { [weak self] url in
 			self?.reloadFromDisk(at: url)
+		}
+		gitGutter.fileURL = { [weak self] in
+			self?.fileURL
+		}
+		gitGutter.decoratorDidChange = { [weak self] in
+			self?.refreshGutterDecorators()
 		}
 	}
 
@@ -139,13 +144,8 @@ final class ItsyDocument: NSDocument {
 		refreshGutterDecorators()
 	}
 
-	func setGitGutterDecorator(_ decorator: GutterDecorator?) {
-		gitGutterDecorator = decorator
-		refreshGutterDecorators()
-	}
-
 	private func refreshGutterDecorators() {
-		let decorators = [problemGutterDecorator, gitGutterDecorator].compactMap { $0 }
+		let decorators = [problemGutterDecorator, gitGutter.decorator].compactMap { $0 }
 		switch decorators.count {
 		case 0:
 			activeGutterDecorator = nil
@@ -160,40 +160,11 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func scheduleGitHunkGutterRefresh() {
-		gitHunkRefreshWorkItem?.cancel()
-		let workItem = DispatchWorkItem { [weak self] in
-			self?.updateGitHunkGutter()
-		}
-		gitHunkRefreshWorkItem = workItem
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+		gitGutter.scheduleRefresh()
 	}
 
 	func updateGitHunkGutter() {
-		guard
-			let fileURL,
-			let gitRoot = try? GitRepository.discoverRoot(containing: fileURL),
-			let relativePath = LSPDiagnosticsAggregator.relativePath(forURI: fileURL.absoluteString, root: gitRoot)
-		else {
-			setGitGutterDecorator(nil)
-			return
-		}
-		do {
-			let repository = GitRepository(root: gitRoot)
-			let files: [DiffFile]
-			switch ItsyGitHunkGutterCoordinator.currentMode {
-			case .index:
-				files = try repository.diffFiles(path: relativePath)
-			case .head:
-				files = try repository.diffFilesAgainstHead(path: relativePath)
-			}
-			let indicators = GitHunkIndicatorBuilder.indicators(files: files)
-			setGitGutterDecorator(indicators.isEmpty ? nil : GitHunkGutterDecorator(
-				indicators: indicators,
-				mode: ItsyGitHunkGutterCoordinator.currentMode
-			))
-		} catch {
-			setGitGutterDecorator(nil)
-		}
+		gitGutter.update()
 	}
 
 	func reloadSyntaxTheme() {

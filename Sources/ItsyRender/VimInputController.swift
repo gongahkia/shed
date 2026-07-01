@@ -1,61 +1,23 @@
 import AppKit
 import ItsyEditor
-import ItsyKeymap
+import struct ItsyKeymap.Key
+import enum ItsyVim.CharacterMotion
+import struct ItsyVim.KeyModifiers
+import struct ItsyVim.SelectionSnapshot
+import enum ItsyVim.VimCommandAction
+import enum ItsyVim.VimOperator
+import enum ItsyVim.VisualMode
+import struct ItsyVim.VimSelection
+import struct ItsyVim.RecordedKey
 
 enum KeyDispatchResult {
 	case handled
 	case passthrough
 }
 
-enum CharacterMotion {
-	case findForward
-	case findBackward
-	case tillForward
-	case tillBackward
-
-	var reversed: CharacterMotion {
-		switch self {
-		case .findForward:
-			return .findBackward
-		case .findBackward:
-			return .findForward
-		case .tillForward:
-			return .tillBackward
-		case .tillBackward:
-			return .tillForward
-		}
-	}
-}
-
-enum VimOperator {
-	case delete
-	case change
-	case yank
-}
-
-enum VisualMode {
-	case character
-	case line
-	case block
-}
-
 enum RegisterOperation {
 	case yank
 	case delete
-}
-
-struct RecordedKey {
-	var characters: String
-	var charactersIgnoringModifiers: String
-	var keyCode: UInt16
-	var modifierFlags: NSEvent.ModifierFlags
-
-	init(_ event: NSEvent) {
-		characters = event.characters ?? ""
-		charactersIgnoringModifiers = event.charactersIgnoringModifiers ?? characters
-		keyCode = event.keyCode
-		modifierFlags = event.modifierFlags.intersection([.command, .shift, .option, .control])
-	}
 }
 
 enum TextObject {
@@ -67,8 +29,97 @@ enum TextObject {
 	case aroundParagraph
 }
 
-
 extension MetalTextView {
+	var pendingCharacterMotion: CharacterMotion? {
+		get { vimEngine.pendingCharacterMotion }
+		set { vimEngine.pendingCharacterMotion = newValue }
+	}
+
+	var lastCharacterMotion: (motion: CharacterMotion, value: Character)? {
+		get { vimEngine.lastCharacterMotion }
+		set { vimEngine.lastCharacterMotion = newValue }
+	}
+
+	var pendingOperator: VimOperator? {
+		get { vimEngine.pendingOperator }
+		set { vimEngine.pendingOperator = newValue }
+	}
+
+	var pendingOperatorCount: Int {
+		get { vimEngine.pendingOperatorCount }
+		set { vimEngine.pendingOperatorCount = newValue }
+	}
+
+	var visualAnchor: Int? {
+		get { vimEngine.visualAnchor }
+		set { vimEngine.visualAnchor = newValue }
+	}
+
+	var visualHead: Int? {
+		get { vimEngine.visualHead }
+		set { vimEngine.visualHead = newValue }
+	}
+
+	var visualMode: VisualMode? {
+		get { vimEngine.visualMode }
+		set { vimEngine.visualMode = newValue }
+	}
+
+	var jumpBackSelection: SelectionSet? {
+		get { vimEngine.jumpBackSelection.map(SelectionSet.init) }
+		set { vimEngine.jumpBackSelection = newValue.map(SelectionSnapshot.init) }
+	}
+
+	var awaitingRegister: Bool {
+		get { vimEngine.awaitingRegister }
+		set { vimEngine.awaitingRegister = newValue }
+	}
+
+	var pendingRegister: String? {
+		get { vimEngine.pendingRegister }
+		set { vimEngine.pendingRegister = newValue }
+	}
+
+	var registers: [String: String] {
+		get { vimEngine.registers }
+		set { vimEngine.registers = newValue }
+	}
+
+	var macroRegisters: [String: [RecordedKey]] {
+		get { vimEngine.macroRegisters }
+		set { vimEngine.macroRegisters = newValue }
+	}
+
+	var recordingMacroRegister: String? {
+		get { vimEngine.recordingMacroRegister }
+		set { vimEngine.recordingMacroRegister = newValue }
+	}
+
+	var currentMacroEvents: [RecordedKey] {
+		get { vimEngine.currentMacroEvents }
+		set { vimEngine.currentMacroEvents = newValue }
+	}
+
+	var awaitingMacroRecordRegister: Bool {
+		get { vimEngine.awaitingMacroRecordRegister }
+		set { vimEngine.awaitingMacroRecordRegister = newValue }
+	}
+
+	var awaitingMacroReplayRegister: Bool {
+		get { vimEngine.awaitingMacroReplayRegister }
+		set { vimEngine.awaitingMacroReplayRegister = newValue }
+	}
+
+	var replayingMacro: Bool {
+		get { vimEngine.replayingMacro }
+		set { vimEngine.replayingMacro = newValue }
+	}
+
+	var pendingExCommand: String? {
+		get { vimEngine.pendingExCommand }
+		set { vimEngine.pendingExCommand = newValue }
+	}
+
 	func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
 		switch keymapEngine.handle(event) {
 		case .command(let commandID):
@@ -84,81 +135,14 @@ extension MetalTextView {
 		if commandID != "emacs.yank", commandID != "emacs.yankPop" {
 			lastYankRange = nil
 		}
-		if let motion = motion(for: commandID), visualMode != nil {
-			extendVisualSelection(motion: motion)
-			return true
-		}
-		if let textObject = textObject(for: commandID), pendingOperator != nil {
-			applyPendingOperator(textObject: textObject)
-			return true
-		}
-		if let motion = motion(for: commandID), pendingOperator != nil {
-			applyPendingOperator(motion: motion)
-			return true
+		if let action = vimEngine.handle(
+			commandID: commandID,
+			count: keymapRepeatCount,
+			hasSelection: !editor.selections.primary.isCaret
+		) {
+			return applyVimCommandAction(action)
 		}
 		switch commandID {
-		case "editor.moveLeft":
-			repeatMotion(.charBackward)
-		case "editor.moveRight":
-			repeatMotion(.charForward)
-		case "editor.moveDown":
-			repeatMotion(.lineDown)
-		case "editor.moveUp":
-			repeatMotion(.lineUp)
-		case "editor.moveWordForward":
-			repeatMotion(.wordForward)
-		case "editor.moveWordBackward":
-			repeatMotion(.wordBackward)
-		case "editor.moveWordEnd":
-			repeatMotion(.wordEnd)
-		case "editor.moveBigWordForward":
-			repeatMotion(.bigWordForward)
-		case "editor.moveBigWordBackward":
-			repeatMotion(.bigWordBackward)
-		case "editor.moveBigWordEnd":
-			repeatMotion(.bigWordEnd)
-		case "editor.moveLineStart":
-			repeatMotion(.lineStart)
-		case "editor.moveLineEnd":
-			repeatMotion(.lineEnd)
-		case "editor.moveBufferStart":
-			repeatMotion(.bufferStart)
-		case "editor.moveBufferEnd":
-			repeatMotion(.bufferEnd)
-		case "editor.moveParagraphBackward":
-			repeatMotion(.paragraphBackward)
-		case "editor.moveParagraphForward":
-			repeatMotion(.paragraphForward)
-		case "editor.findCharForward":
-			pendingCharacterMotion = .findForward
-			return true
-		case "editor.findCharBackward":
-			pendingCharacterMotion = .findBackward
-			return true
-		case "editor.tillCharForward":
-			pendingCharacterMotion = .tillForward
-			return true
-		case "editor.tillCharBackward":
-			pendingCharacterMotion = .tillBackward
-			return true
-		case "editor.repeatCharFind":
-			repeatLastCharacterMotion(reversed: false)
-			return true
-		case "editor.repeatCharFindReverse":
-			repeatLastCharacterMotion(reversed: true)
-			return true
-		case "edit.undo":
-			endInsertUndoGroup()
-			editor.undo()
-			syncEditorState()
-			editorDidChange?(editor)
-			return true
-		case "edit.redo":
-			endInsertUndoGroup()
-			editor.redo()
-			syncEditorState()
-			editorDidChange?(editor)
-			return true
 		case "emacs.killRegion":
 			killSelectedText(delete: true)
 			return true
@@ -171,81 +155,106 @@ extension MetalTextView {
 		case "emacs.yankPop":
 			yankPopFromKillRing()
 			return true
-		case "editor.addNextSelection":
+		default:
+			return performHostCommand(commandID)
+		}
+	}
+
+	func applyVimCommandAction(_ action: VimCommandAction) -> Bool {
+		switch action {
+		case .motion(let commandID):
+			guard let motion = motion(for: commandID) else {
+				return false
+			}
+			repeatMotion(motion)
+		case .visualMotion(let commandID):
+			guard let motion = motion(for: commandID) else {
+				return false
+			}
+			extendVisualSelection(motion: motion)
+		case .beginCharacterMotion:
+			return true
+		case .repeatCharacterMotion(let reversed):
+			repeatLastCharacterMotion(reversed: reversed)
+		case .undo:
+			endInsertUndoGroup()
+			editor.undo()
+			syncEditorState()
+			editorDidChange?(editor)
+			return true
+		case .redo:
+			endInsertUndoGroup()
+			editor.redo()
+			syncEditorState()
+			editorDidChange?(editor)
+			return true
+		case .addNextSelection:
 			addNextSelectionMatch()
-			return true
-		case "vim.operator.delete":
-			return beginOperator(.delete)
-		case "vim.operator.change":
-			return beginOperator(.change)
-		case "vim.operator.yank":
-			return beginOperator(.yank)
-		case "vim.registerPrefix":
-			awaitingRegister = true
-			return true
-		case "vim.jumpBack":
+		case .beginOperator:
+			vimEngine.mode = .operatorPending
+			keymapEngine.pushMode(.operatorPending)
+		case .applySelectionOperator(let op):
+			applySelectionOperator(op)
+			leaveVisualMode(collapse: op == .yank)
+			keymapEngine.setMode(op == .change ? .insert : .normal)
+			vimEngine.mode = op == .change ? .insert : .normal
+		case .applyPendingOperatorMotion(let commandID):
+			guard let motion = motion(for: commandID) else {
+				return false
+			}
+			applyPendingOperator(motion: motion)
+		case .applyPendingOperatorTextObject(let commandID):
+			guard let textObject = textObject(for: commandID) else {
+				return false
+			}
+			applyPendingOperator(textObject: textObject)
+		case .lineOperator(let op):
+			applyLineOperator(op)
+		case .jumpBack:
 			jumpBack()
-		case "vim.macro.recordPrefix":
+		case .macroRecordPrefix:
 			handleMacroRecordPrefix()
 			return true
-		case "vim.macro.replayPrefix":
+		case .macroReplayPrefix:
 			awaitingMacroReplayRegister = true
 			return true
-		case "vim.pasteAfter":
-			pasteRegister(after: true)
-			return true
-		case "vim.pasteBefore":
-			pasteRegister(after: false)
-			return true
-		case "vim.ex.start":
+		case .paste(let after):
+			pasteRegister(after: after)
+		case .exStart:
 			keymapEngine.setMode(.command)
+			vimEngine.mode = .command
 			if exCommandLineRequested?({ [weak self] command in
 				self?.finishExCommand(command)
 			}) == true {
-				return true
+				pendingExCommand = nil
 			}
-			pendingExCommand = ""
 			return true
-		case "vim.visual.char":
-			beginVisualMode(.character)
-			return true
-		case "vim.visual.line":
-			beginVisualMode(.line)
-			return true
-		case "vim.visual.block":
-			beginVisualMode(.block)
-			return true
-		case "vim.operator.line.delete":
-			applyLineOperator(.delete)
-			return true
-		case "vim.operator.line.change":
-			applyLineOperator(.change)
-			return true
-		case "vim.operator.line.yank":
-			applyLineOperator(.yank)
-			return true
-		case "edit.findNext", "edit.findPrevious", "vim.searchForward", "vim.searchBackward":
-			return performHostCommand(commandID, recordsJump: keymapEngine.mode == .normal)
-		case "file.save":
+		case .beginVisualMode(let mode):
+			beginVisualMode(mode)
+		case .search(let commandID, let recordsJump):
+			return performHostCommand(commandID, recordsJump: recordsJump)
+		case .save:
 			saveRequested?()
 			return true
-		case "file.close":
+		case .close:
 			closeRequested?()
 			return true
-		case "mode.normal":
+		case .normalMode:
 			endInsertUndoGroup()
 			leaveVisualMode(collapse: true)
 			keymapEngine.setMode(.normal)
+			vimEngine.mode = .normal
 			return true
-		case "mode.insert":
+		case .insertMode:
 			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
+			vimEngine.mode = .insert
 			return true
-		case "mode.emacs":
+		case .emacsMode:
 			keymapEngine.setMode(.emacs)
 			return true
-		default:
-			return performHostCommand(commandID)
+		case .handled:
+			return true
 		}
 		syncEditorState()
 		return true
@@ -467,19 +476,6 @@ extension MetalTextView {
 		}
 	}
 
-	func beginOperator(_ op: VimOperator) -> Bool {
-		if !editor.selections.primary.isCaret {
-			applySelectionOperator(op)
-			leaveVisualMode(collapse: op == .yank)
-			keymapEngine.setMode(op == .change ? .insert : .normal)
-			return true
-		}
-		pendingOperator = op
-		pendingOperatorCount = keymapRepeatCount
-		keymapEngine.pushMode(.operatorPending)
-		return true
-	}
-
 	func applyPendingOperator(motion: Motion) {
 		guard let pendingOperator else {
 			return
@@ -511,6 +507,7 @@ extension MetalTextView {
 	func clearPendingOperator() {
 		pendingOperator = nil
 		pendingOperatorCount = 1
+		vimEngine.mode = .normal
 		if keymapEngine.mode == .operatorPending {
 			_ = keymapEngine.popMode()
 		}
@@ -525,15 +522,18 @@ extension MetalTextView {
 		case .delete:
 			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
+			vimEngine.mode = .normal
 		case .change:
 			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
 			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
+			vimEngine.mode = .insert
 		case .yank:
 			writeRegister(text, operation: .yank)
 			editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
 			syncEditorState()
+			vimEngine.mode = .normal
 		}
 	}
 
@@ -589,6 +589,7 @@ extension MetalTextView {
 		case 53:
 			pendingExCommand = nil
 			keymapEngine.setMode(.normal)
+			vimEngine.mode = .normal
 		default:
 			guard event.modifierFlags.intersection([.command, .control]).isEmpty, let characters = event.characters, !characters.isEmpty else {
 				return true
@@ -600,6 +601,7 @@ extension MetalTextView {
 
 	func finishExCommand(_ command: String?) {
 		keymapEngine.setMode(.normal)
+		vimEngine.mode = .normal
 		guard let command else {
 			return
 		}
@@ -727,7 +729,7 @@ extension MetalTextView {
 				characters: event.characters,
 				charactersIgnoringModifiers: event.charactersIgnoringModifiers,
 				keyCode: event.keyCode,
-				modifierFlags: event.modifierFlags
+				modifierFlags: event.modifierFlags.appKitModifierFlags
 			)
 		}
 	}
@@ -805,6 +807,7 @@ extension MetalTextView {
 		visualHead = editor.selections.primary.head
 		visualMode = mode
 		keymapEngine.setMode(.visual)
+		vimEngine.mode = .visual(mode)
 		updateVisualSelection(head: editor.selections.primary.head)
 	}
 
@@ -1076,4 +1079,81 @@ extension MetalTextView {
 		}
 	}
 
+}
+
+private extension RecordedKey {
+	init(_ event: NSEvent) {
+		self.init(
+			characters: event.characters ?? "",
+			charactersIgnoringModifiers: event.charactersIgnoringModifiers ?? event.characters ?? "",
+			keyCode: event.keyCode,
+			modifierFlags: KeyModifiers(event.modifierFlags)
+		)
+	}
+}
+
+private extension SelectionSnapshot {
+	init(_ selectionSet: SelectionSet) {
+		self.init(
+			primary: VimSelection(selectionSet.primary),
+			secondaries: selectionSet.secondaries.map(VimSelection.init)
+		)
+	}
+}
+
+private extension VimSelection {
+	init(_ selection: Selection) {
+		self.init(anchor: selection.anchor, head: selection.head)
+	}
+}
+
+private extension SelectionSet {
+	init(_ snapshot: SelectionSnapshot) {
+		self.init(
+			primary: Selection(snapshot.primary),
+			secondaries: snapshot.secondaries.map(Selection.init)
+		)
+	}
+}
+
+private extension Selection {
+	init(_ selection: VimSelection) {
+		self.init(anchor: selection.anchor, head: selection.head)
+	}
+}
+
+private extension KeyModifiers {
+	init(_ flags: NSEvent.ModifierFlags) {
+		var modifiers: KeyModifiers = []
+		if flags.contains(.command) {
+			modifiers.insert(.command)
+		}
+		if flags.contains(.shift) {
+			modifiers.insert(.shift)
+		}
+		if flags.contains(.option) {
+			modifiers.insert(.option)
+		}
+		if flags.contains(.control) {
+			modifiers.insert(.control)
+		}
+		self = modifiers
+	}
+
+	var appKitModifierFlags: NSEvent.ModifierFlags {
+		var flags: NSEvent.ModifierFlags = []
+		if contains(.command) {
+			flags.insert(.command)
+		}
+		if contains(.shift) {
+			flags.insert(.shift)
+		}
+		if contains(.option) {
+			flags.insert(.option)
+		}
+		if contains(.control) {
+			flags.insert(.control)
+		}
+		return flags
+	}
 }

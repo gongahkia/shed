@@ -4,6 +4,7 @@ import CoreVideo
 import Metal
 import ItsyEditor
 import ItsyKeymap
+import struct ItsyVim.VimEngine
 import QuartzCore
 
 struct MetalGlyphInstance {
@@ -247,24 +248,7 @@ public final class MetalTextView: NSView {
 	public var keymapEngine = KeymapEngine()
 	public var completionTriggerCharacters: Set<String> = []
 	public var signatureHelpTriggerCharacters: Set<String> = []
-	var pendingCharacterMotion: CharacterMotion?
-	var lastCharacterMotion: (motion: CharacterMotion, value: Character)?
-	var pendingOperator: VimOperator?
-	var pendingOperatorCount = 1
-	var visualAnchor: Int?
-	var visualHead: Int?
-	var visualMode: VisualMode?
-	var awaitingRegister = false
-	var pendingRegister: String?
-	var registers: [String: String] = [:]
-	var jumpBackSelection: SelectionSet?
-	var macroRegisters: [String: [RecordedKey]] = [:]
-	var recordingMacroRegister: String?
-	var currentMacroEvents: [RecordedKey] = []
-	var awaitingMacroRecordRegister = false
-	var awaitingMacroReplayRegister = false
-	var replayingMacro = false
-	var pendingExCommand: String?
+	var vimEngine = VimEngine()
 	var insertUndoGroupActive = false
 	var killRing = KillRing()
 	var lastYankRange: Range<Int>?

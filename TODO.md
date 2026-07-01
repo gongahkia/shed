@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(B) 2026-07-01 +Phase21-Refactor @refactor id:817 est:3h dep:814 Extract find-highlight/rect logic from `MetalTextView` into `Sources/ItsyRender/MetalTextView+FindHighlights.swift`.
 (C) 2026-07-01 +Phase21-Refactor @refactor id:818 est:2h dep:807 Move `EditorPreferences.swift`, `HoverTooltip.swift`, `SignatureHelpPopover.swift`, `TabBarView.swift`, `FileTreeSidebar.swift`, `GitHunkGutter.swift`, `ProblemGutter.swift`, `ReferencesPanel.swift`, `CompletionPopup.swift`, `FindBarView.swift`, `Localization.swift`, `AppKeymap.swift`, `CommandPalette.swift`, `TerminalEmulator.swift`, `TerminalSession.swift`, `TerminalView.swift` into their new feature directories. Update `Package.swift` if any target needs new paths (SwiftPM auto-discovers; no change likely needed).
 (C) 2026-07-01 +Phase21-Refactor @refactor id:819 est:1h dep:818 Add `Sources/ItsyApp/README.md` with a directory map. Add a top-of-file `// @file <purpose>` doc comment on each new file (single line).
 (A) 2026-07-01 +Phase21-Refactor @refactor id:820 est:2h dep:819 Checkpoint: run `swift build -c release && swift test && bench/scripts/regression.sh`. Attach output to `bench/notes/refactor-phase21.md`. Cold start must not regress >5% vs current 272 ms baseline; RSS must not regress >5% vs current 90 MB.

@@ -44,23 +44,172 @@ public struct SyntaxTheme: Sendable, Equatable {
 	public static let selectedThemeDefaultsKey = "dev.itsy.editor.syntaxTheme"
 	public static let userThemeDirectoryName = "themes"
 	public static let defaultChoiceID = "bundled:default-light"
+	public static let standardCaptures = [
+		"keyword.control",
+		"keyword.function",
+		"keyword.operator",
+		"keyword.return",
+		"type.builtin",
+		"type.parameter",
+		"function.builtin",
+		"function.macro",
+		"function.method",
+		"variable.builtin",
+		"variable.member",
+		"constant.builtin",
+		"constant.macro",
+		"string.escape",
+		"string.regexp",
+		"string.special",
+		"number.float",
+		"boolean",
+		"character",
+		"character.special",
+		"comment.documentation",
+		"punctuation.bracket",
+		"punctuation.delimiter",
+		"punctuation.special",
+		"operator",
+		"attribute",
+		"tag",
+		"label",
+		"namespace",
+		"module",
+		"property",
+		"field",
+		"parameter",
+		"error",
+		"diff.plus",
+		"diff.minus",
+		"markup.heading",
+		"markup.link",
+		"markup.list",
+		"markup.bold",
+		"markup.italic",
+		"markup.raw",
+		"markup.quote",
+	]
+	private static let captureFallbacks: [String: [String]] = [
+		"keyword.control": ["keyword"],
+		"keyword.function": ["keyword"],
+		"keyword.operator": ["keyword"],
+		"keyword.return": ["keyword.control"],
+		"type.parameter": ["type"],
+		"function.builtin": ["function"],
+		"function.macro": ["function"],
+		"function.method": ["function"],
+		"variable.builtin": ["variable"],
+		"variable.member": ["variable"],
+		"constant.builtin": ["constant"],
+		"constant.macro": ["constant"],
+		"string.escape": ["string"],
+		"string.regexp": ["string"],
+		"string.regex": ["string.regexp"],
+		"string.special": ["string"],
+		"number.float": ["number"],
+		"boolean": ["constant.builtin"],
+		"character": ["string"],
+		"character.special": ["character", "string"],
+		"comment.documentation": ["comment"],
+		"punctuation.bracket": ["punctuation"],
+		"punctuation.delimiter": ["punctuation"],
+		"punctuation.special": ["punctuation"],
+		"attribute": ["variable"],
+		"tag": ["type"],
+		"label": ["variable"],
+		"namespace": ["type"],
+		"module": ["namespace", "type"],
+		"property": ["variable.member"],
+		"field": ["variable.member"],
+		"parameter": ["variable.parameter"],
+		"error": ["constant"],
+		"diff.plus": ["comment"],
+		"diff.minus": ["string"],
+		"markup.heading": ["keyword"],
+		"markup.link": ["string"],
+		"markup.list": ["punctuation"],
+		"markup.bold": ["variable"],
+		"markup.italic": ["variable"],
+		"markup.raw": ["string"],
+		"markup.quote": ["comment"],
+		"comment.doc": ["comment.documentation"],
+		"comment.doc.__attribute__": ["comment.documentation"],
+		"comment.block.documentation": ["comment.documentation"],
+		"conditional": ["keyword.control.conditional", "keyword.control"],
+		"repeat": ["keyword.control.repeat", "keyword.control"],
+		"import": ["keyword.control.import", "keyword.control"],
+		"include": ["keyword.control.import", "keyword.control"],
+		"exception": ["keyword.control.exception", "keyword.control"],
+		"keyword.conditional": ["keyword.control.conditional", "keyword.control"],
+		"keyword.coroutine": ["keyword.control"],
+		"keyword.directive": ["keyword.control"],
+		"keyword.exception": ["keyword.control.exception", "keyword.control"],
+		"keyword.import": ["keyword.control.import", "keyword.control"],
+		"keyword.modifier": ["keyword"],
+		"keyword.repeat": ["keyword.control.repeat", "keyword.control"],
+		"keyword.type": ["keyword"],
+		"type.definition": ["type"],
+		"type.qualifier": ["type"],
+		"function.call": ["function"],
+		"function.method.call": ["function.method"],
+		"function.special": ["function"],
+		"constant.character.escape": ["character.special"],
+		"string.special.symbol": ["string.special"],
+		"string.special.key": ["string.special"],
+		"float": ["number.float"],
+		"escape": ["string.escape"],
+		"delimiter": ["punctuation.delimiter"],
+		"text.title": ["markup.heading"],
+		"text.uri": ["markup.link"],
+		"text.reference": ["markup.link"],
+		"text.literal": ["markup.raw"],
+		"text.strong": ["markup.bold"],
+		"text.emphasis": ["markup.italic"],
+		"constructor": ["type"],
+		"storageclass": ["keyword"],
+		"cImport": ["function.macro"],
+		"charset": ["keyword"],
+		"media": ["keyword"],
+		"supports": ["keyword"],
+		"keyframes": ["keyword"],
+		"tag.error": ["error", "tag"],
+	]
 
 	public init(colors: [String: SyntaxColor]) {
 		self.colors = colors
 	}
 
 	public func color(for capture: String) -> SyntaxColor? {
-		if let color = colors[capture] {
-			return color
-		}
-		var pieces = capture.split(separator: ".").map(String.init)
-		while pieces.count > 1 {
-			pieces.removeLast()
-			if let color = colors[pieces.joined(separator: ".")] {
+		for key in Self.lookupKeys(for: capture) {
+			if let color = colors[key] {
 				return color
 			}
 		}
 		return nil
+	}
+
+	private static func lookupKeys(for capture: String) -> [String] {
+		var keys: [String] = []
+		var seen = Set<String>()
+		func append(_ key: String) {
+			if seen.insert(key).inserted {
+				keys.append(key)
+			}
+		}
+		func appendParents(of key: String) {
+			var pieces = key.split(separator: ".").map(String.init)
+			while pieces.count > 1 {
+				pieces.removeLast()
+				append(pieces.joined(separator: "."))
+			}
+		}
+		append(capture)
+		for fallback in captureFallbacks[capture] ?? [] {
+			append(fallback)
+			appendParents(of: fallback)
+		}
+		appendParents(of: capture)
+		return keys
 	}
 
 	public static func loadDefaultDark() throws -> SyntaxTheme {

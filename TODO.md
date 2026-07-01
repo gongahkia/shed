@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(B) 2026-07-01 +Phase21-Refactor @refactor id:810 est:3h dep:808 Extract find bar + regex + match ranges + incremental find from `EditorWindowController` into `Find/FindBarController.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:811 est:3h dep:808 Extract syntax-pipeline lifecycle + syntax theme + dirtyLineRange + refreshSyntaxHighlights from `ItsyDocument` into `Documents/DocumentSyntaxController.swift`. `ItsyDocument` gets a thin `syntax:` handle.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:812 est:3h dep:808 Extract file-watcher lifecycle (`fileWatchSource`, `restartFileWatcher`, `stopFileWatcher`, `pendingExternalChangePrompt`) into `Documents/DocumentFileWatcher.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:813 est:3h dep:808 Extract Git-gutter integration (`gitGutterDecorator`, `updateGitHunkGutter`, `scheduleGitHunkGutterRefresh`) into `Git/DocumentGitGutterController.swift`.

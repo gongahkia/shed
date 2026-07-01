@@ -322,11 +322,15 @@ import Testing
 @Test func textGlyphInstancesUseHighlightColors() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\n")
+	_ = view.textGlyphInstances(scale: 1)
+	let cacheCount = view.lineShapeCacheEntryCount
 	let red = SIMD4<Float>(1, 0, 0, 1)
 	view.highlightSpans = [TextHighlightSpan(range: 0 ..< 1, color: red)]
+	#expect(view.lineShapeCacheEntryCount == cacheCount)
 	let instances = view.textGlyphInstances(scale: 1)
 	let first = try #require(instances.first)
 	#expect(first.color == red)
+	#expect(view.lineShapeCacheEntryCount == cacheCount)
 }
 
 @Test func lineShapeCacheInvalidatesAfterSameLengthEdit() throws {

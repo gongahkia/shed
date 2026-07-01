@@ -41,10 +41,12 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	private var configsByLanguageID: [String: LSPServerConfig]
 	private var languageIDByExtension: [String: String]
+	private var languageIDByFileName: [String: String]
 
 	public init(configs: [LSPServerConfig] = LSPServerRegistry.bundledDefaults) {
 		configsByLanguageID = [:]
 		languageIDByExtension = LSPServerRegistry.defaultExtensionMap
+		languageIDByFileName = LSPServerRegistry.defaultFileNameMap
 		for config in configs {
 			configsByLanguageID[config.languageId] = config
 		}
@@ -86,8 +88,23 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		languageIDByExtension[fileExtension.lowercased()]
 	}
 
+	public func languageID(forFileName fileName: String) -> String? {
+		languageIDByFileName[fileName.lowercased()]
+	}
+
+	public func languageID(for url: URL) -> String? {
+		let fileName = url.lastPathComponent.lowercased()
+		if let languageID = languageID(forFileName: fileName) {
+			return languageID
+		}
+		if fileName.hasPrefix("dockerfile.") || fileName.hasPrefix("containerfile.") || fileName.hasSuffix(".dockerfile") {
+			return "dockerfile"
+		}
+		return languageID(forFileExtension: url.pathExtension)
+	}
+
 	public func config(for url: URL) -> LSPServerConfig? {
-		guard let languageID = languageID(forFileExtension: url.pathExtension) else {
+		guard let languageID = languageID(for: url) else {
 			return nil
 		}
 		return config(forLanguageID: languageID)
@@ -97,7 +114,7 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		for url: URL,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> LSPServerConfig? {
-		guard let languageID = languageID(forFileExtension: url.pathExtension) else {
+		guard let languageID = languageID(for: url) else {
 			return nil
 		}
 		return resolvedConfig(forLanguageID: languageID, environment: environment)
@@ -107,7 +124,7 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		for url: URL,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> MissingBinary? {
-		guard let languageID = languageID(forFileExtension: url.pathExtension) else {
+		guard let languageID = languageID(for: url) else {
 			return nil
 		}
 		return missingBinary(forLanguageID: languageID, environment: environment)
@@ -144,6 +161,12 @@ public struct LSPServerRegistry: Equatable, Sendable {
 	public mutating func registerExtensions(_ map: [String: String]) {
 		for (ext, languageID) in map {
 			languageIDByExtension[ext.lowercased()] = languageID
+		}
+	}
+
+	public mutating func registerFileNames(_ map: [String: String]) {
+		for (fileName, languageID) in map {
+			languageIDByFileName[fileName.lowercased()] = languageID
 		}
 	}
 
@@ -184,6 +207,90 @@ public struct LSPServerRegistry: Equatable, Sendable {
 			args: [],
 			rootPatterns: ["go.mod", ".git"]
 		),
+		LSPServerConfig(
+			languageId: "c",
+			command: "clangd",
+			args: [],
+			rootPatterns: ["compile_commands.json", "compile_flags.txt", ".clangd", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "cpp",
+			command: "clangd",
+			args: [],
+			rootPatterns: ["compile_commands.json", "compile_flags.txt", ".clangd", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "zig",
+			command: "zls",
+			args: [],
+			rootPatterns: ["build.zig", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "elixir",
+			command: "elixir-ls",
+			args: [],
+			rootPatterns: ["mix.exs", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "kotlin",
+			command: "kotlin-language-server",
+			args: [],
+			rootPatterns: ["settings.gradle.kts", "settings.gradle", "build.gradle.kts", "build.gradle", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "csharp",
+			command: "omnisharp",
+			args: ["--languageserver"],
+			rootPatterns: ["omnisharp.json", "global.json", "Directory.Build.props", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "bash",
+			command: "bash-language-server",
+			args: ["start"],
+			rootPatterns: [".git"]
+		),
+		LSPServerConfig(
+			languageId: "dockerfile",
+			command: "docker-langserver",
+			args: ["--stdio"],
+			rootPatterns: [".git"]
+		),
+		LSPServerConfig(
+			languageId: "sql",
+			command: "sqls",
+			args: [],
+			rootPatterns: [".git"]
+		),
+		LSPServerConfig(
+			languageId: "dart",
+			command: "dart",
+			args: ["language-server", "--protocol=lsp"],
+			rootPatterns: ["pubspec.yaml", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "haskell",
+			command: "haskell-language-server-wrapper",
+			args: ["--lsp"],
+			rootPatterns: ["hie.yaml", "stack.yaml", "cabal.project", "package.yaml", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "lua",
+			command: "lua-language-server",
+			args: [],
+			rootPatterns: [".luarc.json", ".luarc.jsonc", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "ruby",
+			command: "ruby-lsp",
+			args: [],
+			rootPatterns: ["Gemfile", ".git"]
+		),
+		LSPServerConfig(
+			languageId: "terraform",
+			command: "terraform-ls",
+			args: ["serve"],
+			rootPatterns: [".terraform", ".git"]
+		),
 	]
 
 	public static let defaultExtensionMap: [String: String] = [
@@ -200,6 +307,42 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		"py": "python",
 		"pyi": "python",
 		"go": "go",
+		"c": "c",
+		"h": "c",
+		"cc": "cpp",
+		"cpp": "cpp",
+		"cxx": "cpp",
+		"hh": "cpp",
+		"hpp": "cpp",
+		"hxx": "cpp",
+		"zig": "zig",
+		"zon": "zig",
+		"ex": "elixir",
+		"exs": "elixir",
+		"kt": "kotlin",
+		"kts": "kotlin",
+		"cs": "csharp",
+		"csx": "csharp",
+		"bash": "bash",
+		"sh": "bash",
+		"zsh": "bash",
+		"dockerfile": "dockerfile",
+		"sql": "sql",
+		"dart": "dart",
+		"hs": "haskell",
+		"lhs": "haskell",
+		"lua": "lua",
+		"rb": "ruby",
+		"rake": "ruby",
+		"tf": "terraform",
+		"tfvars": "terraform",
+	]
+
+	public static let defaultFileNameMap: [String: String] = [
+		"dockerfile": "dockerfile",
+		"containerfile": "dockerfile",
+		"gemfile": "ruby",
+		"rakefile": "ruby",
 	]
 
 	private static func resolvedCommandPath(for config: LSPServerConfig, environment: [String: String]) -> String? {
@@ -289,6 +432,32 @@ public struct LSPServerRegistry: Equatable, Sendable {
 			return "`npm i -g pyright`"
 		case "gopls":
 			return "`go install golang.org/x/tools/gopls@latest`"
+		case "clangd":
+			return "`brew install llvm` and add LLVM's bin directory to PATH"
+		case "zls":
+			return "`brew install zls`"
+		case "elixir-ls":
+			return "`brew install elixir-ls`"
+		case "kotlin-language-server":
+			return "`brew install fwcd/kotlin-language-server/kotlin-language-server`"
+		case "omnisharp":
+			return "`brew install omnisharp`"
+		case "bash-language-server":
+			return "`npm i -g bash-language-server`"
+		case "docker-langserver":
+			return "`npm i -g dockerfile-language-server-nodejs`"
+		case "sqls":
+			return "`brew install sqls`"
+		case "dart":
+			return "`brew install dart-sdk`"
+		case "haskell-language-server-wrapper":
+			return "`brew install haskell-language-server`"
+		case "lua-language-server":
+			return "`brew install lua-language-server`"
+		case "ruby-lsp":
+			return "`gem install ruby-lsp`"
+		case "terraform-ls":
+			return "`brew install hashicorp/tap/terraform-ls`"
 		default:
 			return "install `\(command)` and ensure it is executable"
 		}

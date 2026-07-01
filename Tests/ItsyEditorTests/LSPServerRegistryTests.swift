@@ -35,6 +35,35 @@ import Testing
 	))
 }
 
+@Test func lspServerRegistryReportsInstallHintsForBundledCommands() {
+	let expectedHints: [String: String] = [
+		"clangd": "`brew install llvm` and add LLVM's bin directory to PATH",
+		"zls": "`brew install zls`",
+		"elixir-ls": "`brew install elixir-ls`",
+		"kotlin-language-server": "`brew install fwcd/kotlin-language-server/kotlin-language-server`",
+		"omnisharp": "`brew install omnisharp`",
+		"bash-language-server": "`npm i -g bash-language-server`",
+		"docker-langserver": "`npm i -g dockerfile-language-server-nodejs`",
+		"sqls": "`brew install sqls`",
+		"dart": "`brew install dart-sdk`",
+		"haskell-language-server-wrapper": "`brew install haskell-language-server`",
+		"lua-language-server": "`brew install lua-language-server`",
+		"ruby-lsp": "`gem install ruby-lsp`",
+		"terraform-ls": "`brew install hashicorp/tap/terraform-ls`",
+	]
+	let configs = expectedHints.map { command, _ in
+		LSPServerConfig(languageId: command, command: command)
+	}
+	let registry = LSPServerRegistry(configs: configs)
+	for (command, hint) in expectedHints {
+		#expect(registry.missingBinary(forLanguageID: command, environment: ["PATH": ""]) == LSPServerRegistry.MissingBinary(
+			languageID: command,
+			command: command,
+			hint: hint
+		))
+	}
+}
+
 @Test func lspServerRegistryReturnsBundledDefaultsByLanguageID() {
 	let registry = LSPServerRegistry()
 	#expect(registry.config(forLanguageID: "swift")?.command == "/usr/bin/xcrun")
@@ -42,19 +71,54 @@ import Testing
 	#expect(registry.config(forLanguageID: "rust")?.command == "rust-analyzer")
 	#expect(registry.config(forLanguageID: "python")?.args == ["--stdio"])
 	#expect(registry.config(forLanguageID: "go")?.rootPatterns == ["go.mod", ".git"])
-	#expect(registry.config(forLanguageID: "kotlin") == nil)
+	#expect(registry.config(forLanguageID: "c")?.command == "clangd")
+	#expect(registry.config(forLanguageID: "cpp")?.command == "clangd")
+	#expect(registry.config(forLanguageID: "zig")?.command == "zls")
+	#expect(registry.config(forLanguageID: "elixir")?.command == "elixir-ls")
+	#expect(registry.config(forLanguageID: "kotlin")?.command == "kotlin-language-server")
+	#expect(registry.config(forLanguageID: "csharp")?.args == ["--languageserver"])
+	#expect(registry.config(forLanguageID: "bash")?.args == ["start"])
+	#expect(registry.config(forLanguageID: "dockerfile")?.args == ["--stdio"])
+	#expect(registry.config(forLanguageID: "sql")?.command == "sqls")
+	#expect(registry.config(forLanguageID: "dart")?.args == ["language-server", "--protocol=lsp"])
+	#expect(registry.config(forLanguageID: "haskell")?.args == ["--lsp"])
+	#expect(registry.config(forLanguageID: "lua")?.command == "lua-language-server")
+	#expect(registry.config(forLanguageID: "ruby")?.command == "ruby-lsp")
+	#expect(registry.config(forLanguageID: "terraform")?.args == ["serve"])
 }
 
 @Test func lspServerRegistryMapsCommonExtensionsToLanguageIDs() {
 	let registry = LSPServerRegistry()
-	#expect(registry.languageID(forFileExtension: "Swift") == "swift")
-	#expect(registry.languageID(forFileExtension: "ts") == "typescript")
-	#expect(registry.languageID(forFileExtension: "tsx") == "typescript")
-	#expect(registry.languageID(forFileExtension: "jsx") == "javascript")
-	#expect(registry.languageID(forFileExtension: "rs") == "rust")
-	#expect(registry.languageID(forFileExtension: "go") == "go")
-	#expect(registry.languageID(forFileExtension: "py") == "python")
-	#expect(registry.languageID(forFileExtension: "kt") == nil)
+	let expectations: [(String, String)] = [
+		("Swift", "swift"),
+		("ts", "typescript"),
+		("tsx", "typescript"),
+		("jsx", "javascript"),
+		("rs", "rust"),
+		("go", "go"),
+		("py", "python"),
+		("c", "c"),
+		("hpp", "cpp"),
+		("zig", "zig"),
+		("exs", "elixir"),
+		("kt", "kotlin"),
+		("cs", "csharp"),
+		("sh", "bash"),
+		("dockerfile", "dockerfile"),
+		("sql", "sql"),
+		("dart", "dart"),
+		("hs", "haskell"),
+		("lua", "lua"),
+		("rb", "ruby"),
+		("tfvars", "terraform"),
+	]
+	for (ext, languageID) in expectations {
+		#expect(registry.languageID(forFileExtension: ext) == languageID)
+	}
+	#expect(registry.languageID(forFileName: "Dockerfile") == "dockerfile")
+	#expect(registry.languageID(forFileName: "Gemfile") == "ruby")
+	#expect(registry.languageID(for: URL(fileURLWithPath: "/tmp/Dockerfile.dev")) == "dockerfile")
+	#expect(registry.languageID(for: URL(fileURLWithPath: "/tmp/app.tf")) == "terraform")
 }
 
 @Test func lspServerRegistryDiscoversWorkspaceRootViaRootPatterns() throws {

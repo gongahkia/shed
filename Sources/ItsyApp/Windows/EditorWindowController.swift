@@ -19,6 +19,7 @@ final class EditorWindowController: NSWindowController {
 	private let lspMissingBanner = LSPMissingBanner()
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarLabel = NSTextField(labelWithString: "")
+	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
@@ -37,6 +38,7 @@ final class EditorWindowController: NSWindowController {
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
 	private var lspSupervisorTasks: [LSPSessionKey: Task<Void, Never>] = [:]
+	private var lspStatusEntries: [LSPSessionKey: LSPStatusEntry] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
@@ -45,6 +47,8 @@ final class EditorWindowController: NSWindowController {
 	private var lspCrashStatusText: String?
 	private var lspRestartKey: LSPSessionKey?
 	private var lspRestartURL: URL?
+	private var activeLSPKey: LSPSessionKey?
+	private var lspStatusPanel: LSPStatusPanel?
 
 	init(document: ItsyDocument) {
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
@@ -53,7 +57,7 @@ final class EditorWindowController: NSWindowController {
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
 		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
-		Self.configureStatusBarView(statusBarView, label: statusBarLabel)
+		Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.setContentHuggingPriority(.required, for: .vertical)

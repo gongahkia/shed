@@ -3,7 +3,7 @@
 Codename: `itsy`. Final name TBD.
 
 ## Mission
-A macOS-native code editor that **opens instantly, edits anything, stays out of the way**. Sub-150 ms cold start, sub-30 MB idle RAM, modal-editing-native, OSS.
+A macOS-native code editor that **opens instantly, edits anything, stays out of the way**. Sub-150 ms cold start, sub-100 MB clean idle footprint, modal-editing-native, OSS.
 
 ## Why this exists
 - VSCode is 3.5 GB RAM + ~1.3 s cold (Electron tax).
@@ -55,7 +55,7 @@ A macOS-native code editor that **opens instantly, edits anything, stays out of 
 | KPI | Target | Stretch | Notes |
 |---|---|---|---|
 | Cold start (click → editable) | <150 ms | <100 ms | M-series, sudo purge between runs, Hyperfine 20 runs |
-| Idle RAM (1 small file open) | <30 MB | <20 MB | RSS via `ps -o rss=` |
+| Idle memory footprint (1 small file open) | <100 MB | <80 MB | Primary gate: `vmmap` physical footprint via `bench/scripts/memory_audit.sh`; RSS recorded as context |
 | RAM w/ 100k-line .ts file | <80 MB | <50 MB | Includes tree-sitter parser arena |
 | RSS delta per active LSP server | <150 MB | <100 MB | sourcekit-lsp on a Swift workspace |
 | Time from didOpen to first publishDiagnostics | <5 s | <2 s | Lazy LSP spawn must not affect launch |

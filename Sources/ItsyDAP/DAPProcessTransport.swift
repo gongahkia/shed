@@ -165,6 +165,8 @@ public final class DAPProcessTransport: @unchecked Sendable {
 		stopped = true
 		lock.unlock()
 		clearHandlers()
+		emit(.stdout, from: stdoutPipe.fileHandleForReading)
+		emit(.stderr, from: stderrPipe.fileHandleForReading)
 		continuation.yield(.terminated(status))
 		continuation.finish()
 	}

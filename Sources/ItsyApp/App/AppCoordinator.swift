@@ -6,7 +6,7 @@ import ItsyKeymap
 
 final class AppCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
-	private lazy var menuCoordinator = MenuCoordinator(documentController: documentController, actionTarget: self)
+	private lazy var menuCoordinator = MenuCoordinator(documentController: documentController, actionTarget: self, gitTarget: gitCoordinator)
 	private lazy var commandRegistry = makeCommandRegistry()
 	private lazy var commandPaletteCoordinator = CommandPaletteCoordinator(
 		documentController: documentController,
@@ -188,16 +188,16 @@ final class AppCoordinator: NSObject {
 						self?.showProjectFind(nil)
 					},
 					Command(id: "git.changes", title: L10n.string("Git Changes"), defaultKey: nil) { [weak self] in
-						self?.showGitChanges(nil)
+						self?.sendGitAction(#selector(GitCoordinator.showGitChanges(_:)))
 					},
 					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
-						self?.refreshGitChanges(nil)
+						self?.sendGitAction(#selector(GitCoordinator.refreshGitChanges(_:)))
 					},
 					Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
-						self?.showGitStashes(nil)
+						self?.sendGitAction(#selector(GitCoordinator.showGitStashes(_:)))
 					},
 					Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"), defaultKey: "Cmd-Shift-S") { [weak self] in
-						self?.stashCurrentGitChanges(nil)
+						self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
 					},
 					Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
 						self?.showTasks(nil)
@@ -284,36 +284,8 @@ final class AppCoordinator: NSObject {
 		projectFindCoordinator.showProjectFind(sender)
 	}
 
-	@objc func showGitChanges(_ sender: Any?) {
-		gitCoordinator.showGitChanges(sender)
-	}
-
-	@objc func refreshGitChanges(_ sender: Any?) {
-		gitCoordinator.refreshGitChanges(sender)
-	}
-
-	@objc func showGitStashes(_ sender: Any?) {
-		gitCoordinator.showGitStashes(sender)
-	}
-
-	@objc func stashCurrentGitChanges(_ sender: Any?) {
-		gitCoordinator.stashCurrentGitChanges(sender)
-	}
-
-	@objc func fetchGitRemote(_ sender: Any?) {
-		gitCoordinator.fetchGitRemote(sender)
-	}
-
-	@objc func pullGitRemote(_ sender: Any?) {
-		gitCoordinator.pullGitRemote(sender)
-	}
-
-	@objc func pullGitRemoteRebase(_ sender: Any?) {
-		gitCoordinator.pullGitRemoteRebase(sender)
-	}
-
-	@objc func pushGitRemote(_ sender: Any?) {
-		gitCoordinator.pushGitRemote(sender)
+	private func sendGitAction(_ selector: Selector, sender: Any? = nil) {
+		NSApp.sendAction(selector, to: gitCoordinator, from: sender)
 	}
 
 	@objc func showTasks(_ sender: Any?) {

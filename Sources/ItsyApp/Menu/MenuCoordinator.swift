@@ -3,13 +3,15 @@ import AppKit
 final class MenuCoordinator: NSObject, NSMenuDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var actionTarget: AppCoordinator?
+	private weak var gitTarget: GitCoordinator?
 	private weak var openRecentMenu: NSMenu?
 	private weak var gitGutterIndexMenuItem: NSMenuItem?
 	private weak var gitGutterHeadMenuItem: NSMenuItem?
 
-	init(documentController: ItsyDocumentController, actionTarget: AppCoordinator) {
+	init(documentController: ItsyDocumentController, actionTarget: AppCoordinator, gitTarget: GitCoordinator) {
 		self.documentController = documentController
 		self.actionTarget = actionTarget
+		self.gitTarget = gitTarget
 		super.init()
 	}
 
@@ -27,6 +29,20 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		let mode = ItsyGitHunkGutterCoordinator.currentMode
 		gitGutterIndexMenuItem?.state = mode == .index ? .on : .off
 		gitGutterHeadMenuItem?.state = mode == .head ? .on : .off
+	}
+
+	private func addGitItem(to menu: NSMenu, title: String, selector: Selector, keyEquivalent: String = "", modifiers: NSEvent.ModifierFlags = []) {
+		let item = menu.addItem(withTitle: title, action: #selector(sendGitAction(_:)), keyEquivalent: keyEquivalent)
+		item.keyEquivalentModifierMask = modifiers
+		item.target = self
+		item.representedObject = NSStringFromSelector(selector)
+	}
+
+	@objc private func sendGitAction(_ sender: NSMenuItem) {
+		guard let selectorName = sender.representedObject as? String else {
+			return
+		}
+		NSApp.sendAction(NSSelectorFromString(selectorName), to: gitTarget, from: sender)
 	}
 
 	func installMainMenu() {
@@ -134,25 +150,16 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		viewItem.submenu = viewMenu
 
 		let gitMenu = NSMenu(title: L10n.string("Git"))
-		let gitChangesItem = gitMenu.addItem(withTitle: L10n.string("Git Changes"), action: #selector(AppCoordinator.showGitChanges(_:)), keyEquivalent: "")
-		gitChangesItem.target = actionTarget
-		let gitRefreshItem = gitMenu.addItem(withTitle: L10n.string("Refresh Git Status"), action: #selector(AppCoordinator.refreshGitChanges(_:)), keyEquivalent: "")
-		gitRefreshItem.target = actionTarget
+		addGitItem(to: gitMenu, title: L10n.string("Git Changes"), selector: #selector(GitCoordinator.showGitChanges(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Refresh Git Status"), selector: #selector(GitCoordinator.refreshGitChanges(_:)))
 		gitMenu.addItem(.separator())
-		let gitStashesItem = gitMenu.addItem(withTitle: L10n.string("Stashes"), action: #selector(AppCoordinator.showGitStashes(_:)), keyEquivalent: "")
-		gitStashesItem.target = actionTarget
-		let gitStashCurrentItem = gitMenu.addItem(withTitle: L10n.string("Stash Current Changes..."), action: #selector(AppCoordinator.stashCurrentGitChanges(_:)), keyEquivalent: "S")
-		gitStashCurrentItem.keyEquivalentModifierMask = [.command, .shift]
-		gitStashCurrentItem.target = actionTarget
+		addGitItem(to: gitMenu, title: L10n.string("Stashes"), selector: #selector(GitCoordinator.showGitStashes(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Stash Current Changes..."), selector: #selector(GitCoordinator.stashCurrentGitChanges(_:)), keyEquivalent: "S", modifiers: [.command, .shift])
 		gitMenu.addItem(.separator())
-		let gitFetchItem = gitMenu.addItem(withTitle: L10n.string("Fetch"), action: #selector(AppCoordinator.fetchGitRemote(_:)), keyEquivalent: "")
-		gitFetchItem.target = actionTarget
-		let gitPullItem = gitMenu.addItem(withTitle: L10n.string("Pull"), action: #selector(AppCoordinator.pullGitRemote(_:)), keyEquivalent: "")
-		gitPullItem.target = actionTarget
-		let gitPullRebaseItem = gitMenu.addItem(withTitle: L10n.string("Pull Rebase"), action: #selector(AppCoordinator.pullGitRemoteRebase(_:)), keyEquivalent: "")
-		gitPullRebaseItem.target = actionTarget
-		let gitPushItem = gitMenu.addItem(withTitle: L10n.string("Push"), action: #selector(AppCoordinator.pushGitRemote(_:)), keyEquivalent: "")
-		gitPushItem.target = actionTarget
+		addGitItem(to: gitMenu, title: L10n.string("Fetch"), selector: #selector(GitCoordinator.fetchGitRemote(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Pull"), selector: #selector(GitCoordinator.pullGitRemote(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Pull Rebase"), selector: #selector(GitCoordinator.pullGitRemoteRebase(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Push"), selector: #selector(GitCoordinator.pushGitRemote(_:)))
 		gitItem.submenu = gitMenu
 
 		let taskMenu = NSMenu(title: L10n.string("Tasks"))

@@ -17,6 +17,7 @@ public enum LSPSessionStatus: Equatable, Sendable {
 	case running
 	case failed
 	case exited
+	case disabled
 }
 
 public enum LSPManagerError: Error, Equatable, Sendable {
@@ -24,6 +25,7 @@ public enum LSPManagerError: Error, Equatable, Sendable {
 	case workspaceRootNotFound
 	case missingBinary(LSPServerRegistry.MissingBinary)
 	case retryLimitExceeded
+	case serverDisabled(LSPSessionKey)
 }
 
 public actor LSPManager {
@@ -40,6 +42,7 @@ public actor LSPManager {
 	private var clients: [LSPSessionKey: LSPProcessClient] = [:]
 	private var statuses: [LSPSessionKey: LSPSessionStatus] = [:]
 	private var spawnTimestamps: [LSPSessionKey: [Date]] = [:]
+	private var disabledKeys: Set<LSPSessionKey> = []
 
 	public init(
 		registry: LSPServerRegistry = LSPServerRegistry(),
@@ -99,11 +102,15 @@ public actor LSPManager {
 			throw LSPManagerError.workspaceRootNotFound
 		}
 		let key = LSPSessionKey(languageID: config.languageId, workspaceRoot: root)
+		if disabledKeys.contains(key) {
+			throw LSPManagerError.serverDisabled(key)
+		}
 		if let existing = clients[key] {
 			return existing
 		}
 		guard registerSpawnAttempt(for: key, now: now) else {
-			statuses[key] = .failed
+			disabledKeys.insert(key)
+			statuses[key] = .disabled
 			throw LSPManagerError.retryLimitExceeded
 		}
 		let client = try clientFactory(config, root)
@@ -117,8 +124,14 @@ public actor LSPManager {
 	}
 
 	public func markFailed(_ key: LSPSessionKey) {
-		statuses[key] = .failed
+		statuses[key] = disabledKeys.contains(key) ? .disabled : .failed
 		clients.removeValue(forKey: key)
+	}
+
+	public func enableSession(_ key: LSPSessionKey) {
+		disabledKeys.remove(key)
+		spawnTimestamps[key] = []
+		statuses[key] = .idle
 	}
 
 	public func shutdownAll() async {

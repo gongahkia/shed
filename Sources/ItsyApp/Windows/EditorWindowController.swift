@@ -35,10 +35,16 @@ final class EditorWindowController: NSWindowController {
 	private var referencesRequestGeneration = 0
 	private var referencesCoordinator: ReferencesCoordinator?
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
+	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
+	private var lspSupervisorTasks: [LSPSessionKey: Task<Void, Never>] = [:]
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var lspMissingBannerGeneration = 0
+	private var indexingStatusText: String?
+	private var lspCrashStatusText: String?
+	private var lspRestartKey: LSPSessionKey?
+	private var lspRestartURL: URL?
 
 	init(document: ItsyDocument) {
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
@@ -87,6 +93,7 @@ final class EditorWindowController: NSWindowController {
 		window.contentView = splitView
 		super.init(window: window)
 		configureLSPMissingBanner()
+		configureLSPStatusRestart()
 		fileTreeController.attach(to: window)
 		fileTreeController.openFile = { ItsyWorkspaceController.openFile(at: $0) }
 		installTabBoundsObserver()
@@ -107,6 +114,9 @@ final class EditorWindowController: NSWindowController {
 		hoverTimer?.invalidate()
 		hoverPopover?.close()
 		signatureHelpPopover?.close()
+		for task in lspSupervisorTasks.values {
+			task.cancel()
+		}
 		if let tabBoundsObserver {
 			NotificationCenter.default.removeObserver(tabBoundsObserver)
 		}
@@ -121,13 +131,8 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	func setIndexingStatus(_ text: String?) {
-		if let text, !text.isEmpty {
-			statusBarLabel.stringValue = text
-			statusBarView.isHidden = false
-		} else {
-			statusBarLabel.stringValue = ""
-			statusBarView.isHidden = true
-		}
+		indexingStatusText = text.flatMap { $0.isEmpty ? nil : $0 }
+		refreshStatusBar()
 	}
 
 	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) {
@@ -272,6 +277,11 @@ final class EditorWindowController: NSWindowController {
 		}
 	}
 
+	private func configureLSPStatusRestart() {
+		let recognizer = NSClickGestureRecognizer(target: self, action: #selector(restartLSPFromStatusBar(_:)))
+		statusBarView.addGestureRecognizer(recognizer)
+	}
+
 	private func refreshLSPMissingBanner(for document: ItsyDocument) {
 		lspMissingBannerGeneration += 1
 		let generation = lspMissingBannerGeneration
@@ -324,6 +334,48 @@ final class EditorWindowController: NSWindowController {
 			return missingBinary.command
 		}
 		return String(hint[hint.index(after: start) ..< end])
+	}
+
+	private func refreshStatusBar() {
+		if let text = lspCrashStatusText ?? indexingStatusText {
+			statusBarLabel.stringValue = text
+			statusBarView.isHidden = false
+		} else {
+			statusBarLabel.stringValue = ""
+			statusBarView.isHidden = true
+		}
+	}
+
+	private func showLSPCrashStatus(key: LSPSessionKey, url: URL, reason: LSPSessionFailureReason) {
+		lspRestartKey = key
+		lspRestartURL = url
+		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status)) - click to restart")
+		refreshStatusBar()
+	}
+
+	private func clearLSPCrashStatus(for key: LSPSessionKey) {
+		guard lspRestartKey == key else {
+			return
+		}
+		lspRestartKey = nil
+		lspRestartURL = nil
+		lspCrashStatusText = nil
+		refreshStatusBar()
+	}
+
+	@objc private func restartLSPFromStatusBar(_ sender: NSClickGestureRecognizer) {
+		guard let key = lspRestartKey, let url = lspRestartURL else {
+			return
+		}
+		Task { [weak self] in
+			await Self.lspManager.enableSession(key)
+			await MainActor.run { [weak self] in
+				guard let self else {
+					return
+				}
+				self.restartLSPSession(for: url)
+			}
+		}
 	}
 
 	override func windowDidLoad() {
@@ -653,8 +705,13 @@ final class EditorWindowController: NSWindowController {
 				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
-					self?.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
-					self?.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
+					guard let self else {
+						return
+					}
+					self.installLSPSupervisor(for: key, client: client, url: url)
+					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
+					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
+					self.clearLSPCrashStatus(for: key)
 				}
 			} catch {
 				await Self.lspManager.markFailed(key)
@@ -664,10 +721,17 @@ final class EditorWindowController: NSWindowController {
 				throw error
 			}
 		}
+		await MainActor.run { [weak self] in
+			self?.installLSPSupervisor(for: key, client: client, url: url)
+		}
 		return (client, key)
 	}
 
 	private func syncLSPDocument(client: LSPProcessClient, key: LSPSessionKey, url: URL, content: String) async throws {
+		let supervisor = await MainActor.run {
+			self.lspSupervisors[key]
+		}
+		await supervisor?.recordOwnedURI(url.standardizedFileURL.absoluteString)
 		let coordinator = await MainActor.run {
 			self.lspSyncCoordinator(for: key, client: client)
 		}
@@ -686,6 +750,64 @@ final class EditorWindowController: NSWindowController {
 		let coordinator = LSPDocumentSyncCoordinator(sink: LSPClientNotificationSink(client: client), debounceMillis: 0)
 		lspSyncCoordinators[key] = coordinator
 		return coordinator
+	}
+
+	private func installLSPSupervisor(for key: LSPSessionKey, client: LSPProcessClient, url: URL) {
+		guard lspSupervisors[key] == nil else {
+			lspRestartURL = lspRestartKey == key ? url : lspRestartURL
+			return
+		}
+		let supervisor = LSPSessionSupervisor(key: key, client: client)
+		lspSupervisors[key] = supervisor
+		lspSupervisorTasks[key] = Task { [weak self, supervisor] in
+			await supervisor.start()
+			for await event in supervisor.events {
+				await MainActor.run { [weak self] in
+					self?.handleLSPSupervisorEvent(event, key: key, url: url)
+				}
+			}
+		}
+	}
+
+	private func handleLSPSupervisorEvent(_ event: LSPSessionSupervisorEvent, key: LSPSessionKey, url: URL) {
+		switch event {
+		case .diagnosticsUpdated:
+			break
+		case let .sessionFailed(reason):
+			lspSyncCoordinators[key] = nil
+			completionTriggerCharactersBySession[key] = nil
+			signatureHelpTriggerCharactersBySession[key] = nil
+			completionResolveEnabledBySession[key] = nil
+			lspSupervisors[key] = nil
+			lspSupervisorTasks[key] = nil
+			Task {
+				await Self.lspManager.markFailed(key)
+			}
+			showLSPCrashStatus(key: key, url: url, reason: reason)
+			NSLog("lsp session failed: \(key.languageID) exit \(reason.status) \(reason.stderrTail)")
+		}
+	}
+
+	private func restartLSPSession(for url: URL) {
+		guard (document as? ItsyDocument)?.fileURL == url else {
+			return
+		}
+		let targetView = editorView
+		let content = targetView.editor.text
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: url)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: url, content: content)
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("lsp restart failed: \(error)")
+				}
+			}
+		}
 	}
 
 	private func setCompletionCapabilities(triggerCharacters characters: Set<String>, resolveProvider: Bool, for key: LSPSessionKey) {

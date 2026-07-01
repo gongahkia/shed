@@ -228,7 +228,14 @@ import Testing
 	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 4, event: DAPEvent.stopped))))
 	#expect(await session.state == .stopped)
 
-	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 5, event: DAPEvent.exited))))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(
+		seq: 5,
+		event: DAPEvent.continued,
+		body: .object(["threadId": .int(1)])
+	))))
+	#expect(await session.state == .running)
+
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 6, event: DAPEvent.exited))))
 	#expect(await session.state == .terminated)
 }
 

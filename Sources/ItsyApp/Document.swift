@@ -22,15 +22,13 @@ final class ItsyDocument: NSDocument {
 	private var gitGutterDecorator: GutterDecorator?
 	private var activeGutterDecorator: GutterDecorator?
 	private var gitHunkRefreshWorkItem: DispatchWorkItem?
-	private let fileWatcherQueue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
-	private var fileWatchSource: DispatchSourceFileSystemObject?
-	private var pendingExternalChangePrompt = false
+	private let fileWatcher = DocumentFileWatcher()
 
 	override var fileURL: URL? {
 		didSet {
 			syntax.configure(fileURL: fileURL)
 			updateHandoffActivity()
-			restartFileWatcher()
+			fileWatcher.restart()
 		}
 	}
 
@@ -39,10 +37,25 @@ final class ItsyDocument: NSDocument {
 		syntax.setHighlightSpans = { [weak self] spans in
 			self?.setHighlightSpans(spans)
 		}
+		fileWatcher.fileURL = { [weak self] in
+			self?.fileURL
+		}
+		fileWatcher.currentText = { [weak self] in
+			self?.editor.text ?? ""
+		}
+		fileWatcher.displayName = { [weak self] url in
+			self?.displayName ?? url.lastPathComponent
+		}
+		fileWatcher.promptWindow = { [weak self] in
+			self?.windowControllers.first?.window
+		}
+		fileWatcher.reloadFromDisk = { [weak self] url in
+			self?.reloadFromDisk(at: url)
+		}
 	}
 
 	deinit {
-		stopFileWatcher()
+		fileWatcher.stop()
 	}
 
 	override class var autosavesInPlace: Bool {
@@ -69,7 +82,7 @@ final class ItsyDocument: NSDocument {
 		syntax.configure(fileURL: fileURL)
 		syntax.refresh(editor: editor)
 		updateHandoffActivity()
-		restartFileWatcher()
+		fileWatcher.restart()
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
@@ -113,7 +126,7 @@ final class ItsyDocument: NSDocument {
 		}
 		ItsyProblemGutterCoordinator.apply(to: self)
 		ItsyGitHunkGutterCoordinator.apply(to: self)
-		restartFileWatcher()
+		fileWatcher.restart()
 		updateHandoffActivity()
 	}
 
@@ -244,75 +257,6 @@ final class ItsyDocument: NSDocument {
 		for view in editorViews {
 			view.highlightSpans = spans
 		}
-	}
-
-	private func restartFileWatcher() {
-		stopFileWatcher()
-		guard let url = fileURL, url.isFileURL else {
-			return
-		}
-		let descriptor = open(url.path, O_EVTONLY)
-		guard descriptor >= 0 else {
-			return
-		}
-		let source = DispatchSource.makeFileSystemObjectSource(
-			fileDescriptor: descriptor,
-			eventMask: [.write, .delete, .rename, .extend],
-			queue: fileWatcherQueue
-		)
-		source.setEventHandler { [weak self] in
-			DispatchQueue.main.async {
-				self?.externalFileDidChange()
-			}
-		}
-		source.setCancelHandler {
-			Darwin.close(descriptor)
-		}
-		fileWatchSource = source
-		source.resume()
-	}
-
-	private func stopFileWatcher() {
-		fileWatchSource?.cancel()
-		fileWatchSource = nil
-	}
-
-	private func externalFileDidChange() {
-		guard !pendingExternalChangePrompt, let url = fileURL else {
-			return
-		}
-		pendingExternalChangePrompt = true
-		DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-			self?.promptForExternalFileChange(at: url)
-		}
-	}
-
-	private func promptForExternalFileChange(at url: URL) {
-		if (try? String(contentsOf: url, encoding: .utf8)) == editor.text {
-			pendingExternalChangePrompt = false
-			restartFileWatcher()
-			return
-		}
-		let alert = NSAlert()
-		alert.messageText = L10n.string("\(displayName ?? url.lastPathComponent) changed on disk")
-		alert.informativeText = L10n.string("Reload the file from disk?")
-		alert.addButton(withTitle: L10n.string("Reload"))
-		alert.addButton(withTitle: L10n.string("Keep Editing"))
-		if let window = windowControllers.first?.window {
-			alert.beginSheetModal(for: window) { [weak self] response in
-				self?.handleExternalFilePrompt(response, url: url)
-			}
-		} else {
-			handleExternalFilePrompt(alert.runModal(), url: url)
-		}
-	}
-
-	private func handleExternalFilePrompt(_ response: NSApplication.ModalResponse, url: URL) {
-		if response == .alertFirstButtonReturn {
-			reloadFromDisk(at: url)
-		}
-		pendingExternalChangePrompt = false
-		restartFileWatcher()
 	}
 
 	private func reloadFromDisk(at url: URL) {

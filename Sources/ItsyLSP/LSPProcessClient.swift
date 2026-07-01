@@ -125,6 +125,10 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.sendRequest(method: method, params: params)
 	}
 
+	public func workspaceSymbol(query: String) async throws -> LSPWorkspaceSymbolResult {
+		try await session.workspaceSymbol(query: query)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) async throws {
 		try await session.sendNotification(method: method, params: params)
 	}

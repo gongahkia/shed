@@ -668,6 +668,128 @@ public struct LSPSymbolInformation: Codable, Equatable, Sendable {
 	}
 }
 
+public enum LSPSymbolTag: Int, Codable, Equatable, Sendable {
+	case deprecated = 1
+}
+
+public struct LSPWorkspaceSymbolParams: Codable, Equatable, Sendable {
+	public var query: String
+
+	public init(query: String) {
+		self.query = query
+	}
+}
+
+public enum LSPWorkspaceSymbolLocation: Codable, Equatable, Sendable {
+	case location(LSPLocation)
+	case uri(String)
+
+	private enum CodingKeys: String, CodingKey {
+		case uri
+	}
+
+	public var resolvedLocation: LSPLocation? {
+		guard case let .location(location) = self else {
+			return nil
+		}
+		return location
+	}
+
+	public var uri: String {
+		switch self {
+		case let .location(location):
+			return location.uri
+		case let .uri(uri):
+			return uri
+		}
+	}
+
+	public init(from decoder: Decoder) throws {
+		if let location = try? LSPLocation(from: decoder) {
+			self = .location(location)
+			return
+		}
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		self = .uri(try container.decode(String.self, forKey: .uri))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		switch self {
+		case let .location(location):
+			try location.encode(to: encoder)
+		case let .uri(uri):
+			var container = encoder.container(keyedBy: CodingKeys.self)
+			try container.encode(uri, forKey: .uri)
+		}
+	}
+}
+
+public struct LSPWorkspaceSymbol: Codable, Equatable, Sendable {
+	public var name: String
+	public var kind: LSPSymbolKind
+	public var tags: [LSPSymbolTag]?
+	public var containerName: String?
+	public var location: LSPWorkspaceSymbolLocation
+	public var data: LSPAny?
+
+	public init(
+		name: String,
+		kind: LSPSymbolKind,
+		tags: [LSPSymbolTag]? = nil,
+		containerName: String? = nil,
+		location: LSPWorkspaceSymbolLocation,
+		data: LSPAny? = nil
+	) {
+		self.name = name
+		self.kind = kind
+		self.tags = tags
+		self.containerName = containerName
+		self.location = location
+		self.data = data
+	}
+}
+
+public enum LSPWorkspaceSymbolResult: Equatable, Sendable {
+	case symbolInformation([LSPSymbolInformation])
+	case workspaceSymbols([LSPWorkspaceSymbol])
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if let workspaceSymbols = try? decoder.decode([LSPWorkspaceSymbol].self, from: data) {
+			self = .workspaceSymbols(workspaceSymbols)
+			return
+		}
+		if let symbolInformation = try? decoder.decode([LSPSymbolInformation].self, from: data) {
+			self = .symbolInformation(symbolInformation)
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var workspaceSymbols: [LSPWorkspaceSymbol] {
+		switch self {
+		case let .symbolInformation(symbolInformation):
+			return symbolInformation.map {
+				LSPWorkspaceSymbol(
+					name: $0.name,
+					kind: $0.kind,
+					containerName: $0.containerName,
+					location: .location($0.location)
+				)
+			}
+		case let .workspaceSymbols(workspaceSymbols):
+			return workspaceSymbols
+		case .none:
+			return []
+		}
+	}
+}
+
 public struct LSPCommand: Codable, Equatable, Sendable {
 	public var title: String
 	public var command: String
@@ -954,6 +1076,7 @@ public struct LSPConfigurationParams: Codable, Equatable, Sendable {
 public extension LSPMethod {
 	static let workspaceConfiguration = "workspace/configuration"
 	static let workspaceApplyEdit = "workspace/applyEdit"
+	static let workspaceSymbol = "workspace/symbol"
 }
 
 public enum LSPDiagnosticSeverity: Int, Codable, Equatable, Sendable {

@@ -8,6 +8,7 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private let documentController: ItsyDocumentController
 	private let commandRegistryProvider: () -> CommandRegistry
 	private let activeDocumentProvider: () -> NSDocument?
+	private let workspaceSymbolProvider: @MainActor (String) async throws -> [WorkspaceSymbol]
 	private var commandPalettePanel: NSPanel?
 	private var commandPaletteInputField: NSTextField?
 	private var commandPaletteTableView: NSTableView?
@@ -17,13 +18,21 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private var commandPaletteFilteredItems: [Command] = []
 	private var commandPaletteAcceptsRawText = false
 	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
-	private var commandPaletteSymbols: [WorkspaceSymbol] = []
+	private var commandPaletteBaseSymbols: [WorkspaceSymbol] = []
+	private var commandPaletteLSPSymbols: [WorkspaceSymbol] = []
 	private var commandPaletteFilteredSymbols: [WorkspaceSymbol] = []
+	private var commandPaletteSymbolGeneration = 0
 
-	init(documentController: ItsyDocumentController, commandRegistryProvider: @escaping () -> CommandRegistry, activeDocumentProvider: @escaping () -> NSDocument?) {
+	init(
+		documentController: ItsyDocumentController,
+		commandRegistryProvider: @escaping () -> CommandRegistry,
+		activeDocumentProvider: @escaping () -> NSDocument?,
+		workspaceSymbolProvider: @escaping @MainActor (String) async throws -> [WorkspaceSymbol] = { _ in [] }
+	) {
 		self.documentController = documentController
 		self.commandRegistryProvider = commandRegistryProvider
 		self.activeDocumentProvider = activeDocumentProvider
+		self.workspaceSymbolProvider = workspaceSymbolProvider
 	}
 
 	func installBridge() {
@@ -191,8 +200,10 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private func setCommandPaletteItems(_ items: [Command]) {
 		commandPaletteAcceptsRawText = false
 		commandPaletteSymbolScope = nil
-		commandPaletteSymbols = []
+		commandPaletteBaseSymbols = []
+		commandPaletteLSPSymbols = []
 		commandPaletteFilteredSymbols = []
+		commandPaletteSymbolGeneration += 1
 		commandPaletteItems = items
 		commandPaletteInputField?.stringValue = ""
 		commandPaletteInputField?.placeholderString = L10n.string("Command")
@@ -203,8 +214,10 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 	private func setCommandPaletteCommandLine(_ value: String) {
 		commandPaletteAcceptsRawText = true
 		commandPaletteSymbolScope = nil
-		commandPaletteSymbols = []
+		commandPaletteBaseSymbols = []
+		commandPaletteLSPSymbols = []
 		commandPaletteFilteredSymbols = []
+		commandPaletteSymbolGeneration += 1
 		commandPaletteItems = []
 		commandPaletteFilteredItems = []
 		commandPaletteInputField?.placeholderString = ""
@@ -243,25 +256,26 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		if raw.hasPrefix("@") || raw.hasPrefix("#") {
 			let scope: CommandPaletteSymbolScope = raw.hasPrefix("@") ? .workspace : .file
 			if commandPaletteSymbolScope != scope {
-				commandPaletteSymbols = symbolsForCommandPaletteScope(scope)
+				commandPaletteBaseSymbols = symbolsForCommandPaletteScope(scope)
+				commandPaletteLSPSymbols = []
 				commandPaletteSymbolScope = scope
+				commandPaletteSymbolGeneration += 1
 			}
-			let query = String(raw.dropFirst()).lowercased()
-			let keyPath: (WorkspaceSymbol) -> String = scope == .workspace
-				? { "\($0.name) \($0.relativePath)" }
-				: { $0.name }
-			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(commandPaletteSymbols, query: query, includeUnmatched: query.isEmpty, by: keyPath)
+			let query = String(raw.dropFirst())
+			if scope == .workspace {
+				commandPaletteLSPSymbols = []
+				requestWorkspaceSymbols(query: query)
+			}
+			applyCommandPaletteSymbolFilter(scope: scope, query: query)
 			commandPaletteFilteredItems = []
-			commandPaletteTableView?.reloadData()
-			if !commandPaletteFilteredSymbols.isEmpty {
-				commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-			}
 			return
 		}
 		if commandPaletteSymbolScope != nil {
 			commandPaletteSymbolScope = nil
-			commandPaletteSymbols = []
+			commandPaletteBaseSymbols = []
+			commandPaletteLSPSymbols = []
 			commandPaletteFilteredSymbols = []
+			commandPaletteSymbolGeneration += 1
 		}
 		let query = raw.lowercased()
 		commandPaletteFilteredItems = FuzzyMatcher.ranked(commandPaletteItems, query: query, includeUnmatched: false, by: \.title)
@@ -269,6 +283,72 @@ final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDe
 		if !commandPaletteFilteredItems.isEmpty {
 			commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 		}
+	}
+
+	private func requestWorkspaceSymbols(query: String) {
+		commandPaletteSymbolGeneration += 1
+		let generation = commandPaletteSymbolGeneration
+		let provider = workspaceSymbolProvider
+		Task { [weak self] in
+			let symbols: [WorkspaceSymbol]
+			do {
+				symbols = try await provider(query)
+			} catch {
+				return
+			}
+			await MainActor.run { [weak self] in
+				guard
+					let self,
+					generation == self.commandPaletteSymbolGeneration,
+					self.commandPaletteSymbolScope == .workspace,
+					self.commandPaletteInputField?.stringValue == "@\(query)"
+				else {
+					return
+				}
+				self.commandPaletteLSPSymbols = Array(symbols.prefix(100))
+				self.applyCommandPaletteSymbolFilter(scope: .workspace, query: query)
+			}
+		}
+	}
+
+	private func applyCommandPaletteSymbolFilter(scope: CommandPaletteSymbolScope, query: String) {
+		let fuzzyQuery = query.lowercased()
+		let keyPath: (WorkspaceSymbol) -> String = scope == .workspace
+			? { "\($0.name) \($0.relativePath)" }
+			: { $0.name }
+		switch scope {
+		case .workspace where !commandPaletteLSPSymbols.isEmpty:
+			let lspSymbols = Array(commandPaletteLSPSymbols.prefix(100))
+			let lspKeys = Set(lspSymbols.map(symbolRangeKey(_:)))
+			let fallback = commandPaletteBaseSymbols.filter { !lspKeys.contains(symbolRangeKey($0)) }
+			commandPaletteFilteredSymbols = lspSymbols + FuzzyMatcher.ranked(
+				fallback,
+				query: fuzzyQuery,
+				includeUnmatched: fuzzyQuery.isEmpty,
+				by: keyPath
+			)
+		default:
+			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(
+				commandPaletteBaseSymbols,
+				query: fuzzyQuery,
+				includeUnmatched: fuzzyQuery.isEmpty,
+				by: keyPath
+			)
+		}
+		commandPaletteTableView?.reloadData()
+		if !commandPaletteFilteredSymbols.isEmpty {
+			commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
+	}
+
+	private func symbolRangeKey(_ symbol: WorkspaceSymbol) -> String {
+		[
+			symbol.relativePath,
+			String(symbol.line),
+			String(symbol.column),
+			String(symbol.endLine ?? symbol.line),
+			String(symbol.endColumn ?? symbol.column),
+		].joined(separator: "\u{1f}")
 	}
 
 	private func moveCommandPaletteSelection(_ delta: Int) {

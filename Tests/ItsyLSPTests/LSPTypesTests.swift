@@ -276,6 +276,45 @@ import Testing
 	#expect(none.locations.isEmpty)
 }
 
+@Test func workspaceSymbolParamsEncodeAndResultDecodesWorkspaceSymbols() throws {
+	let params = try LSPAny(encoding: LSPWorkspaceSymbolParams(query: "App"))
+	let result = try LSPWorkspaceSymbolResult(decoding: Data(#"""
+	[
+	  {
+	    "name": "AppShell",
+	    "kind": 23,
+	    "tags": [1],
+	    "containerName": "Sources",
+	    "location": {
+	      "uri": "file:///tmp/main.swift",
+	      "range": {
+	        "start": { "line": 1, "character": 6 },
+	        "end": { "line": 1, "character": 14 }
+	      }
+	    },
+	    "data": { "id": 7 }
+	  },
+	  {
+	    "name": "Deferred",
+	    "kind": 12,
+	    "location": { "uri": "file:///tmp/deferred.swift" }
+	  }
+	]
+	"""#.utf8))
+	let symbols = result.workspaceSymbols
+
+	#expect(LSPMethod.workspaceSymbol == "workspace/symbol")
+	#expect(params == .object(["query": .string("App")]))
+	#expect(symbols.count == 2)
+	#expect(symbols[0].name == "AppShell")
+	#expect(symbols[0].tags == [.deprecated])
+	#expect(symbols[0].containerName == "Sources")
+	#expect(symbols[0].data == .object(["id": .int(7)]))
+	#expect(symbols[0].location.resolvedLocation?.range.start == LSPPosition(line: 1, character: 6))
+	#expect(symbols[1].location.uri == "file:///tmp/deferred.swift")
+	#expect(symbols[1].location.resolvedLocation == nil)
+}
+
 @Test func completionResultDecodesItemArrayAndNull() throws {
 	let items = try LSPCompletionResult(decoding: Data(#"[{"label":"map","insertText":"map"}]"#.utf8))
 	let none = try LSPCompletionResult(decoding: Data("null".utf8))

@@ -46,8 +46,7 @@ Known structural issues (targeted by Phase 21+):
 - Grapheme cluster correctness across selections + multi-cursor is unproven.
 - Highlight color refresh no longer clears shaped-line cache; remaining risk is full highlight-span filtering per visible line.
 - Terminal emulator silently drops SGR params, has no mouse, no OSC titles/clipboard/hyperlinks, no 24-bit color.
-- Workspace symbol extraction is regex-based; no incremental FSEvents watch; no LSP-backed symbols.
-- LSP server registry does not detect missing binaries; users get silent spawn failure. Session crash/exit not surfaced. `workspace/symbol` not wired.
+- Workspace index symbol extraction is regex-based; no incremental FSEvents watch.
 - Git ops shell out to `/usr/bin/git`; hunk staging round-trips via temp patches. No blame, no line-history, no file-history browser. Remote `Process` has no cancel-on-close.
 - DAP is protocol + framing only. No transport, no session, no UI.
 - Extension manifests contribute tasks only. No trust model, no marketplace.
@@ -305,7 +304,6 @@ Goal: pull vim state out of `MetalTextView` into a testable module with no AppKi
 
 ## Phase 29 — LSP UX polish
 
-(A) 2026-07-01 +Phase29-LSP @lsp id:1164 est:3h **`workspace/symbol`.** Wire `LSPClientSession.workspaceSymbol(query:)` request. Add to `LSPManager` a `symbols(matching: String, in: URL) async throws -> [LSPWorkspaceSymbol]`. Feed the Command Palette's `@` scope (already exists) with a merged list: first `workspace/symbol` (up to 100), then `WorkspaceIndex` fallback. Dedup by `(uri, range)`. Ref: `https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol`.
 (A) 2026-07-01 +Phase29-LSP @lsp id:1165 est:2h dep:1164 `textDocument/documentSymbol` for the `#` (file symbols) palette. When the current document's LSP session is running, prefer LSP symbols over the regex extractor.
 (B) 2026-07-01 +Phase29-LSP @lsp id:1166 est:3h Extend bundled LSP configs. Add: `clangd` (c/cpp), `zls` (zig), `elixir-ls` (elixir), `kotlin-language-server` (kotlin), `omnisharp` (csharp), `bash-language-server` (bash), `docker-langserver` (dockerfile), `sqls` (sql), `dart` (dart), `haskell-language-server-wrapper` (haskell), `lua-language-server` (lua), `ruby-lsp` (ruby), `terraform-ls` (terraform). Add extension map entries. Add missing-binary hints for each.
 (B) 2026-07-01 +Phase29-LSP @lsp id:1167 est:2h dep:1163 LSP smoke QA: `bench/scripts/lsp_smoke.sh` opens a small fixture per language, waits for first `publishDiagnostics`, asserts arrival within 5 s KPI, reports per-language latency. Skips any language whose binary is missing.

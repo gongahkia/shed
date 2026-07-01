@@ -13,13 +13,17 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 	public var relativePath: String
 	public var line: Int
 	public var column: Int
+	public var endLine: Int?
+	public var endColumn: Int?
 
-	public init(name: String, kind: WorkspaceSymbolKind, relativePath: String, line: Int, column: Int) {
+	public init(name: String, kind: WorkspaceSymbolKind, relativePath: String, line: Int, column: Int, endLine: Int? = nil, endColumn: Int? = nil) {
 		self.name = name
 		self.kind = kind
 		self.relativePath = relativePath
 		self.line = line
 		self.column = column
+		self.endLine = endLine
+		self.endColumn = endColumn
 	}
 }
 

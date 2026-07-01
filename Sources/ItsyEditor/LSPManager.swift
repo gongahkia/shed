@@ -119,6 +119,17 @@ public actor LSPManager {
 		return client
 	}
 
+	public func symbols(matching query: String, in url: URL) async throws -> [LSPWorkspaceSymbol] {
+		guard registry.config(for: url) != nil else {
+			throw LSPManagerError.noConfigForDocument
+		}
+		guard registry.discoverWorkspaceRoot(for: url) != nil else {
+			throw LSPManagerError.workspaceRootNotFound
+		}
+		let client = try ensureClient(for: url)
+		return try await client.workspaceSymbol(query: query).workspaceSymbols
+	}
+
 	public func markRunning(_ key: LSPSessionKey) {
 		statuses[key] = .running
 	}

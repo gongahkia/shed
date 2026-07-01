@@ -46,6 +46,20 @@ import Testing
 	}
 }
 
+@Test func processTransportExposesProcessMetadataAfterStart() throws {
+	let executableURL = URL(fileURLWithPath: "/bin/cat")
+	let transport = LSPProcessTransport(executableURL: executableURL, arguments: ["-u"])
+	try transport.start()
+	defer {
+		transport.terminate()
+	}
+
+	#expect(transport.executableURL == executableURL)
+	#expect(transport.arguments == ["-u"])
+	#expect(transport.processIdentifier != nil)
+	#expect(transport.startDate != nil)
+}
+
 @Test func processTransportPublishesManualTermination() async throws {
 	let transport = LSPProcessTransport(executableURL: URL(fileURLWithPath: "/bin/cat"))
 

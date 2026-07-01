@@ -9,10 +9,11 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 - Mark complete by replacing the leading `(P)` with `x 2026-MM-DD`.
 - Add new tasks at end of section; do not renumber `id:`.
 - KPIs live in NORTHSTAR.md "KPI table". Anything you do should not regress them.
+- After each Phase 21+ subsection labelled `Checkpoint`, run `swift build && swift test && swift build -c release && bench/scripts/regression.sh` and commit if all pass. Never merge a phase that regresses any KPI >5%.
 
 ## Conventions baked in
 - **Swift 5.9+**, macOS 13.0 deployment target. No iOS code paths.
-- **No external Swift deps** except vendored C: tree-sitter + grammars. No CocoaPods, no Carthage, no SPM remote pulls in release builds.
+- **No external Swift deps** except vendored C: tree-sitter + grammars + (new) libgit2. No CocoaPods, no Carthage, no SPM remote pulls in release builds.
 - **One .app bundle, one binary.** No helper processes through v1.0.
 - **No `@MainActor` annotation on hot paths** unless required; explicit dispatch.
 - **No SwiftUI on launch path.** AppKit only for window + menus + first view.
@@ -20,6 +21,36 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 - **Tests:** Swift Testing (`import Testing`, `@Test`). XCTest tolerated only where Swift Testing lacks parity (e.g., performance baselines via `XCTMetric`).
 - **Comments:** in-line only, lowercase, sparing. WHY only, not WHAT.
 - **Style:** tabs in source. SwiftFormat config committed in `.swiftformat`.
+
+---
+
+## Current state (2026-07-01)
+
+Working, verified in tree:
+
+- 22 kLOC Swift across 11 SwiftPM targets. Editor core (rope, motions, undo), Metal text view with CoreText + glyph atlas, tree-sitter with 14 grammars statically linked, 3 keymap profiles (plain 22 / vim 128 / emacs 37 bindings), LSP session/framing + 6 bundled server configs + full apply-layer (completion, hover, refs, goto def, rename, code actions, formatting, signature help), Git UI shelling to `/usr/bin/git` (status, diff, stage, hunk/line stage, commit, branch, stash, fetch/pull/push, gutter hunks, conflicts), tasks panel, problems panel, workspace file/symbol index (regex-based), file tree, tabs, split panes, command palette (@ workspace symbols, # file symbols), project find, outline panel, hover tooltip, signature help popover, completion popup, quick look, autosave/versions, handoff, recent docs, terminal (PTY forkpty w/ zsh -il), settings.toml, keys.toml, themes (2), lsp.json, bench harness (measure/rss/latency/display/rope).
+
+Blocked / off-target:
+
+- Cold start `<150 ms`: currently ~272 ms mean (warm ~230 ms). Dominated by system dyld + AX-window detection tail, not app-side Swift init (~1.45 ms).
+- Idle RSS `<30 MB`: currently ~90 MB. Dominated by AppKit + Metal + IOSurface + `__OBJC_RO`, not app heap. See task id:1050 for realism check.
+- 1 GB file open `<500 ms`: unreachable on current `Document.read` path (slurps entire file to `String`, then builds rope from string).
+- Distribution: Developer ID cert, notarization, Sparkle, Homebrew cask, final name all pending in Phase 16.
+
+Known structural issues (targeted by Phase 21+):
+
+- `Sources/ItsyApp/main.swift` = 4231 LOC, `Document.swift` = 2318 LOC, `MetalTextView.swift` = 2752 LOC. Feature state concentrated in `AppDelegate` (~100 instance vars) and `EditorWindowController`.
+- `Editor.text` full flatten; `Document.data(ofType:)` full flatten on every save.
+- Rope insert rebuilds the affected leaf as a full `String` then re-splits; each ancestor branch reallocates children. Repeated-ASCII fast path masks this in current benchmarks.
+- `UndoStack.record` snapshots full `textBefore: String` every 32 edits.
+- Grapheme cluster correctness across selections + multi-cursor is unproven.
+- `MetalTextView.highlightSpans.didSet` empties the whole shape cache on every syntax refresh.
+- Terminal emulator silently drops SGR params, has no mouse, no OSC titles/clipboard/hyperlinks, no 24-bit color.
+- Workspace symbol extraction is regex-based; no incremental FSEvents watch; no LSP-backed symbols.
+- LSP server registry does not detect missing binaries; users get silent spawn failure. Session crash/exit not surfaced. `workspace/symbol` not wired.
+- Git ops shell out to `/usr/bin/git`; hunk staging round-trips via temp patches. No blame, no line-history, no file-history browser. Remote `Process` has no cancel-on-close.
+- DAP is protocol + framing only. No transport, no session, no UI.
+- Extension manifests contribute tasks only. No trust model, no marketplace.
 
 ---
 
@@ -39,8 +70,6 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 ---
 
 ## Phase 3 — Metal text renderer
-
-(B) 2026-06-28 +Phase3-Renderer @metal id:049 est:2h dep:046 ProMotion 120Hz support: ensure `CAMetalLayer.maximumDrawableCount = 3`, `wantsExtendedDynamicRangeContent = false`, `CVDisplayLink` runs at refresh rate. Verify on 120Hz display.
 
 ---
 
@@ -132,6 +161,334 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 ---
 
+## Phase 21 — Codebase atomization and organization
+
+Goal: no source file over ~600 LOC, no type over ~300 LOC, feature-per-directory layout. A new contributor should be able to locate any feature by directory name in under a minute. Every task in this phase must pass `swift test` before merge; no behavior change is permitted.
+
+Directory target layout (create empty dirs first in id:800, then move files):
+
+```
+Sources/ItsyApp/
+  App/                  AppDelegate + top-level entry (main.swift shrinks to ~150 LOC)
+  Documents/            ItsyDocument, ItsyDocumentController, tab coord
+  Windows/              EditorWindowController, EditorPane, EditorPaneCoordinator
+  Palette/              CommandPalette panel + registry
+  ProjectFind/          project-find panel
+  Git/                  git panel + composer + branch popover + stash + conflict + gutter
+  Tasks/                task panel
+  Problems/             problems panel
+  Outline/              outline panel + collapse store
+  References/           references panel
+  Hover/                hover tooltip
+  Signature/            signature help popover
+  Completion/           completion popup
+  FileTree/             sidebar
+  Terminal/             terminal panel/view/session/emulator
+  Settings/             settings window + preferences
+  Menu/                 menu builder
+  Bench/                recordBenchStage helpers
+```
+
+(A) 2026-07-01 +Phase21-Refactor @refactor id:800 est:1h Create empty target directories per layout above. Do not move files yet. Add a `Sources/ItsyApp/README.md` describing which directory owns which feature. Acceptance: `swift build` still passes.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:801 est:2h dep:800 Extract `AppDelegate` from `main.swift` to `Sources/ItsyApp/App/AppDelegate.swift`. `main.swift` retains only `recordBenchStage("process_start")`, `NSApplication.shared`, `documentController`, `appDelegate`, `app.setActivationPolicy(.regular)`, `app.delegate = appDelegate`, `app.run()`. Acceptance: unchanged behavior, `swift test` passes.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:802 est:3h dep:801 Split `AppDelegate` into a shell + coordinators. Introduce `MenuCoordinator`, `CommandPaletteCoordinator`, `ProjectFindCoordinator`, `GitCoordinator`, `TaskCoordinator`, `ProblemsCoordinator`, `OutlineCoordinator`, `TerminalCoordinator`, `SettingsCoordinator`. Each coordinator owns its panel + state, exposes a small handle to the delegate. `AppDelegate` retains only lifecycle callbacks (`applicationDidFinishLaunching`, `applicationWillTerminate`, `application(_:openFile:)`, `application(_:continue:restorationHandler:)`) and registers each coordinator. Target: `AppDelegate` under 200 LOC, ≤10 stored properties.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:803 est:2h dep:802 Move `OutlineKindNode`, `OutlineSymbolNode`, `OutlineCollapseStore`, `GitCommitDraft`, `GitCommitDraftStore` from `main.swift` into `Sources/ItsyApp/Outline/` and `Sources/ItsyApp/Git/`.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:804 est:2h dep:802 Move all `@objc private func toggle*/show*/refresh*` for Git into `GitCoordinator`; wire menu actions to coordinator via `NSApp.sendAction(_:to:from:)`. Delete duplicated Git state from `AppDelegate`.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:805 est:2h dep:802 Same treatment for Command Palette (see `main.swift:367..649`): move all palette state + view construction + filter/run into `CommandPaletteCoordinator`.
+(A) 2026-07-01 +Phase21-Refactor @refactor id:806 est:2h dep:802 Same treatment for Project Find (see `main.swift:811..993`).
+(A) 2026-07-01 +Phase21-Refactor @refactor id:807 est:2h dep:802 Same treatment for Task, Problems, Outline, References, Terminal, Settings coordinators.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:808 est:3h dep:807 Split `Document.swift` (2318 LOC). Move `ItsyDocumentController` to `Documents/ItsyDocumentController.swift`. Move `EditorPane` + `EditorPaneCoordinator` + `EditorPaneLayout` to `Windows/EditorPane.swift`. Move `EditorWindowController` to `Windows/EditorWindowController.swift`. Move `CompositeGutterDecorator` to `Windows/CompositeGutterDecorator.swift`. Move `LSPClientNotificationSink` to `Windows/LSPBridging.swift`.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:809 est:3h dep:808 Extract file-tree logic (sidebar view, child cache, key monitor, preview URL, tabIDs) from `EditorWindowController` into `FileTree/FileTreeSidebarController.swift` under 400 LOC. Owned by `EditorWindowController` via composition.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:810 est:3h dep:808 Extract find bar + regex + match ranges + incremental find from `EditorWindowController` into `Find/FindBarController.swift`.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:811 est:3h dep:808 Extract syntax-pipeline lifecycle + syntax theme + dirtyLineRange + refreshSyntaxHighlights from `ItsyDocument` into `Documents/DocumentSyntaxController.swift`. `ItsyDocument` gets a thin `syntax:` handle.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:812 est:3h dep:808 Extract file-watcher lifecycle (`fileWatchSource`, `restartFileWatcher`, `stopFileWatcher`, `pendingExternalChangePrompt`) into `Documents/DocumentFileWatcher.swift`.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:813 est:3h dep:808 Extract Git-gutter integration (`gitGutterDecorator`, `updateGitHunkGutter`, `scheduleGitHunkGutterRefresh`) into `Git/DocumentGitGutterController.swift`.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:814 est:4h dep:800 Split `MetalTextView.swift` (2752 LOC). Extract in-view vim state machine (`VimOperator`, `VisualMode`, `RegisterOperation`, `RecordedKey`, `TextObject`, `CharacterMotion`, `KeyDispatchResult` and all functions gated on `mode == .normal|.visual|.operatorPending`) into `Sources/ItsyRender/VimInputController.swift`. **Do not** relocate the state into a different module in this task — that ships in Phase 28.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:815 est:3h dep:814 Extract `NSTextInputClient` conformance from `MetalTextView` into an extension file `Sources/ItsyRender/MetalTextView+TextInput.swift`.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:816 est:3h dep:814 Extract gutter + marker rendering from `MetalTextView` into `Sources/ItsyRender/GutterView.swift` — a child view rendered via CoreGraphics, not Metal instances. Reduces `MetalTextView` render-path surface.
+(B) 2026-07-01 +Phase21-Refactor @refactor id:817 est:3h dep:814 Extract find-highlight/rect logic from `MetalTextView` into `Sources/ItsyRender/MetalTextView+FindHighlights.swift`.
+(C) 2026-07-01 +Phase21-Refactor @refactor id:818 est:2h dep:807 Move `EditorPreferences.swift`, `HoverTooltip.swift`, `SignatureHelpPopover.swift`, `TabBarView.swift`, `FileTreeSidebar.swift`, `GitHunkGutter.swift`, `ProblemGutter.swift`, `ReferencesPanel.swift`, `CompletionPopup.swift`, `FindBarView.swift`, `Localization.swift`, `AppKeymap.swift`, `CommandPalette.swift`, `TerminalEmulator.swift`, `TerminalSession.swift`, `TerminalView.swift` into their new feature directories. Update `Package.swift` if any target needs new paths (SwiftPM auto-discovers; no change likely needed).
+(C) 2026-07-01 +Phase21-Refactor @refactor id:819 est:1h dep:818 Add `Sources/ItsyApp/README.md` with a directory map. Add a top-of-file `// @file <purpose>` doc comment on each new file (single line).
+(A) 2026-07-01 +Phase21-Refactor @refactor id:820 est:2h dep:819 Checkpoint: run `swift build -c release && swift test && bench/scripts/regression.sh`. Attach output to `bench/notes/refactor-phase21.md`. Cold start must not regress >5% vs current 272 ms baseline; RSS must not regress >5% vs current 90 MB.
+
+---
+
+## Phase 22 — Large-file text stack (piece-tree + mmap + streaming)
+
+Goal: hit the `<500 ms` 1 GB open KPI and stop the O(N) full flatten on save. Piece table with mmap-backed original buffer is the industry standard (VSCode PieceTree uses 64 KB chunks; Zed's SumTree keeps summaries in each B+ tree node for O(log n) traversal). Ref: `https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation`, `https://zed.dev/blog/zed-decoded-rope-sumtree`, `https://dev.to/_darrenburns/the-piece-table---the-unsung-hero-of-your-text-editor-al8`.
+
+Design decision to record in `docs/design/textstack.md` before implementation (id:900):
+
+- Original buffer: `Data` backed by `mmap(fd, len, PROT_READ, MAP_PRIVATE|MAP_NOCACHE, ..., 0)` for files > 1 MB; in-memory `Data` for smaller.
+- Add buffer: `ContiguousArray<UInt8>` appended to, never truncated.
+- Piece tree: red-black tree of pieces keyed by cumulative UTF-8 byte offset; each node caches per-subtree byte + line + grapheme counts (summary metric, like SumTree).
+- Public surface identical to today's `Rope` (`insert`, `remove`, `slice`, `chunk`, `copyUTF8Chunk`, `line(forOffset:)`, `offset(forLine:)`, `lineRange`, `length`, `lineCount`, `graphemeCount`). Old `Rope` type kept, delegates to piece tree behind a feature flag until id:924.
+
+(A) 2026-07-01 +Phase22-TextStack @editor id:900 est:2h Write `docs/design/textstack.md` covering: piece-tree structure, mmap policy, save flow, undo hooks, tree-sitter `TSInput` chunk callback, grapheme boundary strategy. Get design-locked before code.
+(A) 2026-07-01 +Phase22-TextStack @editor id:901 est:4h dep:900 Add `Sources/ItsyEditor/PieceTree/PieceTree.swift`: red-black tree of pieces, each piece = `(buffer: BufferID, start: Int, length: Int, lineFeeds: Int)`. `BufferID` = `original(Int) | add(Int)`. Summaries: total UTF-8 bytes, line-feed count. Public API: `insert(_:at:)`, `remove(_:)`, `substring(_:)`, `utf8Byte(at:)`, `line(forOffset:)`, `offset(forLine:)`, `length`, `lineCount`, `iterateBytes(from:_:)`. Do NOT wire to `Editor` yet.
+(A) 2026-07-01 +Phase22-TextStack @editor id:902 est:3h dep:901 Add `Sources/ItsyEditor/PieceTree/MMapBuffer.swift`: opens a file via `open(2)` + `fstat` + `mmap(2)` w/ `PROT_READ|MAP_PRIVATE`; releases via `munmap` on deinit. Provides `bytes: UnsafeBufferPointer<UInt8>`, `count: Int`, `slice(_:) -> Data` that returns a `Data` with `Deallocator.none` (does NOT copy). Tests: open a 1 GB sparse file, read first + last 4 KB, verify offsets.
+(A) 2026-07-01 +Phase22-TextStack @editor id:903 est:2h dep:902 Add streaming line-feed indexer: given `UnsafeBufferPointer<UInt8>`, produce a `[Int]` of line-start offsets in 64 KB stride using SIMD `memchr` (`Darwin.memchr`). Fallback: byte loop with `_read4` unrolling. Tests: gen 100 kLOC file, index in <50 ms.
+(A) 2026-07-01 +Phase22-TextStack @editor id:904 est:3h dep:901,902,903 `PieceTree.init(readingMappedFile:)`: mmap the file, run line indexer, create a single `.original` piece spanning the whole buffer with pre-computed line count. No String allocation.
+(A) 2026-07-01 +Phase22-TextStack @editor id:905 est:4h dep:901 Piece tree insert: split enclosing piece, append bytes to add buffer, insert new piece nodes, update summaries up the spine. Balance via left-leaning red-black (implementation reference: Sedgewick 2008). Property test: 100k random inserts + `substring(0..<length)` matches oracle `Array<UInt8>`.
+(A) 2026-07-01 +Phase22-TextStack @editor id:906 est:3h dep:905 Piece tree remove: split at range bounds, drop pieces in range, coalesce neighbors when possible. Property test: 100k random ins/del pairs matches oracle.
+(A) 2026-07-01 +Phase22-TextStack @editor id:907 est:3h dep:905 Grapheme summary: each piece caches its own grapheme cluster count computed once at piece creation via a Unicode UAX #29 walker. Tree summary adds a grapheme total. `graphemeCount` is O(1); `graphemeIndex(forOffset:)` is O(log n + piece scan). Ref: `https://www.unicode.org/reports/tr29/`.
+(A) 2026-07-01 +Phase22-TextStack @editor id:908 est:2h dep:907 Add `UAX29GraphemeIterator.swift`: iterates grapheme boundaries over a UTF-8 byte cursor without allocating `String`. Import UCD grapheme tables via a code-gen script `scripts/gen_grapheme_tables.swift`. Tests: pass `GraphemeBreakTest.txt` from the Unicode Character Database (see id:1030).
+(A) 2026-07-01 +Phase22-TextStack @editor id:909 est:3h dep:906,907 Add `PieceTree` iteration protocol used by tree-sitter: `func copyUTF8(at: Int, into: UnsafeMutableBufferPointer<UInt8>) -> Int`. `ItsySyntax/Parser.swift` `RopeInput` gets a PieceTree-shaped variant `PieceTreeInput` behind the same `TSInput` callback shape. No copy per chunk beyond the 4 KB TS default.
+(A) 2026-07-01 +Phase22-TextStack @editor id:910 est:3h dep:906 Add `PieceTree.saveTo(url:)`: writes each piece's byte range to an output file via `writev(2)` when pieces are contiguous, else write-per-piece. Never materializes a whole `Data`. Tests: create a piece tree of 100k pieces, save, `sha256sum` matches oracle.
+(A) 2026-07-01 +Phase22-TextStack @editor id:911 est:2h dep:910 Feature-flag switch in `Editor`: `Editor.textStorage` becomes `enum { case rope(Rope), case pieceTree(PieceTree) }`. Existing code paths use `.rope`. Flag: `ITSY_EDITOR_STORAGE=piecetree` env or `settings.toml` key `[editor.experimental] storage = "piecetree"`.
+(B) 2026-07-01 +Phase22-TextStack @editor id:912 est:3h dep:911 Route `Editor.insert/deleteBackward/deleteForward/replaceSelections/replace(ranges:with:)` through the storage enum. All `rope.slice(...)` in `Editor.swift` become `storage.substring(...)`.
+(B) 2026-07-01 +Phase22-TextStack @editor id:913 est:2h dep:912 Remove `Editor.text: String` from public API. Replace call sites: (a) `Document.data(ofType:)` uses `pieceTree.saveTo(...)` (see id:914); (b) tests use `storage.substring(0..<length)` for oracle checks. Grep guard: `grep -rn "editor.text" Sources/ Tests/` returns nothing.
+(A) 2026-07-01 +Phase22-TextStack @doc id:914 est:3h dep:913 Rework `ItsyDocument.data(ofType:)` and `write(to:ofType:for:originalContentsURL:)`: bypass `data(ofType:)` when storage is piece-tree, override `write(to:ofType:for:)` to call `pieceTree.saveTo(url:)` directly. Old rope path keeps `Data(editor.text.utf8)` fallback. Acceptance: opening a 1 GB file + save round-trips byte-identical, uses `<200 MB` peak RSS delta.
+(A) 2026-07-01 +Phase22-TextStack @doc id:915 est:3h dep:904,914 Rework `ItsyDocument.read(from:ofType:)` + `readFromURL(_:ofType:)`: for files > 1 MB, override `read(from url:...)` (not `read(from data:)`) to mmap via `PieceTree.init(readingMappedFile:)`. Emit `first_page_visible` bench stage as soon as line index for first 4 KB completes. Acceptance: 1 GB file first-page visible < 500 ms warm (M-series).
+(A) 2026-07-01 +Phase22-TextStack @bench id:916 est:2h dep:915 Add `ItsyBench open --file <path>` subcommand that measures `process_start → first_page_visible → first_draw` for a target file. Wire into `bench/scripts/regression.sh`.
+(A) 2026-07-01 +Phase22-TextStack @bench id:917 est:2h dep:916 Add corpus: `bench/scripts/gen_corpus.sh` extended to generate `huge-text.log` (1 GB non-repeating pseudo-random ASCII w/ newlines every 80 bytes) so the repeated-ASCII rope path can't win the bench artificially.
+(B) 2026-07-01 +Phase22-TextStack @syntax id:918 est:3h dep:909 Adapt `SyntaxPipeline.parse(_:oldTree:)` to accept `PieceTree` and produce `TSInput` chunks from piece iteration. Existing `Rope` path stays for now.
+(B) 2026-07-01 +Phase22-TextStack @syntax id:919 est:3h dep:918 Add viewport-aware highlight query: `SyntaxPipeline.highlights(in: tree, byteRange: viewportBytes)` (already exists as `byteRange:`). Ensure `MetalTextView` only asks for highlights of the currently-visible line range plus a small overscan. Ref: `https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html`.
+(B) 2026-07-01 +Phase22-TextStack @doc id:920 est:2h dep:919 `Document.refreshSyntaxHighlights(edits:oldRope:)`: on multi-line edits, still call `tree.edit(...)` + `parser.parse(_:oldTree:)` (incremental) instead of full reparse; only re-query highlights within the union of edit byte-ranges + viewport.
+(B) 2026-07-01 +Phase22-TextStack @editor id:921 est:2h dep:912 Delete `Rope.RepeatedASCII` fast path once piece-tree becomes default; it exists only to game the current sequential-insert bench. Keep the tests that currently target it, but move them under the piece-tree impl.
+(B) 2026-07-01 +Phase22-TextStack @editor id:922 est:4h dep:912 Property fuzz tests: 1M random insert/remove/slice sequences on `PieceTree` matching oracle `Array<UInt8>`. Include grapheme boundary invariants: `graphemeIndex(forOffset:)` monotone non-decreasing, matches Swift's `Character` iteration over `substring(0..<length)`.
+(A) 2026-07-01 +Phase22-TextStack @bench id:923 est:2h dep:922 Add micro-bench `ItsyBench piecetree --ops <N>`: sequential insert, random insert, random remove, random 32-byte slice, mmap-load 1 GB. Publish `bench/notes/piecetree-bench.md` with numbers.
+(A) 2026-07-01 +Phase22-TextStack @editor id:924 est:1h dep:923 Flip default: `settings.toml` `storage = "piecetree"` becomes default; `rope` becomes fallback via env. Bump default storage in `ItsyConfig.EditorSettings`.
+(A) 2026-07-01 +Phase22-TextStack @refactor id:925 est:2h dep:924 Checkpoint: `swift test`, `ItsyBench open --file bench/corpus/huge-text.log`, regression bench. Attach numbers to `bench/notes/textstack-phase22.md`.
+
+---
+
+## Phase 23 — Undo/history without periodic snapshots
+
+Goal: remove the O(N) `textBefore` snapshot every 32 edits. Xi's model: keep only edit deltas + tombstones; snapshots exist as pointers into the persistent structure (Ref: `https://xi-editor.io/docs/rope_science_09.html`, `https://xi-editor.io/docs/crdt-details.html`).
+
+Approach for Itsy (simpler than full CRDT — piece-tree makes this cheap):
+
+- Every `UndoEntry` stores forward `Edit` (byte range + inserted bytes) + reverse `Edit` (byte range + removed bytes as a `Data` chunk). No full-buffer snapshot.
+- Redo stack mirrors the same shape.
+- `popUndo` / `popRedo` apply reverse edits directly to `PieceTree`; O(log n) each.
+- Group semantics (`beginGroup`/`endGroup`) unchanged.
+
+(A) 2026-07-01 +Phase23-Undo @editor id:940 est:3h dep:922 Introduce `Edit` struct in `Sources/ItsyEditor/Edit.swift` with `range: Range<Int>`, `removed: Data`, `inserted: Data`. `PieceTree.replace(_:with:) -> Edit` returns the reverse edit needed to undo.
+(A) 2026-07-01 +Phase23-Undo @editor id:941 est:3h dep:940 Rewrite `UndoStack` in `Editor.swift`: `edits: [UndoEntry]` where `UndoEntry = { edit: Edit, reverse: Edit, selectionAfter: SelectionSet, selectionBefore: SelectionSet, groupID: Int? }`. Drop `snapshotBefore`. `popUndo` applies `entry.reverse` to storage.
+(A) 2026-07-01 +Phase23-Undo @editor id:942 est:2h dep:941 Add `UndoStack` memory cap: `maxEditCount: Int = 10_000` and `maxTotalRemovedBytes: Int = 64 * 1024 * 1024`. Older entries drop from tail. Reason: large deletions retain their bytes in the reverse edit — the bound must be explicit.
+(A) 2026-07-01 +Phase23-Undo @editor id:943 est:2h dep:941 Delete `record(_:selectionAfter:textBefore:)` overload that took `textBefore`. Grep guard: `grep -rn "textBefore" Sources/` returns nothing.
+(A) 2026-07-01 +Phase23-Undo @editor id:944 est:3h dep:941 Property test: 10k random ins/del/redo/undo sequences leave `pieceTree.substring(0..<length)` equal between forward and forward→undo→redo→undo→redo runs.
+(A) 2026-07-01 +Phase23-Undo @bench id:945 est:1h dep:942 Bench: `ItsyBench undo --ops 100000` on a 10 MB buffer must stay under 100 MB peak RSS delta (proves no O(N) snapshot). Publish `bench/notes/undo-phase23.md`.
+
+---
+
+## Phase 24 — Selection + grapheme correctness
+
+Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handled correctly. Adopt the Unicode UAX #29 grapheme break test suite as ground truth. Ref: `https://www.unicode.org/Public/UCD/latest/ucd/auxiliary/GraphemeBreakTest.txt`.
+
+(A) 2026-07-01 +Phase24-Grapheme @editor id:960 est:2h dep:908 Add `scripts/download_ucd.sh`: fetches `GraphemeBreakTest.txt` from `unicode.org/Public/UCD/latest/` and vendors it under `Tests/Fixtures/UCD/GraphemeBreakTest.txt`. Documented in `docs/design/grapheme.md`.
+(A) 2026-07-01 +Phase24-Grapheme @editor id:961 est:3h dep:960 Add `Tests/ItsyEditorTests/GraphemeBreakConformanceTests.swift`: parses each `÷ / ×` divider from `GraphemeBreakTest.txt` (~2000 cases) and asserts `UAX29GraphemeIterator` reports identical boundaries. Failing lines print the row number + the sequence as U+XXXX codepoints.
+(A) 2026-07-01 +Phase24-Grapheme @editor id:962 est:3h dep:940 Rewrite `Editor.previousCharacterRange(before:)` / `nextCharacterRange(after:)` to use grapheme boundaries directly from the piece-tree grapheme summary rather than iterating a materialized `String`. Property test: no allocation of `String` inside these two functions (verify via `os_signpost`).
+(A) 2026-07-01 +Phase24-Grapheme @editor id:963 est:3h dep:962 Selection invariants: add `SelectionSet.validate(_:against:PieceTree)` that asserts (a) every anchor/head lands on a grapheme boundary, (b) selections are pairwise disjoint after `merge(_:)`, (c) all offsets `<= tree.length`. Call from `Editor.setSelection` in DEBUG only.
+(A) 2026-07-01 +Phase24-Grapheme @editor id:964 est:3h dep:962 Multi-cursor emoji regression suite: `Tests/ItsyEditorTests/MultiCursorGraphemeTests.swift`. Cases: family emoji 👨‍👩‍👧‍👦 (7 codepoints, 1 grapheme), Indic ka+virama+ka, national flag 🇸🇬🇯🇵, keycap 1️⃣, skin-tone modifier 👋🏽, ZWJ Woman-Firefighter. For each: place N cursors at random offsets, insert '#' at each, then delete-backward at each — expect exactly N grapheme-cluster deletions.
+(B) 2026-07-01 +Phase24-Grapheme @render id:965 est:2h dep:964 Add manual QA doc `docs/qa/grapheme-checklist.md` listing keystroke sequences to run interactively (paste-family-emoji, arrow-through-flag, backspace-through-ZWJ). Each step includes the observable and the failure mode.
+(A) 2026-07-01 +Phase24-Grapheme @refactor id:966 est:1h dep:965 Checkpoint: `swift test` all grapheme suites green. Any regression in previous suites (rope tests migrated to piece-tree in id:922) blocks merge.
+
+---
+
+## Phase 25 — Renderer perf + memory realism
+
+(A) 2026-07-01 +Phase25-Render @render id:980 est:3h Shape-cache separation in `MetalTextView`. Split the current cache: (a) `lineShapeCache: [LineShapeCacheKey: [CachedLineGlyph]]` keyed by `(lineByteRange, font, size)` — invalidated only on font/size change; (b) `lineHighlightOverlay: [Int: [TextHighlightSpan]]` keyed by line index — regenerated per highlight revision. Remove `highlightRevision` from the shape cache key and remove the `lineShapeCache.removeAll(keepingCapacity: true)` in `highlightSpans.didSet`.
+(A) 2026-07-01 +Phase25-Render @render id:981 est:2h dep:980 Draw path: emit glyph instances from shape cache, then emit color overlays from highlight overlay in a second pass. Prove independence via test: `MetalTextView` sets 10k highlight spans → `lineShapeCache.count` unchanged after set.
+(A) 2026-07-01 +Phase25-Render @render id:982 est:2h dep:981 Bench: scroll 100k-line file, mutate all highlights per frame for 60 frames; report shape-cache hit rate (should approach 100% for stable text).
+(B) 2026-07-01 +Phase25-Render @render id:983 est:3h Lazy-link deferrable frameworks. Audit release binary with `otool -L` and identify `WritingToolsUI`, `AppIntents`, `ViewBridge`, `TextInputUI` link chains. Replace direct `import` of anything transitively pulling `AppIntents`/`WritingToolsUI` with `dlopen`+`dlsym` at first use. See `bench/notes/coldstart-audit.md` for the top dlopen offenders.
+(B) 2026-07-01 +Phase25-Render @render id:984 est:2h dep:983 Bench cold-start again post-lazy-link. Target: ≥40 ms improvement on `first_window_visible`. Update `bench/notes/coldstart-audit.md` with delta.
+(A) 2026-07-01 +Phase25-Render @kpi id:1050 est:3h **Realism check on `<30 MB` idle RSS target.** Read `bench/notes/allocations-audit.md`: 90 MB idle is dominated by `__OBJC_RO`, `__AUTH_CONST`, `IOSurface`, `__DATA_CONST`, `owned unmapped graphics`. Options: (a) accept `<100 MB` as the honest target and update NORTHSTAR.md; (b) attempt to strip AppKit further (write custom `NSApplication` subclass, defer `NSDocument` creation until first file open, drop `NSMenu` in favor of a manually-built `NSStatusItem` menu, skip Services menu). Pick (a) if (b) exceeds 40 h of work. Deliverable: updated `NORTHSTAR.md` KPI row + `bench/notes/rss-realism.md` justifying the choice.
+(B) 2026-07-01 +Phase25-Render @refactor id:1051 est:1h dep:1050,984 Checkpoint. Publish `bench/notes/render-phase25.md`.
+
+---
+
+## Phase 26 — Syntax breadth: grammars, captures, themes
+
+Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8 grammars.
+
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1100 est:3h Add grammars: `bash`, `zig`, `swift`, `sql`, `dockerfile`, `dart`, `kotlin`, `elixir`. Add each as a git submodule under `Sources/CTSGrammars/grammars/<lang>` and extend `Package.swift` C target sources + header paths. Verify `swift build -c release` succeeds.
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1101 est:2h dep:1100 Extend `Language` enum + `symbolName` + `libraryStem` + `queryResourceName` in `Sources/ItsySyntax/Parser.swift` for the 8 new grammars. Add filetype map in `SyntaxPipeline.language(forFileURL:)`.
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1102 est:4h dep:1101 Vendor `highlights.scm` from each grammar's upstream repo (`tree-sitter-<lang>/queries/highlights.scm`) into `Sources/ItsySyntax/Resources/queries/<lang>/highlights.scm`. Preserve upstream licenses in `Sources/ItsySyntax/Resources/queries/<lang>/LICENSE`.
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1103 est:3h Adopt standardized nvim/Helix capture set. Extend `SyntaxTheme.color(for:)` capture list to include: `keyword.control`, `keyword.function`, `keyword.operator`, `keyword.return`, `type.builtin`, `type.parameter`, `function.builtin`, `function.macro`, `function.method`, `variable.builtin`, `variable.member`, `constant.builtin`, `constant.macro`, `string.escape`, `string.regexp`, `string.special`, `number.float`, `boolean`, `character`, `character.special`, `comment.documentation`, `punctuation.bracket`, `punctuation.delimiter`, `punctuation.special`, `operator`, `attribute`, `tag`, `label`, `namespace`, `module`, `property`, `field`, `parameter`, `error`, `diff.plus`, `diff.minus`, `markup.heading`, `markup.link`, `markup.list`, `markup.bold`, `markup.italic`, `markup.raw`, `markup.quote`. Ref: `https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups`, `https://docs.helix-editor.com/themes.html#scopes`.
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1104 est:3h dep:1103 Update the bundled 2 themes with values for every new capture. Missing captures should fall through to a parent (`keyword.control` → `keyword`) via a `capture-fallthrough` table.
+(B) 2026-07-01 +Phase26-Syntax @syntax id:1105 est:4h dep:1104 Add 8 more bundled themes matching the capture set: `bundled:solarized-light`, `bundled:solarized-dark`, `bundled:gruvbox-light`, `bundled:gruvbox-dark`, `bundled:nord`, `bundled:catppuccin-mocha`, `bundled:catppuccin-latte`, `bundled:tokyo-night`. Each is a `.toml` in `Sources/ItsySyntax/Resources/themes/`. Attribution + license in a top-of-file comment.
+(A) 2026-07-01 +Phase26-Syntax @syntax id:1106 est:2h dep:1105 Settings window: theme popup populated from bundled + user themes (glob `~/.config/itsy/themes/*.toml`). Persist selection to `settings.toml`.
+(B) 2026-07-01 +Phase26-Syntax @syntax id:1107 est:2h dep:1102 Update `Sources/ItsyBench/main.swift` `smoke` cmd to open a `.swift` / `.zig` / `.bash` / `.sql` sample and assert non-empty highlight-span output. Prevents grammar-drop regressions.
+(B) 2026-07-01 +Phase26-Syntax @syntax id:1108 est:2h dep:1101 Grammars in separate dylibs by default (finish the deferred lazy-load work). Extend `bench/scripts/build_grammar_dylibs.sh` to be called from `bench/scripts/make_app.sh`; drop grammar `.c` sources from `CTSGrammars` static target for release builds. Wire dlopen in `GrammarLoader.language(for:)` (already exists).
+(B) 2026-07-01 +Phase26-Syntax @syntax id:1109 est:2h dep:1108 Cold-start bench post-dylib. Target: `__TEXT,__const` drops from 9.4 MB to <2 MB; cold start improves ≥25 ms. Update `bench/notes/coldstart-audit.md`.
+
+---
+
+## Phase 27 — Keymap parity (vim + emacs + plain)
+
+(B) 2026-07-01 +Phase27-Keymaps @keymap id:1120 est:3h Expand `keys.vim.toml`. Add: text objects `iw aw is as ip ap i" a" i' a' i( a( i[ a[ i{ a{ it at`, jumps `Ctrl-O Ctrl-I gd gD gf gt gT`, splits `Ctrl-w s Ctrl-w v Ctrl-w h/j/k/l/w Ctrl-w q Ctrl-w o`, folding `zc zo za zC zO zA zM zR`, marks `m<letter> `<letter> '<letter>`, replace `r R`, case `~ gu gU`, indent `>> << = == gq`, search history `q/ q?`, cmdline history `q:`, ex `:w :q :wq :x :bd :bn :bp`, `%s/pattern/replacement/g` command.
+(B) 2026-07-01 +Phase27-Keymaps @keymap id:1121 est:3h Expand `keys.emacs.toml`. Add: mark ring `Ctrl-Space Ctrl-x Ctrl-x`, kill/yank `Ctrl-w Ctrl-y M-w M-y`, transpose `Ctrl-t M-t`, case `M-u M-l M-c`, sexp `Ctrl-M-f Ctrl-M-b Ctrl-M-k Ctrl-M-Space`, isearch `Ctrl-s Ctrl-r`, undo `Ctrl-/ Ctrl-_`, incremental undo/redo, prefix `Ctrl-x Ctrl-f` (open file), `Ctrl-x Ctrl-s` (save), `Ctrl-x Ctrl-c` (quit), `Ctrl-x k` (close buffer), `Ctrl-x b` (switch buffer), `Ctrl-x 0/1/2/3/o` (window mgmt), `M-x` (command palette), macro `Ctrl-x ( Ctrl-x ) Ctrl-x e`, rectangle `Ctrl-x r k/y/t`, `M-g g` goto line, `M-%` query-replace.
+(B) 2026-07-01 +Phase27-Keymaps @keymap id:1122 est:2h Expand `keys.plain.toml`. Add macOS-standard bindings that Cocoa users expect: `Cmd-N` new doc, `Cmd-O` open, `Cmd-Shift-N` new window, `Cmd-,` settings, `Cmd-P` command palette (alt), `Cmd-K Cmd-S` keyboard shortcuts, `Cmd-B` toggle sidebar, `Cmd-J` toggle terminal panel, `Cmd-Shift-P` command palette, `Cmd-Shift-.` toggle hidden files, `Ctrl-Tab / Ctrl-Shift-Tab` tab cycling, `Cmd-1..9` tab N.
+(B) 2026-07-01 +Phase27-Keymaps @keymap id:1123 est:1h dep:1120,1121,1122 Regenerate `docs/keymap-reference.md` via `scripts/gen_keymap_docs.swift`.
+(C) 2026-07-01 +Phase27-Keymaps @keymap id:1124 est:2h Add a keymap validator: `scripts/validate_keymaps.swift` runs at CI-time and asserts every command id referenced in a `.toml` exists in `CommandRegistry`. Failing commands print the file:line.
+
+---
+
+## Phase 28 — Vim semantics isolation
+
+Goal: pull vim state out of `MetalTextView` into a testable module with no AppKit deps. This is the follow-up to id:814.
+
+(A) 2026-07-01 +Phase28-Vim @keymap id:1140 est:4h dep:814 Create `Sources/ItsyVim/` new SwiftPM target (pure Foundation, no AppKit). Add `VimEngine.swift`: state = `{ mode: Mode, pendingOperator: VimOperator?, pendingCount: Int?, register: VimRegister, marks: [Character: Position], macros: [Character: [Key]], macroRecording: Character?, lastSearch: SearchQuery? }`. Public API: `func handle(_ key: Key, buffer: BufferQuery) -> [VimAction]` where `VimAction = .move(Motion) | .delete(Range<Int>) | .insert(String, at: Int) | .yank(Range<Int>, register: Character) | .paste(after: Bool, register: Character) | .setMode(Mode) | .beginMacroRecord(Character) | .endMacroRecord | .playMacro(Character) | ...`. `BufferQuery` is a small protocol exposing `length`, `line(forOffset:)`, `substring(_:)`, `graphemeBoundary(after:)`.
+(A) 2026-07-01 +Phase28-Vim @keymap id:1141 est:3h dep:1140 Migrate current in-`MetalTextView` vim code (extracted in id:814) into `ItsyVim`. `MetalTextView` becomes a thin adapter: `keymapEngine` produces a command id → adapter translates to `VimEngine.handle(_:buffer:)`. Delete duplicated state from `MetalTextView`.
+(A) 2026-07-01 +Phase28-Vim @keymap id:1142 est:4h dep:1141 `Tests/ItsyVimTests/`: black-box tests using an in-memory `BufferQuery` fake. Coverage: motions (all), operators (`d c y ~ g~ gu gU >> <<`), text objects (`iw aw i" a" ib ab iB aB it at ip ap`), registers (`"a "0..9 "+ "* "_`), macros record/replay, marks set/jump, dot-repeat, count prefix, search + `n N`, ex `:w :q :wq :s`, visual block edits. Target: ≥100 tests.
+(B) 2026-07-01 +Phase28-Vim @keymap id:1143 est:2h dep:1142 Add `ItsyVim` fuzz test: random 500-key sequences on a random buffer must not throw, must leave buffer + selection in a consistent state (via `SelectionSet.validate` from id:963).
+(A) 2026-07-01 +Phase28-Vim @refactor id:1144 est:1h dep:1143 Checkpoint. Publish `bench/notes/vim-phase28.md` with test coverage and behavior parity notes.
+
+---
+
+## Phase 29 — LSP UX polish
+
+(A) 2026-07-01 +Phase29-LSP @lsp id:1160 est:3h **Install detection.** `LSPServerRegistry.config(for:)` — before returning a config, resolve the command binary: PATH lookup via `Process.launchPath` + `env` OR direct `access(_:X_OK)` for absolute paths. If missing: return `nil` from a new `resolvedConfig(for:)` and surface `LSPServerRegistry.MissingBinary(languageID:command:hint:)`. Hints table: `sourcekit-lsp` → "part of Xcode, install via `xcode-select --install`"; `typescript-language-server` → "`npm i -g typescript typescript-language-server`"; `rust-analyzer` → "`rustup component add rust-analyzer`"; `pyright-langserver` → "`npm i -g pyright`"; `gopls` → "`go install golang.org/x/tools/gopls@latest`".
+(A) 2026-07-01 +Phase29-LSP @lsp id:1161 est:2h dep:1160 UI surface. When opening a document whose language has an unavailable server, show a non-modal banner at top of the editor with the install hint + a `Copy command` button + a `Dismiss (session)` button. Banner is a subclass in `Sources/ItsyApp/Banners/LSPMissingBanner.swift`.
+(A) 2026-07-01 +Phase29-LSP @lsp id:1162 est:3h **Crash visibility.** `LSPProcessClient` already surfaces termination events. Add a `LSPSessionSupervisor` actor that owns a session; on unexpected termination (exit code ≠ 0), clears all diagnostics associated with the session's owned URIs, emits a `.sessionFailed(reason:)` event, updates status bar to "LSP: <lang> crashed — click to restart". Auto-retry policy: at most 3 restarts in 60 s per (languageID, workspaceRoot) — beyond that, disable server for the workspace until user re-enables.
+(A) 2026-07-01 +Phase29-LSP @lsp id:1163 est:2h dep:1162 Status bar entry: right-aligned pill showing LSP state per language (idle/starting/running/crashed). Click opens a panel `LSPStatusPanel` with server, PID, uptime, last error stderr tail (last 4 KB), Restart / Stop buttons.
+(A) 2026-07-01 +Phase29-LSP @lsp id:1164 est:3h **`workspace/symbol`.** Wire `LSPClientSession.workspaceSymbol(query:)` request. Add to `LSPManager` a `symbols(matching: String, in: URL) async throws -> [LSPWorkspaceSymbol]`. Feed the Command Palette's `@` scope (already exists) with a merged list: first `workspace/symbol` (up to 100), then `WorkspaceIndex` fallback. Dedup by `(uri, range)`. Ref: `https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol`.
+(A) 2026-07-01 +Phase29-LSP @lsp id:1165 est:2h dep:1164 `textDocument/documentSymbol` for the `#` (file symbols) palette. When the current document's LSP session is running, prefer LSP symbols over the regex extractor.
+(B) 2026-07-01 +Phase29-LSP @lsp id:1166 est:3h Extend bundled LSP configs. Add: `clangd` (c/cpp), `zls` (zig), `elixir-ls` (elixir), `kotlin-language-server` (kotlin), `omnisharp` (csharp), `bash-language-server` (bash), `docker-langserver` (dockerfile), `sqls` (sql), `dart` (dart), `haskell-language-server-wrapper` (haskell), `lua-language-server` (lua), `ruby-lsp` (ruby), `terraform-ls` (terraform). Add extension map entries. Add missing-binary hints for each.
+(B) 2026-07-01 +Phase29-LSP @lsp id:1167 est:2h dep:1163 LSP smoke QA: `bench/scripts/lsp_smoke.sh` opens a small fixture per language, waits for first `publishDiagnostics`, asserts arrival within 5 s KPI, reports per-language latency. Skips any language whose binary is missing.
+(A) 2026-07-01 +Phase29-LSP @refactor id:1168 est:1h dep:1167 Checkpoint. Publish `bench/notes/lsp-phase29.md`.
+
+---
+
+## Phase 30 — Debugger (full DAP)
+
+Goal: working debugger for at least one language end-to-end (LLDB DAP → Swift/C/C++), then extend. Ref: `https://microsoft.github.io/debug-adapter-protocol/specification.html`, `https://microsoft.github.io/debug-adapter-protocol/overview`.
+
+Architecture:
+
+- `ItsyDAP` (existing) gets a session actor + process transport analogous to `ItsyLSP`.
+- `ItsyDebugger` (new SwiftPM target) hosts orchestration + UI-adjacent state (breakpoints, stack, threads, variables, watches, console).
+- `ItsyApp/Debugger/` hosts the UI (breakpoints gutter, callstack panel, variables tree, watches, debug console, launch config chooser).
+
+(A) 2026-07-01 +Phase30-DAP @dap id:1200 est:4h Add `ItsyDAP/DAPProcessTransport.swift`: mirror of `LSPProcessTransport`. `stdin/stdout/stderr` via `Process` + `Pipe`. Framing already exists in `ItsyDAP/DAPFraming.swift`.
+(A) 2026-07-01 +Phase30-DAP @dap id:1201 est:4h dep:1200 Add `ItsyDAP/DAPClientSession.swift`: actor. `seq` allocator, pending-response routing (`[Int: CheckedContinuation]`), request/response/event dispatch. Public: `sendRequest(command:arguments:) async throws -> DAPResponse`, `on(event:) async` async-sequence-style consumer.
+(A) 2026-07-01 +Phase30-DAP @dap id:1202 est:3h dep:1201 State machine: `.idle → .initializing → .configuring → .running → .stopped → .terminated`. `initialize(clientCapabilities:)` transitions to `.initializing`; `initialized` event → `.configuring`; `setBreakpoints`+`configurationDone` transitions to `.running`; `launch` or `attach` runs the program. `stopped` event flips to `.stopped`. `terminated`/`exited` → `.terminated`.
+(A) 2026-07-01 +Phase30-DAP @dap id:1203 est:3h dep:1202 Full request/response type coverage for the DAP flows Itsy needs: `initialize`, `launch`, `attach`, `configurationDone`, `disconnect`, `terminate`, `threads`, `stackTrace`, `scopes`, `variables`, `evaluate`, `setBreakpoints`, `setFunctionBreakpoints`, `setExceptionBreakpoints`, `setDataBreakpoints`, `continue`, `next`, `stepIn`, `stepOut`, `pause`, `reverseContinue`, `restart`. Extend `Sources/ItsyDAP/DAPTypes.swift`. Add encoding/decoding tests.
+(A) 2026-07-01 +Phase30-DAP @dap id:1204 est:3h dep:1201 Events: `initialized`, `stopped`, `continued`, `exited`, `terminated`, `thread`, `output` (categories: `console`, `stdout`, `stderr`, `important`, `telemetry`), `breakpoint`, `module`, `loadedSource`, `process`, `capabilities`, `invalidated`. Decode into strongly-typed events.
+(A) 2026-07-01 +Phase30-DAP @debug id:1205 est:3h dep:1204 New target `ItsyDebugger` (pure Foundation). `DebugSession` actor wraps `DAPClientSession`, exposes UI-friendly state: `threads: [DebugThread]`, `focusedThreadID: Int?`, `focusedFrameID: Int?`, `stackFrames(for:threadID) async throws -> [DebugStackFrame]`, `scopes(for:frameID) async throws -> [DebugScope]`, `variables(for:variablesReference) async throws -> [DebugVariable]`, `evaluate(expression:frameID:context:) async throws -> DebugValue`. Sendable throughout.
+(A) 2026-07-01 +Phase30-DAP @debug id:1206 est:3h dep:1205 Breakpoint store. `BreakpointStore` (actor) keyed by `URL`, value is `[SourceBreakpoint]` with line, condition, hitCondition, logMessage. Persist to `~/.config/itsy/breakpoints.json`.
+(A) 2026-07-01 +Phase30-DAP @debug id:1207 est:2h dep:1206 Adapter registry: `.itsy/debug.json` under project root, and `~/.config/itsy/debug.json`. Schema: `{ "adapters": [{ "id": "lldb", "command": "/usr/bin/lldb-dap", "type": "executable", "args": [] }] }`, plus per-workspace launch configs `{ "configurations": [{ "name": "Debug Itsy", "type": "lldb", "request": "launch", "program": ".build/debug/ItsyApp" }] }`. Model in `ItsyDebugger/DebugLaunchConfig.swift`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1208 est:4h dep:1207 UI: launch-config picker. `Cmd-F5` opens a `NSPanel` populated from `.itsy/debug.json`. Selecting a config starts the session. Bind menu items in `MenuCoordinator`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1209 est:3h dep:1206 UI: breakpoints in editor gutter. Extend `GutterView` (from id:816) to render breakpoint dots. Click toggles a breakpoint; right-click opens condition/hitCondition/logMessage editor. Persist via `BreakpointStore`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1210 est:4h dep:1205 UI: callstack panel. New coordinator `DebuggerCoordinator`. Panel shows `Threads → StackFrames`. Clicking a frame focuses it → panels refresh. Frame source → open document at frame line.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1211 est:4h dep:1205 UI: variables tree. Outline view keyed by `variablesReference`. Lazy expansion via `variables` request. Editable if `variablesReference` allows `setVariable`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1212 est:3h dep:1205 UI: watches. User adds an expression → `evaluate` on stop → shows value. Persist watches per workspace to `~/.config/itsy/watches.json`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1213 est:3h dep:1204 UI: debug console. `NSTextView` with monospace + ANSI coloring (reuse SGR parser from id:1360). Feed `output` events. Input line sends `evaluate` with `context: "repl"`.
+(A) 2026-07-01 +Phase30-DAP @debugui id:1214 est:2h dep:1210 Toolbar: continue / step-over / step-in / step-out / pause / restart / stop. Bind to menu.
+(B) 2026-07-01 +Phase30-DAP @dap id:1215 est:3h dep:1204 Exception filters via `setExceptionBreakpoints`. UI in launch-config panel.
+(B) 2026-07-01 +Phase30-DAP @dap id:1216 est:2h dep:1205 Reverse-debug support (LLDB): `stepBack`, `reverseContinue`. UI-gated behind `session.capabilities.supportsStepBack`.
+(A) 2026-07-01 +Phase30-DAP @dap id:1217 est:3h dep:1214 Smoke QA: write a tiny hello-world Swift program in `bench/corpus/debug-hello.swift`, launch `lldb-dap` via a bundled `.itsy/debug.json`, verify breakpoint hits + step-over + variable read via `bench/scripts/dap_smoke.sh`.
+(A) 2026-07-01 +Phase30-DAP @refactor id:1218 est:1h dep:1217 Checkpoint. Publish `bench/notes/dap-phase30.md`. Update `bench/notes/dap-gap.md` marking gap closed for LLDB-DAP path.
+
+---
+
+## Phase 31 — Git (libgit2 + blame + history)
+
+Goal: eliminate temp-patch round-trips for hunk staging; add blame, file history, line history; safe cancel for streaming remote ops.
+
+Decision recorded in `docs/design/git.md`: vendor libgit2 as a C target (`Sources/CLibgit2`) — same pattern as `CTreeSitter`. Do NOT depend on SwiftGit2 (last active update Nov 2025, no XCFramework, iOS-conflict via libpcre — irrelevant here but a maintainability signal). Ref: `https://libgit2.org/`, `https://github.com/SwiftGit2/SwiftGit2`.
+
+(A) 2026-07-01 +Phase31-Git @git id:1300 est:3h Vendor libgit2 as a git submodule under `Sources/CLibgit2/upstream` pinned to v1.9.x. Add `Sources/CLibgit2/module.modulemap` + `Package.swift` C target. Build with `-DUSE_HTTPS=SecureTransport -DUSE_SHA1=CommonCrypto` on macOS. Ensure `swift build -c release` produces a `.o` that links.
+(A) 2026-07-01 +Phase31-Git @git id:1301 est:2h dep:1300 `Sources/ItsyEditor/GitRepository+Libgit2.swift`: thin Swift facade: `Repository.open(at:)`, `Repository.status(pathspec:)`, `Repository.diff(cached: Bool)`, `Repository.blob(at:)`. Wrap `git_repository`, `git_status_list`, `git_diff`, `git_blob` handles as classes with `deinit` cleanup.
+(A) 2026-07-01 +Phase31-Git @git id:1302 est:3h dep:1301 Reimplement `GitRepository.status()` on libgit2. Compare output to current porcelain-v2 parser on a fixture repo — must produce identical `GitStatus`.
+(A) 2026-07-01 +Phase31-Git @git id:1303 est:4h dep:1301 Reimplement hunk stage/unstage on libgit2 via `git_apply_to_tree` + `git_index_write_tree` + `git_index_add_frombuffer`. No temp files, no stdin round-trip. Test: on a 1k-hunk fixture, staging all hunks must be <500 ms.
+(A) 2026-07-01 +Phase31-Git @git id:1304 est:3h dep:1301 Reimplement diff (`GitRepository.diffFiles(...)`, `diffFilesAgainstHead(...)`) on `git_diff_index_to_workdir` / `git_diff_tree_to_index`. Verify identical output to current shell-out on fixture repo.
+(A) 2026-07-01 +Phase31-Git @git id:1305 est:3h dep:1304 Reimplement commit composer: `git_index_write` → `git_commit_create_v` with signoff & amend. Keep the shell fallback behind an env flag `ITSY_GIT_BACKEND=shell` for regression comparison until id:1315.
+(B) 2026-07-01 +Phase31-Git @git id:1306 est:3h dep:1301 Blame. `git_blame_file` for the current file. Return `[BlameHunk = { finalStartLine, lineCount, origCommit, origCommitSummary, origAuthor, origAuthorTime, origPath }]`. Cache per (fileURL, HEAD-oid).
+(A) 2026-07-01 +Phase31-Git @gitui id:1307 est:3h dep:1306 Blame UI: inline gutter annotations showing short-oid + author-initials + relative time on hover. Click opens a popover with full author/committer/summary + `Copy SHA` + `Show file@commit`.
+(B) 2026-07-01 +Phase31-Git @gitui id:1308 est:3h dep:1306 File history panel. `git_revwalk` on the file path yields commits; panel lists them with author + summary + relative date. Selection opens a side-by-side diff of that commit against its parent for the file. Ref: `git log --follow -- <file>` semantics.
+(B) 2026-07-01 +Phase31-Git @gitui id:1309 est:3h dep:1308 Line history (blame → prior). From a blame line, `Show previous change` follows `git_blame` on the parent commit at the origPath's corresponding line. Repeatable.
+(A) 2026-07-01 +Phase31-Git @git id:1310 est:3h dep:1305 Remote-op cancellation. `git_transport` operations wrapped in a `Task` with `CheckedContinuation`; user-triggered close → `git_indexer_progress_cb`/`git_transfer_progress_cb` returns non-zero → libgit2 aborts. Ensure `Process` fallback also gets killed via `Process.terminate()` on window close.
+(A) 2026-07-01 +Phase31-Git @git id:1311 est:2h dep:1310 UI: streaming remote-op panel gets a Cancel button. Wired to a `Task.cancel()`. On close, force-cancels in progress.
+(A) 2026-07-01 +Phase31-Git @git id:1312 est:3h dep:1310 Fetch/pull/push move to libgit2 with credential callback: SSH agent, macOS Keychain via `SecItemCopyMatching`. Fall back to `askpass` prompt via NSAlert if no credentials cached.
+(B) 2026-07-01 +Phase31-Git @git id:1313 est:2h dep:1312 Add `Sign commits with GPG/SSH` toggle in Git settings. Delegate to `gpg --detach-sign` / `ssh-keygen -Y sign` since libgit2 doesn't do this itself.
+(A) 2026-07-01 +Phase31-Git @git id:1314 est:3h dep:1305 Property tests: for a scripted sequence of 50 git ops (add/modify/delete/rename/stage-hunk/commit/branch/checkout/merge/rebase/stash/apply/pop), libgit2 backend produces byte-identical repo state to the shell backend. Fixture in `Tests/ItsyEditorTests/Fixtures/git-parity/`.
+(A) 2026-07-01 +Phase31-Git @git id:1315 est:1h dep:1314 Retire shell backend as default; keep behind `ITSY_GIT_BACKEND=shell` env for triage. Update NORTHSTAR "conventions" and CLAUDE.md if referenced.
+(A) 2026-07-01 +Phase31-Git @refactor id:1316 est:1h dep:1315 Checkpoint. `bench/notes/git-phase31.md`.
+
+---
+
+## Phase 32 — Terminal completeness (SGR, mouse, OSC, allowlist)
+
+Ref: xterm control sequences at `https://invisible-island.net/xterm/ctlseqs/ctlseqs.html`; xterm.js VT support list at `https://xtermjs.org/docs/api/vtfeatures/`.
+
+(A) 2026-07-01 +Phase32-Term @terminal id:1360 est:4h SGR implementation. In `ItsyTerminalEmulator.applyCSI` case `"m"`: parse params (semicolon-separated ints, colon-separated sub-params in mode 38/48). Support: 0 reset, 1 bold, 2 dim, 3 italic, 4 underline, 7 reverse, 8 conceal, 9 strikethrough, 22/23/24/27/28/29 off variants, 30–37 fg indexed 0–7, 39 default fg, 40–47 bg indexed 0–7, 49 default bg, 90–97 bright fg, 100–107 bright bg, `38;5;N` and `48;5;N` for 256-color, `38;2;R;G;B` and `48;2;R;G;B` for 24-bit true color. Store attributes per cell: `TerminalCell = { char: Character, fg: TerminalColor, bg: TerminalColor, style: TerminalStyle }`. `TerminalColor = default | indexed(UInt8) | rgb(UInt8, UInt8, UInt8)`.
+(A) 2026-07-01 +Phase32-Term @terminal id:1361 est:3h dep:1360 Rewrite `TerminalSnapshot` to carry attributed cells, not `[String]`. `TerminalView` renders via `NSTextView`-alt or a small CoreText path.
+(A) 2026-07-01 +Phase32-Term @terminal id:1362 est:3h dep:1360 xterm 256-color palette table. Vendor the standard 6×6×6 cube + 24 grey ramp resolution to sRGB. Themable via `[terminal.palette]` in `settings.toml` (16 named colors).
+(A) 2026-07-01 +Phase32-Term @terminal id:1363 est:3h OSC sequence handling. Currently OSC is entered but not parsed. Parse `OSC Ps ; Pt ST` where `Ps` = param, `Pt` = text, `ST` = `BEL` or `ESC \`. Support: `OSC 0/1/2` set title (propagate to `NSWindow.title` when this is the focused terminal), `OSC 4` set palette color, `OSC 7` set current working directory (used to seed new terminals), `OSC 8` hyperlink (store per-cell URL for hover-to-open), `OSC 10/11` fg/bg default, `OSC 52` clipboard read/write (base64), `OSC 133` semantic prompt marks (start/end/output — enables prompt navigation later).
+(A) 2026-07-01 +Phase32-Term @terminal id:1364 est:3h dep:1363 Clipboard integration (OSC 52). Write path: base64-decode `Pt` payload, write to `NSPasteboard.general`. Read path (rare, most terminals disable): base64-encode current clipboard, respond with `OSC 52 ; c ; <base64> ST`. Guard behind `settings.toml` `[terminal] osc52 = "write" | "readwrite" | "off"` default `write`. Reason: OSC 52 read is a security-sensitive channel.
+(A) 2026-07-01 +Phase32-Term @terminal id:1365 est:3h Mouse tracking. Handle CSI `?1000h` (X10 button), `?1002h` (button-event), `?1003h` (any-event), `?1006h` (SGR extended). Encode outbound mouse events. Preferred encoding: SGR 1006 `CSI < B ; X ; Y M` (press) / `m` (release). Support 1016 (pixel-based) if `?1016h` was requested. Ref: `https://invisible-island.net/xterm/ctlseqs/ctlseqs.html#h4-Mouse-Tracking`.
+(B) 2026-07-01 +Phase32-Term @terminal id:1366 est:2h dep:1365 `TerminalView` translates `NSEvent.mouseDown/mouseUp/mouseMoved/scrollWheel` to the currently-enabled mouse mode and writes to PTY.
+(A) 2026-07-01 +Phase32-Term @terminal id:1367 est:2h Environment allowlist. In `ItsyTerminalSession.start` do NOT forward `ProcessInfo.processInfo.environment` verbatim. Curated allowlist: `HOME`, `USER`, `LOGNAME`, `SHELL`, `PATH`, `TMPDIR`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TERM_PROGRAM_VERSION`, `SSH_AUTH_SOCK`. Add Itsy-injected: `TERM=xterm-256color`, `COLORTERM=truecolor`, `TERM_PROGRAM=Itsy`, `INSIDE_ITSY_TERMINAL=1`. Extra keys can be opted in via `settings.toml` `[terminal.env] allow = ["FOO", "BAR"]`.
+(A) 2026-07-01 +Phase32-Term @terminal id:1368 est:2h dep:1360 Bracketed paste (already parsed via mode 2004) wired to `NSPasteboard`: paste wraps content in `ESC [ 200 ~ ... ESC [ 201 ~` when bracketed paste is enabled by the child.
+(B) 2026-07-01 +Phase32-Term @terminal id:1369 est:3h Smoke test terminal QA. `bench/scripts/terminal_smoke.sh` runs a series of TUIs against Itsy's PTY: `htop -n 1`, `btop --preset 0 --terminal 80x24`, `vim -c ':q'`, `less README.md`. Screenshots stored under `bench/results/terminal-smoke/`. Manual verification checklist in `docs/qa/terminal-checklist.md`.
+(A) 2026-07-01 +Phase32-Term @refactor id:1370 est:1h dep:1369 Checkpoint. `bench/notes/terminal-phase32.md`.
+
+---
+
+## Phase 33 — Workspace symbol extractor + LSP-backed symbols
+
+(A) 2026-07-01 +Phase33-Nav @nav id:1400 est:4h Replace regex-based symbol extraction with tree-sitter query-based extraction. Add per-language `tags.scm` queries under `Sources/ItsySyntax/Resources/queries/<lang>/tags.scm`. Adopt the tree-sitter tags convention: captures `@definition.function`, `@definition.class`, `@definition.method`, `@definition.type`, `@definition.constant`, `@definition.enum`, `@definition.interface`, `@definition.variable`, `@definition.constructor`, `@name`. Ref: `https://tree-sitter.github.io/tree-sitter/4-code-navigation.html`.
+(A) 2026-07-01 +Phase33-Nav @nav id:1401 est:3h dep:1400 Extend `WorkspaceIndexer` to run tags query for each indexed file. Fall back to regex only for languages with no `tags.scm`. Every language added in id:1102 gets a `tags.scm`.
+(A) 2026-07-01 +Phase33-Nav @nav id:1402 est:2h dep:1401 Enrich `WorkspaceSymbol`: add `signature: String?`, `containerName: String?`, `documentation: String?`. Populated from surrounding node text when possible.
+(B) 2026-07-01 +Phase33-Nav @nav id:1403 est:3h Persistence. Serialize the workspace index to `~/.config/itsy/index/<workspace-hash>.json` on quit; reload on open. Invalidate stale entries via `Content-Modified` timestamps.
+(A) 2026-07-01 +Phase33-Nav @nav id:1404 est:2h dep:1403 Load-on-open uses persisted index immediately; kicks off a background re-index via FSEvents (Phase 34).
+(A) 2026-07-01 +Phase33-Nav @lsp id:1405 est:3h dep:1164 LSP-backed workspace symbols hierarchy: (1) LSP `workspace/symbol` results, (2) tree-sitter tags-scm results, (3) persisted-index results. Merge, dedup by `(uri, range, kind)`, sort by fuzzy-match score then kind priority (function > class > variable).
+(A) 2026-07-01 +Phase33-Nav @lsp id:1406 est:3h dep:1165 LSP-backed document symbols mirror. Prefer `textDocument/documentSymbol` when the session for the current document is running.
+(A) 2026-07-01 +Phase33-Nav @refactor id:1407 est:1h dep:1406 Checkpoint. `bench/notes/nav-phase33.md`.
+
+---
+
+## Phase 34 — FSEvents incremental workspace watcher
+
+Ref: `https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html`.
+
+(A) 2026-07-01 +Phase34-FS @nav id:1440 est:4h Add `Sources/ItsyEditor/Workspace/FSEventStream.swift`. Wraps `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagUseExtendedData`. Scheduled on a dedicated dispatch queue (not main). Callback delivers `[FSEvent(url: URL, flags: FSEventFlags, eventID: UInt64)]`.
+(A) 2026-07-01 +Phase34-FS @nav id:1441 est:2h dep:1440 Persist last-seen `eventID` per workspace to `~/.config/itsy/index/<hash>.fsevents`. On start, resume from that ID so events during a previous close aren't lost.
+(A) 2026-07-01 +Phase34-FS @nav id:1442 est:3h dep:1441 Coalesce & debounce. A single `FSEventCoalescer` buffers events for 100 ms then emits a deduplicated set. Adjacent events on the same path collapse.
+(A) 2026-07-01 +Phase34-FS @nav id:1443 est:3h dep:1442 Wire into `WorkspaceIndexer`: on create/remove/rename → touch/drop index rows; on modify → re-run tags query for that file; on directory-created → walk one level, respecting gitignore.
+(A) 2026-07-01 +Phase34-FS @nav id:1444 est:2h dep:1443 Bench: 10k-file monorepo cold-open with persisted index → first symbol query response <100 ms. Measure via `ItsyBench index --workspace <path>`.
+(B) 2026-07-01 +Phase34-FS @nav id:1445 est:2h Gitignore-aware re-index. Events under paths matching `.gitignore` are dropped early.
+(A) 2026-07-01 +Phase34-FS @refactor id:1446 est:1h dep:1444 Checkpoint. `bench/notes/fsevents-phase34.md`.
+
+---
+
+## Phase 35 — Extension system + Vouch trust
+
+Adopt Mitchell Hashimoto's Vouch for the trust layer (Ref: `https://github.com/mitchellh/vouch`, `https://simonwillison.net/2026/Feb/7/vouch/`). Format: `VOUCHED.td` (Trustdown) — one handle per line, `platform:username`, `-` prefix for denounce, `#` comments. Vouch decides "can this author's extension load"; Itsy decides how strictly to apply that gate.
+
+Architecture:
+
+- Ship the current `.itsy/extensions/*.json` manifest work-as-is (tasks contribution).
+- Add contribution kinds: `commands`, `menus`, `snippets`, `themes`, `languages`, `problem-matchers`, `keybindings`. NO in-process executable host through v1.0 — that stays in NORTHSTAR OUT list. Executable behavior can only reach the editor via LSP/DAP/PTY process-boundary channels.
+- Trust store: per-installation `~/.config/itsy/trust/VOUCHED.td` (user's personal vouch list) + optional shared `<project>/VOUCHED.td`. `vouch check` CLI shell-out at install time.
+- Marketplace: a static index published to `https://itsy.dev/extensions/index.json` (post-rename) listing `{ id, name, author, repo, sha256, minItsyVersion }`. Itsy fetches via `URLSession`, verifies sha256, prompts trust decision.
+
+(A) 2026-07-01 +Phase35-Ext @ext id:1500 est:3h Design doc `docs/design/extensions.md`: contribution kinds allowed in v1, trust model (vouch), install/uninstall flow, storage layout, ABI stability guarantee, non-goals (executable plugin host, WASI runtime).
+(A) 2026-07-01 +Phase35-Ext @ext id:1501 est:3h Extend `ExtensionManifest` schemaVersion to 2. New fields: `contributes.commands: [{ id, title, when? }]`, `contributes.keybindings: [{ command, key, when? }]`, `contributes.snippets: [{ language, scope?, path }]`, `contributes.themes: [{ id, name, path, uiTheme: "dark"|"light" }]`, `contributes.languages: [{ id, extensions, grammar?, tagsScm?, highlightsScm? }]`, `contributes.problemMatchers: [{ id, regex, file, line, column, severity, message }]`. Backwards-compatible: v1 manifests still load; new fields ignored.
+(A) 2026-07-01 +Phase35-Ext @ext id:1502 est:3h dep:1501 Wire command contributions into `CommandRegistry`. Extension-contributed commands prefixed with `ext:<extid>:`. Palette shows them.
+(A) 2026-07-01 +Phase35-Ext @ext id:1503 est:3h dep:1502 Wire keybinding contributions into keymap loader. Precedence: user keys > project keys > extension keys > bundled keys.
+(A) 2026-07-01 +Phase35-Ext @ext id:1504 est:3h dep:1501 Wire theme contributions into `SyntaxTheme.loadUserOrDefault`. Extension themes appear in settings picker with an `ext:` prefix.
+(B) 2026-07-01 +Phase35-Ext @ext id:1505 est:3h dep:1501 Wire snippet contributions into completion popup. Snippet activation via prefix match + `Tab` trigger. Existing snippet placeholder parser (`LSPCompletionApply.parsePlaceholder`) is reused.
+(A) 2026-07-01 +Phase35-Ext @ext id:1506 est:3h dep:1501 Wire grammar contributions. When an extension declares a language with a `grammar` field pointing at a `.dylib` in its bundle, `GrammarLoader.language(for:)` looks in extension dirs after the app's Frameworks path. Contribution requires the extension to ship the compiled dylib for the current arch — otherwise disabled with a clear error.
+(B) 2026-07-01 +Phase35-Ext @ext id:1507 est:3h dep:1501 Wire problem-matcher contributions. `WorkspaceProblemParser` accepts registered matchers with named-capture regex.
+(A) 2026-07-01 +Phase35-Ext @ext id:1508 est:3h Trust module. `Sources/ItsyEditor/Trust/VouchStore.swift`: parses `VOUCHED.td`. Public API: `func check(handle: VouchHandle) -> VouchState = .vouched | .denounced(reason: String?) | .unknown`. `VouchHandle` = `platform: String, username: String` (default platform: "github").
+(A) 2026-07-01 +Phase35-Ext @ext id:1509 est:2h dep:1508 Bundled default `VOUCHED.td` lives at `Sources/ItsyEditor/Resources/VOUCHED.default.td` and includes only the Itsy maintainers. User store at `~/.config/itsy/trust/VOUCHED.td`; project store at `<workspace>/VOUCHED.td` if present.
+(A) 2026-07-01 +Phase35-Ext @ext id:1510 est:3h dep:1509 Trust policy: on install, resolve extension's `author` field (must include `platform:handle`) → `VouchStore.check`. If `.vouched`, proceed silently. If `.unknown`, present a modal describing what the extension contributes + "Trust once", "Trust always (add to VOUCHED.td)", "Cancel". If `.denounced`, refuse with the reason string.
+(A) 2026-07-01 +Phase35-Ext @ext id:1511 est:2h dep:1510 CLI passthrough. If `vouch` binary is on PATH, defer to it via `Process` for authoritative checks (supports the web-of-trust sync). Else use local store.
+(A) 2026-07-01 +Phase35-Ext @ext id:1512 est:3h Marketplace client. `Sources/ItsyEditor/Marketplace/MarketplaceClient.swift`: fetches `https://itsy.dev/extensions/index.json` (URL configurable via env `ITSY_MARKETPLACE_URL`). Cache under `~/.config/itsy/marketplace/index.json` with an `ETag`. Model: `MarketplaceEntry = { id, name, author, description, repo, versions: [{ version, sha256, minItsyVersion, downloadURL }] }`.
+(A) 2026-07-01 +Phase35-Ext @ext id:1513 est:3h dep:1512 Install flow. `install(_ id: String, version: String?)` downloads `downloadURL` (zip), verifies sha256, extracts to `~/.config/itsy/extensions/<id>/`, runs manifest validation, resolves trust via id:1510, on approval registers contributions.
+(A) 2026-07-01 +Phase35-Ext @extui id:1514 est:4h dep:1513 Extensions panel. New coordinator `ExtensionsCoordinator`. Panel tabs: `Installed`, `Marketplace`. Marketplace tab is a search field + list; Install button per row. Installed tab: enable/disable/uninstall per row.
+(A) 2026-07-01 +Phase35-Ext @extui id:1515 est:2h dep:1514 Command-palette entries: `Extensions: Install…`, `Extensions: Show Installed`, `Extensions: Reload`, `Extensions: Open VOUCHED.td`.
+(B) 2026-07-01 +Phase35-Ext @ext id:1516 est:3h Marketplace publish flow (out of app). `scripts/publish_extension.sh` takes a manifest + built dylibs, produces a signed zip, uploads via GitHub Release + updates the `index.json`. Documented in `docs/publishing-extensions.md`. Non-blocking for v1; enables ecosystem after v1 ships.
+(A) 2026-07-01 +Phase35-Ext @ext id:1517 est:3h Property tests. `Tests/ItsyEditorTests/VouchStoreTests.swift`: parse round-trip of `VOUCHED.td` handling of comments, denouncements, empty lines, whitespace. Verify examples from the mitchellh/vouch README match.
+(A) 2026-07-01 +Phase35-Ext @ext id:1518 est:2h Extension manifest schema-v2 tests. Round-trip encode/decode, back-compat with schema-v1, validation errors for empty fields, unresolvable grammar paths, dup command ids.
+(A) 2026-07-01 +Phase35-Ext @refactor id:1519 est:1h dep:1517,1518 Checkpoint. `bench/notes/extensions-phase35.md`. Close `bench/notes/extension-gap.md`.
+
+---
+
 ## Cross-cutting
 
 
@@ -141,16 +498,24 @@ Format: [todo.txt](https://github.com/todotxt/todo.txt). One task per line. Prio
 
 - Apple — [Reducing your app's launch time](https://developer.apple.com/documentation/xcode/reducing-your-app-s-launch-time)
 - Apple — [Core Text Programming Guide](https://developer.apple.com/library/archive/documentation/StringsTextFonts/Conceptual/CoreText_Programming/Overview/Overview.html)
+- Apple — [Using the File System Events API](https://developer.apple.com/library/archive/documentation/Darwin/Conceptual/FSEvents_ProgGuide/UsingtheFSEventsFramework/UsingtheFSEventsFramework.html)
 - Metal by Example — [Rendering 3D Text with Core Text](https://metalbyexample.com/text-3d/)
 - Metal by Example — [Rendering Text with SDF](https://metalbyexample.com/rendering-text-in-metal-with-signed-distance-fields/)
-- Xi editor — [Rope science part 1](https://github.com/xi-editor/xi-editor/blob/master/docs/docs/rope_science_01.md), [retrospective](https://raphlinus.github.io/xi/2020/06/27/xi-retrospective.html)
-- Zed — [Rope & SumTree](https://zed.dev/blog/zed-decoded-rope-sumtree)
+- Xi editor — [Rope science part 1](https://github.com/xi-editor/xi-editor/blob/master/docs/docs/rope_science_01.md), [part 3 grapheme clusters](https://xi-editor.io/docs/rope_science_03.html), [part 9 CRDT approach to async plugins and undo](https://xi-editor.io/docs/rope_science_09.html), [CRDT details](https://xi-editor.io/docs/crdt-details.html), [retrospective](https://raphlinus.github.io/xi/2020/06/27/xi-retrospective.html)
+- Zed — [Rope & SumTree](https://zed.dev/blog/zed-decoded-rope-sumtree), [syntax-aware editing](https://zed.dev/blog/syntax-aware-editing)
 - VSCode — [Text Buffer Reimplementation](https://code.visualstudio.com/blogs/2018/03/23/text-buffer-reimplementation)
-- Text data structures — [Gap Buffers vs Ropes](https://coredumped.dev/2023/08/09/text-showdown-gap-buffers-vs-ropes/)
-- Tree-sitter — [official](https://github.com/tree-sitter/tree-sitter), [SwiftTreeSitter (reference wrapper)](https://github.com/viktorstrate/swift-tree-sitter)
+- Text data structures — [Gap Buffers vs Ropes](https://coredumped.dev/2023/08/09/text-showdown-gap-buffers-vs-ropes/), [Piece Table — Darren Burns](https://dev.to/_darrenburns/the-piece-table---the-unsung-hero-of-your-text-editor-al8)
+- Tree-sitter — [official](https://github.com/tree-sitter/tree-sitter), [syntax highlighting](https://tree-sitter.github.io/tree-sitter/3-syntax-highlighting.html), [code navigation](https://tree-sitter.github.io/tree-sitter/4-code-navigation.html)
+- Tree-sitter capture standardization — [nvim treesitter groups](https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups), [Helix theme scopes](https://docs.helix-editor.com/themes.html#scopes), [Zed discussion #23371](https://github.com/zed-industries/zed/discussions/23371)
+- Unicode — [UAX #29 Text Segmentation](https://www.unicode.org/reports/tr29/), [GraphemeBreakTest.txt](https://www.unicode.org/Public/UCD/latest/ucd/auxiliary/GraphemeBreakTest.txt)
+- LSP — [3.17 specification](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/)
+- DAP — [specification](https://microsoft.github.io/debug-adapter-protocol/specification.html), [overview](https://microsoft.github.io/debug-adapter-protocol/overview)
+- libgit2 — [homepage](https://libgit2.org/), [repo](https://github.com/libgit2/libgit2)
+- xterm — [Control Sequences (`ctlseqs.html`)](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html), [xterm.js VT support](https://xtermjs.org/docs/api/vtfeatures/)
+- Vouch — [mitchellh/vouch](https://github.com/mitchellh/vouch), [announcement](https://itsfoss.com/news/mitchell-hashimoto-vouch/), [Simon Willison notes](https://simonwillison.net/2026/Feb/7/vouch/)
 - VimR — [Neovim GUI in Swift](https://github.com/qvacua/vimr) (reference for AppKit+Metal+rope-ish architecture, not for embedding nvim)
-- CodeEdit — [source](https://github.com/CodeEditApp/CodeEdit) (reference for native AppKit code-editor patterns)
-- CotEditor — [source](https://github.com/coteditor/CotEditor) (reference for plain-text editor structure)
+- CodeEdit — [source](https://github.com/CodeEditApp/CodeEdit)
+- CotEditor — [source](https://github.com/coteditor/CotEditor)
 - Hyperfine — [github](https://github.com/sharkdp/hyperfine)
 - FZF algo — [src/algo/algo.go](https://github.com/junegunn/fzf/blob/master/src/algo/algo.go)
 - Emerge Tools — [Swift Reference Types and Startup](https://www.emergetools.com/blog/posts/SwiftReferenceTypes)

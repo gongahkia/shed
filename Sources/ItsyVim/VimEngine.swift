@@ -362,16 +362,16 @@ public struct VimEngine: Sendable {
 		switch commandID {
 		case "editor.findCharForward":
 			pendingCharacterMotion = .findForward
-			return .handled
+			return .beginCharacterMotion(.findForward)
 		case "editor.findCharBackward":
 			pendingCharacterMotion = .findBackward
-			return .handled
+			return .beginCharacterMotion(.findBackward)
 		case "editor.tillCharForward":
 			pendingCharacterMotion = .tillForward
-			return .handled
+			return .beginCharacterMotion(.tillForward)
 		case "editor.tillCharBackward":
 			pendingCharacterMotion = .tillBackward
-			return .handled
+			return .beginCharacterMotion(.tillBackward)
 		case "editor.repeatCharFind":
 			return .repeatCharacterMotion(reversed: false)
 		case "editor.repeatCharFindReverse":
@@ -397,7 +397,7 @@ public struct VimEngine: Sendable {
 			return .macroRecordPrefix
 		case "vim.macro.replayPrefix":
 			awaitingMacroReplayRegister = true
-			return .handled
+			return .macroReplayPrefix
 		case "vim.pasteAfter":
 			return .paste(after: true)
 		case "vim.pasteBefore":
@@ -440,6 +440,7 @@ public struct VimEngine: Sendable {
 		}
 		pendingOperator = op
 		pendingOperatorCount = max(1, count)
+		mode = .operatorPending
 		return .beginOperator(op)
 	}
 
@@ -665,7 +666,7 @@ public struct VimEngine: Sendable {
 			return .bigWordBackward
 		case Key("e", modifiers: .shift):
 			return .bigWordEnd
-		case Key("0"):
+		case Key("0"), Key("6", modifiers: .shift):
 			return .lineStart
 		case Key("4", modifiers: .shift), Key("$"):
 			return .lineEnd
@@ -703,6 +704,12 @@ public struct VimEngine: Sendable {
 		}
 		if key == Key("+") {
 			return "+"
+		}
+		if key == Key("*") || key == Key("8", modifiers: .shift) {
+			return "*"
+		}
+		if key == Key("_") || key == Key("-", modifiers: .shift) {
+			return "_"
 		}
 		guard key.modifiers.isEmpty, key.value.count == 1, let character = key.value.first else {
 			return nil

@@ -2,6 +2,39 @@ import Foundation
 import ItsyEditor
 import Testing
 
+@Test func lspServerRegistryResolvedConfigFindsCommandOnPath() throws {
+	let fixture = try TemporaryRegistryFixture()
+	let bin = try fixture.executable("bin/typescript-language-server")
+	let registry = LSPServerRegistry(configs: [
+		LSPServerConfig(languageId: "typescript", command: "typescript-language-server")
+	])
+	let config = registry.resolvedConfig(forLanguageID: "typescript", environment: ["PATH": bin.deletingLastPathComponent().path])
+	#expect(config?.command == bin.path)
+}
+
+@Test func lspServerRegistryResolvedConfigAcceptsAbsoluteExecutable() throws {
+	let fixture = try TemporaryRegistryFixture()
+	let bin = try fixture.executable("bin/pyright-langserver")
+	let registry = LSPServerRegistry(configs: [
+		LSPServerConfig(languageId: "python", command: bin.path)
+	])
+	let config = registry.resolvedConfig(forLanguageID: "python", environment: ["PATH": ""])
+	#expect(config?.command == bin.path)
+}
+
+@Test func lspServerRegistryReportsMissingBinaryWithInstallHint() {
+	let registry = LSPServerRegistry(configs: [
+		LSPServerConfig(languageId: "typescript", command: "typescript-language-server")
+	])
+	let missing = registry.missingBinary(forLanguageID: "typescript", environment: ["PATH": ""])
+	#expect(registry.resolvedConfig(forLanguageID: "typescript", environment: ["PATH": ""]) == nil)
+	#expect(missing == LSPServerRegistry.MissingBinary(
+		languageID: "typescript",
+		command: "typescript-language-server",
+		hint: "`npm i -g typescript typescript-language-server`"
+	))
+}
+
 @Test func lspServerRegistryReturnsBundledDefaultsByLanguageID() {
 	let registry = LSPServerRegistry()
 	#expect(registry.config(forLanguageID: "swift")?.command == "/usr/bin/xcrun")
@@ -89,5 +122,13 @@ private final class TemporaryRegistryFixture {
 		let url = root.appendingPathComponent(relativePath)
 		try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
 		try contents.write(to: url, atomically: true, encoding: .utf8)
+	}
+
+	func executable(_ relativePath: String) throws -> URL {
+		let url = root.appendingPathComponent(relativePath)
+		try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+		try "#!/bin/sh\nexit 0\n".write(to: url, atomically: true, encoding: .utf8)
+		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+		return url
 	}
 }

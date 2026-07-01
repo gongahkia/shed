@@ -67,6 +67,33 @@ import Testing
 	#expect(result.isEmpty)
 }
 
+@Test func workspaceSymbolAdapterMapsRangedSymbolsAndDropsUriOnlyLocations() {
+	let symbols = [
+		LSPWorkspaceSymbol(
+			name: "AppShell",
+			kind: .struct,
+			location: .location(LSPLocation(
+				uri: "file:///tmp/itsy-symbols/Sources/App.swift",
+				range: LSPRange(start: LSPPosition(line: 2, character: 7), end: LSPPosition(line: 2, character: 15))
+			))
+		),
+		LSPWorkspaceSymbol(
+			name: "Deferred",
+			kind: .function,
+			location: .uri("file:///tmp/itsy-symbols/Sources/Deferred.swift")
+		),
+	]
+	let result = LSPSymbolAdapter.workspaceSymbols(from: symbols, root: URL(fileURLWithPath: "/tmp/itsy-symbols"))
+
+	#expect(result.count == 1)
+	#expect(result[0].name == "AppShell")
+	#expect(result[0].relativePath == "Sources/App.swift")
+	#expect(result[0].line == 3)
+	#expect(result[0].column == 8)
+	#expect(result[0].endLine == 3)
+	#expect(result[0].endColumn == 16)
+}
+
 @Test func symbolKindMappingCollapsesLSPKindsIntoWorkspaceCategories() {
 	#expect(LSPSymbolAdapter.mapKind(.class) == .type)
 	#expect(LSPSymbolAdapter.mapKind(.struct) == .type)

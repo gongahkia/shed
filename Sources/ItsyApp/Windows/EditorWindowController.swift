@@ -769,6 +769,21 @@ final class EditorWindowController: NSWindowController {
 		requestReferences(at: editorView.editor.selections.primary.head, in: editorView)
 	}
 
+	@MainActor
+	func workspaceSymbols(matching query: String) async throws -> [WorkspaceSymbol] {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL
+		else {
+			return []
+		}
+		let session = try await ensureLSPSession(for: fileURL)
+		let content = editorView.editor.text
+		try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+		let symbols = try await Self.lspManager.symbols(matching: query, in: fileURL)
+		return LSPSymbolAdapter.workspaceSymbols(from: symbols, root: session.key.workspaceRoot)
+	}
+
 	@discardableResult
 	private func requestCompletion(triggerCharacter: String?, forIncomplete: Bool = false, in targetView: MetalTextView?) -> Bool {
 		guard

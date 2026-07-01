@@ -50,6 +50,39 @@ import Testing
 	#expect(try await second.value == .string("definition"))
 }
 
+@Test func clientWorkspaceSymbolSendsTypedRequest() async throws {
+	let (session, transport) = try await initializedSession()
+	let task = Task {
+		try await session.workspaceSymbol(query: "App").workspaceSymbols
+	}
+
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.workspaceSymbol,
+		params: .object(["query": .string("App")])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .array([
+			.object([
+				"name": .string("AppShell"),
+				"kind": .int(23),
+				"location": .object([
+					"uri": .string("file:///tmp/App.swift"),
+					"range": .object([
+						"start": .object(["line": .int(0), "character": .int(7)]),
+						"end": .object(["line": .int(0), "character": .int(15)]),
+					]),
+				]),
+			]),
+		])
+	))))
+
+	let symbols = try await task.value
+	#expect(symbols.map(\.name) == ["AppShell"])
+}
+
 @Test func clientReturnsServerNotificationsAsEvents() async throws {
 	let (session, _) = try await initializedSession()
 	let diagnostics = JSONRPCMessage.notification(JSONRPCNotificationMessage(

@@ -11,7 +11,10 @@ final class AppCoordinator: NSObject {
 	private lazy var commandPaletteCoordinator = CommandPaletteCoordinator(
 		documentController: documentController,
 		commandRegistryProvider: { [weak self] in self?.commandRegistry ?? CommandRegistry() },
-		activeDocumentProvider: { [weak self] in self?.activeDocument() }
+		activeDocumentProvider: { [weak self] in self?.activeDocument() },
+		workspaceSymbolProvider: { [weak self] query in
+			try await self?.activeEditorWindowController()?.workspaceSymbols(matching: query) ?? []
+		}
 	)
 	private lazy var settingsCoordinator = SettingsCoordinator(
 		documentController: documentController,

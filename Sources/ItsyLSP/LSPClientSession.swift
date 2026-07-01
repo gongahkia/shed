@@ -57,6 +57,14 @@ public actor LSPClientSession {
 		return try await sendRequestUnchecked(method: method, params: params)
 	}
 
+	public func workspaceSymbol(query: String) async throws -> LSPWorkspaceSymbolResult {
+		let response = try await sendRequest(
+			method: LSPMethod.workspaceSymbol,
+			params: try LSPAny(encoding: LSPWorkspaceSymbolParams(query: query))
+		)
+		return try LSPWorkspaceSymbolResult(result: response.result)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) throws {
 		try requireState([.running])
 		try writeNotificationUnchecked(method: method, params: params)

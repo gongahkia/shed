@@ -189,7 +189,6 @@ Sources/ItsyApp/
   Bench/                recordBenchStage helpers
 ```
 
-(B) 2026-07-01 +Phase21-Refactor @refactor id:815 est:3h dep:814 Extract `NSTextInputClient` conformance from `MetalTextView` into an extension file `Sources/ItsyRender/MetalTextView+TextInput.swift`.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:816 est:3h dep:814 Extract gutter + marker rendering from `MetalTextView` into `Sources/ItsyRender/GutterView.swift` — a child view rendered via CoreGraphics, not Metal instances. Reduces `MetalTextView` render-path surface.
 (B) 2026-07-01 +Phase21-Refactor @refactor id:817 est:3h dep:814 Extract find-highlight/rect logic from `MetalTextView` into `Sources/ItsyRender/MetalTextView+FindHighlights.swift`.
 (C) 2026-07-01 +Phase21-Refactor @refactor id:818 est:2h dep:807 Move `EditorPreferences.swift`, `HoverTooltip.swift`, `SignatureHelpPopover.swift`, `TabBarView.swift`, `FileTreeSidebar.swift`, `GitHunkGutter.swift`, `ProblemGutter.swift`, `ReferencesPanel.swift`, `CompletionPopup.swift`, `FindBarView.swift`, `Localization.swift`, `AppKeymap.swift`, `CommandPalette.swift`, `TerminalEmulator.swift`, `TerminalSession.swift`, `TerminalView.swift` into their new feature directories. Update `Package.swift` if any target needs new paths (SwiftPM auto-discovers; no change likely needed).

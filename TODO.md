@@ -317,7 +317,6 @@ Architecture:
 - `ItsyDebugger` (new SwiftPM target) hosts orchestration + UI-adjacent state (breakpoints, stack, threads, variables, watches, console).
 - `ItsyApp/Debugger/` hosts the UI (breakpoints gutter, callstack panel, variables tree, watches, debug console, launch config chooser).
 
-(A) 2026-07-01 +Phase30-DAP @debugui id:1214 est:2h dep:1210 Toolbar: continue / step-over / step-in / step-out / pause / restart / stop. Bind to menu.
 (B) 2026-07-01 +Phase30-DAP @dap id:1215 est:3h dep:1204 Exception filters via `setExceptionBreakpoints`. UI in launch-config panel.
 (B) 2026-07-01 +Phase30-DAP @dap id:1216 est:2h dep:1205 Reverse-debug support (LLDB): `stepBack`, `reverseContinue`. UI-gated behind `session.capabilities.supportsStepBack`.
 (A) 2026-07-01 +Phase30-DAP @dap id:1217 est:3h dep:1214 Smoke QA: write a tiny hello-world Swift program in `bench/corpus/debug-hello.swift`, launch `lldb-dap` via a bundled `.itsy/debug.json`, verify breakpoint hits + step-over + variable read via `bench/scripts/dap_smoke.sh`.

@@ -228,6 +228,27 @@ final class AppCoordinator: NSObject {
 					Command(id: "debug.console", title: L10n.string("Debug Console"), defaultKey: nil) { [weak self] in
 						self?.showDebugConsole(nil)
 					},
+					Command(id: "debug.continue", title: L10n.string("Continue"), defaultKey: nil) { [weak self] in
+						self?.continueDebug(nil)
+					},
+					Command(id: "debug.stepOver", title: L10n.string("Step Over"), defaultKey: nil) { [weak self] in
+						self?.stepOverDebug(nil)
+					},
+					Command(id: "debug.stepIn", title: L10n.string("Step In"), defaultKey: nil) { [weak self] in
+						self?.stepInDebug(nil)
+					},
+					Command(id: "debug.stepOut", title: L10n.string("Step Out"), defaultKey: nil) { [weak self] in
+						self?.stepOutDebug(nil)
+					},
+					Command(id: "debug.pause", title: L10n.string("Pause"), defaultKey: nil) { [weak self] in
+						self?.pauseDebug(nil)
+					},
+					Command(id: "debug.restart", title: L10n.string("Restart"), defaultKey: nil) { [weak self] in
+						self?.restartDebug(nil)
+					},
+					Command(id: "debug.stop", title: L10n.string("Stop"), defaultKey: nil) { [weak self] in
+						self?.stopDebug(nil)
+					},
 					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
 						self?.showTerminal(nil)
 					},
@@ -337,6 +358,34 @@ final class AppCoordinator: NSObject {
 
 	@objc func showDebugConsole(_ sender: Any?) {
 		debuggerCoordinator.showConsole(sender)
+	}
+
+	@objc func continueDebug(_ sender: Any?) {
+		debuggerCoordinator.continueDebug(sender)
+	}
+
+	@objc func stepOverDebug(_ sender: Any?) {
+		debuggerCoordinator.stepOverDebug(sender)
+	}
+
+	@objc func stepInDebug(_ sender: Any?) {
+		debuggerCoordinator.stepInDebug(sender)
+	}
+
+	@objc func stepOutDebug(_ sender: Any?) {
+		debuggerCoordinator.stepOutDebug(sender)
+	}
+
+	@objc func pauseDebug(_ sender: Any?) {
+		debuggerCoordinator.pauseDebug(sender)
+	}
+
+	@objc func restartDebug(_ sender: Any?) {
+		debuggerCoordinator.restartDebug(sender)
+	}
+
+	@objc func stopDebug(_ sender: Any?) {
+		debuggerCoordinator.stopDebug(sender)
 	}
 
 	@objc func showTerminal(_ sender: Any?) {

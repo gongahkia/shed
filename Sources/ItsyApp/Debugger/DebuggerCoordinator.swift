@@ -51,6 +51,34 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		consoleCoordinator.showConsole(sender)
 	}
 
+	@objc func continueDebug(_ sender: Any?) {
+		runControl(.continueExecution)
+	}
+
+	@objc func stepOverDebug(_ sender: Any?) {
+		runControl(.next)
+	}
+
+	@objc func stepInDebug(_ sender: Any?) {
+		runControl(.stepIn)
+	}
+
+	@objc func stepOutDebug(_ sender: Any?) {
+		runControl(.stepOut)
+	}
+
+	@objc func pauseDebug(_ sender: Any?) {
+		runControl(.pause)
+	}
+
+	@objc func restartDebug(_ sender: Any?) {
+		runControl(.restart)
+	}
+
+	@objc func stopDebug(_ sender: Any?) {
+		runControl(.stop)
+	}
+
 	func terminate() {
 		callStackGeneration += 1
 		activeSession = nil
@@ -93,12 +121,21 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
+		let continueButton = NSButton(title: L10n.string("Continue"), target: self, action: #selector(continueDebug(_:)))
+		let overButton = NSButton(title: L10n.string("Over"), target: self, action: #selector(stepOverDebug(_:)))
+		let inButton = NSButton(title: L10n.string("In"), target: self, action: #selector(stepInDebug(_:)))
+		let outButton = NSButton(title: L10n.string("Out"), target: self, action: #selector(stepOutDebug(_:)))
+		let pauseButton = NSButton(title: L10n.string("Pause"), target: self, action: #selector(pauseDebug(_:)))
+		let restartButton = NSButton(title: L10n.string("Restart"), target: self, action: #selector(restartDebug(_:)))
+		let stopButton = NSButton(title: L10n.string("Stop"), target: self, action: #selector(stopDebug(_:)))
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshCallStack(_:)))
-		let header = NSStackView(views: [statusLabel, refreshButton])
-		header.orientation = .horizontal
-		header.alignment = .centerY
-		header.distribution = .fill
-		header.spacing = 12
+		let buttonStack = NSStackView(views: [continueButton, overButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
+		buttonStack.orientation = .horizontal
+		buttonStack.spacing = 6
+		let header = NSStackView(views: [statusLabel, buttonStack])
+		header.orientation = .vertical
+		header.alignment = .leading
+		header.spacing = 8
 		let outlineView = NSOutlineView()
 		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("callStack"))
 		column.title = L10n.string("Call Stack")
@@ -128,6 +165,62 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		])
 		callStackStatusLabel = statusLabel
 		callStackOutlineView = outlineView
+	}
+
+	private func runControl(_ control: DebugControl) {
+		guard let session = activeSession else {
+			setCallStackStatus(L10n.string("No active debug session"), isError: true)
+			return
+		}
+		setCallStackStatus(control.runningStatus, isError: false)
+		Task(priority: .userInitiated) { [weak self] in
+			do {
+				try await self?.send(control, session: session)
+				Task { @MainActor in
+					guard let self else {
+						return
+					}
+					if control == .stop {
+						session.terminate()
+						self.activeSession = nil
+						self.variablesCoordinator.clear()
+						self.watchesCoordinator.clear()
+						self.consoleCoordinator.clear()
+					}
+					self.setCallStackStatus(control.doneStatus, isError: false)
+				}
+			} catch {
+				Task { @MainActor in
+					self?.setCallStackStatus(String(describing: error), isError: true)
+				}
+			}
+		}
+	}
+
+	private func send(_ control: DebugControl, session: DebugAppSession) async throws {
+		switch control {
+		case .continueExecution:
+			try await session.debugSession.continueExecution(threadID: try await focusedThreadID(session))
+		case .next:
+			try await session.debugSession.next(threadID: try await focusedThreadID(session))
+		case .stepIn:
+			try await session.debugSession.stepIn(threadID: try await focusedThreadID(session))
+		case .stepOut:
+			try await session.debugSession.stepOut(threadID: try await focusedThreadID(session))
+		case .pause:
+			try await session.debugSession.pause(threadID: try await focusedThreadID(session))
+		case .restart:
+			try await session.debugSession.restart()
+		case .stop:
+			_ = try? await session.debugSession.terminate()
+		}
+	}
+
+	private func focusedThreadID(_ session: DebugAppSession) async throws -> Int {
+		guard let threadID = await session.debugSession.focusedThreadID else {
+			throw DebugControlError.missingFocusedThread
+		}
+		return threadID
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -299,5 +392,64 @@ private final class DebugCallStackFrameNode: NSObject {
 	init(threadID: Int, frame: DebugStackFrame) {
 		self.threadID = threadID
 		self.frame = frame
+	}
+}
+
+private enum DebugControl {
+	case continueExecution
+	case next
+	case stepIn
+	case stepOut
+	case pause
+	case restart
+	case stop
+
+	var runningStatus: String {
+		switch self {
+		case .continueExecution:
+			return L10n.string("Continuing")
+		case .next:
+			return L10n.string("Stepping over")
+		case .stepIn:
+			return L10n.string("Stepping in")
+		case .stepOut:
+			return L10n.string("Stepping out")
+		case .pause:
+			return L10n.string("Pausing")
+		case .restart:
+			return L10n.string("Restarting")
+		case .stop:
+			return L10n.string("Stopping")
+		}
+	}
+
+	var doneStatus: String {
+		switch self {
+		case .continueExecution:
+			return L10n.string("Continued")
+		case .next:
+			return L10n.string("Stepped over")
+		case .stepIn:
+			return L10n.string("Stepped in")
+		case .stepOut:
+			return L10n.string("Stepped out")
+		case .pause:
+			return L10n.string("Paused")
+		case .restart:
+			return L10n.string("Restarted")
+		case .stop:
+			return L10n.string("Stopped")
+		}
+	}
+}
+
+private enum DebugControlError: Error, CustomStringConvertible {
+	case missingFocusedThread
+
+	var description: String {
+		switch self {
+		case .missingFocusedThread:
+			return L10n.string("Select a thread first")
+		}
 	}
 }

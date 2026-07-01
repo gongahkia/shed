@@ -32,8 +32,8 @@ Working, verified in tree:
 
 Blocked / off-target:
 
-- Cold start `<150 ms`: currently ~272 ms mean (warm ~230 ms). Dominated by system dyld + AX-window detection tail, not app-side Swift init (~1.45 ms).
-- Idle RSS `<30 MB`: currently ~90 MB. Dominated by AppKit + Metal + IOSurface + `__OBJC_RO`, not app heap. See task id:1050 for realism check.
+- Cold start `<150 ms`: committed release-candidate mean remains 272.661 ms; latest Phase25 post-lazy-link sample regressed to 2414.166 ms warm mean. See `bench/notes/coldstart-audit.md`.
+- Idle memory footprint `<100 MB`: committed clean audit is 98611 KB physical footprint; no-purge local samples are noisier. See `bench/notes/rss-realism.md`.
 - 1 GB file open `<500 ms`: unreachable on current `Document.read` path (slurps entire file to `String`, then builds rope from string).
 - Distribution: Developer ID cert, notarization, Sparkle, Homebrew cask, final name all pending in Phase 16.
 
@@ -44,7 +44,7 @@ Known structural issues (targeted by Phase 21+):
 - Rope insert rebuilds the affected leaf as a full `String` then re-splits; each ancestor branch reallocates children. Repeated-ASCII fast path masks this in current benchmarks.
 - `UndoStack.record` snapshots full `textBefore: String` every 32 edits.
 - Grapheme cluster correctness across selections + multi-cursor is unproven.
-- `MetalTextView.highlightSpans.didSet` empties the whole shape cache on every syntax refresh.
+- Highlight color refresh no longer clears shaped-line cache; remaining risk is full highlight-span filtering per visible line.
 - Terminal emulator silently drops SGR params, has no mouse, no OSC titles/clipboard/hyperlinks, no 24-bit color.
 - Workspace symbol extraction is regex-based; no incremental FSEvents watch; no LSP-backed symbols.
 - LSP server registry does not detect missing binaries; users get silent spawn failure. Session crash/exit not surfaced. `workspace/symbol` not wired.
@@ -271,7 +271,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 ## Phase 25 — Renderer perf + memory realism
 
-(B) 2026-07-01 +Phase25-Render @refactor id:1051 est:1h dep:1050,984 Checkpoint. Publish `bench/notes/render-phase25.md`.
 
 ---
 

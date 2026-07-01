@@ -127,6 +127,124 @@ import Testing
 	#expect(events == [.request(request)])
 }
 
+@Test func dapClientSessionInitializeTransitionsToConfiguringAfterInitializedEvent() async throws {
+	let transport = RecordingDAPTransport()
+	let session = DAPClientSession(transport: transport)
+	let task = Task {
+		try await session.initialize(clientCapabilities: DAPInitializeRequestArguments(adapterID: "lldb"))
+	}
+
+	try await transport.waitForWriteCount(1)
+	#expect(await session.state == .initializing)
+	#expect(try transport.message(at: 0) == .request(DAPRequestMessage(
+		seq: 1,
+		command: DAPCommand.initialize,
+		arguments: .object(["adapterID": .string("lldb")])
+	)))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 2,
+		requestSeq: 1,
+		success: true,
+		command: DAPCommand.initialize
+	))))
+	_ = try await task.value
+	#expect(await session.state == .initializing)
+
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 3, event: DAPEvent.initialized))))
+
+	#expect(await session.state == .configuring)
+}
+
+@Test func dapClientSessionLaunchSendsRequestWhileConfiguring() async throws {
+	let (session, transport) = try await configuredSession()
+	let task = Task {
+		try await session.launch(arguments: .object(["program": .string("/tmp/app")]))
+	}
+
+	try await transport.waitForWriteCount(2)
+	#expect(try transport.message(at: 1) == .request(DAPRequestMessage(
+		seq: 2,
+		command: DAPCommand.launch,
+		arguments: .object(["program": .string("/tmp/app")])
+	)))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 3,
+		requestSeq: 2,
+		success: true,
+		command: DAPCommand.launch
+	))))
+	_ = try await task.value
+
+	#expect(await session.state == .configuring)
+}
+
+@Test func dapClientSessionSetBreakpointsThenConfigurationDoneTransitionsToRunning() async throws {
+	let (session, transport) = try await configuredSession()
+	let breakpoints = DAPSetBreakpointsArguments(
+		source: DAPSource(path: "/tmp/main.swift"),
+		breakpoints: [DAPSourceBreakpoint(line: 7)]
+	)
+	let breakpointsTask = Task {
+		try await session.setBreakpoints(breakpoints)
+	}
+
+	try await transport.waitForWriteCount(2)
+	#expect(try transport.message(at: 1) == .request(DAPRequestMessage(
+		seq: 2,
+		command: DAPCommand.setBreakpoints,
+		arguments: .object([
+			"breakpoints": .array([.object(["line": .int(7)])]),
+			"source": .object(["path": .string("/tmp/main.swift")]),
+		])
+	)))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 3,
+		requestSeq: 2,
+		success: true,
+		command: DAPCommand.setBreakpoints
+	))))
+	_ = try await breakpointsTask.value
+	#expect(await session.state == .configuring)
+
+	let configurationTask = Task {
+		try await session.configurationDone()
+	}
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(DAPRequestMessage(seq: 3, command: DAPCommand.configurationDone)))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 4,
+		requestSeq: 3,
+		success: true,
+		command: DAPCommand.configurationDone
+	))))
+	_ = try await configurationTask.value
+
+	#expect(await session.state == .running)
+}
+
+@Test func dapClientSessionStoppedAndTerminatedEventsUpdateState() async throws {
+	let (session, _) = try await runningSession()
+
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 4, event: DAPEvent.stopped))))
+	#expect(await session.state == .stopped)
+
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 5, event: DAPEvent.exited))))
+	#expect(await session.state == .terminated)
+}
+
+@Test func dapClientSessionRejectsLifecycleRequestsInWrongState() async throws {
+	let session = DAPClientSession(transport: RecordingDAPTransport())
+	var thrown: DAPClientError?
+
+	do {
+		_ = try await session.setBreakpoints(DAPSetBreakpointsArguments(source: DAPSource(path: "/tmp/main.swift")))
+	} catch let error as DAPClientError {
+		thrown = error
+	}
+
+	#expect(thrown == .invalidState(expected: [.configuring], actual: .idle))
+}
+
 private enum RecordingDAPTransportError: Error {
 	case timeout(expected: Int, actual: Int)
 	case missingWrite(Int)
@@ -143,6 +261,42 @@ private func requestSeq(for command: String, in messages: [DAPMessage]) throws -
 		}
 	}
 	throw RecordingDAPTransportError.missingRequest(command)
+}
+
+private func configuredSession() async throws -> (DAPClientSession, RecordingDAPTransport) {
+	let transport = RecordingDAPTransport()
+	let session = DAPClientSession(transport: transport)
+	let task = Task {
+		try await session.initialize(clientCapabilities: DAPInitializeRequestArguments(adapterID: "lldb"))
+	}
+	try await transport.waitForWriteCount(1)
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 2,
+		requestSeq: 1,
+		success: true,
+		command: DAPCommand.initialize
+	))))
+	_ = try await task.value
+	_ = try await session.receive(DAPMessageFramer.frame(message: .event(DAPEventMessage(seq: 3, event: DAPEvent.initialized))))
+	#expect(await session.state == .configuring)
+	return (session, transport)
+}
+
+private func runningSession() async throws -> (DAPClientSession, RecordingDAPTransport) {
+	let (session, transport) = try await configuredSession()
+	let task = Task {
+		try await session.configurationDone()
+	}
+	try await transport.waitForWriteCount(2)
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 4,
+		requestSeq: 2,
+		success: true,
+		command: DAPCommand.configurationDone
+	))))
+	_ = try await task.value
+	#expect(await session.state == .running)
+	return (session, transport)
 }
 
 private final class RecordingDAPTransport: DAPClientTransport, @unchecked Sendable {

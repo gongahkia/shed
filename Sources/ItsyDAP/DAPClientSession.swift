@@ -1,11 +1,21 @@
 import Foundation
 
+public enum DAPClientState: Equatable, Sendable {
+	case idle
+	case initializing
+	case configuring
+	case running
+	case stopped
+	case terminated
+}
+
 public enum DAPClientEvent: Equatable, Sendable {
 	case request(DAPRequestMessage)
 	case event(DAPEventMessage)
 }
 
 public enum DAPClientError: Error, Equatable, Sendable {
+	case invalidState(expected: [DAPClientState], actual: DAPClientState)
 	case unexpectedResponseSeq(Int)
 	case responseFailure(DAPResponseMessage)
 }
@@ -19,6 +29,8 @@ public typealias DAPResponse = DAPResponseMessage
 extension DAPProcessTransport: DAPClientTransport {}
 
 public actor DAPClientSession {
+	public private(set) var state: DAPClientState = .idle
+
 	private let transport: any DAPClientTransport
 	private var decoder = JSONDecoder()
 	private var encoder = JSONEncoder()
@@ -41,6 +53,46 @@ public actor DAPClientSession {
 	}
 
 	public func sendRequest(command: String, arguments: DAPAny? = nil) async throws -> DAPResponse {
+		try await sendRequestUnchecked(command: command, arguments: arguments)
+	}
+
+	@discardableResult
+	public func initialize(clientCapabilities: DAPInitializeRequestArguments) async throws -> DAPResponse {
+		try requireState([.idle])
+		state = .initializing
+		do {
+			return try await sendRequestUnchecked(command: DAPCommand.initialize, arguments: try DAPAny(encoding: clientCapabilities))
+		} catch {
+			state = .idle
+			throw error
+		}
+	}
+
+	@discardableResult
+	public func launch(arguments: DAPAny? = nil) async throws -> DAPResponse {
+		try requireState([.configuring])
+		return try await sendRequestUnchecked(command: DAPCommand.launch, arguments: arguments)
+	}
+
+	@discardableResult
+	public func attach(arguments: DAPAny? = nil) async throws -> DAPResponse {
+		try requireState([.configuring])
+		return try await sendRequestUnchecked(command: DAPCommand.attach, arguments: arguments)
+	}
+
+	@discardableResult
+	public func setBreakpoints(_ arguments: DAPSetBreakpointsArguments) async throws -> DAPResponse {
+		try requireState([.configuring])
+		return try await sendRequestUnchecked(command: DAPCommand.setBreakpoints, arguments: try DAPAny(encoding: arguments))
+	}
+
+	@discardableResult
+	public func configurationDone(arguments: DAPAny? = nil) async throws -> DAPResponse {
+		try requireState([.configuring])
+		return try await sendRequestUnchecked(command: DAPCommand.configurationDone, arguments: arguments)
+	}
+
+	private func sendRequestUnchecked(command: String, arguments: DAPAny? = nil) async throws -> DAPResponse {
 		let seq = nextSeq
 		nextSeq += 1
 		let message = DAPMessage.request(DAPRequestMessage(seq: seq, command: command, arguments: arguments))
@@ -77,6 +129,7 @@ public actor DAPClientSession {
 			case let .request(request):
 				events.append(.request(request))
 			case let .event(event):
+				apply(event: event)
 				emit(event)
 				events.append(.event(event))
 			case let .response(response):
@@ -91,6 +144,7 @@ public actor DAPClientSession {
 			throw DAPClientError.unexpectedResponseSeq(response.requestSeq)
 		}
 		if response.success {
+			apply(response: response)
 			continuation.resume(returning: response)
 		} else {
 			continuation.resume(throwing: DAPClientError.responseFailure(response))
@@ -105,6 +159,35 @@ public actor DAPClientSession {
 
 	private func removeEventContinuation(_ id: UUID) {
 		eventContinuations.removeValue(forKey: id)
+	}
+
+	private func apply(event: DAPEventMessage) {
+		switch event.event {
+		case DAPEvent.initialized where state == .initializing:
+			state = .configuring
+		case DAPEvent.stopped where state != .terminated:
+			state = .stopped
+		case DAPEvent.exited, DAPEvent.terminated:
+			state = .terminated
+		default:
+			break
+		}
+	}
+
+	private func apply(response: DAPResponseMessage) {
+		switch response.command {
+		case DAPCommand.configurationDone where state == .configuring:
+			state = .running
+		default:
+			break
+		}
+	}
+
+	private func requireState(_ expected: [DAPClientState]) throws {
+		guard !expected.contains(state) else {
+			return
+		}
+		throw DAPClientError.invalidState(expected: expected, actual: state)
 	}
 }
 

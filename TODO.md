@@ -304,7 +304,6 @@ Goal: pull vim state out of `MetalTextView` into a testable module with no AppKi
 
 ## Phase 29 — LSP UX polish
 
-(B) 2026-07-01 +Phase29-LSP @lsp id:1166 est:3h Extend bundled LSP configs. Add: `clangd` (c/cpp), `zls` (zig), `elixir-ls` (elixir), `kotlin-language-server` (kotlin), `omnisharp` (csharp), `bash-language-server` (bash), `docker-langserver` (dockerfile), `sqls` (sql), `dart` (dart), `haskell-language-server-wrapper` (haskell), `lua-language-server` (lua), `ruby-lsp` (ruby), `terraform-ls` (terraform). Add extension map entries. Add missing-binary hints for each.
 (B) 2026-07-01 +Phase29-LSP @lsp id:1167 est:2h dep:1163 LSP smoke QA: `bench/scripts/lsp_smoke.sh` opens a small fixture per language, waits for first `publishDiagnostics`, asserts arrival within 5 s KPI, reports per-language latency. Skips any language whose binary is missing.
 (A) 2026-07-01 +Phase29-LSP @refactor id:1168 est:1h dep:1167 Checkpoint. Publish `bench/notes/lsp-phase29.md`.
 

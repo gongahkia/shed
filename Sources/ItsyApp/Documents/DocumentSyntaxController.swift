@@ -41,7 +41,12 @@ final class DocumentSyntaxController {
 				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
 			}
 			let spans: [HighlightSpan]
-			if edits.count == 1, let edit = edits.first, isSingleLineEdit(edit), let oldRope, let tree = syntaxTree {
+			if case .rope = editor.textStorage,
+			   edits.count == 1,
+			   let edit = edits.first,
+			   isSingleLineEdit(edit),
+			   let oldRope,
+			   let tree = syntaxTree {
 				let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
 				tree.edit(inputEdit)
 				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
@@ -53,7 +58,7 @@ final class DocumentSyntaxController {
 				syntaxHighlightSpans += dirtySpans
 				spans = syntaxHighlightSpans
 			} else {
-				let tree = try syntaxPipeline.parse(editor.rope)
+				let tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
 				spans = try syntaxPipeline.highlights(in: tree)
 				syntaxHighlightSpans = spans
@@ -71,11 +76,21 @@ final class DocumentSyntaxController {
 	}
 
 	private func dirtyLineRange(containing offset: Int, editor: Editor) -> Range<Int> {
-		let line = editor.rope.line(forOffset: min(offset, editor.rope.length))
-		return editor.rope.lineRange(line)
+		let storage = editor.textStorage
+		let line = storage.line(forOffset: min(offset, storage.length))
+		return storage.lineRange(line)
 	}
 
 	private func isSingleLineEdit(_ edit: Edit) -> Bool {
 		!edit.oldText.utf8.contains(10) && !edit.newText.utf8.contains(10)
+	}
+
+	private func parse(editor: Editor, using syntaxPipeline: inout SyntaxPipeline) throws -> Tree {
+		switch editor.textStorage {
+		case let .rope(rope):
+			return try syntaxPipeline.parse(rope)
+		case let .pieceTree(pieceTree):
+			return try syntaxPipeline.parse(pieceTree)
+		}
 	}
 }

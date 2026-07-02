@@ -72,3 +72,6 @@
 	path = Sources/CTSGrammars/grammars/elixir
 	url = https://github.com/elixir-lang/tree-sitter-elixir.git
 	branch = main
+[submodule "Sources/CLibgit2/upstream"]
+	path = Sources/CLibgit2/upstream
+	url = https://github.com/libgit2/libgit2.git

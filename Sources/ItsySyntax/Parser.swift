@@ -245,6 +245,29 @@ final class Parser {
 		}
 		return Tree(tree)
 	}
+
+	func parse(_ pieceTree: PieceTree, oldTree: Tree? = nil) throws -> Tree {
+		guard pieceTree.length <= Int(UInt32.max) else {
+			throw SyntaxError.documentTooLarge(pieceTree.length)
+		}
+		var input = PieceTreeInput(pieceTree)
+		defer {
+			input.deallocate()
+		}
+		let tree = try withUnsafeMutablePointer(to: &input) { inputPointer in
+			let tsInput = TSInput(
+				payload: UnsafeMutableRawPointer(inputPointer),
+				read: pieceTreeInputRead,
+				encoding: TSInputEncodingUTF8,
+				decode: nil
+			)
+			guard let tree = ts_parser_parse(parser, oldTree?.tree, tsInput) else {
+				throw SyntaxError.parseFailed
+			}
+			return tree
+		}
+		return Tree(tree)
+	}
 }
 
 public final class Tree {
@@ -558,6 +581,11 @@ public struct SyntaxPipeline {
 		return try parser.parse(rope, oldTree: oldTree)
 	}
 
+	public mutating func parse(_ pieceTree: PieceTree, oldTree: Tree? = nil) throws -> Tree {
+		let parser = try ensureParser()
+		return try parser.parse(pieceTree, oldTree: oldTree)
+	}
+
 	public mutating func highlights(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [HighlightSpan] {
 		let query = try ensureQuery()
 		return try query.highlights(in: tree, byteRange: byteRange)
@@ -622,5 +650,48 @@ private let ropeInputRead: @convention(c) (
 		return nil
 	}
 	let input = payload.assumingMemoryBound(to: RopeInput.self)
+	return input.pointee.read(byteIndex: byteIndex, bytesRead: bytesRead)
+}
+
+private struct PieceTreeInput {
+	let pieceTree: PieceTree
+	let capacity = 4 * 1024
+	let buffer: UnsafeMutablePointer<CChar>
+
+	init(_ pieceTree: PieceTree) {
+		self.pieceTree = pieceTree
+		buffer = UnsafeMutablePointer<CChar>.allocate(capacity: capacity + 1)
+	}
+
+	func deallocate() {
+		buffer.deallocate()
+	}
+
+	func read(byteIndex: UInt32, bytesRead: UnsafeMutablePointer<UInt32>?) -> UnsafePointer<CChar>? {
+		let offset = Int(byteIndex)
+		guard offset < pieceTree.length else {
+			bytesRead?.pointee = 0
+			return nil
+		}
+		let rawBuffer = UnsafeMutableRawPointer(buffer).assumingMemoryBound(to: UInt8.self)
+		let target = UnsafeMutableBufferPointer(start: rawBuffer, count: capacity)
+		let count = pieceTree.copyUTF8(at: offset, into: target)
+		buffer[count] = 0
+		bytesRead?.pointee = UInt32(count)
+		return UnsafePointer(buffer)
+	}
+}
+
+private let pieceTreeInputRead: @convention(c) (
+	UnsafeMutableRawPointer?,
+	UInt32,
+	TSPoint,
+	UnsafeMutablePointer<UInt32>?
+) -> UnsafePointer<CChar>? = { payload, byteIndex, _, bytesRead in
+	guard let payload else {
+		bytesRead?.pointee = 0
+		return nil
+	}
+	let input = payload.assumingMemoryBound(to: PieceTreeInput.self)
 	return input.pointee.read(byteIndex: byteIndex, bytesRead: bytesRead)
 }

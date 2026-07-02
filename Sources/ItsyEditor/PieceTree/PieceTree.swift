@@ -1,4 +1,26 @@
+import Darwin
 import Foundation
+
+public enum PieceTreeSaveError: Error, Equatable, CustomStringConvertible {
+	case openFailed(path: String, code: Int32)
+	case writeFailed(path: String, code: Int32)
+	case closeFailed(path: String, code: Int32)
+
+	public var description: String {
+		switch self {
+		case let .openFailed(path, code):
+			return "open failed for \(path): \(Self.message(code))"
+		case let .writeFailed(path, code):
+			return "write failed for \(path): \(Self.message(code))"
+		case let .closeFailed(path, code):
+			return "close failed for \(path): \(Self.message(code))"
+		}
+	}
+
+	private static func message(_ code: Int32) -> String {
+		String(cString: strerror(code))
+	}
+}
 
 public struct PieceTree: Sendable {
 	public enum BufferID: Equatable, Sendable {
@@ -225,6 +247,27 @@ public struct PieceTree: Sendable {
 		return Self.trimmedUTF8BoundaryCount(in: buffer, copied: copied, sourceEndReached: sourceEndReached)
 	}
 
+	public func saveTo(url: URL) throws {
+		let path = url.path
+		let descriptor = open(path, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+		guard descriptor >= 0 else {
+			throw PieceTreeSaveError.openFailed(path: path, code: errno)
+		}
+		var savedError: Error?
+		do {
+			try writePieces(to: descriptor, path: path)
+		} catch {
+			savedError = error
+		}
+		let closeResult = close(descriptor)
+		if let savedError {
+			throw savedError
+		}
+		guard closeResult == 0 else {
+			throw PieceTreeSaveError.closeFailed(path: path, code: errno)
+		}
+	}
+
 	func debugPieces() -> [Piece] {
 		pieces()
 	}
@@ -435,6 +478,79 @@ public struct PieceTree: Sendable {
 			return false
 		}
 		return byte
+	}
+
+	private func writePieces(to descriptor: Int32, path: String) throws {
+		let allPieces = pieces()
+		let batchSize = 64
+		var index = 0
+		while index < allPieces.count {
+			let upperBound = min(index + batchSize, allPieces.count)
+			try withIOVectors(for: allPieces, range: index ..< upperBound) { vectors in
+				try Self.writeAll(vectors, to: descriptor, path: path)
+			}
+			index = upperBound
+		}
+	}
+
+	private func withIOVectors<T>(
+		for pieces: [Piece],
+		range: Range<Int>,
+		_ body: ([iovec]) throws -> T
+	) throws -> T {
+		var vectors: [iovec] = []
+		vectors.reserveCapacity(range.count)
+		func appendVector(at index: Int) throws -> T {
+			if index == range.upperBound {
+				return try body(vectors)
+			}
+			let piece = pieces[index]
+			return try withPieceBytes(piece, 0 ..< piece.length) { buffer in
+				var didAppend = false
+				if let baseAddress = buffer.baseAddress, !buffer.isEmpty {
+					vectors.append(iovec(iov_base: UnsafeMutableRawPointer(mutating: baseAddress), iov_len: buffer.count))
+					didAppend = true
+				}
+				defer {
+					if didAppend {
+						vectors.removeLast()
+					}
+				}
+				return try appendVector(at: index + 1)
+			}
+		}
+		return try appendVector(at: range.lowerBound)
+	}
+
+	private static func writeAll(_ vectors: [iovec], to descriptor: Int32, path: String) throws {
+		var vectors = vectors
+		var index = 0
+		while index < vectors.count {
+			let written = vectors.withUnsafeBufferPointer { buffer in
+				guard let baseAddress = buffer.baseAddress else {
+					return 0
+				}
+				return writev(descriptor, baseAddress.advanced(by: index), Int32(vectors.count - index))
+			}
+			if written < 0 {
+				if errno == EINTR {
+					continue
+				}
+				throw PieceTreeSaveError.writeFailed(path: path, code: errno)
+			}
+			guard written > 0 else {
+				throw PieceTreeSaveError.writeFailed(path: path, code: EIO)
+			}
+			var remaining = Int(written)
+			while index < vectors.count, remaining >= vectors[index].iov_len {
+				remaining -= vectors[index].iov_len
+				index += 1
+			}
+			if remaining > 0, index < vectors.count {
+				vectors[index].iov_base = vectors[index].iov_base.advanced(by: remaining)
+				vectors[index].iov_len -= remaining
+			}
+		}
 	}
 
 	private func withPieceBytes<T>(_ piece: Piece, _ localRange: Range<Int>, _ body: (UnsafeBufferPointer<UInt8>) throws -> T) rethrows -> T {

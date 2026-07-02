@@ -1,4 +1,5 @@
 @testable import ItsyEditor
+import CryptoKit
 import Foundation
 import Testing
 
@@ -120,6 +121,29 @@ import Testing
 	#expect(tree.debugPieces() == [
 		PieceTree.Piece(buffer: .original(0), start: 0, length: tree.length, lineFeeds: 2),
 	])
+}
+
+@Test func pieceTreeSaveToWritesHundredKPiecesWithMatchingSHA256() throws {
+	let fileManager = FileManager.default
+	let directory = fileManager.temporaryDirectory.appendingPathComponent("itsy-piecetree-save-\(UUID().uuidString)", isDirectory: true)
+	try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer {
+		try? fileManager.removeItem(at: directory)
+	}
+
+	var tree = PieceTree()
+	var oracle: [UInt8] = []
+	oracle.reserveCapacity(100_000)
+	for index in 0 ..< 100_000 {
+		let byte = UInt8(33 + index % 90)
+		tree.insert([byte], at: tree.length)
+		oracle.append(byte)
+	}
+	let url = directory.appendingPathComponent("saved.txt")
+	try tree.saveTo(url: url)
+	let saved = try Data(contentsOf: url)
+	#expect(saved.count == oracle.count)
+	#expect(SHA256.hash(data: saved) == SHA256.hash(data: Data(oracle)))
 }
 
 @Test func pieceTreeRandomInsertsMatchByteOracle() {

@@ -1,3 +1,4 @@
+import Foundation
 import ItsyConfig
 import ItsyEditor
 import Testing
@@ -53,6 +54,18 @@ import Testing
 
 	editor.redo()
 	#expect(editorTextStorageString(editor) == "alpha\nB")
+}
+
+@Test func editorUndoEntryStoresForwardReverseEditsAndSelections() throws {
+	var editor = Editor(text: "alpha", storage: .pieceTree)
+	let selectionBefore = SelectionSet(primary: Selection(anchor: 5, head: 5))
+	editor.setSelection(selectionBefore)
+	editor.insert("!")
+	let entry = try #require(editor.history.edits.last)
+	#expect(entry.edit == Edit(range: 5 ..< 5, removed: Data(), inserted: Data("!".utf8), selectionBefore: selectionBefore))
+	#expect(entry.reverse == Edit(range: 5 ..< 6, removed: Data("!".utf8), inserted: Data()))
+	#expect(entry.selectionBefore == selectionBefore)
+	#expect(entry.selectionAfter == editor.selections)
 }
 
 @Test func editorInsertsAndDeletesText() {

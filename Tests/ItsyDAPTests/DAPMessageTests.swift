@@ -115,6 +115,7 @@ import Testing
 	#expect(DAPCommand.next == "next")
 	#expect(DAPCommand.stepIn == "stepIn")
 	#expect(DAPCommand.stepOut == "stepOut")
+	#expect(DAPCommand.stepBack == "stepBack")
 	#expect(DAPCommand.pause == "pause")
 	#expect(DAPCommand.reverseContinue == "reverseContinue")
 	#expect(DAPCommand.restart == "restart")
@@ -195,6 +196,7 @@ import Testing
 	try expectRoundTrip(DAPNextArguments(threadId: 1, singleThread: true, granularity: DAPSteppingGranularity.line))
 	try expectRoundTrip(DAPStepInArguments(threadId: 1, singleThread: false, targetId: 9, granularity: DAPSteppingGranularity.statement))
 	try expectRoundTrip(DAPStepOutArguments(threadId: 1, singleThread: true, granularity: DAPSteppingGranularity.instruction))
+	try expectRoundTrip(DAPStepBackArguments(threadId: 1, singleThread: false, granularity: DAPSteppingGranularity.line))
 	try expectRoundTrip(DAPPauseArguments(threadId: 1))
 	try expectRoundTrip(DAPReverseContinueArguments(threadId: 1, singleThread: true))
 }

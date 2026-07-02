@@ -231,6 +231,22 @@ public actor DebugSession {
 	}
 
 	@discardableResult
+	public func stepBack(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.stepBack,
+			arguments: try DAPAny(encoding: DAPStepBackArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
+	public func reverseContinue(threadID: Int) async throws -> DAPResponse {
+		try await client.sendRequest(
+			command: DAPCommand.reverseContinue,
+			arguments: try DAPAny(encoding: DAPReverseContinueArguments(threadId: threadID))
+		)
+	}
+
+	@discardableResult
 	public func pause(threadID: Int) async throws -> DAPResponse {
 		try await client.sendRequest(
 			command: DAPCommand.pause,

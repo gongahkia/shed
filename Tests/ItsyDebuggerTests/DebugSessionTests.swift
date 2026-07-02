@@ -112,6 +112,8 @@ import Testing
 		(DAPCommand.next, { try await debug.next(threadID: 11) }, .object(["threadId": .int(11)])),
 		(DAPCommand.stepIn, { try await debug.stepIn(threadID: 11) }, .object(["threadId": .int(11)])),
 		(DAPCommand.stepOut, { try await debug.stepOut(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.stepBack, { try await debug.stepBack(threadID: 11) }, .object(["threadId": .int(11)])),
+		(DAPCommand.reverseContinue, { try await debug.reverseContinue(threadID: 11) }, .object(["threadId": .int(11)])),
 		(DAPCommand.pause, { try await debug.pause(threadID: 11) }, .object(["threadId": .int(11)])),
 		(DAPCommand.restart, { try await debug.restart() }, nil),
 		(DAPCommand.terminate, { try await debug.terminate() }, .object([:])),

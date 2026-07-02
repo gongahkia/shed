@@ -20,6 +20,7 @@ public enum DAPCommand {
 	public static let next = "next"
 	public static let stepIn = "stepIn"
 	public static let stepOut = "stepOut"
+	public static let stepBack = "stepBack"
 	public static let pause = "pause"
 	public static let reverseContinue = "reverseContinue"
 	public static let restart = "restart"
@@ -787,6 +788,18 @@ public struct DAPStepInArguments: Codable, Equatable, Sendable {
 }
 
 public struct DAPStepOutArguments: Codable, Equatable, Sendable {
+	public var threadId: Int
+	public var singleThread: Bool?
+	public var granularity: String?
+
+	public init(threadId: Int, singleThread: Bool? = nil, granularity: String? = nil) {
+		self.threadId = threadId
+		self.singleThread = singleThread
+		self.granularity = granularity
+	}
+}
+
+public struct DAPStepBackArguments: Codable, Equatable, Sendable {
 	public var threadId: Int
 	public var singleThread: Bool?
 	public var granularity: String?

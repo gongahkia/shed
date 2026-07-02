@@ -315,16 +315,20 @@ final class DebugAppSession: @unchecked Sendable {
 	let configuration: DebugLaunchConfiguration
 	let adapter: DebugAdapterConfig
 	let client: DAPClientSession
+	let capabilities: DAPCapabilities
 	let supportsSetVariable: Bool
+	let supportsStepBack: Bool
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, supportsSetVariable: Bool, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
 		self.client = client
+		self.capabilities = capabilities
 		self.supportsSetVariable = supportsSetVariable
+		self.supportsStepBack = capabilities.supportsStepBack == true
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -384,7 +388,8 @@ final class DebugAppSession: @unchecked Sendable {
 				supportsProgressReporting: true,
 				supportsInvalidatedEvent: true
 			))
-			let supportsSetVariable = Self.supportsSetVariable(in: initializeResponse)
+			let capabilities = Self.capabilities(in: initializeResponse)
+			let supportsSetVariable = capabilities.supportsSetVariable == true
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
 				try await client.launch(arguments: try DAPAny(encoding: launchArguments(for: configuration, workspaceRoot: workspaceRoot)))
@@ -396,7 +401,7 @@ final class DebugAppSession: @unchecked Sendable {
 			try await waitForInitialized(initializedTask)
 			try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
 			try await client.configurationDone()
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			transport.terminate()
@@ -450,14 +455,14 @@ final class DebugAppSession: @unchecked Sendable {
 		}
 	}
 
-	private static func supportsSetVariable(in response: DAPResponse) -> Bool {
+	private static func capabilities(in response: DAPResponse) -> DAPCapabilities {
 		guard let body = response.body,
 		      let data = try? JSONEncoder().encode(body),
 		      let capabilities = try? JSONDecoder().decode(DAPCapabilities.self, from: data)
 		else {
-			return false
+			return DAPCapabilities()
 		}
-		return capabilities.supportsSetVariable == true
+		return capabilities
 	}
 
 	private static func resolveExecutable(_ command: String, workspaceRoot: URL) -> URL? {

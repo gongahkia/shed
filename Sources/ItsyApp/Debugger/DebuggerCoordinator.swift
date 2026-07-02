@@ -21,6 +21,7 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 	private var callStackStatusLabel: NSTextField?
 	private var callStackOutlineView: NSOutlineView?
 	private var callStackNodes: [DebugCallStackThreadNode] = []
+	private var reverseDebugButtons: [NSButton] = []
 	private var callStackGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
@@ -67,6 +68,14 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		runControl(.stepOut)
 	}
 
+	@objc func stepBackDebug(_ sender: Any?) {
+		runControl(.stepBack)
+	}
+
+	@objc func reverseContinueDebug(_ sender: Any?) {
+		runControl(.reverseContinue)
+	}
+
 	@objc func pauseDebug(_ sender: Any?) {
 		runControl(.pause)
 	}
@@ -83,6 +92,7 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		callStackGeneration += 1
 		activeSession = nil
 		launchCoordinator.terminate()
+		updateReverseDebugControls()
 		variablesCoordinator.clear()
 		watchesCoordinator.clear()
 		consoleCoordinator.clear()
@@ -90,6 +100,7 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 
 	private func debugSessionDidStart(_ session: DebugAppSession) {
 		activeSession = session
+		updateReverseDebugControls()
 		if callStackPanel?.isVisible == true {
 			refreshCallStack(nil)
 		}
@@ -125,11 +136,15 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		let overButton = NSButton(title: L10n.string("Over"), target: self, action: #selector(stepOverDebug(_:)))
 		let inButton = NSButton(title: L10n.string("In"), target: self, action: #selector(stepInDebug(_:)))
 		let outButton = NSButton(title: L10n.string("Out"), target: self, action: #selector(stepOutDebug(_:)))
+		let reverseButton = NSButton(title: L10n.string("Reverse"), target: self, action: #selector(reverseContinueDebug(_:)))
+		let backButton = NSButton(title: L10n.string("Back"), target: self, action: #selector(stepBackDebug(_:)))
 		let pauseButton = NSButton(title: L10n.string("Pause"), target: self, action: #selector(pauseDebug(_:)))
 		let restartButton = NSButton(title: L10n.string("Restart"), target: self, action: #selector(restartDebug(_:)))
 		let stopButton = NSButton(title: L10n.string("Stop"), target: self, action: #selector(stopDebug(_:)))
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshCallStack(_:)))
-		let buttonStack = NSStackView(views: [continueButton, overButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
+		reverseDebugButtons = [reverseButton, backButton]
+		updateReverseDebugControls()
+		let buttonStack = NSStackView(views: [continueButton, reverseButton, overButton, backButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 6
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -172,6 +187,10 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 			setCallStackStatus(L10n.string("No active debug session"), isError: true)
 			return
 		}
+		guard control.isAvailable(in: session) else {
+			setCallStackStatus(DebugControlError.unsupportedReverseDebug.description, isError: true)
+			return
+		}
 		setCallStackStatus(control.runningStatus, isError: false)
 		Task(priority: .userInitiated) { [weak self] in
 			do {
@@ -207,6 +226,10 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 			try await session.debugSession.stepIn(threadID: try await focusedThreadID(session))
 		case .stepOut:
 			try await session.debugSession.stepOut(threadID: try await focusedThreadID(session))
+		case .stepBack:
+			try await session.debugSession.stepBack(threadID: try await focusedThreadID(session))
+		case .reverseContinue:
+			try await session.debugSession.reverseContinue(threadID: try await focusedThreadID(session))
 		case .pause:
 			try await session.debugSession.pause(threadID: try await focusedThreadID(session))
 		case .restart:
@@ -221,6 +244,14 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 			throw DebugControlError.missingFocusedThread
 		}
 		return threadID
+	}
+
+	private func updateReverseDebugControls() {
+		let enabled = activeSession?.supportsStepBack == true
+		for button in reverseDebugButtons {
+			button.isEnabled = enabled
+			button.isHidden = !enabled
+		}
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -400,6 +431,8 @@ private enum DebugControl {
 	case next
 	case stepIn
 	case stepOut
+	case stepBack
+	case reverseContinue
 	case pause
 	case restart
 	case stop
@@ -414,6 +447,10 @@ private enum DebugControl {
 			return L10n.string("Stepping in")
 		case .stepOut:
 			return L10n.string("Stepping out")
+		case .stepBack:
+			return L10n.string("Stepping back")
+		case .reverseContinue:
+			return L10n.string("Reversing")
 		case .pause:
 			return L10n.string("Pausing")
 		case .restart:
@@ -433,6 +470,10 @@ private enum DebugControl {
 			return L10n.string("Stepped in")
 		case .stepOut:
 			return L10n.string("Stepped out")
+		case .stepBack:
+			return L10n.string("Stepped back")
+		case .reverseContinue:
+			return L10n.string("Reversed")
 		case .pause:
 			return L10n.string("Paused")
 		case .restart:
@@ -441,15 +482,27 @@ private enum DebugControl {
 			return L10n.string("Stopped")
 		}
 	}
+
+	func isAvailable(in session: DebugAppSession) -> Bool {
+		switch self {
+		case .stepBack, .reverseContinue:
+			return session.supportsStepBack
+		default:
+			return true
+		}
+	}
 }
 
 private enum DebugControlError: Error, CustomStringConvertible {
 	case missingFocusedThread
+	case unsupportedReverseDebug
 
 	var description: String {
 		switch self {
 		case .missingFocusedThread:
 			return L10n.string("Select a thread first")
+		case .unsupportedReverseDebug:
+			return L10n.string("Reverse debugging unavailable")
 		}
 	}
 }

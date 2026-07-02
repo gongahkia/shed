@@ -147,6 +147,7 @@ public final class MetalTextView: NSView {
 	private var selectionRects: [CGRect] = []
 	var findMatchRanges: [Range<Int>] = []
 	var findMatchRects: [CGRect] = []
+	private var lastReportedVisibleLineRange: Range<Int> = 0 ..< 0
 	private var gutterTrackingArea: NSTrackingArea?
 	private var gutterPopover: NSPopover?
 	private var hoveredGutterMarkerID: String?
@@ -252,6 +253,7 @@ public final class MetalTextView: NSView {
 			topLineIndex = min(topLineIndex, max(0, lineCount - 1))
 			lineHighlightOverlayRevision = -1
 			markDirty()
+			reportVisibleLineRangeIfNeeded()
 		}
 	}
 	public var editor = Editor() {
@@ -261,6 +263,7 @@ public final class MetalTextView: NSView {
 		}
 	}
 	public var editorDidChange: ((Editor) -> Void)?
+	public var visibleLineRangeDidChange: ((Range<Int>) -> Void)?
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
@@ -366,6 +369,7 @@ public final class MetalTextView: NSView {
 		layoutGutterView()
 		refreshGutterMarkerRects()
 		markDirty()
+		reportVisibleLineRangeIfNeeded()
 	}
 
 	public override func layout() {
@@ -439,7 +443,7 @@ public final class MetalTextView: NSView {
 		markDirty()
 	}
 
-	var visibleLineRange: Range<Int> {
+	public var visibleLineRange: Range<Int> {
 		guard lineCount > 0 else {
 			return 0 ..< 0
 		}
@@ -447,6 +451,15 @@ public final class MetalTextView: NSView {
 		let visibleCount = max(1, Int(ceil(visibleHeight / max(lineHeight, 1))) + 1)
 		let end = min(lineCount, topLineIndex + visibleCount)
 		return topLineIndex ..< end
+	}
+
+	private func reportVisibleLineRangeIfNeeded() {
+		let range = visibleLineRange
+		guard range != lastReportedVisibleLineRange else {
+			return
+		}
+		lastReportedVisibleLineRange = range
+		visibleLineRangeDidChange?(range)
 	}
 
 	private var gutterViewWidth: CGFloat {
@@ -482,6 +495,7 @@ public final class MetalTextView: NSView {
 		refreshFindMatchRects()
 		refreshGutterMarkerRects()
 		markDirty()
+		reportVisibleLineRangeIfNeeded()
 	}
 
 	public func performMotion(_ motion: Motion) {

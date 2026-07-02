@@ -21,14 +21,24 @@ import Testing
 	let status = try repository.status()
 	let trackedStatus = try repository.status(pathspec: ["tracked.txt"])
 	let worktreeDiff = try repository.diff(cached: false)
+	let trackedDiff = try repository.diff(cached: false, pathspec: ["tracked.txt"])
 	let cachedDiff = try repository.diff(cached: true)
 	let blob = try repository.blob(at: oid)
+	let worktreePatch = try worktreeDiff.patchText()
+	let trackedPatch = try trackedDiff.patchText()
+	let cachedPatch = try cachedDiff.patchText()
 
 	#expect(status.count == 2)
 	#expect(trackedStatus.count == 1)
 	#expect(worktreeDiff.count == 1)
+	#expect(trackedDiff.count == 1)
 	#expect(cachedDiff.count == 0)
 	#expect(String(data: blob.data, encoding: .utf8) == "one\n")
+	#expect(worktreePatch.contains("diff --git a/tracked.txt b/tracked.txt"))
+	#expect(worktreePatch.contains("-one"))
+	#expect(worktreePatch.contains("+two"))
+	#expect(trackedPatch == worktreePatch)
+	#expect(cachedPatch.isEmpty)
 }
 
 @Test func gitRepositoryStatusMatchesPorcelainV2OnFixtureRepo() throws {

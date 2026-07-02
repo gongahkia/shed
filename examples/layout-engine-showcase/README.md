@@ -12,6 +12,7 @@ swift test --package-path examples/layout-engine-showcase
 
 - `DwmMonocleLayoutEngine`: every managed window fills the display; focus controls stack order.
 - `DwindleSpiralLayoutEngine`: recursively splits the remainder with configurable ratio and chirality.
+- `FlexibleThreeColLayoutEngine`: XMonad-style three-column layout with center/leading master modes.
 - `FocusBandLayoutEngine`: focused window gets a wide center band; siblings split side rails.
 - `GoldenColumnsLayoutEngine`: columns shrink by a golden-ratio progression.
 - `MatrixGridLayoutEngine`: fixed-column grid with row-major or column-major fill and gaps.
@@ -107,5 +108,36 @@ Config snippet:
 ```swift
 Engines {
     EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.matrix-grid"))
+}
+```
+
+## ThreeCol RFC
+
+Proposal: keep the built-in `ThreeColLayoutEngine` centered and single-master. `FlexibleThreeColLayoutEngine` models the XMonad `ThreeCol` / `ThreeColMid` split by making master position and master count plugin policy.
+
+Plugin knobs:
+
+- `masterCount`: number of windows stacked in the master column.
+- `masterRatio`: width reserved for the master column.
+- `masterPosition`: `.center` for ThreeColMid, `.leading` for side-master ThreeCol.
+
+Metadata:
+
+- `zOrder` groups masters first, then first side column, then second side column.
+- Column role is inferable from frame position.
+
+Fixture coverage:
+
+- empty input
+- one-window full bounds
+- centered multi-master geometry
+- leading-master geometry
+- clamped master count and ratio
+
+Config snippet:
+
+```swift
+Engines {
+    EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.flex-three-col"))
 }
 ```

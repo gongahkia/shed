@@ -138,6 +138,49 @@ final class ShowcaseLayoutsTests: XCTestCase {
         ])
     }
 
+    func testFlexibleThreeColSupportsCenteredMultiMaster() {
+        let engine = FlexibleThreeColLayoutEngine(config: .init(masterCount: 2, masterRatio: 0.5))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3, 4, 5),
+            in: CGRect(x: 0, y: 0, width: 1200, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.first(where: { $0.windowID == 1 })?.frame, CGRect(x: 300, y: 0, width: 600, height: 300))
+        XCTAssertEqual(placements.first(where: { $0.windowID == 2 })?.frame, CGRect(x: 300, y: 300, width: 600, height: 300))
+        XCTAssertEqual(placements.first(where: { $0.windowID == 3 })?.frame, CGRect(x: 0, y: 0, width: 300, height: 300))
+        XCTAssertEqual(placements.first(where: { $0.windowID == 4 })?.frame, CGRect(x: 900, y: 0, width: 300, height: 600))
+        XCTAssertEqual(placements.first(where: { $0.windowID == 5 })?.frame, CGRect(x: 0, y: 300, width: 300, height: 300))
+    }
+
+    func testFlexibleThreeColSupportsLeadingMasterMode() {
+        let engine = FlexibleThreeColLayoutEngine(config: .init(masterRatio: 0.5, masterPosition: .leading))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3),
+            in: CGRect(x: 0, y: 0, width: 1200, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 0, width: 600, height: 600),
+            CGRect(x: 600, y: 0, width: 300, height: 600),
+            CGRect(x: 900, y: 0, width: 300, height: 600)
+        ])
+    }
+
+    func testFlexibleThreeColClampsKnobsAndFillsSingleMaster() {
+        let config = FlexibleThreeColLayoutEngine.Config(masterCount: 0, masterRatio: 0.95)
+        let engine = FlexibleThreeColLayoutEngine(config: config)
+        let bounds = CGRect(x: 0, y: 0, width: 800, height: 500)
+
+        XCTAssertEqual(config.masterCount, 1)
+        XCTAssertEqual(config.masterRatio, 0.75)
+        XCTAssertTrue(engine.arrange(windows: [], in: bounds, focus: nil).isEmpty)
+        XCTAssertEqual(engine.arrange(windows: windows(1), in: bounds, focus: nil), [
+            Placement(windowID: 1, frame: bounds)
+        ])
+    }
+
     func testFocusBandPlacesFocusedWindowInCenter() {
         let engine = FocusBandLayoutEngine(config: .init(focusRatio: 0.5))
         let placements = engine.arrange(

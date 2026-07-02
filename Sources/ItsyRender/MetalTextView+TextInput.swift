@@ -173,14 +173,14 @@ extension MetalTextView: NSTextInputClient {
 	}
 
 	private func nsRange(forUTF8Range range: Range<Int>) -> NSRange {
-		let text = editor.text
+		let text = editorStorageString(editor)
 		let lower = utf16Offset(in: text, forUTF8Offset: range.lowerBound)
 		let upper = utf16Offset(in: text, forUTF8Offset: range.upperBound)
 		return NSRange(location: lower, length: upper - lower)
 	}
 
 	private func utf8Range(forNSRange range: NSRange) -> Range<Int>? {
-		utf8Range(in: editor.text, forUTF16Range: range, baseUTF8Offset: 0)
+		utf8Range(in: editorStorageString(editor), forUTF16Range: range, baseUTF8Offset: 0)
 	}
 
 	private func utf8Range(in text: String, forUTF16Range range: NSRange, baseUTF8Offset: Int) -> Range<Int>? {

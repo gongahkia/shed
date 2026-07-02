@@ -42,7 +42,10 @@ final class ItsyDocument: NSDocument {
 			self?.fileURL
 		}
 		fileWatcher.currentText = { [weak self] in
-			self?.editor.text ?? ""
+			guard let self else {
+				return ""
+			}
+			return editorStorageString(editor)
 		}
 		fileWatcher.displayName = { [weak self] url in
 			self?.displayName ?? url.lastPathComponent
@@ -93,7 +96,7 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
-		return Data(editor.text.utf8)
+		return Data(editorStorageString(editor).utf8)
 	}
 
 	override func makeWindowControllers() {

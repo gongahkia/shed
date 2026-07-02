@@ -255,10 +255,6 @@ public struct Editor: Sendable {
 		settings: ItsySettingsStore().load().settings
 	)
 
-	public var text: String {
-		textStorage.substring(0 ..< textStorage.length)
-	}
-
 	public mutating func beginUndoGroup() {
 		history.beginGroup()
 	}
@@ -382,7 +378,7 @@ public struct Editor: Sendable {
 		guard !normalized.isEmpty else {
 			return
 		}
-		let textBefore = text
+		let textBefore = textStorage.substring(0 ..< textStorage.length)
 		let selectionBefore = selections
 		var recordedEdits: [Edit] = []
 		var carets: [Selection] = []
@@ -416,7 +412,7 @@ public struct Editor: Sendable {
 		guard offset > 0 else {
 			return 0 ..< 0
 		}
-		let text = text
+		let text = textStorage.substring(0 ..< textStorage.length)
 		let index = text.index(atUTF8Offset: offset)
 		let previous = text.index(before: index)
 		guard let utf8Previous = previous.samePosition(in: text.utf8) else {
@@ -430,7 +426,7 @@ public struct Editor: Sendable {
 		guard offset < textStorage.length else {
 			return textStorage.length ..< textStorage.length
 		}
-		let text = text
+		let text = textStorage.substring(0 ..< textStorage.length)
 		let index = text.index(atUTF8Offset: offset)
 		let next = text.index(after: index)
 		guard let utf8Next = next.samePosition(in: text.utf8) else {
@@ -540,7 +536,7 @@ public struct Editor: Sendable {
 
 	private func characterOffsets() -> [(offset: Int, character: Character)] {
 		var offset = 0
-		return text.map { character in
+		return textStorage.substring(0 ..< textStorage.length).map { character in
 			defer { offset += String(character).utf8.count }
 			return (offset, character)
 		}

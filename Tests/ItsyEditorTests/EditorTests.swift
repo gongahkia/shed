@@ -17,7 +17,7 @@ import Testing
 @Test func editorInitializesSelectedTextStorageWithoutChangingRopePath() {
 	let pieceTreeEditor = Editor(text: "abc", storage: .pieceTree)
 	#expect(pieceTreeEditor.textStorage.kind == .pieceTree)
-	#expect(pieceTreeEditor.text == "abc")
+	#expect(editorTextStorageString(pieceTreeEditor) == "abc")
 
 	var ropeEditor = Editor(text: "a", storage: .rope)
 	ropeEditor.insert("b")
@@ -31,41 +31,38 @@ import Testing
 	var editor = Editor(text: "alpha\nbeta", storage: .pieceTree)
 	editor.setSelection(SelectionSet(primary: Selection(anchor: 5, head: 5)))
 	editor.insert("!")
-	#expect(editor.text == "alpha!\nbeta")
 	#expect(editorTextStorageString(editor) == "alpha!\nbeta")
 
 	editor.deleteBackward()
-	#expect(editor.text == "alpha\nbeta")
 	#expect(editorTextStorageString(editor) == "alpha\nbeta")
 
 	editor.setSelection(SelectionSet(primary: Selection(anchor: 6, head: 10)))
 	editor.insert("B")
-	#expect(editor.text == "alpha\nB")
+	#expect(editorTextStorageString(editor) == "alpha\nB")
 	#expect(editor.lastEditBatch.first?.oldText == "beta")
 
 	editor.undo()
-	#expect(editor.text == "alpha\nbeta")
-	#expect(editor.textStorage.kind == .pieceTree)
+	#expect(editorTextStorageString(editor) == "alpha\nbeta")
+	#expect(editorTextStorageKind(editor) == .pieceTree)
 
 	editor.redo()
-	#expect(editor.text == "alpha\nB")
 	#expect(editorTextStorageString(editor) == "alpha\nB")
 }
 
 @Test func editorInsertsAndDeletesText() {
 	var editor = Editor()
 	editor.insert("hello")
-	#expect(editor.text == "hello")
+	#expect(editorTextStorageString(editor) == "hello")
 	#expect(editor.lastEditBatch == [Edit(range: 0 ..< 0, oldText: "", newText: "hello")])
 	#expect(editor.selections.primary.head == 5)
 	editor.deleteBackward()
-	#expect(editor.text == "hell")
+	#expect(editorTextStorageString(editor) == "hell")
 	#expect(editor.lastEditBatch == [Edit(range: 4 ..< 5, oldText: "o", newText: "", selectionBefore: SelectionSet(primary: Selection(anchor: 5, head: 5)))])
 	editor.deleteForward()
-	#expect(editor.text == "hell")
+	#expect(editorTextStorageString(editor) == "hell")
 	editor.moveCursor(.bufferStart)
 	editor.deleteForward()
-	#expect(editor.text == "ell")
+	#expect(editorTextStorageString(editor) == "ell")
 }
 
 @Test func editorAppliesInsertToEverySelection() {
@@ -75,7 +72,7 @@ import Testing
 		secondaries: [Selection(anchor: 6, head: 10)]
 	))
 	editor.insert("x")
-	#expect(editor.text == "x x")
+	#expect(editorTextStorageString(editor) == "x x")
 	#expect(editor.history.edits.count == 2)
 }
 
@@ -87,15 +84,15 @@ import Testing
 		editor.insert(char)
 		expected += char
 	}
-	#expect(editor.text == expected)
+	#expect(editorTextStorageString(editor) == expected)
 	for _ in 0 ..< 1_000 {
 		editor.undo()
 	}
-	#expect(editor.text == "")
+	#expect(editorTextStorageString(editor) == "")
 	for _ in 0 ..< 1_000 {
 		editor.redo()
 	}
-	#expect(editor.text == expected)
+	#expect(editorTextStorageString(editor) == expected)
 }
 
 @Test func editorUndoRedoRestoresGroupedEditTranscript() {
@@ -105,11 +102,11 @@ import Testing
 	editor.insert("b")
 	editor.insert("c")
 	editor.endUndoGroup()
-	#expect(editor.text == "abc")
+	#expect(editorTextStorageString(editor) == "abc")
 	editor.undo()
-	#expect(editor.text == "")
+	#expect(editorTextStorageString(editor) == "")
 	editor.redo()
-	#expect(editor.text == "abc")
+	#expect(editorTextStorageString(editor) == "abc")
 }
 
 @Test func killRingStoresSixtyEntriesAndRotates() {
@@ -168,8 +165,12 @@ import Testing
 	#expect(editor.selections.primary.head == 6)
 }
 
-private func editorTextStorageString(_ editor: Editor) -> String {
-	switch editor.textStorage {
+private func editorTextStorageKind(_ value: Editor) -> EditorStorageKind {
+	value.textStorage.kind
+}
+
+private func editorTextStorageString(_ value: Editor) -> String {
+	switch value.textStorage {
 	case let .rope(rope):
 		return rope.slice(0 ..< rope.length)
 	case let .pieceTree(pieceTree):

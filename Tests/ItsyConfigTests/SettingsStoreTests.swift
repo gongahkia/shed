@@ -11,6 +11,9 @@ import Testing
 	line_numbers = true
 	tab_width = 2
 
+	[editor.experimental]
+	storage = "piecetree"
+
 	[theme]
 	id = "bundled:default-dark"
 
@@ -25,6 +28,7 @@ import Testing
 	#expect(result.settings.editor.fontSize == 16.5)
 	#expect(result.settings.editor.lineNumbers)
 	#expect(result.settings.editor.tabWidth == 2)
+	#expect(result.settings.editor.experimental.storage == .pieceTree)
 	#expect(result.settings.theme.id == "bundled:default-dark")
 	#expect(result.settings.terminal.fontSize == 13)
 	#expect(result.settings.terminal.scrollbackLines == 20_000)
@@ -62,7 +66,7 @@ import Testing
 	let url = directory.appendingPathComponent("settings.toml")
 	let store = ItsySettingsStore(fileURL: url)
 	let settings = ItsySettings(
-		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, tabWidth: 8),
+		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, tabWidth: 8, experimental: .init(storage: .pieceTree)),
 		theme: .init(id: "user:night.toml"),
 		terminal: .init(fontSize: 14, scrollbackLines: 1234)
 	)

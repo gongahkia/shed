@@ -1,4 +1,5 @@
 import Foundation
+import ItsyConfig
 
 public enum Motion: Sendable, Equatable {
 	case charForward
@@ -85,18 +86,72 @@ public struct UndoEntry: Sendable, Equatable {
 	public var groupID: Int?
 }
 
+public enum EditorStorageKind: String, Sendable, Equatable {
+	case rope
+	case pieceTree = "piecetree"
+
+	init(_ setting: ItsySettings.EditorStorage) {
+		switch setting {
+		case .rope:
+			self = .rope
+		case .pieceTree:
+			self = .pieceTree
+		}
+	}
+}
+
+public enum EditorTextStorage: Sendable {
+	case rope(Rope)
+	case pieceTree(PieceTree)
+
+	public var kind: EditorStorageKind {
+		switch self {
+		case .rope:
+			return .rope
+		case .pieceTree:
+			return .pieceTree
+		}
+	}
+}
+
 public struct Editor: Sendable {
 	public var rope: Rope
+	private var storageKind: EditorStorageKind
+	public var textStorage: EditorTextStorage {
+		switch storageKind {
+		case .rope:
+			return .rope(rope)
+		case .pieceTree:
+			return .pieceTree(PieceTree(text))
+		}
+	}
 	public var selections: SelectionSet
 	public var history: UndoStack
 	public private(set) var lastEditBatch: [Edit] = []
 	public var pageLineCount = 40
 
 	public init(text: String = "") {
+		self.init(text: text, storage: Self.configuredStorage)
+	}
+
+	public init(text: String, storage: EditorStorageKind) {
 		rope = Rope(text)
+		storageKind = storage
 		selections = SelectionSet()
 		history = UndoStack()
 	}
+
+	public static func resolveStorage(environment: [String: String], settings: ItsySettings) -> EditorStorageKind {
+		if let rawStorage = environment["ITSY_EDITOR_STORAGE"]?.lowercased(), let storage = EditorStorageKind(rawValue: rawStorage) {
+			return storage
+		}
+		return EditorStorageKind(settings.editor.experimental.storage)
+	}
+
+	private static let configuredStorage = resolveStorage(
+		environment: ProcessInfo.processInfo.environment,
+		settings: ItsySettingsStore().load().settings
+	)
 
 	public var text: String {
 		rope.slice(0 ..< rope.length)

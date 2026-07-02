@@ -68,6 +68,25 @@ import Testing
 	#expect(entry.selectionAfter == editor.selections)
 }
 
+@Test func undoStackDropsOldestEntriesByCount() {
+	var editor = Editor(text: "", storage: .pieceTree)
+	editor.history = UndoStack(maxEditCount: 2, maxTotalRemovedBytes: Int.max)
+	for text in ["a", "b", "c"] {
+		editor.insert(text)
+	}
+	#expect(editor.history.edits.map(\.edit.inserted) == [Data("b".utf8), Data("c".utf8)])
+}
+
+@Test func undoStackDropsOldestEntriesByRemovedByteBudget() {
+	var editor = Editor(text: "abcd", storage: .pieceTree)
+	editor.history = UndoStack(maxEditCount: 10, maxTotalRemovedBytes: 3)
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: 2)))
+	editor.deleteForward()
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: 2)))
+	editor.deleteForward()
+	#expect(editor.history.edits.map(\.edit.removed) == [Data("cd".utf8)])
+}
+
 @Test func editorInsertsAndDeletesText() {
 	var editor = Editor()
 	editor.insert("hello")

@@ -13,6 +13,7 @@ swift test --package-path examples/layout-engine-showcase
 - `DwmMonocleLayoutEngine`: every managed window fills the display; focus controls stack order.
 - `DwindleSpiralLayoutEngine`: recursively splits the remainder with configurable ratio and chirality.
 - `FlexibleThreeColLayoutEngine`: XMonad-style three-column layout with center/leading master modes.
+- `DecoratedAccordionLayoutEngine`: focused window expands while inactive ribbons reserve title-band space.
 - `FocusBandLayoutEngine`: focused window gets a wide center band; siblings split side rails.
 - `GoldenColumnsLayoutEngine`: columns shrink by a golden-ratio progression.
 - `MatrixGridLayoutEngine`: fixed-column grid with row-major or column-major fill and gaps.
@@ -139,5 +140,34 @@ Config snippet:
 ```swift
 Engines {
     EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.flex-three-col"))
+}
+```
+
+## Accordion RFC
+
+Proposal: keep the built-in `AccordionLayoutEngine` geometry-only. `DecoratedAccordionLayoutEngine` is a plugin variant for decorated ribbons: each inactive window gets a reserved title band plus a content strip, while the focused window consumes the remaining space.
+
+Plugin knobs:
+
+- `ribbonHeight`: visible inactive-window content height.
+- `decorationHeight`: reserved overlay/title band height per ribbon.
+
+Metadata:
+
+- `DecoratedAccordionItem.role` marks focused, before-focus ribbon, and after-focus ribbon rows.
+- `visualIndex` gives overlays and IPC debug views stable row order.
+
+Fixture coverage:
+
+- focused middle window
+- short bounds with clamped ribbon metrics
+- overlay/debug metadata roles
+- empty and one-window fallback
+
+Config snippet:
+
+```swift
+Engines {
+    EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.decorated-accordion"))
 }
 ```

@@ -14,6 +14,7 @@ swift test --package-path examples/layout-engine-showcase
 - `DwindleSpiralLayoutEngine`: recursively splits the remainder with configurable ratio and chirality.
 - `FocusBandLayoutEngine`: focused window gets a wide center band; siblings split side rails.
 - `GoldenColumnsLayoutEngine`: columns shrink by a golden-ratio progression.
+- `MatrixGridLayoutEngine`: fixed-column grid with row-major or column-major fill and gaps.
 - `PriorityGridLayoutEngine`: priority windows reserve the first row, remaining windows fill a grid.
 
 All showcase engines keep `arrange()` synchronous and pure: no AX, no I/O, no async suspension, and no mutation outside returned placements.
@@ -76,5 +77,35 @@ Config snippet:
 ```swift
 Engines {
     EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.dwindle-spiral"))
+}
+```
+
+## Grid RFC
+
+Proposal: keep the built-in `GridLayoutEngine` squareish and deterministic, and put Matrix/fair-style variants in plugins. `MatrixGridLayoutEngine` fixes the column count, chooses row-major or column-major fill, and applies a per-cell gap for visual separation.
+
+Plugin knobs:
+
+- `columns`: explicit matrix width.
+- `fillOrder`: row-major for editor-like tiling, column-major for terminal stack tiling.
+- `gap`: spacing applied inside each cell.
+
+Metadata:
+
+- `zOrder` follows packed matrix order.
+- Frames expose row/column geometry directly; overlays can infer cell position from frame and z-order.
+
+Fixture coverage:
+
+- empty input
+- incomplete final row
+- row-major and column-major fill
+- clamped column count and gap inset math
+
+Config snippet:
+
+```swift
+Engines {
+    EngineDeclaration(LayoutEngineID(rawValue: "dev.olly.showcase.matrix-grid"))
 }
 ```

@@ -442,29 +442,12 @@ public struct PieceTree: Sendable {
 	}
 
 	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>) -> Int {
-		if bytes.allSatisfy({ $0 < 128 }) {
-			return bytes.count
-		}
-		return String(decoding: Array(bytes), as: UTF8.self).count
+		return UAX29GraphemeIterator.graphemeCount(in: bytes)
 	}
 
 	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>, before offset: Int) -> Int {
 		precondition((0 ... bytes.count).contains(offset), "grapheme offset out of bounds")
-		if bytes.allSatisfy({ $0 < 128 }) {
-			return offset
-		}
-		let text = String(decoding: Array(bytes), as: UTF8.self)
-		var bytesSeen = 0
-		var graphemes = 0
-		for character in text {
-			let next = bytesSeen + String(character).utf8.count
-			if offset < next {
-				return graphemes
-			}
-			bytesSeen = next
-			graphemes += 1
-		}
-		return graphemes
+		return UAX29GraphemeIterator.graphemeIndex(in: bytes, before: offset)
 	}
 }
 

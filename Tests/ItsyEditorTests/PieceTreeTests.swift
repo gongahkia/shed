@@ -29,6 +29,14 @@ import Testing
 	#expect(tree.graphemeIndex(forOffset: 1) == 1)
 }
 
+@Test func pieceTreeUsesUAX29CRLFGraphemeBoundary() {
+	let tree = PieceTree("a\r\nb")
+	#expect(tree.graphemeCount == 3)
+	#expect(tree.graphemeIndex(forOffset: 1) == 1)
+	#expect(tree.graphemeIndex(forOffset: 2) == 1)
+	#expect(tree.graphemeIndex(forOffset: 3) == 2)
+}
+
 @Test func pieceTreeInsertSplitsOriginalAndAddsBufferPiece() {
 	var tree = PieceTree("hello\nworld")
 	tree.insert(" tiny", at: 5)

@@ -226,7 +226,6 @@ Approach for Itsy (simpler than full CRDT — piece-tree makes this cheap):
 
 Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handled correctly. Adopt the Unicode UAX #29 grapheme break test suite as ground truth. Ref: `https://www.unicode.org/Public/UCD/latest/ucd/auxiliary/GraphemeBreakTest.txt`.
 
-(A) 2026-07-01 +Phase24-Grapheme @refactor id:966 est:1h dep:965 Checkpoint: `swift test` all grapheme suites green. Any regression in previous suites (rope tests migrated to piece-tree in id:922) blocks merge.
 
 ---
 

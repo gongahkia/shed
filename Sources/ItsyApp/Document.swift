@@ -13,6 +13,8 @@ final class ItsyDocument: NSDocument {
 	static let handoffActivityType = "dev.itsy.editor.open-file"
 	static let handoffURLKey = "url"
 	static let handoffCursorOffsetKey = "cursorOffset"
+	private static let mappedReadThreshold = 1_048_576
+	private static let firstPageIndexByteCount = 4 * 1024
 
 	var editor = Editor()
 	private var editorViews: [MetalTextView] = []
@@ -85,14 +87,21 @@ final class ItsyDocument: NSDocument {
 		guard let text = String(data: data, encoding: .utf8) else {
 			throw CocoaError(.fileReadCorruptFile)
 		}
-		editor = Editor(text: text)
-		for view in editorViews {
-			view.editor = editor
+		installReadEditor(Editor(text: text), fileURL: nil)
+	}
+
+	override func read(from url: URL, ofType typeName: String) throws {
+		guard try shouldReadMappedPieceTree(from: url) else {
+			try super.read(from: url, ofType: typeName)
+			return
 		}
-		syntax.configure(fileURL: fileURL)
-		syntax.refresh(editor: editor)
-		updateHandoffActivity()
-		fileWatcher.restart()
+		let pieceTree = try PieceTree(
+			readingMappedFile: url,
+			indexedPrefixBytes: Self.firstPageIndexByteCount
+		) {
+			recordBenchStage("first_page_visible")
+		}
+		installReadEditor(Editor(pieceTree: pieceTree), fileURL: url)
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
@@ -280,10 +289,28 @@ final class ItsyDocument: NSDocument {
 		}
 	}
 
+	private func installReadEditor(_ newEditor: Editor, fileURL readURL: URL?) {
+		editor = newEditor
+		for view in editorViews {
+			view.editor = editor
+		}
+		syntax.configure(fileURL: readURL ?? fileURL)
+		syntax.refresh(editor: editor)
+		updateHandoffActivity()
+		fileWatcher.restart()
+	}
+
+	private func shouldReadMappedPieceTree(from url: URL) throws -> Bool {
+		let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+		guard values.isRegularFile == true, let fileSize = values.fileSize else {
+			return false
+		}
+		return fileSize > Self.mappedReadThreshold
+	}
+
 	private func reloadFromDisk(at url: URL) {
 		do {
-			let data = try Data(contentsOf: url)
-			try read(from: data, ofType: fileType ?? "public.data")
+			try read(from: url, ofType: fileType ?? "public.data")
 			updateChangeCount(.changeCleared)
 		} catch {
 			presentError(error)

@@ -76,18 +76,33 @@ public struct PieceTree: Sendable {
 	}
 
 	public init(readingMappedFile url: URL) throws {
+		try self.init(readingMappedFile: url) { bytes in
+			LineFeedIndexer.lineFeedCount(in: bytes)
+		}
+	}
+
+	public init(readingMappedFile url: URL, indexedPrefixBytes: Int, didIndexPrefix: @escaping () -> Void) throws {
+		try self.init(readingMappedFile: url) { bytes in
+			LineFeedIndexer.lineFeedCount(
+				in: bytes,
+				notifyAfterPrefix: indexedPrefixBytes,
+				onIndexedPrefix: didIndexPrefix
+			)
+		}
+	}
+
+	private init(readingMappedFile url: URL, lineFeedCounter: (UnsafeBufferPointer<UInt8>) -> Int) throws {
 		let mapped = try MMapBuffer(url: url)
 		originalBuffers = mapped.count == 0 ? [] : [.mapped(mapped)]
 		addBuffers = []
 		if mapped.count == 0 {
 			root = nil
 		} else {
-			let lineStarts = LineFeedIndexer.lineStarts(in: mapped.bytes)
 			let piece = Piece(
 				buffer: .original(0),
 				start: 0,
 				length: mapped.count,
-				lineFeeds: lineStarts.count - 1,
+				lineFeeds: lineFeedCounter(mapped.bytes),
 				graphemes: Self.graphemes(in: mapped.bytes)
 			)
 			root = Self.buildTree(from: [piece])

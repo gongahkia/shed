@@ -25,6 +25,21 @@ import Testing
 	#expect(indexed == [0, 64 * 1024, 64 * 1024 + 1, bytes.count])
 }
 
+@Test func lineFeedIndexerCountsWithoutMaterializingStarts() {
+	var bytes = [UInt8](repeating: 65, count: 128 * 1024 + 16)
+	bytes[4095] = 10
+	bytes[64 * 1024] = 10
+	bytes[bytes.count - 1] = 10
+	var didIndexPrefix = false
+	let count = bytes.withUnsafeBufferPointer {
+		LineFeedIndexer.lineFeedCount(in: $0, notifyAfterPrefix: 4 * 1024) {
+			didIndexPrefix = true
+		}
+	}
+	#expect(count == 3)
+	#expect(didIndexPrefix)
+}
+
 @Test func lineFeedIndexerIndexesHundredKLinesUnderBudget() {
 	let line = Array("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n".utf8)
 	let bytes = Array(repeating: line, count: 100_000).flatMap { $0 }

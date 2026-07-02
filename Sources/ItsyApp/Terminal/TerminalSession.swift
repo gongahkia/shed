@@ -6,6 +6,7 @@ import Foundation
 final class ItsyTerminalSession {
 	let currentDirectoryURL: URL
 	private let shellURL: URL
+	private let baseEnvironment: [String: String]
 	private let queue = DispatchQueue(label: "dev.itsy.terminal.session", qos: .userInitiated)
 	private var masterFD: Int32 = -1
 	private var childPID: pid_t = -1
@@ -16,6 +17,7 @@ final class ItsyTerminalSession {
 
 	init(currentDirectoryURL: URL, environment: [String: String] = ProcessInfo.processInfo.environment) {
 		self.currentDirectoryURL = currentDirectoryURL
+		baseEnvironment = environment
 		let shellPath = environment["SHELL"].flatMap { $0.isEmpty ? nil : $0 } ?? "/bin/zsh"
 		shellURL = URL(fileURLWithPath: shellPath)
 	}
@@ -32,12 +34,10 @@ final class ItsyTerminalSession {
 		let shellCString = strdup(shellURL.path)
 		let cwdCString = strdup(currentDirectoryURL.path)
 		let loginCString = strdup("-il")
-		var environment = ProcessInfo.processInfo.environment
-		environment["INSIDE_ITSY_TERMINAL"] = "1"
-		environment["TERM"] = "xterm-256color"
-		environment["COLORTERM"] = "truecolor"
-		environment["LC_CTYPE"] = environment["LC_CTYPE"] ?? "UTF-8"
-		let envStorage = environment.map { strdup("\($0.key)=\($0.value)") }
+		let environment = ItsyTerminalEnvironment.build(from: baseEnvironment, shellPath: shellURL.path)
+		let envStorage = environment.keys.sorted().map { key in
+			strdup("\(key)=\(environment[key] ?? "")")
+		}
 		defer {
 			free(shellCString)
 			free(cwdCString)
@@ -175,5 +175,53 @@ final class ItsyTerminalSession {
 			return 128 + signal
 		}
 		return status
+	}
+}
+
+enum ItsyTerminalEnvironment {
+	private static let forwardedKeys: Set<String> = [
+		"HOME",
+		"LANG",
+		"LC_ALL",
+		"LC_COLLATE",
+		"LC_CTYPE",
+		"LC_MESSAGES",
+		"LC_MONETARY",
+		"LC_NUMERIC",
+		"LC_TIME",
+		"LOGNAME",
+		"PATH",
+		"SHELL",
+		"SSH_AUTH_SOCK",
+		"TMPDIR",
+		"USER",
+		"XDG_CONFIG_HOME",
+		"XDG_DATA_HOME",
+		"XDG_STATE_HOME",
+	]
+
+	static func build(from source: [String: String], shellPath: String) -> [String: String] {
+		var environment: [String: String] = [:]
+		for key in forwardedKeys {
+			guard let value = source[key], !value.isEmpty else {
+				continue
+			}
+			environment[key] = value
+		}
+		environment["PATH"] = environment["PATH"] ?? "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+		environment["SHELL"] = shellPath
+		environment["INSIDE_ITSY_TERMINAL"] = "1"
+		environment["TERM"] = "xterm-256color"
+		environment["TERM_PROGRAM"] = "Itsy"
+		environment["COLORTERM"] = "truecolor"
+		environment["LC_CTYPE"] = environment["LC_CTYPE"] ?? localeFallback(from: source)
+		return environment
+	}
+
+	private static func localeFallback(from source: [String: String]) -> String {
+		if let lang = source["LANG"], !lang.isEmpty {
+			return lang
+		}
+		return "UTF-8"
 	}
 }

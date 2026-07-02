@@ -243,6 +243,12 @@ public struct Editor: Sendable {
 		history = UndoStack()
 	}
 
+	public init(pieceTree: PieceTree) {
+		textStorage = .pieceTree(pieceTree)
+		selections = SelectionSet()
+		history = UndoStack()
+	}
+
 	public static func resolveStorage(environment: [String: String], settings: ItsySettings) -> EditorStorageKind {
 		if let rawStorage = environment["ITSY_EDITOR_STORAGE"]?.lowercased(), let storage = EditorStorageKind(rawValue: rawStorage) {
 			return storage

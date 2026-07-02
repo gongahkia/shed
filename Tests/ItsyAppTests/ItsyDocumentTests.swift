@@ -33,3 +33,34 @@ import Testing
 		try document.data(ofType: "public.plain-text")
 	}
 }
+
+@MainActor
+@Test func documentReadsLargeFilesThroughMappedPieceTree() throws {
+	let fileManager = FileManager.default
+	let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+	try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer {
+		try? fileManager.removeItem(at: directory)
+	}
+
+	let line = Array("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\n".utf8)
+	let bytes = Array(repeating: line, count: 13_000).flatMap { $0 }
+	let sourceURL = directory.appendingPathComponent("large.log")
+	try Data(bytes).write(to: sourceURL)
+
+	let document = ItsyDocument()
+	try document.read(from: sourceURL, ofType: "public.plain-text")
+
+	#expect(document.editor.textStorage.kind == .pieceTree)
+	#expect(document.editor.textStorage.length == bytes.count)
+	#expect(document.editor.textStorage.lineCount == 13_001)
+
+	let savedURL = directory.appendingPathComponent("saved.log")
+	try document.write(
+		to: savedURL,
+		ofType: "public.plain-text",
+		for: .saveOperation,
+		originalContentsURL: sourceURL
+	)
+	#expect(try Data(contentsOf: savedURL) == Data(bytes))
+}

@@ -27,6 +27,31 @@ import Testing
 	}
 }
 
+@Test func editorPieceTreeStorageRoutesEditsUndoRedoAndKeepsTreeCurrent() {
+	var editor = Editor(text: "alpha\nbeta", storage: .pieceTree)
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 5, head: 5)))
+	editor.insert("!")
+	#expect(editor.text == "alpha!\nbeta")
+	#expect(editorTextStorageString(editor) == "alpha!\nbeta")
+
+	editor.deleteBackward()
+	#expect(editor.text == "alpha\nbeta")
+	#expect(editorTextStorageString(editor) == "alpha\nbeta")
+
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 6, head: 10)))
+	editor.insert("B")
+	#expect(editor.text == "alpha\nB")
+	#expect(editor.lastEditBatch.first?.oldText == "beta")
+
+	editor.undo()
+	#expect(editor.text == "alpha\nbeta")
+	#expect(editor.textStorage.kind == .pieceTree)
+
+	editor.redo()
+	#expect(editor.text == "alpha\nB")
+	#expect(editorTextStorageString(editor) == "alpha\nB")
+}
+
 @Test func editorInsertsAndDeletesText() {
 	var editor = Editor()
 	editor.insert("hello")
@@ -141,4 +166,13 @@ import Testing
 	#expect(editor.selections.primary.head == 5)
 	editor.moveCursor(.bigWordEnd)
 	#expect(editor.selections.primary.head == 6)
+}
+
+private func editorTextStorageString(_ editor: Editor) -> String {
+	switch editor.textStorage {
+	case let .rope(rope):
+		return rope.slice(0 ..< rope.length)
+	case let .pieceTree(pieceTree):
+		return pieceTree.substring(0 ..< pieceTree.length)
+	}
 }

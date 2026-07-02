@@ -152,8 +152,11 @@ final class ItsyDocument: NSDocument {
 			editorViews.append(view)
 		}
 		view.editor = editor
+		view.visibleLineRangeDidChange = { [weak self] _ in
+			self?.refreshSyntaxHighlights()
+		}
 		syntax.configure(fileURL: fileURL)
-		syntax.refresh(editor: editor)
+		refreshSyntaxHighlights()
 		view.editorDidChange = { [weak self, weak view] editor in
 			guard let self, let view else {
 				return
@@ -161,7 +164,7 @@ final class ItsyDocument: NSDocument {
 			let oldRope = self.editor.rope
 			let edits = editor.lastEditBatch
 			self.editor = editor
-			self.syntax.refresh(editor: editor, edits: edits, oldRope: oldRope)
+			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
 			self.updateHandoffActivity()
 			self.syncSiblingEditorViews(source: view, editor: editor)
 			self.updateChangeCount(.changeDone)
@@ -180,7 +183,9 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func detach(_ view: MetalTextView) {
+		view.visibleLineRangeDidChange = nil
 		editorViews.removeAll { $0 === view }
+		refreshSyntaxHighlights()
 	}
 
 	func setGutterDecorator(_ decorator: GutterDecorator?) {
@@ -217,7 +222,7 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func reloadSyntaxTheme() {
-		syntax.reloadTheme(editor: editor)
+		syntax.reloadTheme(editor: editor, viewportLineRange: visibleSyntaxLineRange())
 	}
 
 	func restoreHandoffCursorOffset(_ offset: Int) {
@@ -279,6 +284,20 @@ final class ItsyDocument: NSDocument {
 		}
 	}
 
+	private func refreshSyntaxHighlights(edits: [Edit] = [], oldRope: Rope? = nil) {
+		syntax.refresh(editor: editor, edits: edits, oldRope: oldRope, viewportLineRange: visibleSyntaxLineRange())
+	}
+
+	private func visibleSyntaxLineRange() -> Range<Int>? {
+		let ranges = editorViews.map(\.visibleLineRange).filter { !$0.isEmpty }
+		guard let first = ranges.first else {
+			return nil
+		}
+		return ranges.dropFirst().reduce(first) { result, range in
+			min(result.lowerBound, range.lowerBound) ..< max(result.upperBound, range.upperBound)
+		}
+	}
+
 	private func writeEditorStorage(to url: URL) throws -> Bool {
 		switch editor.textStorage {
 		case .rope:
@@ -295,7 +314,7 @@ final class ItsyDocument: NSDocument {
 			view.editor = editor
 		}
 		syntax.configure(fileURL: readURL ?? fileURL)
-		syntax.refresh(editor: editor)
+		refreshSyntaxHighlights()
 		updateHandoffActivity()
 		fileWatcher.restart()
 	}

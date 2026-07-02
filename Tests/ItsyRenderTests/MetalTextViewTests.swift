@@ -238,21 +238,29 @@ import Testing
 
 @Test func viewportTracksVisibleLineRangeAndScrollOffsets() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var reportedRanges: [Range<Int>] = []
+	view.visibleLineRangeDidChange = { range in
+		reportedRanges.append(range)
+	}
 	view.lineHeight = 20
 	view.lineCount = 100_000
 	#expect(view.visibleLineRange == 0 ..< 6)
+	#expect(reportedRanges == [0 ..< 6])
 	_ = view.consumeDirtyForDisplayLink()
 	view.scroll(deltaX: -12, deltaY: -60)
 	#expect(view.topLineIndex == 3)
 	#expect(view.xOffset == 12)
 	#expect(view.visibleLineRange == 3 ..< 9)
+	#expect(reportedRanges.last == 3 ..< 9)
 	#expect(view.consumeDirtyForDisplayLink())
 	view.scroll(deltaX: 4, deltaY: 20)
 	#expect(view.topLineIndex == 2)
 	#expect(view.xOffset == 8)
+	#expect(reportedRanges.last == 2 ..< 8)
 	view.scroll(deltaX: 100, deltaY: 1_000)
 	#expect(view.topLineIndex == 0)
 	#expect(view.xOffset == 0)
+	#expect(reportedRanges.last == 0 ..< 6)
 }
 
 @Test func gutterDecoratorBuildsVisibleSeverityMarkers() throws {

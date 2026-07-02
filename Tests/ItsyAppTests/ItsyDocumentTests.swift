@@ -75,3 +75,24 @@ import Testing
 	controller.refresh(editor: Editor(text: "const value = \"ok\";\n", storage: .pieceTree))
 	#expect(spanCount > 0)
 }
+
+@Test func documentSyntaxRefreshLimitsHighlightsToViewportOverscan() throws {
+	let controller = DocumentSyntaxController()
+	var ranges: [Range<Int>] = []
+	controller.setHighlightSpans = { spans in
+		ranges = spans.map(\.range)
+	}
+	let text = (0 ..< 100)
+		.map { "const value\($0) = \"ok\";" }
+		.joined(separator: "\n")
+	let editor = Editor(text: text, storage: .pieceTree)
+	controller.configure(fileURL: URL(fileURLWithPath: "/tmp/sample.ts"))
+	controller.refresh(editor: editor, viewportLineRange: 50 ..< 52)
+
+	let storage = editor.textStorage
+	let expected = storage.offset(forLine: 30) ..< storage.offset(forLine: 72)
+	let visible = storage.offset(forLine: 50) ..< storage.offset(forLine: 52)
+	#expect(!ranges.isEmpty)
+	#expect(ranges.allSatisfy { $0.overlaps(expected) })
+	#expect(ranges.contains { $0.overlaps(visible) })
+}

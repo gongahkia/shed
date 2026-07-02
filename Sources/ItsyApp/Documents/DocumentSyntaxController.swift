@@ -4,6 +4,7 @@ import ItsyRender
 import ItsySyntax
 
 final class DocumentSyntaxController {
+	private static let highlightOverscanLineCount = 20
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?
 	private var syntaxTree: Tree?
@@ -23,12 +24,12 @@ final class DocumentSyntaxController {
 		}
 	}
 
-	func reloadTheme(editor: Editor) {
+	func reloadTheme(editor: Editor, viewportLineRange: Range<Int>? = nil) {
 		syntaxTheme = nil
-		refresh(editor: editor)
+		refresh(editor: editor, viewportLineRange: viewportLineRange)
 	}
 
-	func refresh(editor: Editor, edits: [Edit] = [], oldRope: Rope? = nil) {
+	func refresh(editor: Editor, edits: [Edit] = [], oldRope: Rope? = nil, viewportLineRange: Range<Int>? = nil) {
 		guard var syntaxPipeline else {
 			setHighlightSpans([])
 			return
@@ -60,7 +61,7 @@ final class DocumentSyntaxController {
 			} else {
 				let tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
-				spans = try syntaxPipeline.highlights(in: tree)
+				spans = try syntaxPipeline.highlights(in: tree, byteRange: highlightByteRange(for: viewportLineRange, editor: editor))
 				syntaxHighlightSpans = spans
 			}
 			let renderedSpans = spans.compactMap { span -> TextHighlightSpan? in
@@ -92,5 +93,20 @@ final class DocumentSyntaxController {
 		case let .pieceTree(pieceTree):
 			return try syntaxPipeline.parse(pieceTree)
 		}
+	}
+
+	private func highlightByteRange(for viewportLineRange: Range<Int>?, editor: Editor) -> Range<Int>? {
+		guard let viewportLineRange, !viewportLineRange.isEmpty else {
+			return nil
+		}
+		let storage = editor.textStorage
+		let lowerLine = max(0, viewportLineRange.lowerBound - Self.highlightOverscanLineCount)
+		let upperLine = min(storage.lineCount, viewportLineRange.upperBound + Self.highlightOverscanLineCount)
+		guard lowerLine < upperLine else {
+			return nil
+		}
+		let lower = storage.offset(forLine: lowerLine)
+		let upper = upperLine < storage.lineCount ? storage.offset(forLine: upperLine) : storage.length
+		return lower ..< upper
 	}
 }

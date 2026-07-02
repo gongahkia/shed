@@ -8,6 +8,7 @@ final class TelemetryTests: XCTestCase {
         XCTAssertFalse(telemetry.enabled)
         XCTAssertNil(telemetry.endpoint)
         XCTAssertTrue(telemetry.scrubbedBundleIDs)
+        XCTAssertNil(telemetry.usageEndpoint)
         XCTAssertFalse(Config().telemetry.enabled)
     }
 
@@ -17,6 +18,7 @@ final class TelemetryTests: XCTestCase {
                 enabled(true)
                 endpoint("https://crashes.example.test/olly")
                 scrubbedBundleIDs(false)
+                usageEndpoint("https://usage.example.test/olly")
             }
         }
 
@@ -26,5 +28,6 @@ final class TelemetryTests: XCTestCase {
         XCTAssertTrue(decoded.telemetry.enabled)
         XCTAssertEqual(decoded.telemetry.endpoint, "https://crashes.example.test/olly")
         XCTAssertFalse(decoded.telemetry.scrubbedBundleIDs)
+        XCTAssertEqual(decoded.telemetry.usageEndpoint, "https://usage.example.test/olly")
     }
 }

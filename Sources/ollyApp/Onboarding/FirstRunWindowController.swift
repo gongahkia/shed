@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ollyDiagnostics
 import ollyDSL
 import ollyKit
 
@@ -14,9 +15,21 @@ final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
     private let axStatusProvider: AXStatusProvider
     private let displayProvider: DisplayProvider
     private let safeZoneCalculator: SafeZoneCalculator
+    private let usageTelemetryConsentStore: UsageTelemetryConsentStore
     private var step: FirstRunStep = .welcome
     private var selectedProfile = ConfigTemplateProfile.defaultProfile
+    private var usageTelemetryConsent = UsageTelemetryConsent.undecided
     private let profilePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let telemetryControl = NSSegmentedControl(
+        labels: [
+            L10n.s("Opt In", "first-run telemetry opt in"),
+            L10n.s("No Telemetry", "first-run telemetry no telemetry"),
+            L10n.s("Decide Later", "first-run telemetry decide later")
+        ],
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
     private var axStatusText = ""
 
     init(
@@ -24,13 +37,15 @@ final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
         fileManager: FileManager = .default,
         axStatusProvider: @escaping AXStatusProvider = { AXPermission.status(prompt: false) },
         displayProvider: @escaping DisplayProvider = { DisplayMonitor().displays() },
-        safeZoneCalculator: SafeZoneCalculator = SafeZoneCalculator()
+        safeZoneCalculator: SafeZoneCalculator = SafeZoneCalculator(),
+        usageTelemetryConsentStore: UsageTelemetryConsentStore = UsageTelemetryConsentStore()
     ) {
         self.sourceURL = sourceURL
         self.fileManager = fileManager
         self.axStatusProvider = axStatusProvider
         self.displayProvider = displayProvider
         self.safeZoneCalculator = safeZoneCalculator
+        self.usageTelemetryConsentStore = usageTelemetryConsentStore
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 720, height: 520),
             styleMask: [.titled, .closable],
@@ -42,6 +57,7 @@ final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
         window.delegate = self
         configureProfilePopUp()
+        configureTelemetryControl()
         render()
         window.center()
     }
@@ -66,12 +82,18 @@ final class FirstRunWindowController: NSWindowController, NSWindowDelegate {
         profilePopUp.selectItem(withTitle: profile.displayName)
     }
 
+    func selectUsageTelemetryConsent(_ consent: UsageTelemetryConsent) {
+        usageTelemetryConsent = consent
+        telemetryControl.selectedSegment = segment(for: consent)
+    }
+
     func completeSetup() throws {
         try SettingsWindowController.ensureConfigExists(
             profile: selectedProfile,
             sourceURL: sourceURL,
             fileManager: fileManager
         )
+        usageTelemetryConsentStore.write(usageTelemetryConsent)
         onComplete?()
         close()
     }
@@ -124,6 +146,7 @@ private extension FirstRunWindowController {
         case .accessibility: return accessibilityView()
         case .display: return displayView()
         case .preset: return presetView()
+        case .telemetry: return telemetryView()
         case .cheatsheet: return cheatsheetView()
         case .done: return doneView()
         }
@@ -176,6 +199,16 @@ private extension FirstRunWindowController {
         )))
         stack.addArrangedSubview(profilePopUp)
         stack.addArrangedSubview(textView(selectedProfile.summary))
+        return stack
+    }
+
+    private func telemetryView() -> NSView {
+        let stack = verticalStack(spacing: 12)
+        stack.addArrangedSubview(textView(L10n.s("""
+        Usage telemetry is off unless you explicitly opt in and configure a usage endpoint. If enabled later, Olly \
+        sends only aggregate session counts and never sends window titles, bundle IDs, frames, or per-window IDs.
+        """, "first-run telemetry body")))
+        stack.addArrangedSubview(telemetryControl)
         return stack
     }
 
@@ -267,6 +300,31 @@ private extension FirstRunWindowController {
         selectProfile(.defaultProfile)
     }
 
+    private func configureTelemetryControl() {
+        telemetryControl.target = self
+        telemetryControl.action = #selector(telemetryChanged)
+        telemetryControl.setWidth(116, forSegment: 0)
+        telemetryControl.setWidth(136, forSegment: 1)
+        telemetryControl.setWidth(136, forSegment: 2)
+        selectUsageTelemetryConsent(.undecided)
+    }
+
+    private func segment(for consent: UsageTelemetryConsent) -> Int {
+        switch consent {
+        case .optIn: return 0
+        case .disabled: return 1
+        case .undecided: return 2
+        }
+    }
+
+    private func consent(for segment: Int) -> UsageTelemetryConsent {
+        switch segment {
+        case 0: return .optIn
+        case 1: return .disabled
+        default: return .undecided
+        }
+    }
+
     private func previewKeybinds() -> Keybinds {
         switch selectedProfile {
         case .minimal:
@@ -350,6 +408,10 @@ private extension FirstRunWindowController {
               let profile = try? ConfigTemplateProfile(name: rawValue) else { return }
         selectedProfile = profile
         render()
+    }
+
+    @objc private func telemetryChanged() {
+        usageTelemetryConsent = consent(for: telemetryControl.selectedSegment)
     }
 
     @objc private func openSettings() {

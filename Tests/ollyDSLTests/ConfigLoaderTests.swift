@@ -35,6 +35,7 @@ final class ConfigLoaderTests: XCTestCase {
                 enabled(true)
                 endpoint("https://crashes.example.test/olly")
                 scrubbedBundleIDs(true)
+                usageEndpoint("https://usage.example.test/olly")
             }
         }
 
@@ -56,6 +57,7 @@ final class ConfigLoaderTests: XCTestCase {
         XCTAssertTrue(config.telemetry.enabled)
         XCTAssertEqual(config.telemetry.endpoint, "https://crashes.example.test/olly")
         XCTAssertTrue(config.telemetry.scrubbedBundleIDs)
+        XCTAssertEqual(config.telemetry.usageEndpoint, "https://usage.example.test/olly")
     }
 
     func testConfigDecodingDefaultsMissingSections() throws {

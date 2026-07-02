@@ -19,6 +19,18 @@ final class CrashTelemetryTests: XCTestCase {
         XCTAssertFalse(settings.scrubbedBundleIDs)
     }
 
+    func testRuntimeSettingsRespectGlobalTelemetryDisableEnvironment() {
+        let settings = CrashTelemetryRuntimeSettings(
+            configEnabled: true,
+            configEndpoint: "https://crashes.example.test",
+            configScrubbedBundleIDs: true,
+            environment: ["OLLY_DISABLE_TELEMETRY": "1"]
+        )
+
+        XCTAssertFalse(settings.enabled)
+        XCTAssertEqual(settings.endpoint?.absoluteString, "https://crashes.example.test")
+    }
+
     func testWriteAndListPendingCrashReports() throws {
         let directory = try temporaryDirectory()
         let report = makeReport(frameCount: 31)

@@ -8,6 +8,7 @@ public enum TelemetryDirective: Codable, Equatable, Sendable {
     case enabled(Bool)
     case endpoint(String?)
     case scrubbedBundleIDs(Bool)
+    case usageEndpoint(String?)
 }
 
 /// Purpose: Configures local crash capture and explicit crash-report upload.
@@ -18,17 +19,25 @@ public struct Telemetry: Codable, Equatable, Sendable {
     public let enabled: Bool
     public let endpoint: String?
     public let scrubbedBundleIDs: Bool
+    public let usageEndpoint: String?
 
-    public init(enabled: Bool = false, endpoint: String? = nil, scrubbedBundleIDs: Bool = true) {
+    public init(
+        enabled: Bool = false,
+        endpoint: String? = nil,
+        scrubbedBundleIDs: Bool = true,
+        usageEndpoint: String? = nil
+    ) {
         self.enabled = enabled
         self.endpoint = endpoint
         self.scrubbedBundleIDs = scrubbedBundleIDs
+        self.usageEndpoint = usageEndpoint
     }
 
     public init(@TelemetryBuilder _ build: () -> [TelemetryDirective]) {
         var enabled = false
         var endpoint: String?
         var scrubbedBundleIDs = true
+        var usageEndpoint: String?
         for directive in build() {
             switch directive {
             case let .enabled(value):
@@ -37,9 +46,16 @@ public struct Telemetry: Codable, Equatable, Sendable {
                 endpoint = value
             case let .scrubbedBundleIDs(value):
                 scrubbedBundleIDs = value
+            case let .usageEndpoint(value):
+                usageEndpoint = value
             }
         }
-        self.init(enabled: enabled, endpoint: endpoint, scrubbedBundleIDs: scrubbedBundleIDs)
+        self.init(
+            enabled: enabled,
+            endpoint: endpoint,
+            scrubbedBundleIDs: scrubbedBundleIDs,
+            usageEndpoint: usageEndpoint
+        )
     }
 }
 
@@ -80,6 +96,14 @@ public func endpoint(_ value: String?) -> TelemetryDirective {
 /// See also: `Telemetry`, `enabled(_:)`.
 public func scrubbedBundleIDs(_ value: Bool) -> TelemetryDirective {
     .scrubbedBundleIDs(value)
+}
+
+/// Purpose: Sets the explicit aggregate usage telemetry endpoint.
+/// Parameters: Pass a self-hosted HTTPS URL string or nil.
+/// Example: `usageEndpoint("https://example.test/olly/usage")`
+/// See also: `Telemetry`, `endpoint(_:)`.
+public func usageEndpoint(_ value: String?) -> TelemetryDirective {
+    .usageEndpoint(value)
 }
 
 public extension ConfigBuilder {

@@ -35,14 +35,24 @@ public struct CrashTelemetryRuntimeSettings: Equatable, Sendable {
         configEnabled: Bool,
         configEndpoint: String?,
         configScrubbedBundleIDs: Bool,
-        userSettings: CrashTelemetryUserSettings = CrashTelemetryUserSettings()
+        userSettings: CrashTelemetryUserSettings = CrashTelemetryUserSettings(),
+        environment: [String: String] = ProcessInfo.processInfo.environment
     ) {
         let endpointString = userSettings.endpoint ?? configEndpoint
         self.init(
-            enabled: userSettings.enabled ?? configEnabled,
+            enabled: TelemetryEnvironment.isDisabled(environment) ? false : (userSettings.enabled ?? configEnabled),
             endpoint: endpointString.flatMap(URL.init(string:)),
             scrubbedBundleIDs: userSettings.scrubbedBundleIDs ?? configScrubbedBundleIDs
         )
+    }
+}
+
+public enum TelemetryEnvironment {
+    public static func isDisabled(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> Bool {
+        let value = environment["OLLY_DISABLE_TELEMETRY"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        return value == "1" || value == "true" || value == "yes" || value == "on"
     }
 }
 

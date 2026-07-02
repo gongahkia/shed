@@ -11,6 +11,10 @@ public func ollyConfig() -> Config {
             EngineDeclaration.floating
         }
 
+        Telemetry {
+            usageEndpoint(nil)
+        }
+
         Keybinds {
             Keybind(KeyChord([.command, .option], .return), do: .cycleEngine)
         }

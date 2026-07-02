@@ -143,7 +143,7 @@ final class AppCoordinator: NSObject {
 		commandPaletteCoordinator.showFileSymbolPalette(sender)
 	}
 
-	private func makeCommandRegistry() -> CommandRegistry {
+	private func makeCommandRegistry(workspaceRoot: URL? = ItsyWorkspaceController.currentRootURL) -> CommandRegistry {
 		var registry = CommandRegistry()
 		do {
 			try registry.register([
@@ -326,9 +326,26 @@ final class AppCoordinator: NSObject {
 				},
 			])
 			try registry.register(KeymapCommandCatalog.hiddenCommands)
+			registerExtensionCommands(from: workspaceRoot, into: &registry)
 			return registry
 		} catch {
 			preconditionFailure("failed to register commands: \(error)")
+		}
+	}
+
+	private func registerExtensionCommands(from workspaceRoot: URL?, into registry: inout CommandRegistry) {
+		guard let workspaceRoot else {
+			return
+		}
+		let commands = ExtensionCommandDiscovery.discover(root: workspaceRoot) { manifest, contribution in
+			NSLog("extension command requested: \(manifest.identifier).\(contribution.id)")
+		}
+		for command in commands {
+			do {
+				try registry.register(command)
+			} catch {
+				NSLog("failed to register extension command \(command.id): \(error)")
+			}
 		}
 	}
 
@@ -509,6 +526,7 @@ final class AppCoordinator: NSObject {
 
 	private func openWorkspace(at url: URL) -> Bool {
 		ItsyWorkspaceController.openWorkspace(at: url)
+		commandRegistry = makeCommandRegistry(workspaceRoot: url)
 		if documentController.documents.isEmpty {
 			do {
 				_ = try documentController.openUntitledDocumentAndDisplay(true)

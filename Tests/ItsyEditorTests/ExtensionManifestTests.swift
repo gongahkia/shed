@@ -192,6 +192,32 @@ import Testing
 	])
 }
 
+@Test func extensionCommandDiscoveryLoadsWorkspaceManifestCommands() throws {
+	let fixture = try TemporaryExtensionFixture()
+	try fixture.write(".itsy/extensions/commands.json", """
+	{
+	  "schemaVersion": 2,
+	  "identifier": "dev.example.commands",
+	  "name": "Commands",
+	  "version": "0.2.0",
+	  "contributes": {
+	    "commands": [
+	      { "id": "openInspector", "title": "Open Inspector", "category": "Tools" }
+	    ]
+	  }
+	}
+	""")
+	var transcript: [String] = []
+	let commands = ExtensionCommandDiscovery.discover(root: fixture.root) { manifest, contribution in
+		transcript.append("\(manifest.identifier):\(contribution.id)")
+	}
+
+	#expect(commands.map(\.id) == ["extension:dev.example.commands:openInspector"])
+	#expect(commands.map(\.title) == ["Tools: Open Inspector"])
+	commands[0].run()
+	#expect(transcript == ["dev.example.commands:openInspector"])
+}
+
 private final class TemporaryExtensionFixture {
 	let root: URL
 

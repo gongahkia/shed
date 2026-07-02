@@ -1,3 +1,4 @@
+// @file AppKit terminal viewport and input handling.
 import AppKit
 import Foundation
 import ItsyConfig

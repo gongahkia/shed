@@ -1,3 +1,4 @@
+// @file editor preference model and settings bridge.
 import AppKit
 import Foundation
 import ItsyConfig

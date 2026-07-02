@@ -1,3 +1,4 @@
+// @file workspace file-tree sidebar and file event watching.
 import AppKit
 import CoreServices
 import ItsyEditor

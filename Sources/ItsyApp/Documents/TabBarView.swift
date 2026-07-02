@@ -1,3 +1,4 @@
+// @file document tab models and AppKit tab bar view.
 import AppKit
 
 struct ItsyTab: Equatable {

@@ -1,3 +1,4 @@
+// @file PTY-backed terminal process session.
 import Darwin
 import Dispatch
 import Foundation

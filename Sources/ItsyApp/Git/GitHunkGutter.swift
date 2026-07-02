@@ -1,3 +1,4 @@
+// @file Git hunk gutter state and decoration.
 import AppKit
 import ItsyEditor
 import ItsyRender

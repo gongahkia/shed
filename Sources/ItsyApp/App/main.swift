@@ -1,3 +1,4 @@
+// @file AppKit process entrypoint.
 import AppKit
 
 if CommandLine.arguments.contains("--bench-exit-on-ready") {

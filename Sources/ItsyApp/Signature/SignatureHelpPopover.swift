@@ -1,3 +1,4 @@
+// @file LSP signature-help popover presentation.
 import AppKit
 import ItsyLSP
 

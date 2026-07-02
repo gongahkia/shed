@@ -1,17 +1,17 @@
 # ItsyApp layout
 
-`ItsyApp` owns the AppKit shell and feature coordinators. Source files stay at the target root until the Phase 21 extraction tasks move them.
+`ItsyApp` owns the AppKit shell and feature coordinators. SwiftPM auto-discovers source files inside the feature directories below.
 
 ## Directory ownership
 
-- `App/`: application entry coordination and `AppDelegate` lifecycle.
-- `Documents/`: `ItsyDocument`, document controller, save/load, file watching, tab coordination.
+- `App/`: application entrypoint, localization, keymap catalog, entry coordination, and `AppDelegate` lifecycle.
+- `Documents/`: `ItsyDocument`, document controller, save/load, file watching, storage extraction, and tab coordination.
 - `Windows/`: editor windows, panes, pane coordination, gutter composition, LSP bridging.
-- `Palette/`: command palette panel, command registry integration, command filtering/execution.
+- `Palette/`: command palette panel/bridge, command registry integration, command filtering/execution.
 - `ProjectFind/`: project-wide find panel, query state, result navigation.
-- `Git/`: Git panel, commit composer, branch/stash/conflict UI, gutter integration.
+- `Git/`: Git panel, commit composer, branch/stash/conflict UI, hunk gutter integration.
 - `Tasks/`: task discovery/run panel and task output state.
-- `Problems/`: problems panel, diagnostics presentation, compiler/task issue state.
+- `Problems/`: problems panel, diagnostics presentation/gutter, compiler/task issue state.
 - `Outline/`: outline panel, symbol tree nodes, collapse state.
 - `References/`: references panel and navigation results.
 - `Hover/`: hover tooltip presentation.

@@ -1,3 +1,4 @@
+// @file find-bar state and AppKit controls.
 import AppKit
 import Foundation
 

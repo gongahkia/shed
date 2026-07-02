@@ -1,3 +1,4 @@
+// @file NSDocument integration for editor workspaces and tabs.
 import AppKit
 import Darwin
 import Dispatch

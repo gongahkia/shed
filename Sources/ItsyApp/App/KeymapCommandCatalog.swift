@@ -1,3 +1,4 @@
+// @file keymap command catalog exposed to app command routing.
 import ItsyEditor
 
 enum KeymapCommandCatalog {

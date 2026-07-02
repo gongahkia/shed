@@ -23,6 +23,7 @@ final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutl
 	private var gitSnapshot: GitWorkspaceSnapshot?
 	private var keyMonitor: Any?
 	private var previewURL: URL?
+	private var showsHiddenFiles = false
 	var openFile: (URL) -> Bool = { _ in false }
 
 	override init() {
@@ -53,6 +54,15 @@ final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutl
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
 		gitSnapshot = snapshot
 		outlineView.reloadData()
+	}
+
+	func toggleHiddenFiles() {
+		showsHiddenFiles.toggle()
+		childCache.removeAll(keepingCapacity: true)
+		outlineView.reloadData()
+		if let rootURL {
+			outlineView.expandItem(rootURL)
+		}
 	}
 
 	private func configureView() {
@@ -177,7 +187,7 @@ final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutl
 		)) ?? []
 		let nodes = contents.compactMap { child -> NSURL? in
 			let values = try? child.resourceValues(forKeys: Set(keys))
-			if values?.isHidden == true {
+			if !showsHiddenFiles, values?.isHidden == true {
 				return nil
 			}
 			return child as NSURL

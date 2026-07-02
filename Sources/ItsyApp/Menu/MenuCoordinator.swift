@@ -83,6 +83,9 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		fileMenu.disableAutomaticWritingToolsItems()
 		let newItem = fileMenu.addItem(withTitle: L10n.string("New"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "n")
 		newItem.target = documentController
+		let newWindowItem = fileMenu.addItem(withTitle: L10n.string("New Window"), action: #selector(AppCoordinator.newWindow(_:)), keyEquivalent: "N")
+		newWindowItem.keyEquivalentModifierMask = [.command, .shift]
+		newWindowItem.target = actionTarget
 		let newTabItem = fileMenu.addItem(withTitle: L10n.string("New Tab"), action: #selector(NSDocumentController.newDocument(_:)), keyEquivalent: "t")
 		newTabItem.keyEquivalentModifierMask = [.command, .option]
 		newTabItem.target = documentController

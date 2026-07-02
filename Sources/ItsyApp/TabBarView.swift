@@ -53,6 +53,16 @@ enum ItsyTabCoordinator {
 		documentController?.showDocument(document)
 	}
 
+	@discardableResult
+	static func selectDocument(atDisplayIndex index: Int) -> Bool {
+		let documents = itsyDocuments()
+		guard documents.indices.contains(index) else {
+			return false
+		}
+		selectDocument(ObjectIdentifier(documents[index]))
+		return true
+	}
+
 	static func closeDocument(_ id: ObjectIdentifier) {
 		guard let document = itsyDocuments().first(where: { ObjectIdentifier($0) == id }) else {
 			return

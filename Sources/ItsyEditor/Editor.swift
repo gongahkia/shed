@@ -32,9 +32,14 @@ public struct UndoStack: Sendable, Equatable {
 
 	public init() {}
 
-	mutating func record(_ edit: Edit, selectionAfter: SelectionSet, textBefore: String) {
-		let snapshot = edits.count.isMultiple(of: 32) ? textBefore : nil
-		edits.append(UndoEntry(edit: edit, selectionAfter: selectionAfter, snapshotBefore: snapshot, groupID: activeGroupID))
+	mutating func record(_ edit: Edit, reverse: Edit, selectionBefore: SelectionSet, selectionAfter: SelectionSet) {
+		edits.append(UndoEntry(
+			edit: edit,
+			reverse: reverse,
+			selectionAfter: selectionAfter,
+			selectionBefore: selectionBefore,
+			groupID: activeGroupID
+		))
 		redoEdits.removeAll()
 	}
 
@@ -81,8 +86,9 @@ public struct UndoStack: Sendable, Equatable {
 
 public struct UndoEntry: Sendable, Equatable {
 	public var edit: Edit
+	public var reverse: Edit
 	public var selectionAfter: SelectionSet
-	public var snapshotBefore: String?
+	public var selectionBefore: SelectionSet
 	public var groupID: Int?
 }
 
@@ -204,6 +210,35 @@ public enum EditorTextStorage: Sendable {
 		case var .pieceTree(pieceTree):
 			pieceTree.remove(range)
 			self = .pieceTree(pieceTree)
+		}
+	}
+
+	@discardableResult
+	public mutating func replace(_ range: Range<Int>, with string: String) -> Edit {
+		replace(range, with: Data(string.utf8))
+	}
+
+	@discardableResult
+	public mutating func replace(_ range: Range<Int>, with data: Data) -> Edit {
+		switch self {
+		case var .rope(rope):
+			let oldText = rope.slice(range)
+			if !range.isEmpty {
+				rope.remove(range)
+			}
+			if !data.isEmpty {
+				rope.insert(String(decoding: data, as: UTF8.self), at: range.lowerBound)
+			}
+			self = .rope(rope)
+			return Edit(
+				range: range.lowerBound ..< range.lowerBound + data.count,
+				removed: data,
+				inserted: Data(oldText.utf8)
+			)
+		case var .pieceTree(pieceTree):
+			let reverse = pieceTree.replace(range, with: data)
+			self = .pieceTree(pieceTree)
+			return reverse
 		}
 	}
 }
@@ -353,14 +388,10 @@ public struct Editor: Sendable {
 		guard let entries = history.popUndo() else {
 			return
 		}
-		if entries.count == 1, let entry = entries.first, let snapshot = entry.snapshotBefore {
-			resetStorage(to: snapshot)
-		} else {
-			for entry in entries {
-				applyInverse(entry.edit)
-			}
+		for entry in entries {
+			apply(entry.reverse)
 		}
-		selections = entries.last?.edit.selectionBefore ?? selections
+		selections = entries.last?.selectionBefore ?? selections
 	}
 
 	public mutating func redo() {
@@ -384,27 +415,23 @@ public struct Editor: Sendable {
 		guard !normalized.isEmpty else {
 			return
 		}
-		let textBefore = textStorage.substring(0 ..< textStorage.length)
 		let selectionBefore = selections
 		var recordedEdits: [Edit] = []
+		var reverseEdits: [Edit] = []
 		var carets: [Selection] = []
 		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
-			let oldText = textStorage.substring(range)
-			if !range.isEmpty {
-				textStorage.remove(range)
-			}
-			if !string.isEmpty {
-				textStorage.insert(string, at: range.lowerBound)
-			}
-			recordedEdits.append(Edit(range: range, oldText: oldText, newText: string, selectionBefore: selectionBefore))
+			let reverse = textStorage.replace(range, with: string)
+			let edit = Edit(range: range, removed: reverse.inserted, inserted: reverse.removed, selectionBefore: selectionBefore)
+			recordedEdits.append(edit)
+			reverseEdits.append(reverse)
 			let caret = range.lowerBound + string.utf8.count
 			carets.append(Selection(anchor: caret, head: caret))
 		}
 		carets.reverse()
 		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
 		lastEditBatch = Array(recordedEdits.reversed())
-		for edit in recordedEdits.reversed() {
-			history.record(edit, selectionAfter: selections, textBefore: textBefore)
+		for (edit, reverse) in zip(recordedEdits.reversed(), reverseEdits.reversed()) {
+			history.record(edit, reverse: reverse, selectionBefore: selectionBefore, selectionAfter: selections)
 		}
 	}
 
@@ -549,31 +576,7 @@ public struct Editor: Sendable {
 	}
 
 	private mutating func apply(_ edit: Edit) {
-		if !edit.range.isEmpty {
-			textStorage.remove(edit.range)
-		}
-		if !edit.newText.isEmpty {
-			textStorage.insert(edit.newText, at: edit.range.lowerBound)
-		}
-	}
-
-	private mutating func applyInverse(_ edit: Edit) {
-		let range = edit.range.lowerBound ..< edit.range.lowerBound + edit.newText.utf8.count
-		if !range.isEmpty {
-			textStorage.remove(range)
-		}
-		if !edit.oldText.isEmpty {
-			textStorage.insert(edit.oldText, at: edit.range.lowerBound)
-		}
-	}
-
-	private mutating func resetStorage(to text: String) {
-		switch textStorage.kind {
-		case .rope:
-			textStorage = .rope(Rope(text))
-		case .pieceTree:
-			textStorage = .pieceTree(PieceTree(text))
-		}
+		textStorage.replace(edit.range, with: edit.inserted)
 	}
 }
 

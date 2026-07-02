@@ -13,6 +13,11 @@ private let crashTelemetryLogger = Logger(
     category: "CrashTelemetry"
 )
 
+private let usageTelemetryLogger = Logger(
+    subsystem: Bundle.main.bundleIdentifier ?? "olly",
+    category: "UsageTelemetry"
+)
+
 @main
 enum OllyApp {
     private static let delegate = OllyAppDelegate()
@@ -47,10 +52,14 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     private let changelogStore = ChangelogVersionStore()
     private var changelogController: ChangelogWindowController?
     private var overviewKeyMonitor: OverviewKeyHoldMonitor?
+    private var usageTelemetrySettings = UsageTelemetryRuntimeSettings()
+    private var usageTelemetryContext: UsageTelemetryContext?
+    private var usageTelemetryStartedAt = Date()
+    private var usageTelemetryEngineIDs: Set<String> = []
     private var isTerminating = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        installCrashTelemetry()
+        configureTelemetry()
         statusController = OllyStatusMenuController(
             onOpenSettings: { [weak self] in
                 self?.settingsWindowController.show()
@@ -91,6 +100,10 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         overviewKeyMonitor?.remove()
         Task { [runtime, weak self] in
             await runtime.stop()
+            let upload = await MainActor.run {
+                self?.makeUsageTelemetryUpload()
+            }
+            upload?()
             await MainActor.run {
                 self?.statusController?.remove()
                 NSApplication.shared.reply(toApplicationShouldTerminate: true)
@@ -202,6 +215,7 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @MainActor private func renderRuntimeSnapshot(_ snapshot: OllyRuntimeMenuSnapshot) {
+        usageTelemetryEngineIDs.insert(snapshot.currentEngineID.rawValue)
         statusController?.apply(snapshot: snapshot)
     }
 
@@ -209,9 +223,14 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
         statusController?.apply(error: message)
     }
 
-    private func installCrashTelemetry() {
+    private func configureTelemetry() {
         let loaded = try? ConfigLoader().load()
         let config = loaded?.config ?? Config()
+        installCrashTelemetry(loaded: loaded, config: config)
+        configureUsageTelemetry(config: config)
+    }
+
+    private func installCrashTelemetry(loaded: LoadedConfig?, config: Config) {
         let userSettings = CrashTelemetryUserSettingsStore().read()
         let settings = CrashTelemetryRuntimeSettings(
             configEnabled: config.telemetry.enabled,
@@ -231,6 +250,40 @@ final class OllyAppDelegate: NSObject, NSApplicationDelegate {
             _ = try CrashTelemetry.install(settings: settings, context: context)
         } catch {
             crashTelemetryLogger.error("install failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    private func configureUsageTelemetry(config: Config) {
+        usageTelemetryStartedAt = Date()
+        usageTelemetrySettings = UsageTelemetryRuntimeSettings(
+            configUsageEndpoint: config.telemetry.usageEndpoint
+        )
+        usageTelemetryContext = UsageTelemetryContext(
+            appVersion: Self.appVersion(),
+            dslVersion: config.version.rawValue,
+            displayCount: DisplayMonitor().displays().count,
+            tagCount: config.workspaces.tags.count
+        )
+        usageTelemetryEngineIDs = []
+    }
+
+    private func makeUsageTelemetryUpload() -> (() -> Void)? {
+        guard usageTelemetrySettings.canUpload,
+              let endpoint = usageTelemetrySettings.endpoint,
+              let context = usageTelemetryContext else {
+            return nil
+        }
+        let payload = UsageTelemetryPayload(
+            context: context,
+            enginesUsed: Array(usageTelemetryEngineIDs),
+            sessionDurationSeconds: Date().timeIntervalSince(usageTelemetryStartedAt)
+        )
+        return {
+            do {
+                try UsageTelemetry.upload(payload: payload, to: endpoint)
+            } catch {
+                usageTelemetryLogger.error("upload failed: \(String(describing: error), privacy: .public)")
+            }
         }
     }
 

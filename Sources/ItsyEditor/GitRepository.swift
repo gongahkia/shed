@@ -373,6 +373,13 @@ public struct GitRepository: Sendable {
 	}
 
 	public func status() throws -> GitStatus {
+		guard runner is ProcessGitCommandRunner else {
+			return try shellStatus()
+		}
+		return try Libgit2.Repository.open(at: root).gitStatus()
+	}
+
+	private func shellStatus() throws -> GitStatus {
 		let output = try runner.runGit(arguments: ["status", "--porcelain=v2", "--branch", "--untracked-files=all"], root: root)
 		return try GitStatusParser.parse(output)
 	}

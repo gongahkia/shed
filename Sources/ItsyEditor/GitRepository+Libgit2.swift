@@ -48,7 +48,7 @@ extension GitRepository {
 			public func status(pathspec: [String] = []) throws -> StatusList {
 				var options = git_status_options()
 				try Libgit2.check(git_status_options_init(&options, 1))
-				options.flags = Libgit2StatusOption.includeUntracked | Libgit2StatusOption.recurseUntrackedDirs
+				options.flags = Libgit2StatusOption.defaults
 				let rawStatus = try withGitStrarray(pathspec) { pathspecArray in
 					if let pathspecArray {
 						options.pathspec = pathspecArray
@@ -61,6 +61,10 @@ extension GitRepository {
 					return raw
 				}
 				return StatusList(raw: rawStatus)
+			}
+
+			func gitStatus() throws -> GitStatus {
+				GitStatus(branch: try branchStatus(), entries: try status().entries)
 			}
 
 			public func diff(cached: Bool) throws -> Diff {
@@ -117,6 +121,15 @@ extension GitRepository {
 
 			public var count: Int {
 				Int(git_status_list_entrycount(raw))
+			}
+
+			var entries: [GitStatusEntry] {
+				(0 ..< count).compactMap { index in
+					guard let pointer = git_status_byindex(raw, index) else {
+						return nil
+					}
+					return GitStatusEntry(libgit2: pointer.pointee)
+				}
 			}
 		}
 
@@ -210,6 +223,213 @@ private enum Runtime {
 private enum Libgit2StatusOption {
 	static let includeUntracked: UInt32 = 1 << 0
 	static let recurseUntrackedDirs: UInt32 = 1 << 4
+	static let renamesHeadToIndex: UInt32 = 1 << 7
+	static let renamesIndexToWorkdir: UInt32 = 1 << 8
+	static let defaults = includeUntracked | recurseUntrackedDirs | renamesHeadToIndex | renamesIndexToWorkdir
+}
+
+private enum Libgit2StatusFlag {
+	static let indexNew: UInt32 = 1 << 0
+	static let indexModified: UInt32 = 1 << 1
+	static let indexDeleted: UInt32 = 1 << 2
+	static let indexRenamed: UInt32 = 1 << 3
+	static let indexTypeChange: UInt32 = 1 << 4
+	static let worktreeNew: UInt32 = 1 << 7
+	static let worktreeModified: UInt32 = 1 << 8
+	static let worktreeDeleted: UInt32 = 1 << 9
+	static let worktreeTypeChange: UInt32 = 1 << 10
+	static let worktreeRenamed: UInt32 = 1 << 11
+	static let ignored: UInt32 = 1 << 14
+	static let conflicted: UInt32 = 1 << 15
+}
+
+private enum Libgit2ErrorCode {
+	static let notFound: Int32 = -3
+	static let unbornBranch: Int32 = -9
+}
+
+private extension GitRepository.Libgit2.Repository {
+	func branchStatus() throws -> GitBranchStatus {
+		let unborn = git_repository_head_unborn(raw) == 1
+		var head: OpaquePointer?
+		let result = git_repository_head(&head, raw)
+		if result == Libgit2ErrorCode.unbornBranch || unborn {
+			return try unbornBranchStatus()
+		}
+		if result == Libgit2ErrorCode.notFound {
+			return GitBranchStatus()
+		}
+		try GitRepository.Libgit2.check(result)
+		guard let head else {
+			return GitBranchStatus()
+		}
+		defer {
+			git_reference_free(head)
+		}
+		let detached = git_repository_head_detached(raw) == 1
+		let oid = git_reference_target(head).map { oidString($0) }
+		var status = GitBranchStatus(oid: oid, head: detached ? nil : shorthand(head))
+		guard !detached else {
+			return status
+		}
+		var upstream: OpaquePointer?
+		let upstreamResult = git_branch_upstream(&upstream, head)
+		if upstreamResult == Libgit2ErrorCode.notFound {
+			return status
+		}
+		try GitRepository.Libgit2.check(upstreamResult)
+		guard let upstream else {
+			return status
+		}
+		defer {
+			git_reference_free(upstream)
+		}
+		status.upstream = shorthand(upstream)
+		if let localOID = git_reference_target(head), let upstreamOID = git_reference_target(upstream) {
+			var ahead = 0
+			var behind = 0
+			try GitRepository.Libgit2.check(git_graph_ahead_behind(&ahead, &behind, raw, localOID, upstreamOID))
+			status.ahead = ahead
+			status.behind = behind
+		}
+		return status
+	}
+
+	func unbornBranchStatus() throws -> GitBranchStatus {
+		var head: OpaquePointer?
+		let result = "HEAD".withCString { name in
+			git_reference_lookup(&head, raw, name)
+		}
+		if result == Libgit2ErrorCode.notFound {
+			return GitBranchStatus(oid: "(initial)")
+		}
+		try GitRepository.Libgit2.check(result)
+		defer {
+			if let head {
+				git_reference_free(head)
+			}
+		}
+		guard let target = head.flatMap(git_reference_symbolic_target) else {
+			return GitBranchStatus(oid: "(initial)")
+		}
+		let name = String(cString: target)
+		return GitBranchStatus(oid: "(initial)", head: name.removingPrefix("refs/heads/"))
+	}
+}
+
+private extension GitStatusEntry {
+	init(libgit2 entry: git_status_entry) {
+		let flags = UInt32(entry.status.rawValue)
+		if flags.has(Libgit2StatusFlag.conflicted) {
+			self.init(kind: .unmerged, indexStatus: "U", worktreeStatus: "U", path: entry.bestPath)
+			return
+		}
+		if flags.has(Libgit2StatusFlag.ignored) {
+			self.init(kind: .ignored, indexStatus: "!", worktreeStatus: "!", path: entry.bestPath)
+			return
+		}
+		if flags.has(Libgit2StatusFlag.worktreeNew), !flags.hasIndexChange {
+			self.init(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: entry.bestPath)
+			return
+		}
+		let indexStatus = flags.indexStatus
+		let worktreeStatus = flags.worktreeStatus
+		if indexStatus == "R" || worktreeStatus == "R" {
+			let delta = entry.head_to_index ?? entry.index_to_workdir
+			self.init(kind: .renamed, indexStatus: indexStatus, worktreeStatus: worktreeStatus, path: delta?.pointee.newPath ?? entry.bestPath, originalPath: delta?.pointee.oldPath)
+			return
+		}
+		self.init(kind: .ordinary, indexStatus: indexStatus, worktreeStatus: worktreeStatus, path: entry.bestPath)
+	}
+}
+
+private extension git_status_entry {
+	var bestPath: String {
+		head_to_index?.pointee.newPath
+			?? head_to_index?.pointee.oldPath
+			?? index_to_workdir?.pointee.newPath
+			?? index_to_workdir?.pointee.oldPath
+			?? ""
+	}
+}
+
+private extension git_diff_delta {
+	var oldPath: String? {
+		old_file.path.map(String.init(cString:))
+	}
+
+	var newPath: String? {
+		new_file.path.map(String.init(cString:))
+	}
+}
+
+private extension UInt32 {
+	func has(_ flag: UInt32) -> Bool {
+		self & flag != 0
+	}
+
+	var hasIndexChange: Bool {
+		has(Libgit2StatusFlag.indexNew)
+			|| has(Libgit2StatusFlag.indexModified)
+			|| has(Libgit2StatusFlag.indexDeleted)
+			|| has(Libgit2StatusFlag.indexRenamed)
+			|| has(Libgit2StatusFlag.indexTypeChange)
+	}
+
+	var indexStatus: Character {
+		if has(Libgit2StatusFlag.indexRenamed) {
+			return "R"
+		}
+		if has(Libgit2StatusFlag.indexNew) {
+			return "A"
+		}
+		if has(Libgit2StatusFlag.indexModified) {
+			return "M"
+		}
+		if has(Libgit2StatusFlag.indexDeleted) {
+			return "D"
+		}
+		if has(Libgit2StatusFlag.indexTypeChange) {
+			return "T"
+		}
+		return "."
+	}
+
+	var worktreeStatus: Character {
+		if has(Libgit2StatusFlag.worktreeRenamed) {
+			return "R"
+		}
+		if has(Libgit2StatusFlag.worktreeNew) {
+			return "?"
+		}
+		if has(Libgit2StatusFlag.worktreeModified) {
+			return "M"
+		}
+		if has(Libgit2StatusFlag.worktreeDeleted) {
+			return "D"
+		}
+		if has(Libgit2StatusFlag.worktreeTypeChange) {
+			return "T"
+		}
+		return "."
+	}
+}
+
+private func oidString(_ oid: UnsafePointer<git_oid>) -> String {
+	guard let value = git_oid_tostr_s(oid) else {
+		return ""
+	}
+	return String(cString: value)
+}
+
+private func shorthand(_ ref: OpaquePointer) -> String? {
+	git_reference_shorthand(ref).map(String.init(cString:))
+}
+
+private extension String {
+	func removingPrefix(_ prefix: String) -> String {
+		hasPrefix(prefix) ? String(dropFirst(prefix.count)) : self
+	}
 }
 
 private func withGitStrarray<T>(_ values: [String], _ body: (git_strarray?) throws -> T) throws -> T {

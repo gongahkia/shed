@@ -103,6 +103,36 @@ import Testing
 	#expect(copied == 6)
 }
 
+@Test func pieceTreeSequentialASCIIPreservesCoreQueries() {
+	var tree = PieceTree()
+	for _ in 0 ..< 1_000 {
+		tree.insert("a", at: tree.length / 2)
+	}
+	#expect(tree.length == 1_000)
+	#expect(tree.graphemeCount == 1_000)
+	#expect(tree.lineCount == 1)
+	#expect(tree.substring(10 ..< 42) == String(repeating: "a", count: 32))
+	var buffer = [UInt8](repeating: 0, count: 8)
+	let copied = buffer.withUnsafeMutableBufferPointer {
+		tree.copyUTF8(at: 3, into: $0)
+	}
+	#expect(copied == 8)
+	#expect(buffer == [UInt8](repeating: 97, count: 8))
+	tree.remove(100 ..< 200)
+	#expect(tree.length == 900)
+	tree.insert("b", at: 450)
+	#expect(tree.substring(448 ..< 453) == "aabaa")
+}
+
+@Test func pieceTreeRepeatedNewlinePreservesLineQueries() {
+	let tree = PieceTree(String(repeating: "\n", count: 4))
+	#expect(tree.lineCount == 5)
+	#expect(tree.lineRange(0) == 0 ..< 0)
+	#expect(tree.lineRange(4) == 4 ..< 4)
+	#expect(tree.offset(forLine: 3) == 3)
+	#expect(tree.line(forOffset: 3) == 3)
+}
+
 @Test func pieceTreeInitializesFromMappedFileAsSingleOriginalPiece() throws {
 	let fileManager = FileManager.default
 	let directory = fileManager.temporaryDirectory.appendingPathComponent("itsy-piecetree-map-\(UUID().uuidString)", isDirectory: true)

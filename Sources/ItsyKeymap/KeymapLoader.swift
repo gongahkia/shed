@@ -113,6 +113,9 @@ public enum KeymapLoader {
 		case ">":
 			modifiers.insert(.shift)
 			return Key(".", modifiers: modifiers)
+		case "_":
+			modifiers.insert(.shift)
+			return Key("-", modifiers: modifiers)
 		default:
 			return Key(specialKeyName(keyName) ?? keyName.lowercased(), modifiers: modifiers)
 		}

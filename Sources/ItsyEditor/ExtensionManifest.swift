@@ -262,3 +262,11 @@ public enum ExtensionCommandMapper {
 		return "\(category): \(contribution.title)"
 	}
 }
+
+public enum ExtensionCommandDiscovery {
+	public static func discover(root: URL, fileManager: FileManager = .default, run: @escaping (ExtensionManifest, ExtensionCommandContribution) -> Void) -> [Command] {
+		ExtensionManifestLoader.discover(root: root, fileManager: fileManager).flatMap { manifest in
+			ExtensionCommandMapper.commands(from: manifest, run: run)
+		}
+	}
+}

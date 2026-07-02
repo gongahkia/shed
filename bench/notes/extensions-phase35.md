@@ -14,6 +14,8 @@ Implemented slice:
 - added default repo/user/project VOUCHED URL order helper.
 - deny records take precedence over allow records.
 - added `ExtensionCommandMapper` for scoped command registry IDs and explicit extension command dispatch.
+- app command registry now reloads workspace extension command contributions on workspace open.
+- duplicate or conflicting extension commands are skipped with a log instead of failing app startup.
 
 References checked:
 
@@ -28,19 +30,23 @@ test -f docs/design/extensions.md
 swift test --filter ExtensionManifest
 swift test --filter VouchStore
 swift test --filter extensionCommandMapper
+swift test --filter extensionCommandDiscovery
+swift test --filter CommandRegistry
+swift build --target ItsyApp
 ```
 
 Result:
 
-- `ExtensionManifest`: 6 tests passed.
+- `ExtensionManifest`: 7 tests passed.
 - `VouchStore`: 5 tests passed.
 - `extensionCommandMapper`: 1 test passed.
+- `extensionCommandDiscovery`: 1 test passed.
 - `CommandRegistry`: 2 tests passed.
+- `ItsyApp` build: passed.
 - `docs/design/extensions.md`: exists; references and non-goals grep passed.
 
 Remaining for #7:
 
-- app-level command registry loading for installed extension manifests.
 - keymap/theme/snippet/grammar/problem-matcher registration.
 - Vouch parser property tests.
 - install-time trust/integrity enforcement and `vouch` CLI integration.

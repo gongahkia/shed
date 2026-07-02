@@ -15,8 +15,22 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 	public var column: Int
 	public var endLine: Int?
 	public var endColumn: Int?
+	public var signature: String?
+	public var containerName: String?
+	public var documentation: String?
 
-	public init(name: String, kind: WorkspaceSymbolKind, relativePath: String, line: Int, column: Int, endLine: Int? = nil, endColumn: Int? = nil) {
+	public init(
+		name: String,
+		kind: WorkspaceSymbolKind,
+		relativePath: String,
+		line: Int,
+		column: Int,
+		endLine: Int? = nil,
+		endColumn: Int? = nil,
+		signature: String? = nil,
+		containerName: String? = nil,
+		documentation: String? = nil
+	) {
 		self.name = name
 		self.kind = kind
 		self.relativePath = relativePath
@@ -24,6 +38,9 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 		self.column = column
 		self.endLine = endLine
 		self.endColumn = endColumn
+		self.signature = signature
+		self.containerName = containerName
+		self.documentation = documentation
 	}
 }
 

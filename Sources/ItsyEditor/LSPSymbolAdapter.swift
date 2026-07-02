@@ -4,13 +4,13 @@ import ItsyLSP
 public enum LSPSymbolAdapter {
 	public static func workspaceSymbols(from documentSymbols: [LSPDocumentSymbol], relativePath: String) -> [WorkspaceSymbol] {
 		var collected: [WorkspaceSymbol] = []
-		collect(documentSymbols, relativePath: relativePath, into: &collected)
+		collect(documentSymbols, relativePath: relativePath, containerName: nil, into: &collected)
 		return collected
 	}
 
 	public static func workspaceSymbols(from symbolInformation: [LSPSymbolInformation], root: URL) -> [WorkspaceSymbol] {
 		symbolInformation.compactMap { info in
-			workspaceSymbol(name: info.name, kind: info.kind, location: info.location, root: root)
+			workspaceSymbol(name: info.name, kind: info.kind, location: info.location, root: root, containerName: info.containerName)
 		}
 	}
 
@@ -19,7 +19,7 @@ public enum LSPSymbolAdapter {
 			guard let location = symbol.location.resolvedLocation else {
 				return nil
 			}
-			return workspaceSymbol(name: symbol.name, kind: symbol.kind, location: location, root: root)
+			return workspaceSymbol(name: symbol.name, kind: symbol.kind, location: location, root: root, containerName: symbol.containerName)
 		}
 	}
 
@@ -38,7 +38,7 @@ public enum LSPSymbolAdapter {
 		}
 	}
 
-	private static func collect(_ symbols: [LSPDocumentSymbol], relativePath: String, into output: inout [WorkspaceSymbol]) {
+	private static func collect(_ symbols: [LSPDocumentSymbol], relativePath: String, containerName: String?, into output: inout [WorkspaceSymbol]) {
 		for symbol in symbols {
 			output.append(WorkspaceSymbol(
 				name: symbol.name,
@@ -47,15 +47,17 @@ public enum LSPSymbolAdapter {
 				line: max(1, symbol.selectionRange.start.line + 1),
 				column: max(1, symbol.selectionRange.start.character + 1),
 				endLine: max(1, symbol.selectionRange.end.line + 1),
-				endColumn: max(1, symbol.selectionRange.end.character + 1)
+				endColumn: max(1, symbol.selectionRange.end.character + 1),
+				signature: symbol.detail,
+				containerName: containerName
 			))
 			if let children = symbol.children, !children.isEmpty {
-				collect(children, relativePath: relativePath, into: &output)
+				collect(children, relativePath: relativePath, containerName: symbol.name, into: &output)
 			}
 		}
 	}
 
-	private static func workspaceSymbol(name: String, kind: LSPSymbolKind, location: LSPLocation, root: URL) -> WorkspaceSymbol? {
+	private static func workspaceSymbol(name: String, kind: LSPSymbolKind, location: LSPLocation, root: URL, containerName: String?) -> WorkspaceSymbol? {
 		guard let relativePath = LSPDiagnosticsAggregator.relativePath(forURI: location.uri, root: root) else {
 			return nil
 		}
@@ -66,7 +68,8 @@ public enum LSPSymbolAdapter {
 			line: max(1, location.range.start.line + 1),
 			column: max(1, location.range.start.character + 1),
 			endLine: max(1, location.range.end.line + 1),
-			endColumn: max(1, location.range.end.character + 1)
+			endColumn: max(1, location.range.end.character + 1),
+			containerName: containerName
 		)
 	}
 }

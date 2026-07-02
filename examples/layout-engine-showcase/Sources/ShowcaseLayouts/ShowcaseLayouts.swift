@@ -223,6 +223,110 @@ public struct MatrixGridLayoutEngine: LayoutEngine {
     }
 }
 
+public enum ThreeColMasterPosition: Equatable, Sendable {
+    case leading
+    case center
+}
+
+public struct FlexibleThreeColLayoutEngine: LayoutEngine {
+    public struct Config: Equatable, Sendable {
+        public let masterCount: Int
+        public let masterRatio: CGFloat
+        public let masterPosition: ThreeColMasterPosition
+
+        public init(
+            masterCount: Int = 1,
+            masterRatio: CGFloat = 0.5,
+            masterPosition: ThreeColMasterPosition = .center
+        ) {
+            self.masterCount = max(1, masterCount)
+            self.masterRatio = max(0.25, min(0.75, masterRatio))
+            self.masterPosition = masterPosition
+        }
+    }
+
+    public let id = LayoutEngineID(rawValue: "dev.olly.showcase.flex-three-col")
+    public let displayName = "Flexible ThreeCol"
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing]
+    public let config: Config
+
+    public init(config: Config = Config()) {
+        self.config = config
+    }
+
+    public func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement] {
+        guard !windows.isEmpty else { return [] }
+        let masterWindows = Array(windows.prefix(config.masterCount))
+        let slaveWindows = Array(windows.dropFirst(masterWindows.count))
+        guard !slaveWindows.isEmpty else {
+            return stack(windows: masterWindows, in: bounds, zStart: 0)
+        }
+
+        let columns = columnFrames(in: bounds)
+        let firstSideCount = (slaveWindows.count + 1) / 2
+        let secondSideCount = slaveWindows.count / 2
+        var firstSide: [WindowSnapshot] = []
+        var secondSide: [WindowSnapshot] = []
+        for (index, window) in slaveWindows.enumerated() {
+            if index.isMultiple(of: 2) {
+                firstSide.append(window)
+            } else {
+                secondSide.append(window)
+            }
+        }
+
+        return stack(windows: masterWindows, in: columns.master, zStart: 0) +
+            stack(windows: firstSide, in: columns.firstSide, zStart: masterWindows.count, expectedCount: firstSideCount) +
+            stack(
+                windows: secondSide,
+                in: columns.secondSide,
+                zStart: masterWindows.count + firstSide.count,
+                expectedCount: secondSideCount
+            )
+    }
+
+    private func columnFrames(in bounds: CGRect) -> (master: CGRect, firstSide: CGRect, secondSide: CGRect) {
+        let masterWidth = floor(bounds.width * config.masterRatio)
+        let sideWidth = (bounds.width - masterWidth) / 2
+        switch config.masterPosition {
+        case .leading:
+            let master = CGRect(x: bounds.minX, y: bounds.minY, width: masterWidth, height: bounds.height)
+            let first = CGRect(x: master.maxX, y: bounds.minY, width: sideWidth, height: bounds.height)
+            let second = CGRect(x: first.maxX, y: bounds.minY, width: bounds.maxX - first.maxX, height: bounds.height)
+            return (master, first, second)
+        case .center:
+            let first = CGRect(x: bounds.minX, y: bounds.minY, width: sideWidth, height: bounds.height)
+            let master = CGRect(x: first.maxX, y: bounds.minY, width: masterWidth, height: bounds.height)
+            let second = CGRect(x: master.maxX, y: bounds.minY, width: bounds.maxX - master.maxX, height: bounds.height)
+            return (master, first, second)
+        }
+    }
+
+    private func stack(
+        windows: [WindowSnapshot],
+        in bounds: CGRect,
+        zStart: Int,
+        expectedCount: Int? = nil
+    ) -> [Placement] {
+        guard !windows.isEmpty else { return [] }
+        let count = expectedCount ?? windows.count
+        let height = bounds.height / CGFloat(count)
+        return windows.enumerated().map { index, window in
+            let originY = bounds.minY + CGFloat(index) * height
+            return Placement(
+                windowID: window.windowID,
+                frame: CGRect(
+                    x: bounds.minX,
+                    y: originY,
+                    width: bounds.width,
+                    height: index == count - 1 ? bounds.maxY - originY : height
+                ),
+                zOrder: zStart + index
+            )
+        }
+    }
+}
+
 public struct FocusBandLayoutEngine: LayoutEngine {
     public struct Config: Equatable, Sendable {
         public let focusRatio: CGFloat

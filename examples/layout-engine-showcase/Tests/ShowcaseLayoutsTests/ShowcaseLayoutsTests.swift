@@ -4,6 +4,47 @@ import ollyLayouts
 @testable import ShowcaseLayouts
 
 final class ShowcaseLayoutsTests: XCTestCase {
+    func testDwmMonocleStacksEveryWindowAtBoundsWithFocusedWindowOnTop() {
+        let engine = DwmMonocleLayoutEngine()
+        let bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3),
+            in: bounds,
+            focus: 2
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [bounds, bounds, bounds])
+        XCTAssertEqual(placements.map(\.hidden), [false, false, false])
+        XCTAssertEqual(placements.first(where: { $0.windowID == 2 })?.zOrder, 2)
+    }
+
+    func testDwmMonocleCyclesByLayoutOrderAndWraps() {
+        let engine = DwmMonocleLayoutEngine()
+        let windows = [
+            WindowSnapshot(windowID: 30, frame: .zero, layoutOrder: 2),
+            WindowSnapshot(windowID: 10, frame: .zero, layoutOrder: 0),
+            WindowSnapshot(windowID: 20, frame: .zero, layoutOrder: 1)
+        ]
+
+        XCTAssertEqual(engine.nextFocus(windows: windows, focus: 20), 30)
+        XCTAssertEqual(engine.nextFocus(windows: windows, focus: 30), 10)
+        XCTAssertEqual(engine.previousFocus(windows: windows, focus: 10), 30)
+    }
+
+    func testDwmMonocleFallsBackToFirstOrderedWindowWhenFocusIsMissing() {
+        let engine = DwmMonocleLayoutEngine()
+        let placements = engine.arrange(
+            windows: [
+                WindowSnapshot(windowID: 2, frame: .zero, layoutOrder: 1),
+                WindowSnapshot(windowID: 1, frame: .zero, layoutOrder: 0)
+            ],
+            in: CGRect(x: 0, y: 0, width: 600, height: 400),
+            focus: 99
+        )
+
+        XCTAssertEqual(placements.first(where: { $0.windowID == 1 })?.zOrder, 1)
+    }
+
     func testFocusBandPlacesFocusedWindowInCenter() {
         let engine = FocusBandLayoutEngine(config: .init(focusRatio: 0.5))
         let placements = engine.arrange(

@@ -3,6 +3,72 @@ import ollyCore
 import ollyKit
 import ollyLayouts
 
+public struct DwmMonocleLayoutEngine: LayoutEngine {
+    public struct Config: Equatable, Sendable {
+        public let sortByLayoutOrder: Bool
+        public let focusedOnTop: Bool
+
+        public init(sortByLayoutOrder: Bool = true, focusedOnTop: Bool = true) {
+            self.sortByLayoutOrder = sortByLayoutOrder
+            self.focusedOnTop = focusedOnTop
+        }
+    }
+
+    public let id = LayoutEngineID(rawValue: "dev.olly.showcase.dwm-monocle")
+    public let displayName = "DWM Monocle"
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing]
+    public let config: Config
+
+    public init(config: Config = Config()) {
+        self.config = config
+    }
+
+    public func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement] {
+        let ordered = orderedWindows(windows)
+        guard let visibleID = visibleWindowID(windows: ordered, focus: focus) else { return [] }
+        return ordered.enumerated().map { index, window in
+            Placement(
+                windowID: window.windowID,
+                frame: bounds,
+                zOrder: zOrder(index: index, count: ordered.count, isFocused: window.windowID == visibleID),
+                hidden: false
+            )
+        }
+    }
+
+    public func nextFocus(windows: [WindowSnapshot], focus: WindowID?) -> WindowID? {
+        cycleFocus(windows: windows, focus: focus, reverse: false)
+    }
+
+    public func previousFocus(windows: [WindowSnapshot], focus: WindowID?) -> WindowID? {
+        cycleFocus(windows: windows, focus: focus, reverse: true)
+    }
+
+    private func orderedWindows(_ windows: [WindowSnapshot]) -> [WindowSnapshot] {
+        config.sortByLayoutOrder ? windows.sorted(by: WindowSnapshot.precedes) : windows
+    }
+
+    private func visibleWindowID(windows: [WindowSnapshot], focus: WindowID?) -> WindowID? {
+        if let focus, windows.contains(where: { $0.windowID == focus }) {
+            return focus
+        }
+        return windows.first?.windowID
+    }
+
+    private func cycleFocus(windows: [WindowSnapshot], focus: WindowID?, reverse: Bool) -> WindowID? {
+        let ids = orderedWindows(windows).map(\.windowID)
+        guard !ids.isEmpty else { return nil }
+        let currentIndex = focus.flatMap { ids.firstIndex(of: $0) } ?? (reverse ? 0 : ids.count - 1)
+        let offset = reverse ? -1 : 1
+        return ids[(currentIndex + offset + ids.count) % ids.count]
+    }
+
+    private func zOrder(index: Int, count: Int, isFocused: Bool) -> Int {
+        guard config.focusedOnTop else { return index }
+        return isFocused ? count - 1 : index
+    }
+}
+
 public struct FocusBandLayoutEngine: LayoutEngine {
     public struct Config: Equatable, Sendable {
         public let focusRatio: CGFloat

@@ -45,6 +45,53 @@ final class ShowcaseLayoutsTests: XCTestCase {
         XCTAssertEqual(placements.first(where: { $0.windowID == 1 })?.zOrder, 1)
     }
 
+    func testDwindleSpiralUsesClockwiseDirectionSequence() {
+        let engine = DwindleSpiralLayoutEngine(config: .init(ratio: 0.5, startDirection: .right, clockwise: true))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3, 4),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 0, width: 400, height: 600),
+            CGRect(x: 400, y: 0, width: 400, height: 300),
+            CGRect(x: 600, y: 300, width: 200, height: 300),
+            CGRect(x: 400, y: 300, width: 200, height: 300)
+        ])
+    }
+
+    func testDwindleSpiralCanReverseChirality() {
+        let engine = DwindleSpiralLayoutEngine(config: .init(ratio: 0.5, startDirection: .right, clockwise: false))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3, 4),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 0, width: 400, height: 600),
+            CGRect(x: 400, y: 300, width: 400, height: 300),
+            CGRect(x: 600, y: 0, width: 200, height: 300),
+            CGRect(x: 400, y: 0, width: 200, height: 300)
+        ])
+    }
+
+    func testDwindleSpiralClampsExtremeRatios() {
+        XCTAssertEqual(DwindleSpiralLayoutEngine.Config(ratio: 0.05).ratio, 0.2)
+        XCTAssertEqual(DwindleSpiralLayoutEngine.Config(ratio: 0.95).ratio, 0.8)
+    }
+
+    func testDwindleSpiralHandlesEmptyAndSingleWindowInputs() {
+        let engine = DwindleSpiralLayoutEngine()
+        let bounds = CGRect(x: 0, y: 0, width: 500, height: 300)
+
+        XCTAssertTrue(engine.arrange(windows: [], in: bounds, focus: nil).isEmpty)
+        XCTAssertEqual(engine.arrange(windows: windows(1), in: bounds, focus: nil), [
+            Placement(windowID: 1, frame: bounds)
+        ])
+    }
+
     func testFocusBandPlacesFocusedWindowInCenter() {
         let engine = FocusBandLayoutEngine(config: .init(focusRatio: 0.5))
         let placements = engine.arrange(

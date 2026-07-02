@@ -69,6 +69,96 @@ public struct DwmMonocleLayoutEngine: LayoutEngine {
     }
 }
 
+public enum SpiralStartDirection: CaseIterable, Equatable, Sendable {
+    case right
+    case down
+    case left
+    case up
+}
+
+public struct DwindleSpiralLayoutEngine: LayoutEngine {
+    public struct Config: Equatable, Sendable {
+        public let ratio: CGFloat
+        public let startDirection: SpiralStartDirection
+        public let clockwise: Bool
+
+        public init(
+            ratio: CGFloat = 0.5,
+            startDirection: SpiralStartDirection = .right,
+            clockwise: Bool = true
+        ) {
+            self.ratio = max(0.2, min(0.8, ratio))
+            self.startDirection = startDirection
+            self.clockwise = clockwise
+        }
+    }
+
+    public let id = LayoutEngineID(rawValue: "dev.olly.showcase.dwindle-spiral")
+    public let displayName = "Dwindle Spiral"
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing]
+    public let config: Config
+
+    public init(config: Config = Config()) {
+        self.config = config
+    }
+
+    public func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement] {
+        guard !windows.isEmpty else { return [] }
+        var remainder = bounds
+        var directionIndex = Self.directionIndex(config.startDirection)
+        return windows.enumerated().map { index, window in
+            if index == windows.count - 1 {
+                return Placement(windowID: window.windowID, frame: remainder, zOrder: index)
+            }
+
+            let split = splitFrame(remainder, direction: Self.directions[directionIndex])
+            remainder = split.remainder
+            directionIndex = nextDirectionIndex(directionIndex)
+            return Placement(windowID: window.windowID, frame: split.window, zOrder: index)
+        }
+    }
+
+    private func splitFrame(_ frame: CGRect, direction: SpiralStartDirection) -> (window: CGRect, remainder: CGRect) {
+        switch direction {
+        case .right:
+            let width = floor(frame.width * config.ratio)
+            return (
+                CGRect(x: frame.minX, y: frame.minY, width: width, height: frame.height),
+                CGRect(x: frame.minX + width, y: frame.minY, width: frame.width - width, height: frame.height)
+            )
+        case .down:
+            let height = floor(frame.height * config.ratio)
+            return (
+                CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: height),
+                CGRect(x: frame.minX, y: frame.minY + height, width: frame.width, height: frame.height - height)
+            )
+        case .left:
+            let width = floor(frame.width * config.ratio)
+            return (
+                CGRect(x: frame.maxX - width, y: frame.minY, width: width, height: frame.height),
+                CGRect(x: frame.minX, y: frame.minY, width: frame.width - width, height: frame.height)
+            )
+        case .up:
+            let height = floor(frame.height * config.ratio)
+            return (
+                CGRect(x: frame.minX, y: frame.maxY - height, width: frame.width, height: height),
+                CGRect(x: frame.minX, y: frame.minY, width: frame.width, height: frame.height - height)
+            )
+        }
+    }
+
+    private func nextDirectionIndex(_ index: Int) -> Int {
+        let offset = config.clockwise ? 1 : -1
+        return (index + offset + Self.directions.count) % Self.directions.count
+    }
+
+    private static let directions: [SpiralStartDirection] = [.right, .down, .left, .up]
+
+    private static func directionIndex(_ direction: SpiralStartDirection) -> Int {
+        directions.firstIndex(of: direction) ?? 0
+    }
+}
+
 public struct FocusBandLayoutEngine: LayoutEngine {
     public struct Config: Equatable, Sendable {
         public let focusRatio: CGFloat

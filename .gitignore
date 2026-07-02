@@ -6,6 +6,7 @@ Itsy.app/
 dist/
 bench/traces/*.trace/
 bench/corpus/huge.log
+bench/corpus/huge-text.log
 bench/results/*.json
 !bench/results/baseline-itsy-current.json
 !.gitkeep

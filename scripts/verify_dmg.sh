@@ -39,11 +39,13 @@ fi
 
 app="${apps[0]}"
 plist="$app/Contents/Info.plist"
-executable="$app/Contents/MacOS/Itsy"
 bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")"
+expected_bundle_id="${ITSY_EXPECTED_BUNDLE_ID:-dev.itsy.editor}"
+executable_name="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$plist")"
+executable="$app/Contents/MacOS/$executable_name"
 
-if [[ "$bundle_id" != "dev.itsy.editor" ]]; then
-	echo "unexpected bundle id: $bundle_id" >&2
+if [[ "$bundle_id" != "$expected_bundle_id" ]]; then
+	echo "unexpected bundle id: $bundle_id; expected $expected_bundle_id" >&2
 	exit 1
 fi
 

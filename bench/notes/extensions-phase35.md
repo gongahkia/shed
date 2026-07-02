@@ -13,6 +13,7 @@ Implemented slice:
 - added `VouchStore` parser/API for the documented local VOUCHED format.
 - added default repo/user/project VOUCHED URL order helper.
 - deny records take precedence over allow records.
+- added `ExtensionCommandMapper` for scoped command registry IDs and explicit extension command dispatch.
 
 References checked:
 
@@ -26,17 +27,20 @@ Verification:
 test -f docs/design/extensions.md
 swift test --filter ExtensionManifest
 swift test --filter VouchStore
+swift test --filter extensionCommandMapper
 ```
 
 Result:
 
-- `ExtensionManifest`: 5 tests passed.
+- `ExtensionManifest`: 6 tests passed.
 - `VouchStore`: 5 tests passed.
+- `extensionCommandMapper`: 1 test passed.
+- `CommandRegistry`: 2 tests passed.
 - `docs/design/extensions.md`: exists; references and non-goals grep passed.
 
 Remaining for #7:
 
-- command registry wiring.
+- app-level command registry loading for installed extension manifests.
 - keymap/theme/snippet/grammar/problem-matcher registration.
 - Vouch parser property tests.
 - install-time trust/integrity enforcement and `vouch` CLI integration.

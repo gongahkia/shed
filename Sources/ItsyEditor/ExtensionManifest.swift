@@ -239,3 +239,26 @@ public enum ExtensionTaskMapper {
 		}
 	}
 }
+
+public enum ExtensionCommandMapper {
+	public static func commands(from manifest: ExtensionManifest, run: @escaping (ExtensionManifest, ExtensionCommandContribution) -> Void) -> [Command] {
+		manifest.contributes.commands.map { contribution in
+			Command(
+				id: commandID(manifest: manifest, contribution: contribution),
+				title: commandTitle(contribution),
+				run: { run(manifest, contribution) }
+			)
+		}
+	}
+
+	public static func commandID(manifest: ExtensionManifest, contribution: ExtensionCommandContribution) -> String {
+		"extension:\(manifest.identifier):\(contribution.id)"
+	}
+
+	private static func commandTitle(_ contribution: ExtensionCommandContribution) -> String {
+		guard let category = contribution.category?.trimmingCharacters(in: .whitespacesAndNewlines), !category.isEmpty else {
+			return contribution.title
+		}
+		return "\(category): \(contribution.title)"
+	}
+}

@@ -159,6 +159,39 @@ import Testing
 	}
 }
 
+@Test func extensionCommandMapperScopesCommandsAndDispatchesRunner() throws {
+	let manifest = ExtensionManifest(
+		schemaVersion: 2,
+		identifier: "dev.example.commands",
+		name: "Commands",
+		version: "0.2.0",
+		contributes: ExtensionContributions(commands: [
+			ExtensionCommandContribution(id: "openInspector", title: "Open Inspector", category: "Tools"),
+			ExtensionCommandContribution(id: "reload", title: "Reload"),
+		])
+	)
+	var transcript: [String] = []
+	let commands = ExtensionCommandMapper.commands(from: manifest) { manifest, contribution in
+		transcript.append("\(manifest.identifier):\(contribution.id)")
+	}
+
+	#expect(commands.map(\.id) == [
+		"extension:dev.example.commands:openInspector",
+		"extension:dev.example.commands:reload",
+	])
+	#expect(commands.map(\.title) == ["Tools: Open Inspector", "Reload"])
+
+	var registry = CommandRegistry()
+	try registry.register(commands)
+	try registry.run(id: "extension:dev.example.commands:openInspector")
+	try registry.run(id: "extension:dev.example.commands:reload")
+
+	#expect(transcript == [
+		"dev.example.commands:openInspector",
+		"dev.example.commands:reload",
+	])
+}
+
 private final class TemporaryExtensionFixture {
 	let root: URL
 

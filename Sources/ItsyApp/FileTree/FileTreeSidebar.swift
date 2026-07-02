@@ -1,6 +1,5 @@
 // @file workspace file-tree sidebar and file event watching.
 import AppKit
-import CoreServices
 import ItsyEditor
 import OSLog
 
@@ -17,7 +16,7 @@ enum ItsyWorkspaceController {
 	private static var workspaceIndex: WorkspaceIndex?
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
-	private static var indexWatcher: FSEventStreamRef?
+	private static var indexWatcher: WorkspaceFSEventStream?
 
 	static var currentRootURL: URL? {
 		rootURL
@@ -95,57 +94,34 @@ enum ItsyWorkspaceController {
 		guard let root = rootURL else {
 			return
 		}
-		let paths = [root.path] as CFArray
-		var context = FSEventStreamContext(version: 0, info: nil, retain: nil, release: nil, copyDescription: nil)
-		let callback: FSEventStreamCallback = { _, _, _, paths, _, _ in
-			let cfPaths = unsafeBitCast(paths, to: CFArray.self)
-			var urls: [URL] = []
-			for index in 0 ..< CFArrayGetCount(cfPaths) {
-				let pointer = CFArrayGetValueAtIndex(cfPaths, index)
-				let cfString = unsafeBitCast(pointer, to: CFString.self)
-				urls.append(URL(fileURLWithPath: cfString as String))
-			}
-			workspaceLogger.debug("Workspace index event count: \(urls.count, privacy: .public)")
+		let watcher = WorkspaceFSEventStream(root: root) { batch in
+			workspaceLogger.debug("Workspace index event count: \(batch.events.count, privacy: .public)")
 			DispatchQueue.main.async {
-				ItsyWorkspaceController.applyIndexFileChanges(urls)
+				ItsyWorkspaceController.applyIndexFileChanges(batch)
 			}
 		}
-		guard let stream = FSEventStreamCreate(
-			kCFAllocatorDefault,
-			callback,
-			&context,
-			paths,
-			FSEventStreamEventId(kFSEventStreamEventIdSinceNow),
-			0.2,
-			indexWatcherFlags
-		) else {
+		guard watcher.start() else {
 			workspaceLogger.error("Failed to start workspace index watcher")
 			return
 		}
-		FSEventStreamSetDispatchQueue(stream, DispatchQueue.main)
-		FSEventStreamStart(stream)
-		indexWatcher = stream
+		indexWatcher = watcher
 		workspaceLogger.info("Started workspace index watcher")
 	}
 
-	private static var indexWatcherFlags: UInt32 {
-		UInt32(kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer | kFSEventStreamCreateFlagUseCFTypes)
-	}
-
 	private static func stopIndexWatcher() {
-		guard let stream = indexWatcher else {
-			return
-		}
-		FSEventStreamStop(stream)
-		FSEventStreamInvalidate(stream)
-		FSEventStreamRelease(stream)
+		indexWatcher?.stop()
 		indexWatcher = nil
 	}
 
-	fileprivate static func applyIndexFileChanges(_ urls: [URL]) {
+	fileprivate static func applyIndexFileChanges(_ batch: WorkspaceFileEventBatch) {
+		if batch.requiresFullRescan {
+			rebuildWorkspaceIndex()
+			return
+		}
 		guard var index = workspaceIndex, let matcher = gitIgnoreMatcher else {
 			return
 		}
+		let urls = batch.events.map(\.url)
 		WorkspaceIndexer.reindex(&index, changedURLs: urls, matcher: matcher)
 		workspaceIndex = index
 	}

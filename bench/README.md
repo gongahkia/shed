@@ -10,6 +10,7 @@
   - `small.ts` (1 kLOC)
   - `large.ts` (100 kLOC)
   - `huge.log` (1 GB synthetic, gitignored — generated via script)
+  - `huge-text.log` (1 GiB pseudo-random ASCII, newline every 80 bytes, gitignored — generated via script)
   - `cold.empty` (no file)
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
@@ -20,6 +21,7 @@
 ```sh
 itsybench display [--display <id>]
 itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
+itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```

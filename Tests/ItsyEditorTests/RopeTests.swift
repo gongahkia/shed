@@ -120,38 +120,6 @@ func ropeRandomEditsMatchCharacterArray(seed: UInt64) {
 	#expect(rebuilt == text)
 }
 
-@Test func ropeRepeatedASCIIFastPathPreservesCoreQueries() {
-	var rope = Rope()
-	for _ in 0 ..< 1_000 {
-		rope.insert("a", at: rope.length / 2)
-	}
-	#expect(rope.length == 1_000)
-	#expect(rope.graphemeCount == 1_000)
-	#expect(rope.lineCount == 1)
-	#expect(rope.slice(10 ..< 42) == String(repeating: "a", count: 32))
-	#expect(rope.chunk(at: 990, maxBytes: 20) == String(repeating: "a", count: 10))
-	var buffer = [UInt8](repeating: 0, count: 8)
-	let copied = buffer.withUnsafeMutableBufferPointer { pointer in
-		rope.copyUTF8Chunk(at: 3, maxBytes: 8, into: pointer.baseAddress!)
-	}
-	#expect(copied == 8)
-	#expect(buffer == [UInt8](repeating: 97, count: 8))
-	rope.remove(100 ..< 200)
-	#expect(rope.length == 900)
-	rope.insert("b", at: 450)
-	#expect(rope.slice(448 ..< 453) == "aabaa")
-	#expect(rope.validateInvariants())
-}
-
-@Test func ropeRepeatedNewlineFastPathPreservesLineQueries() {
-	let rope = Rope(String(repeating: "\n", count: 4))
-	#expect(rope.lineCount == 5)
-	#expect(rope.lineRange(0) == 0 ..< 0)
-	#expect(rope.lineRange(4) == 4 ..< 4)
-	#expect(rope.offset(forLine: 3) == 3)
-	#expect(rope.line(forOffset: 3) == 3)
-}
-
 private struct SeededRNG {
 	private var state: UInt64
 

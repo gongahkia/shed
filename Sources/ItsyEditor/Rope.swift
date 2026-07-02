@@ -1,35 +1,19 @@
 public struct Rope: Sendable {
 	private var root: RopeNode
-	private var repeatedASCII: RepeatedASCII?
 
 	public init(_ string: String = "") {
-		if let repeatedASCII = RepeatedASCII(string) {
-			root = RopeNode(text: "")
-			self.repeatedASCII = repeatedASCII
-		} else {
-			root = RopeNode.build(from: string)
-			repeatedASCII = nil
-		}
+		root = RopeNode.build(from: string)
 	}
 
 	public var length: Int {
-		if let repeatedASCII {
-			return repeatedASCII.count
-		}
 		return root.summary.utf8Bytes
 	}
 
 	public var lineCount: Int {
-		if let repeatedASCII {
-			return repeatedASCII.lineCount
-		}
 		return root.summary.lines + 1
 	}
 
 	public var graphemeCount: Int {
-		if let repeatedASCII {
-			return repeatedASCII.count
-		}
 		return root.summary.graphemes
 	}
 
@@ -38,15 +22,6 @@ public struct Rope: Sendable {
 		guard !string.isEmpty else {
 			return
 		}
-		if repeatedASCII == nil, root.summary.utf8Bytes == 0, let byte = string.singleASCIIByte {
-			repeatedASCII = RepeatedASCII(byte: byte, count: 1)
-			return
-		}
-		if let byte = string.singleASCIIByte, repeatedASCII?.byte == byte {
-			repeatedASCII?.count += 1
-			return
-		}
-		materializeRepeatedASCII()
 		root = RopeNode.buildTree(from: root.inserting(string, at: offset))
 	}
 
@@ -55,23 +30,12 @@ public struct Rope: Sendable {
 		guard !range.isEmpty else {
 			return
 		}
-		if repeatedASCII != nil {
-			repeatedASCII?.count -= range.count
-			if repeatedASCII?.count == 0 {
-				repeatedASCII = nil
-				root = RopeNode(text: "")
-			}
-			return
-		}
 		let nodes = root.removing(range)
 		root = nodes.isEmpty ? RopeNode(text: "") : RopeNode.buildTree(from: nodes)
 	}
 
 	public func slice(_ range: Range<Int>) -> String {
 		precondition(range.lowerBound >= 0 && range.upperBound <= length, "slice range out of bounds")
-		if let repeatedASCII {
-			return repeatedASCII.string(count: range.count)
-		}
 		var result = ""
 		result.reserveCapacity(range.count)
 		root.appendSlice(range, into: &result)
@@ -83,9 +47,6 @@ public struct Rope: Sendable {
 		precondition(maxBytes > 0, "chunk size must be positive")
 		guard offset < length else {
 			return ""
-		}
-		if let repeatedASCII {
-			return repeatedASCII.string(count: min(maxBytes, repeatedASCII.count - offset))
 		}
 		var chunk = ""
 		chunk.reserveCapacity(maxBytes)
@@ -99,11 +60,6 @@ public struct Rope: Sendable {
 		guard offset < length else {
 			return 0
 		}
-		if let repeatedASCII {
-			let count = min(maxBytes, repeatedASCII.count - offset)
-			buffer.initialize(repeating: repeatedASCII.byte, count: count)
-			return count
-		}
 		return root.copyUTF8Chunk(at: offset, maxBytes: maxBytes, into: buffer)
 	}
 
@@ -111,9 +67,6 @@ public struct Rope: Sendable {
 		precondition(index >= 0, "line index out of bounds")
 		guard index < lineCount else {
 			return length ..< length
-		}
-		if let repeatedASCII {
-			return repeatedASCII.lineRange(index)
 		}
 		let start = offset(forLine: index)
 		let next = index + 1 < lineCount ? offset(forLine: index + 1) : length
@@ -126,25 +79,16 @@ public struct Rope: Sendable {
 		guard line < lineCount else {
 			return length
 		}
-		if let repeatedASCII {
-			return repeatedASCII.offset(forLine: line)
-		}
 		return root.offset(forLine: line)
 	}
 
 	public func line(forOffset offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
-		if let repeatedASCII {
-			return repeatedASCII.line(forOffset: offset)
-		}
 		return root.line(forOffset: offset)
 	}
 
 	public func graphemeIndex(forOffset offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
-		if repeatedASCII != nil {
-			return offset
-		}
 		var bytes = 0
 		var graphemes = 0
 		for character in root.text {
@@ -159,66 +103,7 @@ public struct Rope: Sendable {
 	}
 
 	func validateInvariants() -> Bool {
-		if repeatedASCII != nil {
-			return true
-		}
 		return root.validate()
-	}
-
-	private mutating func materializeRepeatedASCII() {
-		guard let repeatedASCII else {
-			return
-		}
-		root = RopeNode.build(from: repeatedASCII.string(count: repeatedASCII.count))
-		self.repeatedASCII = nil
-	}
-}
-
-private struct RepeatedASCII: Sendable, Equatable {
-	var byte: UInt8
-	var count: Int
-
-	init?( _ string: String) {
-		guard let byte = string.repeatedASCIIByte else {
-			return nil
-		}
-		self.byte = byte
-		count = string.utf8.count
-	}
-
-	init(byte: UInt8, count: Int) {
-		self.byte = byte
-		self.count = count
-	}
-
-	var lineCount: Int {
-		byte == 10 ? count + 1 : 1
-	}
-
-	func string(count: Int) -> String {
-		guard count > 0 else {
-			return ""
-		}
-		return String(unsafeUninitializedCapacity: count) { buffer in
-			buffer.initialize(repeating: byte)
-			return count
-		}
-	}
-
-	func lineRange(_ index: Int) -> Range<Int> {
-		if byte == 10 {
-			let offset = min(index, count)
-			return offset ..< offset
-		}
-		return index == 0 ? 0 ..< count : count ..< count
-	}
-
-	func offset(forLine line: Int) -> Int {
-		byte == 10 ? min(line, count) : (line == 0 ? 0 : count)
-	}
-
-	func line(forOffset offset: Int) -> Int {
-		byte == 10 ? offset : 0
 	}
 }
 
@@ -513,20 +398,6 @@ private struct RopeSummary: Equatable, Sendable {
 }
 
 private extension String {
-	var singleASCIIByte: UInt8? {
-		guard utf8.count == 1, let byte = utf8.first, byte < 128 else {
-			return nil
-		}
-		return byte
-	}
-
-	var repeatedASCIIByte: UInt8? {
-		guard let first = utf8.first, first < 128, utf8.allSatisfy({ $0 == first }) else {
-			return nil
-		}
-		return first
-	}
-
 	func index(atUTF8Offset offset: Int) -> String.Index {
 		precondition((0 ... utf8.count).contains(offset), "utf8 offset out of bounds")
 		let utf8Index = utf8.index(utf8.startIndex, offsetBy: offset)

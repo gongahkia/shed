@@ -205,7 +205,6 @@ Design decision to record in `docs/design/textstack.md` before implementation (i
 - Piece tree: red-black tree of pieces keyed by cumulative UTF-8 byte offset; each node caches per-subtree byte + line + grapheme counts (summary metric, like SumTree).
 - Public surface identical to today's `Rope` (`insert`, `remove`, `slice`, `chunk`, `copyUTF8Chunk`, `line(forOffset:)`, `offset(forLine:)`, `lineRange`, `length`, `lineCount`, `graphemeCount`). Old `Rope` type kept, delegates to piece tree behind a feature flag until id:924.
 
-(B) 2026-07-01 +Phase22-TextStack @editor id:922 est:4h dep:912 Property fuzz tests: 1M random insert/remove/slice sequences on `PieceTree` matching oracle `Array<UInt8>`. Include grapheme boundary invariants: `graphemeIndex(forOffset:)` monotone non-decreasing, matches Swift's `Character` iteration over `substring(0..<length)`.
 (A) 2026-07-01 +Phase22-TextStack @bench id:923 est:2h dep:922 Add micro-bench `ItsyBench piecetree --ops <N>`: sequential insert, random insert, random remove, random 32-byte slice, mmap-load 1 GB. Publish `bench/notes/piecetree-bench.md` with numbers.
 (A) 2026-07-01 +Phase22-TextStack @editor id:924 est:1h dep:923 Flip default: `settings.toml` `storage = "piecetree"` becomes default; `rope` becomes fallback via env. Bump default storage in `ItsyConfig.EditorSettings`.
 (A) 2026-07-01 +Phase22-TextStack @refactor id:925 est:2h dep:924 Checkpoint: `swift test`, `ItsyBench open --file bench/corpus/huge-text.log`, regression bench. Attach numbers to `bench/notes/textstack-phase22.md`.

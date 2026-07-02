@@ -242,7 +242,6 @@ Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8
 
 ## Phase 27 — Keymap parity (vim + emacs + plain)
 
-(B) 2026-07-01 +Phase27-Keymaps @keymap id:1123 est:1h dep:1120,1121,1122 Regenerate `docs/keymap-reference.md` via `scripts/gen_keymap_docs.swift`.
 (C) 2026-07-01 +Phase27-Keymaps @keymap id:1124 est:2h Add a keymap validator: `scripts/validate_keymaps.swift` runs at CI-time and asserts every command id referenced in a `.toml` exists in `CommandRegistry`. Failing commands print the file:line.
 
 ---

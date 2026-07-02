@@ -719,6 +719,10 @@ final class EditorWindowController: NSWindowController {
 		switch commandID {
 		case "file.open":
 			NSDocumentController.shared.openDocument(nil)
+		case "app.quit":
+			NSApp.terminate(nil)
+		case "view.commandPalette":
+			return NSApp.sendAction(#selector(AppCoordinator.toggleCommandPalette(_:)), to: nil, from: self)
 		case "file.nextBuffer":
 			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
 		case "file.previousBuffer":

@@ -640,6 +640,7 @@ private final class TestGutterDecorator: GutterDecorator {
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("b")], commandID: "file.nextBuffer"),
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("2")], commandID: "pane.splitHorizontal"),
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("3")], commandID: "pane.splitVertical"),
+		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .option)], commandID: "view.commandPalette"),
 	])
 
 	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
@@ -648,7 +649,8 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
 	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
 	#expect(view.handleKey(characters: "3", charactersIgnoringModifiers: "3", keyCode: 0))
-	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical"])
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .option))
+	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical", "view.commandPalette"])
 }
 
 @Test func emacsIncrementalSearchCommandsRouteToHost() {

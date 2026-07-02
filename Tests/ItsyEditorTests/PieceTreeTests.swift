@@ -68,6 +68,15 @@ import Testing
 	])
 }
 
+@Test func pieceTreeReplaceReturnsReverseEditForUndo() {
+	var tree = PieceTree("alpha beta")
+	let reverse = tree.replace(6 ..< 10, with: "B")
+	#expect(tree.substring(0 ..< tree.length) == "alpha B")
+	#expect(reverse == Edit(range: 6 ..< 7, removed: Data("B".utf8), inserted: Data("beta".utf8)))
+	tree.replace(reverse.range, with: reverse.inserted)
+	#expect(tree.substring(0 ..< tree.length) == "alpha beta")
+}
+
 @Test func pieceTreeIteratesContiguousByteSpansFromOffset() {
 	var tree = PieceTree("abc")
 	tree.insert("DEF", at: 1)

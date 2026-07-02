@@ -220,6 +220,35 @@ public struct PieceTree: Sendable {
 		rebuild(from: coalesced(output))
 	}
 
+	@discardableResult
+	public mutating func replace(_ range: Range<Int>, with string: String) -> Edit {
+		replace(range, with: Array(string.utf8))
+	}
+
+	@discardableResult
+	public mutating func replace(_ range: Range<Int>, with data: Data) -> Edit {
+		replace(range, with: Array(data))
+	}
+
+	@discardableResult
+	public mutating func replace(_ range: Range<Int>, with bytes: [UInt8]) -> Edit {
+		precondition(range.lowerBound >= 0 && range.upperBound <= length, "replace range out of bounds")
+		var removed: [UInt8] = []
+		removed.reserveCapacity(range.count)
+		appendBytes(in: range, into: &removed)
+		if !range.isEmpty {
+			remove(range)
+		}
+		if !bytes.isEmpty {
+			insert(bytes, at: range.lowerBound)
+		}
+		return Edit(
+			range: range.lowerBound ..< range.lowerBound + bytes.count,
+			removed: Data(bytes),
+			inserted: Data(removed)
+		)
+	}
+
 	public func iterateBytes(from offset: Int, _ body: (UnsafeBufferPointer<UInt8>) throws -> Bool) rethrows {
 		precondition((0 ... length).contains(offset), "iteration offset out of bounds")
 		guard offset < length else {

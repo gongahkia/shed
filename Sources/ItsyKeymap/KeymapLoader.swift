@@ -31,6 +31,10 @@ public enum KeymapLoader {
 		return bindings
 	}
 
+	public static func binding(mode: Mode, key: String, commandID: String) throws -> KeyBinding {
+		KeyBinding(mode: mode, chord: try parseChord(key), commandID: commandID)
+	}
+
 	private static func parseSection(_ line: String) throws -> Mode {
 		guard line.hasSuffix("]") else {
 			throw KeymapLoaderError.invalidSection(line)
@@ -86,7 +90,7 @@ public enum KeymapLoader {
 
 	private static func parseKeyToken(_ token: String) throws -> Key {
 		var modifiers: KeyModifiers = []
-		var pieces = token.split(separator: "-", omittingEmptySubsequences: true).map(String.init)
+		var pieces = keyTokenPieces(token)
 		guard let keyName = pieces.popLast() else {
 			throw KeymapLoaderError.invalidKey(token)
 		}
@@ -122,7 +126,14 @@ public enum KeymapLoader {
 	}
 
 	private static func isModifiedKey(_ value: String) -> Bool {
-		value.contains("-")
+		value.contains("-") || value.split(separator: "+", omittingEmptySubsequences: true).count > 1
+	}
+
+	private static func keyTokenPieces(_ token: String) -> [String] {
+		if token.contains("-") {
+			return token.split(separator: "-", omittingEmptySubsequences: true).map(String.init)
+		}
+		return token.split(separator: "+", omittingEmptySubsequences: true).map(String.init)
 	}
 
 	private static func specialKeyName(_ value: String) -> String? {

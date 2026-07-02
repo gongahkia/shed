@@ -59,6 +59,7 @@ final class AppCoordinator: NSObject {
 		super.init()
 		_ = settingsCoordinator.currentSettings
 		commandPaletteCoordinator.installBridge()
+		installCommandBridge()
 	}
 
 
@@ -349,6 +350,14 @@ final class AppCoordinator: NSObject {
 		}
 	}
 
+	private func extensionKeybindings(from workspaceRoot: URL, commandRegistry: CommandRegistry) -> [KeyBinding] {
+		ExtensionKeybindingMapper.discover(
+			root: workspaceRoot,
+			mode: ItsyAppKeymap.currentInitialMode,
+			validCommandIDs: Set(commandRegistry.allCommands.map(\.id))
+		)
+	}
+
 	private func activeDocument() -> NSDocument? {
 		NSApp.keyWindow?.windowController?.document as? NSDocument ?? documentController.currentDocument
 	}
@@ -527,6 +536,7 @@ final class AppCoordinator: NSObject {
 	private func openWorkspace(at url: URL) -> Bool {
 		ItsyWorkspaceController.openWorkspace(at: url)
 		commandRegistry = makeCommandRegistry(workspaceRoot: url)
+		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: url, commandRegistry: commandRegistry))
 		if documentController.documents.isEmpty {
 			do {
 				_ = try documentController.openUntitledDocumentAndDisplay(true)
@@ -542,6 +552,21 @@ final class AppCoordinator: NSObject {
 		NSApp.servicesProvider = self
 		NSRegisterServicesProvider(self, "Itsy")
 		NSUpdateDynamicServices()
+	}
+
+	private func installCommandBridge() {
+		ItsyAppCommandBridge.runCommand = { [weak self] commandID in
+			guard let self else {
+				return false
+			}
+			do {
+				try self.commandRegistry.run(id: commandID)
+				return true
+			} catch {
+				NSLog("failed to run command \(commandID): \(error)")
+				return false
+			}
+		}
 	}
 
 	@objc func openSelection(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {

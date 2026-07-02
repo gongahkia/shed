@@ -481,20 +481,26 @@ public struct Editor: Sendable {
 		let selectionBefore = selections
 		var recordedEdits: [Edit] = []
 		var reverseEdits: [Edit] = []
-		var carets: [Selection] = []
 		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
 			let reverse = textStorage.replace(range, with: string)
 			let edit = Edit(range: range, removed: reverse.inserted, inserted: reverse.removed, selectionBefore: selectionBefore)
 			recordedEdits.append(edit)
 			reverseEdits.append(reverse)
-			let caret = range.lowerBound + string.utf8.count
-			carets.append(Selection(anchor: caret, head: caret))
 		}
-		carets.reverse()
+		let carets = replacementCarets(for: normalized, insertedLength: string.utf8.count)
 		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
 		lastEditBatch = Array(recordedEdits.reversed())
 		for (edit, reverse) in zip(recordedEdits.reversed(), reverseEdits.reversed()) {
 			history.record(edit, reverse: reverse, selectionBefore: selectionBefore, selectionAfter: selections)
+		}
+	}
+
+	private func replacementCarets(for ranges: [Range<Int>], insertedLength: Int) -> [Selection] {
+		var shift = 0
+		return ranges.sorted { $0.lowerBound < $1.lowerBound }.map { range in
+			let caret = range.lowerBound + shift + insertedLength
+			shift += insertedLength - range.count
+			return Selection(anchor: caret, head: caret)
 		}
 	}
 

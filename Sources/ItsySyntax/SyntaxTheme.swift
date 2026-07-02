@@ -44,6 +44,18 @@ public struct SyntaxTheme: Sendable, Equatable {
 	public static let selectedThemeDefaultsKey = "dev.itsy.editor.syntaxTheme"
 	public static let userThemeDirectoryName = "themes"
 	public static let defaultChoiceID = "bundled:default-light"
+	public static let bundledChoices = [
+		SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark"),
+		SyntaxThemeChoice(id: "bundled:default-light", displayName: "Default Light"),
+		SyntaxThemeChoice(id: "bundled:solarized-light", displayName: "Solarized Light"),
+		SyntaxThemeChoice(id: "bundled:solarized-dark", displayName: "Solarized Dark"),
+		SyntaxThemeChoice(id: "bundled:gruvbox-light", displayName: "Gruvbox Light"),
+		SyntaxThemeChoice(id: "bundled:gruvbox-dark", displayName: "Gruvbox Dark"),
+		SyntaxThemeChoice(id: "bundled:nord", displayName: "Nord"),
+		SyntaxThemeChoice(id: "bundled:catppuccin-mocha", displayName: "Catppuccin Mocha"),
+		SyntaxThemeChoice(id: "bundled:catppuccin-latte", displayName: "Catppuccin Latte"),
+		SyntaxThemeChoice(id: "bundled:tokyo-night", displayName: "Tokyo Night"),
+	]
 	public static let standardCaptures = [
 		"keyword.control",
 		"keyword.function",
@@ -241,10 +253,7 @@ public struct SyntaxTheme: Sendable, Equatable {
 	}
 
 	public static func availableChoices(fileManager: FileManager = .default) -> [SyntaxThemeChoice] {
-		var choices = [
-			SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark"),
-			SyntaxThemeChoice(id: "bundled:default-light", displayName: "Default Light"),
-		]
+		var choices = bundledChoices
 		let userThemesURL = userThemesDirectory(fileManager: fileManager)
 		let urls = (try? fileManager.contentsOfDirectory(
 			at: userThemesURL,

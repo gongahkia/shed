@@ -132,7 +132,7 @@ let package = Package(
 				.unsafeFlags(["-O3"], .when(configuration: .release)),
 			]
 		),
-		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyLSP"]),
+		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyLSP"], resources: [.copy("Fixtures")]),
 		.testTarget(name: "ItsyConfigTests", dependencies: ["ItsyConfig"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim"]),

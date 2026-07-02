@@ -103,6 +103,19 @@ import Testing
 	#expect(editorTextStorageString(editor) == "ell")
 }
 
+@Test func editorPieceTreeDeletesWholeGraphemeClusters() {
+	let text = "a👩‍💻b"
+	var backward = Editor(text: text, storage: .pieceTree)
+	backward.setSelection(SelectionSet(primary: Selection(anchor: 12, head: 12)))
+	backward.deleteBackward()
+	#expect(editorTextStorageString(backward) == "ab")
+
+	var forward = Editor(text: text, storage: .pieceTree)
+	forward.setSelection(SelectionSet(primary: Selection(anchor: 1, head: 1)))
+	forward.deleteForward()
+	#expect(editorTextStorageString(forward) == "ab")
+}
+
 @Test func editorAppliesInsertToEverySelection() {
 	var editor = Editor(text: "alpha beta")
 	editor.setSelection(SelectionSet(

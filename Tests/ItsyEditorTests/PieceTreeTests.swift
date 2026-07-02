@@ -30,6 +30,18 @@ import Testing
 	#expect(tree.graphemeIndex(forOffset: 1) == 1)
 }
 
+@Test func pieceTreeMapsGraphemeIndexesToByteBoundaries() {
+	let tree = PieceTree("a\r\né👩‍💻")
+	let offsets = [0, 1, 3, 5, 16]
+	for (index, offset) in offsets.enumerated() {
+		#expect(tree.offset(forGraphemeIndex: index) == offset)
+	}
+	#expect(tree.previousGraphemeBoundary(before: 16) == 5)
+	#expect(tree.previousGraphemeBoundary(before: 4) == 3)
+	#expect(tree.nextGraphemeBoundary(after: 1) == 3)
+	#expect(tree.nextGraphemeBoundary(after: 6) == 16)
+}
+
 @Test func pieceTreeUsesUAX29CRLFGraphemeBoundary() {
 	let tree = PieceTree("a\r\nb")
 	#expect(tree.graphemeCount == 3)

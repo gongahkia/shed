@@ -231,6 +231,24 @@ public enum EditorTextStorage: Sendable {
 		}
 	}
 
+	public func previousGraphemeBoundary(before offset: Int) -> Int {
+		switch self {
+		case let .rope(rope):
+			return rope.previousGraphemeBoundary(before: offset)
+		case let .pieceTree(pieceTree):
+			return pieceTree.previousGraphemeBoundary(before: offset)
+		}
+	}
+
+	public func nextGraphemeBoundary(after offset: Int) -> Int {
+		switch self {
+		case let .rope(rope):
+			return rope.nextGraphemeBoundary(after: offset)
+		case let .pieceTree(pieceTree):
+			return pieceTree.nextGraphemeBoundary(after: offset)
+		}
+	}
+
 	public mutating func insert(_ string: String, at offset: Int) {
 		switch self {
 		case var .rope(rope):
@@ -485,28 +503,14 @@ public struct Editor: Sendable {
 		guard offset > 0 else {
 			return 0 ..< 0
 		}
-		let text = textStorage.substring(0 ..< textStorage.length)
-		let index = text.index(atUTF8Offset: offset)
-		let previous = text.index(before: index)
-		guard let utf8Previous = previous.samePosition(in: text.utf8) else {
-			preconditionFailure("previous character must align with utf8")
-		}
-		let lower = text.utf8.distance(from: text.utf8.startIndex, to: utf8Previous)
-		return lower ..< offset
+		return textStorage.previousGraphemeBoundary(before: offset) ..< offset
 	}
 
 	private func nextCharacterRange(after offset: Int) -> Range<Int> {
 		guard offset < textStorage.length else {
 			return textStorage.length ..< textStorage.length
 		}
-		let text = textStorage.substring(0 ..< textStorage.length)
-		let index = text.index(atUTF8Offset: offset)
-		let next = text.index(after: index)
-		guard let utf8Next = next.samePosition(in: text.utf8) else {
-			preconditionFailure("next character must align with utf8")
-		}
-		let upper = text.utf8.distance(from: text.utf8.startIndex, to: utf8Next)
-		return offset ..< upper
+		return offset ..< textStorage.nextGraphemeBoundary(after: offset)
 	}
 
 	private func verticalLineOffset(from offset: Int, delta: Int) -> Int {
@@ -650,6 +654,32 @@ private func isAlphaNumeric(_ character: Character) -> Bool {
 private extension Rope {
 	func substring(_ range: Range<Int>) -> String {
 		slice(range)
+	}
+
+	func previousGraphemeBoundary(before offset: Int) -> Int {
+		guard offset > 0 else {
+			return 0
+		}
+		let text = slice(0 ..< length)
+		let index = text.index(atUTF8Offset: offset)
+		let previous = text.index(before: index)
+		guard let utf8Previous = previous.samePosition(in: text.utf8) else {
+			preconditionFailure("previous character must align with utf8")
+		}
+		return text.utf8.distance(from: text.utf8.startIndex, to: utf8Previous)
+	}
+
+	func nextGraphemeBoundary(after offset: Int) -> Int {
+		guard offset < length else {
+			return length
+		}
+		let text = slice(0 ..< length)
+		let index = text.index(atUTF8Offset: offset)
+		let next = text.index(after: index)
+		guard let utf8Next = next.samePosition(in: text.utf8) else {
+			preconditionFailure("next character must align with utf8")
+		}
+		return text.utf8.distance(from: text.utf8.startIndex, to: utf8Next)
 	}
 }
 

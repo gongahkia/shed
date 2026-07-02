@@ -156,6 +156,41 @@ public struct PieceTree: Sendable {
 		return graphemeCount(before: offset, in: root)
 	}
 
+	public func offset(forGraphemeIndex index: Int) -> Int {
+		precondition(index >= 0, "grapheme index out of bounds")
+		guard index > 0 else {
+			return 0
+		}
+		guard index < graphemeCount, let root else {
+			return length
+		}
+		return offset(forGraphemeIndex: index, in: root, baseOffset: 0) ?? length
+	}
+
+	public func previousGraphemeBoundary(before offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard offset > 0 else {
+			return 0
+		}
+		let index = graphemeIndex(forOffset: offset)
+		let boundary = self.offset(forGraphemeIndex: index)
+		if boundary < offset {
+			return boundary
+		}
+		guard index > 0 else {
+			return 0
+		}
+		return self.offset(forGraphemeIndex: index - 1)
+	}
+
+	public func nextGraphemeBoundary(after offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard offset < length else {
+			return length
+		}
+		return self.offset(forGraphemeIndex: graphemeIndex(forOffset: offset) + 1)
+	}
+
 	public func offset(forLine line: Int) -> Int {
 		precondition(line >= 0, "line index out of bounds")
 		guard line > 0 else {
@@ -450,6 +485,33 @@ public struct PieceTree: Sendable {
 		return graphemes + graphemeCount(before: local - node.piece.length, in: right)
 	}
 
+	private func offset(forGraphemeIndex target: Int, in node: PieceTreeNode, baseOffset: Int) -> Int? {
+		let leftBytes = node.left?.summary.bytes ?? 0
+		let leftGraphemes = node.left?.summary.graphemes ?? 0
+		if target < leftGraphemes, let left = node.left {
+			return offset(forGraphemeIndex: target, in: left, baseOffset: baseOffset)
+		}
+		let pieceOffset = baseOffset + leftBytes
+		if target == leftGraphemes {
+			return pieceOffset
+		}
+		let remaining = target - leftGraphemes
+		if remaining < node.piece.graphemes {
+			return offset(forGraphemeIndex: remaining, in: node.piece).map { pieceOffset + $0 }
+		}
+		if remaining == node.piece.graphemes {
+			return pieceOffset + node.piece.length
+		}
+		guard let right = node.right else {
+			return nil
+		}
+		return offset(
+			forGraphemeIndex: remaining - node.piece.graphemes,
+			in: right,
+			baseOffset: pieceOffset + node.piece.length
+		)
+	}
+
 	private func offset(afterLineFeeds target: Int, in node: PieceTreeNode, baseOffset: Int) -> Int? {
 		let leftBytes = node.left?.summary.bytes ?? 0
 		let leftFeeds = node.left?.summary.lineFeeds ?? 0
@@ -480,6 +542,24 @@ public struct PieceTree: Sendable {
 				seen += 1
 				if seen == target {
 					result = buffer.distance(from: buffer.startIndex, to: index) + 1
+					return false
+				}
+			}
+			return true
+		}
+		return result
+	}
+
+	private func offset(forGraphemeIndex target: Int, in piece: Piece) -> Int? {
+		precondition(target > 0, "grapheme target must be positive")
+		var seen = 0
+		var result: Int?
+		_ = withPieceBytes(piece, 0 ..< piece.length) { buffer in
+			var iterator = UAX29GraphemeIterator(bytes: buffer)
+			while let range = iterator.next() {
+				seen += 1
+				if seen == target {
+					result = range.upperBound
 					return false
 				}
 			}

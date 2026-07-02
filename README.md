@@ -14,8 +14,7 @@ Pre-release. Do not ship the current release candidate.
 - Full Zed/Sublime/VSCode/CodeEdit comparison is not locally available.
 - Distribution signing and notarization are blocked until a Developer ID Application certificate is installed.
 
-See [NORTHSTAR.md](NORTHSTAR.md) for scope, KPIs, architecture, and non-goals.
-See [TODO.md](TODO.md) for remaining work.
+Remaining work is tracked in [GitHub issues](https://github.com/gongahkia/itsy/issues).
 
 ## Config
 
@@ -39,7 +38,7 @@ bench/scripts/make_app.sh
 cp -R Itsy.app /Applications/Itsy.app
 ```
 
-Release DMG install, after id:301-id:303 are complete:
+Release DMG install, after the signed/notarized release flow is complete:
 
 ```sh
 open Itsy-0.1.0.dmg
@@ -81,7 +80,7 @@ Itsy is intentionally narrow:
 | DAP | Protocol types and message framing | No integrated debugger UI |
 | Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |
 | Tasks/extensions | Built-in task discovery/run panel; extension manifests contribute tasks only | No executable plugin runtime or marketplace |
-| Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | Gap docs track follow-up slices |
+| Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | GitHub issues track follow-up slices |
 | Distribution | Local unsigned app, DMG workflow, GitHub Release workflow | Developer ID signing/notarization, Sparkle, Homebrew cask, final name/domain |
 
 ## Formatting

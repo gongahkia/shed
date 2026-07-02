@@ -31,6 +31,44 @@ import Testing
 	#expect(String(data: blob.data, encoding: .utf8) == "one\n")
 }
 
+@Test func gitRepositoryStatusMatchesPorcelainV2OnFixtureRepo() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try Libgit2TemporaryGitFixture()
+	let remote = FileManager.default.temporaryDirectory
+		.appendingPathComponent("itsy-libgit2-remote-\(UUID().uuidString)", isDirectory: true)
+	try FileManager.default.createDirectory(at: remote, withIntermediateDirectories: true)
+	defer {
+		try? FileManager.default.removeItem(at: remote)
+	}
+	_ = try ProcessGitCommandRunner().runGit(arguments: ["init", "--bare"], root: remote)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("tracked.txt", "one\n")
+	try fixture.write("old-name.txt", "rename me\n")
+	try fixture.git(["add", "tracked.txt", "old-name.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.git(["remote", "add", "origin", remote.path])
+	try fixture.git(["push", "-u", "origin", "main"])
+	try fixture.write("ahead.txt", "ahead\n")
+	try fixture.git(["add", "ahead.txt"])
+	try fixture.git(["commit", "-m", "ahead"])
+	try fixture.write("tracked.txt", "two\n")
+	try fixture.write("staged.txt", "staged\n")
+	try fixture.git(["add", "staged.txt"])
+	try fixture.git(["mv", "old-name.txt", "new-name.txt"])
+	try fixture.write("untracked.txt", "untracked\n")
+
+	let shellOutput = try fixture.git(["status", "--porcelain=v2", "--branch", "--untracked-files=all"])
+	let shellStatus = try GitStatusParser.parse(shellOutput)
+	let libgit2Status = try GitRepository(root: fixture.root).status()
+
+	#expect(libgit2Status == shellStatus)
+}
+
 private final class Libgit2TemporaryGitFixture {
 	let root: URL
 

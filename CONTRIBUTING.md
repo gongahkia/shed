@@ -1,6 +1,6 @@
 # Contributing
 
-Read [NORTHSTAR.md](NORTHSTAR.md) before opening a PR. It defines scope, KPIs, architecture, and non-goals.
+Check [GitHub issues](https://github.com/gongahkia/itsy/issues) before opening a PR. They track remaining scope, KPIs, and follow-up work.
 
 ## PR Gates
 
@@ -14,7 +14,7 @@ swift build -c release
 ```
 
 - Include bench output when touching launch, rendering, rope, syntax, app startup, or file I/O paths.
-- Keep changes scoped to the TODO item or issue being addressed.
+- Keep changes scoped to the issue being addressed.
 
 ## Dependencies
 

@@ -41,8 +41,9 @@ public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
 	public var env: [String: String]
 	public var stopOnEntry: Bool?
 	public var noDebug: Bool?
+	public var exceptionFilters: [String]
 
-	public init(name: String, type: String, request: String, program: String? = nil, args: [String] = [], cwd: String? = nil, env: [String: String] = [:], stopOnEntry: Bool? = nil, noDebug: Bool? = nil) {
+	public init(name: String, type: String, request: String, program: String? = nil, args: [String] = [], cwd: String? = nil, env: [String: String] = [:], stopOnEntry: Bool? = nil, noDebug: Bool? = nil, exceptionFilters: [String] = []) {
 		self.name = name
 		self.type = type
 		self.request = request
@@ -52,6 +53,7 @@ public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
 		self.env = env
 		self.stopOnEntry = stopOnEntry
 		self.noDebug = noDebug
+		self.exceptionFilters = exceptionFilters
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -65,6 +67,7 @@ public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
 		env = try container.decodeIfPresent([String: String].self, forKey: .env) ?? [:]
 		stopOnEntry = try container.decodeIfPresent(Bool.self, forKey: .stopOnEntry)
 		noDebug = try container.decodeIfPresent(Bool.self, forKey: .noDebug)
+		exceptionFilters = try container.decodeIfPresent([String].self, forKey: .exceptionFilters) ?? []
 	}
 }
 

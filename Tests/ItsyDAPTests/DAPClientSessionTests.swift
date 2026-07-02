@@ -222,6 +222,31 @@ import Testing
 	#expect(await session.state == .running)
 }
 
+@Test func dapClientSessionSetExceptionBreakpointsWhileConfiguring() async throws {
+	let (session, transport) = try await configuredSession()
+	let task = Task {
+		try await session.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: ["filter-a", "filter-b"]))
+	}
+
+	try await transport.waitForWriteCount(2)
+	#expect(try transport.message(at: 1) == .request(DAPRequestMessage(
+		seq: 2,
+		command: DAPCommand.setExceptionBreakpoints,
+		arguments: .object([
+			"filters": .array([.string("filter-a"), .string("filter-b")]),
+		])
+	)))
+	_ = try await session.receive(DAPMessageFramer.frame(message: .response(DAPResponseMessage(
+		seq: 3,
+		requestSeq: 2,
+		success: true,
+		command: DAPCommand.setExceptionBreakpoints
+	))))
+	_ = try await task.value
+
+	#expect(await session.state == .configuring)
+}
+
 @Test func dapClientSessionStoppedAndTerminatedEventsUpdateState() async throws {
 	let (session, _) = try await runningSession()
 

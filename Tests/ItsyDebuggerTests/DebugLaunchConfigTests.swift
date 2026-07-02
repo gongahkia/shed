@@ -9,7 +9,7 @@ import Testing
 	    { "id": "lldb", "command": "/usr/bin/lldb-dap", "type": "executable", "args": [] }
 	  ],
 	  "configurations": [
-	    { "name": "Debug Itsy", "type": "lldb", "request": "launch", "program": ".build/debug/ItsyApp" }
+	    { "name": "Debug Itsy", "type": "lldb", "request": "launch", "program": ".build/debug/ItsyApp", "exceptionFilters": ["filter-a", "filter-b"] }
 	  ]
 	}
 	"""#.utf8)
@@ -20,7 +20,7 @@ import Testing
 		DebugAdapterConfig(id: "lldb", command: "/usr/bin/lldb-dap", type: DebugAdapterType.executable, args: []),
 	])
 	#expect(config.configurations == [
-		DebugLaunchConfiguration(name: "Debug Itsy", type: "lldb", request: DebugLaunchRequest.launch, program: ".build/debug/ItsyApp"),
+		DebugLaunchConfiguration(name: "Debug Itsy", type: "lldb", request: DebugLaunchRequest.launch, program: ".build/debug/ItsyApp", exceptionFilters: ["filter-a", "filter-b"]),
 	])
 }
 

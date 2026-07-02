@@ -391,6 +391,14 @@ private let commandActionCases: [CommandActionCase] = [
 	CommandActionCase(commandID: "mode.normal", action: .normalMode),
 	CommandActionCase(commandID: "mode.insert", action: .insertMode),
 	CommandActionCase(commandID: "mode.emacs", action: .emacsMode),
+	CommandActionCase(commandID: "vim.mark.set.a", action: .setMark("a")),
+	CommandActionCase(commandID: "vim.mark.jump.z", action: .jumpToMark("z")),
+	CommandActionCase(commandID: "vim.mark.jumpLine.b", action: .jumpToMark("b")),
+	CommandActionCase(commandID: "vim.macro.record.a", action: .macroRecord("a")),
+	CommandActionCase(commandID: "vim.fold.close", action: .handled),
+	CommandActionCase(commandID: "vim.replace.char", action: .handled),
+	CommandActionCase(commandID: "vim.searchHistory.forward", action: .handled),
+	CommandActionCase(commandID: "vim.textObject.innerSentence", action: .normalMode),
 ]
 
 struct CharacterMotionCommandCase: Sendable {

@@ -721,6 +721,8 @@ final class EditorWindowController: NSWindowController {
 			NSDocumentController.shared.openDocument(nil)
 		case "file.nextBuffer":
 			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
+		case "file.previousBuffer":
+			ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
 		case "pane.close":
 			if !closeActivePane() {
 				(document as? NSDocument)?.close()
@@ -1402,7 +1404,7 @@ final class EditorWindowController: NSWindowController {
 		switch command {
 		case "w":
 			(document as? NSDocument)?.save(nil)
-		case "q":
+		case "q", "bd":
 			(document as? NSDocument)?.close()
 		case "wq", "x":
 			(document as? NSDocument)?.save(nil)

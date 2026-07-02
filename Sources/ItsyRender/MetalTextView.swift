@@ -668,6 +668,9 @@ public final class MetalTextView: NSView {
 		if event.keyCode == 53 {
 			signatureHelpDismissRequested?()
 		}
+		if handleMacroStop(event) {
+			return
+		}
 		if handlePendingMacroRegister(event) {
 			return
 		}
@@ -726,6 +729,9 @@ public final class MetalTextView: NSView {
 			keyCode: keyCode
 		)
 		if let event, handlePendingMacroRegister(event) {
+			return true
+		}
+		if let event, handleMacroStop(event) {
 			return true
 		}
 		let recordsMacro = event.map { shouldRecordMacroEvent($0) } ?? false

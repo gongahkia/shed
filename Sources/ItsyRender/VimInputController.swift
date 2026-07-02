@@ -3,6 +3,7 @@ import ItsyEditor
 import struct ItsyKeymap.Key
 import enum ItsyVim.CharacterMotion
 import struct ItsyVim.KeyModifiers
+import struct ItsyVim.Position
 import struct ItsyVim.SelectionSnapshot
 import enum ItsyVim.VimCommandAction
 import enum ItsyVim.VimOperator
@@ -252,6 +253,16 @@ extension MetalTextView {
 			return true
 		case .emacsMode:
 			keymapEngine.setMode(.emacs)
+			return true
+		case .setMark(let mark):
+			vimEngine.marks[mark] = Position(offset: editor.selections.primary.head)
+		case .jumpToMark(let mark):
+			if let position = vimEngine.marks[mark] {
+				editor.setSelection(SelectionSet(primary: Selection(anchor: position.offset, head: position.offset)))
+				syncEditorState()
+			}
+		case .macroRecord(let register):
+			startMacroRecording(register)
 			return true
 		case .handled:
 			return true
@@ -664,6 +675,14 @@ extension MetalTextView {
 			return true
 		}
 		return false
+	}
+
+	func handleMacroStop(_ event: NSEvent) -> Bool {
+		guard recordingMacroRegister != nil, keymapEngine.mode == .normal, let key = Key(event: event), key.modifiers.isEmpty, key.value == "q" else {
+			return false
+		}
+		stopMacroRecording()
+		return true
 	}
 
 	func registerName(for key: Key) -> String? {

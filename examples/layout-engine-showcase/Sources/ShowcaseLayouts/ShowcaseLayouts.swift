@@ -327,6 +327,127 @@ public struct FlexibleThreeColLayoutEngine: LayoutEngine {
     }
 }
 
+public enum DecoratedAccordionRole: Equatable, Sendable {
+    case focused
+    case ribbonBefore
+    case ribbonAfter
+}
+
+public struct DecoratedAccordionItem: Equatable, Sendable {
+    public let windowID: WindowID
+    public let role: DecoratedAccordionRole
+    public let visualIndex: Int
+
+    public init(windowID: WindowID, role: DecoratedAccordionRole, visualIndex: Int) {
+        self.windowID = windowID
+        self.role = role
+        self.visualIndex = visualIndex
+    }
+}
+
+public struct DecoratedAccordionLayoutEngine: LayoutEngine {
+    public struct Config: Equatable, Sendable {
+        public let ribbonHeight: CGFloat
+        public let decorationHeight: CGFloat
+
+        public init(ribbonHeight: CGFloat = 40, decorationHeight: CGFloat = 18) {
+            self.ribbonHeight = max(1, ribbonHeight)
+            self.decorationHeight = max(0, decorationHeight)
+        }
+    }
+
+    public let id = LayoutEngineID(rawValue: "dev.olly.showcase.decorated-accordion")
+    public let displayName = "Decorated Accordion"
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing]
+    public let config: Config
+
+    public init(config: Config = Config()) {
+        self.config = config
+    }
+
+    public func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement] {
+        guard !windows.isEmpty else { return [] }
+        guard windows.count > 1 else {
+            return [Placement(windowID: windows[0].windowID, frame: bounds)]
+        }
+
+        let focusedIndex = focus.flatMap { focusedID in
+            windows.firstIndex { $0.windowID == focusedID }
+        } ?? 0
+        let metrics = ribbonMetrics(windowCount: windows.count, in: bounds)
+        let focusedFrame = CGRect(
+            x: bounds.minX,
+            y: bounds.minY + CGFloat(focusedIndex) * metrics.extent,
+            width: bounds.width,
+            height: bounds.height - CGFloat(windows.count - 1) * metrics.extent
+        )
+
+        return windows.enumerated().map { index, window in
+            Placement(
+                windowID: window.windowID,
+                frame: frame(
+                    index: index,
+                    focusedIndex: focusedIndex,
+                    focusedFrame: focusedFrame,
+                    metrics: metrics,
+                    in: bounds
+                ),
+                zOrder: index,
+                hidden: false
+            )
+        }
+    }
+
+    public func items(windows: [WindowSnapshot], focus: WindowID?) -> [DecoratedAccordionItem] {
+        let focusedIndex = focus.flatMap { focusedID in
+            windows.firstIndex { $0.windowID == focusedID }
+        } ?? 0
+        return windows.enumerated().map { index, window in
+            let role: DecoratedAccordionRole
+            if index == focusedIndex {
+                role = .focused
+            } else if index < focusedIndex {
+                role = .ribbonBefore
+            } else {
+                role = .ribbonAfter
+            }
+            return DecoratedAccordionItem(windowID: window.windowID, role: role, visualIndex: index)
+        }
+    }
+
+    private func frame(
+        index: Int,
+        focusedIndex: Int,
+        focusedFrame: CGRect,
+        metrics: (extent: CGFloat, decoration: CGFloat, contentHeight: CGFloat),
+        in bounds: CGRect
+    ) -> CGRect {
+        guard index != focusedIndex else { return focusedFrame }
+        let ribbonY: CGFloat
+        if index < focusedIndex {
+            ribbonY = bounds.minY + CGFloat(index) * metrics.extent
+        } else {
+            ribbonY = focusedFrame.maxY + CGFloat(index - focusedIndex - 1) * metrics.extent
+        }
+        return CGRect(
+            x: bounds.minX,
+            y: ribbonY + metrics.decoration,
+            width: bounds.width,
+            height: metrics.contentHeight
+        )
+    }
+
+    private func ribbonMetrics(
+        windowCount: Int,
+        in bounds: CGRect
+    ) -> (extent: CGFloat, decoration: CGFloat, contentHeight: CGFloat) {
+        let desiredExtent = config.ribbonHeight + config.decorationHeight
+        let extent = min(desiredExtent, bounds.height / CGFloat(windowCount))
+        let decoration = min(config.decorationHeight, extent / 2)
+        return (extent, decoration, max(1, extent - decoration))
+    }
+}
+
 public struct FocusBandLayoutEngine: LayoutEngine {
     public struct Config: Equatable, Sendable {
         public let focusRatio: CGFloat

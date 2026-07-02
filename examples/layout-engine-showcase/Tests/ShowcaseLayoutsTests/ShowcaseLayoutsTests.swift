@@ -181,6 +181,58 @@ final class ShowcaseLayoutsTests: XCTestCase {
         ])
     }
 
+    func testDecoratedAccordionReservesRibbonDecorationBands() {
+        let engine = DecoratedAccordionLayoutEngine(config: .init(ribbonHeight: 40, decorationHeight: 10))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3),
+            in: CGRect(x: 0, y: 0, width: 800, height: 600),
+            focus: 2
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 10, width: 800, height: 40),
+            CGRect(x: 0, y: 50, width: 800, height: 500),
+            CGRect(x: 0, y: 560, width: 800, height: 40)
+        ])
+        XCTAssertEqual(placements.map(\.hidden), [false, false, false])
+    }
+
+    func testDecoratedAccordionExposesRibbonMetadata() {
+        let engine = DecoratedAccordionLayoutEngine()
+        let items = engine.items(windows: windows(1, 2, 3), focus: 2)
+
+        XCTAssertEqual(items, [
+            DecoratedAccordionItem(windowID: 1, role: .ribbonBefore, visualIndex: 0),
+            DecoratedAccordionItem(windowID: 2, role: .focused, visualIndex: 1),
+            DecoratedAccordionItem(windowID: 3, role: .ribbonAfter, visualIndex: 2)
+        ])
+    }
+
+    func testDecoratedAccordionClampsRibbonMetricsForShortBounds() {
+        let engine = DecoratedAccordionLayoutEngine(config: .init(ribbonHeight: 60, decorationHeight: 20))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3),
+            in: CGRect(x: 0, y: 0, width: 300, height: 90),
+            focus: 2
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 15, width: 300, height: 15),
+            CGRect(x: 0, y: 30, width: 300, height: 30),
+            CGRect(x: 0, y: 75, width: 300, height: 15)
+        ])
+    }
+
+    func testDecoratedAccordionHandlesEmptyAndSingleWindowInputs() {
+        let engine = DecoratedAccordionLayoutEngine()
+        let bounds = CGRect(x: 0, y: 0, width: 700, height: 500)
+
+        XCTAssertTrue(engine.arrange(windows: [], in: bounds, focus: nil).isEmpty)
+        XCTAssertEqual(engine.arrange(windows: windows(1), in: bounds, focus: nil), [
+            Placement(windowID: 1, frame: bounds)
+        ])
+    }
+
     func testFocusBandPlacesFocusedWindowInCenter() {
         let engine = FocusBandLayoutEngine(config: .init(focusRatio: 0.5))
         let placements = engine.arrange(

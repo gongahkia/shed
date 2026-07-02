@@ -375,7 +375,7 @@ extension MetalTextView {
 	}
 
 	func nextMatchRange(for query: String, after offset: Int, excluding excluded: [Range<Int>]) -> Range<Int>? {
-		let text = editor.text
+		let text = editorStorageString(editor)
 		guard let startIndex = String.Index(text.utf8.index(text.utf8.startIndex, offsetBy: min(offset, text.utf8.count)), within: text) else {
 			return nil
 		}
@@ -631,7 +631,7 @@ extension MetalTextView {
 		guard !needle.isEmpty else {
 			return true
 		}
-		editor = Editor(text: editor.text.replacingOccurrences(of: needle, with: replacement))
+		editor = Editor(text: editorStorageString(editor).replacingOccurrences(of: needle, with: replacement))
 		syncEditorState()
 		editorDidChange?(editor)
 		return true
@@ -1085,7 +1085,7 @@ extension MetalTextView {
 
 	func characterOffsets() -> [(offset: Int, character: Character)] {
 		var offset = 0
-		return editor.text.map { character in
+		return editorStorageString(editor).map { character in
 			defer { offset += String(character).utf8.count }
 			return (offset, character)
 		}

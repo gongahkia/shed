@@ -56,7 +56,7 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 		acceptItem = accept
 		allItems = result.items
 		isIncomplete = result.isIncomplete
-		lastPrefix = Self.completionPrefix(in: editorView.editor.text, cursorOffset: editorView.editor.selections.primary.head)
+		lastPrefix = Self.completionPrefix(in: editorStorageString(editorView.editor), cursorOffset: editorView.editor.selections.primary.head)
 		filterItems(prefix: lastPrefix)
 		guard !filteredItems.isEmpty else {
 			dismiss()
@@ -200,7 +200,7 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 			dismiss()
 			return
 		}
-		let prefix = Self.completionPrefix(in: editorView.editor.text, cursorOffset: editorView.editor.selections.primary.head)
+		let prefix = Self.completionPrefix(in: editorStorageString(editorView.editor), cursorOffset: editorView.editor.selections.primary.head)
 		guard prefix != lastPrefix else {
 			return
 		}

@@ -150,12 +150,12 @@ import Testing
 	view.editor = Editor(text: "abc")
 	var changedText: String?
 	view.editorDidChange = { editor in
-		changedText = editor.text
+		changedText = editorStorageString(editor)
 	}
 
 	view.replaceUTF8Range(1 ..< 2, with: "XYZ", selectUTF8Ranges: [2 ..< 4])
 
-	#expect(view.editor.text == "aXYZc")
+	#expect(editorStorageString(view.editor) == "aXYZc")
 	#expect(changedText == "aXYZc")
 	#expect(view.editor.selections.primary == Selection(anchor: 2, head: 4))
 }
@@ -171,7 +171,7 @@ import Testing
 
 	#expect(view.handleKey(characters: ".", charactersIgnoringModifiers: ".", keyCode: 0))
 
-	#expect(view.editor.text == ".")
+	#expect(editorStorageString(view.editor) == ".")
 	#expect(trigger == ".")
 }
 
@@ -373,12 +373,12 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	for character in "hello world" {
 		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
 	}
-	#expect(view.editor.text == "hello world")
+	#expect(editorStorageString(view.editor) == "hello world")
 	#expect(view.consumeDirtyForDisplayLink())
 	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 123))
 	#expect(view.editor.selections.primary.head == 10)
 	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 51))
-	#expect(view.editor.text == "hello word")
+	#expect(editorStorageString(view.editor) == "hello word")
 }
 
 @Test func textGlyphInstancesUseHighlightColors() throws {
@@ -423,10 +423,10 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	])
 
 	#expect(view.handleKey(characters: "h", charactersIgnoringModifiers: "h", keyCode: 0))
-	#expect(view.editor.text == "")
+	#expect(editorStorageString(view.editor) == "")
 	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
 	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
-	#expect(view.editor.text == "x")
+	#expect(editorStorageString(view.editor) == "x")
 }
 
 @Test func keymapCountRepeatsMotionCommands() {
@@ -479,7 +479,7 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	view.editor = Editor(text: "")
 	#expect(view.handleKey(characters: "@", charactersIgnoringModifiers: "2", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
-	#expect(view.editor.text == "x")
+	#expect(editorStorageString(view.editor) == "x")
 	#expect(view.keymapEngine.mode == .normal)
 }
 
@@ -539,7 +539,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	view.editor = Editor(text: "")
 	#expect(view.handleKey(characters: "@", charactersIgnoringModifiers: "2", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
-	#expect(view.editor.text == "x")
+	#expect(editorStorageString(view.editor) == "x")
 	#expect(view.keymapEngine.mode == .normal)
 }
 
@@ -588,13 +588,13 @@ private final class TestGutterDecorator: GutterDecorator {
 
 		view.selectUTF8Range(6 ..< 10)
 		#expect(view.handleKey(characters: "\u{17}", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .control))
-		#expect(view.editor.text == "alpha  gamma")
+		#expect(editorStorageString(view.editor) == "alpha  gamma")
 		#expect(NSPasteboard.general.string(forType: .string) == "beta")
 		#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
-		#expect(view.editor.text == "alpha beta gamma")
+		#expect(editorStorageString(view.editor) == "alpha beta gamma")
 		view.selectUTF8Range(0 ..< 5)
 		#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
-		#expect(view.editor.text == "alpha beta gamma")
+		#expect(editorStorageString(view.editor) == "alpha beta gamma")
 		#expect(NSPasteboard.general.string(forType: .string) == "alpha")
 	}
 }
@@ -615,9 +615,9 @@ private final class TestGutterDecorator: GutterDecorator {
 		#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0, modifierFlags: .option))
 		view.selectUTF8Range(16 ..< 16)
 		#expect(view.handleKey(characters: "\u{19}", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .control))
-		#expect(view.editor.text == "alpha beta gammagamma")
+		#expect(editorStorageString(view.editor) == "alpha beta gammagamma")
 		#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0, modifierFlags: .option))
-		#expect(view.editor.text == "alpha beta gammaalpha")
+		#expect(editorStorageString(view.editor) == "alpha beta gammaalpha")
 	}
 }
 
@@ -708,11 +708,11 @@ private final class TestGutterDecorator: GutterDecorator {
 		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
 	}
 	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
-	#expect(view.editor.text == "abc")
+	#expect(editorStorageString(view.editor) == "abc")
 	#expect(view.handleKey(characters: "u", charactersIgnoringModifiers: "u", keyCode: 0))
-	#expect(view.editor.text == "")
+	#expect(editorStorageString(view.editor) == "")
 	#expect(view.handleKey(characters: "\u{12}", charactersIgnoringModifiers: "r", keyCode: 0, modifierFlags: .control))
-	#expect(view.editor.text == "abc")
+	#expect(editorStorageString(view.editor) == "abc")
 }
 
 @Test func vimDeleteOperatorAppliesMotionAndLine() {
@@ -726,10 +726,10 @@ private final class TestGutterDecorator: GutterDecorator {
 
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
 	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
-	#expect(view.editor.text == "two\nthree\n")
+	#expect(editorStorageString(view.editor) == "two\nthree\n")
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
-	#expect(view.editor.text == "three\n")
+	#expect(editorStorageString(view.editor) == "three\n")
 }
 
 @Test func vimChangeAndYankLineOperators() {
@@ -746,11 +746,11 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
 	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
-	#expect(view.editor.text == "alpha\nalpha\nbeta\n")
+	#expect(editorStorageString(view.editor) == "alpha\nalpha\nbeta\n")
 	view.editor = Editor(text: "alpha\nbeta\n")
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
-	#expect(view.editor.text == "beta\n")
+	#expect(editorStorageString(view.editor) == "beta\n")
 	#expect(view.keymapEngine.mode == .insert)
 }
 
@@ -765,7 +765,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
 	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
 	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
-	#expect(view.editor.text == " beta")
+	#expect(editorStorageString(view.editor) == " beta")
 }
 
 @Test func vimQuoteTextObjectUsesShiftedQuoteBinding() {
@@ -779,7 +779,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
 	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
 	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
-	#expect(view.editor.text == " tail")
+	#expect(editorStorageString(view.editor) == " tail")
 }
 
 @Test func vimVisualCharModeAppliesDeleteOperator() {
@@ -794,7 +794,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "v", charactersIgnoringModifiers: "v", keyCode: 0))
 	#expect(view.handleKey(characters: "l", charactersIgnoringModifiers: "l", keyCode: 0))
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
-	#expect(view.editor.text == "bc")
+	#expect(editorStorageString(view.editor) == "bc")
 	#expect(view.keymapEngine.mode == .normal)
 }
 
@@ -810,7 +810,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "V", charactersIgnoringModifiers: "v", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "y", charactersIgnoringModifiers: "y", keyCode: 0))
 	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
-	#expect(view.editor.text == "alpha\nalpha\nbeta\n")
+	#expect(editorStorageString(view.editor) == "alpha\nalpha\nbeta\n")
 	#expect(view.keymapEngine.mode == .normal)
 }
 
@@ -846,7 +846,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
 	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
-	#expect(view.editor.text == "alpha\nbeta\n")
+	#expect(editorStorageString(view.editor) == "alpha\nbeta\n")
 }
 
 @Test func vimDeleteWritesNumberedRegister() {
@@ -861,11 +861,11 @@ private final class TestGutterDecorator: GutterDecorator {
 
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
 	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
-	#expect(view.editor.text == "beta\n")
+	#expect(editorStorageString(view.editor) == "beta\n")
 	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
 	#expect(view.handleKey(characters: "1", charactersIgnoringModifiers: "1", keyCode: 0))
 	#expect(view.handleKey(characters: "P", charactersIgnoringModifiers: "p", keyCode: 0, modifierFlags: .shift))
-	#expect(view.editor.text == "alpha\nbeta\n")
+	#expect(editorStorageString(view.editor) == "alpha\nbeta\n")
 }
 
 @Test func vimPlusRegisterSyncsSystemClipboard() {
@@ -898,7 +898,7 @@ private final class TestGutterDecorator: GutterDecorator {
 		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
 	}
 	#expect(view.handleKey(characters: "\n", charactersIgnoringModifiers: "\n", keyCode: 36))
-	#expect(view.editor.text == "bar bar\n")
+	#expect(editorStorageString(view.editor) == "bar bar\n")
 }
 
 @Test func vimExCommandRoutesToHost() {
@@ -947,19 +947,19 @@ private final class TestGutterDecorator: GutterDecorator {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	let noReplacement = NSRange(location: NSNotFound, length: 0)
 	view.insertText("a", replacementRange: noReplacement)
-	#expect(view.editor.text == "a")
+	#expect(editorStorageString(view.editor) == "a")
 	#expect(view.selectedRange() == NSRange(location: 1, length: 0))
 	view.setMarkedText("かな", selectedRange: NSRange(location: 2, length: 0), replacementRange: noReplacement)
-	#expect(view.editor.text == "aかな")
+	#expect(editorStorageString(view.editor) == "aかな")
 	#expect(view.hasMarkedText())
 	#expect(view.markedRange() == NSRange(location: 1, length: 2))
 	#expect(view.selectedRange() == NSRange(location: 3, length: 0))
 	view.insertText("仮名", replacementRange: noReplacement)
-	#expect(view.editor.text == "a仮名")
+	#expect(editorStorageString(view.editor) == "a仮名")
 	#expect(!view.hasMarkedText())
 	#expect(view.attributedSubstring(forProposedRange: NSRange(location: 1, length: 2), actualRange: nil)?.string == "仮名")
 	view.doCommand(by: #selector(NSResponder.deleteBackward(_:)))
-	#expect(view.editor.text == "a仮")
+	#expect(editorStorageString(view.editor) == "a仮")
 }
 
 @Test func typedTextBuildsGlyphInstancesForRendering() {

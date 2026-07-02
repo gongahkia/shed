@@ -778,7 +778,7 @@ final class EditorWindowController: NSWindowController {
 			return []
 		}
 		let session = try await ensureLSPSession(for: fileURL)
-		let content = editorView.editor.text
+		let content = editorStorageString(editorView.editor)
 		try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 		let symbols = try await Self.lspManager.symbols(matching: query, in: fileURL)
 		return LSPSymbolAdapter.workspaceSymbols(from: symbols, root: session.key.workspaceRoot)
@@ -795,7 +795,7 @@ final class EditorWindowController: NSWindowController {
 		else {
 			return nil
 		}
-		let content = editorView.editor.text
+		let content = editorStorageString(editorView.editor)
 		try await syncLSPDocument(client: client, key: key, url: fileURL, content: content)
 		let result = try await client.documentSymbol(textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString))
 		let relativePath = LSPDiagnosticsAggregator.relativePath(forURI: fileURL.standardizedFileURL.absoluteString, root: key.workspaceRoot) ?? fileURL.lastPathComponent
@@ -818,7 +818,7 @@ final class EditorWindowController: NSWindowController {
 		else {
 			return false
 		}
-		let content = targetView.editor.text
+		let content = editorStorageString(targetView.editor)
 		let cursorOffset = targetView.editor.selections.primary.head
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
 		let context = completionContext(triggerCharacter: triggerCharacter, forIncomplete: forIncomplete)
@@ -986,7 +986,7 @@ final class EditorWindowController: NSWindowController {
 			return
 		}
 		let targetView = editorView
-		let content = targetView.editor.text
+		let content = editorStorageString(targetView.editor)
 		Task { [weak self] in
 			do {
 				guard let self else {
@@ -1106,7 +1106,7 @@ final class EditorWindowController: NSWindowController {
 	private func acceptCompletion(_ item: LSPCompletionItem, in targetView: MetalTextView) {
 		guard let application = LSPCompletionApply.application(
 			for: item,
-			in: targetView.editor.text,
+			in: editorStorageString(targetView.editor),
 			cursorOffset: targetView.editor.selections.primary.head
 		) else {
 			return
@@ -1125,7 +1125,7 @@ final class EditorWindowController: NSWindowController {
 		guard
 			let candidate,
 			let targetView,
-			let offset = identifierOffset(in: targetView.editor.text, near: candidate.offset)
+			let offset = identifierOffset(in: editorStorageString(targetView.editor), near: candidate.offset)
 		else {
 			closeHoverPopover()
 			return
@@ -1145,7 +1145,7 @@ final class EditorWindowController: NSWindowController {
 		else {
 			return false
 		}
-		let content = targetView.editor.text
+		let content = editorStorageString(targetView.editor)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
 		hoverRequestGeneration += 1
 		let generation = hoverRequestGeneration
@@ -1208,7 +1208,7 @@ final class EditorWindowController: NSWindowController {
 		else {
 			return false
 		}
-		let content = targetView.editor.text
+		let content = editorStorageString(targetView.editor)
 		let cursorOffset = targetView.editor.selections.primary.head
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
 		let context = signatureHelpContext(triggerCharacter: triggerCharacter)
@@ -1286,7 +1286,7 @@ final class EditorWindowController: NSWindowController {
 		else {
 			return false
 		}
-		let content = targetView.editor.text
+		let content = editorStorageString(targetView.editor)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
 		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
 		referencesRequestGeneration += 1

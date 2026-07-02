@@ -207,7 +207,7 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 			currentEditorView()?.setFindMatchRanges([])
 			return
 		}
-		let text = editorView.editor.text
+		let text = editorStorageString(editorView.editor)
 		let fullRange = NSRange(text.startIndex ..< text.endIndex, in: text)
 		matches = expression.matches(in: text, range: fullRange).compactMap { result in
 			guard result.range.length > 0, let range = Range(result.range, in: text) else {

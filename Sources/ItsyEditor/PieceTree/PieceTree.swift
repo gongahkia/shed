@@ -204,6 +204,27 @@ public struct PieceTree: Sendable {
 		}
 	}
 
+	public func copyUTF8(at offset: Int, into buffer: UnsafeMutableBufferPointer<UInt8>) -> Int {
+		precondition((0 ... length).contains(offset), "copy offset out of bounds")
+		guard offset < length, !buffer.isEmpty, let target = buffer.baseAddress else {
+			return 0
+		}
+		var copied = 0
+		iterateBytes(from: offset) { source in
+			let remaining = buffer.count - copied
+			let count = min(remaining, source.count)
+			if count > 0 {
+				for index in 0 ..< count {
+					target[copied + index] = source[source.startIndex + index]
+				}
+				copied += count
+			}
+			return copied < buffer.count
+		}
+		let sourceEndReached = offset + copied >= length
+		return Self.trimmedUTF8BoundaryCount(in: buffer, copied: copied, sourceEndReached: sourceEndReached)
+	}
+
 	func debugPieces() -> [Piece] {
 		pieces()
 	}
@@ -448,6 +469,48 @@ public struct PieceTree: Sendable {
 	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>, before offset: Int) -> Int {
 		precondition((0 ... bytes.count).contains(offset), "grapheme offset out of bounds")
 		return UAX29GraphemeIterator.graphemeIndex(in: bytes, before: offset)
+	}
+
+	private static func trimmedUTF8BoundaryCount(
+		in buffer: UnsafeMutableBufferPointer<UInt8>,
+		copied: Int,
+		sourceEndReached: Bool
+	) -> Int {
+		guard !sourceEndReached, copied > 0 else {
+			return copied
+		}
+		let lowerBound = max(0, copied - 4)
+		var scalarStart = copied - 1
+		while scalarStart > lowerBound, buffer[scalarStart].isUTF8Continuation {
+			scalarStart -= 1
+		}
+		let expectedLength = buffer[scalarStart].utf8SequenceLength
+		if expectedLength == 1 || scalarStart + expectedLength <= copied {
+			return copied
+		}
+		return scalarStart > 0 ? scalarStart : copied
+	}
+}
+
+private extension UInt8 {
+	var isUTF8Continuation: Bool {
+		(self & 0b1100_0000) == 0b1000_0000
+	}
+
+	var utf8SequenceLength: Int {
+		if self < 0b1000_0000 {
+			return 1
+		}
+		if self & 0b1110_0000 == 0b1100_0000 {
+			return 2
+		}
+		if self & 0b1111_0000 == 0b1110_0000 {
+			return 3
+		}
+		if self & 0b1111_1000 == 0b1111_0000 {
+			return 4
+		}
+		return 1
 	}
 }
 

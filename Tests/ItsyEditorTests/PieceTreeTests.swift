@@ -78,6 +78,30 @@ import Testing
 	#expect(chunks == ["DEF", "bc"])
 }
 
+@Test func pieceTreeCopiesUTF8AcrossPieces() {
+	var tree = PieceTree("abé🇸🇬tail")
+	tree.insert("XYZ", at: 2)
+	var buffer = [UInt8](repeating: 0, count: 32)
+	let copied = buffer.withUnsafeMutableBufferPointer {
+		tree.copyUTF8(at: 1, into: $0)
+	}
+	let text = String(decoding: buffer.prefix(copied), as: UTF8.self)
+	#expect(text == "bXYZé🇸🇬tail")
+	#expect(copied == tree.length - 1)
+}
+
+@Test func pieceTreeCopyUTF8StopsAtScalarBoundary() {
+	var tree = PieceTree("abé🇸🇬tail")
+	tree.insert("XYZ", at: 2)
+	var buffer = [UInt8](repeating: 0, count: 9)
+	let copied = buffer.withUnsafeMutableBufferPointer {
+		tree.copyUTF8(at: 1, into: $0)
+	}
+	let text = String(decoding: buffer.prefix(copied), as: UTF8.self)
+	#expect(text == "bXYZé")
+	#expect(copied == 6)
+}
+
 @Test func pieceTreeInitializesFromMappedFileAsSingleOriginalPiece() throws {
 	let fileManager = FileManager.default
 	let directory = fileManager.temporaryDirectory.appendingPathComponent("itsy-piecetree-map-\(UUID().uuidString)", isDirectory: true)

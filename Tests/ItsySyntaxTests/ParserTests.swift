@@ -14,6 +14,18 @@ import Testing
 	#expect(!root.hasError)
 }
 
+@Test func parserParsesPieceTreeInputAcrossChunkBoundary() throws {
+	var pieceTree = PieceTree("// " + String(repeating: "a", count: 4_092) + "é\n")
+	pieceTree.insert("const answer: number = 42;\n", at: pieceTree.length)
+	var pipeline = SyntaxPipeline(language: .typescript)
+	let tree = try pipeline.parse(pieceTree)
+	let root = tree.rootNode
+	#expect(pipeline.didAllocateParser)
+	#expect(root.type == "program")
+	#expect(root.byteRange == 0 ..< pieceTree.length)
+	#expect(!root.hasError)
+}
+
 @Test func parserParsesLargeTypeScriptAndIncrementalEdit() throws {
 	var rope = Rope(largeTypeScriptLineSet())
 	let parser = try Parser(language: .typescript)

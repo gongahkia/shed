@@ -2,6 +2,7 @@
 set -euo pipefail
 
 RELEASE_DIR="${1:-${RELEASE_DIR:-dist/release}}"
+APP_NAME="${APP_NAME:-Olly}"
 ALLOW_ADHOC_RELEASE="${ALLOW_ADHOC_RELEASE:-0}"
 REQUIRE_NOTARIZED="${REQUIRE_NOTARIZED:-1}"
 
@@ -46,6 +47,44 @@ if ! tar -tzf "$source_path" >/dev/null; then
     echo "source tarball is not readable: $source_path" >&2
     exit 1
 fi
+
+hdiutil verify "$dmg_path" >/dev/null
+attach_plist="$(mktemp)"
+mounted_dmg=""
+cleanup() {
+    if [[ -n "$mounted_dmg" ]]; then
+        hdiutil detach "$mounted_dmg" >/dev/null 2>&1 || true
+    fi
+    rm -f "$attach_plist"
+}
+trap cleanup EXIT
+
+hdiutil attach -readonly -nobrowse -noautoopen -plist "$dmg_path" >"$attach_plist"
+for index in 0 1 2 3 4 5; do
+    mount_point="$(/usr/libexec/PlistBuddy -c "Print :system-entities:$index:mount-point" "$attach_plist" 2>/dev/null || true)"
+    if [[ -n "$mount_point" ]]; then
+        mounted_dmg="$mount_point"
+        break
+    fi
+done
+
+if [[ -z "$mounted_dmg" ]]; then
+    echo "failed to mount release dmg for layout validation: $dmg_path" >&2
+    exit 1
+fi
+
+if [[ ! -d "$mounted_dmg/$APP_NAME.app" ]]; then
+    echo "release dmg missing $APP_NAME.app" >&2
+    exit 1
+fi
+
+if [[ ! -L "$mounted_dmg/Applications" || "$(readlink "$mounted_dmg/Applications")" != "/Applications" ]]; then
+    echo "release dmg missing /Applications drop link" >&2
+    exit 1
+fi
+
+hdiutil detach "$mounted_dmg" >/dev/null
+mounted_dmg=""
 
 if codesign --verify --verbose=2 "$dmg_path" >/dev/null 2>&1; then
     signature_details="$(codesign -dv --verbose=4 "$dmg_path" 2>&1 || true)"

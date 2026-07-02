@@ -135,7 +135,17 @@ struct BenchmarkRunner {
             try await measure("state-snapshot-\(options.windowCount)-windows", runStateSnapshotProxy),
             try await measure("tag-switch-\(options.windowCount)-windows", runTagSwitch),
             try await measure("recovery-journal-\(options.windowCount)-windows", runRecoveryJournal),
+            try await measure("scratchpad-toggle-latency", runScratchpadToggleLatency),
+            try await measure("permission-revoke-recovery", runPermissionRevokeRecovery),
+            try await measure("space-drift-verify", runSpaceDriftVerify),
+            try await measureFocusRateLimitEval(),
+            try await measureRatio(
+                "animated-arrange",
+                baseline: runNonAnimatedArrangeBaseline,
+                candidate: runAnimatedArrange
+            ),
             try await measure("thumbnail-generation-20-windows", runThumbnailGeneration),
+            try await measure("thumbnail-cache-fill-20-windows", runThumbnailGeneration),
             try await measure("wake-from-sleep-proxy", runWakeFromSleepProxy),
             try await measure("soak-\(options.soakEvents)-events", runSoak)
         ]
@@ -167,6 +177,54 @@ struct BenchmarkRunner {
         return PerformanceScenarioResult(
             name: name,
             unit: "milliseconds",
+            sampleCount: samples.count,
+            p50: percentile(samples, 0.50),
+            p95: percentile(samples, 0.95),
+            p99: percentile(samples, 0.99),
+            min: samples.min() ?? 0,
+            max: samples.max() ?? 0
+        )
+    }
+
+    private func measureFocusRateLimitEval() async throws -> PerformanceScenarioResult {
+        let limiter = FocusRateLimiter()
+        var samples: [Double] = []
+        for index in 0..<options.iterations {
+            let start = ContinuousClock.now
+            let accepted = await limiter.shouldAccept(processID: pid_t(index + 1), isUserInitiated: false)
+            samples.append(Self.milliseconds(from: start.duration(to: ContinuousClock.now)))
+            sink.consume(accepted ? index : 0)
+        }
+        return PerformanceScenarioResult(
+            name: "focus-rate-limit-eval",
+            unit: "milliseconds",
+            sampleCount: samples.count,
+            p50: percentile(samples, 0.50),
+            p95: percentile(samples, 0.95),
+            p99: percentile(samples, 0.99),
+            min: samples.min() ?? 0,
+            max: samples.max() ?? 0
+        )
+    }
+
+    private func measureRatio(
+        _ name: String,
+        baseline: () async throws -> Void,
+        candidate: () async throws -> Void
+    ) async throws -> PerformanceScenarioResult {
+        var samples: [Double] = []
+        for _ in 0..<options.iterations {
+            let baselineStart = ContinuousClock.now
+            try await baseline()
+            let baselineMilliseconds = Self.milliseconds(from: baselineStart.duration(to: ContinuousClock.now))
+            let candidateStart = ContinuousClock.now
+            try await candidate()
+            let candidateMilliseconds = Self.milliseconds(from: candidateStart.duration(to: ContinuousClock.now))
+            samples.append(candidateMilliseconds / max(baselineMilliseconds, 0.001))
+        }
+        return PerformanceScenarioResult(
+            name: name,
+            unit: "baseline-ratio",
             sampleCount: samples.count,
             p50: percentile(samples, 0.50),
             p95: percentile(samples, 0.95),
@@ -241,6 +299,41 @@ struct BenchmarkRunner {
         sink.consume(placements.count)
     }
 
+    private func runNonAnimatedArrangeBaseline() async throws {
+        try await runRepeatedArrange(animated: false)
+    }
+
+    private func runAnimatedArrange() async throws {
+        try await runRepeatedArrange(animated: true)
+    }
+
+    private func runRepeatedArrange(animated: Bool) async throws {
+        let engine = MasterStackLayoutEngine()
+        let snapshots = windows(count: options.windowCount, active: try Tag(index: 0), inactive: try Tag(index: 0))
+            .map(WindowSnapshot.init)
+        var consumed = 0, didMeasureAnimation = false
+        for _ in 0..<32 {
+            let placements = engine.arrange(
+                windows: snapshots,
+                in: CGRect(x: 0, y: 0, width: 1_470, height: 918),
+                focus: snapshots.first?.windowID
+            )
+            consumed += placements.count
+            if animated, !didMeasureAnimation, let placement = placements.first {
+                let frames = WindowFrameAnimation.frames(
+                    from: placement.frame.offsetBy(dx: -12, dy: -8),
+                    to: placement.frame,
+                    duration: 0.12,
+                    frameInterval: 1.0 / 60.0,
+                    curve: .easeOut
+                )
+                consumed += frames.count
+                didMeasureAnimation = true
+            }
+        }
+        sink.consume(consumed)
+    }
+
     private func runStateSnapshotProxy() async throws {
         let store = WindowStore()
         let tags = TagStore(defaultActiveTags: TagSet(try Tag(index: 0)))
@@ -267,6 +360,76 @@ struct BenchmarkRunner {
         let state = try await journal.load()
         try await journal.remove(windowIDs: state.entries.map(\.windowID))
         sink.consume(state.entries.count)
+    }
+
+    private func runScratchpadToggleLatency() async throws {
+        let stateURL = temporaryStateURL("scratchpads.json")
+        let registry = ScratchpadRegistry(stateURL: stateURL)
+        defer {
+            try? FileManager.default.removeItem(at: stateURL.deletingLastPathComponent())
+        }
+        let window = WindowState(
+            id: 1,
+            processID: 42,
+            bundleID: "dev.olly.perfbench.scratchpad",
+            displayID: 1,
+            tagMask: 1,
+            frame: CGRect(x: 80, y: 80, width: 720, height: 480),
+            title: "scratchpad",
+            role: "AXWindow"
+        )
+        let parker = WindowParker(displayProvider: { displays() }) { _, _ in }
+        try await registry.upsert(ScratchpadEntry(
+            name: "terminal",
+            bundleID: window.bundleID,
+            role: window.role,
+            lastVisibleFrame: WindowRecoveryFrame(window.frame)
+        ))
+        guard try await registry.matchingEntry(for: window) != nil else {
+            return
+        }
+        let hidden = await parker.park(window)
+        let hiddenEntry = try await registry.setVisibility(
+            name: "terminal",
+            isVisible: false,
+            lastVisibleFrame: WindowRecoveryFrame(window.frame)
+        )
+        let visible = await parker.restore(window, targetFrame: hiddenEntry.lastVisibleFrame?.cgRect ?? window.frame)
+        let visibleEntry = try await registry.setVisibility(name: "terminal", isVisible: true)
+        sink.consume((hidden == nil ? 0 : 1) + (visible.reason == .show ? 1 : 0) + (visibleEntry.isVisible ? 1 : 0))
+    }
+
+    private func runPermissionRevokeRecovery() async throws {
+        let stateURL = temporaryStateURL("permission-recovery.json")
+        let journal = WindowRecoveryJournal(stateURL: stateURL)
+        defer {
+            try? FileManager.default.removeItem(at: stateURL.deletingLastPathComponent())
+        }
+        let parker = WindowParker(displayProvider: { displays() }) { _, _ in }
+        var movedCount = 0
+        for window in windows(count: options.windowCount, active: try Tag(index: 0), inactive: try Tag(index: 1)) {
+            if let move = await parker.park(window) {
+                try await journal.record(window: window, parkedFrame: move.targetFrame)
+                movedCount += 1
+            }
+        }
+        let state = try await journal.load()
+        try await journal.remove(windowIDs: state.entries.map(\.windowID))
+        sink.consume(movedCount + state.entries.count)
+    }
+
+    private func runSpaceDriftVerify() async throws {
+        let store = WindowStore()
+        let expected = NativeSpaceID(rawValue: 7)
+        for window in windows(count: min(options.windowCount, 20), active: try Tag(index: 0), inactive: try Tag(index: 1)) {
+            await store.upsert(window)
+        }
+        let invariant = NativeSpaceInvariant(
+            windowStore: store,
+            spaceProvider: AlternatingNativeSpaceProvider(expectedSpaceID: expected)
+        )
+        let result = await invariant.verify(expectedSpaceID: expected)
+        sink.consume(result.issues.count + result.offSpaceWindowIDs.count)
     }
 
     private func runWakeFromSleepProxy() async throws {
@@ -350,6 +513,12 @@ struct BenchmarkRunner {
         CGRect(x: CGFloat(index % 8) * 40, y: CGFloat(index % 5) * 30, width: 640, height: 420)
     }
 
+    private func temporaryStateURL(_ fileName: String) -> URL {
+        FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent(fileName)
+    }
+
     private static func milliseconds(from duration: Duration) -> Double {
         let components = duration.components
         return Double(components.seconds) * 1_000 + Double(components.attoseconds) / 1_000_000_000_000_000
@@ -370,6 +539,14 @@ struct FixedNativeSpaceProvider: WindowNativeSpaceProviding {
 
     func nativeSpaceID(for window: WindowState) async -> NativeSpaceID? {
         spaceID
+    }
+}
+
+struct AlternatingNativeSpaceProvider: WindowNativeSpaceProviding {
+    let expectedSpaceID: NativeSpaceID
+
+    func nativeSpaceID(for window: WindowState) async -> NativeSpaceID? {
+        Int(window.id).isMultiple(of: 5) ? NativeSpaceID(rawValue: expectedSpaceID.rawValue + 1) : expectedSpaceID
     }
 }
 

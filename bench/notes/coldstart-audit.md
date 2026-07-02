@@ -169,3 +169,45 @@ initial_document_opened 2120.836
 ```
 
 [Inference] The post-lazy-link changes did not produce the requested cold-start improvement. The current miss is dominated by the initial document/window construction path after main-menu installation, not direct `otool -L` dependencies.
+
+## 2026-07-02 post-dylib checkpoint
+
+Command:
+
+```sh
+bench/scripts/make_app.sh
+size -m .build/release/ItsyApp
+hyperfine -N --warmup 0 --runs 20 -- 'Itsy.app/Contents/MacOS/Itsy --bench-exit-on-ready'
+```
+
+Binary section result:
+
+- `__TEXT,__const`: `97,371 bytes` (`0.093 MiB`)
+- Previous recorded `__TEXT,__const`: `9.410 MiB`
+- Delta: `-9.317 MiB`
+- Target: `<2 MiB`
+- Status: pass
+
+Direct-ready cold-start result:
+
+- 20-run mean: `4.187 ms`
+- Min/max: `3.703 ms` / `5.205 ms`
+- Median: `4.069 ms`
+- Previous direct-binary probe in this note: `68 ms`
+- Delta: `-63.813 ms`
+- Target: `>=25 ms` improvement
+- Status: pass
+
+Direct initial-document stages:
+
+| Run | delegate_init ms | app_did_finish_launching ms | main_menu_installed ms | initial_document_opened ms |
+|---:|---:|---:|---:|---:|
+| 1 | 35.827 | 64.607 | 67.452 | 1072.510 |
+| 2 | 31.016 | 58.867 | 62.102 | 1055.192 |
+| 3 | 29.366 | 58.595 | 61.368 | 1060.687 |
+| 4 | 34.171 | 61.225 | 64.251 | 1054.811 |
+| 5 | 36.551 | 65.261 | 68.033 | 1060.629 |
+
+Mean `initial_document_opened`: `1060.766 ms`.
+
+`ItsyBench measure --staged --app Itsy.app --new-instance` timed out waiting for AX window creation at both `--timeout-ms 10000` and `--timeout-ms 30000` in this local session, so first-window-visible could not be reverified here. Direct stage output reached `READY`.

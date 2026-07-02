@@ -238,8 +238,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8 grammars.
 
-(B) 2026-07-01 +Phase26-Syntax @syntax id:1109 est:2h dep:1108 Cold-start bench post-dylib. Target: `__TEXT,__const` drops from 9.4 MB to <2 MB; cold start improves ≥25 ms. Update `bench/notes/coldstart-audit.md`.
-
 ---
 
 ## Phase 27 — Keymap parity (vim + emacs + plain)

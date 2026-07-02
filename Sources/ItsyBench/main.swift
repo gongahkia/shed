@@ -36,6 +36,13 @@ private struct RopeOptions {
 	var sliceLength: Int
 }
 
+private struct PieceTreeOptions {
+	var operations: Int
+	var sliceLength: Int
+	var mmapFile: String?
+	var requireMMapFile: Bool
+}
+
 private struct RenderHighlightCacheOptions {
 	var frames: Int
 	var lineCount: Int
@@ -93,6 +100,21 @@ private struct RopeBenchResult: Encodable {
 	var final_length: Int
 	var operations: Int
 	var random_insert_ns_per_op: Double
+	var sequential_insert_ns_per_op: Double
+	var slice_length: Int
+	var slice_ns_per_op: Double
+	var slice_checksum: Int
+}
+
+private struct PieceTreeBenchResult: Encodable {
+	var final_length: Int
+	var mmap_load_bytes: Int?
+	var mmap_load_line_count: Int?
+	var mmap_load_ms: Double?
+	var mmap_load_path: String?
+	var operations: Int
+	var random_insert_ns_per_op: Double
+	var random_remove_ns_per_op: Double
 	var sequential_insert_ns_per_op: Double
 	var slice_length: Int
 	var slice_ns_per_op: Double
@@ -214,6 +236,8 @@ enum ItsyBenchMain {
 			try printJSON(measure(parseMeasure(Array(args.dropFirst()))))
 		case "open":
 			try printJSON(open(parseOpen(Array(args.dropFirst()))))
+		case "piecetree":
+			try printJSON(pieceTree(parsePieceTree(Array(args.dropFirst()))))
 		case "rope":
 			try printJSON(rope(parseRope(Array(args.dropFirst()))))
 		case "render-highlight-cache":
@@ -446,6 +470,49 @@ enum ItsyBenchMain {
 		return RopeOptions(operations: operations, sliceLength: sliceLength)
 	}
 
+	private static func parsePieceTree(_ args: [String]) throws -> PieceTreeOptions {
+		var operations = 1_000_000
+		var sliceLength = 32
+		var mmapFile: String? = "bench/corpus/huge.log"
+		var requireMMapFile = false
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--ops":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --ops")
+				}
+				operations = value
+				index = args.index(after: valueIndex)
+			case "--slice-length":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --slice-length")
+				}
+				sliceLength = value
+				index = args.index(after: valueIndex)
+			case "--file":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, !args[valueIndex].isEmpty else {
+					throw BenchError.usage("missing value for --file")
+				}
+				mmapFile = args[valueIndex]
+				requireMMapFile = true
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown piecetree option: \(arg)")
+			}
+		}
+		return PieceTreeOptions(
+			operations: operations,
+			sliceLength: sliceLength,
+			mmapFile: mmapFile,
+			requireMMapFile: requireMMapFile
+		)
+	}
+
 	private static func parseRenderHighlightCache(_ args: [String]) throws -> RenderHighlightCacheOptions {
 		var frames = 60
 		var lineCount = 100_000
@@ -519,6 +586,74 @@ enum ItsyBenchMain {
 			final_length: sequential.length + random.length,
 			operations: operations,
 			random_insert_ns_per_op: Double(randomNS) / Double(operations),
+			sequential_insert_ns_per_op: Double(sequentialNS) / Double(operations),
+			slice_length: sliceLength,
+			slice_ns_per_op: Double(sliceNS) / Double(operations),
+			slice_checksum: checksum
+		)
+	}
+
+	private static func pieceTree(_ options: PieceTreeOptions) throws -> PieceTreeBenchResult {
+		let operations = options.operations
+		let sliceLength = min(options.sliceLength, operations)
+		var sequential = PieceTree()
+		let sequentialNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				sequential.insert("a", at: sequential.length)
+			}
+		}
+		var random = PieceTree()
+		var insertRNG = BenchRNG(0xC0FFEE)
+		let randomNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				random.insert("a", at: insertRNG.nextInt(random.length + 1))
+			}
+		}
+		var removing = PieceTree(bytes: [UInt8](repeating: 97, count: operations))
+		var removeRNG = BenchRNG(0x51A7E)
+		let removeNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				let offset = removeRNG.nextInt(removing.length)
+				removing.remove(offset ..< offset + 1)
+			}
+		}
+		let sliceTree = PieceTree(bytes: [UInt8](repeating: 97, count: operations))
+		var sliceRNG = BenchRNG(0xBAD5EED)
+		var checksum = 0
+		let sliceUpperBound = max(1, sliceTree.length - sliceLength + 1)
+		let sliceNS = measureNanoseconds {
+			for _ in 0 ..< operations {
+				let start = sliceRNG.nextInt(sliceUpperBound)
+				checksum += sliceTree.substring(start ..< start + sliceLength).utf8.count
+			}
+		}
+		var mmapPath: String?
+		var mmapBytes: Int?
+		var mmapLineCount: Int?
+		var mmapLoadMS: Double?
+		if let file = options.mmapFile {
+			let url = URL(fileURLWithPath: file)
+			if FileManager.default.fileExists(atPath: url.path) {
+				mmapPath = url.path
+				let loadNS = try measureNanoseconds {
+					let mapped = try PieceTree(readingMappedFile: url)
+					mmapBytes = mapped.length
+					mmapLineCount = mapped.lineCount
+				}
+				mmapLoadMS = Double(loadNS) / 1_000_000
+			} else if options.requireMMapFile {
+				throw BenchError.usage("missing piecetree mmap file: \(file)")
+			}
+		}
+		return PieceTreeBenchResult(
+			final_length: sequential.length + random.length + removing.length,
+			mmap_load_bytes: mmapBytes,
+			mmap_load_line_count: mmapLineCount,
+			mmap_load_ms: mmapLoadMS,
+			mmap_load_path: mmapPath,
+			operations: operations,
+			random_insert_ns_per_op: Double(randomNS) / Double(operations),
+			random_remove_ns_per_op: Double(removeNS) / Double(operations),
 			sequential_insert_ns_per_op: Double(sequentialNS) / Double(operations),
 			slice_length: sliceLength,
 			slice_ns_per_op: Double(sliceNS) / Double(operations),
@@ -938,6 +1073,7 @@ enum ItsyBenchMain {
 	  itsybench display [--display <id>]
 	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
+	  itsybench piecetree [--ops <count>] [--slice-length <bytes>] [--file <path>]
 	  itsybench render-highlight-cache [--lines <count>] [--frames <count>]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>
@@ -945,9 +1081,9 @@ enum ItsyBenchMain {
 	"""
 }
 
-private func measureNanoseconds(_ body: () -> Void) -> UInt64 {
+private func measureNanoseconds(_ body: () throws -> Void) rethrows -> UInt64 {
 	let start = DispatchTime.now().uptimeNanoseconds
-	body()
+	try body()
 	return DispatchTime.now().uptimeNanoseconds - start
 }
 

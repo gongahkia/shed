@@ -77,31 +77,3 @@ public struct SelectionSet: Sendable, Equatable {
 		return mapped
 	}
 }
-
-public struct Edit: Sendable, Equatable {
-	public var range: Range<Int>
-	public var oldText: String
-	public var newText: String
-	public var selectionBefore: SelectionSet
-
-	public init(range: Range<Int>, oldText: String, newText: String, selectionBefore: SelectionSet = SelectionSet()) {
-		self.range = range
-		self.oldText = oldText
-		self.newText = newText
-		self.selectionBefore = selectionBefore
-	}
-
-	var delta: Int {
-		newText.utf8.count - (range.upperBound - range.lowerBound)
-	}
-
-	func mapOffset(_ offset: Int) -> Int {
-		if offset <= range.lowerBound {
-			return offset
-		}
-		if offset >= range.upperBound {
-			return offset + delta
-		}
-		return range.lowerBound + newText.utf8.count
-	}
-}

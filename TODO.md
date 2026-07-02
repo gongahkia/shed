@@ -219,7 +219,6 @@ Approach for Itsy (simpler than full CRDT — piece-tree makes this cheap):
 - `popUndo` / `popRedo` apply reverse edits directly to `PieceTree`; O(log n) each.
 - Group semantics (`beginGroup`/`endGroup`) unchanged.
 
-(A) 2026-07-01 +Phase23-Undo @editor id:940 est:3h dep:922 Introduce `Edit` struct in `Sources/ItsyEditor/Edit.swift` with `range: Range<Int>`, `removed: Data`, `inserted: Data`. `PieceTree.replace(_:with:) -> Edit` returns the reverse edit needed to undo.
 (A) 2026-07-01 +Phase23-Undo @editor id:941 est:3h dep:940 Rewrite `UndoStack` in `Editor.swift`: `edits: [UndoEntry]` where `UndoEntry = { edit: Edit, reverse: Edit, selectionAfter: SelectionSet, selectionBefore: SelectionSet, groupID: Int? }`. Drop `snapshotBefore`. `popUndo` applies `entry.reverse` to storage.
 (A) 2026-07-01 +Phase23-Undo @editor id:942 est:2h dep:941 Add `UndoStack` memory cap: `maxEditCount: Int = 10_000` and `maxTotalRemovedBytes: Int = 64 * 1024 * 1024`. Older entries drop from tail. Reason: large deletions retain their bytes in the reverse edit — the bound must be explicit.
 (A) 2026-07-01 +Phase23-Undo @editor id:943 est:2h dep:941 Delete `record(_:selectionAfter:textBefore:)` overload that took `textBefore`. Grep guard: `grep -rn "textBefore" Sources/` returns nothing.

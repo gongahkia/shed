@@ -7,6 +7,7 @@ struct TerminalSnapshot {
 	var cursorColumn: Int
 	var alternateScreen: Bool
 	var bracketedPaste: Bool
+	var windowTitle: String?
 }
 
 final class ItsyTerminalEmulator {
@@ -14,8 +15,8 @@ final class ItsyTerminalEmulator {
 		case ground
 		case escape
 		case csi(String)
-		case osc
-		case oscEscape
+		case osc(String)
+		case oscEscape(String)
 	}
 
 	private(set) var columns: Int
@@ -32,6 +33,7 @@ final class ItsyTerminalEmulator {
 	private var state = State.ground
 	private(set) var alternateScreen = false
 	private(set) var bracketedPaste = false
+	private(set) var windowTitle: String?
 
 	init(columns: Int = 80, rows: Int = 24, maxScrollbackLines: Int = 10_000) {
 		self.columns = max(1, columns)
@@ -69,6 +71,7 @@ final class ItsyTerminalEmulator {
 		state = .ground
 		alternateScreen = false
 		bracketedPaste = false
+		windowTitle = nil
 	}
 
 	func clearScrollback() {
@@ -113,7 +116,8 @@ final class ItsyTerminalEmulator {
 			cursorRow: cursorRow,
 			cursorColumn: cursorColumn,
 			alternateScreen: alternateScreen,
-			bracketedPaste: bracketedPaste
+			bracketedPaste: bracketedPaste,
+			windowTitle: windowTitle
 		)
 	}
 
@@ -125,14 +129,22 @@ final class ItsyTerminalEmulator {
 			handleEscape(scalar)
 		case let .csi(buffer):
 			handleCSI(scalar, buffer: buffer)
-		case .osc:
+		case let .osc(buffer):
 			if scalar.value == 0x07 {
+				applyOSC(buffer)
 				state = .ground
 			} else if scalar.value == 0x1B {
-				state = .oscEscape
+				state = .oscEscape(buffer)
+			} else {
+				state = .osc(appendingOSC(scalar, to: buffer))
 			}
-		case .oscEscape:
-			state = scalar == "\\" ? .ground : .osc
+		case let .oscEscape(buffer):
+			if scalar == "\\" {
+				applyOSC(buffer)
+				state = .ground
+			} else {
+				state = .osc(appendingOSC(scalar, to: buffer))
+			}
 		}
 	}
 
@@ -160,7 +172,7 @@ final class ItsyTerminalEmulator {
 		case "[":
 			state = .csi("")
 		case "]":
-			state = .osc
+			state = .osc("")
 		case "7":
 			saveCursor()
 			state = .ground
@@ -303,6 +315,33 @@ final class ItsyTerminalEmulator {
 		alternateScreen = enabled
 		scrollTop = 0
 		scrollBottom = rows - 1
+	}
+
+	private func applyOSC(_ buffer: String) {
+		let parts = buffer.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false)
+		guard let code = parts.first else {
+			return
+		}
+		let payload = parts.count > 1 ? String(parts[1]) : ""
+		switch code {
+		case "0", "2":
+			windowTitle = sanitizedOSCText(payload)
+		default:
+			return
+		}
+	}
+
+	private func appendingOSC(_ scalar: UnicodeScalar, to buffer: String) -> String {
+		guard buffer.unicodeScalars.count < 4096 else {
+			return buffer
+		}
+		return buffer + String(scalar)
+	}
+
+	private func sanitizedOSCText(_ value: String) -> String {
+		String(value.unicodeScalars.filter { scalar in
+			scalar.value >= 0x20 && scalar.value != 0x7F
+		})
 	}
 
 	private func put(_ character: Character) {

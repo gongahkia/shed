@@ -25,12 +25,19 @@ public enum Motion: Sendable, Equatable {
 }
 
 public struct UndoStack: Sendable, Equatable {
+	public var maxEditCount: Int
+	public var maxTotalRemovedBytes: Int
 	public private(set) var edits: [UndoEntry] = []
 	private var redoEdits: [UndoEntry] = []
 	private var activeGroupID: Int?
 	private var nextGroupID = 1
 
-	public init() {}
+	public init(maxEditCount: Int = 10_000, maxTotalRemovedBytes: Int = 64 * 1024 * 1024) {
+		precondition(maxEditCount > 0, "maxEditCount must be positive")
+		precondition(maxTotalRemovedBytes >= 0, "maxTotalRemovedBytes must be non-negative")
+		self.maxEditCount = maxEditCount
+		self.maxTotalRemovedBytes = maxTotalRemovedBytes
+	}
 
 	mutating func record(_ edit: Edit, reverse: Edit, selectionBefore: SelectionSet, selectionAfter: SelectionSet) {
 		edits.append(UndoEntry(
@@ -41,6 +48,7 @@ public struct UndoStack: Sendable, Equatable {
 			groupID: activeGroupID
 		))
 		redoEdits.removeAll()
+		trimUndoHistory()
 	}
 
 	mutating func beginGroup() {
@@ -81,6 +89,38 @@ public struct UndoStack: Sendable, Equatable {
 		}
 		edits.append(contentsOf: entries)
 		return entries
+	}
+
+	private mutating func trimUndoHistory() {
+		while edits.count + redoEdits.count > maxEditCount || retainedRemovedBytes > maxTotalRemovedBytes {
+			guard !edits.isEmpty else {
+				redoEdits.removeAll()
+				return
+			}
+			dropOldestUndoGroup()
+		}
+	}
+
+	private var retainedRemovedBytes: Int {
+		retainedRemovedBytes(in: edits) + retainedRemovedBytes(in: redoEdits)
+	}
+
+	private func retainedRemovedBytes(in entries: [UndoEntry]) -> Int {
+		entries.reduce(0) { $0 + $1.edit.removed.count }
+	}
+
+	private mutating func dropOldestUndoGroup() {
+		guard let first = edits.first else {
+			return
+		}
+		let groupID = first.groupID
+		edits.removeFirst()
+		guard let groupID else {
+			return
+		}
+		while edits.first?.groupID == groupID {
+			edits.removeFirst()
+		}
 	}
 }
 

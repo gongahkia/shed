@@ -23,7 +23,7 @@ enum TextStorage {
 }
 ```
 
-The initial integration keeps `.rope` as default. `ITSY_EDITOR_STORAGE=piecetree` and later `settings.toml [editor.experimental] storage = "piecetree"` enable `.pieceTree`.
+`.pieceTree` is the default storage. `ITSY_EDITOR_STORAGE=rope` keeps the old rope path available as an explicit fallback.
 
 All editor-facing offsets remain UTF-8 byte offsets. Rendering, selections, LSP position conversion, and tree-sitter edits already use byte offsets or can derive line/UTF-16 positions from byte offsets.
 

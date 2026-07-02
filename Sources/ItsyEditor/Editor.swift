@@ -439,6 +439,11 @@ public struct Editor: Sendable {
 		lastEditBatch = []
 		selections = selectionSet
 		selections.merge()
+		#if DEBUG
+		if case let .pieceTree(pieceTree) = textStorage {
+			selections.validate("Editor.setSelection", against: pieceTree)
+		}
+		#endif
 	}
 
 	public mutating func undo() {

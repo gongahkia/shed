@@ -167,6 +167,11 @@ public struct PieceTree: Sendable {
 		return offset(forGraphemeIndex: index, in: root, baseOffset: 0) ?? length
 	}
 
+	public func isGraphemeBoundary(_ offset: Int) -> Bool {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		return self.offset(forGraphemeIndex: graphemeIndex(forOffset: offset)) == offset
+	}
+
 	public func previousGraphemeBoundary(before offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
 		guard offset > 0 else {

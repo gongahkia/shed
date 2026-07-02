@@ -23,3 +23,20 @@ import Testing
 	#expect(mapped.primary == Selection(anchor: 2, head: 6))
 	#expect(mapped.secondaries == [Selection(anchor: 8, head: 10)])
 }
+
+@Test func selectionValidationAcceptsGraphemeBoundaries() {
+	let tree = PieceTree("a👩‍💻b")
+	let set = SelectionSet(
+		primary: Selection(anchor: 1, head: 12),
+		secondaries: [Selection(anchor: 13, head: 13)]
+	)
+	#expect(set.validationFailures(against: tree).isEmpty)
+}
+
+@Test func selectionValidationReportsBoundsAndGraphemeFailures() {
+	let tree = PieceTree("a👩‍💻b")
+	let set = SelectionSet(primary: Selection(anchor: 2, head: 99))
+	let failures = set.validationFailures(against: tree)
+	#expect(failures.contains { $0.contains("not a grapheme boundary") })
+	#expect(failures.contains { $0.contains("out of bounds") })
+}

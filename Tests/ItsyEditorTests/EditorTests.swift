@@ -1,5 +1,31 @@
+import ItsyConfig
 import ItsyEditor
 import Testing
+
+@Test func editorStorageFlagResolvesEnvironmentBeforeSettings() {
+	let settings = ItsySettings(editor: .init(experimental: .init(storage: .rope)))
+	#expect(Editor.resolveStorage(environment: ["ITSY_EDITOR_STORAGE": "piecetree"], settings: settings) == .pieceTree)
+	#expect(Editor.resolveStorage(environment: ["ITSY_EDITOR_STORAGE": "rope"], settings: settings) == .rope)
+}
+
+@Test func editorStorageFlagFallsBackToSettings() {
+	let settings = ItsySettings(editor: .init(experimental: .init(storage: .pieceTree)))
+	#expect(Editor.resolveStorage(environment: [:], settings: settings) == .pieceTree)
+	#expect(Editor.resolveStorage(environment: ["ITSY_EDITOR_STORAGE": "invalid"], settings: settings) == .pieceTree)
+}
+
+@Test func editorInitializesSelectedTextStorageWithoutChangingRopePath() {
+	let pieceTreeEditor = Editor(text: "abc", storage: .pieceTree)
+	#expect(pieceTreeEditor.textStorage.kind == .pieceTree)
+	#expect(pieceTreeEditor.text == "abc")
+
+	var ropeEditor = Editor(text: "a", storage: .rope)
+	ropeEditor.insert("b")
+	#expect(ropeEditor.textStorage.kind == .rope)
+	if case let .rope(rope) = ropeEditor.textStorage {
+		#expect(rope.slice(0 ..< rope.length) == "ba")
+	}
+}
 
 @Test func editorInsertsAndDeletesText() {
 	var editor = Editor()

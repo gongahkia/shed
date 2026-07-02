@@ -1,7 +1,20 @@
 import Foundation
 
 public struct ItsySettings: Equatable, Sendable {
+	public enum EditorStorage: String, Equatable, Sendable {
+		case rope
+		case pieceTree = "piecetree"
+	}
+
 	public struct EditorSettings: Equatable, Sendable {
+		public struct ExperimentalSettings: Equatable, Sendable {
+			public var storage: EditorStorage
+
+			public init(storage: EditorStorage = .rope) {
+				self.storage = storage
+			}
+		}
+
 		public static let defaultFont = "Menlo"
 		public static let defaultFontSize = 14.95
 		public static let minFontSize = 9.0
@@ -14,12 +27,20 @@ public struct ItsySettings: Equatable, Sendable {
 		public var fontSize: Double
 		public var lineNumbers: Bool
 		public var tabWidth: Int
+		public var experimental: ExperimentalSettings
 
-		public init(font: String = Self.defaultFont, fontSize: Double = Self.defaultFontSize, lineNumbers: Bool = false, tabWidth: Int = Self.defaultTabWidth) {
+		public init(
+			font: String = Self.defaultFont,
+			fontSize: Double = Self.defaultFontSize,
+			lineNumbers: Bool = false,
+			tabWidth: Int = Self.defaultTabWidth,
+			experimental: ExperimentalSettings = ExperimentalSettings()
+		) {
 			self.font = font
 			self.fontSize = fontSize
 			self.lineNumbers = lineNumbers
 			self.tabWidth = tabWidth
+			self.experimental = experimental
 		}
 	}
 
@@ -170,6 +191,9 @@ public final class ItsySettingsStore {
 		line_numbers = \(settings.editor.lineNumbers ? "true" : "false")
 		tab_width = \(settings.editor.tabWidth)
 
+		[editor.experimental]
+		storage = "\(settings.editor.experimental.storage.rawValue)"
+
 		[theme]
 		id = "\(escape(settings.theme.id))"
 
@@ -225,7 +249,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "theme", "terminal"].contains(section) {
+				if !["editor", "editor.experimental", "theme", "terminal"].contains(section) {
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
 				continue
@@ -271,6 +295,12 @@ struct ItsySettingsParser {
 				settings.editor.tabWidth = integer
 			} else {
 				warnType(key, line: line, expected: "integer")
+			}
+		case "editor.experimental.storage":
+			if case let .string(storage) = value, let storage = ItsySettings.EditorStorage(rawValue: storage.lowercased()) {
+				settings.editor.experimental.storage = storage
+			} else {
+				warnType(key, line: line, expected: #""rope" or "piecetree""#)
 			}
 		case "theme.id":
 			if case let .string(id) = value {

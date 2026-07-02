@@ -39,7 +39,7 @@ let package = Package(
 		),
 		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap", "ItsyVim"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
-		.target(name: "ItsyEditor", dependencies: ["ItsyLSP"], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyEditor", dependencies: ["ItsyConfig", "ItsyLSP"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyKeymap", resources: [.process("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyVim", swiftSettings: releaseSwiftSettings),
@@ -132,7 +132,7 @@ let package = Package(
 				.unsafeFlags(["-O3"], .when(configuration: .release)),
 			]
 		),
-		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyLSP"], resources: [.copy("Fixtures")]),
+		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyConfig", "ItsyLSP"], resources: [.copy("Fixtures")]),
 		.testTarget(name: "ItsyConfigTests", dependencies: ["ItsyConfig"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim"]),

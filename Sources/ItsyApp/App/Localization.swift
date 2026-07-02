@@ -1,3 +1,4 @@
+// @file localized app strings.
 import Foundation
 
 enum L10n {

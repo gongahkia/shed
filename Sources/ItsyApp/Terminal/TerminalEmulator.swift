@@ -1,3 +1,4 @@
+// @file terminal escape parser and screen snapshot state.
 import Foundation
 
 struct TerminalSnapshot {

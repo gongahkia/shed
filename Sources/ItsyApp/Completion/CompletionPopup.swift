@@ -1,3 +1,4 @@
+// @file LSP completion popup controller and row rendering.
 import AppKit
 import ItsyLSP
 import ItsyRender

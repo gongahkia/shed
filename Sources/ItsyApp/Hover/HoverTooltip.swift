@@ -1,3 +1,4 @@
+// @file LSP hover markup rendering and tooltip presentation.
 import AppKit
 import ItsyLSP
 

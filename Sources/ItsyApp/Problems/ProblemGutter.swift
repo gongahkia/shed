@@ -1,3 +1,4 @@
+// @file diagnostics gutter state, markers, and popovers.
 import AppKit
 import ItsyEditor
 import ItsyRender

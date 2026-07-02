@@ -1,3 +1,4 @@
+// @file editor storage extraction helper for document persistence.
 import ItsyEditor
 
 func editorStorageString(_ value: Editor) -> String {

@@ -337,10 +337,17 @@ public struct ProcessGitCommandRunner: GitCommandRunning {
 
 	private func read(_ handle: FileHandle, into box: GitCommandDataBox, group: DispatchGroup) {
 		group.enter()
+		#if DEBUG
+		Thread.detachNewThread {
+			box.data = handle.readDataToEndOfFile()
+			group.leave()
+		}
+		#else
 		DispatchQueue.global(qos: .utility).async {
 			box.data = handle.readDataToEndOfFile()
 			group.leave()
 		}
+		#endif
 	}
 }
 

@@ -1,3 +1,4 @@
+// @file app-level keymap defaults and profile mapping.
 import ItsyKeymap
 
 enum ItsyAppKeymap {

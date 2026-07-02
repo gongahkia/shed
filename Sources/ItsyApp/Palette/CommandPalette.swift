@@ -1,3 +1,4 @@
+// @file command palette bridge actions.
 import AppKit
 
 enum ItsyCommandPaletteBridge {

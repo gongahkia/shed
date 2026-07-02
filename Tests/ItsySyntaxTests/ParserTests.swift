@@ -109,7 +109,8 @@ import Testing
 	]
 	#expect(Set(SyntaxTheme.standardCaptures).isSuperset(of: required))
 	let standardCaptures = Set(SyntaxTheme.standardCaptures)
-	for theme in [try SyntaxTheme.loadDefaultDark(), try SyntaxTheme.loadDefaultLight()] {
+	for choice in SyntaxTheme.bundledChoices {
+		let theme = try SyntaxTheme.loadChoice(id: choice.id)
 		#expect(Set(theme.colors.keys).isSuperset(of: standardCaptures))
 		for capture in SyntaxTheme.standardCaptures {
 			#expect(theme.color(for: capture) != nil)
@@ -137,8 +138,10 @@ import Testing
 
 @Test func syntaxThemeListsAndLoadsSelectedBundledChoice() throws {
 	let choices = SyntaxTheme.availableChoices()
-	#expect(choices.contains(SyntaxThemeChoice(id: "bundled:default-dark", displayName: "Default Dark")))
-	#expect(choices.contains(SyntaxThemeChoice(id: "bundled:default-light", displayName: "Default Light")))
+	for choice in SyntaxTheme.bundledChoices {
+		#expect(choices.contains(choice))
+		_ = try SyntaxTheme.loadChoice(id: choice.id)
+	}
 
 	let suiteName = "dev.itsy.editor.tests.theme.\(UUID().uuidString)"
 	let defaults = try #require(UserDefaults(suiteName: suiteName))

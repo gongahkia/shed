@@ -137,6 +137,7 @@ let package = Package(
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim"]),
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
+		.testTarget(name: "ItsyAppTests", dependencies: ["ItsyApp", "ItsyEditor"]),
 		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor", "CTSGrammars"]),
 		.testTarget(name: "ItsyLSPTests", dependencies: ["ItsyLSP"]),
 		.testTarget(name: "ItsyDAPTests", dependencies: ["ItsyDAP"]),

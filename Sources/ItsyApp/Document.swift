@@ -96,7 +96,36 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
-		return Data(editorStorageString(editor).utf8)
+		switch editor.textStorage {
+		case .rope:
+			return Data(editorStorageString(editor).utf8)
+		case .pieceTree:
+			throw CocoaError(.fileWriteUnknown)
+		}
+	}
+
+	override func write(to url: URL, ofType typeName: String) throws {
+		if try writeEditorStorage(to: url) {
+			return
+		}
+		try super.write(to: url, ofType: typeName)
+	}
+
+	override func write(
+		to url: URL,
+		ofType typeName: String,
+		for saveOperation: NSDocument.SaveOperationType,
+		originalContentsURL absoluteOriginalContentsURL: URL?
+	) throws {
+		if try writeEditorStorage(to: url) {
+			return
+		}
+		try super.write(
+			to: url,
+			ofType: typeName,
+			for: saveOperation,
+			originalContentsURL: absoluteOriginalContentsURL
+		)
 	}
 
 	override func makeWindowControllers() {
@@ -238,6 +267,16 @@ final class ItsyDocument: NSDocument {
 	private func setHighlightSpans(_ spans: [TextHighlightSpan]) {
 		for view in editorViews {
 			view.highlightSpans = spans
+		}
+	}
+
+	private func writeEditorStorage(to url: URL) throws -> Bool {
+		switch editor.textStorage {
+		case .rope:
+			return false
+		case let .pieceTree(pieceTree):
+			try pieceTree.saveTo(url: url)
+			return true
 		}
 	}
 

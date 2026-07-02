@@ -152,6 +152,28 @@ import Testing
 	}
 }
 
+@Test func bundledPlainProfileDefinesMacStandardAppBindings() throws {
+	let bindings = try KeymapConfiguration.load(profile: .plain, userConfigURL: nil)
+	var engine = KeymapEngine(modeStack: [.insert], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("n", modifiers: [.command])) == .command("file.new"))
+	#expect(engine.handle(try keyEvent("o", modifiers: [.command])) == .command("file.open"))
+	#expect(engine.handle(try keyEvent("n", modifiers: [.command, .shift])) == .command("file.newWindow"))
+	#expect(engine.handle(try keyEvent(",", modifiers: [.command])) == .command("app.settings"))
+	#expect(engine.handle(try keyEvent("p", modifiers: [.command])) == .command("view.commandPalette"))
+	#expect(engine.handle(try keyEvent("p", modifiers: [.command, .shift])) == .command("view.commandPalette"))
+	#expect(engine.handle(try keyEvent("k", modifiers: [.command])) == .partial)
+	#expect(engine.handle(try keyEvent("s", modifiers: [.command])) == .command("app.keyboardShortcuts"))
+	#expect(engine.handle(try keyEvent("b", modifiers: [.command])) == .command("view.sidebar.toggle"))
+	#expect(engine.handle(try keyEvent("j", modifiers: [.command])) == .command("terminal.toggle"))
+	#expect(engine.handle(try keyEvent(".", modifiers: [.command, .shift])) == .command("view.hiddenFiles.toggle"))
+	#expect(engine.handle(try keyEvent("\t", modifiers: [.control], keyCode: 48)) == .command("file.nextBuffer"))
+	#expect(engine.handle(try keyEvent("\t", modifiers: [.control, .shift], keyCode: 48)) == .command("file.previousBuffer"))
+	for index in 1 ... 9 {
+		#expect(engine.handle(try keyEvent("\(index)", modifiers: [.command])) == .command("file.selectTab.\(index)"))
+	}
+}
+
 @Test func bundledVimProfileDefinesNormalModeMotions() throws {
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)

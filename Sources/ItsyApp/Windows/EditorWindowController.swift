@@ -32,6 +32,7 @@ final class EditorWindowController: NSWindowController {
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
+	private var sidebarWidthConstraint: NSLayoutConstraint?
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -97,7 +98,9 @@ final class EditorWindowController: NSWindowController {
 		editorStack.translatesAutoresizingMaskIntoConstraints = false
 		splitView.addArrangedSubview(fileTreeController.view)
 		splitView.addArrangedSubview(editorStack)
-		fileTreeController.view.widthAnchor.constraint(equalToConstant: 240).isActive = true
+		let sidebarWidthConstraint = fileTreeController.view.widthAnchor.constraint(equalToConstant: 240)
+		sidebarWidthConstraint.isActive = true
+		self.sidebarWidthConstraint = sidebarWidthConstraint
 		let window = NSWindow(
 			contentRect: splitView.frame,
 			styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -145,6 +148,16 @@ final class EditorWindowController: NSWindowController {
 
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
 		fileTreeController.setGitSnapshot(snapshot)
+	}
+
+	func toggleSidebar() {
+		fileTreeController.view.isHidden.toggle()
+		sidebarWidthConstraint?.constant = fileTreeController.view.isHidden ? 0 : 240
+		window?.contentView?.layoutSubtreeIfNeeded()
+	}
+
+	func toggleHiddenFiles() {
+		fileTreeController.toggleHiddenFiles()
 	}
 
 	func setIndexingStatus(_ text: String?) {
@@ -716,17 +729,34 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
+		if let tabNumber = selectedTabNumber(commandID) {
+			return ItsyTabCoordinator.selectDocument(atDisplayIndex: tabNumber - 1)
+		}
 		switch commandID {
+		case "file.new":
+			NSDocumentController.shared.newDocument(nil)
 		case "file.open":
 			NSDocumentController.shared.openDocument(nil)
+		case "file.newWindow":
+			return NSApp.sendAction(#selector(AppCoordinator.newWindow(_:)), to: nil, from: self)
 		case "app.quit":
 			NSApp.terminate(nil)
+		case "app.settings":
+			return NSApp.sendAction(#selector(AppCoordinator.showSettings(_:)), to: nil, from: self)
+		case "app.keyboardShortcuts":
+			return NSApp.sendAction(#selector(AppCoordinator.showSettings(_:)), to: nil, from: self)
 		case "view.commandPalette":
 			return NSApp.sendAction(#selector(AppCoordinator.toggleCommandPalette(_:)), to: nil, from: self)
+		case "terminal.toggle":
+			return NSApp.sendAction(#selector(AppCoordinator.showTerminal(_:)), to: nil, from: self)
 		case "file.nextBuffer":
 			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
 		case "file.previousBuffer":
 			ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
+		case "view.sidebar.toggle":
+			toggleSidebar()
+		case "view.hiddenFiles.toggle":
+			toggleHiddenFiles()
 		case "pane.close":
 			if !closeActivePane() {
 				(document as? NSDocument)?.close()
@@ -768,6 +798,13 @@ final class EditorWindowController: NSWindowController {
 			return false
 		}
 		return true
+	}
+
+	private func selectedTabNumber(_ commandID: String) -> Int? {
+		guard commandID.hasPrefix("file.selectTab.") else {
+			return nil
+		}
+		return Int(commandID.dropFirst("file.selectTab.".count))
 	}
 
 	@discardableResult

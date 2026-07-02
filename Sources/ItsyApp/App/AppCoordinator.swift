@@ -119,6 +119,18 @@ final class AppCoordinator: NSObject {
 		NSApp.keyWindow?.performClose(sender)
 	}
 
+	@objc func newWindow(_ sender: Any?) {
+		do {
+			let document = try documentController.makeUntitledDocument(ofType: documentController.defaultType ?? "public.data")
+			documentController.addDocument(document)
+			document.makeWindowControllers()
+			document.showWindows()
+			ItsyTabCoordinator.refresh()
+		} catch {
+			NSLog("failed to create new window: \(error)")
+		}
+	}
+
 	@objc func toggleCommandPalette(_ sender: Any?) {
 		commandPaletteCoordinator.toggleCommandPalette(sender)
 	}
@@ -141,6 +153,9 @@ final class AppCoordinator: NSObject {
 				Command(id: "file.open", title: L10n.string("Open File"), defaultKey: "Cmd-O") { [weak self] in
 					self?.documentController.openDocument(nil)
 				},
+				Command(id: "file.newWindow", title: L10n.string("New Window"), defaultKey: "Cmd-Shift-N") { [weak self] in
+					self?.newWindow(nil)
+				},
 				Command(id: "file.openFolder", title: L10n.string("Open Folder"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.openFolder(nil)
 				},
@@ -150,8 +165,47 @@ final class AppCoordinator: NSObject {
 				Command(id: "file.close", title: L10n.string("Close File"), defaultKey: "Cmd-W") { [weak self] in
 					self?.closeCurrentDocument(nil)
 				},
+				Command(id: "file.nextBuffer", title: L10n.string("Next Tab"), defaultKey: "Ctrl-Tab") {
+					ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
+				},
+				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"), defaultKey: "Ctrl-Shift-Tab") {
+					ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
+				},
+				Command(id: "file.selectTab.1", title: L10n.string("Select Tab 1"), defaultKey: "Cmd-1") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 0)
+				},
+				Command(id: "file.selectTab.2", title: L10n.string("Select Tab 2"), defaultKey: "Cmd-2") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 1)
+				},
+				Command(id: "file.selectTab.3", title: L10n.string("Select Tab 3"), defaultKey: "Cmd-3") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 2)
+				},
+				Command(id: "file.selectTab.4", title: L10n.string("Select Tab 4"), defaultKey: "Cmd-4") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 3)
+				},
+				Command(id: "file.selectTab.5", title: L10n.string("Select Tab 5"), defaultKey: "Cmd-5") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 4)
+				},
+				Command(id: "file.selectTab.6", title: L10n.string("Select Tab 6"), defaultKey: "Cmd-6") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 5)
+				},
+				Command(id: "file.selectTab.7", title: L10n.string("Select Tab 7"), defaultKey: "Cmd-7") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 6)
+				},
+				Command(id: "file.selectTab.8", title: L10n.string("Select Tab 8"), defaultKey: "Cmd-8") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 7)
+				},
+				Command(id: "file.selectTab.9", title: L10n.string("Select Tab 9"), defaultKey: "Cmd-9") {
+					ItsyTabCoordinator.selectDocument(atDisplayIndex: 8)
+				},
 				Command(id: "view.commandPalette", title: L10n.string("Command Palette"), defaultKey: "Cmd-Shift-P") { [weak self] in
 					self?.toggleCommandPalette(nil)
+				},
+				Command(id: "view.sidebar.toggle", title: L10n.string("Toggle Sidebar"), defaultKey: "Cmd-B") { [weak self] in
+					self?.activeEditorWindowController()?.toggleSidebar()
+				},
+				Command(id: "view.hiddenFiles.toggle", title: L10n.string("Toggle Hidden Files"), defaultKey: "Cmd-Shift-.") { [weak self] in
+					self?.activeEditorWindowController()?.toggleHiddenFiles()
 				},
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
@@ -178,6 +232,9 @@ final class AppCoordinator: NSObject {
 					_ = self?.activeEditorWindowController()?.findAllReferences(nil)
 				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
+					self?.showSettings(nil)
+				},
+				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"), defaultKey: "Cmd-K Cmd-S") { [weak self] in
 					self?.showSettings(nil)
 				},
 					Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in

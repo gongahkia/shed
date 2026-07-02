@@ -64,3 +64,14 @@ import Testing
 	)
 	#expect(try Data(contentsOf: savedURL) == Data(bytes))
 }
+
+@Test func documentSyntaxRefreshParsesPieceTreeStorage() throws {
+	let controller = DocumentSyntaxController()
+	var spanCount = 0
+	controller.setHighlightSpans = { spans in
+		spanCount = spans.count
+	}
+	controller.configure(fileURL: URL(fileURLWithPath: "/tmp/sample.ts"))
+	controller.refresh(editor: Editor(text: "const value = \"ok\";\n", storage: .pieceTree))
+	#expect(spanCount > 0)
+}

@@ -45,17 +45,25 @@ final class DocumentSyntaxController {
 			if case .rope = editor.textStorage,
 			   edits.count == 1,
 			   let edit = edits.first,
-			   isSingleLineEdit(edit),
 			   let oldRope,
 			   let tree = syntaxTree {
 				let inputEdit = InputEdit(edit: edit, oldRope: oldRope, newRope: editor.rope)
 				tree.edit(inputEdit)
 				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
 				syntaxTree = newTree
-				let dirtyRange = dirtyLineRange(containing: inputEdit.newEndByte, editor: editor)
-				let dirtySpans = try syntaxPipeline.highlights(in: newTree, byteRange: dirtyRange)
+				let queryRanges = mergedByteRanges(
+					[
+						changedLineByteRange(for: inputEdit, editor: editor),
+						highlightByteRange(for: viewportLineRange, editor: editor),
+					].compactMap { $0 }
+				)
+				let dirtySpans = try queryRanges.flatMap { range in
+					try syntaxPipeline.highlights(in: newTree, byteRange: range)
+				}
 				syntaxHighlightSpans = syntaxHighlightSpans.compactMap { $0.mapped(through: edit) }
-				syntaxHighlightSpans.removeAll { $0.range.overlaps(dirtyRange) }
+				syntaxHighlightSpans.removeAll { span in
+					queryRanges.contains { $0.overlaps(span.range) }
+				}
 				syntaxHighlightSpans += dirtySpans
 				spans = syntaxHighlightSpans
 			} else {
@@ -76,14 +84,18 @@ final class DocumentSyntaxController {
 		}
 	}
 
-	private func dirtyLineRange(containing offset: Int, editor: Editor) -> Range<Int> {
+	private func changedLineByteRange(for inputEdit: InputEdit, editor: Editor) -> Range<Int>? {
 		let storage = editor.textStorage
-		let line = storage.line(forOffset: min(offset, storage.length))
-		return storage.lineRange(line)
-	}
-
-	private func isSingleLineEdit(_ edit: Edit) -> Bool {
-		!edit.oldText.utf8.contains(10) && !edit.newText.utf8.contains(10)
+		guard storage.length > 0 else {
+			return nil
+		}
+		let lowerLine = storage.line(forOffset: min(inputEdit.startByte, storage.length))
+		let upperOffset = min(max(inputEdit.newEndByte, inputEdit.startByte), storage.length)
+		let upperLine = storage.line(forOffset: upperOffset)
+		let lower = storage.lineRange(lowerLine).lowerBound
+		let nextLine = min(storage.lineCount, upperLine + 1)
+		let upper = nextLine < storage.lineCount ? storage.offset(forLine: nextLine) : storage.length
+		return lower ..< upper
 	}
 
 	private func parse(editor: Editor, using syntaxPipeline: inout SyntaxPipeline) throws -> Tree {
@@ -108,5 +120,23 @@ final class DocumentSyntaxController {
 		let lower = storage.offset(forLine: lowerLine)
 		let upper = upperLine < storage.lineCount ? storage.offset(forLine: upperLine) : storage.length
 		return lower ..< upper
+	}
+
+	private func mergedByteRanges(_ ranges: [Range<Int>]) -> [Range<Int>] {
+		let sorted = ranges.filter { !$0.isEmpty }.sorted { $0.lowerBound < $1.lowerBound }
+		guard var current = sorted.first else {
+			return []
+		}
+		var result: [Range<Int>] = []
+		for range in sorted.dropFirst() {
+			if range.lowerBound <= current.upperBound {
+				current = current.lowerBound ..< max(current.upperBound, range.upperBound)
+			} else {
+				result.append(current)
+				current = range
+			}
+		}
+		result.append(current)
+		return result
 	}
 }

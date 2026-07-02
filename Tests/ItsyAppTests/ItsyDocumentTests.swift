@@ -96,3 +96,28 @@ import Testing
 	#expect(ranges.allSatisfy { $0.overlaps(expected) })
 	#expect(ranges.contains { $0.overlaps(visible) })
 }
+
+@Test func documentSyntaxRefreshHandlesMultilineIncrementalEdit() throws {
+	let controller = DocumentSyntaxController()
+	var ranges: [Range<Int>] = []
+	controller.setHighlightSpans = { spans in
+		ranges = spans.map(\.range)
+	}
+	controller.configure(fileURL: URL(fileURLWithPath: "/tmp/sample.ts"))
+	var editor = Editor(text: "const first = \"a\";\nconst third = \"c\";\n", storage: .rope)
+	controller.refresh(editor: editor, viewportLineRange: 0 ..< 3)
+	let oldRope = editor.rope
+	let insertOffset = oldRope.offset(forLine: 1)
+	editor.setSelection(SelectionSet(primary: Selection(anchor: insertOffset, head: insertOffset)))
+	editor.insert("const second = \"b\";\n")
+	controller.refresh(
+		editor: editor,
+		edits: editor.lastEditBatch,
+		oldRope: oldRope,
+		viewportLineRange: 0 ..< 4
+	)
+
+	let insertedLine = editor.textStorage.lineRange(1)
+	#expect(!ranges.isEmpty)
+	#expect(ranges.contains { $0.overlaps(insertedLine) })
+}

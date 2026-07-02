@@ -219,7 +219,6 @@ Approach for Itsy (simpler than full CRDT — piece-tree makes this cheap):
 - `popUndo` / `popRedo` apply reverse edits directly to `PieceTree`; O(log n) each.
 - Group semantics (`beginGroup`/`endGroup`) unchanged.
 
-(A) 2026-07-01 +Phase23-Undo @editor id:944 est:3h dep:941 Property test: 10k random ins/del/redo/undo sequences leave `pieceTree.substring(0..<length)` equal between forward and forward→undo→redo→undo→redo runs.
 (A) 2026-07-01 +Phase23-Undo @bench id:945 est:1h dep:942 Bench: `ItsyBench undo --ops 100000` on a 10 MB buffer must stay under 100 MB peak RSS delta (proves no O(N) snapshot). Publish `bench/notes/undo-phase23.md`.
 
 ---

@@ -147,6 +147,46 @@ import Testing
 	#expect(editorTextStorageString(editor) == "abc")
 }
 
+@Test func editorUndoRedoRandomSequencesMatchCycledPieceTreeRuns() {
+	var rng = EditorUndoFuzzRNG(0x9440_0001)
+	var forward = Editor(text: "seed\n", storage: .pieceTree)
+	var cycled = Editor(text: "seed\n", storage: .pieceTree)
+	let inserts = ["a", "b", "Z", "\n", "  ", "=", "{}", "let ", "return "]
+
+	for _ in 0 ..< 10_000 {
+		let forwardSnapshot = editorTextStorageString(forward)
+		let cycledSnapshot = editorTextStorageString(cycled)
+		#expect(cycledSnapshot == forwardSnapshot)
+		guard cycledSnapshot == forwardSnapshot else {
+			return
+		}
+
+		let length = forward.textStorage.length
+		let roll = rng.nextInt(100)
+		if roll < 45 || length == 0 {
+			let offset = rng.nextInt(length + 1)
+			let text = inserts[rng.nextInt(inserts.count)]
+			editorInsert(text, at: offset, in: &forward)
+			editorInsert(text, at: offset, in: &cycled)
+			cycleUndoRedo(&cycled)
+		} else if roll < 75 {
+			let lower = rng.nextInt(length)
+			let upper = lower + 1 + rng.nextInt(min(16, length - lower))
+			editorDelete(lower ..< upper, in: &forward)
+			editorDelete(lower ..< upper, in: &cycled)
+			cycleUndoRedo(&cycled)
+		} else if roll < 88 {
+			forward.undo()
+			cycled.undo()
+		} else {
+			forward.redo()
+			cycled.redo()
+		}
+	}
+
+	#expect(editorTextStorageString(cycled) == editorTextStorageString(forward))
+}
+
 @Test func killRingStoresSixtyEntriesAndRotates() {
 	var ring = KillRing()
 	for index in 0 ..< 61 {
@@ -213,5 +253,36 @@ private func editorTextStorageString(_ value: Editor) -> String {
 		return rope.slice(0 ..< rope.length)
 	case let .pieceTree(pieceTree):
 		return pieceTree.substring(0 ..< pieceTree.length)
+	}
+}
+
+private func editorInsert(_ text: String, at offset: Int, in editor: inout Editor) {
+	editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
+	editor.insert(text)
+}
+
+private func editorDelete(_ range: Range<Int>, in editor: inout Editor) {
+	editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.upperBound)))
+	editor.deleteForward()
+}
+
+private func cycleUndoRedo(_ editor: inout Editor) {
+	editor.undo()
+	editor.redo()
+	editor.undo()
+	editor.redo()
+}
+
+private struct EditorUndoFuzzRNG {
+	private var state: UInt64
+
+	init(_ seed: UInt64) {
+		state = seed
+	}
+
+	mutating func nextInt(_ upperBound: Int) -> Int {
+		precondition(upperBound > 0)
+		state = state &* 6364136223846793005 &+ 1442695040888963407
+		return Int(state % UInt64(upperBound))
 	}
 }

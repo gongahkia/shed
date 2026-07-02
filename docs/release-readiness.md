@@ -37,9 +37,17 @@ scripts/validate-release-assets.sh dist/release
 - `release-manifest.json`
 
 `validate-release-assets.sh` verifies the checksum file, manifest syntax,
-readable source archive, Developer ID DMG signature, stapled notarization ticket,
-and Gatekeeper assessment. Local ad-hoc smoke builds may opt out of the
-Developer ID/notarization gate with `ALLOW_ADHOC_RELEASE=1`.
+readable source archive, DMG mountability, app + `/Applications` drop-link
+layout, Developer ID DMG signature, stapled notarization ticket, and Gatekeeper
+assessment. Local ad-hoc smoke builds may opt out of the Developer
+ID/notarization gate with `ALLOW_ADHOC_RELEASE=1`.
+
+`package-macos-dmg.sh` requires `create-dmg` for the Finder layout, background,
+and fixed icon placement:
+
+```sh
+brew install create-dmg
+```
 
 ## Local Artifact Smoke Test
 

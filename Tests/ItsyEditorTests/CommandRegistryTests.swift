@@ -11,13 +11,18 @@ import Testing
 		Command(id: "file.save", title: "Save File", defaultKey: "Cmd-S") {
 			transcript.append("save")
 		},
+		Command(id: "internal.noop", title: "Hidden", isHidden: true) {
+			transcript.append("hidden")
+		},
 	])
 
 	#expect(registry.commands.map(\.id) == ["file.open", "file.save"])
+	#expect(registry.allCommands.map(\.id) == ["file.open", "file.save", "internal.noop"])
 	#expect(registry.command(id: "file.save")?.title == "Save File")
 	try registry.run(id: "file.open")
 	try registry.run(id: "file.save")
-	#expect(transcript == ["open", "save"])
+	try registry.run(id: "internal.noop")
+	#expect(transcript == ["open", "save", "hidden"])
 }
 
 @Test func commandRegistryRejectsDuplicateAndMissingIDs() throws {

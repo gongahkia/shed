@@ -325,6 +325,7 @@ final class AppCoordinator: NSObject {
 					self?.performEditorMotion(.lineEnd)
 				},
 			])
+			try registry.register(KeymapCommandCatalog.hiddenCommands)
 			return registry
 		} catch {
 			preconditionFailure("failed to register commands: \(error)")

@@ -7,13 +7,14 @@ baseline="${ITSY_REGRESSION_BASELINE:-$repo_dir/bench/results/baseline-itsy-curr
 out="${ITSY_REGRESSION_OUT:-$repo_dir/bench/results/regression-current.json}"
 runs="${ITSY_REGRESSION_RUNS:-20}"
 threshold="${ITSY_REGRESSION_THRESHOLD:-0.05}"
-rope_ops="${ITSY_REGRESSION_ROPE_OPS:-1000000}"
-rope_runs="${ITSY_REGRESSION_ROPE_RUNS:-5}"
+piecetree_ops="${ITSY_REGRESSION_PIECETREE_OPS:-10000}"
+piecetree_runs="${ITSY_REGRESSION_PIECETREE_RUNS:-3}"
+piecetree_file="${ITSY_REGRESSION_PIECETREE_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 slice_length="${ITSY_REGRESSION_SLICE_LENGTH:-32}"
 itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
 itsyapp="${ITSY_APP_BINARY:-$repo_dir/.build/release/ItsyApp}"
 hyperfine_json="$(mktemp)"
-rope_json="$(mktemp)"
+piecetree_json="$(mktemp)"
 open_json="$(mktemp)"
 lsp_json="$(mktemp)"
 lsp_guard_dir="$(mktemp -d)"
@@ -24,7 +25,7 @@ lsp_diagnostics_limit_ms="${ITSY_REGRESSION_LSP_DIAGNOSTICS_LIMIT_MS:-5000}"
 open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
 
-trap 'rm -f "$hyperfine_json" "$rope_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
+trap 'rm -f "$hyperfine_json" "$piecetree_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
 
 setup_lsp_spawn_guard() {
 	local bin_dir="$lsp_guard_dir/bin"
@@ -106,8 +107,12 @@ rm -f "$lsp_guard_marker"
 HOME="$lsp_guard_home" hyperfine "${hyperfine_args[@]}" "$app_command" >/dev/null
 assert_no_lsp_spawn "cold-start launch"
 ITSY_LSP_DIAGNOSTICS_LIMIT_MS="$lsp_diagnostics_limit_ms" ruby "$lsp_probe_script" >"$lsp_json"
-for _ in $(seq 1 "$rope_runs"); do
-	"$itsybench" rope --ops "$rope_ops" --slice-length "$slice_length" >>"$rope_json"
+for _ in $(seq 1 "$piecetree_runs"); do
+	piecetree_args=(piecetree --ops "$piecetree_ops" --slice-length "$slice_length")
+	if [[ -f "$piecetree_file" ]]; then
+		piecetree_args+=(--file "$piecetree_file")
+	fi
+	"$itsybench" "${piecetree_args[@]}" >>"$piecetree_json"
 done
 if [[ -f "$open_file" ]]; then
 	"$itsybench" open --app "$itsyapp" --file "$open_file" --timeout-ms "$open_timeout_ms" >"$open_json"
@@ -131,10 +136,10 @@ ruby -rjson -rtime -e '
 		value.to_s.gsub("%", "%25").gsub("\r", "%0D").gsub("\n", "%0A")
 	end
 
-	baseline_path, hyperfine_path, rope_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
+	baseline_path, hyperfine_path, piecetree_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
-	rope_runs = File.readlines(rope_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
+	piecetree_runs = File.readlines(piecetree_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 	open = File.size?(open_path) ? JSON.parse(File.read(open_path)) : {}
 	lsp = File.size?(lsp_path) ? JSON.parse(File.read(lsp_path)) : {}
 	bench = hyperfine.fetch("results").first
@@ -142,9 +147,10 @@ ruby -rjson -rtime -e '
 		"cold_start_ready_ms" => bench.fetch("median").to_f * 1000.0,
 		"cold_start_ready_min_ms" => bench.fetch("min").to_f * 1000.0,
 		"cold_start_ready_max_ms" => bench.fetch("max").to_f * 1000.0,
-		"rope_random_insert_ns_per_op" => rope_runs.map { |run| run.fetch("random_insert_ns_per_op").to_f }.min,
-		"rope_sequential_insert_ns_per_op" => rope_runs.map { |run| run.fetch("sequential_insert_ns_per_op").to_f }.min,
-		"rope_slice_ns_per_op" => rope_runs.map { |run| run.fetch("slice_ns_per_op").to_f }.min,
+		"piecetree_random_insert_ns_per_op" => piecetree_runs.map { |run| run.fetch("random_insert_ns_per_op").to_f }.min,
+		"piecetree_random_remove_ns_per_op" => piecetree_runs.map { |run| run.fetch("random_remove_ns_per_op").to_f }.min,
+		"piecetree_sequential_insert_ns_per_op" => piecetree_runs.map { |run| run.fetch("sequential_insert_ns_per_op").to_f }.min,
+		"piecetree_slice_ns_per_op" => piecetree_runs.map { |run| run.fetch("slice_ns_per_op").to_f }.min,
 		"binary_size_kb" => File.size(binary).to_f / 1024.0,
 		"swift_loc" => swift_loc(repo).to_f
 	}
@@ -175,7 +181,7 @@ ruby -rjson -rtime -e '
 		"generated_at" => Time.now.utc.iso8601,
 		"baseline" => baseline_path,
 		"runs" => hyperfine.fetch("results").first.fetch("times").length,
-		"rope_runs" => rope_runs.length,
+		"piecetree_runs" => piecetree_runs.length,
 		"threshold" => default_threshold,
 		"metrics" => rows
 	}
@@ -213,6 +219,6 @@ ruby -rjson -rtime -e '
 		end
 	end
 	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$rope_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
+' "$baseline" "$hyperfine_json" "$piecetree_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

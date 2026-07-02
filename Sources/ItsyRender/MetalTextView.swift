@@ -517,8 +517,9 @@ public final class MetalTextView: NSView {
 	}
 
 	public func replaceUTF8Range(_ range: Range<Int>, with text: String, selectUTF8Ranges ranges: [Range<Int>] = []) {
-		let lower = min(max(range.lowerBound, 0), editor.rope.length)
-		let upper = min(max(range.upperBound, lower), editor.rope.length)
+		let storage = editor.textStorage
+		let lower = min(max(range.lowerBound, 0), storage.length)
+		let upper = min(max(range.upperBound, lower), storage.length)
 		replace(range: lower ..< upper, with: text)
 		if !ranges.isEmpty {
 			selectUTF8Ranges(ranges)
@@ -529,7 +530,7 @@ public final class MetalTextView: NSView {
 	}
 
 	func toggleAdditionalCursor(at offset: Int) {
-		let clamped = min(max(offset, 0), editor.rope.length)
+		let clamped = min(max(offset, 0), editor.textStorage.length)
 		var selections = [editor.selections.primary] + editor.selections.secondaries
 		if let index = selections.firstIndex(where: { $0.isCaret && $0.head == clamped }) {
 			guard selections.count > 1 else {
@@ -549,15 +550,16 @@ public final class MetalTextView: NSView {
 	}
 
 	func columnCursorSelection(anchor: Int, head: Int) -> SelectionSet {
-		let clampedAnchor = min(max(anchor, 0), editor.rope.length)
-		let clampedHead = min(max(head, 0), editor.rope.length)
-		let anchorLine = editor.rope.line(forOffset: clampedAnchor)
-		let headLine = editor.rope.line(forOffset: clampedHead)
+		let storage = editor.textStorage
+		let clampedAnchor = min(max(anchor, 0), storage.length)
+		let clampedHead = min(max(head, 0), storage.length)
+		let anchorLine = storage.line(forOffset: clampedAnchor)
+		let headLine = storage.line(forOffset: clampedHead)
 		let lowerLine = min(anchorLine, headLine)
 		let upperLine = max(anchorLine, headLine)
-		let column = clampedAnchor - editor.rope.offset(forLine: anchorLine)
+		let column = clampedAnchor - storage.offset(forLine: anchorLine)
 		let selections = (lowerLine ... upperLine).map { line -> Selection in
-			let lineRange = editor.rope.lineRange(line)
+			let lineRange = storage.lineRange(line)
 			let offset = min(max(lineRange.lowerBound + column, lineRange.lowerBound), lineRange.upperBound)
 			return Selection(anchor: offset, head: offset)
 		}
@@ -838,8 +840,9 @@ public final class MetalTextView: NSView {
 		let scaleKey = Self.scaleKey(for: scale)
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
+		let storage = editor.textStorage
 		for lineIndex in visibleLineRange {
-			let lineRange = editor.rope.lineRange(lineIndex)
+			let lineRange = storage.lineRange(lineIndex)
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
 				upperBound: lineRange.upperBound,
@@ -875,8 +878,9 @@ public final class MetalTextView: NSView {
 		let scaleKey = Self.scaleKey(for: scale)
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
+		let storage = editor.textStorage
 		for lineIndex in visibleLineRange {
-			let lineRange = editor.rope.lineRange(lineIndex)
+			let lineRange = storage.lineRange(lineIndex)
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
 				upperBound: lineRange.upperBound,
@@ -918,7 +922,7 @@ public final class MetalTextView: NSView {
 			return cached
 		}
 		lineShapeCacheMisses += 1
-		let line = editor.rope.slice(lineRange)
+		let line = editor.textStorage.substring(lineRange)
 		guard !line.isEmpty, let cached = shapeCachedGlyphs(line: line, scale: scale, shaper: shaper) else {
 			return []
 		}
@@ -1311,11 +1315,12 @@ public final class MetalTextView: NSView {
 	}
 
 	func syncEditorState() {
-		lineCount = editor.rope.lineCount
+		let storage = editor.textStorage
+		lineCount = storage.lineCount
 		let head = editor.selections.primary.head
-		let line = editor.rope.line(forOffset: head)
-		let lineRange = editor.rope.lineRange(line)
-		let prefix = editor.rope.slice(lineRange.lowerBound ..< min(head, lineRange.upperBound))
+		let line = storage.line(forOffset: head)
+		let lineRange = storage.lineRange(line)
+		let prefix = storage.substring(lineRange.lowerBound ..< min(head, lineRange.upperBound))
 		let cursorX = textInset.x + typographicWidth(prefix) - xOffset
 		let cursorY = topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
@@ -1327,9 +1332,10 @@ public final class MetalTextView: NSView {
 	}
 
 	private func accessibilityCurrentLineValue() -> String {
-		let head = min(max(editor.selections.primary.head, 0), editor.rope.length)
-		let line = editor.rope.line(forOffset: head)
-		let text = editor.rope.slice(editor.rope.lineRange(line))
+		let storage = editor.textStorage
+		let head = min(max(editor.selections.primary.head, 0), storage.length)
+		let line = storage.line(forOffset: head)
+		let text = storage.substring(storage.lineRange(line))
 		if text.isEmpty {
 			return Self.localized("Line \(line + 1): blank")
 		}

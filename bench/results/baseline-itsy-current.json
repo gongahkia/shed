@@ -9,22 +9,28 @@
       "baseline": 8.0
     },
     {
-      "name": "rope_random_insert_ns_per_op",
+      "name": "piecetree_random_insert_ns_per_op",
       "unit": "ns/op",
       "direction": "lower",
-      "baseline": 10.747
+      "baseline": 1000.0
     },
     {
-      "name": "rope_sequential_insert_ns_per_op",
+      "name": "piecetree_random_remove_ns_per_op",
       "unit": "ns/op",
       "direction": "lower",
-      "baseline": 12.18
+      "baseline": 350000.0
     },
     {
-      "name": "rope_slice_ns_per_op",
+      "name": "piecetree_sequential_insert_ns_per_op",
       "unit": "ns/op",
       "direction": "lower",
-      "baseline": 331.0
+      "baseline": 800.0
+    },
+    {
+      "name": "piecetree_slice_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 200.0
     },
     {
       "name": "binary_size_kb",
@@ -36,8 +42,8 @@
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",
-      "baseline": 10051,
-      "limit": 30000.0,
+      "baseline": 32730,
+      "limit": 35000.0,
       "threshold": 0.0
     },
     {

@@ -24,6 +24,13 @@ private struct MeasureOptions {
 	var warmupPurge: Bool
 }
 
+private struct OpenOptions {
+	var app: String
+	var file: String
+	var timeoutMS: Int
+	var warmupPurge: Bool
+}
+
 private struct RopeOptions {
 	var operations: Int
 	var sliceLength: Int
@@ -65,6 +72,16 @@ private struct MeasureResult: Encodable {
 	var rss_kb: UInt64
 	var stage_ms: [String: Double]?
 	var startup_ms: Double
+}
+
+private struct OpenResult: Encodable {
+	var app: String
+	var file: String
+	var open_first_page_visible_to_first_draw_ms: Double?
+	var open_process_start_to_first_draw_ms: Double?
+	var open_process_start_to_first_page_visible_ms: Double?
+	var open_rss_kb: UInt64
+	var stage_ms: [String: Double]
 }
 
 private struct RSSResult: Encodable {
@@ -113,6 +130,7 @@ private enum BenchError: Error, CustomStringConvertible {
 	case purgeTimeout
 	case purgeFailed(Int32)
 	case encodeFailed
+	case stageTimeout(String)
 
 	var description: String {
 		switch self {
@@ -158,6 +176,8 @@ private enum BenchError: Error, CustomStringConvertible {
 			"purge failed with status \(status)"
 		case .encodeFailed:
 			"failed to encode JSON"
+		case let .stageTimeout(name):
+			"timed out waiting for stage: \(name)"
 		}
 	}
 }
@@ -192,6 +212,8 @@ enum ItsyBenchMain {
 			try printJSON(latency(parseLatency(Array(args.dropFirst()))))
 		case "measure":
 			try printJSON(measure(parseMeasure(Array(args.dropFirst()))))
+		case "open":
+			try printJSON(open(parseOpen(Array(args.dropFirst()))))
 		case "rope":
 			try printJSON(rope(parseRope(Array(args.dropFirst()))))
 		case "render-highlight-cache":
@@ -353,6 +375,49 @@ enum ItsyBenchMain {
 		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, staged: staged, timeoutMS: timeoutMS, warmupPurge: warmupPurge)
 	}
 
+	private static func parseOpen(_ args: [String]) throws -> OpenOptions {
+		var app = defaultItsyAppPath()
+		var file: String?
+		var timeoutMS = 10_000
+		var warmupPurge = false
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--app":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex else {
+					throw BenchError.usage("missing value for --app")
+				}
+				app = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--file":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex else {
+					throw BenchError.usage("missing value for --file")
+				}
+				file = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--timeout-ms":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --timeout-ms")
+				}
+				timeoutMS = value
+				index = args.index(after: valueIndex)
+			case "--warmup-purge":
+				warmupPurge = true
+				index = args.index(after: index)
+			default:
+				throw BenchError.usage("unknown open option: \(arg)")
+			}
+		}
+		guard let file else {
+			throw BenchError.usage("usage: itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]")
+		}
+		return OpenOptions(app: app, file: file, timeoutMS: timeoutMS, warmupPurge: warmupPurge)
+	}
+
 	private static func parseRope(_ args: [String]) throws -> RopeOptions {
 		var operations = 1_000_000
 		var sliceLength = 32
@@ -461,6 +526,41 @@ enum ItsyBenchMain {
 		)
 	}
 
+	private static func open(_ options: OpenOptions) throws -> OpenResult {
+		if options.warmupPurge {
+			try purgeMemory()
+		}
+		let appURL = URL(fileURLWithPath: options.app)
+		let fileURL = URL(fileURLWithPath: options.file)
+		let stageURL = temporaryStageURL()
+		FileManager.default.createFile(atPath: stageURL.path, contents: nil)
+		let start = DispatchTime.now().uptimeNanoseconds
+		let deadline = Date(timeIntervalSinceNow: Double(options.timeoutMS) / 1000)
+		let process = Process()
+		process.executableURL = appURL
+		process.arguments = [fileURL.path]
+		process.environment = ProcessInfo.processInfo.environment.merging(["ITSY_BENCH_STAGES_PATH": stageURL.path]) { _, new in new }
+		try process.run()
+		defer {
+			terminate(process)
+			try? FileManager.default.removeItem(at: stageURL)
+		}
+		guard waitForStage("first_draw", at: stageURL, deadline: deadline) else {
+			throw BenchError.stageTimeout("first_draw")
+		}
+		let rawStages = loadRawStages(from: stageURL)
+		let stageMS = loadStages(from: stageURL, since: start)
+		return OpenResult(
+			app: appURL.lastPathComponent,
+			file: fileURL.path,
+			open_first_page_visible_to_first_draw_ms: stageDelta("first_page_visible", "first_draw", in: rawStages),
+			open_process_start_to_first_draw_ms: stageDelta("process_start", "first_draw", in: rawStages),
+			open_process_start_to_first_page_visible_ms: stageDelta("process_start", "first_page_visible", in: rawStages),
+			open_rss_kb: try residentSizeKB(pid: process.processIdentifier),
+			stage_ms: stageMS
+		)
+	}
+
 	private static func latency(_ options: LatencyOptions) throws -> LatencyResult {
 		guard CGPreflightListenEventAccess() else {
 			throw BenchError.eventListenPermissionMissing
@@ -557,6 +657,21 @@ enum ItsyBenchMain {
 		Thread.sleep(forTimeInterval: 0.05)
 	}
 
+	private static func terminate(_ process: Process) {
+		guard process.isRunning else {
+			return
+		}
+		process.terminate()
+		let deadline = Date(timeIntervalSinceNow: 2)
+		while process.isRunning, Date() < deadline {
+			RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.02))
+		}
+		if process.isRunning {
+			kill(process.processIdentifier, SIGKILL)
+			process.waitUntilExit()
+		}
+	}
+
 	private static func launch(url: URL, args: [String], newInstance: Bool, environment: [String: String], deadline: Date) throws -> NSRunningApplication {
 		let config = NSWorkspace.OpenConfiguration()
 		config.arguments = args
@@ -619,6 +734,13 @@ enum ItsyBenchMain {
 			stages[String(parts[0])] = timestamp
 		}
 		return stages
+	}
+
+	private static func stageDelta(_ lower: String, _ upper: String, in stages: [String: UInt64]) -> Double? {
+		guard let lowerValue = stages[lower], let upperValue = stages[upper], upperValue >= lowerValue else {
+			return nil
+		}
+		return Double(upperValue - lowerValue) / 1_000_000
 	}
 
 	private static func waitForFirstWindow(pid: pid_t, start: UInt64, deadline: Date) throws -> UInt64 {
@@ -765,6 +887,12 @@ enum ItsyBenchMain {
 		return UInt64(info.ri_resident_size / 1024)
 	}
 
+	private static func defaultItsyAppPath() -> String {
+		URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+			.appendingPathComponent(".build/release/ItsyApp")
+			.path
+	}
+
 	private static func purgeMemory() throws {
 		let url = URL(fileURLWithPath: "/usr/bin/purge")
 		guard FileManager.default.isExecutableFile(atPath: url.path) else {
@@ -809,6 +937,7 @@ enum ItsyBenchMain {
 	usage:
 	  itsybench display [--display <id>]
 	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
+	  itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench render-highlight-cache [--lines <count>] [--frames <count>]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>

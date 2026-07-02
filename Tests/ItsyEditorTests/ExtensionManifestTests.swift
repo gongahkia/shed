@@ -55,6 +55,110 @@ import Testing
 	}
 }
 
+@Test func extensionManifestLoadsSchemaV2ContributionMetadata() throws {
+	let fixture = try TemporaryExtensionFixture()
+	try fixture.write(".itsy/extensions/v2.json", """
+	{
+	  "schemaVersion": 2,
+	  "identifier": "dev.example.metadata",
+	  "name": "Metadata",
+	  "version": "0.2.0",
+	  "contributes": {
+	    "commands": [
+	      { "id": "openInspector", "title": "Open Inspector", "category": "Tools" }
+	    ],
+	    "keybindings": [
+	      { "command": "dev.example.metadata.openInspector", "key": "cmd+shift+i", "when": "editorFocus" }
+	    ],
+	    "themes": [
+	      { "id": "night", "label": "Night", "path": "./themes/night.toml" }
+	    ],
+	    "snippets": [
+	      { "language": "swift", "path": "./snippets/swift.json" }
+	    ],
+	    "languages": [
+	      { "id": "itsylog", "aliases": ["Itsy Log"], "extensions": [".itsylog"] }
+	    ],
+	    "problemMatchers": [
+	      { "id": "swiftc", "label": "swiftc", "pattern": "^(.*):(\\\\d+):(\\\\d+): error: (.*)$", "fileLocation": "relative" }
+	    ]
+	  }
+	}
+	""")
+
+	let manifest = try ExtensionManifestLoader.load(url: fixture.root.appendingPathComponent(".itsy/extensions/v2.json"))
+
+	#expect(manifest.schemaVersion == 2)
+	#expect(manifest.contributes.tasks.isEmpty)
+	#expect(manifest.contributes.commands == [
+		ExtensionCommandContribution(id: "openInspector", title: "Open Inspector", category: "Tools"),
+	])
+	#expect(manifest.contributes.keybindings == [
+		ExtensionKeybindingContribution(command: "dev.example.metadata.openInspector", key: "cmd+shift+i", when: "editorFocus"),
+	])
+	#expect(manifest.contributes.themes == [
+		ExtensionThemeContribution(id: "night", label: "Night", path: "./themes/night.toml"),
+	])
+	#expect(manifest.contributes.snippets == [
+		ExtensionSnippetContribution(language: "swift", path: "./snippets/swift.json"),
+	])
+	#expect(manifest.contributes.languages == [
+		ExtensionLanguageContribution(id: "itsylog", aliases: ["Itsy Log"], extensions: [".itsylog"]),
+	])
+	#expect(manifest.contributes.problemMatchers == [
+		ExtensionProblemMatcherContribution(
+			id: "swiftc",
+			label: "swiftc",
+			pattern: #"^(.*):(\d+):(\d+): error: (.*)$"#,
+			fileLocation: "relative"
+		),
+	])
+}
+
+@Test func extensionManifestSchemaV2DefaultsMissingContributionArrays() throws {
+	let fixture = try TemporaryExtensionFixture()
+	try fixture.write(".itsy/extensions/minimal-v2.json", """
+	{
+	  "schemaVersion": 2,
+	  "identifier": "dev.example.empty",
+	  "name": "Empty",
+	  "version": "0.2.0",
+	  "contributes": {}
+	}
+	""")
+
+	let manifest = try ExtensionManifestLoader.load(url: fixture.root.appendingPathComponent(".itsy/extensions/minimal-v2.json"))
+
+	#expect(manifest.contributes.tasks.isEmpty)
+	#expect(manifest.contributes.commands.isEmpty)
+	#expect(manifest.contributes.keybindings.isEmpty)
+	#expect(manifest.contributes.themes.isEmpty)
+	#expect(manifest.contributes.snippets.isEmpty)
+	#expect(manifest.contributes.languages.isEmpty)
+	#expect(manifest.contributes.problemMatchers.isEmpty)
+}
+
+@Test func extensionManifestSchemaV2RejectsEmptyContributionMetadata() throws {
+	let fixture = try TemporaryExtensionFixture()
+	try fixture.write(".itsy/extensions/empty-command.json", """
+	{
+	  "schemaVersion": 2,
+	  "identifier": "dev.example.bad",
+	  "name": "Bad",
+	  "version": "0.2.0",
+	  "contributes": {
+	    "commands": [
+	      { "id": " ", "title": "Open Inspector" }
+	    ]
+	  }
+	}
+	""")
+
+	#expect(throws: ExtensionManifestError.emptyContributionID) {
+		_ = try ExtensionManifestLoader.load(url: fixture.root.appendingPathComponent(".itsy/extensions/empty-command.json"))
+	}
+}
+
 private final class TemporaryExtensionFixture {
 	let root: URL
 

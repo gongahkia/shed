@@ -18,9 +18,50 @@ public struct ExtensionManifest: Codable, Equatable, Sendable {
 
 public struct ExtensionContributions: Codable, Equatable, Sendable {
 	public var tasks: [ExtensionTaskContribution]
+	public var commands: [ExtensionCommandContribution]
+	public var keybindings: [ExtensionKeybindingContribution]
+	public var themes: [ExtensionThemeContribution]
+	public var snippets: [ExtensionSnippetContribution]
+	public var languages: [ExtensionLanguageContribution]
+	public var problemMatchers: [ExtensionProblemMatcherContribution]
 
-	public init(tasks: [ExtensionTaskContribution] = []) {
+	public init(
+		tasks: [ExtensionTaskContribution] = [],
+		commands: [ExtensionCommandContribution] = [],
+		keybindings: [ExtensionKeybindingContribution] = [],
+		themes: [ExtensionThemeContribution] = [],
+		snippets: [ExtensionSnippetContribution] = [],
+		languages: [ExtensionLanguageContribution] = [],
+		problemMatchers: [ExtensionProblemMatcherContribution] = []
+	) {
 		self.tasks = tasks
+		self.commands = commands
+		self.keybindings = keybindings
+		self.themes = themes
+		self.snippets = snippets
+		self.languages = languages
+		self.problemMatchers = problemMatchers
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case tasks
+		case commands
+		case keybindings
+		case themes
+		case snippets
+		case languages
+		case problemMatchers
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		tasks = try container.decodeIfPresent([ExtensionTaskContribution].self, forKey: .tasks) ?? []
+		commands = try container.decodeIfPresent([ExtensionCommandContribution].self, forKey: .commands) ?? []
+		keybindings = try container.decodeIfPresent([ExtensionKeybindingContribution].self, forKey: .keybindings) ?? []
+		themes = try container.decodeIfPresent([ExtensionThemeContribution].self, forKey: .themes) ?? []
+		snippets = try container.decodeIfPresent([ExtensionSnippetContribution].self, forKey: .snippets) ?? []
+		languages = try container.decodeIfPresent([ExtensionLanguageContribution].self, forKey: .languages) ?? []
+		problemMatchers = try container.decodeIfPresent([ExtensionProblemMatcherContribution].self, forKey: .problemMatchers) ?? []
 	}
 }
 
@@ -38,10 +79,88 @@ public struct ExtensionTaskContribution: Codable, Equatable, Sendable {
 	}
 }
 
+public struct ExtensionCommandContribution: Codable, Equatable, Sendable {
+	public var id: String
+	public var title: String
+	public var category: String?
+
+	public init(id: String, title: String, category: String? = nil) {
+		self.id = id
+		self.title = title
+		self.category = category
+	}
+}
+
+public struct ExtensionKeybindingContribution: Codable, Equatable, Sendable {
+	public var command: String
+	public var key: String
+	public var when: String?
+
+	public init(command: String, key: String, when: String? = nil) {
+		self.command = command
+		self.key = key
+		self.when = when
+	}
+}
+
+public struct ExtensionThemeContribution: Codable, Equatable, Sendable {
+	public var id: String
+	public var label: String
+	public var path: String
+
+	public init(id: String, label: String, path: String) {
+		self.id = id
+		self.label = label
+		self.path = path
+	}
+}
+
+public struct ExtensionSnippetContribution: Codable, Equatable, Sendable {
+	public var language: String
+	public var path: String
+
+	public init(language: String, path: String) {
+		self.language = language
+		self.path = path
+	}
+}
+
+public struct ExtensionLanguageContribution: Codable, Equatable, Sendable {
+	public var id: String
+	public var aliases: [String]
+	public var extensions: [String]
+
+	public init(id: String, aliases: [String] = [], extensions: [String] = []) {
+		self.id = id
+		self.aliases = aliases
+		self.extensions = extensions
+	}
+}
+
+public struct ExtensionProblemMatcherContribution: Codable, Equatable, Sendable {
+	public var id: String
+	public var label: String
+	public var pattern: String
+	public var fileLocation: String?
+
+	public init(id: String, label: String, pattern: String, fileLocation: String? = nil) {
+		self.id = id
+		self.label = label
+		self.pattern = pattern
+		self.fileLocation = fileLocation
+	}
+}
+
 public enum ExtensionManifestError: Error, Equatable, Sendable {
 	case unsupportedSchemaVersion(Int)
 	case emptyIdentifier
 	case emptyContributionID
+	case emptyContributionTitle
+	case emptyContributionCommand
+	case emptyContributionKey
+	case emptyContributionLanguage
+	case emptyContributionPath
+	case emptyContributionPattern
 }
 
 public enum ExtensionManifestLoader {
@@ -63,7 +182,7 @@ public enum ExtensionManifestLoader {
 	}
 
 	private static func validate(_ manifest: ExtensionManifest) throws {
-		guard manifest.schemaVersion == 1 else {
+		guard manifest.schemaVersion == 1 || manifest.schemaVersion == 2 else {
 			throw ExtensionManifestError.unsupportedSchemaVersion(manifest.schemaVersion)
 		}
 		guard !manifest.identifier.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
@@ -73,6 +192,35 @@ public enum ExtensionManifestLoader {
 			guard !task.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
 				throw ExtensionManifestError.emptyContributionID
 			}
+		}
+		for command in manifest.contributes.commands {
+			try requireNonEmpty(command.id, error: .emptyContributionID)
+			try requireNonEmpty(command.title, error: .emptyContributionTitle)
+		}
+		for keybinding in manifest.contributes.keybindings {
+			try requireNonEmpty(keybinding.command, error: .emptyContributionCommand)
+			try requireNonEmpty(keybinding.key, error: .emptyContributionKey)
+		}
+		for theme in manifest.contributes.themes {
+			try requireNonEmpty(theme.id, error: .emptyContributionID)
+			try requireNonEmpty(theme.path, error: .emptyContributionPath)
+		}
+		for snippet in manifest.contributes.snippets {
+			try requireNonEmpty(snippet.language, error: .emptyContributionLanguage)
+			try requireNonEmpty(snippet.path, error: .emptyContributionPath)
+		}
+		for language in manifest.contributes.languages {
+			try requireNonEmpty(language.id, error: .emptyContributionLanguage)
+		}
+		for matcher in manifest.contributes.problemMatchers {
+			try requireNonEmpty(matcher.id, error: .emptyContributionID)
+			try requireNonEmpty(matcher.pattern, error: .emptyContributionPattern)
+		}
+	}
+
+	private static func requireNonEmpty(_ value: String, error: ExtensionManifestError) throws {
+		guard !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+			throw error
 		}
 	}
 }

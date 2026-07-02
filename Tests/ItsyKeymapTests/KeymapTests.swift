@@ -192,7 +192,8 @@ import Testing
 	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
 	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
 
-	#expect(engine.handle(try keyEvent("q")) == .command("vim.macro.recordPrefix"))
+	#expect(engine.handle(try keyEvent("q")) == .partial)
+	#expect(engine.handle(try keyEvent("a")) == .command("vim.macro.record.a"))
 	#expect(engine.handle(try keyEvent("2", modifiers: [.shift])) == .command("vim.macro.replayPrefix"))
 }
 
@@ -204,6 +205,65 @@ import Testing
 	#expect(engine.handle(try keyEvent("w")) == .command("vim.textObject.innerWord"))
 	#expect(engine.handle(try keyEvent("a")) == .partial)
 	#expect(engine.handle(try keyEvent("'", modifiers: [.shift])) == .command("vim.textObject.aroundDoubleQuote"))
+	#expect(engine.handle(try keyEvent("i")) == .partial)
+	#expect(engine.handle(try keyEvent("s")) == .command("vim.textObject.innerSentence"))
+	#expect(engine.handle(try keyEvent("a")) == .partial)
+	#expect(engine.handle(try keyEvent("t")) == .command("vim.textObject.aroundTag"))
+}
+
+@Test func bundledVimProfileDefinesPhase27NormalPrefixes() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("o", modifiers: [.control])) == .command("vim.jumpOlder"))
+	#expect(engine.handle(try keyEvent("i", modifiers: [.control])) == .command("vim.jumpNewer"))
+	#expect(engine.handle(try keyEvent("g")) == .partial)
+	#expect(engine.handle(try keyEvent("d")) == .command("lsp.definition"))
+	#expect(engine.handle(try keyEvent("g")) == .partial)
+	#expect(engine.handle(try keyEvent("t")) == .command("file.nextBuffer"))
+	#expect(engine.handle(try keyEvent("g")) == .partial)
+	#expect(engine.handle(try keyEvent("t", modifiers: [.shift])) == .command("file.previousBuffer"))
+	#expect(engine.handle(try keyEvent("z")) == .partial)
+	#expect(engine.handle(try keyEvent("c")) == .command("vim.fold.close"))
+	#expect(engine.handle(try keyEvent("q")) == .partial)
+	#expect(engine.handle(try keyEvent("/")) == .command("vim.searchHistory.forward"))
+	#expect(engine.handle(try keyEvent("q")) == .partial)
+	#expect(engine.handle(try keyEvent("/", modifiers: [.shift])) == .command("vim.searchHistory.backward"))
+	#expect(engine.handle(try keyEvent("q")) == .partial)
+	#expect(engine.handle(try keyEvent(";", modifiers: [.shift])) == .command("vim.commandHistory"))
+}
+
+@Test func bundledVimProfileDefinesMarksAndWindowPrefixes() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("m")) == .partial)
+	#expect(engine.handle(try keyEvent("a")) == .command("vim.mark.set.a"))
+	#expect(engine.handle(try keyEvent("`")) == .partial)
+	#expect(engine.handle(try keyEvent("z")) == .command("vim.mark.jump.z"))
+	#expect(engine.handle(try keyEvent("'")) == .partial)
+	#expect(engine.handle(try keyEvent("b")) == .command("vim.mark.jumpLine.b"))
+	#expect(engine.handle(try keyEvent("w", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("v")) == .command("pane.splitVertical"))
+	#expect(engine.handle(try keyEvent("w", modifiers: [.control])) == .partial)
+	#expect(engine.handle(try keyEvent("o")) == .command("pane.closeOthers"))
+}
+
+@Test func bundledVimProfileDefinesReplaceCaseIndentAndFormat() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	var engine = KeymapEngine(modeStack: [.normal], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("r")) == .command("vim.replace.char"))
+	#expect(engine.handle(try keyEvent("r", modifiers: [.shift])) == .command("vim.replace.mode"))
+	#expect(engine.handle(try keyEvent("`", modifiers: [.shift])) == .command("vim.case.toggle"))
+	#expect(engine.handle(try keyEvent("g")) == .partial)
+	#expect(engine.handle(try keyEvent("u")) == .command("vim.case.lowerOperator"))
+	#expect(engine.handle(try keyEvent(".", modifiers: [.shift])) == .partial)
+	#expect(engine.handle(try keyEvent(".", modifiers: [.shift])) == .command("vim.indent.right"))
+	#expect(engine.handle(try keyEvent("=")) == .partial)
+	#expect(engine.handle(try keyEvent("=")) == .command("vim.format.line"))
+	#expect(engine.handle(try keyEvent("g")) == .partial)
+	#expect(engine.handle(try keyEvent("q")) == .command("vim.format.reflowOperator"))
 }
 
 @Test func userKeymapConfigOverlaysSelectedProfile() throws {

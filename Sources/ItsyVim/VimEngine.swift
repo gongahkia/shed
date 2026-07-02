@@ -205,6 +205,9 @@ public enum VimCommandAction: Sendable, Equatable {
 	case normalMode
 	case insertMode
 	case emacsMode
+	case setMark(Character)
+	case jumpToMark(Character)
+	case macroRecord(String)
 	case handled
 }
 
@@ -347,6 +350,15 @@ public struct VimEngine: Sendable {
 	}
 
 	public mutating func handle(commandID: String, count: Int, hasSelection: Bool) -> VimCommandAction? {
+		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.set.") {
+			return .setMark(mark)
+		}
+		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jump.") ?? Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jumpLine.") {
+			return .jumpToMark(mark)
+		}
+		if let register = Self.singleStringSuffix(in: commandID, after: "vim.macro.record.") {
+			return .macroRecord(register)
+		}
 		if let motion = Self.motionCommandIDs[commandID] {
 			if visualMode != nil {
 				return .visualMotion(motion)
@@ -429,9 +441,35 @@ public struct VimEngine: Sendable {
 			return .insertMode
 		case "mode.emacs":
 			return .emacsMode
+		case "vim.textObject.innerSentence", "vim.textObject.aroundSentence", "vim.textObject.innerTag", "vim.textObject.aroundTag":
+			pendingOperator = nil
+			mode = .normal
+			return .normalMode
+		case "vim.jumpOlder", "vim.jumpNewer", "lsp.definition", "lsp.declaration", "file.openUnderCursor",
+		     "vim.replace.char", "vim.replace.mode", "vim.case.toggle", "vim.case.lowerOperator", "vim.case.upperOperator",
+		     "vim.indent.right", "vim.indent.left", "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
+		     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
+		     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll", "vim.searchHistory.forward",
+		     "vim.searchHistory.backward", "vim.commandHistory":
+			return .handled
 		default:
 			return nil
 		}
+	}
+
+	private static func singleCharacterSuffix(in commandID: String, after prefix: String) -> Character? {
+		guard let suffix = singleStringSuffix(in: commandID, after: prefix), suffix.count == 1 else {
+			return nil
+		}
+		return suffix.first
+	}
+
+	private static func singleStringSuffix(in commandID: String, after prefix: String) -> String? {
+		guard commandID.hasPrefix(prefix) else {
+			return nil
+		}
+		let suffix = String(commandID.dropFirst(prefix.count))
+		return suffix.isEmpty ? nil : suffix
 	}
 
 	private mutating func beginOperatorAction(_ op: VimOperator, count: Int, hasSelection: Bool) -> VimCommandAction {

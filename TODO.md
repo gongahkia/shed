@@ -205,7 +205,6 @@ Design decision to record in `docs/design/textstack.md` before implementation (i
 - Piece tree: red-black tree of pieces keyed by cumulative UTF-8 byte offset; each node caches per-subtree byte + line + grapheme counts (summary metric, like SumTree).
 - Public surface identical to today's `Rope` (`insert`, `remove`, `slice`, `chunk`, `copyUTF8Chunk`, `line(forOffset:)`, `offset(forLine:)`, `lineRange`, `length`, `lineCount`, `graphemeCount`). Old `Rope` type kept, delegates to piece tree behind a feature flag until id:924.
 
-(A) 2026-07-01 +Phase22-TextStack @refactor id:925 est:2h dep:924 Checkpoint: `swift test`, `ItsyBench open --file bench/corpus/huge-text.log`, regression bench. Attach numbers to `bench/notes/textstack-phase22.md`.
 
 ---
 

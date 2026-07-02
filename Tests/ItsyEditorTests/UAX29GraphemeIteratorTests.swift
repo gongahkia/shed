@@ -11,6 +11,17 @@ import Testing
 	#expect(boundaries("\u{0915}\u{094D}\u{0915}") == [0, 9])
 }
 
+@Test func uax29ASCIIWithoutCRFastPathMatchesByteOffsets() {
+	let bytes = Array("abc\nxyz".utf8)
+	bytes.withUnsafeBufferPointer { buffer in
+		#expect(UAX29GraphemeIterator.boundaries(in: buffer) == Array(0 ... bytes.count))
+		#expect(UAX29GraphemeIterator.graphemeCount(in: buffer) == bytes.count)
+		for offset in 0 ... bytes.count {
+			#expect(UAX29GraphemeIterator.graphemeIndex(in: buffer, before: offset) == offset)
+		}
+	}
+}
+
 @Test func uax29GraphemeIteratorPassesUnicodeBreakTest() throws {
 	let url = try #require(Bundle.module.url(
 		forResource: "GraphemeBreakTest",

@@ -68,6 +68,9 @@ public struct UAX29GraphemeIterator: Sequence, IteratorProtocol {
 	}
 
 	public static func boundaries(in bytes: UnsafeBufferPointer<UInt8>) -> [Int] {
+		if isASCIIWithoutCR(bytes) {
+			return Array(0 ... bytes.count)
+		}
 		var result = [0]
 		var iterator = UAX29GraphemeIterator(bytes: bytes)
 		while let range = iterator.next() {
@@ -77,6 +80,9 @@ public struct UAX29GraphemeIterator: Sequence, IteratorProtocol {
 	}
 
 	public static func graphemeCount(in bytes: UnsafeBufferPointer<UInt8>) -> Int {
+		if isASCIIWithoutCR(bytes) {
+			return bytes.count
+		}
 		var count = 0
 		var iterator = UAX29GraphemeIterator(bytes: bytes)
 		while iterator.next() != nil {
@@ -87,6 +93,9 @@ public struct UAX29GraphemeIterator: Sequence, IteratorProtocol {
 
 	public static func graphemeIndex(in bytes: UnsafeBufferPointer<UInt8>, before offset: Int) -> Int {
 		precondition((0 ... bytes.count).contains(offset), "grapheme offset out of bounds")
+		if isASCIIWithoutCR(bytes) {
+			return offset
+		}
 		var count = 0
 		var iterator = UAX29GraphemeIterator(bytes: bytes)
 		while let range = iterator.next() {
@@ -96,6 +105,15 @@ public struct UAX29GraphemeIterator: Sequence, IteratorProtocol {
 			count += 1
 		}
 		return count
+	}
+
+	private static func isASCIIWithoutCR(_ bytes: UnsafeBufferPointer<UInt8>) -> Bool {
+		for byte in bytes {
+			if byte >= 0x80 || byte == 0x0D {
+				return false
+			}
+		}
+		return true
 	}
 
 	private static func shouldBreak(

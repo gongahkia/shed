@@ -253,8 +253,11 @@ public struct SyntaxTheme: Sendable, Equatable {
 	}
 
 	public static func availableChoices(fileManager: FileManager = .default) -> [SyntaxThemeChoice] {
+		availableChoices(userThemesURL: userThemesDirectory(fileManager: fileManager), fileManager: fileManager)
+	}
+
+	static func availableChoices(userThemesURL: URL, fileManager: FileManager = .default) -> [SyntaxThemeChoice] {
 		var choices = bundledChoices
-		let userThemesURL = userThemesDirectory(fileManager: fileManager)
 		let urls = (try? fileManager.contentsOfDirectory(
 			at: userThemesURL,
 			includingPropertiesForKeys: nil,

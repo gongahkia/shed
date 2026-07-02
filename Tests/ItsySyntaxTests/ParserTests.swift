@@ -152,6 +152,28 @@ import Testing
 	#expect(selected == (try SyntaxTheme.loadDefaultLight()))
 }
 
+@Test func syntaxThemeListsUserThemeChoices() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-themes-\(UUID().uuidString)", isDirectory: true)
+	defer {
+		try? FileManager.default.removeItem(at: directory)
+	}
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	try #"""
+"keyword" = "#112233"
+"""#.write(to: directory.appendingPathComponent("night.toml"), atomically: true, encoding: .utf8)
+	try #"""
+"keyword" = "#445566"
+"""#.write(to: directory.appendingPathComponent("day.toml"), atomically: true, encoding: .utf8)
+	try "skip".write(to: directory.appendingPathComponent("README.md"), atomically: true, encoding: .utf8)
+
+	let userChoices = SyntaxTheme.availableChoices(userThemesURL: directory)
+		.filter { $0.id.hasPrefix("user:") }
+	#expect(userChoices == [
+		SyntaxThemeChoice(id: "user:day.toml", displayName: "day"),
+		SyntaxThemeChoice(id: "user:night.toml", displayName: "night"),
+	])
+}
+
 @Test func syntaxThemeDefaultsToBundledLight() throws {
 	let suiteName = "dev.itsy.editor.tests.theme.default.\(UUID().uuidString)"
 	let defaults = try #require(UserDefaults(suiteName: suiteName))

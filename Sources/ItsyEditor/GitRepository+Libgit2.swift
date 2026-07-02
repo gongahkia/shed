@@ -67,31 +67,36 @@ extension GitRepository {
 				GitStatus(branch: try branchStatus(), entries: try status().entries)
 			}
 
-			public func diff(cached: Bool) throws -> Diff {
+			public func diff(cached: Bool, pathspec: [String] = []) throws -> Diff {
 				var options = git_diff_options()
 				try Libgit2.check(git_diff_options_init(&options, 1))
-				var raw: OpaquePointer?
-				if cached {
-					var headTree: OpaquePointer?
-					let headResult = "HEAD^{tree}".withCString { spec in
-						git_revparse_single(&headTree, self.raw, spec)
+				return try withGitStrarray(pathspec) { pathspecArray in
+					if let pathspecArray {
+						options.pathspec = pathspecArray
 					}
-					if headResult < 0, headResult != -3, headResult != -9 {
-						try Libgit2.check(headResult)
-					}
-					defer {
-						if let headTree {
-							git_object_free(headTree)
+					var raw: OpaquePointer?
+					if cached {
+						var headTree: OpaquePointer?
+						let headResult = "HEAD^{tree}".withCString { spec in
+							git_revparse_single(&headTree, self.raw, spec)
 						}
+						if headResult < 0, headResult != -3, headResult != -9 {
+							try Libgit2.check(headResult)
+						}
+						defer {
+							if let headTree {
+								git_object_free(headTree)
+							}
+						}
+						try Libgit2.check(git_diff_tree_to_index(&raw, self.raw, headTree, nil, &options))
+					} else {
+						try Libgit2.check(git_diff_index_to_workdir(&raw, self.raw, nil, &options))
 					}
-					try Libgit2.check(git_diff_tree_to_index(&raw, self.raw, headTree, nil, &options))
-				} else {
-					try Libgit2.check(git_diff_index_to_workdir(&raw, self.raw, nil, &options))
+					guard let raw else {
+						throw Failure(code: -1, message: "git_diff returned nil")
+					}
+					return Diff(raw: raw)
 				}
-				guard let raw else {
-					throw Failure(code: -1, message: "git_diff returned nil")
-				}
-				return Diff(raw: raw)
 			}
 
 			public func blob(at oid: String) throws -> Blob {
@@ -146,6 +151,20 @@ extension GitRepository {
 
 			public var count: Int {
 				Int(git_diff_num_deltas(raw))
+			}
+
+			public func patchText() throws -> String {
+				var buffer = git_buf()
+				try GitRepository.Libgit2.check(git_diff_to_buf(&buffer, raw, GIT_DIFF_FORMAT_PATCH))
+				defer {
+					git_buf_dispose(&buffer)
+				}
+				guard let pointer = buffer.ptr, buffer.size > 0 else {
+					return ""
+				}
+				let bytes = UnsafeRawPointer(pointer).assumingMemoryBound(to: UInt8.self)
+				let data = Data(bytes: bytes, count: buffer.size)
+				return String(decoding: data, as: UTF8.self)
 			}
 		}
 

@@ -58,6 +58,12 @@ import Testing
 	#expect(result.warnings.map(\.description).contains("line 4: unknown setting editor.nope"))
 }
 
+@Test func settingsDefaultsUsePieceTreeStorage() {
+	let settings = ItsySettings()
+	#expect(settings.editor.experimental.storage == .pieceTree)
+	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
+}
+
 @Test func settingsStoreSavesAndReloadsToml() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-\(UUID().uuidString)", isDirectory: true)
 	defer {

@@ -10,7 +10,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public struct ExperimentalSettings: Equatable, Sendable {
 			public var storage: EditorStorage
 
-			public init(storage: EditorStorage = .rope) {
+			public init(storage: EditorStorage = .pieceTree) {
 				self.storage = storage
 			}
 		}

@@ -14,6 +14,12 @@ import Testing
 	#expect(Editor.resolveStorage(environment: ["ITSY_EDITOR_STORAGE": "invalid"], settings: settings) == .pieceTree)
 }
 
+@Test func editorStorageDefaultsToPieceTreeWithRopeEnvironmentFallback() {
+	let settings = ItsySettings()
+	#expect(Editor.resolveStorage(environment: [:], settings: settings) == .pieceTree)
+	#expect(Editor.resolveStorage(environment: ["ITSY_EDITOR_STORAGE": "rope"], settings: settings) == .rope)
+}
+
 @Test func editorInitializesSelectedTextStorageWithoutChangingRopePath() {
 	let pieceTreeEditor = Editor(text: "abc", storage: .pieceTree)
 	#expect(pieceTreeEditor.textStorage.kind == .pieceTree)

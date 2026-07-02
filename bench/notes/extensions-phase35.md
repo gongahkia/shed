@@ -10,6 +10,9 @@ Implemented slice:
 - defaults missing contribution arrays to empty arrays.
 - validates non-empty identifiers, command metadata, keybindings, language IDs, paths, and problem patterns.
 - left task discovery mapping unchanged; non-task contributions are metadata-only in this slice.
+- added `VouchStore` parser/API for the documented local VOUCHED format.
+- added default repo/user/project VOUCHED URL order helper.
+- deny records take precedence over allow records.
 
 References checked:
 
@@ -22,18 +25,20 @@ Verification:
 ```sh
 test -f docs/design/extensions.md
 swift test --filter ExtensionManifest
+swift test --filter VouchStore
 ```
 
 Result:
 
 - `ExtensionManifest`: 5 tests passed.
+- `VouchStore`: 5 tests passed.
 - `docs/design/extensions.md`: exists; references and non-goals grep passed.
 
 Remaining for #7:
 
 - command registry wiring.
 - keymap/theme/snippet/grammar/problem-matcher registration.
-- Vouch trust stores and parser/property tests.
-- install-time trust/integrity enforcement.
+- Vouch parser property tests.
+- install-time trust/integrity enforcement and `vouch` CLI integration.
 - marketplace/install/publish flows.
 - Extensions panel and command-palette entries.

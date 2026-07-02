@@ -87,6 +87,12 @@ public actor DAPClientSession {
 	}
 
 	@discardableResult
+	public func setExceptionBreakpoints(_ arguments: DAPSetExceptionBreakpointsArguments) async throws -> DAPResponse {
+		try requireState([.configuring])
+		return try await sendRequestUnchecked(command: DAPCommand.setExceptionBreakpoints, arguments: try DAPAny(encoding: arguments))
+	}
+
+	@discardableResult
 	public func configurationDone(arguments: DAPAny? = nil) async throws -> DAPResponse {
 		try requireState([.configuring])
 		return try await sendRequestUnchecked(command: DAPCommand.configurationDone, arguments: arguments)

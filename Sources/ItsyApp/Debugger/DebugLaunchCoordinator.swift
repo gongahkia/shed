@@ -3,13 +3,14 @@ import Foundation
 import ItsyDAP
 import ItsyDebugger
 
-final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private let loader: DebugLaunchConfigLoader
 	private var launchConfig = DebugLaunchConfig()
 	private var configurations: [DebugLaunchConfiguration] = []
 	private var panel: NSPanel?
 	private var statusLabel: NSTextField?
 	private var tableView: NSTableView?
+	private var exceptionFiltersField: NSTextField?
 	private var activeSession: DebugAppSession?
 	private var launchGeneration = 0
 	private var suppressSelectionLaunch = false
@@ -57,7 +58,10 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 			suppressSelectionLaunch = true
 			tableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 			suppressSelectionLaunch = false
+		} else {
+			tableView?.deselectAll(nil)
 		}
+		refreshExceptionFiltersField()
 	}
 
 	private func makePanelIfNeeded() -> NSPanel {
@@ -65,7 +69,7 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 			return panel
 		}
 		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 640, height: 360),
+			contentRect: NSRect(x: 0, y: 0, width: 640, height: 400),
 			styleMask: [.titled, .closable, .resizable, .utilityWindow],
 			backing: .buffered,
 			defer: false
@@ -108,10 +112,25 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 		scrollView.documentView = tableView
 		scrollView.hasVerticalScroller = true
 		scrollView.drawsBackground = false
+		let exceptionFiltersLabel = NSTextField(labelWithString: L10n.string("Exception Filters"))
+		exceptionFiltersLabel.font = .systemFont(ofSize: 12)
+		exceptionFiltersLabel.textColor = .secondaryLabelColor
+		let exceptionFiltersField = NSTextField(string: "")
+		exceptionFiltersField.font = .systemFont(ofSize: 12)
+		exceptionFiltersField.target = self
+		exceptionFiltersField.action = #selector(exceptionFiltersChanged(_:))
+		exceptionFiltersField.delegate = self
+		let filtersStack = NSStackView(views: [exceptionFiltersLabel, exceptionFiltersField])
+		filtersStack.orientation = .horizontal
+		filtersStack.alignment = .centerY
+		filtersStack.spacing = 8
+		exceptionFiltersLabel.setContentHuggingPriority(.required, for: .horizontal)
 		header.translatesAutoresizingMaskIntoConstraints = false
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		filtersStack.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(header)
 		contentView.addSubview(scrollView)
+		contentView.addSubview(filtersStack)
 		NSLayoutConstraint.activate([
 			header.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			header.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
@@ -119,16 +138,20 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 			scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
-			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: filtersStack.topAnchor, constant: -10),
+			filtersStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			filtersStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			filtersStack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 		])
 		self.statusLabel = statusLabel
 		self.tableView = tableView
+		self.exceptionFiltersField = exceptionFiltersField
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
 		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
 		let width = min(680, max(520, hostFrame.width - 120))
-		let height = min(400, max(280, hostFrame.height - 160))
+		let height = min(440, max(320, hostFrame.height - 160))
 		panel.setFrame(NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height), display: true)
 	}
 
@@ -137,6 +160,7 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 	}
 
 	@objc private func startSelectedConfiguration(_ sender: Any?) {
+		commitExceptionFiltersField()
 		guard let root = ItsyWorkspaceController.currentRootURL,
 		      let configuration = selectedConfiguration()
 		else {
@@ -174,13 +198,20 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 	}
 
 	private func selectedConfiguration() -> DebugLaunchConfiguration? {
+		guard let index = selectedConfigurationIndex() else {
+			return nil
+		}
+		return configurations[index]
+	}
+
+	private func selectedConfigurationIndex() -> Int? {
 		guard let tableView,
 		      tableView.selectedRow >= 0,
 		      tableView.selectedRow < configurations.count
 		else {
 			return nil
 		}
-		return configurations[tableView.selectedRow]
+		return tableView.selectedRow
 	}
 
 	private func setStatus(_ status: String, isError: Bool) {
@@ -190,6 +221,55 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 
 	private func title(for configuration: DebugLaunchConfiguration) -> String {
 		"\(configuration.name)  [\(configuration.request) / \(configuration.type)]"
+	}
+
+	@objc private func exceptionFiltersChanged(_ sender: NSTextField) {
+		updateSelectedExceptionFilters(sender.stringValue)
+	}
+
+	func controlTextDidEndEditing(_ notification: Notification) {
+		guard notification.object as? NSTextField === exceptionFiltersField else {
+			return
+		}
+		commitExceptionFiltersField()
+	}
+
+	private func commitExceptionFiltersField() {
+		guard let exceptionFiltersField else {
+			return
+		}
+		updateSelectedExceptionFilters(exceptionFiltersField.stringValue)
+	}
+
+	private func updateSelectedExceptionFilters(_ rawValue: String) {
+		guard let index = selectedConfigurationIndex() else {
+			return
+		}
+		configurations[index].exceptionFilters = Self.parseExceptionFilters(rawValue)
+	}
+
+	private func refreshExceptionFiltersField() {
+		guard let exceptionFiltersField else {
+			return
+		}
+		guard let configuration = selectedConfiguration() else {
+			exceptionFiltersField.isEnabled = false
+			exceptionFiltersField.stringValue = ""
+			return
+		}
+		exceptionFiltersField.isEnabled = true
+		exceptionFiltersField.stringValue = configuration.exceptionFilters.joined(separator: ", ")
+	}
+
+	private static func parseExceptionFilters(_ rawValue: String) -> [String] {
+		var seen = Set<String>()
+		return rawValue.split { $0 == "," || $0.isWhitespace }.compactMap { part in
+			let filter = String(part)
+			guard seen.insert(filter).inserted else {
+				return nil
+			}
+			return filter
+		}
 	}
 
 	func numberOfRows(in tableView: NSTableView) -> Int {
@@ -226,7 +306,7 @@ final class DebugLaunchCoordinator: NSObject, NSTableViewDataSource, NSTableView
 		else {
 			return
 		}
-		startSelectedConfiguration(nil)
+		refreshExceptionFiltersField()
 	}
 }
 
@@ -314,6 +394,7 @@ final class DebugAppSession: @unchecked Sendable {
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
 			try await waitForInitialized(initializedTask)
+			try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
 			try await client.configurationDone()
 			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
 		} catch {

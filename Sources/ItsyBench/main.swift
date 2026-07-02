@@ -43,6 +43,12 @@ private struct PieceTreeOptions {
 	var requireMMapFile: Bool
 }
 
+private struct UndoOptions {
+	var operations: Int
+	var bufferBytes: Int
+	var rssBudgetKB: UInt64
+}
+
 private struct RenderHighlightCacheOptions {
 	var frames: Int
 	var lineCount: Int
@@ -119,6 +125,29 @@ private struct PieceTreeBenchResult: Encodable {
 	var slice_length: Int
 	var slice_ns_per_op: Double
 	var slice_checksum: Int
+}
+
+private struct UndoBenchResult: Encodable {
+	var after_record_rss_delta_kb: UInt64
+	var after_record_rss_kb: UInt64
+	var after_redo_rss_delta_kb: UInt64
+	var after_redo_rss_kb: UInt64
+	var after_undo_rss_delta_kb: UInt64
+	var after_undo_rss_kb: UInt64
+	var baseline_rss_kb: UInt64
+	var buffer_bytes: Int
+	var final_checksum: Int
+	var final_length: Int
+	var final_undo_entries: Int
+	var max_rss_delta_kb: UInt64
+	var operations: Int
+	var record_ns_per_op: Double
+	var retained_undo_entries: Int
+	var rss_budget_kb: UInt64
+	var rss_budget_passed: Bool
+	var sampled_peak_rss_kb: UInt64
+	var redo_ns_per_op: Double
+	var undo_ns_per_op: Double
 }
 
 private struct SmokeResult: Encodable {
@@ -246,6 +275,8 @@ enum ItsyBenchMain {
 		case "rss":
 			let pid = try parsePID(Array(args.dropFirst()))
 			try printJSON(RSSResult(pid: pid, rss_kb: residentSizeKB(pid: pid)))
+		case "undo":
+			try printJSON(undo(parseUndo(Array(args.dropFirst()))))
 		default:
 			throw BenchError.usage("unknown command: \(command)")
 		}
@@ -513,6 +544,42 @@ enum ItsyBenchMain {
 		)
 	}
 
+	private static func parseUndo(_ args: [String]) throws -> UndoOptions {
+		var operations = 100_000
+		var bufferBytes = 10 * 1024 * 1024
+		var rssBudgetKB: UInt64 = 100 * 1024
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--ops":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --ops")
+				}
+				operations = value
+				index = args.index(after: valueIndex)
+			case "--buffer-bytes":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --buffer-bytes")
+				}
+				bufferBytes = value
+				index = args.index(after: valueIndex)
+			case "--rss-budget-kb":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt64(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --rss-budget-kb")
+				}
+				rssBudgetKB = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown undo option: \(arg)")
+			}
+		}
+		return UndoOptions(operations: operations, bufferBytes: bufferBytes, rssBudgetKB: rssBudgetKB)
+	}
+
 	private static func parseRenderHighlightCache(_ args: [String]) throws -> RenderHighlightCacheOptions {
 		var frames = 60
 		var lineCount = 100_000
@@ -658,6 +725,68 @@ enum ItsyBenchMain {
 			slice_length: sliceLength,
 			slice_ns_per_op: Double(sliceNS) / Double(operations),
 			slice_checksum: checksum
+		)
+	}
+
+	private static func undo(_ options: UndoOptions) throws -> UndoBenchResult {
+		let replacements = ["b", "c", "d", "e"]
+		let pid = getpid()
+		var editor = Editor(pieceTree: PieceTree(bytes: [UInt8](repeating: 97, count: options.bufferBytes)))
+		editor.history = UndoStack(maxEditCount: options.operations, maxTotalRemovedBytes: Int.max)
+		var peakRSS = try residentSizeKB(pid: pid)
+		let baselineRSS = peakRSS
+		let sampleInterval = 1_024
+		let recordNS = try measureNanoseconds {
+			for operation in 0 ..< options.operations {
+				editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: 1)))
+				editor.insert(replacements[operation % replacements.count])
+				if operation % sampleInterval == 0 {
+					_ = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+				}
+			}
+		}
+		let afterRecordRSS = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+		let retainedUndoEntries = editor.history.edits.count
+		let undoNS = try measureNanoseconds {
+			for operation in 0 ..< options.operations {
+				editor.undo()
+				if operation % sampleInterval == 0 {
+					_ = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+				}
+			}
+		}
+		let afterUndoRSS = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+		let redoNS = try measureNanoseconds {
+			for operation in 0 ..< options.operations {
+				editor.redo()
+				if operation % sampleInterval == 0 {
+					_ = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+				}
+			}
+		}
+		let afterRedoRSS = try samplePeakRSS(pid: pid, peakRSS: &peakRSS)
+		let maxDelta = rssDeltaKB(peakRSS, baselineRSS)
+		return UndoBenchResult(
+			after_record_rss_delta_kb: rssDeltaKB(afterRecordRSS, baselineRSS),
+			after_record_rss_kb: afterRecordRSS,
+			after_redo_rss_delta_kb: rssDeltaKB(afterRedoRSS, baselineRSS),
+			after_redo_rss_kb: afterRedoRSS,
+			after_undo_rss_delta_kb: rssDeltaKB(afterUndoRSS, baselineRSS),
+			after_undo_rss_kb: afterUndoRSS,
+			baseline_rss_kb: baselineRSS,
+			buffer_bytes: options.bufferBytes,
+			final_checksum: editorChecksum(editor),
+			final_length: editor.textStorage.length,
+			final_undo_entries: editor.history.edits.count,
+			max_rss_delta_kb: maxDelta,
+			operations: options.operations,
+			record_ns_per_op: Double(recordNS) / Double(options.operations),
+			retained_undo_entries: retainedUndoEntries,
+			rss_budget_kb: options.rssBudgetKB,
+			rss_budget_passed: maxDelta <= options.rssBudgetKB,
+			sampled_peak_rss_kb: peakRSS,
+			redo_ns_per_op: Double(redoNS) / Double(options.operations),
+			undo_ns_per_op: Double(undoNS) / Double(options.operations)
 		)
 	}
 
@@ -1009,7 +1138,7 @@ enum ItsyBenchMain {
 		}
 	}
 
-	private static func residentSizeKB(pid: Int32) throws -> UInt64 {
+	fileprivate static func residentSizeKB(pid: Int32) throws -> UInt64 {
 		var info = rusage_info_v2()
 		let result = withUnsafeMutablePointer(to: &info) { pointer in
 			pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) {
@@ -1077,8 +1206,34 @@ enum ItsyBenchMain {
 	  itsybench render-highlight-cache [--lines <count>] [--frames <count>]
 	  itsybench rope [--ops <count>] [--slice-length <bytes>]
 	  itsybench rss --pid <pid>
+	  itsybench undo [--ops <count>] [--buffer-bytes <bytes>] [--rss-budget-kb <kb>]
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 	"""
+}
+
+private func samplePeakRSS(pid: Int32, peakRSS: inout UInt64) throws -> UInt64 {
+	let value = try ItsyBenchMain.residentSizeKB(pid: pid)
+	peakRSS = max(peakRSS, value)
+	return value
+}
+
+private func rssDeltaKB(_ value: UInt64, _ baseline: UInt64) -> UInt64 {
+	value > baseline ? value - baseline : 0
+}
+
+private func editorChecksum(_ editor: Editor) -> Int {
+	switch editor.textStorage {
+	case let .pieceTree(pieceTree):
+		guard pieceTree.length > 0 else {
+			return 0
+		}
+		let step = max(1, pieceTree.length / 64)
+		return Swift.stride(from: 0, to: pieceTree.length, by: step).reduce(pieceTree.length) {
+			$0 &+ Int(pieceTree.utf8Byte(at: $1))
+		}
+	case let .rope(rope):
+		return rope.length
+	}
 }
 
 private func measureNanoseconds(_ body: () throws -> Void) rethrows -> UInt64 {

@@ -795,6 +795,9 @@ final class EditorWindowController: NSWindowController {
 		case "lsp.references":
 			return findAllReferences(nil)
 		default:
+			if commandID.hasPrefix("extension:") {
+				return ItsyAppCommandBridge.requestRunCommand(commandID)
+			}
 			return false
 		}
 		return true

@@ -121,6 +121,14 @@ import Testing
 	#expect(engine.handle(try keyEvent("f", modifiers: [.control])) == .command("forwardChar"))
 }
 
+@Test func keymapLoaderBuildsSingleBindingFromKeyString() throws {
+	let binding = try KeymapLoader.binding(mode: .insert, key: "cmd+shift+i", commandID: "extension:dev.example:open")
+
+	#expect(binding.mode == .insert)
+	#expect(binding.chord == [Key("i", modifiers: [.command, .shift])])
+	#expect(binding.commandID == "extension:dev.example:open")
+}
+
 @Test func bundledKeymapProfilesLoad() throws {
 	for profile in KeymapProfile.allCases {
 		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)

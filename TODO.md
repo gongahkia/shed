@@ -226,7 +226,6 @@ Approach for Itsy (simpler than full CRDT — piece-tree makes this cheap):
 
 Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handled correctly. Adopt the Unicode UAX #29 grapheme break test suite as ground truth. Ref: `https://www.unicode.org/Public/UCD/latest/ucd/auxiliary/GraphemeBreakTest.txt`.
 
-(A) 2026-07-01 +Phase24-Grapheme @editor id:964 est:3h dep:962 Multi-cursor emoji regression suite: `Tests/ItsyEditorTests/MultiCursorGraphemeTests.swift`. Cases: family emoji 👨‍👩‍👧‍👦 (7 codepoints, 1 grapheme), Indic ka+virama+ka, national flag 🇸🇬🇯🇵, keycap 1️⃣, skin-tone modifier 👋🏽, ZWJ Woman-Firefighter. For each: place N cursors at random offsets, insert '#' at each, then delete-backward at each — expect exactly N grapheme-cluster deletions.
 (B) 2026-07-01 +Phase24-Grapheme @render id:965 est:2h dep:964 Add manual QA doc `docs/qa/grapheme-checklist.md` listing keystroke sequences to run interactively (paste-family-emoji, arrow-through-flag, backspace-through-ZWJ). Each step includes the observable and the failure mode.
 (A) 2026-07-01 +Phase24-Grapheme @refactor id:966 est:1h dep:965 Checkpoint: `swift test` all grapheme suites green. Any regression in previous suites (rope tests migrated to piece-tree in id:922) blocks merge.
 

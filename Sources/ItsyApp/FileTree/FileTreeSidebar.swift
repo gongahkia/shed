@@ -61,6 +61,9 @@ enum ItsyWorkspaceController {
 		}
 		indexGeneration &+= 1
 		let generation = indexGeneration
+		let store = WorkspaceIndexStore()
+		workspaceIndex = try? store.load(for: root)
+		gitIgnoreMatcher = nil
 		broadcastIndexingStatus(L10n.string("Indexing…"))
 		DispatchQueue.global(qos: .utility).async {
 			let matcher = GitIgnoreMatcher(root: root)
@@ -79,6 +82,7 @@ enum ItsyWorkspaceController {
 				workspaceIndex = index
 				gitIgnoreMatcher = matcher
 				broadcastIndexingStatus(nil)
+				persistWorkspaceIndex(index)
 			}
 		}
 	}
@@ -124,6 +128,13 @@ enum ItsyWorkspaceController {
 		let urls = batch.events.map(\.url)
 		WorkspaceIndexer.reindex(&index, changedURLs: urls, matcher: matcher)
 		workspaceIndex = index
+		persistWorkspaceIndex(index)
+	}
+
+	private static func persistWorkspaceIndex(_ index: WorkspaceIndex) {
+		DispatchQueue.global(qos: .utility).async {
+			try? WorkspaceIndexStore().save(index)
+		}
 	}
 
 	static func openFile(at url: URL) -> Bool {

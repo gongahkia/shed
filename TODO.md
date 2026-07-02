@@ -238,7 +238,6 @@ Goal: prove multi-cursor + emoji + regional-indicator + ZWJ sequences are handle
 
 Goal: parity with Zed/nvim/Helix on capture set, at least 10 built-in themes, +8 grammars.
 
-(B) 2026-07-01 +Phase26-Syntax @syntax id:1107 est:2h dep:1102 Update `Sources/ItsyBench/main.swift` `smoke` cmd to open a `.swift` / `.zig` / `.bash` / `.sql` sample and assert non-empty highlight-span output. Prevents grammar-drop regressions.
 (B) 2026-07-01 +Phase26-Syntax @syntax id:1108 est:2h dep:1101 Grammars in separate dylibs by default (finish the deferred lazy-load work). Extend `bench/scripts/build_grammar_dylibs.sh` to be called from `bench/scripts/make_app.sh`; drop grammar `.c` sources from `CTSGrammars` static target for release builds. Wire dlopen in `GrammarLoader.language(for:)` (already exists).
 (B) 2026-07-01 +Phase26-Syntax @syntax id:1109 est:2h dep:1108 Cold-start bench post-dylib. Target: `__TEXT,__const` drops from 9.4 MB to <2 MB; cold start improves ≥25 ms. Update `bench/notes/coldstart-audit.md`.
 

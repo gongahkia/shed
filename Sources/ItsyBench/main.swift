@@ -6,6 +6,7 @@ import Dispatch
 import Foundation
 import ItsyEditor
 import ItsyRender
+import ItsySyntax
 
 private struct LatencyOptions {
 	var pid: Int32
@@ -151,8 +152,14 @@ private struct UndoBenchResult: Encodable {
 }
 
 private struct SmokeResult: Encodable {
+	var highlight_span_counts: [String: Int]
 	var mode: String
 	var runs: Int
+}
+
+private struct HighlightSmokeSample {
+	var filename: String
+	var source: String
 }
 
 private struct ErrorResult: Encodable {
@@ -176,6 +183,7 @@ private enum BenchError: Error, CustomStringConvertible {
 	case eventTapFailed
 	case latencyTimeout
 	case screenCapturePermissionMissing
+	case smokeFailed(String)
 	case windowTimeout
 	case rssFailed(Int32, Int32)
 	case purgeTimeout
@@ -217,6 +225,8 @@ private enum BenchError: Error, CustomStringConvertible {
 			"latency measurement timed out"
 		case .screenCapturePermissionMissing:
 			"screen capture permission is required for latency"
+		case let .smokeFailed(message):
+			"smoke failed: \(message)"
 		case .windowTimeout:
 			"window creation timed out"
 		case let .rssFailed(pid, err):
@@ -246,7 +256,7 @@ enum ItsyBenchMain {
 
 	private static func run(_ args: [String]) throws {
 		if args.contains("--smoke") {
-			try printJSON(SmokeResult(mode: "smoke", runs: parseRuns(args)))
+			try printJSON(smoke(runs: parseRuns(args)))
 			return
 		}
 		if args.isEmpty || args.first == "--help" || args.first == "-h" {
@@ -621,6 +631,28 @@ enum ItsyBenchMain {
 			mode_width: mode.map { $0.width },
 			nominal_refresh_hz: rates.nominal
 		)
+	}
+
+	private static func smoke(runs: Int) throws -> SmokeResult {
+		var counts: [String: Int] = [:]
+		for sample in highlightSmokeSamples {
+			let url = URL(fileURLWithPath: sample.filename)
+			guard let language = SyntaxPipeline.language(forFileURL: url) else {
+				throw BenchError.smokeFailed("no language for \(sample.filename)")
+			}
+			var pipeline = SyntaxPipeline(language: language)
+			let rope = Rope(sample.source)
+			let tree = try pipeline.parse(rope)
+			guard !tree.rootNode.hasError else {
+				throw BenchError.smokeFailed("\(sample.filename) parsed with errors")
+			}
+			let spans = try pipeline.highlights(in: tree)
+			guard !spans.isEmpty else {
+				throw BenchError.smokeFailed("\(sample.filename) produced no highlight spans")
+			}
+			counts[sample.filename] = spans.count
+		}
+		return SmokeResult(highlight_span_counts: counts, mode: "smoke", runs: runs)
 	}
 
 	private static func rope(_ options: RopeOptions) throws -> RopeBenchResult {
@@ -1210,6 +1242,29 @@ enum ItsyBenchMain {
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 	"""
 }
+
+private let highlightSmokeSamples = [
+	HighlightSmokeSample(filename: "sample.swift", source: """
+	import Foundation
+	let answer = 42
+	func smoke() -> Int { answer }
+	"""),
+	HighlightSmokeSample(filename: "sample.zig", source: """
+	const std = @import("std");
+	pub fn main() void {
+	    const answer: i32 = 42;
+	    _ = answer;
+	}
+	"""),
+	HighlightSmokeSample(filename: "sample.bash", source: """
+	#!/usr/bin/env bash
+	set -euo pipefail
+	echo "$HOME"
+	"""),
+	HighlightSmokeSample(filename: "sample.sql", source: """
+	select id, name from users where active = true order by id;
+	"""),
+]
 
 private func samplePeakRSS(pid: Int32, peakRSS: inout UInt64) throws -> UInt64 {
 	let value = try ItsyBenchMain.residentSizeKB(pid: pid)

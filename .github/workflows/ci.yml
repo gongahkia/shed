@@ -18,6 +18,8 @@ jobs:
             ${{ runner.os }}-${{ runner.arch }}-spm-
       - name: Install hyperfine
         run: brew install hyperfine
+      - name: Validate keymaps
+        run: scripts/validate_keymaps.swift
       - name: Build release
         run: swift build -c release
       - name: Test

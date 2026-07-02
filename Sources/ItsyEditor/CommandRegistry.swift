@@ -2,12 +2,14 @@ public struct Command {
 	public let id: String
 	public let title: String
 	public let defaultKey: String?
+	public let isHidden: Bool
 	public let run: () -> Void
 
-	public init(id: String, title: String, defaultKey: String? = nil, run: @escaping () -> Void) {
+	public init(id: String, title: String, defaultKey: String? = nil, isHidden: Bool = false, run: @escaping () -> Void) {
 		self.id = id
 		self.title = title
 		self.defaultKey = defaultKey
+		self.isHidden = isHidden
 		self.run = run
 	}
 }
@@ -24,6 +26,10 @@ public struct CommandRegistry {
 	public init() {}
 
 	public var commands: [Command] {
+		orderedCommands.filter { !$0.isHidden }
+	}
+
+	public var allCommands: [Command] {
 		orderedCommands
 	}
 

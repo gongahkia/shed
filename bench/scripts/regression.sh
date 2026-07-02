@@ -14,14 +14,17 @@ itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
 itsyapp="${ITSY_APP_BINARY:-$repo_dir/.build/release/ItsyApp}"
 hyperfine_json="$(mktemp)"
 rope_json="$(mktemp)"
+open_json="$(mktemp)"
 lsp_json="$(mktemp)"
 lsp_guard_dir="$(mktemp -d)"
 lsp_guard_home="$lsp_guard_dir/home"
 lsp_guard_marker="$lsp_guard_dir/sourcekit-lsp-spawned"
 lsp_probe_script="$script_dir/lsp_diagnostics_probe.rb"
 lsp_diagnostics_limit_ms="${ITSY_REGRESSION_LSP_DIAGNOSTICS_LIMIT_MS:-5000}"
+open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
+open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
 
-trap 'rm -f "$hyperfine_json" "$rope_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
+trap 'rm -f "$hyperfine_json" "$rope_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
 
 setup_lsp_spawn_guard() {
 	local bin_dir="$lsp_guard_dir/bin"
@@ -106,6 +109,9 @@ ITSY_LSP_DIAGNOSTICS_LIMIT_MS="$lsp_diagnostics_limit_ms" ruby "$lsp_probe_scrip
 for _ in $(seq 1 "$rope_runs"); do
 	"$itsybench" rope --ops "$rope_ops" --slice-length "$slice_length" >>"$rope_json"
 done
+if [[ -f "$open_file" ]]; then
+	"$itsybench" open --app "$itsyapp" --file "$open_file" --timeout-ms "$open_timeout_ms" >"$open_json"
+fi
 
 ruby -rjson -rtime -e '
 	def swift_loc(repo)
@@ -125,10 +131,11 @@ ruby -rjson -rtime -e '
 		value.to_s.gsub("%", "%25").gsub("\r", "%0D").gsub("\n", "%0A")
 	end
 
-	baseline_path, hyperfine_path, rope_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
+	baseline_path, hyperfine_path, rope_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
 	rope_runs = File.readlines(rope_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
+	open = File.size?(open_path) ? JSON.parse(File.read(open_path)) : {}
 	lsp = File.size?(lsp_path) ? JSON.parse(File.read(lsp_path)) : {}
 	bench = hyperfine.fetch("results").first
 	current = {
@@ -142,6 +149,9 @@ ruby -rjson -rtime -e '
 		"swift_loc" => swift_loc(repo).to_f
 	}
 	lsp.each do |key, value|
+		current[key] = value.to_f if value.is_a?(Numeric)
+	end
+	open.each do |key, value|
 		current[key] = value.to_f if value.is_a?(Numeric)
 	end
 	default_threshold = baseline.fetch("threshold", threshold_arg).to_f
@@ -203,6 +213,6 @@ ruby -rjson -rtime -e '
 		end
 	end
 	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$rope_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
+' "$baseline" "$hyperfine_json" "$rope_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

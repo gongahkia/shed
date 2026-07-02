@@ -7,12 +7,14 @@ import Testing
 	let symbols = [
 		LSPDocumentSymbol(
 			name: "AppShell",
+			detail: "struct AppShell",
 			kind: .class,
 			range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 5, character: 0)),
 			selectionRange: LSPRange(start: LSPPosition(line: 0, character: 7), end: LSPPosition(line: 0, character: 15)),
 			children: [
 				LSPDocumentSymbol(
 					name: "renderFrame",
+					detail: "func renderFrame()",
 					kind: .method,
 					range: LSPRange(start: LSPPosition(line: 1, character: 4), end: LSPPosition(line: 3, character: 5)),
 					selectionRange: LSPRange(start: LSPPosition(line: 1, character: 9), end: LSPPosition(line: 1, character: 20))
@@ -26,9 +28,13 @@ import Testing
 	#expect(result[0].kind == .type)
 	#expect(result[0].line == 1)
 	#expect(result[0].column == 8)
+	#expect(result[0].signature == "struct AppShell")
+	#expect(result[0].containerName == nil)
 	#expect(result[1].name == "renderFrame")
 	#expect(result[1].kind == .method)
 	#expect(result[1].line == 2)
+	#expect(result[1].signature == "func renderFrame()")
+	#expect(result[1].containerName == "AppShell")
 }
 
 @Test func symbolInformationAdapterMapsUriToRelativePath() {
@@ -39,7 +45,8 @@ import Testing
 			location: LSPLocation(
 				uri: "file:///tmp/itsy-symbols/Sources/Foo.swift",
 				range: LSPRange(start: LSPPosition(line: 2, character: 6), end: LSPPosition(line: 2, character: 9))
-			)
+			),
+			containerName: "Sources"
 		),
 	]
 	let root = URL(fileURLWithPath: "/tmp/itsy-symbols")
@@ -50,6 +57,7 @@ import Testing
 	#expect(result[0].relativePath == "Sources/Foo.swift")
 	#expect(result[0].line == 3)
 	#expect(result[0].column == 7)
+	#expect(result[0].containerName == "Sources")
 }
 
 @Test func symbolInformationAdapterDropsLocationsOutsideRoot() {
@@ -72,6 +80,7 @@ import Testing
 		LSPWorkspaceSymbol(
 			name: "AppShell",
 			kind: .struct,
+			containerName: "Sources",
 			location: .location(LSPLocation(
 				uri: "file:///tmp/itsy-symbols/Sources/App.swift",
 				range: LSPRange(start: LSPPosition(line: 2, character: 7), end: LSPPosition(line: 2, character: 15))
@@ -92,6 +101,7 @@ import Testing
 	#expect(result[0].column == 8)
 	#expect(result[0].endLine == 3)
 	#expect(result[0].endColumn == 16)
+	#expect(result[0].containerName == "Sources")
 }
 
 @Test func symbolKindMappingCollapsesLSPKindsIntoWorkspaceCategories() {

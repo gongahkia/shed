@@ -1,0 +1,57 @@
+import Foundation
+import ItsyEditor
+import Testing
+
+@Test func libgit2RepositoryFacadeOpensStatusDiffAndBlob() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try Libgit2TemporaryGitFixture()
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("tracked.txt", "one\n")
+	try fixture.git(["add", "tracked.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	let oid = try fixture.git(["rev-parse", "HEAD:tracked.txt"]).trimmingCharacters(in: .whitespacesAndNewlines)
+	try fixture.write("tracked.txt", "two\n")
+	try fixture.write("other.txt", "other\n")
+
+	let repository = try GitRepository.Libgit2.Repository.open(at: fixture.root)
+	let status = try repository.status()
+	let trackedStatus = try repository.status(pathspec: ["tracked.txt"])
+	let worktreeDiff = try repository.diff(cached: false)
+	let cachedDiff = try repository.diff(cached: true)
+	let blob = try repository.blob(at: oid)
+
+	#expect(status.count == 2)
+	#expect(trackedStatus.count == 1)
+	#expect(worktreeDiff.count == 1)
+	#expect(cachedDiff.count == 0)
+	#expect(String(data: blob.data, encoding: .utf8) == "one\n")
+}
+
+private final class Libgit2TemporaryGitFixture {
+	let root: URL
+
+	init() throws {
+		root = FileManager.default.temporaryDirectory
+			.appendingPathComponent("itsy-libgit2-\(UUID().uuidString)", isDirectory: true)
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+	}
+
+	deinit {
+		try? FileManager.default.removeItem(at: root)
+	}
+
+	func write(_ path: String, _ contents: String) throws {
+		let url = root.appendingPathComponent(path)
+		try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+		try contents.write(to: url, atomically: true, encoding: .utf8)
+	}
+
+	@discardableResult
+	func git(_ arguments: [String]) throws -> String {
+		try ProcessGitCommandRunner().runGit(arguments: arguments, root: root)
+	}
+}

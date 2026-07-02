@@ -40,7 +40,7 @@ let package = Package(
 		),
 		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap", "ItsyVim"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
-		.target(name: "ItsyEditor", dependencies: ["ItsyConfig", "ItsyLSP"], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyEditor", dependencies: ["CLibgit2", "ItsyConfig", "ItsyLSP"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyKeymap", resources: [.process("Resources")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyVim", swiftSettings: releaseSwiftSettings),

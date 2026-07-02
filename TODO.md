@@ -276,7 +276,6 @@ Goal: eliminate temp-patch round-trips for hunk staging; add blame, file history
 
 Decision recorded in `docs/design/git.md`: vendor libgit2 as a C target (`Sources/CLibgit2`) — same pattern as `CTreeSitter`. Do NOT depend on SwiftGit2 (last active update Nov 2025, no XCFramework, iOS-conflict via libpcre — irrelevant here but a maintainability signal). Ref: `https://libgit2.org/`, `https://github.com/SwiftGit2/SwiftGit2`.
 
-(A) 2026-07-01 +Phase31-Git @git id:1301 est:2h dep:1300 `Sources/ItsyEditor/GitRepository+Libgit2.swift`: thin Swift facade: `Repository.open(at:)`, `Repository.status(pathspec:)`, `Repository.diff(cached: Bool)`, `Repository.blob(at:)`. Wrap `git_repository`, `git_status_list`, `git_diff`, `git_blob` handles as classes with `deinit` cleanup.
 (A) 2026-07-01 +Phase31-Git @git id:1302 est:3h dep:1301 Reimplement `GitRepository.status()` on libgit2. Compare output to current porcelain-v2 parser on a fixture repo — must produce identical `GitStatus`.
 (A) 2026-07-01 +Phase31-Git @git id:1303 est:4h dep:1301 Reimplement hunk stage/unstage on libgit2 via `git_apply_to_tree` + `git_index_write_tree` + `git_index_add_frombuffer`. No temp files, no stdin round-trip. Test: on a 1k-hunk fixture, staging all hunks must be <500 ms.
 (A) 2026-07-01 +Phase31-Git @git id:1304 est:3h dep:1301 Reimplement diff (`GitRepository.diffFiles(...)`, `diffFilesAgainstHead(...)`) on `git_diff_index_to_workdir` / `git_diff_tree_to_index`. Verify identical output to current shell-out on fixture repo.

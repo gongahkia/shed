@@ -73,6 +73,25 @@ final class PerformanceBudgetTests: XCTestCase {
         XCTAssertTrue(scenarioNames.contains("soak-345-events"))
     }
 
+    func testCatalogIncludesReleaseScenarioBudgets() {
+        let budgets = PerformanceBudgetCatalog.v0ProxyBudgets(windowCount: 50, soakEvents: 5_000)
+        let budgetsByScenario = Dictionary(grouping: budgets, by: \.scenarioName)
+
+        XCTAssertEqual(budgetsByScenario["scratchpad-toggle-latency"]?.first?.metric, .p99)
+        XCTAssertEqual(budgetsByScenario["scratchpad-toggle-latency"]?.first?.limit, 60)
+        XCTAssertEqual(budgetsByScenario["permission-revoke-recovery"]?.first?.metric, .max)
+        XCTAssertEqual(budgetsByScenario["permission-revoke-recovery"]?.first?.limit, 1_500)
+        XCTAssertEqual(budgetsByScenario["space-drift-verify"]?.first?.metric, .p95)
+        XCTAssertEqual(budgetsByScenario["space-drift-verify"]?.first?.limit, 25)
+        XCTAssertEqual(budgetsByScenario["focus-rate-limit-eval"]?.first?.metric, .p99)
+        XCTAssertEqual(budgetsByScenario["focus-rate-limit-eval"]?.first?.limit, 0.5)
+        XCTAssertEqual(budgetsByScenario["animated-arrange"]?.first?.metric, .max)
+        XCTAssertEqual(budgetsByScenario["animated-arrange"]?.first?.limit, 2)
+        XCTAssertEqual(budgetsByScenario["animated-arrange"]?.first?.unit, "baseline-ratio")
+        XCTAssertEqual(budgetsByScenario["thumbnail-cache-fill-20-windows"]?.first?.metric, .p95)
+        XCTAssertEqual(budgetsByScenario["thumbnail-cache-fill-20-windows"]?.first?.limit, 80)
+    }
+
     private func scenario(
         name: String,
         p50: Double = 1,

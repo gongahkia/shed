@@ -163,6 +163,7 @@ public enum PerformanceBudgetCatalog {
     public static func v0ProxyBudgets(windowCount: Int, soakEvents: Int) -> [PerformanceBudget] {
         baseBudgets()
             + windowBudgets(windowCount: windowCount)
+            + releaseScenarioBudgets()
             + soakBudgets(soakEvents: soakEvents)
     }
 
@@ -226,6 +227,48 @@ public enum PerformanceBudgetCatalog {
                 metric: .p95,
                 limit: 80,
                 reason: "thumbnail cache generation should stay bounded"
+            )
+        ]
+    }
+
+    private static func releaseScenarioBudgets() -> [PerformanceBudget] {
+        [
+            PerformanceBudget(
+                scenarioName: "scratchpad-toggle-latency",
+                metric: .p99,
+                limit: 60,
+                reason: "scratchpad hide/show path should feel immediate"
+            ),
+            PerformanceBudget(
+                scenarioName: "permission-revoke-recovery",
+                metric: .max,
+                limit: 1_500,
+                reason: "AX permission revocation recovery should stay bounded"
+            ),
+            PerformanceBudget(
+                scenarioName: "space-drift-verify",
+                metric: .p95,
+                limit: 25,
+                reason: "native Space drift verification should stay cheap"
+            ),
+            PerformanceBudget(
+                scenarioName: "focus-rate-limit-eval",
+                metric: .p99,
+                limit: 0.5,
+                reason: "focus rate-limit decisions should stay sub-millisecond"
+            ),
+            PerformanceBudget(
+                scenarioName: "animated-arrange",
+                metric: .max,
+                limit: 2,
+                unit: "baseline-ratio",
+                reason: "animated arrange should stay within 2x non-animated arrange"
+            ),
+            PerformanceBudget(
+                scenarioName: "thumbnail-cache-fill-20-windows",
+                metric: .p95,
+                limit: 80,
+                reason: "thumbnail cache fill for 20 windows should stay bounded"
             )
         ]
     }

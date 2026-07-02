@@ -92,6 +92,52 @@ final class ShowcaseLayoutsTests: XCTestCase {
         ])
     }
 
+    func testMatrixGridPacksRowMajorWithFixedColumns() {
+        let engine = MatrixGridLayoutEngine(config: .init(columns: 2))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3, 4, 5),
+            in: CGRect(x: 0, y: 0, width: 200, height: 300),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 0, width: 100, height: 100),
+            CGRect(x: 100, y: 0, width: 100, height: 100),
+            CGRect(x: 0, y: 100, width: 100, height: 100),
+            CGRect(x: 100, y: 100, width: 100, height: 100),
+            CGRect(x: 0, y: 200, width: 100, height: 100)
+        ])
+    }
+
+    func testMatrixGridPacksColumnMajorWithFixedColumns() {
+        let engine = MatrixGridLayoutEngine(config: .init(columns: 2, fillOrder: .columnMajor))
+        let placements = engine.arrange(
+            windows: windows(1, 2, 3, 4, 5),
+            in: CGRect(x: 0, y: 0, width: 200, height: 300),
+            focus: nil
+        )
+
+        XCTAssertEqual(placements.map(\.frame), [
+            CGRect(x: 0, y: 0, width: 100, height: 100),
+            CGRect(x: 0, y: 100, width: 100, height: 100),
+            CGRect(x: 0, y: 200, width: 100, height: 100),
+            CGRect(x: 100, y: 0, width: 100, height: 100),
+            CGRect(x: 100, y: 100, width: 100, height: 100)
+        ])
+    }
+
+    func testMatrixGridAppliesGapsAndHandlesEmptyInput() {
+        let engine = MatrixGridLayoutEngine(config: .init(columns: 2, gap: 10))
+        let bounds = CGRect(x: 0, y: 0, width: 200, height: 100)
+
+        XCTAssertEqual(MatrixGridLayoutEngine.Config(columns: 0).columns, 1)
+        XCTAssertTrue(engine.arrange(windows: [], in: bounds, focus: nil).isEmpty)
+        XCTAssertEqual(engine.arrange(windows: windows(1, 2), in: bounds, focus: nil).map(\.frame), [
+            CGRect(x: 5, y: 5, width: 90, height: 90),
+            CGRect(x: 105, y: 5, width: 90, height: 90)
+        ])
+    }
+
     func testFocusBandPlacesFocusedWindowInCenter() {
         let engine = FocusBandLayoutEngine(config: .init(focusRatio: 0.5))
         let placements = engine.arrange(

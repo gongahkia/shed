@@ -159,6 +159,70 @@ public struct DwindleSpiralLayoutEngine: LayoutEngine {
     }
 }
 
+public enum MatrixFillOrder: Equatable, Sendable {
+    case rowMajor
+    case columnMajor
+}
+
+public struct MatrixGridLayoutEngine: LayoutEngine {
+    public struct Config: Equatable, Sendable {
+        public let columns: Int
+        public let fillOrder: MatrixFillOrder
+        public let gap: CGFloat
+
+        public init(columns: Int = 3, fillOrder: MatrixFillOrder = .rowMajor, gap: CGFloat = 0) {
+            self.columns = max(1, columns)
+            self.fillOrder = fillOrder
+            self.gap = max(0, gap)
+        }
+    }
+
+    public let id = LayoutEngineID(rawValue: "dev.olly.showcase.matrix-grid")
+    public let displayName = "Matrix Grid"
+    public let capabilities: LayoutEngineCapabilities = [.supportsResizing]
+    public let config: Config
+
+    public init(config: Config = Config()) {
+        self.config = config
+    }
+
+    public func arrange(windows: [WindowSnapshot], in bounds: CGRect, focus: WindowID?) -> [Placement] {
+        guard !windows.isEmpty else { return [] }
+        let ordered = windows.sorted(by: WindowSnapshot.precedes)
+        let rows = Int(ceil(Double(ordered.count) / Double(config.columns)))
+        return ordered.enumerated().map { index, window in
+            let position = cellPosition(index: index, rows: rows)
+            return Placement(
+                windowID: window.windowID,
+                frame: frame(column: position.column, row: position.row, rows: rows, in: bounds),
+                zOrder: index
+            )
+        }
+    }
+
+    private func cellPosition(index: Int, rows: Int) -> (column: Int, row: Int) {
+        switch config.fillOrder {
+        case .rowMajor:
+            return (index % config.columns, index / config.columns)
+        case .columnMajor:
+            return (index / rows, index % rows)
+        }
+    }
+
+    private func frame(column: Int, row: Int, rows: Int, in bounds: CGRect) -> CGRect {
+        let cellWidth = bounds.width / CGFloat(config.columns)
+        let cellHeight = bounds.height / CGFloat(rows)
+        let cell = CGRect(
+            x: bounds.minX + CGFloat(column) * cellWidth,
+            y: bounds.minY + CGFloat(row) * cellHeight,
+            width: cellWidth,
+            height: cellHeight
+        )
+        let inset = min(config.gap / 2, min(cellWidth, cellHeight) / 2)
+        return cell.insetBy(dx: inset, dy: inset)
+    }
+}
+
 public struct FocusBandLayoutEngine: LayoutEngine {
     public struct Config: Equatable, Sendable {
         public let focusRatio: CGFloat

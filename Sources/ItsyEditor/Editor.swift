@@ -112,19 +112,117 @@ public enum EditorTextStorage: Sendable {
 			return .pieceTree
 		}
 	}
+
+	public var length: Int {
+		switch self {
+		case let .rope(rope):
+			return rope.length
+		case let .pieceTree(pieceTree):
+			return pieceTree.length
+		}
+	}
+
+	public var lineCount: Int {
+		switch self {
+		case let .rope(rope):
+			return rope.lineCount
+		case let .pieceTree(pieceTree):
+			return pieceTree.lineCount
+		}
+	}
+
+	public var graphemeCount: Int {
+		switch self {
+		case let .rope(rope):
+			return rope.graphemeCount
+		case let .pieceTree(pieceTree):
+			return pieceTree.graphemeCount
+		}
+	}
+
+	public func substring(_ range: Range<Int>) -> String {
+		switch self {
+		case let .rope(rope):
+			return rope.substring(range)
+		case let .pieceTree(pieceTree):
+			return pieceTree.substring(range)
+		}
+	}
+
+	public func line(forOffset offset: Int) -> Int {
+		switch self {
+		case let .rope(rope):
+			return rope.line(forOffset: offset)
+		case let .pieceTree(pieceTree):
+			return pieceTree.line(forOffset: offset)
+		}
+	}
+
+	public func offset(forLine line: Int) -> Int {
+		switch self {
+		case let .rope(rope):
+			return rope.offset(forLine: line)
+		case let .pieceTree(pieceTree):
+			return pieceTree.offset(forLine: line)
+		}
+	}
+
+	public func lineRange(_ line: Int) -> Range<Int> {
+		switch self {
+		case let .rope(rope):
+			return rope.lineRange(line)
+		case let .pieceTree(pieceTree):
+			return pieceTree.lineRange(line)
+		}
+	}
+
+	public func graphemeIndex(forOffset offset: Int) -> Int {
+		switch self {
+		case let .rope(rope):
+			return rope.graphemeIndex(forOffset: offset)
+		case let .pieceTree(pieceTree):
+			return pieceTree.graphemeIndex(forOffset: offset)
+		}
+	}
+
+	public mutating func insert(_ string: String, at offset: Int) {
+		switch self {
+		case var .rope(rope):
+			rope.insert(string, at: offset)
+			self = .rope(rope)
+		case var .pieceTree(pieceTree):
+			pieceTree.insert(string, at: offset)
+			self = .pieceTree(pieceTree)
+		}
+	}
+
+	public mutating func remove(_ range: Range<Int>) {
+		switch self {
+		case var .rope(rope):
+			rope.remove(range)
+			self = .rope(rope)
+		case var .pieceTree(pieceTree):
+			pieceTree.remove(range)
+			self = .pieceTree(pieceTree)
+		}
+	}
 }
 
 public struct Editor: Sendable {
-	public var rope: Rope
-	private var storageKind: EditorStorageKind
-	public var textStorage: EditorTextStorage {
-		switch storageKind {
-		case .rope:
-			return .rope(rope)
-		case .pieceTree:
-			return .pieceTree(PieceTree(text))
+	public var rope: Rope {
+		get {
+			switch textStorage {
+			case let .rope(rope):
+				return rope
+			case let .pieceTree(pieceTree):
+				return Rope(pieceTree.substring(0 ..< pieceTree.length))
+			}
+		}
+		set {
+			textStorage = .rope(newValue)
 		}
 	}
+	public private(set) var textStorage: EditorTextStorage
 	public var selections: SelectionSet
 	public var history: UndoStack
 	public private(set) var lastEditBatch: [Edit] = []
@@ -135,8 +233,12 @@ public struct Editor: Sendable {
 	}
 
 	public init(text: String, storage: EditorStorageKind) {
-		rope = Rope(text)
-		storageKind = storage
+		switch storage {
+		case .rope:
+			textStorage = .rope(Rope(text))
+		case .pieceTree:
+			textStorage = .pieceTree(PieceTree(text))
+		}
 		selections = SelectionSet()
 		history = UndoStack()
 	}
@@ -154,7 +256,7 @@ public struct Editor: Sendable {
 	)
 
 	public var text: String {
-		rope.slice(0 ..< rope.length)
+		textStorage.substring(0 ..< textStorage.length)
 	}
 
 	public mutating func beginUndoGroup() {
@@ -215,23 +317,23 @@ public struct Editor: Sendable {
 			case .bigWordEnd:
 				offset = wordEnd(from: selection.head, isWordCharacter: { !$0.isWhitespace })
 			case .lineStart, .visualLineStart:
-				offset = rope.offset(forLine: rope.line(forOffset: selection.head))
+				offset = textStorage.offset(forLine: textStorage.line(forOffset: selection.head))
 			case .lineEnd, .visualLineEnd:
-				offset = rope.lineRange(rope.line(forOffset: selection.head)).upperBound
+				offset = textStorage.lineRange(textStorage.line(forOffset: selection.head)).upperBound
 			case .bufferStart:
 				offset = 0
 			case .bufferEnd:
-				offset = rope.length
+				offset = textStorage.length
 			case .paragraphForward:
 				offset = paragraphForward(from: selection.head)
 			case .paragraphBackward:
 				offset = paragraphBackward(from: selection.head)
 			case .pageDown:
-				let line = min(rope.line(forOffset: selection.head) + pageLineCount, max(0, rope.lineCount - 1))
-				offset = rope.offset(forLine: line)
+				let line = min(textStorage.line(forOffset: selection.head) + pageLineCount, max(0, textStorage.lineCount - 1))
+				offset = textStorage.offset(forLine: line)
 			case .pageUp:
-				let line = max(rope.line(forOffset: selection.head) - pageLineCount, 0)
-				offset = rope.offset(forLine: line)
+				let line = max(textStorage.line(forOffset: selection.head) - pageLineCount, 0)
+				offset = textStorage.offset(forLine: line)
 			}
 			return Selection(anchor: offset, head: offset, affinity: selection.affinity)
 		}
@@ -250,7 +352,7 @@ public struct Editor: Sendable {
 			return
 		}
 		if entries.count == 1, let entry = entries.first, let snapshot = entry.snapshotBefore {
-			rope = Rope(snapshot)
+			resetStorage(to: snapshot)
 		} else {
 			for entry in entries {
 				applyInverse(entry.edit)
@@ -285,12 +387,12 @@ public struct Editor: Sendable {
 		var recordedEdits: [Edit] = []
 		var carets: [Selection] = []
 		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
-			let oldText = rope.slice(range)
+			let oldText = textStorage.substring(range)
 			if !range.isEmpty {
-				rope.remove(range)
+				textStorage.remove(range)
 			}
 			if !string.isEmpty {
-				rope.insert(string, at: range.lowerBound)
+				textStorage.insert(string, at: range.lowerBound)
 			}
 			recordedEdits.append(Edit(range: range, oldText: oldText, newText: string, selectionBefore: selectionBefore))
 			let caret = range.lowerBound + string.utf8.count
@@ -325,8 +427,8 @@ public struct Editor: Sendable {
 	}
 
 	private func nextCharacterRange(after offset: Int) -> Range<Int> {
-		guard offset < rope.length else {
-			return rope.length ..< rope.length
+		guard offset < textStorage.length else {
+			return textStorage.length ..< textStorage.length
 		}
 		let text = text
 		let index = text.index(atUTF8Offset: offset)
@@ -339,11 +441,11 @@ public struct Editor: Sendable {
 	}
 
 	private func verticalLineOffset(from offset: Int, delta: Int) -> Int {
-		let line = rope.line(forOffset: offset)
-		let lineRange = rope.lineRange(line)
+		let line = textStorage.line(forOffset: offset)
+		let lineRange = textStorage.lineRange(line)
 		let column = offset - lineRange.lowerBound
-		let targetLine = min(max(line + delta, 0), max(0, rope.lineCount - 1))
-		let targetRange = rope.lineRange(targetLine)
+		let targetLine = min(max(line + delta, 0), max(0, textStorage.lineCount - 1))
+		let targetRange = textStorage.lineRange(targetLine)
 		return min(targetRange.lowerBound + column, targetRange.upperBound)
 	}
 
@@ -354,7 +456,7 @@ public struct Editor: Sendable {
 	private func wordForward(from offset: Int, isWordCharacter: (Character) -> Bool) -> Int {
 		let chars = characterOffsets()
 		guard let index = chars.firstIndex(where: { $0.offset >= offset }), index < chars.count else {
-			return rope.length
+			return textStorage.length
 		}
 		let current = chars[index].character
 		if isWordCharacter(current) {
@@ -365,9 +467,9 @@ public struct Editor: Sendable {
 			while cursor < chars.count, chars[cursor].character.isWhitespace {
 				cursor += 1
 			}
-			return cursor < chars.count ? chars[cursor].offset : rope.length
+			return cursor < chars.count ? chars[cursor].offset : textStorage.length
 		}
-		return index + 1 < chars.count ? chars[index + 1].offset : rope.length
+		return index + 1 < chars.count ? chars[index + 1].offset : textStorage.length
 	}
 
 	private func wordBackward(from offset: Int) -> Int {
@@ -392,7 +494,7 @@ public struct Editor: Sendable {
 	private func wordEnd(from offset: Int, isWordCharacter: (Character) -> Bool) -> Int {
 		let chars = characterOffsets()
 		guard let index = chars.firstIndex(where: { $0.offset >= offset }), index < chars.count else {
-			return rope.length
+			return textStorage.length
 		}
 		var cursor = index
 		if cursor < chars.count, chars[cursor].character.isWhitespace {
@@ -401,7 +503,7 @@ public struct Editor: Sendable {
 			}
 		}
 		guard cursor < chars.count else {
-			return rope.length
+			return textStorage.length
 		}
 		let wordState = isWordCharacter(chars[cursor].character)
 		while cursor + 1 < chars.count, isWordCharacter(chars[cursor + 1].character) == wordState, !chars[cursor + 1].character.isWhitespace {
@@ -411,26 +513,26 @@ public struct Editor: Sendable {
 	}
 
 	private func paragraphForward(from offset: Int) -> Int {
-		let currentLine = rope.line(forOffset: offset)
-		guard currentLine + 1 < rope.lineCount else {
-			return rope.length
+		let currentLine = textStorage.line(forOffset: offset)
+		guard currentLine + 1 < textStorage.lineCount else {
+			return textStorage.length
 		}
-		for line in (currentLine + 1) ..< rope.lineCount {
-			if rope.slice(rope.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-				return rope.offset(forLine: min(line + 1, rope.lineCount - 1))
+		for line in (currentLine + 1) ..< textStorage.lineCount {
+			if textStorage.substring(textStorage.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+				return textStorage.offset(forLine: min(line + 1, textStorage.lineCount - 1))
 			}
 		}
-		return rope.length
+		return textStorage.length
 	}
 
 	private func paragraphBackward(from offset: Int) -> Int {
-		let currentLine = rope.line(forOffset: offset)
+		let currentLine = textStorage.line(forOffset: offset)
 		guard currentLine > 0 else {
 			return 0
 		}
 		for line in stride(from: currentLine - 1, through: 0, by: -1) {
-			if rope.slice(rope.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-				return rope.offset(forLine: min(line + 1, rope.lineCount - 1))
+			if textStorage.substring(textStorage.lineRange(line)).trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+				return textStorage.offset(forLine: min(line + 1, textStorage.lineCount - 1))
 			}
 		}
 		return 0
@@ -446,20 +548,29 @@ public struct Editor: Sendable {
 
 	private mutating func apply(_ edit: Edit) {
 		if !edit.range.isEmpty {
-			rope.remove(edit.range)
+			textStorage.remove(edit.range)
 		}
 		if !edit.newText.isEmpty {
-			rope.insert(edit.newText, at: edit.range.lowerBound)
+			textStorage.insert(edit.newText, at: edit.range.lowerBound)
 		}
 	}
 
 	private mutating func applyInverse(_ edit: Edit) {
 		let range = edit.range.lowerBound ..< edit.range.lowerBound + edit.newText.utf8.count
 		if !range.isEmpty {
-			rope.remove(range)
+			textStorage.remove(range)
 		}
 		if !edit.oldText.isEmpty {
-			rope.insert(edit.oldText, at: edit.range.lowerBound)
+			textStorage.insert(edit.oldText, at: edit.range.lowerBound)
+		}
+	}
+
+	private mutating func resetStorage(to text: String) {
+		switch textStorage.kind {
+		case .rope:
+			textStorage = .rope(Rope(text))
+		case .pieceTree:
+			textStorage = .pieceTree(PieceTree(text))
 		}
 	}
 }
@@ -489,6 +600,12 @@ private func merge(_ ranges: [Range<Int>]) -> [Range<Int>] {
 
 private func isAlphaNumeric(_ character: Character) -> Bool {
 	!character.unicodeScalars.isEmpty && character.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
+}
+
+private extension Rope {
+	func substring(_ range: Range<Int>) -> String {
+		slice(range)
+	}
 }
 
 private extension String {

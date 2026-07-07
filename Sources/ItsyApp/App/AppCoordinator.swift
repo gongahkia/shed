@@ -44,6 +44,7 @@ final class AppCoordinator: NSObject {
 		documentController: documentController,
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
 	)
+	private lazy var extensionsCoordinator = ExtensionsCoordinator()
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -271,6 +272,12 @@ final class AppCoordinator: NSObject {
 					Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
 						self?.refreshTasks(nil)
 					},
+					Command(id: "extensions.manage", title: L10n.string("Extensions"), defaultKey: nil) { [weak self] in
+						self?.showExtensions(nil)
+					},
+					Command(id: "extensions.reload", title: L10n.string("Reload Extension Contributions"), defaultKey: nil) { [weak self] in
+						self?.reloadExtensionContributions(nil)
+					},
 					Command(id: "debug.start", title: L10n.string("Start Debugging"), defaultKey: "Cmd-F5") { [weak self] in
 						self?.showDebugLaunchConfigPicker(nil)
 					},
@@ -422,6 +429,18 @@ final class AppCoordinator: NSObject {
 
 	@objc func refreshTasks(_ sender: Any?) {
 		taskCoordinator.refreshTasks(sender)
+	}
+
+	@objc func showExtensions(_ sender: Any?) {
+		extensionsCoordinator.showExtensions(sender)
+	}
+
+	@objc func reloadExtensionContributions(_ sender: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			return
+		}
+		commandRegistry = makeCommandRegistry(workspaceRoot: root)
+		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: root, commandRegistry: commandRegistry))
 	}
 
 	@objc func showDebugLaunchConfigPicker(_ sender: Any?) {

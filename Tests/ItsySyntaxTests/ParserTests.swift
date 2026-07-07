@@ -4,6 +4,9 @@ import ItsyEditor
 @testable import ItsySyntax
 import Testing
 
+@Suite(.serialized)
+struct ParserTests {
+
 @Test func parserParsesTypeScriptProgram() throws {
 	let rope = Rope("const answer: number = 42;\n")
 	let parser = try Parser(language: .typescript)
@@ -12,6 +15,44 @@ import Testing
 	#expect(root.type == "program")
 	#expect(root.byteRange == 0 ..< rope.length)
 	#expect(!root.hasError)
+}
+
+@Test func parserLoadsGrammarFromDylibAndUnloadsForTests() throws {
+	let repo = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+	let output = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-json-grammar-\(UUID().uuidString)", isDirectory: true)
+	try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+	defer {
+		try? FileManager.default.removeItem(at: output)
+	}
+	let libraryURL = output.appendingPathComponent("libitsy-tree-sitter-json.dylib")
+	try runXcrunClang([
+		"-dynamiclib",
+		"-O0",
+		"-fPIC",
+		"-mmacosx-version-min=13.0",
+		"-o",
+		libraryURL.path,
+		"-I\(repo.appendingPathComponent("Sources/CTreeSitter/upstream/lib/include").path)",
+		"-I\(repo.appendingPathComponent("Sources/CTSGrammars/grammars/json/src").path)",
+		repo.appendingPathComponent("Sources/CTSGrammars/grammars/json/src/parser.c").path,
+	])
+	GrammarLoader.configureForTests(libraryDirectories: [output], useDefaultSymbols: false)
+	GrammarLoader.unloadLibraryStemForTests("json")
+	defer {
+		GrammarLoader.unloadLibraryStemForTests("json")
+		GrammarLoader.configureForTests()
+	}
+
+	do {
+		let rope = Rope(#"{"ok": true}"#)
+		let parser = try Parser(language: .json)
+		let tree = try parser.parse(rope)
+		#expect(tree.rootNode.byteRange == 0 ..< rope.length)
+		#expect(!tree.rootNode.hasError)
+		#expect(GrammarLoader.loadedLibraryStemsForTests().contains("json"))
+	}
+	GrammarLoader.unloadLibraryStemForTests("json")
+	#expect(!GrammarLoader.loadedLibraryStemsForTests().contains("json"))
 }
 
 @Test func parserParsesPieceTreeInputAcrossChunkBoundary() throws {
@@ -322,6 +363,8 @@ import Testing
 	#expect(inputEdit.newEndPoint == Point(row: 0, column: 15))
 }
 
+}
+
 private func largeTypeScriptLineSet() -> String {
 	String(repeating: "\n", count: 100_000) + "const done: boolean = true;\n"
 }
@@ -332,4 +375,19 @@ private func largeTypeScriptLineSetWithMiddleLine() -> String {
 
 private func milliseconds(_ nanoseconds: UInt64) -> Double {
 	Double(nanoseconds) / 1_000_000
+}
+
+private func runXcrunClang(_ arguments: [String]) throws {
+	let process = Process()
+	process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+	process.arguments = ["clang"] + arguments
+	let errorPipe = Pipe()
+	process.standardError = errorPipe
+	try process.run()
+	process.waitUntilExit()
+	guard process.terminationStatus == 0 else {
+		let data = errorPipe.fileHandleForReading.readDataToEndOfFile()
+		let message = String(data: data, encoding: .utf8) ?? "clang failed"
+		throw NSError(domain: "ItsySyntaxTests", code: Int(process.terminationStatus), userInfo: [NSLocalizedDescriptionKey: message])
+	}
 }

@@ -6,6 +6,12 @@ public struct ItsySettings: Equatable, Sendable {
 		case pieceTree = "piecetree"
 	}
 
+	public enum SyntaxPreloadGrammars: String, Equatable, Sendable {
+		case none
+		case opened
+		case all
+	}
+
 	public struct EditorSettings: Equatable, Sendable {
 		public struct ExperimentalSettings: Equatable, Sendable {
 			public var storage: EditorStorage
@@ -54,6 +60,14 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public struct SyntaxSettings: Equatable, Sendable {
+		public var preloadGrammars: SyntaxPreloadGrammars
+
+		public init(preloadGrammars: SyntaxPreloadGrammars = .opened) {
+			self.preloadGrammars = preloadGrammars
+		}
+	}
+
 	public struct TerminalSettings: Equatable, Sendable {
 		public static let defaultFontSize = 12.0
 		public static let minFontSize = 8.0
@@ -75,11 +89,18 @@ public struct ItsySettings: Equatable, Sendable {
 
 	public var editor: EditorSettings
 	public var theme: ThemeSettings
+	public var syntax: SyntaxSettings
 	public var terminal: TerminalSettings
 
-	public init(editor: EditorSettings = EditorSettings(), theme: ThemeSettings = ThemeSettings(), terminal: TerminalSettings = TerminalSettings()) {
+	public init(
+		editor: EditorSettings = EditorSettings(),
+		theme: ThemeSettings = ThemeSettings(),
+		syntax: SyntaxSettings = SyntaxSettings(),
+		terminal: TerminalSettings = TerminalSettings()
+	) {
 		self.editor = editor
 		self.theme = theme
+		self.syntax = syntax
 		self.terminal = terminal
 	}
 
@@ -197,6 +218,9 @@ public final class ItsySettingsStore {
 		[theme]
 		id = "\(escape(settings.theme.id))"
 
+		[syntax]
+		preload_grammars = "\(settings.syntax.preloadGrammars.rawValue)"
+
 		[terminal]
 		font_size = \(format(settings.terminal.fontSize))
 		scrollback_lines = \(settings.terminal.scrollbackLines)
@@ -249,7 +273,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "terminal"].contains(section) {
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal"].contains(section) {
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
 				continue
@@ -307,6 +331,12 @@ struct ItsySettingsParser {
 				settings.theme.id = id
 			} else {
 				warnType(key, line: line, expected: "string")
+			}
+		case "syntax.preload_grammars":
+			if case let .string(mode) = value, let mode = ItsySettings.SyntaxPreloadGrammars(rawValue: mode.lowercased()) {
+				settings.syntax.preloadGrammars = mode
+			} else {
+				warnType(key, line: line, expected: #""none", "opened", or "all""#)
 			}
 		case "terminal.font_size":
 			if let number = doubleValue(value) {

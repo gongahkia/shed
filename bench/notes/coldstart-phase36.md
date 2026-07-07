@@ -48,3 +48,50 @@ Remaining for #8:
 - Reduce `NSWorkspace` launch-to-process-start variance or exclude it from the app-owned gate.
 - Reduce `process_start` -> `app_did_finish_launching`, `window_controller_init_begin` -> `editor_pane_install_begin`, and `window_show_begin` -> `window_show_end`.
 - Rerun 20 staged external-window measurements after the next optimization and close only after verified mean `first_window_visible < 150 ms`.
+
+## Phase 36 A2 Lazy Grammar Loading
+
+Date: 2026-07-07
+
+Implemented slice:
+
+- `ItsySyntax` resolves Tree-sitter grammar symbols through `dlopen`/`dlsym` and caches per-language-group dylib handles.
+- Missing grammar dylibs fail open with one warning per grammar stem, leaving syntax highlighting disabled for that language.
+- Grammar dylib packaging emits 21 libraries under `Itsy.app/Contents/Frameworks/ItsyGrammars`.
+- Added `[syntax] preload_grammars = "none" | "opened" | "all"` settings parsing/serialization docs.
+- Added a dylib load/parse/reset test for the JSON grammar.
+
+Size check:
+
+```sh
+swift build -c release
+bench/scripts/build_grammar_dylibs.sh
+size -m .build/release/ItsyApp
+nm -gU .build/release/ItsyApp | rg 'tree_sitter_'
+```
+
+Result:
+
+- Release `ItsyApp` `__TEXT,__const`: `122459` bytes.
+- Issue baseline for static `CTSGrammars` `__TEXT,__const`: `9.410 MB`.
+- Current release binary has no exported `tree_sitter_` symbols.
+- Built grammar dylib count: `21`.
+- Built grammar dylib directory size: `35M`.
+
+Verification:
+
+```sh
+swift test --filter ItsyConfigTests
+swift test --filter ItsySyntaxTests
+swift test
+bench/scripts/make_app.sh
+.build/release/ItsyBench measure --staged --app Itsy.app --new-instance --timeout-ms 10000
+```
+
+Result:
+
+- `swift test --filter ItsyConfigTests`: passed, 5 tests.
+- `swift test --filter ItsySyntaxTests`: passed, 20 tests.
+- `swift test`: passed, 460 tests.
+- `bench/scripts/make_app.sh`: passed, packaged 21 grammar dylibs.
+- staged sample: `first_window_visible_ms=1045.867292`, `rss_kb=87840`, `process_start=743.563625`, `window_show_end=1002.755167`.

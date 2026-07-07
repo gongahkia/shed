@@ -4,7 +4,7 @@
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
 - **Tooling:** `hyperfine --warmup 0 --runs 20 --prepare 'sudo purge'` per cmd.
 - **Cold-start measurement:** Each editor under test gets a startup probe:
-  - For `itsy`: `itsybench measure --staged` sets `ITSY_BENCH_STAGES_PATH` and records internal stage deltas for `process_start`, `delegate_init`, `app_did_finish_launching`, `main_menu_installed`, `initial_document_opened`, `app_activated`, and `first_draw` alongside the external first-window-visible KPI.
+  - For `itsy`: `itsybench measure --staged` sets `ITSY_BENCH_STAGES_PATH` and records internal stage deltas for process/delegate/menu stages plus document open, window-controller init/show, first display-link tick, render begin, and `first_draw` alongside the external first-window-visible KPI.
   - For Zed/Sublime/VSCode/CodeEdit: external observer (Swift CLI using Accessibility API `AXObserver` to detect first window-visible event), records timestamp, then `kill -TERM`.
 - **Corpus** (checked into `bench/corpus/`):
   - `small.ts` (1 kLOC)
@@ -14,7 +14,7 @@
   - `cold.empty` (no file)
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
-- **Regression gate:** PR CI runs the harness against `itsy` only; fails if any KPI regresses >5% vs `main` baseline.
+- **Regression gate:** PR CI runs the harness against `itsy` only; fails if any KPI regresses >5% vs `main` baseline or `first_window_visible_ms` exceeds `150 ms`.
 
 ## CLI
 

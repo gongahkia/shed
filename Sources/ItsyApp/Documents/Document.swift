@@ -139,8 +139,11 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override func makeWindowControllers() {
+		recordBenchStage("document_make_window_controllers_begin")
 		let controller = EditorWindowController(document: self)
+		recordBenchStage("document_window_controller_init_end")
 		addWindowController(controller)
+		recordBenchStage("document_make_window_controllers_end")
 	}
 
 	override func save(_ sender: Any?) {
@@ -149,6 +152,7 @@ final class ItsyDocument: NSDocument {
 	}
 
 	func attach(_ view: MetalTextView) {
+		recordBenchStage("document_attach_editor_begin")
 		if !editorViews.contains(where: { $0 === view }) {
 			editorViews.append(view)
 		}
@@ -181,6 +185,7 @@ final class ItsyDocument: NSDocument {
 		ItsyGitHunkGutterCoordinator.apply(to: self)
 		fileWatcher.restart()
 		updateHandoffActivity()
+		recordBenchStage("document_attach_editor_end")
 	}
 
 	func detach(_ view: MetalTextView) {

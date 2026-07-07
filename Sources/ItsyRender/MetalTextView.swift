@@ -285,23 +285,35 @@ public final class MetalTextView: NSView {
 	private var lastAccessibilityValue: String?
 
 	public override init(frame frameRect: NSRect) {
+		Self.recordBenchStageOnce("metal_text_view_init_begin")
+		Self.recordBenchStageOnce("metal_device_create_begin")
 		let device = MTLCreateSystemDefaultDevice()
+		Self.recordBenchStageOnce("metal_device_create_end")
 		metalDevice = device
 		commandQueue = device?.makeCommandQueue()
+		Self.recordBenchStageOnce("metal_command_queue_end")
 		super.init(frame: frameRect)
+		Self.recordBenchStageOnce("metal_text_view_super_end")
 		wantsLayer = true
 		addSubview(gutterView)
 		layoutGutterView()
 		syncEditorState()
+		Self.recordBenchStageOnce("metal_text_view_init_end")
 	}
 
 	public required init?(coder: NSCoder) {
+		Self.recordBenchStageOnce("metal_text_view_init_begin")
+		Self.recordBenchStageOnce("metal_device_create_begin")
 		let device = MTLCreateSystemDefaultDevice()
+		Self.recordBenchStageOnce("metal_device_create_end")
 		metalDevice = device
 		commandQueue = device?.makeCommandQueue()
+		Self.recordBenchStageOnce("metal_command_queue_end")
 		super.init(coder: coder)
+		Self.recordBenchStageOnce("metal_text_view_super_end")
 		wantsLayer = true
 		syncEditorState()
+		Self.recordBenchStageOnce("metal_text_view_init_end")
 	}
 
 	public override var wantsUpdateLayer: Bool {
@@ -1032,8 +1044,9 @@ public final class MetalTextView: NSView {
 		else {
 			return
 		}
-			let scale = layer.contentsScale
-			renderFindMatchInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
+		Self.recordBenchStageOnce("first_render_begin")
+		let scale = layer.contentsScale
+		renderFindMatchInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderSelectionInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
 		renderText(encoder: encoder, drawableSize: layer.drawableSize, scale: scale)
 		renderCursorInstances(scale: scale, encoder: encoder, drawableSize: layer.drawableSize)
@@ -1101,6 +1114,7 @@ public final class MetalTextView: NSView {
 	}
 
 	fileprivate func displayLinkDidTick() {
+		Self.recordBenchStageOnce("first_display_link_tick")
 		guard consumeDirtyForDisplayLink() else {
 			return
 		}

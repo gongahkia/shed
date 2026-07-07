@@ -7,9 +7,13 @@ struct EditorPane {
 	let editorView: MetalTextView
 
 	init() {
+		recordBenchStage("editor_pane_view_init_begin")
 		viewController = NSViewController()
+		recordBenchStage("editor_pane_view_controller_end")
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+		recordBenchStage("editor_pane_metal_view_end")
 		viewController.view = editorView
+		recordBenchStage("editor_pane_view_init_end")
 	}
 }
 
@@ -81,10 +85,13 @@ struct EditorPaneCoordinator {
 	}
 
 	init() {
+		recordBenchStage("pane_coordinator_init_begin")
 		let pane = EditorPane()
 		panes = [pane]
+		recordBenchStage("pane_coordinator_pane_end")
 		rootSplitViewController.splitView.dividerStyle = .thin
 		rootSplitViewController.addSplitViewItem(NSSplitViewItem(viewController: pane.viewController))
+		recordBenchStage("pane_coordinator_init_end")
 	}
 
 	var view: NSView {

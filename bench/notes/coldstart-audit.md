@@ -211,3 +211,13 @@ Direct initial-document stages:
 Mean `initial_document_opened`: `1060.766 ms`.
 
 `ItsyBench measure --staged --app Itsy.app --new-instance` timed out waiting for AX window creation at both `--timeout-ms 10000` and `--timeout-ms 30000` in this local session, so first-window-visible could not be reverified here. Direct stage output reached `READY`.
+
+## 2026-07-07 Phase 36 checkpoint
+
+See `bench/notes/coldstart-phase36.md`.
+
+The new staged probes isolated a local direct-startup outlier in `EditorPreferences.load()`: font validation was enumerating/sorting all installed fonts during initial pane install. Direct font validation reduced that stage from about `5.02 s` to about `2-4 ms`.
+
+The AX timeout was traced to missing SwiftPM resource bundles in `Itsy.app`; packaged `Bundle.module` lookup stalled inside keymap resource resolution under `NSWorkspace` launch. `bench/scripts/make_app.sh` now copies `Itsy_Itsy*.bundle` into `Itsy.app`.
+
+External `ItsyBench measure --staged --app Itsy.app --new-instance` now completes, but still fails the `first_window_visible < 150 ms` target. Local samples after the packaging fix were `355.908 ms`, `458.213 ms`, and `522.621 ms`; the final verification sample was `948.651 ms`.

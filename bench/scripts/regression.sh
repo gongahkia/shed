@@ -13,7 +13,9 @@ piecetree_file="${ITSY_REGRESSION_PIECETREE_FILE:-$repo_dir/bench/corpus/huge-te
 slice_length="${ITSY_REGRESSION_SLICE_LENGTH:-32}"
 itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
 itsyapp="${ITSY_APP_BINARY:-$repo_dir/.build/release/ItsyApp}"
+itsyapp_bundle="${ITSY_APP_BUNDLE:-$repo_dir/Itsy.app}"
 hyperfine_json="$(mktemp)"
+window_json="$(mktemp)"
 piecetree_json="$(mktemp)"
 open_json="$(mktemp)"
 lsp_json="$(mktemp)"
@@ -24,8 +26,9 @@ lsp_probe_script="$script_dir/lsp_diagnostics_probe.rb"
 lsp_diagnostics_limit_ms="${ITSY_REGRESSION_LSP_DIAGNOSTICS_LIMIT_MS:-5000}"
 open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
+window_timeout_ms="${ITSY_REGRESSION_WINDOW_TIMEOUT_MS:-15000}"
 
-trap 'rm -f "$hyperfine_json" "$piecetree_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
+trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
 
 setup_lsp_spawn_guard() {
 	local bin_dir="$lsp_guard_dir/bin"
@@ -93,6 +96,9 @@ if [[ ! -x "$itsybench" || ! -x "$itsyapp" ]]; then
 elif [[ -n "$(find "$repo_dir/Sources" "$repo_dir/Package.swift" -newer "$itsyapp" -print -quit)" ]]; then
 	(cd "$repo_dir" && swift build -c release)
 fi
+if [[ ! -x "$itsyapp_bundle/Contents/MacOS/Itsy" || "$itsyapp" -nt "$itsyapp_bundle/Contents/MacOS/Itsy" ]]; then
+	APP_DIR="$itsyapp_bundle" "$script_dir/make_app.sh" >/dev/null
+fi
 
 setup_lsp_spawn_guard
 assert_lsp_lazy_file_open
@@ -106,6 +112,7 @@ fi
 rm -f "$lsp_guard_marker"
 HOME="$lsp_guard_home" hyperfine "${hyperfine_args[@]}" "$app_command" >/dev/null
 assert_no_lsp_spawn "cold-start launch"
+"$itsybench" measure --staged --app "$itsyapp_bundle" --new-instance --timeout-ms "$window_timeout_ms" >"$window_json"
 ITSY_LSP_DIAGNOSTICS_LIMIT_MS="$lsp_diagnostics_limit_ms" ruby "$lsp_probe_script" >"$lsp_json"
 for _ in $(seq 1 "$piecetree_runs"); do
 	piecetree_args=(piecetree --ops "$piecetree_ops" --slice-length "$slice_length")
@@ -138,9 +145,10 @@ ruby -rjson -rtime -e '
 		value.to_s.gsub("%", "%25").gsub("\r", "%0D").gsub("\n", "%0A")
 	end
 
-	baseline_path, hyperfine_path, piecetree_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
+	baseline_path, hyperfine_path, window_path, piecetree_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
+	window = File.size?(window_path) ? JSON.parse(File.read(window_path)) : {}
 	piecetree_runs = File.readlines(piecetree_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 	open = File.size?(open_path) ? JSON.parse(File.read(open_path)) : {}
 	lsp = File.size?(lsp_path) ? JSON.parse(File.read(lsp_path)) : {}
@@ -149,6 +157,7 @@ ruby -rjson -rtime -e '
 		"cold_start_ready_ms" => bench.fetch("median").to_f * 1000.0,
 		"cold_start_ready_min_ms" => bench.fetch("min").to_f * 1000.0,
 		"cold_start_ready_max_ms" => bench.fetch("max").to_f * 1000.0,
+		"first_window_visible_ms" => window.fetch("first_window_visible_ms").to_f,
 		"piecetree_random_insert_ns_per_op" => piecetree_runs.map { |run| run.fetch("random_insert_ns_per_op").to_f }.min,
 		"piecetree_random_remove_ns_per_op" => piecetree_runs.map { |run| run.fetch("random_remove_ns_per_op").to_f }.min,
 		"piecetree_sequential_insert_ns_per_op" => piecetree_runs.map { |run| run.fetch("sequential_insert_ns_per_op").to_f }.min,
@@ -221,6 +230,6 @@ ruby -rjson -rtime -e '
 		end
 	end
 	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$piecetree_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
+' "$baseline" "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

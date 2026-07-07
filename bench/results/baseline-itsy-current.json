@@ -9,6 +9,14 @@
       "baseline": 8.0
     },
     {
+      "name": "first_window_visible_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "baseline": 150.0,
+      "limit": 150.0,
+      "threshold": 0.0
+    },
+    {
       "name": "piecetree_random_insert_ns_per_op",
       "unit": "ns/op",
       "direction": "lower",

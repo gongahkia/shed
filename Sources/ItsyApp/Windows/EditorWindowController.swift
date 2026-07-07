@@ -64,6 +64,7 @@ final class EditorWindowController: NSWindowController {
 	private var lspStatusPanel: LSPStatusPanel?
 
 	init(document: ItsyDocument) {
+		recordBenchStage("window_controller_init_begin")
 		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 		editorStack.orientation = .vertical
 		editorStack.alignment = .width
@@ -118,11 +119,14 @@ final class EditorWindowController: NSWindowController {
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
+		recordBenchStage("window_controller_install_pane_end")
 		refreshLSPMissingBanner(for: document)
 		refreshLSPStatus(for: document)
+		recordBenchStage("window_controller_lsp_refresh_end")
 		ItsyWorkspaceController.register(self)
 		ItsyTabCoordinator.register(self)
 		window.makeFirstResponder(editorView)
+		recordBenchStage("window_controller_init_end")
 	}
 
 	required init?(coder: NSCoder) {
@@ -540,11 +544,13 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	override func showWindow(_ sender: Any?) {
+		recordBenchStage("window_show_begin")
 		super.showWindow(sender)
 		window?.makeKeyAndOrderFront(sender)
 		window?.orderFrontRegardless()
 		focusEditor()
 		ItsyTabCoordinator.refresh()
+		recordBenchStage("window_show_end")
 	}
 
 	func display(document newDocument: ItsyDocument) {
@@ -605,15 +611,24 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	private func installPane(_ pane: EditorPane, document: ItsyDocument) {
+		recordBenchStage("editor_pane_install_begin")
 		let view = pane.editorView
 		document.attach(view)
+		recordBenchStage("editor_pane_attach_end")
+		recordBenchStage("editor_pane_preferences_begin")
 		let preferences = EditorPreferences.load()
+		recordBenchStage("editor_pane_preferences_end")
+		recordBenchStage("editor_pane_appearance_begin")
 		view.configureEditorAppearance(
 			fontName: preferences.fontName,
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		recordBenchStage("editor_pane_appearance_end")
+		recordBenchStage("editor_pane_keymap_begin")
 		view.keymapEngine = ItsyAppKeymap.makeEngine()
+		recordBenchStage("editor_pane_keymap_end")
+		recordBenchStage("editor_pane_callbacks_begin")
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
 		}
@@ -637,6 +652,8 @@ final class EditorWindowController: NSWindowController {
 		view.exCommandLineRequested = { [weak self] completion in
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
+		recordBenchStage("editor_pane_callbacks_end")
+		recordBenchStage("editor_pane_install_end")
 	}
 
 	func applyEditorPreferences(_ preferences: EditorPreferences) {

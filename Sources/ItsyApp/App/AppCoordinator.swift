@@ -49,6 +49,7 @@ final class AppCoordinator: NSObject {
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
 		recordBenchStage("delegate_init")
+		recordBenchStage("delegate_keymap_begin")
 		do {
 			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
 			let bindings = try KeymapConfiguration.load(profile: profile)
@@ -57,10 +58,17 @@ final class AppCoordinator: NSObject {
 			NSLog("failed to load keymap profile: \(error)")
 			ItsyAppKeymap.configure(profile: .plain, bindings: [])
 		}
+		recordBenchStage("delegate_keymap_end")
 		super.init()
+		recordBenchStage("delegate_settings_begin")
 		_ = settingsCoordinator.currentSettings
+		recordBenchStage("delegate_settings_end")
+		recordBenchStage("delegate_palette_bridge_begin")
 		commandPaletteCoordinator.installBridge()
+		recordBenchStage("delegate_palette_bridge_end")
+		recordBenchStage("delegate_command_bridge_begin")
 		installCommandBridge()
+		recordBenchStage("delegate_command_bridge_end")
 	}
 
 
@@ -69,6 +77,7 @@ final class AppCoordinator: NSObject {
 		installServicesProvider()
 		menuCoordinator.installMainMenu()
 		recordBenchStage("main_menu_installed")
+		recordBenchStage("initial_document_open_begin")
 		openInitialDocument()
 		recordBenchStage("initial_document_opened")
 		if CommandLine.arguments.contains("--bench-exit-after-initial-document") {
@@ -538,7 +547,16 @@ final class AppCoordinator: NSObject {
 			return
 		}
 		do {
-			_ = try documentController.openUntitledDocumentAndDisplay(true)
+			recordBenchStage("initial_untitled_make_begin")
+			let document = try documentController.makeUntitledDocument(ofType: documentController.defaultType ?? "public.data")
+			recordBenchStage("initial_untitled_make_end")
+			documentController.addDocument(document)
+			recordBenchStage("initial_make_window_controllers_begin")
+			document.makeWindowControllers()
+			recordBenchStage("initial_make_window_controllers_end")
+			recordBenchStage("initial_show_windows_begin")
+			document.showWindows()
+			recordBenchStage("initial_show_windows_end")
 		} catch {
 			NSLog("failed to open untitled document: \(error)")
 		}

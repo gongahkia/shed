@@ -14,6 +14,10 @@ rm -rf "$app_dir"
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Frameworks"
 cp "$binary" "$app_dir/Contents/MacOS/Itsy"
 chmod +x "$app_dir/Contents/MacOS/Itsy"
+for bundle in "$repo_dir"/.build/release/Itsy_Itsy*.bundle; do
+	[[ -d "$bundle" ]] || continue
+	cp -R "$bundle" "$app_dir/"
+done
 GRAMMAR_DYLIB_DIR="$app_dir/Contents/Frameworks/ItsyGrammars" "$repo_dir/bench/scripts/build_grammar_dylibs.sh" >/dev/null
 cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

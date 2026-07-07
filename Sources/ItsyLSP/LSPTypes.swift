@@ -16,9 +16,13 @@ public enum LSPMethod {
 	public static let textDocumentDefinition = "textDocument/definition"
 	public static let textDocumentDocumentSymbol = "textDocument/documentSymbol"
 	public static let textDocumentReferences = "textDocument/references"
+	public static let textDocumentPrepareRename = "textDocument/prepareRename"
 	public static let textDocumentRename = "textDocument/rename"
 	public static let textDocumentCodeAction = "textDocument/codeAction"
+	public static let codeActionResolve = "codeAction/resolve"
 	public static let textDocumentFormatting = "textDocument/formatting"
+	public static let textDocumentRangeFormatting = "textDocument/rangeFormatting"
+	public static let workspaceExecuteCommand = "workspace/executeCommand"
 }
 
 public struct LSPPosition: Codable, Equatable, Sendable {
@@ -586,13 +590,60 @@ public struct LSPSignatureHelpOptions: Codable, Equatable, Sendable {
 	}
 }
 
+public struct LSPCodeActionOptions: Codable, Equatable, Sendable {
+	public var resolveProvider: Bool?
+
+	public init(resolveProvider: Bool? = nil) {
+		self.resolveProvider = resolveProvider
+	}
+}
+
+public enum LSPCodeActionProviderCapability: Codable, Equatable, Sendable {
+	case bool(Bool)
+	case options(LSPCodeActionOptions)
+
+	public var resolveProvider: Bool {
+		switch self {
+		case .bool:
+			return false
+		case let .options(options):
+			return options.resolveProvider ?? false
+		}
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(Bool.self) {
+			self = .bool(value)
+			return
+		}
+		self = .options(try container.decode(LSPCodeActionOptions.self))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .bool(value):
+			try container.encode(value)
+		case let .options(options):
+			try container.encode(options)
+		}
+	}
+}
+
 public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 	public var completionProvider: LSPCompletionOptions?
 	public var signatureHelpProvider: LSPSignatureHelpOptions?
+	public var codeActionProvider: LSPCodeActionProviderCapability?
 
-	public init(completionProvider: LSPCompletionOptions? = nil, signatureHelpProvider: LSPSignatureHelpOptions? = nil) {
+	public init(
+		completionProvider: LSPCompletionOptions? = nil,
+		signatureHelpProvider: LSPSignatureHelpOptions? = nil,
+		codeActionProvider: LSPCodeActionProviderCapability? = nil
+	) {
 		self.completionProvider = completionProvider
 		self.signatureHelpProvider = signatureHelpProvider
+		self.codeActionProvider = codeActionProvider
 	}
 }
 
@@ -865,23 +916,37 @@ public struct LSPCodeAction: Codable, Equatable, Sendable {
 	public var kind: LSPCodeActionKind?
 	public var diagnostics: [LSPDiagnostic]?
 	public var isPreferred: Bool?
+	public var disabled: LSPCodeActionDisabled?
 	public var edit: LSPWorkspaceEdit?
 	public var command: LSPCommand?
+	public var data: LSPAny?
 
 	public init(
 		title: String,
 		kind: LSPCodeActionKind? = nil,
 		diagnostics: [LSPDiagnostic]? = nil,
 		isPreferred: Bool? = nil,
+		disabled: LSPCodeActionDisabled? = nil,
 		edit: LSPWorkspaceEdit? = nil,
-		command: LSPCommand? = nil
+		command: LSPCommand? = nil,
+		data: LSPAny? = nil
 	) {
 		self.title = title
 		self.kind = kind
 		self.diagnostics = diagnostics
 		self.isPreferred = isPreferred
+		self.disabled = disabled
 		self.edit = edit
 		self.command = command
+		self.data = data
+	}
+}
+
+public struct LSPCodeActionDisabled: Codable, Equatable, Sendable {
+	public var reason: String
+
+	public init(reason: String) {
+		self.reason = reason
 	}
 }
 
@@ -907,28 +972,94 @@ public struct LSPCodeActionParams: Codable, Equatable, Sendable {
 	}
 }
 
+public enum LSPCodeActionEntry: Codable, Equatable, Sendable {
+	case action(LSPCodeAction)
+	case command(LSPCommand)
+
+	public var title: String {
+		switch self {
+		case let .action(action):
+			return action.title
+		case let .command(command):
+			return command.title
+		}
+	}
+
+	public init(from decoder: Decoder) throws {
+		if let action = try? LSPCodeAction(from: decoder) {
+			self = .action(action)
+			return
+		}
+		self = .command(try LSPCommand(from: decoder))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		switch self {
+		case let .action(action):
+			try action.encode(to: encoder)
+		case let .command(command):
+			try command.encode(to: encoder)
+		}
+	}
+}
+
 public enum LSPCodeActionResponse: Equatable, Sendable {
 	case actions([LSPCodeAction])
 	case commands([LSPCommand])
+	case mixed([LSPCodeActionEntry])
 	case none
 
 	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
-		if let actions = try? decoder.decode([LSPCodeAction].self, from: data), !actions.isEmpty {
-			self = .actions(actions)
-			return
-		}
-		if let commands = try? decoder.decode([LSPCommand].self, from: data), !commands.isEmpty {
-			self = .commands(commands)
+		if let entries = try? decoder.decode([LSPCodeActionEntry].self, from: data), !entries.isEmpty {
+			let actions = entries.compactMap { entry -> LSPCodeAction? in
+				if case let .action(action) = entry {
+					return action
+				}
+				return nil
+			}
+			let commands = entries.compactMap { entry -> LSPCommand? in
+				if case let .command(command) = entry {
+					return command
+				}
+				return nil
+			}
+			if actions.count == entries.count {
+				self = .actions(actions)
+			} else if commands.count == entries.count {
+				self = .commands(commands)
+			} else {
+				self = .mixed(entries)
+			}
 			return
 		}
 		self = .none
 	}
 
-	public func filteredQuickFixes() -> [LSPCodeAction] {
-		guard case let .actions(list) = self else {
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var entries: [LSPCodeActionEntry] {
+		switch self {
+		case let .actions(actions):
+			return actions.map(LSPCodeActionEntry.action)
+		case let .commands(commands):
+			return commands.map(LSPCodeActionEntry.command)
+		case let .mixed(entries):
+			return entries
+		case .none:
 			return []
 		}
-		return list.filter { $0.kind == .quickFix || $0.kind == nil }
+	}
+
+	public func filteredQuickFixes() -> [LSPCodeAction] {
+		entries.compactMap { entry -> LSPCodeAction? in
+			guard case let .action(action) = entry, action.kind == .quickFix || action.kind == nil else {
+				return nil
+			}
+			return action
+		}
 	}
 }
 
@@ -954,6 +1085,63 @@ public struct LSPRenameParams: Codable, Equatable, Sendable {
 	}
 }
 
+public enum LSPPrepareRenameResult: Equatable, Sendable {
+	case range(LSPRange)
+	case placeholder(range: LSPRange, placeholder: String)
+	case defaultBehavior(Bool)
+	case none
+
+	public init(decoding data: Data, decoder: JSONDecoder = JSONDecoder()) throws {
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		if let range = try? decoder.decode(LSPRange.self, from: data) {
+			self = .range(range)
+			return
+		}
+		if let value = try? decoder.decode(LSPPrepareRenamePlaceholder.self, from: data) {
+			self = .placeholder(range: value.range, placeholder: value.placeholder)
+			return
+		}
+		if let value = try? decoder.decode(LSPPrepareRenameDefaultBehavior.self, from: data) {
+			self = .defaultBehavior(value.defaultBehavior)
+			return
+		}
+		self = .none
+	}
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		try self.init(decoding: data, decoder: decoder)
+	}
+
+	public var range: LSPRange? {
+		switch self {
+		case let .range(range), let .placeholder(range, _):
+			return range
+		case .defaultBehavior, .none:
+			return nil
+		}
+	}
+
+	public var placeholder: String? {
+		guard case let .placeholder(_, placeholder) = self else {
+			return nil
+		}
+		return placeholder
+	}
+}
+
+private struct LSPPrepareRenamePlaceholder: Codable, Equatable, Sendable {
+	var range: LSPRange
+	var placeholder: String
+}
+
+private struct LSPPrepareRenameDefaultBehavior: Codable, Equatable, Sendable {
+	var defaultBehavior: Bool
+}
+
 public struct LSPTextDocumentEdit: Codable, Equatable, Sendable {
 	public var textDocument: LSPVersionedTextDocumentIdentifier
 	public var edits: [LSPTextEdit]
@@ -971,6 +1159,27 @@ public struct LSPWorkspaceEdit: Codable, Equatable, Sendable {
 	public init(changes: [String: [LSPTextEdit]]? = nil, documentChanges: [LSPTextDocumentEdit]? = nil) {
 		self.changes = changes
 		self.documentChanges = documentChanges
+	}
+}
+
+public enum LSPWorkspaceEditResult: Equatable, Sendable {
+	case edit(LSPWorkspaceEdit)
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		self = .edit(try decoder.decode(LSPWorkspaceEdit.self, from: data))
+	}
+
+	public var edit: LSPWorkspaceEdit? {
+		guard case let .edit(edit) = self else {
+			return nil
+		}
+		return edit
 	}
 }
 
@@ -1098,6 +1307,60 @@ public struct LSPDocumentRangeFormattingParams: Codable, Equatable, Sendable {
 		self.textDocument = textDocument
 		self.range = range
 		self.options = options
+	}
+}
+
+public enum LSPTextEditResult: Equatable, Sendable {
+	case edits([LSPTextEdit])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let edits = (try? decoder.decode([LSPTextEdit].self, from: data)) ?? []
+		self = edits.isEmpty ? .none : .edits(edits)
+	}
+
+	public var edits: [LSPTextEdit] {
+		guard case let .edits(edits) = self else {
+			return []
+		}
+		return edits
+	}
+}
+
+public struct LSPExecuteCommandParams: Codable, Equatable, Sendable {
+	public var command: String
+	public var arguments: [LSPAny]?
+
+	public init(command: String, arguments: [LSPAny]? = nil) {
+		self.command = command
+		self.arguments = arguments
+	}
+}
+
+public struct LSPApplyWorkspaceEditParams: Codable, Equatable, Sendable {
+	public var label: String?
+	public var edit: LSPWorkspaceEdit
+
+	public init(label: String? = nil, edit: LSPWorkspaceEdit) {
+		self.label = label
+		self.edit = edit
+	}
+}
+
+public struct LSPApplyWorkspaceEditResponse: Codable, Equatable, Sendable {
+	public var applied: Bool
+	public var failureReason: String?
+	public var failedChange: Int?
+
+	public init(applied: Bool, failureReason: String? = nil, failedChange: Int? = nil) {
+		self.applied = applied
+		self.failureReason = failureReason
+		self.failedChange = failedChange
 	}
 }
 

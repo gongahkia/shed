@@ -175,6 +175,8 @@ import Testing
 	#expect(engine.handle(try keyEvent("b", modifiers: [.command])) == .command("view.sidebar.toggle"))
 	#expect(engine.handle(try keyEvent("j", modifiers: [.command])) == .command("terminal.toggle"))
 	#expect(engine.handle(try keyEvent(".", modifiers: [.command, .shift])) == .command("view.hiddenFiles.toggle"))
+	#expect(engine.handle(try keyEvent("f", modifiers: [.option, .shift])) == .command("lsp.formatDocument"))
+	#expect(engine.handle(try keyEvent(".", modifiers: [.command])) == .command("lsp.codeAction"))
 	#expect(engine.handle(try keyEvent("\t", modifiers: [.control], keyCode: 48)) == .command("file.nextBuffer"))
 	#expect(engine.handle(try keyEvent("\t", modifiers: [.control, .shift], keyCode: 48)) == .command("file.previousBuffer"))
 	for index in 1 ... 9 {
@@ -298,6 +300,16 @@ import Testing
 	#expect(engine.handle(try keyEvent("=")) == .command("vim.format.line"))
 	#expect(engine.handle(try keyEvent("g")) == .partial)
 	#expect(engine.handle(try keyEvent("q")) == .command("vim.format.reflowOperator"))
+	#expect(engine.handle(try keyEvent(" ", keyCode: 49)) == .partial)
+	#expect(engine.handle(try keyEvent("c")) == .partial)
+	#expect(engine.handle(try keyEvent("a")) == .command("lsp.codeAction"))
+}
+
+@Test func bundledVimVisualProfileDefinesLSPSelectionFormat() throws {
+	let bindings = try KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+	var engine = KeymapEngine(modeStack: [.visual], bindings: bindings)
+
+	#expect(engine.handle(try keyEvent("=")) == .command("lsp.formatSelection"))
 }
 
 @Test func userKeymapConfigOverlaysSelectedProfile() throws {

@@ -133,6 +133,35 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.documentSymbol(textDocument: textDocument)
 	}
 
+	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
+		try await session.prepareRename(uri: uri, position: position)
+	}
+
+	public func rename(uri: String, position: LSPPosition, newName: String) async throws -> LSPWorkspaceEdit? {
+		try await session.rename(uri: uri, position: position, newName: newName)
+	}
+
+	public func formatDocument(uri: String, options: LSPFormattingOptions) async throws -> [LSPTextEdit] {
+		try await session.formatDocument(uri: uri, options: options)
+	}
+
+	public func formatRange(uri: String, range: LSPRange, options: LSPFormattingOptions) async throws -> [LSPTextEdit] {
+		try await session.formatRange(uri: uri, range: range, options: options)
+	}
+
+	public func codeActions(uri: String, range: LSPRange, context: LSPCodeActionContext) async throws -> LSPCodeActionResponse {
+		try await session.codeActions(uri: uri, range: range, context: context)
+	}
+
+	public func resolveCodeAction(_ action: LSPCodeAction) async throws -> LSPCodeAction {
+		try await session.resolveCodeAction(action)
+	}
+
+	@discardableResult
+	public func executeCommand(_ command: LSPCommand) async throws -> LSPAny {
+		try await session.executeCommand(command)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) async throws {
 		try await session.sendNotification(method: method, params: params)
 	}

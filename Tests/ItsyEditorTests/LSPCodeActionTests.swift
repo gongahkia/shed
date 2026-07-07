@@ -40,6 +40,31 @@ import Testing
 	#expect(garbage == .none)
 }
 
+@Test func codeActionResponseDecodesMixedActionAndCommandArray() throws {
+	let json = """
+	[
+		{ "title": "Fix", "kind": "quickfix", "data": { "id": 1 } },
+		{ "title": "Run", "command": "swift.run", "arguments": [] }
+	]
+	""".data(using: .utf8)!
+	let response = try LSPCodeActionResponse(decoding: json)
+	guard case let .mixed(entries) = response else {
+		Issue.record("expected mixed, got \(response)")
+		return
+	}
+	#expect(entries.map(\.title) == ["Fix", "Run"])
+	guard case let .action(action) = entries[0] else {
+		Issue.record("expected first entry action")
+		return
+	}
+	#expect(action.data == .object(["id": .int(1)]))
+	guard case let .command(command) = entries[1] else {
+		Issue.record("expected second entry command")
+		return
+	}
+	#expect(command.command == "swift.run")
+}
+
 @Test func codeActionResponseQuickFixFilterKeepsUntyped() throws {
 	let json = """
 	[
@@ -57,6 +82,7 @@ import Testing
 	let action = LSPCodeAction(
 		title: "Add missing import",
 		kind: .quickFix,
+		disabled: LSPCodeActionDisabled(reason: "not available"),
 		edit: LSPWorkspaceEdit(changes: [
 			"file:///a.swift": [
 				LSPTextEdit(
@@ -64,7 +90,8 @@ import Testing
 					newText: "import Foundation\n"
 				),
 			],
-		])
+		]),
+		data: .object(["id": .int(3)])
 	)
 	let data = try JSONEncoder().encode(action)
 	let decoded = try JSONDecoder().decode(LSPCodeAction.self, from: data)

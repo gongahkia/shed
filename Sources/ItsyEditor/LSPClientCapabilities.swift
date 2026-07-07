@@ -75,12 +75,59 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			}
 		}
 
+		public struct CodeAction: Codable, Equatable, Sendable {
+			public struct ResolveSupport: Codable, Equatable, Sendable {
+				public var properties: [String]
+
+				public init(properties: [String] = ["edit"]) {
+					self.properties = properties
+				}
+			}
+
+			public struct CodeActionLiteralSupport: Codable, Equatable, Sendable {
+				public struct CodeActionKind: Codable, Equatable, Sendable {
+					public var valueSet: [String]
+
+					public init(valueSet: [String] = ["", "quickfix", "refactor", "refactor.extract", "refactor.inline", "refactor.rewrite", "source", "source.organizeImports", "source.fixAll"]) {
+						self.valueSet = valueSet
+					}
+				}
+
+				public var codeActionKind: CodeActionKind
+
+				public init(codeActionKind: CodeActionKind = CodeActionKind()) {
+					self.codeActionKind = codeActionKind
+				}
+			}
+
+			public var dataSupport: Bool
+			public var isPreferredSupport: Bool
+			public var disabledSupport: Bool
+			public var resolveSupport: ResolveSupport
+			public var codeActionLiteralSupport: CodeActionLiteralSupport
+
+			public init(
+				dataSupport: Bool = true,
+				isPreferredSupport: Bool = true,
+				disabledSupport: Bool = true,
+				resolveSupport: ResolveSupport = ResolveSupport(),
+				codeActionLiteralSupport: CodeActionLiteralSupport = CodeActionLiteralSupport()
+			) {
+				self.dataSupport = dataSupport
+				self.isPreferredSupport = isPreferredSupport
+				self.disabledSupport = disabledSupport
+				self.resolveSupport = resolveSupport
+				self.codeActionLiteralSupport = codeActionLiteralSupport
+			}
+		}
+
 		public var documentSymbol: DocumentSymbol
 		public var completion: Completion
 		public var publishDiagnostics: PublishDiagnostics
 		public var hover: Hover
 		public var definition: Definition
 		public var rename: Rename
+		public var codeAction: CodeAction
 
 		public init(
 			documentSymbol: DocumentSymbol = DocumentSymbol(),
@@ -88,7 +135,8 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			publishDiagnostics: PublishDiagnostics = PublishDiagnostics(),
 			hover: Hover = Hover(),
 			definition: Definition = Definition(),
-			rename: Rename = Rename()
+			rename: Rename = Rename(),
+			codeAction: CodeAction = CodeAction()
 		) {
 			self.documentSymbol = documentSymbol
 			self.completion = completion
@@ -96,6 +144,7 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			self.hover = hover
 			self.definition = definition
 			self.rename = rename
+			self.codeAction = codeAction
 		}
 	}
 

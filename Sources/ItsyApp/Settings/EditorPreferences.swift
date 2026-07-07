@@ -24,8 +24,7 @@ struct EditorPreferences: Equatable {
 	}
 
 	init(settings: ItsySettings.EditorSettings) {
-		let fontNames = Self.availableFontNames()
-		let fontName = fontNames.contains(settings.font) ? settings.font : Self.resolvedDefaultFontName()
+		let fontName = Self.isUsableEditorFontName(settings.font) ? settings.font : Self.resolvedDefaultFontName()
 		self.init(
 			fontName: fontName,
 			fontSize: Self.clampedFontSize(CGFloat(settings.fontSize)),

@@ -30,17 +30,21 @@ final class ItsyDocumentController: NSDocumentController {
 
 	@discardableResult
 	func openDocument(at url: URL, line: Int?, column: Int?) -> Bool {
+		recordBenchStage("document_open_begin")
 		let typeName = defaultType ?? "public.data"
 		let document: ItsyDocument
 		if let existing = self.document(for: url) as? ItsyDocument {
 			document = existing
+			recordBenchStage("document_existing_found")
 			showDocument(document)
 			noteRecentDocumentIfNeeded(document)
 		} else {
 			do {
+				recordBenchStage("document_make_begin")
 				guard let made = try makeDocument(withContentsOf: url, ofType: typeName) as? ItsyDocument else {
 					return false
 				}
+				recordBenchStage("document_make_end")
 				document = made
 				addDocument(document)
 				showDocument(document)
@@ -52,16 +56,19 @@ final class ItsyDocumentController: NSDocumentController {
 		if let line {
 			document.jumpTo(line: line, column: column ?? 1)
 		}
+		recordBenchStage("document_open_end")
 		return true
 	}
 
 	func showDocument(_ document: ItsyDocument) {
+		recordBenchStage("document_show_begin")
 		if let controller = activeEditorWindowController() {
 			controller.display(document: document)
 		} else {
 			document.makeWindowControllers()
 			document.showWindows()
 		}
+		recordBenchStage("document_show_end")
 	}
 
 	override func addDocument(_ document: NSDocument) {

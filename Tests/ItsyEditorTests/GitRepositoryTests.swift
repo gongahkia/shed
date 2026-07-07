@@ -124,6 +124,85 @@ import Testing
 	#expect(runner.recordedArguments == [["log", "-10", "--format=%B%x00"]])
 }
 
+@Test func gitBlameParserReadsLinePorcelainRecords() {
+	let output = """
+	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1
+	author Ada
+	author-mail <ada@example.invalid>
+	author-time 1700000000
+	summary initial
+	filename file.txt
+	\tone
+	bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 2 2 1
+	author Bob
+	author-mail <bob@example.invalid>
+	author-time 1700000100
+	summary change two
+	filename file.txt
+	\ttwo
+	"""
+
+	let lines = GitBlameParser.parse(output)
+
+	#expect(lines == [
+		GitBlameLine(line: 1, originalLine: 1, oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", summary: "initial", author: "Ada", authorEmail: "ada@example.invalid", time: Date(timeIntervalSince1970: 1_700_000_000), originalPath: "file.txt"),
+		GitBlameLine(line: 2, originalLine: 2, oid: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", summary: "change two", author: "Bob", authorEmail: "bob@example.invalid", time: Date(timeIntervalSince1970: 1_700_000_100), originalPath: "file.txt"),
+	])
+}
+
+@Test func gitHistoryParserReadsNulSeparatedRecords() {
+	let output = "abc\u{1f}Ada\u{1f}ada@example.invalid\u{1f}1700000000\u{1f}initial\u{0}\ndef\u{1f}Bob\u{1f}bob@example.invalid\u{1f}1700000100\u{1f}change\u{0}"
+
+	let entries = GitHistoryParser.parse(output)
+
+	#expect(entries == [
+		GitHistoryEntry(oid: "abc", author: "Ada", authorEmail: "ada@example.invalid", date: Date(timeIntervalSince1970: 1_700_000_000), summary: "initial"),
+		GitHistoryEntry(oid: "def", author: "Bob", authorEmail: "bob@example.invalid", date: Date(timeIntervalSince1970: 1_700_000_100), summary: "change"),
+	])
+}
+
+@Test func gitRepositoryRunsBlameAndHistoryCommandsWithInjectedRunner() throws {
+	let runner = RecordingGitRunner(output: "")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	_ = try repository.blame(path: "file.txt")
+	_ = try repository.fileHistory(path: "file.txt", limit: 2)
+	_ = try repository.lineHistory(path: "file.txt", line: 3, limit: 4)
+
+	#expect(runner.recordedArguments == [
+		["blame", "--line-porcelain", "--", "file.txt"],
+		["log", "-2", "--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00", "--", "file.txt"],
+		["log", "-4", "--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00", "--no-patch", "-L", "3,3:file.txt"],
+	])
+}
+
+@Test func gitBlameCacheReusesRepositoryResultsUntilInvalidated() throws {
+	let output = """
+	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1
+	author Ada
+	author-mail <ada@example.invalid>
+	author-time 1700000000
+	summary initial
+	filename file.txt
+	\tone
+	"""
+	let runner = RecordingGitRunner(output: output)
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+	var cache = GitBlameCache()
+
+	let first = try cache.blame(path: "file.txt", repository: repository)
+	let second = try cache.blame(path: "file.txt", repository: repository)
+	cache.invalidate()
+	let third = try cache.blame(path: "file.txt", repository: repository)
+
+	#expect(first == second)
+	#expect(third == first)
+	#expect(runner.recordedArguments == [
+		["blame", "--line-porcelain", "--", "file.txt"],
+		["blame", "--line-porcelain", "--", "file.txt"],
+	])
+}
+
 @Test func gitRepositoryDiffUsesNoColorAndCachedMode() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)

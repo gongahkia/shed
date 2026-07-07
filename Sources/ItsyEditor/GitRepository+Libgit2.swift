@@ -111,6 +111,54 @@ extension GitRepository {
 				}
 				return Blob(raw: raw)
 			}
+
+			public func blame(path: String) throws -> [GitBlameLine] {
+				var options = git_blame_options()
+				try Libgit2.check(git_blame_options_init(&options, 1))
+				var rawBlame: OpaquePointer?
+				try path.withCString { value in
+					try Libgit2.check(git_blame_file(&rawBlame, self.raw, value, &options))
+				}
+				guard let rawBlame else {
+					throw Failure(code: -1, message: "git_blame_file returned nil")
+				}
+				defer {
+					git_blame_free(rawBlame)
+				}
+				let lineCount = Int(git_blame_linecount(rawBlame))
+				guard lineCount > 0 else {
+					return []
+				}
+				var lines: [GitBlameLine] = []
+				lines.reserveCapacity(lineCount)
+				for line in 1 ... lineCount {
+					guard let pointer = git_blame_hunk_byline(rawBlame, line) else {
+						continue
+					}
+					let hunk = pointer.pointee
+					let finalStart = Int(hunk.final_start_line_number)
+					let originalStart = Int(hunk.orig_start_line_number)
+					lines.append(GitBlameLine(
+						line: line,
+						originalLine: originalStart + max(0, line - finalStart),
+						oid: oidString(hunk.final_commit_id),
+						summary: hunk.summary.map(String.init(cString:)) ?? "",
+						author: hunk.final_signature.map { String(cString: $0.pointee.name) } ?? "",
+						authorEmail: hunk.final_signature.map { String(cString: $0.pointee.email) } ?? "",
+						time: hunk.final_signature.map { Date(timeIntervalSince1970: TimeInterval($0.pointee.when.time)) },
+						originalPath: hunk.orig_path.map(String.init(cString:))
+					))
+				}
+				return lines
+			}
+
+			public func commit(message: String) throws -> String {
+				var oid = git_oid()
+				try message.withCString { value in
+					try Libgit2.check(git_commit_create_from_stage(&oid, raw, value, nil))
+				}
+				return oidString(oid)
+			}
 		}
 
 		public final class StatusList {
@@ -439,6 +487,11 @@ private func oidString(_ oid: UnsafePointer<git_oid>) -> String {
 		return ""
 	}
 	return String(cString: value)
+}
+
+private func oidString(_ oid: git_oid) -> String {
+	var oid = oid
+	return withUnsafePointer(to: &oid) { oidString($0) }
 }
 
 private func shorthand(_ ref: OpaquePointer) -> String? {

@@ -435,6 +435,7 @@ public struct HighlightSpan: Sendable, Equatable {
 }
 
 final class HighlightQuery {
+	private static let compileLock = NSLock()
 	private let query: OpaquePointer
 
 	init(language: Language) throws {
@@ -444,6 +445,10 @@ final class HighlightQuery {
 		let source = try Self.loadSource(language: language)
 		var errorOffset: UInt32 = 0
 		var errorType = TSQueryErrorNone
+		Self.compileLock.lock()
+		defer {
+			Self.compileLock.unlock()
+		}
 		let query = source.withCString { pointer in
 			ts_query_new(rawLanguage, pointer, UInt32(source.utf8.count), &errorOffset, &errorType)
 		}

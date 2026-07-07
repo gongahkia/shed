@@ -122,7 +122,9 @@ ruby -rjson -rtime -e '
 	def swift_loc(repo)
 		patterns = ["Sources/**/*.swift"]
 		patterns.sum do |pattern|
-			Dir[File.join(repo, pattern)].sum do |path|
+			Dir[File.join(repo, pattern)].reject { |path|
+				path.include?("#{File::SEPARATOR}Sources#{File::SEPARATOR}CTSGrammars#{File::SEPARATOR}grammars#{File::SEPARATOR}")
+			}.sum do |path|
 				File.readlines(path).count { |line| line.strip != "" }
 			end
 		end

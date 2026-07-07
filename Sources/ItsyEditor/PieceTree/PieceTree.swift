@@ -126,6 +126,11 @@ public struct PieceTree: Sendable {
 		guard !range.isEmpty else {
 			return ""
 		}
+		if let root, root.left == nil, root.right == nil {
+			return withPieceBytes(root.piece, range) { buffer in
+				String(decoding: buffer, as: UTF8.self)
+			}
+		}
 		var bytes: [UInt8] = []
 		bytes.reserveCapacity(range.count)
 		appendBytes(in: range, into: &bytes)
@@ -377,15 +382,8 @@ public struct PieceTree: Sendable {
 	}
 
 	private static func buildTree(from pieces: [Piece]) -> PieceTreeNode? {
-		var root: PieceTreeNode?
-		var offset = 0
-		for piece in pieces where piece.length > 0 {
-			root = PieceTreeNode.insertBoundary(piece, at: offset, into: root)
-			root?.color = .black
-			root?.recalculate()
-			offset += piece.length
-		}
-		return root
+		let pieces = pieces.filter { $0.length > 0 }
+		return PieceTreeNode.buildBalanced(from: pieces, in: pieces.startIndex ..< pieces.endIndex)
 	}
 
 	private func pieces() -> [Piece] {
@@ -574,6 +572,9 @@ public struct PieceTree: Sendable {
 	}
 
 	private func lineFeeds(in piece: Piece, localRange: Range<Int>) -> Int {
+		guard piece.lineFeeds > 0 else {
+			return 0
+		}
 		var count = 0
 		_ = withPieceBytes(piece, localRange) { buffer in
 			count = buffer.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
@@ -583,6 +584,9 @@ public struct PieceTree: Sendable {
 	}
 
 	private func graphemes(in piece: Piece, localRange: Range<Int>) -> Int {
+		guard piece.graphemes != piece.length else {
+			return localRange.count
+		}
 		var count = 0
 		_ = withPieceBytes(piece, localRange) { buffer in
 			count = Self.graphemes(in: buffer)
@@ -698,16 +702,28 @@ public struct PieceTree: Sendable {
 	}
 
 	private static func lineFeeds(in bytes: [UInt8]) -> Int {
-		bytes.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+		if bytes.count == 1 {
+			return bytes[0] == 10 ? 1 : 0
+		}
+		return bytes.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
 	}
 
 	private static func graphemes(in bytes: [UInt8]) -> Int {
-		bytes.withUnsafeBufferPointer {
+		if bytes.count == 1, bytes[0] < 0x80 {
+			return 1
+		}
+		if bytes.allSatisfy({ $0 < 0x80 && $0 != 13 }) {
+			return bytes.count
+		}
+		return bytes.withUnsafeBufferPointer {
 			graphemes(in: $0)
 		}
 	}
 
 	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>) -> Int {
+		if bytes.count == 1, let byte = bytes.baseAddress?.pointee, byte < 0x80 {
+			return 1
+		}
 		return UAX29GraphemeIterator.graphemeCount(in: bytes)
 	}
 
@@ -830,6 +846,21 @@ private final class PieceTreeNode: @unchecked Sendable {
 		left?.appendPieces(into: &pieces)
 		pieces.append(piece)
 		right?.appendPieces(into: &pieces)
+	}
+
+	static func buildBalanced(from pieces: [PieceTree.Piece], in range: Range<Int>) -> PieceTreeNode? {
+		guard !range.isEmpty else {
+			return nil
+		}
+		let middle = range.lowerBound + range.count / 2
+		let node = PieceTreeNode(
+			color: .black,
+			piece: pieces[middle],
+			left: buildBalanced(from: pieces, in: range.lowerBound ..< middle),
+			right: buildBalanced(from: pieces, in: middle + 1 ..< range.upperBound)
+		)
+		node.recalculate()
+		return node
 	}
 
 	static func insertBoundary(_ piece: PieceTree.Piece, at offset: Int, into node: PieceTreeNode?) -> PieceTreeNode {

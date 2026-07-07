@@ -21,7 +21,8 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 	private var callStackStatusLabel: NSTextField?
 	private var callStackOutlineView: NSOutlineView?
 	private var callStackNodes: [DebugCallStackThreadNode] = []
-	private var reverseDebugButtons: [NSButton] = []
+	private var reverseContinueButton: NSButton?
+	private var stepBackButton: NSButton?
 	private var callStackGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
@@ -142,7 +143,8 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 		let restartButton = NSButton(title: L10n.string("Restart"), target: self, action: #selector(restartDebug(_:)))
 		let stopButton = NSButton(title: L10n.string("Stop"), target: self, action: #selector(stopDebug(_:)))
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshCallStack(_:)))
-		reverseDebugButtons = [reverseButton, backButton]
+		reverseContinueButton = reverseButton
+		stepBackButton = backButton
 		updateReverseDebugControls()
 		let buttonStack = NSStackView(views: [continueButton, reverseButton, overButton, backButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
 		buttonStack.orientation = .horizontal
@@ -247,11 +249,13 @@ final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineVie
 	}
 
 	private func updateReverseDebugControls() {
-		let enabled = activeSession?.supportsStepBack == true
-		for button in reverseDebugButtons {
-			button.isEnabled = enabled
-			button.isHidden = !enabled
-		}
+		configureReverseDebugButton(reverseContinueButton, enabled: activeSession?.supportsReverseContinue == true)
+		configureReverseDebugButton(stepBackButton, enabled: activeSession?.supportsStepBack == true)
+	}
+
+	private func configureReverseDebugButton(_ button: NSButton?, enabled: Bool) {
+		button?.isEnabled = enabled
+		button?.isHidden = !enabled
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -486,7 +490,7 @@ private enum DebugControl {
 	func isAvailable(in session: DebugAppSession) -> Bool {
 		switch self {
 		case .stepBack, .reverseContinue:
-			return session.supportsStepBack
+			return self == .stepBack ? session.supportsStepBack : session.supportsReverseContinue
 		default:
 			return true
 		}

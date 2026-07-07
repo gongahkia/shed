@@ -96,6 +96,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 	public var supportsHitConditionalBreakpoints: Bool?
 	public var supportsEvaluateForHovers: Bool?
 	public var supportsStepBack: Bool?
+	public var supportsReverseContinue: Bool?
 	public var supportsSetVariable: Bool?
 	public var supportsRestartFrame: Bool?
 	public var supportsGotoTargetsRequest: Bool?
@@ -133,6 +134,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		supportsHitConditionalBreakpoints: Bool? = nil,
 		supportsEvaluateForHovers: Bool? = nil,
 		supportsStepBack: Bool? = nil,
+		supportsReverseContinue: Bool? = nil,
 		supportsSetVariable: Bool? = nil,
 		supportsRestartFrame: Bool? = nil,
 		supportsGotoTargetsRequest: Bool? = nil,
@@ -169,6 +171,7 @@ public struct DAPCapabilities: Codable, Equatable, Sendable {
 		self.supportsHitConditionalBreakpoints = supportsHitConditionalBreakpoints
 		self.supportsEvaluateForHovers = supportsEvaluateForHovers
 		self.supportsStepBack = supportsStepBack
+		self.supportsReverseContinue = supportsReverseContinue
 		self.supportsSetVariable = supportsSetVariable
 		self.supportsRestartFrame = supportsRestartFrame
 		self.supportsGotoTargetsRequest = supportsGotoTargetsRequest

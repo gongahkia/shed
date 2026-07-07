@@ -18,6 +18,8 @@
 - Added persisted breakpoint, launch config, and watch stores.
 - Added AppKit debugger UI for launch configs, breakpoint gutter, call stack, variables, watches, debug console, and controls.
 - Added `bench/scripts/dap_smoke.sh` validating LLDB-DAP launch, breakpoint hit, step-over, and variable read on `bench/corpus/debug-hello.swift`.
+- Added DAP adapter registry defaults and `dap.toml` overrides for LLDB, debugpy, delve, and vscode-js-debug.
+- Added persisted breakpoint sync before `configurationDone`.
 
 ## Closed
 
@@ -28,4 +30,4 @@
 
 - Exception filter UI and `setExceptionBreakpoints`.
 - Reverse-debug UI gated on adapter capabilities.
-- App-driven smoke that synchronizes persisted breakpoints into launch before `configurationDone`.
+- CI-hosted debugpy coverage when `debugpy` is not installed locally.

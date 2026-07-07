@@ -53,6 +53,13 @@ jobs:
         run: |
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
           test "v$version" = "$GITHUB_REF_NAME"
+      - name: Release prerequisite check
+        env:
+          ITSY_CODESIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}
+          ITSY_NOTARY_APPLE_ID: ${{ secrets.APPLE_ID }}
+          ITSY_NOTARY_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ITSY_NOTARY_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: scripts/release_doctor.sh
       - name: Sign app
         env:
           ITSY_CODESIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}

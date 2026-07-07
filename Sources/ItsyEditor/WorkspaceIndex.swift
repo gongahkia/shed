@@ -111,11 +111,14 @@ public struct WorkspaceIndex: Equatable, Sendable {
 	}
 }
 
+public typealias WorkspaceSymbolProvider = @Sendable (_ text: String, _ url: URL, _ relativePath: String) -> [WorkspaceSymbol]?
+
 public enum WorkspaceIndexer {
 	public static func build(
 		root: URL,
 		maxFileBytes: Int = 1_000_000,
 		fileManager: FileManager = .default,
+		symbolProvider: WorkspaceSymbolProvider? = nil,
 		progress: ((_ processed: Int, _ total: Int) -> Void)? = nil
 	) -> WorkspaceIndex {
 		let matcher = GitIgnoreMatcher(root: root, fileManager: fileManager)
@@ -126,7 +129,7 @@ public enum WorkspaceIndexer {
 		indexedFiles.reserveCapacity(total)
 		let reportEvery = max(1, total / 40)
 		for (offset, file) in files.enumerated() {
-			if let indexed = indexedFile(at: file, root: root, maxFileBytes: maxFileBytes, fileManager: fileManager) {
+			if let indexed = indexedFile(at: file, root: root, maxFileBytes: maxFileBytes, fileManager: fileManager, symbolProvider: symbolProvider) {
 				indexedFiles.append(indexed)
 			}
 			let processed = offset + 1
@@ -137,7 +140,13 @@ public enum WorkspaceIndexer {
 		return WorkspaceIndex(root: root, files: indexedFiles)
 	}
 
-	public static func indexedFile(at url: URL, root: URL, maxFileBytes: Int = 1_000_000, fileManager: FileManager = .default) -> WorkspaceIndexedFile? {
+	public static func indexedFile(
+		at url: URL,
+		root: URL,
+		maxFileBytes: Int = 1_000_000,
+		fileManager: FileManager = .default,
+		symbolProvider: WorkspaceSymbolProvider? = nil
+	) -> WorkspaceIndexedFile? {
 		guard
 			let data = try? Data(contentsOf: url, options: .mappedIfSafe),
 			data.count <= maxFileBytes,
@@ -147,9 +156,10 @@ public enum WorkspaceIndexer {
 			return nil
 		}
 		let relativePath = ProjectFind.relativePath(for: url, root: root)
+		let symbols = symbolProvider?(text, url, relativePath) ?? symbols(in: text, relativePath: relativePath)
 		return WorkspaceIndexedFile(
 			relativePath: relativePath,
-			symbols: symbols(in: text, relativePath: relativePath)
+			symbols: symbols
 		)
 	}
 
@@ -158,7 +168,8 @@ public enum WorkspaceIndexer {
 		changedURLs: [URL],
 		matcher: GitIgnoreMatcher,
 		maxFileBytes: Int = 1_000_000,
-		fileManager: FileManager = .default
+		fileManager: FileManager = .default,
+		symbolProvider: WorkspaceSymbolProvider? = nil
 	) {
 		for url in changedURLs {
 			guard let relative = index.relativePath(for: url) else {
@@ -176,7 +187,7 @@ public enum WorkspaceIndexer {
 				index.files.removeAll { $0.relativePath == relative }
 				continue
 			}
-			if let updated = indexedFile(at: url, root: index.root, maxFileBytes: maxFileBytes, fileManager: fileManager) {
+			if let updated = indexedFile(at: url, root: index.root, maxFileBytes: maxFileBytes, fileManager: fileManager, symbolProvider: symbolProvider) {
 				if let position = index.files.firstIndex(where: { $0.relativePath == relative }) {
 					index.files[position] = updated
 				} else {

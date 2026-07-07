@@ -13,7 +13,7 @@ public enum SyntaxError: Error, Equatable {
 	case queryCursorAllocationFailed
 }
 
-public enum Language: Sendable, Equatable, CaseIterable {
+public enum Language: Sendable, Hashable, CaseIterable {
 	case bash
 	case c
 	case cpp
@@ -515,6 +515,196 @@ final class HighlightQuery {
 			throw SyntaxError.queryLoadFailed(language)
 		}
 		return try String(contentsOf: url, encoding: .utf8)
+	}
+}
+
+final class TagQuery {
+	private static let compileLock = NSLock()
+	private let executionLock = NSLock()
+	private let query: OpaquePointer
+
+	init(language: Language) throws {
+		guard let rawLanguage = language.rawLanguage else {
+			throw SyntaxError.incompatibleLanguage(language)
+		}
+		let source = try Self.loadSource(language: language)
+		var errorOffset: UInt32 = 0
+		var errorType = TSQueryErrorNone
+		Self.compileLock.lock()
+		defer {
+			Self.compileLock.unlock()
+		}
+		let query = source.withCString { pointer in
+			ts_query_new(rawLanguage, pointer, UInt32(source.utf8.count), &errorOffset, &errorType)
+		}
+		guard let query else {
+			throw SyntaxError.queryCompileFailed(language, errorOffset, Int(errorType.rawValue))
+		}
+		self.query = query
+	}
+
+	deinit {
+		ts_query_delete(query)
+	}
+
+	func symbols(in tree: Tree, source: String, relativePath: String) throws -> [WorkspaceSymbol] {
+		executionLock.lock()
+		defer {
+			executionLock.unlock()
+		}
+		guard let cursor = ts_query_cursor_new() else {
+			throw SyntaxError.queryCursorAllocationFailed
+		}
+		defer {
+			ts_query_cursor_delete(cursor)
+		}
+		let bytes = Array(source.utf8)
+		ts_query_cursor_exec(cursor, query, tree.rootNode.node)
+		var symbols: [WorkspaceSymbol] = []
+		var seen: Set<String> = []
+		var match = TSQueryMatch()
+		while ts_query_cursor_next_match(cursor, &match) {
+			guard let symbol = symbol(from: match, bytes: bytes, relativePath: relativePath) else {
+				continue
+			}
+			let key = "\(symbol.relativePath)\u{1f}\(symbol.line)\u{1f}\(symbol.column)\u{1f}\(symbol.name)"
+			if seen.insert(key).inserted {
+				symbols.append(symbol)
+			}
+		}
+		return symbols.sorted { lhs, rhs in
+			lhs.line == rhs.line ? lhs.column < rhs.column : lhs.line < rhs.line
+		}
+	}
+
+	private func symbol(from match: TSQueryMatch, bytes: [UInt8], relativePath: String) -> WorkspaceSymbol? {
+		var nameNode: Node?
+		var definitionNode: Node?
+		var kind: WorkspaceSymbolKind?
+		var docs: [String] = []
+		for captureOffset in 0 ..< Int(match.capture_count) {
+			let capture = match.captures[captureOffset]
+			let captureName = captureName(for: capture.index)
+			let node = Node(capture.node)
+			if captureName == "name" {
+				nameNode = node
+			} else if let mappedKind = Self.kind(for: captureName) {
+				kind = mappedKind
+				definitionNode = node
+			} else if captureName == "doc" {
+				docs.append(Self.text(in: node.byteRange, bytes: bytes))
+			}
+		}
+		guard let nameNode, let kind else {
+			return nil
+		}
+		let name = Self.text(in: nameNode.byteRange, bytes: bytes).trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !name.isEmpty else {
+			return nil
+		}
+		let rangeNode = definitionNode ?? nameNode
+		return WorkspaceSymbol(
+			name: name,
+			kind: kind,
+			relativePath: relativePath,
+			line: nameNode.startPoint.row + 1,
+			column: nameNode.startPoint.column + 1,
+			endLine: rangeNode.endPoint.row + 1,
+			endColumn: rangeNode.endPoint.column + 1,
+			documentation: Self.documentation(from: docs)
+		)
+	}
+
+	private func captureName(for index: UInt32) -> String {
+		var length: UInt32 = 0
+		let pointer = ts_query_capture_name_for_id(query, index, &length)
+		guard let pointer else {
+			return ""
+		}
+		let bytes = UnsafeRawPointer(pointer).assumingMemoryBound(to: UInt8.self)
+		let buffer = UnsafeBufferPointer(start: bytes, count: Int(length))
+		return String(decoding: buffer, as: UTF8.self)
+	}
+
+	private static func kind(for captureName: String) -> WorkspaceSymbolKind? {
+		switch captureName {
+		case "definition.function":
+			return .function
+		case "definition.method":
+			return .method
+		case "definition.class", "definition.interface", "definition.module":
+			return .type
+		case "definition.constant", "definition.property":
+			return .variable
+		default:
+			return nil
+		}
+	}
+
+	private static func text(in range: Range<Int>, bytes: [UInt8]) -> String {
+		guard range.lowerBound >= 0, range.upperBound <= bytes.count else {
+			return ""
+		}
+		return String(decoding: bytes[range], as: UTF8.self)
+	}
+
+	private static func documentation(from docs: [String]) -> String? {
+		let lines = docs
+			.flatMap { $0.split(separator: "\n", omittingEmptySubsequences: false) }
+			.map { line in
+				line
+					.trimmingCharacters(in: .whitespaces)
+					.trimmingCharacters(in: CharacterSet(charactersIn: "/#* "))
+			}
+			.filter { !$0.isEmpty }
+		return lines.isEmpty ? nil : lines.joined(separator: "\n")
+	}
+
+	private static func loadSource(language: Language) throws -> String {
+		if language == .typescript || language == .tsx {
+			return try loadSource(resourceName: "javascript", language: language) + "\n" + loadSource(resourceName: "typescript", language: language)
+		}
+		return try loadSource(resourceName: language.queryResourceName, language: language)
+	}
+
+	private static func loadSource(resourceName: String, language: Language) throws -> String {
+		let subdirectory = "Resources/queries/\(resourceName)"
+		guard let url = Bundle.module.url(forResource: "tags", withExtension: "scm", subdirectory: subdirectory) else {
+			throw SyntaxError.queryLoadFailed(language)
+		}
+		return try String(contentsOf: url, encoding: .utf8)
+	}
+}
+
+public enum TreeSitterSymbolExtractor {
+	private static let lock = NSLock()
+	private static var queries: [Language: TagQuery] = [:]
+
+	public static func workspaceSymbols(in text: String, fileURL: URL, relativePath: String) -> [WorkspaceSymbol]? {
+		guard let language = SyntaxPipeline.language(forFileURL: fileURL) else {
+			return nil
+		}
+		do {
+			var pipeline = SyntaxPipeline(language: language)
+			let tree = try pipeline.parse(Rope(text))
+			let query = try query(for: language)
+			return try query.symbols(in: tree, source: text, relativePath: relativePath)
+		} catch {
+			return nil
+		}
+	}
+
+	private static func query(for language: Language) throws -> TagQuery {
+		lock.lock()
+		defer {
+			lock.unlock()
+		}
+		if let query = queries[language] {
+			return query
+		}
+		let query = try TagQuery(language: language)
+		queries[language] = query
+		return query
 	}
 }
 

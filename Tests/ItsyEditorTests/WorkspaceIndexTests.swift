@@ -46,6 +46,21 @@ import Testing
 	#expect(index.searchSymbols(query: "openproj", limit: 1).map(\.name) == ["openProject"])
 }
 
+@Test func workspaceIndexerUsesInjectedSymbolsAndFallsBackToRegex() throws {
+	let fixture = try TemporaryWorkspaceIndexFixture()
+	try fixture.write("Sources/Foo.swift", "struct Foo { func runFoo() {} }\n")
+	let provided = WorkspaceSymbol(name: "Provided", kind: .type, relativePath: "Sources/Foo.swift", line: 1, column: 1)
+	let providedIndex = WorkspaceIndexer.build(root: fixture.root, symbolProvider: { _, _, _ in
+		[provided]
+	})
+	let fallbackIndex = WorkspaceIndexer.build(root: fixture.root, symbolProvider: { _, _, _ in
+		nil
+	})
+
+	#expect(providedIndex.symbols == [provided])
+	#expect(fallbackIndex.symbolsForFile(relativePath: "Sources/Foo.swift").map(\.name) == ["Foo"])
+}
+
 @Test func workspaceIndexerReindexUpdatesAddsAndRemovesFiles() throws {
 	let fixture = try TemporaryWorkspaceIndexFixture()
 	try fixture.write(".gitignore", "ignored/\n")

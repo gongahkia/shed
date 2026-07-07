@@ -1,6 +1,7 @@
 // @file workspace file-tree sidebar and file event watching.
 import AppKit
 import ItsyEditor
+import ItsySyntax
 import OSLog
 
 private let workspaceLogger = Logger(
@@ -17,6 +18,9 @@ enum ItsyWorkspaceController {
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
 	private static var indexWatcher: WorkspaceFSEventStream?
+	private static let symbolProvider: WorkspaceSymbolProvider = { text, url, relativePath in
+		TreeSitterSymbolExtractor.workspaceSymbols(in: text, fileURL: url, relativePath: relativePath)
+	}
 
 	static var currentRootURL: URL? {
 		rootURL
@@ -67,7 +71,7 @@ enum ItsyWorkspaceController {
 		broadcastIndexingStatus(L10n.string("Indexing…"))
 		DispatchQueue.global(qos: .utility).async {
 			let matcher = GitIgnoreMatcher(root: root)
-			let index = WorkspaceIndexer.build(root: root) { processed, total in
+			let index = WorkspaceIndexer.build(root: root, symbolProvider: symbolProvider) { processed, total in
 				DispatchQueue.main.async {
 					guard generation == indexGeneration, total > 0 else {
 						return
@@ -126,7 +130,7 @@ enum ItsyWorkspaceController {
 			return
 		}
 		let urls = batch.events.map(\.url)
-		WorkspaceIndexer.reindex(&index, changedURLs: urls, matcher: matcher)
+		WorkspaceIndexer.reindex(&index, changedURLs: urls, matcher: matcher, symbolProvider: symbolProvider)
 		workspaceIndex = index
 		persistWorkspaceIndex(index)
 	}

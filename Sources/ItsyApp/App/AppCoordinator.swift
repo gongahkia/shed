@@ -242,6 +242,18 @@ final class AppCoordinator: NSObject {
 				Command(id: "lsp.references", title: L10n.string("Find All References"), defaultKey: "Shift-F12") { [weak self] in
 					_ = self?.activeEditorWindowController()?.findAllReferences(nil)
 				},
+				Command(id: "lsp.rename", title: L10n.string("Rename Symbol"), defaultKey: "F2") { [weak self] in
+					_ = self?.activeEditorWindowController()?.renameSymbol(nil)
+				},
+				Command(id: "lsp.formatDocument", title: L10n.string("Format Document"), defaultKey: "Shift-Opt-F") { [weak self] in
+					_ = self?.activeEditorWindowController()?.formatDocument(nil)
+				},
+				Command(id: "lsp.formatSelection", title: L10n.string("Format Selection"), defaultKey: nil) { [weak self] in
+					_ = self?.activeEditorWindowController()?.formatSelection(nil)
+				},
+				Command(id: "lsp.codeAction", title: L10n.string("Code Action"), defaultKey: "Cmd-.") { [weak self] in
+					_ = self?.activeEditorWindowController()?.showCodeActions(nil)
+				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},

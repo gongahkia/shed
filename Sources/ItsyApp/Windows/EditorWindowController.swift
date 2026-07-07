@@ -1,6 +1,7 @@
 import AppKit
 import Dispatch
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import ItsyLSP
 import ItsyRender
@@ -15,6 +16,11 @@ private struct LSPStatusEntry {
 	var lastError: String
 	var url: URL?
 	var client: LSPProcessClient?
+}
+
+private enum LSPWorkspaceEditFileError: Error {
+	case invalidURI(String)
+	case nonUTF8(URL)
 }
 
 final class EditorWindowController: NSWindowController {
@@ -43,6 +49,9 @@ final class EditorWindowController: NSWindowController {
 	private var hoverPopover: NSPopover?
 	private var hoverTimer: Timer?
 	private var hoverRequestGeneration = 0
+	private var renamePopover: NSPopover?
+	private var codeActionPopover: NSPopover?
+	private var codeActionRequestGeneration = 0
 	private var signatureHelpPopover: NSPopover?
 	private var signatureHelpRequestGeneration = 0
 	private var referencesRequestGeneration = 0
@@ -54,6 +63,7 @@ final class EditorWindowController: NSWindowController {
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var codeActionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var lspMissingBannerGeneration = 0
 	private var lspStatusGeneration = 0
 	private var indexingStatusText: String?
@@ -137,6 +147,8 @@ final class EditorWindowController: NSWindowController {
 		completionPopup?.dismiss()
 		hoverTimer?.invalidate()
 		hoverPopover?.close()
+		renamePopover?.close()
+		codeActionPopover?.close()
 		signatureHelpPopover?.close()
 		for task in lspSupervisorTasks.values {
 			task.cancel()
@@ -811,6 +823,14 @@ final class EditorWindowController: NSWindowController {
 			return requestHover(at: offset, positioningRect: editorView.positioningRectForUTF8Offset(offset), in: editorView)
 		case "lsp.references":
 			return findAllReferences(nil)
+		case "lsp.rename":
+			return renameSymbol(nil)
+		case "lsp.formatDocument":
+			return formatDocument(nil)
+		case "lsp.formatSelection", "vim.format.line":
+			return formatSelection(nil)
+		case "lsp.codeAction":
+			return showCodeActions(nil)
 		default:
 			if commandID.hasPrefix("extension:") {
 				return ItsyAppCommandBridge.requestRunCommand(commandID)
@@ -830,6 +850,26 @@ final class EditorWindowController: NSWindowController {
 	@discardableResult
 	func findAllReferences(_: Any?) -> Bool {
 		requestReferences(at: editorView.editor.selections.primary.head, in: editorView)
+	}
+
+	@discardableResult
+	func renameSymbol(_: Any?) -> Bool {
+		requestRename(in: editorView)
+	}
+
+	@discardableResult
+	func formatDocument(_: Any?) -> Bool {
+		requestFormatDocument(in: editorView)
+	}
+
+	@discardableResult
+	func formatSelection(_: Any?) -> Bool {
+		requestFormatSelection(in: editorView)
+	}
+
+	@discardableResult
+	func showCodeActions(_: Any?) -> Bool {
+		requestCodeActions(in: editorView)
 	}
 
 	@MainActor
@@ -934,6 +974,327 @@ final class EditorWindowController: NSWindowController {
 		return LSPCompletionContext(triggerKind: .invoked)
 	}
 
+	@discardableResult
+	private func requestRename(in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let cursorOffset = targetView.editor.selections.primary.head
+		guard let fallbackRange = identifierRange(in: content, near: cursorOffset) else {
+			return false
+		}
+		let renameOffset = min(max(cursorOffset, fallbackRange.lowerBound), fallbackRange.upperBound - 1)
+		let uri = fileURL.standardizedFileURL.absoluteString
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: renameOffset, in: content)
+		let rect = targetView.positioningRectForUTF8Offset(fallbackRange.lowerBound)
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let prepared = try? await session.client.prepareRename(uri: uri, position: position)
+				await MainActor.run { [weak self, weak targetView] in
+					guard let self, let targetView else {
+						return
+					}
+					let range = prepared?.range.flatMap { LSPTextEditApply.utf8Range(for: $0, in: content) } ?? fallbackRange
+					let initialName = prepared?.placeholder ?? self.substring(in: content, range: range)
+					self.showRenamePopover(initialName: initialName, positioningRect: rect, in: targetView) { [weak self, weak targetView] newName in
+						self?.requestRenameApply(newName: newName, fileURL: fileURL, uri: uri, position: position, in: targetView)
+					}
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("rename prepare failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func showRenamePopover(
+		initialName: String,
+		positioningRect: NSRect,
+		in targetView: MetalTextView,
+		submit: @escaping (String) -> Void
+	) {
+		renamePopover?.close()
+		var popover: NSPopover!
+		let controller = RenamePopoverController(
+			initialName: initialName,
+			submit: { [weak self] newName in
+				popover.close()
+				self?.renamePopover = nil
+				submit(newName)
+			},
+			cancel: { [weak self] in
+				popover.close()
+				self?.renamePopover = nil
+				self?.focusEditor()
+			}
+		)
+		popover = NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = controller
+		popover.show(relativeTo: positioningRect, of: targetView, preferredEdge: .maxY)
+		renamePopover = popover
+	}
+
+	private func requestRenameApply(newName: String, fileURL: URL, uri: String, position: LSPPosition, in targetView: MetalTextView?) {
+		guard let targetView else {
+			return
+		}
+		let content = editorStorageString(targetView.editor)
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let edit = try await session.client.rename(uri: uri, position: position, newName: newName)
+				await MainActor.run { [weak self] in
+					guard let self, let edit else {
+						return
+					}
+					_ = self.applyWorkspaceEdit(edit)
+					self.focusEditor()
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("rename failed: \(error)")
+				}
+			}
+		}
+	}
+
+	@discardableResult
+	private func requestFormatDocument(in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let uri = fileURL.standardizedFileURL.absoluteString
+		let options = lspFormattingOptions()
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let edits = try await session.client.formatDocument(uri: uri, options: options)
+				await MainActor.run { [weak self] in
+					self?.applyTextEdits(edits, uri: uri)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("format document failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	@discardableResult
+	private func requestFormatSelection(in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let selection = targetView.editor.selections.primary.range
+		let range = selection.isEmpty ? currentLineRange(in: targetView.editor) : selection
+		let uri = fileURL.standardizedFileURL.absoluteString
+		let options = lspFormattingOptions()
+		let lspRange = lspRange(forUTF8Range: range, in: content)
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let edits = try await session.client.formatRange(uri: uri, range: lspRange, options: options)
+				await MainActor.run { [weak self] in
+					self?.applyTextEdits(edits, uri: uri)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("format range failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	@discardableResult
+	private func requestCodeActions(in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let cursorOffset = targetView.editor.selections.primary.head
+		let selection = targetView.editor.selections.primary.range
+		let range = selection.isEmpty ? cursorOffset ..< cursorOffset : selection
+		let uri = fileURL.standardizedFileURL.absoluteString
+		let lspRange = lspRange(forUTF8Range: range, in: content)
+		let rect = targetView.positioningRectForUTF8Offset(cursorOffset)
+		codeActionRequestGeneration += 1
+		let generation = codeActionRequestGeneration
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let response = try await session.client.codeActions(
+					uri: uri,
+					range: lspRange,
+					context: LSPCodeActionContext(diagnostics: [])
+				)
+				await MainActor.run { [weak self, weak targetView] in
+					guard let self, let targetView, generation == self.codeActionRequestGeneration else {
+						return
+					}
+					self.showCodeActionPopover(entries: response.entries, sessionKey: session.key, fileURL: fileURL, positioningRect: rect, in: targetView)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.codeActionRequestGeneration else {
+						return
+					}
+					self.closeCodeActionPopover()
+					self.handleLSPRequestError(error)
+					NSLog("code actions failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func showCodeActionPopover(
+		entries: [LSPCodeActionEntry],
+		sessionKey: LSPSessionKey,
+		fileURL: URL,
+		positioningRect: NSRect,
+		in targetView: MetalTextView
+	) {
+		let enabled = entries.filter { entry in
+			if case let .action(action) = entry {
+				return action.disabled == nil
+			}
+			return true
+		}
+		guard !enabled.isEmpty else {
+			closeCodeActionPopover()
+			return
+		}
+		closeCodeActionPopover()
+		var popover: NSPopover!
+		let controller = CodeActionPopoverController(entries: enabled) { [weak self] entry in
+			popover.close()
+			self?.codeActionPopover = nil
+			self?.applyCodeActionEntry(entry, sessionKey: sessionKey, fileURL: fileURL)
+		}
+		popover = NSPopover()
+		popover.behavior = .transient
+		popover.animates = false
+		popover.contentViewController = controller
+		popover.show(relativeTo: positioningRect, of: targetView, preferredEdge: .maxY)
+		codeActionPopover = popover
+	}
+
+	private func applyCodeActionEntry(_ entry: LSPCodeActionEntry, sessionKey: LSPSessionKey, fileURL: URL) {
+		let resolveProvider = codeActionResolveEnabledBySession[sessionKey] == true
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				switch entry {
+				case let .action(action):
+					let resolved = try await self.resolvedCodeAction(action, client: session.client, resolveProvider: resolveProvider)
+					await MainActor.run { [weak self] in
+						if let edit = resolved.edit {
+							_ = self?.applyWorkspaceEdit(edit)
+						}
+					}
+					if let command = resolved.command {
+						try await session.client.executeCommand(command)
+					}
+				case let .command(command):
+					try await session.client.executeCommand(command)
+				}
+				await MainActor.run { [weak self] in
+					self?.focusEditor()
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+					NSLog("code action apply failed: \(error)")
+				}
+			}
+		}
+	}
+
+	private func resolvedCodeAction(_ action: LSPCodeAction, client: LSPProcessClient, resolveProvider: Bool) async throws -> LSPCodeAction {
+		if resolveProvider, action.edit == nil {
+			return try await client.resolveCodeAction(action)
+		}
+		return action
+	}
+
+	private func applyTextEdits(_ edits: [LSPTextEdit], uri: String) {
+		guard !edits.isEmpty else {
+			return
+		}
+		_ = applyWorkspaceEdit(LSPWorkspaceEdit(changes: [uri: edits]))
+		focusEditor()
+	}
+
+	private func lspFormattingOptions() -> LSPFormattingOptions {
+		let tabWidth = ItsySettingsStore().load().settings.editor.tabWidth
+		return LSPFormattingOptions(tabSize: tabWidth, insertSpaces: false)
+	}
+
+	private func currentLineRange(in editor: Editor) -> Range<Int> {
+		let line = editor.textStorage.line(forOffset: editor.selections.primary.head)
+		return editor.textStorage.lineRange(line)
+	}
+
+	private func lspRange(forUTF8Range range: Range<Int>, in text: String) -> LSPRange {
+		LSPRange(
+			start: LSPTextEditApply.utf16Position(forUTF8Offset: range.lowerBound, in: text),
+			end: LSPTextEditApply.utf16Position(forUTF8Offset: range.upperBound, in: text)
+		)
+	}
+
 	private func ensureLSPSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
 		guard let key = await Self.lspManager.sessionKey(for: url) else {
 			throw LSPManagerError.noConfigForDocument
@@ -954,6 +1315,7 @@ final class EditorWindowController: NSWindowController {
 				let triggers = completionProvider?.triggerCharacters.map(Set.init) ?? []
 				let resolveProvider = completionProvider?.resolveProvider ?? false
 				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
+				let codeActionResolveProvider = capabilities?.codeActionProvider?.resolveProvider ?? false
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
 					guard let self else {
@@ -963,6 +1325,7 @@ final class EditorWindowController: NSWindowController {
 					self.setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
 					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
+					self.setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
 					self.clearLSPCrashStatus(for: key)
 				}
 			} catch {
@@ -1034,6 +1397,7 @@ final class EditorWindowController: NSWindowController {
 			completionTriggerCharactersBySession[key] = nil
 			signatureHelpTriggerCharactersBySession[key] = nil
 			completionResolveEnabledBySession[key] = nil
+			codeActionResolveEnabledBySession[key] = nil
 			lspSupervisors[key] = nil
 			lspSupervisorTasks[key] = nil
 			Task {
@@ -1041,6 +1405,22 @@ final class EditorWindowController: NSWindowController {
 			}
 			showLSPCrashStatus(key: key, url: url, reason: reason)
 			NSLog("lsp session failed: \(key.languageID) exit \(reason.status) \(reason.stderrTail)")
+		case let .workspaceEditRequested(id, params):
+			let applied = applyWorkspaceEdit(params.edit)
+			let response = LSPApplyWorkspaceEditResponse(
+				applied: applied,
+				failureReason: applied ? nil : "unable to apply workspace edit"
+			)
+			guard let client = lspStatusEntries[key]?.client else {
+				return
+			}
+			Task {
+				do {
+					try await client.session.respond(to: id, result: try LSPAny(encoding: response))
+				} catch {
+					NSLog("workspace/applyEdit response failed: \(error)")
+				}
+			}
 		}
 	}
 
@@ -1079,6 +1459,10 @@ final class EditorWindowController: NSWindowController {
 		for pane in paneCoordinator.panes {
 			pane.editorView.signatureHelpTriggerCharacters = characters
 		}
+	}
+
+	private func setCodeActionCapabilities(resolveProvider: Bool, for key: LSPSessionKey) {
+		codeActionResolveEnabledBySession[key] = resolveProvider
 	}
 
 	private func installCompletionTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {
@@ -1421,6 +1805,79 @@ final class EditorWindowController: NSWindowController {
 		signatureHelpPopover = nil
 	}
 
+	private func closeCodeActionPopover() {
+		codeActionRequestGeneration += 1
+		codeActionPopover?.close()
+		codeActionPopover = nil
+	}
+
+	@discardableResult
+	private func applyWorkspaceEdit(_ edit: LSPWorkspaceEdit) -> Bool {
+		do {
+			let groups = LSPWorkspaceEditApply.normalize(edit)
+			guard !groups.isEmpty else {
+				return true
+			}
+			var sources: [String: String] = [:]
+			for uri in groups.keys {
+				sources[uri] = try sourceText(forURI: uri)
+			}
+			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources)
+			for file in resolved {
+				try applyResolvedWorkspaceFile(file)
+			}
+			return true
+		} catch {
+			handleLSPRequestError(error)
+			NSLog("workspace edit apply failed: \(error)")
+			return false
+		}
+	}
+
+	private func sourceText(forURI uri: String) throws -> String {
+		if let document = openDocument(forURI: uri) {
+			return editorStorageString(document.editor)
+		}
+		guard let url = fileURL(forLSPURI: uri) else {
+			throw LSPWorkspaceEditFileError.invalidURI(uri)
+		}
+		guard let text = String(data: try Data(contentsOf: url), encoding: .utf8) else {
+			throw LSPWorkspaceEditFileError.nonUTF8(url)
+		}
+		return text
+	}
+
+	private func applyResolvedWorkspaceFile(_ file: LSPWorkspaceEditApply.ResolvedFile) throws {
+		if let document = openDocument(forURI: file.uri) {
+			document.applyLSPUpdatedText(file.updatedText)
+			return
+		}
+		guard let url = fileURL(forLSPURI: file.uri) else {
+			throw LSPWorkspaceEditFileError.invalidURI(file.uri)
+		}
+		try Data(file.updatedText.utf8).write(to: url, options: .atomic)
+	}
+
+	private func openDocument(forURI uri: String) -> ItsyDocument? {
+		let targetURL = fileURL(forLSPURI: uri)
+		return NSDocumentController.shared.documents.compactMap { $0 as? ItsyDocument }.first { document in
+			guard let fileURL = document.fileURL?.standardizedFileURL else {
+				return false
+			}
+			if fileURL.absoluteString == uri {
+				return true
+			}
+			return targetURL.map { fileURL == $0 } ?? false
+		}
+	}
+
+	private func fileURL(forLSPURI uri: String) -> URL? {
+		guard let url = URL(string: uri), url.isFileURL else {
+			return nil
+		}
+		return url.standardizedFileURL
+	}
+
 	private func identifierOffset(in text: String, near offset: Int) -> Int? {
 		let clamped = min(max(offset, 0), text.utf8.count)
 		let index = stringIndex(in: text, utf8Offset: clamped)
@@ -1435,6 +1892,37 @@ final class EditorWindowController: NSWindowController {
 			return nil
 		}
 		return utf8Offset(in: text, for: previous)
+	}
+
+	private func identifierRange(in text: String, near offset: Int) -> Range<Int>? {
+		guard let identifierOffset = identifierOffset(in: text, near: offset) else {
+			return nil
+		}
+		let center = stringIndex(in: text, utf8Offset: identifierOffset)
+		var lower = center
+		var upper = center
+		while lower > text.startIndex {
+			let previous = text.index(before: lower)
+			guard isIdentifierCharacter(text[previous]) else {
+				break
+			}
+			lower = previous
+		}
+		while upper < text.endIndex, isIdentifierCharacter(text[upper]) {
+			upper = text.index(after: upper)
+		}
+		let lowerOffset = utf8Offset(in: text, for: lower)
+		let upperOffset = utf8Offset(in: text, for: upper)
+		guard lowerOffset < upperOffset else {
+			return nil
+		}
+		return lowerOffset ..< upperOffset
+	}
+
+	private func substring(in text: String, range: Range<Int>) -> String {
+		let lower = stringIndex(in: text, utf8Offset: range.lowerBound)
+		let upper = stringIndex(in: text, utf8Offset: range.upperBound)
+		return String(text[lower ..< upper])
 	}
 
 	private func isIdentifierCharacter(_ character: Character) -> Bool {

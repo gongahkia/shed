@@ -83,6 +83,42 @@ import Testing
 	#expect(reason.stderrTail.hasSuffix("tail"))
 }
 
+@Test func lspSessionSupervisorEmitsWorkspaceApplyEditRequests() async throws {
+	let source = ManualLSPClientEvents()
+	let supervisor = LSPSessionSupervisor(
+		key: LSPSessionKey(languageID: "swift", workspaceRoot: URL(fileURLWithPath: "/tmp/itsy-supervisor")),
+		events: source.stream
+	)
+	let collector = SupervisorEventCollector()
+	let eventTask = Task {
+		for await event in supervisor.events {
+			await collector.append(event)
+		}
+	}
+	defer {
+		eventTask.cancel()
+		source.finish()
+	}
+
+	let params = LSPApplyWorkspaceEditParams(edit: LSPWorkspaceEdit(changes: [
+		"file:///tmp/itsy-supervisor/App.swift": [
+			LSPTextEdit(
+				range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 0)),
+				newText: "import Foundation\n"
+			),
+		],
+	]))
+	await supervisor.start()
+	source.yield(.server(.request(JSONRPCRequestMessage(
+		id: .int(7),
+		method: LSPMethod.workspaceApplyEdit,
+		params: try LSPAny(encoding: params)
+	))))
+
+	let events = try await collector.waitForCount(1)
+	#expect(events == [.workspaceEditRequested(id: .int(7), params: params)])
+}
+
 private final class ManualLSPClientEvents: @unchecked Sendable {
 	let stream: AsyncStream<LSPProcessClientEvent>
 	private let continuation: AsyncStream<LSPProcessClientEvent>.Continuation

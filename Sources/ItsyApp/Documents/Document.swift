@@ -232,6 +232,14 @@ final class ItsyDocument: NSDocument {
 		gitGutter.scheduleRefresh()
 	}
 
+	func applyLSPUpdatedText(_ text: String) {
+		var updated = Editor(text: text)
+		updated.setSelection(clampedSelection(editor.selections, length: updated.textStorage.length))
+		installReadEditor(updated, fileURL: fileURL)
+		updateChangeCount(.changeDone)
+		scheduleGitHunkGutterRefresh()
+	}
+
 	func updateGitHunkGutter() {
 		gitGutter.update()
 	}
@@ -332,6 +340,17 @@ final class ItsyDocument: NSDocument {
 		refreshSyntaxHighlights()
 		updateHandoffActivity()
 		fileWatcher.restart()
+	}
+
+	private func clampedSelection(_ selectionSet: SelectionSet, length: Int) -> SelectionSet {
+		func clamped(_ selection: Selection) -> Selection {
+			Selection(
+				anchor: min(max(selection.anchor, 0), length),
+				head: min(max(selection.head, 0), length),
+				affinity: selection.affinity
+			)
+		}
+		return SelectionSet(primary: clamped(selectionSet.primary), secondaries: selectionSet.secondaries.map(clamped))
 	}
 
 	private func shouldReadMappedPieceTree(from url: URL) throws -> Bool {

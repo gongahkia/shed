@@ -14,6 +14,7 @@ public struct LSPSessionFailureReason: Equatable, Sendable {
 public enum LSPSessionSupervisorEvent: Equatable, Sendable {
 	case diagnosticsUpdated(WorkspaceProblemSnapshot)
 	case sessionFailed(reason: LSPSessionFailureReason)
+	case workspaceEditRequested(id: JSONRPCID, params: LSPApplyWorkspaceEditParams)
 }
 
 public actor LSPSessionSupervisor {
@@ -81,8 +82,8 @@ public actor LSPSessionSupervisor {
 			await handleTermination(status)
 		case let .failure(message):
 			appendStderr(Data(message.utf8))
-		case .server(.request):
-			break
+		case let .server(.request(request)):
+			await handle(request)
 		}
 	}
 
@@ -96,6 +97,15 @@ public actor LSPSessionSupervisor {
 		await diagnostics.ingest(params, source: key.languageID)
 		let snapshot = await diagnostics.snapshot()
 		continuation.yield(.diagnosticsUpdated(snapshot))
+	}
+
+	private func handle(_ request: JSONRPCRequestMessage) async {
+		guard request.method == LSPMethod.workspaceApplyEdit,
+		      let params = try? Self.decode(LSPApplyWorkspaceEditParams.self, from: request.params)
+		else {
+			return
+		}
+		continuation.yield(.workspaceEditRequested(id: request.id, params: params))
 	}
 
 	private func handleTermination(_ status: Int32) async {

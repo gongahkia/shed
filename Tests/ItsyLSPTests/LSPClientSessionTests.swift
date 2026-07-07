@@ -117,6 +117,164 @@ import Testing
 	#expect(symbols.map(\.name) == ["AppShell"])
 }
 
+@Test func clientEditingActionsSendTypedRequests() async throws {
+	let (session, transport) = try await initializedSession()
+	let position = LSPPosition(line: 2, character: 4)
+	let range = LSPRange(start: position, end: LSPPosition(line: 2, character: 8))
+	let renameTask = Task {
+		try await session.rename(uri: "file:///tmp/App.swift", position: position, newName: "renamed")
+	}
+
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.textDocumentRename,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"position": .object(["line": .int(2), "character": .int(4)]),
+			"newName": .string("renamed"),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .object(["changes": .object(["file:///tmp/App.swift": .array([
+			.object([
+				"range": .object([
+					"start": .object(["line": .int(2), "character": .int(4)]),
+					"end": .object(["line": .int(2), "character": .int(8)]),
+				]),
+				"newText": .string("renamed"),
+			]),
+		])])])
+	))))
+	#expect(try await renameTask.value?.changes?["file:///tmp/App.swift"]?.first?.newText == "renamed")
+
+	let formatTask = Task {
+		try await session.formatRange(uri: "file:///tmp/App.swift", range: range, options: LSPFormattingOptions(tabSize: 2, insertSpaces: true))
+	}
+	try await transport.waitForWriteCount(4)
+	#expect(try transport.message(at: 3) == .request(JSONRPCRequestMessage(
+		id: .int(3),
+		method: LSPMethod.textDocumentRangeFormatting,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"range": .object([
+				"start": .object(["line": .int(2), "character": .int(4)]),
+				"end": .object(["line": .int(2), "character": .int(8)]),
+			]),
+			"options": .object(["tabSize": .int(2), "insertSpaces": .bool(true)]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(3),
+		result: .array([.object([
+			"range": .object([
+				"start": .object(["line": .int(0), "character": .int(0)]),
+				"end": .object(["line": .int(0), "character": .int(0)]),
+			]),
+			"newText": .string("\t"),
+		])])
+	))))
+	#expect(try await formatTask.value.first?.newText == "\t")
+
+	let actionsTask = Task {
+		try await session.codeActions(uri: "file:///tmp/App.swift", range: range, context: LSPCodeActionContext(diagnostics: []))
+	}
+	try await transport.waitForWriteCount(5)
+	#expect(try transport.message(at: 4) == .request(JSONRPCRequestMessage(
+		id: .int(4),
+		method: LSPMethod.textDocumentCodeAction,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"range": .object([
+				"start": .object(["line": .int(2), "character": .int(4)]),
+				"end": .object(["line": .int(2), "character": .int(8)]),
+			]),
+			"context": .object(["diagnostics": .array([])]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(4),
+		result: .array([.object(["title": .string("Fix"), "kind": .string("quickfix")])])
+	))))
+	#expect(try await actionsTask.value.entries.map(\.title) == ["Fix"])
+
+	let prepareTask = Task {
+		try await session.prepareRename(uri: "file:///tmp/App.swift", position: position)
+	}
+	try await transport.waitForWriteCount(6)
+	#expect(try transport.message(at: 5) == .request(JSONRPCRequestMessage(
+		id: .int(5),
+		method: LSPMethod.textDocumentPrepareRename,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"position": .object(["line": .int(2), "character": .int(4)]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(5),
+		result: .object([
+			"range": .object([
+				"start": .object(["line": .int(2), "character": .int(4)]),
+				"end": .object(["line": .int(2), "character": .int(8)]),
+			]),
+			"placeholder": .string("name"),
+		])
+	))))
+	#expect(try await prepareTask.value.placeholder == "name")
+
+	let documentFormatTask = Task {
+		try await session.formatDocument(uri: "file:///tmp/App.swift", options: LSPFormattingOptions(tabSize: 4, insertSpaces: false))
+	}
+	try await transport.waitForWriteCount(7)
+	#expect(try transport.message(at: 6) == .request(JSONRPCRequestMessage(
+		id: .int(6),
+		method: LSPMethod.textDocumentFormatting,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"options": .object(["tabSize": .int(4), "insertSpaces": .bool(false)]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(6),
+		result: .array([.object([
+			"range": .object([
+				"start": .object(["line": .int(0), "character": .int(0)]),
+				"end": .object(["line": .int(0), "character": .int(0)]),
+			]),
+			"newText": .string(" "),
+		])])
+	))))
+	#expect(try await documentFormatTask.value.first?.newText == " ")
+
+	let resolveTask = Task {
+		try await session.resolveCodeAction(LSPCodeAction(title: "Resolve", data: .int(7)))
+	}
+	try await transport.waitForWriteCount(8)
+	#expect(try transport.message(at: 7) == .request(JSONRPCRequestMessage(
+		id: .int(7),
+		method: LSPMethod.codeActionResolve,
+		params: .object(["title": .string("Resolve"), "data": .int(7)])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(7),
+		result: .object(["title": .string("Resolved"), "kind": .string("quickfix")])
+	))))
+	#expect(try await resolveTask.value.title == "Resolved")
+
+	let executeTask = Task {
+		try await session.executeCommand(LSPCommand(title: "Run", command: "swift.run", arguments: [.string("a")]))
+	}
+	try await transport.waitForWriteCount(9)
+	#expect(try transport.message(at: 8) == .request(JSONRPCRequestMessage(
+		id: .int(8),
+		method: LSPMethod.workspaceExecuteCommand,
+		params: .object(["command": .string("swift.run"), "arguments": .array([.string("a")])])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(id: .int(8), result: .null))))
+	#expect(try await executeTask.value == .null)
+}
+
 @Test func clientReturnsServerNotificationsAsEvents() async throws {
 	let (session, _) = try await initializedSession()
 	let diagnostics = JSONRPCMessage.notification(JSONRPCNotificationMessage(

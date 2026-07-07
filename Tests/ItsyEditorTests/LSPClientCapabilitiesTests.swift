@@ -21,10 +21,20 @@ import Testing
 	#expect(publish?["relatedInformation"] as? Bool == true)
 	let definition = textDocument?["definition"] as? [String: Any]
 	#expect(definition?["linkSupport"] as? Bool == true)
-	let rename = textDocument?["rename"] as? [String: Any]
-	#expect(rename?["prepareSupport"] as? Bool == true)
+		let rename = textDocument?["rename"] as? [String: Any]
+		#expect(rename?["prepareSupport"] as? Bool == true)
+		let codeAction = textDocument?["codeAction"] as? [String: Any]
+		#expect(codeAction?["dataSupport"] as? Bool == true)
+		#expect(codeAction?["isPreferredSupport"] as? Bool == true)
+		#expect(codeAction?["disabledSupport"] as? Bool == true)
+		let codeActionResolveSupport = codeAction?["resolveSupport"] as? [String: Any]
+		#expect(codeActionResolveSupport?["properties"] as? [String] == ["edit"])
+		let literalSupport = codeAction?["codeActionLiteralSupport"] as? [String: Any]
+		let actionKind = literalSupport?["codeActionKind"] as? [String: Any]
+		#expect((actionKind?["valueSet"] as? [String])?.contains("refactor.extract") == true)
+		#expect((actionKind?["valueSet"] as? [String])?.contains("source.organizeImports") == true)
 
-	let workspace = json?["workspace"] as? [String: Any]
+		let workspace = json?["workspace"] as? [String: Any]
 	#expect(workspace?["applyEdit"] as? Bool == true)
 	#expect(workspace?["configuration"] as? Bool == true)
 	let workspaceEdit = workspace?["workspaceEdit"] as? [String: Any]

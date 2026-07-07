@@ -73,6 +73,82 @@ public actor LSPClientSession {
 		return try LSPDocumentSymbolResult(result: response.result)
 	}
 
+	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentPrepareRename,
+			params: try LSPAny(encoding: LSPPrepareRenameParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position
+			))
+		)
+		return try LSPPrepareRenameResult(result: response.result)
+	}
+
+	public func rename(uri: String, position: LSPPosition, newName: String) async throws -> LSPWorkspaceEdit? {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentRename,
+			params: try LSPAny(encoding: LSPRenameParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position,
+				newName: newName
+			))
+		)
+		return try LSPWorkspaceEditResult(result: response.result).edit
+	}
+
+	public func formatDocument(uri: String, options: LSPFormattingOptions) async throws -> [LSPTextEdit] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentFormatting,
+			params: try LSPAny(encoding: LSPDocumentFormattingParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				options: options
+			))
+		)
+		return try LSPTextEditResult(result: response.result).edits
+	}
+
+	public func formatRange(uri: String, range: LSPRange, options: LSPFormattingOptions) async throws -> [LSPTextEdit] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentRangeFormatting,
+			params: try LSPAny(encoding: LSPDocumentRangeFormattingParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				range: range,
+				options: options
+			))
+		)
+		return try LSPTextEditResult(result: response.result).edits
+	}
+
+	public func codeActions(uri: String, range: LSPRange, context: LSPCodeActionContext) async throws -> LSPCodeActionResponse {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentCodeAction,
+			params: try LSPAny(encoding: LSPCodeActionParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				range: range,
+				context: context
+			))
+		)
+		return try LSPCodeActionResponse(result: response.result)
+	}
+
+	public func resolveCodeAction(_ action: LSPCodeAction) async throws -> LSPCodeAction {
+		let response = try await sendRequest(
+			method: LSPMethod.codeActionResolve,
+			params: try LSPAny(encoding: action)
+		)
+		let data = try JSONEncoder().encode(response.result ?? .null)
+		return try JSONDecoder().decode(LSPCodeAction.self, from: data)
+	}
+
+	@discardableResult
+	public func executeCommand(_ command: LSPCommand) async throws -> LSPAny {
+		let response = try await sendRequest(
+			method: LSPMethod.workspaceExecuteCommand,
+			params: try LSPAny(encoding: LSPExecuteCommandParams(command: command.command, arguments: command.arguments))
+		)
+		return response.result ?? .null
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) throws {
 		try requireState([.running])
 		try writeNotificationUnchecked(method: method, params: params)

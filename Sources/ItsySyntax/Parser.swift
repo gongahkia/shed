@@ -17,24 +17,41 @@ public enum Language: Sendable, Hashable, CaseIterable {
 	case bash
 	case c
 	case cpp
+	case csharp
 	case css
 	case dart
 	case dockerfile
 	case elixir
 	case go
+	case graphql
+	case haskell
 	case html
+	case java
 	case javascript
+	case julia
 	case json
 	case kotlin
+	case latex
+	case lua
 	case markdown
 	case markdownInline
+	case nix
+	case ocaml
+	case php
+	case proto
 	case python
+	case r
+	case ruby
 	case rust
+	case scss
 	case sql
+	case svelte
 	case swift
+	case terraform
 	case toml
 	case tsx
 	case typescript
+	case vue
 	case yaml
 	case zig
 
@@ -50,6 +67,8 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "tree_sitter_c"
 		case .cpp:
 			return "tree_sitter_cpp"
+		case .csharp:
+			return "tree_sitter_c_sharp"
 		case .css:
 			return "tree_sitter_css"
 		case .dart:
@@ -60,32 +79,64 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "tree_sitter_elixir"
 		case .go:
 			return "tree_sitter_go"
+		case .graphql:
+			return "tree_sitter_graphql"
+		case .haskell:
+			return "tree_sitter_haskell"
 		case .html:
 			return "tree_sitter_html"
+		case .java:
+			return "tree_sitter_java"
 		case .javascript:
 			return "tree_sitter_javascript"
+		case .julia:
+			return "tree_sitter_julia"
 		case .json:
 			return "tree_sitter_json"
 		case .kotlin:
 			return "tree_sitter_kotlin"
+		case .latex:
+			return "tree_sitter_latex"
+		case .lua:
+			return "tree_sitter_lua"
 		case .markdown:
 			return "tree_sitter_markdown"
 		case .markdownInline:
 			return "tree_sitter_markdown_inline"
+		case .nix:
+			return "tree_sitter_nix"
+		case .ocaml:
+			return "tree_sitter_ocaml"
+		case .php:
+			return "tree_sitter_php"
+		case .proto:
+			return "tree_sitter_proto"
 		case .python:
 			return "tree_sitter_python"
+		case .r:
+			return "tree_sitter_r"
+		case .ruby:
+			return "tree_sitter_ruby"
 		case .rust:
 			return "tree_sitter_rust"
+		case .scss:
+			return "tree_sitter_scss"
 		case .sql:
 			return "tree_sitter_sql"
+		case .svelte:
+			return "tree_sitter_svelte"
 		case .swift:
 			return "tree_sitter_swift"
+		case .terraform:
+			return "tree_sitter_terraform"
 		case .toml:
 			return "tree_sitter_toml"
 		case .tsx:
 			return "tree_sitter_tsx"
 		case .typescript:
 			return "tree_sitter_typescript"
+		case .vue:
+			return "tree_sitter_vue"
 		case .yaml:
 			return "tree_sitter_yaml"
 		case .zig:
@@ -99,6 +150,8 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "markdown"
 		case .tsx, .typescript:
 			return "typescript"
+		case .csharp:
+			return "csharp"
 		default:
 			return queryResourceName
 		}
@@ -112,6 +165,8 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "c"
 		case .cpp:
 			return "cpp"
+		case .csharp:
+			return "csharp"
 		case .css:
 			return "css"
 		case .dart:
@@ -122,30 +177,62 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "elixir"
 		case .go:
 			return "go"
+		case .graphql:
+			return "graphql"
+		case .haskell:
+			return "haskell"
 		case .html:
 			return "html"
+		case .java:
+			return "java"
 		case .javascript:
 			return "javascript"
+		case .julia:
+			return "julia"
 		case .json:
 			return "json"
 		case .kotlin:
 			return "kotlin"
+		case .latex:
+			return "latex"
+		case .lua:
+			return "lua"
 		case .markdown:
 			return "markdown"
 		case .markdownInline:
 			return "markdown-inline"
+		case .nix:
+			return "nix"
+		case .ocaml:
+			return "ocaml"
+		case .php:
+			return "php"
+		case .proto:
+			return "proto"
 		case .python:
 			return "python"
+		case .r:
+			return "r"
+		case .ruby:
+			return "ruby"
 		case .rust:
 			return "rust"
+		case .scss:
+			return "scss"
 		case .sql:
 			return "sql"
+		case .svelte:
+			return "svelte"
 		case .swift:
 			return "swift"
+		case .terraform:
+			return "terraform"
 		case .toml:
 			return "toml"
 		case .tsx, .typescript:
 			return "typescript"
+		case .vue:
+			return "vue"
 		case .yaml:
 			return "yaml"
 		case .zig:
@@ -788,38 +875,72 @@ public struct SyntaxPipeline {
 			return .c
 		case "cc", "cpp", "cxx", "hpp", "hxx":
 			return .cpp
+		case "cs", "csx":
+			return .csharp
 		case "css":
 			return .css
 		case "dart":
 			return .dart
 		case "go":
 			return .go
+		case "graphql", "gql":
+			return .graphql
 		case "ex", "exs":
 			return .elixir
+		case "hs", "lhs":
+			return .haskell
 		case "html", "htm":
 			return .html
+		case "java":
+			return .java
 		case "js", "mjs", "cjs":
 			return .javascript
+		case "jl":
+			return .julia
 		case "json":
 			return .json
 		case "kt", "kts":
 			return .kotlin
+		case "tex", "sty", "cls":
+			return .latex
+		case "lua":
+			return .lua
 		case "md", "markdown":
 			return .markdown
+		case "nix":
+			return .nix
+		case "ml", "mli":
+			return .ocaml
+		case "php":
+			return .php
+		case "proto":
+			return .proto
 		case "py":
 			return .python
+		case "r":
+			return .r
+		case "rb", "rake":
+			return .ruby
 		case "rs":
 			return .rust
+		case "scss":
+			return .scss
 		case "sql":
 			return .sql
+		case "svelte":
+			return .svelte
 		case "swift":
 			return .swift
+		case "tf", "tfvars", "hcl":
+			return .terraform
 		case "toml":
 			return .toml
 		case "tsx":
 			return .tsx
 		case "ts":
 			return .typescript
+		case "vue":
+			return .vue
 		case "yaml", "yml":
 			return .yaml
 		case "zig", "zon":

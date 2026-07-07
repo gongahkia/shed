@@ -23,13 +23,30 @@ const TSLanguage *tree_sitter_tsx(void);
 const TSLanguage *tree_sitter_typescript(void);
 const TSLanguage *tree_sitter_yaml(void);
 const TSLanguage *tree_sitter_bash(void);
+const TSLanguage *tree_sitter_c_sharp(void);
+const TSLanguage *tree_sitter_graphql(void);
+const TSLanguage *tree_sitter_haskell(void);
+const TSLanguage *tree_sitter_java(void);
+const TSLanguage *tree_sitter_julia(void);
+const TSLanguage *tree_sitter_latex(void);
+const TSLanguage *tree_sitter_lua(void);
+const TSLanguage *tree_sitter_nix(void);
+const TSLanguage *tree_sitter_ocaml(void);
+const TSLanguage *tree_sitter_php(void);
+const TSLanguage *tree_sitter_proto(void);
+const TSLanguage *tree_sitter_r(void);
+const TSLanguage *tree_sitter_ruby(void);
+const TSLanguage *tree_sitter_scss(void);
+const TSLanguage *tree_sitter_svelte(void);
 const TSLanguage *tree_sitter_zig(void);
 const TSLanguage *tree_sitter_swift(void);
 const TSLanguage *tree_sitter_sql(void);
+const TSLanguage *tree_sitter_terraform(void);
 const TSLanguage *tree_sitter_dockerfile(void);
 const TSLanguage *tree_sitter_dart(void);
 const TSLanguage *tree_sitter_kotlin(void);
 const TSLanguage *tree_sitter_elixir(void);
+const TSLanguage *tree_sitter_vue(void);
 
 #ifdef __cplusplus
 }

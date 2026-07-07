@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import CoreServices
 import CoreVideo
 import Darwin
 import Dispatch
@@ -53,6 +54,15 @@ private struct UndoOptions {
 private struct RenderHighlightCacheOptions {
 	var frames: Int
 	var lineCount: Int
+}
+
+private struct WorkspaceFSEventsOptions {
+	var timeoutMS: Int
+}
+
+private struct WorkspaceIndexOptions {
+	var files: Int
+	var ignoredFiles: Int
 }
 
 private struct DisplayOptions {
@@ -155,6 +165,29 @@ private struct SmokeResult: Encodable {
 	var highlight_span_counts: [String: Int]
 	var mode: String
 	var runs: Int
+}
+
+private struct WorkspaceFSEventsResult: Encodable {
+	var batches: Int
+	var create_seen: Bool
+	var modify_seen: Bool
+	var remove_seen: Bool
+	var rename_seen: Bool
+	var resume_seen: Bool
+	var stored_event_id: UInt64?
+}
+
+private struct WorkspaceIndexBenchResult: Encodable {
+	var build_ms: Double
+	var files_requested: Int
+	var first_symbol_query_ms: Double
+	var first_symbol_query_under_100ms: Bool
+	var ignored_files_requested: Int
+	var ignored_indexed_files: Int
+	var indexed_files: Int
+	var load_ms: Double
+	var query_results: Int
+	var save_ms: Double
 }
 
 private struct HighlightSmokeSample {
@@ -287,6 +320,10 @@ enum ItsyBenchMain {
 			try printJSON(RSSResult(pid: pid, rss_kb: residentSizeKB(pid: pid)))
 		case "undo":
 			try printJSON(undo(parseUndo(Array(args.dropFirst()))))
+		case "workspace-fsevents":
+			try printJSON(workspaceFSEvents(parseWorkspaceFSEvents(Array(args.dropFirst()))))
+		case "workspace-index":
+			try printJSON(workspaceIndex(parseWorkspaceIndex(Array(args.dropFirst()))))
 		default:
 			throw BenchError.usage("unknown command: \(command)")
 		}
@@ -618,6 +655,54 @@ enum ItsyBenchMain {
 		return RenderHighlightCacheOptions(frames: frames, lineCount: lineCount)
 	}
 
+	private static func parseWorkspaceFSEvents(_ args: [String]) throws -> WorkspaceFSEventsOptions {
+		var timeoutMS = 5_000
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--timeout-ms":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --timeout-ms")
+				}
+				timeoutMS = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown workspace-fsevents option: \(arg)")
+			}
+		}
+		return WorkspaceFSEventsOptions(timeoutMS: timeoutMS)
+	}
+
+	private static func parseWorkspaceIndex(_ args: [String]) throws -> WorkspaceIndexOptions {
+		var files = 10_000
+		var ignoredFiles = 2_000
+		var index = args.startIndex
+		while index < args.endIndex {
+			let arg = args[index]
+			switch arg {
+			case "--files":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --files")
+				}
+				files = value
+				index = args.index(after: valueIndex)
+			case "--ignored-files":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value >= 0 else {
+					throw BenchError.usage("invalid --ignored-files")
+				}
+				ignoredFiles = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown workspace-index option: \(arg)")
+			}
+		}
+		return WorkspaceIndexOptions(files: files, ignoredFiles: ignoredFiles)
+	}
+
 	private static func display(_ options: DisplayOptions) throws -> DisplayResult {
 		let mode = CGDisplayCopyDisplayMode(options.displayID)
 		let rates = displayLinkRates(for: options.displayID)
@@ -653,6 +738,141 @@ enum ItsyBenchMain {
 			counts[sample.filename] = spans.count
 		}
 		return SmokeResult(highlight_span_counts: counts, mode: "smoke", runs: runs)
+	}
+
+	private static func workspaceFSEvents(_ options: WorkspaceFSEventsOptions) throws -> WorkspaceFSEventsResult {
+		let root = FileManager.default.temporaryDirectory
+			.appendingPathComponent("itsy-fsevents-smoke-\(UUID().uuidString)", isDirectory: true)
+		let workspace = root.appendingPathComponent("workspace", isDirectory: true)
+		let store = WorkspaceFSEventIDStore(directory: root.appendingPathComponent("store", isDirectory: true))
+		try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+		defer {
+			try? FileManager.default.removeItem(at: root)
+		}
+		let recorder = WorkspaceFSEventRecorder()
+		let stream = WorkspaceFSEventStream(root: workspace, store: store, latency: 0.05, debounce: 0.05) { batch in
+			recorder.record(batch)
+		}
+		guard stream.start() else {
+			throw BenchError.smokeFailed("FSEvent stream did not start")
+		}
+		Thread.sleep(forTimeInterval: 0.2)
+		let createBaseline = recorder.snapshot().batches
+		let created = workspace.appendingPathComponent("created.swift")
+		guard FileManager.default.createFile(atPath: created.path, contents: Data("struct Created {}\n".utf8)) else {
+			stream.stop()
+			throw BenchError.smokeFailed("fixture file create failed")
+		}
+		guard waitForFSEvent(options, recorder, minimumBatches: createBaseline + 1, condition: { $0.sawPath("created.swift", after: createBaseline) }) else {
+			stream.stop()
+			throw BenchError.smokeFailed("create event missing: \(recorder.snapshot().flagsByPath)")
+		}
+		let modifyBaseline = recorder.snapshot().batches
+		let handle = try FileHandle(forWritingTo: created)
+		try handle.seekToEnd()
+		try handle.write(contentsOf: Data("func edited() {}\n".utf8))
+		try handle.close()
+		guard waitForFSEvent(options, recorder, minimumBatches: modifyBaseline + 1, condition: { $0.saw("created.swift", kFSEventStreamEventFlagItemModified, after: modifyBaseline) }) else {
+			stream.stop()
+			throw BenchError.smokeFailed("modify event missing")
+		}
+		let renameBaseline = recorder.snapshot().batches
+		let renamed = workspace.appendingPathComponent("renamed.swift")
+		try FileManager.default.moveItem(at: created, to: renamed)
+		guard waitForFSEvent(options, recorder, minimumBatches: renameBaseline + 1, condition: { $0.saw("created.swift", kFSEventStreamEventFlagItemRenamed, after: renameBaseline) || $0.saw("renamed.swift", kFSEventStreamEventFlagItemRenamed, after: renameBaseline) }) else {
+			stream.stop()
+			throw BenchError.smokeFailed("rename event missing")
+		}
+		let removeBaseline = recorder.snapshot().batches
+		try FileManager.default.removeItem(at: renamed)
+		guard waitForFSEvent(options, recorder, minimumBatches: removeBaseline + 1, condition: { $0.saw("renamed.swift", kFSEventStreamEventFlagItemRemoved, after: removeBaseline) }) else {
+			stream.stop()
+			throw BenchError.smokeFailed("remove event missing")
+		}
+		guard let storedInitialID = store.eventID(for: workspace) else {
+			stream.stop()
+			throw BenchError.smokeFailed("stored event ID missing")
+		}
+		stream.stop()
+		let offline = workspace.appendingPathComponent("offline.swift")
+		guard FileManager.default.createFile(atPath: offline.path, contents: Data("struct Offline {}\n".utf8)) else {
+			throw BenchError.smokeFailed("offline fixture file create failed")
+		}
+		Thread.sleep(forTimeInterval: 0.2)
+		let resumeRecorder = WorkspaceFSEventRecorder()
+		let resumeStream = WorkspaceFSEventStream(root: workspace, store: store, latency: 0.05, debounce: 0.05) { batch in
+			resumeRecorder.record(batch)
+		}
+		guard resumeStream.start() else {
+			throw BenchError.smokeFailed("resume FSEvent stream did not start")
+		}
+		defer {
+			resumeStream.stop()
+		}
+		guard waitForFSEvent(options, resumeRecorder, minimumBatches: 1, condition: { $0.sawPath("offline.swift") }) else {
+			throw BenchError.smokeFailed("resume event missing after stored ID \(UInt64(storedInitialID))")
+		}
+		let first = recorder.snapshot()
+		let resumed = resumeRecorder.snapshot()
+		return WorkspaceFSEventsResult(
+			batches: first.batches + resumed.batches,
+			create_seen: first.sawPath("created.swift"),
+			modify_seen: first.saw("created.swift", kFSEventStreamEventFlagItemModified),
+			remove_seen: first.saw("renamed.swift", kFSEventStreamEventFlagItemRemoved),
+			rename_seen: first.saw("created.swift", kFSEventStreamEventFlagItemRenamed) || first.saw("renamed.swift", kFSEventStreamEventFlagItemRenamed),
+			resume_seen: resumed.sawPath("offline.swift"),
+			stored_event_id: store.eventID(for: workspace).map { UInt64($0) }
+		)
+	}
+
+	private static func workspaceIndex(_ options: WorkspaceIndexOptions) throws -> WorkspaceIndexBenchResult {
+		let root = FileManager.default.temporaryDirectory
+			.appendingPathComponent("itsy-workspace-index-bench-\(UUID().uuidString)", isDirectory: true)
+		let workspace = root.appendingPathComponent("workspace", isDirectory: true)
+		let store = WorkspaceIndexStore(directory: root.appendingPathComponent("store", isDirectory: true))
+		try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+		defer {
+			try? FileManager.default.removeItem(at: root)
+		}
+		try "ignored/\n".write(to: workspace.appendingPathComponent(".gitignore"), atomically: true, encoding: .utf8)
+		for index in 0 ..< options.files {
+			try writeWorkspaceIndexFixtureFile(root: workspace, path: "Sources/Group\(index / 100)/File\(index).swift", index: index)
+		}
+		for index in 0 ..< options.ignoredFiles {
+			try writeWorkspaceIndexFixtureFile(root: workspace, path: "ignored/Group\(index / 100)/Ignored\(index).swift", index: index)
+		}
+		var built = WorkspaceIndex(root: workspace, files: [])
+		let buildNS = measureNanoseconds {
+			built = WorkspaceIndexer.build(root: workspace)
+		}
+		let saveNS = try measureNanoseconds {
+			try store.save(built)
+		}
+		var loaded: WorkspaceIndex?
+		let loadNS = try measureNanoseconds {
+			loaded = try store.load(for: workspace)
+		}
+		guard let loaded else {
+			throw BenchError.smokeFailed("persisted workspace index did not load")
+		}
+		let query = "IndexedType\(options.files - 1)"
+		var results: [WorkspaceSymbol] = []
+		let queryNS = measureNanoseconds {
+			results = loaded.searchSymbols(query: query, limit: 10)
+		}
+		let queryMS = Double(queryNS) / 1_000_000
+		return WorkspaceIndexBenchResult(
+			build_ms: Double(buildNS) / 1_000_000,
+			files_requested: options.files,
+			first_symbol_query_ms: queryMS,
+			first_symbol_query_under_100ms: queryMS < 100,
+			ignored_files_requested: options.ignoredFiles,
+			ignored_indexed_files: loaded.files.filter { $0.relativePath.hasPrefix("ignored/") }.count,
+			indexed_files: loaded.files.count,
+			load_ms: Double(loadNS) / 1_000_000,
+			query_results: results.count,
+			save_ms: Double(saveNS) / 1_000_000
+		)
 	}
 
 	private static func rope(_ options: RopeOptions) throws -> RopeBenchResult {
@@ -1240,6 +1460,8 @@ enum ItsyBenchMain {
 	  itsybench rss --pid <pid>
 	  itsybench undo [--ops <count>] [--buffer-bytes <bytes>] [--rss-budget-kb <kb>]
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
+	  itsybench workspace-fsevents [--timeout-ms <ms>]
+	  itsybench workspace-index [--files <count>] [--ignored-files <count>]
 	"""
 }
 
@@ -1288,6 +1510,87 @@ private func editorChecksum(_ editor: Editor) -> Int {
 		}
 	case let .rope(rope):
 		return rope.length
+	}
+}
+
+private func writeWorkspaceIndexFixtureFile(root: URL, path: String, index: Int) throws {
+	let url = root.appendingPathComponent(path)
+	try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try """
+	struct IndexedType\(index) {
+		func indexedFunction\(index)() {}
+	}
+	""".write(to: url, atomically: true, encoding: .utf8)
+}
+
+private func waitForFSEvent(
+	_ options: WorkspaceFSEventsOptions,
+	_ recorder: WorkspaceFSEventRecorder,
+	minimumBatches: Int = 0,
+	condition: (WorkspaceFSEventSnapshot) -> Bool
+) -> Bool {
+	let deadline = Date(timeIntervalSinceNow: Double(options.timeoutMS) / 1000)
+	while Date() < deadline {
+		let snapshot = recorder.snapshot()
+		if snapshot.batches >= minimumBatches, condition(snapshot) {
+			return true
+		}
+		Thread.sleep(forTimeInterval: 0.025)
+	}
+	let snapshot = recorder.snapshot()
+	return snapshot.batches >= minimumBatches && condition(snapshot)
+}
+
+private struct WorkspaceFSEventSnapshot {
+	var batches: Int
+	var events: [WorkspaceFSEventSeen]
+	var flagsByPath: [String: UInt32]
+
+	func saw(_ filename: String, _ flag: Int, after batch: Int = 0) -> Bool {
+		events.contains { event in
+			event.batch > batch && event.filename == filename && event.flags & UInt32(flag) != 0
+		}
+	}
+
+	func sawPath(_ filename: String, after batch: Int = 0) -> Bool {
+		events.contains { event in
+			event.batch > batch && event.filename == filename
+		}
+	}
+}
+
+private struct WorkspaceFSEventSeen {
+	var batch: Int
+	var filename: String
+	var flags: UInt32
+}
+
+private final class WorkspaceFSEventRecorder: @unchecked Sendable {
+	private let lock = NSLock()
+	private var batches = 0
+	private var events: [WorkspaceFSEventSeen] = []
+	private var flagsByPath: [String: UInt32] = [:]
+
+	func record(_ batch: WorkspaceFileEventBatch) {
+		lock.lock()
+		defer {
+			lock.unlock()
+		}
+		batches += 1
+		for event in batch.events {
+			let filename = event.url.lastPathComponent
+			let flags = UInt32(event.flags)
+			events.append(WorkspaceFSEventSeen(batch: batches, filename: filename, flags: flags))
+			flagsByPath[filename, default: 0] |= flags
+		}
+	}
+
+	func snapshot() -> WorkspaceFSEventSnapshot {
+		lock.lock()
+		defer {
+			lock.unlock()
+		}
+		return WorkspaceFSEventSnapshot(batches: batches, events: events, flagsByPath: flagsByPath)
 	}
 }
 

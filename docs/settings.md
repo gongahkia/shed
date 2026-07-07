@@ -18,6 +18,9 @@ tab_width = 4
 [theme]
 id = "bundled:default-light"
 
+[syntax]
+preload_grammars = "opened"
+
 [terminal]
 font_size = 12
 scrollback_lines = 10000
@@ -29,6 +32,14 @@ Theme ids:
 id = "bundled:default-light"
 id = "bundled:default-dark"
 id = "user:my-theme.toml"
+```
+
+Syntax grammar preload modes:
+
+```toml
+preload_grammars = "none"
+preload_grammars = "opened"
+preload_grammars = "all"
 ```
 
 Related config remains separate:

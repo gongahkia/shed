@@ -17,6 +17,9 @@ import Testing
 	[theme]
 	id = "bundled:default-dark"
 
+	[syntax]
+	preload_grammars = "all"
+
 	[terminal]
 	font_size = 13
 	scrollback_lines = 20000
@@ -30,6 +33,7 @@ import Testing
 	#expect(result.settings.editor.tabWidth == 2)
 	#expect(result.settings.editor.experimental.storage == .pieceTree)
 	#expect(result.settings.theme.id == "bundled:default-dark")
+	#expect(result.settings.syntax.preloadGrammars == .all)
 	#expect(result.settings.terminal.fontSize == 13)
 	#expect(result.settings.terminal.scrollbackLines == 20_000)
 }
@@ -61,7 +65,9 @@ import Testing
 @Test func settingsDefaultsUsePieceTreeStorage() {
 	let settings = ItsySettings()
 	#expect(settings.editor.experimental.storage == .pieceTree)
+	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 }
 
 @Test func settingsStoreSavesAndReloadsToml() throws {
@@ -74,6 +80,7 @@ import Testing
 	let settings = ItsySettings(
 		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, tabWidth: 8, experimental: .init(storage: .pieceTree)),
 		theme: .init(id: "user:night.toml"),
+		syntax: .init(preloadGrammars: .none),
 		terminal: .init(fontSize: 14, scrollbackLines: 1234)
 	)
 	try store.save(settings)

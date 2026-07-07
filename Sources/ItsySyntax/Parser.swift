@@ -154,15 +154,18 @@ public enum Language: Sendable, Hashable, CaseIterable {
 	}
 }
 
-private enum GrammarLoader {
+enum GrammarLoader {
 	private typealias LanguageFactory = @convention(c) () -> OpaquePointer?
 	private static let lock = NSLock()
 	private static var handles: [String: UnsafeMutableRawPointer] = [:]
+	private static var warnedStems: Set<String> = []
+	private static let testLibraryDirectoriesKey = "ItsySyntax.GrammarLoader.testLibraryDirectories"
+	private static let testUseDefaultSymbolsKey = "ItsySyntax.GrammarLoader.testUseDefaultSymbols"
 
 	static func language(for language: Language) -> OpaquePointer? {
 		lock.lock()
 		defer { lock.unlock() }
-		if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
+		if useDefaultSymbols(), let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
 			return unsafeBitCast(symbol, to: LanguageFactory.self)()
 		}
 		let stem = language.libraryStem
@@ -173,13 +176,44 @@ private enum GrammarLoader {
 			guard let handle = dlopen(url.path, RTLD_NOW | RTLD_LOCAL) else {
 				continue
 			}
-			handles[stem] = handle
 			guard let symbol = dlsym(handle, language.symbolName) else {
+				dlclose(handle)
 				continue
 			}
+			handles[stem] = handle
 			return unsafeBitCast(symbol, to: LanguageFactory.self)()
 		}
+		warnMissing(language: language)
 		return nil
+	}
+
+	static func loadedLibraryStemsForTests() -> Set<String> {
+		lock.lock()
+		defer { lock.unlock() }
+		return Set(handles.keys)
+	}
+
+	static func configureForTests(libraryDirectories: [URL]? = nil, useDefaultSymbols: Bool? = nil) {
+		let dictionary = Thread.current.threadDictionary
+		if let libraryDirectories {
+			dictionary[testLibraryDirectoriesKey] = libraryDirectories
+		} else {
+			dictionary.removeObject(forKey: testLibraryDirectoriesKey)
+		}
+		if let useDefaultSymbols {
+			dictionary[testUseDefaultSymbolsKey] = useDefaultSymbols
+		} else {
+			dictionary.removeObject(forKey: testUseDefaultSymbolsKey)
+		}
+	}
+
+	static func unloadLibraryStemForTests(_ stem: String) {
+		lock.lock()
+		defer { lock.unlock() }
+		if let handle = handles.removeValue(forKey: stem) {
+			dlclose(handle)
+		}
+		warnedStems.remove(stem)
 	}
 
 	private static func libraryURLs(for language: Language) -> [URL] {
@@ -188,9 +222,15 @@ private enum GrammarLoader {
 	}
 
 	private static func libraryDirectories() -> [URL] {
+		if let directories = Thread.current.threadDictionary[testLibraryDirectoriesKey] as? [URL] {
+			return directories
+		}
 		var directories: [URL] = []
-		if let path = ProcessInfo.processInfo.environment["ITSY_GRAMMAR_LIBRARY_DIR"], !path.isEmpty {
-			directories.append(URL(fileURLWithPath: path))
+		if let value = getenv("ITSY_GRAMMAR_LIBRARY_DIR") {
+			let path = String(cString: value)
+			if !path.isEmpty {
+				directories.append(URL(fileURLWithPath: path))
+			}
 		}
 		if let frameworksURL = Bundle.main.privateFrameworksURL {
 			directories.append(frameworksURL.appendingPathComponent("ItsyGrammars"))
@@ -202,6 +242,24 @@ private enum GrammarLoader {
 		directories.append(cwd.appendingPathComponent(".build/release/ItsyGrammars"))
 		directories.append(cwd.appendingPathComponent("Itsy.app/Contents/Frameworks/ItsyGrammars"))
 		return directories
+	}
+
+	private static func useDefaultSymbols() -> Bool {
+		if let value = Thread.current.threadDictionary[testUseDefaultSymbolsKey] as? Bool {
+			return value
+		}
+		guard let value = getenv("ITSY_GRAMMAR_DISABLE_DEFAULT_SYMBOLS") else {
+			return true
+		}
+		return String(cString: value) != "1"
+	}
+
+	private static func warnMissing(language: Language) {
+		let stem = language.libraryStem
+		guard warnedStems.insert(stem).inserted else {
+			return
+		}
+		NSLog("ItsySyntax warning: failed to load grammar \(stem); syntax highlighting disabled for \(language)")
 	}
 }
 

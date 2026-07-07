@@ -239,6 +239,51 @@ public enum Language: Sendable, Hashable, CaseIterable {
 			return "zig"
 		}
 	}
+
+	static func injectionLanguage(named name: String) -> Language? {
+		switch name.lowercased().trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "`\"'"))) {
+		case "bash", "shell", "sh":
+			return .bash
+		case "c":
+			return .c
+		case "cpp", "c++":
+			return .cpp
+		case "css":
+			return .css
+		case "dockerfile":
+			return .dockerfile
+		case "go", "golang":
+			return .go
+		case "graphql", "gql":
+			return .graphql
+		case "html":
+			return .html
+		case "javascript", "js", "jsx":
+			return .javascript
+		case "json":
+			return .json
+		case "markdown", "md":
+			return .markdown
+		case "markdown_inline", "markdown-inline":
+			return .markdownInline
+		case "python", "py":
+			return .python
+		case "rust", "rs":
+			return .rust
+		case "sql":
+			return .sql
+		case "swift":
+			return .swift
+		case "tsx":
+			return .tsx
+		case "typescript", "ts":
+			return .typescript
+		case "yaml", "yml":
+			return .yaml
+		default:
+			return nil
+		}
+	}
 }
 
 enum GrammarLoader {
@@ -579,6 +624,190 @@ public struct HighlightSpan: Sendable, Equatable {
 	}
 }
 
+struct QueryCapture: Sendable, Equatable {
+	var range: Range<Int>
+	var capture: String
+	var text: String
+}
+
+struct InjectionSite: Sendable, Equatable {
+	var range: Range<Int>
+	var language: Language
+}
+
+private enum SyntaxQueryFile: String {
+	case highlights
+	case tags
+	case injections
+	case locals
+	case indents
+}
+
+private enum SyntaxQuerySource {
+	static func load(language: Language, file: SyntaxQueryFile) throws -> String {
+		switch (language, file) {
+		case (.typescript, .highlights), (.tsx, .highlights),
+		     (.typescript, .tags), (.tsx, .tags),
+		     (.typescript, .locals), (.tsx, .locals):
+			return try load(resourceName: "javascript", file: file, language: language) + "\n" + load(resourceName: "typescript", file: file, language: language)
+		default:
+			return try load(resourceName: language.queryResourceName, file: file, language: language)
+		}
+	}
+
+	private static func load(resourceName: String, file: SyntaxQueryFile, language: Language) throws -> String {
+		let subdirectory = "Resources/queries/\(resourceName)"
+		guard let url = Bundle.module.url(forResource: file.rawValue, withExtension: "scm", subdirectory: subdirectory) else {
+			throw SyntaxError.queryLoadFailed(language)
+		}
+		return try String(contentsOf: url, encoding: .utf8)
+	}
+}
+
+private struct RawQueryCapture {
+	var node: Node
+	var capture: String
+}
+
+private struct RawQueryMatch {
+	var patternIndex: UInt32
+	var captures: [RawQueryCapture]
+	var properties: [String: String]
+}
+
+private final class CompiledSyntaxQuery {
+	private static let compileLock = NSLock()
+	private let query: OpaquePointer
+
+	init(language: Language, file: SyntaxQueryFile) throws {
+		guard let rawLanguage = language.rawLanguage else {
+			throw SyntaxError.incompatibleLanguage(language)
+		}
+		let source = try SyntaxQuerySource.load(language: language, file: file)
+		var errorOffset: UInt32 = 0
+		var errorType = TSQueryErrorNone
+		Self.compileLock.lock()
+		defer {
+			Self.compileLock.unlock()
+		}
+		let query = source.withCString { pointer in
+			ts_query_new(rawLanguage, pointer, UInt32(source.utf8.count), &errorOffset, &errorType)
+		}
+		guard let query else {
+			throw SyntaxError.queryCompileFailed(language, errorOffset, Int(errorType.rawValue))
+		}
+		self.query = query
+	}
+
+	deinit {
+		ts_query_delete(query)
+	}
+
+	func captures(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [RawQueryCapture] {
+		guard let cursor = ts_query_cursor_new() else {
+			throw SyntaxError.queryCursorAllocationFailed
+		}
+		defer {
+			ts_query_cursor_delete(cursor)
+		}
+		if let byteRange {
+			_ = ts_query_cursor_set_byte_range(cursor, UInt32(byteRange.lowerBound), UInt32(byteRange.upperBound))
+		}
+		ts_query_cursor_exec(cursor, query, tree.rootNode.node)
+		var captures: [RawQueryCapture] = []
+		var match = TSQueryMatch()
+		var captureIndex: UInt32 = 0
+		while ts_query_cursor_next_capture(cursor, &match, &captureIndex) {
+			let index = Int(captureIndex)
+			guard index < Int(match.capture_count) else {
+				continue
+			}
+			let capture = match.captures[index]
+			captures.append(RawQueryCapture(node: Node(capture.node), capture: captureName(for: capture.index)))
+		}
+		return captures.sorted { lhs, rhs in
+			lhs.node.byteRange.lowerBound == rhs.node.byteRange.lowerBound ? lhs.capture < rhs.capture : lhs.node.byteRange.lowerBound < rhs.node.byteRange.lowerBound
+		}
+	}
+
+	func matches(in tree: Tree, byteRange: Range<Int>? = nil) throws -> [RawQueryMatch] {
+		guard let cursor = ts_query_cursor_new() else {
+			throw SyntaxError.queryCursorAllocationFailed
+		}
+		defer {
+			ts_query_cursor_delete(cursor)
+		}
+		if let byteRange {
+			_ = ts_query_cursor_set_byte_range(cursor, UInt32(byteRange.lowerBound), UInt32(byteRange.upperBound))
+		}
+		ts_query_cursor_exec(cursor, query, tree.rootNode.node)
+		var result: [RawQueryMatch] = []
+		var match = TSQueryMatch()
+		while ts_query_cursor_next_match(cursor, &match) {
+			var captures: [RawQueryCapture] = []
+			for captureOffset in 0 ..< Int(match.capture_count) {
+				let capture = match.captures[captureOffset]
+				captures.append(RawQueryCapture(node: Node(capture.node), capture: captureName(for: capture.index)))
+			}
+			result.append(RawQueryMatch(
+				patternIndex: UInt32(match.pattern_index),
+				captures: captures,
+				properties: setProperties(for: UInt32(match.pattern_index))
+			))
+		}
+		return result
+	}
+
+	private func captureName(for index: UInt32) -> String {
+		var length: UInt32 = 0
+		let pointer = ts_query_capture_name_for_id(query, index, &length)
+		guard let pointer else {
+			return ""
+		}
+		let bytes = UnsafeRawPointer(pointer).assumingMemoryBound(to: UInt8.self)
+		let buffer = UnsafeBufferPointer(start: bytes, count: Int(length))
+		return String(decoding: buffer, as: UTF8.self)
+	}
+
+	private func stringValue(for index: UInt32) -> String {
+		var length: UInt32 = 0
+		let pointer = ts_query_string_value_for_id(query, index, &length)
+		guard let pointer else {
+			return ""
+		}
+		let bytes = UnsafeRawPointer(pointer).assumingMemoryBound(to: UInt8.self)
+		let buffer = UnsafeBufferPointer(start: bytes, count: Int(length))
+		return String(decoding: buffer, as: UTF8.self)
+	}
+
+	private func setProperties(for patternIndex: UInt32) -> [String: String] {
+		var count: UInt32 = 0
+		guard let steps = ts_query_predicates_for_pattern(query, patternIndex, &count), count > 0 else {
+			return [:]
+		}
+		var properties: [String: String] = [:]
+		var current: [String] = []
+		for index in 0 ..< Int(count) {
+			let step = steps[index]
+			if step.type == TSQueryPredicateStepTypeDone {
+				applySetPredicate(current, to: &properties)
+				current.removeAll(keepingCapacity: true)
+			} else if step.type == TSQueryPredicateStepTypeString {
+				current.append(stringValue(for: step.value_id))
+			}
+		}
+		applySetPredicate(current, to: &properties)
+		return properties
+	}
+
+	private func applySetPredicate(_ values: [String], to properties: inout [String: String]) {
+		guard values.count >= 2, values[0] == "set!" else {
+			return
+		}
+		properties[values[1]] = values.count >= 3 ? values[2] : "true"
+	}
+}
+
 final class HighlightQuery {
 	private static let compileLock = NSLock()
 	private let query: OpaquePointer
@@ -648,18 +877,124 @@ final class HighlightQuery {
 	}
 
 	private static func loadSource(language: Language) throws -> String {
-		if language == .typescript || language == .tsx {
-			return try loadSource(resourceName: "javascript", language: language) + "\n" + loadSource(resourceName: "typescript", language: language)
-		}
-		return try loadSource(resourceName: language.queryResourceName, language: language)
+		try SyntaxQuerySource.load(language: language, file: .highlights)
+	}
+}
+
+final class LocalQuery {
+	private let query: CompiledSyntaxQuery
+
+	init(language: Language) throws {
+		query = try CompiledSyntaxQuery(language: language, file: .locals)
 	}
 
-	private static func loadSource(resourceName: String, language: Language) throws -> String {
-		let subdirectory = "Resources/queries/\(resourceName)"
-		guard let url = Bundle.module.url(forResource: "highlights", withExtension: "scm", subdirectory: subdirectory) else {
-			throw SyntaxError.queryLoadFailed(language)
+	func captures(in tree: Tree, source: String) throws -> [QueryCapture] {
+		let bytes = Array(source.utf8)
+		return try query.captures(in: tree).map { capture in
+			QueryCapture(
+				range: capture.node.byteRange,
+				capture: capture.capture,
+				text: Self.text(in: capture.node.byteRange, bytes: bytes)
+			)
 		}
-		return try String(contentsOf: url, encoding: .utf8)
+	}
+
+	private static func text(in range: Range<Int>, bytes: [UInt8]) -> String {
+		guard range.lowerBound >= 0, range.upperBound <= bytes.count else {
+			return ""
+		}
+		return String(decoding: bytes[range], as: UTF8.self)
+	}
+}
+
+final class InjectionQuery {
+	private let query: CompiledSyntaxQuery
+
+	init(language: Language) throws {
+		query = try CompiledSyntaxQuery(language: language, file: .injections)
+	}
+
+	func injections(in tree: Tree, source: String, byteRange: Range<Int>? = nil) throws -> [InjectionSite] {
+		let bytes = Array(source.utf8)
+		return try query.matches(in: tree).flatMap { match -> [InjectionSite] in
+			let languageName = match.properties["injection.language"] ?? match.captures.first(where: { $0.capture == "injection.language" }).map { Self.text(in: $0.node.byteRange, bytes: bytes) }
+			guard let languageName, let language = Language.injectionLanguage(named: languageName) else {
+				return []
+			}
+			return match.captures.compactMap { capture in
+				guard capture.capture == "injection.content" else {
+					return nil
+				}
+				let range = capture.node.byteRange
+				if let byteRange, !range.overlaps(byteRange) {
+					return nil
+				}
+				return InjectionSite(range: range, language: language)
+			}
+		}.sorted { lhs, rhs in
+			lhs.range.lowerBound == rhs.range.lowerBound ? lhs.language.queryResourceName < rhs.language.queryResourceName : lhs.range.lowerBound < rhs.range.lowerBound
+		}
+	}
+
+	private static func text(in range: Range<Int>, bytes: [UInt8]) -> String {
+		guard range.lowerBound >= 0, range.upperBound <= bytes.count else {
+			return ""
+		}
+		return String(decoding: bytes[range], as: UTF8.self)
+	}
+}
+
+final class IndentQuery {
+	private let query: CompiledSyntaxQuery
+
+	init(language: Language) throws {
+		query = try CompiledSyntaxQuery(language: language, file: .indents)
+	}
+
+	func indentationAfterNewline(in tree: Tree, source: String, offset: Int, tabWidth: Int) throws -> String {
+		let bytes = Array(source.utf8)
+		let clampedOffset = min(max(offset, 0), bytes.count)
+		let lineStart = Self.lineStart(before: clampedOffset, bytes: bytes)
+		let baseIndent = Self.leadingWhitespace(from: lineStart, bytes: bytes)
+		let previous = Self.previousNonBlankByte(before: clampedOffset, stoppingAt: lineStart, bytes: bytes)
+		let shouldIndent = try previous.map { byte in
+			try query.captures(in: tree).contains { capture in
+				capture.capture == "indent.begin" && capture.node.byteRange.contains(byte)
+			}
+		} ?? false
+		let width = min(max(tabWidth, 1), 16)
+		return "\n" + baseIndent + (shouldIndent ? String(repeating: " ", count: width) : "")
+	}
+
+	private static func lineStart(before offset: Int, bytes: [UInt8]) -> Int {
+		var index = offset
+		while index > 0 {
+			if bytes[index - 1] == 10 {
+				return index
+			}
+			index -= 1
+		}
+		return 0
+	}
+
+	private static func leadingWhitespace(from offset: Int, bytes: [UInt8]) -> String {
+		var index = offset
+		while index < bytes.count, bytes[index] == 32 || bytes[index] == 9 {
+			index += 1
+		}
+		return String(decoding: bytes[offset ..< index], as: UTF8.self)
+	}
+
+	private static func previousNonBlankByte(before offset: Int, stoppingAt lineStart: Int, bytes: [UInt8]) -> Int? {
+		var index = offset
+		while index > lineStart {
+			let byte = bytes[index - 1]
+			if byte != 32 && byte != 9 {
+				return index - 1
+			}
+			index -= 1
+		}
+		return nil
 	}
 }
 
@@ -806,18 +1141,7 @@ final class TagQuery {
 	}
 
 	private static func loadSource(language: Language) throws -> String {
-		if language == .typescript || language == .tsx {
-			return try loadSource(resourceName: "javascript", language: language) + "\n" + loadSource(resourceName: "typescript", language: language)
-		}
-		return try loadSource(resourceName: language.queryResourceName, language: language)
-	}
-
-	private static func loadSource(resourceName: String, language: Language) throws -> String {
-		let subdirectory = "Resources/queries/\(resourceName)"
-		guard let url = Bundle.module.url(forResource: "tags", withExtension: "scm", subdirectory: subdirectory) else {
-			throw SyntaxError.queryLoadFailed(language)
-		}
-		return try String(contentsOf: url, encoding: .utf8)
+		try SyntaxQuerySource.load(language: language, file: .tags)
 	}
 }
 
@@ -857,6 +1181,8 @@ public struct SyntaxPipeline {
 	public let language: Language
 	private var parser: Parser?
 	private var highlightQuery: HighlightQuery?
+	private var injectionQuery: InjectionQuery?
+	private var indentQuery: IndentQuery?
 	public private(set) var didAllocateParser = false
 
 	public init(language: Language) {
@@ -965,6 +1291,22 @@ public struct SyntaxPipeline {
 		return try query.highlights(in: tree, byteRange: byteRange)
 	}
 
+	public mutating func highlights(in tree: Tree, source: String, byteRange: Range<Int>? = nil, includeInjections: Bool) throws -> [HighlightSpan] {
+		var spans = try highlights(in: tree, byteRange: byteRange)
+		guard includeInjections else {
+			return spans
+		}
+		spans += try injectedHighlights(in: tree, source: source, byteRange: byteRange, depth: 0)
+		return spans.sorted { lhs, rhs in
+			lhs.range.lowerBound == rhs.range.lowerBound ? lhs.capture < rhs.capture : lhs.range.lowerBound < rhs.range.lowerBound
+		}
+	}
+
+	public mutating func indentationAfterNewline(in tree: Tree, source: String, offset: Int, tabWidth: Int) throws -> String {
+		let query = try ensureIndentQuery()
+		return try query.indentationAfterNewline(in: tree, source: source, offset: offset, tabWidth: tabWidth)
+	}
+
 	private mutating func ensureParser() throws -> Parser {
 		if let parser {
 			return parser
@@ -982,6 +1324,54 @@ public struct SyntaxPipeline {
 		let query = try HighlightQuery(language: language)
 		highlightQuery = query
 		return query
+	}
+
+	private mutating func ensureInjectionQuery() throws -> InjectionQuery {
+		if let injectionQuery {
+			return injectionQuery
+		}
+		let query = try InjectionQuery(language: language)
+		injectionQuery = query
+		return query
+	}
+
+	private mutating func ensureIndentQuery() throws -> IndentQuery {
+		if let indentQuery {
+			return indentQuery
+		}
+		let query = try IndentQuery(language: language)
+		indentQuery = query
+		return query
+	}
+
+	private mutating func injectedHighlights(in tree: Tree, source: String, byteRange: Range<Int>?, depth: Int) throws -> [HighlightSpan] {
+		guard depth < 2 else {
+			return []
+		}
+		let query: InjectionQuery
+		do {
+			query = try ensureInjectionQuery()
+		} catch SyntaxError.queryLoadFailed(_) {
+			return []
+		}
+		let bytes = Array(source.utf8)
+		return try query.injections(in: tree, source: source, byteRange: byteRange).flatMap { site -> [HighlightSpan] in
+			guard site.range.lowerBound >= 0, site.range.upperBound <= bytes.count, site.range.lowerBound < site.range.upperBound else {
+				return []
+			}
+			let embeddedSource = String(decoding: bytes[site.range], as: UTF8.self)
+			var pipeline = SyntaxPipeline(language: site.language)
+			guard let embeddedTree = try? pipeline.parse(Rope(embeddedSource)) else {
+				return []
+			}
+			let spans = (try? pipeline.highlights(in: embeddedTree)) ?? []
+			return spans.map { span in
+				HighlightSpan(
+					range: (site.range.lowerBound + span.range.lowerBound) ..< (site.range.lowerBound + span.range.upperBound),
+					capture: span.capture
+				)
+			}
+		}
 	}
 }
 

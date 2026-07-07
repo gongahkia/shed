@@ -365,6 +365,95 @@ struct ParserTests {
 	}
 }
 
+@Test func injectionQueriesLoadForCoveredGrammars() throws {
+	for language in [Language.markdown, .javascript, .typescript, .tsx, .html, .rust, .python, .go, .c, .cpp, .swift, .dockerfile] {
+		_ = try InjectionQuery(language: language)
+	}
+}
+
+@Test func localQueriesCaptureDefinitionsAndReferences() throws {
+	let cases: [(Language, String, String)] = [
+		(.rust, "fn main() { let value = 1; value; }\n", "value"),
+		(.python, "def main(value):\n    local = value\n    return local\n", "local"),
+		(.go, "package main\nfunc main() { value := 1; _ = value }\n", "value"),
+		(.swift, "func main(value: Int) { let local = value; _ = local }\n", "local"),
+		(.javascript, "function main(value) { const local = value; return local; }\n", "local"),
+		(.typescript, "function main(value: number) { const local = value; return local; }\n", "local"),
+		(.c, "int main() { int value = 1; return value; }\n", "value"),
+		(.cpp, "int main() { int value = 1; return value; }\n", "value"),
+	]
+	for (language, source, expectedName) in cases {
+		var pipeline = SyntaxPipeline(language: language)
+		let tree = try pipeline.parse(Rope(source))
+		let captures = try LocalQuery(language: language).captures(in: tree, source: source)
+		#expect(captures.contains { $0.capture == "local.definition" && $0.text == expectedName })
+		#expect(captures.contains { $0.capture == "local.reference" && $0.text == expectedName })
+	}
+}
+
+@Test func indentQueriesIndentAfterOpeningDelimiter() throws {
+	let cases: [(Language, String)] = [
+		(.rust, "fn main() {}"),
+		(.python, "values = []"),
+		(.go, "package main\nfunc main() {}"),
+		(.swift, "func main() {}"),
+		(.javascript, "function main() {}"),
+		(.typescript, "function main(): void {}"),
+		(.c, "int main() {}"),
+		(.cpp, "int main() {}"),
+	]
+	for (language, source) in cases {
+		var pipeline = SyntaxPipeline(language: language)
+		let tree = try pipeline.parse(Rope(source))
+		let offset = try #require(byteRange(of: "{", in: source)?.upperBound ?? byteRange(of: "[", in: source)?.upperBound)
+		let insertion = try pipeline.indentationAfterNewline(in: tree, source: source, offset: offset, tabWidth: 4)
+		#expect(insertion == "\n    ")
+	}
+}
+
+@Test func markdownFenceHighlightsEmbeddedSwift() throws {
+	let source = "```swift\nlet value = 1\n```\n"
+	var pipeline = SyntaxPipeline(language: .markdown)
+	let tree = try pipeline.parse(Rope(source))
+	let spans = try pipeline.highlights(in: tree, source: source, includeInjections: true)
+	let letRange = try #require(byteRange(of: "let", in: source))
+	#expect(spans.contains { $0.range == letRange && $0.capture.hasPrefix("keyword") })
+}
+
+@Test func injectionExpansionKeepsBaseHighlightsWhenQueryIsMissing() throws {
+	let source = #"{"value": 1}"#
+	var pipeline = SyntaxPipeline(language: .json)
+	let tree = try pipeline.parse(Rope(source))
+	let spans = try pipeline.highlights(in: tree, source: source, includeInjections: true)
+	#expect(spans.contains { $0.capture == "string" })
+	#expect(spans.contains { $0.capture == "number" })
+}
+
+@Test func injectionQueriesCaptureRepresentativeSites() throws {
+	let cases: [(Language, String, Language, String)] = [
+		(.markdown, "```swift\nlet value = 1\n```\n", .swift, "let value = 1\n"),
+		(.javascript, "graphql`type Query { ok: String }`;\n", .graphql, "type Query { ok: String }"),
+		(.typescript, "const query = graphql`type Query { ok: String }`;\n", .graphql, "type Query { ok: String }"),
+		(.tsx, "const query = graphql`type Query { ok: String }`;\n", .graphql, "type Query { ok: String }"),
+		(.html, "<script>const value = 1;</script>\n", .javascript, "const value = 1;"),
+		(.rust, "fn main() { sql! { let value = 1; } }\n", .rust, "{ let value = 1; }"),
+		(.python, "sql(\"select 1\")\n", .sql, "select 1"),
+		(.go, "package main\nfunc main() { graphql(`type Query { ok: String }`) }\n", .graphql, "type Query { ok: String }"),
+		(.c, "int main() { sql(\"select 1\"); }\n", .sql, "select 1"),
+		(.cpp, "int main() { sql(\"select 1\"); }\n", .sql, "select 1"),
+		(.swift, "func main() { sql(\"select 1\") }\n", .sql, "select 1"),
+		(.dockerfile, "FROM scratch\nRUN echo hi\n", .bash, "echo hi"),
+	]
+	for (language, source, expectedLanguage, expectedContent) in cases {
+		var pipeline = SyntaxPipeline(language: language)
+		let tree = try pipeline.parse(Rope(source))
+		let sites = try InjectionQuery(language: language).injections(in: tree, source: source)
+		#expect(sites.contains { site in
+			site.language == expectedLanguage && String(decoding: Array(source.utf8)[site.range], as: UTF8.self) == expectedContent
+		})
+	}
+}
+
 @Test func syntaxPipelineIncrementalMiddleEditFitsFrameBudget() throws {
 	var editor = Editor(text: largeTypeScriptLineSetWithMiddleLine())
 	var pipeline = SyntaxPipeline(language: .typescript)
@@ -415,6 +504,15 @@ private func largeTypeScriptLineSetWithMiddleLine() -> String {
 
 private func milliseconds(_ nanoseconds: UInt64) -> Double {
 	Double(nanoseconds) / 1_000_000
+}
+
+private func byteRange(of needle: String, in haystack: String) -> Range<Int>? {
+	guard let range = haystack.range(of: needle) else {
+		return nil
+	}
+	let lower = haystack[..<range.lowerBound].utf8.count
+	let upper = lower + needle.utf8.count
+	return lower ..< upper
 }
 
 private func runXcrunClang(_ arguments: [String]) throws {

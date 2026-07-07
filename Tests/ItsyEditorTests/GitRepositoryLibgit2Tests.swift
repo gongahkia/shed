@@ -79,6 +79,33 @@ import Testing
 	#expect(libgit2Status == shellStatus)
 }
 
+@Test func libgit2BlameAndCommitFromStageWorkOnFixtureRepo() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try Libgit2TemporaryGitFixture()
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "one changed\ntwo\n")
+	try fixture.git(["commit", "-am", "change one"])
+	try fixture.write("committed.txt", "from libgit2\n")
+	try fixture.git(["add", "committed.txt"])
+
+	try GitRepository(root: fixture.root).commit(summary: "libgit2 commit")
+	let blame = try GitRepository(root: fixture.root).blame(path: "file.txt")
+	let subject = try fixture.git(["log", "-1", "--format=%s"]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+	#expect(subject == "libgit2 commit")
+	#expect(blame.count == 2)
+	#expect(blame[0].summary == "change one")
+	#expect(blame[0].author == "Itsy")
+	#expect(blame[1].summary == "initial")
+}
+
 private final class Libgit2TemporaryGitFixture {
 	let root: URL
 

@@ -260,11 +260,23 @@ final class AppCoordinator: NSObject {
 					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
 						self?.sendGitAction(#selector(GitCoordinator.refreshGitChanges(_:)))
 					},
+					Command(id: "git.blame", title: L10n.string("Blame Current File"), defaultKey: nil) { [weak self] in
+						self?.sendGitAction(#selector(GitCoordinator.showGitBlame(_:)))
+					},
+					Command(id: "git.fileHistory", title: L10n.string("File History"), defaultKey: nil) { [weak self] in
+						self?.sendGitAction(#selector(GitCoordinator.showGitFileHistory(_:)))
+					},
+					Command(id: "git.lineHistory", title: L10n.string("Line History"), defaultKey: nil) { [weak self] in
+						self?.sendGitAction(#selector(GitCoordinator.showGitLineHistory(_:)))
+					},
 					Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
 						self?.sendGitAction(#selector(GitCoordinator.showGitStashes(_:)))
 					},
 					Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"), defaultKey: "Cmd-Shift-S") { [weak self] in
 						self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
+					},
+					Command(id: "git.cancelRemote", title: L10n.string("Cancel Remote Operation"), defaultKey: nil) { [weak self] in
+						self?.sendGitAction(#selector(GitCoordinator.cancelGitRemote(_:)))
 					},
 					Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
 						self?.showTasks(nil)

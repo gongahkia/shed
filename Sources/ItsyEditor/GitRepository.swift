@@ -118,6 +118,69 @@ public struct GitStatus: Equatable, Sendable {
 	}
 }
 
+public struct GitBlameLine: Equatable, Sendable {
+	public var line: Int
+	public var originalLine: Int
+	public var oid: String
+	public var summary: String
+	public var author: String
+	public var authorEmail: String
+	public var time: Date?
+	public var originalPath: String?
+
+	public init(line: Int, originalLine: Int, oid: String, summary: String, author: String, authorEmail: String, time: Date? = nil, originalPath: String? = nil) {
+		self.line = line
+		self.originalLine = originalLine
+		self.oid = oid
+		self.summary = summary
+		self.author = author
+		self.authorEmail = authorEmail
+		self.time = time
+		self.originalPath = originalPath
+	}
+}
+
+public struct GitHistoryEntry: Equatable, Sendable {
+	public var oid: String
+	public var author: String
+	public var authorEmail: String
+	public var date: Date?
+	public var summary: String
+
+	public init(oid: String, author: String, authorEmail: String, date: Date? = nil, summary: String) {
+		self.oid = oid
+		self.author = author
+		self.authorEmail = authorEmail
+		self.date = date
+		self.summary = summary
+	}
+}
+
+public struct GitBlameCache: Sendable {
+	private var entries: [Key: [GitBlameLine]] = [:]
+
+	public init() {}
+
+	public mutating func blame(path: String, repository: GitRepository) throws -> [GitBlameLine] {
+		let key = Key(root: repository.root.standardizedFileURL.path, path: path)
+		if let cached = entries[key] {
+			return cached
+		}
+		let lines = try repository.blame(path: path)
+		entries[key] = lines
+		return lines
+	}
+
+	public mutating func invalidate() {
+		entries.removeAll()
+	}
+
+	private struct Key: Hashable, Sendable {
+		var root: String
+		var path: String
+	}
+}
+
 public enum GitStatusParseError: Error, Equatable, Sendable {
 	case malformedLine(String)
 }
@@ -279,6 +342,74 @@ public enum GitBranchParser {
 	}
 }
 
+public enum GitBlameParser {
+	public static func parse(_ output: String) -> [GitBlameLine] {
+		var lines: [GitBlameLine] = []
+		var currentOID = ""
+		var currentOriginalLine = 0
+		var currentFinalLine = 0
+		var author = ""
+		var authorEmail = ""
+		var authorTime: Date?
+		var summary = ""
+		var originalPath: String?
+		for rawLine in output.split(separator: "\n", omittingEmptySubsequences: false).map(String.init) {
+			if rawLine.hasPrefix("\t") {
+				lines.append(GitBlameLine(
+					line: currentFinalLine,
+					originalLine: currentOriginalLine,
+					oid: currentOID,
+					summary: summary,
+					author: author,
+					authorEmail: authorEmail,
+					time: authorTime,
+					originalPath: originalPath
+				))
+				continue
+			}
+			let fields = rawLine.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+			if fields.count >= 3, fields[0].count >= 8, fields[0].allSatisfy(\.isHexDigit) {
+				currentOID = fields[0]
+				currentOriginalLine = Int(fields[1]) ?? 0
+				currentFinalLine = Int(fields[2]) ?? 0
+			} else if rawLine.hasPrefix("author ") {
+				author = String(rawLine.dropFirst("author ".count))
+			} else if rawLine.hasPrefix("author-mail ") {
+				authorEmail = String(rawLine.dropFirst("author-mail ".count)).trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+			} else if rawLine.hasPrefix("author-time ") {
+				authorTime = Double(rawLine.dropFirst("author-time ".count)).map { Date(timeIntervalSince1970: $0) }
+			} else if rawLine.hasPrefix("summary ") {
+				summary = String(rawLine.dropFirst("summary ".count))
+			} else if rawLine.hasPrefix("filename ") {
+				originalPath = String(rawLine.dropFirst("filename ".count))
+			}
+		}
+		return lines
+	}
+}
+
+public enum GitHistoryParser {
+	public static func parse(_ output: String) -> [GitHistoryEntry] {
+		output.split(separator: "\0", omittingEmptySubsequences: true).compactMap { rawRecord in
+			let record = rawRecord.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !record.isEmpty else {
+				return nil
+			}
+			let fields = record.split(separator: "\u{1f}", maxSplits: 4, omittingEmptySubsequences: false).map(String.init)
+			guard fields.count == 5 else {
+				return nil
+			}
+			return GitHistoryEntry(
+				oid: fields[0],
+				author: fields[1],
+				authorEmail: fields[2],
+				date: Double(fields[3]).map { Date(timeIntervalSince1970: $0) },
+				summary: fields[4]
+			)
+		}
+	}
+}
+
 public enum GitPullMode: Equatable, Sendable {
 	case ffOnly
 	case rebase
@@ -406,6 +537,11 @@ public struct GitRepository: Sendable {
 	}
 
 	public func diff(path: String, staged: Bool = false) throws -> String {
+		if runner is ProcessGitCommandRunner {
+			let repository = try Libgit2.Repository.open(at: root)
+			let diff = try repository.diff(cached: staged, pathspec: [path])
+			return try diff.patchText()
+		}
 		var arguments = ["diff", "--no-color"]
 		if staged {
 			arguments.append("--cached")
@@ -569,6 +705,11 @@ public struct GitRepository: Sendable {
 			throw GitCommitError.emptySummary
 		}
 		let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
+		if runner is ProcessGitCommandRunner, !signoff, !amend {
+			let message = body.isEmpty ? summary : "\(summary)\n\n\(body)"
+			_ = try Libgit2.Repository.open(at: root).commit(message: message)
+			return
+		}
 		var arguments = ["commit"]
 		if signoff {
 			arguments.append("--signoff")
@@ -588,6 +729,32 @@ public struct GitRepository: Sendable {
 		return output.split(separator: "\0", omittingEmptySubsequences: true)
 			.map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
 			.filter { !$0.isEmpty }
+	}
+
+	public func blame(path: String) throws -> [GitBlameLine] {
+		if runner is ProcessGitCommandRunner {
+			return try Libgit2.Repository.open(at: root).blame(path: path)
+		}
+		let output = try runner.runGit(arguments: ["blame", "--line-porcelain", "--", path], root: root)
+		return GitBlameParser.parse(output)
+	}
+
+	public func fileHistory(path: String, limit: Int = 50) throws -> [GitHistoryEntry] {
+		let output = try runner.runGit(arguments: ["log", "-\(max(1, limit))", "--format=\(Self.historyFormat)", "--", path], root: root)
+		return GitHistoryParser.parse(output)
+	}
+
+	public func lineHistory(path: String, line: Int, limit: Int = 50) throws -> [GitHistoryEntry] {
+		let line = max(1, line)
+		let output = try runner.runGit(arguments: [
+			"log",
+			"-\(max(1, limit))",
+			"--format=\(Self.historyFormat)",
+			"--no-patch",
+			"-L",
+			"\(line),\(line):\(path)",
+		], root: root)
+		return GitHistoryParser.parse(output)
 	}
 
 	private func validatedStashRef(_ ref: String) throws -> String {
@@ -619,4 +786,6 @@ public struct GitRepository: Sendable {
 		let output = try runner.runGit(arguments: ["rev-parse", "--show-toplevel"], root: root)
 		return URL(fileURLWithPath: output.trimmingCharacters(in: .whitespacesAndNewlines), isDirectory: true)
 	}
+
+	private static let historyFormat = "%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00"
 }

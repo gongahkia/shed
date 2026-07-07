@@ -53,7 +53,27 @@ private enum GitCommitDraftStore {
 	}
 }
 
+private enum GitNavigationError: Error, CustomStringConvertible {
+	case noActiveFile
+	case outsideRepository
+
+	var description: String {
+		switch self {
+		case .noActiveFile:
+			return L10n.string("No active file")
+		case .outsideRepository:
+			return L10n.string("File is outside the Git repository")
+		}
+	}
+}
+
 final class GitCoordinator: NSObject {
+	private static let historyDateFormatter: DateFormatter = {
+		let formatter = DateFormatter()
+		formatter.dateFormat = "yyyy-MM-dd HH:mm"
+		return formatter
+	}()
+
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
 	private var gitPanel: NSPanel?
@@ -110,7 +130,10 @@ final class GitCoordinator: NSObject {
 	private var gitHunkItems: [GitDiffHunkItem] = []
 	private var gitUnifiedLineItems: [GitDiffLineItem] = []
 	private var gitRemoteProcess: Process?
+	private var gitRemoteCancelButton: NSButton?
+	private var gitRemoteWasCancelled = false
 	private var gitRemoteLog = ""
+	private var gitHistoryPanel: NSPanel?
 	private var gitConflictPanel: NSPanel?
 	private var gitConflictRootURL: URL?
 	private var gitConflictPath: String?
@@ -180,10 +203,12 @@ final class GitCoordinator: NSObject {
 		let fetchButton = NSButton(title: L10n.string("Fetch"), target: self, action: #selector(fetchGitRemote(_:)))
 		let pullButton = NSButton(title: L10n.string("Pull"), target: self, action: #selector(pullGitRemote(_:)))
 		let pushButton = NSButton(title: L10n.string("Push"), target: self, action: #selector(pushGitRemote(_:)))
+		let cancelButton = NSButton(title: L10n.string("Cancel"), target: self, action: #selector(cancelGitRemote(_:)))
+		cancelButton.isEnabled = false
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
 		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
 		let unstageButton = NSButton(title: L10n.string("Unstage"), target: self, action: #selector(unstageSelectedGitEntries(_:)))
-		let buttonStack = NSStackView(views: [branchButton, fetchButton, pullButton, pushButton, refreshButton, stageButton, unstageButton])
+		let buttonStack = NSStackView(views: [branchButton, fetchButton, pullButton, pushButton, cancelButton, refreshButton, stageButton, unstageButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -237,6 +262,7 @@ final class GitCoordinator: NSObject {
 		gitStatusLabel = statusLabel
 		gitTableView = tableView
 		gitBranchButton = branchButton
+		gitRemoteCancelButton = cancelButton
 	}
 
 	private func makeGitDiffPane() -> NSView {
@@ -836,6 +862,16 @@ final class GitCoordinator: NSObject {
 		}
 	}
 
+	@objc func cancelGitRemote(_ sender: Any?) {
+		guard let process = gitRemoteProcess else {
+			return
+		}
+		gitRemoteWasCancelled = true
+		gitStatusLabel?.textColor = .secondaryLabelColor
+		gitStatusLabel?.stringValue = L10n.string("Canceling Git remote command...")
+		process.terminate()
+	}
+
 	private func runGitRemoteOperation(title: String, arguments: [String]) {
 		guard let gitRootURL, gitRemoteProcess == nil else {
 			gitStatusLabel?.textColor = .systemRed
@@ -851,6 +887,8 @@ final class GitCoordinator: NSObject {
 		process.standardOutput = stdout
 		process.standardError = stderr
 		gitRemoteProcess = process
+		gitRemoteWasCancelled = false
+		gitRemoteCancelButton?.isEnabled = true
 		gitRemoteLog = "$ git \(arguments.joined(separator: " "))\n"
 		gitStatusLabel?.textColor = .secondaryLabelColor
 		gitStatusLabel?.stringValue = "\(title)..."
@@ -880,6 +918,13 @@ final class GitCoordinator: NSObject {
 					return
 				}
 				self.gitRemoteProcess = nil
+				self.gitRemoteCancelButton?.isEnabled = false
+				if self.gitRemoteWasCancelled {
+					self.gitRemoteWasCancelled = false
+					self.gitStatusLabel?.textColor = .secondaryLabelColor
+					self.gitStatusLabel?.stringValue = "\(title) canceled"
+					return
+				}
 				if process.terminationStatus == 0 {
 					self.gitStatusLabel?.textColor = .secondaryLabelColor
 					self.gitStatusLabel?.stringValue = "\(title) complete"
@@ -895,6 +940,8 @@ final class GitCoordinator: NSObject {
 			try process.run()
 		} catch {
 			gitRemoteProcess = nil
+			gitRemoteCancelButton?.isEnabled = false
+			gitRemoteWasCancelled = false
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
 		}
@@ -915,6 +962,124 @@ final class GitCoordinator: NSObject {
 		alert.accessoryView = scrollView
 		alert.addButton(withTitle: L10n.string("OK"))
 		alert.runModal()
+	}
+
+	@objc func showGitBlame(_ sender: Any?) {
+		do {
+			let context = try currentGitFileContext()
+			let lines = try GitRepository(root: context.root).blame(path: context.path)
+			let text = lines.map { line in
+				"\(line.line)\t\(shortOID(line.oid))\t\(line.author)\t\(line.summary)"
+			}.joined(separator: "\n")
+			showGitTextPanel(title: L10n.string("Git Blame"), subtitle: context.path, text: text.isEmpty ? L10n.string("No blame data") : text)
+		} catch {
+			showGitTextPanel(title: L10n.string("Git Blame"), subtitle: "", text: String(describing: error))
+		}
+	}
+
+	@objc func showGitFileHistory(_ sender: Any?) {
+		do {
+			let context = try currentGitFileContext()
+			let entries = try GitRepository(root: context.root).fileHistory(path: context.path)
+			showGitTextPanel(title: L10n.string("File History"), subtitle: context.path, text: renderGitHistory(entries))
+		} catch {
+			showGitTextPanel(title: L10n.string("File History"), subtitle: "", text: String(describing: error))
+		}
+	}
+
+	@objc func showGitLineHistory(_ sender: Any?) {
+		do {
+			let context = try currentGitFileContext()
+			let line = context.document.editor.textStorage.line(forOffset: context.document.editor.selections.primary.head) + 1
+			let entries = try GitRepository(root: context.root).lineHistory(path: context.path, line: line)
+			showGitTextPanel(title: L10n.string("Line History"), subtitle: "\(context.path):\(line)", text: renderGitHistory(entries))
+		} catch {
+			showGitTextPanel(title: L10n.string("Line History"), subtitle: "", text: String(describing: error))
+		}
+	}
+
+	private func currentGitFileContext() throws -> (document: ItsyDocument, root: URL, path: String) {
+		guard let document = activeDocumentProvider() as? ItsyDocument, let fileURL = document.fileURL else {
+			throw GitNavigationError.noActiveFile
+		}
+		let root = try GitRepository.discoverRoot(containing: fileURL)
+		return (document, root, try relativeGitPath(fileURL: fileURL, root: root))
+	}
+
+	private func relativeGitPath(fileURL: URL, root: URL) throws -> String {
+		let filePath = fileURL.standardizedFileURL.path
+		let rootPath = root.standardizedFileURL.path
+		if filePath == rootPath {
+			return fileURL.lastPathComponent
+		}
+		let prefix = rootPath.hasSuffix("/") ? rootPath : "\(rootPath)/"
+		guard filePath.hasPrefix(prefix) else {
+			throw GitNavigationError.outsideRepository
+		}
+		return String(filePath.dropFirst(prefix.count))
+	}
+
+	private func renderGitHistory(_ entries: [GitHistoryEntry]) -> String {
+		guard !entries.isEmpty else {
+			return L10n.string("No history")
+		}
+		return entries.map { entry in
+			"\(shortOID(entry.oid))\t\(formatGitDate(entry.date))\t\(entry.author)\t\(entry.summary)"
+		}.joined(separator: "\n")
+	}
+
+	private func showGitTextPanel(title: String, subtitle: String, text: String) {
+		gitHistoryPanel?.close()
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 760, height: 460),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = title
+		panel.isReleasedWhenClosed = false
+		let contentView = NSView()
+		let titleLabel = NSTextField(labelWithString: subtitle.isEmpty ? title : subtitle)
+		titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+		let scrollView = NSScrollView()
+		let textView = NSTextView()
+		textView.isEditable = false
+		textView.isSelectable = true
+		textView.isRichText = false
+		textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+		textView.string = text
+		scrollView.documentView = textView
+		scrollView.hasVerticalScroller = true
+		scrollView.hasHorizontalScroller = true
+		scrollView.borderType = .bezelBorder
+		contentView.addSubview(titleLabel)
+		contentView.addSubview(scrollView)
+		titleLabel.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		NSLayoutConstraint.activate([
+			titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+			scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
+		])
+		panel.contentView = contentView
+		centerGitPanel(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		panel.makeKeyAndOrderFront(nil)
+		gitHistoryPanel = panel
+	}
+
+	private func shortOID(_ oid: String) -> String {
+		String(oid.prefix(12))
+	}
+
+	private func formatGitDate(_ date: Date?) -> String {
+		guard let date else {
+			return ""
+		}
+		return Self.historyDateFormatter.string(from: date)
 	}
 
 	@objc func refreshGitChanges(_ sender: Any?) {

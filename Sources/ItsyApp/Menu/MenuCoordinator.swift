@@ -166,6 +166,10 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		addGitItem(to: gitMenu, title: L10n.string("Git Changes"), selector: #selector(GitCoordinator.showGitChanges(_:)))
 		addGitItem(to: gitMenu, title: L10n.string("Refresh Git Status"), selector: #selector(GitCoordinator.refreshGitChanges(_:)))
 		gitMenu.addItem(.separator())
+		addGitItem(to: gitMenu, title: L10n.string("Blame Current File"), selector: #selector(GitCoordinator.showGitBlame(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("File History"), selector: #selector(GitCoordinator.showGitFileHistory(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Line History"), selector: #selector(GitCoordinator.showGitLineHistory(_:)))
+		gitMenu.addItem(.separator())
 		addGitItem(to: gitMenu, title: L10n.string("Stashes"), selector: #selector(GitCoordinator.showGitStashes(_:)))
 		addGitItem(to: gitMenu, title: L10n.string("Stash Current Changes..."), selector: #selector(GitCoordinator.stashCurrentGitChanges(_:)), keyEquivalent: "S", modifiers: [.command, .shift])
 		gitMenu.addItem(.separator())
@@ -173,6 +177,7 @@ final class MenuCoordinator: NSObject, NSMenuDelegate {
 		addGitItem(to: gitMenu, title: L10n.string("Pull"), selector: #selector(GitCoordinator.pullGitRemote(_:)))
 		addGitItem(to: gitMenu, title: L10n.string("Pull Rebase"), selector: #selector(GitCoordinator.pullGitRemoteRebase(_:)))
 		addGitItem(to: gitMenu, title: L10n.string("Push"), selector: #selector(GitCoordinator.pushGitRemote(_:)))
+		addGitItem(to: gitMenu, title: L10n.string("Cancel Remote Operation"), selector: #selector(GitCoordinator.cancelGitRemote(_:)))
 		gitItem.submenu = gitMenu
 
 		let taskMenu = NSMenu(title: L10n.string("Tasks"))

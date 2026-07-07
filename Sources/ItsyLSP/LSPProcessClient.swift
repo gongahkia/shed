@@ -162,6 +162,34 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.executeCommand(command)
 	}
 
+	public func semanticTokensFull(uri: String) async throws -> LSPSemanticTokens? {
+		try await session.semanticTokensFull(uri: uri)
+	}
+
+	public func semanticTokensDelta(uri: String, previousResultId: String) async throws -> LSPSemanticTokensResult {
+		try await session.semanticTokensDelta(uri: uri, previousResultId: previousResultId)
+	}
+
+	public func semanticTokensRange(uri: String, range: LSPRange) async throws -> LSPSemanticTokens? {
+		try await session.semanticTokensRange(uri: uri, range: range)
+	}
+
+	public func inlayHints(uri: String, range: LSPRange) async throws -> [LSPInlayHint] {
+		try await session.inlayHints(uri: uri, range: range)
+	}
+
+	public func resolveInlayHint(_ hint: LSPInlayHint) async throws -> LSPInlayHint {
+		try await session.resolveInlayHint(hint)
+	}
+
+	public func foldingRanges(uri: String) async throws -> [LSPFoldingRange] {
+		try await session.foldingRanges(uri: uri)
+	}
+
+	public func documentHighlights(uri: String, position: LSPPosition) async throws -> [LSPDocumentHighlight] {
+		try await session.documentHighlights(uri: uri, position: position)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) async throws {
 		try await session.sendNotification(method: method, params: params)
 	}

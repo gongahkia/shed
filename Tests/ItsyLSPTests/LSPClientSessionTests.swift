@@ -275,6 +275,162 @@ import Testing
 	#expect(try await executeTask.value == .null)
 }
 
+@Test func clientSemanticSurfaceSendsTypedRequests() async throws {
+	let (session, transport) = try await initializedSession()
+	let uri = "file:///tmp/App.swift"
+	let range = LSPRange(start: LSPPosition(line: 1, character: 0), end: LSPPosition(line: 4, character: 0))
+	let fullTask = Task {
+		try await session.semanticTokensFull(uri: uri)
+	}
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.textDocumentSemanticTokensFull,
+		params: .object(["textDocument": .object(["uri": .string(uri)])])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .object(["resultId": .string("1"), "data": .array([.int(0), .int(0), .int(3), .int(1), .int(0)])])
+	))))
+	#expect(try await fullTask.value?.resultId == "1")
+
+	let deltaTask = Task {
+		try await session.semanticTokensDelta(uri: uri, previousResultId: "1")
+	}
+	try await transport.waitForWriteCount(4)
+	#expect(try transport.message(at: 3) == .request(JSONRPCRequestMessage(
+		id: .int(3),
+		method: LSPMethod.textDocumentSemanticTokensFullDelta,
+		params: .object([
+			"textDocument": .object(["uri": .string(uri)]),
+			"previousResultId": .string("1"),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(3),
+		result: .object(["resultId": .string("2"), "edits": .array([.object([
+			"start": .int(0),
+			"deleteCount": .int(1),
+			"data": .array([.int(1)]),
+		])])])
+	))))
+	if case let .delta(delta) = try await deltaTask.value {
+		#expect(delta.resultId == "2")
+		#expect(delta.edits.first?.start == 0)
+	} else {
+		Issue.record("expected semantic token delta")
+	}
+
+	let rangeTask = Task {
+		try await session.semanticTokensRange(uri: uri, range: range)
+	}
+	try await transport.waitForWriteCount(5)
+	#expect(try transport.message(at: 4) == .request(JSONRPCRequestMessage(
+		id: .int(4),
+		method: LSPMethod.textDocumentSemanticTokensRange,
+		params: .object([
+			"textDocument": .object(["uri": .string(uri)]),
+			"range": .object([
+				"start": .object(["line": .int(1), "character": .int(0)]),
+				"end": .object(["line": .int(4), "character": .int(0)]),
+			]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(4),
+		result: .object(["data": .array([.int(0), .int(1), .int(2), .int(0), .int(0)])])
+	))))
+	#expect(try await rangeTask.value?.data.count == 5)
+
+	let inlayTask = Task {
+		try await session.inlayHints(uri: uri, range: range)
+	}
+	try await transport.waitForWriteCount(6)
+	#expect(try transport.message(at: 5) == .request(JSONRPCRequestMessage(
+		id: .int(5),
+		method: LSPMethod.textDocumentInlayHint,
+		params: .object([
+			"textDocument": .object(["uri": .string(uri)]),
+			"range": .object([
+				"start": .object(["line": .int(1), "character": .int(0)]),
+				"end": .object(["line": .int(4), "character": .int(0)]),
+			]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(5),
+		result: .array([.object([
+			"position": .object(["line": .int(2), "character": .int(4)]),
+			"label": .string(": Int"),
+			"kind": .int(1),
+		])])
+	))))
+	let hints = try await inlayTask.value
+	#expect(hints.first?.label.text == ": Int")
+
+	let resolveTask = Task {
+		try await session.resolveInlayHint(hints[0])
+	}
+	try await transport.waitForWriteCount(7)
+	#expect(try transport.message(at: 6) == .request(JSONRPCRequestMessage(
+		id: .int(6),
+		method: LSPMethod.inlayHintResolve,
+		params: .object([
+			"position": .object(["line": .int(2), "character": .int(4)]),
+			"label": .string(": Int"),
+			"kind": .int(1),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(6),
+		result: .object([
+			"position": .object(["line": .int(2), "character": .int(4)]),
+			"label": .string(": Int"),
+			"tooltip": .string("type"),
+		])
+	))))
+	#expect(try await resolveTask.value.tooltip == .string("type"))
+
+	let foldingTask = Task {
+		try await session.foldingRanges(uri: uri)
+	}
+	try await transport.waitForWriteCount(8)
+	#expect(try transport.message(at: 7) == .request(JSONRPCRequestMessage(
+		id: .int(7),
+		method: LSPMethod.textDocumentFoldingRange,
+		params: .object(["textDocument": .object(["uri": .string(uri)])])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(7),
+		result: .array([.object(["startLine": .int(0), "endLine": .int(3), "kind": .string("region")])])
+	))))
+	#expect(try await foldingTask.value.first?.endLine == 3)
+
+	let highlightTask = Task {
+		try await session.documentHighlights(uri: uri, position: LSPPosition(line: 2, character: 4))
+	}
+	try await transport.waitForWriteCount(9)
+	#expect(try transport.message(at: 8) == .request(JSONRPCRequestMessage(
+		id: .int(8),
+		method: LSPMethod.textDocumentDocumentHighlight,
+		params: .object([
+			"textDocument": .object(["uri": .string(uri)]),
+			"position": .object(["line": .int(2), "character": .int(4)]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(8),
+		result: .array([.object([
+			"range": .object([
+				"start": .object(["line": .int(2), "character": .int(4)]),
+				"end": .object(["line": .int(2), "character": .int(7)]),
+			]),
+			"kind": .int(2),
+		])])
+	))))
+	#expect(try await highlightTask.value.first?.kind == .read)
+}
+
 @Test func clientReturnsServerNotificationsAsEvents() async throws {
 	let (session, _) = try await initializedSession()
 	let diagnostics = JSONRPCMessage.notification(JSONRPCNotificationMessage(

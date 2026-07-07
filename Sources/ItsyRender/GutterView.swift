@@ -19,6 +19,9 @@ final class GutterView: NSView {
 	var visibleLineRange: Range<Int> = 0 ..< 0 {
 		didSet { needsDisplay = true }
 	}
+	var visibleLineSlots: [Int] = [] {
+		didSet { needsDisplay = true }
+	}
 	var topLineIndex = 0 {
 		didSet { needsDisplay = true }
 	}
@@ -65,7 +68,8 @@ final class GutterView: NSView {
 		guard showsLineNumbers else {
 			return []
 		}
-		return visibleLineRange.map { "\($0 + 1)" }
+		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
+		return lines.map { "\($0 + 1)" }
 	}
 
 	override func draw(_ dirtyRect: NSRect) {
@@ -79,12 +83,13 @@ final class GutterView: NSView {
 			return
 		}
 		let attributes = lineNumberAttributes
-		for lineIndex in visibleLineRange {
+		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
+		for (row, lineIndex) in lines.enumerated() {
 			let label = "\(lineIndex + 1)"
 			let size = label.size(withAttributes: attributes)
 			let origin = CGPoint(
 				x: lineNumberRightEdge - size.width,
-				y: topContentInset + textInsetY + CGFloat(lineIndex - topLineIndex) * lineHeight + max(0, (lineHeight - size.height) / 2)
+				y: topContentInset + textInsetY + CGFloat(row) * lineHeight + max(0, (lineHeight - size.height) / 2)
 			)
 			let rect = CGRect(origin: origin, size: size)
 			guard rect.intersects(dirtyRect) else {
@@ -103,6 +108,12 @@ final class GutterView: NSView {
 			context.setFillColor(Self.cgColor(from: color))
 			if layout.marker.shape == .dot {
 				context.fillEllipse(in: layout.rect)
+			} else if layout.marker.shape == .foldOpen {
+				context.addPath(Self.foldOpenPath(in: layout.rect))
+				context.fillPath()
+			} else if layout.marker.shape == .foldClosed {
+				context.addPath(Self.foldClosedPath(in: layout.rect))
+				context.fillPath()
 			} else if layout.marker.placement == .betweenLines {
 				for slice in caretSlices(for: layout.rect) where slice.width > 0 {
 					context.fill(slice)
@@ -157,5 +168,23 @@ final class GutterView: NSView {
 			blue: CGFloat(color.z),
 			alpha: CGFloat(color.w)
 		)
+	}
+
+	private static func foldOpenPath(in rect: CGRect) -> CGPath {
+		let path = CGMutablePath()
+		path.move(to: CGPoint(x: rect.minX + 1, y: rect.minY + 3))
+		path.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.minY + 3))
+		path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - 2))
+		path.closeSubpath()
+		return path
+	}
+
+	private static func foldClosedPath(in rect: CGRect) -> CGPath {
+		let path = CGMutablePath()
+		path.move(to: CGPoint(x: rect.minX + 3, y: rect.minY + 1))
+		path.addLine(to: CGPoint(x: rect.maxX - 2, y: rect.midY))
+		path.addLine(to: CGPoint(x: rect.minX + 3, y: rect.maxY - 1))
+		path.closeSubpath()
+		return path
 	}
 }

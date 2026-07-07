@@ -33,6 +33,22 @@ import Testing
 		let actionKind = literalSupport?["codeActionKind"] as? [String: Any]
 		#expect((actionKind?["valueSet"] as? [String])?.contains("refactor.extract") == true)
 		#expect((actionKind?["valueSet"] as? [String])?.contains("source.organizeImports") == true)
+		let semanticTokens = textDocument?["semanticTokens"] as? [String: Any]
+		let semanticRequests = semanticTokens?["requests"] as? [String: Any]
+		#expect(semanticRequests?["range"] as? Bool == true)
+		#expect((semanticRequests?["full"] as? [String: Any])?["delta"] as? Bool == true)
+		#expect((semanticTokens?["tokenTypes"] as? [String])?.contains("decorator") == true)
+		#expect(semanticTokens?["formats"] as? [String] == ["relative"])
+		#expect(semanticTokens?["augmentsSyntaxTokens"] as? Bool == true)
+		let inlayHint = textDocument?["inlayHint"] as? [String: Any]
+		let inlayResolve = inlayHint?["resolveSupport"] as? [String: Any]
+		#expect((inlayResolve?["properties"] as? [String])?.contains("label.location") == true)
+		let foldingRange = textDocument?["foldingRange"] as? [String: Any]
+		#expect(foldingRange?["lineFoldingOnly"] as? Bool == true)
+		let foldingKind = foldingRange?["foldingRangeKind"] as? [String: Any]
+		#expect(foldingKind?["valueSet"] as? [String] == ["comment", "imports", "region"])
+		let documentHighlight = textDocument?["documentHighlight"] as? [String: Any]
+		#expect(documentHighlight?["dynamicRegistration"] as? Bool == false)
 
 		let workspace = json?["workspace"] as? [String: Any]
 	#expect(workspace?["applyEdit"] as? Bool == true)

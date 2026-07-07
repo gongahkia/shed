@@ -24,6 +24,18 @@ public struct TextHighlightSpan: Sendable, Equatable {
 	}
 }
 
+public struct TextInlineAnnotation: Sendable, Equatable {
+	public var offset: Int
+	public var label: String
+	public var color: SIMD4<Float>
+
+	public init(offset: Int, label: String, color: SIMD4<Float> = SIMD4<Float>(0.45, 0.48, 0.54, 1.0)) {
+		self.offset = offset
+		self.label = label
+		self.color = color
+	}
+}
+
 public struct GutterMarker: Sendable, Equatable {
 	public var id: String
 	public var line: Int
@@ -60,6 +72,8 @@ public enum GutterMarkerPlacement: Sendable, Equatable {
 public enum GutterMarkerShape: Sendable, Equatable {
 	case bar
 	case dot
+	case foldOpen
+	case foldClosed
 }
 
 public protocol GutterDecorator: AnyObject {
@@ -147,6 +161,8 @@ public final class MetalTextView: NSView {
 	private var selectionRects: [CGRect] = []
 	var findMatchRanges: [Range<Int>] = []
 	var findMatchRects: [CGRect] = []
+	var documentHighlightRanges: [Range<Int>] = []
+	var documentHighlightRects: [CGRect] = []
 	private var lastReportedVisibleLineRange: Range<Int> = 0 ..< 0
 	private var gutterTrackingArea: NSTrackingArea?
 	private var gutterPopover: NSPopover?
@@ -157,6 +173,12 @@ public final class MetalTextView: NSView {
 			highlightRevision += 1
 			markDirty()
 		}
+	}
+	public var inlayHintAnnotations: [TextInlineAnnotation] = [] {
+		didSet { markDirty() }
+	}
+	public var foldedLineRanges: [Range<Int>] = [] {
+		didSet { syncEditorState() }
 	}
 	public weak var gutterDecorator: GutterDecorator? {
 		didSet {
@@ -466,6 +488,36 @@ public final class MetalTextView: NSView {
 		return topLineIndex ..< end
 	}
 
+	private func visibleLineSlots() -> [(line: Int, row: Int)] {
+		let capacity = visibleDisplayLineCapacity
+		guard capacity > 0, lineCount > 0 else {
+			return []
+		}
+		var slots: [(line: Int, row: Int)] = []
+		var line = min(max(topLineIndex, 0), max(0, lineCount - 1))
+		while line < lineCount, slots.count < capacity {
+			if let folded = foldedLineRanges.first(where: { $0.contains(line) }) {
+				line = min(max(line + 1, folded.upperBound), lineCount)
+				continue
+			}
+			slots.append((line, slots.count))
+			line += 1
+		}
+		return slots
+	}
+
+	private var visibleDisplayLineCapacity: Int {
+		guard lineHeight > 0 else {
+			return 0
+		}
+		let visibleHeight = max(0, bounds.height - topContentInset - textInset.y)
+		return max(1, Int(ceil(visibleHeight / max(lineHeight, 1))) + 1)
+	}
+
+	func visibleRow(for line: Int) -> Int? {
+		visibleLineSlots().first { $0.line == line }?.row
+	}
+
 	private func reportVisibleLineRangeIfNeeded() {
 		let range = visibleLineRange
 		guard range != lastReportedVisibleLineRange else {
@@ -488,6 +540,7 @@ public final class MetalTextView: NSView {
 		gutterView.showsLineNumbers = showLineNumbers
 		gutterView.lineCount = lineCount
 		gutterView.visibleLineRange = visibleLineRange
+		gutterView.visibleLineSlots = visibleLineSlots().map { $0.line }
 		gutterView.topLineIndex = topLineIndex
 		gutterView.topContentInset = topContentInset
 		gutterView.textInsetY = textInset.y
@@ -829,6 +882,7 @@ public final class MetalTextView: NSView {
 		var instances: [MetalGlyphInstance] = []
 		appendTextGlyphInstances(scale: scale, into: &instances)
 		appendHighlightGlyphInstances(scale: scale, into: &instances)
+		appendInlayHintGlyphInstances(scale: scale, into: &instances)
 		return instances
 	}
 
@@ -860,7 +914,8 @@ public final class MetalTextView: NSView {
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
 		let storage = editor.textStorage
-		for lineIndex in visibleLineRange {
+		for slot in visibleLineSlots() {
+			let lineIndex = slot.line
 			let lineRange = storage.lineRange(lineIndex)
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
@@ -874,7 +929,7 @@ public final class MetalTextView: NSView {
 			guard !glyphs.isEmpty else {
 				continue
 			}
-			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			let y = topContentInset + textInset.y + CGFloat(slot.row) * lineHeight
 			for glyph in glyphs {
 				let pixelX = ((textInset.x + glyph.originX - xOffset) * scale).rounded()
 				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
@@ -898,7 +953,8 @@ public final class MetalTextView: NSView {
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
 		let storage = editor.textStorage
-		for lineIndex in visibleLineRange {
+		for slot in visibleLineSlots() {
+			let lineIndex = slot.line
 			let lineRange = storage.lineRange(lineIndex)
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
@@ -912,7 +968,7 @@ public final class MetalTextView: NSView {
 			guard !glyphs.isEmpty else {
 				continue
 			}
-			let y = topContentInset + textInset.y + CGFloat(lineIndex - topLineIndex) * lineHeight
+			let y = topContentInset + textInset.y + CGFloat(slot.row) * lineHeight
 			for glyph in glyphs {
 				let absoluteRange = (lineRange.lowerBound + glyph.sourceUTF8Range.lowerBound) ..< (lineRange.lowerBound + glyph.sourceUTF8Range.upperBound)
 				guard let color = highlightColor(for: absoluteRange, lineIndex: lineIndex, lineRange: lineRange) else {
@@ -925,6 +981,40 @@ public final class MetalTextView: NSView {
 					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
 					atlasUV: glyph.atlasUV,
 					color: color
+				))
+			}
+		}
+	}
+
+	private func appendInlayHintGlyphInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		guard ensureGlyphAtlas(scale: scale), !inlayHintAnnotations.isEmpty else {
+			return
+		}
+		let shaper = LineShaper()
+		let storage = editor.textStorage
+		let rowsByLine = Dictionary(uniqueKeysWithValues: visibleLineSlots().map { ($0.line, $0.row) })
+		for annotation in inlayHintAnnotations.sorted(by: { $0.offset < $1.offset }) {
+			let offset = min(max(annotation.offset, 0), storage.length)
+			let lineIndex = storage.line(forOffset: offset)
+			guard let row = rowsByLine[lineIndex] else {
+				continue
+			}
+			let lineRange = storage.lineRange(lineIndex)
+			let prefix = storage.substring(lineRange.lowerBound ..< min(offset, lineRange.upperBound))
+			let label = " " + annotation.label + " "
+			guard let glyphs = shapeCachedGlyphs(line: label, scale: scale, shaper: shaper) else {
+				continue
+			}
+			let x = textInset.x + typographicWidth(prefix) - xOffset + 4
+			let y = topContentInset + textInset.y + CGFloat(row) * lineHeight
+			for glyph in glyphs {
+				let pixelX = ((x + glyph.originX) * scale).rounded()
+				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
+				instances.append(MetalGlyphInstance(
+					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
+					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
+					atlasUV: glyph.atlasUV,
+					color: annotation.color
 				))
 			}
 		}
@@ -1175,6 +1265,7 @@ public final class MetalTextView: NSView {
 		renderTextInstances(textInstanceScratch, encoder: encoder, drawableSize: drawableSize, scale: scale)
 		highlightInstanceScratch.removeAll(keepingCapacity: true)
 		appendHighlightGlyphInstances(scale: scale, into: &highlightInstanceScratch)
+		appendInlayHintGlyphInstances(scale: scale, into: &highlightInstanceScratch)
 		renderTextInstances(highlightInstanceScratch, encoder: encoder, drawableSize: drawableSize, scale: scale)
 	}
 
@@ -1377,6 +1468,7 @@ public final class MetalTextView: NSView {
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
 		refreshFindMatchRects()
+		refreshDocumentHighlightRects()
 		refreshGutterMarkerRects()
 		refreshAccessibilityValue()
 		markDirty()
@@ -1419,7 +1511,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		let markers = gutterDecorator.gutterMarkers(in: visibleLineRange, for: self)
-			.filter { visibleLineRange.contains($0.line) }
+			.filter { visibleRow(for: $0.line) != nil }
 			.sorted {
 				if $0.line != $1.line {
 					return $0.line < $1.line
@@ -1430,7 +1522,8 @@ public final class MetalTextView: NSView {
 		gutterView.markerLayouts = markers.map { marker in
 			let slot = slotsByLine[marker.line, default: 0]
 			slotsByLine[marker.line] = slot + 1
-			let lineY = topContentInset + textInset.y + CGFloat(marker.line - topLineIndex) * lineHeight
+			let row = visibleRow(for: marker.line) ?? 0
+			let lineY = topContentInset + textInset.y + CGFloat(row) * lineHeight
 			let x = max(3, gutterWidth - 7 - CGFloat(slot % 3) * 6)
 			if marker.placement == .betweenLines {
 				let rect = CGRect(
@@ -1445,6 +1538,16 @@ public final class MetalTextView: NSView {
 				let size = min(10, max(7, lineHeight - 8))
 				let rect = CGRect(
 					x: max(3, x - size / 2),
+					y: lineY + max(2, (lineHeight - size) / 2),
+					width: size,
+					height: size
+				)
+				return GutterMarkerLayout(marker: marker, rect: rect)
+			}
+			if marker.shape == .foldOpen || marker.shape == .foldClosed {
+				let size = min(10, max(7, lineHeight - 8))
+				let rect = CGRect(
+					x: max(4, gutterWidth - size - 2),
 					y: lineY + max(2, (lineHeight - size) / 2),
 					width: size,
 					height: size

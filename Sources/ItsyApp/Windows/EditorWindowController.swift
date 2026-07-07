@@ -23,6 +23,52 @@ private enum LSPWorkspaceEditFileError: Error {
 	case nonUTF8(URL)
 }
 
+private struct LSPSemanticSurfaceCapabilities {
+	var semanticTokens: LSPSemanticTokensOptions?
+	var inlayHint: Bool
+	var foldingRange: Bool
+	var documentHighlight: Bool
+}
+
+private struct LSPSemanticTokenState {
+	var resultId: String?
+	var data: [Int]
+}
+
+private final class LSPFoldGutterDecorator: GutterDecorator {
+	var ranges: [LSPFoldingRange] = []
+	var collapsedStartLines: Set<Int> = []
+	var toggleFold: ((Int) -> Void)?
+
+	func gutterMarkers(in lineRange: Range<Int>, for _: MetalTextView) -> [GutterMarker] {
+		ranges.compactMap { range in
+			guard range.endLine > range.startLine, lineRange.contains(range.startLine) else {
+				return nil
+			}
+			let collapsed = collapsedStartLines.contains(range.startLine)
+			return GutterMarker(
+				id: "fold-\(range.startLine)-\(range.endLine)",
+				line: range.startLine,
+				severity: .hint,
+				message: collapsed ? "folded" : "fold",
+				color: SIMD4<Float>(0.54, 0.57, 0.62, 1.0),
+				shape: collapsed ? .foldClosed : .foldOpen
+			)
+		}
+	}
+
+	func gutterMarkerClicked(_ marker: GutterMarker, in _: MetalTextView) {
+		guard marker.id.hasPrefix("fold-") else {
+			return
+		}
+		toggleFold?(marker.line)
+	}
+
+	func gutterPopoverViewController(for _: GutterMarker, in _: MetalTextView) -> NSViewController? {
+		nil
+	}
+}
+
 final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
@@ -64,6 +110,13 @@ final class EditorWindowController: NSWindowController {
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var codeActionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var semanticSurfaceCapabilitiesBySession: [LSPSessionKey: LSPSemanticSurfaceCapabilities] = [:]
+	private var semanticTokenStateByURI: [String: LSPSemanticTokenState] = [:]
+	private var foldingRangesByURI: [String: [LSPFoldingRange]] = [:]
+	private var collapsedFoldStartsByURI: [String: Set<Int>] = [:]
+	private let lspFoldGutterDecorator = LSPFoldGutterDecorator()
+	private var lspSurfaceRefreshTask: Task<Void, Never>?
+	private var lspSurfaceGeneration = 0
 	private var lspMissingBannerGeneration = 0
 	private var lspStatusGeneration = 0
 	private var indexingStatusText: String?
@@ -150,6 +203,7 @@ final class EditorWindowController: NSWindowController {
 		renamePopover?.close()
 		codeActionPopover?.close()
 		signatureHelpPopover?.close()
+		lspSurfaceRefreshTask?.cancel()
 		for task in lspSupervisorTasks.values {
 			task.cancel()
 		}
@@ -626,6 +680,13 @@ final class EditorWindowController: NSWindowController {
 		recordBenchStage("editor_pane_install_begin")
 		let view = pane.editorView
 		document.attach(view)
+		document.setLSPGutterDecorator(lspFoldGutterDecorator)
+		document.lspSurfaceRefreshRequested = { [weak self] in
+			self?.scheduleLSPSemanticSurfaceRefresh()
+		}
+		lspFoldGutterDecorator.toggleFold = { [weak self] line in
+			self?.toggleFold(startLine: line)
+		}
 		recordBenchStage("editor_pane_attach_end")
 		recordBenchStage("editor_pane_preferences_begin")
 		let preferences = EditorPreferences.load()
@@ -664,6 +725,7 @@ final class EditorWindowController: NSWindowController {
 		view.exCommandLineRequested = { [weak self] completion in
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
+		scheduleLSPSemanticSurfaceRefresh()
 		recordBenchStage("editor_pane_callbacks_end")
 		recordBenchStage("editor_pane_install_end")
 	}
@@ -831,6 +893,12 @@ final class EditorWindowController: NSWindowController {
 			return formatSelection(nil)
 		case "lsp.codeAction":
 			return showCodeActions(nil)
+		case "vim.fold.close":
+			return closeFoldAtCursor()
+		case "vim.fold.open":
+			return openFoldAtCursor()
+		case "vim.fold.toggle":
+			return toggleFoldAtCursor()
 		default:
 			if commandID.hasPrefix("extension:") {
 				return ItsyAppCommandBridge.requestRunCommand(commandID)
@@ -870,6 +938,87 @@ final class EditorWindowController: NSWindowController {
 	@discardableResult
 	func showCodeActions(_: Any?) -> Bool {
 		requestCodeActions(in: editorView)
+	}
+
+	@discardableResult
+	private func closeFoldAtCursor() -> Bool {
+		setFoldAtCursor(collapsed: true)
+	}
+
+	@discardableResult
+	private func openFoldAtCursor() -> Bool {
+		setFoldAtCursor(collapsed: false)
+	}
+
+	@discardableResult
+	private func toggleFoldAtCursor() -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let uri = document.fileURL?.standardizedFileURL.absoluteString,
+			let range = foldRangeAtCursor(uri: uri)
+		else {
+			return false
+		}
+		toggleFold(startLine: range.startLine)
+		return true
+	}
+
+	private func setFoldAtCursor(collapsed: Bool) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let uri = document.fileURL?.standardizedFileURL.absoluteString,
+			let range = foldRangeAtCursor(uri: uri)
+		else {
+			return false
+		}
+		var starts = collapsedFoldStartsByURI[uri, default: []]
+		if collapsed {
+			starts.insert(range.startLine)
+		} else {
+			starts.remove(range.startLine)
+		}
+		collapsedFoldStartsByURI[uri] = starts
+		applyFoldState(uri: uri, document: document)
+		return true
+	}
+
+	private func toggleFold(startLine: Int) {
+		guard let document = document as? ItsyDocument, let uri = document.fileURL?.standardizedFileURL.absoluteString else {
+			return
+		}
+		var starts = collapsedFoldStartsByURI[uri, default: []]
+		if starts.contains(startLine) {
+			starts.remove(startLine)
+		} else {
+			starts.insert(startLine)
+		}
+		collapsedFoldStartsByURI[uri] = starts
+		applyFoldState(uri: uri, document: document)
+	}
+
+	private func foldRangeAtCursor(uri: String) -> LSPFoldingRange? {
+		let line = editorView.editor.textStorage.line(forOffset: editorView.editor.selections.primary.head)
+		return foldingRangesByURI[uri]?
+			.filter { $0.startLine <= line && line <= $0.endLine && $0.endLine > $0.startLine }
+			.sorted { ($0.endLine - $0.startLine) < ($1.endLine - $1.startLine) }
+			.first
+	}
+
+	private func applyFoldState(uri: String, document: ItsyDocument) {
+		let ranges = foldingRangesByURI[uri] ?? []
+		let collapsedStarts = collapsedFoldStartsByURI[uri, default: []]
+		let hidden = ranges.compactMap { range -> Range<Int>? in
+			guard collapsedStarts.contains(range.startLine), range.endLine > range.startLine else {
+				return nil
+			}
+			return (range.startLine + 1) ..< (range.endLine + 1)
+		}
+		lspFoldGutterDecorator.ranges = ranges
+		lspFoldGutterDecorator.collapsedStartLines = collapsedStarts
+		document.setLSPGutterDecorator(lspFoldGutterDecorator)
+		for pane in paneCoordinator.panes {
+			pane.editorView.foldedLineRanges = hidden
+		}
 	}
 
 	@MainActor
@@ -1295,6 +1444,256 @@ final class EditorWindowController: NSWindowController {
 		)
 	}
 
+	private func scheduleLSPSemanticSurfaceRefresh() {
+		lspSurfaceGeneration += 1
+		let generation = lspSurfaceGeneration
+		lspSurfaceRefreshTask?.cancel()
+		lspSurfaceRefreshTask = Task { [weak self] in
+			do {
+				try await Task.sleep(nanoseconds: 150_000_000)
+			} catch {
+				return
+			}
+			guard !Task.isCancelled else {
+				return
+			}
+			await MainActor.run { [weak self] in
+				guard let self, generation == self.lspSurfaceGeneration else {
+					return
+				}
+				self.requestLSPSemanticSurface(generation: generation)
+			}
+		}
+	}
+
+	private func requestLSPSemanticSurface(generation: Int) {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL
+		else {
+			return
+		}
+		let targetView = editorView
+		let content = editorStorageString(targetView.editor)
+		let uri = fileURL.standardizedFileURL.absoluteString
+		let visibleRange = lspRange(forUTF8Range: visibleUTF8Range(in: targetView), in: content)
+		let cursorOffset = targetView.editor.selections.primary.head
+		let cursorPosition = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
+		Task { [weak self] in
+			guard let self else {
+				return
+			}
+			do {
+				let session = try await self.ensureLSPSession(for: fileURL)
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let capabilities = await MainActor.run {
+					self.semanticSurfaceCapabilitiesBySession[session.key]
+				}
+				let semanticSpans = try await self.semanticHighlightSpans(
+					client: session.client,
+					uri: uri,
+					content: content,
+					visibleRange: visibleRange,
+					capability: capabilities?.semanticTokens
+				)
+				let inlayHints = capabilities?.inlayHint == true
+					? ((try? await session.client.inlayHints(uri: uri, range: visibleRange)) ?? [])
+					: []
+				let foldingRanges = capabilities?.foldingRange == true
+					? ((try? await session.client.foldingRanges(uri: uri)) ?? [])
+					: []
+				let documentHighlights = capabilities?.documentHighlight == true
+					? ((try? await session.client.documentHighlights(uri: uri, position: cursorPosition)) ?? [])
+					: []
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.lspSurfaceGeneration else {
+						return
+					}
+					self.applyLSPSemanticSurface(
+						uri: uri,
+						content: content,
+						document: document,
+						semanticSpans: semanticSpans,
+						inlayHints: inlayHints,
+						foldingRanges: foldingRanges,
+						documentHighlights: documentHighlights
+					)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					self?.handleLSPRequestError(error)
+				}
+			}
+		}
+	}
+
+	private func visibleUTF8Range(in view: MetalTextView) -> Range<Int> {
+		let storage = view.editor.textStorage
+		let lines = view.visibleLineRange
+		guard !lines.isEmpty else {
+			return 0 ..< storage.length
+		}
+		let lowerLine = min(max(lines.lowerBound, 0), max(0, storage.lineCount - 1))
+		let upperLine = min(max(lines.upperBound, lowerLine), storage.lineCount)
+		let lower = storage.offset(forLine: lowerLine)
+		let upper = upperLine < storage.lineCount ? storage.offset(forLine: upperLine) : storage.length
+		return lower ..< max(lower, upper)
+	}
+
+	private func semanticHighlightSpans(
+		client: LSPProcessClient,
+		uri: String,
+		content: String,
+		visibleRange: LSPRange,
+		capability: LSPSemanticTokensOptions?
+	) async throws -> [TextHighlightSpan] {
+		guard let capability else {
+			await MainActor.run {
+				self.semanticTokenStateByURI[uri] = nil
+			}
+			return []
+		}
+		let tokens: LSPSemanticTokens?
+		if capability.full?.isEnabled == true {
+			let previous = await MainActor.run {
+				self.semanticTokenStateByURI[uri]
+			}
+			if capability.full?.supportsDelta == true, let previous, let resultId = previous.resultId {
+				let result = try await client.semanticTokensDelta(uri: uri, previousResultId: resultId)
+				switch result {
+				case let .tokens(full):
+					tokens = full
+					await MainActor.run {
+						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(resultId: full.resultId, data: full.data)
+					}
+				case let .delta(delta):
+					let data = Self.applySemanticTokenDelta(delta, to: previous.data)
+					tokens = LSPSemanticTokens(resultId: delta.resultId ?? previous.resultId, data: data)
+					await MainActor.run {
+						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(resultId: delta.resultId ?? previous.resultId, data: data)
+					}
+				case .none:
+					tokens = nil
+				}
+			} else {
+				let full = try await client.semanticTokensFull(uri: uri)
+				tokens = full
+				await MainActor.run {
+					self.semanticTokenStateByURI[uri] = full.map { LSPSemanticTokenState(resultId: $0.resultId, data: $0.data) }
+				}
+			}
+		} else if capability.range?.isEnabled == true {
+			tokens = try await client.semanticTokensRange(uri: uri, range: visibleRange)
+		} else {
+			tokens = nil
+		}
+		guard let tokens else {
+			return []
+		}
+		return Self.semanticHighlightSpans(from: tokens, legend: capability.legend, content: content)
+	}
+
+	private static func applySemanticTokenDelta(_ delta: LSPSemanticTokensDelta, to previous: [Int]) -> [Int] {
+		var data = previous
+		for edit in delta.edits.sorted(by: { $0.start > $1.start }) {
+			let start = min(max(edit.start, 0), data.count)
+			let end = min(max(start, start + edit.deleteCount), data.count)
+			data.replaceSubrange(start ..< end, with: edit.data ?? [])
+		}
+		return data
+	}
+
+	private static func semanticHighlightSpans(
+		from tokens: LSPSemanticTokens,
+		legend: LSPSemanticTokensLegend,
+		content: String
+	) -> [TextHighlightSpan] {
+		var spans: [TextHighlightSpan] = []
+		var line = 0
+		var character = 0
+		var index = 0
+		while index + 4 < tokens.data.count {
+			let deltaLine = tokens.data[index]
+			let deltaStart = tokens.data[index + 1]
+			let length = tokens.data[index + 2]
+			let tokenTypeIndex = tokens.data[index + 3]
+			index += 5
+			line += deltaLine
+			character = deltaLine == 0 ? character + deltaStart : deltaStart
+			guard tokenTypeIndex >= 0, tokenTypeIndex < legend.tokenTypes.count else {
+				continue
+			}
+			let type = legend.tokenTypes[tokenTypeIndex]
+			guard let color = semanticTokenColor(for: type) else {
+				continue
+			}
+			let range = LSPRange(
+				start: LSPPosition(line: line, character: character),
+				end: LSPPosition(line: line, character: character + length)
+			)
+			guard let utf8Range = LSPTextEditApply.utf8Range(for: range, in: content), !utf8Range.isEmpty else {
+				continue
+			}
+			spans.append(TextHighlightSpan(range: utf8Range, color: color))
+		}
+		return spans
+	}
+
+	private static func semanticTokenColor(for type: String) -> SIMD4<Float>? {
+		switch type {
+		case "keyword", "modifier", "operator":
+			return SIMD4<Float>(0.12, 0.32, 0.78, 1.0)
+		case "string", "regexp":
+			return SIMD4<Float>(0.08, 0.45, 0.28, 1.0)
+		case "number":
+			return SIMD4<Float>(0.76, 0.38, 0.10, 1.0)
+		case "comment":
+			return SIMD4<Float>(0.45, 0.49, 0.54, 1.0)
+		case "class", "enum", "interface", "struct", "type", "typeParameter":
+			return SIMD4<Float>(0.43, 0.22, 0.72, 1.0)
+		case "function", "method", "macro":
+			return SIMD4<Float>(0.48, 0.26, 0.10, 1.0)
+		case "parameter", "variable", "property", "enumMember":
+			return SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
+		default:
+			return nil
+		}
+	}
+
+	private func applyLSPSemanticSurface(
+		uri: String,
+		content: String,
+		document: ItsyDocument,
+		semanticSpans: [TextHighlightSpan],
+		inlayHints: [LSPInlayHint],
+		foldingRanges: [LSPFoldingRange],
+		documentHighlights: [LSPDocumentHighlight]
+	) {
+		document.setLSPSemanticHighlightSpans(semanticSpans)
+		let annotations = inlayHints.compactMap { hint -> TextInlineAnnotation? in
+			let range = LSPRange(start: hint.position, end: hint.position)
+			guard let offset = LSPTextEditApply.utf8Range(for: range, in: content)?.lowerBound else {
+				return nil
+			}
+			let label = hint.label.text.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !label.isEmpty else {
+				return nil
+			}
+			return TextInlineAnnotation(offset: offset, label: label)
+		}
+		let highlightRanges = documentHighlights.compactMap {
+			LSPTextEditApply.utf8Range(for: $0.range, in: content)
+		}
+		foldingRangesByURI[uri] = foldingRanges
+		let validStarts = Set(foldingRanges.map(\.startLine))
+		collapsedFoldStartsByURI[uri] = collapsedFoldStartsByURI[uri, default: []].intersection(validStarts)
+		applyFoldState(uri: uri, document: document)
+		for pane in paneCoordinator.panes {
+			pane.editorView.inlayHintAnnotations = annotations
+			pane.editorView.setDocumentHighlightRanges(highlightRanges)
+		}
+	}
+
 	private func ensureLSPSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
 		guard let key = await Self.lspManager.sessionKey(for: url) else {
 			throw LSPManagerError.noConfigForDocument
@@ -1316,6 +1715,12 @@ final class EditorWindowController: NSWindowController {
 				let resolveProvider = completionProvider?.resolveProvider ?? false
 				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
 				let codeActionResolveProvider = capabilities?.codeActionProvider?.resolveProvider ?? false
+				let semanticSurfaceCapabilities = LSPSemanticSurfaceCapabilities(
+					semanticTokens: capabilities?.semanticTokensProvider,
+					inlayHint: capabilities?.inlayHintProvider?.isEnabled ?? false,
+					foldingRange: capabilities?.foldingRangeProvider?.isEnabled ?? false,
+					documentHighlight: capabilities?.documentHighlightProvider?.isEnabled ?? false
+				)
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
 					guard let self else {
@@ -1326,6 +1731,7 @@ final class EditorWindowController: NSWindowController {
 					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
 					self.setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
+					self.setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
 					self.clearLSPCrashStatus(for: key)
 				}
 			} catch {
@@ -1398,6 +1804,7 @@ final class EditorWindowController: NSWindowController {
 			signatureHelpTriggerCharactersBySession[key] = nil
 			completionResolveEnabledBySession[key] = nil
 			codeActionResolveEnabledBySession[key] = nil
+			semanticSurfaceCapabilitiesBySession[key] = nil
 			lspSupervisors[key] = nil
 			lspSupervisorTasks[key] = nil
 			Task {
@@ -1463,6 +1870,10 @@ final class EditorWindowController: NSWindowController {
 
 	private func setCodeActionCapabilities(resolveProvider: Bool, for key: LSPSessionKey) {
 		codeActionResolveEnabledBySession[key] = resolveProvider
+	}
+
+	private func setSemanticSurfaceCapabilities(_ capabilities: LSPSemanticSurfaceCapabilities, for key: LSPSessionKey) {
+		semanticSurfaceCapabilitiesBySession[key] = capabilities
 	}
 
 	private func installCompletionTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {

@@ -19,6 +19,8 @@ window_json="$(mktemp)"
 piecetree_json="$(mktemp)"
 open_json="$(mktemp)"
 lsp_json="$(mktemp)"
+memory_json="$(mktemp)"
+memory_md="$(mktemp)"
 lsp_guard_dir="$(mktemp -d)"
 lsp_guard_home="$lsp_guard_dir/home"
 lsp_guard_marker="$lsp_guard_dir/sourcekit-lsp-spawned"
@@ -28,7 +30,7 @@ open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
 window_timeout_ms="${ITSY_REGRESSION_WINDOW_TIMEOUT_MS:-15000}"
 
-trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json"; rm -rf "$lsp_guard_dir"' EXIT
+trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$memory_md"; rm -rf "$lsp_guard_dir"' EXIT
 
 setup_lsp_spawn_guard() {
 	local bin_dir="$lsp_guard_dir/bin"
@@ -124,6 +126,7 @@ done
 if [[ -f "$open_file" ]]; then
 	"$itsybench" open --app "$itsyapp" --file "$open_file" --timeout-ms "$open_timeout_ms" >"$open_json"
 fi
+ITSY_MEMORY_JSON="$memory_json" ITSY_MEMORY_MD="$memory_md" "$script_dir/memory_audit.sh" >/dev/null
 
 ruby -rjson -rtime -e '
 	def swift_loc(repo)
@@ -145,13 +148,14 @@ ruby -rjson -rtime -e '
 		value.to_s.gsub("%", "%25").gsub("\r", "%0D").gsub("\n", "%0A")
 	end
 
-	baseline_path, hyperfine_path, window_path, piecetree_path, open_path, lsp_path, out_path, repo, binary, threshold_arg = ARGV
+	baseline_path, hyperfine_path, window_path, piecetree_path, open_path, lsp_path, memory_path, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
 	window = File.size?(window_path) ? JSON.parse(File.read(window_path)) : {}
 	piecetree_runs = File.readlines(piecetree_path, chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
 	open = File.size?(open_path) ? JSON.parse(File.read(open_path)) : {}
 	lsp = File.size?(lsp_path) ? JSON.parse(File.read(lsp_path)) : {}
+	memory = File.size?(memory_path) ? JSON.parse(File.read(memory_path)) : {}
 	bench = hyperfine.fetch("results").first
 	current = {
 		"cold_start_ready_ms" => bench.fetch("median").to_f * 1000.0,
@@ -170,6 +174,9 @@ ruby -rjson -rtime -e '
 	end
 	open.each do |key, value|
 		current[key] = value.to_f if value.is_a?(Numeric)
+	end
+	if memory["physical_footprint_kb"].is_a?(Numeric)
+		current["physical_footprint_kb"] = memory.fetch("physical_footprint_kb").to_f
 	end
 	default_threshold = baseline.fetch("threshold", threshold_arg).to_f
 	rows = baseline.fetch("metrics").map do |metric|
@@ -230,6 +237,6 @@ ruby -rjson -rtime -e '
 		end
 	end
 	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
+' "$baseline" "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

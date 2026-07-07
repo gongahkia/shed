@@ -39,7 +39,8 @@ public enum GlyphAtlasError: Error, CustomStringConvertible {
 }
 
 public struct GlyphAtlas {
-	public static let defaultSize = 1024
+	public static let defaultSize = 512
+	public static let maxSize = 2048
 
 	public enum RenderingMode: Sendable, Hashable {
 		case grayscale

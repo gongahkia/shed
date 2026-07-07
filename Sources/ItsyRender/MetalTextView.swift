@@ -354,7 +354,7 @@ public final class MetalTextView: NSView {
 		layer.device = metalDevice
 		layer.pixelFormat = .bgra8Unorm
 		layer.framebufferOnly = true
-		layer.maximumDrawableCount = 3
+		layer.maximumDrawableCount = 2
 		if #available(macOS 10.11, *) {
 			layer.wantsExtendedDynamicRangeContent = false
 		}
@@ -953,7 +953,20 @@ public final class MetalTextView: NSView {
 	}
 
 	private func shapeCachedGlyphs(line: String, scale: CGFloat, shaper: LineShaper) -> [CachedLineGlyph]? {
-		try? withGlyphAtlas { atlas in
+		do {
+			return try shapeCachedGlyphsWithCurrentAtlas(line: line, scale: scale, shaper: shaper)
+		} catch GlyphAtlasError.atlasFull {
+			guard growGlyphAtlas(scale: scale) else {
+				return nil
+			}
+			return try? shapeCachedGlyphsWithCurrentAtlas(line: line, scale: scale, shaper: shaper)
+		} catch {
+			return nil
+		}
+	}
+
+	private func shapeCachedGlyphsWithCurrentAtlas(line: String, scale: CGFloat, shaper: LineShaper) throws -> [CachedLineGlyph]? {
+		try withGlyphAtlas { atlas in
 			let rasterScale = max(scale, 1)
 			let rasterFont = scaledTextFont(scale: rasterScale)
 			let shaped = try shaper.shape(line, font: textFont, rasterFont: rasterFont, atlas: &atlas)
@@ -1019,7 +1032,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
-		layer.maximumDrawableCount = 3
+		layer.maximumDrawableCount = 2
 		if #available(macOS 10.11, *) {
 			layer.wantsExtendedDynamicRangeContent = false
 		}
@@ -1268,6 +1281,23 @@ public final class MetalTextView: NSView {
 		glyphAtlas = atlas
 		glyphAtlasRenderingMode = renderingMode
 		glyphAtlasScaleKey = scaleKey
+		return true
+	}
+
+	private func growGlyphAtlas(scale: CGFloat) -> Bool {
+		let renderingMode = glyphRenderingMode(scale: scale)
+		let scaleKey = Self.scaleKey(for: scale)
+		guard let metalDevice, let current = glyphAtlas, glyphAtlasRenderingMode == renderingMode, glyphAtlasScaleKey == scaleKey else {
+			return false
+		}
+		let nextSize = min(max(current.texture.width * 2, GlyphAtlas.defaultSize), GlyphAtlas.maxSize)
+		guard nextSize > current.texture.width, let atlas = try? GlyphAtlas(device: metalDevice, size: nextSize, renderingMode: renderingMode) else {
+			return false
+		}
+		glyphAtlas = atlas
+		glyphAtlasRenderingMode = renderingMode
+		glyphAtlasScaleKey = scaleKey
+		lineShapeCache.removeAll(keepingCapacity: true)
 		return true
 	}
 

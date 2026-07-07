@@ -8,6 +8,7 @@ import Testing
 	var atlas = try GlyphAtlas(device: device)
 	#expect(atlas.texture.width == GlyphAtlas.defaultSize)
 	#expect(atlas.texture.height == GlyphAtlas.defaultSize)
+	#expect(GlyphAtlas.maxSize >= GlyphAtlas.defaultSize * 2)
 	let font = CTFontCreateWithName("Menlo" as CFString, 14, nil)
 	var chars: [UniChar] = Array("Hello".utf16)
 	var glyphs = [CGGlyph](repeating: 0, count: chars.count)

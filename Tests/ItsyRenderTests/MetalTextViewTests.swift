@@ -13,10 +13,10 @@ import Testing
 	#expect(!view.consumeDirtyForDisplayLink())
 }
 
-@Test func metalLayerUsesTripleBufferedSDRDrawable() throws {
+@Test func metalLayerUsesDoubleBufferedSDRDrawable() throws {
 	let view = MetalTextView(frame: .zero)
 	let layer = try #require(view.makeBackingLayer() as? CAMetalLayer)
-	#expect(layer.maximumDrawableCount == 3)
+	#expect(layer.maximumDrawableCount == 2)
 	#expect(!layer.wantsExtendedDynamicRangeContent)
 }
 

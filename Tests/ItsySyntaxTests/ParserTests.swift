@@ -74,6 +74,47 @@ import Testing
 	#expect(captures.contains("string"))
 }
 
+@Test func tagQueryCapturesSwiftDefinitions() throws {
+	let text = """
+	struct AppShell {
+		func renderFrame() {}
+		let frameCount = 0
+	}
+	func makeApp() {}
+	"""
+	let symbols = try #require(TreeSitterSymbolExtractor.workspaceSymbols(
+		in: text,
+		fileURL: URL(fileURLWithPath: "/tmp/App.swift"),
+		relativePath: "Sources/App.swift"
+	))
+
+	#expect(symbols.contains { $0.name == "AppShell" && $0.kind == .type && $0.line == 1 && $0.column == 8 })
+	#expect(symbols.contains { $0.name == "renderFrame" && $0.kind == .method })
+	#expect(symbols.contains { $0.name == "frameCount" && $0.kind == .variable })
+	#expect(symbols.contains { $0.name == "makeApp" && $0.kind == .function })
+}
+
+@Test func tagQueryCapturesTypeScriptDefinitionsAndDocs() throws {
+	let text = """
+	/** Build the app. */
+	function buildApp() {}
+	class Widget {
+		render() {}
+	}
+	const makeWidget = () => new Widget()
+	"""
+	let symbols = try #require(TreeSitterSymbolExtractor.workspaceSymbols(
+		in: text,
+		fileURL: URL(fileURLWithPath: "/tmp/app.ts"),
+		relativePath: "src/app.ts"
+	))
+
+	#expect(symbols.contains { $0.name == "buildApp" && $0.kind == .function && $0.documentation == "Build the app." })
+	#expect(symbols.contains { $0.name == "Widget" && $0.kind == .type })
+	#expect(symbols.contains { $0.name == "render" && $0.kind == .method })
+	#expect(symbols.contains { $0.name == "makeWidget" && $0.kind == .function })
+}
+
 @Test func highlightSpanMapsThroughEditorEdit() throws {
 	let edit = Edit(range: 5 ..< 7, oldText: "bc", newText: "XYZ")
 	#expect(HighlightSpan(range: 0 ..< 3, capture: "keyword").mapped(through: edit)?.range == 0 ..< 3)
@@ -234,6 +275,12 @@ import Testing
 @Test func highlightQueriesLoadForNewGrammars() throws {
 	for language in [Language.bash, .zig, .swift, .sql, .dockerfile, .dart, .kotlin, .elixir] {
 		_ = try HighlightQuery(language: language)
+	}
+}
+
+@Test func tagQueriesLoadForBundledGrammars() throws {
+	for language in [Language.c, .cpp, .dart, .elixir, .go, .javascript, .kotlin, .python, .rust, .swift, .typescript] {
+		_ = try TagQuery(language: language)
 	}
 }
 

@@ -241,6 +241,14 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			}
 		}
 
+		public struct Hierarchy: Codable, Equatable, Sendable {
+			public var dynamicRegistration: Bool
+
+			public init(dynamicRegistration: Bool = false) {
+				self.dynamicRegistration = dynamicRegistration
+			}
+		}
+
 		public var documentSymbol: DocumentSymbol
 		public var completion: Completion
 		public var publishDiagnostics: PublishDiagnostics
@@ -252,6 +260,8 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 		public var inlayHint: InlayHint
 		public var foldingRange: FoldingRange
 		public var documentHighlight: DocumentHighlight
+		public var callHierarchy: Hierarchy
+		public var typeHierarchy: Hierarchy
 
 		public init(
 			documentSymbol: DocumentSymbol = DocumentSymbol(),
@@ -264,7 +274,9 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			semanticTokens: SemanticTokens = SemanticTokens(),
 			inlayHint: InlayHint = InlayHint(),
 			foldingRange: FoldingRange = FoldingRange(),
-			documentHighlight: DocumentHighlight = DocumentHighlight()
+			documentHighlight: DocumentHighlight = DocumentHighlight(),
+			callHierarchy: Hierarchy = Hierarchy(),
+			typeHierarchy: Hierarchy = Hierarchy()
 		) {
 			self.documentSymbol = documentSymbol
 			self.completion = completion
@@ -277,6 +289,8 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			self.inlayHint = inlayHint
 			self.foldingRange = foldingRange
 			self.documentHighlight = documentHighlight
+			self.callHierarchy = callHierarchy
+			self.typeHierarchy = typeHierarchy
 		}
 	}
 

@@ -88,17 +88,18 @@ public actor LSPManager {
 	}
 
 	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
-		registry.missingBinary(for: url)
+		effectiveRegistry(for: url).missingBinary(for: url)
 	}
 
 	public func ensureClient(for url: URL, now: Date = .init()) throws -> LSPProcessClient {
-		guard let config = registry.resolvedConfig(for: url) else {
-			if let missingBinary = registry.missingBinary(for: url) {
+		let effectiveRegistry = effectiveRegistry(for: url)
+		guard let config = effectiveRegistry.resolvedConfig(for: url) else {
+			if let missingBinary = effectiveRegistry.missingBinary(for: url) {
 				throw LSPManagerError.missingBinary(missingBinary)
 			}
 			throw LSPManagerError.noConfigForDocument
 		}
-		guard let root = registry.discoverWorkspaceRoot(for: url) else {
+		guard let root = effectiveRegistry.discoverWorkspaceRoot(for: url) else {
 			throw LSPManagerError.workspaceRootNotFound
 		}
 		let key = LSPSessionKey(languageID: config.languageId, workspaceRoot: root)
@@ -120,10 +121,11 @@ public actor LSPManager {
 	}
 
 	public func symbols(matching query: String, in url: URL) async throws -> [LSPWorkspaceSymbol] {
-		guard registry.config(for: url) != nil else {
+		let effectiveRegistry = effectiveRegistry(for: url)
+		guard effectiveRegistry.config(for: url) != nil else {
 			throw LSPManagerError.noConfigForDocument
 		}
-		guard registry.discoverWorkspaceRoot(for: url) != nil else {
+		guard effectiveRegistry.discoverWorkspaceRoot(for: url) != nil else {
 			throw LSPManagerError.workspaceRootNotFound
 		}
 		let client = try ensureClient(for: url)
@@ -173,5 +175,18 @@ public actor LSPManager {
 		recent.append(now)
 		spawnTimestamps[key] = recent
 		return true
+	}
+
+	private func effectiveRegistry(for url: URL) -> LSPServerRegistry {
+		guard let root = registry.discoverWorkspaceRoot(for: url) else {
+			return registry
+		}
+		let overrideURL = root
+			.appendingPathComponent(".itsy", isDirectory: true)
+			.appendingPathComponent("lsp.toml")
+		guard let override = try? LSPServerRegistryLoader.loadTOML(from: overrideURL) else {
+			return registry
+		}
+		return registry.merging(override)
 	}
 }

@@ -122,6 +122,9 @@ enum ItsyWorkspaceController {
 	}
 
 	fileprivate static func applyIndexFileChanges(_ batch: WorkspaceFileEventBatch) {
+		for controller in controllers.allObjects {
+			controller.notifyLSPWatchedFiles(batch)
+		}
 		if batch.requiresFullRescan {
 			rebuildWorkspaceIndex()
 			return

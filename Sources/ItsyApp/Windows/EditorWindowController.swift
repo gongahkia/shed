@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Dispatch
 import Foundation
 import ItsyConfig
@@ -110,6 +111,8 @@ final class EditorWindowController: NSWindowController {
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var codeActionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var callHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var typeHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var semanticSurfaceCapabilitiesBySession: [LSPSessionKey: LSPSemanticSurfaceCapabilities] = [:]
 	private var semanticTokenStateByURI: [String: LSPSemanticTokenState] = [:]
 	private var foldingRangesByURI: [String: [LSPFoldingRange]] = [:]
@@ -218,6 +221,48 @@ final class EditorWindowController: NSWindowController {
 
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
 		fileTreeController.setGitSnapshot(snapshot)
+	}
+
+	func notifyLSPWatchedFiles(_ batch: WorkspaceFileEventBatch) {
+		guard !batch.events.isEmpty else {
+			return
+		}
+		for entry in lspStatusEntries.values {
+			guard let client = entry.client else {
+				continue
+			}
+			let rootPath = entry.key.workspaceRoot.standardizedFileURL.path
+			let matchingEvents = batch.events.filter { event in
+				let path = event.url.standardizedFileURL.path
+				return path == rootPath || path.hasPrefix(rootPath + "/")
+			}
+			guard !matchingEvents.isEmpty else {
+				continue
+			}
+			let params = LSPDidChangeWatchedFilesParams(changes: matchingEvents.map {
+				LSPFileEvent(uri: $0.url.standardizedFileURL.absoluteString, type: Self.lspFileChangeType(for: $0))
+			})
+			Task {
+				do {
+					try await client.sendNotification(
+						method: LSPMethod.workspaceDidChangeWatchedFiles,
+						params: try LSPAny(encoding: params)
+					)
+				} catch {
+					NSLog("lsp didChangeWatchedFiles failed: \(error)")
+				}
+			}
+		}
+	}
+
+	private static func lspFileChangeType(for event: WorkspaceFileEvent) -> LSPFileChangeType {
+		if event.flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemRemoved) != 0 {
+			return .deleted
+		}
+		if event.flags & FSEventStreamEventFlags(kFSEventStreamEventFlagItemCreated) != 0 {
+			return .created
+		}
+		return .changed
 	}
 
 	func toggleSidebar() {
@@ -684,6 +729,9 @@ final class EditorWindowController: NSWindowController {
 		document.lspSurfaceRefreshRequested = { [weak self] in
 			self?.scheduleLSPSemanticSurfaceRefresh()
 		}
+		document.lspDocumentSaved = { [weak self] in
+			self?.notifyLSPDidSave()
+		}
 		lspFoldGutterDecorator.toggleFold = { [weak self] line in
 			self?.toggleFold(startLine: line)
 		}
@@ -885,6 +933,8 @@ final class EditorWindowController: NSWindowController {
 			return requestHover(at: offset, positioningRect: editorView.positioningRectForUTF8Offset(offset), in: editorView)
 		case "lsp.references":
 			return findAllReferences(nil)
+		case "lsp.callHierarchy":
+			return findCallHierarchy(nil)
 		case "lsp.rename":
 			return renameSymbol(nil)
 		case "lsp.formatDocument":
@@ -918,6 +968,11 @@ final class EditorWindowController: NSWindowController {
 	@discardableResult
 	func findAllReferences(_: Any?) -> Bool {
 		requestReferences(at: editorView.editor.selections.primary.head, in: editorView)
+	}
+
+	@discardableResult
+	func findCallHierarchy(_: Any?) -> Bool {
+		requestCallHierarchy(at: editorView.editor.selections.primary.head, in: editorView)
 	}
 
 	@discardableResult
@@ -1715,6 +1770,8 @@ final class EditorWindowController: NSWindowController {
 				let resolveProvider = completionProvider?.resolveProvider ?? false
 				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
 				let codeActionResolveProvider = capabilities?.codeActionProvider?.resolveProvider ?? false
+				let callHierarchyProvider = capabilities?.callHierarchyProvider?.isEnabled ?? false
+				let typeHierarchyProvider = capabilities?.typeHierarchyProvider?.isEnabled ?? false
 				let semanticSurfaceCapabilities = LSPSemanticSurfaceCapabilities(
 					semanticTokens: capabilities?.semanticTokensProvider,
 					inlayHint: capabilities?.inlayHintProvider?.isEnabled ?? false,
@@ -1731,6 +1788,7 @@ final class EditorWindowController: NSWindowController {
 					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
 					self.setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
+					self.setHierarchyCapabilities(callHierarchy: callHierarchyProvider, typeHierarchy: typeHierarchyProvider, for: key)
 					self.setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
 					self.clearLSPCrashStatus(for: key)
 				}
@@ -1765,6 +1823,39 @@ final class EditorWindowController: NSWindowController {
 		} else {
 			await coordinator.didChange(url: url, content: content)
 			await coordinator.flushPendingChange(for: url)
+		}
+	}
+
+	private func notifyLSPDidSave() {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL
+		else {
+			return
+		}
+		let content = editorStorageString(editorView.editor)
+		Task { [weak self] in
+			guard
+				let self,
+				let key = await Self.lspManager.sessionKey(for: fileURL),
+				await Self.lspManager.status(of: key) == .running,
+				let client = await Self.lspManager.existingClient(for: key)
+			else {
+				return
+			}
+			let coordinator = await MainActor.run {
+				self.lspSyncCoordinator(for: key, client: client)
+			}
+			do {
+				if await coordinator.currentVersion(for: fileURL) == nil {
+					try await coordinator.didOpen(url: fileURL, languageID: key.languageID, content: content)
+				} else {
+					await coordinator.didChange(url: fileURL, content: content)
+				}
+				try await coordinator.didSave(url: fileURL)
+			} catch {
+				NSLog("lsp didSave failed: \(error)")
+			}
 		}
 	}
 
@@ -1804,6 +1895,8 @@ final class EditorWindowController: NSWindowController {
 			signatureHelpTriggerCharactersBySession[key] = nil
 			completionResolveEnabledBySession[key] = nil
 			codeActionResolveEnabledBySession[key] = nil
+			callHierarchyEnabledBySession[key] = nil
+			typeHierarchyEnabledBySession[key] = nil
 			semanticSurfaceCapabilitiesBySession[key] = nil
 			lspSupervisors[key] = nil
 			lspSupervisorTasks[key] = nil
@@ -1870,6 +1963,11 @@ final class EditorWindowController: NSWindowController {
 
 	private func setCodeActionCapabilities(resolveProvider: Bool, for key: LSPSessionKey) {
 		codeActionResolveEnabledBySession[key] = resolveProvider
+	}
+
+	private func setHierarchyCapabilities(callHierarchy: Bool, typeHierarchy: Bool, for key: LSPSessionKey) {
+		callHierarchyEnabledBySession[key] = callHierarchy
+		typeHierarchyEnabledBySession[key] = typeHierarchy
 	}
 
 	private func setSemanticSurfaceCapabilities(_ capabilities: LSPSemanticSurfaceCapabilities, for key: LSPSessionKey) {
@@ -2133,6 +2231,85 @@ final class EditorWindowController: NSWindowController {
 		popover.contentViewController = SignatureHelpViewController(help: help)
 		popover.show(relativeTo: targetView.positioningRectForUTF8Offset(cursorOffset), of: targetView, preferredEdge: .maxY)
 		signatureHelpPopover = popover
+	}
+
+	@discardableResult
+	private func requestCallHierarchy(at offset: Int, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
+		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
+		referencesRequestGeneration += 1
+		let generation = referencesRequestGeneration
+		let panel = referencesCoordinator ?? ReferencesCoordinator()
+		referencesCoordinator = panel
+		panel.showCallHierarchyLoading(relativeTo: window)
+		Task { [weak self] in
+			do {
+				guard let self else {
+					return
+				}
+				let session = try await self.ensureLSPSession(for: fileURL)
+				guard await MainActor.run(body: { self.callHierarchyEnabledBySession[session.key] == true }) else {
+					throw LSPManagerError.noConfigForDocument
+				}
+				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let uri = fileURL.standardizedFileURL.absoluteString
+				let items = try await session.client.prepareCallHierarchy(uri: uri, position: position)
+				let item = items.first
+				let incoming: [LSPCallHierarchyIncomingCall]
+				let outgoing: [LSPCallHierarchyOutgoingCall]
+				if let item {
+					incoming = (try? await session.client.incomingCalls(for: item)) ?? []
+					outgoing = (try? await session.client.outgoingCalls(for: item)) ?? []
+				} else {
+					incoming = []
+					outgoing = []
+				}
+				let locations = Self.callHierarchyLocations(incoming: incoming, outgoing: outgoing)
+				let snapshot = LSPReferencesSnapshot(locations: locations, rootURL: rootURL, currentFileURL: fileURL, currentText: content)
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.referencesRequestGeneration else {
+						return
+					}
+					panel.showCallHierarchy(snapshot: snapshot, relativeTo: self.window) { entry in
+						guard let controller = NSDocumentController.shared as? ItsyDocumentController else {
+							return
+						}
+						_ = controller.openDocument(at: entry.url, line: entry.line, column: entry.column)
+					}
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == self.referencesRequestGeneration else {
+						return
+					}
+					panel.show(error: error, relativeTo: self.window)
+					self.handleLSPRequestError(error)
+					NSLog("call hierarchy failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private static func callHierarchyLocations(
+		incoming: [LSPCallHierarchyIncomingCall],
+		outgoing: [LSPCallHierarchyOutgoingCall]
+	) -> [LSPLocation] {
+		let incomingLocations = incoming.map {
+			LSPLocation(uri: $0.from.uri, range: $0.from.selectionRange)
+		}
+		let outgoingLocations = outgoing.map {
+			LSPLocation(uri: $0.to.uri, range: $0.to.selectionRange)
+		}
+		return incomingLocations + outgoingLocations
 	}
 
 	@discardableResult

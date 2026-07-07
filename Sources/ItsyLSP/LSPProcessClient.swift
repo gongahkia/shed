@@ -190,6 +190,30 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.documentHighlights(uri: uri, position: position)
 	}
 
+	public func prepareCallHierarchy(uri: String, position: LSPPosition) async throws -> [LSPCallHierarchyItem] {
+		try await session.prepareCallHierarchy(uri: uri, position: position)
+	}
+
+	public func incomingCalls(for item: LSPCallHierarchyItem) async throws -> [LSPCallHierarchyIncomingCall] {
+		try await session.incomingCalls(for: item)
+	}
+
+	public func outgoingCalls(for item: LSPCallHierarchyItem) async throws -> [LSPCallHierarchyOutgoingCall] {
+		try await session.outgoingCalls(for: item)
+	}
+
+	public func prepareTypeHierarchy(uri: String, position: LSPPosition) async throws -> [LSPTypeHierarchyItem] {
+		try await session.prepareTypeHierarchy(uri: uri, position: position)
+	}
+
+	public func supertypes(for item: LSPTypeHierarchyItem) async throws -> [LSPTypeHierarchyItem] {
+		try await session.supertypes(for: item)
+	}
+
+	public func subtypes(for item: LSPTypeHierarchyItem) async throws -> [LSPTypeHierarchyItem] {
+		try await session.subtypes(for: item)
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) async throws {
 		try await session.sendNotification(method: method, params: params)
 	}

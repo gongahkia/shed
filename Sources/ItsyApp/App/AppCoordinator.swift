@@ -242,6 +242,9 @@ final class AppCoordinator: NSObject {
 				Command(id: "lsp.references", title: L10n.string("Find All References"), defaultKey: "Shift-F12") { [weak self] in
 					_ = self?.activeEditorWindowController()?.findAllReferences(nil)
 				},
+				Command(id: "lsp.callHierarchy", title: L10n.string("Find Callers of Symbol"), defaultKey: nil) { [weak self] in
+					_ = self?.activeEditorWindowController()?.findCallHierarchy(nil)
+				},
 				Command(id: "lsp.rename", title: L10n.string("Rename Symbol"), defaultKey: "F2") { [weak self] in
 					_ = self?.activeEditorWindowController()?.renameSymbol(nil)
 				},

@@ -79,6 +79,19 @@ public actor LSPDocumentSyncCoordinator {
 		states[url]?.pendingTask = task
 	}
 
+	public func didSave(url: URL, text: String? = nil) async throws {
+		guard states[url] != nil else {
+			return
+		}
+		await flush(url: url)
+		let params = LSPDidSaveTextDocumentParams(
+			textDocument: LSPTextDocumentIdentifier(uri: Self.uri(for: url)),
+			text: text
+		)
+		try await sink.send(method: LSPMethod.textDocumentDidSave, params: try LSPAny(encoding: params))
+		sent.append(LSPDocumentSyncMessage(url: url, method: LSPMethod.textDocumentDidSave, version: states[url]?.version))
+	}
+
 	public func flushPendingChange(for url: URL) async {
 		await flush(url: url)
 	}

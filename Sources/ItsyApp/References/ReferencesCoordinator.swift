@@ -72,6 +72,7 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 	}
 
 	private let panel: NSPanel
+	private let modeControl = NSSegmentedControl(labels: [L10n.string("References"), L10n.string("Call Hierarchy")], trackingMode: .selectOne, target: nil, action: nil)
 	private let statusLabel = NSTextField(labelWithString: "")
 	private let tableView = NSTableView()
 	private var rows: [Row] = []
@@ -90,11 +91,20 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 	}
 
 	func showLoading(relativeTo hostWindow: NSWindow?) {
+		showLoading(title: L10n.string("Finding references..."), selectedSegment: 0, relativeTo: hostWindow)
+	}
+
+	func showCallHierarchyLoading(relativeTo hostWindow: NSWindow?) {
+		showLoading(title: L10n.string("Finding call hierarchy..."), selectedSegment: 1, relativeTo: hostWindow)
+	}
+
+	private func showLoading(title: String, selectedSegment: Int, relativeTo hostWindow: NSWindow?) {
 		rows = []
 		entries = []
 		tableView.reloadData()
+		modeControl.selectedSegment = selectedSegment
 		statusLabel.textColor = .secondaryLabelColor
-		statusLabel.stringValue = L10n.string("Finding references...")
+		statusLabel.stringValue = title
 		show(relativeTo: hostWindow)
 	}
 
@@ -107,8 +117,30 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 		rows = Self.rows(for: snapshot.entries)
 		openReference = open
 		tableView.reloadData()
+		modeControl.selectedSegment = 0
 		statusLabel.textColor = .secondaryLabelColor
 		statusLabel.stringValue = L10n.string("\(entries.count) references in \(Set(entries.map(\.path)).count) files")
+		selectFirstReference()
+		show(relativeTo: hostWindow)
+	}
+
+	func showCallHierarchy(
+		snapshot: LSPReferencesSnapshot,
+		relativeTo hostWindow: NSWindow?,
+		open: @escaping (LSPReferenceEntry) -> Void
+	) {
+		entries = snapshot.entries
+		rows = Self.rows(for: snapshot.entries)
+		openReference = open
+		tableView.reloadData()
+		modeControl.selectedSegment = 1
+		statusLabel.textColor = .secondaryLabelColor
+		statusLabel.stringValue = L10n.string("\(entries.count) call sites in \(Set(entries.map(\.path)).count) files")
+		selectFirstReference()
+		show(relativeTo: hostWindow)
+	}
+
+	private func selectFirstReference() {
 		if let firstReferenceRow = rows.firstIndex(where: {
 			if case .reference = $0 { return true }
 			return false
@@ -116,7 +148,6 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 			tableView.selectRowIndexes(IndexSet(integer: firstReferenceRow), byExtendingSelection: false)
 			tableView.scrollRowToVisible(firstReferenceRow)
 		}
-		show(relativeTo: hostWindow)
 	}
 
 	func show(error: Error, relativeTo hostWindow: NSWindow?) {
@@ -172,6 +203,9 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 		panel.isReleasedWhenClosed = false
 		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
 		panel.contentView = contentView
+		modeControl.selectedSegment = 0
+		modeControl.setEnabled(false, forSegment: 0)
+		modeControl.setEnabled(false, forSegment: 1)
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
 		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("reference"))
@@ -187,14 +221,18 @@ final class ReferencesCoordinator: NSObject, NSTableViewDataSource, NSTableViewD
 		scrollView.documentView = tableView
 		scrollView.hasVerticalScroller = true
 		scrollView.drawsBackground = false
+		modeControl.translatesAutoresizingMaskIntoConstraints = false
 		statusLabel.translatesAutoresizingMaskIntoConstraints = false
 		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(modeControl)
 		contentView.addSubview(statusLabel)
 		contentView.addSubview(scrollView)
 		NSLayoutConstraint.activate([
+			modeControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+			modeControl.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
 			statusLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-			statusLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
+			statusLabel.topAnchor.constraint(equalTo: modeControl.bottomAnchor, constant: 8),
 			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
 			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 			scrollView.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 10),

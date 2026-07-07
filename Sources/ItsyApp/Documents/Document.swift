@@ -20,6 +20,7 @@ final class ItsyDocument: NSDocument {
 
 	var editor = Editor()
 	var lspSurfaceRefreshRequested: (() -> Void)?
+	var lspDocumentSaved: (() -> Void)?
 	private var editorViews: [MetalTextView] = []
 	private let syntax = DocumentSyntaxController()
 	private var syntaxHighlightSpans: [TextHighlightSpan] = []
@@ -153,6 +154,7 @@ final class ItsyDocument: NSDocument {
 
 	override func save(_ sender: Any?) {
 		super.save(sender)
+		lspDocumentSaved?()
 		scheduleGitHunkGutterRefresh()
 	}
 

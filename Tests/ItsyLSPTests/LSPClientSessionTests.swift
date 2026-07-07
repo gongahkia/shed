@@ -431,6 +431,113 @@ import Testing
 	#expect(try await highlightTask.value.first?.kind == .read)
 }
 
+@Test func clientHierarchySurfaceSendsTypedRequests() async throws {
+	let (session, transport) = try await initializedSession()
+	let uri = "file:///tmp/App.swift"
+	let position = LSPPosition(line: 2, character: 4)
+	let range = LSPRange(start: LSPPosition(line: 1, character: 0), end: LSPPosition(line: 3, character: 1))
+	let selectionRange = LSPRange(start: LSPPosition(line: 1, character: 5), end: LSPPosition(line: 1, character: 8))
+	let item = LSPCallHierarchyItem(name: "run", kind: .function, detail: "()", uri: uri, range: range, selectionRange: selectionRange, data: .int(7))
+	let caller = LSPCallHierarchyItem(name: "caller", kind: .function, uri: uri, range: range, selectionRange: selectionRange)
+	let callee = LSPCallHierarchyItem(name: "callee", kind: .function, uri: uri, range: range, selectionRange: selectionRange)
+	let prepareParams = try LSPAny(encoding: LSPCallHierarchyPrepareParams(
+		textDocument: LSPTextDocumentIdentifier(uri: uri),
+		position: position
+	))
+	let itemParams = try LSPAny(encoding: LSPCallHierarchyCallsParams(item: item))
+	let typeItemParams = try LSPAny(encoding: LSPTypeHierarchyParams(item: item))
+
+	let prepareCallTask = Task {
+		try await session.prepareCallHierarchy(uri: uri, position: position)
+	}
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.textDocumentPrepareCallHierarchy,
+		params: prepareParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .array([try LSPAny(encoding: item)])
+	))))
+	#expect(try await prepareCallTask.value.first?.name == "run")
+
+	let incomingTask = Task {
+		try await session.incomingCalls(for: item)
+	}
+	try await transport.waitForWriteCount(4)
+	#expect(try transport.message(at: 3) == .request(JSONRPCRequestMessage(
+		id: .int(3),
+		method: LSPMethod.callHierarchyIncomingCalls,
+		params: itemParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(3),
+		result: .array([try LSPAny(encoding: LSPCallHierarchyIncomingCall(from: caller, fromRanges: [selectionRange]))])
+	))))
+	#expect(try await incomingTask.value.first?.from.name == "caller")
+
+	let outgoingTask = Task {
+		try await session.outgoingCalls(for: item)
+	}
+	try await transport.waitForWriteCount(5)
+	#expect(try transport.message(at: 4) == .request(JSONRPCRequestMessage(
+		id: .int(4),
+		method: LSPMethod.callHierarchyOutgoingCalls,
+		params: itemParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(4),
+		result: .array([try LSPAny(encoding: LSPCallHierarchyOutgoingCall(to: callee, fromRanges: [selectionRange]))])
+	))))
+	#expect(try await outgoingTask.value.first?.to.name == "callee")
+
+	let prepareTypeTask = Task {
+		try await session.prepareTypeHierarchy(uri: uri, position: position)
+	}
+	try await transport.waitForWriteCount(6)
+	#expect(try transport.message(at: 5) == .request(JSONRPCRequestMessage(
+		id: .int(5),
+		method: LSPMethod.textDocumentPrepareTypeHierarchy,
+		params: prepareParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(5),
+		result: .array([try LSPAny(encoding: item)])
+	))))
+	#expect(try await prepareTypeTask.value.first?.name == "run")
+
+	let supertypesTask = Task {
+		try await session.supertypes(for: item)
+	}
+	try await transport.waitForWriteCount(7)
+	#expect(try transport.message(at: 6) == .request(JSONRPCRequestMessage(
+		id: .int(6),
+		method: LSPMethod.typeHierarchySupertypes,
+		params: typeItemParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(6),
+		result: .array([try LSPAny(encoding: caller)])
+	))))
+	#expect(try await supertypesTask.value.first?.name == "caller")
+
+	let subtypesTask = Task {
+		try await session.subtypes(for: item)
+	}
+	try await transport.waitForWriteCount(8)
+	#expect(try transport.message(at: 7) == .request(JSONRPCRequestMessage(
+		id: .int(7),
+		method: LSPMethod.typeHierarchySubtypes,
+		params: typeItemParams
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(7),
+		result: .array([try LSPAny(encoding: callee)])
+	))))
+	#expect(try await subtypesTask.value.first?.name == "callee")
+}
+
 @Test func clientReturnsServerNotificationsAsEvents() async throws {
 	let (session, _) = try await initializedSession()
 	let diagnostics = JSONRPCMessage.notification(JSONRPCNotificationMessage(

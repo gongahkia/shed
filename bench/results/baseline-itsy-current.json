@@ -47,6 +47,14 @@
       "baseline": 11573.0
     },
     {
+      "name": "physical_footprint_kb",
+      "unit": "KB",
+      "direction": "lower",
+      "baseline": 98611.0,
+      "limit": 102400.0,
+      "threshold": 0.0
+    },
+    {
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",

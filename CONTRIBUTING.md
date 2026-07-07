@@ -4,7 +4,7 @@ Check [GitHub issues](https://github.com/gongahkia/itsy/issues) before opening a
 
 ## PR Gates
 
-- No KPI regression: cold start, idle RSS, large-file RAM, 1 GB open time, scroll FPS, keystroke latency, binary size, LOC.
+- No KPI regression: cold start, idle RSS, physical footprint, large-file RAM, 1 GB open time, scroll FPS, keystroke latency, binary size, LOC.
 - Run the relevant SwiftPM checks before review:
 
 ```sh

@@ -8,6 +8,7 @@ final class ItsyTerminalView: NSView {
 	private var font = NSFont.monospacedSystemFont(ofSize: CGFloat(ItsySettings.TerminalSettings.defaultFontSize), weight: .regular)
 	private var characterSize = CGSize(width: 7, height: 15)
 	private var scrollbackOffset = 0
+	private var trackingArea: NSTrackingArea?
 	var onInput: ((Data) -> Void)?
 	var onResize: ((Int, Int) -> Void)?
 
@@ -75,24 +76,13 @@ final class ItsyTerminalView: NSView {
 	}
 
 	override func draw(_ dirtyRect: NSRect) {
-		NSColor.textBackgroundColor.setFill()
-		dirtyRect.fill()
 		let snapshot = emulator.snapshot(scrollbackOffset: scrollbackOffset)
-		let paragraph = NSMutableParagraphStyle()
-		paragraph.lineBreakMode = .byClipping
-		let attributes: [NSAttributedString.Key: Any] = [
-			.font: font,
-			.foregroundColor: NSColor.textColor,
-			.paragraphStyle: paragraph,
-		]
-		for (index, line) in snapshot.lines.enumerated() {
-			let rect = NSRect(
-				x: 4,
-				y: CGFloat(index) * characterSize.height + 2,
-				width: bounds.width - 8,
-				height: characterSize.height
-			)
-			(line as NSString).draw(in: rect, withAttributes: attributes)
+		let defaultBackground = color(for: snapshot.defaultBackground) ?? NSColor.textBackgroundColor
+		defaultBackground.setFill()
+		dirtyRect.fill()
+		for (row, cells) in snapshot.cells.enumerated() {
+			drawBackgrounds(cells, row: row, snapshot: snapshot)
+			attributedLine(cells, snapshot: snapshot).draw(at: NSPoint(x: 4, y: CGFloat(row) * characterSize.height + 2))
 		}
 		drawCursor(snapshot)
 	}
@@ -107,12 +97,85 @@ final class ItsyTerminalView: NSView {
 	}
 
 	override func scrollWheel(with event: NSEvent) {
+		if sendMouseWheel(event) {
+			return
+		}
 		guard !emulator.alternateScreen else {
 			return
 		}
 		let lineDelta = Int((event.scrollingDeltaY / max(characterSize.height, 1)).rounded(.toNearestOrAwayFromZero))
 		scrollbackOffset = max(0, scrollbackOffset + lineDelta)
 		needsDisplay = true
+	}
+
+	override func updateTrackingAreas() {
+		super.updateTrackingAreas()
+		if let trackingArea {
+			removeTrackingArea(trackingArea)
+		}
+		let area = NSTrackingArea(rect: .zero, options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved], owner: self, userInfo: nil)
+		addTrackingArea(area)
+		trackingArea = area
+	}
+
+	override func mouseDown(with event: NSEvent) {
+		if !sendMouse(event, button: 0, pressed: true) {
+			super.mouseDown(with: event)
+		}
+	}
+
+	override func mouseUp(with event: NSEvent) {
+		if !sendMouse(event, button: 0, pressed: false) {
+			super.mouseUp(with: event)
+		}
+	}
+
+	override func rightMouseDown(with event: NSEvent) {
+		if !sendMouse(event, button: 2, pressed: true) {
+			super.rightMouseDown(with: event)
+		}
+	}
+
+	override func rightMouseUp(with event: NSEvent) {
+		if !sendMouse(event, button: 2, pressed: false) {
+			super.rightMouseUp(with: event)
+		}
+	}
+
+	override func otherMouseDown(with event: NSEvent) {
+		if !sendMouse(event, button: 1, pressed: true) {
+			super.otherMouseDown(with: event)
+		}
+	}
+
+	override func otherMouseUp(with event: NSEvent) {
+		if !sendMouse(event, button: 1, pressed: false) {
+			super.otherMouseUp(with: event)
+		}
+	}
+
+	override func mouseDragged(with event: NSEvent) {
+		if !sendMouseMotion(event, button: 0) {
+			super.mouseDragged(with: event)
+		}
+	}
+
+	override func rightMouseDragged(with event: NSEvent) {
+		if !sendMouseMotion(event, button: 2) {
+			super.rightMouseDragged(with: event)
+		}
+	}
+
+	override func otherMouseDragged(with event: NSEvent) {
+		if !sendMouseMotion(event, button: 1) {
+			super.otherMouseDragged(with: event)
+		}
+	}
+
+	override func mouseMoved(with event: NSEvent) {
+		if !sendMouseMotion(event, button: 3) {
+			super.mouseMoved(with: event)
+		}
 	}
 
 	@objc func paste(_ sender: Any?) {
@@ -153,6 +216,180 @@ final class ItsyTerminalView: NSView {
 		let rect = NSRect(x: x, y: y, width: max(2, characterSize.width), height: characterSize.height)
 		NSColor.textColor.withAlphaComponent(0.24).setFill()
 		rect.fill()
+	}
+
+	private func drawBackgrounds(_ cells: [TerminalCell], row: Int, snapshot: TerminalSnapshot) {
+		for (column, cell) in cells.enumerated() {
+			guard let background = resolvedColors(for: cell.attributes, snapshot: snapshot).background else {
+				continue
+			}
+			background.setFill()
+			NSRect(
+				x: 4 + CGFloat(column) * characterSize.width,
+				y: CGFloat(row) * characterSize.height + 2,
+				width: characterSize.width,
+				height: characterSize.height
+			).fill()
+		}
+	}
+
+	private func attributedLine(_ cells: [TerminalCell], snapshot: TerminalSnapshot) -> NSAttributedString {
+		let result = NSMutableAttributedString()
+		for cell in cells {
+			var attributes: [NSAttributedString.Key: Any] = [
+				.font: font(for: cell.attributes),
+				.foregroundColor: resolvedColors(for: cell.attributes, snapshot: snapshot).foreground,
+			]
+			if cell.attributes.underline || cell.attributes.hyperlink != nil {
+				attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue
+			}
+			result.append(NSAttributedString(string: String(cell.character), attributes: attributes))
+		}
+		return result
+	}
+
+	private func font(for attributes: TerminalTextAttributes) -> NSFont {
+		var traits: NSFontTraitMask = []
+		if attributes.bold {
+			traits.insert(.boldFontMask)
+		}
+		if attributes.italic {
+			traits.insert(.italicFontMask)
+		}
+		return NSFontManager.shared.convert(font, toHaveTrait: traits)
+	}
+
+	private func resolvedColors(for attributes: TerminalTextAttributes, snapshot: TerminalSnapshot) -> (foreground: NSColor, background: NSColor?) {
+		var foreground = color(for: attributes.foreground, snapshot: snapshot) ?? color(for: snapshot.defaultForeground) ?? NSColor.textColor
+		var background = color(for: attributes.background, snapshot: snapshot) ?? color(for: snapshot.defaultBackground)
+		if attributes.inverse {
+			let originalForeground = foreground
+			foreground = background ?? NSColor.textBackgroundColor
+			background = originalForeground
+		}
+		return (foreground, background)
+	}
+
+	private func color(for terminalColor: TerminalColor?, snapshot: TerminalSnapshot) -> NSColor? {
+		guard let terminalColor else {
+			return nil
+		}
+		switch terminalColor {
+		case let .ansi(index), let .indexed(index):
+			return color(for: snapshot.palette[index])
+		case let .rgb(rgb):
+			return color(for: rgb)
+		}
+	}
+
+	private func color(for rgb: TerminalRGB?) -> NSColor? {
+		guard let rgb else {
+			return nil
+		}
+		return NSColor(
+			srgbRed: CGFloat(max(0, min(255, rgb.red))) / 255,
+			green: CGFloat(max(0, min(255, rgb.green))) / 255,
+			blue: CGFloat(max(0, min(255, rgb.blue))) / 255,
+			alpha: 1
+		)
+	}
+
+	func encodedMouseInput(button: Int, row: Int, column: Int, pressed: Bool) -> Data? {
+		encodedMouseInput(button: button, row: row, column: column, pressed: pressed, snapshot: emulator.snapshot(scrollbackOffset: 0))
+	}
+
+	private func encodedMouseInput(button: Int, row: Int, column: Int, pressed: Bool, snapshot: TerminalSnapshot) -> Data? {
+		guard snapshot.mouseTrackingMode != .none else {
+			return nil
+		}
+		let x = max(0, min(emulator.columns - 1, column)) + 1
+		let y = max(0, min(emulator.rows - 1, row)) + 1
+		if snapshot.sgrMouseMode {
+			return Data("\u{1B}[<\(button);\(x);\(y)\(pressed ? "M" : "m")".utf8)
+		}
+		let legacyButton = pressed ? button : 3
+		guard legacyButton <= 223, x <= 223, y <= 223 else {
+			return nil
+		}
+		return Data([0x1B, 0x5B, 0x4D, UInt8(legacyButton + 32), UInt8(x + 32), UInt8(y + 32)])
+	}
+
+	@discardableResult
+	private func sendMouse(_ event: NSEvent, button: Int, pressed: Bool) -> Bool {
+		let snapshot = emulator.snapshot(scrollbackOffset: 0)
+		guard snapshot.mouseTrackingMode != .none else {
+			return false
+		}
+		let point = terminalCellLocation(for: event)
+		let code = mouseButtonCode(button: button, event: event)
+		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: pressed, snapshot: snapshot) else {
+			return false
+		}
+		onInput?(data)
+		return true
+	}
+
+	@discardableResult
+	private func sendMouseMotion(_ event: NSEvent, button: Int) -> Bool {
+		let snapshot = emulator.snapshot(scrollbackOffset: 0)
+		guard snapshot.mouseTrackingMode == .button || snapshot.mouseTrackingMode == .any else {
+			return false
+		}
+		if button == 3, snapshot.mouseTrackingMode != .any {
+			return false
+		}
+		let point = terminalCellLocation(for: event)
+		let code = mouseButtonCode(button: button, event: event) + 32
+		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: true, snapshot: snapshot) else {
+			return false
+		}
+		onInput?(data)
+		return true
+	}
+
+	@discardableResult
+	private func sendMouseWheel(_ event: NSEvent) -> Bool {
+		let snapshot = emulator.snapshot(scrollbackOffset: 0)
+		guard snapshot.mouseTrackingMode != .none, event.scrollingDeltaY != 0 else {
+			return false
+		}
+		let point = terminalCellLocation(for: event)
+		let base = event.scrollingDeltaY > 0 ? 64 : 65
+		let code = base + mouseModifierCode(event)
+		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: true, snapshot: snapshot) else {
+			return false
+		}
+		onInput?(data)
+		return true
+	}
+
+	private func terminalCellLocation(for event: NSEvent) -> (row: Int, column: Int) {
+		let point = convert(event.locationInWindow, from: nil)
+		let column = Int(((point.x - 4) / max(characterSize.width, 1)).rounded(.down))
+		let row = Int(((point.y - 2) / max(characterSize.height, 1)).rounded(.down))
+		return (
+			row: max(0, min(emulator.rows - 1, row)),
+			column: max(0, min(emulator.columns - 1, column))
+		)
+	}
+
+	private func mouseButtonCode(button: Int, event: NSEvent) -> Int {
+		max(0, min(3, button)) + mouseModifierCode(event)
+	}
+
+	private func mouseModifierCode(_ event: NSEvent) -> Int {
+		let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+		var code = 0
+		if flags.contains(.shift) {
+			code += 4
+		}
+		if flags.contains(.option) {
+			code += 8
+		}
+		if flags.contains(.control) {
+			code += 16
+		}
+		return code
 	}
 
 	private func encodedInput(for event: NSEvent) -> Data? {

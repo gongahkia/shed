@@ -174,6 +174,32 @@ import Testing
 	#expect(registry.config(forLanguageID: "rust")?.command == "rust-analyzer")
 }
 
+@Test func lspServerRegistryLoaderReadsTOMLOverrides() throws {
+	let fixture = try TemporaryRegistryFixture()
+	let path = fixture.root.appendingPathComponent("lsp.toml")
+	let toml = """
+	[swift]
+	command = "/tmp/sourcekit-shim"
+	args = ["--stdio", "--trace"]
+	root_patterns = ["Package.swift", ".git"]
+
+	[swift.initOptions]
+	toolchain = "debug"
+
+	[swift.settings]
+	index = "on"
+	"""
+	try toml.write(to: path, atomically: true, encoding: .utf8)
+	let registry = try LSPServerRegistryLoader.load(from: path)
+	let config = registry.config(forLanguageID: "swift")
+	#expect(config?.command == "/tmp/sourcekit-shim")
+	#expect(config?.args == ["--stdio", "--trace"])
+	#expect(config?.rootPatterns == ["Package.swift", ".git"])
+	#expect(config?.initOptions["toolchain"] == "debug")
+	#expect(config?.settings["index"] == "on")
+	#expect(registry.config(forLanguageID: "rust")?.command == "rust-analyzer")
+}
+
 @Test func lspServerRegistryLoaderFallsBackToBundledWhenFileMissing() throws {
 	let fixture = try TemporaryRegistryFixture()
 	let path = fixture.root.appendingPathComponent("missing.json")

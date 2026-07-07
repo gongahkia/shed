@@ -158,6 +158,14 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		configsByLanguageID[config.languageId] = config
 	}
 
+	public func merging(_ override: LSPServerRegistry) -> LSPServerRegistry {
+		var copy = self
+		for config in override.configs {
+			copy.register(config)
+		}
+		return copy
+	}
+
 	public mutating func registerExtensions(_ map: [String: String]) {
 		for (ext, languageID) in map {
 			languageIDByExtension[ext.lowercased()] = languageID
@@ -492,12 +500,23 @@ public enum LSPServerRegistryLoader {
 			.homeDirectoryForCurrentUser
 			.appendingPathComponent(".config", isDirectory: true)
 			.appendingPathComponent("itsy", isDirectory: true)
+			.appendingPathComponent("lsp.toml")
+	}
+
+	public static var legacyJSONConfigURL: URL {
+		FileManager.default
+			.homeDirectoryForCurrentUser
+			.appendingPathComponent(".config", isDirectory: true)
+			.appendingPathComponent("itsy", isDirectory: true)
 			.appendingPathComponent("lsp.json")
 	}
 
 	public static func load(from url: URL = defaultConfigURL, fileManager: FileManager = .default) throws -> LSPServerRegistry {
 		guard fileManager.fileExists(atPath: url.path) else {
 			throw LSPServerRegistryLoaderError.fileNotFound
+		}
+		if url.pathExtension.lowercased() == "toml" {
+			return try loadTOML(from: url, fileManager: fileManager)
 		}
 		let data = try Data(contentsOf: url)
 		do {
@@ -514,7 +533,186 @@ public enum LSPServerRegistryLoader {
 		}
 	}
 
+	public static func loadTOML(from url: URL, fileManager: FileManager = .default) throws -> LSPServerRegistry {
+		guard fileManager.fileExists(atPath: url.path) else {
+			throw LSPServerRegistryLoaderError.fileNotFound
+		}
+		do {
+			let text = try String(contentsOf: url, encoding: .utf8)
+			return try LSPRegistryTOMLParser().parse(text)
+		} catch let error as LSPServerRegistryLoaderError {
+			throw error
+		} catch {
+			throw LSPServerRegistryLoaderError.decodeFailed(String(describing: error))
+		}
+	}
+
 	public static func loadOrBundled(from url: URL = defaultConfigURL, fileManager: FileManager = .default) -> LSPServerRegistry {
-		(try? load(from: url, fileManager: fileManager)) ?? LSPServerRegistry()
+		if let registry = try? load(from: url, fileManager: fileManager) {
+			return registry
+		}
+		if url == defaultConfigURL, let registry = try? load(from: legacyJSONConfigURL, fileManager: fileManager) {
+			return registry
+		}
+		return LSPServerRegistry()
+	}
+}
+
+private struct LSPRegistryTOMLParser {
+	private enum Value: Equatable {
+		case string(String)
+		case strings([String])
+	}
+
+	func parse(_ text: String) throws -> LSPServerRegistry {
+		var configs: [String: LSPServerConfig] = [:]
+		var section: [String] = []
+		for (offset, rawLine) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+			let line = stripComment(String(rawLine)).trimmingCharacters(in: .whitespaces)
+			guard !line.isEmpty else {
+				continue
+			}
+			if line.hasPrefix("["), line.hasSuffix("]") {
+				section = line.dropFirst().dropLast().split(separator: ".").map { String($0).trimmingCharacters(in: .whitespaces) }
+				continue
+			}
+			guard !section.isEmpty, let equals = line.firstIndex(of: "=") else {
+				throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): expected [language] and key = value")
+			}
+			let key = String(line[..<equals]).trimmingCharacters(in: .whitespaces)
+			let rawValue = String(line[line.index(after: equals)...]).trimmingCharacters(in: .whitespaces)
+			guard let value = parseValue(rawValue) else {
+				throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): invalid value")
+			}
+			let languageID = section[0]
+			var config = configs[languageID] ?? LSPServerConfig(languageId: languageID, command: "")
+			switch (Array(section.dropFirst()), key, value) {
+			case ([], "command", let .string(command)):
+				config.command = command
+			case ([], "args", let .strings(args)):
+				config.args = args
+			case ([], "root_patterns", let .strings(patterns)), ([], "rootPatterns", let .strings(patterns)):
+				config.rootPatterns = patterns
+			case (["initOptions"], let optionKey, let .string(optionValue)):
+				config.initOptions[optionKey] = optionValue
+			case (["settings"], let settingKey, let .string(settingValue)):
+				config.settings[settingKey] = settingValue
+			default:
+				throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): unsupported key \(key)")
+			}
+			configs[languageID] = config
+		}
+		var registry = LSPServerRegistry()
+		for (languageID, config) in configs {
+			guard !config.command.isEmpty else {
+				throw LSPServerRegistryLoaderError.decodeFailed("\(languageID): command is required")
+			}
+			registry.register(config)
+		}
+		return registry
+	}
+
+	private func parseValue(_ raw: String) -> Value? {
+		if raw.hasPrefix("\""), raw.hasSuffix("\""), raw.count >= 2 {
+			return .string(unescape(String(raw.dropFirst().dropLast())))
+		}
+		if raw.hasPrefix("["), raw.hasSuffix("]") {
+			let inner = String(raw.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
+			guard !inner.isEmpty else {
+				return .strings([])
+			}
+			var values: [String] = []
+			for part in splitArray(inner) {
+				let trimmed = part.trimmingCharacters(in: .whitespaces)
+				guard trimmed.hasPrefix("\""), trimmed.hasSuffix("\""), trimmed.count >= 2 else {
+					return nil
+				}
+				values.append(unescape(String(trimmed.dropFirst().dropLast())))
+			}
+			return .strings(values)
+		}
+		return nil
+	}
+
+	private func splitArray(_ value: String) -> [String] {
+		var parts: [String] = []
+		var current = ""
+		var quoted = false
+		var escaped = false
+		for character in value {
+			if escaped {
+				current.append(character)
+				escaped = false
+				continue
+			}
+			if character == "\\" {
+				current.append(character)
+				escaped = true
+				continue
+			}
+			if character == "\"" {
+				quoted.toggle()
+				current.append(character)
+				continue
+			}
+			if character == ",", !quoted {
+				parts.append(current)
+				current = ""
+			} else {
+				current.append(character)
+			}
+		}
+		parts.append(current)
+		return parts
+	}
+
+	private func stripComment(_ line: String) -> String {
+		var quoted = false
+		var escaped = false
+		for index in line.indices {
+			let character = line[index]
+			if escaped {
+				escaped = false
+				continue
+			}
+			if character == "\\" {
+				escaped = true
+				continue
+			}
+			if character == "\"" {
+				quoted.toggle()
+				continue
+			}
+			if character == "#", !quoted {
+				return String(line[..<index])
+			}
+		}
+		return line
+	}
+
+	private func unescape(_ value: String) -> String {
+		var result = ""
+		var escaping = false
+		for character in value {
+			if escaping {
+				switch character {
+				case "n":
+					result.append("\n")
+				case "t":
+					result.append("\t")
+				default:
+					result.append(character)
+				}
+				escaping = false
+			} else if character == "\\" {
+				escaping = true
+			} else {
+				result.append(character)
+			}
+		}
+		if escaping {
+			result.append("\\")
+		}
+		return result
 	}
 }

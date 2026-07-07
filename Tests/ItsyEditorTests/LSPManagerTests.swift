@@ -35,6 +35,22 @@ import Testing
 	#expect(counter.count == 1)
 }
 
+@Test func lspManagerUsesWorkspaceTOMLOverride() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/App.swift", "")
+	let override = try fixture.executable("override/sourcekit-lsp")
+	try fixture.write("ws/.itsy/lsp.toml", """
+	[swift]
+	command = "\(override.path)"
+	root_patterns = ["Package.swift", ".git"]
+	""")
+	let counter = SpawnCounter()
+	let manager = LSPManager(registry: try fixture.swiftRegistry(), clientFactory: counter.makeFactory())
+	_ = try await manager.ensureClient(for: fixture.root.appendingPathComponent("ws/Sources/App.swift"))
+	#expect(counter.configs.first?.command == override.path)
+}
+
 @Test func lspManagerCapsSpawnsWithinRetryWindow() async throws {
 	let fixture = try TemporaryLSPManagerFixture()
 	try fixture.write("ws/Package.swift", "")
@@ -137,6 +153,7 @@ import Testing
 private final class SpawnCounter: @unchecked Sendable {
 	private let lock = NSLock()
 	private var value = 0
+	private var seenConfigs: [LSPServerConfig] = []
 
 	var count: Int {
 		lock.lock()
@@ -144,10 +161,17 @@ private final class SpawnCounter: @unchecked Sendable {
 		return value
 	}
 
+	var configs: [LSPServerConfig] {
+		lock.lock()
+		defer { lock.unlock() }
+		return seenConfigs
+	}
+
 	func makeFactory() -> LSPManager.ClientFactory {
-		{ [self] _, _ in
+		{ [self] config, _ in
 			lock.lock()
 			value += 1
+			seenConfigs.append(config)
 			lock.unlock()
 			return LSPProcessClient(executableURL: URL(fileURLWithPath: "/usr/bin/true"))
 		}
@@ -180,7 +204,7 @@ private final class TemporaryLSPManagerFixture {
 		])
 	}
 
-	private func executable(_ relativePath: String) throws -> URL {
+	func executable(_ relativePath: String) throws -> URL {
 		let url = root.appendingPathComponent(relativePath)
 		try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
 		try "#!/bin/sh\nexit 0\n".write(to: url, atomically: true, encoding: .utf8)

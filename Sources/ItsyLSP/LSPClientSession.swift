@@ -218,6 +218,60 @@ public actor LSPClientSession {
 		return try LSPDocumentHighlightResult(result: response.result).highlights
 	}
 
+	public func prepareCallHierarchy(uri: String, position: LSPPosition) async throws -> [LSPCallHierarchyItem] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentPrepareCallHierarchy,
+			params: try LSPAny(encoding: LSPCallHierarchyPrepareParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position
+			))
+		)
+		return try LSPCallHierarchyPrepareResult(result: response.result).items
+	}
+
+	public func incomingCalls(for item: LSPCallHierarchyItem) async throws -> [LSPCallHierarchyIncomingCall] {
+		let response = try await sendRequest(
+			method: LSPMethod.callHierarchyIncomingCalls,
+			params: try LSPAny(encoding: LSPCallHierarchyCallsParams(item: item))
+		)
+		return try LSPCallHierarchyIncomingResult(result: response.result).calls
+	}
+
+	public func outgoingCalls(for item: LSPCallHierarchyItem) async throws -> [LSPCallHierarchyOutgoingCall] {
+		let response = try await sendRequest(
+			method: LSPMethod.callHierarchyOutgoingCalls,
+			params: try LSPAny(encoding: LSPCallHierarchyCallsParams(item: item))
+		)
+		return try LSPCallHierarchyOutgoingResult(result: response.result).calls
+	}
+
+	public func prepareTypeHierarchy(uri: String, position: LSPPosition) async throws -> [LSPTypeHierarchyItem] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentPrepareTypeHierarchy,
+			params: try LSPAny(encoding: LSPTypeHierarchyPrepareParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position
+			))
+		)
+		return try LSPTypeHierarchyResult(result: response.result).items
+	}
+
+	public func supertypes(for item: LSPTypeHierarchyItem) async throws -> [LSPTypeHierarchyItem] {
+		let response = try await sendRequest(
+			method: LSPMethod.typeHierarchySupertypes,
+			params: try LSPAny(encoding: LSPTypeHierarchyParams(item: item))
+		)
+		return try LSPTypeHierarchyResult(result: response.result).items
+	}
+
+	public func subtypes(for item: LSPTypeHierarchyItem) async throws -> [LSPTypeHierarchyItem] {
+		let response = try await sendRequest(
+			method: LSPMethod.typeHierarchySubtypes,
+			params: try LSPAny(encoding: LSPTypeHierarchyParams(item: item))
+		)
+		return try LSPTypeHierarchyResult(result: response.result).items
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) throws {
 		try requireState([.running])
 		try writeNotificationUnchecked(method: method, params: params)

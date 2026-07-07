@@ -7,6 +7,7 @@ public enum LSPMethod {
 	public static let exit = "exit"
 	public static let textDocumentDidOpen = "textDocument/didOpen"
 	public static let textDocumentDidChange = "textDocument/didChange"
+	public static let textDocumentDidSave = "textDocument/didSave"
 	public static let textDocumentDidClose = "textDocument/didClose"
 	public static let textDocumentPublishDiagnostics = "textDocument/publishDiagnostics"
 	public static let textDocumentCompletion = "textDocument/completion"
@@ -29,7 +30,14 @@ public enum LSPMethod {
 	public static let inlayHintResolve = "inlayHint/resolve"
 	public static let textDocumentFoldingRange = "textDocument/foldingRange"
 	public static let textDocumentDocumentHighlight = "textDocument/documentHighlight"
+	public static let textDocumentPrepareCallHierarchy = "textDocument/prepareCallHierarchy"
+	public static let callHierarchyIncomingCalls = "callHierarchy/incomingCalls"
+	public static let callHierarchyOutgoingCalls = "callHierarchy/outgoingCalls"
+	public static let textDocumentPrepareTypeHierarchy = "textDocument/prepareTypeHierarchy"
+	public static let typeHierarchySupertypes = "typeHierarchy/supertypes"
+	public static let typeHierarchySubtypes = "typeHierarchy/subtypes"
 	public static let workspaceExecuteCommand = "workspace/executeCommand"
+	public static let workspaceDidChangeWatchedFiles = "workspace/didChangeWatchedFiles"
 }
 
 public struct LSPPosition: Codable, Equatable, Sendable {
@@ -111,6 +119,16 @@ public struct LSPDidChangeTextDocumentParams: Codable, Equatable, Sendable {
 	public init(textDocument: LSPVersionedTextDocumentIdentifier, contentChanges: [LSPTextDocumentContentChangeEvent]) {
 		self.textDocument = textDocument
 		self.contentChanges = contentChanges
+	}
+}
+
+public struct LSPDidSaveTextDocumentParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var text: String?
+
+	public init(textDocument: LSPTextDocumentIdentifier, text: String? = nil) {
+		self.textDocument = textDocument
+		self.text = text
 	}
 }
 
@@ -221,6 +239,8 @@ public struct LSPFoldingRangeParams: Codable, Equatable, Sendable {
 }
 
 public typealias LSPDocumentHighlightParams = LSPTextDocumentPositionParams
+public typealias LSPCallHierarchyPrepareParams = LSPTextDocumentPositionParams
+public typealias LSPTypeHierarchyPrepareParams = LSPTextDocumentPositionParams
 
 public enum LSPSignatureHelpTriggerKind: Int, Codable, Equatable, Sendable {
 	case invoked = 1
@@ -801,6 +821,8 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 	public var inlayHintProvider: LSPBooleanCapability?
 	public var foldingRangeProvider: LSPBooleanCapability?
 	public var documentHighlightProvider: LSPBooleanCapability?
+	public var callHierarchyProvider: LSPBooleanCapability?
+	public var typeHierarchyProvider: LSPBooleanCapability?
 
 	public init(
 		completionProvider: LSPCompletionOptions? = nil,
@@ -809,7 +831,9 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 		semanticTokensProvider: LSPSemanticTokensOptions? = nil,
 		inlayHintProvider: LSPBooleanCapability? = nil,
 		foldingRangeProvider: LSPBooleanCapability? = nil,
-		documentHighlightProvider: LSPBooleanCapability? = nil
+		documentHighlightProvider: LSPBooleanCapability? = nil,
+		callHierarchyProvider: LSPBooleanCapability? = nil,
+		typeHierarchyProvider: LSPBooleanCapability? = nil
 	) {
 		self.completionProvider = completionProvider
 		self.signatureHelpProvider = signatureHelpProvider
@@ -818,6 +842,8 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 		self.inlayHintProvider = inlayHintProvider
 		self.foldingRangeProvider = foldingRangeProvider
 		self.documentHighlightProvider = documentHighlightProvider
+		self.callHierarchyProvider = callHierarchyProvider
+		self.typeHierarchyProvider = typeHierarchyProvider
 	}
 }
 
@@ -1704,6 +1730,163 @@ public enum LSPDocumentHighlightResult: Equatable, Sendable {
 	}
 }
 
+public struct LSPCallHierarchyItem: Codable, Equatable, Sendable {
+	public var name: String
+	public var kind: LSPSymbolKind
+	public var tags: [LSPSymbolTag]?
+	public var detail: String?
+	public var uri: String
+	public var range: LSPRange
+	public var selectionRange: LSPRange
+	public var data: LSPAny?
+
+	public init(
+		name: String,
+		kind: LSPSymbolKind,
+		tags: [LSPSymbolTag]? = nil,
+		detail: String? = nil,
+		uri: String,
+		range: LSPRange,
+		selectionRange: LSPRange,
+		data: LSPAny? = nil
+	) {
+		self.name = name
+		self.kind = kind
+		self.tags = tags
+		self.detail = detail
+		self.uri = uri
+		self.range = range
+		self.selectionRange = selectionRange
+		self.data = data
+	}
+}
+
+public struct LSPCallHierarchyIncomingCall: Codable, Equatable, Sendable {
+	public var from: LSPCallHierarchyItem
+	public var fromRanges: [LSPRange]
+
+	public init(from: LSPCallHierarchyItem, fromRanges: [LSPRange]) {
+		self.from = from
+		self.fromRanges = fromRanges
+	}
+}
+
+public struct LSPCallHierarchyOutgoingCall: Codable, Equatable, Sendable {
+	public var to: LSPCallHierarchyItem
+	public var fromRanges: [LSPRange]
+
+	public init(to: LSPCallHierarchyItem, fromRanges: [LSPRange]) {
+		self.to = to
+		self.fromRanges = fromRanges
+	}
+}
+
+public struct LSPCallHierarchyCallsParams: Codable, Equatable, Sendable {
+	public var item: LSPCallHierarchyItem
+
+	public init(item: LSPCallHierarchyItem) {
+		self.item = item
+	}
+}
+
+public enum LSPCallHierarchyPrepareResult: Equatable, Sendable {
+	case items([LSPCallHierarchyItem])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let items = (try? decoder.decode([LSPCallHierarchyItem].self, from: data)) ?? []
+		self = items.isEmpty ? .none : .items(items)
+	}
+
+	public var items: [LSPCallHierarchyItem] {
+		guard case let .items(items) = self else {
+			return []
+		}
+		return items
+	}
+}
+
+public enum LSPCallHierarchyIncomingResult: Equatable, Sendable {
+	case calls([LSPCallHierarchyIncomingCall])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let calls = (try? decoder.decode([LSPCallHierarchyIncomingCall].self, from: data)) ?? []
+		self = calls.isEmpty ? .none : .calls(calls)
+	}
+
+	public var calls: [LSPCallHierarchyIncomingCall] {
+		guard case let .calls(calls) = self else {
+			return []
+		}
+		return calls
+	}
+}
+
+public enum LSPCallHierarchyOutgoingResult: Equatable, Sendable {
+	case calls([LSPCallHierarchyOutgoingCall])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let calls = (try? decoder.decode([LSPCallHierarchyOutgoingCall].self, from: data)) ?? []
+		self = calls.isEmpty ? .none : .calls(calls)
+	}
+
+	public var calls: [LSPCallHierarchyOutgoingCall] {
+		guard case let .calls(calls) = self else {
+			return []
+		}
+		return calls
+	}
+}
+
+public typealias LSPTypeHierarchyItem = LSPCallHierarchyItem
+
+public struct LSPTypeHierarchyParams: Codable, Equatable, Sendable {
+	public var item: LSPTypeHierarchyItem
+
+	public init(item: LSPTypeHierarchyItem) {
+		self.item = item
+	}
+}
+
+public enum LSPTypeHierarchyResult: Equatable, Sendable {
+	case items([LSPTypeHierarchyItem])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let items = (try? decoder.decode([LSPTypeHierarchyItem].self, from: data)) ?? []
+		self = items.isEmpty ? .none : .items(items)
+	}
+
+	public var items: [LSPTypeHierarchyItem] {
+		guard case let .items(items) = self else {
+			return []
+		}
+		return items
+	}
+}
+
 public struct LSPFormattingOptions: Codable, Equatable, Sendable {
 	public var tabSize: Int
 	public var insertSpaces: Bool
@@ -1787,6 +1970,30 @@ public struct LSPApplyWorkspaceEditResponse: Codable, Equatable, Sendable {
 		self.applied = applied
 		self.failureReason = failureReason
 		self.failedChange = failedChange
+	}
+}
+
+public enum LSPFileChangeType: Int, Codable, Equatable, Sendable {
+	case created = 1
+	case changed = 2
+	case deleted = 3
+}
+
+public struct LSPFileEvent: Codable, Equatable, Sendable {
+	public var uri: String
+	public var type: LSPFileChangeType
+
+	public init(uri: String, type: LSPFileChangeType) {
+		self.uri = uri
+		self.type = type
+	}
+}
+
+public struct LSPDidChangeWatchedFilesParams: Codable, Equatable, Sendable {
+	public var changes: [LSPFileEvent]
+
+	public init(changes: [LSPFileEvent]) {
+		self.changes = changes
 	}
 }
 

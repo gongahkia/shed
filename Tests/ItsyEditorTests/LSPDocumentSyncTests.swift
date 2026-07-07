@@ -70,6 +70,28 @@ import Testing
 	#expect(messages.last?.version == 2)
 }
 
+@Test func lspDocumentSyncDidSaveFlushesPendingChange() async throws {
+	let sink = RecordingNotificationSink()
+	let coordinator = LSPDocumentSyncCoordinator(sink: sink, debounceMillis: 60_000)
+	let url = URL(fileURLWithPath: "/tmp/itsy-sync-F.swift")
+	try await coordinator.didOpen(url: url, languageID: "swift", content: "open")
+	await coordinator.didChange(url: url, content: "saved")
+	try await coordinator.didSave(url: url, text: "saved")
+	let messages = await coordinator.recordedMessages
+	#expect(messages.map(\.method) == [
+		LSPMethod.textDocumentDidOpen,
+		LSPMethod.textDocumentDidChange,
+		LSPMethod.textDocumentDidSave,
+	])
+	#expect(messages.map(\.version) == [1, 2, 2])
+	let calls = await sink.recordedCalls()
+	#expect(calls.last?.method == LSPMethod.textDocumentDidSave)
+	#expect(calls.last?.params == .object([
+		"textDocument": .object(["uri": .string(url.standardizedFileURL.absoluteString)]),
+		"text": .string("saved"),
+	]))
+}
+
 private actor RecordingNotificationSink: LSPNotificationSink {
 	private var calls: [(method: String, params: LSPAny)] = []
 
@@ -79,5 +101,9 @@ private actor RecordingNotificationSink: LSPNotificationSink {
 
 	func recordedMethods() -> [String] {
 		calls.map(\.method)
+	}
+
+	func recordedCalls() -> [(method: String, params: LSPAny)] {
+		calls
 	}
 }

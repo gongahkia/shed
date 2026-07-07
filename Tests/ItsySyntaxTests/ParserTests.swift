@@ -288,6 +288,23 @@ struct ParserTests {
 		("/tmp/app.dart", .dart),
 		("/tmp/Main.kt", .kotlin),
 		("/tmp/app.exs", .elixir),
+		("/tmp/Program.cs", .csharp),
+		("/tmp/schema.graphql", .graphql),
+		("/tmp/Main.java", .java),
+		("/tmp/notebook.jl", .julia),
+		("/tmp/paper.tex", .latex),
+		("/tmp/init.lua", .lua),
+		("/tmp/flake.nix", .nix),
+		("/tmp/main.ml", .ocaml),
+		("/tmp/index.php", .php),
+		("/tmp/service.proto", .proto),
+		("/tmp/analysis.R", .r),
+		("/tmp/app.rb", .ruby),
+		("/tmp/style.scss", .scss),
+		("/tmp/App.svelte", .svelte),
+		("/tmp/main.tf", .terraform),
+		("/tmp/App.vue", .vue),
+		("/tmp/Main.hs", .haskell),
 	]
 	for (path, language) in cases {
 		#expect(SyntaxPipeline.language(forFileURL: URL(fileURLWithPath: path)) == language)
@@ -304,6 +321,23 @@ struct ParserTests {
 		(.dart, "void main() {}\n"),
 		(.kotlin, "fun main() {}\n"),
 		(.elixir, "x = 1\n"),
+		(.csharp, "class Program { static void Main() {} }\n"),
+		(.graphql, "type Query { hello: String }\n"),
+		(.haskell, "main = putStrLn \"hi\"\n"),
+		(.java, "class Main { void run() {} }\n"),
+		(.julia, "function f(x)\n x + 1\nend\n"),
+		(.latex, "\\section{Hi}\ntext\n"),
+		(.lua, "local x = 1\nprint(x)\n"),
+		(.nix, "{ pkgs ? import <nixpkgs> {} }: pkgs.hello\n"),
+		(.ocaml, "let x = 1\n"),
+		(.php, "<?php echo \"hi\";\n"),
+		(.proto, "syntax = \"proto3\"; message Foo { string name = 1; }\n"),
+		(.r, "x <- 1\nprint(x)\n"),
+		(.ruby, "class App\n def run\n  1\n end\nend\n"),
+		(.scss, "$color: red;\n.a { color: $color; }\n"),
+		(.svelte, "<script>let x = 1;</script><h1>{x}</h1>\n"),
+		(.terraform, "resource \"x\" \"y\" { name = \"z\" }\n"),
+		(.vue, "<template><div>{{ msg }}</div></template>\n"),
 	]
 	for (language, source) in cases {
 		let rope = Rope(source)
@@ -315,6 +349,12 @@ struct ParserTests {
 
 @Test func highlightQueriesLoadForNewGrammars() throws {
 	for language in [Language.bash, .zig, .swift, .sql, .dockerfile, .dart, .kotlin, .elixir] {
+		_ = try HighlightQuery(language: language)
+	}
+}
+
+@Test func highlightQueriesLoadForAdditionalGrammars() throws {
+	for language in [Language.csharp, .graphql, .haskell, .java, .julia, .latex, .lua, .nix, .ocaml, .php, .proto, .r, .ruby, .scss, .svelte, .terraform, .vue] {
 		_ = try HighlightQuery(language: language)
 	}
 }

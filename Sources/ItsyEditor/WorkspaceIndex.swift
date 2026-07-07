@@ -93,7 +93,19 @@ public struct WorkspaceIndex: Equatable, Sendable {
 		guard limit > 0 else {
 			return []
 		}
-		return Array(FuzzyMatcher.ranked(symbols, query: query, includeUnmatched: false) { symbol in
+		let allSymbols = symbols
+		let exact = allSymbols.filter { $0.name.compare(query, options: [.caseInsensitive]) == .orderedSame }
+		if !exact.isEmpty {
+			return Array(exact.prefix(limit))
+		}
+		let contained = allSymbols.filter { symbol in
+			symbol.name.range(of: query, options: [.caseInsensitive]) != nil ||
+				symbol.relativePath.range(of: query, options: [.caseInsensitive]) != nil
+		}
+		if !contained.isEmpty {
+			return Array(contained.prefix(limit))
+		}
+		return Array(FuzzyMatcher.ranked(allSymbols, query: query, includeUnmatched: false) { symbol in
 			"\(symbol.name) \(symbol.relativePath)"
 		}.prefix(limit))
 	}

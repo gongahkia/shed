@@ -1,6 +1,6 @@
 # Phase 35 Extensions Checkpoint
 
-Date: 2026-07-02
+Date: 2026-07-07
 
 Implemented slice:
 
@@ -16,6 +16,15 @@ Implemented slice:
 - added `ExtensionCommandMapper` for scoped command registry IDs and explicit extension command dispatch.
 - app command registry now reloads workspace extension command contributions on workspace open.
 - duplicate or conflicting extension commands are skipped with a log instead of failing app startup.
+- added `ExtensionContributionRegistry` for scoped theme, snippet, language, and problem-matcher metadata.
+- contribution file paths are resolved relative to the extension root and reject absolute paths, `..`, missing files, and invalid matcher regexes.
+- added SHA-256/trust-checked install flow from a staged extracted extension directory into versioned install roots.
+- install validation rejects symlinks, nested `.app` bundles, executable files, hash mismatches, deny records, and missing trust.
+- install trust loads repo/user/workspace `VOUCHED` stores and accepts injected/optional `vouch` CLI evidence.
+- added marketplace index/cache load/save models.
+- added a minimal Extensions panel listing installed extension versions.
+- command palette now includes `Extensions` and `Reload Extension Contributions`.
+- added `scripts/package_extension.sh` for local publish packaging, SHA-256 output, and VOUCHED allow-line generation.
 
 References checked:
 
@@ -31,8 +40,12 @@ swift test --filter ExtensionManifest
 swift test --filter VouchStore
 swift test --filter extensionCommandMapper
 swift test --filter extensionCommandDiscovery
+swift test --filter Extension
 swift test --filter CommandRegistry
+swift test --filter VouchStore
 swift build --target ItsyApp
+bash -n scripts/package_extension.sh
+scripts/package_extension.sh <temp-extension> <temp-out> && shasum -c <temp-out>/dev.example.pack-0.1.0.itsyext.zip.sha256
 ```
 
 Result:
@@ -41,14 +54,14 @@ Result:
 - `VouchStore`: 5 tests passed.
 - `extensionCommandMapper`: 1 test passed.
 - `extensionCommandDiscovery`: 1 test passed.
+- `Extension`: 17 tests passed.
 - `CommandRegistry`: 2 tests passed.
+- `VouchStore`: 6 tests passed.
 - `ItsyApp` build: passed.
+- `scripts/package_extension.sh`: bash syntax check and temp packaging smoke passed.
 - `docs/design/extensions.md`: exists; references and non-goals grep passed.
 
-Remaining for #7:
+Remaining follow-up:
 
-- keymap/theme/snippet/grammar/problem-matcher registration.
-- Vouch parser property tests.
-- install-time trust/integrity enforcement and `vouch` CLI integration.
-- marketplace/install/publish flows.
-- Extensions panel and command-palette entries.
+- remote marketplace submission is still policy/process work.
+- snippet/theme/language/problem-matcher runtime consumers now have registered metadata, but richer editor UX can expand in later feature issues.

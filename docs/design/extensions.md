@@ -110,6 +110,12 @@ Uninstall disables the extension first, unregisters contributions, then removes 
 
 User state under `extension-state` is retained by default. A later UI can expose "remove state" as a separate destructive action.
 
+## Publish
+
+`scripts/package_extension.sh <extension-dir> [output-dir]` creates a `.itsyext.zip` archive, writes a `.sha256` file, and prints the matching local `allow sha256:<hex> id:<extension-id> version:<version> signer:<signer>` line for review before adding it to a VOUCHED store.
+
+The script rejects missing manifests, symlinks, nested `.app` bundles, and executable files before packaging. Marketplace submission remains a separate distribution step that should publish the archive URL and SHA-256 in an index compatible with `ExtensionMarketplaceCache`.
+
 ## Trust
 
 Trust is checked before registration.

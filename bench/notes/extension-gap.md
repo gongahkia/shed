@@ -1,23 +1,17 @@
 # Extension ABI Gap
 
-## Sources checked
+Closed: 2026-07-07
 
-- VS Code Contribution Points documentation: extension capabilities are declared through JSON contribution points, including commands, languages, problem matchers, and task definitions.
+Phase 35 now covers the original gap:
 
-## Current implementation slice
+- schema v2 manifest metadata for commands, keybindings, themes, snippets, languages, problem matchers, and tasks.
+- command registry and app-level workspace command discovery.
+- keybinding contribution mapping into the app keymap layer.
+- scoped non-command contribution registry with extension-root path validation.
+- `VouchStore` parser/API, default repo/user/workspace store order, and property-style parser rejection tests.
+- SHA-256 and trust-checked install flow from staged extracted extensions into versioned install roots.
+- marketplace index/cache models.
+- minimal Extensions panel and command-palette entries.
+- `scripts/package_extension.sh` local publish/package flow with SHA-256 and VOUCHED allow-line output.
 
-- Added a schema-versioned JSON extension manifest ABI under `.itsy/extensions/*.json`.
-- Added declarative task contributions.
-- Wired extension-contributed tasks into workspace task discovery.
-- Added manifest validation and discovery tests.
-
-## Not done yet
-
-- No executable plugin host.
-- No command/menu contribution wiring.
-- No language/snippet/theme contribution wiring.
-- No trust/sandbox model.
-
-## Next slice
-
-Current TODO keeps extensions tasks-only via id:411; no Phase18/19/20 task id adds command/menu contributions, trust/sandboxing, or an executable host. Next extension slice should be a new post-Phase20 TODO for command-palette contribution metadata plus trust model before host work.
+No executable extension host is introduced. v1 remains declarative and non-executable.

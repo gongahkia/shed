@@ -113,6 +113,20 @@ private let deniedSHA = "fffffffffffffffffffffffffffffffffffffffffffffffffffffff
 	}
 }
 
+@Test func vouchStorePropertyRejectsInvalidSHA256Shapes() {
+	let invalidValues = [
+		String(repeating: "0", count: 63),
+		String(repeating: "0", count: 65),
+		String(repeating: "g", count: 64),
+	]
+
+	for value in invalidValues {
+		#expect(throws: VouchParseError.invalidSHA256(line: 1, value: value)) {
+			_ = try VouchStore.parse("deny sha256:\(value) id:dev.example.tools")
+		}
+	}
+}
+
 private final class TemporaryVouchFixture {
 	let root: URL
 

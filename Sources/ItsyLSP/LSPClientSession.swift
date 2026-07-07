@@ -149,6 +149,75 @@ public actor LSPClientSession {
 		return response.result ?? .null
 	}
 
+	public func semanticTokensFull(uri: String) async throws -> LSPSemanticTokens? {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentSemanticTokensFull,
+			params: try LSPAny(encoding: LSPSemanticTokensParams(textDocument: LSPTextDocumentIdentifier(uri: uri)))
+		)
+		return try LSPSemanticTokensResult(result: response.result).tokens
+	}
+
+	public func semanticTokensDelta(uri: String, previousResultId: String) async throws -> LSPSemanticTokensResult {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentSemanticTokensFullDelta,
+			params: try LSPAny(encoding: LSPSemanticTokensDeltaParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				previousResultId: previousResultId
+			))
+		)
+		return try LSPSemanticTokensResult(result: response.result)
+	}
+
+	public func semanticTokensRange(uri: String, range: LSPRange) async throws -> LSPSemanticTokens? {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentSemanticTokensRange,
+			params: try LSPAny(encoding: LSPSemanticTokensRangeParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				range: range
+			))
+		)
+		return try LSPSemanticTokensResult(result: response.result).tokens
+	}
+
+	public func inlayHints(uri: String, range: LSPRange) async throws -> [LSPInlayHint] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentInlayHint,
+			params: try LSPAny(encoding: LSPInlayHintParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				range: range
+			))
+		)
+		return try LSPInlayHintResult(result: response.result).hints
+	}
+
+	public func resolveInlayHint(_ hint: LSPInlayHint) async throws -> LSPInlayHint {
+		let response = try await sendRequest(
+			method: LSPMethod.inlayHintResolve,
+			params: try LSPAny(encoding: hint)
+		)
+		let data = try JSONEncoder().encode(response.result ?? .null)
+		return try JSONDecoder().decode(LSPInlayHint.self, from: data)
+	}
+
+	public func foldingRanges(uri: String) async throws -> [LSPFoldingRange] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentFoldingRange,
+			params: try LSPAny(encoding: LSPFoldingRangeParams(textDocument: LSPTextDocumentIdentifier(uri: uri)))
+		)
+		return try LSPFoldingRangeResult(result: response.result).ranges
+	}
+
+	public func documentHighlights(uri: String, position: LSPPosition) async throws -> [LSPDocumentHighlight] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentDocumentHighlight,
+			params: try LSPAny(encoding: LSPDocumentHighlightParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position
+			))
+		)
+		return try LSPDocumentHighlightResult(result: response.result).highlights
+	}
+
 	public func sendNotification(method: String, params: LSPAny? = nil) throws {
 		try requireState([.running])
 		try writeNotificationUnchecked(method: method, params: params)

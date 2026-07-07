@@ -7,14 +7,25 @@ extension MetalTextView {
 		refreshFindMatchRects()
 	}
 
+	public func setDocumentHighlightRanges(_ ranges: [Range<Int>]) {
+		documentHighlightRanges = ranges
+		refreshDocumentHighlightRects()
+	}
+
 	func renderFindMatchInstances(scale: CGFloat, encoder: MTLRenderCommandEncoder, drawableSize: CGSize) {
 		solidInstanceScratch.removeAll(keepingCapacity: true)
 		appendFindMatchOverlayInstances(scale: scale, into: &solidInstanceScratch)
+		appendDocumentHighlightOverlayInstances(scale: scale, into: &solidInstanceScratch)
 		renderSolidInstances(solidInstanceScratch, encoder: encoder, drawableSize: drawableSize)
 	}
 
 	func refreshFindMatchRects() {
 		findMatchRects = findMatchRanges.flatMap { rects(forUTF8Range: $0) }
+		markDirty()
+	}
+
+	func refreshDocumentHighlightRects() {
+		documentHighlightRects = documentHighlightRanges.flatMap { rects(forUTF8Range: $0) }
 		markDirty()
 	}
 
@@ -28,7 +39,7 @@ extension MetalTextView {
 			return []
 		}
 		return (startLine ... endLine).compactMap { line -> CGRect? in
-			guard visibleLineRange.contains(line) else {
+			guard let row = visibleRow(for: line) else {
 				return nil
 			}
 			let lineRange = editor.rope.lineRange(line)
@@ -41,7 +52,7 @@ extension MetalTextView {
 			let selected = editor.rope.slice(lower ..< upper)
 			return CGRect(
 				x: textInset.x + typographicWidth(before) - xOffset,
-				y: topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight,
+				y: topContentInset + textInset.y + CGFloat(row) * lineHeight,
 				width: max(2, typographicWidth(selected)),
 				height: lineHeight
 			)
@@ -51,6 +62,13 @@ extension MetalTextView {
 	private func appendFindMatchOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		for rect in findMatchRects {
 			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34)))
+		}
+	}
+
+	private func appendDocumentHighlightOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
+		for rect in documentHighlightRects {
+			let underline = CGRect(x: rect.minX, y: rect.maxY - 3, width: rect.width, height: 2)
+			instances.append(solidInstance(rect: underline, scale: scale, color: SIMD4<Float>(0.22, 0.42, 0.90, 0.42)))
 		}
 	}
 }

@@ -121,6 +121,126 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			}
 		}
 
+		public struct SemanticTokens: Codable, Equatable, Sendable {
+			public struct Requests: Codable, Equatable, Sendable {
+				public struct Full: Codable, Equatable, Sendable {
+					public var delta: Bool
+
+					public init(delta: Bool = true) {
+						self.delta = delta
+					}
+				}
+
+				public var range: Bool
+				public var full: Full
+
+				public init(range: Bool = true, full: Full = Full()) {
+					self.range = range
+					self.full = full
+				}
+			}
+
+			public var dynamicRegistration: Bool
+			public var requests: Requests
+			public var tokenTypes: [String]
+			public var tokenModifiers: [String]
+			public var formats: [String]
+			public var overlappingTokenSupport: Bool
+			public var multilineTokenSupport: Bool
+			public var serverCancelSupport: Bool
+			public var augmentsSyntaxTokens: Bool
+
+			public init(
+				dynamicRegistration: Bool = false,
+				requests: Requests = Requests(),
+				tokenTypes: [String] = [
+					"namespace", "type", "class", "enum", "interface", "struct", "typeParameter", "parameter",
+					"variable", "property", "enumMember", "event", "function", "method", "macro", "keyword",
+					"modifier", "comment", "string", "number", "regexp", "operator", "decorator",
+				],
+				tokenModifiers: [String] = [
+					"declaration", "definition", "readonly", "static", "deprecated", "abstract",
+					"async", "modification", "documentation", "defaultLibrary",
+				],
+				formats: [String] = ["relative"],
+				overlappingTokenSupport: Bool = false,
+				multilineTokenSupport: Bool = false,
+				serverCancelSupport: Bool = true,
+				augmentsSyntaxTokens: Bool = true
+			) {
+				self.dynamicRegistration = dynamicRegistration
+				self.requests = requests
+				self.tokenTypes = tokenTypes
+				self.tokenModifiers = tokenModifiers
+				self.formats = formats
+				self.overlappingTokenSupport = overlappingTokenSupport
+				self.multilineTokenSupport = multilineTokenSupport
+				self.serverCancelSupport = serverCancelSupport
+				self.augmentsSyntaxTokens = augmentsSyntaxTokens
+			}
+		}
+
+		public struct InlayHint: Codable, Equatable, Sendable {
+			public struct ResolveSupport: Codable, Equatable, Sendable {
+				public var properties: [String]
+
+				public init(properties: [String] = ["tooltip", "textEdits", "label.tooltip", "label.location", "label.command"]) {
+					self.properties = properties
+				}
+			}
+
+			public var dynamicRegistration: Bool
+			public var resolveSupport: ResolveSupport
+
+			public init(dynamicRegistration: Bool = false, resolveSupport: ResolveSupport = ResolveSupport()) {
+				self.dynamicRegistration = dynamicRegistration
+				self.resolveSupport = resolveSupport
+			}
+		}
+
+		public struct FoldingRange: Codable, Equatable, Sendable {
+			public struct FoldingRangeKind: Codable, Equatable, Sendable {
+				public var valueSet: [String]
+
+				public init(valueSet: [String] = ["comment", "imports", "region"]) {
+					self.valueSet = valueSet
+				}
+			}
+
+			public struct FoldingRangeOptions: Codable, Equatable, Sendable {
+				public var collapsedText: Bool
+
+				public init(collapsedText: Bool = false) {
+					self.collapsedText = collapsedText
+				}
+			}
+
+			public var dynamicRegistration: Bool
+			public var lineFoldingOnly: Bool
+			public var foldingRangeKind: FoldingRangeKind
+			public var foldingRange: FoldingRangeOptions
+
+			public init(
+				dynamicRegistration: Bool = false,
+				lineFoldingOnly: Bool = true,
+				foldingRangeKind: FoldingRangeKind = FoldingRangeKind(),
+				foldingRange: FoldingRangeOptions = FoldingRangeOptions()
+			) {
+				self.dynamicRegistration = dynamicRegistration
+				self.lineFoldingOnly = lineFoldingOnly
+				self.foldingRangeKind = foldingRangeKind
+				self.foldingRange = foldingRange
+			}
+		}
+
+		public struct DocumentHighlight: Codable, Equatable, Sendable {
+			public var dynamicRegistration: Bool
+
+			public init(dynamicRegistration: Bool = false) {
+				self.dynamicRegistration = dynamicRegistration
+			}
+		}
+
 		public var documentSymbol: DocumentSymbol
 		public var completion: Completion
 		public var publishDiagnostics: PublishDiagnostics
@@ -128,6 +248,10 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 		public var definition: Definition
 		public var rename: Rename
 		public var codeAction: CodeAction
+		public var semanticTokens: SemanticTokens
+		public var inlayHint: InlayHint
+		public var foldingRange: FoldingRange
+		public var documentHighlight: DocumentHighlight
 
 		public init(
 			documentSymbol: DocumentSymbol = DocumentSymbol(),
@@ -136,7 +260,11 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			hover: Hover = Hover(),
 			definition: Definition = Definition(),
 			rename: Rename = Rename(),
-			codeAction: CodeAction = CodeAction()
+			codeAction: CodeAction = CodeAction(),
+			semanticTokens: SemanticTokens = SemanticTokens(),
+			inlayHint: InlayHint = InlayHint(),
+			foldingRange: FoldingRange = FoldingRange(),
+			documentHighlight: DocumentHighlight = DocumentHighlight()
 		) {
 			self.documentSymbol = documentSymbol
 			self.completion = completion
@@ -145,6 +273,10 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 			self.definition = definition
 			self.rename = rename
 			self.codeAction = codeAction
+			self.semanticTokens = semanticTokens
+			self.inlayHint = inlayHint
+			self.foldingRange = foldingRange
+			self.documentHighlight = documentHighlight
 		}
 	}
 

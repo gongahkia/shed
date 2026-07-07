@@ -19,11 +19,15 @@ final class ItsyDocument: NSDocument {
 	private static let firstPageIndexByteCount = 4 * 1024
 
 	var editor = Editor()
+	var lspSurfaceRefreshRequested: (() -> Void)?
 	private var editorViews: [MetalTextView] = []
 	private let syntax = DocumentSyntaxController()
+	private var syntaxHighlightSpans: [TextHighlightSpan] = []
+	private var lspHighlightSpans: [TextHighlightSpan] = []
 	private var handoffActivity: NSUserActivity?
 	private var breakpointGutterDecorator: GutterDecorator?
 	private var problemGutterDecorator: GutterDecorator?
+	private var lspGutterDecorator: GutterDecorator?
 	private var activeGutterDecorator: GutterDecorator?
 	private let fileWatcher = DocumentFileWatcher()
 	private let gitGutter = DocumentGitGutterController()
@@ -160,6 +164,7 @@ final class ItsyDocument: NSDocument {
 		view.editor = editor
 		view.visibleLineRangeDidChange = { [weak self] _ in
 			self?.refreshSyntaxHighlights()
+			self?.lspSurfaceRefreshRequested?()
 		}
 		view.newlineInsertionTextProvider = { [weak self] editor in
 			guard let self else {
@@ -177,7 +182,9 @@ final class ItsyDocument: NSDocument {
 			let oldRope = self.editor.rope
 			let edits = editor.lastEditBatch
 			self.editor = editor
+			self.lspHighlightSpans = []
 			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			self.lspSurfaceRefreshRequested?()
 			self.updateHandoffActivity()
 			self.syncSiblingEditorViews(source: view, editor: editor)
 			self.updateChangeCount(.changeDone)
@@ -213,8 +220,18 @@ final class ItsyDocument: NSDocument {
 		refreshGutterDecorators()
 	}
 
+	func setLSPGutterDecorator(_ decorator: GutterDecorator?) {
+		lspGutterDecorator = decorator
+		refreshGutterDecorators()
+	}
+
+	func setLSPSemanticHighlightSpans(_ spans: [TextHighlightSpan]) {
+		lspHighlightSpans = spans
+		applyHighlightSpans()
+	}
+
 	private func refreshGutterDecorators() {
-		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator].compactMap { $0 }
+		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator, lspGutterDecorator].compactMap { $0 }
 		switch decorators.count {
 		case 0:
 			activeGutterDecorator = nil
@@ -302,6 +319,12 @@ final class ItsyDocument: NSDocument {
 	}
 
 	private func setHighlightSpans(_ spans: [TextHighlightSpan]) {
+		syntaxHighlightSpans = spans
+		applyHighlightSpans()
+	}
+
+	private func applyHighlightSpans() {
+		let spans = syntaxHighlightSpans + lspHighlightSpans
 		for view in editorViews {
 			view.highlightSpans = spans
 		}

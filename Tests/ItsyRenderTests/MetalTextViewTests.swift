@@ -359,6 +359,52 @@ import Testing
 	#expect(decorator.rightClickedMarkers == ["breakpoint"])
 }
 
+@Test func gutterDrawsFoldTriangleMarkers() throws {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "0\n1\n2\n3\n")
+	view.lineHeight = 20
+	let decorator = TestGutterDecorator(markers: [
+		GutterMarker(id: "open", line: 0, severity: .hint, message: "fold", shape: .foldOpen),
+		GutterMarker(id: "closed", line: 1, severity: .hint, message: "folded", shape: .foldClosed),
+	])
+	view.gutterDecorator = decorator
+
+	let layouts = view.gutterView.markerLayouts
+	#expect(layouts.map(\.marker.shape) == [.foldOpen, .foldClosed])
+	#expect(layouts.allSatisfy { $0.rect.width == $0.rect.height })
+}
+
+@Test func foldedLineRangesCompressVisibleLineNumbers() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "0\n1\n2\n3\n4\n5\n")
+	view.lineHeight = 20
+	view.showLineNumbers = true
+	view.foldedLineRanges = [2 ..< 4]
+
+	#expect(Array(view.gutterView.visibleLineNumberLabels.prefix(4)) == ["1", "2", "5", "6"])
+}
+
+@Test func inlayHintAnnotationsRenderAsTintedGlyphs() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "let value = 1\n")
+	let color = SIMD4<Float>(0.45, 0.48, 0.54, 1)
+	view.inlayHintAnnotations = [TextInlineAnnotation(offset: 9, label: ": Int", color: color)]
+
+	let instances = view.textGlyphInstances(scale: 1)
+
+	#expect(instances.contains { $0.color == color })
+}
+
+@Test func documentHighlightsRenderUnderlineRects() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\n")
+
+	view.setDocumentHighlightRanges([0 ..< 3])
+
+	#expect(view.documentHighlightRects.count == 1)
+	#expect(view.documentHighlightRects[0].width > 2)
+}
+
 private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	NSPoint(x: point.x, y: height - point.y)
 }

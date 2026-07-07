@@ -22,6 +22,13 @@ public enum LSPMethod {
 	public static let codeActionResolve = "codeAction/resolve"
 	public static let textDocumentFormatting = "textDocument/formatting"
 	public static let textDocumentRangeFormatting = "textDocument/rangeFormatting"
+	public static let textDocumentSemanticTokensFull = "textDocument/semanticTokens/full"
+	public static let textDocumentSemanticTokensFullDelta = "textDocument/semanticTokens/full/delta"
+	public static let textDocumentSemanticTokensRange = "textDocument/semanticTokens/range"
+	public static let textDocumentInlayHint = "textDocument/inlayHint"
+	public static let inlayHintResolve = "inlayHint/resolve"
+	public static let textDocumentFoldingRange = "textDocument/foldingRange"
+	public static let textDocumentDocumentHighlight = "textDocument/documentHighlight"
 	public static let workspaceExecuteCommand = "workspace/executeCommand"
 }
 
@@ -166,6 +173,54 @@ public struct LSPDocumentSymbolParams: Codable, Equatable, Sendable {
 		self.textDocument = textDocument
 	}
 }
+
+public struct LSPSemanticTokensParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+
+	public init(textDocument: LSPTextDocumentIdentifier) {
+		self.textDocument = textDocument
+	}
+}
+
+public struct LSPSemanticTokensDeltaParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var previousResultId: String
+
+	public init(textDocument: LSPTextDocumentIdentifier, previousResultId: String) {
+		self.textDocument = textDocument
+		self.previousResultId = previousResultId
+	}
+}
+
+public struct LSPSemanticTokensRangeParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var range: LSPRange
+
+	public init(textDocument: LSPTextDocumentIdentifier, range: LSPRange) {
+		self.textDocument = textDocument
+		self.range = range
+	}
+}
+
+public struct LSPInlayHintParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+	public var range: LSPRange
+
+	public init(textDocument: LSPTextDocumentIdentifier, range: LSPRange) {
+		self.textDocument = textDocument
+		self.range = range
+	}
+}
+
+public struct LSPFoldingRangeParams: Codable, Equatable, Sendable {
+	public var textDocument: LSPTextDocumentIdentifier
+
+	public init(textDocument: LSPTextDocumentIdentifier) {
+		self.textDocument = textDocument
+	}
+}
+
+public typealias LSPDocumentHighlightParams = LSPTextDocumentPositionParams
 
 public enum LSPSignatureHelpTriggerKind: Int, Codable, Equatable, Sendable {
 	case invoked = 1
@@ -631,19 +686,138 @@ public enum LSPCodeActionProviderCapability: Codable, Equatable, Sendable {
 	}
 }
 
+public enum LSPBooleanCapability: Codable, Equatable, Sendable {
+	case bool(Bool)
+	case options(LSPAny)
+
+	public var isEnabled: Bool {
+		switch self {
+		case let .bool(value):
+			return value
+		case .options:
+			return true
+		}
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(Bool.self) {
+			self = .bool(value)
+			return
+		}
+		self = .options(try container.decode(LSPAny.self))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .bool(value):
+			try container.encode(value)
+		case let .options(value):
+			try container.encode(value)
+		}
+	}
+}
+
+public struct LSPSemanticTokensLegend: Codable, Equatable, Sendable {
+	public var tokenTypes: [String]
+	public var tokenModifiers: [String]
+
+	public init(tokenTypes: [String], tokenModifiers: [String]) {
+		self.tokenTypes = tokenTypes
+		self.tokenModifiers = tokenModifiers
+	}
+}
+
+public struct LSPSemanticTokensFullOptions: Codable, Equatable, Sendable {
+	public var delta: Bool?
+
+	public init(delta: Bool? = nil) {
+		self.delta = delta
+	}
+}
+
+public enum LSPSemanticTokensFullCapability: Codable, Equatable, Sendable {
+	case bool(Bool)
+	case options(LSPSemanticTokensFullOptions)
+
+	public var isEnabled: Bool {
+		switch self {
+		case let .bool(value):
+			return value
+		case .options:
+			return true
+		}
+	}
+
+	public var supportsDelta: Bool {
+		guard case let .options(options) = self else {
+			return false
+		}
+		return options.delta == true
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(Bool.self) {
+			self = .bool(value)
+			return
+		}
+		self = .options(try container.decode(LSPSemanticTokensFullOptions.self))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .bool(value):
+			try container.encode(value)
+		case let .options(options):
+			try container.encode(options)
+		}
+	}
+}
+
+public struct LSPSemanticTokensOptions: Codable, Equatable, Sendable {
+	public var legend: LSPSemanticTokensLegend
+	public var range: LSPBooleanCapability?
+	public var full: LSPSemanticTokensFullCapability?
+
+	public init(
+		legend: LSPSemanticTokensLegend,
+		range: LSPBooleanCapability? = nil,
+		full: LSPSemanticTokensFullCapability? = nil
+	) {
+		self.legend = legend
+		self.range = range
+		self.full = full
+	}
+}
+
 public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 	public var completionProvider: LSPCompletionOptions?
 	public var signatureHelpProvider: LSPSignatureHelpOptions?
 	public var codeActionProvider: LSPCodeActionProviderCapability?
+	public var semanticTokensProvider: LSPSemanticTokensOptions?
+	public var inlayHintProvider: LSPBooleanCapability?
+	public var foldingRangeProvider: LSPBooleanCapability?
+	public var documentHighlightProvider: LSPBooleanCapability?
 
 	public init(
 		completionProvider: LSPCompletionOptions? = nil,
 		signatureHelpProvider: LSPSignatureHelpOptions? = nil,
-		codeActionProvider: LSPCodeActionProviderCapability? = nil
+		codeActionProvider: LSPCodeActionProviderCapability? = nil,
+		semanticTokensProvider: LSPSemanticTokensOptions? = nil,
+		inlayHintProvider: LSPBooleanCapability? = nil,
+		foldingRangeProvider: LSPBooleanCapability? = nil,
+		documentHighlightProvider: LSPBooleanCapability? = nil
 	) {
 		self.completionProvider = completionProvider
 		self.signatureHelpProvider = signatureHelpProvider
 		self.codeActionProvider = codeActionProvider
+		self.semanticTokensProvider = semanticTokensProvider
+		self.inlayHintProvider = inlayHintProvider
+		self.foldingRangeProvider = foldingRangeProvider
+		self.documentHighlightProvider = documentHighlightProvider
 	}
 }
 
@@ -1275,6 +1449,258 @@ public struct LSPTextEdit: Codable, Equatable, Sendable {
 	public init(range: LSPRange, newText: String) {
 		self.range = range
 		self.newText = newText
+	}
+}
+
+public struct LSPSemanticTokens: Codable, Equatable, Sendable {
+	public var resultId: String?
+	public var data: [Int]
+
+	public init(resultId: String? = nil, data: [Int]) {
+		self.resultId = resultId
+		self.data = data
+	}
+}
+
+public struct LSPSemanticTokensEdit: Codable, Equatable, Sendable {
+	public var start: Int
+	public var deleteCount: Int
+	public var data: [Int]?
+
+	public init(start: Int, deleteCount: Int, data: [Int]? = nil) {
+		self.start = start
+		self.deleteCount = deleteCount
+		self.data = data
+	}
+}
+
+public struct LSPSemanticTokensDelta: Codable, Equatable, Sendable {
+	public var resultId: String?
+	public var edits: [LSPSemanticTokensEdit]
+
+	public init(resultId: String? = nil, edits: [LSPSemanticTokensEdit]) {
+		self.resultId = resultId
+		self.edits = edits
+	}
+}
+
+public enum LSPSemanticTokensResult: Equatable, Sendable {
+	case tokens(LSPSemanticTokens)
+	case delta(LSPSemanticTokensDelta)
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		if let tokens = try? decoder.decode(LSPSemanticTokens.self, from: data) {
+			self = .tokens(tokens)
+			return
+		}
+		if let delta = try? decoder.decode(LSPSemanticTokensDelta.self, from: data) {
+			self = .delta(delta)
+			return
+		}
+		self = .none
+	}
+
+	public var tokens: LSPSemanticTokens? {
+		guard case let .tokens(tokens) = self else {
+			return nil
+		}
+		return tokens
+	}
+}
+
+public enum LSPInlayHintKind: Int, Codable, Equatable, Sendable {
+	case type = 1
+	case parameter = 2
+}
+
+public struct LSPInlayHintLabelPart: Codable, Equatable, Sendable {
+	public var value: String
+	public var tooltip: LSPAny?
+	public var location: LSPLocation?
+	public var command: LSPCommand?
+
+	public init(value: String, tooltip: LSPAny? = nil, location: LSPLocation? = nil, command: LSPCommand? = nil) {
+		self.value = value
+		self.tooltip = tooltip
+		self.location = location
+		self.command = command
+	}
+}
+
+public enum LSPInlayHintLabel: Codable, Equatable, Sendable {
+	case string(String)
+	case parts([LSPInlayHintLabelPart])
+
+	public var text: String {
+		switch self {
+		case let .string(value):
+			return value
+		case let .parts(parts):
+			return parts.map(\.value).joined()
+		}
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if let value = try? container.decode(String.self) {
+			self = .string(value)
+			return
+		}
+		self = .parts(try container.decode([LSPInlayHintLabelPart].self))
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case let .string(value):
+			try container.encode(value)
+		case let .parts(parts):
+			try container.encode(parts)
+		}
+	}
+}
+
+public struct LSPInlayHint: Codable, Equatable, Sendable {
+	public var position: LSPPosition
+	public var label: LSPInlayHintLabel
+	public var kind: LSPInlayHintKind?
+	public var textEdits: [LSPTextEdit]?
+	public var tooltip: LSPAny?
+	public var paddingLeft: Bool?
+	public var paddingRight: Bool?
+	public var data: LSPAny?
+
+	public init(
+		position: LSPPosition,
+		label: LSPInlayHintLabel,
+		kind: LSPInlayHintKind? = nil,
+		textEdits: [LSPTextEdit]? = nil,
+		tooltip: LSPAny? = nil,
+		paddingLeft: Bool? = nil,
+		paddingRight: Bool? = nil,
+		data: LSPAny? = nil
+	) {
+		self.position = position
+		self.label = label
+		self.kind = kind
+		self.textEdits = textEdits
+		self.tooltip = tooltip
+		self.paddingLeft = paddingLeft
+		self.paddingRight = paddingRight
+		self.data = data
+	}
+}
+
+public enum LSPInlayHintResult: Equatable, Sendable {
+	case hints([LSPInlayHint])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let hints = (try? decoder.decode([LSPInlayHint].self, from: data)) ?? []
+		self = hints.isEmpty ? .none : .hints(hints)
+	}
+
+	public var hints: [LSPInlayHint] {
+		guard case let .hints(hints) = self else {
+			return []
+		}
+		return hints
+	}
+}
+
+public struct LSPFoldingRange: Codable, Equatable, Sendable {
+	public var startLine: Int
+	public var startCharacter: Int?
+	public var endLine: Int
+	public var endCharacter: Int?
+	public var kind: String?
+	public var collapsedText: String?
+
+	public init(
+		startLine: Int,
+		startCharacter: Int? = nil,
+		endLine: Int,
+		endCharacter: Int? = nil,
+		kind: String? = nil,
+		collapsedText: String? = nil
+	) {
+		self.startLine = startLine
+		self.startCharacter = startCharacter
+		self.endLine = endLine
+		self.endCharacter = endCharacter
+		self.kind = kind
+		self.collapsedText = collapsedText
+	}
+}
+
+public enum LSPFoldingRangeResult: Equatable, Sendable {
+	case ranges([LSPFoldingRange])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let ranges = (try? decoder.decode([LSPFoldingRange].self, from: data)) ?? []
+		self = ranges.isEmpty ? .none : .ranges(ranges)
+	}
+
+	public var ranges: [LSPFoldingRange] {
+		guard case let .ranges(ranges) = self else {
+			return []
+		}
+		return ranges
+	}
+}
+
+public enum LSPDocumentHighlightKind: Int, Codable, Equatable, Sendable {
+	case text = 1
+	case read = 2
+	case write = 3
+}
+
+public struct LSPDocumentHighlight: Codable, Equatable, Sendable {
+	public var range: LSPRange
+	public var kind: LSPDocumentHighlightKind?
+
+	public init(range: LSPRange, kind: LSPDocumentHighlightKind? = nil) {
+		self.range = range
+		self.kind = kind
+	}
+}
+
+public enum LSPDocumentHighlightResult: Equatable, Sendable {
+	case highlights([LSPDocumentHighlight])
+	case none
+
+	public init(result: LSPAny?, encoder: JSONEncoder = JSONEncoder(), decoder: JSONDecoder = JSONDecoder()) throws {
+		let data = try encoder.encode(result ?? .null)
+		if (try? decoder.decode(LSPNull.self, from: data)) != nil {
+			self = .none
+			return
+		}
+		let highlights = (try? decoder.decode([LSPDocumentHighlight].self, from: data)) ?? []
+		self = highlights.isEmpty ? .none : .highlights(highlights)
+	}
+
+	public var highlights: [LSPDocumentHighlight] {
+		guard case let .highlights(highlights) = self else {
+			return []
+		}
+		return highlights
 	}
 }
 

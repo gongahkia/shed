@@ -222,9 +222,10 @@ extension MetalTextView: NSTextInputClient {
 		let line = editor.rope.line(forOffset: min(max(offset, 0), editor.rope.length))
 		let lineRange = editor.rope.lineRange(line)
 		let prefix = editor.rope.slice(lineRange.lowerBound ..< min(offset, lineRange.upperBound))
+		let row = visibleRow(for: line) ?? line - topLineIndex
 		return NSRect(
 			x: textInset.x + typographicWidth(prefix) - xOffset,
-			y: textInset.y + CGFloat(line - topLineIndex) * lineHeight,
+			y: topContentInset + textInset.y + CGFloat(row) * lineHeight,
 			width: 2,
 			height: lineHeight
 		)

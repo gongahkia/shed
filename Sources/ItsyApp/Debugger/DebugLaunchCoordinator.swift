@@ -5,6 +5,7 @@ import ItsyDebugger
 
 final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private let loader: DebugLaunchConfigLoader
+	private let adapterRegistryLoader: DebugAdapterRegistryLoader
 	private var launchConfig = DebugLaunchConfig()
 	private var configurations: [DebugLaunchConfiguration] = []
 	private var panel: NSPanel?
@@ -16,8 +17,13 @@ final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDa
 	private var suppressSelectionLaunch = false
 	private let onSessionStarted: (DebugAppSession) -> Void
 
-	init(loader: DebugLaunchConfigLoader = DebugLaunchConfigLoader(), onSessionStarted: @escaping (DebugAppSession) -> Void = { _ in }) {
+	init(
+		loader: DebugLaunchConfigLoader = DebugLaunchConfigLoader(),
+		adapterRegistryLoader: DebugAdapterRegistryLoader = DebugAdapterRegistryLoader(),
+		onSessionStarted: @escaping (DebugAppSession) -> Void = { _ in }
+	) {
 		self.loader = loader
+		self.adapterRegistryLoader = adapterRegistryLoader
 		self.onSessionStarted = onSessionStarted
 		super.init()
 	}
@@ -42,7 +48,11 @@ final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDa
 		}
 		do {
 			let config = try loader.load(workspaceRoot: root)
-			launchConfig = config
+			let adapterRegistry = try adapterRegistryLoader.load(workspaceRoot: root)
+			let mergedAdapters = adapterRegistry
+				.merging(DebugAdapterRegistry(adapters: config.adapters))
+				.adapters
+			launchConfig = DebugLaunchConfig(adapters: mergedAdapters, configurations: config.configurations)
 			setConfigurations(config.configurations, status: L10n.string("\(config.configurations.count) debug configurations"), isError: false)
 		} catch {
 			setConfigurations([], status: String(describing: error), isError: true)
@@ -318,6 +328,7 @@ final class DebugAppSession: @unchecked Sendable {
 	let capabilities: DAPCapabilities
 	let supportsSetVariable: Bool
 	let supportsStepBack: Bool
+	let supportsReverseContinue: Bool
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
@@ -329,6 +340,7 @@ final class DebugAppSession: @unchecked Sendable {
 		self.capabilities = capabilities
 		self.supportsSetVariable = supportsSetVariable
 		self.supportsStepBack = capabilities.supportsStepBack == true
+		self.supportsReverseContinue = (capabilities.supportsReverseContinue ?? capabilities.supportsStepBack) == true
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -337,7 +349,12 @@ final class DebugAppSession: @unchecked Sendable {
 		terminate()
 	}
 
-	static func start(adapter: DebugAdapterConfig, configuration: DebugLaunchConfiguration, workspaceRoot: URL) async throws -> DebugAppSession {
+	static func start(
+		adapter: DebugAdapterConfig,
+		configuration: DebugLaunchConfiguration,
+		workspaceRoot: URL,
+		breakpointStore: BreakpointStore = BreakpointStore()
+	) async throws -> DebugAppSession {
 		guard adapter.type == DebugAdapterType.executable else {
 			throw DebugLaunchError.unsupportedAdapter(adapter.type)
 		}
@@ -399,6 +416,7 @@ final class DebugAppSession: @unchecked Sendable {
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
 			try await waitForInitialized(initializedTask)
+			try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot)
 			try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
 			try await client.configurationDone()
 			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)

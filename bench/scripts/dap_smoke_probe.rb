@@ -4,16 +4,18 @@
 require "json"
 require "open3"
 require "timeout"
+require "uri"
 
 class DAPSmokeError < StandardError; end
 
 class DAPClient
-	def initialize(command)
-		@stdin, @stdout, @stderr, @wait_thread = Open3.popen3(command)
+	def initialize(command, args = [])
+		@stdin, @stdout, @stderr, @wait_thread = Open3.popen3(command, *args)
 		@buffer = +""
+		@pending = []
 		@seq = 1
 		@stderr_thread = Thread.new do
-			@stderr.each_line { |line| warn "lldb-dap: #{line}" if ENV["ITSY_DAP_SMOKE_VERBOSE"] }
+			@stderr.each_line { |line| warn "dap: #{line}" if ENV["ITSY_DAP_SMOKE_VERBOSE"] }
 		rescue IOError
 			nil
 		end
@@ -60,9 +62,17 @@ class DAPClient
 	def wait_until(timeout:)
 		deadline = monotonic + timeout
 		loop do
+			pending_index = @pending.index { |message| yield(message) }
+			return @pending.delete_at(pending_index) if pending_index
+
 			message = read_message(deadline)
-			handle_server_request(message)
+			if message["type"] == "request"
+				handle_server_request(message)
+				next
+			end
+			warn "dap message: #{message.inspect}" if ENV["ITSY_DAP_SMOKE_VERBOSE"]
 			return message if yield(message)
+			@pending << message
 		end
 	end
 
@@ -130,8 +140,10 @@ def expand_path(value, workspace)
 	value.gsub("${workspaceFolder}", workspace)
 end
 
-def resolve_adapter(command)
-	return ENV["LLDB_DAP"] if ENV["LLDB_DAP"] && File.executable?(ENV["LLDB_DAP"])
+def resolve_adapter(command, adapter_id)
+	env_key = "#{adapter_id.upcase.tr("-", "_")}_DAP"
+	return ENV[env_key] if ENV[env_key] && File.executable?(ENV[env_key])
+	return ENV["LLDB_DAP"] if adapter_id == "lldb" && ENV["LLDB_DAP"] && File.executable?(ENV["LLDB_DAP"])
 	return command if command.include?("/") && File.executable?(command)
 
 	found = `command -v #{command} 2>/dev/null`.strip
@@ -174,15 +186,41 @@ def variables(client, frame_id)
 	end
 end
 
-workspace, config_path, source_path, break_line = ARGV
-raise DAPSmokeError, "usage: dap_smoke_probe.rb WORKSPACE CONFIG SOURCE BREAK_LINE" unless break_line
+def wait_for_source_stop(client, source_path, timeout: 15, attempts: 4)
+	attempts.times do
+		stopped = client.wait_event("stopped", timeout: timeout)
+		thread_id = stopped.dig("body", "threadId")
+		raise DAPSmokeError, "missing stopped threadId" unless thread_id
+
+		frame = stack_frame(client, thread_id)
+		return [thread_id, frame] if frame.dig("source", "path") == source_path
+
+		request_and_check(client, "continue", "threadId" => thread_id)
+	end
+	raise DAPSmokeError, "breakpoint did not stop in #{File.basename(source_path)}"
+end
+
+def persisted_breakpoints(path)
+	file = JSON.parse(File.read(path))
+	file.fetch("files").each_with_object({}) do |record, result|
+		url = URI.parse(record.fetch("url"))
+		source_path = url.scheme == "file" ? URI.decode_www_form_component(url.path) : record.fetch("url")
+		result[source_path] = record.fetch("breakpoints")
+	end
+end
+
+workspace, config_path, source_path, break_line, breakpoint_store = ARGV
+raise DAPSmokeError, "usage: dap_smoke_probe.rb WORKSPACE CONFIG SOURCE BREAK_LINE [BREAKPOINT_STORE]" unless break_line
 
 config = JSON.parse(File.read(config_path))
-adapter = config.fetch("adapters").find { |entry| entry["id"] == "lldb" } || config.fetch("adapters").first
-launch = config.fetch("configurations").find { |entry| entry["name"] == "Debug Hello" } || config.fetch("configurations").first
+adapter_id = ENV.fetch("ITSY_DAP_SMOKE_ADAPTER", "lldb")
+launch_name = ENV.fetch("ITSY_DAP_SMOKE_CONFIG", "Debug Hello")
+adapter = config.fetch("adapters").find { |entry| entry["id"] == adapter_id } || config.fetch("adapters").first
+launch = config.fetch("configurations").find { |entry| entry["name"] == launch_name } || config.fetch("configurations").first
 program = expand_path(launch.fetch("program"), workspace)
-adapter_command = resolve_adapter(adapter.fetch("command"))
-client = DAPClient.new(adapter_command)
+adapter_command = resolve_adapter(adapter.fetch("command"), adapter.fetch("id"))
+client = DAPClient.new(adapter_command, adapter.fetch("args", []))
+breakpoints_by_source = breakpoint_store ? persisted_breakpoints(breakpoint_store) : { source_path => [{ "line" => break_line.to_i }] }
 
 begin
 	checked_response!(client.wait_response(client.request("initialize", {
@@ -195,25 +233,29 @@ begin
 		"supportsRunInTerminalRequest" => false
 	})))
 
-	client.request(launch.fetch("request"), {
+	launch_args = {
 		"program" => program,
 		"cwd" => expand_path(launch.fetch("cwd", workspace), workspace),
 		"stopOnEntry" => launch.fetch("stopOnEntry", false),
 		"args" => launch.fetch("args", [])
-	})
+	}
+	launch_args["env"] = launch["env"] if launch["env"]
+	launch_args["noDebug"] = launch["noDebug"] unless launch["noDebug"].nil?
+	launch_args["stopOnEntry"] = true if ENV["ITSY_DAP_SMOKE_STOP_ON_ENTRY"] == "1"
+	client.request(launch.fetch("request"), launch_args)
 	client.wait_event("initialized", timeout: 10)
-	checked_response!(client.wait_response(client.request("setBreakpoints", {
-		"source" => { "path" => source_path },
-		"breakpoints" => [{ "line" => break_line.to_i }]
-	})))
+	breakpoints_by_source.sort.each do |path, breakpoints|
+		response = client.wait_response(client.request("setBreakpoints", {
+			"source" => { "path" => path },
+			"breakpoints" => breakpoints
+		}))
+		checked_response!(response)
+		verified = response.dig("body", "breakpoints")&.all? { |breakpoint| breakpoint["verified"] }
+		raise DAPSmokeError, "unverified breakpoint response: #{response.inspect}" unless verified
+	end
 	checked_response!(client.wait_response(client.request("configurationDone")))
 
-	stopped = client.wait_event("stopped", timeout: 15)
-	thread_id = stopped.dig("body", "threadId")
-	raise DAPSmokeError, "missing stopped threadId" unless thread_id
-
-	frame = stack_frame(client, thread_id)
-	raise DAPSmokeError, "breakpoint did not stop in debug-hello.swift" unless frame.dig("source", "path") == source_path
+	thread_id, = wait_for_source_stop(client, source_path)
 
 	client.request("next", "threadId" => thread_id)
 	client.wait_event("stopped", timeout: 10)

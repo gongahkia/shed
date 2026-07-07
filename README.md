@@ -41,6 +41,7 @@ cp -R Itsy.app /Applications/Itsy.app
 Release DMG install, after the signed/notarized release flow is complete:
 
 ```sh
+scripts/release_doctor.sh
 open Itsy-0.1.0.dmg
 ```
 

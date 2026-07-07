@@ -121,3 +121,15 @@ import Testing
 	#expect(!ranges.isEmpty)
 	#expect(ranges.contains { $0.overlaps(insertedLine) })
 }
+
+@Test func documentSyntaxControllerReturnsQueryBackedNewlineIndent() throws {
+	let controller = DocumentSyntaxController()
+	controller.configure(fileURL: URL(fileURLWithPath: "/tmp/main.swift"))
+	var editor = Editor(text: "func main() {}", storage: .pieceTree)
+	let text = editor.textStorage.substring(0 ..< editor.textStorage.length)
+	let brace = try #require(text.range(of: "{"))
+	let offset = text[..<brace.upperBound].utf8.count
+	editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
+
+	#expect(controller.newlineText(editor: editor, tabWidth: 2) == "\n  ")
+}

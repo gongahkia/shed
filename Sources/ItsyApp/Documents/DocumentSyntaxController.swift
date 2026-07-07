@@ -42,6 +42,7 @@ final class DocumentSyntaxController {
 				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
 			}
 			let spans: [HighlightSpan]
+			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
 			if case .rope = editor.textStorage,
 			   edits.count == 1,
 			   let edit = edits.first,
@@ -51,25 +52,13 @@ final class DocumentSyntaxController {
 				tree.edit(inputEdit)
 				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
 				syntaxTree = newTree
-				let queryRanges = mergedByteRanges(
-					[
-						changedLineByteRange(for: inputEdit, editor: editor),
-						highlightByteRange(for: viewportLineRange, editor: editor),
-					].compactMap { $0 }
-				)
-				let dirtySpans = try queryRanges.flatMap { range in
-					try syntaxPipeline.highlights(in: newTree, byteRange: range)
-				}
-				syntaxHighlightSpans = syntaxHighlightSpans.compactMap { $0.mapped(through: edit) }
-				syntaxHighlightSpans.removeAll { span in
-					queryRanges.contains { $0.overlaps(span.range) }
-				}
-				syntaxHighlightSpans += dirtySpans
+				let queryRange = highlightByteRange(for: viewportLineRange, editor: editor)
+				syntaxHighlightSpans = try syntaxPipeline.highlights(in: newTree, source: source, byteRange: queryRange, includeInjections: true)
 				spans = syntaxHighlightSpans
 			} else {
 				let tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
-				spans = try syntaxPipeline.highlights(in: tree, byteRange: highlightByteRange(for: viewportLineRange, editor: editor))
+				spans = try syntaxPipeline.highlights(in: tree, source: source, byteRange: highlightByteRange(for: viewportLineRange, editor: editor), includeInjections: true)
 				syntaxHighlightSpans = spans
 			}
 			let renderedSpans = spans.compactMap { span -> TextHighlightSpan? in
@@ -84,18 +73,26 @@ final class DocumentSyntaxController {
 		}
 	}
 
-	private func changedLineByteRange(for inputEdit: InputEdit, editor: Editor) -> Range<Int>? {
-		let storage = editor.textStorage
-		guard storage.length > 0 else {
-			return nil
+	func newlineText(editor: Editor, tabWidth: Int) -> String {
+		guard editor.selections.primary.isCaret, var syntaxPipeline else {
+			return "\n"
 		}
-		let lowerLine = storage.line(forOffset: min(inputEdit.startByte, storage.length))
-		let upperOffset = min(max(inputEdit.newEndByte, inputEdit.startByte), storage.length)
-		let upperLine = storage.line(forOffset: upperOffset)
-		let lower = storage.lineRange(lowerLine).lowerBound
-		let nextLine = min(storage.lineCount, upperLine + 1)
-		let upper = nextLine < storage.lineCount ? storage.offset(forLine: nextLine) : storage.length
-		return lower ..< upper
+		defer {
+			self.syntaxPipeline = syntaxPipeline
+		}
+		do {
+			let tree: Tree
+			if let syntaxTree {
+				tree = syntaxTree
+			} else {
+				tree = try parse(editor: editor, using: &syntaxPipeline)
+				syntaxTree = tree
+			}
+			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
+			return try syntaxPipeline.indentationAfterNewline(in: tree, source: source, offset: editor.selections.primary.head, tabWidth: tabWidth)
+		} catch {
+			return "\n"
+		}
 	}
 
 	private func parse(editor: Editor, using syntaxPipeline: inout SyntaxPipeline) throws -> Tree {
@@ -122,21 +119,4 @@ final class DocumentSyntaxController {
 		return lower ..< upper
 	}
 
-	private func mergedByteRanges(_ ranges: [Range<Int>]) -> [Range<Int>] {
-		let sorted = ranges.filter { !$0.isEmpty }.sorted { $0.lowerBound < $1.lowerBound }
-		guard var current = sorted.first else {
-			return []
-		}
-		var result: [Range<Int>] = []
-		for range in sorted.dropFirst() {
-			if range.lowerBound <= current.upperBound {
-				current = current.lowerBound ..< max(current.upperBound, range.upperBound)
-			} else {
-				result.append(current)
-				current = range
-			}
-		}
-		result.append(current)
-		return result
-	}
 }

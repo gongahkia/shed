@@ -3,6 +3,7 @@ import AppKit
 import Darwin
 import Dispatch
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import ItsyLSP
 import ItsyRender
@@ -160,6 +161,13 @@ final class ItsyDocument: NSDocument {
 		view.visibleLineRangeDidChange = { [weak self] _ in
 			self?.refreshSyntaxHighlights()
 		}
+		view.newlineInsertionTextProvider = { [weak self] editor in
+			guard let self else {
+				return "\n"
+			}
+			let tabWidth = ItsySettingsStore().load().settings.editor.tabWidth
+			return self.syntax.newlineText(editor: editor, tabWidth: tabWidth)
+		}
 		syntax.configure(fileURL: fileURL)
 		refreshSyntaxHighlights()
 		view.editorDidChange = { [weak self, weak view] editor in
@@ -190,6 +198,7 @@ final class ItsyDocument: NSDocument {
 
 	func detach(_ view: MetalTextView) {
 		view.visibleLineRangeDidChange = nil
+		view.newlineInsertionTextProvider = nil
 		editorViews.removeAll { $0 === view }
 		refreshSyntaxHighlights()
 	}

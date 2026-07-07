@@ -1368,7 +1368,7 @@ final class GitCoordinator: NSObject {
 		do {
 			var pipeline = SyntaxPipeline(language: language)
 			let tree = try pipeline.parse(Rope(source))
-			return try pipeline.highlights(in: tree).flatMap { span -> [TextHighlightSpan] in
+			return try pipeline.highlights(in: tree, source: source, includeInjections: true).flatMap { span -> [TextHighlightSpan] in
 				mappings.compactMap { mapping -> TextHighlightSpan? in
 					let lower = max(span.range.lowerBound, mapping.source.lowerBound)
 					let upper = min(span.range.upperBound, mapping.source.upperBound)

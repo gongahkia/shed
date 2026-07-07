@@ -389,6 +389,17 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	#expect(editorStorageString(view.editor) == "hello word")
 }
 
+@Test func insertNewlineUsesProviderText() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "func main() {")
+	view.editor.setSelection(SelectionSet(primary: Selection(anchor: view.editor.textStorage.length, head: view.editor.textStorage.length)))
+	view.newlineInsertionTextProvider = { _ in "\n  " }
+
+	view.doCommand(by: #selector(NSResponder.insertNewline(_:)))
+
+	#expect(editorStorageString(view.editor) == "func main() {\n  ")
+}
+
 @Test func textGlyphInstancesUseHighlightColors() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\n")

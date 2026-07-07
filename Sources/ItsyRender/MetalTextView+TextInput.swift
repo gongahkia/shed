@@ -43,7 +43,7 @@ extension MetalTextView: NSTextInputClient {
 		case #selector(NSResponder.moveToEndOfLine(_:)):
 			editor.moveCursor(.lineEnd)
 		case #selector(NSResponder.insertNewline(_:)):
-			editor.insert("\n")
+			editor.insert(newlineInsertionTextProvider?(editor) ?? "\n")
 			didEdit = true
 		default:
 			_ = tryToPerform(selector, with: nil)

@@ -23,12 +23,26 @@ struct EditorPreferences: Equatable {
 
 	var fontName: String
 	var fontSize: CGFloat
-	var showLineNumbers: Bool
+	var lineNumberMode: ItsySettings.LineNumberMode
+	var wrap: ItsySettings.WrapMode
+	var wrapColumn: Int
 
-	init(fontName: String, fontSize: CGFloat, showLineNumbers: Bool) {
+	var showLineNumbers: Bool {
+		lineNumberMode != .off
+	}
+
+	init(
+		fontName: String,
+		fontSize: CGFloat,
+		lineNumberMode: ItsySettings.LineNumberMode,
+		wrap: ItsySettings.WrapMode = .none,
+		wrapColumn: Int = ItsySettings.EditorSettings.defaultWrapColumn
+	) {
 		self.fontName = fontName
 		self.fontSize = fontSize
-		self.showLineNumbers = showLineNumbers
+		self.lineNumberMode = lineNumberMode
+		self.wrap = wrap
+		self.wrapColumn = wrapColumn
 	}
 
 	init(settings: ItsySettings.EditorSettings) {
@@ -36,7 +50,9 @@ struct EditorPreferences: Equatable {
 		self.init(
 			fontName: fontName,
 			fontSize: Self.clampedFontSize(CGFloat(settings.fontSize)),
-			showLineNumbers: settings.lineNumbers
+			lineNumberMode: settings.lineNumberMode,
+			wrap: settings.wrap,
+			wrapColumn: settings.wrapColumn
 		)
 	}
 
@@ -52,6 +68,7 @@ struct EditorPreferences: Equatable {
 		let storedSize = defaults.double(forKey: fontSizeKey)
 		settings.editor.fontSize = storedSize > 0 ? storedSize : Double(defaultFontSize)
 		settings.editor.lineNumbers = defaults.bool(forKey: showLineNumbersKey)
+		settings.editor.lineNumberMode = settings.editor.lineNumbers ? .absolute : .off
 		return settings
 	}
 
@@ -62,17 +79,20 @@ struct EditorPreferences: Equatable {
 	}
 
 	func zoomed(by delta: CGFloat) -> EditorPreferences {
-		EditorPreferences(fontName: fontName, fontSize: Self.clampedFontSize(fontSize + delta), showLineNumbers: showLineNumbers)
+		EditorPreferences(fontName: fontName, fontSize: Self.clampedFontSize(fontSize + delta), lineNumberMode: lineNumberMode, wrap: wrap, wrapColumn: wrapColumn)
 	}
 
 	func resetZoom() -> EditorPreferences {
-		EditorPreferences(fontName: fontName, fontSize: Self.defaultFontSize, showLineNumbers: showLineNumbers)
+		EditorPreferences(fontName: fontName, fontSize: Self.defaultFontSize, lineNumberMode: lineNumberMode, wrap: wrap, wrapColumn: wrapColumn)
 	}
 
 	func apply(to settings: inout ItsySettings) {
 		settings.editor.font = fontName
 		settings.editor.fontSize = Double(Self.clampedFontSize(fontSize))
 		settings.editor.lineNumbers = showLineNumbers
+		settings.editor.lineNumberMode = lineNumberMode
+		settings.editor.wrap = wrap
+		settings.editor.wrapColumn = wrapColumn
 	}
 
 	static func clampedFontSize(_ value: CGFloat) -> CGFloat {

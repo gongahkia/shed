@@ -6,6 +6,8 @@ import ItsyKeymap
 
 @MainActor final class AppCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
+	private var activeKeymapProfile = KeymapProfile.plain
+	private var commandLineKeymapProfile: KeymapProfile?
 	private lazy var sparkleUpdateCoordinator = SparkleUpdateCoordinator()
 	private lazy var menuCoordinator = MenuCoordinator(
 		documentController: documentController,
@@ -56,12 +58,22 @@ import ItsyKeymap
 		self.documentController = documentController
 		recordBenchStage("delegate_init")
 		recordBenchStage("delegate_keymap_begin")
+		let initialSettings = ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings.normalized()
 		do {
-			let profile = try KeymapProfile.selected(from: CommandLine.arguments)
+			let profile = try KeymapProfile.selected(
+				from: CommandLine.arguments,
+				default: Self.keymapProfile(for: initialSettings.editor.keymap)
+			)
+			activeKeymapProfile = profile
+			commandLineKeymapProfile = Self.hasCommandLineKeymapProfile(CommandLine.arguments) ? profile : nil
 			let bindings = try KeymapConfiguration.load(profile: profile)
 			ItsyAppKeymap.configure(profile: profile, bindings: bindings)
 		} catch {
 			NSLog("failed to load keymap profile: \(error)")
+			activeKeymapProfile = .plain
 			ItsyAppKeymap.configure(profile: .plain, bindings: [])
 		}
 		recordBenchStage("delegate_keymap_end")
@@ -128,6 +140,10 @@ import ItsyKeymap
 	}
 
 	@objc func closeCurrentDocument(_ sender: Any?) {
+		if let controller = NSApp.keyWindow?.windowController as? EditorWindowController {
+			controller.closeActiveTabOrDocument()
+			return
+		}
 		if let document = NSApp.keyWindow?.windowController?.document as? NSDocument {
 			document.close()
 			return
@@ -203,38 +219,38 @@ import ItsyKeymap
 				Command(id: "file.close", title: L10n.string("Close File"), defaultKey: "Cmd-W") { [weak self] in
 					self?.closeCurrentDocument(nil)
 				},
-				Command(id: "file.nextBuffer", title: L10n.string("Next Tab"), defaultKey: "Ctrl-Tab") {
-					ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
+				Command(id: "file.nextBuffer", title: L10n.string("Next Tab"), defaultKey: "Ctrl-Tab") { [weak self] in
+					self?.selectAdjacentTab(delta: 1)
 				},
-				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"), defaultKey: "Ctrl-Shift-Tab") {
-					ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
+				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"), defaultKey: "Ctrl-Shift-Tab") { [weak self] in
+					self?.selectAdjacentTab(delta: -1)
 				},
-				Command(id: "file.selectTab.1", title: L10n.string("Select Tab 1"), defaultKey: "Cmd-1") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 0)
+				Command(id: "file.selectTab.1", title: L10n.string("Select Tab 1"), defaultKey: "Cmd-1") { [weak self] in
+					self?.selectTab(atDisplayIndex: 0)
 				},
-				Command(id: "file.selectTab.2", title: L10n.string("Select Tab 2"), defaultKey: "Cmd-2") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 1)
+				Command(id: "file.selectTab.2", title: L10n.string("Select Tab 2"), defaultKey: "Cmd-2") { [weak self] in
+					self?.selectTab(atDisplayIndex: 1)
 				},
-				Command(id: "file.selectTab.3", title: L10n.string("Select Tab 3"), defaultKey: "Cmd-3") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 2)
+				Command(id: "file.selectTab.3", title: L10n.string("Select Tab 3"), defaultKey: "Cmd-3") { [weak self] in
+					self?.selectTab(atDisplayIndex: 2)
 				},
-				Command(id: "file.selectTab.4", title: L10n.string("Select Tab 4"), defaultKey: "Cmd-4") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 3)
+				Command(id: "file.selectTab.4", title: L10n.string("Select Tab 4"), defaultKey: "Cmd-4") { [weak self] in
+					self?.selectTab(atDisplayIndex: 3)
 				},
-				Command(id: "file.selectTab.5", title: L10n.string("Select Tab 5"), defaultKey: "Cmd-5") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 4)
+				Command(id: "file.selectTab.5", title: L10n.string("Select Tab 5"), defaultKey: "Cmd-5") { [weak self] in
+					self?.selectTab(atDisplayIndex: 4)
 				},
-				Command(id: "file.selectTab.6", title: L10n.string("Select Tab 6"), defaultKey: "Cmd-6") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 5)
+				Command(id: "file.selectTab.6", title: L10n.string("Select Tab 6"), defaultKey: "Cmd-6") { [weak self] in
+					self?.selectTab(atDisplayIndex: 5)
 				},
-				Command(id: "file.selectTab.7", title: L10n.string("Select Tab 7"), defaultKey: "Cmd-7") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 6)
+				Command(id: "file.selectTab.7", title: L10n.string("Select Tab 7"), defaultKey: "Cmd-7") { [weak self] in
+					self?.selectTab(atDisplayIndex: 6)
 				},
-				Command(id: "file.selectTab.8", title: L10n.string("Select Tab 8"), defaultKey: "Cmd-8") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 7)
+				Command(id: "file.selectTab.8", title: L10n.string("Select Tab 8"), defaultKey: "Cmd-8") { [weak self] in
+					self?.selectTab(atDisplayIndex: 7)
 				},
-				Command(id: "file.selectTab.9", title: L10n.string("Select Tab 9"), defaultKey: "Cmd-9") {
-					ItsyTabCoordinator.selectDocument(atDisplayIndex: 8)
+				Command(id: "file.selectTab.9", title: L10n.string("Select Tab 9"), defaultKey: "Cmd-9") { [weak self] in
+					self?.selectTab(atDisplayIndex: 8)
 				},
 				Command(id: "view.commandPalette", title: L10n.string("Command Palette"),
 				        defaultKey: "Cmd-Shift-P")
@@ -517,6 +533,22 @@ import ItsyKeymap
 			?? documentController.currentDocument?.windowControllers.first as? EditorWindowController
 	}
 
+	private func selectAdjacentTab(delta: Int) {
+		if let controller = activeEditorWindowController() {
+			controller.selectAdjacentTab(delta: delta)
+		} else {
+			ItsyTabCoordinator.selectAdjacentDocument(delta: delta)
+		}
+	}
+
+	private func selectTab(atDisplayIndex index: Int) {
+		if let controller = activeEditorWindowController() {
+			_ = controller.selectTab(atDisplayIndex: index)
+		} else {
+			ItsyTabCoordinator.selectDocument(atDisplayIndex: index)
+		}
+	}
+
 	private func performEditorMotion(_ motion: Motion) {
 		activeEditorWindowController()?.performEditorMotion(motion)
 	}
@@ -535,6 +567,7 @@ import ItsyKeymap
 
 	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
 		AppTheme.update(settings: settings)
+		applyKeymapSettings(settings)
 		for document in documentController.documents {
 			for controller in document.windowControllers {
 				(controller as? EditorWindowController)?.applySettings(settings)
@@ -543,6 +576,39 @@ import ItsyKeymap
 		ItsyGitHunkGutterCoordinator.applyAll()
 		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
+	}
+
+	private func applyKeymapSettings(_ settings: ItsySettings) {
+		guard commandLineKeymapProfile == nil else {
+			return
+		}
+		let profile = Self.keymapProfile(for: settings.normalized().editor.keymap)
+		guard profile != activeKeymapProfile else {
+			return
+		}
+		do {
+			let bindings = try KeymapConfiguration.load(profile: profile)
+			activeKeymapProfile = profile
+			ItsyAppKeymap.configure(profile: profile, bindings: bindings)
+			if let root = ItsyWorkspaceController.currentRootURL {
+				ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: root, commandRegistry: commandRegistry))
+			}
+			for document in documentController.documents {
+				for controller in document.windowControllers {
+					(controller as? EditorWindowController)?.reloadKeymap()
+				}
+			}
+		} catch {
+			NSLog("failed to apply keymap profile \(profile.rawValue): \(error)")
+		}
+	}
+
+	private static func keymapProfile(for mode: ItsySettings.KeymapMode) -> KeymapProfile {
+		KeymapProfile(rawValue: mode.rawValue) ?? .plain
+	}
+
+	private static func hasCommandLineKeymapProfile(_ arguments: [String]) -> Bool {
+		arguments.contains { $0.hasPrefix("--profile=") }
 	}
 
 	@objc func toggleFindBar(_: Any?) {

@@ -5,7 +5,7 @@ public enum KeymapProfile: String, CaseIterable, Sendable {
 	case vim
 	case emacs
 
-	public static func selected(from arguments: [String]) throws -> KeymapProfile {
+	public static func selected(from arguments: [String], default defaultProfile: KeymapProfile = .plain) throws -> KeymapProfile {
 		for argument in arguments {
 			guard argument.hasPrefix("--profile=") else {
 				continue
@@ -16,7 +16,7 @@ public enum KeymapProfile: String, CaseIterable, Sendable {
 			}
 			return profile
 		}
-		return .plain
+		return defaultProfile
 	}
 }
 

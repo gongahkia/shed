@@ -15,6 +15,12 @@ final class GutterView: NSView {
 	var showsLineNumbers = false {
 		didSet { needsDisplay = true }
 	}
+	var lineNumberMode = MetalLineNumberMode.absolute {
+		didSet { needsDisplay = true }
+	}
+	var activeLineIndex = 0 {
+		didSet { needsDisplay = true }
+	}
 	var lineCount = 0 {
 		didSet { needsDisplay = true }
 	}
@@ -71,7 +77,20 @@ final class GutterView: NSView {
 			return []
 		}
 		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
-		return lines.map { "\($0 + 1)" }
+		var seenLines = Set<Int>()
+		return lines.map { line in
+			guard seenLines.insert(line).inserted else {
+				return ""
+			}
+			switch lineNumberMode {
+			case .off:
+				return ""
+			case .absolute:
+				return "\(line + 1)"
+			case .relative:
+				return "\(abs(line - activeLineIndex))"
+			}
+		}
 	}
 
 	override func draw(_ dirtyRect: NSRect) {
@@ -86,8 +105,20 @@ final class GutterView: NSView {
 		}
 		let attributes = lineNumberAttributes
 		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
+		var seenLines = Set<Int>()
 		for (row, lineIndex) in lines.enumerated() {
-			let label = "\(lineIndex + 1)"
+			guard seenLines.insert(lineIndex).inserted else {
+				continue
+			}
+			let label: String
+			switch lineNumberMode {
+			case .off:
+				continue
+			case .absolute:
+				label = "\(lineIndex + 1)"
+			case .relative:
+				label = "\(abs(lineIndex - activeLineIndex))"
+			}
 			let size = label.size(withAttributes: attributes)
 			let origin = CGPoint(
 				x: lineNumberRightEdge - size.width,

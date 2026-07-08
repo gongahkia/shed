@@ -18,7 +18,7 @@ extension MetalTextView: @MainActor NSTextInputClient {
 		lastYankRange = nil
 		let text = plainString(from: string)
 		let range = replacementUTF8Range(replacementRange) ?? markedRangeUTF8 ?? editor.selections.primary.range
-		replace(range: range, with: text)
+		replace(range: range, with: textApplyingHardWrap(text, replacing: range))
 		markedRangeUTF8 = nil
 		syncEditorState()
 		editorDidChange?(editor)
@@ -38,6 +38,18 @@ extension MetalTextView: @MainActor NSTextInputClient {
 			editor.moveCursor(.charBackward)
 		case #selector(NSResponder.moveRight(_:)):
 			editor.moveCursor(.charForward)
+		case #selector(NSResponder.moveUp(_:)):
+			editor.moveCursor(.lineUp)
+		case #selector(NSResponder.moveDown(_:)):
+			editor.moveCursor(.lineDown)
+		case #selector(NSResponder.moveLeftAndModifySelection(_:)):
+			extendSelection(motion: .charBackward)
+		case #selector(NSResponder.moveRightAndModifySelection(_:)):
+			extendSelection(motion: .charForward)
+		case #selector(NSResponder.moveUpAndModifySelection(_:)):
+			extendSelection(motion: .lineUp)
+		case #selector(NSResponder.moveDownAndModifySelection(_:)):
+			extendSelection(motion: .lineDown)
 		case #selector(NSResponder.moveToBeginningOfLine(_:)):
 			editor.moveCursor(.lineStart)
 		case #selector(NSResponder.moveToEndOfLine(_:)):
@@ -116,8 +128,8 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	public func characterIndex(for point: NSPoint) -> Int {
 		let windowPoint = window?.convertPoint(fromScreen: point) ?? point
 		let local = convert(windowPoint, from: nil)
-		let line = min(max(Int((local.y - textInset.y) / max(lineHeight, 1)) + topLineIndex, 0), max(0, editor.rope.lineCount - 1))
-		let lineRange = editor.rope.lineRange(line)
+		let slot = visibleSlot(forLocalPoint: local)
+		let lineRange = slot?.range ?? editor.rope.lineRange(min(max(Int((local.y - textInset.y) / max(lineHeight, 1)) + topLineIndex, 0), max(0, editor.rope.lineCount - 1)))
 		let lineText = editor.rope.slice(lineRange)
 		let targetX = local.x - textInset.x + xOffset
 		var offset = lineRange.lowerBound
@@ -140,8 +152,7 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	}
 
 	func utf8Offset(forLocalPoint local: NSPoint) -> Int {
-		let line = min(max(Int((local.y - topContentInset - textInset.y) / max(lineHeight, 1)) + topLineIndex, 0), max(0, editor.rope.lineCount - 1))
-		let lineRange = editor.rope.lineRange(line)
+		let lineRange = visibleSlot(forLocalPoint: local)?.range ?? editor.rope.lineRange(min(max(Int((local.y - topContentInset - textInset.y) / max(lineHeight, 1)) + topLineIndex, 0), max(0, editor.rope.lineCount - 1)))
 		let lineText = editor.rope.slice(lineRange)
 		let targetX = local.x - textInset.x + xOffset
 		var offset = lineRange.lowerBound
@@ -170,6 +181,20 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	func replace(range: Range<Int>, with text: String) {
 		editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.upperBound)))
 		editor.insert(text)
+	}
+
+	func textApplyingHardWrap(_ text: String, replacing range: Range<Int>) -> String {
+		guard wrapMode == .hard, !text.isEmpty, !text.contains("\n"), range.lowerBound == range.upperBound else {
+			return text
+		}
+		let storage = editor.textStorage
+		let line = storage.line(forOffset: range.lowerBound)
+		let lineRange = storage.lineRange(line)
+		let column = storage.substring(lineRange.lowerBound ..< min(range.lowerBound, lineRange.upperBound)).count
+		guard column >= hardWrapColumn else {
+			return text
+		}
+		return "\n" + text
 	}
 
 	private func nsRange(forUTF8Range range: Range<Int>) -> NSRange {
@@ -221,13 +246,20 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	func rectForUTF8Offset(_ offset: Int) -> NSRect {
 		let line = editor.rope.line(forOffset: min(max(offset, 0), editor.rope.length))
 		let lineRange = editor.rope.lineRange(line)
-		let prefix = editor.rope.slice(lineRange.lowerBound ..< min(offset, lineRange.upperBound))
-		let row = visibleRow(for: line) ?? line - topLineIndex
+		let slot = visibleLineSlots().first { $0.line == line && ($0.range.contains(offset) || $0.range.upperBound == offset) }
+		let cursorRange = slot?.range ?? lineRange
+		let prefix = editor.rope.slice(cursorRange.lowerBound ..< min(offset, cursorRange.upperBound))
+		let row = slot?.row ?? visibleRow(for: line) ?? line - topLineIndex
 		return NSRect(
 			x: textInset.x + typographicWidth(prefix) - xOffset,
 			y: topContentInset + textInset.y + CGFloat(row) * lineHeight,
 			width: 2,
 			height: lineHeight
 		)
+	}
+
+	private func visibleSlot(forLocalPoint local: NSPoint) -> VisibleLineSlot? {
+		let row = Int(floor((local.y - topContentInset - textInset.y) / max(lineHeight, 1)))
+		return visibleLineSlots().first { $0.row == row }
 	}
 }

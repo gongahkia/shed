@@ -38,21 +38,20 @@ extension MetalTextView {
 		guard startLine < visibleLineRange.upperBound, endLine >= visibleLineRange.lowerBound else {
 			return []
 		}
-		return (startLine ... endLine).compactMap { line -> CGRect? in
-			guard let row = visibleRow(for: line) else {
+		return visibleLineSlots().compactMap { slot -> CGRect? in
+			guard slot.line >= startLine, slot.line <= endLine else {
 				return nil
 			}
-			let lineRange = editor.rope.lineRange(line)
-			let lower = max(range.lowerBound, lineRange.lowerBound)
-			let upper = min(range.upperBound, lineRange.upperBound)
+			let lower = max(range.lowerBound, slot.range.lowerBound)
+			let upper = min(range.upperBound, slot.range.upperBound)
 			guard lower < upper else {
 				return nil
 			}
-			let before = editor.rope.slice(lineRange.lowerBound ..< lower)
+			let before = editor.rope.slice(slot.range.lowerBound ..< lower)
 			let selected = editor.rope.slice(lower ..< upper)
 			return CGRect(
 				x: textInset.x + typographicWidth(before) - xOffset,
-				y: topContentInset + textInset.y + CGFloat(row) * lineHeight,
+				y: topContentInset + textInset.y + CGFloat(slot.row) * lineHeight,
 				width: max(2, typographicWidth(selected)),
 				height: lineHeight
 			)

@@ -175,6 +175,18 @@ extension MetalTextView {
 		     "emacs.macro.end", "emacs.macro.run", "emacs.rectangle.kill", "emacs.rectangle.yank",
 		     "emacs.rectangle.string", "emacs.queryReplace":
 			return true
+		case "editor.extendLeft":
+			extendSelection(motion: .charBackward)
+			return true
+		case "editor.extendRight":
+			extendSelection(motion: .charForward)
+			return true
+		case "editor.extendDown":
+			extendSelection(motion: .lineDown)
+			return true
+		case "editor.extendUp":
+			extendSelection(motion: .lineUp)
+			return true
 		default:
 			return performHostCommand(commandID)
 		}
@@ -1143,6 +1155,15 @@ extension MetalTextView {
 		if keymapEngine.mode == .normal, isJumpMotion(motion), editor.selections != before {
 			jumpBackSelection = before
 		}
+	}
+
+	func extendSelection(motion: Motion) {
+		let selection = editor.selections.primary
+		var projected = editor
+		projected.setSelection(SelectionSet(primary: Selection(anchor: selection.head, head: selection.head)))
+		projected.moveCursor(motion)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: selection.anchor, head: projected.selections.primary.head)))
+		syncEditorState()
 	}
 
 	func isJumpMotion(_ motion: Motion) -> Bool {

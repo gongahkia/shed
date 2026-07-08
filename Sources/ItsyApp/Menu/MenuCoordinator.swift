@@ -94,6 +94,8 @@ import AppKit
 		let openFolderItem = fileMenu.addItem(withTitle: L10n.string("Open Folder..."), action: #selector(AppCoordinator.openFolder(_:)), keyEquivalent: "o")
 		openFolderItem.keyEquivalentModifierMask = [.command, .option]
 		openFolderItem.target = actionTarget
+		let addFolderItem = fileMenu.addItem(withTitle: L10n.string("Add Folder to Workspace..."), action: #selector(AppCoordinator.addFolderToWorkspace(_:)), keyEquivalent: "")
+		addFolderItem.target = actionTarget
 		let openRecentItem = fileMenu.addItem(withTitle: L10n.string("Open Recent"), action: nil, keyEquivalent: "")
 		let openRecentMenu = NSMenu(title: L10n.string("Open Recent"))
 		openRecentMenu.disableAutomaticWritingToolsItems()

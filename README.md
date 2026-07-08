@@ -46,6 +46,8 @@ scripts/release_doctor.sh
 open Itsy-0.1.0.dmg
 ```
 
+Release readiness and blocked external prerequisites are tracked in [docs/release.md](docs/release.md).
+
 Homebrew cask install, after a cask is published:
 
 ```sh

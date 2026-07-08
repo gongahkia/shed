@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `45`
+- Bindings: `47`
 
 ### mode.insert
 
@@ -59,6 +59,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Alt-N` | `problems.next` |
+| `Ctrl-Alt-P` | `problems.previous` |
 | `Ctrl-Space` | `lsp.completion` |
 | `Shift-Opt-F` | `lsp.formatDocument` |
 | `Cmd-.` | `lsp.codeAction` |
@@ -66,7 +68,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `275`
+- Bindings: `281`
 
 ### mode.normal
 
@@ -262,6 +264,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Alt-N` | `problems.next` |
+| `Ctrl-Alt-P` | `problems.previous` |
 | `Ctrl-Space` | `lsp.completion` |
 | `Shift-K` | `lsp.hover` |
 | `gr` | `lsp.references` |
@@ -288,6 +292,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Alt-N` | `problems.next` |
+| `Ctrl-Alt-P` | `problems.previous` |
 | `Space c a` | `lsp.codeAction` |
 | `=` | `lsp.formatSelection` |
 | `Esc` | `mode.normal` |
@@ -359,6 +365,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Alt-N` | `problems.next` |
+| `Ctrl-Alt-P` | `problems.previous` |
 | `Esc` | `mode.normal` |
 | `Ctrl-Space` | `lsp.completion` |
 | `jk` | `mode.normal` |
@@ -366,7 +374,7 @@ scripts/gen_keymap_docs.swift
 ## Emacs
 
 - Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
-- Bindings: `60`
+- Bindings: `62`
 
 ### mode.emacs
 
@@ -409,6 +417,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Ctrl-Alt-N` | `problems.next` |
+| `Ctrl-Alt-P` | `problems.previous` |
 | `Ctrl-Space` | `emacs.setMark` |
 | `C-s` | `emacs.isearchForward` |
 | `C-r` | `emacs.isearchBackward` |

@@ -41,12 +41,22 @@ import Testing
 				source: "sourcekit-lsp",
 				message: "expected expression"
 			),
+			LSPDiagnostic(
+				range: LSPRange(start: LSPPosition(line: 3, character: 6), end: LSPPosition(line: 3, character: 10)),
+				severity: .warning,
+				source: "sourcekit-lsp",
+				message: "unused value"
+			),
 		]
 	), source: "sourcekit-lsp")
 	problemsCoordinator.setProblems(await aggregator.snapshot())
 	problemsCoordinator.showProblemsForTesting()
-	#expect(problemsCoordinator.problemCountForTesting == 1)
-	#expect(problemsCoordinator.statusTextForTesting == "1 errors, 0 warnings, 1 total")
+	#expect(problemsCoordinator.problemCountForTesting == 2)
+	#expect(problemsCoordinator.statusTextForTesting == "1 errors, 1 warnings, 2 total")
+	problemsCoordinator.showNextProblemForTesting()
+	#expect(problemsCoordinator.selectedProblemIndexForTesting == 1)
+	problemsCoordinator.showPreviousProblemForTesting()
+	#expect(problemsCoordinator.selectedProblemIndexForTesting == 0)
 
 	let task = WorkspaceTask(
 		id: "compile",

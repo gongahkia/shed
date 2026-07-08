@@ -69,6 +69,7 @@ import ItsyKeymap
 		recordBenchStage("delegate_command_bridge_begin")
 		installCommandBridge()
 		recordBenchStage("delegate_command_bridge_end")
+		installProblemsBridge()
 	}
 
 
@@ -357,6 +358,12 @@ import ItsyKeymap
 					Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
 						self?.showProblems(nil)
 					},
+					Command(id: "problems.next", title: L10n.string("Next Problem"), defaultKey: "Ctrl-Alt-N") { [weak self] in
+						self?.showNextProblem(nil)
+					},
+					Command(id: "problems.previous", title: L10n.string("Previous Problem"), defaultKey: "Ctrl-Alt-P") { [weak self] in
+						self?.showPreviousProblem(nil)
+					},
 					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
 						self?.performEditorMotion(.charBackward)
 					},
@@ -544,6 +551,14 @@ import ItsyKeymap
 		problemsCoordinator.showProblems(sender)
 	}
 
+	@objc func showNextProblem(_ sender: Any?) {
+		problemsCoordinator.showNextProblem(sender)
+	}
+
+	@objc func showPreviousProblem(_ sender: Any?) {
+		problemsCoordinator.showPreviousProblem(sender)
+	}
+
 	private func setProblems(_ snapshot: WorkspaceProblemSnapshot) {
 		problemsCoordinator.setProblems(snapshot)
 	}
@@ -631,6 +646,12 @@ import ItsyKeymap
 				NSLog("failed to run command \(commandID): \(error)")
 				return false
 			}
+		}
+	}
+
+	private func installProblemsBridge() {
+		ItsyProblemsBridge.publishDiagnostics = { [weak self] snapshot, sourceID in
+			self?.problemsCoordinator.setProblems(snapshot, sourceID: sourceID)
 		}
 	}
 

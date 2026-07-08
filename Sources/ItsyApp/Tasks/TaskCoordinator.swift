@@ -313,7 +313,8 @@ import ItsyEditor
 				taskResult.stderr,
 			].filter { !$0.isEmpty }.joined(separator: "\n")
 			if let root {
-				problemsCoordinator.setProblems(WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root))
+				let matchers = WorkspaceProblemMatcherDiscovery.discover(root: root)
+				problemsCoordinator.setProblems(WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers))
 			}
 		case let .failure(error):
 			taskStatusLabel?.textColor = .systemRed

@@ -7,9 +7,11 @@ struct GutterMarkerLayout: Equatable {
 }
 
 final class GutterView: NSView {
-	private static let lineNumberTextColor = NSColor(calibratedRed: 0.68, green: 0.70, blue: 0.74, alpha: 1)
 	private static let defaultFont = NSFont.monospacedSystemFont(ofSize: 14.95, weight: .regular)
 
+	var colors = EditorColorPalette.defaultLight.gutter {
+		didSet { needsDisplay = true }
+	}
 	var showsLineNumbers = false {
 		didSet { needsDisplay = true }
 	}
@@ -104,7 +106,7 @@ final class GutterView: NSView {
 			return
 		}
 		for layout in markerLayouts where layout.rect.intersects(dirtyRect) {
-			let color = layout.marker.color ?? Self.markerColor(for: layout.marker.severity)
+			let color = layout.marker.color ?? markerColor(for: layout.marker.severity)
 			context.setFillColor(Self.cgColor(from: color))
 			if layout.marker.shape == .dot {
 				context.fillEllipse(in: layout.rect)
@@ -127,7 +129,7 @@ final class GutterView: NSView {
 	private var lineNumberAttributes: [NSAttributedString.Key: Any] {
 		[
 			.font: font,
-			.foregroundColor: Self.lineNumberTextColor,
+			.foregroundColor: Self.nsColor(from: colors.lineNumber),
 		]
 	}
 
@@ -148,22 +150,31 @@ final class GutterView: NSView {
 		]
 	}
 
-	private static func markerColor(for severity: WorkspaceProblemSeverity) -> SIMD4<Float> {
+	private func markerColor(for severity: WorkspaceProblemSeverity) -> SIMD4<Float> {
 		switch severity {
 		case .error:
-			return SIMD4<Float>(0.95, 0.25, 0.22, 1.0)
+			return colors.error
 		case .warning:
-			return SIMD4<Float>(0.95, 0.68, 0.18, 1.0)
+			return colors.warning
 		case .info:
-			return SIMD4<Float>(0.24, 0.56, 0.96, 1.0)
+			return colors.info
 		case .hint:
-			return SIMD4<Float>(0.58, 0.62, 0.68, 1.0)
+			return colors.hint
 		}
 	}
 
 	private static func cgColor(from color: SIMD4<Float>) -> CGColor {
 		CGColor(
 			red: CGFloat(color.x),
+			green: CGFloat(color.y),
+			blue: CGFloat(color.z),
+			alpha: CGFloat(color.w)
+		)
+	}
+
+	private static func nsColor(from color: SIMD4<Float>) -> NSColor {
+		NSColor(
+			srgbRed: CGFloat(color.x),
 			green: CGFloat(color.y),
 			blue: CGFloat(color.z),
 			alpha: CGFloat(color.w)

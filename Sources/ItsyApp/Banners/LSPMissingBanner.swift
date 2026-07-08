@@ -30,6 +30,13 @@ final class LSPMissingBanner: NSView {
 		isHidden = true
 	}
 
+	func applyTheme(_ palette: AppThemePalette) {
+		layer?.backgroundColor = palette.bannerBackground.cgColor
+		label.textColor = palette.bannerForeground
+		copyButton.contentTintColor = palette.buttonForeground
+		dismissButton.contentTintColor = palette.buttonForeground
+	}
+
 	private func configure() {
 		wantsLayer = true
 		layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.14).cgColor

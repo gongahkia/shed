@@ -1,6 +1,5 @@
 @preconcurrency import Dispatch
 import Foundation
-import ItsyConfig
 import ItsyEditor
 import ItsyRender
 
@@ -48,15 +47,10 @@ import ItsyRender
 				try repository.diffFilesAgainstHead(path: relativePath)
 			}
 			let indicators = GitHunkIndicatorBuilder.indicators(files: files)
-			let theme = ItsySettingsStore()
-				.load(workspaceRoot: ItsyWorkspaceController.currentRootURL)
-				.settings
-				.theme
-				.gitGutter
 			decorator = indicators.isEmpty ? nil : GitHunkGutterDecorator(
 				indicators: indicators,
 				mode: ItsyGitHunkGutterCoordinator.currentMode,
-				theme: theme
+				theme: AppTheme.palette.gitGutterSettings
 			)
 		} catch {
 			decorator = nil

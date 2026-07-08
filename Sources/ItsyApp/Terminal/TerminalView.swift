@@ -18,6 +18,7 @@ final class ItsyTerminalView: NSView {
 	private var searchQuery = ""
 	private var searchUsesRegex = false
 	private var selectedSearchMatch = 0
+	private var theme = AppTheme.palette.terminal
 	var onInput: ((Data) -> Void)?
 	var onResize: ((Int, Int) -> Void)?
 	var onFocus: (() -> Void)?
@@ -137,6 +138,12 @@ final class ItsyTerminalView: NSView {
 		syncSize()
 	}
 
+	func applyTerminalTheme(_ theme: TerminalThemePalette) {
+		self.theme = theme
+		layer?.backgroundColor = theme.background.cgColor
+		needsDisplay = true
+	}
+
 	override func setFrameSize(_ newSize: NSSize) {
 		super.setFrameSize(newSize)
 		syncSize()
@@ -150,7 +157,7 @@ final class ItsyTerminalView: NSView {
 
 	override func draw(_ dirtyRect: NSRect) {
 		let snapshot = emulator.snapshot(scrollbackOffset: scrollbackOffset)
-		let defaultBackground = color(for: snapshot.defaultBackground) ?? NSColor.textBackgroundColor
+		let defaultBackground = color(for: snapshot.defaultBackground) ?? theme.background
 		defaultBackground.setFill()
 		dirtyRect.fill()
 		for (row, cells) in snapshot.cells.enumerated() {
@@ -285,7 +292,7 @@ final class ItsyTerminalView: NSView {
 
 	private func commonInit() {
 		wantsLayer = true
-		layer?.backgroundColor = NSColor.textBackgroundColor.cgColor
+		layer?.backgroundColor = theme.background.cgColor
 		measureCharacterSize()
 	}
 
@@ -308,7 +315,7 @@ final class ItsyTerminalView: NSView {
 		let x = 4 + CGFloat(min(snapshot.cursorColumn, emulator.columns - 1)) * characterSize.width
 		let y = 2 + CGFloat(min(snapshot.cursorRow, emulator.rows - 1)) * characterSize.height
 		let rect = NSRect(x: x, y: y, width: max(2, characterSize.width), height: characterSize.height)
-		NSColor.textColor.withAlphaComponent(0.24).setFill()
+		theme.cursor.withAlphaComponent(0.24).setFill()
 		rect.fill()
 	}
 
@@ -425,11 +432,11 @@ final class ItsyTerminalView: NSView {
 	}
 
 	private func resolvedColors(for attributes: TerminalTextAttributes, snapshot: TerminalSnapshot) -> (foreground: NSColor, background: NSColor?) {
-		var foreground = color(for: attributes.foreground, snapshot: snapshot) ?? color(for: snapshot.defaultForeground) ?? NSColor.textColor
+		var foreground = color(for: attributes.foreground, snapshot: snapshot) ?? color(for: snapshot.defaultForeground) ?? theme.foreground
 		var background = color(for: attributes.background, snapshot: snapshot) ?? color(for: snapshot.defaultBackground)
 		if attributes.inverse {
 			let originalForeground = foreground
-			foreground = background ?? NSColor.textBackgroundColor
+			foreground = background ?? theme.background
 			background = originalForeground
 		}
 		return (foreground, background)
@@ -441,6 +448,9 @@ final class ItsyTerminalView: NSView {
 		}
 		switch terminalColor {
 		case let .ansi(index), let .indexed(index):
+			if (0 ... 15).contains(index), !snapshot.paletteOverrideIndexes.contains(index), let themed = theme.ansi[index] {
+				return themed
+			}
 			return color(for: snapshot.palette[index])
 		case let .rgb(rgb):
 			return color(for: rgb)

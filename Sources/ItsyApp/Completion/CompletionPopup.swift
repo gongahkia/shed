@@ -65,6 +65,7 @@ import ItsyRender
 			dismiss()
 			return
 		}
+		applyTheme()
 		reloadAndSelectFirst()
 		position(relativeTo: editorView, hostWindow: hostWindow)
 		installKeyMonitor()
@@ -115,9 +116,19 @@ import ItsyRender
 			cell.textField = label
 		}
 		let item = displayItem(for: filteredItems[row])
+		label.textColor = AppTheme.palette.foreground
 		label.stringValue = item.detail.map { "\(item.label)  \($0)" } ?? item.label
 		cell.toolTip = item.detail
 		return cell
+	}
+
+	private func applyTheme() {
+		let palette = AppTheme.palette
+		panel.contentView?.layer?.backgroundColor = palette.panelBackground.cgColor
+		panel.contentView?.layer?.borderColor = palette.border.cgColor
+		tableView.backgroundColor = palette.panelBackground
+		tableView.gridColor = palette.border
+		AppThemeApplier.apply(palette, to: panel)
 	}
 
 	func tableViewSelectionDidChange(_: Notification) {

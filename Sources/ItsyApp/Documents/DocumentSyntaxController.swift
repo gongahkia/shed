@@ -39,7 +39,7 @@ final class DocumentSyntaxController {
 		}
 		do {
 			if syntaxTheme == nil {
-				syntaxTheme = try SyntaxTheme.loadUserOrDefault()
+				syntaxTheme = try ItsyTheme.loadUserOrDefault().syntax
 			}
 			let spans: [HighlightSpan]
 			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)

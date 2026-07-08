@@ -201,6 +201,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
+		applyTheme(AppTheme.palette)
 		recordBenchStage("window_controller_install_pane_end")
 		refreshLSPMissingBanner(for: document)
 		refreshLSPStatus(for: document)
@@ -370,8 +371,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let container = NSView()
 		container.wantsLayer = true
 		container.layer?.backgroundColor = tab.isSelected
-			? NSColor.selectedControlColor.withAlphaComponent(0.24).cgColor
-			: NSColor.clear.cgColor
+			? AppTheme.palette.tabActiveBackground.cgColor
+			: AppTheme.palette.tabInactiveBackground.cgColor
 
 		let stack = NSStackView()
 		stack.orientation = .horizontal
@@ -389,12 +390,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		selectButton.lineBreakMode = .byTruncatingMiddle
 		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		selectButton.toolTip = tab.title
+		selectButton.contentTintColor = tab.isSelected ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
 
 		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
 		closeButton.tag = tag
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
 		closeButton.toolTip = L10n.string("Close")
+		closeButton.contentTintColor = AppTheme.palette.tabInactiveForeground
 
 		stack.addArrangedSubview(selectButton)
 		stack.addArrangedSubview(closeButton)
@@ -814,6 +817,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		view.applyEditorColorPalette(AppTheme.palette.editor)
 		recordBenchStage("editor_pane_appearance_end")
 		recordBenchStage("editor_pane_keymap_begin")
 		view.keymapEngine = ItsyAppKeymap.makeEngine()
@@ -873,11 +877,31 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				fontSize: preferences.fontSize,
 				showsLineNumbers: preferences.showLineNumbers
 			)
+			pane.editorView.applyEditorColorPalette(AppTheme.palette.editor)
 		}
 	}
 
 	func applySettings(_ settings: ItsySettings) {
 		applyEditorPreferences(EditorPreferences(settings: settings.editorSettings(languageID: currentLanguageID())))
+		applyTheme(AppTheme.palette)
+	}
+
+	func applyTheme(_ palette: AppThemePalette) {
+		if let window {
+			AppThemeApplier.apply(palette, to: window)
+		}
+		tabBarView.layer?.backgroundColor = palette.tabInactiveBackground.cgColor
+		editorContainer.wantsLayer = true
+		editorContainer.layer?.backgroundColor = palette.editor.nsBackgroundColor.cgColor
+		statusBarView.layer?.backgroundColor = palette.statusBackground.cgColor
+		statusBarLabel.textColor = palette.statusForeground
+		lspStatusButton.contentTintColor = palette.statusForeground
+		lspMissingBanner.applyTheme(palette)
+		findBarController?.applyTheme(palette)
+		fileTreeController.applyTheme(palette)
+		for pane in paneCoordinator.panes {
+			pane.editorView.applyEditorColorPalette(palette.editor)
+		}
 	}
 
 	private func ensureFindBarController() -> FindBarController {

@@ -48,6 +48,7 @@ struct TerminalSnapshot {
 	var mouseTrackingMode: TerminalMouseTrackingMode
 	var sgrMouseMode: Bool
 	var palette: [Int: TerminalRGB]
+	var paletteOverrideIndexes: Set<Int>
 	var defaultForeground: TerminalRGB?
 	var defaultBackground: TerminalRGB?
 }
@@ -83,6 +84,7 @@ final class ItsyTerminalEmulator {
 	private(set) var mouseTrackingMode: TerminalMouseTrackingMode = .none
 	private(set) var sgrMouseMode = false
 	private(set) var palette = ItsyTerminalEmulator.xtermPalette()
+	private(set) var paletteOverrideIndexes: Set<Int> = []
 	private(set) var defaultForeground: TerminalRGB?
 	private(set) var defaultBackground: TerminalRGB?
 
@@ -130,6 +132,7 @@ final class ItsyTerminalEmulator {
 		mouseTrackingMode = .none
 		sgrMouseMode = false
 		palette = Self.xtermPalette()
+		paletteOverrideIndexes.removeAll(keepingCapacity: true)
 		defaultForeground = nil
 		defaultBackground = nil
 	}
@@ -184,6 +187,7 @@ final class ItsyTerminalEmulator {
 			mouseTrackingMode: mouseTrackingMode,
 			sgrMouseMode: sgrMouseMode,
 			palette: palette,
+			paletteOverrideIndexes: paletteOverrideIndexes,
 			defaultForeground: defaultForeground,
 			defaultBackground: defaultBackground
 		)
@@ -517,6 +521,7 @@ final class ItsyTerminalEmulator {
 		while index + 1 < parts.count {
 			if let paletteIndex = Int(parts[index]), (0 ... 255).contains(paletteIndex), let color = parseOSCColor(parts[index + 1]) {
 				palette[paletteIndex] = color
+				paletteOverrideIndexes.insert(paletteIndex)
 			}
 			index += 2
 		}

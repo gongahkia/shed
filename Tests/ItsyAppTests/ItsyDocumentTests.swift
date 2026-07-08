@@ -35,6 +35,48 @@ import Testing
 }
 
 @MainActor
+@Test func documentCanDeinitializeOffMainDocumentActivityQueue() {
+	var document: ItsyDocument? = ItsyDocument()
+	let retainedDocument = Unmanaged.passRetained(document!).toOpaque()
+	document = nil
+	DispatchQueue(label: "NSDocument Activity").sync {
+		Unmanaged<ItsyDocument>.fromOpaque(retainedDocument).release()
+	}
+}
+
+@MainActor
+@Test func documentWithWindowControllerCanDeinitializeOffMainDocumentActivityQueue() {
+	var document: ItsyDocument? = ItsyDocument()
+	document?.makeWindowControllers()
+	let retainedDocument = Unmanaged.passRetained(document!).toOpaque()
+	document = nil
+	DispatchQueue(label: "NSDocument Activity").sync {
+		Unmanaged<ItsyDocument>.fromOpaque(retainedDocument).release()
+	}
+}
+
+@MainActor
+@Test func documentFileWatcherCanDeinitializeOffMainWithActiveSource() throws {
+	let fileManager = FileManager.default
+	let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+	try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer {
+		try? fileManager.removeItem(at: directory)
+	}
+	let url = directory.appendingPathComponent("watched.txt")
+	try Data("value".utf8).write(to: url)
+
+	var watcher: DocumentFileWatcher? = DocumentFileWatcher()
+	watcher?.fileURL = { url }
+	watcher?.restart()
+	let retainedWatcher = Unmanaged.passRetained(watcher!).toOpaque()
+	watcher = nil
+	DispatchQueue(label: "NSDocument Activity").sync {
+		Unmanaged<DocumentFileWatcher>.fromOpaque(retainedWatcher).release()
+	}
+}
+
+@MainActor
 @Test func documentReadsLargeFilesThroughMappedPieceTree() throws {
 	let fileManager = FileManager.default
 	let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)

@@ -34,13 +34,15 @@ public struct PieceTree: Sendable {
 		public var length: Int
 		public var lineFeeds: Int
 		public var graphemes: Int
+		public var isSimpleGraphemeSpan: Bool
 
-		public init(buffer: BufferID, start: Int, length: Int, lineFeeds: Int, graphemes: Int? = nil) {
+		public init(buffer: BufferID, start: Int, length: Int, lineFeeds: Int, graphemes: Int? = nil, isSimpleGraphemeSpan: Bool = true) {
 			self.buffer = buffer
 			self.start = start
 			self.length = length
 			self.lineFeeds = lineFeeds
 			self.graphemes = graphemes ?? length
+			self.isSimpleGraphemeSpan = isSimpleGraphemeSpan
 		}
 	}
 
@@ -69,7 +71,8 @@ public struct PieceTree: Sendable {
 				start: 0,
 				length: bytes.count,
 				lineFeeds: Self.lineFeeds(in: bytes),
-				graphemes: Self.graphemes(in: bytes)
+				graphemes: Self.graphemes(in: bytes),
+				isSimpleGraphemeSpan: Self.isSimpleGraphemeSpan(in: bytes)
 			)
 			root = Self.buildTree(from: [piece])
 		}
@@ -103,7 +106,8 @@ public struct PieceTree: Sendable {
 				start: 0,
 				length: mapped.count,
 				lineFeeds: lineFeedCounter(mapped.bytes),
-				graphemes: Self.graphemes(in: mapped.bytes)
+				graphemes: Self.graphemes(in: mapped.bytes),
+				isSimpleGraphemeSpan: Self.isSimpleGraphemeSpan(in: mapped.bytes)
 			)
 			root = Self.buildTree(from: [piece])
 		}
@@ -118,7 +122,10 @@ public struct PieceTree: Sendable {
 	}
 
 	public var graphemeCount: Int {
-		root?.summary.graphemes ?? 0
+		guard canUsePieceGraphemeSummaries() else {
+			return documentGraphemeBoundaries().count - 1
+		}
+		return root?.summary.graphemes ?? 0
 	}
 
 	public func substring(_ range: Range<Int>) -> String {
@@ -155,6 +162,9 @@ public struct PieceTree: Sendable {
 
 	public func graphemeIndex(forOffset offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard canUsePieceGraphemeSummaries() else {
+			return graphemeIndex(in: documentGraphemeBoundaries(), before: offset)
+		}
 		guard let root else {
 			return 0
 		}
@@ -163,6 +173,10 @@ public struct PieceTree: Sendable {
 
 	public func offset(forGraphemeIndex index: Int) -> Int {
 		precondition(index >= 0, "grapheme index out of bounds")
+		guard canUsePieceGraphemeSummaries() else {
+			let boundaries = documentGraphemeBoundaries()
+			return index < boundaries.count ? boundaries[index] : length
+		}
 		guard index > 0 else {
 			return 0
 		}
@@ -174,11 +188,17 @@ public struct PieceTree: Sendable {
 
 	public func isGraphemeBoundary(_ offset: Int) -> Bool {
 		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard canUsePieceGraphemeSummaries() else {
+			return documentGraphemeBoundaries().contains(offset)
+		}
 		return self.offset(forGraphemeIndex: graphemeIndex(forOffset: offset)) == offset
 	}
 
 	public func previousGraphemeBoundary(before offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard canUsePieceGraphemeSummaries() else {
+			return documentGraphemeBoundaries().last { $0 < offset } ?? 0
+		}
 		guard offset > 0 else {
 			return 0
 		}
@@ -195,6 +215,9 @@ public struct PieceTree: Sendable {
 
 	public func nextGraphemeBoundary(after offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		guard canUsePieceGraphemeSummaries() else {
+			return documentGraphemeBoundaries().first { $0 > offset } ?? length
+		}
 		guard offset < length else {
 			return length
 		}
@@ -373,7 +396,8 @@ public struct PieceTree: Sendable {
 			start: 0,
 			length: bytes.count,
 			lineFeeds: Self.lineFeeds(in: bytes),
-			graphemes: Self.graphemes(in: bytes)
+			graphemes: Self.graphemes(in: bytes),
+			isSimpleGraphemeSpan: Self.isSimpleGraphemeSpan(in: bytes)
 		)
 	}
 
@@ -393,6 +417,26 @@ public struct PieceTree: Sendable {
 		return result
 	}
 
+	private func canUsePieceGraphemeSummaries() -> Bool {
+		root?.summary.isSimpleGraphemeSpan ?? true
+	}
+
+	private func documentGraphemeBoundaries() -> [Int] {
+		var bytes: [UInt8] = []
+		bytes.reserveCapacity(length)
+		iterateBytes(from: 0) { buffer in
+			bytes.append(contentsOf: buffer)
+			return true
+		}
+		return bytes.withUnsafeBufferPointer {
+			UAX29GraphemeIterator.boundaries(in: $0)
+		}
+	}
+
+	private func graphemeIndex(in boundaries: [Int], before offset: Int) -> Int {
+		boundaries.prefix(while: { $0 <= offset }).count - 1
+	}
+
 	private func split(_ piece: Piece, _ localRange: Range<Int>) -> Piece {
 		precondition(localRange.lowerBound >= 0 && localRange.upperBound <= piece.length, "piece split out of bounds")
 		return Piece(
@@ -400,7 +444,8 @@ public struct PieceTree: Sendable {
 			start: piece.start + localRange.lowerBound,
 			length: localRange.count,
 			lineFeeds: lineFeeds(in: piece, localRange: localRange),
-			graphemes: graphemes(in: piece, localRange: localRange)
+			graphemes: graphemes(in: piece, localRange: localRange),
+			isSimpleGraphemeSpan: isSimpleGraphemeSpan(in: piece, localRange: localRange)
 		)
 	}
 
@@ -595,6 +640,18 @@ public struct PieceTree: Sendable {
 		return count
 	}
 
+	private func isSimpleGraphemeSpan(in piece: Piece, localRange: Range<Int>) -> Bool {
+		guard piece.isSimpleGraphemeSpan else {
+			return false
+		}
+		var result = true
+		_ = withPieceBytes(piece, localRange) { buffer in
+			result = Self.isSimpleGraphemeSpan(in: buffer)
+			return true
+		}
+		return result
+	}
+
 	private func graphemeIndex(in piece: Piece, before offset: Int) -> Int {
 		var count = 0
 		_ = withPieceBytes(piece, 0 ..< piece.length) { buffer in
@@ -727,6 +784,19 @@ public struct PieceTree: Sendable {
 		return UAX29GraphemeIterator.graphemeCount(in: bytes)
 	}
 
+	private static func isSimpleGraphemeSpan(in bytes: [UInt8]) -> Bool {
+		bytes.withUnsafeBufferPointer {
+			isSimpleGraphemeSpan(in: $0)
+		}
+	}
+
+	private static func isSimpleGraphemeSpan(in bytes: UnsafeBufferPointer<UInt8>) -> Bool {
+		for byte in bytes where byte >= 0x80 || byte == 0x0D {
+			return false
+		}
+		return true
+	}
+
 	private static func graphemes(in bytes: UnsafeBufferPointer<UInt8>, before offset: Int) -> Int {
 		precondition((0 ... bytes.count).contains(offset), "grapheme offset out of bounds")
 		return UAX29GraphemeIterator.graphemeIndex(in: bytes, before: offset)
@@ -798,26 +868,30 @@ private struct PieceTreeSummary: Sendable {
 	var bytes: Int
 	var lineFeeds: Int
 	var graphemes: Int
+	var isSimpleGraphemeSpan: Bool
 
-	static let zero = PieceTreeSummary(bytes: 0, lineFeeds: 0, graphemes: 0)
+	static let zero = PieceTreeSummary(bytes: 0, lineFeeds: 0, graphemes: 0, isSimpleGraphemeSpan: true)
 
-	init(bytes: Int, lineFeeds: Int, graphemes: Int) {
+	init(bytes: Int, lineFeeds: Int, graphemes: Int, isSimpleGraphemeSpan: Bool) {
 		self.bytes = bytes
 		self.lineFeeds = lineFeeds
 		self.graphemes = graphemes
+		self.isSimpleGraphemeSpan = isSimpleGraphemeSpan
 	}
 
 	init(_ piece: PieceTree.Piece) {
 		bytes = piece.length
 		lineFeeds = piece.lineFeeds
 		graphemes = piece.graphemes
+		isSimpleGraphemeSpan = piece.isSimpleGraphemeSpan
 	}
 
 	static func + (lhs: PieceTreeSummary, rhs: PieceTreeSummary) -> PieceTreeSummary {
 		PieceTreeSummary(
 			bytes: lhs.bytes + rhs.bytes,
 			lineFeeds: lhs.lineFeeds + rhs.lineFeeds,
-			graphemes: lhs.graphemes + rhs.graphemes
+			graphemes: lhs.graphemes + rhs.graphemes,
+			isSimpleGraphemeSpan: lhs.isSimpleGraphemeSpan && rhs.isSimpleGraphemeSpan
 		)
 	}
 }

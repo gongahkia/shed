@@ -1,3 +1,4 @@
+import Darwin
 import Dispatch
 import Foundation
 
@@ -7,6 +8,7 @@ public enum WorkspaceTaskSource: String, Codable, Equatable, Sendable {
 	case makefile
 	case shellScript
 	case extensionManifest
+	case workspaceTaskFile
 }
 
 public struct WorkspaceTask: Codable, Equatable, Sendable {
@@ -16,18 +18,80 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 	public var command: String
 	public var arguments: [String]
 	public var workingDirectory: URL?
+	public var dependsOn: [String]
+	public var isBackground: Bool
+	public var watch: WorkspaceTaskWatch?
 
-	public init(id: String, label: String, source: WorkspaceTaskSource, command: String, arguments: [String] = [], workingDirectory: URL? = nil) {
+	public init(
+		id: String,
+		label: String,
+		source: WorkspaceTaskSource,
+		command: String,
+		arguments: [String] = [],
+		workingDirectory: URL? = nil,
+		dependsOn: [String] = [],
+		isBackground: Bool = false,
+		watch: WorkspaceTaskWatch? = nil
+	) {
 		self.id = id
 		self.label = label
 		self.source = source
 		self.command = command
 		self.arguments = arguments
 		self.workingDirectory = workingDirectory
+		self.dependsOn = dependsOn
+		self.isBackground = isBackground
+		self.watch = watch
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case id
+		case label
+		case source
+		case command
+		case arguments
+		case workingDirectory
+		case dependsOn = "depends_on"
+		case isBackground = "is_background"
+		case watch
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		id = try container.decode(String.self, forKey: .id)
+		label = try container.decode(String.self, forKey: .label)
+		source = try container.decode(WorkspaceTaskSource.self, forKey: .source)
+		command = try container.decode(String.self, forKey: .command)
+		arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
+		workingDirectory = try container.decodeIfPresent(URL.self, forKey: .workingDirectory)
+		dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
+		isBackground = try container.decodeIfPresent(Bool.self, forKey: .isBackground) ?? false
+		watch = try container.decodeIfPresent(WorkspaceTaskWatch.self, forKey: .watch)
 	}
 
 	public var commandLine: String {
 		([command] + arguments).joined(separator: " ")
+	}
+}
+
+public struct WorkspaceTaskWatch: Codable, Equatable, Sendable {
+	public var paths: [String]
+	public var debounceMillis: Int
+
+	public init(paths: [String], debounceMillis: Int = 300) {
+		self.paths = paths
+		self.debounceMillis = debounceMillis
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case paths
+		case debounceMillis = "debounce_ms"
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		paths = try container.decodeIfPresent([String].self, forKey: .paths) ?? []
+		debounceMillis = try container.decodeIfPresent(Int.self, forKey: .debounceMillis) ?? 300
 	}
 }
 
@@ -38,6 +102,7 @@ public enum WorkspaceTaskDiscovery {
 		tasks += packageJSONTasks(root: root)
 		tasks += makefileTasks(root: root)
 		tasks += shellScriptTasks(root: root, fileManager: fileManager)
+		tasks += workspaceFileTasks(root: root, fileManager: fileManager)
 		tasks += extensionTasks(root: root, fileManager: fileManager)
 		return tasks
 	}
@@ -122,6 +187,31 @@ public enum WorkspaceTaskDiscovery {
 		}
 	}
 
+	private static func workspaceFileTasks(root: URL, fileManager: FileManager) -> [WorkspaceTask] {
+		let url = root
+			.appendingPathComponent(".itsy", isDirectory: true)
+			.appendingPathComponent("tasks.json")
+		guard fileManager.fileExists(atPath: url.path),
+		      let data = try? Data(contentsOf: url),
+		      let file = try? JSONDecoder().decode(WorkspaceTaskFile.self, from: data)
+		else {
+			return []
+		}
+		return file.tasks.map {
+			WorkspaceTask(
+				id: "workspace:\($0.id)",
+				label: $0.label,
+				source: .workspaceTaskFile,
+				command: $0.command,
+				arguments: $0.arguments,
+				workingDirectory: root,
+				dependsOn: $0.dependsOn,
+				isBackground: $0.isBackground,
+				watch: $0.watch
+			)
+		}
+	}
+
 	private static func relativePath(_ url: URL, root: URL) -> String? {
 		let rootPath = root.standardizedFileURL.path
 		let path = url.standardizedFileURL.path
@@ -130,6 +220,86 @@ public enum WorkspaceTaskDiscovery {
 			return nil
 		}
 		return String(path.dropFirst(prefix.count))
+	}
+}
+
+private struct WorkspaceTaskFile: Decodable {
+	var tasks: [WorkspaceTaskDefinition]
+}
+
+private struct WorkspaceTaskDefinition: Decodable {
+	var id: String
+	var label: String
+	var command: String
+	var arguments: [String]
+	var dependsOn: [String]
+	var isBackground: Bool
+	var watch: WorkspaceTaskWatch?
+
+	private enum CodingKeys: String, CodingKey {
+		case id
+		case label
+		case command
+		case arguments
+		case dependsOn = "depends_on"
+		case isBackground = "is_background"
+		case watch
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		id = try container.decode(String.self, forKey: .id)
+		label = try container.decodeIfPresent(String.self, forKey: .label) ?? id
+		command = try container.decode(String.self, forKey: .command)
+		arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
+		dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
+		isBackground = try container.decodeIfPresent(Bool.self, forKey: .isBackground) ?? false
+		watch = try container.decodeIfPresent(WorkspaceTaskWatch.self, forKey: .watch)
+	}
+}
+
+public enum WorkspaceTaskPlanError: Error, Equatable, Sendable {
+	case missingDependency(String)
+	case dependencyCycle([String])
+}
+
+public enum WorkspaceTaskPlanner {
+	public static func executionPlan(for task: WorkspaceTask, in tasks: [WorkspaceTask]) throws -> [WorkspaceTask] {
+		var visiting: [String] = []
+		var visited = Set<String>()
+		var plan: [WorkspaceTask] = []
+		try visit(task, tasks: tasks, visiting: &visiting, visited: &visited, plan: &plan)
+		return plan
+	}
+
+	private static func visit(
+		_ task: WorkspaceTask,
+		tasks: [WorkspaceTask],
+		visiting: inout [String],
+		visited: inout Set<String>,
+		plan: inout [WorkspaceTask]
+	) throws {
+		if let cycleIndex = visiting.firstIndex(of: task.id) {
+			throw WorkspaceTaskPlanError.dependencyCycle(Array(visiting[cycleIndex...]) + [task.id])
+		}
+		guard visited.insert(task.id).inserted else {
+			return
+		}
+		visiting.append(task.id)
+		for dependency in task.dependsOn {
+			guard let dependencyTask = resolve(dependency, in: tasks) else {
+				throw WorkspaceTaskPlanError.missingDependency(dependency)
+			}
+			try visit(dependencyTask, tasks: tasks, visiting: &visiting, visited: &visited, plan: &plan)
+		}
+		_ = visiting.popLast()
+		plan.append(task)
+	}
+
+	private static func resolve(_ id: String, in tasks: [WorkspaceTask]) -> WorkspaceTask? {
+		tasks.first { task in
+			task.id == id || task.id.hasSuffix(":\(id)")
+		}
 	}
 }
 
@@ -153,6 +323,84 @@ public struct WorkspaceTaskResult: Equatable, Sendable {
 
 public enum WorkspaceTaskRunError: Error, Equatable, Sendable {
 	case invalidOutput
+}
+
+public enum WorkspaceTaskOutputKind: Sendable, Equatable {
+	case stdout
+	case stderr
+}
+
+public struct WorkspaceTaskOutput: Sendable, Equatable {
+	public var kind: WorkspaceTaskOutputKind
+	public var text: String
+
+	public init(kind: WorkspaceTaskOutputKind, text: String) {
+		self.kind = kind
+		self.text = text
+	}
+}
+
+public final class WorkspaceTaskHandle: @unchecked Sendable {
+	private let process: Process
+	private let task: WorkspaceTask
+	private let lock = NSLock()
+	private var stdout = Data()
+	private var stderr = Data()
+	private var didFinish = false
+
+	fileprivate init(task: WorkspaceTask, process: Process) {
+		self.task = task
+		self.process = process
+	}
+
+	public var isRunning: Bool {
+		process.isRunning
+	}
+
+	public func cancel(escalationDelay: TimeInterval = 1.0) {
+		guard process.isRunning else {
+			return
+		}
+		process.terminate()
+		let pid = process.processIdentifier
+		DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + escalationDelay) {
+			if self.process.isRunning {
+				kill(pid, SIGKILL)
+			}
+		}
+	}
+
+	fileprivate func append(_ data: Data, kind: WorkspaceTaskOutputKind, onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void) {
+		guard !data.isEmpty else {
+			return
+		}
+		lock.lock()
+		switch kind {
+		case .stdout:
+			stdout.append(data)
+		case .stderr:
+			stderr.append(data)
+		}
+		lock.unlock()
+		onOutput(WorkspaceTaskOutput(kind: kind, text: String(decoding: data, as: UTF8.self)))
+	}
+
+	fileprivate func finish(status: Int32) -> WorkspaceTaskResult? {
+		lock.lock()
+		defer {
+			lock.unlock()
+		}
+		guard !didFinish else {
+			return nil
+		}
+		didFinish = true
+		return WorkspaceTaskResult(
+			task: task,
+			exitStatus: status,
+			stdout: String(decoding: stdout, as: UTF8.self),
+			stderr: String(decoding: stderr, as: UTF8.self)
+		)
+	}
 }
 
 public struct WorkspaceTaskRunner: Sendable {
@@ -187,12 +435,144 @@ public struct WorkspaceTaskRunner: Sendable {
 		return WorkspaceTaskResult(task: task, exitStatus: process.terminationStatus, stdout: stdoutText, stderr: stderrText)
 	}
 
+	public func run(_ task: WorkspaceTask, root: URL, availableTasks: [WorkspaceTask]) throws -> WorkspaceTaskResult {
+		let plan = try WorkspaceTaskPlanner.executionPlan(for: task, in: availableTasks)
+		var stdout = ""
+		var stderr = ""
+		var exitStatus: Int32 = 0
+		for plannedTask in plan {
+			let result = try run(plannedTask, root: root)
+			stdout += result.stdout
+			stderr += result.stderr
+			exitStatus = result.exitStatus
+			if !result.succeeded {
+				break
+			}
+		}
+		return WorkspaceTaskResult(task: task, exitStatus: exitStatus, stdout: stdout, stderr: stderr)
+	}
+
+	public func start(
+		_ task: WorkspaceTask,
+		root: URL,
+		onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void,
+		onFinish: @escaping @Sendable (WorkspaceTaskResult) -> Void
+	) throws -> WorkspaceTaskHandle {
+		let process = Process()
+		process.executableURL = executableURL
+		process.arguments = [task.command] + task.arguments
+		process.currentDirectoryURL = task.workingDirectory ?? root
+		let stdoutPipe = Pipe()
+		let stderrPipe = Pipe()
+		process.standardOutput = stdoutPipe
+		process.standardError = stderrPipe
+		let handle = WorkspaceTaskHandle(task: task, process: process)
+		stdoutPipe.fileHandleForReading.readabilityHandler = { fileHandle in
+			handle.append(fileHandle.availableData, kind: .stdout, onOutput: onOutput)
+		}
+		stderrPipe.fileHandleForReading.readabilityHandler = { fileHandle in
+			handle.append(fileHandle.availableData, kind: .stderr, onOutput: onOutput)
+		}
+		process.terminationHandler = { process in
+			stdoutPipe.fileHandleForReading.readabilityHandler = nil
+			stderrPipe.fileHandleForReading.readabilityHandler = nil
+			handle.append(stdoutPipe.fileHandleForReading.availableData, kind: .stdout, onOutput: onOutput)
+			handle.append(stderrPipe.fileHandleForReading.availableData, kind: .stderr, onOutput: onOutput)
+			if let result = handle.finish(status: process.terminationStatus) {
+				onFinish(result)
+			}
+		}
+		do {
+			try process.run()
+		} catch {
+			stdoutPipe.fileHandleForReading.readabilityHandler = nil
+			stderrPipe.fileHandleForReading.readabilityHandler = nil
+			process.terminationHandler = nil
+			throw error
+		}
+		return handle
+	}
+
 	private func read(_ handle: FileHandle, into box: WorkspaceTaskDataBox, group: DispatchGroup) {
 		group.enter()
 		DispatchQueue.global(qos: .utility).async {
 			box.data = handle.readDataToEndOfFile()
 			group.leave()
 		}
+	}
+}
+
+public final class WorkspaceTaskWatcher: @unchecked Sendable {
+	private let root: URL
+	private let watch: WorkspaceTaskWatch
+	private let queue: DispatchQueue
+	private let onChange: @Sendable () -> Void
+	private let lock = NSLock()
+	private var sources: [DispatchSourceFileSystemObject] = []
+	private var debounceWorkItem: DispatchWorkItem?
+
+	public init(root: URL, watch: WorkspaceTaskWatch, queue: DispatchQueue = .main, onChange: @escaping @Sendable () -> Void) {
+		self.root = root
+		self.watch = watch
+		self.queue = queue
+		self.onChange = onChange
+	}
+
+	deinit {
+		stop()
+	}
+
+	public func start(fileManager: FileManager = .default) {
+		stop()
+		for path in watch.paths {
+			let url = root.appendingPathComponent(path)
+			guard fileManager.fileExists(atPath: url.path) else {
+				continue
+			}
+			let descriptor = open(url.path, O_EVTONLY)
+			guard descriptor >= 0 else {
+				continue
+			}
+			let source = DispatchSource.makeFileSystemObjectSource(
+				fileDescriptor: descriptor,
+				eventMask: [.write, .extend, .attrib, .delete, .rename],
+				queue: queue
+			)
+			source.setEventHandler { [weak self] in
+				self?.scheduleChange()
+			}
+			source.setCancelHandler {
+				close(descriptor)
+			}
+			lock.lock()
+			sources.append(source)
+			lock.unlock()
+			source.resume()
+		}
+	}
+
+	public func stop() {
+		lock.lock()
+		let activeSources = sources
+		sources.removeAll()
+		debounceWorkItem?.cancel()
+		debounceWorkItem = nil
+		lock.unlock()
+		for source in activeSources {
+			source.cancel()
+		}
+	}
+
+	private func scheduleChange() {
+		let debounceMillis = max(0, watch.debounceMillis)
+		lock.lock()
+		debounceWorkItem?.cancel()
+		let item = DispatchWorkItem { [weak self] in
+			self?.onChange()
+		}
+		debounceWorkItem = item
+		lock.unlock()
+		queue.asyncAfter(deadline: .now() + .milliseconds(debounceMillis), execute: item)
 	}
 }
 

@@ -9,8 +9,11 @@ import ItsyEditor
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
 	private var taskOutputTextView: NSTextView?
+	private var cancelButton: NSButton?
 	private var workspaceTasks: [WorkspaceTask] = []
 	private var taskRunGeneration = 0
+	private var activeTaskHandle: WorkspaceTaskHandle?
+	private var taskWatcher: WorkspaceTaskWatcher?
 
 	init(problemsCoordinator: ProblemsCoordinator) {
 		self.problemsCoordinator = problemsCoordinator
@@ -73,7 +76,9 @@ import ItsyEditor
 		statusLabel.textColor = .secondaryLabelColor
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshTasks(_:)))
 		let runButton = NSButton(title: L10n.string("Run"), target: self, action: #selector(runSelectedTask(_:)))
-		let buttonStack = NSStackView(views: [refreshButton, runButton])
+		let cancelButton = NSButton(title: L10n.string("Cancel"), target: self, action: #selector(cancelRunningTask(_:)))
+		cancelButton.isEnabled = false
+		let buttonStack = NSStackView(views: [refreshButton, runButton, cancelButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -127,6 +132,7 @@ import ItsyEditor
 		taskStatusLabel = statusLabel
 		taskTableView = tableView
 		taskOutputTextView = outputTextView
+		self.cancelButton = cancelButton
 	}
 
 	private func centerTaskPanel(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -154,20 +160,18 @@ import ItsyEditor
 		else {
 			return
 		}
+		startTask(task, root: root, preserveWatch: false)
+	}
+
+	@objc private func cancelRunningTask(_ sender: Any?) {
 		taskRunGeneration += 1
-		let generation = taskRunGeneration
+		taskWatcher?.stop()
+		taskWatcher = nil
+		activeTaskHandle?.cancel()
+		activeTaskHandle = nil
+		cancelButton?.isEnabled = false
 		taskStatusLabel?.textColor = .secondaryLabelColor
-		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
-		taskOutputTextView?.string = "$ \(task.commandLine)\n"
-		DispatchQueue.global(qos: .userInitiated).async {
-			let result = Result { try WorkspaceTaskRunner().run(task, root: root) }
-			Task { @MainActor [weak self] in
-				guard let self, self.taskRunGeneration == generation else {
-					return
-				}
-				self.applyTaskResult(result)
-			}
-		}
+		taskStatusLabel?.stringValue = L10n.string("Cancelled")
 	}
 
 	private func selectedTask() -> WorkspaceTask? {
@@ -178,6 +182,120 @@ import ItsyEditor
 			return nil
 		}
 		return workspaceTasks[tableView.selectedRow]
+	}
+
+	private func startTask(_ task: WorkspaceTask, root: URL, preserveWatch: Bool) {
+		taskRunGeneration += 1
+		let generation = taskRunGeneration
+		activeTaskHandle?.cancel()
+		activeTaskHandle = nil
+		let plan: [WorkspaceTask]
+		do {
+			plan = try WorkspaceTaskPlanner.executionPlan(for: task, in: workspaceTasks)
+		} catch {
+			if !preserveWatch {
+				taskWatcher?.stop()
+				taskWatcher = nil
+			}
+			cancelButton?.isEnabled = false
+			applyTaskResult(.failure(error))
+			return
+		}
+		if !preserveWatch {
+			installWatchIfNeeded(for: task, root: root)
+		}
+		cancelButton?.isEnabled = true
+		taskStatusLabel?.textColor = .secondaryLabelColor
+		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
+		if preserveWatch {
+			taskOutputTextView?.string += "\n$ \(task.commandLine)\n"
+		} else {
+			taskOutputTextView?.string = "$ \(task.commandLine)\n"
+		}
+		startPlannedTask(plan: plan, index: 0, root: root, generation: generation, rootTask: task, stdout: "", stderr: "")
+	}
+
+	private func startPlannedTask(
+		plan: [WorkspaceTask],
+		index: Int,
+		root: URL,
+		generation: Int,
+		rootTask: WorkspaceTask,
+		stdout: String,
+		stderr: String
+	) {
+		guard index < plan.count else {
+			return
+		}
+		let task = plan[index]
+		do {
+			activeTaskHandle = try WorkspaceTaskRunner().start(
+				task,
+				root: root,
+				onOutput: { [weak self] output in
+					Task { @MainActor [weak self] in
+						guard let self, self.taskRunGeneration == generation else {
+							return
+						}
+						self.taskOutputTextView?.string += output.text
+					}
+				},
+				onFinish: { [weak self] result in
+					Task { @MainActor [weak self] in
+						guard let self, self.taskRunGeneration == generation else {
+							return
+						}
+						let nextStdout = stdout + result.stdout
+						let nextStderr = stderr + result.stderr
+						if result.succeeded, index + 1 < plan.count {
+							self.startPlannedTask(
+								plan: plan,
+								index: index + 1,
+								root: root,
+								generation: generation,
+								rootTask: rootTask,
+								stdout: nextStdout,
+								stderr: nextStderr
+							)
+							return
+						}
+						self.activeTaskHandle = nil
+						self.cancelButton?.isEnabled = self.taskWatcher != nil
+						self.applyTaskResult(.success(WorkspaceTaskResult(
+							task: rootTask,
+							exitStatus: result.exitStatus,
+							stdout: nextStdout,
+							stderr: nextStderr
+						)), root: root)
+						if self.taskWatcher != nil {
+							self.taskStatusLabel?.stringValue = L10n.string("Watching \(rootTask.label)")
+						}
+					}
+				}
+			)
+		} catch {
+			activeTaskHandle = nil
+			cancelButton?.isEnabled = taskWatcher != nil
+			applyTaskResult(.failure(error))
+		}
+	}
+
+	private func installWatchIfNeeded(for task: WorkspaceTask, root: URL) {
+		taskWatcher?.stop()
+		taskWatcher = nil
+		guard let watch = task.watch, !watch.paths.isEmpty else {
+			return
+		}
+		let watcher = WorkspaceTaskWatcher(root: root, watch: watch) { [weak self] in
+			Task { @MainActor [weak self] in
+				guard let self else {
+					return
+				}
+				self.startTask(task, root: root, preserveWatch: true)
+			}
+		}
+		taskWatcher = watcher
+		watcher.start()
 	}
 
 	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>) {

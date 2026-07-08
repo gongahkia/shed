@@ -70,12 +70,47 @@ public struct ExtensionTaskContribution: Codable, Equatable, Sendable {
 	public var label: String
 	public var command: String
 	public var arguments: [String]
+	public var dependsOn: [String]
+	public var isBackground: Bool
+	public var watch: WorkspaceTaskWatch?
 
-	public init(id: String, label: String, command: String, arguments: [String] = []) {
+	public init(
+		id: String,
+		label: String,
+		command: String,
+		arguments: [String] = [],
+		dependsOn: [String] = [],
+		isBackground: Bool = false,
+		watch: WorkspaceTaskWatch? = nil
+	) {
 		self.id = id
 		self.label = label
 		self.command = command
 		self.arguments = arguments
+		self.dependsOn = dependsOn
+		self.isBackground = isBackground
+		self.watch = watch
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case id
+		case label
+		case command
+		case arguments
+		case dependsOn = "depends_on"
+		case isBackground = "is_background"
+		case watch
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		id = try container.decode(String.self, forKey: .id)
+		label = try container.decodeIfPresent(String.self, forKey: .label) ?? id
+		command = try container.decode(String.self, forKey: .command)
+		arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
+		dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
+		isBackground = try container.decodeIfPresent(Bool.self, forKey: .isBackground) ?? false
+		watch = try container.decodeIfPresent(WorkspaceTaskWatch.self, forKey: .watch)
 	}
 }
 
@@ -234,7 +269,10 @@ public enum ExtensionTaskMapper {
 				source: .extensionManifest,
 				command: task.command,
 				arguments: task.arguments,
-				workingDirectory: root
+				workingDirectory: root,
+				dependsOn: task.dependsOn,
+				isBackground: task.isBackground,
+				watch: task.watch
 			)
 		}
 	}

@@ -6,7 +6,11 @@ import ItsyKeymap
 
 @MainActor final class AppCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
-	private lazy var menuCoordinator = MenuCoordinator(documentController: documentController, actionTarget: self, gitTarget: gitCoordinator)
+	private lazy var menuCoordinator = MenuCoordinator(
+		documentController: documentController,
+		actionTarget: self,
+		gitTarget: gitCoordinator
+	)
 	private lazy var commandRegistry = makeCommandRegistry()
 	private lazy var commandPaletteCoordinator = CommandPaletteCoordinator(
 		documentController: documentController,
@@ -72,8 +76,7 @@ import ItsyKeymap
 		installProblemsBridge()
 	}
 
-
-	func applicationDidFinishLaunching(_ notification: Notification) {
+	func applicationDidFinishLaunching(_: Notification) {
 		recordBenchStage("app_did_finish_launching")
 		installServicesProvider()
 		menuCoordinator.installMainMenu()
@@ -88,16 +91,20 @@ import ItsyKeymap
 		recordBenchStage("app_activated")
 	}
 
-	func applicationWillTerminate(_ notification: Notification) {
+	func applicationWillTerminate(_: Notification) {
 		debuggerCoordinator.terminate()
 		terminalCoordinator.terminate()
 	}
 
-	func application(_ sender: NSApplication, openFile filename: String) -> Bool {
+	func application(_: NSApplication, openFile filename: String) -> Bool {
 		openPath(URL(fileURLWithPath: filename))
 	}
 
-	func application(_ application: NSApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([NSUserActivityRestoring]) -> Void) -> Bool {
+	func application(
+		_: NSApplication,
+		continue userActivity: NSUserActivity,
+		restorationHandler _: @escaping ([NSUserActivityRestoring]) -> Void
+	) -> Bool {
 		guard userActivity.activityType == ItsyDocument.handoffActivityType,
 		      let value = userActivity.userInfo?[ItsyDocument.handoffURLKey] as? String,
 		      let url = URL(string: value)
@@ -131,7 +138,7 @@ import ItsyKeymap
 		NSApp.keyWindow?.performClose(sender)
 	}
 
-	@objc func newWindow(_ sender: Any?) {
+	@objc func newWindow(_: Any?) {
 		do {
 			let document = try documentController.makeUntitledDocument(ofType: documentController.defaultType ?? "public.data")
 			documentController.addDocument(document)
@@ -180,7 +187,9 @@ import ItsyKeymap
 				Command(id: "file.openFolder", title: L10n.string("Open Folder"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.openFolder(nil)
 				},
-				Command(id: "file.addFolderToWorkspace", title: L10n.string("Add Folder to Workspace..."), defaultKey: nil) { [weak self] in
+				Command(id: "file.addFolderToWorkspace", title: L10n.string("Add Folder to Workspace..."),
+				        defaultKey: nil)
+				{ [weak self] in
 					self?.addFolderToWorkspace(nil)
 				},
 				Command(id: "file.save", title: L10n.string("Save File"), defaultKey: "Cmd-S") { [weak self] in
@@ -222,13 +231,17 @@ import ItsyKeymap
 				Command(id: "file.selectTab.9", title: L10n.string("Select Tab 9"), defaultKey: "Cmd-9") {
 					ItsyTabCoordinator.selectDocument(atDisplayIndex: 8)
 				},
-				Command(id: "view.commandPalette", title: L10n.string("Command Palette"), defaultKey: "Cmd-Shift-P") { [weak self] in
+				Command(id: "view.commandPalette", title: L10n.string("Command Palette"),
+				        defaultKey: "Cmd-Shift-P")
+				{ [weak self] in
 					self?.toggleCommandPalette(nil)
 				},
 				Command(id: "view.sidebar.toggle", title: L10n.string("Toggle Sidebar"), defaultKey: "Cmd-B") { [weak self] in
 					self?.activeEditorWindowController()?.toggleSidebar()
 				},
-				Command(id: "view.hiddenFiles.toggle", title: L10n.string("Toggle Hidden Files"), defaultKey: "Cmd-Shift-.") { [weak self] in
+				Command(id: "view.hiddenFiles.toggle", title: L10n.string("Toggle Hidden Files"),
+				        defaultKey: "Cmd-Shift-.")
+				{ [weak self] in
 					self?.activeEditorWindowController()?.toggleHiddenFiles()
 				},
 				Command(
@@ -250,10 +263,14 @@ import ItsyKeymap
 				Command(id: "view.resetZoom", title: L10n.string("Reset Zoom"), defaultKey: "Cmd-0") { [weak self] in
 					self?.resetZoom(nil)
 				},
-				Command(id: "nav.gotoSymbolWorkspace", title: L10n.string("Go to Symbol in Workspace"), defaultKey: "Cmd-T") { [weak self] in
+				Command(id: "nav.gotoSymbolWorkspace", title: L10n.string("Go to Symbol in Workspace"),
+				        defaultKey: "Cmd-T")
+				{ [weak self] in
 					self?.showWorkspaceSymbolPalette(nil)
 				},
-				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"), defaultKey: "Cmd-Shift-O") { [weak self] in
+				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"),
+				        defaultKey: "Cmd-Shift-O")
+				{ [weak self] in
 					self?.showFileSymbolPalette(nil)
 				},
 				Command(id: "nav.gotoFile", title: L10n.string("Go to File"), defaultKey: "Cmd-P") { [weak self] in
@@ -286,138 +303,167 @@ import ItsyKeymap
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},
-				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"), defaultKey: "Cmd-K Cmd-S") { [weak self] in
+				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"),
+				        defaultKey: "Cmd-K Cmd-S")
+				{ [weak self] in
 					self?.showSettings(nil)
 				},
-					Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in
-						self?.toggleFindBar(nil)
-					},
-					Command(id: "edit.findNext", title: L10n.string("Find Next"), defaultKey: "Cmd-G") { [weak self] in
-						self?.findNext(nil)
-					},
-					Command(id: "edit.findPrevious", title: L10n.string("Find Previous"), defaultKey: "Cmd-Shift-G") { [weak self] in
-						self?.findPrevious(nil)
-					},
-					Command(id: "edit.selectAllFindMatches", title: L10n.string("Select All Find Matches"), defaultKey: "Cmd-Ctrl-G") { [weak self] in
-						self?.selectAllFindMatches(nil)
-					},
-					Command(id: "edit.findInProject", title: L10n.string("Find in Project"), defaultKey: "Cmd-Shift-F") { [weak self] in
-						self?.showProjectFind(nil)
-					},
-					Command(id: "git.changes", title: L10n.string("Git Changes"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.showGitChanges(_:)))
-					},
-					Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.refreshGitChanges(_:)))
-					},
-					Command(id: "git.blame", title: L10n.string("Blame Current File"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.showGitBlame(_:)))
-					},
-					Command(id: "git.fileHistory", title: L10n.string("File History"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.showGitFileHistory(_:)))
-					},
-					Command(id: "git.lineHistory", title: L10n.string("Line History"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.showGitLineHistory(_:)))
-					},
-					Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.showGitStashes(_:)))
-					},
-					Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"), defaultKey: "Cmd-Shift-S") { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
-					},
-					Command(id: "git.cancelRemote", title: L10n.string("Cancel Remote Operation"), defaultKey: nil) { [weak self] in
-						self?.sendGitAction(#selector(GitCoordinator.cancelGitRemote(_:)))
-					},
-					Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
-						self?.showTasks(nil)
-					},
-					Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
-						self?.refreshTasks(nil)
-					},
-					Command(id: "extensions.manage", title: L10n.string("Extensions"), defaultKey: nil) { [weak self] in
-						self?.showExtensions(nil)
-					},
-					Command(id: "extensions.reload", title: L10n.string("Reload Extension Contributions"), defaultKey: nil) { [weak self] in
-						self?.reloadExtensionContributions(nil)
-					},
-					Command(id: "debug.start", title: L10n.string("Start Debugging"), defaultKey: "Cmd-F5") { [weak self] in
-						self?.showDebugLaunchConfigPicker(nil)
-					},
-					Command(id: "debug.callStack", title: L10n.string("Call Stack"), defaultKey: nil) { [weak self] in
-						self?.showDebugCallStack(nil)
-					},
-					Command(id: "debug.variables", title: L10n.string("Variables"), defaultKey: nil) { [weak self] in
-						self?.showDebugVariables(nil)
-					},
-					Command(id: "debug.watches", title: L10n.string("Watches"), defaultKey: nil) { [weak self] in
-						self?.showDebugWatches(nil)
-					},
-					Command(id: "debug.console", title: L10n.string("Debug Console"), defaultKey: nil) { [weak self] in
-						self?.showDebugConsole(nil)
-					},
-					Command(id: "debug.continue", title: L10n.string("Continue"), defaultKey: nil) { [weak self] in
-						self?.continueDebug(nil)
-					},
-					Command(id: "debug.stepOver", title: L10n.string("Step Over"), defaultKey: nil) { [weak self] in
-						self?.stepOverDebug(nil)
-					},
-					Command(id: "debug.stepIn", title: L10n.string("Step In"), defaultKey: nil) { [weak self] in
-						self?.stepInDebug(nil)
-					},
-					Command(id: "debug.stepOut", title: L10n.string("Step Out"), defaultKey: nil) { [weak self] in
-						self?.stepOutDebug(nil)
-					},
-					Command(id: "debug.pause", title: L10n.string("Pause"), defaultKey: nil) { [weak self] in
-						self?.pauseDebug(nil)
-					},
-					Command(id: "debug.restart", title: L10n.string("Restart"), defaultKey: nil) { [weak self] in
-						self?.restartDebug(nil)
-					},
-					Command(id: "debug.stop", title: L10n.string("Stop"), defaultKey: nil) { [weak self] in
-						self?.stopDebug(nil)
-					},
-					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
-						self?.showTerminal(nil)
-					},
-					Command(id: "terminal.newTab", title: L10n.string("Terminal: New Tab"), defaultKey: nil) { [weak self] in
-						self?.newTerminalTab(nil)
-					},
-					Command(id: "terminal.splitHorizontal", title: L10n.string("Terminal: Split Horizontal"), defaultKey: nil) { [weak self] in
-						self?.splitTerminalHorizontal(nil)
-					},
-					Command(id: "terminal.splitVertical", title: L10n.string("Terminal: Split Vertical"), defaultKey: nil) { [weak self] in
-						self?.splitTerminalVertical(nil)
-					},
-					Command(id: "terminal.find", title: L10n.string("Terminal: Find"), defaultKey: nil) { [weak self] in
-						self?.findInTerminal(nil)
-					},
-					Command(id: "terminal.findNext", title: L10n.string("Terminal: Find Next"), defaultKey: nil) { [weak self] in
-						self?.findTerminalNext(nil)
-					},
-					Command(id: "terminal.findPrevious", title: L10n.string("Terminal: Find Previous"), defaultKey: nil) { [weak self] in
-						self?.findTerminalPrevious(nil)
-					},
-					Command(id: "terminal.openAtFileDirectory", title: L10n.string("Terminal: Open at File Directory"), defaultKey: nil) { [weak self] in
-						self?.openTerminalAtFileDirectory(nil)
-					},
-					Command(id: "terminal.revealCWD", title: L10n.string("Terminal: Reveal CWD in File Tree"), defaultKey: nil) { [weak self] in
-						self?.revealTerminalCWD(nil)
-					},
-					Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
-						self?.showProblems(nil)
-					},
-					Command(id: "problems.next", title: L10n.string("Next Problem"), defaultKey: "Ctrl-Alt-N") { [weak self] in
-						self?.showNextProblem(nil)
-					},
-					Command(id: "problems.previous", title: L10n.string("Previous Problem"), defaultKey: "Ctrl-Alt-P") { [weak self] in
-						self?.showPreviousProblem(nil)
-					},
-					Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
-						self?.performEditorMotion(.charBackward)
-					},
-					Command(id: "editor.moveRight", title: L10n.string("Move Right"), defaultKey: "Right") { [weak self] in
-						self?.performEditorMotion(.charForward)
-					},
+				Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in
+					self?.toggleFindBar(nil)
+				},
+				Command(id: "edit.findNext", title: L10n.string("Find Next"), defaultKey: "Cmd-G") { [weak self] in
+					self?.findNext(nil)
+				},
+				Command(id: "edit.findPrevious", title: L10n.string("Find Previous"), defaultKey: "Cmd-Shift-G") { [weak self] in
+					self?.findPrevious(nil)
+				},
+				Command(id: "edit.selectAllFindMatches", title: L10n.string("Select All Find Matches"),
+				        defaultKey: "Cmd-Ctrl-G")
+				{ [weak self] in
+					self?.selectAllFindMatches(nil)
+				},
+				Command(id: "edit.findInProject", title: L10n.string("Find in Project"), defaultKey: "Cmd-Shift-F") { [weak self] in
+					self?.showProjectFind(nil)
+				},
+				Command(id: "git.changes", title: L10n.string("Git Changes"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitChanges(_:)))
+				},
+				Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.refreshGitChanges(_:)))
+				},
+				Command(id: "git.blame", title: L10n.string("Blame Current File"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitBlame(_:)))
+				},
+				Command(id: "git.fileHistory", title: L10n.string("File History"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitFileHistory(_:)))
+				},
+				Command(id: "git.lineHistory", title: L10n.string("Line History"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitLineHistory(_:)))
+				},
+				Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitStashes(_:)))
+				},
+				Command(id: "git.stashSave", title: L10n.string("Git: Save Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
+				},
+				Command(id: "git.stashApply", title: L10n.string("Git: Apply Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.applyLatestGitStash(_:)))
+				},
+				Command(id: "git.stashPop", title: L10n.string("Git: Pop Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.popLatestGitStash(_:)))
+				},
+				Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"),
+				        defaultKey: "Cmd-Shift-S")
+				{ [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
+				},
+				Command(id: "git.cancelRemote", title: L10n.string("Cancel Remote Operation"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.cancelGitRemote(_:)))
+				},
+				Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
+					self?.showTasks(nil)
+				},
+				Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
+					self?.refreshTasks(nil)
+				},
+				Command(id: "extensions.manage", title: L10n.string("Extensions"), defaultKey: nil) { [weak self] in
+					self?.showExtensions(nil)
+				},
+				Command(id: "extensions.reload", title: L10n.string("Reload Extension Contributions"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.reloadExtensionContributions(nil)
+				},
+				Command(id: "debug.start", title: L10n.string("Start Debugging"), defaultKey: "Cmd-F5") { [weak self] in
+					self?.showDebugLaunchConfigPicker(nil)
+				},
+				Command(id: "debug.callStack", title: L10n.string("Call Stack"), defaultKey: nil) { [weak self] in
+					self?.showDebugCallStack(nil)
+				},
+				Command(id: "debug.variables", title: L10n.string("Variables"), defaultKey: nil) { [weak self] in
+					self?.showDebugVariables(nil)
+				},
+				Command(id: "debug.watches", title: L10n.string("Watches"), defaultKey: nil) { [weak self] in
+					self?.showDebugWatches(nil)
+				},
+				Command(id: "debug.console", title: L10n.string("Debug Console"), defaultKey: nil) { [weak self] in
+					self?.showDebugConsole(nil)
+				},
+				Command(id: "debug.continue", title: L10n.string("Continue"), defaultKey: nil) { [weak self] in
+					self?.continueDebug(nil)
+				},
+				Command(id: "debug.stepOver", title: L10n.string("Step Over"), defaultKey: nil) { [weak self] in
+					self?.stepOverDebug(nil)
+				},
+				Command(id: "debug.stepIn", title: L10n.string("Step In"), defaultKey: nil) { [weak self] in
+					self?.stepInDebug(nil)
+				},
+				Command(id: "debug.stepOut", title: L10n.string("Step Out"), defaultKey: nil) { [weak self] in
+					self?.stepOutDebug(nil)
+				},
+				Command(id: "debug.pause", title: L10n.string("Pause"), defaultKey: nil) { [weak self] in
+					self?.pauseDebug(nil)
+				},
+				Command(id: "debug.restart", title: L10n.string("Restart"), defaultKey: nil) { [weak self] in
+					self?.restartDebug(nil)
+				},
+				Command(id: "debug.stop", title: L10n.string("Stop"), defaultKey: nil) { [weak self] in
+					self?.stopDebug(nil)
+				},
+				Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
+					self?.showTerminal(nil)
+				},
+				Command(id: "terminal.newTab", title: L10n.string("Terminal: New Tab"), defaultKey: nil) { [weak self] in
+					self?.newTerminalTab(nil)
+				},
+				Command(id: "terminal.splitHorizontal", title: L10n.string("Terminal: Split Horizontal"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.splitTerminalHorizontal(nil)
+				},
+				Command(id: "terminal.splitVertical", title: L10n.string("Terminal: Split Vertical"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.splitTerminalVertical(nil)
+				},
+				Command(id: "terminal.find", title: L10n.string("Terminal: Find"), defaultKey: nil) { [weak self] in
+					self?.findInTerminal(nil)
+				},
+				Command(id: "terminal.findNext", title: L10n.string("Terminal: Find Next"), defaultKey: nil) { [weak self] in
+					self?.findTerminalNext(nil)
+				},
+				Command(id: "terminal.findPrevious", title: L10n.string("Terminal: Find Previous"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.findTerminalPrevious(nil)
+				},
+				Command(
+					id: "terminal.openAtFileDirectory",
+					title: L10n.string("Terminal: Open at File Directory"),
+					defaultKey: nil
+				) { [weak self] in
+					self?.openTerminalAtFileDirectory(nil)
+				},
+				Command(id: "terminal.revealCWD", title: L10n.string("Terminal: Reveal CWD in File Tree"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.revealTerminalCWD(nil)
+				},
+				Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
+					self?.showProblems(nil)
+				},
+				Command(id: "problems.next", title: L10n.string("Next Problem"), defaultKey: "Ctrl-Alt-N") { [weak self] in
+					self?.showNextProblem(nil)
+				},
+				Command(id: "problems.previous", title: L10n.string("Previous Problem"), defaultKey: "Ctrl-Alt-P") { [weak self] in
+					self?.showPreviousProblem(nil)
+				},
+				Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
+					self?.performEditorMotion(.charBackward)
+				},
+				Command(id: "editor.moveRight", title: L10n.string("Move Right"), defaultKey: "Right") { [weak self] in
+					self?.performEditorMotion(.charForward)
+				},
 				Command(id: "editor.moveLineStart", title: L10n.string("Move Line Start"), defaultKey: "Cmd-Left") { [weak self] in
 					self?.performEditorMotion(.lineStart)
 				},
@@ -488,22 +534,23 @@ import ItsyKeymap
 				(controller as? EditorWindowController)?.applySettings(settings)
 			}
 		}
+		ItsyGitHunkGutterCoordinator.applyAll()
 		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
 	}
 
-	@objc func toggleFindBar(_ sender: Any?) {
+	@objc func toggleFindBar(_: Any?) {
 		activeEditorWindowController()?.toggleFindBar()
 	}
 
-	@objc func findNext(_ sender: Any?) {
+	@objc func findNext(_: Any?) {
 		activeEditorWindowController()?.findNext()
 	}
 
-	@objc func findPrevious(_ sender: Any?) {
+	@objc func findPrevious(_: Any?) {
 		activeEditorWindowController()?.findPrevious()
 	}
 
-	@objc func selectAllFindMatches(_ sender: Any?) {
+	@objc func selectAllFindMatches(_: Any?) {
 		activeEditorWindowController()?.selectAllFindMatches()
 	}
 
@@ -527,7 +574,7 @@ import ItsyKeymap
 		extensionsCoordinator.showExtensions(sender)
 	}
 
-	@objc func reloadExtensionContributions(_ sender: Any?) {
+	@objc func reloadExtensionContributions(_: Any?) {
 		guard let root = ItsyWorkspaceController.currentRootURL else {
 			return
 		}
@@ -673,7 +720,7 @@ import ItsyKeymap
 		}
 	}
 
-	@objc func openFolder(_ sender: Any?) {
+	@objc func openFolder(_: Any?) {
 		let panel = NSOpenPanel()
 		panel.canChooseDirectories = true
 		panel.canChooseFiles = false
@@ -684,7 +731,7 @@ import ItsyKeymap
 		_ = openWorkspace(at: url)
 	}
 
-	@objc func addFolderToWorkspace(_ sender: Any?) {
+	@objc func addFolderToWorkspace(_: Any?) {
 		let panel = NSOpenPanel()
 		panel.canChooseDirectories = true
 		panel.canChooseFiles = false
@@ -761,7 +808,7 @@ import ItsyKeymap
 				return false
 			}
 			do {
-				try self.commandRegistry.run(id: commandID)
+				try commandRegistry.run(id: commandID)
 				return true
 			} catch {
 				NSLog("failed to run command \(commandID): \(error)")
@@ -779,7 +826,11 @@ import ItsyKeymap
 		}
 	}
 
-	@objc func openSelection(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {
+	@objc func openSelection(
+		_ pasteboard: NSPasteboard,
+		userData _: String,
+		error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>
+	) {
 		guard let text = pasteboard.string(forType: .string), !text.isEmpty else {
 			serviceError.pointee = L10n.string("No text selection was provided") as NSString
 			return
@@ -795,7 +846,11 @@ import ItsyKeymap
 		}
 	}
 
-	@objc func openFile(_ pasteboard: NSPasteboard, userData: String, error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>) {
+	@objc func openFile(
+		_ pasteboard: NSPasteboard,
+		userData _: String,
+		error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>
+	) {
 		let urls = (pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
 		guard !urls.isEmpty else {
 			serviceError.pointee = L10n.string("No file was provided") as NSString

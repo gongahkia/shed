@@ -1,8 +1,8 @@
 import Foundation
-import Testing
 @testable import ItsyConfig
+import Testing
 
-@Test func settingsParserReadsKnownSectionsAndComments() throws {
+@Test func settingsParserReadsKnownSectionsAndComments() {
 	let contents = #"""
 	# user-editable config
 	[editor]
@@ -16,6 +16,9 @@ import Testing
 
 	[theme]
 	id = "bundled:default-dark"
+	git.gutter.added = "#123456"
+	git.gutter.modified = "#abcdef"
+	git.gutter.removed = "#fedcba"
 
 	[syntax]
 	preload_grammars = "all"
@@ -34,16 +37,19 @@ import Testing
 	#expect(!result.settings.editor.useSpaces)
 	#expect(result.settings.editor.experimental.storage == .pieceTree)
 	#expect(result.settings.theme.id == "bundled:default-dark")
+	#expect(result.settings.theme.gitGutter.added == "#123456")
+	#expect(result.settings.theme.gitGutter.modified == "#abcdef")
+	#expect(result.settings.theme.gitGutter.removed == "#fedcba")
 	#expect(result.settings.syntax.preloadGrammars == .all)
 	#expect(result.settings.terminal.fontSize == 13)
-	#expect(result.settings.terminal.scrollbackLines == 20_000)
+	#expect(result.settings.terminal.scrollbackLines == 20000)
 }
 
-@Test func settingsParserWarnsAndKeepsFallbackForBadValues() throws {
+@Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
 	let fallback = ItsySettings(
 		editor: .init(font: "Menlo", fontSize: 15, lineNumbers: false, tabWidth: 4),
 		theme: .init(id: "bundled:default-light"),
-		terminal: .init(fontSize: 12, scrollbackLines: 10_000)
+		terminal: .init(fontSize: 12, scrollbackLines: 10000)
 	)
 	let contents = #"""
 	[editor]
@@ -63,7 +69,7 @@ import Testing
 	#expect(result.warnings.map(\.description).contains("line 4: unknown setting editor.nope"))
 }
 
-@Test func settingsParserReadsPerLanguageEditorOverrides() throws {
+@Test func settingsParserReadsPerLanguageEditorOverrides() {
 	let contents = #"""
 	[editor]
 	font_size = 15
@@ -96,10 +102,14 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
+	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 
 @Test func settingsStoreSavesAndReloadsToml() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-\(UUID().uuidString)", isDirectory: true)
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-\(UUID().uuidString)",
+		isDirectory: true
+	)
 	defer {
 		try? FileManager.default.removeItem(at: directory)
 	}
@@ -107,7 +117,7 @@ import Testing
 	let store = ItsySettingsStore(fileURL: url)
 	let settings = ItsySettings(
 		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, tabWidth: 8, experimental: .init(storage: .pieceTree)),
-		theme: .init(id: "user:night.toml"),
+		theme: .init(id: "user:night.toml", gitGutter: .init(added: "#101010", modified: "#202020", removed: "#303030")),
 		syntax: .init(preloadGrammars: .none),
 		terminal: .init(fontSize: 14, scrollbackLines: 1234)
 	)
@@ -118,7 +128,7 @@ import Testing
 	#expect(loaded.settings == settings)
 }
 
-@Test func settingsStoreUsesFallbackWhenFileIsMissing() throws {
+@Test func settingsStoreUsesFallbackWhenFileIsMissing() {
 	let url = FileManager.default.temporaryDirectory
 		.appendingPathComponent("missing-\(UUID().uuidString)")
 		.appendingPathComponent("settings.toml")
@@ -129,14 +139,20 @@ import Testing
 }
 
 @Test func settingsStoreMergesGlobalWorkspaceAndPerLanguageOverrides() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-\(UUID().uuidString)", isDirectory: true)
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-\(UUID().uuidString)",
+		isDirectory: true
+	)
 	defer {
 		try? FileManager.default.removeItem(at: directory)
 	}
 	let globalURL = directory.appendingPathComponent("settings.toml")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
-	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try FileManager.default.createDirectory(
+		at: workspaceURL.deletingLastPathComponent(),
+		withIntermediateDirectories: true
+	)
 	try """
 	[editor]
 	tab_width = 2
@@ -169,7 +185,10 @@ import Testing
 }
 
 @Test func settingsWatcherPublishesFileChangesForHotReload() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-watch-\(UUID().uuidString)", isDirectory: true)
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-watch-\(UUID().uuidString)",
+		isDirectory: true
+	)
 	defer {
 		try? FileManager.default.removeItem(at: directory)
 	}

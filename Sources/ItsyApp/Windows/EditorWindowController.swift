@@ -90,6 +90,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
+
 	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
 	private var tabBoundsObserver: NSObjectProtocol?
 	private var completionPopup: CompletionPopupController?
@@ -209,7 +210,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recordBenchStage("window_controller_init_end")
 	}
 
-	required init?(coder: NSCoder) {
+	required init?(coder _: NSCoder) {
 		nil
 	}
 
@@ -271,7 +272,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				do {
 					try await client.sendNotification(
 						method: LSPMethod.workspaceDidChangeWatchedFiles,
-						params: try LSPAny(encoding: params)
+						params: LSPAny(encoding: params)
 					)
 				} catch {
 					NSLog("lsp didChangeWatchedFiles failed: \(error)")
@@ -472,13 +473,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		Task { [weak self] in
 			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
 			await MainActor.run { [weak self] in
-				guard let self, generation == self.lspMissingBannerGeneration else {
+				guard let self, generation == lspMissingBannerGeneration else {
 					return
 				}
 				if let missingBinary {
-					self.showLSPMissingBanner(missingBinary)
+					showLSPMissingBanner(missingBinary)
 				} else {
-					self.lspMissingBanner.hide()
+					lspMissingBanner.hide()
 				}
 			}
 		}
@@ -496,9 +497,21 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
 			showLSPMissingBanner(missingBinary)
 		} else if case let LSPManagerError.serverDisabled(key) = error {
-			setLSPStatus(key: key, status: "disabled", client: nil, lastError: lspStatusEntries[key]?.lastError, url: lspStatusEntries[key]?.url)
+			setLSPStatus(
+				key: key,
+				status: "disabled",
+				client: nil,
+				lastError: lspStatusEntries[key]?.lastError,
+				url: lspStatusEntries[key]?.url
+			)
 		} else if case LSPManagerError.retryLimitExceeded = error, let key = activeLSPKey {
-			setLSPStatus(key: key, status: "disabled", client: nil, lastError: lspStatusEntries[key]?.lastError, url: lspStatusEntries[key]?.url)
+			setLSPStatus(
+				key: key,
+				status: "disabled",
+				client: nil,
+				lastError: lspStatusEntries[key]?.lastError,
+				url: lspStatusEntries[key]?.url
+			)
 		}
 	}
 
@@ -546,7 +559,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		refreshStatusBar()
 	}
 
-	@objc private func showLSPStatusPanel(_ sender: NSButton) {
+	@objc private func showLSPStatusPanel(_: NSButton) {
 		guard let snapshot = currentLSPStatusSnapshot() else {
 			return
 		}
@@ -573,7 +586,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				self.restartLSPSession(for: url)
+				restartLSPSession(for: url)
 			}
 		}
 	}
@@ -608,14 +621,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				guard generation == self.lspStatusGeneration else {
+				guard generation == lspStatusGeneration else {
 					return
 				}
-				self.activeLSPKey = key
-				if let key, self.lspStatusEntries[key] == nil {
-					self.setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
+				activeLSPKey = key
+				if let key, lspStatusEntries[key] == nil {
+					setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
 				} else {
-					self.refreshStatusBar()
+					refreshStatusBar()
 				}
 			}
 		}
@@ -692,13 +705,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func display(document newDocument: ItsyDocument) {
-		if self.document as? ItsyDocument === newDocument {
+		if document as? ItsyDocument === newDocument {
 			showWindow(nil)
 			focusEditor()
 			ItsyTabCoordinator.refresh()
 			return
 		}
-		if let oldDocument = self.document as? ItsyDocument {
+		if let oldDocument = document as? ItsyDocument {
 			for pane in paneCoordinator.panes {
 				oldDocument.detach(pane.editorView)
 			}
@@ -921,13 +934,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		ensureFindBarController().toggle()
 	}
 
-	func toggleUndoTree(_ sender: Any?) {
+	func toggleUndoTree(_: Any?) {
 		let panel = undoTreePanel ?? UndoTreePanelController()
 		panel.jumpRequested = { [weak self] nodeID in
-			guard let self, self.editorView.restoreUndoTreeNode(nodeID) else {
+			guard let self, editorView.restoreUndoTreeNode(nodeID) else {
 				return
 			}
-			self.window?.makeFirstResponder(self.editorView)
+			window?.makeFirstResponder(editorView)
 		}
 		undoTreePanel = panel
 		panel.toggle(relativeTo: window, tree: editorView.editor.history.tree)
@@ -1043,6 +1056,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return formatDocument(nil)
 		case "lsp.formatSelection", "vim.format.line":
 			return formatSelection(nil)
+		case "git.stashSave", "git.stashCurrent":
+			return NSApp.sendAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)), to: nil, from: self)
+		case "git.stashApply":
+			return NSApp.sendAction(#selector(GitCoordinator.applyLatestGitStash(_:)), to: nil, from: self)
+		case "git.stashPop":
+			return NSApp.sendAction(#selector(GitCoordinator.popLatestGitStash(_:)), to: nil, from: self)
 		case "lsp.codeAction":
 			return showCodeActions(nil)
 		case "problems.next", "problems.previous":
@@ -1225,8 +1244,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		let content = editorStorageString(editorView.editor)
 		try await syncLSPDocument(client: client, key: key, url: fileURL, content: content)
-		let result = try await client.documentSymbol(textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString))
-		let relativePath = LSPDiagnosticsAggregator.relativePath(forURI: fileURL.standardizedFileURL.absoluteString, root: key.workspaceRoot) ?? fileURL.lastPathComponent
+		let result = try await client
+			.documentSymbol(textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString))
+		let relativePath = LSPDiagnosticsAggregator.relativePath(
+			forURI: fileURL.standardizedFileURL.absoluteString,
+			root: key.workspaceRoot
+		) ?? fileURL.lastPathComponent
 		switch result {
 		case let .documentSymbols(symbols):
 			return LSPSymbolAdapter.workspaceSymbols(from: symbols, relativePath: relativePath)
@@ -1238,7 +1261,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	@discardableResult
-	private func requestCompletion(triggerCharacter: String?, forIncomplete: Bool = false, in targetView: MetalTextView?) -> Bool {
+	private func requestCompletion(triggerCharacter: String?, forIncomplete: Bool = false,
+	                               in targetView: MetalTextView?) -> Bool
+	{
 		guard
 			let document = document as? ItsyDocument,
 			let fileURL = document.fileURL,
@@ -1263,8 +1288,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let params = LSPCompletionParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -1272,27 +1297,31 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let response = try await session.client.sendRequest(
 					method: LSPMethod.textDocumentCompletion,
-					params: try LSPAny(encoding: params)
+					params: LSPAny(encoding: params)
 				)
 				let result = try LSPCompletionResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == self.completionRequestGeneration else {
+					guard let self, let targetView, generation == completionRequestGeneration else {
 						return
 					}
-					self.showCompletionPopup(result: self.completionResult(result, appending: snippetItems), in: targetView, sessionKey: session.key)
+					showCompletionPopup(
+						result: completionResult(result, appending: snippetItems),
+						in: targetView,
+						sessionKey: session.key
+					)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.completionRequestGeneration else {
+					guard let self, generation == completionRequestGeneration else {
 						return
 					}
-					let result = self.completionResult(.none, appending: snippetItems)
+					let result = completionResult(.none, appending: snippetItems)
 					if !result.items.isEmpty, let targetView {
-						self.showCompletionPopup(result: result, in: targetView, sessionKey: nil)
+						showCompletionPopup(result: result, in: targetView, sessionKey: nil)
 					} else {
-						self.completionPopup?.dismiss()
+						completionPopup?.dismiss()
 					}
-					self.handleLSPRequestError(error)
+					handleLSPRequestError(error)
 					NSLog("completion failed: \(error)")
 				}
 			}
@@ -1310,7 +1339,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		return LSPCompletionContext(triggerKind: .invoked)
 	}
 
-	private func completionResult(_ result: LSPCompletionResult, appending snippetItems: [LSPCompletionItem]) -> LSPCompletionResult {
+	private func completionResult(_ result: LSPCompletionResult,
+	                              appending snippetItems: [LSPCompletionItem]) -> LSPCompletionResult
+	{
 		let items = result.items + snippetItems
 		if result.isIncomplete {
 			return .list(LSPCompletionList(isIncomplete: true, items: items))
@@ -1361,16 +1392,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let prepared = try? await session.client.prepareRename(uri: uri, position: position)
 				await MainActor.run { [weak self, weak targetView] in
 					guard let self, let targetView else {
 						return
 					}
 					let range = prepared?.range.flatMap { LSPTextEditApply.utf8Range(for: $0, in: content) } ?? fallbackRange
-					let initialName = prepared?.placeholder ?? self.substring(in: content, range: range)
-					self.showRenamePopover(initialName: initialName, positioningRect: rect, in: targetView) { [weak self, weak targetView] newName in
+					let initialName = prepared?.placeholder ?? substring(in: content, range: range)
+					showRenamePopover(initialName: initialName, positioningRect: rect, in: targetView) { [
+						weak self,
+						weak targetView
+					] newName in
 						self?.requestRenameApply(newName: newName, fileURL: fileURL, uri: uri, position: position, in: targetView)
 					}
 				}
@@ -1413,7 +1447,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		renamePopover = popover
 	}
 
-	private func requestRenameApply(newName: String, fileURL: URL, uri: String, position: LSPPosition, in targetView: MetalTextView?) {
+	private func requestRenameApply(
+		newName: String,
+		fileURL: URL,
+		uri: String,
+		position: LSPPosition,
+		in targetView: MetalTextView?
+	) {
 		guard let targetView else {
 			return
 		}
@@ -1423,15 +1463,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let edit = try await session.client.rename(uri: uri, position: position, newName: newName)
 				await MainActor.run { [weak self] in
 					guard let self, let edit else {
 						return
 					}
-					_ = self.applyWorkspaceEdit(edit)
-					self.focusEditor()
+					_ = applyWorkspaceEdit(edit)
+					focusEditor()
 				}
 			} catch {
 				await MainActor.run { [weak self] in
@@ -1459,8 +1499,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let edits = try await session.client.formatDocument(uri: uri, options: options)
 				await MainActor.run { [weak self] in
 					self?.applyTextEdits(edits, uri: uri)
@@ -1495,8 +1535,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let edits = try await session.client.formatRange(uri: uri, range: lspRange, options: options)
 				await MainActor.run { [weak self] in
 					self?.applyTextEdits(edits, uri: uri)
@@ -1534,26 +1574,32 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let response = try await session.client.codeActions(
 					uri: uri,
 					range: lspRange,
 					context: LSPCodeActionContext(diagnostics: [])
 				)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == self.codeActionRequestGeneration else {
+					guard let self, let targetView, generation == codeActionRequestGeneration else {
 						return
 					}
-					self.showCodeActionPopover(entries: response.entries, sessionKey: session.key, fileURL: fileURL, positioningRect: rect, in: targetView)
+					showCodeActionPopover(
+						entries: response.entries,
+						sessionKey: session.key,
+						fileURL: fileURL,
+						positioningRect: rect,
+						in: targetView
+					)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.codeActionRequestGeneration else {
+					guard let self, generation == codeActionRequestGeneration else {
 						return
 					}
-					self.closeCodeActionPopover()
-					self.handleLSPRequestError(error)
+					closeCodeActionPopover()
+					handleLSPRequestError(error)
 					NSLog("code actions failed: \(error)")
 				}
 			}
@@ -1600,10 +1646,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
+				let session = try await ensureLSPSession(for: fileURL)
 				switch entry {
 				case let .action(action):
-					let resolved = try await self.resolvedCodeAction(action, client: session.client, resolveProvider: resolveProvider)
+					let resolved = try await resolvedCodeAction(action, client: session.client, resolveProvider: resolveProvider)
 					await MainActor.run { [weak self] in
 						if let edit = resolved.edit {
 							_ = self?.applyWorkspaceEdit(edit)
@@ -1627,7 +1673,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func resolvedCodeAction(_ action: LSPCodeAction, client: LSPProcessClient, resolveProvider: Bool) async throws -> LSPCodeAction {
+	private func resolvedCodeAction(_ action: LSPCodeAction, client: LSPProcessClient,
+	                                resolveProvider: Bool) async throws -> LSPCodeAction
+	{
 		if resolveProvider, action.edit == nil {
 			return try await client.resolveCodeAction(action)
 		}
@@ -1673,10 +1721,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				return
 			}
 			await MainActor.run { [weak self] in
-				guard let self, generation == self.lspSurfaceGeneration else {
+				guard let self, generation == lspSurfaceGeneration else {
 					return
 				}
-				self.requestLSPSemanticSurface(generation: generation)
+				requestLSPSemanticSurface(generation: generation)
 			}
 		}
 	}
@@ -1699,32 +1747,32 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				return
 			}
 			do {
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let capabilities = await MainActor.run {
 					self.semanticSurfaceCapabilitiesBySession[session.key]
 				}
-				let semanticSpans = try await self.semanticHighlightSpans(
+				let semanticSpans = try await semanticHighlightSpans(
 					client: session.client,
 					uri: uri,
 					content: content,
 					visibleRange: visibleRange,
 					capability: capabilities?.semanticTokens
 				)
-				let inlayHints = capabilities?.inlayHint == true
-					? ((try? await session.client.inlayHints(uri: uri, range: visibleRange)) ?? [])
+				let inlayHints = await capabilities?.inlayHint == true
+					? ((try? session.client.inlayHints(uri: uri, range: visibleRange)) ?? [])
 					: []
-				let foldingRanges = capabilities?.foldingRange == true
-					? ((try? await session.client.foldingRanges(uri: uri)) ?? [])
+				let foldingRanges = await capabilities?.foldingRange == true
+					? ((try? session.client.foldingRanges(uri: uri)) ?? [])
 					: []
-				let documentHighlights = capabilities?.documentHighlight == true
-					? ((try? await session.client.documentHighlights(uri: uri, position: cursorPosition)) ?? [])
+				let documentHighlights = await capabilities?.documentHighlight == true
+					? ((try? session.client.documentHighlights(uri: uri, position: cursorPosition)) ?? [])
 					: []
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.lspSurfaceGeneration else {
+					guard let self, generation == lspSurfaceGeneration else {
 						return
 					}
-					self.applyLSPSemanticSurface(
+					applyLSPSemanticSurface(
 						uri: uri,
 						content: content,
 						document: document,
@@ -1785,7 +1833,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					let data = Self.applySemanticTokenDelta(delta, to: previous.data)
 					tokens = LSPSemanticTokens(resultId: delta.resultId ?? previous.resultId, data: data)
 					await MainActor.run {
-						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(resultId: delta.resultId ?? previous.resultId, data: data)
+						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(
+							resultId: delta.resultId ?? previous.resultId,
+							data: data
+						)
 					}
 				case .none:
 					tokens = nil
@@ -1857,21 +1908,21 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private static func semanticTokenColor(for type: String) -> SIMD4<Float>? {
 		switch type {
 		case "keyword", "modifier", "operator":
-			return SIMD4<Float>(0.12, 0.32, 0.78, 1.0)
+			SIMD4<Float>(0.12, 0.32, 0.78, 1.0)
 		case "string", "regexp":
-			return SIMD4<Float>(0.08, 0.45, 0.28, 1.0)
+			SIMD4<Float>(0.08, 0.45, 0.28, 1.0)
 		case "number":
-			return SIMD4<Float>(0.76, 0.38, 0.10, 1.0)
+			SIMD4<Float>(0.76, 0.38, 0.10, 1.0)
 		case "comment":
-			return SIMD4<Float>(0.45, 0.49, 0.54, 1.0)
+			SIMD4<Float>(0.45, 0.49, 0.54, 1.0)
 		case "class", "enum", "interface", "struct", "type", "typeParameter":
-			return SIMD4<Float>(0.43, 0.22, 0.72, 1.0)
+			SIMD4<Float>(0.43, 0.22, 0.72, 1.0)
 		case "function", "method", "macro":
-			return SIMD4<Float>(0.48, 0.26, 0.10, 1.0)
+			SIMD4<Float>(0.48, 0.26, 0.10, 1.0)
 		case "parameter", "variable", "property", "enumMember":
-			return SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
+			SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 		default:
-			return nil
+			nil
 		}
 	}
 
@@ -1943,14 +1994,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					guard let self else {
 						return
 					}
-					self.installLSPSupervisor(for: key, client: client, url: url)
-					self.setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
-					self.setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
-					self.setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
-					self.setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
-					self.setHierarchyCapabilities(callHierarchy: callHierarchyProvider, typeHierarchy: typeHierarchyProvider, for: key)
-					self.setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
-					self.clearLSPCrashStatus(for: key)
+					installLSPSupervisor(for: key, client: client, url: url)
+					setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
+					setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
+					setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
+					setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
+					setHierarchyCapabilities(callHierarchy: callHierarchyProvider, typeHierarchy: typeHierarchyProvider, for: key)
+					setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
+					clearLSPCrashStatus(for: key)
 				}
 			} catch {
 				await Self.lspManager.markFailed(key)
@@ -1964,8 +2015,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			guard let self else {
 				return
 			}
-			self.installLSPSupervisor(for: key, client: client, url: url)
-			self.setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
+			installLSPSupervisor(for: key, client: client, url: url)
+			setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
 		}
 		return (client, key)
 	}
@@ -2076,7 +2127,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			}
 			Task {
 				do {
-					try await client.session.respond(to: id, result: try LSPAny(encoding: response))
+					try await client.session.respond(to: id, result: LSPAny(encoding: response))
 				} catch {
 					NSLog("workspace/applyEdit response failed: \(error)")
 				}
@@ -2095,8 +2146,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: url)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: url, content: content)
+				let session = try await ensureLSPSession(for: url)
+				try await syncLSPDocument(client: session.client, key: session.key, url: url, content: content)
 			} catch {
 				await MainActor.run { [weak self] in
 					self?.handleLSPRequestError(error)
@@ -2106,7 +2157,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func setCompletionCapabilities(triggerCharacters characters: Set<String>, resolveProvider: Bool, for key: LSPSessionKey) {
+	private func setCompletionCapabilities(
+		triggerCharacters characters: Set<String>,
+		resolveProvider: Bool,
+		for key: LSPSessionKey
+	) {
 		completionTriggerCharactersBySession[key] = characters
 		completionResolveEnabledBySession[key] = resolveProvider
 		for pane in paneCoordinator.panes {
@@ -2164,16 +2219,20 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView, sessionKey: LSPSessionKey?) {
+	private func showCompletionPopup(
+		result: LSPCompletionResult,
+		in targetView: MetalTextView,
+		sessionKey: LSPSessionKey?
+	) {
 		let popup = completionPopup ?? CompletionPopupController()
 		completionPopup = popup
-		let resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
-		if let sessionKey, completionResolveEnabledBySession[sessionKey] == true {
-			resolve = { [weak self] item, completion in
+		let canResolve = sessionKey.map { completionResolveEnabledBySession[$0] == true } ?? false
+		let resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)? = if canResolve {
+			{ [weak self] item, completion in
 				self?.requestCompletionResolve(item, completion: completion)
 			}
 		} else {
-			resolve = nil
+			nil
 		}
 		popup.show(
 			result: result,
@@ -2187,7 +2246,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				self.acceptCompletion(item, in: targetView)
+				acceptCompletion(item, in: targetView)
 			}
 		)
 	}
@@ -2201,12 +2260,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
+				let session = try await ensureLSPSession(for: fileURL)
 				let response = try await session.client.sendRequest(
 					method: LSPMethod.completionItemResolve,
-					params: try LSPAny(encoding: item)
+					params: LSPAny(encoding: item)
 				)
-				let resolved = item.mergingResolvedFields(from: try LSPCompletionItem(resolveResult: response.result))
+				let resolved = try item.mergingResolvedFields(from: LSPCompletionItem(resolveResult: response.result))
 				await MainActor.run {
 					completion(resolved)
 				}
@@ -2255,7 +2314,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		else {
 			return false
 		}
-		let selectionRanges = [targetView.editor.selections.primary.range] + targetView.editor.selections.secondaries.map(\.range)
+		let selectionRanges = [targetView.editor.selections.primary.range] + targetView.editor.selections.secondaries
+			.map(\.range)
 		guard let ranges = session.move(direction: direction, currentSelectionRanges: selectionRanges) else {
 			snippetTabStopSession = nil
 			snippetTabStopView = nil
@@ -2309,30 +2369,30 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let params = LSPHoverParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position
 				)
 				let response = try await session.client.sendRequest(
 					method: LSPMethod.textDocumentHover,
-					params: try LSPAny(encoding: params)
+					params: LSPAny(encoding: params)
 				)
 				let result = try LSPHoverResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == self.hoverRequestGeneration else {
+					guard let self, let targetView, generation == hoverRequestGeneration else {
 						return
 					}
-					self.showHoverPopover(result: result, positioningRect: positioningRect, in: targetView)
+					showHoverPopover(result: result, positioningRect: positioningRect, in: targetView)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.hoverRequestGeneration else {
+					guard let self, generation == hoverRequestGeneration else {
 						return
 					}
-					self.closeHoverPopover()
-					self.handleLSPRequestError(error)
+					closeHoverPopover()
+					handleLSPRequestError(error)
 					NSLog("hover failed: \(error)")
 				}
 			}
@@ -2374,8 +2434,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self, let targetView else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let params = LSPSignatureHelpParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -2383,22 +2443,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let response = try await session.client.sendRequest(
 					method: LSPMethod.textDocumentSignatureHelp,
-					params: try LSPAny(encoding: params)
+					params: LSPAny(encoding: params)
 				)
 				let result = try LSPSignatureHelpResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == self.signatureHelpRequestGeneration else {
+					guard let self, let targetView, generation == signatureHelpRequestGeneration else {
 						return
 					}
-					self.showSignatureHelpPopover(result: result, in: targetView)
+					showSignatureHelpPopover(result: result, in: targetView)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.signatureHelpRequestGeneration else {
+					guard let self, generation == signatureHelpRequestGeneration else {
 						return
 					}
-					self.closeSignatureHelpPopover()
-					self.handleLSPRequestError(error)
+					closeSignatureHelpPopover()
+					handleLSPRequestError(error)
 					NSLog("signature help failed: \(error)")
 				}
 			}
@@ -2454,30 +2514,35 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
+				let session = try await ensureLSPSession(for: fileURL)
 				guard await MainActor.run(body: { self.callHierarchyEnabledBySession[session.key] == true }) else {
 					throw LSPManagerError.noConfigForDocument
 				}
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let uri = fileURL.standardizedFileURL.absoluteString
 				let items = try await session.client.prepareCallHierarchy(uri: uri, position: position)
 				let item = items.first
 				let incoming: [LSPCallHierarchyIncomingCall]
 				let outgoing: [LSPCallHierarchyOutgoingCall]
 				if let item {
-					incoming = (try? await session.client.incomingCalls(for: item)) ?? []
-					outgoing = (try? await session.client.outgoingCalls(for: item)) ?? []
+					incoming = await (try? session.client.incomingCalls(for: item)) ?? []
+					outgoing = await (try? session.client.outgoingCalls(for: item)) ?? []
 				} else {
 					incoming = []
 					outgoing = []
 				}
 				let locations = Self.callHierarchyLocations(incoming: incoming, outgoing: outgoing)
-				let snapshot = LSPReferencesSnapshot(locations: locations, rootURL: rootURL, currentFileURL: fileURL, currentText: content)
+				let snapshot = LSPReferencesSnapshot(
+					locations: locations,
+					rootURL: rootURL,
+					currentFileURL: fileURL,
+					currentText: content
+				)
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.referencesRequestGeneration else {
+					guard let self, generation == referencesRequestGeneration else {
 						return
 					}
-					panel.showCallHierarchy(snapshot: snapshot, relativeTo: self.window) { entry in
+					panel.showCallHierarchy(snapshot: snapshot, relativeTo: window) { entry in
 						guard let controller = NSDocumentController.shared as? ItsyDocumentController else {
 							return
 						}
@@ -2486,11 +2551,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.referencesRequestGeneration else {
+					guard let self, generation == referencesRequestGeneration else {
 						return
 					}
-					panel.show(error: error, relativeTo: self.window)
-					self.handleLSPRequestError(error)
+					panel.show(error: error, relativeTo: window)
+					handleLSPRequestError(error)
 					NSLog("call hierarchy failed: \(error)")
 				}
 			}
@@ -2533,8 +2598,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				guard let self else {
 					return
 				}
-				let session = try await self.ensureLSPSession(for: fileURL)
-				try await self.syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let params = LSPReferenceParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -2542,7 +2607,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let response = try await session.client.sendRequest(
 					method: LSPMethod.textDocumentReferences,
-					params: try LSPAny(encoding: params)
+					params: LSPAny(encoding: params)
 				)
 				let result = try LSPReferencesResult(result: response.result)
 				let snapshot = LSPReferencesSnapshot(
@@ -2552,18 +2617,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					currentText: content
 				)
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.referencesRequestGeneration else {
+					guard let self, generation == referencesRequestGeneration else {
 						return
 					}
-					self.showReferences(snapshot)
+					showReferences(snapshot)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == self.referencesRequestGeneration else {
+					guard let self, generation == referencesRequestGeneration else {
 						return
 					}
-					self.handleLSPRequestError(error)
-					self.referencesCoordinator?.show(error: error, relativeTo: self.window)
+					handleLSPRequestError(error)
+					referencesCoordinator?.show(error: error, relativeTo: window)
 				}
 			}
 		}
@@ -2628,7 +2693,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		guard let url = fileURL(forLSPURI: uri) else {
 			throw LSPWorkspaceEditFileError.invalidURI(uri)
 		}
-		guard let text = String(data: try Data(contentsOf: url), encoding: .utf8) else {
+		guard let text = try String(data: Data(contentsOf: url), encoding: .utf8) else {
 			throw LSPWorkspaceEditFileError.nonUTF8(url)
 		}
 		return text
@@ -2799,24 +2864,24 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if trimmed.hasPrefix("/") {
 			url = URL(fileURLWithPath: trimmed)
 		} else {
-			let base = document?.fileURL?.deletingLastPathComponent() ?? ItsyWorkspaceController.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+			let base = document?.fileURL?.deletingLastPathComponent() ?? ItsyWorkspaceController
+				.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 			url = base.appendingPathComponent(trimmed)
 		}
 		return ItsyWorkspaceController.openFile(at: url)
 	}
-
 }
 
 extension EditorWindowController: NSWindowDelegate {
-	func windowDidBecomeKey(_ notification: Notification) {
+	func windowDidBecomeKey(_: Notification) {
 		ItsyTabCoordinator.refresh()
 	}
 
-	func windowDidBecomeMain(_ notification: Notification) {
+	func windowDidBecomeMain(_: Notification) {
 		ItsyTabCoordinator.refresh()
 	}
 
-	func windowWillClose(_ notification: Notification) {
+	func windowWillClose(_: Notification) {
 		ItsyWorkspaceController.persistWindowState(from: self)
 		ItsyTabCoordinator.refresh()
 	}

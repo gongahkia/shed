@@ -19,11 +19,32 @@ import Testing
 
 	#expect(status.branch == GitBranchStatus(oid: "abc123", head: "main", upstream: "origin/main", ahead: 2, behind: 1))
 	#expect(status.entries.count == 5)
-	#expect(status.entries[0] == GitStatusEntry(kind: .ordinary, indexStatus: "M", worktreeStatus: ".", path: "Sources/App.swift"))
+	#expect(status.entries[0] == GitStatusEntry(
+		kind: .ordinary,
+		indexStatus: "M",
+		worktreeStatus: ".",
+		path: "Sources/App.swift"
+	))
 	#expect(status.entries[1] == GitStatusEntry(kind: .ordinary, indexStatus: ".", worktreeStatus: "M", path: "README.md"))
-	#expect(status.entries[2] == GitStatusEntry(kind: .renamed, indexStatus: "R", worktreeStatus: ".", path: "Sources/New.swift", originalPath: "Sources/Old.swift"))
-	#expect(status.entries[3] == GitStatusEntry(kind: .unmerged, indexStatus: "U", worktreeStatus: "U", path: "conflict.txt"))
-	#expect(status.entries[4] == GitStatusEntry(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: "scratch notes.txt"))
+	#expect(status.entries[2] == GitStatusEntry(
+		kind: .renamed,
+		indexStatus: "R",
+		worktreeStatus: ".",
+		path: "Sources/New.swift",
+		originalPath: "Sources/Old.swift"
+	))
+	#expect(status.entries[3] == GitStatusEntry(
+		kind: .unmerged,
+		indexStatus: "U",
+		worktreeStatus: "U",
+		path: "conflict.txt"
+	))
+	#expect(status.entries[4] == GitStatusEntry(
+		kind: .untracked,
+		indexStatus: "?",
+		worktreeStatus: "?",
+		path: "scratch notes.txt"
+	))
 	#expect(status.entries[3].isConflict)
 	#expect(status.stagedCount == 3)
 	#expect(status.unstagedCount == 3)
@@ -46,26 +67,52 @@ import Testing
 	try fixture.write("new.txt", "new\n")
 
 	let status = try repository.status()
-	#expect(status.entries.contains(GitStatusEntry(kind: .ordinary, indexStatus: ".", worktreeStatus: "M", path: "tracked.txt")))
-	#expect(status.entries.contains(GitStatusEntry(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: "new.txt")))
+	#expect(status.entries.contains(GitStatusEntry(
+		kind: .ordinary,
+		indexStatus: ".",
+		worktreeStatus: "M",
+		path: "tracked.txt"
+	)))
+	#expect(status.entries.contains(GitStatusEntry(
+		kind: .untracked,
+		indexStatus: "?",
+		worktreeStatus: "?",
+		path: "new.txt"
+	)))
 	let diff = try repository.diff(path: "tracked.txt")
 	#expect(diff.contains("-one"))
 	#expect(diff.contains("+two"))
 
 	try repository.stage(paths: ["new.txt"])
 	let staged = try repository.status()
-	#expect(staged.entries.contains(GitStatusEntry(kind: .ordinary, indexStatus: "A", worktreeStatus: ".", path: "new.txt")))
+	#expect(staged.entries.contains(GitStatusEntry(
+		kind: .ordinary,
+		indexStatus: "A",
+		worktreeStatus: ".",
+		path: "new.txt"
+	)))
 
 	try repository.unstage(paths: ["new.txt"])
 	let unstaged = try repository.status()
-	#expect(unstaged.entries.contains(GitStatusEntry(kind: .untracked, indexStatus: "?", worktreeStatus: "?", path: "new.txt")))
+	#expect(unstaged.entries.contains(GitStatusEntry(
+		kind: .untracked,
+		indexStatus: "?",
+		worktreeStatus: "?",
+		path: "new.txt"
+	)))
 }
 
 @Test func gitWorkspaceSnapshotLooksUpEntriesByURL() {
 	let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
 	let status = GitStatus(entries: [
 		GitStatusEntry(kind: .ordinary, indexStatus: ".", worktreeStatus: "M", path: "Sources/App.swift"),
-		GitStatusEntry(kind: .renamed, indexStatus: "R", worktreeStatus: ".", path: "Sources/New.swift", originalPath: "Sources/Old.swift"),
+		GitStatusEntry(
+			kind: .renamed,
+			indexStatus: "R",
+			worktreeStatus: ".",
+			path: "Sources/New.swift",
+			originalPath: "Sources/Old.swift"
+		),
 	])
 	let snapshot = GitWorkspaceSnapshot(root: root, status: status)
 
@@ -107,7 +154,10 @@ import Testing
 }
 
 @Test func gitRepositoryCommitRejectsEmptySummary() {
-	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: RecordingGitRunner())
+	let repository = GitRepository(
+		root: URL(fileURLWithPath: "/tmp/project", isDirectory: true),
+		runner: RecordingGitRunner()
+	)
 
 	#expect(throws: GitCommitError.emptySummary) {
 		try repository.commit(summary: "  ")
@@ -145,8 +195,26 @@ import Testing
 	let lines = GitBlameParser.parse(output)
 
 	#expect(lines == [
-		GitBlameLine(line: 1, originalLine: 1, oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", summary: "initial", author: "Ada", authorEmail: "ada@example.invalid", time: Date(timeIntervalSince1970: 1_700_000_000), originalPath: "file.txt"),
-		GitBlameLine(line: 2, originalLine: 2, oid: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", summary: "change two", author: "Bob", authorEmail: "bob@example.invalid", time: Date(timeIntervalSince1970: 1_700_000_100), originalPath: "file.txt"),
+		GitBlameLine(
+			line: 1,
+			originalLine: 1,
+			oid: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			summary: "initial",
+			author: "Ada",
+			authorEmail: "ada@example.invalid",
+			time: Date(timeIntervalSince1970: 1_700_000_000),
+			originalPath: "file.txt"
+		),
+		GitBlameLine(
+			line: 2,
+			originalLine: 2,
+			oid: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+			summary: "change two",
+			author: "Bob",
+			authorEmail: "bob@example.invalid",
+			time: Date(timeIntervalSince1970: 1_700_000_100),
+			originalPath: "file.txt"
+		),
 	])
 }
 
@@ -156,8 +224,20 @@ import Testing
 	let entries = GitHistoryParser.parse(output)
 
 	#expect(entries == [
-		GitHistoryEntry(oid: "abc", author: "Ada", authorEmail: "ada@example.invalid", date: Date(timeIntervalSince1970: 1_700_000_000), summary: "initial"),
-		GitHistoryEntry(oid: "def", author: "Bob", authorEmail: "bob@example.invalid", date: Date(timeIntervalSince1970: 1_700_000_100), summary: "change"),
+		GitHistoryEntry(
+			oid: "abc",
+			author: "Ada",
+			authorEmail: "ada@example.invalid",
+			date: Date(timeIntervalSince1970: 1_700_000_000),
+			summary: "initial"
+		),
+		GitHistoryEntry(
+			oid: "def",
+			author: "Bob",
+			authorEmail: "bob@example.invalid",
+			date: Date(timeIntervalSince1970: 1_700_000_100),
+			summary: "change"
+		),
 	])
 }
 
@@ -226,8 +306,22 @@ import Testing
 	let branches = GitBranchParser.parse(output)
 
 	#expect(branches == [
-		GitBranch(name: "main", upstream: "origin/main", isCurrent: true, committerDateRelative: "2 hours ago", refname: "refs/heads/main", kind: .local),
-		GitBranch(name: "origin/feature", upstream: nil, isCurrent: false, committerDateRelative: "1 day ago", refname: "refs/remotes/origin/feature", kind: .remote),
+		GitBranch(
+			name: "main",
+			upstream: "origin/main",
+			isCurrent: true,
+			committerDateRelative: "2 hours ago",
+			refname: "refs/heads/main",
+			kind: .local
+		),
+		GitBranch(
+			name: "origin/feature",
+			upstream: nil,
+			isCurrent: false,
+			committerDateRelative: "1 day ago",
+			refname: "refs/remotes/origin/feature",
+			kind: .remote
+		),
 	])
 }
 
@@ -280,21 +374,27 @@ import Testing
 	try repository.applyStash(" stash@{0} ")
 	try repository.popStash("stash@{0}")
 	try repository.dropStash("stash@{0}")
+	let diff = try repository.stashDiff("stash@{0}")
 
 	#expect(entries == [
 		GitStashEntry(ref: "stash@{0}", date: "2026-06-30 10:11:12 +0800", message: "work"),
 	])
+	#expect(diff == "stash@{0}|2026-06-30 10:11:12 +0800|work\n")
 	#expect(runner.recordedArguments == [
 		["stash", "list", "--format=%gd|%ai|%s"],
 		["stash", "push", "-u", "-m", "work in progress"],
 		["stash", "apply", "stash@{0}"],
 		["stash", "pop", "stash@{0}"],
 		["stash", "drop", "stash@{0}"],
+		["stash", "show", "--patch", "stash@{0}"],
 	])
 }
 
 @Test func gitRepositoryRejectsEmptyStashInputs() {
-	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: RecordingGitRunner())
+	let repository = GitRepository(
+		root: URL(fileURLWithPath: "/tmp/project", isDirectory: true),
+		runner: RecordingGitRunner()
+	)
 
 	#expect(throws: GitStashError.emptyMessage) {
 		try repository.stash(message: "  ")
@@ -323,9 +423,16 @@ import Testing
 
 @Test func gitRepositoryBuildsRemoteOperationArguments() throws {
 	let newBranchRunner = RecordingGitRunner(output: "# branch.head feature\n# branch.oid abc123\n")
-	let trackingRunner = RecordingGitRunner(output: "# branch.head main\n# branch.upstream origin/main\n# branch.oid abc123\n")
-	let newBranchRepository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: newBranchRunner)
-	let trackingRepository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: trackingRunner)
+	let trackingRunner =
+		RecordingGitRunner(output: "# branch.head main\n# branch.upstream origin/main\n# branch.oid abc123\n")
+	let newBranchRepository = GitRepository(
+		root: URL(fileURLWithPath: "/tmp/project", isDirectory: true),
+		runner: newBranchRunner
+	)
+	let trackingRepository = GitRepository(
+		root: URL(fileURLWithPath: "/tmp/project", isDirectory: true),
+		runner: trackingRunner
+	)
 
 	#expect(newBranchRepository.fetchArguments() == ["fetch", "--all", "--prune"])
 	#expect(newBranchRepository.pullArguments() == ["pull", "--ff-only"])
@@ -341,10 +448,25 @@ import Testing
 		.remove("old"),
 		.add("new"),
 	])
-	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", indexLine: "index 1111111..2222222 100644", hunks: [hunk])
+	let file = DiffFile(
+		oldPath: "file.txt",
+		newPath: "file.txt",
+		indexLine: "index 1111111..2222222 100644",
+		hunks: [hunk]
+	)
 	let patch = DiffPatchBuilder.patch(file: file, hunk: hunk)
-	let linePatch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 0 ..< 2), operation: .stage)
-	let reverseLinePatch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: IndexSet(integersIn: 0 ..< 2), operation: .unstage)
+	let linePatch = try DiffPatchBuilder.patch(
+		file: file,
+		hunk: hunk,
+		selectedLineIndexes: IndexSet(integersIn: 0 ..< 2),
+		operation: .stage
+	)
+	let reverseLinePatch = try DiffPatchBuilder.patch(
+		file: file,
+		hunk: hunk,
+		selectedLineIndexes: IndexSet(integersIn: 0 ..< 2),
+		operation: .unstage
+	)
 
 	try repository.stage(hunk: hunk, in: file)
 	try repository.unstage(hunk: hunk, in: file)
@@ -361,7 +483,16 @@ import Testing
 		["apply", "--cached", "--check", "--reverse", "-"],
 		["apply", "--cached", "--reverse", "-"],
 	])
-	#expect(runner.recordedInputs == [patch, patch, patch, patch, linePatch, linePatch, reverseLinePatch, reverseLinePatch])
+	#expect(runner.recordedInputs == [
+		patch,
+		patch,
+		patch,
+		patch,
+		linePatch,
+		linePatch,
+		reverseLinePatch,
+		reverseLinePatch,
+	])
 }
 
 @Test func gitRepositoryStagesSingleWorkingTreeHunk() throws {
@@ -491,7 +622,7 @@ private func lineIndexes(in hunk: DiffHunk, containing values: Set<String>) -> I
 		switch line {
 		case .context:
 			continue
-		case .add(let content), .remove(let content):
+		case let .add(content), let .remove(content):
 			if values.contains(content) {
 				indexes.insert(index)
 			}
@@ -557,10 +688,10 @@ private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 		try runGit(arguments: arguments, input: Optional(input), root: root)
 	}
 
-	private func runGit(arguments: [String], input: String?, root: URL) throws -> String {
+	private func runGit(arguments: [String], input: String?, root _: URL) throws -> String {
 		lock.lock()
 		self.arguments.append(arguments)
-		self.inputs.append(input)
+		inputs.append(input)
 		lock.unlock()
 		return output
 	}

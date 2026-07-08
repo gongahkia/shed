@@ -65,6 +65,7 @@ import Testing
 	#expect(snapshot.currentDirectory == "file://host/tmp/project")
 	#expect(snapshot.palette[1] == TerminalRGB(red: 255, green: 0, blue: 17))
 	#expect(snapshot.palette[2] == TerminalRGB(red: 1, green: 2, blue: 3))
+	#expect(snapshot.paletteOverrideIndexes == [1, 2])
 	#expect(snapshot.defaultForeground == TerminalRGB(red: 170, green: 187, blue: 204))
 	#expect(snapshot.defaultBackground == TerminalRGB(red: 0, green: 255, blue: 127))
 	#expect(snapshot.promptMark == "A")
@@ -117,6 +118,20 @@ import Testing
 	view.paste(nil)
 
 	#expect(String(decoding: input, as: UTF8.self) == "\u{1B}[200~one\ntwo\u{1B}[201~")
+}
+
+@Test @MainActor func terminalViewAppliesThemeBackground() {
+	let view = ItsyTerminalView(frame: NSRect(x: 0, y: 0, width: 240, height: 120))
+	let theme = TerminalThemePalette(
+		background: NSColor(srgbRed: 0.10, green: 0.11, blue: 0.12, alpha: 1),
+		foreground: NSColor(srgbRed: 0.80, green: 0.81, blue: 0.82, alpha: 1),
+		cursor: NSColor(srgbRed: 0.90, green: 0.20, blue: 0.10, alpha: 1),
+		ansi: [:]
+	)
+
+	view.applyTerminalTheme(theme)
+
+	#expect(view.layer?.backgroundColor == theme.background.cgColor)
 }
 
 @Test func terminalPaneLayoutRoundTrips() {

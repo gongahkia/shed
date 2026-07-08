@@ -157,8 +157,6 @@ public final class MetalTextView: NSView {
 	private static let maxCachedShapedLines = 512
 	private static let defaultFontSize: CGFloat = 14.95
 	private static let defaultFontName = "Menlo"
-	private static let defaultTextColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
-	private static let cursorColor = SIMD4<Float>(0.08, 0.09, 0.11, 1.0)
 
 	var clearColor = MTLClearColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0) {
 		didSet { needsDisplay = true }
@@ -221,6 +219,7 @@ public final class MetalTextView: NSView {
 	private var lineHighlightOverlayRevision = -1
 	var markedRangeUTF8: Range<Int>?
 	private var textFont = MetalTextView.makeDefaultTextFont()
+	public private(set) var editorColorPalette = EditorColorPalette.defaultLight
 	private let gutterWidth: CGFloat = 24
 	private let baseTextInset = CGPoint(x: 30, y: 6)
 	var textInset: CGPoint {
@@ -284,6 +283,13 @@ public final class MetalTextView: NSView {
 		}
 		showLineNumbers = showsLineNumbers
 		syncEditorState()
+	}
+
+	public func applyEditorColorPalette(_ palette: EditorColorPalette) {
+		editorColorPalette = palette
+		clearColor = palette.metalClearColor
+		gutterView.colors = palette.gutter
+		markDirty()
 	}
 
 	var lineCount: Int = 0 {
@@ -1086,7 +1092,7 @@ public final class MetalTextView: NSView {
 					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
 					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
 					atlasUV: glyph.atlasUV,
-					color: Self.defaultTextColor
+					color: editorColorPalette.foreground
 				))
 			}
 		}
@@ -1163,7 +1169,7 @@ public final class MetalTextView: NSView {
 					screenOrigin: SIMD2<Float>(Float(pixelX), Float(pixelY)),
 					size: SIMD2<Float>(Float(glyph.width * scale), Float(glyph.height * scale)),
 					atlasUV: glyph.atlasUV,
-					color: annotation.color
+					color: editorColorPalette.inlayHintForeground
 				))
 			}
 		}
@@ -1236,7 +1242,7 @@ public final class MetalTextView: NSView {
 
 	private func appendSelectionOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		for rect in selectionRects {
-			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.25, 0.45, 0.95, 0.35)))
+			instances.append(solidInstance(rect: rect, scale: scale, color: editorColorPalette.selection))
 		}
 	}
 
@@ -1262,7 +1268,7 @@ public final class MetalTextView: NSView {
 
 	private func appendCursorOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		if cursorBlinkVisible, let cursorRect {
-			instances.append(solidInstance(rect: cursorRect, scale: scale, color: Self.cursorColor))
+			instances.append(solidInstance(rect: cursorRect, scale: scale, color: editorColorPalette.cursor))
 		}
 	}
 

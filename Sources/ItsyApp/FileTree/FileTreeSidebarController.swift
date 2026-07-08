@@ -51,6 +51,15 @@ import ItsyEditor
 		self.window = window
 	}
 
+	func applyTheme(_ palette: AppThemePalette) {
+		view.layer?.backgroundColor = palette.sidebarBackground.cgColor
+		outlineView.backgroundColor = palette.sidebarBackground
+		outlineView.gridColor = palette.sidebarBorder
+		scrollView.backgroundColor = palette.sidebarBackground
+		scrollView.contentView.backgroundColor = palette.sidebarBackground
+		outlineView.reloadData()
+	}
+
 	func setWorkspaceRootURL(_ url: URL?) {
 		setWorkspaceRootURLs(url.map { [$0] } ?? [])
 	}
@@ -334,6 +343,7 @@ import ItsyEditor
 		let textField = cell.textField ?? NSTextField(labelWithString: "")
 		textField.lineBreakMode = .byTruncatingMiddle
 		textField.font = .systemFont(ofSize: 12)
+		textField.textColor = AppTheme.palette.sidebarForeground
 		textField.stringValue = title(for: url)
 		if imageView.superview == nil {
 			imageView.translatesAutoresizingMaskIntoConstraints = false

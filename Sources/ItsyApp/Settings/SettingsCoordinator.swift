@@ -319,7 +319,7 @@ import ItsySyntax
 		guard let themePopup = settingsThemePopup else {
 			return
 		}
-		let choices = SyntaxTheme.availableChoices()
+		let choices = ItsyTheme.availableChoices()
 		themePopup.removeAllItems()
 		for choice in choices {
 			themePopup.addItem(withTitle: choice.displayName)
@@ -417,7 +417,7 @@ import ItsySyntax
 			return
 		}
 		do {
-			_ = try SyntaxTheme.loadChoice(id: id)
+			_ = try ItsyTheme.loadChoice(id: id)
 			appSettings.theme.id = id
 			saveAppSettings()
 			reloadSyntaxThemes()

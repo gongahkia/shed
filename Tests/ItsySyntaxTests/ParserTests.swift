@@ -175,6 +175,21 @@ struct ParserTests {
 	let parameter = try SyntaxColor(hex: "#445566cc")
 	#expect(parsed.color(for: "keyword") == keyword)
 	#expect(parsed.color(for: "variable.parameter") == parameter)
+	#expect(try SyntaxColor(hex: "#abc") == SyntaxColor(red: Float(0xaa) / 255, green: Float(0xbb) / 255, blue: Float(0xcc) / 255))
+	#expect(try SyntaxColor(hex: "#abcd") == SyntaxColor(red: Float(0xaa) / 255, green: Float(0xbb) / 255, blue: Float(0xcc) / 255, alpha: Float(0xdd) / 255))
+}
+
+@Test func itsyThemeLoadsWorkbenchColorsAndAppearance() throws {
+	let theme = ItsyTheme(id: "test", displayName: "Test", colors: [
+		"editor.background": try SyntaxColor(hex: "#101820"),
+		"editor.foreground": try SyntaxColor(hex: "#f0f3f6"),
+		"keyword": try SyntaxColor(hex: "#ff00aa"),
+	])
+	let background = try SyntaxColor(hex: "#101820")
+	let keyword = try SyntaxColor(hex: "#ff00aa")
+	#expect(theme.appearance == .dark)
+	#expect(theme.color(for: "editor.background") == background)
+	#expect(theme.syntax.color(for: "keyword") == keyword)
 }
 
 @Test func syntaxThemeCoversStandardCaptureSetWithFallbacks() throws {

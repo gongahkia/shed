@@ -37,6 +37,22 @@ import ItsyRender
 		self.window = window
 	}
 
+	func applyTheme(_ palette: AppThemePalette) {
+		view.layer?.backgroundColor = palette.panelBackground.cgColor
+		view.layer?.borderColor = palette.border.cgColor
+		for field in [queryField, replaceField] {
+			field.textColor = palette.inputForeground
+			field.backgroundColor = palette.inputBackground
+			field.placeholderAttributedString = NSAttributedString(
+				string: field.placeholderString ?? "",
+				attributes: [.foregroundColor: palette.inputPlaceholder]
+			)
+		}
+		for button in [regexButton, caseButton, wholeWordButton, closeButton] {
+			button.contentTintColor = palette.foreground
+		}
+	}
+
 	func toggle() {
 		setVisible(view.isHidden)
 	}
@@ -184,7 +200,7 @@ import ItsyRender
 
 	private func findStateDidChange() {
 		let expression = findRegularExpression()
-		queryField.textColor = findState.query.isEmpty || expression != nil ? .labelColor : .systemRed
+		queryField.textColor = findState.query.isEmpty || expression != nil ? AppTheme.palette.inputForeground : AppTheme.palette.errorForeground
 		refreshMatches()
 		if let incrementalDirection {
 			selectMatch(direction: incrementalDirection, refreshBeforeSelecting: false, focusEditorAfterSelection: false)

@@ -247,6 +247,17 @@ struct TerminalPaneLayout: Equatable {
 		}
 	}
 
+	func applyTerminalTheme(_ theme: TerminalThemePalette) {
+		for tab in tabs {
+			for pane in tab.panes {
+				pane.view.applyTerminalTheme(theme)
+			}
+		}
+		if let panel = terminalPanel {
+			AppThemeApplier.apply(AppTheme.palette, to: panel)
+		}
+	}
+
 	private var activeTab: TerminalTab? {
 		guard tabs.indices.contains(selectedTabIndex) else {
 			return nil
@@ -403,6 +414,7 @@ struct TerminalPaneLayout: Equatable {
 	private func configurePanes(for tab: TerminalTab) {
 		for pane in tab.panes {
 			pane.view.applyTerminalSettings(settingsProvider())
+			pane.view.applyTerminalTheme(AppTheme.palette.terminal)
 			pane.view.onInput = { [weak tab] data in
 				tab?.session?.send(data)
 			}
@@ -439,6 +451,7 @@ struct TerminalPaneLayout: Equatable {
 			button.tag = index
 			button.bezelStyle = index == selectedTabIndex ? .rounded : .recessed
 			button.font = .systemFont(ofSize: 11, weight: index == selectedTabIndex ? .semibold : .regular)
+			button.contentTintColor = index == selectedTabIndex ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
 			button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 			terminalTabStack.addArrangedSubview(button)
 		}

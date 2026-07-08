@@ -71,6 +71,41 @@ import Testing
 	#expect(instances[1].size == SIMD2<Float>(4, 20))
 }
 
+@Test func editorColorPaletteUpdatesBackgroundTextSelectionAndCursor() throws {
+	let palette = EditorColorPalette(
+		background: SIMD4<Float>(0.10, 0.11, 0.12, 1),
+		foreground: SIMD4<Float>(0.80, 0.81, 0.82, 1),
+		cursor: SIMD4<Float>(0.90, 0.20, 0.10, 1),
+		selection: SIMD4<Float>(0.20, 0.30, 0.90, 0.45),
+		findMatch: SIMD4<Float>(0.70, 0.60, 0.10, 0.50),
+		findMatchHighlight: SIMD4<Float>(0.70, 0.60, 0.10, 0.24),
+		documentHighlightUnderline: SIMD4<Float>(0.30, 0.50, 0.90, 0.50),
+		inlayHintForeground: SIMD4<Float>(0.45, 0.46, 0.47, 1),
+		gutter: GutterColorPalette(
+			background: SIMD4<Float>(0.10, 0.11, 0.12, 1),
+			lineNumber: SIMD4<Float>(0.50, 0.51, 0.52, 1),
+			activeLineNumber: SIMD4<Float>(0.80, 0.81, 0.82, 1),
+			error: SIMD4<Float>(1, 0, 0, 1),
+			warning: SIMD4<Float>(1, 0.7, 0, 1),
+			info: SIMD4<Float>(0, 0.4, 1, 1),
+			hint: SIMD4<Float>(0.5, 0.5, 0.5, 1)
+		)
+	)
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "a")
+	view.applyEditorColorPalette(palette)
+	view.setSelectionRects([.init(x: 4, y: 8, width: 20, height: 10)])
+	view.setCursor(x: 30, y: 8, height: 10)
+
+	#expect(abs(view.clearColor.red - 0.10) < 0.001)
+	#expect(abs(view.clearColor.green - 0.11) < 0.001)
+	#expect(abs(view.clearColor.blue - 0.12) < 0.001)
+	#expect(try #require(view.textGlyphInstances(scale: 2).first).color == palette.foreground)
+	let overlays = view.solidOverlayInstances(scale: 2)
+	#expect(overlays[0].color == palette.selection)
+	#expect(overlays[1].color == palette.cursor)
+}
+
 @Test func selectingUTF8RangesMergesOverlaps() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "abcdef")

@@ -23,11 +23,14 @@ final class SignatureHelpViewController: NSViewController {
 		)
 		let height = min(140, max(44, ceil(bounds.height) + 20))
 		let container = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+		container.wantsLayer = true
+		container.layer?.backgroundColor = AppTheme.palette.panelBackground.cgColor
 		let textView = NSTextView(frame: container.bounds)
 		textView.autoresizingMask = [.width, .height]
 		textView.isEditable = false
 		textView.isSelectable = true
 		textView.drawsBackground = false
+		textView.textColor = AppTheme.palette.foreground
 		textView.textContainerInset = NSSize(width: 10, height: 8)
 		textView.textStorage?.setAttributedString(attributed)
 		container.addSubview(textView)
@@ -45,7 +48,7 @@ final class SignatureHelpViewController: NSViewController {
 			string: signature.label,
 			attributes: [
 				.font: baseFont,
-				.foregroundColor: NSColor.labelColor,
+				.foregroundColor: AppTheme.palette.foreground,
 			]
 		)
 		if let range = activeParameterRange(in: signature, help: help) {

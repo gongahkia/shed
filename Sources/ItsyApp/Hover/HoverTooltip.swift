@@ -125,22 +125,22 @@ import ItsyLSP
 	private static func baseAttributes() -> [NSAttributedString.Key: Any] {
 		[
 			.font: baseFont,
-			.foregroundColor: NSColor.labelColor,
+			.foregroundColor: AppTheme.palette.foreground,
 		]
 	}
 
 	private static func headingAttributes() -> [NSAttributedString.Key: Any] {
 		[
 			.font: headingFont,
-			.foregroundColor: NSColor.labelColor,
+			.foregroundColor: AppTheme.palette.foreground,
 		]
 	}
 
 	private static func codeAttributes() -> [NSAttributedString.Key: Any] {
 		[
 			.font: monoFont,
-			.foregroundColor: NSColor.labelColor,
-			.backgroundColor: NSColor.textBackgroundColor,
+			.foregroundColor: AppTheme.palette.foreground,
+			.backgroundColor: AppTheme.palette.inputBackground,
 		]
 	}
 }
@@ -166,6 +166,8 @@ import ItsyLSP
 		)
 		let height = min(320, max(72, ceil(bounds.height) + 24))
 		let container = NSView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+		container.wantsLayer = true
+		container.layer?.backgroundColor = AppTheme.palette.panelBackground.cgColor
 		let scrollView = NSScrollView(frame: container.bounds)
 		scrollView.autoresizingMask = [.width, .height]
 		scrollView.hasVerticalScroller = true
@@ -175,6 +177,7 @@ import ItsyLSP
 		textView.isEditable = false
 		textView.isSelectable = true
 		textView.drawsBackground = false
+		textView.textColor = AppTheme.palette.foreground
 		textView.textContainerInset = NSSize(width: 10, height: 8)
 		textView.textStorage?.setAttributedString(attributed)
 		scrollView.documentView = textView

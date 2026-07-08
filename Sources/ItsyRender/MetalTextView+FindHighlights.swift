@@ -61,14 +61,14 @@ extension MetalTextView {
 
 	private func appendFindMatchOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		for rect in findMatchRects {
-			instances.append(solidInstance(rect: rect, scale: scale, color: SIMD4<Float>(0.80, 0.62, 0.12, 0.34)))
+			instances.append(solidInstance(rect: rect, scale: scale, color: editorColorPalette.findMatch))
 		}
 	}
 
 	private func appendDocumentHighlightOverlayInstances(scale: CGFloat, into instances: inout [MetalGlyphInstance]) {
 		for rect in documentHighlightRects {
 			let underline = CGRect(x: rect.minX, y: rect.maxY - 3, width: rect.width, height: 2)
-			instances.append(solidInstance(rect: underline, scale: scale, color: SIMD4<Float>(0.22, 0.42, 0.90, 0.42)))
+			instances.append(solidInstance(rect: underline, scale: scale, color: editorColorPalette.documentHighlightUnderline))
 		}
 	}
 }

@@ -68,6 +68,8 @@ import ItsyKeymap
 		super.init()
 		recordBenchStage("delegate_settings_begin")
 		_ = settingsCoordinator.currentSettings
+		AppTheme.install()
+		AppTheme.update(settings: settingsCoordinator.currentSettings)
 		recordBenchStage("delegate_settings_end")
 		recordBenchStage("delegate_palette_bridge_begin")
 		commandPaletteCoordinator.installBridge()
@@ -532,6 +534,7 @@ import ItsyKeymap
 	}
 
 	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
+		AppTheme.update(settings: settings)
 		for document in documentController.documents {
 			for controller in document.windowControllers {
 				(controller as? EditorWindowController)?.applySettings(settings)
@@ -539,6 +542,7 @@ import ItsyKeymap
 		}
 		ItsyGitHunkGutterCoordinator.applyAll()
 		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
+		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
 	}
 
 	@objc func toggleFindBar(_: Any?) {
@@ -671,6 +675,7 @@ import ItsyKeymap
 
 	private func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
 		terminalCoordinator.applyTerminalSettings(settings)
+		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
 	}
 
 	private func currentTerminalSettings() -> ItsySettings.TerminalSettings {

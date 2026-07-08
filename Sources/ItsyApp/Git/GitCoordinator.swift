@@ -158,16 +158,22 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		gitUnifiedDiffView?.applyEditorColorPalette(AppTheme.palette.editor)
 		gitSideOldDiffView?.configureEditorAppearance(
 			fontName: preferences.fontName,
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		gitSideOldDiffView?.applyEditorColorPalette(AppTheme.palette.editor)
 		gitSideNewDiffView?.configureEditorAppearance(
 			fontName: preferences.fontName,
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		gitSideNewDiffView?.applyEditorColorPalette(AppTheme.palette.editor)
+		if let panel = gitPanel {
+			AppThemeApplier.apply(AppTheme.palette, to: panel)
+		}
 	}
 
 	@objc func showGitChanges(_: Any?) {
@@ -326,6 +332,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 				fontSize: preferences.fontSize,
 				showsLineNumbers: preferences.showLineNumbers
 			)
+			view.applyEditorColorPalette(AppTheme.palette.editor)
 		}
 		let sideSplitView = NSSplitView()
 		sideSplitView.isVertical = true
@@ -1471,7 +1478,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		guard let path,
 		      let gitRootURL,
 		      let language = SyntaxPipeline.language(forFileURL: gitRootURL.appendingPathComponent(path)),
-		      let theme = try? SyntaxTheme.loadUserOrDefault()
+		      let theme = try? ItsyTheme.loadUserOrDefault().syntax
 		else {
 			return []
 		}

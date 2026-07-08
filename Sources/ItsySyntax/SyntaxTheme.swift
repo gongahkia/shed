@@ -6,6 +6,12 @@ public enum SyntaxThemeError: Error, Equatable {
 	case themeLoadFailed(String)
 }
 
+public enum ItsyThemeAppearance: String, Sendable, Equatable {
+	case light
+	case dark
+	case unspecified
+}
+
 public struct SyntaxColor: Sendable, Equatable {
 	public var red: Float
 	public var green: Float
@@ -21,11 +27,20 @@ public struct SyntaxColor: Sendable, Equatable {
 
 	public init(hex: String) throws {
 		let value = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
-		guard value.count == 6 || value.count == 8, let raw = UInt32(value, radix: 16) else {
+		let expanded: String
+		switch value.count {
+		case 3, 4:
+			expanded = value.map { "\($0)\($0)" }.joined()
+		case 6, 8:
+			expanded = value
+		default:
+			throw SyntaxThemeError.invalidColor(0, hex)
+		}
+		guard let raw = UInt32(expanded, radix: 16) else {
 			throw SyntaxThemeError.invalidColor(0, hex)
 		}
 		let divisor: Float = 255
-		if value.count == 6 {
+		if expanded.count == 6 {
 			red = Float((raw >> 16) & 0xff) / divisor
 			green = Float((raw >> 8) & 0xff) / divisor
 			blue = Float(raw & 0xff) / divisor
@@ -36,6 +51,10 @@ public struct SyntaxColor: Sendable, Equatable {
 			blue = Float((raw >> 8) & 0xff) / divisor
 			alpha = Float(raw & 0xff) / divisor
 		}
+	}
+
+	public var luminance: Float {
+		0.2126 * red + 0.7152 * green + 0.0722 * blue
 	}
 }
 
@@ -342,6 +361,127 @@ public struct SyntaxTheme: Sendable, Equatable {
 			return String(value.dropFirst().dropLast())
 		}
 		return value
+	}
+}
+
+public struct ItsyTheme: Sendable, Equatable {
+	public static let requiredWorkbenchColorIDs: [String] = [
+		"foreground",
+		"descriptionForeground",
+		"disabledForeground",
+		"errorForeground",
+		"focusBorder",
+		"widget.border",
+		"editor.background",
+		"editor.foreground",
+		"editorCursor.foreground",
+		"editor.selectionBackground",
+		"editor.findMatchBackground",
+		"editor.findMatchHighlightBackground",
+		"editor.wordHighlightBackground",
+		"editorGutter.background",
+		"editorLineNumber.foreground",
+		"editorLineNumber.activeForeground",
+		"sideBar.background",
+		"sideBar.foreground",
+		"sideBar.border",
+		"tab.activeBackground",
+		"tab.inactiveBackground",
+		"tab.activeForeground",
+		"tab.inactiveForeground",
+		"tab.border",
+		"statusBar.background",
+		"statusBar.foreground",
+		"panel.background",
+		"panel.foreground",
+		"panel.border",
+		"input.background",
+		"input.foreground",
+		"input.placeholderForeground",
+		"input.border",
+		"list.activeSelectionBackground",
+		"list.activeSelectionForeground",
+		"list.inactiveSelectionBackground",
+		"list.hoverBackground",
+		"button.foreground",
+		"button.background",
+		"terminal.background",
+		"terminal.foreground",
+		"terminalCursor.background",
+		"terminal.ansiBlack",
+		"terminal.ansiBlue",
+		"terminal.ansiCyan",
+		"terminal.ansiGreen",
+		"terminal.ansiMagenta",
+		"terminal.ansiRed",
+		"terminal.ansiWhite",
+		"terminal.ansiYellow",
+		"terminal.ansiBrightBlack",
+		"terminal.ansiBrightBlue",
+		"terminal.ansiBrightCyan",
+		"terminal.ansiBrightGreen",
+		"terminal.ansiBrightMagenta",
+		"terminal.ansiBrightRed",
+		"terminal.ansiBrightWhite",
+		"terminal.ansiBrightYellow",
+		"itsy.editor.inlayHintForeground",
+		"itsy.editor.documentHighlightUnderline",
+		"itsy.banner.background",
+		"itsy.banner.foreground",
+		"itsy.git.added",
+		"itsy.git.modified",
+		"itsy.git.removed",
+	]
+
+	public var id: String
+	public var displayName: String
+	public var colors: [String: SyntaxColor]
+	public var syntax: SyntaxTheme
+	public var appearance: ItsyThemeAppearance
+
+	public init(id: String, displayName: String, colors: [String: SyntaxColor]) {
+		self.id = id
+		self.displayName = displayName
+		self.colors = colors
+		syntax = SyntaxTheme(colors: colors)
+		appearance = Self.appearance(from: colors)
+	}
+
+	public func color(for key: String) -> SyntaxColor? {
+		colors[key]
+	}
+
+	public static func loadUserOrDefault(fileManager: FileManager = .default) throws -> ItsyTheme {
+		try loadSelectedOrDefault(fileManager: fileManager)
+	}
+
+	public static func loadSelectedOrDefault(defaults: UserDefaults = .standard, fileManager: FileManager = .default) throws -> ItsyTheme {
+		if let selectedID = defaults.string(forKey: SyntaxTheme.selectedThemeDefaultsKey), !selectedID.isEmpty {
+			if let selectedTheme = try? loadChoice(id: selectedID, fileManager: fileManager) {
+				return selectedTheme
+			}
+		}
+		let syntax = try SyntaxTheme.loadSelectedOrDefault(defaults: defaults, fileManager: fileManager)
+		return ItsyTheme(id: SyntaxTheme.defaultChoiceID, displayName: "Default Light", colors: syntax.colors)
+	}
+
+	public static func availableChoices(fileManager: FileManager = .default) -> [SyntaxThemeChoice] {
+		SyntaxTheme.availableChoices(fileManager: fileManager)
+	}
+
+	public static func loadChoice(id: String, fileManager: FileManager = .default) throws -> ItsyTheme {
+		let syntax = try SyntaxTheme.loadChoice(id: id, fileManager: fileManager)
+		let displayName = SyntaxTheme.availableChoices(fileManager: fileManager)
+			.first { $0.id == id }?
+			.displayName ?? id
+		return ItsyTheme(id: id, displayName: displayName, colors: syntax.colors)
+	}
+
+	private static func appearance(from colors: [String: SyntaxColor]) -> ItsyThemeAppearance {
+		guard let background = colors["editor.background"] ?? colors["background"] else {
+			return .unspecified
+		}
+		return background.luminance < 0.5 ? .dark : .light
 	}
 }
 

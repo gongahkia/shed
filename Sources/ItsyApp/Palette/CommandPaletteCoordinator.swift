@@ -296,8 +296,28 @@ import ItsyEditor
 	}
 
 	private func focusCommandPaletteInput() {
+		applyCommandPaletteTheme()
 		commandPalettePanel?.makeFirstResponder(commandPaletteInputField)
 		commandPaletteInputField?.currentEditor()?.selectedRange = NSRange(location: commandPaletteInputField?.stringValue.count ?? 0, length: 0)
+	}
+
+	private func applyCommandPaletteTheme() {
+		guard let panel = commandPalettePanel else {
+			return
+		}
+		let palette = AppTheme.palette
+		panel.contentView?.layer?.backgroundColor = palette.panelBackground.cgColor
+		panel.contentView?.layer?.borderColor = palette.border.cgColor
+		commandPaletteInputField?.textColor = palette.inputForeground
+		commandPaletteInputField?.backgroundColor = palette.panelBackground
+		commandPaletteInputField?.placeholderAttributedString = NSAttributedString(
+			string: commandPaletteInputField?.placeholderString ?? "",
+			attributes: [.foregroundColor: palette.inputPlaceholder]
+		)
+		commandPaletteTableView?.backgroundColor = palette.panelBackground
+		commandPaletteTableView?.gridColor = palette.border
+		commandPaletteTableView?.reloadData()
+		AppThemeApplier.apply(palette, to: panel)
 	}
 
 	private func symbolsForCommandPaletteScope(_ scope: CommandPaletteSymbolScope) -> [WorkspaceSymbol] {
@@ -610,6 +630,7 @@ import ItsyEditor
 		cell.identifier = identifier
 		let textField = cell.textField ?? NSTextField(labelWithString: "")
 		textField.font = .systemFont(ofSize: 13)
+		textField.textColor = AppTheme.palette.foreground
 		textField.lineBreakMode = .byTruncatingTail
 		if let scope = commandPaletteSymbolScope {
 			let symbol = commandPaletteFilteredSymbols[row]

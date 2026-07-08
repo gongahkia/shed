@@ -240,6 +240,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		fileTreeController.setWorkspaceRootURLs(urls)
 	}
 
+	func revealInFileTree(_ url: URL) {
+		fileTreeController.reveal(url)
+	}
+
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
 		fileTreeController.setGitSnapshot(snapshot)
 	}
@@ -968,6 +972,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return ItsyAppCommandBridge.requestRunCommand(commandID)
 		case "terminal.toggle":
 			return NSApp.sendAction(#selector(AppCoordinator.showTerminal(_:)), to: nil, from: self)
+		case "terminal.newTab":
+			return NSApp.sendAction(#selector(AppCoordinator.newTerminalTab(_:)), to: nil, from: self)
+		case "terminal.splitHorizontal":
+			return NSApp.sendAction(#selector(AppCoordinator.splitTerminalHorizontal(_:)), to: nil, from: self)
+		case "terminal.splitVertical":
+			return NSApp.sendAction(#selector(AppCoordinator.splitTerminalVertical(_:)), to: nil, from: self)
+		case "terminal.find":
+			return NSApp.sendAction(#selector(AppCoordinator.findInTerminal(_:)), to: nil, from: self)
+		case "terminal.findNext":
+			return NSApp.sendAction(#selector(AppCoordinator.findTerminalNext(_:)), to: nil, from: self)
+		case "terminal.findPrevious":
+			return NSApp.sendAction(#selector(AppCoordinator.findTerminalPrevious(_:)), to: nil, from: self)
+		case "terminal.openAtFileDirectory":
+			return NSApp.sendAction(#selector(AppCoordinator.openTerminalAtFileDirectory(_:)), to: nil, from: self)
+		case "terminal.revealCWD":
+			return NSApp.sendAction(#selector(AppCoordinator.revealTerminalCWD(_:)), to: nil, from: self)
 		case "file.nextBuffer":
 			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
 		case "file.previousBuffer":

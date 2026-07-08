@@ -379,6 +379,30 @@ import ItsyKeymap
 					Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
 						self?.showTerminal(nil)
 					},
+					Command(id: "terminal.newTab", title: L10n.string("Terminal: New Tab"), defaultKey: nil) { [weak self] in
+						self?.newTerminalTab(nil)
+					},
+					Command(id: "terminal.splitHorizontal", title: L10n.string("Terminal: Split Horizontal"), defaultKey: nil) { [weak self] in
+						self?.splitTerminalHorizontal(nil)
+					},
+					Command(id: "terminal.splitVertical", title: L10n.string("Terminal: Split Vertical"), defaultKey: nil) { [weak self] in
+						self?.splitTerminalVertical(nil)
+					},
+					Command(id: "terminal.find", title: L10n.string("Terminal: Find"), defaultKey: nil) { [weak self] in
+						self?.findInTerminal(nil)
+					},
+					Command(id: "terminal.findNext", title: L10n.string("Terminal: Find Next"), defaultKey: nil) { [weak self] in
+						self?.findTerminalNext(nil)
+					},
+					Command(id: "terminal.findPrevious", title: L10n.string("Terminal: Find Previous"), defaultKey: nil) { [weak self] in
+						self?.findTerminalPrevious(nil)
+					},
+					Command(id: "terminal.openAtFileDirectory", title: L10n.string("Terminal: Open at File Directory"), defaultKey: nil) { [weak self] in
+						self?.openTerminalAtFileDirectory(nil)
+					},
+					Command(id: "terminal.revealCWD", title: L10n.string("Terminal: Reveal CWD in File Tree"), defaultKey: nil) { [weak self] in
+						self?.revealTerminalCWD(nil)
+					},
 					Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
 						self?.showProblems(nil)
 					},
@@ -561,6 +585,38 @@ import ItsyKeymap
 
 	@objc func showTerminal(_ sender: Any?) {
 		terminalCoordinator.showTerminal(sender)
+	}
+
+	@objc func newTerminalTab(_ sender: Any?) {
+		terminalCoordinator.newTerminalTab(sender)
+	}
+
+	@objc func splitTerminalHorizontal(_ sender: Any?) {
+		terminalCoordinator.splitTerminalHorizontal(sender)
+	}
+
+	@objc func splitTerminalVertical(_ sender: Any?) {
+		terminalCoordinator.splitTerminalVertical(sender)
+	}
+
+	@objc func findInTerminal(_ sender: Any?) {
+		terminalCoordinator.showTerminalFind(sender)
+	}
+
+	@objc func findTerminalNext(_ sender: Any?) {
+		terminalCoordinator.findTerminalNext(sender)
+	}
+
+	@objc func findTerminalPrevious(_ sender: Any?) {
+		terminalCoordinator.findTerminalPrevious(sender)
+	}
+
+	@objc func openTerminalAtFileDirectory(_ sender: Any?) {
+		terminalCoordinator.openTerminalAtActiveDocumentDirectory(sender)
+	}
+
+	@objc func revealTerminalCWD(_ sender: Any?) {
+		terminalCoordinator.revealTerminalCWDInFileTree(sender)
 	}
 
 	private func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {

@@ -3,27 +3,45 @@ import AppKit
 import Foundation
 import ItsyConfig
 
+enum TerminalViewCommand {
+	case find
+	case findNext
+	case findPrevious
+}
+
 final class ItsyTerminalView: NSView {
-	private let emulator = ItsyTerminalEmulator()
+	private let emulator: ItsyTerminalEmulator
 	private var font = NSFont.monospacedSystemFont(ofSize: CGFloat(ItsySettings.TerminalSettings.defaultFontSize), weight: .regular)
 	private var characterSize = CGSize(width: 7, height: 15)
 	private var scrollbackOffset = 0
 	private var trackingArea: NSTrackingArea?
+	private var searchQuery = ""
+	private var searchUsesRegex = false
+	private var selectedSearchMatch = 0
 	var onInput: ((Data) -> Void)?
 	var onResize: ((Int, Int) -> Void)?
+	var onFocus: (() -> Void)?
+	var onCommand: ((TerminalViewCommand) -> Bool)?
 
-	override init(frame frameRect: NSRect) {
+	init(emulator: ItsyTerminalEmulator = ItsyTerminalEmulator(), frame frameRect: NSRect = .zero) {
+		self.emulator = emulator
 		super.init(frame: frameRect)
 		commonInit()
 	}
 
 	required init?(coder: NSCoder) {
+		emulator = ItsyTerminalEmulator()
 		super.init(coder: coder)
 		commonInit()
 	}
 
 	override var acceptsFirstResponder: Bool {
 		true
+	}
+
+	override func becomeFirstResponder() -> Bool {
+		onFocus?()
+		return true
 	}
 
 	override var isFlipped: Bool {
@@ -38,6 +56,10 @@ final class ItsyTerminalView: NSView {
 
 	func ingest(_ data: Data) {
 		emulator.feed(data)
+		refreshAfterEmulatorUpdate()
+	}
+
+	func refreshAfterEmulatorUpdate() {
 		if emulator.alternateScreen {
 			scrollbackOffset = 0
 		}
@@ -54,6 +76,57 @@ final class ItsyTerminalView: NSView {
 		emulator.clearScrollback()
 		scrollbackOffset = 0
 		needsDisplay = true
+	}
+
+	var currentDirectoryURL: URL? {
+		guard let raw = emulator.snapshot(scrollbackOffset: 0).currentDirectory,
+		      let url = URL(string: raw),
+		      url.isFileURL
+		else {
+			return nil
+		}
+		return url.standardizedFileURL
+	}
+
+	@discardableResult
+	func setSearch(query: String, regex: Bool) -> Int {
+		let shouldReset = searchQuery != query || searchUsesRegex != regex
+		searchQuery = query
+		searchUsesRegex = regex
+		let count = searchMatches(in: emulator.snapshot(scrollbackOffset: scrollbackOffset)).count
+		if shouldReset {
+			selectedSearchMatch = 0
+		} else if count > 0 {
+			selectedSearchMatch = min(selectedSearchMatch, count - 1)
+		}
+		needsDisplay = true
+		return count
+	}
+
+	@discardableResult
+	func findNextSearchMatch() -> Int {
+		let count = searchMatches(in: emulator.snapshot(scrollbackOffset: scrollbackOffset)).count
+		guard count > 0 else {
+			selectedSearchMatch = 0
+			needsDisplay = true
+			return 0
+		}
+		selectedSearchMatch = (selectedSearchMatch + 1) % count
+		needsDisplay = true
+		return selectedSearchMatch
+	}
+
+	@discardableResult
+	func findPreviousSearchMatch() -> Int {
+		let count = searchMatches(in: emulator.snapshot(scrollbackOffset: scrollbackOffset)).count
+		guard count > 0 else {
+			selectedSearchMatch = 0
+			needsDisplay = true
+			return 0
+		}
+		selectedSearchMatch = (selectedSearchMatch + count - 1) % count
+		needsDisplay = true
+		return selectedSearchMatch
 	}
 
 	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
@@ -82,18 +155,39 @@ final class ItsyTerminalView: NSView {
 		dirtyRect.fill()
 		for (row, cells) in snapshot.cells.enumerated() {
 			drawBackgrounds(cells, row: row, snapshot: snapshot)
+		}
+		drawSearchHighlights(snapshot)
+		for (row, cells) in snapshot.cells.enumerated() {
 			attributedLine(cells, snapshot: snapshot).draw(at: NSPoint(x: 4, y: CGFloat(row) * characterSize.height + 2))
 		}
 		drawCursor(snapshot)
 	}
 
 	override func keyDown(with event: NSEvent) {
+		if handleCommandShortcut(event) {
+			return
+		}
 		guard let data = encodedInput(for: event) else {
 			super.keyDown(with: event)
 			return
 		}
 		scrollbackOffset = 0
 		onInput?(data)
+	}
+
+	private func handleCommandShortcut(_ event: NSEvent) -> Bool {
+		let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+		guard flags.contains(.command) else {
+			return false
+		}
+		switch event.keyCode {
+		case 3:
+			return onCommand?(.find) ?? false
+		case 5:
+			return onCommand?(flags.contains(.shift) ? .findPrevious : .findNext) ?? false
+		default:
+			return false
+		}
 	}
 
 	override func scrollWheel(with event: NSEvent) {
@@ -216,6 +310,77 @@ final class ItsyTerminalView: NSView {
 		let rect = NSRect(x: x, y: y, width: max(2, characterSize.width), height: characterSize.height)
 		NSColor.textColor.withAlphaComponent(0.24).setFill()
 		rect.fill()
+	}
+
+	private struct SearchMatch {
+		var row: Int
+		var column: Int
+		var length: Int
+	}
+
+	private func drawSearchHighlights(_ snapshot: TerminalSnapshot) {
+		let matches = searchMatches(in: snapshot)
+		guard !matches.isEmpty else {
+			return
+		}
+		selectedSearchMatch = min(selectedSearchMatch, matches.count - 1)
+		for (index, match) in matches.enumerated() {
+			let rect = NSRect(
+				x: 4 + CGFloat(match.column) * characterSize.width,
+				y: CGFloat(match.row) * characterSize.height + 2,
+				width: CGFloat(max(1, match.length)) * characterSize.width,
+				height: characterSize.height
+			)
+			(index == selectedSearchMatch ? NSColor.systemOrange : NSColor.systemYellow).withAlphaComponent(0.38).setFill()
+			rect.fill()
+		}
+	}
+
+	private func searchMatches(in snapshot: TerminalSnapshot) -> [SearchMatch] {
+		guard !searchQuery.isEmpty else {
+			return []
+		}
+		if searchUsesRegex {
+			return regexSearchMatches(in: snapshot)
+		}
+		return literalSearchMatches(in: snapshot)
+	}
+
+	private func literalSearchMatches(in snapshot: TerminalSnapshot) -> [SearchMatch] {
+		var matches: [SearchMatch] = []
+		for (row, line) in snapshot.lines.enumerated() {
+			var start = line.startIndex
+			while let range = line.range(of: searchQuery, options: [.caseInsensitive], range: start ..< line.endIndex) {
+				matches.append(SearchMatch(
+					row: row,
+					column: line.distance(from: line.startIndex, to: range.lowerBound),
+					length: line.distance(from: range.lowerBound, to: range.upperBound)
+				))
+				start = range.upperBound
+			}
+		}
+		return matches
+	}
+
+	private func regexSearchMatches(in snapshot: TerminalSnapshot) -> [SearchMatch] {
+		guard let expression = try? NSRegularExpression(pattern: searchQuery, options: [.caseInsensitive]) else {
+			return []
+		}
+		var matches: [SearchMatch] = []
+		for (row, line) in snapshot.lines.enumerated() {
+			let nsRange = NSRange(line.startIndex ..< line.endIndex, in: line)
+			for match in expression.matches(in: line, range: nsRange) {
+				guard let range = Range(match.range, in: line), !range.isEmpty else {
+					continue
+				}
+				matches.append(SearchMatch(
+					row: row,
+					column: line.distance(from: line.startIndex, to: range.lowerBound),
+					length: line.distance(from: range.lowerBound, to: range.upperBound)
+				))
+			}
+		}
+		return matches
 	}
 
 	private func drawBackgrounds(_ cells: [TerminalCell], row: Int, snapshot: TerminalSnapshot) {

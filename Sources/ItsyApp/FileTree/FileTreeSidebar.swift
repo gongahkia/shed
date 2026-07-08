@@ -183,6 +183,16 @@ private let workspaceLogger = Logger(
 		ItsyGitHunkGutterCoordinator.applyAll()
 	}
 
+	static func revealInFileTree(_ url: URL) {
+		let url = url.standardizedFileURL
+		if !rootURLs.contains(where: { pathIsInside(url.standardizedFileURL.path, root: $0.standardizedFileURL.path) }) {
+			addWorkspaceRoot(url)
+		}
+		for controller in controllers.allObjects {
+			controller.revealInFileTree(url)
+		}
+	}
+
 	private static func loadGitStatus() {
 		guard let rootURL = currentRootURL,
 		      let gitRoot = try? GitRepository.discoverRoot(containing: rootURL)
@@ -323,5 +333,9 @@ private let workspaceLogger = Logger(
 			normalized.append(url)
 		}
 		return normalized
+	}
+
+	private static func pathIsInside(_ path: String, root: String) -> Bool {
+		path == root || path.hasPrefix(root + "/")
 	}
 }

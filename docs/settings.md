@@ -18,7 +18,10 @@ Both files hot-reload while Itsy is running. The merge order is global, then wor
 [editor]
 font = "Menlo"
 font_size = 14.95
-line_numbers = false
+line_number_mode = "absolute" # off, absolute, relative
+keymap = "plain" # plain, vim, emacs
+wrap = "none" # none, soft, hard
+wrap_column = 100
 tab_width = 4
 use_spaces = false
 
@@ -60,6 +63,8 @@ Related config remains separate:
 ~/.config/itsy/themes/*.toml
 ~/.config/itsy/snippets/<language-id>.json
 ```
+
+Bundled keymaps live in `Sources/ItsyKeymap/Resources/keys.plain.toml`, `keys.vim.toml`, and `keys.emacs.toml`. Toggle the active keymap in Settings or with `editor.keymap`; user overrides stay in `~/.config/itsy/keys.toml`.
 
 Workspace problem matchers live at:
 

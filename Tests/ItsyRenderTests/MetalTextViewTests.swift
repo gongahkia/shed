@@ -505,6 +505,29 @@ import Testing
 	#expect(Array(view.gutterView.visibleLineNumberLabels.prefix(4)) == ["1", "2", "5", "6"])
 }
 
+@Test func relativeLineNumbersUseActiveLineDistance() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "a\nb\nc\n")
+	view.lineHeight = 20
+	view.lineNumberMode = .relative
+	view.selectUTF8Range(2 ..< 2)
+
+	#expect(Array(view.gutterView.visibleLineNumberLabels.prefix(3)) == ["1", "0", "1"])
+}
+
+@Test func softWrapSplitsVisibleLineSlots() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 60, height: 100))
+	view.editor = Editor(text: "abcdef")
+	view.lineHeight = 20
+	view.wrapMode = .soft
+
+	let ranges = view.visibleLineSlots().map(\.range)
+	#expect(ranges.count > 1)
+	#expect(ranges.first?.lowerBound == 0)
+	#expect(ranges.last?.upperBound == 6)
+	#expect(zip(ranges, ranges.dropFirst()).allSatisfy { $0.upperBound == $1.lowerBound })
+}
+
 @Test func inlayHintAnnotationsRenderAsTintedGlyphs() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "let value = 1\n")
@@ -554,6 +577,28 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	#expect(view.editor.selections.primary.head == 10)
 	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 51))
 	#expect(editorStorageString(view.editor) == "hello word")
+}
+
+@Test func shiftArrowKeysExtendSelectionByDefault() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\nxyz")
+	view.selectUTF8Range(1 ..< 1)
+
+	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 124, modifierFlags: .shift))
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 2))
+	#expect(view.handleKey(characters: nil, charactersIgnoringModifiers: nil, keyCode: 125, modifierFlags: .shift))
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 6))
+}
+
+@Test func hardWrapInsertsNewlineAtConfiguredColumn() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abcdefghijklmnopqrst")
+	view.wrapMode = .hard
+	view.hardWrapColumn = 20
+	view.selectUTF8Range(20 ..< 20)
+
+	#expect(view.handleKey(characters: "u", charactersIgnoringModifiers: "u", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "abcdefghijklmnopqrst\nu")
 }
 
 @Test func insertNewlineUsesProviderText() {

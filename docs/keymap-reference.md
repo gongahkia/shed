@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `48`
+- Bindings: `54`
 
 ### mode.insert
 
@@ -19,6 +19,12 @@ scripts/gen_keymap_docs.swift
 |---|---|
 | `Left` | `editor.moveLeft` |
 | `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
+| `Shift-Left` | `editor.extendLeft` |
+| `Shift-Right` | `editor.extendRight` |
+| `Shift-Up` | `editor.extendUp` |
+| `Shift-Down` | `editor.extendDown` |
 | `Cmd-Left` | `editor.moveLineStart` |
 | `Cmd-Right` | `editor.moveLineEnd` |
 | `Cmd-N` | `file.new` |
@@ -69,7 +75,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `286`
+- Bindings: `306`
 
 ### mode.normal
 
@@ -79,6 +85,10 @@ scripts/gen_keymap_docs.swift
 | `j` | `editor.moveDown` |
 | `k` | `editor.moveUp` |
 | `l` | `editor.moveRight` |
+| `Left` | `editor.moveLeft` |
+| `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
 | `w` | `editor.moveWordForward` |
 | `Shift-W` | `editor.moveBigWordForward` |
 | `b` | `editor.moveWordBackward` |
@@ -307,6 +317,10 @@ scripts/gen_keymap_docs.swift
 | `j` | `editor.moveDown` |
 | `k` | `editor.moveUp` |
 | `l` | `editor.moveRight` |
+| `Left` | `editor.moveLeft` |
+| `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
 | `w` | `editor.moveWordForward` |
 | `b` | `editor.moveWordBackward` |
 | `e` | `editor.moveWordEnd` |
@@ -324,6 +338,10 @@ scripts/gen_keymap_docs.swift
 | `j` | `editor.moveDown` |
 | `k` | `editor.moveUp` |
 | `l` | `editor.moveRight` |
+| `Left` | `editor.moveLeft` |
+| `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
 | `w` | `editor.moveWordForward` |
 | `Shift-W` | `editor.moveBigWordForward` |
 | `b` | `editor.moveWordBackward` |
@@ -359,6 +377,14 @@ scripts/gen_keymap_docs.swift
 
 | Key | Command |
 |---|---|
+| `Left` | `editor.moveLeft` |
+| `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
+| `Shift-Left` | `editor.extendLeft` |
+| `Shift-Right` | `editor.extendRight` |
+| `Shift-Up` | `editor.extendUp` |
+| `Shift-Down` | `editor.extendDown` |
 | `Cmd-D` | `editor.addNextSelection` |
 | `Cmd-Ctrl-G` | `edit.selectAllFindMatches` |
 | `Cmd-W` | `pane.close` |
@@ -380,7 +406,7 @@ scripts/gen_keymap_docs.swift
 ## Emacs
 
 - Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
-- Bindings: `62`
+- Bindings: `70`
 
 ### mode.emacs
 
@@ -390,6 +416,14 @@ scripts/gen_keymap_docs.swift
 | `C-b` | `editor.moveLeft` |
 | `C-n` | `editor.moveDown` |
 | `C-p` | `editor.moveUp` |
+| `Left` | `editor.moveLeft` |
+| `Right` | `editor.moveRight` |
+| `Up` | `editor.moveUp` |
+| `Down` | `editor.moveDown` |
+| `Shift-Left` | `editor.extendLeft` |
+| `Shift-Right` | `editor.extendRight` |
+| `Shift-Up` | `editor.extendUp` |
+| `Shift-Down` | `editor.extendDown` |
 | `C-a` | `editor.moveLineStart` |
 | `C-e` | `editor.moveLineEnd` |
 | `M-f` | `editor.moveWordForward` |

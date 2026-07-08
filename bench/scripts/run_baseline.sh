@@ -7,12 +7,16 @@ repo_dir="$(cd "$bench_dir/.." && pwd)"
 results_dir="$bench_dir/results"
 runs="${RUNS:-20}"
 only="${ITSY_BASELINE_ONLY:-}"
+include="${ITSY_BASELINE_INCLUDE:-}"
+include_itsy="${ITSY_BASELINE_INCLUDE_ITSY:-0}"
 purge="${ITSY_BASELINE_PURGE:-1}"
 itsybench="${ITSYBENCH:-$repo_dir/.build/release/ItsyBench}"
 date_stamp="${BASELINE_DATE:-$(date +%F)}"
-json_out="$results_dir/baseline-$date_stamp.json"
-md_out="$results_dir/baseline-$date_stamp.md"
+prefix="${BASELINE_PREFIX:-baseline}"
+json_out="$results_dir/$prefix-$date_stamp.json"
+md_out="$results_dir/$prefix-$date_stamp.md"
 ndjson="$(mktemp)"
+include_names=()
 
 trap 'rm -f "$ndjson"' EXIT
 mkdir -p "$results_dir"
@@ -21,7 +25,36 @@ if [[ ! -x "$itsybench" ]]; then
 	(cd "$repo_dir" && swift build -c release)
 fi
 
-apps=(
+if [[ "$include_itsy" == "1" && ! -d "$repo_dir/Itsy.app" ]]; then
+	(cd "$repo_dir" && swift build -c release >/dev/null && bench/scripts/make_app.sh >/dev/null)
+fi
+
+if [[ -n "$include" ]]; then
+	IFS=',' read -r -a include_names <<< "$include"
+fi
+
+should_include() {
+	local name="$1"
+	if [[ -n "$only" && "$name" != "$only" ]]; then
+		return 1
+	fi
+	if [[ ${#include_names[@]} -eq 0 ]]; then
+		return 0
+	fi
+	local include_name
+	for include_name in "${include_names[@]}"; do
+		if [[ "$name" == "$include_name" ]]; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+apps=()
+if [[ "$include_itsy" == "1" ]]; then
+	apps+=("Itsy|$repo_dir/Itsy.app")
+fi
+apps+=(
 	"Zed|/Applications/Zed.app"
 	"Sublime Text|/Applications/Sublime Text.app"
 	"VSCode|/Applications/Visual Studio Code.app"
@@ -32,7 +65,7 @@ apps=(
 for entry in "${apps[@]}"; do
 	name="${entry%%|*}"
 	path="${entry#*|}"
-	if [[ -n "$only" && "$name" != "$only" ]]; then
+	if ! should_include "$name"; then
 		continue
 	fi
 	if [[ ! -d "$path" ]]; then

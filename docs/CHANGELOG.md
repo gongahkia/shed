@@ -2,6 +2,11 @@
 
 ## 2026-07-08
 
+### Phase 36 D8: Competitor perf automation
+
+- Added a nightly competitor workflow for Zed, Sublime Text, CodeEdit, and Itsy.
+- Added competitor threshold checks for startup against Sublime Text and RSS against Zed.
+
 ### Phase 36 D9: Docs automation
 
 - Added screenshot capture automation for main, command palette, find, and terminal views.

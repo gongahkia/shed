@@ -111,6 +111,20 @@ public struct TextHoverCandidate: Sendable, Equatable {
 	}
 }
 
+public struct TextContextMenuRequest: Equatable {
+	public var localPoint: NSPoint
+	public var utf8Offset: Int
+	public var hasSelection: Bool
+	public var selectedText: String?
+
+	public init(localPoint: NSPoint, utf8Offset: Int, hasSelection: Bool, selectedText: String?) {
+		self.localPoint = localPoint
+		self.utf8Offset = utf8Offset
+		self.hasSelection = hasSelection
+		self.selectedText = selectedText
+	}
+}
+
 struct MetalViewportUniforms {
 	var size: SIMD2<Float>
 }
@@ -296,6 +310,7 @@ public final class MetalTextView: NSView {
 	public var signatureHelpRequested: ((String?) -> Bool)?
 	public var signatureHelpDismissRequested: (() -> Void)?
 	public var hoverCandidateChanged: ((TextHoverCandidate?) -> Void)?
+	public var contextMenuProvider: ((TextContextMenuRequest) -> NSMenu?)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var exCommandCompletionsProvider: (() -> [String])?
@@ -636,6 +651,59 @@ public final class MetalTextView: NSView {
 		editorDidChange?(editor)
 	}
 
+	public var hasNonEmptySelection: Bool {
+		!nonEmptySelectionRanges.isEmpty
+	}
+
+	public func selectedText(trimmed: Bool = false) -> String? {
+		let ranges = nonEmptySelectionRanges
+		guard !ranges.isEmpty else {
+			return nil
+		}
+		let text = ranges.map { editor.rope.slice($0) }.joined(separator: "\n")
+		return trimmed ? text.trimmingCharacters(in: .whitespacesAndNewlines) : text
+	}
+
+	@discardableResult
+	public func copySelectedText(trimmed: Bool = false) -> Bool {
+		guard let text = selectedText(trimmed: trimmed) else {
+			return false
+		}
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		return true
+	}
+
+	@discardableResult
+	public func cutSelectedText() -> Bool {
+		guard copySelectedText() else {
+			return false
+		}
+		lastYankRange = nil
+		editor.insert("")
+		syncEditorState()
+		editorDidChange?(editor)
+		return true
+	}
+
+	@discardableResult
+	public func pasteTextFromPasteboard() -> Bool {
+		guard let text = NSPasteboard.general.string(forType: .string) else {
+			return false
+		}
+		lastYankRange = nil
+		editor.insert(text)
+		syncEditorState()
+		editorDidChange?(editor)
+		return true
+	}
+
+	private var nonEmptySelectionRanges: [Range<Int>] {
+		([editor.selections.primary] + editor.selections.secondaries)
+			.map(\.range)
+			.filter { !$0.isEmpty }
+	}
+
 	func toggleAdditionalCursor(at offset: Int) {
 		let clamped = min(max(offset, 0), editor.textStorage.length)
 		var selections = [editor.selections.primary] + editor.selections.secondaries
@@ -740,6 +808,26 @@ public final class MetalTextView: NSView {
 			return
 		}
 		super.rightMouseDown(with: event)
+	}
+
+	public override func menu(for event: NSEvent) -> NSMenu? {
+		guard gutterMarker(forMouseEvent: event) == nil, gutterLine(forMouseEvent: event) == nil else {
+			return nil
+		}
+		window?.makeFirstResponder(self)
+		let localPoint = convert(event.locationInWindow, from: nil)
+		let offset = utf8Offset(forLocalPoint: localPoint)
+		if !nonEmptySelectionRanges.contains(where: { $0.contains(offset) || $0.upperBound == offset }) {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
+			syncEditorState()
+		}
+		let request = TextContextMenuRequest(
+			localPoint: localPoint,
+			utf8Offset: offset,
+			hasSelection: hasNonEmptySelection,
+			selectedText: selectedText()
+		)
+		return contextMenuProvider?(request) ?? super.menu(for: event)
 	}
 
 	public override func mouseMoved(with event: NSEvent) {

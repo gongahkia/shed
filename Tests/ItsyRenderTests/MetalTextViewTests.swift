@@ -146,6 +146,76 @@ import Testing
 	#expect(view.editor.selections.primary == Selection(anchor: 4, head: 8))
 }
 
+@MainActor @Test func contextMenuPreservesSelectionWhenRightClickInsideSelection() throws {
+	let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 100), styleMask: [], backing: .buffered, defer: false)
+	let view = MetalTextView(frame: window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abcdef")
+	window.contentView?.addSubview(view)
+	view.selectUTF8Range(1 ..< 4)
+	var captured: TextContextMenuRequest?
+	view.contextMenuProvider = { request in
+		captured = request
+		return NSMenu()
+	}
+
+	let rect = view.positioningRectForUTF8Offset(2)
+	let event = try #require(rightMouseEvent(at: NSPoint(x: rect.minX + 1, y: rect.midY), in: view, window: window))
+	_ = view.menu(for: event)
+
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 4))
+	#expect(captured?.hasSelection == true)
+	#expect(captured?.selectedText == "bcd")
+}
+
+@MainActor @Test func contextMenuMovesCaretWhenRightClickOutsideSelection() throws {
+	let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 100), styleMask: [], backing: .buffered, defer: false)
+	let view = MetalTextView(frame: window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abcdef")
+	window.contentView?.addSubview(view)
+	view.selectUTF8Range(1 ..< 4)
+	var captured: TextContextMenuRequest?
+	view.contextMenuProvider = { request in
+		captured = request
+		return NSMenu()
+	}
+
+	let rect = view.positioningRectForUTF8Offset(5)
+	let event = try #require(rightMouseEvent(at: NSPoint(x: rect.minX + 1, y: rect.midY), in: view, window: window))
+	_ = view.menu(for: event)
+
+	#expect(view.editor.selections.primary == Selection(anchor: 5, head: 5))
+	#expect(captured?.hasSelection == false)
+	#expect(captured?.selectedText == nil)
+}
+
+@MainActor @Test func contextMenuClipboardHelpersCopyCutAndPasteSelection() {
+	withPasteboardLock {
+		NSPasteboard.general.clearContents()
+		let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
+		view.editor = Editor(text: "  alpha  beta")
+		var changeCount = 0
+		view.editorDidChange = { _ in
+			changeCount += 1
+		}
+
+		view.selectUTF8Range(0 ..< 9)
+		#expect(view.copySelectedText())
+		#expect(NSPasteboard.general.string(forType: .string) == "  alpha  ")
+		#expect(view.copySelectedText(trimmed: true))
+		#expect(NSPasteboard.general.string(forType: .string) == "alpha")
+		#expect(view.cutSelectedText())
+		#expect(NSPasteboard.general.string(forType: .string) == "  alpha  ")
+		#expect(editorStorageString(view.editor) == "beta")
+
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString("gamma", forType: .string)
+		view.selectUTF8Range(4 ..< 4)
+		#expect(view.pasteTextFromPasteboard())
+		#expect(editorStorageString(view.editor) == "betagamma")
+		#expect(changeCount == 2)
+	}
+}
+
 @Test func replacingUTF8RangeAppliesSelectionAndChangeCallback() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "abc")
@@ -1217,4 +1287,18 @@ private func withPasteboardLock(_ body: () -> Void) {
 	pasteboardTestLock.lock()
 	defer { pasteboardTestLock.unlock() }
 	body()
+}
+
+private func rightMouseEvent(at localPoint: NSPoint, in view: NSView, window: NSWindow) -> NSEvent? {
+	NSEvent.mouseEvent(
+		with: .rightMouseDown,
+		location: view.convert(localPoint, to: nil),
+		modifierFlags: [],
+		timestamp: 0,
+		windowNumber: window.windowNumber,
+		context: nil,
+		eventNumber: 1,
+		clickCount: 1,
+		pressure: 0
+	)
 }

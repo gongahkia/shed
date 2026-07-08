@@ -4,7 +4,7 @@
 - **Hardware:** M2 or newer, 16 GB+ RAM, on AC, no other GUI apps open.
 - **Tooling:** `hyperfine --warmup 0 --runs 20 --prepare 'sudo purge'` per cmd.
 - **Cold-start measurement:** Each editor under test gets a startup probe:
-  - For `itsy`: `itsybench measure --staged` sets `ITSY_BENCH_STAGES_PATH` and records internal stage deltas for process/delegate/menu stages plus document open, window-controller init/show, first display-link tick, render begin, and `first_draw` alongside the external first-window-visible KPI.
+  - For `itsy`: `itsybench measure --staged` sets `ITSY_BENCH_STAGES_PATH` and records internal stage deltas for process/delegate/menu stages plus document open, window-controller init/show, first display-link tick, render begin, and `first_draw`. In staged mode, `first_window_visible_ms` is the app-owned `applicationDidFinishLaunching` to first AX-visible window delta; `external_first_window_visible_ms` preserves the full `NSWorkspace.openApplication` wall-clock delta.
   - For Zed/Sublime/VSCode/CodeEdit: external observer (Swift CLI using Accessibility API `AXObserver` to detect first window-visible event), records timestamp, then `kill -TERM`.
 - **Corpus** (checked into `bench/corpus/`):
   - `small.ts` (1 kLOC)
@@ -20,7 +20,7 @@
 
 ```sh
 itsybench display [--display <id>]
-itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
+itsybench measure --app <path> [--args <arg>] [--new-instance] [--runs <count>] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]

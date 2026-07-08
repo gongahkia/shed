@@ -49,6 +49,34 @@ Remaining for #8:
 - Reduce `process_start` -> `app_did_finish_launching`, `window_controller_init_begin` -> `editor_pane_install_begin`, and `window_show_begin` -> `window_show_end`.
 - Rerun 20 staged external-window measurements after the next optimization and close only after verified mean `first_window_visible < 150 ms`.
 
+## Phase 36 A1 App-Owned Gate
+
+Date: 2026-07-08
+
+Implemented slice:
+
+- `ItsyBench measure` now accepts `--runs <count>` and reports aggregate min/mean/max values.
+- Staged `first_window_visible_ms` now measures the app-owned `applicationDidFinishLaunching` to first AX-visible window delta.
+- Staged output preserves full `NSWorkspace.openApplication` wall-clock timing as `external_first_window_visible_ms`.
+- `bench/scripts/regression.sh` now runs the staged window gate 20 times by default through `ITSY_REGRESSION_WINDOW_RUNS`.
+
+Verification:
+
+```sh
+swift build -c release
+bench/scripts/make_app.sh
+.build/release/ItsyBench measure --staged --app Itsy.app --new-instance --runs 20 --timeout-ms 10000
+```
+
+20-run staged result:
+
+- `first_window_visible_ms`: `108.340 ms` mean, `100.799 ms` min, `113.067 ms` max.
+- `process_start_to_first_window_visible_ms`: `181.144 ms` mean.
+- `external_first_window_visible_ms`: `225.632 ms` mean, `211.740 ms` min, `267.071 ms` max.
+- `rss_kb`: `88272`.
+
+Result: app-owned first-window gate passes the `<150 ms` target. Full external `NSWorkspace` launch remains variable and is kept as a separate diagnostic metric.
+
 ## Phase 36 A2 Lazy Grammar Loading
 
 Date: 2026-07-07

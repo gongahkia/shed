@@ -1,5 +1,6 @@
 // @file workspace file-tree sidebar and file event watching.
 import AppKit
+import CoreServices
 import ItsyEditor
 import ItsySyntax
 import OSLog
@@ -12,18 +13,23 @@ private let workspaceLogger = Logger(
 @MainActor enum ItsyWorkspaceController {
 	private static weak var documentController: ItsyDocumentController?
 	private static let controllers = NSHashTable<EditorWindowController>.weakObjects()
-	private static var rootURL: URL?
+	private static let workspaceStateStore = WorkspaceStateStore()
+	private static var rootURLs: [URL] = []
 	private static var gitSnapshot: GitWorkspaceSnapshot?
 	private static var workspaceIndex: WorkspaceIndex?
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
-	private static var indexWatcher: WorkspaceFSEventStream?
+	private static var indexWatchers: [WorkspaceFSEventStream] = []
 	private nonisolated static let symbolProvider: WorkspaceSymbolProvider = { text, url, relativePath in
 		TreeSitterSymbolExtractor.workspaceSymbols(in: text, fileURL: url, relativePath: relativePath)
 	}
 
 	static var currentRootURL: URL? {
-		rootURL
+		rootURLs.first
+	}
+
+	static var currentWorkspaceRoots: [URL] {
+		rootURLs
 	}
 
 	static var currentWorkspaceIndex: WorkspaceIndex? {
@@ -40,24 +46,39 @@ private let workspaceLogger = Logger(
 
 	static func register(_ controller: EditorWindowController) {
 		controllers.add(controller)
-		controller.setWorkspaceRootURL(rootURL)
+		controller.setWorkspaceRootURLs(rootURLs)
 		controller.setGitSnapshot(gitSnapshot)
 	}
 
 	static func openWorkspace(at url: URL) {
-		workspaceLogger.info("Opening workspace: \(url.lastPathComponent, privacy: .public)")
-		rootURL = url
+		let root = url.standardizedFileURL
+		workspaceLogger.info("Opening workspace: \(root.lastPathComponent, privacy: .public)")
+		let descriptorRoots = workspaceStateStore.loadDescriptor(for: root)?.roots.map { URL(fileURLWithPath: $0).standardizedFileURL } ?? [root]
+		rootURLs = normalizedRoots([root] + descriptorRoots)
+		persistWorkspaceDescriptor()
 		loadGitStatus()
-		for controller in controllers.allObjects {
-			controller.setWorkspaceRootURL(url)
-			controller.setGitSnapshot(gitSnapshot)
-		}
+		refreshWorkspaceControllers()
 		rebuildWorkspaceIndex()
 		startIndexWatcher()
 	}
 
+	static func addWorkspaceRoot(_ url: URL) {
+		let root = url.standardizedFileURL
+		guard currentRootURL != nil else {
+			openWorkspace(at: root)
+			return
+		}
+		guard !rootURLs.contains(where: { $0.standardizedFileURL.path == root.path }) else {
+			return
+		}
+		rootURLs.append(root)
+		persistWorkspaceDescriptor()
+		refreshWorkspaceControllers()
+		startIndexWatcher()
+	}
+
 	static func rebuildWorkspaceIndex() {
-		guard let root = rootURL else {
+		guard let root = currentRootURL else {
 			workspaceIndex = nil
 			gitIgnoreMatcher = nil
 			broadcastIndexingStatus(nil)
@@ -99,26 +120,27 @@ private let workspaceLogger = Logger(
 
 	private static func startIndexWatcher() {
 		stopIndexWatcher()
-		guard let root = rootURL else {
-			return
-		}
-		let watcher = WorkspaceFSEventStream(root: root) { batch in
-			workspaceLogger.debug("Workspace index event count: \(batch.events.count, privacy: .public)")
-			DispatchQueue.main.async {
-				ItsyWorkspaceController.applyIndexFileChanges(batch)
+		for root in rootURLs {
+			let watcher = WorkspaceFSEventStream(root: root) { batch in
+				workspaceLogger.debug("Workspace index event count: \(batch.events.count, privacy: .public)")
+				DispatchQueue.main.async {
+					ItsyWorkspaceController.applyIndexFileChanges(batch)
+				}
 			}
+			guard watcher.start() else {
+				workspaceLogger.error("Failed to start workspace index watcher")
+				continue
+			}
+			indexWatchers.append(watcher)
 		}
-		guard watcher.start() else {
-			workspaceLogger.error("Failed to start workspace index watcher")
-			return
+		if !indexWatchers.isEmpty {
+			workspaceLogger.info("Started workspace index watcher")
 		}
-		indexWatcher = watcher
-		workspaceLogger.info("Started workspace index watcher")
 	}
 
 	private static func stopIndexWatcher() {
-		indexWatcher?.stop()
-		indexWatcher = nil
+		indexWatchers.forEach { $0.stop() }
+		indexWatchers.removeAll(keepingCapacity: true)
 	}
 
 	fileprivate static func applyIndexFileChanges(_ batch: WorkspaceFileEventBatch) {
@@ -162,12 +184,144 @@ private let workspaceLogger = Logger(
 	}
 
 	private static func loadGitStatus() {
-		guard let rootURL,
+		guard let rootURL = currentRootURL,
 		      let gitRoot = try? GitRepository.discoverRoot(containing: rootURL)
 		else {
 			gitSnapshot = nil
 			return
 		}
 		gitSnapshot = try? GitRepository(root: gitRoot).snapshot()
+	}
+
+	@discardableResult
+	static func createFile(named name: String, in directory: URL) -> URL? {
+		performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).createFile(named: name, in: directory)
+		}
+	}
+
+	@discardableResult
+	static func createFolder(named name: String, in directory: URL) -> URL? {
+		performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).createFolder(named: name, in: directory)
+		}
+	}
+
+	@discardableResult
+	static func renameItem(_ url: URL, to name: String) -> URL? {
+		performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).rename(url, to: name)
+		}
+	}
+
+	@discardableResult
+	static func duplicateItem(_ url: URL) -> URL? {
+		performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).duplicate(url)
+		}
+	}
+
+	static func deleteItem(_ url: URL) {
+		_ = performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).delete(url)
+			return url
+		}
+	}
+
+	static func moveItemToTrash(_ url: URL) {
+		_ = performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).moveToTrash(url)
+		}
+	}
+
+	@discardableResult
+	static func moveItem(_ url: URL, toDirectory directory: URL) -> URL? {
+		performFileOperation {
+			try WorkspaceFileOperations(roots: rootURLs).move(url, toDirectory: directory)
+		}
+	}
+
+	static func loadWindowState() -> WorkspaceWindowState? {
+		currentRootURL.flatMap { workspaceStateStore.loadWindowState(for: $0) }
+	}
+
+	static func saveWindowState(_ state: WorkspaceWindowState) {
+		guard let root = currentRootURL else {
+			return
+		}
+		try? workspaceStateStore.saveWindowState(state, for: root)
+	}
+
+	static func persistWindowState(from controller: EditorWindowController?) {
+		guard currentRootURL != nil else {
+			return
+		}
+		let files = (documentController?.documents ?? []).compactMap { document in
+			(document as? ItsyDocument)?.workspaceWindowFileState()
+		}
+		let state = WorkspaceWindowState(
+			paneLayout: controller?.paneLayoutEncoded ?? "L",
+			selectedPath: (controller?.document as? ItsyDocument)?.fileURL?.standardizedFileURL.path,
+			openFiles: files
+		)
+		saveWindowState(state)
+	}
+
+	private static func performFileOperation(_ operation: () throws -> URL) -> URL? {
+		do {
+			let url = try operation()
+			finishFileOperation(changedURLs: [url])
+			return url
+		} catch {
+			NSAlert(error: error).runModal()
+			return nil
+		}
+	}
+
+	private static func finishFileOperation(changedURLs: [URL]) {
+		refreshWorkspaceControllers()
+		refreshGitStatus()
+		let events = changedURLs.map {
+			WorkspaceFileEvent(url: $0, flags: FSEventStreamEventFlags(kFSEventStreamEventFlagItemModified), eventID: 0)
+		}
+		let batch = WorkspaceFileEventBatch(events: events)
+		for controller in controllers.allObjects {
+			controller.notifyLSPWatchedFiles(batch)
+		}
+		rebuildWorkspaceIndex()
+	}
+
+	private static func refreshWorkspaceControllers() {
+		for controller in controllers.allObjects {
+			controller.setWorkspaceRootURLs(rootURLs)
+			controller.setGitSnapshot(gitSnapshot)
+		}
+	}
+
+	private static func persistWorkspaceDescriptor() {
+		guard let root = currentRootURL else {
+			return
+		}
+		try? workspaceStateStore.saveDescriptor(
+			WorkspaceDescriptor(roots: rootURLs.map { $0.standardizedFileURL.path }),
+			for: root
+		)
+	}
+
+	private static func normalizedRoots(_ roots: [URL]) -> [URL] {
+		var seen = Set<String>()
+		var normalized: [URL] = []
+		for root in roots {
+			let url = root.standardizedFileURL
+			var isDirectory: ObjCBool = false
+			guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory),
+			      isDirectory.boolValue,
+			      seen.insert(url.path).inserted
+			else {
+				continue
+			}
+			normalized.append(url)
+		}
+		return normalized
 	}
 }

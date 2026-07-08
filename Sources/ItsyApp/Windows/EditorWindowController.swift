@@ -189,6 +189,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		configureLSPStatusRestart()
 		fileTreeController.attach(to: window)
 		fileTreeController.openFile = { ItsyWorkspaceController.openFile(at: $0) }
+		fileTreeController.createFileRequested = { ItsyWorkspaceController.createFile(named: $0, in: $1) }
+		fileTreeController.createFolderRequested = { ItsyWorkspaceController.createFolder(named: $0, in: $1) }
+		fileTreeController.renameItemRequested = { ItsyWorkspaceController.renameItem($0, to: $1) }
+		fileTreeController.duplicateItemRequested = { ItsyWorkspaceController.duplicateItem($0) }
+		fileTreeController.deleteItemRequested = { ItsyWorkspaceController.deleteItem($0) }
+		fileTreeController.trashItemRequested = { ItsyWorkspaceController.moveItemToTrash($0) }
+		fileTreeController.moveItemRequested = { ItsyWorkspaceController.moveItem($0, toDirectory: $1) }
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
@@ -227,6 +234,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	func setWorkspaceRootURL(_ url: URL?) {
 		fileTreeController.setWorkspaceRootURL(url)
+	}
+
+	func setWorkspaceRootURLs(_ urls: [URL]) {
+		fileTreeController.setWorkspaceRootURLs(urls)
 	}
 
 	func setGitSnapshot(_ snapshot: GitWorkspaceSnapshot?) {
@@ -702,6 +713,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		showWindow(nil)
 		focusEditor()
 		ItsyTabCoordinator.refresh()
+		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
 	override func encodeRestorableState(with coder: NSCoder) {
@@ -714,6 +726,28 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		guard
 			let string = coder.decodeObject(forKey: Self.paneLayoutStateKey) as? String,
 			let layout = EditorPaneLayout.decode(string),
+			let document = document as? ItsyDocument
+		else {
+			return
+		}
+		for pane in paneCoordinator.panes {
+			document.detach(pane.editorView)
+		}
+		for pane in paneCoordinator.restore(layout: layout) {
+			installPane(pane, document: document)
+		}
+		refreshLSPMissingBanner(for: document)
+		refreshLSPStatus(for: document)
+		focusEditor()
+	}
+
+	var paneLayoutEncoded: String {
+		paneCoordinator.layout().encoded
+	}
+
+	func restoreWorkspacePaneLayout(_ encoded: String) {
+		guard
+			let layout = EditorPaneLayout.decode(encoded),
 			let document = document as? ItsyDocument
 		else {
 			return
@@ -795,6 +829,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		view.undoTreeChanged = { [weak self] tree in
 			self?.undoTreePanel?.update(tree: tree)
 		}
+		view.fileDropRequested = { [weak self] urls in
+			self?.openDroppedFiles(urls) ?? false
+		}
 		scheduleLSPSemanticSurfaceRefresh()
 		recordBenchStage("editor_pane_callbacks_end")
 		recordBenchStage("editor_pane_install_end")
@@ -842,6 +879,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let pane = paneCoordinator.splitActive(vertical: vertical)
 		installPane(pane, document: document)
 		focusEditor()
+		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
 	private func closeActivePane() -> Bool {
@@ -850,6 +888,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		document.detach(pane.editorView)
 		focusEditor()
+		ItsyWorkspaceController.persistWindowState(from: self)
 		return true
 	}
 
@@ -861,6 +900,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			document.detach(pane.editorView)
 		}
 		focusEditor()
+		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
 	private func focusAdjacentPane(delta: Int) {
@@ -1078,6 +1118,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		collapsedFoldStartsByURI[uri] = starts
 		applyFoldState(uri: uri, document: document)
+		ItsyWorkspaceController.persistWindowState(from: self)
 		return true
 	}
 
@@ -1093,6 +1134,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		collapsedFoldStartsByURI[uri] = starts
 		applyFoldState(uri: uri, document: document)
+		ItsyWorkspaceController.persistWindowState(from: self)
+	}
+
+	private func openDroppedFiles(_ urls: [URL]) -> Bool {
+		var didOpen = false
+		for url in urls {
+			var isDirectory: ObjCBool = false
+			FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+			if isDirectory.boolValue {
+				ItsyWorkspaceController.addWorkspaceRoot(url)
+				didOpen = true
+			} else {
+				didOpen = ItsyWorkspaceController.openFile(at: url) || didOpen
+			}
+		}
+		return didOpen
 	}
 
 	private func foldRangeAtCursor(uri: String) -> LSPFoldingRange? {
@@ -2740,6 +2797,7 @@ extension EditorWindowController: NSWindowDelegate {
 	}
 
 	func windowWillClose(_ notification: Notification) {
+		ItsyWorkspaceController.persistWindowState(from: self)
 		ItsyTabCoordinator.refresh()
 	}
 }

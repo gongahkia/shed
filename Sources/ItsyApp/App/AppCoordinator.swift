@@ -180,6 +180,9 @@ import ItsyKeymap
 				Command(id: "file.openFolder", title: L10n.string("Open Folder"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.openFolder(nil)
 				},
+				Command(id: "file.addFolderToWorkspace", title: L10n.string("Add Folder to Workspace..."), defaultKey: nil) { [weak self] in
+					self?.addFolderToWorkspace(nil)
+				},
 				Command(id: "file.save", title: L10n.string("Save File"), defaultKey: "Cmd-S") { [weak self] in
 					self?.activeDocument()?.save(nil)
 				},
@@ -625,6 +628,21 @@ import ItsyKeymap
 		_ = openWorkspace(at: url)
 	}
 
+	@objc func addFolderToWorkspace(_ sender: Any?) {
+		let panel = NSOpenPanel()
+		panel.canChooseDirectories = true
+		panel.canChooseFiles = false
+		panel.allowsMultipleSelection = false
+		guard panel.runModal() == .OK, let url = panel.url else {
+			return
+		}
+		guard ItsyWorkspaceController.currentRootURL != nil else {
+			_ = openWorkspace(at: url)
+			return
+		}
+		ItsyWorkspaceController.addWorkspaceRoot(url)
+	}
+
 	private func openPath(_ url: URL) -> Bool {
 		var isDirectory: ObjCBool = false
 		FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
@@ -639,7 +657,8 @@ import ItsyKeymap
 		settingsCoordinator.workspaceDidChange()
 		commandRegistry = makeCommandRegistry(workspaceRoot: url)
 		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: url, commandRegistry: commandRegistry))
-		if documentController.documents.isEmpty {
+		let restored = restoreWorkspaceWindowState()
+		if documentController.documents.isEmpty, !restored {
 			do {
 				_ = try documentController.openUntitledDocumentAndDisplay(true)
 			} catch {
@@ -648,6 +667,30 @@ import ItsyKeymap
 			}
 		}
 		return true
+	}
+
+	private func restoreWorkspaceWindowState() -> Bool {
+		guard let state = ItsyWorkspaceController.loadWindowState() else {
+			return false
+		}
+		var didOpen = false
+		for fileState in state.openFiles {
+			let url = URL(fileURLWithPath: fileState.path)
+			guard FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url) else {
+				continue
+			}
+			(documentController.document(for: url) as? ItsyDocument)?.restoreWorkspaceWindowFileState(fileState)
+			didOpen = true
+		}
+		if let selectedPath = state.selectedPath {
+			let url = URL(fileURLWithPath: selectedPath)
+			if FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url) {
+				didOpen = true
+			}
+		}
+		activeEditorWindowController()?.restoreWorkspacePaneLayout(state.paneLayout)
+		ItsyWorkspaceController.persistWindowState(from: activeEditorWindowController())
+		return didOpen
 	}
 
 	private func installServicesProvider() {

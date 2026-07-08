@@ -302,6 +302,40 @@ import ItsySyntax
 		updateHandoffActivity()
 	}
 
+	func workspaceWindowFileState() -> WorkspaceWindowFileState? {
+		guard let fileURL else {
+			return nil
+		}
+		let selection = editor.selections.primary
+		let foldedRanges = (editorViews.first?.foldedLineRanges ?? []).map {
+			WorkspaceRangeState(lowerBound: $0.lowerBound, upperBound: $0.upperBound)
+		}
+		return WorkspaceWindowFileState(
+			path: fileURL.standardizedFileURL.path,
+			selectionAnchor: selection.anchor,
+			selectionHead: selection.head,
+			foldedRanges: foldedRanges
+		)
+	}
+
+	func restoreWorkspaceWindowFileState(_ state: WorkspaceWindowFileState) {
+		let length = editor.rope.length
+		let anchor = min(max(state.selectionAnchor, 0), length)
+		let head = min(max(state.selectionHead, 0), length)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: anchor, head: head)))
+		let foldedRanges = state.foldedRanges.compactMap { range -> Range<Int>? in
+			guard range.lowerBound >= 0, range.upperBound > range.lowerBound else {
+				return nil
+			}
+			return range.lowerBound ..< range.upperBound
+		}
+		for view in editorViews {
+			view.editor = editor
+			view.foldedLineRanges = foldedRanges
+		}
+		updateHandoffActivity()
+	}
+
 	func jumpTo(line: Int, column: Int) {
 		let zeroLine = max(0, line - 1)
 		let zeroColumn = max(0, column - 1)

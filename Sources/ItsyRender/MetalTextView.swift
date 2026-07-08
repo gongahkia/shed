@@ -300,6 +300,7 @@ public final class MetalTextView: NSView {
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var exCommandCompletionsProvider: (() -> [String])?
 	public var undoTreeChanged: ((UndoTree) -> Void)?
+	public var fileDropRequested: (([URL]) -> Bool)?
 	public var vimMarkStore = VimMarkStore() {
 		didSet {
 			loadPersistedVimMarks()
@@ -338,6 +339,7 @@ public final class MetalTextView: NSView {
 		super.init(frame: frameRect)
 		Self.recordBenchStageOnce("metal_text_view_super_end")
 		wantsLayer = true
+		registerForDraggedTypes([.fileURL])
 		addSubview(gutterView)
 		layoutGutterView()
 		syncEditorState()
@@ -355,6 +357,7 @@ public final class MetalTextView: NSView {
 		super.init(coder: coder)
 		Self.recordBenchStageOnce("metal_text_view_super_end")
 		wantsLayer = true
+		registerForDraggedTypes([.fileURL])
 		syncEditorState()
 		Self.recordBenchStageOnce("metal_text_view_init_end")
 	}
@@ -391,6 +394,18 @@ public final class MetalTextView: NSView {
 		true
 	}
 
+	public override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+		draggedFileURLs(sender.draggingPasteboard).isEmpty ? [] : .copy
+	}
+
+	public override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+		let urls = draggedFileURLs(sender.draggingPasteboard)
+		guard !urls.isEmpty else {
+			return false
+		}
+		return fileDropRequested?(urls) ?? false
+	}
+
 	public override func makeBackingLayer() -> CALayer {
 		let layer = CAMetalLayer()
 		layer.device = metalDevice
@@ -402,6 +417,10 @@ public final class MetalTextView: NSView {
 		}
 		layer.contentsScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1
 		return layer
+	}
+
+	private func draggedFileURLs(_ pasteboard: NSPasteboard) -> [URL] {
+		(pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
 	}
 
 	public override func viewDidMoveToWindow() {

@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 import ItsyEditor
 
-@MainActor final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+@MainActor final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
 	private static let quickLookPanelSelector = NSSelectorFromString("sharedPreviewPanel")
 	private static let quickLookDataSourceSelector = NSSelectorFromString("setDataSource:")
 	private static let quickLookDelegateSelector = NSSelectorFromString("setDelegate:")
@@ -18,13 +18,20 @@ import ItsyEditor
 	private let outlineView = NSOutlineView()
 	private let scrollView = NSScrollView()
 	private weak var window: NSWindow?
-	private var rootURL: NSURL?
+	private var rootURLs: [NSURL] = []
 	private var childCache: [NSURL: [NSURL]] = [:]
 	private var gitSnapshot: GitWorkspaceSnapshot?
 	private var keyMonitor: Any?
 	private var previewURL: URL?
 	private var showsHiddenFiles = false
 	var openFile: (URL) -> Bool = { _ in false }
+	var createFileRequested: (String, URL) -> URL? = { _, _ in nil }
+	var createFolderRequested: (String, URL) -> URL? = { _, _ in nil }
+	var renameItemRequested: (URL, String) -> URL? = { _, _ in nil }
+	var duplicateItemRequested: (URL) -> URL? = { _ in nil }
+	var deleteItemRequested: (URL) -> Void = { _ in }
+	var trashItemRequested: (URL) -> Void = { _ in }
+	var moveItemRequested: (URL, URL) -> URL? = { _, _ in nil }
 
 	override init() {
 		super.init()
@@ -45,10 +52,14 @@ import ItsyEditor
 	}
 
 	func setWorkspaceRootURL(_ url: URL?) {
-		rootURL = url.map { $0 as NSURL }
+		setWorkspaceRootURLs(url.map { [$0] } ?? [])
+	}
+
+	func setWorkspaceRootURLs(_ urls: [URL]) {
+		rootURLs = urls.map { $0 as NSURL }
 		childCache.removeAll(keepingCapacity: true)
 		outlineView.reloadData()
-		if let rootURL {
+		for rootURL in rootURLs {
 			outlineView.expandItem(rootURL)
 		}
 	}
@@ -62,7 +73,7 @@ import ItsyEditor
 		showsHiddenFiles.toggle()
 		childCache.removeAll(keepingCapacity: true)
 		outlineView.reloadData()
-		if let rootURL {
+		for rootURL in rootURLs {
 			outlineView.expandItem(rootURL)
 		}
 	}
@@ -98,6 +109,11 @@ import ItsyEditor
 		outlineView.delegate = self
 		outlineView.target = self
 		outlineView.doubleAction = #selector(doubleClickFileTree(_:))
+		outlineView.registerForDraggedTypes([.fileURL])
+		outlineView.setDraggingSourceOperationMask(.move, forLocal: true)
+		let menu = NSMenu()
+		menu.delegate = self
+		outlineView.menu = menu
 		keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
 			guard let self,
 			      event.keyCode == 49,
@@ -141,6 +157,11 @@ import ItsyEditor
 	private func isDirectory(_ url: NSURL) -> Bool {
 		let values = try? (url as URL).resourceValues(forKeys: [.isDirectoryKey])
 		return values?.isDirectory == true
+	}
+
+	private func isWorkspaceRoot(_ url: NSURL) -> Bool {
+		let path = (url as URL).standardizedFileURL.path
+		return rootURLs.contains { ($0 as URL).standardizedFileURL.path == path }
 	}
 
 	private func title(for url: NSURL) -> String {
@@ -253,17 +274,14 @@ import ItsyEditor
 		if let url = item as? NSURL {
 			return children(of: url).count
 		}
-		return rootURL == nil ? 0 : 1
+		return rootURLs.count
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
 		if let url = item as? NSURL {
 			return children(of: url)[index]
 		}
-		guard let rootURL else {
-			preconditionFailure("root node requested before workspace root was set")
-		}
-		return rootURL
+		return rootURLs[index]
 	}
 
 	func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
@@ -307,5 +325,193 @@ import ItsyEditor
 			])
 		}
 		return cell
+	}
+
+	func menuNeedsUpdate(_ menu: NSMenu) {
+		menu.removeAllItems()
+		let selected = contextURL()
+		guard let directory = contextDirectory(for: selected) else {
+			return
+		}
+		let newFile = menu.addItem(withTitle: L10n.string("New File"), action: #selector(newFile(_:)), keyEquivalent: "")
+		let newFolder = menu.addItem(withTitle: L10n.string("New Folder"), action: #selector(newFolder(_:)), keyEquivalent: "")
+		for item in [newFile, newFolder] {
+			item.target = self
+			item.representedObject = directory
+		}
+		guard let selected, !isWorkspaceRoot(selected) else {
+			return
+		}
+		menu.addItem(.separator())
+		menu.addItem(withTitle: L10n.string("Rename"), action: #selector(renameItem(_:)), keyEquivalent: "")
+		menu.addItem(withTitle: L10n.string("Duplicate"), action: #selector(duplicateItem(_:)), keyEquivalent: "")
+		menu.addItem(withTitle: L10n.string("Delete"), action: #selector(deleteItem(_:)), keyEquivalent: "")
+		menu.addItem(withTitle: L10n.string("Move to Trash"), action: #selector(moveItemToTrash(_:)), keyEquivalent: "")
+		for item in menu.items {
+			item.target = self
+			item.representedObject = directory
+		}
+	}
+
+	@objc private func newFile(_ sender: NSMenuItem) {
+		guard let directory = sender.representedObject as? URL,
+		      let name = promptName(title: L10n.string("New File"), defaultName: "")
+		else {
+			return
+		}
+		if let url = createFileRequested(name, directory) {
+			_ = openFile(url)
+		}
+	}
+
+	@objc private func newFolder(_ sender: NSMenuItem) {
+		guard let directory = sender.representedObject as? URL,
+		      let name = promptName(title: L10n.string("New Folder"), defaultName: "")
+		else {
+			return
+		}
+		_ = createFolderRequested(name, directory)
+	}
+
+	@objc private func renameItem(_ sender: NSMenuItem) {
+		guard let url = selectedURLForAction(),
+		      let name = promptName(title: L10n.string("Rename"), defaultName: url.lastPathComponent)
+		else {
+			return
+		}
+		_ = renameItemRequested(url, name)
+	}
+
+	@objc private func duplicateItem(_ sender: NSMenuItem) {
+		guard let url = selectedURLForAction() else {
+			return
+		}
+		_ = duplicateItemRequested(url)
+	}
+
+	@objc private func deleteItem(_ sender: NSMenuItem) {
+		guard let url = selectedURLForAction(), confirmDestructive(title: L10n.string("Delete \(url.lastPathComponent)?")) else {
+			return
+		}
+		deleteItemRequested(url)
+	}
+
+	@objc private func moveItemToTrash(_ sender: NSMenuItem) {
+		guard let url = selectedURLForAction() else {
+			return
+		}
+		trashItemRequested(url)
+	}
+
+	func outlineView(_ outlineView: NSOutlineView, pasteboardWriterForItem item: Any) -> NSPasteboardWriting? {
+		guard let url = item as? NSURL, !isWorkspaceRoot(url) else {
+			return nil
+		}
+		return url
+	}
+
+	func outlineView(
+		_ outlineView: NSOutlineView,
+		validateDrop info: NSDraggingInfo,
+		proposedItem item: Any?,
+		proposedChildIndex index: Int
+	) -> NSDragOperation {
+		guard info.draggingSource as AnyObject? === outlineView,
+		      let directory = dropDirectory(for: item),
+		      canDrop(draggedFileURLs(info.draggingPasteboard), into: directory)
+		else {
+			return []
+		}
+		return .move
+	}
+
+	func outlineView(
+		_ outlineView: NSOutlineView,
+		acceptDrop info: NSDraggingInfo,
+		item: Any?,
+		childIndex index: Int
+	) -> Bool {
+		guard info.draggingSource as AnyObject? === outlineView,
+		      let directory = dropDirectory(for: item)
+		else {
+			return false
+		}
+		let urls = draggedFileURLs(info.draggingPasteboard)
+		for url in urls {
+			_ = moveItemRequested(url, directory)
+		}
+		return !urls.isEmpty
+	}
+
+	private func contextURL() -> NSURL? {
+		let row = outlineView.clickedRow >= 0 ? outlineView.clickedRow : outlineView.selectedRow
+		guard row >= 0 else {
+			return nil
+		}
+		outlineView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+		return outlineView.item(atRow: row) as? NSURL
+	}
+
+	private func selectedURLForAction() -> URL? {
+		contextURL().map { $0 as URL }
+	}
+
+	private func contextDirectory(for url: NSURL?) -> URL? {
+		guard let url else {
+			return rootURLs.first.map { $0 as URL }
+		}
+		if isDirectory(url) {
+			return url as URL
+		}
+		return (url as URL).deletingLastPathComponent()
+	}
+
+	private func dropDirectory(for item: Any?) -> URL? {
+		guard let url = item as? NSURL else {
+			return nil
+		}
+		if isDirectory(url) {
+			return url as URL
+		}
+		return (url as URL).deletingLastPathComponent()
+	}
+
+	private func draggedFileURLs(_ pasteboard: NSPasteboard) -> [URL] {
+		(pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
+	}
+
+	private func canDrop(_ urls: [URL], into directory: URL) -> Bool {
+		guard !urls.isEmpty else {
+			return false
+		}
+		let directoryPath = directory.standardizedFileURL.path
+		return !urls.contains { url in
+			let path = url.standardizedFileURL.path
+			return directoryPath == path || directoryPath.hasPrefix(path + "/")
+		}
+	}
+
+	private func promptName(title: String, defaultName: String) -> String? {
+		let alert = NSAlert()
+		alert.messageText = title
+		let field = NSTextField(string: defaultName)
+		field.frame = NSRect(x: 0, y: 0, width: 280, height: 24)
+		alert.accessoryView = field
+		alert.addButton(withTitle: L10n.string("OK"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		guard alert.runModal() == .alertFirstButtonReturn else {
+			return nil
+		}
+		let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+		return name.isEmpty ? nil : name
+	}
+
+	private func confirmDestructive(title: String) -> Bool {
+		let alert = NSAlert()
+		alert.messageText = title
+		alert.addButton(withTitle: L10n.string("Delete"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		alert.alertStyle = .warning
+		return alert.runModal() == .alertFirstButtonReturn
 	}
 }

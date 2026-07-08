@@ -80,12 +80,34 @@ public struct ItsySettings: Equatable, Sendable {
 	}
 
 	public struct ThemeSettings: Equatable, Sendable {
+		public struct GitGutterSettings: Equatable, Sendable {
+			public static let defaultAdded = "#47C775"
+			public static let defaultModified = "#F2AD2E"
+			public static let defaultRemoved = "#F24038"
+
+			public var added: String
+			public var modified: String
+			public var removed: String
+
+			public init(
+				added: String = Self.defaultAdded,
+				modified: String = Self.defaultModified,
+				removed: String = Self.defaultRemoved
+			) {
+				self.added = added
+				self.modified = modified
+				self.removed = removed
+			}
+		}
+
 		public static let defaultID = "bundled:default-light"
 
 		public var id: String
+		public var gitGutter: GitGutterSettings
 
-		public init(id: String = Self.defaultID) {
+		public init(id: String = Self.defaultID, gitGutter: GitGutterSettings = GitGutterSettings()) {
 			self.id = id
+			self.gitGutter = gitGutter
 		}
 	}
 
@@ -101,7 +123,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public static let defaultFontSize = 12.0
 		public static let minFontSize = 8.0
 		public static let maxFontSize = 36.0
-		public static let defaultScrollbackLines = 10_000
+		public static let defaultScrollbackLines = 10000
 		public static let minScrollbackLines = 0
 		public static let maxScrollbackLines = 1_000_000
 
@@ -138,8 +160,16 @@ public struct ItsySettings: Equatable, Sendable {
 		if copy.editor.font.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 			copy.editor.font = EditorSettings.defaultFont
 		}
-		copy.editor.fontSize = Self.clamp(copy.editor.fontSize, min: EditorSettings.minFontSize, max: EditorSettings.maxFontSize)
-		copy.editor.tabWidth = Self.clamp(copy.editor.tabWidth, min: EditorSettings.minTabWidth, max: EditorSettings.maxTabWidth)
+		copy.editor.fontSize = Self.clamp(
+			copy.editor.fontSize,
+			min: EditorSettings.minFontSize,
+			max: EditorSettings.maxFontSize
+		)
+		copy.editor.tabWidth = Self.clamp(
+			copy.editor.tabWidth,
+			min: EditorSettings.minTabWidth,
+			max: EditorSettings.maxTabWidth
+		)
 		copy.editor.language = copy.editor.language.reduce(into: [:]) { result, entry in
 			let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
 			guard !key.isEmpty else {
@@ -160,8 +190,25 @@ public struct ItsySettings: Equatable, Sendable {
 		if copy.theme.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 			copy.theme.id = ThemeSettings.defaultID
 		}
-		copy.terminal.fontSize = Self.clamp(copy.terminal.fontSize, min: TerminalSettings.minFontSize, max: TerminalSettings.maxFontSize)
-		copy.terminal.scrollbackLines = Self.clamp(copy.terminal.scrollbackLines, min: TerminalSettings.minScrollbackLines, max: TerminalSettings.maxScrollbackLines)
+		if copy.theme.gitGutter.added.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			copy.theme.gitGutter.added = ThemeSettings.GitGutterSettings.defaultAdded
+		}
+		if copy.theme.gitGutter.modified.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			copy.theme.gitGutter.modified = ThemeSettings.GitGutterSettings.defaultModified
+		}
+		if copy.theme.gitGutter.removed.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			copy.theme.gitGutter.removed = ThemeSettings.GitGutterSettings.defaultRemoved
+		}
+		copy.terminal.fontSize = Self.clamp(
+			copy.terminal.fontSize,
+			min: TerminalSettings.minFontSize,
+			max: TerminalSettings.maxFontSize
+		)
+		copy.terminal.scrollbackLines = Self.clamp(
+			copy.terminal.scrollbackLines,
+			min: TerminalSettings.minScrollbackLines,
+			max: TerminalSettings.maxScrollbackLines
+		)
 		return copy
 	}
 
@@ -253,7 +300,11 @@ public final class ItsySettingsStore {
 			let contents = try String(contentsOf: fileURL, encoding: .utf8)
 			var parser = ItsySettingsParser(settings: fallback)
 			let result = parser.parse(contents)
-			return ItsySettingsLoadResult(settings: result.settings.normalized(), warnings: result.warnings, loadedFromFile: true)
+			return ItsySettingsLoadResult(
+				settings: result.settings.normalized(),
+				warnings: result.warnings,
+				loadedFromFile: true
+			)
 		} catch {
 			return ItsySettingsLoadResult(
 				settings: fallback.normalized(),
@@ -268,7 +319,10 @@ public final class ItsySettingsStore {
 		guard let workspaceRoot else {
 			return global
 		}
-		let workspaceStore = ItsySettingsStore(fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot), fileManager: fileManager)
+		let workspaceStore = ItsySettingsStore(
+			fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot),
+			fileManager: fileManager
+		)
 		let workspace = workspaceStore.load(fallback: global.settings)
 		return ItsySettingsLoadResult(
 			settings: workspace.settings,
@@ -300,6 +354,9 @@ public final class ItsySettingsStore {
 
 		[theme]
 		id = "\(escape(settings.theme.id))"
+		git.gutter.added = "\(escape(settings.theme.gitGutter.added))"
+		git.gutter.modified = "\(escape(settings.theme.gitGutter.modified))"
+		git.gutter.removed = "\(escape(settings.theme.gitGutter.removed))"
 
 		[syntax]
 		preload_grammars = "\(settings.syntax.preloadGrammars.rawValue)"
@@ -330,7 +387,9 @@ public final class ItsySettingsStore {
 			.replacingOccurrences(of: "\t", with: "\\t")
 	}
 
-	private static func serializeLanguageSettings(_ language: [String: ItsySettings.EditorSettings.LanguageSettings]) -> String {
+	private static func serializeLanguageSettings(_ language: [String: ItsySettings.EditorSettings.LanguageSettings])
+		-> String
+	{
 		guard !language.isEmpty else {
 			return ""
 		}
@@ -441,8 +500,8 @@ public final class ItsySettingsWatcher: @unchecked Sendable {
 			guard let self else {
 				return
 			}
-			self.scheduled = false
-			self.handler()
+			scheduled = false
+			handler()
 		}
 	}
 
@@ -485,7 +544,8 @@ struct ItsySettingsParser {
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
 				if !["editor", "editor.experimental", "theme", "syntax", "terminal"].contains(section),
-				   !section.hasPrefix("editor.language.") {
+				   !section.hasPrefix("editor.language.")
+				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
 				continue
@@ -550,6 +610,24 @@ struct ItsySettingsParser {
 		case "theme.id":
 			if case let .string(id) = value {
 				settings.theme.id = id
+			} else {
+				warnType(key, line: line, expected: "string")
+			}
+		case "theme.git.gutter.added":
+			if case let .string(color) = value {
+				settings.theme.gitGutter.added = color
+			} else {
+				warnType(key, line: line, expected: "string")
+			}
+		case "theme.git.gutter.modified":
+			if case let .string(color) = value {
+				settings.theme.gitGutter.modified = color
+			} else {
+				warnType(key, line: line, expected: "string")
+			}
+		case "theme.git.gutter.removed":
+			if case let .string(color) = value {
+				settings.theme.gitGutter.removed = color
 			} else {
 				warnType(key, line: line, expected: "string")
 			}
@@ -638,11 +716,11 @@ struct ItsySettingsParser {
 	private func doubleValue(_ value: ItsySettingsValue) -> Double? {
 		switch value {
 		case let .double(value):
-			return value
+			value
 		case let .int(value):
-			return Double(value)
+			Double(value)
 		default:
-			return nil
+			nil
 		}
 	}
 

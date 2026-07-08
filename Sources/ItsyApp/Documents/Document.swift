@@ -9,8 +9,6 @@ import ItsyLSP
 import ItsyRender
 import ItsySyntax
 
-
-
 @MainActor final class ItsyDocument: NSDocument {
 	static let handoffActivityType = "dev.itsy.editor.open-file"
 	static let handoffURLKey = "url"
@@ -96,7 +94,7 @@ import ItsySyntax
 		ItsyTabCoordinator.refresh()
 	}
 
-	override func read(from data: Data, ofType typeName: String) throws {
+	override func read(from data: Data, ofType _: String) throws {
 		try MainActor.assumeIsolated {
 			guard let text = String(data: data, encoding: .utf8) else {
 				throw CocoaError(.fileReadCorruptFile)
@@ -121,7 +119,7 @@ import ItsySyntax
 		}
 	}
 
-	override func data(ofType typeName: String) throws -> Data {
+	override func data(ofType _: String) throws -> Data {
 		switch editor.textStorage {
 		case .rope:
 			return Data(editorStorageString(editor).utf8)
@@ -187,8 +185,8 @@ import ItsySyntax
 			guard let self else {
 				return "\n"
 			}
-			let tabWidth = self.currentEditorSettings().tabWidth
-			return self.syntax.newlineText(editor: editor, tabWidth: tabWidth)
+			let tabWidth = currentEditorSettings().tabWidth
+			return syntax.newlineText(editor: editor, tabWidth: tabWidth)
 		}
 		syntax.configure(fileURL: fileURL)
 		refreshSyntaxHighlights()
@@ -199,14 +197,15 @@ import ItsySyntax
 			let oldRope = self.editor.rope
 			let edits = editor.lastEditBatch
 			self.editor = editor
-			self.lspHighlightSpans = []
-			self.refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
-			self.lspSurfaceRefreshRequested?()
-			self.updateHandoffActivity()
-			self.syncSiblingEditorViews(source: view, editor: editor)
-			self.saveUndoHistoryIfAvailable()
+			lspHighlightSpans = []
+			refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			lspSurfaceRefreshRequested?()
+			updateHandoffActivity()
+			syncSiblingEditorViews(source: view, editor: editor)
+			saveUndoHistoryIfAvailable()
 			view.undoTreeChanged?(editor.history.tree)
-			self.updateChangeCount(.changeDone)
+			updateChangeCount(.changeDone)
+			scheduleGitHunkGutterRefresh()
 		}
 		view.saveRequested = { [weak self] in
 			self?.save(nil)
@@ -250,7 +249,8 @@ import ItsySyntax
 	}
 
 	private func refreshGutterDecorators() {
-		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator, lspGutterDecorator].compactMap { $0 }
+		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator, lspGutterDecorator]
+			.compactMap { $0 }
 		switch decorators.count {
 		case 0:
 			activeGutterDecorator = nil

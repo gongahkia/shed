@@ -1,5 +1,6 @@
 @preconcurrency import Dispatch
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import ItsyRender
 
@@ -10,6 +11,7 @@ import ItsyRender
 			decoratorDidChange()
 		}
 	}
+
 	var fileURL: () -> URL? = { nil }
 	var decoratorDidChange: () -> Void = {}
 
@@ -39,17 +41,22 @@ import ItsyRender
 		}
 		do {
 			let repository = GitRepository(root: gitRoot)
-			let files: [DiffFile]
-			switch ItsyGitHunkGutterCoordinator.currentMode {
+			let files: [DiffFile] = switch ItsyGitHunkGutterCoordinator.currentMode {
 			case .index:
-				files = try repository.diffFiles(path: relativePath)
+				try repository.diffFiles(path: relativePath)
 			case .head:
-				files = try repository.diffFilesAgainstHead(path: relativePath)
+				try repository.diffFilesAgainstHead(path: relativePath)
 			}
 			let indicators = GitHunkIndicatorBuilder.indicators(files: files)
+			let theme = ItsySettingsStore()
+				.load(workspaceRoot: ItsyWorkspaceController.currentRootURL)
+				.settings
+				.theme
+				.gitGutter
 			decorator = indicators.isEmpty ? nil : GitHunkGutterDecorator(
 				indicators: indicators,
-				mode: ItsyGitHunkGutterCoordinator.currentMode
+				mode: ItsyGitHunkGutterCoordinator.currentMode,
+				theme: theme
 			)
 		} catch {
 			decorator = nil

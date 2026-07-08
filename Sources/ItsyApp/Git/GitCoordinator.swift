@@ -25,7 +25,9 @@ private enum GitCommitDraftStore {
 
 	static func save(_ draft: GitCommitDraft, for root: URL) {
 		var all = loadAll()
-		if draft.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+		if draft.summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+		   draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+		{
 			all.removeValue(forKey: key(for: root))
 		} else {
 			all[key(for: root)] = draft
@@ -60,9 +62,9 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	var description: String {
 		switch self {
 		case .noActiveFile:
-			return L10n.string("No active file")
+			L10n.string("No active file")
 		case .outsideRepository:
-			return L10n.string("File is outside the Git repository")
+			L10n.string("File is outside the Git repository")
 		}
 	}
 }
@@ -109,16 +111,19 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		var title: String
 		var isStaged: Bool
 	}
+
 	private struct GitDiffLineItem {
 		var fileIndex: Int
 		var hunkIndex: Int
 		var lineIndex: Int
 		var range: Range<Int>
 	}
+
 	private enum GitLineSelectionError: Error {
 		case unifiedModeRequired
 		case noChangedLinesSelected
 	}
+
 	private var gitDraftRootURL: URL?
 	private var gitDraftBeforeHistory: GitCommitDraft?
 	private var gitRecentCommitMessages: [GitCommitDraft] = []
@@ -147,12 +152,24 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	}
 
 	func applyEditorPreferences(_ preferences: EditorPreferences) {
-		gitUnifiedDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
-		gitSideOldDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
-		gitSideNewDiffView?.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
+		gitUnifiedDiffView?.configureEditorAppearance(
+			fontName: preferences.fontName,
+			fontSize: preferences.fontSize,
+			showsLineNumbers: preferences.showLineNumbers
+		)
+		gitSideOldDiffView?.configureEditorAppearance(
+			fontName: preferences.fontName,
+			fontSize: preferences.fontSize,
+			showsLineNumbers: preferences.showLineNumbers
+		)
+		gitSideNewDiffView?.configureEditorAppearance(
+			fontName: preferences.fontName,
+			fontSize: preferences.fontSize,
+			showsLineNumbers: preferences.showLineNumbers
+		)
 	}
 
-	@objc func showGitChanges(_ sender: Any?) {
+	@objc func showGitChanges(_: Any?) {
 		toggleGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
@@ -207,8 +224,21 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		cancelButton.isEnabled = false
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
 		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
-		let unstageButton = NSButton(title: L10n.string("Unstage"), target: self, action: #selector(unstageSelectedGitEntries(_:)))
-		let buttonStack = NSStackView(views: [branchButton, fetchButton, pullButton, pushButton, cancelButton, refreshButton, stageButton, unstageButton])
+		let unstageButton = NSButton(
+			title: L10n.string("Unstage"),
+			target: self,
+			action: #selector(unstageSelectedGitEntries(_:))
+		)
+		let buttonStack = NSStackView(views: [
+			branchButton,
+			fetchButton,
+			pullButton,
+			pushButton,
+			cancelButton,
+			refreshButton,
+			stageButton,
+			unstageButton,
+		])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -272,7 +302,12 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
 		statusLabel.textColor = .secondaryLabelColor
-		let modeControl = NSSegmentedControl(labels: [L10n.string("Unified"), L10n.string("Side")], trackingMode: .selectOne, target: self, action: #selector(changeGitDiffMode(_:)))
+		let modeControl = NSSegmentedControl(
+			labels: [L10n.string("Unified"), L10n.string("Side")],
+			trackingMode: .selectOne,
+			target: self,
+			action: #selector(changeGitDiffMode(_:))
+		)
 		modeControl.selectedSegment = 0
 		modeControl.segmentStyle = .rounded
 		let header = NSStackView(views: [titleLabel, statusLabel, modeControl])
@@ -285,7 +320,11 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		let newView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 320, height: 360))
 		let preferences = EditorPreferences.load()
 		for view in [unifiedView, oldView, newView] {
-			view.configureEditorAppearance(fontName: preferences.fontName, fontSize: preferences.fontSize, showsLineNumbers: preferences.showLineNumbers)
+			view.configureEditorAppearance(
+				fontName: preferences.fontName,
+				fontSize: preferences.fontSize,
+				showsLineNumbers: preferences.showLineNumbers
+			)
 		}
 		let sideSplitView = NSSplitView()
 		sideSplitView.isVertical = true
@@ -382,17 +421,25 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
 		statusLabel.textColor = .secondaryLabelColor
-		let signoffButton = NSButton(checkboxWithTitle: L10n.string("--signoff"), target: self, action: #selector(updateGitComposerStateAction(_:)))
-		let amendButton = NSButton(checkboxWithTitle: L10n.string("--amend"), target: self, action: #selector(updateGitComposerStateAction(_:)))
+		let signoffButton = NSButton(
+			checkboxWithTitle: L10n.string("--signoff"),
+			target: self,
+			action: #selector(updateGitComposerStateAction(_:))
+		)
+		let amendButton = NSButton(
+			checkboxWithTitle: L10n.string("--amend"),
+			target: self,
+			action: #selector(updateGitComposerStateAction(_:))
+		)
 		let commitButton = NSButton(title: L10n.string("Commit"), target: self, action: #selector(commitGitChanges(_:)))
 		let footer = NSStackView(views: [statusLabel, signoffButton, amendButton, commitButton])
 		footer.orientation = .horizontal
 		footer.alignment = .centerY
 		footer.spacing = 8
 		footer.distribution = .fill
-		[summaryRow, bodyHint, bodyScrollView, footer].forEach {
-			$0.translatesAutoresizingMaskIntoConstraints = false
-			container.addSubview($0)
+		for item in [summaryRow, bodyHint, bodyScrollView, footer] {
+			item.translatesAutoresizingMaskIntoConstraints = false
+			container.addSubview(item)
 		}
 		NSLayoutConstraint.activate([
 			summaryHint.widthAnchor.constraint(equalToConstant: 28),
@@ -629,7 +676,11 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitStashes(_:)))
-		let stashButton = NSButton(title: L10n.string("Stash Current Changes..."), target: self, action: #selector(stashCurrentGitChanges(_:)))
+		let stashButton = NSButton(
+			title: L10n.string("Stash Current Changes..."),
+			target: self,
+			action: #selector(stashCurrentGitChanges(_:))
+		)
 		let buttonStack = NSStackView(views: [refreshButton, stashButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
@@ -707,11 +758,13 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 
 	private func currentGitRootURL() -> URL? {
 		if let root = ItsyWorkspaceController.currentRootURL,
-		   let gitRoot = try? GitRepository.discoverRoot(containing: root) {
+		   let gitRoot = try? GitRepository.discoverRoot(containing: root)
+		{
 			return gitRoot
 		}
 		if let fileURL = (activeDocumentProvider() as? ItsyDocument)?.fileURL,
-		   let gitRoot = try? GitRepository.discoverRoot(containing: fileURL) {
+		   let gitRoot = try? GitRepository.discoverRoot(containing: fileURL)
+		{
 			return gitRoot
 		}
 		if let gitRootURL {
@@ -754,6 +807,32 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		return message.isEmpty ? nil : message
 	}
 
+	@objc func applyLatestGitStash(_: Any?) {
+		runLatestGitStashAction(title: L10n.string("Apply")) { repository in
+			try repository.applyStash("stash@{0}")
+		}
+	}
+
+	@objc func popLatestGitStash(_: Any?) {
+		runLatestGitStashAction(title: L10n.string("Pop")) { repository in
+			try repository.popStash("stash@{0}")
+		}
+	}
+
+	private func runLatestGitStashAction(title: String, action: (GitRepository) throws -> Void) {
+		guard let root = currentGitRootURL() else {
+			showGitStashAlert(title: L10n.string("\(title) failed"), message: L10n.string("Open a Git repository first"))
+			return
+		}
+		do {
+			try action(GitRepository(root: root))
+			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
+		} catch {
+			setGitStashStatus(String(describing: error), isError: true)
+			showGitStashAlert(title: L10n.string("\(title) failed"), message: String(describing: error))
+		}
+	}
+
 	@objc private func applyGitStashFromRow(_ sender: NSButton) {
 		runGitStashEntryAction(row: sender.tag, title: L10n.string("Apply")) { repository, entry in
 			try repository.applyStash(entry.ref)
@@ -776,6 +855,23 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 		runGitStashEntryAction(row: sender.tag, title: L10n.string("Drop")) { repository, entry in
 			try repository.dropStash(entry.ref)
+		}
+	}
+
+	@objc private func showGitStashDiffFromRow(_ sender: NSButton) {
+		guard let root = gitStashRootURL, sender.tag >= 0, sender.tag < gitStashEntries.count else {
+			return
+		}
+		let entry = gitStashEntries[sender.tag]
+		do {
+			let diff = try GitRepository(root: root).stashDiff(entry.ref)
+			showGitTextPanel(
+				title: L10n.string("Stash Diff"),
+				subtitle: "\(entry.ref)  \(entry.message)",
+				text: diff.isEmpty ? L10n.string("No stash diff") : diff
+			)
+		} catch {
+			setGitStashStatus(String(describing: error), isError: true)
 		}
 	}
 
@@ -825,7 +921,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		alert.runModal()
 	}
 
-	@objc func fetchGitRemote(_ sender: Any?) {
+	@objc func fetchGitRemote(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
@@ -833,7 +929,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		runGitRemoteOperation(title: L10n.string("Fetch"), arguments: repository.fetchArguments())
 	}
 
-	@objc func pullGitRemote(_ sender: Any?) {
+	@objc func pullGitRemote(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
@@ -841,7 +937,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		runGitRemoteOperation(title: L10n.string("Pull"), arguments: repository.pullArguments())
 	}
 
-	@objc func pullGitRemoteRebase(_ sender: Any?) {
+	@objc func pullGitRemoteRebase(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
@@ -849,20 +945,20 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		runGitRemoteOperation(title: L10n.string("Pull Rebase"), arguments: repository.pullArguments(mode: .rebase))
 	}
 
-	@objc func pushGitRemote(_ sender: Any?) {
+	@objc func pushGitRemote(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
 		do {
 			let repository = GitRepository(root: gitRootURL)
-			runGitRemoteOperation(title: L10n.string("Push"), arguments: try repository.pushArguments())
+			try runGitRemoteOperation(title: L10n.string("Push"), arguments: repository.pushArguments())
 		} catch {
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
 		}
 	}
 
-	@objc func cancelGitRemote(_ sender: Any?) {
+	@objc func cancelGitRemote(_: Any?) {
 		guard let process = gitRemoteProcess else {
 			return
 		}
@@ -911,22 +1007,22 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 				guard let self else {
 					return
 				}
-				self.gitRemoteProcess = nil
-				self.gitRemoteCancelButton?.isEnabled = false
-				if self.gitRemoteWasCancelled {
-					self.gitRemoteWasCancelled = false
-					self.gitStatusLabel?.textColor = .secondaryLabelColor
-					self.gitStatusLabel?.stringValue = "\(title) canceled"
+				gitRemoteProcess = nil
+				gitRemoteCancelButton?.isEnabled = false
+				if gitRemoteWasCancelled {
+					gitRemoteWasCancelled = false
+					gitStatusLabel?.textColor = .secondaryLabelColor
+					gitStatusLabel?.stringValue = "\(title) canceled"
 					return
 				}
 				if process.terminationStatus == 0 {
-					self.gitStatusLabel?.textColor = .secondaryLabelColor
-					self.gitStatusLabel?.stringValue = "\(title) complete"
-					self.refreshGitChanges(nil)
+					gitStatusLabel?.textColor = .secondaryLabelColor
+					gitStatusLabel?.stringValue = "\(title) complete"
+					refreshGitChanges(nil)
 				} else {
-					self.gitStatusLabel?.textColor = .systemRed
-					self.gitStatusLabel?.stringValue = "\(title) failed"
-					self.showGitRemoteFailure(title: title)
+					gitStatusLabel?.textColor = .systemRed
+					gitStatusLabel?.stringValue = "\(title) failed"
+					showGitRemoteFailure(title: title)
 				}
 			}
 		}
@@ -946,7 +1042,8 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			return
 		}
 		gitRemoteLog += text
-		let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
+		let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text
+			.trimmingCharacters(in: .whitespacesAndNewlines)
 		if !line.isEmpty {
 			gitStatusLabel?.textColor = .secondaryLabelColor
 			gitStatusLabel?.stringValue = line
@@ -970,20 +1067,24 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		alert.runModal()
 	}
 
-	@objc func showGitBlame(_ sender: Any?) {
+	@objc func showGitBlame(_: Any?) {
 		do {
 			let context = try currentGitFileContext()
 			let lines = try GitRepository(root: context.root).blame(path: context.path)
 			let text = lines.map { line in
 				"\(line.line)\t\(shortOID(line.oid))\t\(line.author)\t\(line.summary)"
 			}.joined(separator: "\n")
-			showGitTextPanel(title: L10n.string("Git Blame"), subtitle: context.path, text: text.isEmpty ? L10n.string("No blame data") : text)
+			showGitTextPanel(
+				title: L10n.string("Git Blame"),
+				subtitle: context.path,
+				text: text.isEmpty ? L10n.string("No blame data") : text
+			)
 		} catch {
 			showGitTextPanel(title: L10n.string("Git Blame"), subtitle: "", text: String(describing: error))
 		}
 	}
 
-	@objc func showGitFileHistory(_ sender: Any?) {
+	@objc func showGitFileHistory(_: Any?) {
 		do {
 			let context = try currentGitFileContext()
 			let entries = try GitRepository(root: context.root).fileHistory(path: context.path)
@@ -993,12 +1094,16 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 	}
 
-	@objc func showGitLineHistory(_ sender: Any?) {
+	@objc func showGitLineHistory(_: Any?) {
 		do {
 			let context = try currentGitFileContext()
 			let line = context.document.editor.textStorage.line(forOffset: context.document.editor.selections.primary.head) + 1
 			let entries = try GitRepository(root: context.root).lineHistory(path: context.path, line: line)
-			showGitTextPanel(title: L10n.string("Line History"), subtitle: "\(context.path):\(line)", text: renderGitHistory(entries))
+			showGitTextPanel(
+				title: L10n.string("Line History"),
+				subtitle: "\(context.path):\(line)",
+				text: renderGitHistory(entries)
+			)
 		} catch {
 			showGitTextPanel(title: L10n.string("Line History"), subtitle: "", text: String(describing: error))
 		}
@@ -1009,7 +1114,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			throw GitNavigationError.noActiveFile
 		}
 		let root = try GitRepository.discoverRoot(containing: fileURL)
-		return (document, root, try relativeGitPath(fileURL: fileURL, root: root))
+		return try (document, root, relativeGitPath(fileURL: fileURL, root: root))
 	}
 
 	private func relativeGitPath(fileURL: URL, root: URL) throws -> String {
@@ -1088,7 +1193,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		return Self.historyDateFormatter.string(from: date)
 	}
 
-	@objc func refreshGitChanges(_ sender: Any?) {
+	@objc func refreshGitChanges(_: Any?) {
 		guard let root = ItsyWorkspaceController.currentRootURL else {
 			setGitEntries([], root: nil, status: L10n.string("Open a folder first"), isError: true, branchLabel: nil)
 			return
@@ -1101,14 +1206,27 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		do {
 			let snapshot = try GitRepository(root: gitRoot).snapshot()
 			let status = "\(snapshot.branchLabel) - \(snapshot.status.stagedCount) staged, \(snapshot.status.unstagedCount) unstaged"
-			setGitEntries(snapshot.status.entries, root: gitRoot, status: status, isError: false, branchLabel: snapshot.branchLabel)
+			setGitEntries(
+				snapshot.status.entries,
+				root: gitRoot,
+				status: status,
+				isError: false,
+				branchLabel: snapshot.branchLabel
+			)
 			ItsyWorkspaceController.refreshGitStatus()
+			ItsyGitHunkGutterCoordinator.applyAll()
 		} catch {
 			setGitEntries([], root: gitRoot, status: String(describing: error), isError: true, branchLabel: nil)
 		}
 	}
 
-	private func setGitEntries(_ entries: [GitStatusEntry], root: URL?, status: String, isError: Bool, branchLabel: String?) {
+	private func setGitEntries(
+		_ entries: [GitStatusEntry],
+		root: URL?,
+		status: String,
+		isError: Bool,
+		branchLabel: String?
+	) {
 		syncGitDraftRoot(root)
 		gitEntries = entries
 		gitRootURL = root
@@ -1124,7 +1242,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		updateGitComposerState()
 	}
 
-	@objc private func changeGitDiffMode(_ sender: Any?) {
+	@objc private func changeGitDiffMode(_: Any?) {
 		gitDiffMode = gitDiffModeControl?.selectedSegment == 1 ? .sideBySide : .unified
 		renderGitDiff()
 	}
@@ -1338,13 +1456,13 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	private func gitDiffColor(for kind: RenderedDiffLineKind) -> SIMD4<Float>? {
 		switch kind {
 		case .header:
-			return SIMD4<Float>(0.56, 0.62, 0.70, 1)
+			SIMD4<Float>(0.56, 0.62, 0.70, 1)
 		case .addition:
-			return SIMD4<Float>(0.28, 0.78, 0.46, 1)
+			SIMD4<Float>(0.28, 0.78, 0.46, 1)
 		case .removal:
-			return SIMD4<Float>(0.93, 0.37, 0.37, 1)
+			SIMD4<Float>(0.93, 0.37, 0.37, 1)
 		case .context, .blank:
-			return nil
+			nil
 		}
 	}
 
@@ -1374,24 +1492,28 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		do {
 			var pipeline = SyntaxPipeline(language: language)
 			let tree = try pipeline.parse(Rope(source))
-			return try pipeline.highlights(in: tree, source: source, includeInjections: true).flatMap { span -> [TextHighlightSpan] in
-				mappings.compactMap { mapping -> TextHighlightSpan? in
-					let lower = max(span.range.lowerBound, mapping.source.lowerBound)
-					let upper = min(span.range.upperBound, mapping.source.upperBound)
-					guard lower < upper, let color = theme.color(for: span.capture) else {
-						return nil
+			return try pipeline.highlights(in: tree, source: source, includeInjections: true)
+				.flatMap { span -> [TextHighlightSpan] in
+					mappings.compactMap { mapping -> TextHighlightSpan? in
+						let lower = max(span.range.lowerBound, mapping.source.lowerBound)
+						let upper = min(span.range.upperBound, mapping.source.upperBound)
+						guard lower < upper, let color = theme.color(for: span.capture) else {
+							return nil
+						}
+						let renderedLower = mapping.rendered.lowerBound + lower - mapping.source.lowerBound
+						let renderedUpper = mapping.rendered.lowerBound + upper - mapping.source.lowerBound
+						return TextHighlightSpan(
+							range: renderedLower ..< renderedUpper,
+							color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha)
+						)
 					}
-					let renderedLower = mapping.rendered.lowerBound + lower - mapping.source.lowerBound
-					let renderedUpper = mapping.rendered.lowerBound + upper - mapping.source.lowerBound
-					return TextHighlightSpan(range: renderedLower ..< renderedUpper, color: SIMD4<Float>(color.red, color.green, color.blue, color.alpha))
 				}
-			}
 		} catch {
 			return []
 		}
 	}
 
-	@objc private func updateGitComposerStateAction(_ sender: Any?) {
+	@objc private func updateGitComposerStateAction(_: Any?) {
 		updateGitComposerState()
 	}
 
@@ -1404,7 +1526,10 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitRecentCommitMessages = []
 		gitRecentCommitIndex = nil
 		gitDraftBeforeHistory = nil
-		setGitComposerDraft(root.map { GitCommitDraftStore.load(for: $0) } ?? GitCommitDraft(summary: "", body: ""), persist: false)
+		setGitComposerDraft(
+			root.map { GitCommitDraftStore.load(for: $0) } ?? GitCommitDraft(summary: "", body: ""),
+			persist: false
+		)
 	}
 
 	private func currentGitCommitDraft() -> GitCommitDraft {
@@ -1439,7 +1564,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitCommitButton?.isEnabled = gitRootURL != nil && stagedCount > 0 && !summary.isEmpty
 	}
 
-	@objc private func commitGitChanges(_ sender: Any?) {
+	@objc private func commitGitChanges(_: Any?) {
 		guard let gitRootURL else {
 			updateGitComposerState()
 			return
@@ -1460,12 +1585,21 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			setGitComposerDraft(GitCommitDraft(summary: "", body: ""), persist: true)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
+			setGitEntries(
+				gitEntries,
+				root: gitRootURL,
+				status: String(describing: error),
+				isError: true,
+				branchLabel: gitBranchButton?.title
+			)
 		}
 	}
 
 	private func showPreviousGitCommitMessage() -> Bool {
-		guard let gitRootURL, gitSummaryField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true || gitRecentCommitIndex != nil else {
+		guard let gitRootURL,
+		      gitSummaryField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+		      .isEmpty == true || gitRecentCommitIndex != nil
+		else {
 			return false
 		}
 		if gitRecentCommitIndex == nil {
@@ -1504,7 +1638,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		return GitCommitDraft(summary: summary, body: body)
 	}
 
-	@objc private func stageSelectedGitEntries(_ sender: Any?) {
+	@objc private func stageSelectedGitEntries(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
@@ -1516,11 +1650,17 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			try GitRepository(root: gitRootURL).stage(paths: paths)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
+			setGitEntries(
+				gitEntries,
+				root: gitRootURL,
+				status: String(describing: error),
+				isError: true,
+				branchLabel: gitBranchButton?.title
+			)
 		}
 	}
 
-	@objc private func unstageSelectedGitEntries(_ sender: Any?) {
+	@objc private func unstageSelectedGitEntries(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
@@ -1532,7 +1672,13 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			try GitRepository(root: gitRootURL).unstage(paths: paths)
 			refreshGitChanges(nil)
 		} catch {
-			setGitEntries(gitEntries, root: gitRootURL, status: String(describing: error), isError: true, branchLabel: gitBranchButton?.title)
+			setGitEntries(
+				gitEntries,
+				root: gitRootURL,
+				status: String(describing: error),
+				isError: true,
+				branchLabel: gitBranchButton?.title
+			)
 		}
 	}
 
@@ -1548,7 +1694,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 	}
 
-	@objc private func openSelectedGitEntry(_ sender: Any?) {
+	@objc private func openSelectedGitEntry(_: Any?) {
 		guard let tableView = gitTableView,
 		      let gitRootURL,
 		      tableView.selectedRow >= 0,
@@ -1586,9 +1732,12 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		let sourceSplit = NSSplitView()
 		sourceSplit.isVertical = true
 		sourceSplit.dividerStyle = .thin
-		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Ours (:2)"), text: ours, isEditable: false).view)
-		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Base (:1)"), text: base, isEditable: false).view)
-		sourceSplit.addArrangedSubview(makeGitConflictPane(title: L10n.string("Theirs (:3)"), text: theirs, isEditable: false).view)
+		sourceSplit
+			.addArrangedSubview(makeGitConflictPane(title: L10n.string("Ours (:2)"), text: ours, isEditable: false).view)
+		sourceSplit
+			.addArrangedSubview(makeGitConflictPane(title: L10n.string("Base (:1)"), text: base, isEditable: false).view)
+		sourceSplit
+			.addArrangedSubview(makeGitConflictPane(title: L10n.string("Theirs (:3)"), text: theirs, isEditable: false).view)
 		let mergedPane = makeGitConflictPane(title: L10n.string("Merged result"), text: merged, isEditable: true)
 		let regionStack = NSStackView()
 		regionStack.orientation = .vertical
@@ -1633,7 +1782,9 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		panel.makeKeyAndOrderFront(nil)
 	}
 
-	private func makeGitConflictPane(title: String, text: String, isEditable: Bool) -> (view: NSView, textView: NSTextView) {
+	private func makeGitConflictPane(title: String, text: String,
+	                                 isEditable: Bool) -> (view: NSView, textView: NSTextView)
+	{
 		let container = NSView()
 		let label = NSTextField(labelWithString: title)
 		label.font = .systemFont(ofSize: 11, weight: .semibold)
@@ -1678,12 +1829,21 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			return
 		}
 		for (index, region) in regions.enumerated() {
-			let label = NSTextField(labelWithString: L10n.string("Region \(index + 1), lines \(region.startLine + 1)-\(region.endLine)"))
+			let label = NSTextField(labelWithString: L10n
+				.string("Region \(index + 1), lines \(region.startLine + 1)-\(region.endLine)"))
 			label.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
 			let ours = NSButton(title: L10n.string("Accept Ours"), target: self, action: #selector(acceptGitConflictOurs(_:)))
-			let theirs = NSButton(title: L10n.string("Accept Theirs"), target: self, action: #selector(acceptGitConflictTheirs(_:)))
+			let theirs = NSButton(
+				title: L10n.string("Accept Theirs"),
+				target: self,
+				action: #selector(acceptGitConflictTheirs(_:))
+			)
 			let both = NSButton(title: L10n.string("Accept Both"), target: self, action: #selector(acceptGitConflictBoth(_:)))
-			let edit = NSButton(title: L10n.string("Edit Manually"), target: self, action: #selector(editGitConflictManually(_:)))
+			let edit = NSButton(
+				title: L10n.string("Edit Manually"),
+				target: self,
+				action: #selector(editGitConflictManually(_:))
+			)
 			for button in [ours, theirs, both, edit] {
 				button.bezelStyle = .rounded
 				button.font = .systemFont(ofSize: 11)
@@ -1725,11 +1885,14 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		guard sender.tag >= 0, sender.tag < regions.count else {
 			return
 		}
-		textView.setSelectedRange(nsRangeForLines(regions[sender.tag].startLine ..< regions[sender.tag].endLine, in: textView.string))
+		textView.setSelectedRange(nsRangeForLines(
+			regions[sender.tag].startLine ..< regions[sender.tag].endLine,
+			in: textView.string
+		))
 		gitConflictPanel?.makeFirstResponder(textView)
 	}
 
-	@objc private func saveGitConflict(_ sender: Any?) {
+	@objc private func saveGitConflict(_: Any?) {
 		guard let root = gitConflictRootURL, let path = gitConflictPath, let textView = gitConflictMergedTextView else {
 			return
 		}
@@ -1744,7 +1907,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 	}
 
-	@objc private func closeGitConflict(_ sender: Any?) {
+	@objc private func closeGitConflict(_: Any?) {
 		gitConflictPanel?.close()
 	}
 
@@ -1796,7 +1959,6 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		let upstream = branch.upstream.map { "upstream \($0)" } ?? "no upstream"
 		return "\(upstream) - \(branch.committerDateRelative)"
 	}
-
 }
 
 extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDataSource, NSTableViewDelegate {
@@ -1811,7 +1973,7 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 		}
 	}
 
-	func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+	func control(_ control: NSControl, textView _: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
 		if control === gitSummaryField {
 			switch commandSelector {
 			case #selector(NSResponder.insertNewline(_:)) where currentEventHasCommandModifier():
@@ -1838,7 +2000,9 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 	}
 
 	func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-		if textView === gitBodyTextView, commandSelector == #selector(NSResponder.insertNewline(_:)), currentEventHasCommandModifier() {
+		if textView === gitBodyTextView, commandSelector == #selector(NSResponder.insertNewline(_:)),
+		   currentEventHasCommandModifier()
+		{
 			commitGitChanges(nil)
 			return true
 		}
@@ -1872,7 +2036,7 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 		updateSelectedGitDiff()
 	}
 
-	func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
+	func tableView(_ tableView: NSTableView, viewFor _: NSTableColumn?, row: Int) -> NSView? {
 		if tableView === gitTableView {
 			let identifier = NSUserInterfaceItemIdentifier("GitCell")
 			let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
@@ -1896,11 +2060,19 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 		if tableView === gitHunkTableView {
 			let item = gitHunkItems[row]
 			let cell = NSTableCellView()
-			let hunkButton = NSButton(title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"), target: self, action: #selector(applyGitHunk(_:)))
+			let hunkButton = NSButton(
+				title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"),
+				target: self,
+				action: #selector(applyGitHunk(_:))
+			)
 			hunkButton.bezelStyle = .rounded
 			hunkButton.font = .systemFont(ofSize: 10)
 			hunkButton.tag = row
-			let lineButton = NSButton(title: item.isStaged ? L10n.string("Unstage Lines") : L10n.string("Stage Lines"), target: self, action: #selector(applyGitSelectedLines(_:)))
+			let lineButton = NSButton(
+				title: item.isStaged ? L10n.string("Unstage Lines") : L10n.string("Stage Lines"),
+				target: self,
+				action: #selector(applyGitSelectedLines(_:))
+			)
 			lineButton.bezelStyle = .rounded
 			lineButton.font = .systemFont(ofSize: 10)
 			lineButton.tag = row
@@ -1938,12 +2110,20 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 			textStack.alignment = .leading
 			textStack.spacing = 2
 			let switchButton = NSButton(title: L10n.string("Switch"), target: self, action: #selector(switchGitBranch(_:)))
-			let createButton = NSButton(title: L10n.string("Create"), target: self, action: #selector(createGitBranchFromRow(_:)))
-			let deleteButton = NSButton(title: L10n.string("Delete"), target: self, action: #selector(deleteGitBranchFromRow(_:)))
-			[switchButton, createButton, deleteButton].forEach {
-				$0.bezelStyle = .rounded
-				$0.font = .systemFont(ofSize: 10)
-				$0.tag = row
+			let createButton = NSButton(
+				title: L10n.string("Create"),
+				target: self,
+				action: #selector(createGitBranchFromRow(_:))
+			)
+			let deleteButton = NSButton(
+				title: L10n.string("Delete"),
+				target: self,
+				action: #selector(deleteGitBranchFromRow(_:))
+			)
+			for item in [switchButton, createButton, deleteButton] {
+				item.bezelStyle = .rounded
+				item.font = .systemFont(ofSize: 10)
+				item.tag = row
 			}
 			switchButton.isEnabled = branch.kind == .local && !branch.isCurrent
 			deleteButton.isEnabled = branch.kind == .local && !branch.isCurrent
@@ -1982,12 +2162,17 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 			let applyButton = NSButton(title: L10n.string("Apply"), target: self, action: #selector(applyGitStashFromRow(_:)))
 			let popButton = NSButton(title: L10n.string("Pop"), target: self, action: #selector(popGitStashFromRow(_:)))
 			let dropButton = NSButton(title: L10n.string("Drop"), target: self, action: #selector(dropGitStashFromRow(_:)))
-			[applyButton, popButton, dropButton].forEach {
-				$0.bezelStyle = .rounded
-				$0.font = .systemFont(ofSize: 10)
-				$0.tag = row
+			let diffButton = NSButton(
+				title: L10n.string("Show Diff"),
+				target: self,
+				action: #selector(showGitStashDiffFromRow(_:))
+			)
+			for item in [applyButton, popButton, dropButton, diffButton] {
+				item.bezelStyle = .rounded
+				item.font = .systemFont(ofSize: 10)
+				item.tag = row
 			}
-			let buttonStack = NSStackView(views: [applyButton, popButton, dropButton])
+			let buttonStack = NSStackView(views: [applyButton, popButton, dropButton, diffButton])
 			buttonStack.orientation = .horizontal
 			buttonStack.spacing = 6
 			let rowStack = NSStackView(views: [textStack, buttonStack])
@@ -2001,7 +2186,7 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 				rowStack.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
 				rowStack.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
 				rowStack.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-				buttonStack.widthAnchor.constraint(equalToConstant: 156),
+				buttonStack.widthAnchor.constraint(equalToConstant: 250),
 			])
 			return cell
 		}

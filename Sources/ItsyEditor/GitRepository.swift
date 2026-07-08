@@ -30,7 +30,14 @@ public struct GitBranch: Equatable, Sendable {
 	public var refname: String
 	public var kind: GitBranchKind
 
-	public init(name: String, upstream: String? = nil, isCurrent: Bool = false, committerDateRelative: String = "", refname: String = "", kind: GitBranchKind = .local) {
+	public init(
+		name: String,
+		upstream: String? = nil,
+		isCurrent: Bool = false,
+		committerDateRelative: String = "",
+		refname: String = "",
+		kind: GitBranchKind = .local
+	) {
 		self.name = name
 		self.upstream = upstream
 		self.isCurrent = isCurrent
@@ -56,7 +63,13 @@ public struct GitStatusEntry: Equatable, Sendable {
 	public var path: String
 	public var originalPath: String?
 
-	public init(kind: GitStatusEntryKind, indexStatus: Character?, worktreeStatus: Character?, path: String, originalPath: String? = nil) {
+	public init(
+		kind: GitStatusEntryKind,
+		indexStatus: Character?,
+		worktreeStatus: Character?,
+		path: String,
+		originalPath: String? = nil
+	) {
 		self.kind = kind
 		self.indexStatus = indexStatus
 		self.worktreeStatus = worktreeStatus
@@ -128,7 +141,16 @@ public struct GitBlameLine: Equatable, Sendable {
 	public var time: Date?
 	public var originalPath: String?
 
-	public init(line: Int, originalLine: Int, oid: String, summary: String, author: String, authorEmail: String, time: Date? = nil, originalPath: String? = nil) {
+	public init(
+		line: Int,
+		originalLine: Int,
+		oid: String,
+		summary: String,
+		author: String,
+		authorEmail: String,
+		time: Date? = nil,
+		originalPath: String? = nil
+	) {
 		self.line = line
 		self.originalLine = originalLine
 		self.oid = oid
@@ -175,7 +197,7 @@ public struct GitBlameCache: Sendable {
 		entries.removeAll()
 	}
 
-	private struct Key: Hashable, Sendable {
+	private struct Key: Hashable {
 		var root: String
 		var path: String
 	}
@@ -193,7 +215,7 @@ public enum GitStatusParser {
 			if rawLine.hasPrefix("# ") {
 				parseHeader(rawLine, branch: &branch)
 			} else if !rawLine.isEmpty {
-				entries.append(try parseEntry(rawLine))
+				try entries.append(parseEntry(rawLine))
 			}
 		}
 		return GitStatus(branch: branch, entries: entries)
@@ -238,7 +260,12 @@ public enum GitStatusParser {
 				throw GitStatusParseError.malformedLine(line)
 			}
 			let status = fields[1]
-			return GitStatusEntry(kind: .ordinary, indexStatus: status.first, worktreeStatus: status.dropFirst().first, path: fields[8])
+			return GitStatusEntry(
+				kind: .ordinary,
+				indexStatus: status.first,
+				worktreeStatus: status.dropFirst().first,
+				path: fields[8]
+			)
 		}
 		if line.hasPrefix("2 ") {
 			let fields = line.split(separator: " ", maxSplits: 9, omittingEmptySubsequences: false).map(String.init)
@@ -261,7 +288,12 @@ public enum GitStatusParser {
 				throw GitStatusParseError.malformedLine(line)
 			}
 			let status = fields[1]
-			return GitStatusEntry(kind: .unmerged, indexStatus: status.first, worktreeStatus: status.dropFirst().first, path: fields[10])
+			return GitStatusEntry(
+				kind: .unmerged,
+				indexStatus: status.first,
+				worktreeStatus: status.dropFirst().first,
+				path: fields[10]
+			)
 		}
 		return GitStatusEntry(kind: .unknown(String(line.prefix(1))), indexStatus: nil, worktreeStatus: nil, path: line)
 	}
@@ -375,7 +407,8 @@ public enum GitBlameParser {
 			} else if rawLine.hasPrefix("author ") {
 				author = String(rawLine.dropFirst("author ".count))
 			} else if rawLine.hasPrefix("author-mail ") {
-				authorEmail = String(rawLine.dropFirst("author-mail ".count)).trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
+				authorEmail = String(rawLine.dropFirst("author-mail ".count))
+					.trimmingCharacters(in: CharacterSet(charactersIn: "<>"))
 			} else if rawLine.hasPrefix("author-time ") {
 				authorTime = Double(rawLine.dropFirst("author-time ".count)).map { Date(timeIntervalSince1970: $0) }
 			} else if rawLine.hasPrefix("summary ") {
@@ -458,7 +491,10 @@ public struct ProcessGitCommandRunner: GitCommandRunning {
 		let stdoutData = stdoutBox.data
 		let stderrData = stderrBox.data
 		guard process.terminationStatus == 0 else {
-			throw GitCommandError.failed(status: process.terminationStatus, stderr: String(data: stderrData, encoding: .utf8) ?? "")
+			throw GitCommandError.failed(
+				status: process.terminationStatus,
+				stderr: String(data: stderrData, encoding: .utf8) ?? ""
+			)
 		}
 		guard let output = String(data: stdoutData, encoding: .utf8) else {
 			throw GitCommandError.invalidOutput
@@ -469,15 +505,15 @@ public struct ProcessGitCommandRunner: GitCommandRunning {
 	private func read(_ handle: FileHandle, into box: GitCommandDataBox, group: DispatchGroup) {
 		group.enter()
 		#if DEBUG
-		Thread.detachNewThread {
-			box.data = handle.readDataToEndOfFile()
-			group.leave()
-		}
+			Thread.detachNewThread {
+				box.data = handle.readDataToEndOfFile()
+				group.leave()
+			}
 		#else
-		DispatchQueue.global(qos: .utility).async {
-			box.data = handle.readDataToEndOfFile()
-			group.leave()
-		}
+			DispatchQueue.global(qos: .utility).async {
+				box.data = handle.readDataToEndOfFile()
+				group.leave()
+			}
 		#endif
 	}
 }
@@ -518,12 +554,15 @@ public struct GitRepository: Sendable {
 	}
 
 	private func shellStatus() throws -> GitStatus {
-		let output = try runner.runGit(arguments: ["status", "--porcelain=v2", "--branch", "--untracked-files=all"], root: root)
+		let output = try runner.runGit(
+			arguments: ["status", "--porcelain=v2", "--branch", "--untracked-files=all"],
+			root: root
+		)
 		return try GitStatusParser.parse(output)
 	}
 
 	public func snapshot() throws -> GitWorkspaceSnapshot {
-		GitWorkspaceSnapshot(root: root, status: try status())
+		try GitWorkspaceSnapshot(root: root, status: status())
 	}
 
 	public func branches() throws -> [GitBranch] {
@@ -612,7 +651,11 @@ public struct GitRepository: Sendable {
 		}
 	}
 
-	public func createBranch(named name: String, from startPoint: String? = nil, stashingDirtyChanges: Bool = false) throws {
+	public func createBranch(
+		named name: String,
+		from startPoint: String? = nil,
+		stashingDirtyChanges: Bool = false
+	) throws {
 		let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !name.isEmpty else {
 			throw GitBranchError.emptyName
@@ -645,9 +688,9 @@ public struct GitRepository: Sendable {
 	public func pullArguments(mode: GitPullMode = .ffOnly) -> [String] {
 		switch mode {
 		case .ffOnly:
-			return ["pull", "--ff-only"]
+			["pull", "--ff-only"]
 		case .rebase:
-			return ["pull", "--rebase"]
+			["pull", "--rebase"]
 		}
 	}
 
@@ -699,6 +742,11 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["stash", "drop", ref], root: root)
 	}
 
+	public func stashDiff(_ ref: String) throws -> String {
+		let ref = try validatedStashRef(ref)
+		return try runner.runGit(arguments: ["stash", "show", "--patch", ref], root: root)
+	}
+
 	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {
 		let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !summary.isEmpty else {
@@ -740,7 +788,10 @@ public struct GitRepository: Sendable {
 	}
 
 	public func fileHistory(path: String, limit: Int = 50) throws -> [GitHistoryEntry] {
-		let output = try runner.runGit(arguments: ["log", "-\(max(1, limit))", "--format=\(Self.historyFormat)", "--", path], root: root)
+		let output = try runner.runGit(
+			arguments: ["log", "-\(max(1, limit))", "--format=\(Self.historyFormat)", "--", path],
+			root: root
+		)
 		return GitHistoryParser.parse(output)
 	}
 
@@ -780,7 +831,9 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: applyArguments, input: patch, root: root)
 	}
 
-	public static func discoverRoot(containing url: URL, runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL {
+	public static func discoverRoot(containing url: URL,
+	                                runner: any GitCommandRunning = ProcessGitCommandRunner()) throws -> URL
+	{
 		let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
 		let root = values?.isDirectory == true ? url : url.deletingLastPathComponent()
 		let output = try runner.runGit(arguments: ["rev-parse", "--show-toplevel"], root: root)

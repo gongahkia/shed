@@ -69,7 +69,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `283`
+- Bindings: `286`
 
 ### mode.normal
 
@@ -223,10 +223,12 @@ scripts/gen_keymap_docs.swift
 | `r` | `vim.replace.char` |
 | `Shift-R` | `vim.replace.mode` |
 | `Shift-\`` | `vim.case.toggle` |
+| `g Shift-\`` | `vim.case.toggleOperator` |
 | `gu` | `vim.case.lowerOperator` |
 | `g Shift-U` | `vim.case.upperOperator` |
 | `Shift-. Shift-.` | `vim.indent.right` |
 | `Shift-, Shift-,` | `vim.indent.left` |
+| `.` | `vim.repeatChange` |
 | `=` | `vim.format.operator` |
 | `==` | `vim.format.line` |
 | `gq` | `vim.format.reflowOperator` |
@@ -272,6 +274,7 @@ scripts/gen_keymap_docs.swift
 | `gr` | `lsp.references` |
 | `Space f` | `nav.gotoFile` |
 | `Space g` | `nav.gotoLine` |
+| `Space u` | `history.undoTree.toggle` |
 | `Space c a` | `lsp.codeAction` |
 | `i` | `mode.insert` |
 | `/` | `vim.searchForward` |

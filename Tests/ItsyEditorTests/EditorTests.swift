@@ -68,6 +68,57 @@ import Testing
 	#expect(entry.selectionAfter == editor.selections)
 }
 
+@Test func editorUndoTreeBranchesAndRestoresSnapshots() throws {
+	var editor = Editor(text: "a", storage: .pieceTree)
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 1, head: 1)))
+	editor.insert("b")
+	let firstID = try #require(editor.history.tree.currentNode?.id)
+	editor.insert("c")
+	let secondID = try #require(editor.history.tree.currentNode?.id)
+	editor.undo()
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 2, head: 2)))
+	editor.insert("d")
+	let branchID = try #require(editor.history.tree.currentNode?.id)
+
+	let first = try #require(editor.history.tree.node(id: firstID))
+	#expect(Set(first.childIDs) == Set([secondID, branchID]))
+	#expect(editorTextStorageString(editor) == "abd")
+
+	let restored = editor.restoreUndoTreeNode(id: secondID)
+	#expect(restored)
+	#expect(editorTextStorageString(editor) == "abc")
+	#expect(editor.history.tree.currentID == secondID)
+	editor.undo()
+	#expect(editorTextStorageString(editor) == "ab")
+}
+
+@Test func undoHistoryStorePersistsCappedUndoTree() throws {
+	var editor = Editor(text: "a", storage: .pieceTree)
+	editor.setSelection(SelectionSet(primary: Selection(anchor: 1, head: 1)))
+	editor.insert("b")
+	editor.insert("c")
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+	let workspace = directory.appendingPathComponent("workspace", isDirectory: true)
+	let fileURL = workspace.appendingPathComponent("file.txt")
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let store = UndoHistoryStore(maxNodeCount: 2, maxTotalTextBytes: 16)
+
+	try store.save(editor.history.tree, fileURL: fileURL, workspaceRoot: workspace)
+	let loaded = try #require(store.load(fileURL: fileURL, workspaceRoot: workspace))
+
+	#expect(store.historyURL(fileURL: fileURL, workspaceRoot: workspace).path.contains("/.itsy/undo/"))
+	#expect(loaded.currentNode?.text == Data("abc".utf8))
+	#expect(loaded.nodes.count <= 2 || loaded.path(to: loaded.currentID).count > 2)
+	for node in loaded.orderedNodes where node.id != loaded.rootID {
+		#expect(node.parentID.flatMap { loaded.node(id: $0) } != nil)
+	}
+
+	var restored = Editor(text: "abc", storage: .pieceTree)
+	restored.history.replaceTree(loaded)
+	restored.undo()
+	#expect(editorTextStorageString(restored) == "ab")
+}
+
 @Test func undoStackDropsOldestEntriesByCount() {
 	var editor = Editor(text: "", storage: .pieceTree)
 	editor.history = UndoStack(maxEditCount: 2, maxTotalRemovedBytes: Int.max)

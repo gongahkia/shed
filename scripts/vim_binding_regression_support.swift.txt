@@ -17,7 +17,7 @@ struct GeneratedVimBindingCase: CustomTestStringConvertible {
 	let actual = try bundledVimBindings().map(bindingSignature(_:))
 	let expected = try generatedVimBindingCases.map { try bindingSignature($0.binding()) }
 	#expect(actual == expected)
-	#expect(expected.count == 285)
+	#expect(expected.count == 286)
 }
 
 @Test(arguments: generatedVimBindingCases)

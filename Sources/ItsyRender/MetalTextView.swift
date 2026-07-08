@@ -299,6 +299,7 @@ public final class MetalTextView: NSView {
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var exCommandCompletionsProvider: (() -> [String])?
+	public var undoTreeChanged: ((UndoTree) -> Void)?
 	public var vimMarkStore = VimMarkStore() {
 		didSet {
 			loadPersistedVimMarks()

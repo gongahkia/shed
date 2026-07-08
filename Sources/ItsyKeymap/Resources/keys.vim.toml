@@ -198,6 +198,7 @@
 "gr" = "lsp.references"
 "Space f" = "nav.gotoFile"
 "Space g" = "nav.gotoLine"
+"Space u" = "history.undoTree.toggle"
 "Space c a" = "lsp.codeAction"
 "i" = "mode.insert"
 "/" = "vim.searchForward"

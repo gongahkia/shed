@@ -56,6 +56,7 @@ enum KeymapCommandCatalog {
 		"emacs.yank",
 		"emacs.yankPop",
 		"file.openUnderCursor",
+		"history.undoTree.toggle",
 		"lsp.completion",
 		"lsp.declaration",
 		"lsp.definition",

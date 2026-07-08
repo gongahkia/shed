@@ -134,6 +134,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var lspRestartURL: URL?
 	private var activeLSPKey: LSPSessionKey?
 	private var lspStatusPanel: LSPStatusPanel?
+	private var undoTreePanel: UndoTreePanelController?
 
 	init(document: ItsyDocument) {
 		recordBenchStage("window_controller_init_begin")
@@ -213,6 +214,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			renamePopover?.close()
 			codeActionPopover?.close()
 			signatureHelpPopover?.close()
+			undoTreePanel = nil
 			lspSurfaceRefreshTask?.cancel()
 			for task in lspSupervisorTasks.values {
 				task.cancel()
@@ -790,6 +792,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
 		view.vimMarksWorkspaceRoot = ItsyWorkspaceController.currentRootURL
+		view.undoTreeChanged = { [weak self] tree in
+			self?.undoTreePanel?.update(tree: tree)
+		}
 		scheduleLSPSemanticSurfaceRefresh()
 		recordBenchStage("editor_pane_callbacks_end")
 		recordBenchStage("editor_pane_install_end")
@@ -872,6 +877,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		ensureFindBarController().toggle()
 	}
 
+	func toggleUndoTree(_ sender: Any?) {
+		let panel = undoTreePanel ?? UndoTreePanelController()
+		panel.jumpRequested = { [weak self] nodeID in
+			guard let self, self.editorView.restoreUndoTreeNode(nodeID) else {
+				return
+			}
+			self.window?.makeFirstResponder(self.editorView)
+		}
+		undoTreePanel = panel
+		panel.toggle(relativeTo: window, tree: editorView.editor.history.tree)
+	}
+
 	func findNext() {
 		ensureFindBarController().findNext()
 	}
@@ -919,6 +936,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			toggleSidebar()
 		case "view.hiddenFiles.toggle":
 			toggleHiddenFiles()
+		case "history.undoTree.toggle":
+			toggleUndoTree(nil)
 		case "pane.close":
 			if !closeActivePane() {
 				(document as? NSDocument)?.close()

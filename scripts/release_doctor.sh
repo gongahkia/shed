@@ -53,6 +53,14 @@ if [[ -d "$app_dir" ]]; then
 		if [[ "${GITHUB_REF:-}" == refs/tags/* && -n "${GITHUB_REF_NAME:-}" && "v$version" != "$GITHUB_REF_NAME" ]]; then
 			fail "tag $GITHUB_REF_NAME does not match app version $version"
 		fi
+		if [[ "$mode" == "signed" ]]; then
+			sparkle_feed_url="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist" 2>/dev/null || true)"
+			sparkle_public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist" 2>/dev/null || true)"
+			[[ -n "$sparkle_feed_url" ]] || fail "missing Sparkle SUFeedURL; set ITSY_SPARKLE_FEED_URL before bench/scripts/make_app.sh"
+			[[ -n "$sparkle_public_key" ]] || fail "missing Sparkle SUPublicEDKey; set ITSY_SPARKLE_PUBLIC_ED_KEY before bench/scripts/make_app.sh"
+			require_path "$app_dir/Contents/Frameworks/Sparkle.framework"
+			require_path "$app_dir/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
+		fi
 	fi
 fi
 

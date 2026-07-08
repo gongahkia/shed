@@ -44,5 +44,5 @@ Result:
 
 - `ItsyVim` now owns key-state decisions; buffer mutation still lives in `MetalTextView`.
 - Text object range calculation is still adapter-side.
-- `~`, `g~`, `gu`, `gU`, `>>`, `<<`, dot-repeat, and tag text objects are pinned as current no-op gaps in `ItsyVimTests`.
+- Remaining unsupported Vim commands stay pinned in `ItsyVimTests`; case, indent, dot-repeat, and tag text objects now have regression coverage.
 - Full ex parsing is still adapter-side; `ItsyVim` only emits command-start/action routing.

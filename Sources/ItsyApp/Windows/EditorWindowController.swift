@@ -783,9 +783,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		view.exCommandRequested = { [weak self] command in
 			self?.performExCommand(command) ?? false
 		}
+		view.exCommandCompletionsProvider = {
+			ItsyAppCommandBridge.availableCommandIDs()
+		}
 		view.exCommandLineRequested = { [weak self] completion in
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
+		view.vimMarksWorkspaceRoot = ItsyWorkspaceController.currentRootURL
 		scheduleLSPSemanticSurfaceRefresh()
 		recordBenchStage("editor_pane_callbacks_end")
 		recordBenchStage("editor_pane_install_end")

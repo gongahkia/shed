@@ -4,7 +4,9 @@ import CoreVideo
 import Metal
 import ItsyEditor
 import ItsyKeymap
+import struct ItsyVim.RecordedKey
 import struct ItsyVim.VimEngine
+import struct ItsyVim.VimMarkStore
 import QuartzCore
 
 struct MetalGlyphInstance {
@@ -296,6 +298,17 @@ public final class MetalTextView: NSView {
 	public var hoverCandidateChanged: ((TextHoverCandidate?) -> Void)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
+	public var exCommandCompletionsProvider: (() -> [String])?
+	public var vimMarkStore = VimMarkStore() {
+		didSet {
+			loadPersistedVimMarks()
+		}
+	}
+	public var vimMarksWorkspaceRoot: URL? {
+		didSet {
+			loadPersistedVimMarks()
+		}
+	}
 	public var keymapEngine = KeymapEngine()
 	public var completionTriggerCharacters: Set<String> = []
 	public var signatureHelpTriggerCharacters: Set<String> = []
@@ -303,6 +316,12 @@ public final class MetalTextView: NSView {
 	var insertUndoGroupActive = false
 	var killRing = KillRing()
 	var lastYankRange: Range<Int>?
+	var vimPendingChordEvents: [RecordedKey] = []
+	var vimPendingChangePrefixEvents: [RecordedKey] = []
+	var vimCurrentChangeEvents: [RecordedKey]?
+	var vimCurrentChangeCount = 1
+	var vimCurrentChangeRegister: String?
+	var replayingVimLastChange = false
 	private var optionDragAnchor: Int?
 	private var mouseSelectionAnchor: Int?
 	private var lastAccessibilityValue: String?
@@ -768,6 +787,7 @@ public final class MetalTextView: NSView {
 			return
 		}
 		interpretKeyEvents([event])
+		recordVimChangeEvent(RecordedKey(event))
 		recordMacroEvent(event, when: recordsMacro)
 	}
 
@@ -829,6 +849,7 @@ public final class MetalTextView: NSView {
 		}
 		let handled = handlePassthroughKey(characters: characters, charactersIgnoringModifiers: charactersIgnoringModifiers, keyCode: keyCode, modifierFlags: modifierFlags)
 		if let event, handled {
+			recordVimChangeEvent(RecordedKey(event))
 			recordMacroEvent(event, when: recordsMacro)
 		}
 		return handled

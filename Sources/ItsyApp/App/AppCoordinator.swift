@@ -662,6 +662,9 @@ import ItsyKeymap
 				return false
 			}
 		}
+		ItsyAppCommandBridge.commandIDs = { [weak self] in
+			self?.commandRegistry.allCommands.map(\.id) ?? []
+		}
 	}
 
 	private func installProblemsBridge() {

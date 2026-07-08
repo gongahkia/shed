@@ -1,3 +1,4 @@
+import Foundation
 import ItsyVim
 import Testing
 
@@ -54,6 +55,18 @@ import Testing
 	#expect(engine.marks["a"] == Position(offset: 0))
 	#expect(engine.handle(Key("'"), buffer: buffer).isEmpty)
 	#expect(engine.handle(Key("a"), buffer: buffer) == [.jumpToMark("a")])
+}
+
+@Test func vimMarkStorePersistsWorkspaceMarks() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let store = VimMarkStore(directory: directory)
+	let workspace = URL(fileURLWithPath: "/tmp/itsy-workspace")
+
+	try store.save(["a": Position(offset: 42), "z": Position(offset: 7)], workspaceRoot: workspace)
+
+	#expect(store.load(workspaceRoot: workspace) == ["a": Position(offset: 42), "z": Position(offset: 7)])
+	#expect(store.marksURL(workspaceRoot: workspace).lastPathComponent == VimMarkStore.workspaceHash(for: workspace) + ".json")
 }
 
 private struct TestBuffer: BufferQuery {

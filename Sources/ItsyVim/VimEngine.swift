@@ -61,6 +61,11 @@ public enum VimOperator: Sendable, Equatable {
 	case delete
 	case change
 	case yank
+	case toggleCase
+	case lowercase
+	case uppercase
+	case indentRight
+	case indentLeft
 }
 
 public struct VimRegister: Sendable, Equatable {
@@ -133,6 +138,63 @@ public struct RecordedKey: Sendable, Equatable {
 	}
 }
 
+public struct VimLastChange: Sendable, Equatable {
+	public var events: [RecordedKey]
+	public var count: Int
+	public var register: String?
+
+	public init(events: [RecordedKey], count: Int = 1, register: String? = nil) {
+		self.events = events
+		self.count = max(1, count)
+		self.register = register
+	}
+}
+
+public struct VimMarkStore: Sendable {
+	public var directory: URL
+
+	public init(directory: URL = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".config/itsy/vim-marks", isDirectory: true)) {
+		self.directory = directory
+	}
+
+	public func marksURL(workspaceRoot: URL) -> URL {
+		directory.appendingPathComponent(Self.workspaceHash(for: workspaceRoot) + ".json")
+	}
+
+	public func load(workspaceRoot: URL) -> [Character: Position] {
+		let url = marksURL(workspaceRoot: workspaceRoot)
+		guard let data = try? Data(contentsOf: url),
+		      let payload = try? JSONDecoder().decode([String: Int].self, from: data)
+		else {
+			return [:]
+		}
+		var marks: [Character: Position] = [:]
+		for (key, offset) in payload where key.count == 1 {
+			if let character = key.first {
+				marks[character] = Position(offset: offset)
+			}
+		}
+		return marks
+	}
+
+	public func save(_ marks: [Character: Position], workspaceRoot: URL) throws {
+		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+		let payload = Dictionary(uniqueKeysWithValues: marks.map { (String($0.key), $0.value.offset) })
+		let data = try JSONEncoder().encode(payload)
+		try data.write(to: marksURL(workspaceRoot: workspaceRoot), options: .atomic)
+	}
+
+	public static func workspaceHash(for workspaceRoot: URL) -> String {
+		let path = workspaceRoot.standardizedFileURL.path
+		var hash: UInt64 = 0xcbf2_9ce4_8422_2325
+		for byte in path.utf8 {
+			hash ^= UInt64(byte)
+			hash &*= 0x0000_0100_0000_01b3
+		}
+		return String(hash, radix: 16)
+	}
+}
+
 public enum Motion: Sendable, Equatable {
 	case charForward
 	case charBackward
@@ -193,6 +255,8 @@ public enum VimCommandAction: Sendable, Equatable {
 	case applyPendingOperatorMotion(String)
 	case applyPendingOperatorTextObject(String)
 	case lineOperator(VimOperator)
+	case toggleCaseAtCursor
+	case repeatLastChange
 	case jumpBack
 	case macroRecordPrefix
 	case macroReplayPrefix
@@ -245,6 +309,8 @@ public struct VimEngine: Sendable {
 		"vim.textObject.aroundBrace": "vim.textObject.aroundBrace",
 		"vim.textObject.innerParagraph": "vim.textObject.innerParagraph",
 		"vim.textObject.aroundParagraph": "vim.textObject.aroundParagraph",
+		"vim.textObject.innerTag": "vim.textObject.innerTag",
+		"vim.textObject.aroundTag": "vim.textObject.aroundTag",
 	]
 	public var mode: Mode
 	public var pendingCharacterMotion: CharacterMotion?
@@ -265,6 +331,7 @@ public struct VimEngine: Sendable {
 	public var macroRecording: Character?
 	public var recordingMacroRegister: String?
 	public var currentMacroEvents: [RecordedKey]
+	public var lastChange: VimLastChange?
 	public var lastSearch: SearchQuery?
 	public var awaitingRegister: Bool
 	public var awaitingMacroRecordRegister: Bool
@@ -306,6 +373,7 @@ public struct VimEngine: Sendable {
 		self.macroRecording = macroRecording
 		self.recordingMacroRegister = nil
 		self.currentMacroEvents = []
+		self.lastChange = nil
 		self.lastSearch = lastSearch
 		self.awaitingRegister = false
 		self.awaitingMacroRecordRegister = false
@@ -400,6 +468,20 @@ public struct VimEngine: Sendable {
 			return beginOperatorAction(.change, count: count, hasSelection: hasSelection)
 		case "vim.operator.yank":
 			return beginOperatorAction(.yank, count: count, hasSelection: hasSelection)
+		case "vim.case.toggle":
+			return hasSelection ? .applySelectionOperator(.toggleCase) : .toggleCaseAtCursor
+		case "vim.case.toggleOperator":
+			return beginOperatorAction(.toggleCase, count: count, hasSelection: hasSelection)
+		case "vim.case.lowerOperator":
+			return beginOperatorAction(.lowercase, count: count, hasSelection: hasSelection)
+		case "vim.case.upperOperator":
+			return beginOperatorAction(.uppercase, count: count, hasSelection: hasSelection)
+		case "vim.indent.right":
+			return hasSelection ? .applySelectionOperator(.indentRight) : .lineOperator(.indentRight)
+		case "vim.indent.left":
+			return hasSelection ? .applySelectionOperator(.indentLeft) : .lineOperator(.indentLeft)
+		case "vim.repeatChange":
+			return .repeatLastChange
 		case "vim.registerPrefix":
 			awaitingRegister = true
 			return .handled
@@ -441,13 +523,12 @@ public struct VimEngine: Sendable {
 			return .insertMode
 		case "mode.emacs":
 			return .emacsMode
-		case "vim.textObject.innerSentence", "vim.textObject.aroundSentence", "vim.textObject.innerTag", "vim.textObject.aroundTag":
+		case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
 			pendingOperator = nil
 			mode = .normal
 			return .normalMode
 		case "vim.jumpOlder", "vim.jumpNewer", "lsp.definition", "lsp.declaration", "file.openUnderCursor",
-		     "vim.replace.char", "vim.replace.mode", "vim.case.toggle", "vim.case.lowerOperator", "vim.case.upperOperator",
-		     "vim.indent.right", "vim.indent.left", "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
+		     "vim.replace.char", "vim.replace.mode", "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
 		     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
 		     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll", "vim.searchHistory.forward",
 		     "vim.searchHistory.backward", "vim.commandHistory":
@@ -782,6 +863,16 @@ private extension VimOperator {
 			return "change"
 		case .yank:
 			return "yank"
+		case .toggleCase:
+			return "toggleCase"
+		case .lowercase:
+			return "lowercase"
+		case .uppercase:
+			return "uppercase"
+		case .indentRight:
+			return "indentRight"
+		case .indentLeft:
+			return "indentLeft"
 		}
 	}
 }

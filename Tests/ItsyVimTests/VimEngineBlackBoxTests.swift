@@ -366,6 +366,8 @@ private let textObjectCommandIDs = [
 	"vim.textObject.aroundBrace",
 	"vim.textObject.innerParagraph",
 	"vim.textObject.aroundParagraph",
+	"vim.textObject.innerTag",
+	"vim.textObject.aroundTag",
 ]
 
 struct CommandActionCase: Sendable {
@@ -395,6 +397,13 @@ private let commandActionCases: [CommandActionCase] = [
 	CommandActionCase(commandID: "vim.mark.jump.z", action: .jumpToMark("z")),
 	CommandActionCase(commandID: "vim.mark.jumpLine.b", action: .jumpToMark("b")),
 	CommandActionCase(commandID: "vim.macro.record.a", action: .macroRecord("a")),
+	CommandActionCase(commandID: "vim.case.toggle", action: .toggleCaseAtCursor),
+	CommandActionCase(commandID: "vim.case.toggleOperator", action: .beginOperator(.toggleCase)),
+	CommandActionCase(commandID: "vim.case.lowerOperator", action: .beginOperator(.lowercase)),
+	CommandActionCase(commandID: "vim.case.upperOperator", action: .beginOperator(.uppercase)),
+	CommandActionCase(commandID: "vim.indent.right", action: .lineOperator(.indentRight)),
+	CommandActionCase(commandID: "vim.indent.left", action: .lineOperator(.indentLeft)),
+	CommandActionCase(commandID: "vim.repeatChange", action: .repeatLastChange),
 	CommandActionCase(commandID: "vim.fold.close", action: .handled),
 	CommandActionCase(commandID: "vim.replace.char", action: .handled),
 	CommandActionCase(commandID: "vim.searchHistory.forward", action: .handled),

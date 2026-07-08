@@ -6,6 +6,7 @@ import struct ItsyVim.KeyModifiers
 import struct ItsyVim.Position
 import struct ItsyVim.SelectionSnapshot
 import enum ItsyVim.VimCommandAction
+import struct ItsyVim.VimLastChange
 import enum ItsyVim.VimOperator
 import enum ItsyVim.VisualMode
 import struct ItsyVim.VimSelection
@@ -28,6 +29,8 @@ enum TextObject {
 	case aroundPair(Character, Character)
 	case innerParagraph
 	case aroundParagraph
+	case innerTag
+	case aroundTag
 }
 
 extension MetalTextView {
@@ -124,10 +127,20 @@ extension MetalTextView {
 	func dispatchKeymap(_ event: NSEvent) -> KeyDispatchResult {
 		switch keymapEngine.handle(event) {
 		case .command(let commandID):
-			return performKeymapCommand(commandID) ? .handled : .passthrough
-		case .partial, .consumed:
+			prepareVimChangeRecording(for: commandID, event: event)
+			let handled = performKeymapCommand(commandID)
+			if !handled {
+				cancelVimChangeRecording()
+			}
+			return handled ? .handled : .passthrough
+		case .partial:
+			recordVimKeymapPrefixEvent(event)
+			return .handled
+		case .consumed:
+			vimPendingChordEvents = []
 			return .handled
 		case .passthrough:
+			vimPendingChordEvents = []
 			return .passthrough
 		}
 	}
@@ -217,6 +230,10 @@ extension MetalTextView {
 			applyPendingOperator(textObject: textObject)
 		case .lineOperator(let op):
 			applyLineOperator(op)
+		case .toggleCaseAtCursor:
+			toggleCaseAtCursor()
+		case .repeatLastChange:
+			replayLastChange()
 		case .jumpBack:
 			jumpBack()
 		case .macroRecordPrefix:
@@ -251,6 +268,7 @@ extension MetalTextView {
 			leaveVisualMode(collapse: true)
 			keymapEngine.setMode(.normal)
 			vimEngine.mode = .normal
+			finishVimChangeRecording()
 			return true
 		case .insertMode:
 			beginInsertUndoGroup()
@@ -262,6 +280,7 @@ extension MetalTextView {
 			return true
 		case .setMark(let mark):
 			vimEngine.marks[mark] = Position(offset: editor.selections.primary.head)
+			savePersistedVimMarks()
 		case .jumpToMark(let mark):
 			if let position = vimEngine.marks[mark] {
 				editor.setSelection(SelectionSet(primary: Selection(anchor: position.offset, head: position.offset)))
@@ -488,6 +507,10 @@ extension MetalTextView {
 			return .innerParagraph
 		case "vim.textObject.aroundParagraph":
 			return .aroundParagraph
+		case "vim.textObject.innerTag":
+			return .innerTag
+		case "vim.textObject.aroundTag":
+			return .aroundTag
 		default:
 			return nil
 		}
@@ -517,8 +540,9 @@ extension MetalTextView {
 	}
 
 	func applyLineOperator(_ op: VimOperator) {
+		let range = currentLineRange(count: max(1, pendingOperatorCount * keymapRepeatCount))
 		clearPendingOperator()
-		applyOperator(op, range: currentLineIncludingNewline())
+		applyOperator(op, range: range)
 	}
 
 	func clearPendingOperator() {
@@ -540,17 +564,32 @@ extension MetalTextView {
 			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
 			vimEngine.mode = .normal
+			syncEditorState()
+			editorDidChange?(editor)
+			finishVimChangeRecording()
 		case .change:
 			writeRegister(text, operation: .delete)
 			replace(range: range, with: "")
 			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
 			vimEngine.mode = .insert
+			syncEditorState()
+			editorDidChange?(editor)
 		case .yank:
 			writeRegister(text, operation: .yank)
 			editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
 			syncEditorState()
 			vimEngine.mode = .normal
+		case .toggleCase, .lowercase, .uppercase:
+			replace(range: range, with: transformCase(text, op: op))
+			vimEngine.mode = .normal
+			syncEditorState()
+			editorDidChange?(editor)
+			finishVimChangeRecording()
+		case .indentRight, .indentLeft:
+			applyIndentOperator(op, range: range)
+			vimEngine.mode = .normal
+			finishVimChangeRecording()
 		}
 	}
 
@@ -568,6 +607,7 @@ extension MetalTextView {
 			editor.deleteForward()
 			syncEditorState()
 			editorDidChange?(editor)
+			finishVimChangeRecording()
 		case .change:
 			writeRegister(selections.map { editor.rope.slice($0) }.joined(), operation: .delete)
 			editor.deleteForward()
@@ -580,13 +620,30 @@ extension MetalTextView {
 			writeRegister(text, operation: .yank)
 			editor.setSelection(SelectionSet(primary: Selection(anchor: selections[0].lowerBound, head: selections[0].lowerBound)))
 			syncEditorState()
+		case .toggleCase, .lowercase, .uppercase:
+			for range in selections.reversed() {
+				replace(range: range, with: transformCase(editor.rope.slice(range), op: op))
+			}
+			syncEditorState()
+			editorDidChange?(editor)
+			finishVimChangeRecording()
+		case .indentRight, .indentLeft:
+			for range in selections.reversed() {
+				applyIndentOperator(op, range: range)
+			}
+			finishVimChangeRecording()
 		}
 	}
 
 	func currentLineIncludingNewline() -> Range<Int> {
+		currentLineRange(count: 1)
+	}
+
+	func currentLineRange(count: Int) -> Range<Int> {
 		let line = editor.rope.line(forOffset: editor.selections.primary.head)
 		let start = editor.rope.offset(forLine: line)
-		let end = line + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: line + 1) : editor.rope.length
+		let endLine = min(max(line, line + count - 1), editor.rope.lineCount - 1)
+		let end = endLine + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: endLine + 1) : editor.rope.length
 		return start ..< end
 	}
 
@@ -603,6 +660,8 @@ extension MetalTextView {
 			if pendingExCommand?.isEmpty == false {
 				pendingExCommand?.removeLast()
 			}
+		case 48:
+			completePendingExCommand()
 		case 53:
 			pendingExCommand = nil
 			keymapEngine.setMode(.normal)
@@ -660,6 +719,9 @@ extension MetalTextView {
 		}
 		pendingRegister = register
 		awaitingRegister = false
+		if !replayingVimLastChange {
+			vimPendingChangePrefixEvents.append(RecordedKey(event))
+		}
 		return true
 	}
 
@@ -829,6 +891,7 @@ extension MetalTextView {
 		editor.insert(text)
 		syncEditorState()
 		editorDidChange?(editor)
+		finishVimChangeRecording()
 	}
 
 	func offsetAfterCharacter(at offset: Int) -> Int {
@@ -930,6 +993,10 @@ extension MetalTextView {
 			return paragraphTextObjectRange(includeBlankLine: false)
 		case .aroundParagraph:
 			return paragraphTextObjectRange(includeBlankLine: true)
+		case .innerTag:
+			return tagTextObjectRange(includeDelimiters: false)
+		case .aroundTag:
+			return tagTextObjectRange(includeDelimiters: true)
 		}
 	}
 
@@ -1001,6 +1068,63 @@ extension MetalTextView {
 			end = editor.rope.offset(forLine: endLineAfterObject + 1)
 		}
 		return start ..< end
+	}
+
+	func tagTextObjectRange(includeDelimiters: Bool) -> Range<Int>? {
+		let text = editorStorageString(editor)
+		guard !text.isEmpty,
+		      let headIndex = String.Index(text.utf8.index(text.utf8.startIndex, offsetBy: min(editor.selections.primary.head, text.utf8.count)), within: text)
+		else {
+			return nil
+		}
+		struct OpenTag {
+			var name: String
+			var start: String.Index
+			var end: String.Index
+		}
+		var stack: [OpenTag] = []
+		var best: Range<String.Index>?
+		var cursor = text.startIndex
+		while let openStart = text[cursor...].firstIndex(of: "<"),
+		      let openEnd = text[openStart...].firstIndex(of: ">") {
+			let contentStart = text.index(after: openStart)
+			let raw = String(text[contentStart ..< openEnd]).trimmingCharacters(in: .whitespacesAndNewlines)
+			let closeEnd = text.index(after: openEnd)
+			if raw.hasPrefix("!") || raw.hasPrefix("?") {
+				cursor = closeEnd
+				continue
+			}
+			if raw.hasPrefix("/") {
+				if let name = tagName(in: String(raw.dropFirst())),
+				   let matchIndex = stack.lastIndex(where: { $0.name == name }) {
+					let opening = stack.remove(at: matchIndex)
+					let around = opening.start ..< closeEnd
+					if around.lowerBound <= headIndex, headIndex <= around.upperBound {
+						let inner = opening.end ..< openStart
+						let candidate = includeDelimiters ? around : inner
+						if best == nil || utf8Range(candidate, in: text).count < utf8Range(best!, in: text).count {
+							best = candidate
+						}
+					}
+				}
+			} else if !raw.hasSuffix("/"), let name = tagName(in: raw) {
+				stack.append(OpenTag(name: name, start: openStart, end: closeEnd))
+			}
+			cursor = closeEnd
+		}
+		return best.map { utf8Range($0, in: text) }
+	}
+
+	func tagName(in raw: String) -> String? {
+		var name = ""
+		for scalar in raw.unicodeScalars.drop(while: { CharacterSet.whitespacesAndNewlines.contains($0) }) {
+			if CharacterSet.alphanumerics.contains(scalar) || scalar == "-" || scalar == "_" || scalar == ":" {
+				name.unicodeScalars.append(scalar)
+			} else {
+				break
+			}
+		}
+		return name.isEmpty ? nil : name
 	}
 
 	func lineIsBlank(_ line: Int) -> Bool {
@@ -1116,9 +1240,205 @@ extension MetalTextView {
 		}
 	}
 
+	func toggleCaseAtCursor() {
+		let offsets = characterOffsets()
+		let head = editor.selections.primary.head
+		guard let current = offsets.first(where: { $0.offset >= head }) else {
+			cancelVimChangeRecording()
+			return
+		}
+		let end = current.offset + String(current.character).utf8.count
+		replace(range: current.offset ..< end, with: transformCase(String(current.character), op: .toggleCase))
+		syncEditorState()
+		editorDidChange?(editor)
+		finishVimChangeRecording()
+	}
+
+	func transformCase(_ text: String, op: VimOperator) -> String {
+		switch op {
+		case .lowercase:
+			return text.lowercased()
+		case .uppercase:
+			return text.uppercased()
+		case .toggleCase:
+			var result = ""
+			for character in text {
+				let value = String(character)
+				let lower = value.lowercased()
+				let upper = value.uppercased()
+				if lower == upper {
+					result += value
+				} else if value == upper {
+					result += lower
+				} else {
+					result += upper
+				}
+			}
+			return result
+		default:
+			return text
+		}
+	}
+
+	func applyIndentOperator(_ op: VimOperator, range: Range<Int>) {
+		let lineRange = lineRangeCovering(range)
+		let text = editor.rope.slice(lineRange)
+		var result = ""
+		var cursor = text.startIndex
+		while cursor < text.endIndex {
+			let newline = text[cursor...].firstIndex(of: "\n")
+			let end = newline ?? text.endIndex
+			let line = String(text[cursor ..< end])
+			result += op == .indentLeft ? outdentedLine(line) : "\t" + line
+			if let newline {
+				result.append("\n")
+				cursor = text.index(after: newline)
+			} else {
+				cursor = text.endIndex
+			}
+		}
+		replace(range: lineRange, with: result)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: lineRange.lowerBound, head: lineRange.lowerBound)))
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func outdentedLine(_ line: String) -> String {
+		if line.hasPrefix("\t") {
+			return String(line.dropFirst())
+		}
+		var removeCount = 0
+		for character in line.prefix(4) where character == " " {
+			removeCount += 1
+		}
+		return String(line.dropFirst(removeCount))
+	}
+
+	func lineRangeCovering(_ range: Range<Int>) -> Range<Int> {
+		let lowerLine = editor.rope.line(forOffset: range.lowerBound)
+		let upperOffset = max(range.lowerBound, range.upperBound - 1)
+		let upperLine = editor.rope.line(forOffset: upperOffset)
+		let start = editor.rope.offset(forLine: lowerLine)
+		let end = upperLine + 1 < editor.rope.lineCount ? editor.rope.offset(forLine: upperLine + 1) : editor.rope.length
+		return start ..< end
+	}
+
+	func completePendingExCommand() {
+		guard let raw = pendingExCommand else {
+			return
+		}
+		let hasColon = raw.hasPrefix(":")
+		let prefix = hasColon ? String(raw.dropFirst()) : raw
+		guard let match = exCommandCompletionsProvider?().sorted().first(where: { $0.hasPrefix(prefix) }) else {
+			return
+		}
+		pendingExCommand = (hasColon ? ":" : "") + match
+	}
+
+	public func loadPersistedVimMarks() {
+		guard let root = vimMarksWorkspaceRoot else {
+			return
+		}
+		vimEngine.marks = vimMarkStore.load(workspaceRoot: root)
+	}
+
+	func savePersistedVimMarks() {
+		guard let root = vimMarksWorkspaceRoot else {
+			return
+		}
+		try? vimMarkStore.save(vimEngine.marks, workspaceRoot: root)
+	}
+
+	func recordVimKeymapPrefixEvent(_ event: NSEvent) {
+		guard !replayingVimLastChange else {
+			return
+		}
+		if vimCurrentChangeEvents != nil {
+			recordVimChangeEvent(RecordedKey(event))
+		} else {
+			vimPendingChordEvents.append(RecordedKey(event))
+		}
+	}
+
+	func prepareVimChangeRecording(for commandID: String, event: NSEvent) {
+		guard !replayingVimLastChange else {
+			return
+		}
+		let record = RecordedKey(event)
+		if vimCurrentChangeEvents != nil {
+			vimCurrentChangeEvents?.append(record)
+			vimPendingChordEvents = []
+			return
+		}
+		if commandID == "vim.registerPrefix" {
+			vimPendingChangePrefixEvents = vimPendingChordEvents + [record]
+			vimPendingChordEvents = []
+			return
+		}
+		guard vimCommandStartsChange(commandID) else {
+			vimPendingChordEvents = []
+			return
+		}
+		vimCurrentChangeEvents = vimPendingChangePrefixEvents + vimPendingChordEvents + [record]
+		vimCurrentChangeCount = max(1, keymapEngine.lastCommandCount)
+		vimCurrentChangeRegister = pendingRegister
+		vimPendingChangePrefixEvents = []
+		vimPendingChordEvents = []
+	}
+
+	func vimCommandStartsChange(_ commandID: String) -> Bool {
+		switch commandID {
+		case "mode.insert", "vim.operator.delete", "vim.operator.change",
+		     "vim.case.toggle", "vim.case.toggleOperator", "vim.case.lowerOperator", "vim.case.upperOperator",
+		     "vim.indent.right", "vim.indent.left", "vim.pasteAfter", "vim.pasteBefore":
+			return true
+		default:
+			return false
+		}
+	}
+
+	func recordVimChangeEvent(_ event: RecordedKey) {
+		guard !replayingVimLastChange, vimCurrentChangeEvents != nil else {
+			return
+		}
+		vimCurrentChangeEvents?.append(event)
+	}
+
+	func finishVimChangeRecording() {
+		guard !replayingVimLastChange, let events = vimCurrentChangeEvents, !events.isEmpty else {
+			return
+		}
+		vimEngine.lastChange = VimLastChange(events: events, count: vimCurrentChangeCount, register: vimCurrentChangeRegister)
+		vimCurrentChangeEvents = nil
+		vimCurrentChangeCount = 1
+		vimCurrentChangeRegister = nil
+	}
+
+	func cancelVimChangeRecording() {
+		vimCurrentChangeEvents = nil
+		vimCurrentChangeCount = 1
+		vimCurrentChangeRegister = nil
+	}
+
+	func replayLastChange() {
+		guard !replayingVimLastChange, let change = vimEngine.lastChange, !change.events.isEmpty else {
+			return
+		}
+		replayingVimLastChange = true
+		defer { replayingVimLastChange = false }
+		for event in change.events {
+			_ = handleKey(
+				characters: event.characters,
+				charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+				keyCode: event.keyCode,
+				modifierFlags: event.modifierFlags.appKitModifierFlags
+			)
+		}
+	}
+
 }
 
-private extension RecordedKey {
+extension RecordedKey {
 	init(_ event: NSEvent) {
 		self.init(
 			characters: event.characters ?? "",

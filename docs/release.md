@@ -46,6 +46,7 @@ ITSY_RELEASE_MODE=unsigned scripts/release_doctor.sh
 ITSY_ALLOW_UNSIGNED_DMG=1 scripts/make_dmg.sh
 shasum -c dist/Itsy-0.1.0.dmg.sha256
 ITSY_ALLOW_UNSIGNED_DMG=1 scripts/verify_dmg.sh dist/Itsy-0.1.0.dmg
+scripts/make_homebrew_cask.sh
 ```
 
 This validates app layout, DMG integrity, mounted bundle layout, and checksum. It does not satisfy Developer ID signing or notarization.
@@ -61,6 +62,7 @@ scripts/make_dmg.sh
 scripts/notarize.sh
 shasum -c dist/Itsy-0.1.0.dmg.sha256
 scripts/verify_dmg.sh dist/Itsy-0.1.0.dmg
+scripts/make_homebrew_cask.sh
 ```
 
 Expected properties:
@@ -88,6 +90,12 @@ https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml
 ```
 
 Do not enable automatic updates until the URL and signing key are final.
+
+After Sparkle is vendored and the EdDSA key is available, generate the appcast with:
+
+```sh
+SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast scripts/make_appcast.sh
+```
 
 ## Homebrew Cask Gate
 
@@ -118,6 +126,12 @@ brew uninstall --cask itsy
 ```
 
 Submit to `homebrew/homebrew-cask` only after the URL is public and the SHA-256 is for the signed/notarized DMG.
+
+Draft the cask from the current DMG with:
+
+```sh
+scripts/make_homebrew_cask.sh
+```
 
 ## Name And Domain Gate
 

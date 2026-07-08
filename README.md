@@ -54,6 +54,8 @@ Homebrew cask install, after a cask is published:
 brew install --cask itsy
 ```
 
+Draft the cask locally with `scripts/make_homebrew_cask.sh` after building the release DMG.
+
 ## Bench
 
 Latest committed release-candidate result: [bench/results/release-candidate.md](bench/results/release-candidate.md).

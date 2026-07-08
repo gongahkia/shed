@@ -151,6 +151,15 @@ struct EditorPaneLayout: Equatable {
 		return activePane
 	}
 
+	@discardableResult
+	mutating func focusPane(containing editorView: MetalTextView) -> EditorPane? {
+		guard let index = panes.firstIndex(where: { $0.editorView === editorView }) else {
+			return nil
+		}
+		activePaneIndex = index
+		return panes[index]
+	}
+
 	func layout() -> EditorPaneLayout {
 		layout(for: rootSplitViewController)
 	}

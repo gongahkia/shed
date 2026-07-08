@@ -106,6 +106,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var renamePopover: NSPopover?
 	private var codeActionPopover: NSPopover?
 	private var codeActionRequestGeneration = 0
+	private weak var contextMenuEditorView: MetalTextView?
 	private var signatureHelpPopover: NSPopover?
 	private var signatureHelpRequestGeneration = 0
 	private var referencesRequestGeneration = 0
@@ -784,6 +785,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window?.makeFirstResponder(editorView)
 	}
 
+	private func focusEditor(_ targetView: MetalTextView) {
+		paneCoordinator.focusPane(containing: targetView)
+		window?.makeFirstResponder(targetView)
+	}
+
 	private func installPane(_ pane: EditorPane, document: ItsyDocument) {
 		recordBenchStage("editor_pane_install_begin")
 		let view = pane.editorView
@@ -815,6 +821,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recordBenchStage("editor_pane_callbacks_begin")
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
+		}
+		view.contextMenuProvider = { [weak self, weak view] request in
+			guard let self, let view else {
+				return nil
+			}
+			return self.makeEditorContextMenu(request: request, in: view)
 		}
 		view.completionRequested = { [weak self, weak view] trigger in
 			self?.requestCompletion(triggerCharacter: trigger, in: view) ?? false
@@ -960,6 +972,99 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	func selectAllFindMatches() {
 		ensureFindBarController().selectAllMatches()
+	}
+
+	private func makeEditorContextMenu(request: TextContextMenuRequest, in view: MetalTextView) -> NSMenu {
+		contextMenuEditorView = view
+		focusEditor(view)
+		let hasFileURL = (document as? ItsyDocument)?.fileURL != nil
+		let menu = NSMenu()
+		menu.autoenablesItems = false
+
+		@discardableResult
+		func addItem(
+			_ title: String.LocalizationValue,
+			action: Selector?,
+			enabled: Bool = true,
+			commandID: String? = nil,
+			keyEquivalent: String = "",
+			modifiers: NSEvent.ModifierFlags = []
+		) -> NSMenuItem {
+			let item = NSMenuItem(title: L10n.string(title), action: action, keyEquivalent: keyEquivalent)
+			item.target = action == nil ? nil : self
+			item.isEnabled = enabled
+			item.representedObject = commandID
+			item.keyEquivalentModifierMask = modifiers
+			menu.addItem(item)
+			return item
+		}
+
+		addItem("Go to Definition", action: nil, enabled: false)
+		addItem("Go to Declaration", action: nil, enabled: false)
+		addItem("Go to Type Definition", action: nil, enabled: false)
+		addItem("Go to Implementation", action: nil, enabled: false)
+		addItem("Find All References", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.references")
+		menu.addItem(NSMenuItem.separator())
+		addItem("Rename Symbol", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.rename")
+		addItem("Format Selection", action: #selector(runContextCommand(_:)), enabled: hasFileURL && request.hasSelection, commandID: "lsp.formatSelection")
+		addItem("Show Code Actions", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.codeAction")
+		menu.addItem(NSMenuItem.separator())
+		addItem("Cut", action: #selector(cutContextSelection(_:)), enabled: request.hasSelection, keyEquivalent: "x", modifiers: .command)
+		addItem("Copy", action: #selector(copyContextSelection(_:)), enabled: request.hasSelection, keyEquivalent: "c", modifiers: .command)
+		addItem("Copy and Trim", action: #selector(copyTrimmedContextSelection(_:)), enabled: request.hasSelection)
+		addItem("Paste", action: #selector(pasteContextClipboard(_:)), enabled: NSPasteboard.general.string(forType: .string) != nil, keyEquivalent: "v", modifiers: .command)
+		menu.addItem(NSMenuItem.separator())
+		addItem("Reveal in Finder", action: #selector(revealContextFileInFinder(_:)), enabled: hasFileURL)
+		addItem("Open in Terminal", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "terminal.openAtFileDirectory")
+		addItem("Copy Permalink", action: nil, enabled: false)
+		addItem("View File History", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "git.fileHistory")
+		return menu
+	}
+
+	@objc private func runContextCommand(_ sender: NSMenuItem) {
+		guard let commandID = sender.representedObject as? String else {
+			return
+		}
+		let targetView = contextMenuEditorView ?? editorView
+		focusEditor(targetView)
+		if commandID == "git.fileHistory" {
+			_ = ItsyAppCommandBridge.requestRunCommand(commandID)
+			return
+		}
+		if !performKeymapCommand(commandID) {
+			_ = ItsyAppCommandBridge.requestRunCommand(commandID)
+		}
+	}
+
+	@objc private func cutContextSelection(_: NSMenuItem) {
+		let targetView = contextMenuEditorView ?? editorView
+		_ = targetView.cutSelectedText()
+		focusEditor(targetView)
+	}
+
+	@objc private func copyContextSelection(_: NSMenuItem) {
+		let targetView = contextMenuEditorView ?? editorView
+		_ = targetView.copySelectedText()
+		focusEditor(targetView)
+	}
+
+	@objc private func copyTrimmedContextSelection(_: NSMenuItem) {
+		let targetView = contextMenuEditorView ?? editorView
+		_ = targetView.copySelectedText(trimmed: true)
+		focusEditor(targetView)
+	}
+
+	@objc private func pasteContextClipboard(_: NSMenuItem) {
+		let targetView = contextMenuEditorView ?? editorView
+		_ = targetView.pasteTextFromPasteboard()
+		focusEditor(targetView)
+	}
+
+	@objc private func revealContextFileInFinder(_: NSMenuItem) {
+		guard let fileURL = (document as? ItsyDocument)?.fileURL else {
+			return
+		}
+		NSWorkspace.shared.activateFileViewerSelecting([fileURL])
 	}
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {

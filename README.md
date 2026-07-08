@@ -19,6 +19,7 @@ Remaining work is tracked in [GitHub issues](https://github.com/gongahkia/itsy/i
 ## Config
 
 Itsy reads user settings from `~/.config/itsy/settings.toml`; see [docs/settings.md](docs/settings.md).
+Generated keymap docs live at [docs/keymap-reference.md](docs/keymap-reference.md).
 
 ## Build
 
@@ -82,6 +83,7 @@ Itsy is intentionally narrow:
 | Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |
 | Tasks/extensions | Built-in task discovery/run panel; extension manifests contribute tasks only | No executable plugin runtime or marketplace |
 | Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | GitHub issues track follow-up slices |
+| Docs/QA | Generated keymap reference, screenshot capture script, changelog, coverage gate, Vim binding regression suite | Screenshot capture requires local GUI permissions |
 | Distribution | Local unsigned app, DMG workflow, GitHub Release workflow | Developer ID signing/notarization, Sparkle, Homebrew cask, final name/domain |
 
 ## Formatting

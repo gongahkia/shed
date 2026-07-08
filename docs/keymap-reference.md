@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `43`
+- Bindings: `45`
 
 ### mode.insert
 
@@ -60,11 +60,13 @@ scripts/gen_keymap_docs.swift
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
 | `Ctrl-Space` | `lsp.completion` |
+| `Shift-Opt-F` | `lsp.formatDocument` |
+| `Cmd-.` | `lsp.codeAction` |
 
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `272`
+- Bindings: `275`
 
 ### mode.normal
 
@@ -263,6 +265,7 @@ scripts/gen_keymap_docs.swift
 | `Ctrl-Space` | `lsp.completion` |
 | `Shift-K` | `lsp.hover` |
 | `gr` | `lsp.references` |
+| `Space c a` | `lsp.codeAction` |
 | `i` | `mode.insert` |
 | `/` | `vim.searchForward` |
 | `Shift-/` | `vim.searchBackward` |
@@ -285,6 +288,8 @@ scripts/gen_keymap_docs.swift
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
 | `Cmd-Shift-O` | `nav.gotoSymbolFile` |
 | `Cmd-Opt-7` | `view.outline` |
+| `Space c a` | `lsp.codeAction` |
+| `=` | `lsp.formatSelection` |
 | `Esc` | `mode.normal` |
 | `h` | `editor.moveLeft` |
 | `j` | `editor.moveDown` |

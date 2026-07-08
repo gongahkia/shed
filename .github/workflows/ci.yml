@@ -20,6 +20,10 @@ jobs:
         run: brew install hyperfine
       - name: Validate keymaps
         run: scripts/validate_keymaps.swift
+      - name: Verify generated keymap docs
+        run: |
+          scripts/gen_keymap_docs.swift
+          git diff --exit-code -- docs/keymap-reference.md
       - name: Build release
         run: swift build -c release
       - name: Test with coverage

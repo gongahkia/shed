@@ -279,6 +279,7 @@ let package = Package(
 		.testTarget(name: "ItsyLSPTests", dependencies: ["ItsyLSP"]),
 		.testTarget(name: "ItsyDAPTests", dependencies: ["ItsyDAP"]),
 		.testTarget(name: "ItsyDebuggerTests", dependencies: ["ItsyDebugger", "ItsyDAP"]),
+		.testTarget(name: "ItsyIntegrationTests", dependencies: ["ItsyApp", "ItsyEditor", "ItsyLSP", "ItsyDAP", "ItsyDebugger"]),
 		.testTarget(name: "CLibgit2Tests", dependencies: ["CLibgit2"]),
 		.testTarget(name: "CTSGrammarsTests", dependencies: ["CTSGrammars", "CTreeSitter"]),
 	]

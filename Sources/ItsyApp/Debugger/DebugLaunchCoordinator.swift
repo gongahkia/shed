@@ -407,6 +407,7 @@ final class DebugAppSession: @unchecked Sendable {
 			))
 			let capabilities = Self.capabilities(in: initializeResponse)
 			let supportsSetVariable = capabilities.supportsSetVariable == true
+			try await waitForInitialized(initializedTask)
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
 				try await client.launch(arguments: try DAPAny(encoding: launchArguments(for: configuration, workspaceRoot: workspaceRoot)))
@@ -415,7 +416,6 @@ final class DebugAppSession: @unchecked Sendable {
 			default:
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
-			try await waitForInitialized(initializedTask)
 			try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot)
 			try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
 			try await client.configurationDone()

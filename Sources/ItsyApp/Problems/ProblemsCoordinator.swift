@@ -195,4 +195,37 @@ import ItsyEditor
 		}
 		return cell
 	}
+
+	#if DEBUG
+	var problemCountForTesting: Int {
+		workspaceProblems.count
+	}
+
+	var selectedProblemIndexForTesting: Int? {
+		guard let selectedRow = problemsTableView?.selectedRow, selectedRow >= 0 else {
+			return nil
+		}
+		return selectedRow
+	}
+
+	var statusTextForTesting: String? {
+		problemsStatusLabel?.stringValue
+	}
+
+	func showProblemsForTesting() {
+		showProblems(relativeTo: nil)
+	}
+
+	func focusProblemForTesting(index: Int) {
+		focusProblem(index: index)
+	}
+
+	func openSelectedProblemForTesting() {
+		openSelectedProblem(nil)
+	}
+
+	func closeProblemsForTesting() {
+		closeProblems()
+	}
+	#endif
 }

@@ -42,6 +42,19 @@ jobs:
         run: swift test --filter ItsyLSPSmokeTests
       - name: UI snapshots
         run: swift test --filter ItsyUISnapshotTests --jobs 1
+      - name: Install DAP adapters
+        run: |
+          debugpy_dir="$RUNNER_TEMP/debugpy"
+          python3 -m pip install --target "$debugpy_dir" debugpy
+          echo "PYTHONPATH=$debugpy_dir${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"
+          if ! /usr/bin/xcrun --find lldb-dap >/dev/null 2>&1 && ! command -v lldb-dap >/dev/null 2>&1; then
+            brew install llvm
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          fi
+      - name: DAP smoke
+        run: bench/scripts/dap_smoke.sh
+      - name: Integration tests
+        run: swift test --filter ItsyIntegrationTests --jobs 1
       - name: Bench smoke
         run: .build/release/ItsyBench --smoke --runs 1
       - name: Regression bench

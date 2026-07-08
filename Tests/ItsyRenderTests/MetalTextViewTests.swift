@@ -698,6 +698,7 @@ private final class TestGutterDecorator: GutterDecorator {
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("2")], commandID: "pane.splitHorizontal"),
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("3")], commandID: "pane.splitVertical"),
 		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .option)], commandID: "view.commandPalette"),
+		KeyBinding(mode: .emacs, chord: [Key("g", modifiers: .option), Key("g")], commandID: "nav.gotoLine"),
 	])
 
 	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
@@ -707,7 +708,28 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
 	#expect(view.handleKey(characters: "3", charactersIgnoringModifiers: "3", keyCode: 0))
 	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .option))
-	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical", "view.commandPalette"])
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0, modifierFlags: .option))
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(commands == ["file.nextBuffer", "pane.splitHorizontal", "pane.splitVertical", "view.commandPalette", "nav.gotoLine"])
+}
+
+@Test func vimLeaderNavigationCommandsRouteToHost() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var commands: [String] = []
+	view.commandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("space"), Key("f")], commandID: "nav.gotoFile"),
+		KeyBinding(mode: .normal, chord: [Key("space"), Key("g")], commandID: "nav.gotoLine"),
+	])
+
+	#expect(view.handleKey(characters: " ", charactersIgnoringModifiers: " ", keyCode: 49))
+	#expect(view.handleKey(characters: "f", charactersIgnoringModifiers: "f", keyCode: 0))
+	#expect(view.handleKey(characters: " ", charactersIgnoringModifiers: " ", keyCode: 49))
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(commands == ["nav.gotoFile", "nav.gotoLine"])
 }
 
 @Test func emacsIncrementalSearchCommandsRouteToHost() {

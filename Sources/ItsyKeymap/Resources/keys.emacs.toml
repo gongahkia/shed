@@ -42,7 +42,7 @@
 "C-s" = "emacs.isearchForward"
 "C-r" = "emacs.isearchBackward"
 "C-x C-s" = "file.save"
-"C-x C-f" = "file.open"
+"C-x C-f" = "nav.gotoFile"
 "C-x C-c" = "app.quit"
 "C-x C-x" = "emacs.exchangePointMark"
 "C-x b" = "file.nextBuffer"

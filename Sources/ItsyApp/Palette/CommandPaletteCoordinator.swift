@@ -17,6 +17,9 @@ import ItsyEditor
 	private var commandPaletteRunText: ((String) -> Void)?
 	private var commandPaletteItems: [Command] = []
 	private var commandPaletteFilteredItems: [Command] = []
+	private var commandPaletteFiles: [String] = []
+	private var commandPaletteFilteredFiles: [String] = []
+	private var commandPaletteShowsFiles = false
 	private var commandPaletteAcceptsRawText = false
 	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
 	private var commandPaletteBaseSymbols: [WorkspaceSymbol] = []
@@ -59,6 +62,41 @@ import ItsyEditor
 
 	@objc func showFileSymbolPalette(_ sender: Any?) {
 		showCommandPalette(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow, prefill: "#")
+	}
+
+	@objc func showFilePalette(_ sender: Any?) {
+		let panel = makeCommandPalettePanelIfNeeded()
+		commandPaletteCancelHandler = nil
+		commandPaletteRunText = nil
+		let files = ItsyWorkspaceController.currentWorkspaceIndex?.files.map(\.relativePath) ?? []
+		setCommandPaletteFiles(files)
+		centerCommandPalette(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		focusCommandPaletteInput()
+	}
+
+	@objc func showLinePalette(_ sender: Any?) {
+		let panel = makeCommandPalettePanelIfNeeded()
+		commandPaletteCancelHandler = nil
+		commandPaletteRunText = { [weak self] text in
+			guard
+				let self,
+				let target = CommandPaletteLineTarget.parse(text),
+				let document = self.activeDocumentProvider() as? ItsyDocument
+			else {
+				NSSound.beep()
+				return
+			}
+			self.closeCommandPalette()
+			document.jumpTo(line: target.line, column: target.column)
+		}
+		setCommandPaletteCommandLine(":")
+		commandPaletteInputField?.placeholderString = L10n.string("Line")
+		centerCommandPalette(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		focusCommandPaletteInput()
 	}
 
 	private func toggleCommandPalettePanel(relativeTo hostWindow: NSWindow?) {
@@ -207,6 +245,9 @@ import ItsyEditor
 		commandPaletteBaseSymbols = []
 		commandPaletteLSPSymbols = nil
 		commandPaletteFilteredSymbols = []
+		commandPaletteFiles = []
+		commandPaletteFilteredFiles = []
+		commandPaletteShowsFiles = false
 		commandPaletteSymbolGeneration += 1
 		commandPaletteFileSymbolsRequested = false
 		commandPaletteItems = items
@@ -222,6 +263,9 @@ import ItsyEditor
 		commandPaletteBaseSymbols = []
 		commandPaletteLSPSymbols = nil
 		commandPaletteFilteredSymbols = []
+		commandPaletteFiles = []
+		commandPaletteFilteredFiles = []
+		commandPaletteShowsFiles = false
 		commandPaletteSymbolGeneration += 1
 		commandPaletteFileSymbolsRequested = false
 		commandPaletteItems = []
@@ -230,6 +274,25 @@ import ItsyEditor
 		commandPaletteInputField?.stringValue = value
 		commandPaletteTableView?.enclosingScrollView?.isHidden = true
 		commandPaletteTableView?.reloadData()
+	}
+
+	private func setCommandPaletteFiles(_ files: [String]) {
+		commandPaletteAcceptsRawText = false
+		commandPaletteSymbolScope = nil
+		commandPaletteBaseSymbols = []
+		commandPaletteLSPSymbols = nil
+		commandPaletteFilteredSymbols = []
+		commandPaletteSymbolGeneration += 1
+		commandPaletteFileSymbolsRequested = false
+		commandPaletteItems = []
+		commandPaletteFilteredItems = []
+		commandPaletteFiles = files
+		commandPaletteFilteredFiles = []
+		commandPaletteShowsFiles = true
+		commandPaletteInputField?.stringValue = ""
+		commandPaletteInputField?.placeholderString = L10n.string("File")
+		commandPaletteTableView?.enclosingScrollView?.isHidden = false
+		filterCommandPaletteItems()
 	}
 
 	private func focusCommandPaletteInput() {
@@ -259,6 +322,14 @@ import ItsyEditor
 			return
 		}
 		let raw = commandPaletteInputField?.stringValue ?? ""
+		if commandPaletteShowsFiles {
+			commandPaletteFilteredFiles = CommandPaletteFileFilter.ranked(paths: commandPaletteFiles, query: raw)
+			commandPaletteTableView?.reloadData()
+			if !commandPaletteFilteredFiles.isEmpty {
+				commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+			}
+			return
+		}
 		if raw.hasPrefix("@") || raw.hasPrefix("#") {
 			let scope: CommandPaletteSymbolScope = raw.hasPrefix("@") ? .workspace : .file
 			if commandPaletteSymbolScope != scope {
@@ -404,7 +475,7 @@ import ItsyEditor
 		guard !commandPaletteAcceptsRawText, let tableView = commandPaletteTableView else {
 			return
 		}
-		let count = commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : commandPaletteFilteredItems.count
+		let count = commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : (commandPaletteShowsFiles ? commandPaletteFilteredFiles.count : commandPaletteFilteredItems.count)
 		guard count > 0 else {
 			return
 		}
@@ -432,6 +503,20 @@ import ItsyEditor
 			closeCommandPalette()
 			let url = root.appendingPathComponent(symbol.relativePath)
 			documentController.openDocument(at: url, line: symbol.line, column: symbol.column)
+			return
+		}
+		if commandPaletteShowsFiles {
+			guard
+				let tableView = commandPaletteTableView,
+				tableView.selectedRow >= 0,
+				tableView.selectedRow < commandPaletteFilteredFiles.count,
+				let root = ItsyWorkspaceController.currentRootURL
+			else {
+				return
+			}
+			let relativePath = commandPaletteFilteredFiles[tableView.selectedRow]
+			closeCommandPalette()
+			documentController.openDocument(at: root.appendingPathComponent(relativePath))
 			return
 		}
 		guard let tableView = commandPaletteTableView, tableView.selectedRow >= 0, tableView.selectedRow < commandPaletteFilteredItems.count else {
@@ -493,7 +578,7 @@ import ItsyEditor
 
 	func numberOfRows(in tableView: NSTableView) -> Int {
 		tableView === commandPaletteTableView
-			? (commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : commandPaletteFilteredItems.count)
+			? (commandPaletteSymbolScope != nil ? commandPaletteFilteredSymbols.count : (commandPaletteShowsFiles ? commandPaletteFilteredFiles.count : commandPaletteFilteredItems.count))
 			: 0
 	}
 
@@ -515,6 +600,8 @@ import ItsyEditor
 			case .file:
 				textField.stringValue = "\(symbol.name) · \(symbol.kind.rawValue) — line \(symbol.line)"
 			}
+		} else if commandPaletteShowsFiles {
+			textField.stringValue = commandPaletteFilteredFiles[row]
 		} else {
 			textField.stringValue = commandPaletteFilteredItems[row].title
 		}

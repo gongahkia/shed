@@ -11,7 +11,7 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `47`
+- Bindings: `48`
 
 ### mode.insert
 
@@ -27,7 +27,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-S` | `file.save` |
 | `Cmd-W` | `pane.close` |
 | `Cmd-,` | `app.settings` |
-| `Cmd-P` | `view.commandPalette` |
+| `Cmd-P` | `nav.gotoFile` |
 | `Cmd-Shift-P` | `view.commandPalette` |
 | `Cmd-K Cmd-S` | `app.keyboardShortcuts` |
 | `Cmd-B` | `view.sidebar.toggle` |
@@ -54,6 +54,7 @@ scripts/gen_keymap_docs.swift
 | `Cmd-G` | `edit.findNext` |
 | `Cmd-Shift-G` | `edit.findPrevious` |
 | `Cmd-Ctrl-G` | `edit.selectAllFindMatches` |
+| `Ctrl-G` | `nav.gotoLine` |
 | `Cmd-D` | `editor.addNextSelection` |
 | `Cmd-Shift-F` | `edit.findInProject` |
 | `Cmd-T` | `nav.gotoSymbolWorkspace` |
@@ -68,7 +69,7 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `281`
+- Bindings: `283`
 
 ### mode.normal
 
@@ -269,6 +270,8 @@ scripts/gen_keymap_docs.swift
 | `Ctrl-Space` | `lsp.completion` |
 | `Shift-K` | `lsp.hover` |
 | `gr` | `lsp.references` |
+| `Space f` | `nav.gotoFile` |
+| `Space g` | `nav.gotoLine` |
 | `Space c a` | `lsp.codeAction` |
 | `i` | `mode.insert` |
 | `/` | `vim.searchForward` |
@@ -423,7 +426,7 @@ scripts/gen_keymap_docs.swift
 | `C-s` | `emacs.isearchForward` |
 | `C-r` | `emacs.isearchBackward` |
 | `C-x C-s` | `file.save` |
-| `C-x C-f` | `file.open` |
+| `C-x C-f` | `nav.gotoFile` |
 | `C-x C-c` | `app.quit` |
 | `C-x C-x` | `emacs.exchangePointMark` |
 | `C-x b` | `file.nextBuffer` |

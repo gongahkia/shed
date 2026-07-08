@@ -194,6 +194,8 @@
 "Ctrl-Space" = "lsp.completion"
 "Shift-K" = "lsp.hover"
 "gr" = "lsp.references"
+"Space f" = "nav.gotoFile"
+"Space g" = "nav.gotoLine"
 "Space c a" = "lsp.codeAction"
 "i" = "mode.insert"
 "/" = "vim.searchForward"

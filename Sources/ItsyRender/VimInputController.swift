@@ -160,7 +160,7 @@ extension MetalTextView {
 		     "emacs.uppercaseWord", "emacs.lowercaseWord", "emacs.capitalizeWord", "emacs.forwardSexp",
 		     "emacs.backwardSexp", "emacs.killSexp", "emacs.markSexp", "emacs.macro.start",
 		     "emacs.macro.end", "emacs.macro.run", "emacs.rectangle.kill", "emacs.rectangle.yank",
-		     "emacs.rectangle.string", "emacs.queryReplace", "nav.gotoLine":
+		     "emacs.rectangle.string", "emacs.queryReplace":
 			return true
 		default:
 			return performHostCommand(commandID)

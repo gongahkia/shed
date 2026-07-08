@@ -30,6 +30,7 @@ import Testing
 	#expect(application.replacementRange == 12 ..< 15)
 	#expect(application.replacementText == "print(value)")
 	#expect(application.selectionRanges == [18 ..< 23])
+	#expect(application.tabStopRanges[1] == [18 ..< 23])
 }
 
 @Test func completionApplyReplacesCurrentPrefixWithoutTextEdit() throws {

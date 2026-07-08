@@ -175,6 +175,21 @@ import Testing
 	#expect(trigger == ".")
 }
 
+@Test func snippetTabStopCallbackHandlesTabBeforeTextInsertion() {
+	let view = MetalTextView(frame: .zero)
+	var directions: [Int] = []
+	view.snippetTabStopRequested = { direction in
+		directions.append(direction)
+		return true
+	}
+
+	#expect(view.handleKey(characters: "\t", charactersIgnoringModifiers: "\t", keyCode: 48))
+	#expect(view.handleKey(characters: "\t", charactersIgnoringModifiers: "\t", keyCode: 48, modifierFlags: .shift))
+
+	#expect(directions == [1, -1])
+	#expect(editorStorageString(view.editor).isEmpty)
+}
+
 @Test func signatureHelpTriggerAndCloseCharactersNotifyAfterEdit() {
 	let view = MetalTextView(frame: .zero)
 	view.signatureHelpTriggerCharacters = ["(", ","]

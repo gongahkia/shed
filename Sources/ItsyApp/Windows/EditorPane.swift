@@ -2,17 +2,171 @@ import AppKit
 import ItsyEditor
 import ItsyRender
 
+@MainActor final class EditorPaneTabBarController: NSObject {
+	let view = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
+	private let scrollView = NSScrollView()
+	private let stackView = NSStackView()
+	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
+	private var boundsObserver: NSObjectProtocol?
+	var selectTab: ((ObjectIdentifier) -> Void)?
+	var closeTab: ((ObjectIdentifier) -> Void)?
+
+	override init() {
+		super.init()
+		configureView()
+		boundsObserver = NotificationCenter.default.addObserver(
+			forName: NSView.boundsDidChangeNotification,
+			object: scrollView.contentView,
+			queue: nil
+		) { [weak self] _ in
+			MainActor.assumeIsolated {
+				self?.layoutTabContent()
+			}
+		}
+		view.isHidden = true
+	}
+
+	deinit {
+		if let boundsObserver {
+			NotificationCenter.default.removeObserver(boundsObserver)
+		}
+	}
+
+	func setTabs(_ tabs: [ItsyTab]) {
+		for view in stackView.arrangedSubviews {
+			stackView.removeArrangedSubview(view)
+			view.removeFromSuperview()
+		}
+		tabIDsByTag = Dictionary(uniqueKeysWithValues: tabs.enumerated().map { index, tab in (index, tab.id) })
+		for (index, tab) in tabs.enumerated() {
+			stackView.addArrangedSubview(makeTabView(tab, tag: index))
+		}
+		layoutTabContent()
+	}
+
+	func applyTheme(_ palette: AppThemePalette) {
+		view.layer?.backgroundColor = palette.tabInactiveBackground.cgColor
+	}
+
+	private func configureView() {
+		view.wantsLayer = true
+		view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
+		scrollView.drawsBackground = false
+		scrollView.borderType = .noBorder
+		scrollView.hasHorizontalScroller = true
+		scrollView.hasVerticalScroller = false
+		scrollView.autohidesScrollers = true
+		scrollView.scrollerStyle = .overlay
+		scrollView.translatesAutoresizingMaskIntoConstraints = false
+		scrollView.contentView.postsBoundsChangedNotifications = true
+		stackView.orientation = .horizontal
+		stackView.alignment = .centerY
+		stackView.spacing = 2
+		stackView.edgeInsets = NSEdgeInsets(top: 3, left: 6, bottom: 3, right: 6)
+		scrollView.documentView = stackView
+		view.addSubview(scrollView)
+		NSLayoutConstraint.activate([
+			scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+			scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+			scrollView.topAnchor.constraint(equalTo: view.topAnchor),
+			scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+			view.heightAnchor.constraint(equalToConstant: 32),
+		])
+	}
+
+	private func layoutTabContent() {
+		stackView.layoutSubtreeIfNeeded()
+		let fit = stackView.fittingSize
+		let height = max(view.bounds.height, 32)
+		let width = max(scrollView.contentView.bounds.width, fit.width)
+		stackView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+		scrollView.documentView = stackView
+	}
+
+	private func makeTabView(_ tab: ItsyTab, tag: Int) -> NSView {
+		let container = NSView()
+		container.wantsLayer = true
+		container.layer?.backgroundColor = tab.isSelected
+			? AppTheme.palette.tabActiveBackground.cgColor
+			: AppTheme.palette.tabInactiveBackground.cgColor
+
+		let stack = NSStackView()
+		stack.orientation = .horizontal
+		stack.alignment = .centerY
+		stack.spacing = 4
+		stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 6)
+		stack.translatesAutoresizingMaskIntoConstraints = false
+		container.addSubview(stack)
+
+		let title = tab.isDirty ? "• \(tab.title)" : tab.title
+		let selectButton = NSButton(title: title, target: self, action: #selector(selectTab(_:)))
+		selectButton.tag = tag
+		selectButton.isBordered = false
+		selectButton.font = .systemFont(ofSize: 12, weight: tab.isSelected ? .semibold : .regular)
+		selectButton.lineBreakMode = .byTruncatingMiddle
+		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+		selectButton.toolTip = tab.title
+		selectButton.contentTintColor = tab.isSelected ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
+
+		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
+		closeButton.tag = tag
+		closeButton.isBordered = false
+		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
+		closeButton.toolTip = L10n.string("Close")
+		closeButton.contentTintColor = AppTheme.palette.tabInactiveForeground
+
+		stack.addArrangedSubview(selectButton)
+		stack.addArrangedSubview(closeButton)
+		NSLayoutConstraint.activate([
+			stack.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+			stack.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+			stack.topAnchor.constraint(equalTo: container.topAnchor),
+			stack.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+			container.heightAnchor.constraint(equalToConstant: 26),
+			container.widthAnchor.constraint(greaterThanOrEqualToConstant: 96),
+			container.widthAnchor.constraint(lessThanOrEqualToConstant: 220),
+		])
+		return container
+	}
+
+	@objc private func selectTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		selectTab?(tabID)
+	}
+
+	@objc private func closeTab(_ sender: NSButton) {
+		guard let tabID = tabIDsByTag[sender.tag] else {
+			return
+		}
+		closeTab?(tabID)
+	}
+}
+
 @MainActor struct EditorPane {
 	let viewController: NSViewController
 	let editorView: MetalTextView
+	let tabBarController: EditorPaneTabBarController
 
 	init() {
 		recordBenchStage("editor_pane_view_init_begin")
 		viewController = NSViewController()
 		recordBenchStage("editor_pane_view_controller_end")
+		tabBarController = EditorPaneTabBarController()
 		editorView = MetalTextView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 		recordBenchStage("editor_pane_metal_view_end")
-		viewController.view = editorView
+		let stack = NSStackView(frame: NSRect(x: 0, y: 0, width: 960, height: 672))
+		stack.orientation = .vertical
+		stack.alignment = .width
+		stack.distribution = .fill
+		stack.spacing = 0
+		tabBarController.view.setContentHuggingPriority(.required, for: .vertical)
+		editorView.setContentHuggingPriority(.defaultLow, for: .vertical)
+		editorView.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+		stack.addArrangedSubview(tabBarController.view)
+		stack.addArrangedSubview(editorView)
+		viewController.view = stack
 		recordBenchStage("editor_pane_view_init_end")
 	}
 }

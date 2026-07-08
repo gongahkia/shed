@@ -10,6 +10,7 @@ import ItsySyntax
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsFontPopup: NSPopUpButton?
+	private var settingsTabGroupsPopup: NSPopUpButton?
 	private var settingsFontSizeField: NSTextField?
 	private var settingsFontSizeStepper: NSStepper?
 	private var settingsLineNumbersButton: NSButton?
@@ -119,7 +120,7 @@ import ItsySyntax
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 430))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 470))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -181,6 +182,19 @@ import ItsySyntax
 		let lineNumbersButton = NSButton(checkboxWithTitle: L10n.string("Show Line Numbers"), target: self, action: #selector(settingsLineNumbersDidChange(_:)))
 		lineNumbersButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(lineNumbersButton)
+
+		let tabGroupsLabel = settingsLabel("Tab Groups")
+		contentView.addSubview(tabGroupsLabel)
+
+		let tabGroupsPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		tabGroupsPopup.addItem(withTitle: L10n.string("Window"))
+		tabGroupsPopup.lastItem?.representedObject = ItsySettings.TabGroupScope.window.rawValue
+		tabGroupsPopup.addItem(withTitle: L10n.string("Pane"))
+		tabGroupsPopup.lastItem?.representedObject = ItsySettings.TabGroupScope.pane.rawValue
+		tabGroupsPopup.target = self
+		tabGroupsPopup.action = #selector(settingsTabGroupsDidChange(_:))
+		tabGroupsPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(tabGroupsPopup)
 
 		let terminalFontSizeLabel = settingsLabel("Terminal Size")
 		contentView.addSubview(terminalFontSizeLabel)
@@ -277,8 +291,14 @@ import ItsySyntax
 			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
 			lineNumbersButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			lineNumbersButton.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			tabGroupsLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			tabGroupsLabel.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			tabGroupsLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			tabGroupsPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			tabGroupsPopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			tabGroupsPopup.centerYAnchor.constraint(equalTo: tabGroupsLabel.centerYAnchor),
 			terminalFontSizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			terminalFontSizeLabel.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.topAnchor.constraint(equalTo: tabGroupsPopup.bottomAnchor, constant: 18),
 			terminalFontSizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			terminalFontSizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			terminalFontSizeField.widthAnchor.constraint(equalToConstant: 72),
@@ -304,6 +324,7 @@ import ItsySyntax
 		])
 		settingsThemePopup = themePopup
 		settingsFontPopup = fontPopup
+		settingsTabGroupsPopup = tabGroupsPopup
 		settingsFontSizeField = sizeField
 		settingsFontSizeStepper = sizeStepper
 		settingsLineNumbersButton = lineNumbersButton
@@ -388,6 +409,9 @@ import ItsySyntax
 		settingsFontSizeField?.doubleValue = Double(preferences.fontSize)
 		settingsFontSizeStepper?.doubleValue = Double(preferences.fontSize)
 		settingsLineNumbersButton?.state = preferences.showLineNumbers ? .on : .off
+		if let item = settingsTabGroupsPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.editor.tabGroups.rawValue }) {
+			settingsTabGroupsPopup?.select(item)
+		}
 	}
 
 	private func refreshSettingsTerminalControls() {
@@ -489,6 +513,19 @@ import ItsySyntax
 		var preferences = EditorPreferences(settings: appSettings.editor)
 		preferences.showLineNumbers = settingsLineNumbersButton?.state == .on
 		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsTabGroupsDidChange(_ sender: Any?) {
+		guard
+			let rawValue = settingsTabGroupsPopup?.selectedItem?.representedObject as? String,
+			let tabGroups = ItsySettings.TabGroupScope(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.editor.tabGroups = tabGroups
+		saveAppSettings()
+		refreshSettingsEditorControls()
+		onSettingsChange(appSettings.normalized())
 	}
 
 	@objc private func settingsTerminalFontSizeDidChange(_ sender: Any?) {

@@ -5,16 +5,40 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 probe_script="$script_dir/lsp_diagnostics_probe.rb"
 limit_ms="${ITSY_LSP_SMOKE_LIMIT_MS:-5000}"
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/itsy-lsp-smoke.XXXXXX")"
+json_output="${ITSY_LSP_SMOKE_JSON:-}"
+only_languages="${ITSY_LSP_SMOKE_LANGUAGES:-}"
+results_jsonl="$tmp_root/results.jsonl"
 ok=0
 skipped=0
 failed=0
 trap 'rm -rf "$tmp_root"' EXIT
 
-languages=(swift typescript javascript rust python go c cpp zig elixir kotlin csharp bash dockerfile sql dart haskell lua ruby terraform)
+languages=(swift typescript javascript rust python go c cpp zig elixir kotlin csharp bash dockerfile sql dart haskell lua ruby terraform html css json)
+
+while [[ "$#" -gt 0 ]]; do
+	case "$1" in
+	--only)
+		only_languages="${only_languages:+$only_languages,}$2"
+		shift 2
+		;;
+	--json)
+		json_output="$2"
+		shift 2
+		;;
+	--list)
+		printf '%s\n' "${languages[@]}"
+		exit 0
+		;;
+	*)
+		echo "usage: $0 [--only language] [--json path] [--list]" >&2
+		exit 2
+		;;
+	esac
+done
 
 language_enabled() {
 	local language="$1"
-	[[ -z "${ITSY_LSP_SMOKE_LANGUAGES:-}" || ",${ITSY_LSP_SMOKE_LANGUAGES}," == *",$language,"* ]]
+	[[ -z "$only_languages" || ",$only_languages," == *",$language,"* ]]
 }
 
 server_binary() {
@@ -37,6 +61,9 @@ server_binary() {
 	lua) printf '%s\n' lua-language-server ;;
 	ruby) printf '%s\n' ruby-lsp ;;
 	terraform) printf '%s\n' terraform-ls ;;
+	html) printf '%s\n' vscode-html-language-server ;;
+	css) printf '%s\n' vscode-css-language-server ;;
+	json) printf '%s\n' vscode-json-language-server ;;
 	esac
 }
 
@@ -51,6 +78,9 @@ server_command() {
 	dart) printf '%s\n' "dart language-server --protocol=lsp" ;;
 	haskell) printf '%s\n' "haskell-language-server-wrapper --lsp" ;;
 	terraform) printf '%s\n' "terraform-ls serve" ;;
+	html) printf '%s\n' "vscode-html-language-server --stdio" ;;
+	css) printf '%s\n' "vscode-css-language-server --stdio" ;;
+	json) printf '%s\n' "vscode-json-language-server --stdio" ;;
 	*) server_binary "$1" ;;
 	esac
 }
@@ -211,7 +241,40 @@ CABAL
 		printf 'terraform {\n  required_version = ">= 1.0"\n}\nresource "null_resource" "bad" {\n' >"$root/main.tf"
 		printf '%s\n' "$root/main.tf"
 		;;
+	html)
+		printf '<!doctype html>\n<html><body><div></body></html>\n' >"$root/index.html"
+		printf '%s\n' "$root/index.html"
+		;;
+	css)
+		printf 'body {\n  color: ;\n}\n' >"$root/main.css"
+		printf '%s\n' "$root/main.css"
+		;;
+	json)
+		printf '{ "name": "itsy", }\n' >"$root/main.json"
+		printf '%s\n' "$root/main.json"
+		;;
 	esac
+}
+
+write_result() {
+	local language="$1"
+	local status="$2"
+	local latency="$3"
+	local diagnostics="$4"
+	local command_string="$5"
+	local reason="$6"
+	ruby -rjson -e '
+		latency = ARGV[2] == "-" ? nil : ARGV[2].to_f
+		diagnostics = ARGV[3] == "-" ? nil : ARGV[3].to_i
+		puts JSON.generate({
+			"language" => ARGV[0],
+			"status" => ARGV[1],
+			"latency_ms" => latency,
+			"diagnostics" => diagnostics,
+			"command" => ARGV[4],
+			"reason" => ARGV[5],
+		})
+	' "$language" "$status" "$latency" "$diagnostics" "$command_string" "$reason" >>"$results_jsonl"
 }
 
 run_language() {
@@ -219,10 +282,12 @@ run_language() {
 	if ! language_enabled "$language"; then
 		return
 	fi
-	local binary command_string root source_path json_path err_path latency diagnostics error_text
+	local binary command_string root source_path json_path err_path latency diagnostics error_text reason
 	binary="$(server_binary "$language")"
 	if ! binary_available "$language" "$binary"; then
-		printf '%-12s %-6s %10s %7s %s\n' "$language" skip - - "$binary missing/unusable"
+		reason="$binary missing/unusable"
+		printf '%-12s %-6s %10s %7s %s\n' "$language" skip - - "$reason"
+		write_result "$language" skip - - "$(server_command "$language")" "$reason"
 		skipped=$((skipped + 1))
 		return
 	fi
@@ -237,14 +302,19 @@ run_language() {
 		diagnostics="$(ruby -rjson -e 'data = JSON.parse(File.read(ARGV[0])); print data.fetch("lsp_diagnostics_count")' "$json_path")"
 		if ruby -e 'exit(ARGV[0].to_f <= ARGV[1].to_f ? 0 : 1)' "$latency" "$limit_ms"; then
 			printf '%-12s %-6s %10s %7s %s\n' "$language" ok "$latency" "$diagnostics" "$command_string"
+			write_result "$language" ok "$latency" "$diagnostics" "$command_string" ""
 			ok=$((ok + 1))
 		else
-			printf '%-12s %-6s %10s %7s %s\n' "$language" fail "$latency" "$diagnostics" "diagnostics exceeded ${limit_ms}ms"
+			reason="diagnostics exceeded ${limit_ms}ms"
+			printf '%-12s %-6s %10s %7s %s\n' "$language" fail "$latency" "$diagnostics" "$reason"
+			write_result "$language" fail "$latency" "$diagnostics" "$command_string" "$reason"
 			failed=$((failed + 1))
 		fi
 	else
 		error_text="$(ruby -e 'puts File.read(ARGV[0]).lines.first.to_s.strip' "$err_path")"
-		printf '%-12s %-6s %10s %7s %s\n' "$language" fail - - "${error_text:-probe failed}"
+		reason="${error_text:-probe failed}"
+		printf '%-12s %-6s %10s %7s %s\n' "$language" fail - - "$reason"
+		write_result "$language" fail - - "$command_string" "$reason"
 		failed=$((failed + 1))
 	fi
 }
@@ -254,6 +324,25 @@ for language in "${languages[@]}"; do
 	run_language "$language"
 done
 printf 'ok=%d skipped=%d failed=%d limit_ms=%s\n' "$ok" "$skipped" "$failed" "$limit_ms"
+if [[ -n "$json_output" ]]; then
+	mkdir -p "$(dirname "$json_output")"
+	ruby -rjson -rtime -e '
+		results = File.readlines(ARGV[0], chomp: true).reject(&:empty?).map { |line| JSON.parse(line) }
+		summary = results.each_with_object(Hash.new(0)) { |entry, counts| counts[entry.fetch("status")] += 1 }
+		payload = {
+			"generated_at" => Time.now.utc.iso8601,
+			"limit_ms" => Float(ARGV[2]),
+			"summary" => {
+				"ok" => summary["ok"],
+				"skipped" => summary["skip"],
+				"failed" => summary["fail"],
+				"total" => results.length,
+			},
+			"results" => results.sort_by { |entry| entry.fetch("language") },
+		}
+		File.write(ARGV[1], JSON.pretty_generate(payload) + "\n")
+	' "$results_jsonl" "$json_output" "$limit_ms"
+fi
 if [[ "$failed" -gt 0 ]]; then
 	exit 1
 fi

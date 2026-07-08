@@ -17,6 +17,7 @@ import ItsySyntax
 	static let handoffCursorOffsetKey = "cursorOffset"
 	private static let mappedReadThreshold = 1_048_576
 	private static let firstPageIndexByteCount = 4 * 1024
+	private static let settingsLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 
 	var editor = Editor()
 	var lspSurfaceRefreshRequested: (() -> Void)?
@@ -184,7 +185,7 @@ import ItsySyntax
 			guard let self else {
 				return "\n"
 			}
-			let tabWidth = ItsySettingsStore().load().settings.editor.tabWidth
+			let tabWidth = self.currentEditorSettings().tabWidth
 			return self.syntax.newlineText(editor: editor, tabWidth: tabWidth)
 		}
 		syntax.configure(fileURL: fileURL)
@@ -257,6 +258,15 @@ import ItsySyntax
 		for view in editorViews {
 			view.gutterDecorator = activeGutterDecorator
 		}
+	}
+
+	private func currentEditorSettings() -> ItsySettings.EditorSettings {
+		let settings = ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings
+		let languageID = fileURL.flatMap { Self.settingsLanguageRegistry.languageID(for: $0) }
+		return settings.editorSettings(languageID: languageID)
 	}
 
 	func scheduleGitHunkGutterRefresh() {

@@ -5,7 +5,7 @@ import ItsySyntax
 
 @MainActor final class SettingsCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
-	private let onEditorPreferencesChange: (EditorPreferences) -> Void
+	private let onSettingsChange: (ItsySettings) -> Void
 	private let onTerminalSettingsChange: (ItsySettings.TerminalSettings) -> Void
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
@@ -20,6 +20,7 @@ import ItsySyntax
 	private let settingsStore: ItsySettingsStore
 	private var appSettings: ItsySettings
 	private var settingsWarnings: [ItsySettingsWarning]
+	private var settingsWatcher: ItsySettingsWatcher?
 
 	var currentSettings: ItsySettings {
 		appSettings.normalized()
@@ -27,19 +28,24 @@ import ItsySyntax
 
 	init(
 		documentController: ItsyDocumentController,
-		onEditorPreferencesChange: @escaping (EditorPreferences) -> Void,
+		onSettingsChange: @escaping (ItsySettings) -> Void,
 		onTerminalSettingsChange: @escaping (ItsySettings.TerminalSettings) -> Void
 	) {
 		let store = ItsySettingsStore()
-		let loadedSettings = store.load(fallback: Self.legacySettingsFromDefaults())
+		let loadedSettings = store.load(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
 		self.documentController = documentController
-		self.onEditorPreferencesChange = onEditorPreferencesChange
+		self.onSettingsChange = onSettingsChange
 		self.onTerminalSettingsChange = onTerminalSettingsChange
 		settingsStore = store
 		appSettings = loadedSettings.settings
 		settingsWarnings = loadedSettings.warnings
 		Self.mirrorSettingsToDefaults(appSettings)
 		super.init()
+		restartSettingsWatcher()
+	}
+
+	deinit {
+		settingsWatcher?.stop()
 	}
 
 	private static func legacySettingsFromDefaults(_ defaults: UserDefaults = .standard) -> ItsySettings {
@@ -58,15 +64,15 @@ import ItsySyntax
 		defaults.set(settings.theme.id, forKey: SyntaxTheme.selectedThemeDefaultsKey)
 	}
 	@objc func zoomIn(_ sender: Any?) {
-		saveAndApplyEditorPreferences(EditorPreferences.load().zoomed(by: 1))
+		saveAndApplyEditorPreferences(EditorPreferences(settings: appSettings.editor).zoomed(by: 1))
 	}
 
 	@objc func zoomOut(_ sender: Any?) {
-		saveAndApplyEditorPreferences(EditorPreferences.load().zoomed(by: -1))
+		saveAndApplyEditorPreferences(EditorPreferences(settings: appSettings.editor).zoomed(by: -1))
 	}
 
 	@objc func resetZoom(_ sender: Any?) {
-		saveAndApplyEditorPreferences(EditorPreferences.load().resetZoom())
+		saveAndApplyEditorPreferences(EditorPreferences(settings: appSettings.editor).resetZoom())
 	}
 
 	private func saveAndApplyEditorPreferences(_ preferences: EditorPreferences) {
@@ -74,7 +80,7 @@ import ItsySyntax
 		preferences.apply(to: &appSettings)
 		saveAppSettings()
 		syncSettingsEditorControls(preferences)
-		onEditorPreferencesChange(preferences)
+		onSettingsChange(appSettings.normalized())
 	}
 
 	private func saveAppSettings() {
@@ -83,10 +89,16 @@ import ItsySyntax
 			settingsWarnings.removeAll()
 			Self.mirrorSettingsToDefaults(appSettings)
 			setDefaultSettingsStatus()
+			publishSettingsChanged()
 		} catch {
 			settingsStatusLabel?.textColor = .systemRed
 			settingsStatusLabel?.stringValue = L10n.string("Failed to save settings: \(String(describing: error))")
 		}
+	}
+
+	func workspaceDidChange() {
+		restartSettingsWatcher()
+		reloadSettingsFromDisk()
 	}
 
 	@objc func showSettings(_ sender: Any?) {
@@ -355,19 +367,49 @@ import ItsySyntax
 			settingsStatusLabel?.stringValue = L10n.string("Settings warning: \(warning.description)")
 		} else {
 			settingsStatusLabel?.textColor = .secondaryLabelColor
-			settingsStatusLabel?.stringValue = L10n.string("Config: ~/.config/itsy/settings.toml")
+			settingsStatusLabel?.stringValue = ItsyWorkspaceController.currentRootURL == nil
+				? L10n.string("Config: ~/.config/itsy/settings.toml")
+				: L10n.string("Config: global + workspace")
 		}
 	}
 
 	@objc private func reloadSettings(_ sender: Any?) {
-		let result = settingsStore.load(fallback: Self.legacySettingsFromDefaults())
+		reloadSettingsFromDisk()
+	}
+
+	private func reloadSettingsFromDisk() {
+		let result = settingsStore.load(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
 		appSettings = result.settings
 		settingsWarnings = result.warnings
 		Self.mirrorSettingsToDefaults(appSettings)
 		refreshSettingsThemes()
-		onEditorPreferencesChange(EditorPreferences(settings: appSettings.editor))
+		onSettingsChange(appSettings.normalized())
 		onTerminalSettingsChange(appSettings.terminal)
 		reloadSyntaxThemes()
+		publishSettingsChanged()
+	}
+
+	private func restartSettingsWatcher() {
+		settingsWatcher?.stop()
+		var urls = [settingsStore.fileURL]
+		if let root = ItsyWorkspaceController.currentRootURL {
+			urls.append(ItsySettingsStore.workspaceFileURL(workspaceRoot: root))
+		}
+		let watcher = ItsySettingsWatcher(urls: urls) { [weak self] in
+			DispatchQueue.main.async {
+				self?.reloadSettingsFromDisk()
+			}
+		}
+		_ = watcher.start()
+		settingsWatcher = watcher
+	}
+
+	private func publishSettingsChanged() {
+		NotificationCenter.default.post(
+			name: .itsySettingsChanged,
+			object: self,
+			userInfo: [ItsySettingsNotificationUserInfoKey.settings: appSettings.normalized()]
+		)
 	}
 
 	@objc private func settingsThemeDidChange(_ sender: Any?) {
@@ -389,13 +431,13 @@ import ItsySyntax
 		guard let fontName = settingsFontPopup?.selectedItem?.representedObject as? String else {
 			return
 		}
-		var preferences = EditorPreferences.load()
+		var preferences = EditorPreferences(settings: appSettings.editor)
 		preferences.fontName = fontName
 		saveAndApplyEditorPreferences(preferences)
 	}
 
 	@objc private func settingsFontSizeDidChange(_ sender: Any?) {
-		var preferences = EditorPreferences.load()
+		var preferences = EditorPreferences(settings: appSettings.editor)
 		if sender as? NSStepper === settingsFontSizeStepper {
 			preferences.fontSize = CGFloat(settingsFontSizeStepper?.doubleValue ?? Double(preferences.fontSize))
 		} else {
@@ -406,7 +448,7 @@ import ItsySyntax
 	}
 
 	@objc private func settingsLineNumbersDidChange(_ sender: Any?) {
-		var preferences = EditorPreferences.load()
+		var preferences = EditorPreferences(settings: appSettings.editor)
 		preferences.showLineNumbers = settingsLineNumbersButton?.state == .on
 		saveAndApplyEditorPreferences(preferences)
 	}

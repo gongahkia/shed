@@ -6,7 +6,13 @@ Itsy reads user settings from:
 ~/.config/itsy/settings.toml
 ```
 
-The file is TOML-shaped and intentionally small. Unknown keys are ignored with a warning in the Settings window. Bad values keep the previous/default value.
+Workspace overrides are loaded from:
+
+```toml
+<workspace>/.itsy/settings.toml
+```
+
+Both files hot-reload while Itsy is running. The merge order is global, then workspace, then per-language editor overrides for the current buffer. Unknown keys are ignored with a warning in the Settings window. Bad values keep the previous/default value.
 
 ```toml
 [editor]
@@ -14,6 +20,11 @@ font = "Menlo"
 font_size = 14.95
 line_numbers = false
 tab_width = 4
+use_spaces = false
+
+[editor.language.python]
+tab_width = 4
+use_spaces = true
 
 [theme]
 id = "bundled:default-light"

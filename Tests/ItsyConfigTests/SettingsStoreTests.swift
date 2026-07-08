@@ -31,6 +31,7 @@ import Testing
 	#expect(result.settings.editor.fontSize == 16.5)
 	#expect(result.settings.editor.lineNumbers)
 	#expect(result.settings.editor.tabWidth == 2)
+	#expect(!result.settings.editor.useSpaces)
 	#expect(result.settings.editor.experimental.storage == .pieceTree)
 	#expect(result.settings.theme.id == "bundled:default-dark")
 	#expect(result.settings.syntax.preloadGrammars == .all)
@@ -62,12 +63,39 @@ import Testing
 	#expect(result.warnings.map(\.description).contains("line 4: unknown setting editor.nope"))
 }
 
+@Test func settingsParserReadsPerLanguageEditorOverrides() throws {
+	let contents = #"""
+	[editor]
+	font_size = 15
+	line_numbers = false
+	tab_width = 8
+	use_spaces = false
+
+	[editor.language.python]
+	tab_width = 4
+	use_spaces = true
+	line_numbers = true
+	"""#
+	var parser = ItsySettingsParser()
+	let result = parser.parse(contents)
+
+	#expect(result.warnings.isEmpty)
+	#expect(result.settings.editor.tabWidth == 8)
+	#expect(!result.settings.editor.useSpaces)
+	let python = result.settings.editorSettings(languageID: "python")
+	#expect(python.fontSize == 15)
+	#expect(python.tabWidth == 4)
+	#expect(python.useSpaces)
+	#expect(python.lineNumbers)
+}
+
 @Test func settingsDefaultsUsePieceTreeStorage() {
 	let settings = ItsySettings()
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
+	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 }
 
 @Test func settingsStoreSavesAndReloadsToml() throws {
@@ -98,4 +126,65 @@ import Testing
 	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
 	#expect(!loaded.loadedFromFile)
 	#expect(loaded.settings == fallback)
+}
+
+@Test func settingsStoreMergesGlobalWorkspaceAndPerLanguageOverrides() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-\(UUID().uuidString)", isDirectory: true)
+	defer {
+		try? FileManager.default.removeItem(at: directory)
+	}
+	let globalURL = directory.appendingPathComponent("settings.toml")
+	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
+	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
+	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try """
+	[editor]
+	tab_width = 2
+	use_spaces = false
+
+	[editor.language.python]
+	tab_width = 3
+	""".write(to: globalURL, atomically: true, encoding: .utf8)
+	try """
+	[editor]
+	font_size = 18
+	tab_width = 6
+
+	[editor.language.python]
+	use_spaces = true
+	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
+
+	let loaded = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
+	let base = loaded.settings.editorSettings(languageID: nil)
+	let python = loaded.settings.editorSettings(languageID: "python")
+
+	#expect(loaded.loadedFromFile)
+	#expect(loaded.warnings.isEmpty)
+	#expect(base.fontSize == 18)
+	#expect(base.tabWidth == 6)
+	#expect(!base.useSpaces)
+	#expect(python.fontSize == 18)
+	#expect(python.tabWidth == 3)
+	#expect(python.useSpaces)
+}
+
+@Test func settingsWatcherPublishesFileChangesForHotReload() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-watch-\(UUID().uuidString)", isDirectory: true)
+	defer {
+		try? FileManager.default.removeItem(at: directory)
+	}
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	let url = directory.appendingPathComponent("settings.toml")
+	let semaphore = DispatchSemaphore(value: 0)
+	let watcher = ItsySettingsWatcher(
+		urls: [url],
+		queue: DispatchQueue(label: "dev.itsy.settings-watch-test"),
+		debounce: 0.02
+	) {
+		semaphore.signal()
+	}
+	#expect(watcher.start())
+	try "[editor]\ntab_width = 7\n".write(to: url, atomically: true, encoding: .utf8)
+	#expect(semaphore.wait(timeout: .now() + .seconds(3)) == .success)
+	watcher.stop()
 }

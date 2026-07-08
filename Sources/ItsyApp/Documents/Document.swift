@@ -76,9 +76,7 @@ import ItsySyntax
 	}
 
 	deinit {
-		MainActor.assumeIsolated {
-			fileWatcher.stop()
-		}
+		fileWatcher.stop()
 	}
 
 	override class var autosavesInPlace: Bool {

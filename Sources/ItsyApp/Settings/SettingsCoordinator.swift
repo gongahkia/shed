@@ -21,6 +21,8 @@ import ItsySyntax
 	private var appSettings: ItsySettings
 	private var settingsWarnings: [ItsySettingsWarning]
 	private var settingsWatcher: ItsySettingsWatcher?
+	private var settingsFontChoicesLoaded = false
+	private var settingsFontChoicesLoading = false
 
 	var currentSettings: ItsySettings {
 		appSettings.normalized()
@@ -104,10 +106,13 @@ import ItsySyntax
 	@objc func showSettings(_ sender: Any?) {
 		let controller = makeSettingsWindowControllerIfNeeded()
 		refreshSettingsThemes()
+		refreshSettingsEditorControls()
+		refreshSettingsTerminalControls()
 		controller.showWindow(sender)
 		controller.window?.center()
 		controller.window?.makeKeyAndOrderFront(sender)
 		NSApp.activate(ignoringOtherApps: true)
+		loadSettingsFontChoicesIfNeeded()
 	}
 
 	private func makeSettingsWindowControllerIfNeeded() -> NSWindowController {
@@ -330,19 +335,50 @@ import ItsySyntax
 		} else if let item = themePopup.itemArray.first {
 			themePopup.select(item)
 		}
-		refreshSettingsEditorControls()
-		refreshSettingsTerminalControls()
 		setDefaultSettingsStatus()
 	}
 
 	private func refreshSettingsEditorControls() {
 		let preferences = EditorPreferences(settings: appSettings.editor)
-		settingsFontPopup?.removeAllItems()
-		for fontName in EditorPreferences.availableFontNames() {
-			settingsFontPopup?.addItem(withTitle: EditorPreferences.fontDisplayName(for: fontName))
-			settingsFontPopup?.lastItem?.representedObject = fontName
+		if settingsFontPopup?.numberOfItems == 0 {
+			applySettingsFontChoices([EditorPreferences.FontChoice(name: preferences.fontName, displayName: EditorPreferences.fontDisplayName(for: preferences.fontName))])
 		}
 		syncSettingsEditorControls(preferences)
+	}
+
+	private func loadSettingsFontChoicesIfNeeded() {
+		guard !settingsFontChoicesLoaded, !settingsFontChoicesLoading else {
+			return
+		}
+		settingsFontChoicesLoading = true
+		DispatchQueue.global(qos: .userInitiated).async {
+			let choices = EditorPreferences.availableFontChoices()
+			DispatchQueue.main.async { [weak self] in
+				guard let self else {
+					return
+				}
+				settingsFontChoicesLoaded = true
+				settingsFontChoicesLoading = false
+				let preferences = EditorPreferences(settings: appSettings.editor)
+				applySettingsFontChoices(fontChoices(choices, including: preferences.fontName))
+				syncSettingsEditorControls(preferences)
+			}
+		}
+	}
+
+	private func applySettingsFontChoices(_ choices: [EditorPreferences.FontChoice]) {
+		settingsFontPopup?.removeAllItems()
+		for choice in choices {
+			settingsFontPopup?.addItem(withTitle: choice.displayName)
+			settingsFontPopup?.lastItem?.representedObject = choice.name
+		}
+	}
+
+	private func fontChoices(_ choices: [EditorPreferences.FontChoice], including fontName: String) -> [EditorPreferences.FontChoice] {
+		guard !choices.contains(where: { $0.name == fontName }) else {
+			return choices
+		}
+		return [EditorPreferences.FontChoice(name: fontName, displayName: EditorPreferences.fontDisplayName(for: fontName))] + choices
 	}
 
 	private func syncSettingsEditorControls(_ preferences: EditorPreferences) {
@@ -383,6 +419,8 @@ import ItsySyntax
 		settingsWarnings = result.warnings
 		Self.mirrorSettingsToDefaults(appSettings)
 		refreshSettingsThemes()
+		refreshSettingsEditorControls()
+		refreshSettingsTerminalControls()
 		onSettingsChange(appSettings.normalized())
 		onTerminalSettingsChange(appSettings.terminal)
 		reloadSyntaxThemes()

@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 public struct ItsySettings: Equatable, Sendable {
@@ -13,6 +14,28 @@ public struct ItsySettings: Equatable, Sendable {
 	}
 
 	public struct EditorSettings: Equatable, Sendable {
+		public struct LanguageSettings: Equatable, Sendable {
+			public var font: String?
+			public var fontSize: Double?
+			public var lineNumbers: Bool?
+			public var tabWidth: Int?
+			public var useSpaces: Bool?
+
+			public init(
+				font: String? = nil,
+				fontSize: Double? = nil,
+				lineNumbers: Bool? = nil,
+				tabWidth: Int? = nil,
+				useSpaces: Bool? = nil
+			) {
+				self.font = font
+				self.fontSize = fontSize
+				self.lineNumbers = lineNumbers
+				self.tabWidth = tabWidth
+				self.useSpaces = useSpaces
+			}
+		}
+
 		public struct ExperimentalSettings: Equatable, Sendable {
 			public var storage: EditorStorage
 
@@ -33,6 +56,8 @@ public struct ItsySettings: Equatable, Sendable {
 		public var fontSize: Double
 		public var lineNumbers: Bool
 		public var tabWidth: Int
+		public var useSpaces: Bool
+		public var language: [String: LanguageSettings]
 		public var experimental: ExperimentalSettings
 
 		public init(
@@ -40,12 +65,16 @@ public struct ItsySettings: Equatable, Sendable {
 			fontSize: Double = Self.defaultFontSize,
 			lineNumbers: Bool = false,
 			tabWidth: Int = Self.defaultTabWidth,
+			useSpaces: Bool = false,
+			language: [String: LanguageSettings] = [:],
 			experimental: ExperimentalSettings = ExperimentalSettings()
 		) {
 			self.font = font
 			self.fontSize = fontSize
 			self.lineNumbers = lineNumbers
 			self.tabWidth = tabWidth
+			self.useSpaces = useSpaces
+			self.language = language
 			self.experimental = experimental
 		}
 	}
@@ -111,12 +140,45 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 		copy.editor.fontSize = Self.clamp(copy.editor.fontSize, min: EditorSettings.minFontSize, max: EditorSettings.maxFontSize)
 		copy.editor.tabWidth = Self.clamp(copy.editor.tabWidth, min: EditorSettings.minTabWidth, max: EditorSettings.maxTabWidth)
+		copy.editor.language = copy.editor.language.reduce(into: [:]) { result, entry in
+			let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !key.isEmpty else {
+				return
+			}
+			var value = entry.value
+			if value.font?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
+				value.font = nil
+			}
+			if let fontSize = value.fontSize {
+				value.fontSize = Self.clamp(fontSize, min: EditorSettings.minFontSize, max: EditorSettings.maxFontSize)
+			}
+			if let tabWidth = value.tabWidth {
+				value.tabWidth = Self.clamp(tabWidth, min: EditorSettings.minTabWidth, max: EditorSettings.maxTabWidth)
+			}
+			result[key] = value
+		}
 		if copy.theme.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
 			copy.theme.id = ThemeSettings.defaultID
 		}
 		copy.terminal.fontSize = Self.clamp(copy.terminal.fontSize, min: TerminalSettings.minFontSize, max: TerminalSettings.maxFontSize)
 		copy.terminal.scrollbackLines = Self.clamp(copy.terminal.scrollbackLines, min: TerminalSettings.minScrollbackLines, max: TerminalSettings.maxScrollbackLines)
 		return copy
+	}
+
+	public func editorSettings(languageID: String?) -> EditorSettings {
+		var editor = normalized().editor
+		guard let languageID = languageID?.trimmingCharacters(in: .whitespacesAndNewlines), !languageID.isEmpty else {
+			return editor
+		}
+		guard let override = editor.language[languageID] ?? editor.language[languageID.lowercased()] else {
+			return editor
+		}
+		editor.font = override.font ?? editor.font
+		editor.fontSize = override.fontSize ?? editor.fontSize
+		editor.lineNumbers = override.lineNumbers ?? editor.lineNumbers
+		editor.tabWidth = override.tabWidth ?? editor.tabWidth
+		editor.useSpaces = override.useSpaces ?? editor.useSpaces
+		return ItsySettings(editor: editor).normalized().editor
 	}
 
 	private static func clamp(_ value: Double, min: Double, max: Double) -> Double {
@@ -177,6 +239,12 @@ public final class ItsySettingsStore {
 			.appendingPathComponent("settings.toml")
 	}
 
+	public static func workspaceFileURL(workspaceRoot: URL) -> URL {
+		workspaceRoot
+			.appendingPathComponent(".itsy", isDirectory: true)
+			.appendingPathComponent("settings.toml")
+	}
+
 	public func load(fallback: ItsySettings = .default) -> ItsySettingsLoadResult {
 		guard fileManager.fileExists(atPath: fileURL.path) else {
 			return ItsySettingsLoadResult(settings: fallback.normalized(), loadedFromFile: false)
@@ -195,6 +263,20 @@ public final class ItsySettingsStore {
 		}
 	}
 
+	public func load(workspaceRoot: URL?, fallback: ItsySettings = .default) -> ItsySettingsLoadResult {
+		let global = load(fallback: fallback)
+		guard let workspaceRoot else {
+			return global
+		}
+		let workspaceStore = ItsySettingsStore(fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot), fileManager: fileManager)
+		let workspace = workspaceStore.load(fallback: global.settings)
+		return ItsySettingsLoadResult(
+			settings: workspace.settings,
+			warnings: global.warnings + workspace.warnings,
+			loadedFromFile: global.loadedFromFile || workspace.loadedFromFile
+		)
+	}
+
 	public func save(_ settings: ItsySettings) throws {
 		let directory = fileURL.deletingLastPathComponent()
 		try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -204,13 +286,14 @@ public final class ItsySettingsStore {
 	public static func serialize(_ settings: ItsySettings) -> String {
 		let settings = settings.normalized()
 		return """
-		# Itsy settings. Reload from Settings or restart Itsy after editing.
+		# Itsy settings. Changes reload while Itsy is running.
 
 		[editor]
 		font = "\(escape(settings.editor.font))"
 		font_size = \(format(settings.editor.fontSize))
 		line_numbers = \(settings.editor.lineNumbers ? "true" : "false")
 		tab_width = \(settings.editor.tabWidth)
+		use_spaces = \(settings.editor.useSpaces ? "true" : "false")
 
 		[editor.experimental]
 		storage = "\(settings.editor.experimental.storage.rawValue)"
@@ -224,7 +307,7 @@ public final class ItsySettingsStore {
 		[terminal]
 		font_size = \(format(settings.terminal.fontSize))
 		scrollback_lines = \(settings.terminal.scrollbackLines)
-		"""
+		""" + serializeLanguageSettings(settings.editor.language)
 	}
 
 	private static func format(_ value: Double) -> String {
@@ -245,6 +328,134 @@ public final class ItsySettingsStore {
 			.replacingOccurrences(of: "\"", with: "\\\"")
 			.replacingOccurrences(of: "\n", with: "\\n")
 			.replacingOccurrences(of: "\t", with: "\\t")
+	}
+
+	private static func serializeLanguageSettings(_ language: [String: ItsySettings.EditorSettings.LanguageSettings]) -> String {
+		guard !language.isEmpty else {
+			return ""
+		}
+		return language.keys.sorted().map { key in
+			guard let settings = language[key] else {
+				return ""
+			}
+			var lines = ["", "[editor.language.\(key)]"]
+			if let font = settings.font {
+				lines.append("font = \"\(escape(font))\"")
+			}
+			if let fontSize = settings.fontSize {
+				lines.append("font_size = \(format(fontSize))")
+			}
+			if let lineNumbers = settings.lineNumbers {
+				lines.append("line_numbers = \(lineNumbers ? "true" : "false")")
+			}
+			if let tabWidth = settings.tabWidth {
+				lines.append("tab_width = \(tabWidth)")
+			}
+			if let useSpaces = settings.useSpaces {
+				lines.append("use_spaces = \(useSpaces ? "true" : "false")")
+			}
+			return lines.joined(separator: "\n")
+		}.joined(separator: "\n") + "\n"
+	}
+}
+
+public extension Notification.Name {
+	static let itsySettingsChanged = Notification.Name("dev.itsy.settings.changed")
+}
+
+public enum ItsySettingsNotificationUserInfoKey {
+	public static let settings = "settings"
+}
+
+public final class ItsySettingsWatcher: @unchecked Sendable {
+	public typealias Handler = () -> Void
+
+	private let urls: [URL]
+	private let queue: DispatchQueue
+	private let debounce: TimeInterval
+	private let handler: Handler
+	private var sources: [DispatchSourceFileSystemObject] = []
+	private var fileDescriptors: [Int32] = []
+	private var scheduled = false
+
+	public init(
+		urls: [URL],
+		queue: DispatchQueue = DispatchQueue(label: "dev.itsy.settings-watcher"),
+		debounce: TimeInterval = 0.12,
+		handler: @escaping Handler
+	) {
+		self.urls = urls
+		self.queue = queue
+		self.debounce = debounce
+		self.handler = handler
+	}
+
+	deinit {
+		stop()
+	}
+
+	@discardableResult
+	public func start() -> Bool {
+		stop()
+		var watched: Set<String> = []
+		for url in urls {
+			let directory = watchDirectory(for: url)
+			guard watched.insert(directory.path).inserted else {
+				continue
+			}
+			let descriptor = open(directory.path, O_EVTONLY)
+			guard descriptor >= 0 else {
+				continue
+			}
+			let source = DispatchSource.makeFileSystemObjectSource(
+				fileDescriptor: descriptor,
+				eventMask: [.write, .delete, .rename, .attrib, .extend, .link],
+				queue: queue
+			)
+			source.setEventHandler { [weak self] in
+				self?.schedule()
+			}
+			source.setCancelHandler {
+				close(descriptor)
+			}
+			fileDescriptors.append(descriptor)
+			sources.append(source)
+			source.resume()
+		}
+		return !sources.isEmpty
+	}
+
+	public func stop() {
+		sources.forEach { $0.cancel() }
+		sources.removeAll()
+		fileDescriptors.removeAll()
+		scheduled = false
+	}
+
+	private func schedule() {
+		guard !scheduled else {
+			return
+		}
+		scheduled = true
+		queue.asyncAfter(deadline: .now() + debounce) { [weak self] in
+			guard let self else {
+				return
+			}
+			self.scheduled = false
+			self.handler()
+		}
+	}
+
+	private func watchDirectory(for url: URL) -> URL {
+		var directory = url.deletingLastPathComponent().standardizedFileURL
+		while !FileManager.default.fileExists(atPath: directory.path) {
+			let parent = directory.deletingLastPathComponent().standardizedFileURL
+			if parent.path == directory.path {
+				break
+			}
+			directory = parent
+		}
+		return directory
 	}
 }
 
@@ -273,7 +484,8 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal"].contains(section) {
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal"].contains(section),
+				   !section.hasPrefix("editor.language.") {
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
 				continue
@@ -295,6 +507,9 @@ struct ItsySettingsParser {
 	}
 
 	private mutating func assign(_ value: ItsySettingsValue, key: String, line: Int) {
+		if assignLanguageEditor(value, key: key, line: line) {
+			return
+		}
 		switch key {
 		case "editor.font":
 			if case let .string(font) = value {
@@ -319,6 +534,12 @@ struct ItsySettingsParser {
 				settings.editor.tabWidth = integer
 			} else {
 				warnType(key, line: line, expected: "integer")
+			}
+		case "editor.use_spaces":
+			if case let .bool(useSpaces) = value {
+				settings.editor.useSpaces = useSpaces
+			} else {
+				warnType(key, line: line, expected: "bool")
 			}
 		case "editor.experimental.storage":
 			if case let .string(storage) = value, let storage = ItsySettings.EditorStorage(rawValue: storage.lowercased()) {
@@ -353,6 +574,61 @@ struct ItsySettingsParser {
 		default:
 			warnings.append(ItsySettingsWarning(line: line, message: "unknown setting \(key)"))
 		}
+	}
+
+	private mutating func assignLanguageEditor(_ value: ItsySettingsValue, key: String, line: Int) -> Bool {
+		let prefix = "editor.language."
+		guard key.hasPrefix(prefix) else {
+			return false
+		}
+		let suffix = key.dropFirst(prefix.count)
+		guard let dot = suffix.firstIndex(of: ".") else {
+			warnings.append(ItsySettingsWarning(line: line, message: "unknown setting \(key)"))
+			return true
+		}
+		let languageID = suffix[..<dot].trimmingCharacters(in: .whitespacesAndNewlines)
+		let setting = String(suffix[suffix.index(after: dot)...])
+		guard !languageID.isEmpty else {
+			warnings.append(ItsySettingsWarning(line: line, message: "unknown setting \(key)"))
+			return true
+		}
+		var language = settings.editor.language[languageID] ?? ItsySettings.EditorSettings.LanguageSettings()
+		switch setting {
+		case "font":
+			if case let .string(font) = value {
+				language.font = font
+			} else {
+				warnType(key, line: line, expected: "string")
+			}
+		case "font_size":
+			if let number = doubleValue(value) {
+				language.fontSize = number
+			} else {
+				warnType(key, line: line, expected: "number")
+			}
+		case "line_numbers":
+			if case let .bool(lineNumbers) = value {
+				language.lineNumbers = lineNumbers
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "tab_width":
+			if let integer = intValue(value) {
+				language.tabWidth = integer
+			} else {
+				warnType(key, line: line, expected: "integer")
+			}
+		case "use_spaces":
+			if case let .bool(useSpaces) = value {
+				language.useSpaces = useSpaces
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		default:
+			warnings.append(ItsySettingsWarning(line: line, message: "unknown setting \(key)"))
+		}
+		settings.editor.language[languageID] = language
+		return true
 	}
 
 	private mutating func warnType(_ key: String, line: Int, expected: String) {

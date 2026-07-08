@@ -21,8 +21,8 @@ import ItsyKeymap
 	)
 	private lazy var settingsCoordinator = SettingsCoordinator(
 		documentController: documentController,
-		onEditorPreferencesChange: { [weak self] preferences in
-			self?.applyEditorPreferencesToOpenWindows(preferences)
+		onSettingsChange: { [weak self] settings in
+			self?.applySettingsToOpenWindows(settings)
 		},
 		onTerminalSettingsChange: { [weak self] settings in
 			self?.applyTerminalSettings(settings)
@@ -448,13 +448,13 @@ import ItsyKeymap
 		settingsCoordinator.resetZoom(sender)
 	}
 
-	private func applyEditorPreferencesToOpenWindows(_ preferences: EditorPreferences = EditorPreferences.load()) {
+	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
 		for document in documentController.documents {
 			for controller in document.windowControllers {
-				(controller as? EditorWindowController)?.applyEditorPreferences(preferences)
+				(controller as? EditorWindowController)?.applySettings(settings)
 			}
 		}
-		gitCoordinator.applyEditorPreferences(preferences)
+		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
 	}
 
 	@objc func toggleFindBar(_ sender: Any?) {
@@ -629,6 +629,7 @@ import ItsyKeymap
 
 	private func openWorkspace(at url: URL) -> Bool {
 		ItsyWorkspaceController.openWorkspace(at: url)
+		settingsCoordinator.workspaceDidChange()
 		commandRegistry = makeCommandRegistry(workspaceRoot: url)
 		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: url, commandRegistry: commandRegistry))
 		if documentController.documents.isEmpty {

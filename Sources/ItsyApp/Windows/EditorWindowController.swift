@@ -747,7 +747,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		recordBenchStage("editor_pane_attach_end")
 		recordBenchStage("editor_pane_preferences_begin")
-		let preferences = EditorPreferences.load()
+		let preferences = currentEditorPreferences()
 		recordBenchStage("editor_pane_preferences_end")
 		recordBenchStage("editor_pane_appearance_begin")
 		view.configureEditorAppearance(
@@ -799,6 +799,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				showsLineNumbers: preferences.showLineNumbers
 			)
 		}
+	}
+
+	func applySettings(_ settings: ItsySettings) {
+		applyEditorPreferences(EditorPreferences(settings: settings.editorSettings(languageID: currentLanguageID())))
 	}
 
 	private func ensureFindBarController() -> FindBarController {
@@ -1539,8 +1543,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func lspFormattingOptions() -> LSPFormattingOptions {
-		let tabWidth = ItsySettingsStore().load().settings.editor.tabWidth
-		return LSPFormattingOptions(tabSize: tabWidth, insertSpaces: false)
+		let settings = currentEditorSettings()
+		return LSPFormattingOptions(tabSize: settings.tabWidth, insertSpaces: settings.useSpaces)
 	}
 
 	private func currentLineRange(in editor: Editor) -> Range<Int> {
@@ -2619,6 +2623,25 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			start = previous
 		}
 		return String(text[start ..< cursor])
+	}
+
+	private func currentEditorPreferences() -> EditorPreferences {
+		EditorPreferences(settings: currentEditorSettings())
+	}
+
+	private func currentEditorSettings() -> ItsySettings.EditorSettings {
+		let settings = ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings
+		return settings.editorSettings(languageID: currentLanguageID())
+	}
+
+	private func currentLanguageID() -> String? {
+		guard let fileURL = (document as? ItsyDocument)?.fileURL else {
+			return nil
+		}
+		return Self.snippetLanguageRegistry.languageID(for: fileURL)
 	}
 
 	private func isIdentifierCharacter(_ character: Character) -> Bool {

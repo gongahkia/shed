@@ -1,6 +1,6 @@
 import AppKit
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
 	private let coordinator: AppCoordinator
 
 	init(documentController: ItsyDocumentController) {

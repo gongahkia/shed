@@ -11,7 +11,7 @@ import ItsySyntax
 
 
 
-final class ItsyDocument: NSDocument {
+@MainActor final class ItsyDocument: NSDocument {
 	static let handoffActivityType = "dev.itsy.editor.open-file"
 	static let handoffURLKey = "url"
 	static let handoffCursorOffsetKey = "cursorOffset"
@@ -35,10 +35,12 @@ final class ItsyDocument: NSDocument {
 
 	override var fileURL: URL? {
 		didSet {
-			syntax.configure(fileURL: fileURL)
-			updateHandoffActivity()
-			fileWatcher.restart()
-			ItsyBreakpointGutterCoordinator.apply(to: self)
+			MainActor.assumeIsolated {
+				syntax.configure(fileURL: fileURL)
+				updateHandoffActivity()
+				fileWatcher.restart()
+				ItsyBreakpointGutterCoordinator.apply(to: self)
+			}
 		}
 	}
 
@@ -74,7 +76,9 @@ final class ItsyDocument: NSDocument {
 	}
 
 	deinit {
-		fileWatcher.stop()
+		MainActor.assumeIsolated {
+			fileWatcher.stop()
+		}
 	}
 
 	override class var autosavesInPlace: Bool {
@@ -91,24 +95,28 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override func read(from data: Data, ofType typeName: String) throws {
-		guard let text = String(data: data, encoding: .utf8) else {
-			throw CocoaError(.fileReadCorruptFile)
+		try MainActor.assumeIsolated {
+			guard let text = String(data: data, encoding: .utf8) else {
+				throw CocoaError(.fileReadCorruptFile)
+			}
+			installReadEditor(Editor(text: text), fileURL: nil)
 		}
-		installReadEditor(Editor(text: text), fileURL: nil)
 	}
 
 	override func read(from url: URL, ofType typeName: String) throws {
-		guard try shouldReadMappedPieceTree(from: url) else {
-			try super.read(from: url, ofType: typeName)
-			return
+		try MainActor.assumeIsolated {
+			guard try shouldReadMappedPieceTree(from: url) else {
+				try super.read(from: url, ofType: typeName)
+				return
+			}
+			let pieceTree = try PieceTree(
+				readingMappedFile: url,
+				indexedPrefixBytes: Self.firstPageIndexByteCount
+			) {
+				recordBenchStage("first_page_visible")
+			}
+			installReadEditor(Editor(pieceTree: pieceTree), fileURL: url)
 		}
-		let pieceTree = try PieceTree(
-			readingMappedFile: url,
-			indexedPrefixBytes: Self.firstPageIndexByteCount
-		) {
-			recordBenchStage("first_page_visible")
-		}
-		installReadEditor(Editor(pieceTree: pieceTree), fileURL: url)
 	}
 
 	override func data(ofType typeName: String) throws -> Data {
@@ -121,10 +129,12 @@ final class ItsyDocument: NSDocument {
 	}
 
 	override func write(to url: URL, ofType typeName: String) throws {
-		if try writeEditorStorage(to: url) {
-			return
+		try MainActor.assumeIsolated {
+			if try writeEditorStorage(to: url) {
+				return
+			}
+			try super.write(to: url, ofType: typeName)
 		}
-		try super.write(to: url, ofType: typeName)
 	}
 
 	override func write(
@@ -133,15 +143,17 @@ final class ItsyDocument: NSDocument {
 		for saveOperation: NSDocument.SaveOperationType,
 		originalContentsURL absoluteOriginalContentsURL: URL?
 	) throws {
-		if try writeEditorStorage(to: url) {
-			return
+		try MainActor.assumeIsolated {
+			if try writeEditorStorage(to: url) {
+				return
+			}
+			try super.write(
+				to: url,
+				ofType: typeName,
+				for: saveOperation,
+				originalContentsURL: absoluteOriginalContentsURL
+			)
 		}
-		try super.write(
-			to: url,
-			ofType: typeName,
-			for: saveOperation,
-			originalContentsURL: absoluteOriginalContentsURL
-		)
 	}
 
 	override func makeWindowControllers() {

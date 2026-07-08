@@ -256,10 +256,22 @@ extension GitRepository {
 }
 
 private enum Runtime {
-	private static let lock = NSLock()
-	private static var count = 0
+	private static let state = Libgit2RuntimeState()
 
 	static func retain() throws {
+		try state.retain()
+	}
+
+	static func release() {
+		state.release()
+	}
+}
+
+private final class Libgit2RuntimeState: @unchecked Sendable {
+	private let lock = NSLock()
+	private var count = 0
+
+	func retain() throws {
 		lock.lock()
 		if count == 0 {
 			do {
@@ -273,7 +285,7 @@ private enum Runtime {
 		lock.unlock()
 	}
 
-	static func release() {
+	func release() {
 		lock.lock()
 		guard count > 0 else {
 			lock.unlock()

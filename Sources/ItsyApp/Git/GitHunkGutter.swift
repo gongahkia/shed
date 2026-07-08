@@ -17,7 +17,7 @@ enum GitHunkGutterMode {
 	}
 }
 
-enum ItsyGitHunkGutterCoordinator {
+@MainActor enum ItsyGitHunkGutterCoordinator {
 	private weak static var documentController: ItsyDocumentController?
 	private static var mode: GitHunkGutterMode = .index
 

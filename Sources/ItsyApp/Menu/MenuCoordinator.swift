@@ -1,6 +1,6 @@
 import AppKit
 
-final class MenuCoordinator: NSObject, NSMenuDelegate {
+@MainActor final class MenuCoordinator: NSObject, NSMenuDelegate {
 	private let documentController: ItsyDocumentController
 	private weak var actionTarget: AppCoordinator?
 	private weak var gitTarget: GitCoordinator?

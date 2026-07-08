@@ -263,7 +263,7 @@ import Testing
 	#expect(reportedRanges.last == 0 ..< 6)
 }
 
-@Test func gutterDecoratorBuildsVisibleSeverityMarkers() throws {
+@MainActor @Test func gutterDecoratorBuildsVisibleSeverityMarkers() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "0\n1\n2\n3\n4\n5\n6\n")
 	view.lineHeight = 20
@@ -281,7 +281,7 @@ import Testing
 	#expect(try #require(view.gutterMarker(atLocalPoint: point)).id == "a")
 }
 
-@Test func gutterDecoratorBuildsBetweenLineCaretMarkers() throws {
+@MainActor @Test func gutterDecoratorBuildsBetweenLineCaretMarkers() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "0\n1\n2\n")
 	view.lineHeight = 20
@@ -359,7 +359,7 @@ import Testing
 	#expect(decorator.rightClickedMarkers == ["breakpoint"])
 }
 
-@Test func gutterDrawsFoldTriangleMarkers() throws {
+@MainActor @Test func gutterDrawsFoldTriangleMarkers() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "0\n1\n2\n3\n")
 	view.lineHeight = 20

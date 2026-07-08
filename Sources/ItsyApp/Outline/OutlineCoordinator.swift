@@ -52,14 +52,14 @@ private enum OutlineCollapseStore {
 	}
 }
 
-final class OutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+@MainActor final class OutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
 	private var outlinePanel: NSPanel?
 	private var outlineStatusLabel: NSTextField?
 	private var outlineOutlineView: NSOutlineView?
 	private var outlineKindNodes: [OutlineKindNode] = []
-	private var outlineWindowObserver: NSObjectProtocol?
+	private var outlineWindowObserverInstalled = false
 	private var outlineCollapseStateByURL: [String: Set<String>] = OutlineCollapseStore.load()
 	private var outlineActiveURLKey: String?
 	private var outlineSuppressPersist = false
@@ -166,20 +166,22 @@ final class OutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineView
 	}
 
 	private func installOutlineWindowObserverIfNeeded() {
-		guard outlineWindowObserver == nil else {
+		guard !outlineWindowObserverInstalled else {
 			return
 		}
-		outlineWindowObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification, object: nil, queue: .main) { [weak self] notification in
-			guard
-				let self,
-				self.outlinePanel?.isVisible == true,
-				let window = notification.object as? NSWindow,
-				window !== self.outlinePanel
-			else {
-				return
-			}
-			self.refreshOutline()
+		outlineWindowObserverInstalled = true
+		NotificationCenter.default.addObserver(self, selector: #selector(outlineWindowDidBecomeKey(_:)), name: NSWindow.didBecomeKeyNotification, object: nil)
+	}
+
+	@objc private func outlineWindowDidBecomeKey(_ notification: Notification) {
+		guard
+			outlinePanel?.isVisible == true,
+			let window = notification.object as? NSWindow,
+			window !== outlinePanel
+		else {
+			return
 		}
+		refreshOutline()
 	}
 
 	@objc private func refreshOutlineAction(_ sender: Any?) {

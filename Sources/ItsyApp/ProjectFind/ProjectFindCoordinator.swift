@@ -3,7 +3,7 @@ import Dispatch
 import Foundation
 import ItsyEditor
 
-final class ProjectFindCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class ProjectFindCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private let documentController: ItsyDocumentController
 	private var projectFindPanel: NSPanel?
 	private var projectFindInputField: NSTextField?

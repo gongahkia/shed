@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyRender
 
-final class FindBarController: NSObject, NSTextFieldDelegate {
+@MainActor final class FindBarController: NSObject, NSTextFieldDelegate {
 	let view = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 38))
 	private let queryField = NSTextField(frame: .zero)
 	private let replaceField = NSTextField(frame: .zero)
@@ -26,8 +26,10 @@ final class FindBarController: NSObject, NSTextFieldDelegate {
 	}
 
 	deinit {
-		if let keyMonitor {
-			NSEvent.removeMonitor(keyMonitor)
+		MainActor.assumeIsolated {
+			if let keyMonitor {
+				NSEvent.removeMonitor(keyMonitor)
+			}
 		}
 	}
 

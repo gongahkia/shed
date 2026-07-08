@@ -9,7 +9,7 @@ private let workspaceLogger = Logger(
 	category: "Workspace"
 )
 
-enum ItsyWorkspaceController {
+@MainActor enum ItsyWorkspaceController {
 	private static weak var documentController: ItsyDocumentController?
 	private static let controllers = NSHashTable<EditorWindowController>.weakObjects()
 	private static var rootURL: URL?
@@ -18,7 +18,7 @@ enum ItsyWorkspaceController {
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
 	private static var indexWatcher: WorkspaceFSEventStream?
-	private static let symbolProvider: WorkspaceSymbolProvider = { text, url, relativePath in
+	private nonisolated static let symbolProvider: WorkspaceSymbolProvider = { text, url, relativePath in
 		TreeSitterSymbolExtractor.workspaceSymbols(in: text, fileURL: url, relativePath: relativePath)
 	}
 

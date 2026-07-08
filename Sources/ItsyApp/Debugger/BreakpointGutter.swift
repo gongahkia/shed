@@ -3,7 +3,7 @@ import Foundation
 import ItsyDebugger
 import ItsyRender
 
-enum ItsyBreakpointGutterCoordinator {
+@MainActor enum ItsyBreakpointGutterCoordinator {
 	private weak static var documentController: ItsyDocumentController?
 	private static let store = BreakpointStore()
 	private static var breakpointsByURL: [URL: [SourceBreakpoint]] = [:]
@@ -192,7 +192,7 @@ private enum BreakpointEditResult {
 	case remove
 }
 
-private enum BreakpointEditor {
+@MainActor private enum BreakpointEditor {
 	static func run(line: Int, breakpoint: SourceBreakpoint?) -> BreakpointEditResult? {
 		let conditionField = textField(value: breakpoint?.condition)
 		let hitConditionField = textField(value: breakpoint?.hitCondition)

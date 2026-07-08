@@ -288,41 +288,16 @@ public enum Language: Sendable, Hashable, CaseIterable {
 
 enum GrammarLoader {
 	private typealias LanguageFactory = @convention(c) () -> OpaquePointer?
-	private static let lock = NSLock()
-	private static var handles: [String: UnsafeMutableRawPointer] = [:]
-	private static var warnedStems: Set<String> = []
+	private static let state = GrammarLoaderState()
 	private static let testLibraryDirectoriesKey = "ItsySyntax.GrammarLoader.testLibraryDirectories"
 	private static let testUseDefaultSymbolsKey = "ItsySyntax.GrammarLoader.testUseDefaultSymbols"
 
 	static func language(for language: Language) -> OpaquePointer? {
-		lock.lock()
-		defer { lock.unlock() }
-		if useDefaultSymbols(), let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
-			return unsafeBitCast(symbol, to: LanguageFactory.self)()
-		}
-		let stem = language.libraryStem
-		if let handle = handles[stem], let symbol = dlsym(handle, language.symbolName) {
-			return unsafeBitCast(symbol, to: LanguageFactory.self)()
-		}
-		for url in libraryURLs(for: language) {
-			guard let handle = dlopen(url.path, RTLD_NOW | RTLD_LOCAL) else {
-				continue
-			}
-			guard let symbol = dlsym(handle, language.symbolName) else {
-				dlclose(handle)
-				continue
-			}
-			handles[stem] = handle
-			return unsafeBitCast(symbol, to: LanguageFactory.self)()
-		}
-		warnMissing(language: language)
-		return nil
+		state.language(for: language, useDefaultSymbols: useDefaultSymbols(), libraryURLs: libraryURLs(for: language))
 	}
 
 	static func loadedLibraryStemsForTests() -> Set<String> {
-		lock.lock()
-		defer { lock.unlock() }
-		return Set(handles.keys)
+		state.loadedLibraryStems()
 	}
 
 	static func configureForTests(libraryDirectories: [URL]? = nil, useDefaultSymbols: Bool? = nil) {
@@ -340,19 +315,13 @@ enum GrammarLoader {
 	}
 
 	static func unloadLibraryStemForTests(_ stem: String) {
-		lock.lock()
-		defer { lock.unlock() }
-		if let handle = handles.removeValue(forKey: stem) {
-			dlclose(handle)
-		}
-		warnedStems.remove(stem)
+		state.unloadLibraryStem(stem)
 	}
 
 	private static func libraryURLs(for language: Language) -> [URL] {
 		let name = "libitsy-tree-sitter-\(language.libraryStem).dylib"
 		return libraryDirectories().map { $0.appendingPathComponent(name) }
 	}
-
 	private static func libraryDirectories() -> [URL] {
 		if let directories = Thread.current.threadDictionary[testLibraryDirectoriesKey] as? [URL] {
 			return directories
@@ -385,12 +354,57 @@ enum GrammarLoader {
 		}
 		return String(cString: value) != "1"
 	}
+}
 
-	private static func warnMissing(language: Language) {
-		let stem = language.libraryStem
-		guard warnedStems.insert(stem).inserted else {
-			return
+private final class GrammarLoaderState: @unchecked Sendable {
+	private typealias LanguageFactory = @convention(c) () -> OpaquePointer?
+	private let lock = NSLock()
+	private var handles: [String: UnsafeMutableRawPointer] = [:]
+	private var warnedStems: Set<String> = []
+
+	func language(for language: Language, useDefaultSymbols: Bool, libraryURLs: [URL]) -> OpaquePointer? {
+		lock.lock()
+		defer { lock.unlock() }
+		if useDefaultSymbols, let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), language.symbolName) {
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
 		}
+		let stem = language.libraryStem
+		if let handle = handles[stem], let symbol = dlsym(handle, language.symbolName) {
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
+		}
+		for url in libraryURLs {
+			guard let handle = dlopen(url.path, RTLD_NOW | RTLD_LOCAL) else {
+				continue
+			}
+			guard let symbol = dlsym(handle, language.symbolName) else {
+				dlclose(handle)
+				continue
+			}
+			handles[stem] = handle
+			return unsafeBitCast(symbol, to: LanguageFactory.self)()
+		}
+		warnMissing(language: language)
+		return nil
+	}
+
+	func loadedLibraryStems() -> Set<String> {
+		lock.lock()
+		defer { lock.unlock() }
+		return Set(handles.keys)
+	}
+
+	func unloadLibraryStem(_ stem: String) {
+		lock.lock()
+		defer { lock.unlock() }
+		if let handle = handles.removeValue(forKey: stem) {
+			dlclose(handle)
+		}
+		warnedStems.remove(stem)
+	}
+
+	private func warnMissing(language: Language) {
+		let stem = language.libraryStem
+		guard warnedStems.insert(stem).inserted else { return }
 		NSLog("ItsySyntax warning: failed to load grammar \(stem); syntax highlighting disabled for \(language)")
 	}
 }
@@ -1146,8 +1160,7 @@ final class TagQuery {
 }
 
 public enum TreeSitterSymbolExtractor {
-	private static let lock = NSLock()
-	private static var queries: [Language: TagQuery] = [:]
+	private static let queryCache = TreeSitterSymbolQueryCache()
 
 	public static func workspaceSymbols(in text: String, fileURL: URL, relativePath: String) -> [WorkspaceSymbol]? {
 		guard let language = SyntaxPipeline.language(forFileURL: fileURL) else {
@@ -1164,6 +1177,15 @@ public enum TreeSitterSymbolExtractor {
 	}
 
 	private static func query(for language: Language) throws -> TagQuery {
+		try queryCache.query(for: language)
+	}
+}
+
+private final class TreeSitterSymbolQueryCache: @unchecked Sendable {
+	private let lock = NSLock()
+	private var queries: [Language: TagQuery] = [:]
+
+	func query(for language: Language) throws -> TagQuery {
 		lock.lock()
 		defer {
 			lock.unlock()

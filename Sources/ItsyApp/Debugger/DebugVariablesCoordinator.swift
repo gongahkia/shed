@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyDebugger
 
-final class DebugVariablesCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+@MainActor final class DebugVariablesCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let activeSessionProvider: () -> DebugAppSession?
 	private var panel: NSPanel?
 	private var statusLabel: NSTextField?
@@ -367,7 +367,7 @@ private final class DebugVariableNode: NSObject {
 	}
 }
 
-private enum VariableEditPanel {
+@MainActor private enum VariableEditPanel {
 	static func value(for variable: DebugVariable) -> String? {
 		let field = NSTextField(string: variable.value)
 		field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)

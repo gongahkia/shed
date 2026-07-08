@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyDebugger
 
-final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+@MainActor final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let documentController: ItsyDocumentController
 	private lazy var launchCoordinator = DebugLaunchCoordinator { [weak self] session in
 		self?.debugSessionDidStart(session)

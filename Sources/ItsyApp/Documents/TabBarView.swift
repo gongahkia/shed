@@ -8,7 +8,7 @@ struct ItsyTab: Equatable {
 	let isSelected: Bool
 }
 
-enum ItsyTabCoordinator {
+@MainActor enum ItsyTabCoordinator {
 	private static weak var documentController: ItsyDocumentController?
 	private static let controllers = NSHashTable<EditorWindowController>.weakObjects()
 

@@ -67,7 +67,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	}
 }
 
-final class GitCoordinator: NSObject {
+@MainActor final class GitCoordinator: NSObject {
 	private static let historyDateFormatter: DateFormatter = {
 		let formatter = DateFormatter()
 		formatter.dateFormat = "yyyy-MM-dd HH:mm"
@@ -892,26 +892,20 @@ final class GitCoordinator: NSObject {
 		gitRemoteLog = "$ git \(arguments.joined(separator: " "))\n"
 		gitStatusLabel?.textColor = .secondaryLabelColor
 		gitStatusLabel?.stringValue = "\(title)..."
-		let appendOutput: (Data) -> Void = { [weak self] data in
-			guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
-				return
-			}
-			DispatchQueue.main.async {
-				guard let self else {
-					return
-				}
-				self.gitRemoteLog += text
-				let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
-				if !line.isEmpty {
-					self.gitStatusLabel?.textColor = .secondaryLabelColor
-					self.gitStatusLabel?.stringValue = line
-				}
+		stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
+			let data = handle.availableData
+			Task { @MainActor [weak self] in
+				self?.appendGitRemoteOutput(data)
 			}
 		}
-		stdout.fileHandleForReading.readabilityHandler = { handle in appendOutput(handle.availableData) }
-		stderr.fileHandleForReading.readabilityHandler = { handle in appendOutput(handle.availableData) }
+		stderr.fileHandleForReading.readabilityHandler = { [weak self] handle in
+			let data = handle.availableData
+			Task { @MainActor [weak self] in
+				self?.appendGitRemoteOutput(data)
+			}
+		}
 		process.terminationHandler = { [weak self] process in
-			DispatchQueue.main.async {
+			Task { @MainActor [weak self] in
 				stdout.fileHandleForReading.readabilityHandler = nil
 				stderr.fileHandleForReading.readabilityHandler = nil
 				guard let self else {
@@ -944,6 +938,18 @@ final class GitCoordinator: NSObject {
 			gitRemoteWasCancelled = false
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
+		}
+	}
+
+	private func appendGitRemoteOutput(_ data: Data) {
+		guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+			return
+		}
+		gitRemoteLog += text
+		let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text.trimmingCharacters(in: .whitespacesAndNewlines)
+		if !line.isEmpty {
+			gitStatusLabel?.textColor = .secondaryLabelColor
+			gitStatusLabel?.stringValue = line
 		}
 	}
 

@@ -36,18 +36,15 @@ public enum ProjectFind {
 		}
 		let matcher = GitIgnoreMatcher(root: root, fileManager: fileManager)
 		let files = searchableFiles(root: root, matcher: matcher, maxFileBytes: options.maxFileBytes, fileManager: fileManager)
-		let lock = NSLock()
-		var matches: [ProjectFindMatch] = []
+		let collector = ProjectFindMatchCollector()
 		DispatchQueue.concurrentPerform(iterations: files.count) { index in
 			let fileMatches = matchesInFile(files[index], root: root, options: options)
 			guard !fileMatches.isEmpty else {
 				return
 			}
-			lock.lock()
-			matches.append(contentsOf: fileMatches)
-			lock.unlock()
+			collector.append(contentsOf: fileMatches)
 		}
-		return matches.sorted { lhs, rhs in
+		return collector.snapshot().sorted { lhs, rhs in
 			if lhs.relativePath != rhs.relativePath {
 				return lhs.relativePath.localizedStandardCompare(rhs.relativePath) == .orderedAscending
 			}
@@ -134,6 +131,23 @@ public enum ProjectFind {
 			return url.lastPathComponent
 		}
 		return String(path.dropFirst(prefix.count))
+	}
+}
+
+private final class ProjectFindMatchCollector: @unchecked Sendable {
+	private let lock = NSLock()
+	private var matches: [ProjectFindMatch] = []
+
+	func append(contentsOf newMatches: [ProjectFindMatch]) {
+		lock.lock()
+		matches.append(contentsOf: newMatches)
+		lock.unlock()
+	}
+
+	func snapshot() -> [ProjectFindMatch] {
+		lock.lock()
+		defer { lock.unlock() }
+		return matches
 	}
 }
 

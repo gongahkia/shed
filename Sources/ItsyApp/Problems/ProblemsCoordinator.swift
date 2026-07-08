@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyEditor
 
-final class ProblemsCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class ProblemsCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let documentController: ItsyDocumentController
 	private var problemsPanel: NSPanel?
 	private var problemsStatusLabel: NSTextField?

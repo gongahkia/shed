@@ -76,7 +76,7 @@ public enum GutterMarkerShape: Sendable, Equatable {
 	case foldClosed
 }
 
-public protocol GutterDecorator: AnyObject {
+@MainActor public protocol GutterDecorator: AnyObject {
 	func gutterMarkers(in lineRange: Range<Int>, for view: MetalTextView) -> [GutterMarker]
 	func gutterMarkerClicked(_ marker: GutterMarker, in view: MetalTextView)
 	func gutterMarkerRightClicked(_ marker: GutterMarker, in view: MetalTextView, event: NSEvent) -> Bool
@@ -137,8 +137,7 @@ private struct CachedLineGlyph {
 
 public final class MetalTextView: NSView {
 	private static let accessibilityLocale = Locale(identifier: "en")
-	private static let benchStageLock = NSLock()
-	private static var recordedBenchStages: Set<String> = []
+	private nonisolated static let benchStageRecorder = MetalTextViewBenchStageRecorder()
 	private static let maxCachedShapedLines = 512
 	private static let defaultFontSize: CGFloat = 14.95
 	private static let defaultFontName = "Menlo"
@@ -151,8 +150,8 @@ public final class MetalTextView: NSView {
 
 	private let metalDevice: MTLDevice?
 	private let commandQueue: MTLCommandQueue?
-	private let dirtyLock = NSLock()
-	private var dirty = true
+	private nonisolated let dirtyLock = NSLock()
+	private nonisolated(unsafe) var dirty = true
 	private var displayLink: CVDisplayLink?
 	private(set) var renderedFrameCount = 0
 	private var cursorRect: CGRect?
@@ -441,18 +440,20 @@ public final class MetalTextView: NSView {
 	}
 
 	deinit {
-		closeGutterPopover()
-		stopDisplayLink()
-		stopCursorBlinkTimer()
+		MainActor.assumeIsolated {
+			closeGutterPopover()
+			stopDisplayLink()
+			stopCursorBlinkTimer()
+		}
 	}
 
-	func markDirty() {
+	nonisolated func markDirty() {
 		dirtyLock.lock()
 		dirty = true
 		dirtyLock.unlock()
 	}
 
-	func consumeDirtyForDisplayLink() -> Bool {
+	nonisolated func consumeDirtyForDisplayLink() -> Bool {
 		dirtyLock.lock()
 		defer { dirtyLock.unlock() }
 		guard dirty else {
@@ -1204,11 +1205,13 @@ public final class MetalTextView: NSView {
 			return
 		}
 		cursorBlinkTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
-			guard let self, self.cursorRect != nil else {
-				return
+			MainActor.assumeIsolated {
+				guard let self, self.cursorRect != nil else {
+					return
+				}
+				self.cursorBlinkVisible.toggle()
+				self.markDirty()
 			}
-			self.cursorBlinkVisible.toggle()
-			self.markDirty()
 		}
 	}
 
@@ -1217,7 +1220,7 @@ public final class MetalTextView: NSView {
 		cursorBlinkTimer = nil
 	}
 
-	fileprivate func displayLinkDidTick() {
+	fileprivate nonisolated func displayLinkDidTick() {
 		Self.recordBenchStageOnce("first_display_link_tick")
 		guard consumeDirtyForDisplayLink() else {
 			return
@@ -1628,10 +1631,19 @@ public final class MetalTextView: NSView {
 		String(localized: value, bundle: .module, locale: accessibilityLocale)
 	}
 
-	private static func recordBenchStageOnce(_ name: String) {
-		benchStageLock.lock()
-		let inserted = recordedBenchStages.insert(name).inserted
-		benchStageLock.unlock()
+	private nonisolated static func recordBenchStageOnce(_ name: String) {
+		benchStageRecorder.record(name)
+	}
+}
+
+private final class MetalTextViewBenchStageRecorder: @unchecked Sendable {
+	private let lock = NSLock()
+	private var recordedStages: Set<String> = []
+
+	func record(_ name: String) {
+		lock.lock()
+		let inserted = recordedStages.insert(name).inserted
+		lock.unlock()
 		guard inserted, let path = ProcessInfo.processInfo.environment["ITSY_BENCH_STAGES_PATH"] else {
 			return
 		}
@@ -1660,7 +1672,14 @@ func solidInstance(rect: CGRect, scale: CGFloat, color: SIMD4<Float>) -> MetalGl
 	)
 }
 
-private let metalTextViewDisplayLinkCallback: CVDisplayLinkOutputCallback = { _, _, _, _, _, context in
+private func metalTextViewDisplayLinkCallback(
+	_ displayLink: CVDisplayLink,
+	_ now: UnsafePointer<CVTimeStamp>,
+	_ outputTime: UnsafePointer<CVTimeStamp>,
+	_ flagsIn: CVOptionFlags,
+	_ flagsOut: UnsafeMutablePointer<CVOptionFlags>,
+	_ context: UnsafeMutableRawPointer?
+) -> CVReturn {
 	guard let context else {
 		return kCVReturnSuccess
 	}

@@ -3,7 +3,7 @@ import AppKit
 import ItsyEditor
 import ItsyRender
 
-enum ItsyProblemGutterCoordinator {
+@MainActor enum ItsyProblemGutterCoordinator {
 	private weak static var documentController: ItsyDocumentController?
 	private static var rootURL: URL?
 	private static var problems: [WorkspaceProblem] = []
@@ -101,7 +101,9 @@ private final class ProblemGutterDecorator: GutterDecorator {
 		guard let index = Int(marker.id), let problem = problems.first(where: { $0.index == index })?.problem else {
 			return nil
 		}
-		return ProblemGutterPopoverViewController(problem: problem, openRelated: openRelated)
+		return MainActor.assumeIsolated {
+			ProblemGutterPopoverViewController(problem: problem, openRelated: openRelated)
+		}
 	}
 }
 

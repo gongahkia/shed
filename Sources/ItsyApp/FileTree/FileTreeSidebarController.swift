@@ -3,7 +3,7 @@ import Darwin
 import Foundation
 import ItsyEditor
 
-final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
+@MainActor final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private static let quickLookPanelSelector = NSSelectorFromString("sharedPreviewPanel")
 	private static let quickLookDataSourceSelector = NSSelectorFromString("setDataSource:")
 	private static let quickLookDelegateSelector = NSSelectorFromString("setDelegate:")
@@ -33,8 +33,10 @@ final class FileTreeSidebarController: NSObject, NSOutlineViewDataSource, NSOutl
 	}
 
 	deinit {
-		if let keyMonitor {
-			NSEvent.removeMonitor(keyMonitor)
+		MainActor.assumeIsolated {
+			if let keyMonitor {
+				NSEvent.removeMonitor(keyMonitor)
+			}
 		}
 	}
 

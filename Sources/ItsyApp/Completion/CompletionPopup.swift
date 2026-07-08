@@ -3,7 +3,7 @@ import AppKit
 import ItsyLSP
 import ItsyRender
 
-final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let panel: NSPanel
 	private let tableView = NSTableView()
 	private let scrollView = NSScrollView()
@@ -35,7 +35,9 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 	}
 
 	deinit {
-		removeKeyMonitor()
+		MainActor.assumeIsolated {
+			removeKeyMonitor()
+		}
 	}
 
 	func show(
@@ -275,23 +277,25 @@ final class CompletionPopupController: NSObject, NSTableViewDataSource, NSTableV
 		} else {
 			closeDetailPopover()
 		}
-		guard let resolveItem, !pendingResolveKeys.contains(key) else {
+		guard resolveItem != nil, !pendingResolveKeys.contains(key) else {
 			return
 		}
 		resolveGeneration += 1
 		let generation = resolveGeneration
 		resolveTimer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: false) { [weak self] _ in
-			guard let self, generation == resolveGeneration, panel.isVisible else {
-				return
-			}
-			pendingResolveKeys.insert(key)
-			resolveItem(item) { [weak self] resolved in
-				DispatchQueue.main.async { [weak self] in
-					guard let self else {
-						return
+			MainActor.assumeIsolated {
+				guard let self, generation == self.resolveGeneration, self.panel.isVisible, let resolveItem = self.resolveItem else {
+					return
+				}
+				self.pendingResolveKeys.insert(key)
+				resolveItem(item) { [weak self] resolved in
+					Task { @MainActor [weak self] in
+						guard let self else {
+							return
+						}
+						self.pendingResolveKeys.remove(key)
+						self.storeResolvedItem(resolved, forKey: key)
 					}
-					pendingResolveKeys.remove(key)
-					storeResolvedItem(resolved, forKey: key)
 				}
 			}
 		}

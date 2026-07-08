@@ -2,7 +2,7 @@ import AppKit
 import ItsyEditor
 import ItsyRender
 
-struct EditorPane {
+@MainActor struct EditorPane {
 	let viewController: NSViewController
 	let editorView: MetalTextView
 
@@ -76,7 +76,7 @@ struct EditorPaneLayout: Equatable {
 	}
 }
 
-struct EditorPaneCoordinator {
+@MainActor struct EditorPaneCoordinator {
 	let rootSplitViewController = NSSplitViewController()
 	private(set) var panes: [EditorPane] = []
 	private var activePaneIndex = 0

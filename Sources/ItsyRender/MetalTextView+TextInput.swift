@@ -1,7 +1,7 @@
 import AppKit
 import ItsyEditor
 
-extension MetalTextView: NSTextInputClient {
+extension MetalTextView: @MainActor NSTextInputClient {
 	@available(macOS 15.0, *)
 	@objc public var writingToolsBehavior: NSWritingToolsBehavior {
 		get { .none }

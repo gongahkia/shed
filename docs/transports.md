@@ -23,8 +23,6 @@ The supported transports are:
 - `ntfy`: topic alerts with optional signed approval actions.
 - `gotify`: self-hosted alerts with optional signed approval deep-links.
 
-Signal support currently lives at the provider-client layer for a local `signal-cli` JSON-RPC daemon. It is documented below, but is not selectable through `onibi up --transport=signal` until the daemon bridge is live-verified with a linked Signal number.
-
 `auto` tries `tailscale` first and falls back to `lan` when Tailscale is unavailable. It does not select third-party relays.
 Run `onibi up` from a terminal to choose category first, provider second, or pass `--transport=<mode>` for scripts.
 

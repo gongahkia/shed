@@ -24,3 +24,9 @@ import Testing
 		"Sources/ItsyApp/Palette/CommandPaletteCoordinator.swift",
 	])
 }
+
+@Test func keymapCommandCatalogIncludesUndoTreeCommand() throws {
+	let command = try #require(KeymapCommandCatalog.hiddenCommands.first { $0.id == "history.undoTree.toggle" })
+	#expect(command.title == "history.undoTree.toggle")
+	#expect(command.isHidden)
+}

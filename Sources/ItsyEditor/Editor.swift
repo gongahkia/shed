@@ -24,31 +24,254 @@ public enum Motion: Sendable, Equatable {
 	case pageUp
 }
 
+public struct UndoTreeSelection: Sendable, Equatable, Codable {
+	public struct Range: Sendable, Equatable, Codable {
+		public var anchor: Int
+		public var head: Int
+		public var affinity: String
+	}
+
+	public var primary: Range
+	public var secondaries: [Range]
+
+	public init(_ selectionSet: SelectionSet) {
+		func snapshot(_ selection: Selection) -> Range {
+			Range(
+				anchor: selection.anchor,
+				head: selection.head,
+				affinity: selection.affinity == .upstream ? "upstream" : "downstream"
+			)
+		}
+		primary = snapshot(selectionSet.primary)
+		secondaries = selectionSet.secondaries.map(snapshot)
+	}
+
+	public var selectionSet: SelectionSet {
+		func selection(_ range: Range) -> Selection {
+			Selection(
+				anchor: range.anchor,
+				head: range.head,
+				affinity: range.affinity == "upstream" ? .upstream : .downstream
+			)
+		}
+		return SelectionSet(primary: selection(primary), secondaries: secondaries.map(selection))
+	}
+}
+
+public struct UndoTreeNode: Sendable, Equatable, Codable, Identifiable {
+	public var id: Int
+	public var parentID: Int?
+	public var childIDs: [Int]
+	public var summary: String
+	public var text: Data
+	public var selection: UndoTreeSelection
+	public var timestamp: Date
+
+	public init(
+		id: Int,
+		parentID: Int?,
+		childIDs: [Int] = [],
+		summary: String,
+		text: Data,
+		selection: SelectionSet,
+		timestamp: Date = Date()
+	) {
+		self.id = id
+		self.parentID = parentID
+		self.childIDs = childIDs
+		self.summary = summary
+		self.text = text
+		self.selection = UndoTreeSelection(selection)
+		self.timestamp = timestamp
+	}
+}
+
+public struct UndoTree: Sendable, Equatable, Codable {
+	public private(set) var nodes: [Int: UndoTreeNode]
+	public private(set) var rootID: Int
+	public private(set) var currentID: Int
+	private var nextID: Int
+
+	public init(text: Data = Data(), selection: SelectionSet = SelectionSet()) {
+		let root = UndoTreeNode(id: 0, parentID: nil, summary: "Original", text: text, selection: selection)
+		nodes = [0: root]
+		rootID = 0
+		currentID = 0
+		nextID = 1
+	}
+
+	public var currentNode: UndoTreeNode? {
+		nodes[currentID]
+	}
+
+	public var orderedNodes: [UndoTreeNode] {
+		nodes.values.sorted { $0.id < $1.id }
+	}
+
+	public func node(id: Int) -> UndoTreeNode? {
+		nodes[id]
+	}
+
+	@discardableResult
+	public mutating func append(summary: String, text: Data, selection: SelectionSet) -> Int {
+		let parentID = currentID
+		let id = nextID
+		nextID += 1
+		let node = UndoTreeNode(id: id, parentID: parentID, summary: summary, text: text, selection: selection)
+		nodes[id] = node
+		if var parent = nodes[parentID] {
+			parent.childIDs.append(id)
+			nodes[parentID] = parent
+		}
+		currentID = id
+		return id
+	}
+
+	public mutating func reset(text: Data, selection: SelectionSet) {
+		self = UndoTree(text: text, selection: selection)
+	}
+
+	public mutating func moveToParent(of nodeID: Int?) {
+		guard let nodeID, let parentID = nodes[nodeID]?.parentID else {
+			return
+		}
+		currentID = parentID
+	}
+
+	public mutating func moveToNode(_ nodeID: Int?) {
+		guard let nodeID, nodes[nodeID] != nil else {
+			return
+		}
+		currentID = nodeID
+	}
+
+	public mutating func jump(to nodeID: Int) -> Bool {
+		guard nodes[nodeID] != nil else {
+			return false
+		}
+		currentID = nodeID
+		return true
+	}
+
+	public func path(to nodeID: Int) -> [Int] {
+		guard nodes[nodeID] != nil else {
+			return []
+		}
+		var path: [Int] = []
+		var cursor: Int? = nodeID
+		while let id = cursor, let node = nodes[id] {
+			path.append(id)
+			cursor = node.parentID
+		}
+		return path.reversed()
+	}
+
+	public func limited(maxNodeCount: Int, maxTotalTextBytes: Int) -> UndoTree {
+		let currentPath = Set(path(to: currentID))
+		var keep = Set([rootID]).union(currentPath)
+		var keptBytes = keep.reduce(0) { $0 + (nodes[$1]?.text.count ?? 0) }
+		for node in orderedNodes.reversed() where !keep.contains(node.id) {
+			let nodePath = path(to: node.id)
+			let missingIDs = nodePath.filter { !keep.contains($0) }
+			let missingBytes = missingIDs.reduce(0) { $0 + (nodes[$1]?.text.count ?? 0) }
+			guard keep.count + missingIDs.count <= maxNodeCount,
+			      keptBytes + missingBytes <= maxTotalTextBytes
+			else {
+				continue
+			}
+			keep.formUnion(missingIDs)
+			keptBytes += missingBytes
+		}
+		var keptNodes = nodes.filter { keep.contains($0.key) }
+		for (id, node) in keptNodes {
+			var updated = node
+			updated.childIDs = node.childIDs.filter { keep.contains($0) }
+			keptNodes[id] = updated
+		}
+		var copy = self
+		copy.nodes = keptNodes
+		if !keptNodes.keys.contains(copy.currentID) {
+			copy.currentID = rootID
+		}
+		return copy
+	}
+}
+
 public struct UndoStack: Sendable, Equatable {
 	public var maxEditCount: Int
 	public var maxTotalRemovedBytes: Int
 	public private(set) var edits: [UndoEntry] = []
+	public private(set) var tree = UndoTree()
 	private var redoEdits: [UndoEntry] = []
+	private var entryByNodeID: [Int: UndoEntry] = [:]
 	private var activeGroupID: Int?
 	private var nextGroupID = 1
 
-	public init(maxEditCount: Int = 10_000, maxTotalRemovedBytes: Int = 64 * 1024 * 1024) {
+	public init(maxEditCount: Int = 10_000, maxTotalRemovedBytes: Int = 64 * 1_024 * 1_024) {
 		precondition(maxEditCount > 0, "maxEditCount must be positive")
 		precondition(maxTotalRemovedBytes >= 0, "maxTotalRemovedBytes must be non-negative")
 		self.maxEditCount = maxEditCount
 		self.maxTotalRemovedBytes = maxTotalRemovedBytes
 	}
 
-	mutating func record(_ edit: Edit, reverse: Edit, selectionBefore: SelectionSet, selectionAfter: SelectionSet) {
-		edits.append(UndoEntry(
+	mutating func record(
+		_ edit: Edit,
+		reverse: Edit,
+		selectionBefore: SelectionSet,
+		selectionAfter: SelectionSet,
+		snapshotText: Data
+	) {
+		let nodeID = tree.append(summary: Self.summary(for: edit), text: snapshotText, selection: selectionAfter)
+		let entry = UndoEntry(
 			edit: edit,
 			reverse: reverse,
 			selectionAfter: selectionAfter,
 			selectionBefore: selectionBefore,
-			groupID: activeGroupID
-		))
+			groupID: activeGroupID,
+			treeNodeID: nodeID
+		)
+		edits.append(entry)
+		entryByNodeID[nodeID] = entry
 		redoEdits.removeAll()
 		trimUndoHistory()
+	}
+
+	mutating func resetTree(text: Data, selection: SelectionSet) {
+		tree.reset(text: text, selection: selection)
+		entryByNodeID = [:]
+		edits = []
+		redoEdits = []
+	}
+
+	public mutating func replaceTree(_ tree: UndoTree) {
+		self.tree = tree
+		edits = Self.entries(for: tree, nodeIDs: Array(tree.path(to: tree.currentID).dropFirst()))
+		redoEdits = []
+		entryByNodeID = Dictionary(uniqueKeysWithValues: edits.compactMap { entry in
+			guard let nodeID = entry.treeNodeID else {
+				return nil
+			}
+			return (nodeID, entry)
+		})
+	}
+
+	public mutating func jumpToTreeNode(_ id: Int) -> Bool {
+		guard tree.jump(to: id) else {
+			return false
+		}
+		let path = tree.path(to: id).dropFirst()
+		let missingEntries = path.contains { entryByNodeID[$0] == nil }
+		if missingEntries {
+			let rebuilt = Self.entries(for: tree, nodeIDs: Array(path))
+			for entry in rebuilt {
+				if let nodeID = entry.treeNodeID {
+					entryByNodeID[nodeID] = entry
+				}
+			}
+		}
+		edits = path.compactMap { entryByNodeID[$0] }
+		redoEdits = []
+		return true
 	}
 
 	mutating func beginGroup() {
@@ -74,6 +297,7 @@ public struct UndoStack: Sendable, Equatable {
 			}
 		}
 		redoEdits.append(contentsOf: entries)
+		tree.moveToParent(of: entries.last?.treeNodeID)
 		return entries
 	}
 
@@ -88,6 +312,7 @@ public struct UndoStack: Sendable, Equatable {
 			}
 		}
 		edits.append(contentsOf: entries)
+		tree.moveToNode(entries.last?.treeNodeID)
 		return entries
 	}
 
@@ -99,6 +324,7 @@ public struct UndoStack: Sendable, Equatable {
 			}
 			dropOldestUndoGroup()
 		}
+		pruneEntryIndex()
 	}
 
 	private var retainedRemovedBytes: Int {
@@ -122,6 +348,75 @@ public struct UndoStack: Sendable, Equatable {
 			edits.removeFirst()
 		}
 	}
+
+	private mutating func pruneEntryIndex() {
+		let liveIDs = Set((edits + redoEdits).compactMap(\.treeNodeID))
+		entryByNodeID = entryByNodeID.filter { liveIDs.contains($0.key) }
+	}
+
+	private static func summary(for edit: Edit) -> String {
+		if edit.inserted.isEmpty {
+			return "Delete \(edit.removed.count)b"
+		}
+		if edit.removed.isEmpty {
+			return "Insert \(edit.inserted.count)b"
+		}
+		return "Replace \(edit.removed.count)b -> \(edit.inserted.count)b"
+	}
+
+	private static func entries(for tree: UndoTree, nodeIDs: [Int]) -> [UndoEntry] {
+		nodeIDs.compactMap { nodeID in
+			guard let node = tree.node(id: nodeID),
+			      let parentID = node.parentID,
+			      let parent = tree.node(id: parentID)
+			else {
+				return nil
+			}
+			let edit = edit(from: parent, to: node)
+			let reverse = reverseEdit(for: edit, selectionBefore: node.selection.selectionSet)
+			return UndoEntry(
+				edit: edit,
+				reverse: reverse,
+				selectionAfter: node.selection.selectionSet,
+				selectionBefore: parent.selection.selectionSet,
+				groupID: nil,
+				treeNodeID: nodeID
+			)
+		}
+	}
+
+	private static func edit(from parent: UndoTreeNode, to node: UndoTreeNode) -> Edit {
+		let oldBytes = Array(parent.text)
+		let newBytes = Array(node.text)
+		var prefix = 0
+		while prefix < oldBytes.count, prefix < newBytes.count, oldBytes[prefix] == newBytes[prefix] {
+			prefix += 1
+		}
+		var suffix = 0
+		while suffix < oldBytes.count - prefix,
+		      suffix < newBytes.count - prefix,
+		      oldBytes[oldBytes.count - suffix - 1] == newBytes[newBytes.count - suffix - 1]
+		{
+			suffix += 1
+		}
+		let oldUpper = oldBytes.count - suffix
+		let newUpper = newBytes.count - suffix
+		return Edit(
+			range: prefix ..< oldUpper,
+			removed: Data(oldBytes[prefix ..< oldUpper]),
+			inserted: Data(newBytes[prefix ..< newUpper]),
+			selectionBefore: parent.selection.selectionSet
+		)
+	}
+
+	private static func reverseEdit(for edit: Edit, selectionBefore: SelectionSet) -> Edit {
+		Edit(
+			range: edit.range.lowerBound ..< edit.range.lowerBound + edit.inserted.count,
+			removed: edit.inserted,
+			inserted: edit.removed,
+			selectionBefore: selectionBefore
+		)
+	}
 }
 
 public struct UndoEntry: Sendable, Equatable {
@@ -130,6 +425,7 @@ public struct UndoEntry: Sendable, Equatable {
 	public var selectionAfter: SelectionSet
 	public var selectionBefore: SelectionSet
 	public var groupID: Int?
+	public var treeNodeID: Int?
 }
 
 public enum EditorStorageKind: String, Sendable, Equatable {
@@ -334,12 +630,14 @@ public struct Editor: Sendable {
 		}
 		selections = SelectionSet()
 		history = UndoStack()
+		history.resetTree(text: Data(text.utf8), selection: selections)
 	}
 
 	public init(pieceTree: PieceTree) {
 		textStorage = .pieceTree(pieceTree)
 		selections = SelectionSet()
 		history = UndoStack()
+		history.resetTree(text: fullTextData, selection: selections)
 	}
 
 	public static func resolveStorage(environment: [String: String], settings: ItsySettings) -> EditorStorageKind {
@@ -468,6 +766,24 @@ public struct Editor: Sendable {
 		selections = entries.last?.selectionAfter ?? selections
 	}
 
+	public mutating func restoreUndoTreeNode(id: Int) -> Bool {
+		guard let node = history.tree.node(id: id),
+		      history.jumpToTreeNode(id)
+		else {
+			return false
+		}
+		let text = String(decoding: node.text, as: UTF8.self)
+		switch textStorage.kind {
+		case .rope:
+			textStorage = .rope(Rope(text))
+		case .pieceTree:
+			textStorage = .pieceTree(PieceTree(text))
+		}
+		selections = clamped(node.selection.selectionSet, length: textStorage.length)
+		lastEditBatch = []
+		return true
+	}
+
 	private mutating func replaceSelections(with string: String) {
 		let ranges = selectionsForEdit().map(\.range)
 		replace(ranges: ranges, with: string)
@@ -491,7 +807,13 @@ public struct Editor: Sendable {
 		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
 		lastEditBatch = Array(recordedEdits.reversed())
 		for (edit, reverse) in zip(recordedEdits.reversed(), reverseEdits.reversed()) {
-			history.record(edit, reverse: reverse, selectionBefore: selectionBefore, selectionAfter: selections)
+			history.record(
+				edit,
+				reverse: reverse,
+				selectionBefore: selectionBefore,
+				selectionAfter: selections,
+				snapshotText: fullTextData
+			)
 		}
 	}
 
@@ -508,6 +830,21 @@ public struct Editor: Sendable {
 		var set = selections
 		set.merge()
 		return [set.primary] + set.secondaries
+	}
+
+	private var fullTextData: Data {
+		Data(textStorage.substring(0 ..< textStorage.length).utf8)
+	}
+
+	private func clamped(_ selectionSet: SelectionSet, length: Int) -> SelectionSet {
+		func clamp(_ selection: Selection) -> Selection {
+			Selection(
+				anchor: min(max(selection.anchor, 0), length),
+				head: min(max(selection.head, 0), length),
+				affinity: selection.affinity
+			)
+		}
+		return SelectionSet(primary: clamp(selectionSet.primary), secondaries: selectionSet.secondaries.map(clamp))
 	}
 
 	private func previousCharacterRange(before offset: Int) -> Range<Int> {

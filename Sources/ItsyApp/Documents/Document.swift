@@ -33,6 +33,7 @@ import ItsySyntax
 	private var activeGutterDecorator: GutterDecorator?
 	private let fileWatcher = DocumentFileWatcher()
 	private let gitGutter = DocumentGitGutterController()
+	private let undoHistoryStore = UndoHistoryStore()
 
 	override var fileURL: URL? {
 		didSet {
@@ -177,6 +178,7 @@ import ItsySyntax
 			editorViews.append(view)
 		}
 		view.editor = editor
+		view.undoTreeChanged?(editor.history.tree)
 		view.visibleLineRangeDidChange = { [weak self] _ in
 			self?.refreshSyntaxHighlights()
 			self?.lspSurfaceRefreshRequested?()
@@ -202,6 +204,8 @@ import ItsySyntax
 			self.lspSurfaceRefreshRequested?()
 			self.updateHandoffActivity()
 			self.syncSiblingEditorViews(source: view, editor: editor)
+			self.saveUndoHistoryIfAvailable()
+			view.undoTreeChanged?(editor.history.tree)
 			self.updateChangeCount(.changeDone)
 		}
 		view.saveRequested = { [weak self] in
@@ -380,13 +384,36 @@ import ItsySyntax
 
 	private func installReadEditor(_ newEditor: Editor, fileURL readURL: URL?) {
 		editor = newEditor
+		loadUndoHistoryIfAvailable(fileURL: readURL ?? fileURL)
 		for view in editorViews {
 			view.editor = editor
+			view.undoTreeChanged?(editor.history.tree)
 		}
 		syntax.configure(fileURL: readURL ?? fileURL)
 		refreshSyntaxHighlights()
 		updateHandoffActivity()
 		fileWatcher.restart()
+	}
+
+	private func undoWorkspaceRoot(for fileURL: URL) -> URL {
+		ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
+	}
+
+	private func loadUndoHistoryIfAvailable(fileURL: URL?) {
+		guard let fileURL,
+		      let tree = undoHistoryStore.load(fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL)),
+		      tree.currentNode?.text == Data(editorStorageString(editor).utf8)
+		else {
+			return
+		}
+		editor.history.replaceTree(tree)
+	}
+
+	private func saveUndoHistoryIfAvailable() {
+		guard let fileURL else {
+			return
+		}
+		try? undoHistoryStore.save(editor.history.tree, fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL))
 	}
 
 	private func clampedSelection(_ selectionSet: SelectionSet, length: Int) -> SelectionSet {

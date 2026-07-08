@@ -228,6 +228,13 @@ import ItsyKeymap
 				Command(id: "view.hiddenFiles.toggle", title: L10n.string("Toggle Hidden Files"), defaultKey: "Cmd-Shift-.") { [weak self] in
 					self?.activeEditorWindowController()?.toggleHiddenFiles()
 				},
+				Command(
+					id: "history.undoTree.toggle",
+					title: L10n.string("History: Toggle Undo Tree"),
+					defaultKey: nil
+				) { [weak self] in
+					self?.activeEditorWindowController()?.toggleUndoTree(nil)
+				},
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},

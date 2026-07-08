@@ -61,3 +61,12 @@ ITSY_BASELINE_PURGE=0 bench/scripts/run_baseline.sh
 ```
 
 `sudo purge` was unavailable non-interactively (`sudo: a password is required`), so this baseline records no-purge cold starts.
+
+Nightly competitor command:
+
+```sh
+RUNS=20 BASELINE_PREFIX=nightly-competitors ITSY_BASELINE_INCLUDE_ITSY=1 ITSY_BASELINE_INCLUDE="Itsy,Zed,Sublime Text,CodeEdit" ITSY_BASELINE_PURGE=0 bench/scripts/run_baseline.sh
+bench/scripts/competitor_gate.sh bench/results/nightly-competitors-YYYY-MM-DD.json
+```
+
+The competitor gate fails if Itsy is more than 25% slower than Sublime Text on mean startup, or more than 15% larger RSS than Zed.

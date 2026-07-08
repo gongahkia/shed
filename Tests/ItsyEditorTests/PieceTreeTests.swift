@@ -84,6 +84,16 @@ func pieceTreeGraphemeQueriesCrossPieceSeams(_ testCase: GraphemeSeamCase) {
 	#expect(tree.debugPieces().map(\.buffer) == [.original(0), .add(0), .original(0)])
 }
 
+@Test func pieceTreeInsertDoesNotMutateCopiedTree() {
+	let originalText = "abc"
+	let original = PieceTree(originalText)
+	var edited = original
+	edited.insert("x", at: 1)
+	#expect(original.length == originalText.utf8.count)
+	#expect(original.substring(0 ..< original.length) == originalText)
+	#expect(edited.substring(0 ..< edited.length) == "axbc")
+}
+
 @Test func pieceTreeRemoveAcrossPiecesPreservesLineLookups() {
 	var tree = PieceTree("ab\ncd\nef")
 	tree.insert("XX\n", at: 5)

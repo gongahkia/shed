@@ -255,6 +255,7 @@ public struct PieceTree: Sendable {
 		guard !bytes.isEmpty else {
 			return
 		}
+		ensureUniqueRoot()
 		let inserted = appendAddPiece(bytes)
 		root = PieceTreeNode.insert(inserted, at: offset, into: root, split: split)
 		root?.color = .black
@@ -386,6 +387,12 @@ public struct PieceTree: Sendable {
 
 	private var pieceCount: Int {
 		pieces().count
+	}
+
+	private mutating func ensureUniqueRoot() {
+		if root != nil, !isKnownUniquelyReferenced(&root) {
+			root = root?.copy()
+		}
 	}
 
 	private mutating func appendAddPiece(_ bytes: [UInt8]) -> Piece {
@@ -920,6 +927,10 @@ private final class PieceTreeNode: @unchecked Sendable {
 		left?.appendPieces(into: &pieces)
 		pieces.append(piece)
 		right?.appendPieces(into: &pieces)
+	}
+
+	func copy() -> PieceTreeNode {
+		PieceTreeNode(color: color, piece: piece, left: left?.copy(), right: right?.copy())
 	}
 
 	static func buildBalanced(from pieces: [PieceTree.Piece], in range: Range<Int>) -> PieceTreeNode? {

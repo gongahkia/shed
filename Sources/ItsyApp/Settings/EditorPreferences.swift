@@ -1,9 +1,15 @@
 // @file editor preference model and settings bridge.
 import AppKit
+import CoreText
 import Foundation
 import ItsyConfig
 
 struct EditorPreferences: Equatable {
+	struct FontChoice: Equatable {
+		var name: String
+		var displayName: String
+	}
+
 	static let fontNameKey = "dev.itsy.editor.fontName"
 	static let fontSizeKey = "dev.itsy.editor.fontSize"
 	static let showLineNumbersKey = "dev.itsy.editor.showLineNumbers"
@@ -12,6 +18,8 @@ struct EditorPreferences: Equatable {
 	static let minFontSize: CGFloat = 9
 	static let maxFontSize: CGFloat = 36
 	private static let preferredFontNames = ["Menlo", "Monaco", "Courier"]
+	private static let fontCatalogLock = NSLock()
+	private static var cachedFontChoices: [FontChoice]?
 
 	var fontName: String
 	var fontSize: CGFloat
@@ -72,34 +80,64 @@ struct EditorPreferences: Equatable {
 	}
 
 	static func availableFontNames() -> [String] {
-		var result: [String] = []
+		availableFontChoices().map(\.name)
+	}
+
+	static func availableFontChoices() -> [FontChoice] {
+		fontCatalogLock.lock()
+		if let cachedFontChoices {
+			fontCatalogLock.unlock()
+			return cachedFontChoices
+		}
+		fontCatalogLock.unlock()
+
+		let choices = buildFontChoices()
+		fontCatalogLock.lock()
+		if cachedFontChoices == nil {
+			cachedFontChoices = choices
+		}
+		let cached = cachedFontChoices ?? choices
+		fontCatalogLock.unlock()
+		return cached
+	}
+
+	private static func buildFontChoices() -> [FontChoice] {
+		var result: [FontChoice] = []
 		var seenNames = Set<String>()
 		var seenDisplayNames = Set<String>()
-		func append(_ name: String) {
-			guard isUsableEditorFontName(name) else {
+		func append(_ choice: FontChoice) {
+			let displayKey = choice.displayName.lowercased()
+			guard seenNames.insert(choice.name).inserted, seenDisplayNames.insert(displayKey).inserted else {
 				return
 			}
-			let displayKey = fontDisplayName(for: name).lowercased()
-			guard seenNames.insert(name).inserted, seenDisplayNames.insert(displayKey).inserted else {
-				return
-			}
-			result.append(name)
+			result.append(choice)
 		}
-		preferredFontNames.forEach(append)
-		NSFontManager.shared.availableFonts
-			.sorted { fontDisplayName(for: $0).localizedCaseInsensitiveCompare(fontDisplayName(for: $1)) == .orderedAscending }
+		preferredFontNames.compactMap(fontChoiceIfUsable).forEach(append)
+		(CTFontManagerCopyAvailablePostScriptNames() as? [String] ?? [])
+			.compactMap(fontChoiceIfUsable)
+			.sorted { $0.displayName.localizedCaseInsensitiveCompare($1.displayName) == .orderedAscending }
 			.forEach(append)
 		if result.isEmpty {
-			result.append(resolvedDefaultFontName())
+			let name = resolvedDefaultFontName()
+			result.append(FontChoice(name: name, displayName: fontDisplayNameUncached(for: name)))
 		}
 		return result
 	}
 
 	static func fontDisplayName(for fontName: String) -> String {
-		guard let font = NSFont(name: fontName, size: defaultFontSize) else {
+		fontCatalogLock.lock()
+		let cached = cachedFontChoices?.first { $0.name == fontName }?.displayName
+		fontCatalogLock.unlock()
+		return cached ?? fontDisplayNameUncached(for: fontName)
+	}
+
+	private static func fontDisplayNameUncached(for fontName: String) -> String {
+		let font = CTFontCreateWithName(fontName as CFString, defaultFontSize, nil)
+		let displayName = CTFontCopyDisplayName(font) as String
+		guard displayName != "Helvetica" || fontName == "Helvetica" else {
 			return fontName
 		}
-		return font.displayName ?? font.familyName ?? fontName
+		return displayName
 	}
 
 	private static func resolvedDefaultFontName() -> String {
@@ -110,9 +148,19 @@ struct EditorPreferences: Equatable {
 	}
 
 	private static func isUsableEditorFontName(_ fontName: String) -> Bool {
-		guard let font = NSFont(name: fontName, size: defaultFontSize) else {
-			return false
+		fontChoiceIfUsable(fontName) != nil
+	}
+
+	private static func fontChoiceIfUsable(_ fontName: String) -> FontChoice? {
+		let font = CTFontCreateWithName(fontName as CFString, defaultFontSize, nil)
+		guard CTFontGetSymbolicTraits(font).contains(.traitMonoSpace) else {
+			return nil
 		}
-		return font.fontDescriptor.symbolicTraits.contains(.monoSpace)
+		let postScriptName = CTFontCopyPostScriptName(font) as String
+		let familyName = CTFontCopyFamilyName(font) as String
+		guard postScriptName == fontName || familyName == fontName else {
+			return nil
+		}
+		return FontChoice(name: fontName, displayName: CTFontCopyDisplayName(font) as String)
 	}
 }

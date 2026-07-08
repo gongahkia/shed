@@ -15,9 +15,7 @@ import ItsyRender
 	var decoratorDidChange: () -> Void = {}
 
 	deinit {
-		MainActor.assumeIsolated {
-			refreshWorkItem?.cancel()
-		}
+		refreshWorkItem?.cancel()
 	}
 
 	func scheduleRefresh() {

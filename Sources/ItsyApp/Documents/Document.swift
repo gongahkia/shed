@@ -75,10 +75,6 @@ import ItsySyntax
 		}
 	}
 
-	deinit {
-		fileWatcher.stop()
-	}
-
 	override class var autosavesInPlace: Bool {
 		true
 	}

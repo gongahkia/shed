@@ -14,7 +14,7 @@ import Foundation
 	var reloadFromDisk: (URL) -> Void = { _ in }
 
 	deinit {
-		stop()
+		source?.cancel()
 	}
 
 	func restart() {

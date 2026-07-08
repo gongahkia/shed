@@ -277,7 +277,7 @@ import ItsyRender
 		} else {
 			closeDetailPopover()
 		}
-		guard resolveItem != nil, !pendingResolveKeys.contains(key) else {
+		guard !SnippetCompletionMarker.isSnippet(item), resolveItem != nil, !pendingResolveKeys.contains(key) else {
 			return
 		}
 		resolveGeneration += 1

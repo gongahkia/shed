@@ -73,6 +73,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 @MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
+	private static let snippetLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let fileTreeController = FileTreeSidebarController()
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -93,6 +94,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var tabBoundsObserver: NSObjectProtocol?
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
+	private weak var snippetTabStopView: MetalTextView?
+	private var snippetTabStopSession: SnippetTabStopSession?
 	private var hoverPopover: NSPopover?
 	private var hoverTimer: Timer?
 	private weak var hoverTargetView: MetalTextView?
@@ -763,6 +766,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		view.completionRequested = { [weak self, weak view] trigger in
 			self?.requestCompletion(triggerCharacter: trigger, in: view) ?? false
 		}
+		view.snippetTabStopRequested = { [weak self, weak view] direction in
+			self?.moveSnippetTabStop(direction: direction, in: view) ?? false
+		}
 		view.signatureHelpRequested = { [weak self, weak view] trigger in
 			self?.requestSignatureHelp(triggerCharacter: trigger, in: view) ?? false
 		}
@@ -1138,6 +1144,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		let content = editorStorageString(targetView.editor)
 		let cursorOffset = targetView.editor.selections.primary.head
+		let snippetItems = snippetCompletionItems(
+			fileURL: fileURL,
+			content: content,
+			cursorOffset: cursorOffset,
+			includeEmptyPrefix: triggerCharacter == nil
+		)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
 		let context = completionContext(triggerCharacter: triggerCharacter, forIncomplete: forIncomplete)
 		completionRequestGeneration += 1
@@ -1163,14 +1175,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					guard let self, let targetView, generation == self.completionRequestGeneration else {
 						return
 					}
-					self.showCompletionPopup(result: result, in: targetView, sessionKey: session.key)
+					self.showCompletionPopup(result: self.completionResult(result, appending: snippetItems), in: targetView, sessionKey: session.key)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
 					guard let self, generation == self.completionRequestGeneration else {
 						return
 					}
-					self.completionPopup?.dismiss()
+					let result = self.completionResult(.none, appending: snippetItems)
+					if !result.items.isEmpty, let targetView {
+						self.showCompletionPopup(result: result, in: targetView, sessionKey: nil)
+					} else {
+						self.completionPopup?.dismiss()
+					}
 					self.handleLSPRequestError(error)
 					NSLog("completion failed: \(error)")
 				}
@@ -1187,6 +1204,34 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return LSPCompletionContext(triggerKind: .triggerCharacter, triggerCharacter: triggerCharacter)
 		}
 		return LSPCompletionContext(triggerKind: .invoked)
+	}
+
+	private func completionResult(_ result: LSPCompletionResult, appending snippetItems: [LSPCompletionItem]) -> LSPCompletionResult {
+		let items = result.items + snippetItems
+		if result.isIncomplete {
+			return .list(LSPCompletionList(isIncomplete: true, items: items))
+		}
+		return items.isEmpty ? .none : .items(items)
+	}
+
+	private func snippetCompletionItems(
+		fileURL: URL,
+		content: String,
+		cursorOffset: Int,
+		includeEmptyPrefix: Bool
+	) -> [LSPCompletionItem] {
+		guard let languageID = Self.snippetLanguageRegistry.languageID(for: fileURL) else {
+			return []
+		}
+		let prefix = completionPrefix(in: content, cursorOffset: cursorOffset)
+		guard includeEmptyPrefix || !prefix.isEmpty else {
+			return []
+		}
+		let snippets = SnippetRegistry.discover(
+			languageID: languageID,
+			workspaceRoot: ItsyWorkspaceController.currentRootURL
+		)
+		return SnippetCompletionMapper.completionItems(from: snippets, matching: prefix)
 	}
 
 	@discardableResult
@@ -2015,11 +2060,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView, sessionKey: LSPSessionKey) {
+	private func showCompletionPopup(result: LSPCompletionResult, in targetView: MetalTextView, sessionKey: LSPSessionKey?) {
 		let popup = completionPopup ?? CompletionPopupController()
 		completionPopup = popup
 		let resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
-		if completionResolveEnabledBySession[sessionKey] == true {
+		if let sessionKey, completionResolveEnabledBySession[sessionKey] == true {
 			resolve = { [weak self] item, completion in
 				self?.requestCompletionResolve(item, completion: completion)
 			}
@@ -2083,7 +2128,38 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			with: application.replacementText,
 			selectUTF8Ranges: application.selectionRanges
 		)
+		installSnippetTabStops(application.tabStopRanges, in: targetView)
 		focusEditor()
+	}
+
+	private func installSnippetTabStops(_ tabStopRanges: [Int: [Range<Int>]], in targetView: MetalTextView) {
+		let session = SnippetTabStopSession(tabStopRanges: tabStopRanges)
+		guard !session.isEmpty else {
+			snippetTabStopSession = nil
+			snippetTabStopView = nil
+			return
+		}
+		snippetTabStopSession = session
+		snippetTabStopView = targetView
+	}
+
+	private func moveSnippetTabStop(direction: Int, in targetView: MetalTextView?) -> Bool {
+		guard
+			let targetView,
+			targetView === snippetTabStopView,
+			var session = snippetTabStopSession
+		else {
+			return false
+		}
+		let selectionRanges = [targetView.editor.selections.primary.range] + targetView.editor.selections.secondaries.map(\.range)
+		guard let ranges = session.move(direction: direction, currentSelectionRanges: selectionRanges) else {
+			snippetTabStopSession = nil
+			snippetTabStopView = nil
+			return false
+		}
+		targetView.selectUTF8Ranges(ranges)
+		snippetTabStopSession = session
+		return true
 	}
 
 	private func scheduleHover(_ candidate: TextHoverCandidate?, in targetView: MetalTextView?) {
@@ -2530,6 +2606,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let lower = stringIndex(in: text, utf8Offset: range.lowerBound)
 		let upper = stringIndex(in: text, utf8Offset: range.upperBound)
 		return String(text[lower ..< upper])
+	}
+
+	private func completionPrefix(in text: String, cursorOffset: Int) -> String {
+		let cursor = stringIndex(in: text, utf8Offset: cursorOffset)
+		var start = cursor
+		while start > text.startIndex {
+			let previous = text.index(before: start)
+			guard isIdentifierCharacter(text[previous]) else {
+				break
+			}
+			start = previous
+		}
+		return String(text[start ..< cursor])
 	}
 
 	private func isIdentifierCharacter(_ character: Character) -> Bool {

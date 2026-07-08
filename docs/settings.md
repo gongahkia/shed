@@ -47,6 +47,7 @@ Related config remains separate:
 ```text
 ~/.config/itsy/keys.toml
 ~/.config/itsy/themes/*.toml
+~/.config/itsy/snippets/<language-id>.json
 ```
 
 Workspace problem matchers live at:
@@ -65,4 +66,36 @@ column_group = 3
 severity_group = 4
 message_group = 5
 source = "eslint"
+```
+
+Snippets use VS Code JSON format and load from:
+
+```text
+~/.config/itsy/snippets/<language-id>.json
+<workspace>/.itsy/snippets/<language-id>.json
+```
+
+```json
+{
+  "Print value": {
+    "prefix": ["pr", "printv"],
+    "body": ["print(${1:value})", "$0"],
+    "description": "Prints a value",
+    "scope": "swift,typescript"
+  }
+}
+```
+
+`prefix` and `body` may be strings or arrays. `scope` is optional and may be a comma-list or array. Snippets appear below LSP completions and above fallback prefix completions; Tab and Shift-Tab move through `$1`, `$2`, `${1:default}`, and `$0` tab-stops.
+
+Extension snippet contributions use the same JSON files from installed extension manifests under `~/.config/itsy/extensions/<identifier>/<version>/extension.json` or workspace development manifests under `<workspace>/.itsy/extensions/*.json`:
+
+```json
+{
+  "contributes": {
+    "snippets": [
+      { "language": "swift", "path": "snippets/swift.json" }
+    ]
+  }
+}
 ```

@@ -290,6 +290,7 @@ public final class MetalTextView: NSView {
 	public var closeRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
 	public var completionRequested: ((String?) -> Bool)?
+	public var snippetTabStopRequested: ((Int) -> Bool)?
 	public var signatureHelpRequested: ((String?) -> Bool)?
 	public var signatureHelpDismissRequested: (() -> Void)?
 	public var hoverCandidateChanged: ((TextHoverCandidate?) -> Void)?
@@ -754,6 +755,10 @@ public final class MetalTextView: NSView {
 			recordMacroEvent(event, when: recordsMacro)
 			return
 		}
+		if handleSnippetTabStop(event) {
+			recordMacroEvent(event, when: recordsMacro)
+			return
+		}
 		if dispatchKeymap(event) == .handled {
 			recordMacroEvent(event, when: recordsMacro)
 			return
@@ -814,6 +819,10 @@ public final class MetalTextView: NSView {
 			recordMacroEvent(event, when: recordsMacro)
 			return true
 		}
+		if let event, handleSnippetTabStop(event) {
+			recordMacroEvent(event, when: recordsMacro)
+			return true
+		}
 		if let event, dispatchKeymap(event) == .handled {
 			recordMacroEvent(event, when: recordsMacro)
 			return true
@@ -823,6 +832,16 @@ public final class MetalTextView: NSView {
 			recordMacroEvent(event, when: recordsMacro)
 		}
 		return handled
+	}
+
+	private func handleSnippetTabStop(_ event: NSEvent) -> Bool {
+		guard event.keyCode == 48,
+		      event.modifierFlags.intersection([.command, .control, .option]).isEmpty
+		else {
+			return false
+		}
+		let direction = event.modifierFlags.contains(.shift) ? -1 : 1
+		return snippetTabStopRequested?(direction) == true
 	}
 
 	private func handlePassthroughKey(

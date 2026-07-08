@@ -81,11 +81,18 @@ public struct LSPCompletionApplication: Equatable, Sendable {
 	public var replacementRange: Range<Int>
 	public var replacementText: String
 	public var selectionRanges: [Range<Int>]
+	public var tabStopRanges: [Int: [Range<Int>]]
 
-	public init(replacementRange: Range<Int>, replacementText: String, selectionRanges: [Range<Int>]) {
+	public init(
+		replacementRange: Range<Int>,
+		replacementText: String,
+		selectionRanges: [Range<Int>],
+		tabStopRanges: [Int: [Range<Int>]] = [:]
+	) {
 		self.replacementRange = replacementRange
 		self.replacementText = replacementText
 		self.selectionRanges = selectionRanges
+		self.tabStopRanges = tabStopRanges
 	}
 }
 
@@ -108,11 +115,17 @@ public enum LSPCompletionApply {
 		let selections = expansion.firstTabStopRanges.map {
 			(replacementRange.lowerBound + $0.lowerBound) ..< (replacementRange.lowerBound + $0.upperBound)
 		}
+		let tabStopRanges = expansion.tabStops.mapValues { ranges in
+			ranges.map {
+				(replacementRange.lowerBound + $0.lowerBound) ..< (replacementRange.lowerBound + $0.upperBound)
+			}
+		}
 		let fallback = replacementRange.lowerBound + expansion.text.utf8.count
 		return LSPCompletionApplication(
 			replacementRange: replacementRange,
 			replacementText: expansion.text,
-			selectionRanges: selections.isEmpty ? [fallback ..< fallback] : selections
+			selectionRanges: selections.isEmpty ? [fallback ..< fallback] : selections,
+			tabStopRanges: tabStopRanges
 		)
 	}
 

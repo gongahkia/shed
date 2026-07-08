@@ -29,6 +29,7 @@ lsp_diagnostics_limit_ms="${ITSY_REGRESSION_LSP_DIAGNOSTICS_LIMIT_MS:-5000}"
 open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
 window_timeout_ms="${ITSY_REGRESSION_WINDOW_TIMEOUT_MS:-15000}"
+window_runs="${ITSY_REGRESSION_WINDOW_RUNS:-20}"
 
 trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$memory_md"; rm -rf "$lsp_guard_dir"' EXIT
 
@@ -114,7 +115,7 @@ fi
 rm -f "$lsp_guard_marker"
 HOME="$lsp_guard_home" hyperfine "${hyperfine_args[@]}" "$app_command" >/dev/null
 assert_no_lsp_spawn "cold-start launch"
-"$itsybench" measure --staged --app "$itsyapp_bundle" --new-instance --timeout-ms "$window_timeout_ms" >"$window_json"
+"$itsybench" measure --staged --app "$itsyapp_bundle" --new-instance --runs "$window_runs" --timeout-ms "$window_timeout_ms" >"$window_json"
 ITSY_LSP_DIAGNOSTICS_LIMIT_MS="$lsp_diagnostics_limit_ms" ruby "$lsp_probe_script" >"$lsp_json"
 for _ in $(seq 1 "$piecetree_runs"); do
 	piecetree_args=(piecetree --ops "$piecetree_ops" --slice-length "$slice_length")

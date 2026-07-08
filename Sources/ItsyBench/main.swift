@@ -21,6 +21,7 @@ private struct MeasureOptions {
 	var app: String
 	var args: [String]
 	var newInstance: Bool
+	var runs: Int
 	var staged: Bool
 	var timeoutMS: Int
 	var warmupPurge: Bool
@@ -90,10 +91,30 @@ private struct LatencyResult: Encodable {
 	var pid: Int32
 }
 
+private struct MeasureSampleResult: Encodable {
+	var app: String
+	var app_did_finish_launching_to_first_window_visible_ms: Double?
+	var external_first_window_visible_ms: Double
+	var first_window_visible_ms: Double
+	var process_start_to_first_window_visible_ms: Double?
+	var rss_kb: UInt64
+	var stage_ms: [String: Double]?
+	var startup_ms: Double
+}
+
 private struct MeasureResult: Encodable {
 	var app: String
+	var app_did_finish_launching_to_first_window_visible_ms: Double?
+	var external_first_window_visible_ms: Double
+	var external_first_window_visible_max_ms: Double?
+	var external_first_window_visible_min_ms: Double?
+	var first_window_visible_max_ms: Double?
+	var first_window_visible_min_ms: Double?
 	var first_window_visible_ms: Double
+	var process_start_to_first_window_visible_ms: Double?
 	var rss_kb: UInt64
+	var runs: Int
+	var samples: [MeasureSampleResult]?
 	var stage_ms: [String: Double]?
 	var startup_ms: Double
 }
@@ -450,6 +471,7 @@ enum ItsyBenchMain {
 		var app: String?
 		var appArgs: [String] = []
 		var newInstance = false
+		var runs = 1
 		var staged = false
 		var timeoutMS = 5_000
 		var warmupPurge = false
@@ -474,6 +496,13 @@ enum ItsyBenchMain {
 			case "--new-instance":
 				newInstance = true
 				index = args.index(after: index)
+			case "--runs":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --runs")
+				}
+				runs = value
+				index = args.index(after: valueIndex)
 			case "--staged":
 				staged = true
 				index = args.index(after: index)
@@ -492,9 +521,17 @@ enum ItsyBenchMain {
 			}
 		}
 		guard let app else {
-			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]")
+			throw BenchError.usage("usage: itsybench measure --app <path> [--args <arg>] [--new-instance] [--runs <count>] [--staged] [--timeout-ms <ms>] [--warmup-purge]")
 		}
-		return MeasureOptions(app: app, args: appArgs, newInstance: newInstance, staged: staged, timeoutMS: timeoutMS, warmupPurge: warmupPurge)
+		return MeasureOptions(
+			app: app,
+			args: appArgs,
+			newInstance: newInstance,
+			runs: runs,
+			staged: staged,
+			timeoutMS: timeoutMS,
+			warmupPurge: warmupPurge
+		)
 	}
 
 	private static func parseOpen(_ args: [String]) throws -> OpenOptions {
@@ -1149,6 +1186,36 @@ enum ItsyBenchMain {
 		if options.warmupPurge {
 			try purgeMemory()
 		}
+		var samples: [MeasureSampleResult] = []
+		for _ in 0 ..< options.runs {
+			samples.append(try measureOnce(options))
+		}
+		guard let first = samples.first else {
+			throw BenchError.usage("invalid --runs")
+		}
+		let firstWindowValues = samples.map(\.first_window_visible_ms)
+		let externalValues = samples.map(\.external_first_window_visible_ms)
+		let appDidValues = samples.compactMap(\.app_did_finish_launching_to_first_window_visible_ms)
+		let processValues = samples.compactMap(\.process_start_to_first_window_visible_ms)
+		return MeasureResult(
+			app: first.app,
+			app_did_finish_launching_to_first_window_visible_ms: mean(appDidValues),
+			external_first_window_visible_ms: mean(externalValues) ?? first.external_first_window_visible_ms,
+			external_first_window_visible_max_ms: externalValues.max(),
+			external_first_window_visible_min_ms: externalValues.min(),
+			first_window_visible_max_ms: firstWindowValues.max(),
+			first_window_visible_min_ms: firstWindowValues.min(),
+			first_window_visible_ms: mean(firstWindowValues) ?? first.first_window_visible_ms,
+			process_start_to_first_window_visible_ms: mean(processValues),
+			rss_kb: UInt64(samples.map(\.rss_kb).reduce(0, +) / UInt64(samples.count)),
+			runs: samples.count,
+			samples: options.runs > 1 ? samples : nil,
+			stage_ms: options.runs == 1 ? first.stage_ms : nil,
+			startup_ms: mean(externalValues) ?? first.startup_ms
+		)
+	}
+
+	private static func measureOnce(_ options: MeasureOptions) throws -> MeasureSampleResult {
 		try requireAccessibility()
 		let url = URL(fileURLWithPath: options.app)
 		let start = DispatchTime.now().uptimeNanoseconds
@@ -1158,20 +1225,44 @@ enum ItsyBenchMain {
 			FileManager.default.createFile(atPath: stageURL.path, contents: nil)
 		}
 		let environment = stageURL.map { ["ITSY_BENCH_STAGES_PATH": $0.path] } ?? [:]
-		let app = try launch(url: url, args: options.args, newInstance: options.newInstance, environment: environment, deadline: deadline)
+		let app = try launch(
+			url: url,
+			args: options.args,
+			newInstance: options.newInstance,
+			environment: environment,
+			deadline: deadline
+		)
 		defer { terminate(app) }
 		let firstWindow = try waitForFirstWindow(pid: app.processIdentifier, start: start, deadline: deadline)
 		if let stageURL {
 			_ = waitForStage("first_draw", at: stageURL, deadline: deadline)
 		}
-		let startup = Double(firstWindow - start) / 1_000_000
-		return MeasureResult(
+		let rawStages = stageURL.map { loadRawStages(from: $0) }
+		let startup = milliseconds(from: start, to: firstWindow)
+		let processStartToVisible = rawStages?["process_start"].map { milliseconds(from: $0, to: firstWindow) }
+		let appDidFinishToVisible = rawStages?["app_did_finish_launching"].map { milliseconds(from: $0, to: firstWindow) }
+		let firstWindowVisible = options.staged ? appDidFinishToVisible ?? processStartToVisible ?? startup : startup
+		return MeasureSampleResult(
 			app: url.lastPathComponent,
-			first_window_visible_ms: startup,
+			app_did_finish_launching_to_first_window_visible_ms: appDidFinishToVisible,
+			external_first_window_visible_ms: startup,
+			first_window_visible_ms: firstWindowVisible,
+			process_start_to_first_window_visible_ms: processStartToVisible,
 			rss_kb: try residentSizeKB(pid: app.processIdentifier),
 			stage_ms: stageURL.map { loadStages(from: $0, since: start) },
 			startup_ms: startup
 		)
+	}
+
+	private static func mean(_ values: [Double]) -> Double? {
+		guard !values.isEmpty else {
+			return nil
+		}
+		return values.reduce(0, +) / Double(values.count)
+	}
+
+	private static func milliseconds(from start: UInt64, to end: UInt64) -> Double {
+		Double(end - min(start, end)) / 1_000_000
 	}
 
 	private static func terminate(_ app: NSRunningApplication) {
@@ -1471,7 +1562,7 @@ enum ItsyBenchMain {
 	private static let usage = """
 	usage:
 	  itsybench display [--display <id>]
-	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--staged] [--timeout-ms <ms>] [--warmup-purge]
+	  itsybench measure --app <path> [--args <arg>] [--new-instance] [--runs <count>] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
 	  itsybench piecetree [--ops <count>] [--slice-length <bytes>] [--file <path>]
 	  itsybench render-highlight-cache [--lines <count>] [--frames <count>]

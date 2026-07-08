@@ -25,8 +25,12 @@ import Testing
 	])
 }
 
-@Test func keymapCommandCatalogIncludesUndoTreeCommand() throws {
-	let command = try #require(KeymapCommandCatalog.hiddenCommands.first { $0.id == "history.undoTree.toggle" })
-	#expect(command.title == "history.undoTree.toggle")
+@Test func keymapCommandCatalogIncludesHiddenCommand() throws {
+	let command = try #require(KeymapCommandCatalog.hiddenCommands.first { $0.id == "file.openUnderCursor" })
+	#expect(command.title == "file.openUnderCursor")
 	#expect(command.isHidden)
+}
+
+@Test func keymapCommandCatalogExcludesVisibleUndoTreeCommand() {
+	#expect(!KeymapCommandCatalog.hiddenCommandIDs.contains("history.undoTree.toggle"))
 }

@@ -181,6 +181,10 @@ import ItsyEditor
 	}
 
 	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>) {
+		applyTaskResult(result, root: ItsyWorkspaceController.currentRootURL)
+	}
+
+	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?) {
 		switch result {
 		case let .success(taskResult):
 			taskStatusLabel?.textColor = taskResult.succeeded ? .secondaryLabelColor : .systemRed
@@ -190,7 +194,7 @@ import ItsyEditor
 				taskResult.stdout,
 				taskResult.stderr,
 			].filter { !$0.isEmpty }.joined(separator: "\n")
-			if let root = ItsyWorkspaceController.currentRootURL {
+			if let root {
 				problemsCoordinator.setProblems(WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root))
 			}
 		case let .failure(error):
@@ -230,4 +234,10 @@ import ItsyEditor
 		}
 		return cell
 	}
+
+	#if DEBUG
+	func applyTaskResultForTesting(_ result: WorkspaceTaskResult, root: URL) {
+		applyTaskResult(.success(result), root: root)
+	}
+	#endif
 }

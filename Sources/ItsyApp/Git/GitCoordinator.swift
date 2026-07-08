@@ -144,6 +144,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	private var gitConflictPath: String?
 	private var gitConflictMergedTextView: NSTextView?
 	private var gitConflictRegionStack: NSStackView?
+	private var gitConflictSelectedRegionIndex = 0
 
 	init(documentController: ItsyDocumentController, activeDocumentProvider: @escaping () -> NSDocument?) {
 		self.documentController = documentController
@@ -1559,7 +1560,13 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 
 	private func updateGitComposerState() {
 		let stagedCount = gitEntries.filter(\.isStaged).count
+		let conflictCount = gitEntries.filter(\.isConflict).count
 		let summary = gitSummaryField?.stringValue.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+		if conflictCount > 0 {
+			gitComposerStatusLabel?.stringValue = L10n.string("\(conflictCount) unresolved conflicts")
+			gitCommitButton?.isEnabled = false
+			return
+		}
 		gitComposerStatusLabel?.stringValue = L10n.string("\(stagedCount) staged files")
 		gitCommitButton?.isEnabled = gitRootURL != nil && stagedCount > 0 && !summary.isEmpty
 	}
@@ -1748,8 +1755,14 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		regionScrollView.hasVerticalScroller = true
 		regionScrollView.drawsBackground = false
 		let saveButton = NSButton(title: L10n.string("Save and Add"), target: self, action: #selector(saveGitConflict(_:)))
+		let previousButton = NSButton(
+			title: L10n.string("Previous Conflict"),
+			target: self,
+			action: #selector(previousGitConflict(_:))
+		)
+		let nextButton = NSButton(title: L10n.string("Next Conflict"), target: self, action: #selector(nextGitConflict(_:)))
 		let closeButton = NSButton(title: L10n.string("Close"), target: self, action: #selector(closeGitConflict(_:)))
-		let footer = NSStackView(views: [saveButton, closeButton])
+		let footer = NSStackView(views: [saveButton, previousButton, nextButton, closeButton])
 		footer.orientation = .horizontal
 		footer.alignment = .centerY
 		footer.spacing = 8
@@ -1777,7 +1790,9 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitConflictPath = entry.path
 		gitConflictMergedTextView = mergedPane.textView
 		gitConflictRegionStack = regionStack
+		gitConflictSelectedRegionIndex = 0
 		refreshGitConflictRegions()
+		selectGitConflictRegion(index: 0)
 		panel.center()
 		panel.makeKeyAndOrderFront(nil)
 	}
@@ -1861,8 +1876,15 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		guard let textView = gitConflictMergedTextView else {
 			return
 		}
-		textView.string = GitConflictParser.resolvedText(textView.string, regionIndex: sender.tag, resolution: resolution)
+		let index = sender.tag
+		textView.string = GitConflictParser.resolvedText(textView.string, regionIndex: index, resolution: resolution)
 		refreshGitConflictRegions()
+		let regions = GitConflictParser.parse(textView.string)
+		guard !regions.isEmpty else {
+			gitConflictSelectedRegionIndex = 0
+			return
+		}
+		selectGitConflictRegion(index: min(index, regions.count - 1))
 	}
 
 	@objc private func acceptGitConflictOurs(_ sender: NSButton) {
@@ -1878,15 +1900,40 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	}
 
 	@objc private func editGitConflictManually(_ sender: NSButton) {
+		selectGitConflictRegion(index: sender.tag)
+	}
+
+	@objc private func previousGitConflict(_: Any?) {
+		moveGitConflictSelection(delta: -1)
+	}
+
+	@objc private func nextGitConflict(_: Any?) {
+		moveGitConflictSelection(delta: 1)
+	}
+
+	private func moveGitConflictSelection(delta: Int) {
 		guard let textView = gitConflictMergedTextView else {
 			return
 		}
 		let regions = GitConflictParser.parse(textView.string)
-		guard sender.tag >= 0, sender.tag < regions.count else {
+		guard !regions.isEmpty else {
 			return
 		}
+		let next = (gitConflictSelectedRegionIndex + delta + regions.count) % regions.count
+		selectGitConflictRegion(index: next)
+	}
+
+	private func selectGitConflictRegion(index: Int) {
+		guard let textView = gitConflictMergedTextView else {
+			return
+		}
+		let regions = GitConflictParser.parse(textView.string)
+		guard index >= 0, index < regions.count else {
+			return
+		}
+		gitConflictSelectedRegionIndex = index
 		textView.setSelectedRange(nsRangeForLines(
-			regions[sender.tag].startLine ..< regions[sender.tag].endLine,
+			regions[index].startLine ..< regions[index].endLine,
 			in: textView.string
 		))
 		gitConflictPanel?.makeFirstResponder(textView)

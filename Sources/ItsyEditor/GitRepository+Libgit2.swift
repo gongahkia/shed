@@ -1,8 +1,8 @@
 import CLibgit2
 import Foundation
 
-extension GitRepository {
-	public enum Libgit2 {
+public extension GitRepository {
+	enum Libgit2 {
 		public struct Failure: Error, Equatable, Sendable, CustomStringConvertible {
 			public var code: Int32
 			public var message: String
@@ -64,7 +64,7 @@ extension GitRepository {
 			}
 
 			func gitStatus() throws -> GitStatus {
-				GitStatus(branch: try branchStatus(), entries: try status().entries)
+				try GitStatus(branch: branchStatus(), entries: status().entries)
 			}
 
 			public func diff(cached: Bool, pathspec: [String] = []) throws -> Diff {
@@ -158,6 +158,138 @@ extension GitRepository {
 					try Libgit2.check(git_commit_create_from_stage(&oid, raw, value, nil))
 				}
 				return oidString(oid)
+			}
+
+			public func conflicts() throws -> [GitConflictEntry] {
+				let index = try repositoryIndex()
+				defer {
+					git_index_free(index)
+				}
+				var iterator: OpaquePointer?
+				try Libgit2.check(git_index_conflict_iterator_new(&iterator, index))
+				guard let iterator else {
+					return []
+				}
+				defer {
+					git_index_conflict_iterator_free(iterator)
+				}
+				var conflicts: [GitConflictEntry] = []
+				while true {
+					var ancestor: UnsafePointer<git_index_entry>?
+					var ours: UnsafePointer<git_index_entry>?
+					var theirs: UnsafePointer<git_index_entry>?
+					let result = git_index_conflict_next(&ancestor, &ours, &theirs, iterator)
+					if result == Libgit2ErrorCode.iterOver {
+						break
+					}
+					try Libgit2.check(result)
+					let path = Self.path(for: ours) ?? Self.path(for: theirs) ?? Self.path(for: ancestor) ?? ""
+					guard !path.isEmpty else {
+						continue
+					}
+					conflicts.append(GitConflictEntry(
+						path: path,
+						ancestorPath: Self.path(for: ancestor),
+						oursPath: Self.path(for: ours),
+						theirsPath: Self.path(for: theirs)
+					))
+				}
+				return conflicts
+			}
+
+			public func conflictBlob(path: String, stage: Int) throws -> String {
+				let entry = try conflictIndexEntry(path: path, stage: stage)
+				var rawBlob: OpaquePointer?
+				var oid = entry.id
+				try Libgit2.check(git_blob_lookup(&rawBlob, raw, &oid))
+				guard let rawBlob else {
+					throw Failure(code: -1, message: "git_blob_lookup returned nil")
+				}
+				defer {
+					git_blob_free(rawBlob)
+				}
+				let size = Int(git_blob_rawsize(rawBlob))
+				guard let content = git_blob_rawcontent(rawBlob), size > 0 else {
+					return ""
+				}
+				return String(decoding: Data(bytes: content, count: size), as: UTF8.self)
+			}
+
+			public func applyCachedPatch(_ patch: String) throws {
+				let diff = try Self.diff(from: patch)
+				defer {
+					git_diff_free(diff)
+				}
+				var options = git_apply_options()
+				try Libgit2.check(git_apply_options_init(&options, 1))
+				options.flags = UInt32(GIT_APPLY_CHECK.rawValue)
+				try Libgit2.check(git_apply(raw, diff, GIT_APPLY_LOCATION_INDEX, &options))
+				options.flags = 0
+				try Libgit2.check(git_apply(raw, diff, GIT_APPLY_LOCATION_INDEX, &options))
+			}
+
+			private func conflictIndexEntry(path: String, stage: Int) throws -> git_index_entry {
+				let index = try repositoryIndex()
+				defer {
+					git_index_free(index)
+				}
+				var iterator: OpaquePointer?
+				try Libgit2.check(git_index_conflict_iterator_new(&iterator, index))
+				guard let iterator else {
+					throw Failure(code: Libgit2ErrorCode.notFound, message: "conflict iterator returned nil")
+				}
+				defer {
+					git_index_conflict_iterator_free(iterator)
+				}
+				while true {
+					var ancestor: UnsafePointer<git_index_entry>?
+					var ours: UnsafePointer<git_index_entry>?
+					var theirs: UnsafePointer<git_index_entry>?
+					let result = git_index_conflict_next(&ancestor, &ours, &theirs, iterator)
+					if result == Libgit2ErrorCode.iterOver {
+						break
+					}
+					try Libgit2.check(result)
+					let entry: UnsafePointer<git_index_entry>? = switch stage {
+					case 1:
+						ancestor
+					case 2:
+						ours
+					case 3:
+						theirs
+					default:
+						nil
+					}
+					guard let entry, Self.path(for: entry) == path else {
+						continue
+					}
+					return entry.pointee
+				}
+				throw Failure(code: Libgit2ErrorCode.notFound, message: "conflict stage \(stage) not found for \(path)")
+			}
+
+			private func repositoryIndex() throws -> OpaquePointer {
+				var index: OpaquePointer?
+				try Libgit2.check(git_repository_index(&index, raw))
+				guard let index else {
+					throw Failure(code: -1, message: "git_repository_index returned nil")
+				}
+				return index
+			}
+
+			private static func path(for entry: UnsafePointer<git_index_entry>?) -> String? {
+				entry?.pointee.path.map { String(cString: $0) }
+			}
+
+			private static func diff(from patch: String) throws -> OpaquePointer {
+				var diff: OpaquePointer?
+				try patch.withCString { pointer in
+					try Libgit2.check(git_diff_from_buffer(&diff, pointer, strlen(pointer)))
+				}
+				guard let diff else {
+					throw Failure(code: -1, message: "git_diff_from_buffer returned nil")
+				}
+				return diff
 			}
 		}
 
@@ -325,6 +457,7 @@ private enum Libgit2StatusFlag {
 private enum Libgit2ErrorCode {
 	static let notFound: Int32 = -3
 	static let unbornBranch: Int32 = -9
+	static let iterOver: Int32 = -31
 }
 
 private extension GitRepository.Libgit2.Repository {
@@ -415,7 +548,13 @@ private extension GitStatusEntry {
 		let worktreeStatus = flags.worktreeStatus
 		if indexStatus == "R" || worktreeStatus == "R" {
 			let delta = entry.head_to_index ?? entry.index_to_workdir
-			self.init(kind: .renamed, indexStatus: indexStatus, worktreeStatus: worktreeStatus, path: delta?.pointee.newPath ?? entry.bestPath, originalPath: delta?.pointee.oldPath)
+			self.init(
+				kind: .renamed,
+				indexStatus: indexStatus,
+				worktreeStatus: worktreeStatus,
+				path: delta?.pointee.newPath ?? entry.bestPath,
+				originalPath: delta?.pointee.oldPath
+			)
 			return
 		}
 		self.init(kind: .ordinary, indexStatus: indexStatus, worktreeStatus: worktreeStatus, path: entry.bestPath)

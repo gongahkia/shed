@@ -178,6 +178,20 @@ public struct GitHistoryEntry: Equatable, Sendable {
 	}
 }
 
+public struct GitConflictEntry: Equatable, Sendable {
+	public var path: String
+	public var ancestorPath: String?
+	public var oursPath: String?
+	public var theirsPath: String?
+
+	public init(path: String, ancestorPath: String? = nil, oursPath: String? = nil, theirsPath: String? = nil) {
+		self.path = path
+		self.ancestorPath = ancestorPath
+		self.oursPath = oursPath
+		self.theirsPath = theirsPath
+	}
+}
+
 public struct GitBlameCache: Sendable {
 	private var entries: [Key: [GitBlameLine]] = [:]
 
@@ -602,7 +616,19 @@ public struct GitRepository: Sendable {
 	}
 
 	public func conflictBlob(path: String, stage: Int) throws -> String {
-		try runner.runGit(arguments: ["show", ":\(stage):\(path)"], root: root)
+		if runner is ProcessGitCommandRunner {
+			return try Libgit2.Repository.open(at: root).conflictBlob(path: path, stage: stage)
+		}
+		return try runner.runGit(arguments: ["show", ":\(stage):\(path)"], root: root)
+	}
+
+	public func conflicts() throws -> [GitConflictEntry] {
+		if runner is ProcessGitCommandRunner {
+			return try Libgit2.Repository.open(at: root).conflicts()
+		}
+		return try status().entries
+			.filter(\.isConflict)
+			.map { GitConflictEntry(path: $0.path) }
 	}
 
 	public func stage(paths: [String]) throws {
@@ -817,6 +843,10 @@ public struct GitRepository: Sendable {
 	}
 
 	private func applyCachedPatch(_ patch: String, reverse: Bool) throws {
+		if !reverse, runner is ProcessGitCommandRunner {
+			try Libgit2.Repository.open(at: root).applyCachedPatch(patch)
+			return
+		}
 		var checkArguments = ["apply", "--cached", "--check"]
 		if reverse {
 			checkArguments.append("--reverse")

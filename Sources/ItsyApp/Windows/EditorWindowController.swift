@@ -92,6 +92,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private var tabIDsByTag: [Int: ObjectIdentifier] = [:]
+	private var tabGroupScope = ItsySettings.TabGroupScope.window
+	private var latestTabs: [ItsyTab] = []
+	private var paneTabDocuments: [ObjectIdentifier: [ItsyDocument]] = [:]
+	private var paneSelectedDocuments: [ObjectIdentifier: ObjectIdentifier] = [:]
 	private var tabBoundsObserver: NSObjectProtocol?
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
@@ -187,6 +191,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.isRestorable = true
 		window.contentView = splitView
 		super.init(window: window)
+		tabGroupScope = ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings.normalized().editor.tabGroups
+		configurePaneTabBar(paneCoordinator.activePane)
+		syncTabGroupVisibility()
 		configureLSPMissingBanner()
 		configureLSPStatusRestart()
 		fileTreeController.attach(to: window)
@@ -347,6 +357,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func setTabs(_ tabs: [ItsyTab]) {
+		latestTabs = tabs
+		guard tabGroupScope == .window else {
+			refreshPaneTabBars()
+			return
+		}
 		for view in tabStackView.arrangedSubviews {
 			tabStackView.removeArrangedSubview(view)
 			view.removeFromSuperview()
@@ -709,6 +724,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func display(document newDocument: ItsyDocument) {
+		guard tabGroupScope == .window else {
+			displayPaneScoped(document: newDocument)
+			return
+		}
+		displayWindowScoped(document: newDocument)
+	}
+
+	private func displayWindowScoped(document newDocument: ItsyDocument) {
 		if document as? ItsyDocument === newDocument {
 			showWindow(nil)
 			focusEditor()
@@ -737,6 +760,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
+	private func displayPaneScoped(document newDocument: ItsyDocument) {
+		let pane = paneCoordinator.activePane
+		selectPaneDocument(newDocument, in: pane, addIfMissing: true)
+		showWindow(nil)
+		focusEditor()
+		ItsyTabCoordinator.refresh()
+		ItsyWorkspaceController.persistWindowState(from: self)
+	}
+
 	override func encodeRestorableState(with coder: NSCoder) {
 		super.encodeRestorableState(with: coder)
 		coder.encode(paneCoordinator.layout().encoded, forKey: Self.paneLayoutStateKey)
@@ -755,8 +787,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			document.detach(pane.editorView)
 		}
 		for pane in paneCoordinator.restore(layout: layout) {
+			configurePaneTabBar(pane)
 			installPane(pane, document: document)
+			ensurePaneTabs(for: pane, preferredDocument: document)
 		}
+		syncTabGroupVisibility()
+		refreshPaneTabBars()
 		refreshLSPMissingBanner(for: document)
 		refreshLSPStatus(for: document)
 		focusEditor()
@@ -777,8 +813,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			document.detach(pane.editorView)
 		}
 		for pane in paneCoordinator.restore(layout: layout) {
+			configurePaneTabBar(pane)
 			installPane(pane, document: document)
+			ensurePaneTabs(for: pane, preferredDocument: document)
 		}
+		syncTabGroupVisibility()
+		refreshPaneTabBars()
 		refreshLSPMissingBanner(for: document)
 		refreshLSPStatus(for: document)
 		focusEditor()
@@ -790,6 +830,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func focusEditor(_ targetView: MetalTextView) {
 		paneCoordinator.focusPane(containing: targetView)
+		syncActiveDocumentToFocusedPane()
+		refreshPaneTabBars()
 		window?.makeFirstResponder(targetView)
 	}
 
@@ -825,6 +867,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recordBenchStage("editor_pane_callbacks_begin")
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
+		}
+		view.focusRequested = { [weak self, weak view] in
+			guard let self, let view else {
+				return
+			}
+			_ = paneCoordinator.focusPane(containing: view)
+			syncActiveDocumentToFocusedPane()
+			refreshPaneTabBars()
 		}
 		view.contextMenuProvider = { [weak self, weak view] request in
 			guard let self, let view else {
@@ -884,6 +934,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	func applySettings(_ settings: ItsySettings) {
 		applyEditorPreferences(EditorPreferences(settings: settings.editorSettings(languageID: currentLanguageID())))
 		applyTheme(AppTheme.palette)
+		setTabGroupScope(settings.normalized().editor.tabGroups)
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -900,8 +951,218 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		findBarController?.applyTheme(palette)
 		fileTreeController.applyTheme(palette)
 		for pane in paneCoordinator.panes {
+			pane.tabBarController.applyTheme(palette)
 			pane.editorView.applyEditorColorPalette(palette.editor)
 		}
+		refreshPaneTabBars()
+	}
+
+	private func configurePaneTabBar(_ pane: EditorPane) {
+		pane.tabBarController.selectTab = { [weak self, weak paneViewController = pane.viewController] tabID in
+			guard
+				let self,
+				let paneViewController,
+				let pane = self.pane(for: paneViewController)
+			else {
+				return
+			}
+			_ = self.paneCoordinator.focusPane(containing: pane.editorView)
+			self.selectPaneDocument(tabID, in: pane)
+		}
+		pane.tabBarController.closeTab = { [weak self, weak paneViewController = pane.viewController] tabID in
+			guard
+				let self,
+				let paneViewController,
+				let pane = self.pane(for: paneViewController)
+			else {
+				return
+			}
+			_ = self.paneCoordinator.focusPane(containing: pane.editorView)
+			self.closePaneDocument(tabID, in: pane)
+		}
+	}
+
+	private func setTabGroupScope(_ scope: ItsySettings.TabGroupScope) {
+		guard scope != tabGroupScope else {
+			syncTabGroupVisibility()
+			refreshPaneTabBars()
+			return
+		}
+		let activeDocument = selectedDocument(for: paneCoordinator.activePane) ?? document as? ItsyDocument
+		tabGroupScope = scope
+		syncTabGroupVisibility()
+		if scope == .pane {
+			for pane in paneCoordinator.panes {
+				configurePaneTabBar(pane)
+				ensurePaneTabs(for: pane, preferredDocument: activeDocument)
+			}
+			refreshPaneTabBars()
+		} else if let activeDocument {
+			for pane in paneCoordinator.panes {
+				if let oldDocument = selectedDocument(for: pane), oldDocument !== activeDocument {
+					oldDocument.detach(pane.editorView)
+				}
+				installPane(pane, document: activeDocument)
+			}
+			activateWindowDocument(activeDocument)
+			ItsyTabCoordinator.refresh()
+		}
+	}
+
+	private func syncTabGroupVisibility() {
+		tabBarView.isHidden = tabGroupScope == .pane
+		for pane in paneCoordinator.panes {
+			pane.tabBarController.view.isHidden = tabGroupScope == .window
+		}
+	}
+
+	private func refreshPaneTabBars() {
+		let paneIDs = Set(paneCoordinator.panes.map(paneID(_:)))
+		paneTabDocuments = paneTabDocuments.filter { paneIDs.contains($0.key) }
+		paneSelectedDocuments = paneSelectedDocuments.filter { paneIDs.contains($0.key) }
+		let openIDs = Set((NSDocumentController.shared.documents.compactMap { $0 as? ItsyDocument }).map(ObjectIdentifier.init))
+		for pane in paneCoordinator.panes {
+			ensurePaneTabs(for: pane, preferredDocument: document as? ItsyDocument)
+			let id = paneID(pane)
+			let documents = (paneTabDocuments[id] ?? []).filter { openIDs.contains(ObjectIdentifier($0)) || openIDs.isEmpty }
+			paneTabDocuments[id] = documents
+			if let selected = paneSelectedDocuments[id], !documents.contains(where: { ObjectIdentifier($0) == selected }) {
+				paneSelectedDocuments[id] = documents.first.map(ObjectIdentifier.init)
+			}
+			let selectedID = paneSelectedDocuments[id]
+			let tabs = documents.map { tab(for: $0, selected: ObjectIdentifier($0) == selectedID) }
+			pane.tabBarController.setTabs(tabs)
+			pane.tabBarController.view.isHidden = tabGroupScope == .window
+		}
+	}
+
+	private func ensurePaneTabs(for pane: EditorPane, preferredDocument: ItsyDocument?) {
+		let id = paneID(pane)
+		if paneTabDocuments[id]?.isEmpty != false, let preferredDocument {
+			paneTabDocuments[id] = [preferredDocument]
+			paneSelectedDocuments[id] = ObjectIdentifier(preferredDocument)
+			return
+		}
+		if paneSelectedDocuments[id] == nil {
+			paneSelectedDocuments[id] = paneTabDocuments[id]?.first.map(ObjectIdentifier.init)
+		}
+	}
+
+	private func selectPaneDocument(_ tabID: ObjectIdentifier, in pane: EditorPane) {
+		guard let document = document(for: tabID) else {
+			return
+		}
+		selectPaneDocument(document, in: pane, addIfMissing: false)
+	}
+
+	private func selectPaneDocument(_ newDocument: ItsyDocument, in pane: EditorPane, addIfMissing: Bool) {
+		let id = paneID(pane)
+		var documents = paneTabDocuments[id] ?? []
+		if !documents.contains(where: { $0 === newDocument }) {
+			guard addIfMissing else {
+				return
+			}
+			documents.append(newDocument)
+			paneTabDocuments[id] = documents
+		}
+		let oldDocument = selectedDocument(for: pane)
+		if oldDocument !== newDocument {
+			oldDocument?.detach(pane.editorView)
+		}
+		paneSelectedDocuments[id] = ObjectIdentifier(newDocument)
+		activateWindowDocument(newDocument)
+		if oldDocument !== newDocument {
+			installPane(pane, document: newDocument)
+		}
+		refreshLSPMissingBanner(for: newDocument)
+		refreshLSPStatus(for: newDocument)
+		refreshPaneTabBars()
+	}
+
+	private func closePaneDocument(_ tabID: ObjectIdentifier, in pane: EditorPane) {
+		let id = paneID(pane)
+		guard let closingDocument = document(for: tabID) else {
+			return
+		}
+		var documents = paneTabDocuments[id] ?? []
+		guard let index = documents.firstIndex(where: { ObjectIdentifier($0) == tabID }) else {
+			return
+		}
+		documents.remove(at: index)
+		paneTabDocuments[id] = documents
+		let wasSelected = paneSelectedDocuments[id] == tabID
+		if wasSelected {
+			if !documents.isEmpty {
+				let replacementIndex = min(index, documents.count - 1)
+				selectPaneDocument(documents[replacementIndex], in: pane, addIfMissing: false)
+			} else {
+				_ = closeActivePane()
+			}
+		}
+		let stillOpenInPane = paneTabDocuments.values.joined().contains { $0 === closingDocument }
+		if !stillOpenInPane {
+			closingDocument.close()
+		}
+		refreshPaneTabBars()
+	}
+
+	private func selectedDocument(for pane: EditorPane) -> ItsyDocument? {
+		let id = paneID(pane)
+		guard let selectedID = paneSelectedDocuments[id] else {
+			return nil
+		}
+		return paneTabDocuments[id]?.first { ObjectIdentifier($0) == selectedID }
+	}
+
+	private func syncActiveDocumentToFocusedPane() {
+		guard tabGroupScope == .pane else {
+			return
+		}
+		ensurePaneTabs(for: paneCoordinator.activePane, preferredDocument: document as? ItsyDocument)
+		guard let selectedDocument = selectedDocument(for: paneCoordinator.activePane) else {
+			return
+		}
+		activateWindowDocument(selectedDocument)
+		refreshLSPMissingBanner(for: selectedDocument)
+		refreshLSPStatus(for: selectedDocument)
+	}
+
+	private func activateWindowDocument(_ newDocument: ItsyDocument) {
+		if document as? ItsyDocument !== newDocument {
+			(document as? ItsyDocument)?.removeWindowController(self)
+			if !newDocument.windowControllers.contains(where: { $0 === self }) {
+				newDocument.addWindowController(self)
+			}
+		}
+		window?.title = newDocument.fileURL?.lastPathComponent ?? newDocument.displayName
+		window?.representedURL = newDocument.fileURL
+	}
+
+	private func paneID(_ pane: EditorPane) -> ObjectIdentifier {
+		ObjectIdentifier(pane.viewController)
+	}
+
+	private func pane(for viewController: NSViewController) -> EditorPane? {
+		paneCoordinator.panes.first { $0.viewController === viewController }
+	}
+
+	private func document(for tabID: ObjectIdentifier) -> ItsyDocument? {
+		NSDocumentController.shared.documents.compactMap { $0 as? ItsyDocument }.first { ObjectIdentifier($0) == tabID }
+	}
+
+	private func tab(for document: ItsyDocument, selected: Bool) -> ItsyTab {
+		let id = ObjectIdentifier(document)
+		if let tab = latestTabs.first(where: { $0.id == id }) {
+			return ItsyTab(id: id, title: tab.title, isDirty: tab.isDirty, isSelected: selected)
+		}
+		return ItsyTab(id: id, title: Self.title(for: document), isDirty: document.isDocumentEdited, isSelected: selected)
+	}
+
+	private static func title(for document: ItsyDocument) -> String {
+		if let fileName = document.fileURL?.lastPathComponent {
+			return fileName
+		}
+		return document.displayName
 	}
 
 	private func ensureFindBarController() -> FindBarController {
@@ -926,16 +1187,43 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func splitActivePane(vertical: Bool) {
-		guard let document = document as? ItsyDocument else {
+		let sourcePane = paneCoordinator.activePane
+		let sourceDocument = tabGroupScope == .pane
+			? selectedDocument(for: sourcePane) ?? document as? ItsyDocument
+			: document as? ItsyDocument
+		guard let sourceDocument else {
 			return
 		}
 		let pane = paneCoordinator.splitActive(vertical: vertical)
-		installPane(pane, document: document)
+		configurePaneTabBar(pane)
+		if tabGroupScope == .pane {
+			paneTabDocuments[paneID(pane)] = [sourceDocument]
+			paneSelectedDocuments[paneID(pane)] = ObjectIdentifier(sourceDocument)
+		}
+		installPane(pane, document: sourceDocument)
+		syncTabGroupVisibility()
+		refreshPaneTabBars()
 		focusEditor()
 		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
 	private func closeActivePane() -> Bool {
+		if tabGroupScope == .pane {
+			let closingPane = paneCoordinator.activePane
+			let closingDocument = selectedDocument(for: closingPane)
+			guard let pane = paneCoordinator.closeActive() else {
+				return false
+			}
+			closingDocument?.detach(pane.editorView)
+			paneTabDocuments[paneID(pane)] = nil
+			paneSelectedDocuments[paneID(pane)] = nil
+			syncTabGroupVisibility()
+			syncActiveDocumentToFocusedPane()
+			refreshPaneTabBars()
+			focusEditor()
+			ItsyWorkspaceController.persistWindowState(from: self)
+			return true
+		}
 		guard let document = document as? ItsyDocument, let pane = paneCoordinator.closeActive() else {
 			return false
 		}
@@ -946,6 +1234,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func closeOtherPanes() {
+		if tabGroupScope == .pane {
+			for pane in paneCoordinator.closeOtherPanes() {
+				selectedDocument(for: pane)?.detach(pane.editorView)
+				paneTabDocuments[paneID(pane)] = nil
+				paneSelectedDocuments[paneID(pane)] = nil
+			}
+			syncTabGroupVisibility()
+			syncActiveDocumentToFocusedPane()
+			refreshPaneTabBars()
+			focusEditor()
+			ItsyWorkspaceController.persistWindowState(from: self)
+			return
+		}
 		guard let document = document as? ItsyDocument else {
 			return
 		}
@@ -958,6 +1259,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func focusAdjacentPane(delta: Int) {
 		_ = paneCoordinator.focusAdjacent(delta: delta)
+		syncActiveDocumentToFocusedPane()
+		refreshPaneTabBars()
 		focusEditor()
 	}
 
@@ -980,6 +1283,40 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		undoTreePanel = panel
 		panel.toggle(relativeTo: window, tree: editorView.editor.history.tree)
+	}
+
+	@discardableResult
+	func selectTab(atDisplayIndex index: Int) -> Bool {
+		guard tabGroupScope == .pane else {
+			return ItsyTabCoordinator.selectDocument(atDisplayIndex: index)
+		}
+		let pane = paneCoordinator.activePane
+		let documents = paneTabDocuments[paneID(pane)] ?? []
+		guard documents.indices.contains(index) else {
+			return false
+		}
+		selectPaneDocument(documents[index], in: pane, addIfMissing: false)
+		focusEditor()
+		return true
+	}
+
+	func selectAdjacentTab(delta: Int) {
+		guard tabGroupScope == .pane else {
+			ItsyTabCoordinator.selectAdjacentDocument(delta: delta)
+			return
+		}
+		let pane = paneCoordinator.activePane
+		let documents = paneTabDocuments[paneID(pane)] ?? []
+		guard
+			!documents.isEmpty,
+			let selected = selectedDocument(for: pane),
+			let index = documents.firstIndex(where: { $0 === selected })
+		else {
+			return
+		}
+		let next = (index + delta + documents.count) % documents.count
+		selectPaneDocument(documents[next], in: pane, addIfMissing: false)
+		focusEditor()
 	}
 
 	func findNext() {
@@ -1093,7 +1430,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func performKeymapCommand(_ commandID: String) -> Bool {
 		if let tabNumber = selectedTabNumber(commandID) {
-			return ItsyTabCoordinator.selectDocument(atDisplayIndex: tabNumber - 1)
+			return selectTab(atDisplayIndex: tabNumber - 1)
 		}
 		switch commandID {
 		case "file.new":
@@ -1131,9 +1468,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		case "terminal.revealCWD":
 			return NSApp.sendAction(#selector(AppCoordinator.revealTerminalCWD(_:)), to: nil, from: self)
 		case "file.nextBuffer":
-			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
+			selectAdjacentTab(delta: 1)
 		case "file.previousBuffer":
-			ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
+			selectAdjacentTab(delta: -1)
 		case "view.sidebar.toggle":
 			toggleSidebar()
 		case "view.hiddenFiles.toggle":
@@ -2972,9 +3309,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			(document as? NSDocument)?.save(nil)
 			(document as? NSDocument)?.close()
 		case "bn":
-			ItsyTabCoordinator.selectAdjacentDocument(delta: 1)
+			selectAdjacentTab(delta: 1)
 		case "bp":
-			ItsyTabCoordinator.selectAdjacentDocument(delta: -1)
+			selectAdjacentTab(delta: -1)
 		default:
 			if command.hasPrefix("e ") {
 				return openExCommandPath(String(command.dropFirst(2)))

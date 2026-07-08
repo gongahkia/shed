@@ -13,6 +13,11 @@ public struct ItsySettings: Equatable, Sendable {
 		case all
 	}
 
+	public enum TabGroupScope: String, Equatable, Sendable {
+		case window
+		case pane
+	}
+
 	public struct EditorSettings: Equatable, Sendable {
 		public struct LanguageSettings: Equatable, Sendable {
 			public var font: String?
@@ -57,6 +62,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public var lineNumbers: Bool
 		public var tabWidth: Int
 		public var useSpaces: Bool
+		public var tabGroups: TabGroupScope
 		public var language: [String: LanguageSettings]
 		public var experimental: ExperimentalSettings
 
@@ -66,6 +72,7 @@ public struct ItsySettings: Equatable, Sendable {
 			lineNumbers: Bool = false,
 			tabWidth: Int = Self.defaultTabWidth,
 			useSpaces: Bool = false,
+			tabGroups: TabGroupScope = .window,
 			language: [String: LanguageSettings] = [:],
 			experimental: ExperimentalSettings = ExperimentalSettings()
 		) {
@@ -74,6 +81,7 @@ public struct ItsySettings: Equatable, Sendable {
 			self.lineNumbers = lineNumbers
 			self.tabWidth = tabWidth
 			self.useSpaces = useSpaces
+			self.tabGroups = tabGroups
 			self.language = language
 			self.experimental = experimental
 		}
@@ -348,6 +356,7 @@ public final class ItsySettingsStore {
 		line_numbers = \(settings.editor.lineNumbers ? "true" : "false")
 		tab_width = \(settings.editor.tabWidth)
 		use_spaces = \(settings.editor.useSpaces ? "true" : "false")
+		tab_groups = "\(settings.editor.tabGroups.rawValue)"
 
 		[editor.experimental]
 		storage = "\(settings.editor.experimental.storage.rawValue)"
@@ -600,6 +609,12 @@ struct ItsySettingsParser {
 				settings.editor.useSpaces = useSpaces
 			} else {
 				warnType(key, line: line, expected: "bool")
+			}
+		case "editor.tab_groups":
+			if case let .string(scope) = value, let scope = ItsySettings.TabGroupScope(rawValue: scope.lowercased()) {
+				settings.editor.tabGroups = scope
+			} else {
+				warnType(key, line: line, expected: #""window" or "pane""#)
 			}
 		case "editor.experimental.storage":
 			if case let .string(storage) = value, let storage = ItsySettings.EditorStorage(rawValue: storage.lowercased()) {

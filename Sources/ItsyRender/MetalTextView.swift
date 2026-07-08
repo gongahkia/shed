@@ -310,6 +310,7 @@ public final class MetalTextView: NSView {
 	public var visibleLineRangeDidChange: ((Range<Int>) -> Void)?
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
+	public var focusRequested: (() -> Void)?
 	public var commandRequested: ((String) -> Bool)?
 	public var completionRequested: ((String?) -> Bool)?
 	public var snippetTabStopRequested: ((Int) -> Bool)?
@@ -753,6 +754,7 @@ public final class MetalTextView: NSView {
 
 	public override func mouseDown(with event: NSEvent) {
 		window?.makeFirstResponder(self)
+		focusRequested?()
 		if let marker = gutterMarker(forMouseEvent: event) {
 			mouseSelectionAnchor = nil
 			gutterDecorator?.gutterMarkerClicked(marker, in: self)

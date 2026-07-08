@@ -50,6 +50,31 @@ import Testing
 	#expect(tree.graphemeIndex(forOffset: 3) == 2)
 }
 
+@Test(arguments: [
+	GraphemeSeamCase(name: "combining mark", left: "e", right: "\u{301}"),
+	GraphemeSeamCase(name: "flag regional indicators", left: "🇸", right: "🇬"),
+	GraphemeSeamCase(name: "zwj emoji", left: "👩‍", right: "🚒"),
+	GraphemeSeamCase(name: "indic conjunct", left: "\u{0915}\u{094D}", right: "\u{0915}"),
+	GraphemeSeamCase(name: "crlf", left: "a\r", right: "\nb"),
+])
+func pieceTreeGraphemeQueriesCrossPieceSeams(_ testCase: GraphemeSeamCase) {
+	var tree = PieceTree(testCase.left)
+	tree.insert(testCase.right, at: tree.length)
+	let text = testCase.left + testCase.right
+	let boundaries = graphemeBoundaries(in: text)
+	#expect(tree.substring(0 ..< tree.length) == text)
+	#expect(tree.graphemeCount == boundaries.count - 1)
+	for offset in 0 ... tree.length {
+		#expect(tree.graphemeIndex(forOffset: offset) == graphemeIndex(in: boundaries, before: offset))
+		#expect(tree.isGraphemeBoundary(offset) == boundaries.contains(offset))
+		#expect(tree.previousGraphemeBoundary(before: offset) == (boundaries.last { $0 < offset } ?? 0))
+		#expect(tree.nextGraphemeBoundary(after: offset) == (boundaries.first { $0 > offset } ?? tree.length))
+	}
+	for (index, boundary) in boundaries.enumerated() {
+		#expect(tree.offset(forGraphemeIndex: index) == boundary)
+	}
+}
+
 @Test func pieceTreeInsertSplitsOriginalAndAddsBufferPiece() {
 	var tree = PieceTree("hello\nworld")
 	tree.insert(" tiny", at: 5)
@@ -246,4 +271,24 @@ private struct PieceTreeTestRNG {
 		state = state &* 6364136223846793005 &+ 1442695040888963407
 		return Int(state % UInt64(upperBound))
 	}
+}
+
+struct GraphemeSeamCase: CustomTestStringConvertible {
+	let name: String
+	let left: String
+	let right: String
+
+	var testDescription: String {
+		name
+	}
+}
+
+private func graphemeBoundaries(in text: String) -> [Int] {
+	Array(text.utf8).withUnsafeBufferPointer {
+		UAX29GraphemeIterator.boundaries(in: $0)
+	}
+}
+
+private func graphemeIndex(in boundaries: [Int], before offset: Int) -> Int {
+	boundaries.prefix(while: { $0 <= offset }).count - 1
 }

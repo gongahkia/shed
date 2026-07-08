@@ -2,6 +2,14 @@ import AppKit
 import Foundation
 import ItsyEditor
 
+@MainActor enum ItsyProblemsBridge {
+	static var publishDiagnostics: ((WorkspaceProblemSnapshot, String) -> Void)?
+
+	static func publishDiagnostics(_ snapshot: WorkspaceProblemSnapshot, sourceID: String) {
+		publishDiagnostics?(snapshot, sourceID)
+	}
+}
+
 @MainActor final class ProblemsCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let documentController: ItsyDocumentController
 	private var problemsPanel: NSPanel?
@@ -9,6 +17,7 @@ import ItsyEditor
 	private var problemsTableView: NSTableView?
 	private var workspaceProblems: [WorkspaceProblem] = []
 	private var problemsRootURL: URL?
+	private var problemSnapshotsBySource: [String: WorkspaceProblemSnapshot] = [:]
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -19,6 +28,30 @@ import ItsyEditor
 	}
 
 	func setProblems(_ snapshot: WorkspaceProblemSnapshot) {
+		problemSnapshotsBySource.removeAll()
+		applyProblems(snapshot)
+	}
+
+	func setProblems(_ snapshot: WorkspaceProblemSnapshot, sourceID: String) {
+		if let problemsRootURL, problemsRootURL != snapshot.root {
+			problemSnapshotsBySource.removeAll()
+		}
+		problemSnapshotsBySource[sourceID] = snapshot
+		let problems = problemSnapshotsBySource.values
+			.filter { $0.root == snapshot.root }
+			.flatMap(\.problems)
+		applyProblems(WorkspaceProblemSnapshot(root: snapshot.root, problems: problems))
+	}
+
+	@objc func showNextProblem(_ sender: Any?) {
+		navigateProblem(delta: 1)
+	}
+
+	@objc func showPreviousProblem(_ sender: Any?) {
+		navigateProblem(delta: -1)
+	}
+
+	private func applyProblems(_ snapshot: WorkspaceProblemSnapshot) {
 		workspaceProblems = snapshot.problems
 		problemsRootURL = snapshot.root
 		problemsTableView?.reloadData()
@@ -54,6 +87,10 @@ import ItsyEditor
 		let panel = makeProblemsPanelIfNeeded()
 		centerProblemsPanel(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
+		problemsTableView?.reloadData()
+		if !workspaceProblems.isEmpty, problemsTableView?.selectedRow ?? -1 < 0 {
+			problemsTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+		}
 		refreshProblemsStatus()
 	}
 
@@ -128,13 +165,30 @@ import ItsyEditor
 
 	@objc private func openSelectedProblem(_ sender: Any?) {
 		guard let tableView = problemsTableView,
-		      let problemsRootURL,
 		      tableView.selectedRow >= 0,
 		      tableView.selectedRow < workspaceProblems.count
 		else {
 			return
 		}
-		let problem = workspaceProblems[tableView.selectedRow]
+		openProblem(at: tableView.selectedRow)
+	}
+
+	private func navigateProblem(delta: Int) {
+		guard !workspaceProblems.isEmpty else {
+			return
+		}
+		let selected = problemsTableView?.selectedRow ?? -1
+		let current = selected >= 0 && selected < workspaceProblems.count ? selected : (delta > 0 ? -1 : 0)
+		let next = (current + delta + workspaceProblems.count) % workspaceProblems.count
+		openProblem(at: next)
+		focusProblem(index: next)
+	}
+
+	private func openProblem(at index: Int) {
+		guard let problemsRootURL, index >= 0, index < workspaceProblems.count else {
+			return
+		}
+		let problem = workspaceProblems[index]
 		let url = problemsRootURL.appendingPathComponent(problem.path)
 		_ = documentController.openDocument(at: url, line: problem.line, column: problem.column ?? 1)
 		if let document = documentController.document(for: url) as? ItsyDocument {
@@ -222,6 +276,14 @@ import ItsyEditor
 
 	func openSelectedProblemForTesting() {
 		openSelectedProblem(nil)
+	}
+
+	func showNextProblemForTesting() {
+		showNextProblem(nil)
+	}
+
+	func showPreviousProblemForTesting() {
+		showPreviousProblem(nil)
 	}
 
 	func closeProblemsForTesting() {

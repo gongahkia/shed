@@ -950,6 +950,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return formatSelection(nil)
 		case "lsp.codeAction":
 			return showCodeActions(nil)
+		case "problems.next", "problems.previous":
+			return ItsyAppCommandBridge.requestRunCommand(commandID)
 		case "vim.fold.close":
 			return closeFoldAtCursor()
 		case "vim.fold.open":
@@ -1894,8 +1896,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func handleLSPSupervisorEvent(_ event: LSPSessionSupervisorEvent, key: LSPSessionKey, url: URL) {
 		switch event {
-		case .diagnosticsUpdated:
-			break
+		case let .diagnosticsUpdated(snapshot):
+			ItsyProblemsBridge.publishDiagnostics(snapshot, sourceID: "lsp:\(key.languageID):\(key.workspaceRoot.path)")
 		case let .sessionFailed(reason):
 			lspSyncCoordinators[key] = nil
 			completionTriggerCharactersBySession[key] = nil

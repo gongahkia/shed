@@ -177,12 +177,67 @@ public struct ExtensionProblemMatcherContribution: Codable, Equatable, Sendable 
 	public var label: String
 	public var pattern: String
 	public var fileLocation: String?
+	public var fileGroup: Int
+	public var lineGroup: Int
+	public var columnGroup: Int?
+	public var severityGroup: Int?
+	public var messageGroup: Int
+	public var defaultSeverity: WorkspaceProblemSeverity
+	public var source: String?
 
-	public init(id: String, label: String, pattern: String, fileLocation: String? = nil) {
+	public init(
+		id: String,
+		label: String,
+		pattern: String,
+		fileLocation: String? = nil,
+		fileGroup: Int = 1,
+		lineGroup: Int = 2,
+		columnGroup: Int? = 3,
+		severityGroup: Int? = nil,
+		messageGroup: Int = 4,
+		defaultSeverity: WorkspaceProblemSeverity = .error,
+		source: String? = nil
+	) {
 		self.id = id
 		self.label = label
 		self.pattern = pattern
 		self.fileLocation = fileLocation
+		self.fileGroup = fileGroup
+		self.lineGroup = lineGroup
+		self.columnGroup = columnGroup
+		self.severityGroup = severityGroup
+		self.messageGroup = messageGroup
+		self.defaultSeverity = defaultSeverity
+		self.source = source
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case id
+		case label
+		case pattern
+		case fileLocation
+		case fileGroup = "file_group"
+		case lineGroup = "line_group"
+		case columnGroup = "column_group"
+		case severityGroup = "severity_group"
+		case messageGroup = "message_group"
+		case defaultSeverity = "severity"
+		case source
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		id = try container.decode(String.self, forKey: .id)
+		label = try container.decodeIfPresent(String.self, forKey: .label) ?? id
+		pattern = try container.decode(String.self, forKey: .pattern)
+		fileLocation = try container.decodeIfPresent(String.self, forKey: .fileLocation)
+		fileGroup = try container.decodeIfPresent(Int.self, forKey: .fileGroup) ?? 1
+		lineGroup = try container.decodeIfPresent(Int.self, forKey: .lineGroup) ?? 2
+		columnGroup = try container.decodeIfPresent(Int.self, forKey: .columnGroup) ?? 3
+		severityGroup = try container.decodeIfPresent(Int.self, forKey: .severityGroup)
+		messageGroup = try container.decodeIfPresent(Int.self, forKey: .messageGroup) ?? 4
+		defaultSeverity = try container.decodeIfPresent(WorkspaceProblemSeverity.self, forKey: .defaultSeverity) ?? .error
+		source = try container.decodeIfPresent(String.self, forKey: .source)
 	}
 }
 
@@ -273,6 +328,26 @@ public enum ExtensionTaskMapper {
 				dependsOn: task.dependsOn,
 				isBackground: task.isBackground,
 				watch: task.watch
+			)
+		}
+	}
+}
+
+public enum ExtensionProblemMatcherMapper {
+	public static func matchers(from manifest: ExtensionManifest) -> [WorkspaceProblemMatcher] {
+		manifest.contributes.problemMatchers.map { matcher in
+			let id = ExtensionContributionRegistry.scopedID(manifest: manifest, localID: matcher.id)
+			return WorkspaceProblemMatcher(
+				id: id,
+				label: matcher.label,
+				pattern: matcher.pattern,
+				fileGroup: matcher.fileGroup,
+				lineGroup: matcher.lineGroup,
+				columnGroup: matcher.columnGroup,
+				severityGroup: matcher.severityGroup,
+				messageGroup: matcher.messageGroup,
+				defaultSeverity: matcher.defaultSeverity,
+				source: matcher.source ?? id
 			)
 		}
 	}

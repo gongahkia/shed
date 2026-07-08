@@ -58,7 +58,23 @@ Commands are command-palette entries only unless backed by a built-in Itsy actio
 
 Keybindings target registered command IDs. Invalid targets fail registration for that extension.
 
-Themes, snippets, grammars, and problem matchers resolve paths relative to the extension root. Resolved paths must stay inside the extension root.
+Themes, snippets, and grammars resolve paths relative to the extension root. Resolved paths must stay inside the extension root.
+
+Problem matchers contribute regex group mappings to task output parsing:
+
+```json
+{
+  "id": "eslint",
+  "label": "ESLint",
+  "pattern": "^(.+)\\\\((\\\\d+),(\\\\d+)\\\\): (warning|error) (.+)$",
+  "file_group": 1,
+  "line_group": 2,
+  "column_group": 3,
+  "severity_group": 4,
+  "message_group": 5,
+  "source": "eslint"
+}
+```
 
 ## Storage
 

@@ -48,3 +48,21 @@ Related config remains separate:
 ~/.config/itsy/keys.toml
 ~/.config/itsy/themes/*.toml
 ```
+
+Workspace problem matchers live at:
+
+```text
+<workspace>/.itsy/matchers.toml
+```
+
+```toml
+[matcher.eslint]
+label = "ESLint"
+pattern = "^(.+)\\((\\d+),(\\d+)\\): (warning|error) (.+)$"
+file_group = 1
+line_group = 2
+column_group = 3
+severity_group = 4
+message_group = 5
+source = "eslint"
+```

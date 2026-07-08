@@ -230,6 +230,13 @@ import AppKit
 		let problemShowItem = problemMenu.addItem(withTitle: L10n.string("Problems"), action: #selector(AppCoordinator.showProblems(_:)), keyEquivalent: "M")
 		problemShowItem.keyEquivalentModifierMask = [.command, .shift]
 		problemShowItem.target = actionTarget
+		problemMenu.addItem(.separator())
+		let nextProblemItem = problemMenu.addItem(withTitle: L10n.string("Next Problem"), action: #selector(AppCoordinator.showNextProblem(_:)), keyEquivalent: "n")
+		nextProblemItem.keyEquivalentModifierMask = [.control, .option]
+		nextProblemItem.target = actionTarget
+		let previousProblemItem = problemMenu.addItem(withTitle: L10n.string("Previous Problem"), action: #selector(AppCoordinator.showPreviousProblem(_:)), keyEquivalent: "p")
+		previousProblemItem.keyEquivalentModifierMask = [.control, .option]
+		previousProblemItem.target = actionTarget
 		problemItem.submenu = problemMenu
 
 		let commandMenu = NSMenu(title: L10n.string("Command"))

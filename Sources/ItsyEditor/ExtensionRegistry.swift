@@ -65,12 +65,38 @@ public struct ExtensionRegisteredProblemMatcher: Equatable, Sendable {
 	public var label: String
 	public var pattern: String
 	public var fileLocation: String?
+	public var fileGroup: Int
+	public var lineGroup: Int
+	public var columnGroup: Int?
+	public var severityGroup: Int?
+	public var messageGroup: Int
+	public var defaultSeverity: WorkspaceProblemSeverity
+	public var source: String?
 
-	public init(id: String, label: String, pattern: String, fileLocation: String? = nil) {
+	public init(
+		id: String,
+		label: String,
+		pattern: String,
+		fileLocation: String? = nil,
+		fileGroup: Int = 1,
+		lineGroup: Int = 2,
+		columnGroup: Int? = 3,
+		severityGroup: Int? = nil,
+		messageGroup: Int = 4,
+		defaultSeverity: WorkspaceProblemSeverity = .error,
+		source: String? = nil
+	) {
 		self.id = id
 		self.label = label
 		self.pattern = pattern
 		self.fileLocation = fileLocation
+		self.fileGroup = fileGroup
+		self.lineGroup = lineGroup
+		self.columnGroup = columnGroup
+		self.severityGroup = severityGroup
+		self.messageGroup = messageGroup
+		self.defaultSeverity = defaultSeverity
+		self.source = source
 	}
 }
 
@@ -115,7 +141,14 @@ public enum ExtensionContributionRegistry {
 				id: scopedID(manifest: manifest, localID: matcher.id),
 				label: matcher.label,
 				pattern: matcher.pattern,
-				fileLocation: matcher.fileLocation
+				fileLocation: matcher.fileLocation,
+				fileGroup: matcher.fileGroup,
+				lineGroup: matcher.lineGroup,
+				columnGroup: matcher.columnGroup,
+				severityGroup: matcher.severityGroup,
+				messageGroup: matcher.messageGroup,
+				defaultSeverity: matcher.defaultSeverity,
+				source: matcher.source
 			)
 		}
 		return ExtensionRegisteredContributions(

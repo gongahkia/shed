@@ -30,13 +30,21 @@ let package = Package(
 		.library(name: "CTreeSitter", type: .static, targets: ["CTreeSitter"]),
 		.library(name: "CTSGrammars", type: .static, targets: ["CTSGrammars"]),
 	],
-	dependencies: [],
+	dependencies: [
+		.package(url: "https://github.com/sparkle-project/Sparkle", from: "2.9.4"),
+	],
 	targets: [
 		.executableTarget(
 			name: "ItsyApp",
-			dependencies: ["ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP", "ItsyDAP", "ItsyDebugger"],
+			dependencies: [
+				"ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP", "ItsyDAP", "ItsyDebugger",
+				.product(name: "Sparkle", package: "Sparkle"),
+			],
 			exclude: ["README.md"],
-			swiftSettings: releaseSwiftSettings
+			swiftSettings: releaseSwiftSettings,
+			linkerSettings: [
+				.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
+			]
 		),
 		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap", "ItsyVim"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),

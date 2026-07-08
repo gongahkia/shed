@@ -18,6 +18,13 @@ for bundle in "$repo_dir"/.build/release/Itsy_Itsy*.bundle; do
 	[[ -d "$bundle" ]] || continue
 	cp -R "$bundle" "$app_dir/"
 done
+if [[ -d "$repo_dir/.build/artifacts" ]]; then
+	sparkle_framework="$(find "$repo_dir/.build/artifacts" -path '*/Sparkle.xcframework/*/Sparkle.framework' -type d -print -quit)"
+	if [[ -n "$sparkle_framework" ]]; then
+		rm -rf "$app_dir/Contents/Frameworks/Sparkle.framework"
+		ditto "$sparkle_framework" "$app_dir/Contents/Frameworks/Sparkle.framework"
+	fi
+fi
 GRAMMAR_DYLIB_DIR="$app_dir/Contents/Frameworks/ItsyGrammars" "$repo_dir/bench/scripts/build_grammar_dylibs.sh" >/dev/null
 cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -90,4 +97,15 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 </dict>
 </plist>
 PLIST
+if [[ -n "${ITSY_SPARKLE_FEED_URL:-}" || -n "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+	if [[ -z "${ITSY_SPARKLE_FEED_URL:-}" || -z "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+		echo "ITSY_SPARKLE_FEED_URL and ITSY_SPARKLE_PUBLIC_ED_KEY must be set together" >&2
+		exit 1
+	fi
+	/usr/libexec/PlistBuddy -c "Add :SUFeedURL string ${ITSY_SPARKLE_FEED_URL}" "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string ${ITSY_SPARKLE_PUBLIC_ED_KEY}" "$app_dir/Contents/Info.plist"
+	if [[ "${ITSY_SPARKLE_ENABLE_INSTALLER_XPC:-1}" == "1" ]]; then
+		/usr/libexec/PlistBuddy -c "Add :SUEnableInstallerLauncherService bool true" "$app_dir/Contents/Info.plist"
+	fi
+fi
 echo "$app_dir"

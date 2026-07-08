@@ -22,13 +22,33 @@ if [[ -z "$identity" ]]; then
 	identity="${identities[0]}"
 fi
 
+sign_runtime() {
+	codesign --force --sign "$identity" --options runtime --timestamp "$1"
+}
+
 if [[ -d "$app_dir/Contents/Frameworks" ]]; then
+	sparkle_framework="$app_dir/Contents/Frameworks/Sparkle.framework"
+	if [[ -d "$sparkle_framework" ]]; then
+		sparkle_version_dir="$sparkle_framework/Versions/Current"
+		if [[ ! -d "$sparkle_version_dir" ]]; then
+			sparkle_version_dir="$(find "$sparkle_framework/Versions" -mindepth 1 -maxdepth 1 -type d -print | sort | tail -n 1)"
+		fi
+		for helper in "$sparkle_version_dir/XPCServices/Installer.xpc" "$sparkle_version_dir/Autoupdate" "$sparkle_version_dir/Updater.app"; do
+			[[ -e "$helper" ]] || continue
+			sign_runtime "$helper"
+		done
+		downloader="$sparkle_version_dir/XPCServices/Downloader.xpc"
+		if [[ -e "$downloader" ]]; then
+			codesign --force --sign "$identity" --options runtime --timestamp --preserve-metadata=entitlements "$downloader"
+		fi
+		sign_runtime "$sparkle_framework"
+	fi
 	while IFS= read -r -d '' code_path; do
-		codesign --force --sign "$identity" --options runtime --timestamp "$code_path"
-	done < <(find "$app_dir/Contents/Frameworks" -type f \( -name '*.dylib' -o -perm -111 \) -print0)
+		sign_runtime "$code_path"
+	done < <(find "$app_dir/Contents/Frameworks" -path "$sparkle_framework" -prune -o -type f \( -name '*.dylib' -o -perm -111 \) -print0)
 fi
 
-codesign --force --sign "$identity" --options runtime --timestamp "$app_dir"
+sign_runtime "$app_dir"
 codesign --verify --deep --strict --verbose=2 "$app_dir"
 codesign -dvvv --entitlements :- "$app_dir"
 echo "$app_dir"

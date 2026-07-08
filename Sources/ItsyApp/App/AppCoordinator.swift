@@ -6,10 +6,12 @@ import ItsyKeymap
 
 @MainActor final class AppCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
+	private lazy var sparkleUpdateCoordinator = SparkleUpdateCoordinator()
 	private lazy var menuCoordinator = MenuCoordinator(
 		documentController: documentController,
 		actionTarget: self,
-		gitTarget: gitCoordinator
+		gitTarget: gitCoordinator,
+		updateTarget: sparkleUpdateCoordinator
 	)
 	private lazy var commandRegistry = makeCommandRegistry()
 	private lazy var commandPaletteCoordinator = CommandPaletteCoordinator(
@@ -80,6 +82,7 @@ import ItsyKeymap
 		recordBenchStage("app_did_finish_launching")
 		installServicesProvider()
 		menuCoordinator.installMainMenu()
+		sparkleUpdateCoordinator.start()
 		recordBenchStage("main_menu_installed")
 		recordBenchStage("initial_document_open_begin")
 		openInitialDocument()

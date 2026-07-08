@@ -4,14 +4,16 @@ import AppKit
 	private let documentController: ItsyDocumentController
 	private weak var actionTarget: AppCoordinator?
 	private weak var gitTarget: GitCoordinator?
+	private weak var updateTarget: SparkleUpdateCoordinator?
 	private weak var openRecentMenu: NSMenu?
 	private weak var gitGutterIndexMenuItem: NSMenuItem?
 	private weak var gitGutterHeadMenuItem: NSMenuItem?
 
-	init(documentController: ItsyDocumentController, actionTarget: AppCoordinator, gitTarget: GitCoordinator) {
+	init(documentController: ItsyDocumentController, actionTarget: AppCoordinator, gitTarget: GitCoordinator, updateTarget: SparkleUpdateCoordinator) {
 		self.documentController = documentController
 		self.actionTarget = actionTarget
 		self.gitTarget = gitTarget
+		self.updateTarget = updateTarget
 		super.init()
 	}
 
@@ -75,6 +77,10 @@ import AppKit
 		appMenu.disableAutomaticWritingToolsItems()
 		let settingsItem = appMenu.addItem(withTitle: L10n.string("Settings..."), action: #selector(AppCoordinator.showSettings(_:)), keyEquivalent: ",")
 		settingsItem.target = actionTarget
+		appMenu.addItem(.separator())
+		let updateItem = appMenu.addItem(withTitle: L10n.string("Check for Updates..."), action: #selector(SparkleUpdateCoordinator.checkForUpdates(_:)), keyEquivalent: "")
+		updateItem.target = updateTarget
+		updateItem.isEnabled = updateTarget?.isConfigured ?? false
 		appMenu.addItem(.separator())
 		appMenu.addItem(withTitle: L10n.string("Quit Itsy"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
 		appItem.submenu = appMenu

@@ -10,7 +10,7 @@ This page is the Phase 16 release checklist. It is intentionally explicit becaus
 - Release DMG path: `dist/Itsy-0.1.0.dmg`.
 - Local unsigned release smoke is supported.
 - Signed release is blocked until a `Developer ID Application` identity and notary credentials are available.
-- Sparkle is not integrated yet because the appcast URL, EdDSA key, and signed update asset URL are not final.
+- Sparkle is linked and bundled, but remains inactive unless `SUFeedURL` and `SUPublicEDKey` are present.
 - Homebrew cask submission is blocked until the signed/notarized GitHub Release DMG and final SHA-256 exist.
 
 ## Required Secrets
@@ -37,6 +37,11 @@ or:
 - `ITSY_NOTARY_TEAM_ID`
 - `ITSY_NOTARY_PASSWORD`
 
+Signed Sparkle release config expects:
+
+- `ITSY_SPARKLE_FEED_URL`
+- `ITSY_SPARKLE_PUBLIC_ED_KEY`
+
 ## Local Smoke
 
 ```sh
@@ -54,6 +59,8 @@ This validates app layout, DMG integrity, mounted bundle layout, and checksum. I
 ## Signed Release
 
 ```sh
+export ITSY_SPARKLE_FEED_URL=https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml
+export ITSY_SPARKLE_PUBLIC_ED_KEY=<sparkle-public-ed-key>
 swift build -c release
 bench/scripts/make_app.sh
 scripts/release_doctor.sh
@@ -74,13 +81,13 @@ Expected properties:
 
 ## Sparkle Gate
 
-Before Sparkle can be added:
+Before Sparkle can ship:
 
 - Pick the production appcast URL.
 - Generate and store the Sparkle EdDSA public key.
-- Vendor Sparkle 2 framework and XPC services into the app bundle.
-- Add the appcast URL and public key to `Info.plist`.
-- Ensure the Sparkle framework and XPC services are signed before the app bundle.
+- Build the app with `ITSY_SPARKLE_FEED_URL` and `ITSY_SPARKLE_PUBLIC_ED_KEY` set together.
+- Confirm `Sparkle.framework` and its XPC services are present under `Itsy.app/Contents/Frameworks`.
+- Ensure the Sparkle framework and XPC services are signed before the app bundle via `scripts/codesign.sh`.
 - Generate the appcast from signed release assets.
 
 Candidate appcast URL shape:
@@ -91,7 +98,7 @@ https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml
 
 Do not enable automatic updates until the URL and signing key are final.
 
-After Sparkle is vendored and the EdDSA key is available, generate the appcast with:
+After the signed DMG and EdDSA key are available, generate the appcast with:
 
 ```sh
 SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast scripts/make_appcast.sh

@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-final class ExtensionsCoordinator: NSObject {
+@MainActor final class ExtensionsCoordinator: NSObject {
 	private var panel: NSPanel?
 	private let extensionRootProvider: () -> URL
 
@@ -88,7 +88,7 @@ final class ExtensionsCoordinator: NSObject {
 		return fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
 	}
 
-	private static func defaultExtensionRoot() -> URL {
+	private nonisolated static func defaultExtensionRoot() -> URL {
 		FileManager.default.homeDirectoryForCurrentUser
 			.appendingPathComponent(".config", isDirectory: true)
 			.appendingPathComponent("itsy", isDirectory: true)

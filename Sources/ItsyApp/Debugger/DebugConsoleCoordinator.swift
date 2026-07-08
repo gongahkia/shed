@@ -3,7 +3,7 @@ import Foundation
 import ItsyDAP
 import ItsyDebugger
 
-final class DebugConsoleCoordinator: NSObject, NSTextFieldDelegate {
+@MainActor final class DebugConsoleCoordinator: NSObject, NSTextFieldDelegate {
 	private let activeSessionProvider: () -> DebugAppSession?
 	private var panel: NSPanel?
 	private var statusLabel: NSTextField?

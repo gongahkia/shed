@@ -3,7 +3,7 @@ import Foundation
 import ItsyDAP
 import ItsyDebugger
 
-final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private let loader: DebugLaunchConfigLoader
 	private let adapterRegistryLoader: DebugAdapterRegistryLoader
 	private var launchConfig = DebugLaunchConfig()

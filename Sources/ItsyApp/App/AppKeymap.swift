@@ -1,7 +1,7 @@
 // @file app-level keymap defaults and profile mapping.
 import ItsyKeymap
 
-enum ItsyAppKeymap {
+@MainActor enum ItsyAppKeymap {
 	private static var bindings: [KeyBinding] = []
 	private static var baseBindings: [KeyBinding] = []
 	private static var extensionBindings: [KeyBinding] = []

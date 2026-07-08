@@ -16,7 +16,7 @@ public struct RenderHighlightCacheBenchmarkResult: Encodable, Sendable {
 	public var visible_lines_per_frame: Int
 }
 
-public func runRenderHighlightCacheBenchmark(lineCount: Int = 100_000, frames: Int = 60) -> RenderHighlightCacheBenchmarkResult {
+@MainActor public func runRenderHighlightCacheBenchmark(lineCount: Int = 100_000, frames: Int = 60) -> RenderHighlightCacheBenchmarkResult {
 	precondition(lineCount > 0)
 	precondition(frames > 0)
 	let line = "let value = 1234567890 // render cache bench\n"

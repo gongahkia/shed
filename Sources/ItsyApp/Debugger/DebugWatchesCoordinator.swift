@@ -3,7 +3,7 @@ import Foundation
 import ItsyDAP
 import ItsyDebugger
 
-final class DebugWatchesCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class DebugWatchesCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let store: WatchStore
 	private let activeSessionProvider: () -> DebugAppSession?
 	private var panel: NSPanel?
@@ -319,7 +319,7 @@ private struct DebugWatchItem {
 	}
 }
 
-private enum WatchExpressionPanel {
+@MainActor private enum WatchExpressionPanel {
 	static func expression() -> String? {
 		let field = NSTextField(string: "")
 		field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)

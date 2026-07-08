@@ -3,7 +3,7 @@ import Darwin
 import Dispatch
 import Foundation
 
-final class DocumentFileWatcher {
+@MainActor final class DocumentFileWatcher {
 	private let queue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
 	private var source: DispatchSourceFileSystemObject?
 	private var pendingExternalChangePrompt = false
@@ -14,7 +14,9 @@ final class DocumentFileWatcher {
 	var reloadFromDisk: (URL) -> Void = { _ in }
 
 	deinit {
-		stop()
+		MainActor.assumeIsolated {
+			stop()
+		}
 	}
 
 	func restart() {

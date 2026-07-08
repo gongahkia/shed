@@ -3,7 +3,7 @@ import Foundation
 import ItsyConfig
 import ItsySyntax
 
-final class SettingsCoordinator: NSObject {
+@MainActor final class SettingsCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
 	private let onEditorPreferencesChange: (EditorPreferences) -> Void
 	private let onTerminalSettingsChange: (ItsySettings.TerminalSettings) -> Void

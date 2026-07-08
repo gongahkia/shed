@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyConfig
 
-final class TerminalCoordinator: NSObject {
+@MainActor final class TerminalCoordinator: NSObject {
 	private var terminalPanel: NSPanel?
 	private var terminalStatusLabel: NSTextField?
 	private var terminalView: ItsyTerminalView?

@@ -26,6 +26,8 @@ jobs:
           git diff --exit-code -- docs/keymap-reference.md
       - name: Build release
         run: swift build -c release
+      - name: Strict concurrency
+        run: scripts/strict_concurrency.sh
       - name: Test with coverage
         run: ITSY_COVERAGE_DATE=current ITSY_COVERAGE_GATE=1 bench/scripts/coverage.sh
       - name: Upload coverage artifact

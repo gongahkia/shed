@@ -2,7 +2,7 @@
 import AppKit
 import ItsyLSP
 
-enum LSPHoverMarkupRenderer {
+@MainActor enum LSPHoverMarkupRenderer {
 	private static let baseFont = NSFont.systemFont(ofSize: 12)
 	private static let headingFont = NSFont.systemFont(ofSize: 14, weight: .semibold)
 	private static let monoFont = NSFont.monospacedSystemFont(ofSize: 12, weight: .regular)
@@ -145,7 +145,7 @@ enum LSPHoverMarkupRenderer {
 	}
 }
 
-final class HoverTooltipViewController: NSViewController {
+@MainActor final class HoverTooltipViewController: NSViewController {
 	private let hover: LSPHover
 
 	init(hover: LSPHover) {

@@ -276,7 +276,27 @@ private enum BenchError: Error, CustomStringConvertible {
 	}
 }
 
+private final class OpenApplicationResultBox: @unchecked Sendable {
+	private let lock = NSLock()
+	private var app: NSRunningApplication?
+	private var error: Error?
+
+	func store(app: NSRunningApplication?, error: Error?) {
+		lock.lock()
+		self.app = app
+		self.error = error
+		lock.unlock()
+	}
+
+	func snapshot() -> (NSRunningApplication?, Error?) {
+		lock.lock()
+		defer { lock.unlock() }
+		return (app, error)
+	}
+}
+
 @main
+@MainActor
 enum ItsyBenchMain {
 	static func main() {
 		do {
@@ -1198,16 +1218,15 @@ enum ItsyBenchMain {
 			config.environment = ProcessInfo.processInfo.environment.merging(environment) { _, new in new }
 		}
 		let semaphore = DispatchSemaphore(value: 0)
-		var runningApp: NSRunningApplication?
-		var launchError: Error?
+		let resultBox = OpenApplicationResultBox()
 		NSWorkspace.shared.openApplication(at: url, configuration: config) { app, error in
-			runningApp = app
-			launchError = error
+			resultBox.store(app: app, error: error)
 			semaphore.signal()
 		}
 		guard semaphore.wait(timeout: dispatchDeadline(deadline)) == .success else {
 			throw BenchError.launchTimeout
 		}
+		let (runningApp, launchError) = resultBox.snapshot()
 		if let launchError {
 			throw BenchError.launchFailed(launchError.localizedDescription)
 		}
@@ -1301,7 +1320,7 @@ enum ItsyBenchMain {
 	}
 
 	private static func requireAccessibility() throws {
-		let opts = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false] as CFDictionary
+		let opts = ["AXTrustedCheckOptionPrompt": false] as CFDictionary
 		guard AXIsProcessTrustedWithOptions(opts) else {
 			throw BenchError.axPermissionMissing
 		}
@@ -1488,7 +1507,7 @@ private let highlightSmokeSamples = [
 	"""),
 ]
 
-private func samplePeakRSS(pid: Int32, peakRSS: inout UInt64) throws -> UInt64 {
+@MainActor private func samplePeakRSS(pid: Int32, peakRSS: inout UInt64) throws -> UInt64 {
 	let value = try ItsyBenchMain.residentSizeKB(pid: pid)
 	peakRSS = max(peakRSS, value)
 	return value

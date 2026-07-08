@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import ItsyEditor
 
-final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class CommandPaletteCoordinator: NSObject, NSWindowDelegate, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private enum CommandPaletteSymbolScope { case workspace, file }
 
 	private let documentController: ItsyDocumentController

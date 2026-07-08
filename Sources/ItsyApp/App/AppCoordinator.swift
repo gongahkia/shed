@@ -4,7 +4,7 @@ import ItsyConfig
 import ItsyEditor
 import ItsyKeymap
 
-final class AppCoordinator: NSObject {
+@MainActor final class AppCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
 	private lazy var menuCoordinator = MenuCoordinator(documentController: documentController, actionTarget: self, gitTarget: gitCoordinator)
 	private lazy var commandRegistry = makeCommandRegistry()
@@ -154,7 +154,8 @@ final class AppCoordinator: NSObject {
 		commandPaletteCoordinator.showFileSymbolPalette(sender)
 	}
 
-	private func makeCommandRegistry(workspaceRoot: URL? = ItsyWorkspaceController.currentRootURL) -> CommandRegistry {
+	private func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {
+		let workspaceRoot = workspaceRoot ?? ItsyWorkspaceController.currentRootURL
 		var registry = CommandRegistry()
 		do {
 			try registry.register([

@@ -3,7 +3,7 @@ import Dispatch
 import Foundation
 import ItsyEditor
 
-final class TaskCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+@MainActor final class TaskCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let problemsCoordinator: ProblemsCoordinator
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
@@ -159,9 +159,9 @@ final class TaskCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegat
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
 		taskOutputTextView?.string = "$ \(task.commandLine)\n"
-		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+		DispatchQueue.global(qos: .userInitiated).async {
 			let result = Result { try WorkspaceTaskRunner().run(task, root: root) }
-			DispatchQueue.main.async {
+			Task { @MainActor [weak self] in
 				guard let self, self.taskRunGeneration == generation else {
 					return
 				}

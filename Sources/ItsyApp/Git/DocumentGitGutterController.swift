@@ -1,9 +1,9 @@
-import Dispatch
+@preconcurrency import Dispatch
 import Foundation
 import ItsyEditor
 import ItsyRender
 
-final class DocumentGitGutterController {
+@MainActor final class DocumentGitGutterController {
 	private var refreshWorkItem: DispatchWorkItem?
 	private(set) var decorator: GutterDecorator? {
 		didSet {
@@ -14,7 +14,9 @@ final class DocumentGitGutterController {
 	var decoratorDidChange: () -> Void = {}
 
 	deinit {
-		refreshWorkItem?.cancel()
+		MainActor.assumeIsolated {
+			refreshWorkItem?.cancel()
+		}
 	}
 
 	func scheduleRefresh() {

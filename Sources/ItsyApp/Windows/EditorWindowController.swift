@@ -70,7 +70,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 }
 
-final class EditorWindowController: NSWindowController {
+@MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
 	private static var dismissedLSPMissingCommands: Set<String> = []
@@ -95,6 +95,9 @@ final class EditorWindowController: NSWindowController {
 	private var completionRequestGeneration = 0
 	private var hoverPopover: NSPopover?
 	private var hoverTimer: Timer?
+	private weak var hoverTargetView: MetalTextView?
+	private var hoverTargetOffset = 0
+	private var hoverTargetRect = NSRect.zero
 	private var hoverRequestGeneration = 0
 	private var renamePopover: NSPopover?
 	private var codeActionPopover: NSPopover?
@@ -200,18 +203,20 @@ final class EditorWindowController: NSWindowController {
 	}
 
 	deinit {
-		completionPopup?.dismiss()
-		hoverTimer?.invalidate()
-		hoverPopover?.close()
-		renamePopover?.close()
-		codeActionPopover?.close()
-		signatureHelpPopover?.close()
-		lspSurfaceRefreshTask?.cancel()
-		for task in lspSupervisorTasks.values {
-			task.cancel()
-		}
-		if let tabBoundsObserver {
-			NotificationCenter.default.removeObserver(tabBoundsObserver)
+		MainActor.assumeIsolated {
+			completionPopup?.dismiss()
+			hoverTimer?.invalidate()
+			hoverPopover?.close()
+			renamePopover?.close()
+			codeActionPopover?.close()
+			signatureHelpPopover?.close()
+			lspSurfaceRefreshTask?.cancel()
+			for task in lspSupervisorTasks.values {
+				task.cancel()
+			}
+			if let tabBoundsObserver {
+				NotificationCenter.default.removeObserver(tabBoundsObserver)
+			}
 		}
 	}
 
@@ -312,7 +317,9 @@ final class EditorWindowController: NSWindowController {
 			object: tabScrollView.contentView,
 			queue: nil
 		) { [weak self] _ in
-			self?.layoutTabContent()
+			MainActor.assumeIsolated {
+				self?.layoutTabContent()
+			}
 		}
 	}
 
@@ -2083,12 +2090,20 @@ final class EditorWindowController: NSWindowController {
 			let targetView,
 			let offset = identifierOffset(in: editorStorageString(targetView.editor), near: candidate.offset)
 		else {
+			hoverTargetView = nil
 			closeHoverPopover()
 			return
 		}
-		let rect = targetView.positioningRectForUTF8Offset(offset)
-		hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self, weak targetView] _ in
-			_ = self?.requestHover(at: offset, positioningRect: rect, in: targetView)
+		hoverTargetView = targetView
+		hoverTargetOffset = offset
+		hoverTargetRect = targetView.positioningRectForUTF8Offset(offset)
+		hoverTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+			MainActor.assumeIsolated {
+				guard let self else {
+					return
+				}
+				_ = self.requestHover(at: self.hoverTargetOffset, positioningRect: self.hoverTargetRect, in: self.hoverTargetView)
+			}
 		}
 	}
 

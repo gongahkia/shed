@@ -11,7 +11,7 @@ struct LSPStatusPanelSnapshot {
 	var lastError: String
 }
 
-final class LSPStatusPanel: NSObject {
+@MainActor final class LSPStatusPanel: NSObject {
 	var restartRequested: ((LSPSessionKey) -> Void)?
 	var stopRequested: ((LSPSessionKey) -> Void)?
 

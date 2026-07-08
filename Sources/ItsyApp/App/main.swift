@@ -7,11 +7,13 @@ if CommandLine.arguments.contains("--bench-exit-on-ready") {
 
 recordBenchStage("process_start")
 
-let app = NSApplication.shared
-private let documentController = ItsyDocumentController()
-private let appDelegate = AppDelegate(documentController: documentController)
+MainActor.assumeIsolated {
+	let app = NSApplication.shared
+	let documentController = ItsyDocumentController()
+	let appDelegate = AppDelegate(documentController: documentController)
 
-_ = documentController
-app.setActivationPolicy(.regular)
-app.delegate = appDelegate
-app.run()
+	_ = documentController
+	app.setActivationPolicy(.regular)
+	app.delegate = appDelegate
+	app.run()
+}

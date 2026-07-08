@@ -18,6 +18,24 @@ public struct ItsySettings: Equatable, Sendable {
 		case pane
 	}
 
+	public enum KeymapMode: String, Equatable, Sendable {
+		case plain
+		case vim
+		case emacs
+	}
+
+	public enum LineNumberMode: String, Equatable, Sendable {
+		case off
+		case absolute
+		case relative
+	}
+
+	public enum WrapMode: String, Equatable, Sendable {
+		case none
+		case soft
+		case hard
+	}
+
 	public struct EditorSettings: Equatable, Sendable {
 		public struct LanguageSettings: Equatable, Sendable {
 			public var font: String?
@@ -56,13 +74,20 @@ public struct ItsySettings: Equatable, Sendable {
 		public static let defaultTabWidth = 4
 		public static let minTabWidth = 1
 		public static let maxTabWidth = 16
+		public static let defaultWrapColumn = 100
+		public static let minWrapColumn = 20
+		public static let maxWrapColumn = 240
 
 		public var font: String
 		public var fontSize: Double
 		public var lineNumbers: Bool
+		public var lineNumberMode: LineNumberMode
 		public var tabWidth: Int
 		public var useSpaces: Bool
 		public var tabGroups: TabGroupScope
+		public var keymap: KeymapMode
+		public var wrap: WrapMode
+		public var wrapColumn: Int
 		public var language: [String: LanguageSettings]
 		public var experimental: ExperimentalSettings
 
@@ -70,18 +95,26 @@ public struct ItsySettings: Equatable, Sendable {
 			font: String = Self.defaultFont,
 			fontSize: Double = Self.defaultFontSize,
 			lineNumbers: Bool = false,
+			lineNumberMode: LineNumberMode? = nil,
 			tabWidth: Int = Self.defaultTabWidth,
 			useSpaces: Bool = false,
 			tabGroups: TabGroupScope = .window,
+			keymap: KeymapMode = .plain,
+			wrap: WrapMode = .none,
+			wrapColumn: Int = Self.defaultWrapColumn,
 			language: [String: LanguageSettings] = [:],
 			experimental: ExperimentalSettings = ExperimentalSettings()
 		) {
 			self.font = font
 			self.fontSize = fontSize
 			self.lineNumbers = lineNumbers
+			self.lineNumberMode = lineNumberMode ?? (lineNumbers ? .absolute : .off)
 			self.tabWidth = tabWidth
 			self.useSpaces = useSpaces
 			self.tabGroups = tabGroups
+			self.keymap = keymap
+			self.wrap = wrap
+			self.wrapColumn = wrapColumn
 			self.language = language
 			self.experimental = experimental
 		}
@@ -178,6 +211,12 @@ public struct ItsySettings: Equatable, Sendable {
 			min: EditorSettings.minTabWidth,
 			max: EditorSettings.maxTabWidth
 		)
+		copy.editor.lineNumbers = copy.editor.lineNumberMode != .off
+		copy.editor.wrapColumn = Self.clamp(
+			copy.editor.wrapColumn,
+			min: EditorSettings.minWrapColumn,
+			max: EditorSettings.maxWrapColumn
+		)
 		copy.editor.language = copy.editor.language.reduce(into: [:]) { result, entry in
 			let key = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
 			guard !key.isEmpty else {
@@ -230,7 +269,10 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 		editor.font = override.font ?? editor.font
 		editor.fontSize = override.fontSize ?? editor.fontSize
-		editor.lineNumbers = override.lineNumbers ?? editor.lineNumbers
+		if let lineNumbers = override.lineNumbers {
+			editor.lineNumbers = lineNumbers
+			editor.lineNumberMode = lineNumbers ? (editor.lineNumberMode == .off ? .absolute : editor.lineNumberMode) : .off
+		}
 		editor.tabWidth = override.tabWidth ?? editor.tabWidth
 		editor.useSpaces = override.useSpaces ?? editor.useSpaces
 		return ItsySettings(editor: editor).normalized().editor
@@ -354,9 +396,13 @@ public final class ItsySettingsStore {
 		font = "\(escape(settings.editor.font))"
 		font_size = \(format(settings.editor.fontSize))
 		line_numbers = \(settings.editor.lineNumbers ? "true" : "false")
+		line_number_mode = "\(settings.editor.lineNumberMode.rawValue)"
 		tab_width = \(settings.editor.tabWidth)
 		use_spaces = \(settings.editor.useSpaces ? "true" : "false")
+		keymap = "\(settings.editor.keymap.rawValue)"
 		tab_groups = "\(settings.editor.tabGroups.rawValue)"
+		wrap = "\(settings.editor.wrap.rawValue)"
+		wrap_column = \(settings.editor.wrapColumn)
 
 		[editor.experimental]
 		storage = "\(settings.editor.experimental.storage.rawValue)"
@@ -595,8 +641,16 @@ struct ItsySettingsParser {
 		case "editor.line_numbers":
 			if case let .bool(lineNumbers) = value {
 				settings.editor.lineNumbers = lineNumbers
+				settings.editor.lineNumberMode = lineNumbers ? .absolute : .off
 			} else {
 				warnType(key, line: line, expected: "bool")
+			}
+		case "editor.line_number_mode":
+			if case let .string(mode) = value, let mode = ItsySettings.LineNumberMode(rawValue: mode.lowercased()) {
+				settings.editor.lineNumberMode = mode
+				settings.editor.lineNumbers = mode != .off
+			} else {
+				warnType(key, line: line, expected: #""off", "absolute", or "relative""#)
 			}
 		case "editor.tab_width":
 			if let integer = intValue(value) {
@@ -610,11 +664,29 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "editor.keymap":
+			if case let .string(mode) = value, let mode = ItsySettings.KeymapMode(rawValue: mode.lowercased()) {
+				settings.editor.keymap = mode
+			} else {
+				warnType(key, line: line, expected: #""plain", "vim", or "emacs""#)
+			}
 		case "editor.tab_groups":
 			if case let .string(scope) = value, let scope = ItsySettings.TabGroupScope(rawValue: scope.lowercased()) {
 				settings.editor.tabGroups = scope
 			} else {
 				warnType(key, line: line, expected: #""window" or "pane""#)
+			}
+		case "editor.wrap":
+			if case let .string(mode) = value, let mode = ItsySettings.WrapMode(rawValue: mode.lowercased()) {
+				settings.editor.wrap = mode
+			} else {
+				warnType(key, line: line, expected: #""none", "soft", or "hard""#)
+			}
+		case "editor.wrap_column":
+			if let integer = intValue(value) {
+				settings.editor.wrapColumn = integer
+			} else {
+				warnType(key, line: line, expected: "integer")
 			}
 		case "editor.experimental.storage":
 			if case let .string(storage) = value, let storage = ItsySettings.EditorStorage(rawValue: storage.lowercased()) {

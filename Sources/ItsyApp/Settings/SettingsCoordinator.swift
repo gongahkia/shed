@@ -10,10 +10,14 @@ import ItsySyntax
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsFontPopup: NSPopUpButton?
+	private var settingsKeymapPopup: NSPopUpButton?
 	private var settingsTabGroupsPopup: NSPopUpButton?
+	private var settingsLineNumberModePopup: NSPopUpButton?
+	private var settingsWrapPopup: NSPopUpButton?
+	private var settingsWrapColumnField: NSTextField?
+	private var settingsWrapColumnStepper: NSStepper?
 	private var settingsFontSizeField: NSTextField?
 	private var settingsFontSizeStepper: NSStepper?
-	private var settingsLineNumbersButton: NSButton?
 	private var settingsTerminalFontSizeField: NSTextField?
 	private var settingsTerminalFontSizeStepper: NSStepper?
 	private var settingsTerminalScrollbackField: NSTextField?
@@ -120,7 +124,7 @@ import ItsySyntax
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 470))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 570))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -144,6 +148,21 @@ import ItsySyntax
 		themePopup.action = #selector(settingsThemeDidChange(_:))
 		themePopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(themePopup)
+
+		let keymapLabel = settingsLabel("Keymap")
+		contentView.addSubview(keymapLabel)
+
+		let keymapPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		keymapPopup.addItem(withTitle: L10n.string("Plain"))
+		keymapPopup.lastItem?.representedObject = ItsySettings.KeymapMode.plain.rawValue
+		keymapPopup.addItem(withTitle: L10n.string("Vim"))
+		keymapPopup.lastItem?.representedObject = ItsySettings.KeymapMode.vim.rawValue
+		keymapPopup.addItem(withTitle: L10n.string("Emacs"))
+		keymapPopup.lastItem?.representedObject = ItsySettings.KeymapMode.emacs.rawValue
+		keymapPopup.target = self
+		keymapPopup.action = #selector(settingsKeymapDidChange(_:))
+		keymapPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(keymapPopup)
 
 		let fontLabel = settingsLabel("Font")
 		contentView.addSubview(fontLabel)
@@ -179,9 +198,20 @@ import ItsySyntax
 		sizeStepper.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(sizeStepper)
 
-		let lineNumbersButton = NSButton(checkboxWithTitle: L10n.string("Show Line Numbers"), target: self, action: #selector(settingsLineNumbersDidChange(_:)))
-		lineNumbersButton.translatesAutoresizingMaskIntoConstraints = false
-		contentView.addSubview(lineNumbersButton)
+		let lineNumberModeLabel = settingsLabel("Line Numbers")
+		contentView.addSubview(lineNumberModeLabel)
+
+		let lineNumberModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		lineNumberModePopup.addItem(withTitle: L10n.string("Off"))
+		lineNumberModePopup.lastItem?.representedObject = ItsySettings.LineNumberMode.off.rawValue
+		lineNumberModePopup.addItem(withTitle: L10n.string("Absolute"))
+		lineNumberModePopup.lastItem?.representedObject = ItsySettings.LineNumberMode.absolute.rawValue
+		lineNumberModePopup.addItem(withTitle: L10n.string("Relative"))
+		lineNumberModePopup.lastItem?.representedObject = ItsySettings.LineNumberMode.relative.rawValue
+		lineNumberModePopup.target = self
+		lineNumberModePopup.action = #selector(settingsLineNumberModeDidChange(_:))
+		lineNumberModePopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(lineNumberModePopup)
 
 		let tabGroupsLabel = settingsLabel("Tab Groups")
 		contentView.addSubview(tabGroupsLabel)
@@ -195,6 +225,42 @@ import ItsySyntax
 		tabGroupsPopup.action = #selector(settingsTabGroupsDidChange(_:))
 		tabGroupsPopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(tabGroupsPopup)
+
+		let wrapLabel = settingsLabel("Wrap")
+		contentView.addSubview(wrapLabel)
+
+		let wrapPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		wrapPopup.addItem(withTitle: L10n.string("Off"))
+		wrapPopup.lastItem?.representedObject = ItsySettings.WrapMode.none.rawValue
+		wrapPopup.addItem(withTitle: L10n.string("Soft"))
+		wrapPopup.lastItem?.representedObject = ItsySettings.WrapMode.soft.rawValue
+		wrapPopup.addItem(withTitle: L10n.string("Hard"))
+		wrapPopup.lastItem?.representedObject = ItsySettings.WrapMode.hard.rawValue
+		wrapPopup.target = self
+		wrapPopup.action = #selector(settingsWrapDidChange(_:))
+		wrapPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(wrapPopup)
+
+		let wrapColumnField = NSTextField(frame: .zero)
+		wrapColumnField.alignment = .right
+		let wrapColumnFormatter = NumberFormatter()
+		wrapColumnFormatter.minimum = NSNumber(value: ItsySettings.EditorSettings.minWrapColumn)
+		wrapColumnFormatter.maximum = NSNumber(value: ItsySettings.EditorSettings.maxWrapColumn)
+		wrapColumnFormatter.allowsFloats = false
+		wrapColumnField.formatter = wrapColumnFormatter
+		wrapColumnField.target = self
+		wrapColumnField.action = #selector(settingsWrapColumnDidChange(_:))
+		wrapColumnField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(wrapColumnField)
+
+		let wrapColumnStepper = NSStepper()
+		wrapColumnStepper.minValue = Double(ItsySettings.EditorSettings.minWrapColumn)
+		wrapColumnStepper.maxValue = Double(ItsySettings.EditorSettings.maxWrapColumn)
+		wrapColumnStepper.increment = 1
+		wrapColumnStepper.target = self
+		wrapColumnStepper.action = #selector(settingsWrapColumnDidChange(_:))
+		wrapColumnStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(wrapColumnStepper)
 
 		let terminalFontSizeLabel = settingsLabel("Terminal Size")
 		contentView.addSubview(terminalFontSizeLabel)
@@ -275,8 +341,14 @@ import ItsySyntax
 			themePopup.leadingAnchor.constraint(equalTo: themeLabel.trailingAnchor, constant: 12),
 			themePopup.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
 			themePopup.centerYAnchor.constraint(equalTo: themeLabel.centerYAnchor),
+			keymapLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			keymapLabel.topAnchor.constraint(equalTo: themeLabel.bottomAnchor, constant: 22),
+			keymapLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			keymapPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			keymapPopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			keymapPopup.centerYAnchor.constraint(equalTo: keymapLabel.centerYAnchor),
 			fontLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			fontLabel.topAnchor.constraint(equalTo: themeLabel.bottomAnchor, constant: 22),
+			fontLabel.topAnchor.constraint(equalTo: keymapLabel.bottomAnchor, constant: 22),
 			fontLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			fontPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			fontPopup.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
@@ -289,16 +361,31 @@ import ItsySyntax
 			sizeField.centerYAnchor.constraint(equalTo: sizeLabel.centerYAnchor),
 			sizeStepper.leadingAnchor.constraint(equalTo: sizeField.trailingAnchor, constant: 8),
 			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
-			lineNumbersButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			lineNumbersButton.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			lineNumberModeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			lineNumberModeLabel.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			lineNumberModeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			lineNumberModePopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			lineNumberModePopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			lineNumberModePopup.centerYAnchor.constraint(equalTo: lineNumberModeLabel.centerYAnchor),
 			tabGroupsLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			tabGroupsLabel.topAnchor.constraint(equalTo: lineNumbersButton.bottomAnchor, constant: 18),
+			tabGroupsLabel.topAnchor.constraint(equalTo: lineNumberModePopup.bottomAnchor, constant: 18),
 			tabGroupsLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			tabGroupsPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			tabGroupsPopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
 			tabGroupsPopup.centerYAnchor.constraint(equalTo: tabGroupsLabel.centerYAnchor),
+			wrapLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			wrapLabel.topAnchor.constraint(equalTo: tabGroupsPopup.bottomAnchor, constant: 18),
+			wrapLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			wrapPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			wrapPopup.centerYAnchor.constraint(equalTo: wrapLabel.centerYAnchor),
+			wrapColumnField.leadingAnchor.constraint(equalTo: wrapPopup.trailingAnchor, constant: 8),
+			wrapColumnField.widthAnchor.constraint(equalToConstant: 72),
+			wrapColumnField.centerYAnchor.constraint(equalTo: wrapPopup.centerYAnchor),
+			wrapColumnStepper.leadingAnchor.constraint(equalTo: wrapColumnField.trailingAnchor, constant: 8),
+			wrapColumnStepper.centerYAnchor.constraint(equalTo: wrapColumnField.centerYAnchor),
+			wrapColumnStepper.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
 			terminalFontSizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			terminalFontSizeLabel.topAnchor.constraint(equalTo: tabGroupsPopup.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.topAnchor.constraint(equalTo: wrapPopup.bottomAnchor, constant: 18),
 			terminalFontSizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			terminalFontSizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			terminalFontSizeField.widthAnchor.constraint(equalToConstant: 72),
@@ -324,10 +411,14 @@ import ItsySyntax
 		])
 		settingsThemePopup = themePopup
 		settingsFontPopup = fontPopup
+		settingsKeymapPopup = keymapPopup
 		settingsTabGroupsPopup = tabGroupsPopup
+		settingsLineNumberModePopup = lineNumberModePopup
+		settingsWrapPopup = wrapPopup
+		settingsWrapColumnField = wrapColumnField
+		settingsWrapColumnStepper = wrapColumnStepper
 		settingsFontSizeField = sizeField
 		settingsFontSizeStepper = sizeStepper
-		settingsLineNumbersButton = lineNumbersButton
 		settingsTerminalFontSizeField = terminalFontSizeField
 		settingsTerminalFontSizeStepper = terminalFontSizeStepper
 		settingsTerminalScrollbackField = scrollbackField
@@ -408,10 +499,20 @@ import ItsySyntax
 		}
 		settingsFontSizeField?.doubleValue = Double(preferences.fontSize)
 		settingsFontSizeStepper?.doubleValue = Double(preferences.fontSize)
-		settingsLineNumbersButton?.state = preferences.showLineNumbers ? .on : .off
+		if let item = settingsKeymapPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.editor.keymap.rawValue }) {
+			settingsKeymapPopup?.select(item)
+		}
+		if let item = settingsLineNumberModePopup?.itemArray.first(where: { $0.representedObject as? String == preferences.lineNumberMode.rawValue }) {
+			settingsLineNumberModePopup?.select(item)
+		}
 		if let item = settingsTabGroupsPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.editor.tabGroups.rawValue }) {
 			settingsTabGroupsPopup?.select(item)
 		}
+		if let item = settingsWrapPopup?.itemArray.first(where: { $0.representedObject as? String == preferences.wrap.rawValue }) {
+			settingsWrapPopup?.select(item)
+		}
+		settingsWrapColumnField?.integerValue = preferences.wrapColumn
+		settingsWrapColumnStepper?.integerValue = preferences.wrapColumn
 	}
 
 	private func refreshSettingsTerminalControls() {
@@ -509,9 +610,28 @@ import ItsySyntax
 		saveAndApplyEditorPreferences(preferences)
 	}
 
-	@objc private func settingsLineNumbersDidChange(_ sender: Any?) {
+	@objc private func settingsKeymapDidChange(_ sender: Any?) {
+		guard
+			let rawValue = settingsKeymapPopup?.selectedItem?.representedObject as? String,
+			let keymap = ItsySettings.KeymapMode(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.editor.keymap = keymap
+		saveAppSettings()
+		refreshSettingsEditorControls()
+		onSettingsChange(appSettings.normalized())
+	}
+
+	@objc private func settingsLineNumberModeDidChange(_ sender: Any?) {
+		guard
+			let rawValue = settingsLineNumberModePopup?.selectedItem?.representedObject as? String,
+			let lineNumberMode = ItsySettings.LineNumberMode(rawValue: rawValue)
+		else {
+			return
+		}
 		var preferences = EditorPreferences(settings: appSettings.editor)
-		preferences.showLineNumbers = settingsLineNumbersButton?.state == .on
+		preferences.lineNumberMode = lineNumberMode
 		saveAndApplyEditorPreferences(preferences)
 	}
 
@@ -526,6 +646,32 @@ import ItsySyntax
 		saveAppSettings()
 		refreshSettingsEditorControls()
 		onSettingsChange(appSettings.normalized())
+	}
+
+	@objc private func settingsWrapDidChange(_ sender: Any?) {
+		guard
+			let rawValue = settingsWrapPopup?.selectedItem?.representedObject as? String,
+			let wrap = ItsySettings.WrapMode(rawValue: rawValue)
+		else {
+			return
+		}
+		var preferences = EditorPreferences(settings: appSettings.editor)
+		preferences.wrap = wrap
+		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsWrapColumnDidChange(_ sender: Any?) {
+		var preferences = EditorPreferences(settings: appSettings.editor)
+		if sender as? NSStepper === settingsWrapColumnStepper {
+			preferences.wrapColumn = settingsWrapColumnStepper?.integerValue ?? preferences.wrapColumn
+		} else {
+			preferences.wrapColumn = settingsWrapColumnField?.integerValue ?? preferences.wrapColumn
+		}
+		preferences.wrapColumn = min(
+			max(preferences.wrapColumn, ItsySettings.EditorSettings.minWrapColumn),
+			ItsySettings.EditorSettings.maxWrapColumn
+		)
+		saveAndApplyEditorPreferences(preferences)
 	}
 
 	@objc private func settingsTerminalFontSizeDidChange(_ sender: Any?) {

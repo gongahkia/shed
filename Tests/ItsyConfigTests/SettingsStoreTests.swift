@@ -9,7 +9,12 @@ import Testing
 	font = "Monaco" # installed on macOS
 	font_size = 16.5
 	line_numbers = true
+	line_number_mode = "relative"
 	tab_width = 2
+	keymap = "vim"
+	tab_groups = "pane"
+	wrap = "soft"
+	wrap_column = 88
 
 	[editor.experimental]
 	storage = "piecetree"
@@ -33,7 +38,12 @@ import Testing
 	#expect(result.settings.editor.font == "Monaco")
 	#expect(result.settings.editor.fontSize == 16.5)
 	#expect(result.settings.editor.lineNumbers)
+	#expect(result.settings.editor.lineNumberMode == .relative)
 	#expect(result.settings.editor.tabWidth == 2)
+	#expect(result.settings.editor.keymap == .vim)
+	#expect(result.settings.editor.tabGroups == .pane)
+	#expect(result.settings.editor.wrap == .soft)
+	#expect(result.settings.editor.wrapColumn == 88)
 	#expect(!result.settings.editor.useSpaces)
 	#expect(result.settings.editor.experimental.storage == .pieceTree)
 	#expect(result.settings.theme.id == "bundled:default-dark")
@@ -102,6 +112,11 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"line_number_mode = "off""#))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"keymap = "plain""#))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"tab_groups = "window""#))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"wrap = "none""#))
+	#expect(ItsySettingsStore.serialize(settings).contains("wrap_column = 100"))
 	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 
@@ -116,7 +131,7 @@ import Testing
 	let url = directory.appendingPathComponent("settings.toml")
 	let store = ItsySettingsStore(fileURL: url)
 	let settings = ItsySettings(
-		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, tabWidth: 8, experimental: .init(storage: .pieceTree)),
+		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, lineNumberMode: .relative, tabWidth: 8, tabGroups: .pane, keymap: .emacs, wrap: .hard, wrapColumn: 72, experimental: .init(storage: .pieceTree)),
 		theme: .init(id: "user:night.toml", gitGutter: .init(added: "#101010", modified: "#202020", removed: "#303030")),
 		syntax: .init(preloadGrammars: .none),
 		terminal: .init(fontSize: 14, scrollbackLines: 1234)

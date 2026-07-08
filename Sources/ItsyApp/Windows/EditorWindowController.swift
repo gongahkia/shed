@@ -859,6 +859,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			fontSize: preferences.fontSize,
 			showsLineNumbers: preferences.showLineNumbers
 		)
+		view.configureEditorBehavior(
+			lineNumberMode: Self.metalLineNumberMode(preferences.lineNumberMode),
+			wrapMode: Self.metalWrapMode(preferences.wrap),
+			hardWrapColumn: preferences.wrapColumn
+		)
 		view.applyEditorColorPalette(AppTheme.palette.editor)
 		recordBenchStage("editor_pane_appearance_end")
 		recordBenchStage("editor_pane_keymap_begin")
@@ -867,6 +872,17 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recordBenchStage("editor_pane_callbacks_begin")
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
+		}
+		view.closeRequested = { [weak self, weak view, weak document] in
+			guard let self, let view else {
+				document?.close()
+				return
+			}
+			if tabGroupScope == .pane, let pane = paneCoordinator.panes.first(where: { $0.editorView === view }), let selectedDocument = selectedDocument(for: pane) {
+				closePaneDocument(ObjectIdentifier(selectedDocument), in: pane)
+			} else {
+				document?.close()
+			}
 		}
 		view.focusRequested = { [weak self, weak view] in
 			guard let self, let view else {
@@ -927,7 +943,40 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				fontSize: preferences.fontSize,
 				showsLineNumbers: preferences.showLineNumbers
 			)
+			pane.editorView.configureEditorBehavior(
+				lineNumberMode: Self.metalLineNumberMode(preferences.lineNumberMode),
+				wrapMode: Self.metalWrapMode(preferences.wrap),
+				hardWrapColumn: preferences.wrapColumn
+			)
 			pane.editorView.applyEditorColorPalette(AppTheme.palette.editor)
+		}
+	}
+
+	func reloadKeymap() {
+		for pane in paneCoordinator.panes {
+			pane.editorView.keymapEngine = ItsyAppKeymap.makeEngine()
+		}
+	}
+
+	private static func metalLineNumberMode(_ mode: ItsySettings.LineNumberMode) -> MetalLineNumberMode {
+		switch mode {
+		case .off:
+			return .off
+		case .absolute:
+			return .absolute
+		case .relative:
+			return .relative
+		}
+	}
+
+	private static func metalWrapMode(_ mode: ItsySettings.WrapMode) -> MetalWrapMode {
+		switch mode {
+		case .none:
+			return .none
+		case .soft:
+			return .soft
+		case .hard:
+			return .hard
 		}
 	}
 
@@ -1024,7 +1073,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		for pane in paneCoordinator.panes {
 			ensurePaneTabs(for: pane, preferredDocument: document as? ItsyDocument)
 			let id = paneID(pane)
-			let documents = (paneTabDocuments[id] ?? []).filter { openIDs.contains(ObjectIdentifier($0)) || openIDs.isEmpty }
+			let documents = (paneTabDocuments[id] ?? []).filter { openIDs.contains(ObjectIdentifier($0)) }
 			paneTabDocuments[id] = documents
 			if let selected = paneSelectedDocuments[id], !documents.contains(where: { ObjectIdentifier($0) == selected }) {
 				paneSelectedDocuments[id] = documents.first.map(ObjectIdentifier.init)
@@ -1317,6 +1366,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let next = (index + delta + documents.count) % documents.count
 		selectPaneDocument(documents[next], in: pane, addIfMissing: false)
 		focusEditor()
+	}
+
+	func closeActiveTabOrDocument() {
+		guard tabGroupScope == .pane, let selectedDocument = selectedDocument(for: paneCoordinator.activePane) else {
+			(document as? NSDocument)?.close()
+			return
+		}
+		closePaneDocument(ObjectIdentifier(selectedDocument), in: paneCoordinator.activePane)
 	}
 
 	func findNext() {

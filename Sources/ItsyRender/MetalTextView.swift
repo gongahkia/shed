@@ -9,6 +9,18 @@ import struct ItsyVim.VimEngine
 import struct ItsyVim.VimMarkStore
 import QuartzCore
 
+public enum MetalLineNumberMode: String, Sendable, Equatable {
+	case off
+	case absolute
+	case relative
+}
+
+public enum MetalWrapMode: String, Sendable, Equatable {
+	case none
+	case soft
+	case hard
+}
+
 struct MetalGlyphInstance {
 	var screenOrigin: SIMD2<Float>
 	var size: SIMD2<Float>
@@ -151,6 +163,13 @@ private struct CachedLineGlyph {
 	var atlasUV: SIMD4<Float>
 }
 
+struct VisibleLineSlot {
+	var line: Int
+	var row: Int
+	var range: Range<Int>
+	var xOffsetColumns: Int
+}
+
 public final class MetalTextView: NSView {
 	private static let accessibilityLocale = Locale(identifier: "en")
 	private nonisolated static let benchStageRecorder = MetalTextViewBenchStageRecorder()
@@ -232,11 +251,30 @@ public final class MetalTextView: NSView {
 	private var lineNumberRightEdge: CGFloat {
 		textInset.x - 12
 	}
-	public var showLineNumbers = false {
+	public var lineNumberMode = MetalLineNumberMode.off {
 		didSet {
-			guard oldValue != showLineNumbers else {
+			guard oldValue != lineNumberMode else {
 				return
 			}
+			syncEditorState()
+		}
+	}
+	public var showLineNumbers: Bool {
+		get { lineNumberMode != .off }
+		set { lineNumberMode = newValue ? .absolute : .off }
+	}
+	public var wrapMode = MetalWrapMode.none {
+		didSet {
+			guard oldValue != wrapMode else {
+				return
+			}
+			xOffset = 0
+			syncEditorState()
+		}
+	}
+	public var hardWrapColumn = 100 {
+		didSet {
+			hardWrapColumn = min(max(hardWrapColumn, 20), 240)
 			syncEditorState()
 		}
 	}
@@ -282,6 +320,17 @@ public final class MetalTextView: NSView {
 			lineShapeCache.removeAll(keepingCapacity: true)
 		}
 		showLineNumbers = showsLineNumbers
+		syncEditorState()
+	}
+
+	public func configureEditorBehavior(
+		lineNumberMode: MetalLineNumberMode,
+		wrapMode: MetalWrapMode,
+		hardWrapColumn: Int
+	) {
+		self.lineNumberMode = lineNumberMode
+		self.wrapMode = wrapMode
+		self.hardWrapColumn = hardWrapColumn
 		syncEditorState()
 	}
 
@@ -551,22 +600,63 @@ public final class MetalTextView: NSView {
 		return topLineIndex ..< end
 	}
 
-	private func visibleLineSlots() -> [(line: Int, row: Int)] {
+	func visibleLineSlots() -> [VisibleLineSlot] {
 		let capacity = visibleDisplayLineCapacity
 		guard capacity > 0, lineCount > 0 else {
 			return []
 		}
-		var slots: [(line: Int, row: Int)] = []
+		var slots: [VisibleLineSlot] = []
 		var line = min(max(topLineIndex, 0), max(0, lineCount - 1))
 		while line < lineCount, slots.count < capacity {
 			if let folded = foldedLineRanges.first(where: { $0.contains(line) }) {
 				line = min(max(line + 1, folded.upperBound), lineCount)
 				continue
 			}
-			slots.append((line, slots.count))
+			for slot in displaySlots(for: line, startingRow: slots.count) {
+				guard slots.count < capacity else {
+					break
+				}
+				slots.append(slot)
+			}
 			line += 1
 		}
 		return slots
+	}
+
+	private func displaySlots(for line: Int, startingRow: Int) -> [VisibleLineSlot] {
+		let lineRange = editor.textStorage.lineRange(line)
+		guard wrapMode == .soft, let wrapColumn = softWrapColumnCount(), wrapColumn > 0 else {
+			return [VisibleLineSlot(line: line, row: startingRow, range: lineRange, xOffsetColumns: 0)]
+		}
+		let text = editor.textStorage.substring(lineRange)
+		guard !text.isEmpty else {
+			return [VisibleLineSlot(line: line, row: startingRow, range: lineRange, xOffsetColumns: 0)]
+		}
+		var slots: [VisibleLineSlot] = []
+		var segmentStart = lineRange.lowerBound
+		var offset = lineRange.lowerBound
+		var column = 0
+		var segmentColumn = 0
+		for character in text {
+			let next = offset + String(character).utf8.count
+			if column > segmentColumn, column - segmentColumn >= wrapColumn {
+				slots.append(VisibleLineSlot(line: line, row: startingRow + slots.count, range: segmentStart ..< offset, xOffsetColumns: segmentColumn))
+				segmentStart = offset
+				segmentColumn = column
+			}
+			offset = next
+			column += 1
+		}
+		slots.append(VisibleLineSlot(line: line, row: startingRow + slots.count, range: segmentStart ..< lineRange.upperBound, xOffsetColumns: segmentColumn))
+		return slots
+	}
+
+	private func softWrapColumnCount() -> Int? {
+		guard wrapMode == .soft, textFontAdvance > 0 else {
+			return nil
+		}
+		let availableWidth = max(textFontAdvance, bounds.width - textInset.x - 12)
+		return max(1, Int(floor(availableWidth / textFontAdvance)))
 	}
 
 	private var visibleDisplayLineCapacity: Int {
@@ -601,6 +691,8 @@ public final class MetalTextView: NSView {
 	private func updateGutterView() {
 		layoutGutterView()
 		gutterView.showsLineNumbers = showLineNumbers
+		gutterView.lineNumberMode = lineNumberMode == .off ? .absolute : lineNumberMode
+		gutterView.activeLineIndex = editor.textStorage.line(forOffset: editor.selections.primary.head)
 		gutterView.lineCount = lineCount
 		gutterView.visibleLineRange = visibleLineRange
 		gutterView.visibleLineSlots = visibleLineSlots().map { $0.line }
@@ -618,7 +710,7 @@ public final class MetalTextView: NSView {
 			let lineDelta = Int((deltaY / max(lineHeight, 1)).rounded(.toNearestOrAwayFromZero))
 			topLineIndex = min(max(topLineIndex - lineDelta, 0), max(0, lineCount - 1))
 		}
-		if deltaX != 0 {
+		if deltaX != 0, wrapMode != .soft {
 			xOffset = max(0, xOffset - deltaX)
 		}
 		refreshFindMatchRects()
@@ -1000,14 +1092,34 @@ public final class MetalTextView: NSView {
 			editor.deleteForward()
 			didEdit = true
 		case 123:
-			editor.moveCursor(.charBackward)
+			if modifierFlags.contains(.shift) {
+				extendSelection(motion: .charBackward)
+			} else {
+				editor.moveCursor(.charBackward)
+			}
 		case 124:
-			editor.moveCursor(.charForward)
+			if modifierFlags.contains(.shift) {
+				extendSelection(motion: .charForward)
+			} else {
+				editor.moveCursor(.charForward)
+			}
+		case 125:
+			if modifierFlags.contains(.shift) {
+				extendSelection(motion: .lineDown)
+			} else {
+				editor.moveCursor(.lineDown)
+			}
+		case 126:
+			if modifierFlags.contains(.shift) {
+				extendSelection(motion: .lineUp)
+			} else {
+				editor.moveCursor(.lineUp)
+			}
 		default:
 			guard let characters, !characters.isEmpty, charactersIgnoringModifiers != "\u{1b}" else {
 				return false
 			}
-			editor.insert(characters)
+			editor.insert(textApplyingHardWrap(characters, replacing: editor.selections.primary.range))
 			didEdit = true
 		}
 		syncEditorState()
@@ -1070,10 +1182,8 @@ public final class MetalTextView: NSView {
 		let scaleKey = Self.scaleKey(for: scale)
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
-		let storage = editor.textStorage
 		for slot in visibleLineSlots() {
-			let lineIndex = slot.line
-			let lineRange = storage.lineRange(lineIndex)
+			let lineRange = slot.range
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
 				upperBound: lineRange.upperBound,
@@ -1109,10 +1219,9 @@ public final class MetalTextView: NSView {
 		let scaleKey = Self.scaleKey(for: scale)
 		let fontName = textFontPostScriptName
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
-		let storage = editor.textStorage
 		for slot in visibleLineSlots() {
 			let lineIndex = slot.line
-			let lineRange = storage.lineRange(lineIndex)
+			let lineRange = slot.range
 			let key = LineShapeCacheKey(
 				lowerBound: lineRange.lowerBound,
 				upperBound: lineRange.upperBound,
@@ -1149,21 +1258,20 @@ public final class MetalTextView: NSView {
 		}
 		let shaper = LineShaper()
 		let storage = editor.textStorage
-		let rowsByLine = Dictionary(uniqueKeysWithValues: visibleLineSlots().map { ($0.line, $0.row) })
+		let slots = visibleLineSlots()
 		for annotation in inlayHintAnnotations.sorted(by: { $0.offset < $1.offset }) {
 			let offset = min(max(annotation.offset, 0), storage.length)
 			let lineIndex = storage.line(forOffset: offset)
-			guard let row = rowsByLine[lineIndex] else {
+			guard let slot = slots.first(where: { $0.line == lineIndex && ($0.range.contains(offset) || $0.range.upperBound == offset) }) else {
 				continue
 			}
-			let lineRange = storage.lineRange(lineIndex)
-			let prefix = storage.substring(lineRange.lowerBound ..< min(offset, lineRange.upperBound))
+			let prefix = storage.substring(slot.range.lowerBound ..< min(offset, slot.range.upperBound))
 			let label = " " + annotation.label + " "
 			guard let glyphs = shapeCachedGlyphs(line: label, scale: scale, shaper: shaper) else {
 				continue
 			}
 			let x = textInset.x + typographicWidth(prefix) - xOffset + 4
-			let y = topContentInset + textInset.y + CGFloat(row) * lineHeight
+			let y = topContentInset + textInset.y + CGFloat(slot.row) * lineHeight
 			for glyph in glyphs {
 				let pixelX = ((x + glyph.originX) * scale).rounded()
 				let pixelY = ((y + glyph.originYOffset) * scale).rounded()
@@ -1621,9 +1729,11 @@ public final class MetalTextView: NSView {
 		let head = editor.selections.primary.head
 		let line = storage.line(forOffset: head)
 		let lineRange = storage.lineRange(line)
-		let prefix = storage.substring(lineRange.lowerBound ..< min(head, lineRange.upperBound))
+		let slot = visibleLineSlots().first { $0.line == line && ($0.range.contains(head) || $0.range.upperBound == head) }
+		let cursorRange = slot?.range ?? lineRange
+		let prefix = storage.substring(cursorRange.lowerBound ..< min(head, cursorRange.upperBound))
 		let cursorX = textInset.x + typographicWidth(prefix) - xOffset
-		let cursorY = topContentInset + textInset.y + CGFloat(line - topLineIndex) * lineHeight
+		let cursorY = topContentInset + textInset.y + CGFloat(slot?.row ?? line - topLineIndex) * lineHeight
 		setCursor(x: cursorX, y: cursorY, height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
 		refreshFindMatchRects()
@@ -1744,8 +1854,8 @@ public final class MetalTextView: NSView {
 			return nil
 		}
 		let relativeY = point.y - topContentInset - textInset.y
-		let line = topLineIndex + Int(floor(relativeY / lineHeight))
-		return visibleLineRange.contains(line) ? line : nil
+		let row = Int(floor(relativeY / lineHeight))
+		return visibleLineSlots().first { $0.row == row }?.line
 	}
 
 	private func gutterMarkerRect(for id: String) -> CGRect? {

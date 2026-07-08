@@ -126,6 +126,12 @@ import AppKit
 
 		let navigateMenu = NSMenu(title: L10n.string("Navigate"))
 		navigateMenu.disableAutomaticWritingToolsItems()
+		let gotoFileItem = navigateMenu.addItem(withTitle: L10n.string("Go to File"), action: #selector(AppCoordinator.showFilePalette(_:)), keyEquivalent: "p")
+		gotoFileItem.target = actionTarget
+		let gotoLineItem = navigateMenu.addItem(withTitle: L10n.string("Go to Line"), action: #selector(AppCoordinator.showLinePalette(_:)), keyEquivalent: "g")
+		gotoLineItem.keyEquivalentModifierMask = [.control]
+		gotoLineItem.target = actionTarget
+		navigateMenu.addItem(.separator())
 		let gotoWorkspaceSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in Workspace"), action: #selector(AppCoordinator.showWorkspaceSymbolPalette(_:)), keyEquivalent: "t")
 		gotoWorkspaceSymbolItem.target = actionTarget
 		let gotoFileSymbolItem = navigateMenu.addItem(withTitle: L10n.string("Go to Symbol in File"), action: #selector(AppCoordinator.showFileSymbolPalette(_:)), keyEquivalent: "O")

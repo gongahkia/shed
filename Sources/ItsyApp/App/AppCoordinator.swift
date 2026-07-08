@@ -155,6 +155,14 @@ import ItsyKeymap
 		commandPaletteCoordinator.showFileSymbolPalette(sender)
 	}
 
+	@objc func showFilePalette(_ sender: Any?) {
+		commandPaletteCoordinator.showFilePalette(sender)
+	}
+
+	@objc func showLinePalette(_ sender: Any?) {
+		commandPaletteCoordinator.showLinePalette(sender)
+	}
+
 	private func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {
 		let workspaceRoot = workspaceRoot ?? ItsyWorkspaceController.currentRootURL
 		var registry = CommandRegistry()
@@ -237,6 +245,12 @@ import ItsyKeymap
 				},
 				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"), defaultKey: "Cmd-Shift-O") { [weak self] in
 					self?.showFileSymbolPalette(nil)
+				},
+				Command(id: "nav.gotoFile", title: L10n.string("Go to File"), defaultKey: "Cmd-P") { [weak self] in
+					self?.showFilePalette(nil)
+				},
+				Command(id: "nav.gotoLine", title: L10n.string("Go to Line"), defaultKey: "Ctrl-G") { [weak self] in
+					self?.showLinePalette(nil)
 				},
 				Command(id: "view.outline", title: L10n.string("Outline"), defaultKey: "Cmd-Opt-7") { [weak self] in
 					self?.showOutline(nil)

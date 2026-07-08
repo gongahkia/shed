@@ -893,6 +893,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return NSApp.sendAction(#selector(AppCoordinator.showSettings(_:)), to: nil, from: self)
 		case "view.commandPalette":
 			return NSApp.sendAction(#selector(AppCoordinator.toggleCommandPalette(_:)), to: nil, from: self)
+		case "nav.gotoFile", "nav.gotoLine", "nav.gotoSymbolWorkspace", "nav.gotoSymbolFile":
+			return ItsyAppCommandBridge.requestRunCommand(commandID)
 		case "terminal.toggle":
 			return NSApp.sendAction(#selector(AppCoordinator.showTerminal(_:)), to: nil, from: self)
 		case "file.nextBuffer":

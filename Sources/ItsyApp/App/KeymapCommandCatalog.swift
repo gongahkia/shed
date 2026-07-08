@@ -62,7 +62,6 @@ enum KeymapCommandCatalog {
 		"lsp.hover",
 		"mode.insert",
 		"mode.normal",
-		"nav.gotoLine",
 		"pane.close",
 		"pane.closeOthers",
 		"pane.focusDown",

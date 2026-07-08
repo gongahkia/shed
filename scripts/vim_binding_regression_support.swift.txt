@@ -17,7 +17,7 @@ struct GeneratedVimBindingCase: CustomTestStringConvertible {
 	let actual = try bundledVimBindings().map(bindingSignature(_:))
 	let expected = try generatedVimBindingCases.map { try bindingSignature($0.binding()) }
 	#expect(actual == expected)
-	#expect(expected.count == 283)
+	#expect(expected.count == 285)
 }
 
 @Test(arguments: generatedVimBindingCases)
@@ -200,6 +200,20 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 		return mode == .visual ? .applySelectionOperator(.change) : .beginOperator(.change)
 	case "vim.operator.yank":
 		return mode == .visual ? .applySelectionOperator(.yank) : .beginOperator(.yank)
+	case "vim.case.toggle":
+		return .toggleCaseAtCursor
+	case "vim.case.toggleOperator":
+		return mode == .visual ? .applySelectionOperator(.toggleCase) : .beginOperator(.toggleCase)
+	case "vim.case.lowerOperator":
+		return mode == .visual ? .applySelectionOperator(.lowercase) : .beginOperator(.lowercase)
+	case "vim.case.upperOperator":
+		return mode == .visual ? .applySelectionOperator(.uppercase) : .beginOperator(.uppercase)
+	case "vim.indent.right":
+		return mode == .visual ? .applySelectionOperator(.indentRight) : .lineOperator(.indentRight)
+	case "vim.indent.left":
+		return mode == .visual ? .applySelectionOperator(.indentLeft) : .lineOperator(.indentLeft)
+	case "vim.repeatChange":
+		return .repeatLastChange
 	case "vim.registerPrefix":
 		return .handled
 	case "vim.jumpBack":
@@ -238,7 +252,7 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 		return .insertMode
 	case "mode.emacs":
 		return .emacsMode
-	case "vim.textObject.innerSentence", "vim.textObject.aroundSentence", "vim.textObject.innerTag", "vim.textObject.aroundTag":
+	case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
 		return .normalMode
 	default:
 		return handledCommandIDs.contains(commandID) ? .handled : nil
@@ -287,6 +301,8 @@ private let textObjectCommandIDs: Set<String> = [
 	"vim.textObject.aroundBrace",
 	"vim.textObject.innerParagraph",
 	"vim.textObject.aroundParagraph",
+	"vim.textObject.innerTag",
+	"vim.textObject.aroundTag",
 ]
 
 private let handledCommandIDs: Set<String> = [
@@ -297,11 +313,6 @@ private let handledCommandIDs: Set<String> = [
 	"file.openUnderCursor",
 	"vim.replace.char",
 	"vim.replace.mode",
-	"vim.case.toggle",
-	"vim.case.lowerOperator",
-	"vim.case.upperOperator",
-	"vim.indent.right",
-	"vim.indent.left",
 	"vim.format.operator",
 	"vim.format.line",
 	"vim.format.reflowOperator",

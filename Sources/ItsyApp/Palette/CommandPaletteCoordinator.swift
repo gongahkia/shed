@@ -558,6 +558,12 @@ import ItsyEditor
 		case #selector(NSResponder.insertNewline(_:)):
 			runCommandPaletteSelection()
 			return true
+		case #selector(NSResponder.insertTab(_:)):
+			if commandPaletteAcceptsRawText {
+				completeCommandPaletteRawText()
+				return true
+			}
+			return false
 		case #selector(NSResponder.cancelOperation(_:)):
 			if commandPaletteAcceptsRawText {
 				cancelCommandPalette()
@@ -574,6 +580,19 @@ import ItsyEditor
 		default:
 			return false
 		}
+	}
+
+	private func completeCommandPaletteRawText() {
+		guard let input = commandPaletteInputField else {
+			return
+		}
+		let raw = input.stringValue
+		let hasColon = raw.hasPrefix(":")
+		let prefix = hasColon ? String(raw.dropFirst()) : raw
+		guard let match = commandRegistryProvider().allCommands.map(\.id).sorted().first(where: { $0.hasPrefix(prefix) }) else {
+			return
+		}
+		input.stringValue = (hasColon ? ":" : "") + match
 	}
 
 	func numberOfRows(in tableView: NSTableView) -> Int {

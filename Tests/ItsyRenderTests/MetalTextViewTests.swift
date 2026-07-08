@@ -1,6 +1,7 @@
 import AppKit
 import ItsyEditor
 import ItsyKeymap
+import struct ItsyVim.VimMarkStore
 @testable import ItsyRender
 import Testing
 
@@ -1045,6 +1046,140 @@ private final class TestGutterDecorator: GutterDecorator {
 	completion?(":wq")
 	#expect(view.keymapEngine.mode == .normal)
 	#expect(commands == ["wq"])
+}
+
+@Test func vimCaseAndIndentCommandsEditText() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("`", modifiers: .shift)], commandID: "vim.case.toggle"),
+		KeyBinding(mode: .normal, chord: [Key("g"), Key("`", modifiers: .shift)], commandID: "vim.case.toggleOperator"),
+		KeyBinding(mode: .normal, chord: [Key("g"), Key("u")], commandID: "vim.case.lowerOperator"),
+		KeyBinding(mode: .normal, chord: [Key("g"), Key("u", modifiers: .shift)], commandID: "vim.case.upperOperator"),
+		KeyBinding(mode: .normal, chord: [Key(".", modifiers: .shift), Key(".", modifiers: .shift)], commandID: "vim.indent.right"),
+		KeyBinding(mode: .normal, chord: [Key(",", modifiers: .shift), Key(",", modifiers: .shift)], commandID: "vim.indent.left"),
+		KeyBinding(mode: .normal, chord: [Key(".")], commandID: "vim.repeatChange"),
+		KeyBinding(mode: .operatorPending, chord: [Key("w")], commandID: "editor.moveWordForward"),
+	])
+
+	view.editor = Editor(text: "Abc DEF")
+	#expect(view.handleKey(characters: "~", charactersIgnoringModifiers: "`", keyCode: 0, modifierFlags: .shift))
+	#expect(editorStorageString(view.editor) == "abc DEF")
+	view.editor = Editor(text: "Abc DEF")
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(view.handleKey(characters: "u", charactersIgnoringModifiers: "u", keyCode: 0))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "abc DEF")
+	view.editor = Editor(text: "Abc DEF")
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(view.handleKey(characters: "U", charactersIgnoringModifiers: "u", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "ABC DEF")
+	view.editor = Editor(text: "Abc DEF")
+	#expect(view.handleKey(characters: "g", charactersIgnoringModifiers: "g", keyCode: 0))
+	#expect(view.handleKey(characters: "~", charactersIgnoringModifiers: "`", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "aBC DEF")
+	view.editor = Editor(text: "one\ntwo\n")
+	#expect(view.handleKey(characters: ">", charactersIgnoringModifiers: ".", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: ">", charactersIgnoringModifiers: ".", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: ".", charactersIgnoringModifiers: ".", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "\t\tone\ntwo\n")
+	#expect(view.handleKey(characters: "<", charactersIgnoringModifiers: ",", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "<", charactersIgnoringModifiers: ",", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: ".", charactersIgnoringModifiers: ".", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "one\ntwo\n")
+}
+
+@Test func vimDotRepeatReplaysLastChangeCountAndRegister() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "one two three four")
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("'", modifiers: .shift)], commandID: "vim.registerPrefix"),
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .normal, chord: [Key(".")], commandID: "vim.repeatChange"),
+		KeyBinding(mode: .operatorPending, chord: [Key("w")], commandID: "editor.moveWordForward"),
+	])
+
+	#expect(view.handleKey(characters: "\"", charactersIgnoringModifiers: "'", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "w", charactersIgnoringModifiers: "w", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "three four")
+	#expect(view.vimEngine.lastChange?.count == 2)
+	#expect(view.vimEngine.lastChange?.register == "a")
+	#expect(view.registers["a"] == "one two ")
+	#expect(view.handleKey(characters: ".", charactersIgnoringModifiers: ".", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "")
+}
+
+@Test func vimTagTextObjectsDeleteInnerAndAroundTags() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .operatorPending, chord: [Key("i"), Key("t")], commandID: "vim.textObject.innerTag"),
+		KeyBinding(mode: .operatorPending, chord: [Key("a"), Key("t")], commandID: "vim.textObject.aroundTag"),
+	])
+
+	view.editor = Editor(text: "<div><span>value</span></div> tail")
+	view.selectUTF8Range(13 ..< 13)
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "t", charactersIgnoringModifiers: "t", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "<div><span></span></div> tail")
+	view.editor = Editor(text: "<div><span>value</span></div> tail")
+	view.selectUTF8Range(13 ..< 13)
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "t", charactersIgnoringModifiers: "t", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "<div></div> tail")
+}
+
+@Test func vimExCommandTabCompletesFallbackCommandLine() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	var commands: [String] = []
+	view.exCommandCompletionsProvider = { ["file.close", "file.save"] }
+	view.exCommandRequested = { command in
+		commands.append(command)
+		return true
+	}
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key(";", modifiers: .shift)], commandID: "vim.ex.start"),
+	])
+
+	#expect(view.handleKey(characters: ":", charactersIgnoringModifiers: ";", keyCode: 0, modifierFlags: .shift))
+	for character in "file.s" {
+		#expect(view.handleKey(characters: String(character), charactersIgnoringModifiers: String(character), keyCode: 0))
+	}
+	#expect(view.handleKey(characters: "\t", charactersIgnoringModifiers: "\t", keyCode: 48))
+	#expect(view.handleKey(characters: "\n", charactersIgnoringModifiers: "\n", keyCode: 36))
+	#expect(commands == ["file.save"])
+}
+
+@Test func vimMarksPersistAcrossViewInstances() {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+	let workspace = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+	defer {
+		try? FileManager.default.removeItem(at: directory)
+		try? FileManager.default.removeItem(at: workspace)
+	}
+	let store = VimMarkStore(directory: directory)
+	let first = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	first.vimMarkStore = store
+	first.vimMarksWorkspaceRoot = workspace
+	first.editor = Editor(text: "abc")
+	first.selectUTF8Range(2 ..< 2)
+	first.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("m"), Key("a")], commandID: "vim.mark.set.a"),
+	])
+
+	#expect(first.handleKey(characters: "m", charactersIgnoringModifiers: "m", keyCode: 0))
+	#expect(first.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+
+	let second = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	second.vimMarkStore = store
+	second.vimMarksWorkspaceRoot = workspace
+	#expect(second.vimEngine.marks["a"]?.offset == 2)
 }
 
 @Test func textInputClientCommitsAndMarksIMEText() {

@@ -78,6 +78,38 @@ import ItsyEditor
 		}
 	}
 
+	func reveal(_ url: URL) {
+		let target = url.standardizedFileURL
+		guard let root = rootURLs.first(where: { root in
+			let rootPath = (root as URL).standardizedFileURL.path
+			return target.path == rootPath || target.path.hasPrefix(rootPath + "/")
+		}) else {
+			return
+		}
+		var ancestors: [NSURL] = []
+		var current = target
+		while current.standardizedFileURL.path != (root as URL).standardizedFileURL.path {
+			ancestors.append(current as NSURL)
+			current.deleteLastPathComponent()
+		}
+		outlineView.expandItem(root)
+		for ancestor in ancestors.reversed().dropLast() {
+			outlineView.expandItem(ancestor)
+		}
+		childCache.removeAll(keepingCapacity: true)
+		outlineView.reloadData()
+		outlineView.expandItem(root)
+		for ancestor in ancestors.reversed().dropLast() {
+			outlineView.expandItem(ancestor)
+		}
+		let item = (ancestors.first ?? root) as NSURL
+		let row = outlineView.row(forItem: item)
+		if row >= 0 {
+			outlineView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+			outlineView.scrollRowToVisible(row)
+		}
+	}
+
 	private func configureView() {
 		view.wantsLayer = true
 		view.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor

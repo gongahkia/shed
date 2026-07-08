@@ -1,6 +1,6 @@
-@testable import ItsyApp
 import AppKit
 import Foundation
+@testable import ItsyApp
 import Testing
 
 @Test func terminalEmulatorParsesOSCTitleWithBellAndStringTerminator() {
@@ -117,4 +117,50 @@ import Testing
 	view.paste(nil)
 
 	#expect(String(decoding: input, as: UTF8.self) == "\u{1B}[200~one\ntwo\u{1B}[201~")
+}
+
+@Test func terminalPaneLayoutRoundTrips() {
+	let layout = TerminalPaneLayout.split(vertical: true, children: [
+		.leaf,
+		.split(vertical: false, children: [.leaf, .leaf]),
+	])
+
+	#expect(layout.encoded == "V[L,H[L,L]]")
+	#expect(TerminalPaneLayout.decode(layout.encoded) == layout)
+	#expect(TerminalPaneLayout.decode("V[L") == nil)
+}
+
+@Test func terminalWorkspaceStateCodableRoundTrips() throws {
+	let state = TerminalWorkspaceState(
+		selectedTabIndex: 1,
+		tabs: [
+			TerminalTabState(currentDirectoryPath: "/tmp/one", layout: "L"),
+			TerminalTabState(currentDirectoryPath: "/tmp/two", layout: "H[L,L]"),
+		]
+	)
+	let data = try JSONEncoder().encode(state)
+
+	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: data) == state)
+}
+
+@Test @MainActor func terminalViewParsesOSC7CurrentDirectory() {
+	let view = ItsyTerminalView(frame: NSRect(x: 0, y: 0, width: 240, height: 120))
+	let cwd = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+		.appendingPathComponent("Itsy Terminal CWD", isDirectory: true)
+
+	view.ingest(Data("\u{1B}]7;\(cwd.absoluteString)\u{07}".utf8))
+
+	#expect(view.currentDirectoryURL?.path == cwd.standardizedFileURL.path)
+}
+
+@Test @MainActor func terminalViewSearchPreservesSelectionForSameQuery() {
+	let view = ItsyTerminalView(frame: NSRect(x: 0, y: 0, width: 240, height: 120))
+
+	view.ingest(Data("alpha beta\r\nAlpha gamma\r\n".utf8))
+
+	#expect(view.setSearch(query: "alpha", regex: false) == 2)
+	#expect(view.findNextSearchMatch() == 1)
+	#expect(view.setSearch(query: "alpha", regex: false) == 2)
+	#expect(view.findNextSearchMatch() == 0)
+	#expect(view.setSearch(query: "a[a-z]+a", regex: true) == 3)
 }

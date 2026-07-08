@@ -24,6 +24,7 @@ GitHub Actions release flow expects:
 - `APPLE_ID`
 - `APPLE_TEAM_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
+- `SPARKLE_PRIVATE_KEY`
 
 Local signing/notarization expects either:
 
@@ -105,6 +106,8 @@ scripts/make_appcast.sh
 ```
 
 Set `SPARKLE_GENERATE_APPCAST` only if overriding the SwiftPM artifact tool path.
+Set `SPARKLE_PRIVATE_KEY` or `SPARKLE_ED_KEY_FILE` for non-Keychain signing.
+Set `SPARKLE_REQUIRE_ED_KEY=1` in CI so appcast generation cannot silently omit EdDSA signatures.
 
 ## Homebrew Cask Gate
 

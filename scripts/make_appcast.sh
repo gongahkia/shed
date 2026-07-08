@@ -12,6 +12,10 @@ fi
 
 dmg_path="${ITSY_DMG_PATH:-$repo_dir/dist/$app_name-$version.dmg}"
 updates_dir="${SPARKLE_UPDATES_DIR:-$repo_dir/dist/sparkle}"
+download_url_prefix="${SPARKLE_DOWNLOAD_URL_PREFIX:-}"
+private_key="${SPARKLE_PRIVATE_KEY:-}"
+ed_key_file="${SPARKLE_ED_KEY_FILE:-}"
+require_ed_key="${SPARKLE_REQUIRE_ED_KEY:-0}"
 default_generate_appcast="$repo_dir/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
 generate_appcast="${SPARKLE_GENERATE_APPCAST:-}"
 if [[ -z "$generate_appcast" ]]; then
@@ -32,8 +36,28 @@ if ! command -v "$generate_appcast" >/dev/null 2>&1; then
 	exit 1
 fi
 
+if [[ "$require_ed_key" == "1" && -z "$private_key" && -z "$ed_key_file" ]]; then
+	echo "missing Sparkle EdDSA private key; set SPARKLE_PRIVATE_KEY or SPARKLE_ED_KEY_FILE" >&2
+	exit 1
+fi
+
 mkdir -p "$updates_dir"
 cp "$dmg_path" "$updates_dir/"
-"$generate_appcast" "$updates_dir"
+appcast_args=()
+if [[ -n "$download_url_prefix" ]]; then
+	appcast_args+=(--download-url-prefix "$download_url_prefix")
+fi
+if [[ -n "$ed_key_file" ]]; then
+	appcast_args+=(--ed-key-file "$ed_key_file")
+elif [[ -n "$private_key" ]]; then
+	appcast_args+=(--ed-key-file -)
+fi
+appcast_args+=("$updates_dir")
+
+if [[ -n "$private_key" && -z "$ed_key_file" ]]; then
+	printf '%s' "$private_key" | "$generate_appcast" "${appcast_args[@]}"
+else
+	"$generate_appcast" "${appcast_args[@]}"
+fi
 
 find "$updates_dir" -maxdepth 1 \( -name '*.xml' -o -name 'appcast*.rss' \) -print

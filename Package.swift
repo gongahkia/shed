@@ -271,7 +271,7 @@ let package = Package(
 		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyConfig", "ItsyLSP"], resources: [.copy("Fixtures")]),
 		.testTarget(name: "ItsyConfigTests", dependencies: ["ItsyConfig"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
-		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim"]),
+		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim", "ItsyKeymap"]),
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),
 		.testTarget(name: "ItsyAppTests", dependencies: ["ItsyApp", "ItsyEditor"]),
 		.testTarget(name: "ItsySyntaxTests", dependencies: ["ItsySyntax", "ItsyEditor", "CTSGrammars"]),

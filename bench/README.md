@@ -38,6 +38,14 @@ bench/scripts/memory_audit.sh
 
 This launches the release binary, waits for `first_draw`, samples `ItsyBench rss`, runs `vmmap -summary`, and writes `bench/results/memory-YYYY-MM-DD.{json,md}`.
 
+Coverage:
+
+```sh
+bench/scripts/coverage.sh
+```
+
+This runs `swift test --enable-code-coverage`, exports LCOV with `xcrun llvm-cov`, writes `bench/results/coverage-YYYY-MM-DD.{lcov,json,md}`, and fails when `ITSY_COVERAGE_GATE=1` and line coverage drops by more than `ITSY_COVERAGE_DROP_LIMIT` percentage points from the latest committed coverage JSON.
+
 ## 2026-06-28 baseline
 
 Installed Homebrew casks:

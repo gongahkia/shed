@@ -22,8 +22,16 @@ jobs:
         run: scripts/validate_keymaps.swift
       - name: Build release
         run: swift build -c release
-      - name: Test
-        run: swift test
+      - name: Test with coverage
+        run: ITSY_COVERAGE_DATE=current ITSY_COVERAGE_GATE=1 bench/scripts/coverage.sh
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            bench/results/coverage-current.lcov
+            bench/results/coverage-current.json
+            bench/results/coverage-current.md
       - name: LSP smoke
         run: swift test --filter ItsyLSPSmokeTests
       - name: Bench smoke

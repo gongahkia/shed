@@ -9,6 +9,7 @@ bench/corpus/huge.log
 bench/corpus/huge-text.log
 bench/results/*.json
 !bench/results/baseline-itsy-current.json
+!bench/results/coverage-*.json
 !.gitkeep
 !.gitignore
 !*.md

@@ -12,7 +12,7 @@ struct Binding {
 let repo = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
 let keymapDir = repo.appendingPathComponent("Sources/ItsyKeymap/Resources")
 let sourcesDir = repo.appendingPathComponent("Sources")
-let hiddenCatalogURL = repo.appendingPathComponent("Sources/ItsyApp/KeymapCommandCatalog.swift")
+let hiddenCatalogURL = repo.appendingPathComponent("Sources/ItsyApp/App/KeymapCommandCatalog.swift")
 
 func fail(_ message: String) -> Never {
 	FileHandle.standardError.write(Data((message + "\n").utf8))

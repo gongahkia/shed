@@ -61,6 +61,7 @@ type Daemon struct {
 	Matrix                  MatrixOptions
 	Slack                   SlackOptions
 	Discord                 DiscordOptions
+	Zulip                   ZulipOptions
 	Pushover                PushoverOptions
 	Ntfy                    NtfyOptions
 	Gotify                  GotifyOptions
@@ -120,6 +121,7 @@ type Options struct {
 	Matrix                  MatrixOptions
 	Slack                   SlackOptions
 	Discord                 DiscordOptions
+	Zulip                   ZulipOptions
 	Pushover                PushoverOptions
 	Ntfy                    NtfyOptions
 	Gotify                  GotifyOptions
@@ -158,6 +160,15 @@ type DiscordOptions struct {
 	GatewayURL string
 	AllowedIDs []string
 	Intents    int
+}
+
+type ZulipOptions struct {
+	BaseURL     string
+	Email       string
+	APIKey      string
+	Stream      string
+	TopicPrefix string
+	OwnerEmail  string
 }
 
 type PushoverOptions struct {
@@ -240,6 +251,7 @@ func New(opts Options) *Daemon {
 		Matrix:                  opts.Matrix,
 		Slack:                   opts.Slack,
 		Discord:                 opts.Discord,
+		Zulip:                   opts.Zulip,
 		Pushover:                opts.Pushover,
 		Ntfy:                    opts.Ntfy,
 		Gotify:                  opts.Gotify,
@@ -539,6 +551,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	d.startMatrixBridge(ctx, &wg, cancel)
 	d.startSlackBridge(ctx, &wg, cancel)
 	d.startDiscordBridge(ctx, &wg, cancel)
+	d.startZulipBridge(ctx, &wg, cancel)
 	d.startPushoverNotifier(ctx, &wg)
 	d.startNtfyNotifier(ctx, &wg)
 	d.startGotifyNotifier(ctx, &wg)

@@ -607,9 +607,13 @@ import Testing
 
 	let status = try repository.status()
 	let entry = try #require(status.entries.first)
+	let conflicts = try repository.conflicts()
 	let merged = try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8)
 
 	#expect(entry.isConflict)
+	#expect(conflicts == [
+		GitConflictEntry(path: "file.txt", ancestorPath: "file.txt", oursPath: "file.txt", theirsPath: "file.txt"),
+	])
 	#expect(try repository.conflictBlob(path: "file.txt", stage: 1) == "base\n")
 	#expect(try repository.conflictBlob(path: "file.txt", stage: 2) == "ours\n")
 	#expect(try repository.conflictBlob(path: "file.txt", stage: 3) == "theirs\n")

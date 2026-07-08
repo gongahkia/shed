@@ -12,7 +12,15 @@ fi
 
 dmg_path="${ITSY_DMG_PATH:-$repo_dir/dist/$app_name-$version.dmg}"
 updates_dir="${SPARKLE_UPDATES_DIR:-$repo_dir/dist/sparkle}"
-generate_appcast="${SPARKLE_GENERATE_APPCAST:-generate_appcast}"
+default_generate_appcast="$repo_dir/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
+generate_appcast="${SPARKLE_GENERATE_APPCAST:-}"
+if [[ -z "$generate_appcast" ]]; then
+	if [[ -x "$default_generate_appcast" ]]; then
+		generate_appcast="$default_generate_appcast"
+	else
+		generate_appcast="generate_appcast"
+	fi
+fi
 
 if [[ ! -f "$dmg_path" ]]; then
 	echo "missing DMG: $dmg_path" >&2
@@ -20,7 +28,7 @@ if [[ ! -f "$dmg_path" ]]; then
 fi
 
 if ! command -v "$generate_appcast" >/dev/null 2>&1; then
-	echo "missing Sparkle generate_appcast tool; set SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast" >&2
+	echo "missing Sparkle generate_appcast tool; run swift build or set SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast" >&2
 	exit 1
 fi
 

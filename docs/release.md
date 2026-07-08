@@ -101,8 +101,10 @@ Do not enable automatic updates until the URL and signing key are final.
 After the signed DMG and EdDSA key are available, generate the appcast with:
 
 ```sh
-SPARKLE_GENERATE_APPCAST=/path/to/generate_appcast scripts/make_appcast.sh
+scripts/make_appcast.sh
 ```
+
+Set `SPARKLE_GENERATE_APPCAST` only if overriding the SwiftPM artifact tool path.
 
 ## Homebrew Cask Gate
 

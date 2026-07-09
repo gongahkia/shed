@@ -76,6 +76,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private static let snippetLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let fileTreeController = FileTreeSidebarController()
+	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private var findBarController: FindBarController?
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
@@ -87,6 +88,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
+	private var sidebarVisible = true
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -170,26 +172,25 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		editorStack.addArrangedSubview(editorContainer)
 		editorStack.addArrangedSubview(statusBarView)
 
-		let splitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
-		splitView.isVertical = true
-		splitView.dividerStyle = .thin
-		splitView.autoresizingMask = [.width, .height]
+		rootSplitView.isVertical = true
+		rootSplitView.dividerStyle = .thin
+		rootSplitView.autoresizingMask = [.width, .height]
 		fileTreeController.view.translatesAutoresizingMaskIntoConstraints = false
 		editorStack.translatesAutoresizingMaskIntoConstraints = false
-		splitView.addArrangedSubview(fileTreeController.view)
-		splitView.addArrangedSubview(editorStack)
+		rootSplitView.addArrangedSubview(fileTreeController.view)
+		rootSplitView.addArrangedSubview(editorStack)
 		let sidebarWidthConstraint = fileTreeController.view.widthAnchor.constraint(equalToConstant: 240)
 		sidebarWidthConstraint.isActive = true
 		self.sidebarWidthConstraint = sidebarWidthConstraint
 		let window = NSWindow(
-			contentRect: splitView.frame,
+			contentRect: rootSplitView.frame,
 			styleMask: [.titled, .closable, .miniaturizable, .resizable],
 			backing: .buffered,
 			defer: false
 		)
 		window.title = document.fileURL?.lastPathComponent ?? L10n.string("Untitled")
 		window.isRestorable = true
-		window.contentView = splitView
+		window.contentView = rootSplitView
 		super.init(window: window)
 		tabGroupScope = ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
@@ -304,9 +305,44 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func toggleSidebar() {
-		fileTreeController.view.isHidden.toggle()
-		sidebarWidthConstraint?.constant = fileTreeController.view.isHidden ? 0 : 240
-		window?.contentView?.layoutSubtreeIfNeeded()
+		setSidebarVisible(!sidebarVisible)
+	}
+
+	private func setSidebarVisible(_ visible: Bool) {
+		guard visible != sidebarVisible else {
+			return
+		}
+		sidebarVisible = visible
+		if visible {
+			sidebarWidthConstraint?.constant = 240
+			fileTreeController.view.isHidden = false
+			if !rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
+				rootSplitView.insertArrangedSubview(fileTreeController.view, at: 0)
+			}
+		} else {
+			if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
+				rootSplitView.removeArrangedSubview(fileTreeController.view)
+				fileTreeController.view.removeFromSuperview()
+			}
+			fileTreeController.view.isHidden = true
+			sidebarWidthConstraint?.constant = 0
+		}
+		invalidateEditorShellLayout()
+	}
+
+	private func invalidateEditorShellLayout() {
+		rootSplitView.needsLayout = true
+		rootSplitView.layoutSubtreeIfNeeded()
+		editorContainer.needsLayout = true
+		editorContainer.layoutSubtreeIfNeeded()
+		paneCoordinator.view.needsLayout = true
+		paneCoordinator.view.layoutSubtreeIfNeeded()
+		for pane in paneCoordinator.panes {
+			pane.viewController.view.needsLayout = true
+			pane.viewController.view.layoutSubtreeIfNeeded()
+			pane.editorView.needsDisplay = true
+		}
+		layoutTabContent()
 	}
 
 	func toggleHiddenFiles() {

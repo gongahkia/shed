@@ -56,6 +56,33 @@ import Testing
 }
 
 @MainActor
+@Test func togglingSidebarReclaimsEditorSplitSpace() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 1200, height: 672), display: false)
+	splitView.frame = NSRect(x: 0, y: 0, width: 1200, height: 672)
+	splitView.layoutSubtreeIfNeeded()
+
+	#expect(splitView.arrangedSubviews.count == 2)
+
+	controller.toggleSidebar()
+	splitView.layoutSubtreeIfNeeded()
+
+	#expect(splitView.arrangedSubviews.count == 1)
+	#expect(abs(splitView.arrangedSubviews[0].frame.minX) < 0.5)
+	#expect(splitView.arrangedSubviews[0].frame.width > 1_100)
+
+	controller.toggleSidebar()
+	splitView.layoutSubtreeIfNeeded()
+
+	#expect(splitView.arrangedSubviews.count == 2)
+	#expect(abs(splitView.arrangedSubviews[0].frame.width - 240) < 2)
+	#expect(splitView.arrangedSubviews[1].frame.minX > 200)
+}
+
+@MainActor
 @Test func documentFileWatcherCanDeinitializeOffMainWithActiveSource() throws {
 	let fileManager = FileManager.default
 	let directory = fileManager.temporaryDirectory.appendingPathComponent(UUID().uuidString)

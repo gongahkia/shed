@@ -20,6 +20,7 @@ import (
 	"github.com/gongahkia/onibi/internal/config"
 	"github.com/gongahkia/onibi/internal/daemon"
 	"github.com/gongahkia/onibi/internal/discord"
+	emailapi "github.com/gongahkia/onibi/internal/email"
 	"github.com/gongahkia/onibi/internal/gotify"
 	"github.com/gongahkia/onibi/internal/irc"
 	"github.com/gongahkia/onibi/internal/matrix"
@@ -27,6 +28,7 @@ import (
 	"github.com/gongahkia/onibi/internal/secrets"
 	"github.com/gongahkia/onibi/internal/service"
 	"github.com/gongahkia/onibi/internal/slack"
+	"github.com/gongahkia/onibi/internal/sms"
 	"github.com/gongahkia/onibi/internal/web"
 	"github.com/gongahkia/onibi/internal/web/transport"
 	"github.com/gongahkia/onibi/internal/zulip"
@@ -294,6 +296,12 @@ func (r *runner) checkTransportProvider() {
 		r.checkNtfyProvider(topic)
 	case "gotify":
 		r.checkGotifyProvider()
+	case "apns":
+		r.checkAPNsProvider()
+	case "sms":
+		r.checkSMSProvider()
+	case "email":
+		r.checkEmailProvider()
 	default:
 		r.add("transport provider", Warn, "unknown transport "+mode)
 	}
@@ -605,6 +613,77 @@ func (r *runner) checkGotifyProvider() {
 		return
 	}
 	r.add("transport provider", Pass, "Gotify live API ok: token + send; set ONIBI_GOTIFY_CLIENT_TOKEN for WS")
+}
+
+func (r *runner) checkAPNsProvider() {
+	if missing := missingEnv("ONIBI_APNS_KEY_PATH", "ONIBI_APNS_KEY_ID", "ONIBI_APNS_TEAM_ID", "ONIBI_APNS_TOPIC", "ONIBI_APNS_DEVICE_TOKEN"); len(missing) > 0 {
+		r.add("transport provider", Warn, "APNs missing "+strings.Join(missing, ", "))
+		return
+	}
+	cfg := apns.Config{KeyPath: os.Getenv("ONIBI_APNS_KEY_PATH"), KeyID: os.Getenv("ONIBI_APNS_KEY_ID"), TeamID: os.Getenv("ONIBI_APNS_TEAM_ID"), Topic: os.Getenv("ONIBI_APNS_TOPIC"), Environment: os.Getenv("ONIBI_APNS_ENV")}
+	if err := cfg.Validate(); err != nil {
+		r.add("transport provider", Warn, err.Error())
+		return
+	}
+	if r.opts.Offline || !doctorLiveProbe() {
+		r.add("transport provider", Pass, "APNs env present; set ONIBI_DOCTOR_LIVE=1 for send probe")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.ctx, 8*time.Second)
+	defer cancel()
+	c, err := apns.New(cfg)
+	if err != nil {
+		r.add("transport provider", Warn, "APNs client failed: "+err.Error())
+		return
+	}
+	result, err := c.PushApproval(ctx, apns.PushRequest{DeviceToken: os.Getenv("ONIBI_APNS_DEVICE_TOKEN"), Title: "Onibi doctor", Body: "onibi doctor apns probe", ApprovalID: "doctor", TTL: 30 * time.Second})
+	if err != nil {
+		r.add("transport provider", Warn, fmt.Sprintf("APNs send probe failed: status=%d reason=%s err=%s", result.StatusCode, result.Reason, err.Error()))
+		return
+	}
+	r.add("transport provider", Pass, "APNs live API ok: send")
+}
+
+func (r *runner) checkSMSProvider() {
+	missing := missingEnv("ONIBI_TWILIO_ACCOUNT_SID", "ONIBI_TWILIO_AUTH_TOKEN", "ONIBI_SMS_TO", "ONIBI_SMS_ACTION_BASE_URL")
+	if strings.TrimSpace(os.Getenv("ONIBI_TWILIO_FROM")) == "" && strings.TrimSpace(os.Getenv("ONIBI_TWILIO_MESSAGING_SERVICE_SID")) == "" {
+		missing = append(missing, "ONIBI_TWILIO_FROM or ONIBI_TWILIO_MESSAGING_SERVICE_SID")
+	}
+	if len(missing) > 0 {
+		r.add("transport provider", Warn, "SMS missing "+strings.Join(missing, ", "))
+		return
+	}
+	if r.opts.Offline || !doctorLiveProbe() {
+		r.add("transport provider", Pass, "SMS env present; set ONIBI_DOCTOR_LIVE=1 for Twilio send probe")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.ctx, 8*time.Second)
+	defer cancel()
+	resp, err := newSMSClient(os.Getenv("ONIBI_TWILIO_ACCOUNT_SID"), os.Getenv("ONIBI_TWILIO_AUTH_TOKEN"), os.Getenv("ONIBI_TWILIO_FROM"), os.Getenv("ONIBI_TWILIO_MESSAGING_SERVICE_SID")).Send(ctx, sms.Message{To: os.Getenv("ONIBI_SMS_TO"), Body: "onibi doctor sms probe"})
+	if err != nil {
+		r.add("transport provider", Warn, "SMS send probe failed: "+err.Error())
+		return
+	}
+	r.add("transport provider", Pass, "SMS live API ok: send sid="+providerValueOrDefault(resp.SID, "unknown"))
+}
+
+func (r *runner) checkEmailProvider() {
+	if missing := missingEnv("ONIBI_SMTP_ADDR", "ONIBI_EMAIL_FROM", "ONIBI_EMAIL_TO", "ONIBI_EMAIL_ACTION_BASE_URL"); len(missing) > 0 {
+		r.add("transport provider", Warn, "Email missing "+strings.Join(missing, ", "))
+		return
+	}
+	if r.opts.Offline || !doctorLiveProbe() {
+		r.add("transport provider", Pass, "Email env present; set ONIBI_DOCTOR_LIVE=1 for SMTP send probe")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.ctx, 8*time.Second)
+	defer cancel()
+	err := newEmailClient(os.Getenv("ONIBI_SMTP_ADDR"), os.Getenv("ONIBI_SMTP_HOST"), os.Getenv("ONIBI_SMTP_USERNAME"), os.Getenv("ONIBI_SMTP_PASSWORD"), os.Getenv("ONIBI_EMAIL_FROM")).Send(ctx, emailapi.Message{To: os.Getenv("ONIBI_EMAIL_TO"), Subject: "Onibi doctor email probe", Body: "onibi doctor email probe"})
+	if err != nil {
+		r.add("transport provider", Warn, "Email send probe failed: "+err.Error())
+		return
+	}
+	r.add("transport provider", Pass, "Email live API ok: send")
 }
 
 func (r *runner) transportMode(cfg config.Config) string {

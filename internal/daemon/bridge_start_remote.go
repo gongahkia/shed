@@ -16,4 +16,10 @@ func (d *Daemon) startIRCBridge(context.Context, *sync.WaitGroup, context.Cancel
 func (d *Daemon) startPushoverNotifier(context.Context, *sync.WaitGroup)                   {}
 func (d *Daemon) startNtfyNotifier(context.Context, *sync.WaitGroup)                       {}
 func (d *Daemon) startGotifyNotifier(context.Context, *sync.WaitGroup)                     {}
+func (d *Daemon) startAPNsNotifier(context.Context, *sync.WaitGroup)                       {}
+func (d *Daemon) startSMSNotifier(context.Context, *sync.WaitGroup)                        {}
+func (d *Daemon) startEmailNotifier(context.Context, *sync.WaitGroup)                      {}
 func (d *Daemon) startWebPushNotifier(context.Context, *sync.WaitGroup)                    {}
+func (d *Daemon) apnsConfigured() bool                                                     { return false }
+func (d *Daemon) smsConfigured() bool                                                      { return false }
+func (d *Daemon) emailConfigured() bool                                                    { return false }

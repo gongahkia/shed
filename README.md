@@ -1,7 +1,7 @@
 # Itsy
 
 <div align="center">
-    <img src="./asset/logo/itsy-logo.png" width="45%">
+    <img src="./asset/logo/itsy-logo.png" width="30%">
 </div>
 
 macOS-native code editor targeting instant launch, low RSS, and modal editing.

@@ -1,5 +1,9 @@
 # Itsy
 
+<div align="center">
+    <img src="./asset/logo/itsy-logo.png" width="45%">
+</div>
+
 macOS-native code editor targeting instant launch, low RSS, and modal editing.
 
 [![status](https://img.shields.io/badge/status-pre--release-orange.svg)](#)

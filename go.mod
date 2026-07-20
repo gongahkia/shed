@@ -11,7 +11,6 @@ require (
 	github.com/mark3labs/mcp-go v0.55.1
 	github.com/pelletier/go-toml/v2 v2.4.2
 	github.com/pkg/sftp v1.13.9
-	github.com/sideshow/apns2 v0.25.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/crypto v0.53.0
@@ -49,7 +48,6 @@ require (
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	go.mau.fi/util v0.9.10 // indirect
-	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/tools v0.46.0 // indirect
 	modernc.org/libc v1.72.3 // indirect

@@ -45,6 +45,49 @@ struct ItsyUISnapshotTests {
 		}
 	}
 
+	@Test func findBarMatchesGolden() throws {
+		try SnapshotHarness.assertSnapshot(named: "find-bar", size: NSSize(width: 640, height: 38)) {
+			let controller = FindBarController()
+			controller.view.isHidden = false
+			return windowedSnapshotSubject(view: controller.view, size: NSSize(width: 640, height: 38), retained: [controller])
+		}
+	}
+
+	@Test func splitPanesMatchGolden() throws {
+		try SnapshotHarness.assertSnapshot(named: "split-panes", size: NSSize(width: 640, height: 260)) {
+			var coordinator = EditorPaneCoordinator()
+			let first = SnapshotTabIdentity()
+			let second = SnapshotTabIdentity()
+			coordinator.activePane.tabBarController.setTabs([
+				ItsyTab(id: ObjectIdentifier(first), title: "Editor.swift", isDirty: true, isSelected: true),
+			])
+			let newPane = coordinator.splitActive(vertical: true)
+			newPane.tabBarController.setTabs([
+				ItsyTab(id: ObjectIdentifier(second), title: "Tests.swift", isDirty: false, isSelected: true),
+			])
+			for pane in coordinator.panes {
+				pane.tabBarController.view.isHidden = false
+			}
+			return windowedSnapshotSubject(view: coordinator.view, size: NSSize(width: 640, height: 260), retained: [coordinator.rootSplitViewController, first, second])
+		}
+	}
+
+	@Test func recoveryBannerMatchesGolden() throws {
+		try SnapshotHarness.assertSnapshot(named: "recovery-banner", size: NSSize(width: 640, height: 38)) {
+			let banner = RecoveryBanner(frame: NSRect(x: 0, y: 0, width: 640, height: 38))
+			banner.show(fileURL: URL(fileURLWithPath: "/workspace/Editor.swift"))
+			return windowedSnapshotSubject(view: banner, size: NSSize(width: 640, height: 38))
+		}
+	}
+
+	@Test func missingLanguageServerBannerMatchesGolden() throws {
+		try SnapshotHarness.assertSnapshot(named: "lsp-missing-banner", size: NSSize(width: 640, height: 38)) {
+			let banner = LSPMissingBanner(frame: NSRect(x: 0, y: 0, width: 640, height: 38))
+			banner.show(missingBinary: LSPServerRegistry.MissingBinary(languageID: "swift", command: "sourcekit-lsp", hint: "Install Xcode Command Line Tools."))
+			return windowedSnapshotSubject(view: banner, size: NSSize(width: 640, height: 38))
+		}
+	}
+
 	@Test func terminalMatchesGolden() throws {
 		try SnapshotHarness.assertSnapshot(named: "terminal", size: NSSize(width: 640, height: 240)) {
 			let terminal = ItsyTerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 240))
@@ -61,6 +104,13 @@ struct ItsyUISnapshotTests {
 			return SnapshotSubject(view: terminal, retained: [window])
 		}
 	}
+
+	@Test func snapshotRecordingRequiresExplicitApproval() {
+		#expect(!SnapshotHarness.shouldRecord(in: [:]))
+		#expect(!SnapshotHarness.shouldRecord(in: ["ITSY_RECORD_SNAPSHOTS": "1"]))
+		#expect(!SnapshotHarness.shouldRecord(in: ["ITSY_SNAPSHOT_UPDATE_APPROVED": "1"]))
+		#expect(SnapshotHarness.shouldRecord(in: ["ITSY_RECORD_SNAPSHOTS": "1", "ITSY_SNAPSHOT_UPDATE_APPROVED": "1"]))
+	}
 }
 
 private struct SnapshotSubject {
@@ -69,14 +119,29 @@ private struct SnapshotSubject {
 	var cleanup: () -> Void = {}
 }
 
+@MainActor private func windowedSnapshotSubject(view: NSView, size: NSSize, retained: [AnyObject] = []) -> SnapshotSubject {
+	view.frame = NSRect(origin: .zero, size: size)
+	let window = NSWindow(contentRect: view.frame, styleMask: [], backing: .buffered, defer: false)
+	window.contentView = view
+	return SnapshotSubject(view: view, retained: retained + [window])
+}
+
 private enum SnapshotHarness {
+	static func shouldRecord(in environment: [String: String]) -> Bool {
+		environment["ITSY_RECORD_SNAPSHOTS"] == "1" && environment["ITSY_SNAPSHOT_UPDATE_APPROVED"] == "1"
+	}
+
 	static func assertSnapshot(named name: String, size: NSSize? = nil, makeSubject: () throws -> SnapshotSubject) throws {
 		_ = NSApplication.shared
 		let subject = try makeSubject()
 		defer { subject.cleanup() }
 		let targetSize = size ?? subject.view.frame.size
 		let actual = try render(subject.view, size: targetSize)
-		if ProcessInfo.processInfo.environment["ITSY_RECORD_SNAPSHOTS"] == "1" {
+		let environment = ProcessInfo.processInfo.environment
+		if environment["ITSY_RECORD_SNAPSHOTS"] == "1" {
+			guard shouldRecord(in: environment) else {
+				throw SnapshotError.recordingNotApproved
+			}
 			try record(actual.pngData, named: name)
 			return
 		}
@@ -84,10 +149,7 @@ private enum SnapshotHarness {
 		let golden = try decodePNG(Data(contentsOf: goldenURL))
 		guard actual.width == golden.width, actual.height == golden.height, actual.rgba == golden.rgba else {
 			let actualURL = try writeFailure(actual.pngData, named: name)
-			let actualHash = sha256(actual.rgba)
-			let goldenHash = sha256(golden.rgba)
-			Issue.record("snapshot \(name) differed: actual \(actualHash), golden \(goldenHash), wrote \(actualURL.path)")
-			return
+			throw SnapshotError.mismatch(name: name, actualHash: sha256(actual.rgba), goldenHash: sha256(golden.rgba), actualURL: actualURL)
 		}
 	}
 
@@ -196,6 +258,8 @@ private struct SnapshotImage {
 private enum SnapshotError: Error, CustomStringConvertible {
 	case decodeFailed
 	case missingFixture(String)
+	case mismatch(name: String, actualHash: String, goldenHash: String, actualURL: URL)
+	case recordingNotApproved
 	case renderFailed
 
 	var description: String {
@@ -204,11 +268,17 @@ private enum SnapshotError: Error, CustomStringConvertible {
 			return "failed to decode snapshot PNG"
 		case let .missingFixture(name):
 			return "missing snapshot fixture: \(name).png"
+		case let .mismatch(name, actualHash, goldenHash, actualURL):
+			return "snapshot \(name) differed: actual \(actualHash), golden \(goldenHash), wrote \(actualURL.path)"
+		case .recordingNotApproved:
+			return "set ITSY_SNAPSHOT_UPDATE_APPROVED=1 with ITSY_RECORD_SNAPSHOTS=1 to update baselines"
 		case .renderFailed:
 			return "failed to render snapshot"
 		}
 	}
 }
+
+private final class SnapshotTabIdentity: NSObject {}
 
 private final class EditorSnapshotView: NSView {
 	private let lines = [

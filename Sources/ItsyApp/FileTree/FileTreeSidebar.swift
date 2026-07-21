@@ -50,6 +50,12 @@ private let workspaceLogger = Logger(
 		controller.setGitSnapshot(gitSnapshot)
 	}
 
+	static func lspConfigurationDidReload() {
+		for controller in controllers.allObjects {
+			controller.lspConfigurationDidReload()
+		}
+	}
+
 	static func openWorkspace(at url: URL) {
 		let root = url.standardizedFileURL
 		workspaceLogger.info("Opening workspace: \(root.lastPathComponent, privacy: .public)")

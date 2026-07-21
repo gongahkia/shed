@@ -26,8 +26,9 @@ import Testing
 	for id in ids {
 		let palette = AppThemePalette(settings: ItsySettings(theme: .init(id: id)))
 		#expect(palette.contrastFailures() == palette.contrastFailures())
-		#expect(AppThemePalette.contrastRatio(palette.foreground, palette.panelBackground) >= 4.5)
+		#expect(palette.contrastFailures().isEmpty)
 	}
+	#expect(abs(AppThemePalette.contrastRatio(.white, .black) - 21) < 0.01)
 }
 
 private func close(_ lhs: NSColor, to rhs: NSColor) -> Bool {

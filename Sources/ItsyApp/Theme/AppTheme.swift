@@ -64,8 +64,11 @@ struct AppThemePalette {
 	}
 
 	func contrastFailures(minimumRatio: CGFloat = 4.5) -> [String] {
+		func editorColor(_ color: SIMD4<Float>) -> NSColor {
+			NSColor(srgbRed: CGFloat(color.x), green: CGFloat(color.y), blue: CGFloat(color.z), alpha: CGFloat(color.w))
+		}
 		let pairs: [(String, NSColor, NSColor)] = [
-			("editor", nsColor(editor.foreground), nsColor(editor.background)),
+			("editor", editorColor(editor.foreground), editorColor(editor.background)),
 			("panel", panelForeground, panelBackground),
 			("input", inputForeground, inputBackground),
 			("sidebar", sidebarForeground, sidebarBackground),
@@ -118,7 +121,7 @@ struct AppThemePalette {
 		let editorForeground = color("editor.foreground", seed.foreground)
 		let accent = color("focusBorder", seed.accent)
 		isDark = editorBackground.itsyLuminance < 0.5
-		foreground = color("foreground", editorForeground)
+		foreground = Self.readable(color("foreground", editorForeground), against: editorBackground)
 		secondaryForeground = color("descriptionForeground", foreground.withAlphaComponent(0.72))
 		disabledForeground = color("disabledForeground", foreground.withAlphaComponent(0.42))
 		errorForeground = color("errorForeground", seed.error)
@@ -127,26 +130,26 @@ struct AppThemePalette {
 		focusBorder = accent
 		border = color("widget.border", seed.border)
 		panelBackground = color("panel.background", seed.panelBackground)
-		panelForeground = color("panel.foreground", foreground)
+		panelForeground = Self.readable(color("panel.foreground", foreground), against: panelBackground)
 		inputBackground = color("input.background", seed.inputBackground)
-		inputForeground = color("input.foreground", foreground)
+		inputForeground = Self.readable(color("input.foreground", foreground), against: inputBackground)
 		inputPlaceholder = color("input.placeholderForeground", secondaryForeground)
 		inputBorder = color("input.border", border)
 		listSelectionBackground = color("list.activeSelectionBackground", accent.withAlphaComponent(isDark ? 0.35 : 0.22))
 		listSelectionForeground = color("list.activeSelectionForeground", foreground)
 		listHoverBackground = color("list.hoverBackground", foreground.withAlphaComponent(isDark ? 0.08 : 0.06))
 		buttonBackground = color("button.background", accent)
-		buttonForeground = color("button.foreground", seed.buttonForeground)
+		buttonForeground = Self.readable(color("button.foreground", seed.buttonForeground), against: buttonBackground)
 		sidebarBackground = color("sideBar.background", seed.sidebarBackground)
-		sidebarForeground = color("sideBar.foreground", foreground)
+		sidebarForeground = Self.readable(color("sideBar.foreground", foreground), against: sidebarBackground)
 		sidebarBorder = color("sideBar.border", border)
 		tabActiveBackground = color("tab.activeBackground", editorBackground)
 		tabInactiveBackground = color("tab.inactiveBackground", seed.panelBackground)
-		tabActiveForeground = color("tab.activeForeground", foreground)
-		tabInactiveForeground = color("tab.inactiveForeground", secondaryForeground)
+		tabActiveForeground = Self.readable(color("tab.activeForeground", foreground), against: tabActiveBackground)
+		tabInactiveForeground = Self.readable(color("tab.inactiveForeground", secondaryForeground), against: tabInactiveBackground)
 		tabBorder = color("tab.border", border)
 		statusBackground = color("statusBar.background", seed.statusBackground)
-		statusForeground = color("statusBar.foreground", seed.statusForeground)
+		statusForeground = Self.readable(color("statusBar.foreground", seed.statusForeground), against: statusBackground)
 		bannerBackground = color("itsy.banner.background", accent.withAlphaComponent(0.14))
 		bannerForeground = color("itsy.banner.foreground", foreground)
 		gitAdded = color("itsy.git.added", Self.nsColor(hex: settings.theme.gitGutter.added, fallback: seed.success))
@@ -154,7 +157,7 @@ struct AppThemePalette {
 		gitRemoved = color("itsy.git.removed", Self.nsColor(hex: settings.theme.gitGutter.removed, fallback: seed.error))
 		editor = EditorColorPalette(
 			background: simd("editor.background", editorBackground),
-			foreground: simd("editor.foreground", editorForeground),
+			foreground: Self.simdColor(Self.readable(color("editor.foreground", editorForeground), against: editorBackground)),
 			cursor: simd("editorCursor.foreground", foreground),
 			selection: simd("editor.selectionBackground", accent.withAlphaComponent(0.32)),
 			findMatch: simd("editor.findMatchBackground", seed.findMatch),
@@ -193,6 +196,13 @@ struct AppThemePalette {
 
 	private static func nsColor(_ color: SyntaxColor) -> NSColor {
 		NSColor(srgbRed: CGFloat(color.red), green: CGFloat(color.green), blue: CGFloat(color.blue), alpha: CGFloat(color.alpha))
+	}
+
+	private static func readable(_ foreground: NSColor, against background: NSColor, minimumRatio: CGFloat = 4.5) -> NSColor {
+		guard contrastRatio(foreground, background) < minimumRatio else {
+			return foreground
+		}
+		return contrastRatio(.white, background) >= contrastRatio(.black, background) ? .white : .black
 	}
 
 	private static func simdColor(_ color: NSColor) -> SIMD4<Float> {

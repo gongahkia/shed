@@ -2103,17 +2103,20 @@ public struct LSPInitializeParams: Codable, Equatable, Sendable {
 	public var processId: Int?
 	public var rootUri: String?
 	public var capabilities: LSPAny
+	public var initializationOptions: LSPAny?
 
-	public init(processId: Int?, rootUri: String?, capabilities: LSPAny = .object([:])) {
+	public init(processId: Int?, rootUri: String?, capabilities: LSPAny = .object([:]), initializationOptions: LSPAny? = nil) {
 		self.processId = processId
 		self.rootUri = rootUri
 		self.capabilities = capabilities
+		self.initializationOptions = initializationOptions
 	}
 
 	private enum CodingKeys: String, CodingKey {
 		case processId
 		case rootUri
 		case capabilities
+		case initializationOptions
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -2129,6 +2132,7 @@ public struct LSPInitializeParams: Codable, Equatable, Sendable {
 			rootUri = nil
 		}
 		capabilities = try container.decodeIfPresent(LSPAny.self, forKey: .capabilities) ?? .object([:])
+		initializationOptions = try container.decodeIfPresent(LSPAny.self, forKey: .initializationOptions)
 	}
 
 	public func encode(to encoder: Encoder) throws {
@@ -2144,5 +2148,6 @@ public struct LSPInitializeParams: Codable, Equatable, Sendable {
 			try container.encodeNil(forKey: .rootUri)
 		}
 		try container.encode(capabilities, forKey: .capabilities)
+		try container.encodeIfPresent(initializationOptions, forKey: .initializationOptions)
 	}
 }

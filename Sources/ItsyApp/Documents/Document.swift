@@ -37,6 +37,7 @@ import ItsySyntax
 	private let gitGutter = DocumentGitGutterController()
 	private let undoHistoryStore = UndoHistoryStore()
 	private let recoveryJournalScheduler = RecoveryJournalScheduler()
+	private(set) var recoveredJournalFileURL: URL?
 
 	override var fileURL: URL? {
 		didSet {
@@ -519,6 +520,7 @@ import ItsySyntax
 			return
 		}
 		installReadEditor(Editor(text: text), fileURL: fileURL)
+		recoveredJournalFileURL = fileURL
 		updateChangeCount(.changeDone)
 	}
 

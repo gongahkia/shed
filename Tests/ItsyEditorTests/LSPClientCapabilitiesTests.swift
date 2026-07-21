@@ -78,3 +78,9 @@ import Testing
 	let params = try LSPInitializeParams.itsy(processID: 0, workspaceRoot: nil)
 	#expect(params.rootUri == nil)
 }
+
+@Test func lspInitializeParamsItsyHelperPreservesInitializationOptions() throws {
+	let options: LSPAny = .object(["index": .bool(true)])
+	let params = try LSPInitializeParams.itsy(processID: 0, workspaceRoot: nil, initializationOptions: options)
+	#expect(params.initializationOptions == options)
+}

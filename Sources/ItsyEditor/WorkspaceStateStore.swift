@@ -110,6 +110,6 @@ public struct WorkspaceStateStore {
 		try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
 		let encoder = JSONEncoder()
 		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-		try encoder.encode(value).write(to: url, options: .atomic)
+		try AtomicFileWriter.write(data: try encoder.encode(value), to: url)
 	}
 }

@@ -21,6 +21,26 @@ import Testing
 	#expect(none == nil)
 }
 
+@Test func lspManagerReplacesConfigurationWithoutRestartingAndResetsSessionState() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/App.swift", "")
+	let url = fixture.root.appendingPathComponent("ws/Sources/App.swift")
+	let manager = LSPManager(registry: LSPServerRegistry(configs: [
+		LSPServerConfig(languageId: "typescript", command: "typescript-language-server", rootPatterns: ["package.json"]),
+	]))
+	#expect(await manager.sessionKey(for: url) == nil)
+
+	await manager.replaceRegistry(try fixture.swiftRegistry())
+	let key = try #require(await manager.sessionKey(for: url))
+	await manager.markFailed(key)
+	#expect(await manager.status(of: key) == .failed)
+
+	await manager.replaceRegistry(try fixture.swiftRegistry())
+	#expect(await manager.sessionKey(for: url) == key)
+	#expect(await manager.status(of: key) == .idle)
+}
+
 @Test func lspManagerLazilySpawnsAndReusesClientPerKey() async throws {
 	let fixture = try TemporaryLSPManagerFixture()
 	try fixture.write("ws/Package.swift", "")

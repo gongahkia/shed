@@ -362,6 +362,19 @@ struct ParserTests {
 	}
 }
 
+@Test func bundledLanguageInventoryCoversEverySyntaxGrammarAndFixture() throws {
+	let inventory = BundledLanguageInventory.languages
+	#expect(Set(inventory.map(\.grammarID)) == Set(Language.allCases.map(\.inventoryID)))
+	#expect(inventory.count == Language.allCases.count)
+	for language in Language.allCases {
+		let entry = try #require(inventory.first { $0.grammarID == language.inventoryID })
+		let rope = Rope(entry.fixture)
+		let tree = try Parser(language: language).parse(rope)
+		#expect(tree.rootNode.byteRange == 0 ..< rope.length)
+		#expect(!tree.rootNode.hasError)
+	}
+}
+
 @Test func highlightQueriesLoadForNewGrammars() throws {
 	for language in [Language.bash, .zig, .swift, .sql, .dockerfile, .dart, .kotlin, .elixir] {
 		_ = try HighlightQuery(language: language)

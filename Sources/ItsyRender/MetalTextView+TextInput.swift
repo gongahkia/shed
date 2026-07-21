@@ -18,10 +18,23 @@ extension MetalTextView: @MainActor NSTextInputClient {
 		lastYankRange = nil
 		let text = plainString(from: string)
 		let range = replacementUTF8Range(replacementRange) ?? markedRangeUTF8 ?? editor.selections.primary.range
-		replace(range: range, with: textApplyingHardWrap(text, replacing: range))
+		let operation = editor.selections.secondaries.isEmpty && markedRangeUTF8 == nil
+			? TextEditBehavior.insertion(
+				text: text,
+				content: editorStorageString(editor),
+				range: range,
+				configuration: textEditBehaviorConfiguration
+			)
+			: nil
+		let didEdit = operation.map(applyTextEditOperation) ?? {
+			replace(range: range, with: textApplyingHardWrap(text, replacing: range))
+			return true
+		}()
 		markedRangeUTF8 = nil
 		syncEditorState()
-		editorDidChange?(editor)
+		if didEdit {
+			editorDidChange?(editor)
+		}
 	}
 
 	public override func doCommand(by selector: Selector) {
@@ -29,8 +42,17 @@ extension MetalTextView: @MainActor NSTextInputClient {
 		var didEdit = false
 		switch selector {
 		case #selector(NSResponder.deleteBackward(_:)):
-			editor.deleteBackward()
-			didEdit = true
+			let range = editor.selections.primary.range
+			if let operation = editor.selections.secondaries.isEmpty ? TextEditBehavior.deleteBackward(
+				content: editorStorageString(editor),
+				range: range,
+				configuration: textEditBehaviorConfiguration
+			) : nil {
+				didEdit = applyTextEditOperation(operation)
+			} else {
+				editor.deleteBackward()
+				didEdit = true
+			}
 		case #selector(NSResponder.deleteForward(_:)):
 			editor.deleteForward()
 			didEdit = true
@@ -55,8 +77,19 @@ extension MetalTextView: @MainActor NSTextInputClient {
 		case #selector(NSResponder.moveToEndOfLine(_:)):
 			editor.moveCursor(.lineEnd)
 		case #selector(NSResponder.insertNewline(_:)):
-			editor.insert(newlineInsertionTextProvider?(editor) ?? "\n")
-			didEdit = true
+			let range = editor.selections.primary.range
+			let newline = textEditBehaviorConfiguration.smartIndent ? newlineInsertionTextProvider?(editor) : nil
+			if let operation = editor.selections.secondaries.isEmpty ? TextEditBehavior.newline(
+				content: editorStorageString(editor),
+				range: range,
+				providedText: newline,
+				configuration: textEditBehaviorConfiguration
+			) : nil {
+				didEdit = applyTextEditOperation(operation)
+			} else {
+				editor.insert(newline ?? "\n")
+				didEdit = true
+			}
 		default:
 			_ = tryToPerform(selector, with: nil)
 		}
@@ -181,6 +214,21 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	func replace(range: Range<Int>, with text: String) {
 		editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.upperBound)))
 		editor.insert(text)
+	}
+
+	@discardableResult
+	private func applyTextEditOperation(_ operation: TextEditOperation) -> Bool {
+		switch operation {
+		case let .replace(range, text, selection):
+			replace(range: range, with: text)
+			if let selection {
+				editor.setSelection(SelectionSet(primary: Selection(anchor: selection.lowerBound, head: selection.upperBound)))
+			}
+			return true
+		case let .select(selection):
+			editor.setSelection(SelectionSet(primary: Selection(anchor: selection.lowerBound, head: selection.upperBound)))
+			return false
+		}
 	}
 
 	func textApplyingHardWrap(_ text: String, replacing range: Range<Int>) -> String {

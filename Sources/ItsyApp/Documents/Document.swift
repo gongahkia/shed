@@ -18,6 +18,10 @@ import ItsySyntax
 	private static let settingsLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 
 	var editor = Editor()
+	private(set) var textFileSavePolicy = TextFileSavePolicy()
+	private(set) var textFileRequiresEncodingChoice = false
+	private var undecidedTextFileData: Data?
+	private var hasPresentedTextFileEncodingChoice = false
 	var lspSurfaceRefreshRequested: (() -> Void)?
 	var lspDocumentSaved: (() -> Void)?
 	private var editorViews: [MetalTextView] = []
@@ -32,11 +36,13 @@ import ItsySyntax
 	private let fileWatcher = DocumentFileWatcher()
 	private let gitGutter = DocumentGitGutterController()
 	private let undoHistoryStore = UndoHistoryStore()
+	private let recoveryJournalScheduler = RecoveryJournalScheduler()
 
 	override var fileURL: URL? {
 		didSet {
 			MainActor.assumeIsolated {
 				syntax.configure(fileURL: fileURL)
+				configureTextEditBehavior()
 				updateHandoffActivity()
 				fileWatcher.restart()
 				ItsyBreakpointGutterCoordinator.apply(to: self)
@@ -58,6 +64,9 @@ import ItsySyntax
 			}
 			return editorStorageString(editor)
 		}
+		fileWatcher.isDocumentEdited = { [weak self] in
+			self?.isDocumentEdited ?? false
+		}
 		fileWatcher.displayName = { [weak self] url in
 			self?.displayName ?? url.lastPathComponent
 		}
@@ -66,6 +75,16 @@ import ItsySyntax
 		}
 		fileWatcher.reloadFromDisk = { [weak self] url in
 			self?.reloadFromDisk(at: url)
+		}
+		fileWatcher.compareExternalText = { [weak self] url, localText, diskText in
+			self?.presentExternalFileComparison(url: url, localText: localText, diskText: diskText)
+		}
+		fileWatcher.mergeExternalText = { [weak self] url, localText, diskText in
+			self?.mergeExternalText(url: url, localText: localText, diskText: diskText)
+		}
+		fileWatcher.discardDeletedBuffer = { [weak self] in
+			self?.discardRecoveryJournal()
+			self?.close()
 		}
 		gitGutter.fileURL = { [weak self] in
 			self?.fileURL
@@ -90,17 +109,20 @@ import ItsySyntax
 
 	override func read(from data: Data, ofType _: String) throws {
 		try MainActor.assumeIsolated {
-			guard let text = String(data: data, encoding: .utf8) else {
-				throw CocoaError(.fileReadCorruptFile)
-			}
-			installReadEditor(Editor(text: text), fileURL: nil)
+			let decoded = try TextFileCodec.decode(data)
+			textFileSavePolicy = decoded.savePolicy
+			textFileRequiresEncodingChoice = decoded.requiresEncodingChoice
+			undecidedTextFileData = decoded.requiresEncodingChoice ? data : nil
+			hasPresentedTextFileEncodingChoice = false
+			installReadEditor(Editor(text: decoded.text), fileURL: nil)
 		}
 	}
 
 	override func read(from url: URL, ofType typeName: String) throws {
 		try MainActor.assumeIsolated {
-			guard try shouldReadMappedPieceTree(from: url) else {
+			guard let policy = try mappedReadPolicy(from: url) else {
 				try super.read(from: url, ofType: typeName)
+				restoreRecoveryJournalIfAvailable(fileURL: url)
 				return
 			}
 			let pieceTree = try PieceTree(
@@ -109,25 +131,22 @@ import ItsySyntax
 			) {
 				recordBenchStage("first_page_visible")
 			}
-			installReadEditor(Editor(pieceTree: pieceTree), fileURL: url)
+			textFileSavePolicy = policy
+			textFileRequiresEncodingChoice = false
+			undecidedTextFileData = nil
+			installReadEditor(Editor(pieceTree: pieceTree, retainsUndoTreeSnapshots: false), fileURL: url)
+			restoreRecoveryJournalIfAvailable(fileURL: url)
 		}
 	}
 
 	override func data(ofType _: String) throws -> Data {
-		switch editor.textStorage {
-		case .rope:
-			return Data(editorStorageString(editor).utf8)
-		case .pieceTree:
-			throw CocoaError(.fileWriteUnknown)
-		}
+		try TextFileCodec.encode(editorStorageString(editor), policy: textFileSavePolicy)
 	}
 
 	override func write(to url: URL, ofType typeName: String) throws {
 		try MainActor.assumeIsolated {
-			if try writeEditorStorage(to: url) {
-				return
-			}
-			try super.write(to: url, ofType: typeName)
+			try writeEditorStorage(to: url)
+			discardRecoveryJournal(fileURL: fileURL ?? url)
 		}
 	}
 
@@ -138,15 +157,8 @@ import ItsySyntax
 		originalContentsURL absoluteOriginalContentsURL: URL?
 	) throws {
 		try MainActor.assumeIsolated {
-			if try writeEditorStorage(to: url) {
-				return
-			}
-			try super.write(
-				to: url,
-				ofType: typeName,
-				for: saveOperation,
-				originalContentsURL: absoluteOriginalContentsURL
-			)
+			try writeEditorStorage(to: url)
+			discardRecoveryJournal(fileURL: fileURL ?? url)
 		}
 	}
 
@@ -170,6 +182,7 @@ import ItsySyntax
 			editorViews.append(view)
 		}
 		view.editor = editor
+		view.textEditBehaviorConfiguration = textEditBehaviorConfiguration()
 		view.undoTreeChanged?(editor.history.tree)
 		view.visibleLineRangeDidChange = { [weak self] _ in
 			self?.refreshSyntaxHighlights()
@@ -188,7 +201,7 @@ import ItsySyntax
 			guard let self, let view else {
 				return
 			}
-			let oldRope = self.editor.rope
+			let oldRope: Rope? = if case let .rope(rope) = self.editor.textStorage { rope } else { nil }
 			let edits = editor.lastEditBatch
 			self.editor = editor
 			lspHighlightSpans = []
@@ -199,6 +212,7 @@ import ItsySyntax
 			saveUndoHistoryIfAvailable()
 			view.undoTreeChanged?(editor.history.tree)
 			updateChangeCount(.changeDone)
+			scheduleRecoveryJournal()
 			scheduleGitHunkGutterRefresh()
 		}
 		view.saveRequested = { [weak self] in
@@ -207,6 +221,7 @@ import ItsySyntax
 		view.closeRequested = { [weak self] in
 			self?.close()
 		}
+		presentTextFileEncodingChoice(in: view.window)
 		ItsyProblemGutterCoordinator.apply(to: self)
 		ItsyBreakpointGutterCoordinator.apply(to: self)
 		ItsyGitHunkGutterCoordinator.apply(to: self)
@@ -220,6 +235,30 @@ import ItsySyntax
 		view.newlineInsertionTextProvider = nil
 		editorViews.removeAll { $0 === view }
 		refreshSyntaxHighlights()
+	}
+
+	func selectTextFileSavePolicy(_ policy: TextFileSavePolicy) {
+		textFileSavePolicy = policy
+		textFileRequiresEncodingChoice = false
+		undecidedTextFileData = nil
+	}
+
+	func discardRecoveryJournal() {
+		guard let fileURL else {
+			return
+		}
+		discardRecoveryJournal(fileURL: fileURL)
+	}
+
+	func chooseTextFileEncoding(_ encoding: TextFileEncoding) throws {
+		guard let data = undecidedTextFileData else {
+			return
+		}
+		let decoded = try TextFileCodec.decode(data, using: encoding)
+		textFileSavePolicy = decoded.savePolicy
+		textFileRequiresEncodingChoice = false
+		undecidedTextFileData = nil
+		installReadEditor(Editor(text: decoded.text), fileURL: fileURL)
 	}
 
 	func setGutterDecorator(_ decorator: GutterDecorator?) {
@@ -267,6 +306,23 @@ import ItsySyntax
 		return settings.editorSettings(languageID: languageID)
 	}
 
+	private func configureTextEditBehavior() {
+		let configuration = textEditBehaviorConfiguration()
+		for view in editorViews {
+			view.textEditBehaviorConfiguration = configuration
+		}
+	}
+
+	private func textEditBehaviorConfiguration() -> TextEditBehaviorConfiguration {
+		let settings = currentEditorSettings()
+		let indentationUnit = settings.useSpaces ? String(repeating: " ", count: settings.tabWidth) : "\t"
+		return TextEditBehaviorConfiguration(
+			autoPairs: settings.autoPairs,
+			smartIndent: settings.smartIndent,
+			indentationUnit: indentationUnit
+		)
+	}
+
 	func scheduleGitHunkGutterRefresh() {
 		gitGutter.scheduleRefresh()
 	}
@@ -288,7 +344,7 @@ import ItsySyntax
 	}
 
 	func restoreHandoffCursorOffset(_ offset: Int) {
-		let clamped = min(max(offset, 0), editor.rope.length)
+		let clamped = min(max(offset, 0), editor.textStorage.length)
 		editor.setSelection(SelectionSet(primary: Selection(anchor: clamped, head: clamped)))
 		for view in editorViews {
 			view.editor = editor
@@ -313,7 +369,7 @@ import ItsySyntax
 	}
 
 	func restoreWorkspaceWindowFileState(_ state: WorkspaceWindowFileState) {
-		let length = editor.rope.length
+		let length = editor.textStorage.length
 		let anchor = min(max(state.selectionAnchor, 0), length)
 		let head = min(max(state.selectionHead, 0), length)
 		editor.setSelection(SelectionSet(primary: Selection(anchor: anchor, head: head)))
@@ -333,11 +389,11 @@ import ItsySyntax
 	func jumpTo(line: Int, column: Int) {
 		let zeroLine = max(0, line - 1)
 		let zeroColumn = max(0, column - 1)
-		let rope = editor.rope
-		guard zeroLine < rope.lineCount else {
+		let storage = editor.textStorage
+		guard zeroLine < storage.lineCount else {
 			return
 		}
-		let lineRange = rope.lineRange(zeroLine)
+		let lineRange = storage.lineRange(zeroLine)
 		let offset = min(lineRange.upperBound, lineRange.lowerBound + zeroColumn)
 		editor.setSelection(SelectionSet(primary: Selection(anchor: offset, head: offset)))
 		for view in editorViews {
@@ -400,13 +456,30 @@ import ItsySyntax
 		}
 	}
 
-	private func writeEditorStorage(to url: URL) throws -> Bool {
+	private func writeEditorStorage(to url: URL) throws {
 		switch editor.textStorage {
 		case .rope:
-			return false
+			try writeAtomically(try data(ofType: fileType ?? "public.data"), to: url)
 		case let .pieceTree(pieceTree):
-			try pieceTree.saveTo(url: url)
-			return true
+			if textFileSavePolicy.encoding == .utf8, case .preserve = textFileSavePolicy.newline {
+				do {
+					try AtomicFileWriter.write(to: url) { descriptor in
+						try pieceTree.write(to: descriptor, path: url.path)
+					}
+				} catch let error as AtomicFileWriteError {
+					throw error.cocoaError
+				}
+			} else {
+				try writeAtomically(try data(ofType: fileType ?? "public.data"), to: url)
+			}
+		}
+	}
+
+	private func writeAtomically(_ data: Data, to url: URL) throws {
+		do {
+			try AtomicFileWriter.write(data: data, to: url)
+		} catch let error as AtomicFileWriteError {
+			throw error.cocoaError
 		}
 	}
 
@@ -427,8 +500,31 @@ import ItsySyntax
 		ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
 	}
 
+	private func scheduleRecoveryJournal() {
+		guard let fileURL, editor.retainsUndoTreeSnapshots else {
+			return
+		}
+		let journal = RecoveryJournal(fileURL: fileURL, text: editorStorageString(editor))
+		recoveryJournalScheduler.schedule(journal, workspaceRoot: undoWorkspaceRoot(for: fileURL))
+	}
+
+	private func discardRecoveryJournal(fileURL: URL) {
+		recoveryJournalScheduler.discard(fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL))
+	}
+
+	private func restoreRecoveryJournalIfAvailable(fileURL: URL) {
+		guard let journal = RecoveryJournalStore().load(fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL)),
+		      let text = String(data: journal.text, encoding: .utf8)
+		else {
+			return
+		}
+		installReadEditor(Editor(text: text), fileURL: fileURL)
+		updateChangeCount(.changeDone)
+	}
+
 	private func loadUndoHistoryIfAvailable(fileURL: URL?) {
-		guard let fileURL,
+		guard editor.retainsUndoTreeSnapshots,
+		      let fileURL,
 		      let tree = undoHistoryStore.load(fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL)),
 		      tree.currentNode?.text == Data(editorStorageString(editor).utf8)
 		else {
@@ -438,7 +534,7 @@ import ItsySyntax
 	}
 
 	private func saveUndoHistoryIfAvailable() {
-		guard let fileURL else {
+		guard let fileURL, editor.retainsUndoTreeSnapshots else {
 			return
 		}
 		try? undoHistoryStore.save(editor.history.tree, fileURL: fileURL, workspaceRoot: undoWorkspaceRoot(for: fileURL))
@@ -455,12 +551,40 @@ import ItsySyntax
 		return SelectionSet(primary: clamped(selectionSet.primary), secondaries: selectionSet.secondaries.map(clamped))
 	}
 
-	private func shouldReadMappedPieceTree(from url: URL) throws -> Bool {
+	private func mappedReadPolicy(from url: URL) throws -> TextFileSavePolicy? {
 		let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
 		guard values.isRegularFile == true, let fileSize = values.fileSize else {
-			return false
+			return nil
 		}
-		return fileSize > Self.mappedReadThreshold
+		guard fileSize > Self.mappedReadThreshold else {
+			return nil
+		}
+		return try TextFileCodec.mappedUTF8SavePolicy(at: url)
+	}
+
+	private func presentTextFileEncodingChoice(in window: NSWindow?) {
+		guard textFileRequiresEncodingChoice, !hasPresentedTextFileEncodingChoice, let window else {
+			return
+		}
+		hasPresentedTextFileEncodingChoice = true
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Choose text encoding")
+		alert.informativeText = L10n.string("This file has no encoding marker. Choose how to interpret and save it.")
+		alert.addButton(withTitle: L10n.string("UTF-16 Little Endian"))
+		alert.addButton(withTitle: L10n.string("UTF-16 Big Endian"))
+		alert.addButton(withTitle: L10n.string("UTF-8"))
+		alert.beginSheetModal(for: window) { [weak self] response in
+			let encoding: TextFileEncoding = switch response {
+			case .alertFirstButtonReturn: .utf16LittleEndian
+			case .alertSecondButtonReturn: .utf16BigEndian
+			default: .utf8
+			}
+			do {
+				try self?.chooseTextFileEncoding(encoding)
+			} catch {
+				self?.presentError(error)
+			}
+		}
 	}
 
 	private func reloadFromDisk(at url: URL) {
@@ -470,5 +594,56 @@ import ItsySyntax
 		} catch {
 			presentError(error)
 		}
+	}
+
+	private func presentExternalFileComparison(url: URL, localText: String, diskText: String) {
+		let panel = NSPanel(
+			contentRect: NSRect(x: 0, y: 0, width: 960, height: 640),
+			styleMask: [.titled, .closable, .resizable, .utilityWindow],
+			backing: .buffered,
+			defer: false
+		)
+		panel.title = L10n.string("Compare \(displayName ?? url.lastPathComponent)")
+		let splitView = NSSplitView(frame: panel.contentView?.bounds ?? .zero)
+		splitView.isVertical = true
+		splitView.autoresizingMask = [.width, .height]
+		func textPane(title: String, text: String) -> NSView {
+			let textView = NSTextView()
+			textView.isEditable = false
+			textView.isSelectable = true
+			textView.isRichText = false
+			textView.font = .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+			textView.string = text
+			let scrollView = NSScrollView()
+			scrollView.hasVerticalScroller = true
+			scrollView.documentView = textView
+			let label = NSTextField(labelWithString: title)
+			let container = NSView()
+			container.addSubview(label)
+			container.addSubview(scrollView)
+			label.translatesAutoresizingMaskIntoConstraints = false
+			scrollView.translatesAutoresizingMaskIntoConstraints = false
+			NSLayoutConstraint.activate([
+				label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
+				label.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+				scrollView.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+				scrollView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+				scrollView.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 4),
+				scrollView.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+			])
+			return container
+		}
+		splitView.addArrangedSubview(textPane(title: L10n.string("Local (unsaved)"), text: localText))
+		splitView.addArrangedSubview(textPane(title: L10n.string("On disk"), text: diskText))
+		panel.contentView = splitView
+		panel.center()
+		panel.makeKeyAndOrderFront(self)
+	}
+
+	private func mergeExternalText(url: URL, localText: String, diskText: String) {
+		let text = "<<<<<<< Local (unsaved)\n\(localText)\n=======\n\(diskText)\n>>>>>>> On disk\n"
+		installReadEditor(Editor(text: text), fileURL: url)
+		updateChangeCount(.changeDone)
+		scheduleRecoveryJournal()
 	}
 }

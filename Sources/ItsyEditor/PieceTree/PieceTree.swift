@@ -381,6 +381,10 @@ public struct PieceTree: Sendable {
 		}
 	}
 
+	public func write(to descriptor: Int32, path: String = "") throws {
+		try writePieces(to: descriptor, path: path)
+	}
+
 	func debugPieces() -> [Piece] {
 		pieces()
 	}

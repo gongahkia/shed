@@ -17,6 +17,7 @@ import ItsyRender
 	private var incrementalDirection: Int?
 	var currentEditorView: () -> MetalTextView? = { nil }
 	var focusEditor: () -> Void = {}
+	var visibilityDidChange: () -> Void = {}
 
 	override init() {
 		super.init()
@@ -35,6 +36,10 @@ import ItsyRender
 
 	func attach(to window: NSWindow) {
 		self.window = window
+	}
+
+	var focusableViews: [NSView] {
+		[queryField, replaceField, regexButton, caseButton, wholeWordButton, closeButton]
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -191,6 +196,7 @@ import ItsyRender
 			currentEditorView()?.setFindMatchRanges([])
 			focusEditor()
 		}
+		visibilityDidChange()
 	}
 
 	private func focusQuery() {

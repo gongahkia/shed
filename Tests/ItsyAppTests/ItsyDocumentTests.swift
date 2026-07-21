@@ -30,9 +30,7 @@ import Testing
 	)
 
 	#expect(try Data(contentsOf: url) == Data("alpha\nbeta\ngamma".utf8))
-	#expect(throws: CocoaError.self) {
-		try document.data(ofType: "public.plain-text")
-	}
+	#expect(try document.data(ofType: "public.plain-text") == Data("alpha\nbeta\ngamma".utf8))
 }
 
 @MainActor
@@ -43,6 +41,43 @@ import Testing
 	DispatchQueue(label: "NSDocument Activity").sync {
 		Unmanaged<ItsyDocument>.fromOpaque(retainedDocument).release()
 	}
+}
+
+@MainActor
+@Test func documentPreservesDecodedEncodingAndSelectedNewlinePolicy() throws {
+	let document = ItsyDocument()
+	let body = try #require("alpha\r\nbeta".data(using: .utf16LittleEndian))
+	let source = Data([0xFF, 0xFE]) + body
+	try document.read(from: source, ofType: "public.plain-text")
+	#expect(document.textFileSavePolicy.encoding == .utf16LittleEndian)
+	#expect(document.textFileSavePolicy.newline == .preserve(.crlf))
+	document.selectTextFileSavePolicy(TextFileSavePolicy(encoding: .utf8BOM, newline: .lf))
+	let saved = try document.data(ofType: "public.plain-text")
+	#expect(saved.starts(with: Data([0xEF, 0xBB, 0xBF])))
+	#expect(String(data: saved.dropFirst(3), encoding: .utf8) == "alpha\nbeta")
+}
+
+@MainActor
+@Test func documentRestoresAndClearsDurableDirtyRecoveryJournal() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let url = directory.appendingPathComponent("note.txt")
+	try Data("saved".utf8).write(to: url)
+	let store = RecoveryJournalStore()
+	try store.save(RecoveryJournal(fileURL: url, text: "dirty recovery"), workspaceRoot: directory)
+
+	let document = ItsyDocument()
+	document.fileURL = url
+	try document.read(from: url, ofType: "public.plain-text")
+	#expect(editorStorageString(document.editor) == "dirty recovery")
+	#expect(document.isDocumentEdited)
+	try document.write(to: url, ofType: "public.plain-text")
+	#expect(store.load(fileURL: url, workspaceRoot: directory) == nil)
+
+	try store.save(RecoveryJournal(fileURL: url, text: "discard me"), workspaceRoot: directory)
+	document.discardRecoveryJournal()
+	#expect(store.load(fileURL: url, workspaceRoot: directory) == nil)
 }
 
 @MainActor
@@ -100,6 +135,26 @@ import Testing
 
 	controller.restoreWorkspacePaneLayout("V[]")
 	#expect(controller.paneLayoutEncoded == "V[L]")
+}
+
+@MainActor
+@Test func editorFocusTraversalCyclesVisibleShellControlsWithoutTraps() {
+	let document = ItsyDocument()
+	let controller = EditorWindowController(document: document)
+	document.addWindowController(controller)
+	defer { controller.close() }
+
+	let initial = controller.focusTraversalTargetsForTesting
+	#expect(initial.count >= 2)
+	for index in initial.indices {
+		#expect(initial[index].nextKeyView === initial[(index + 1) % initial.count])
+	}
+	controller.toggleSidebar()
+	let withoutSidebar = controller.focusTraversalTargetsForTesting
+	#expect(withoutSidebar.count < initial.count)
+	for index in withoutSidebar.indices {
+		#expect(withoutSidebar[index].nextKeyView === withoutSidebar[(index + 1) % withoutSidebar.count])
+	}
 }
 
 @MainActor
@@ -242,6 +297,8 @@ import Testing
 	try document.read(from: sourceURL, ofType: "public.plain-text")
 
 	#expect(document.editor.textStorage.kind == .pieceTree)
+	#expect(!document.editor.retainsUndoTreeSnapshots)
+	#expect(document.editor.history.tree.currentNode?.text.isEmpty == true)
 	#expect(document.editor.textStorage.length == bytes.count)
 	#expect(document.editor.textStorage.lineCount == 13_001)
 

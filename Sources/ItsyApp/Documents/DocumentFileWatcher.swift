@@ -2,6 +2,7 @@ import AppKit
 import Darwin
 import Dispatch
 import Foundation
+import ItsyEditor
 
 @MainActor final class DocumentFileWatcher {
 	private let queue = DispatchQueue(label: "dev.itsy.editor.file-watcher")
@@ -9,9 +10,13 @@ import Foundation
 	private var pendingExternalChangePrompt = false
 	var fileURL: () -> URL? = { nil }
 	var currentText: () -> String = { "" }
+	var isDocumentEdited: () -> Bool = { false }
 	var displayName: (URL) -> String = { $0.lastPathComponent }
 	var promptWindow: () -> NSWindow? = { nil }
 	var reloadFromDisk: (URL) -> Void = { _ in }
+	var compareExternalText: (URL, String, String) -> Void = { _, _, _ in }
+	var mergeExternalText: (URL, String, String) -> Void = { _, _, _ in }
+	var discardDeletedBuffer: () -> Void = {}
 
 	deinit {
 		source?.cancel()
@@ -59,30 +64,88 @@ import Foundation
 	}
 
 	private func promptForExternalFileChange(at url: URL) {
-		if (try? String(contentsOf: url, encoding: .utf8)) == currentText() {
+		let exists = FileManager.default.fileExists(atPath: url.path)
+		let diskText = exists ? (try? TextFileCodec.decode(Data(contentsOf: url)).text) : nil
+		let localText = currentText()
+		switch ExternalFileChangeResolver.state(localText: localText, diskText: diskText, isDirty: isDocumentEdited(), fileExists: exists) {
+		case .unchanged:
 			pendingExternalChangePrompt = false
 			restart()
-			return
-		}
-		let alert = NSAlert()
-		alert.messageText = L10n.string("\(displayName(url)) changed on disk")
-		alert.informativeText = L10n.string("Reload the file from disk?")
-		alert.addButton(withTitle: L10n.string("Reload"))
-		alert.addButton(withTitle: L10n.string("Keep Editing"))
-		if let window = promptWindow() {
-			alert.beginSheetModal(for: window) { [weak self] response in
-				self?.handleExternalFilePrompt(response, url: url)
-			}
-		} else {
-			handleExternalFilePrompt(alert.runModal(), url: url)
+		case .cleanReload:
+			reloadFromDisk(url)
+			pendingExternalChangePrompt = false
+			restart()
+		case .dirtyConflict:
+			presentDirtyConflict(url: url, localText: localText, diskText: diskText ?? "")
+		case .deletedClean, .deletedDirty:
+			presentDeletion(url: url)
+		case .unreadable:
+			presentUnreadableChange(url: url)
 		}
 	}
 
-	private func handleExternalFilePrompt(_ response: NSApplication.ModalResponse, url: URL) {
+	private func presentDirtyConflict(url: URL, localText: String, diskText: String) {
+		let alert = NSAlert()
+		alert.messageText = L10n.string("\(displayName(url)) changed on disk")
+		alert.informativeText = L10n.string("Your unsaved edits conflict with the on-disk version.")
+		alert.addButton(withTitle: L10n.string("Reload"))
+		alert.addButton(withTitle: L10n.string("Keep Editing"))
+		alert.addButton(withTitle: L10n.string("Compare"))
+		alert.addButton(withTitle: L10n.string("Merge Safely"))
+		if let window = promptWindow() {
+			alert.beginSheetModal(for: window) { [weak self] response in
+				self?.handleDirtyConflictPrompt(response, url: url, localText: localText, diskText: diskText)
+			}
+		} else {
+			handleDirtyConflictPrompt(alert.runModal(), url: url, localText: localText, diskText: diskText)
+		}
+	}
+
+	private func handleDirtyConflictPrompt(_ response: NSApplication.ModalResponse, url: URL, localText: String, diskText: String) {
 		if response == .alertFirstButtonReturn {
 			reloadFromDisk(url)
+		} else if response == .alertThirdButtonReturn {
+			compareExternalText(url, localText, diskText)
+		} else if response.rawValue == NSApplication.ModalResponse.alertThirdButtonReturn.rawValue + 1 {
+			mergeExternalText(url, localText, diskText)
 		}
 		pendingExternalChangePrompt = false
 		restart()
+	}
+
+	private func presentDeletion(url: URL) {
+		let alert = NSAlert()
+		alert.messageText = L10n.string("\(displayName(url)) was removed or renamed")
+		alert.informativeText = L10n.string("Keep the current buffer or explicitly discard it.")
+		alert.addButton(withTitle: L10n.string("Keep Editing"))
+		alert.addButton(withTitle: L10n.string("Discard Buffer"))
+		let complete: (NSApplication.ModalResponse) -> Void = { [weak self] response in
+			if response == .alertSecondButtonReturn {
+				self?.discardDeletedBuffer()
+			}
+			self?.pendingExternalChangePrompt = false
+			self?.restart()
+		}
+		if let window = promptWindow() {
+			alert.beginSheetModal(for: window, completionHandler: complete)
+		} else {
+			complete(alert.runModal())
+		}
+	}
+
+	private func presentUnreadableChange(url: URL) {
+		let alert = NSAlert()
+		alert.messageText = L10n.string("\(displayName(url)) changed to an unsupported format")
+		alert.informativeText = L10n.string("The current buffer was kept unchanged.")
+		alert.addButton(withTitle: L10n.string("Keep Editing"))
+		let complete: (NSApplication.ModalResponse) -> Void = { [weak self] _ in
+			self?.pendingExternalChangePrompt = false
+			self?.restart()
+		}
+		if let window = promptWindow() {
+			alert.beginSheetModal(for: window, completionHandler: complete)
+		} else {
+			complete(alert.runModal())
+		}
 	}
 }

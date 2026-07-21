@@ -279,6 +279,7 @@ public final class MetalTextView: NSView {
 		}
 	}
 	public var newlineInsertionTextProvider: ((Editor) -> String)?
+	public var textEditBehaviorConfiguration = TextEditBehaviorConfiguration()
 	public var topContentInset: CGFloat = 0 {
 		didSet { syncEditorState() }
 	}

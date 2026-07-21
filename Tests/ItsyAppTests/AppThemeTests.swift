@@ -17,6 +17,19 @@ import Testing
 	#expect(palette.gitGutterSettings.added.hasPrefix("#"))
 }
 
+@Test @MainActor func bundledThemesReportContrastFailuresDeterministically() {
+	let ids = [
+		"bundled:default-dark", "bundled:default-light", "bundled:solarized-dark", "bundled:solarized-light",
+		"bundled:gruvbox-dark", "bundled:gruvbox-light", "bundled:nord", "bundled:catppuccin-mocha",
+		"bundled:catppuccin-latte", "bundled:tokyo-night",
+	]
+	for id in ids {
+		let palette = AppThemePalette(settings: ItsySettings(theme: .init(id: id)))
+		#expect(palette.contrastFailures() == palette.contrastFailures())
+		#expect(AppThemePalette.contrastRatio(palette.foreground, palette.panelBackground) >= 4.5)
+	}
+}
+
 private func close(_ lhs: NSColor, to rhs: NSColor) -> Bool {
 	guard let a = lhs.usingColorSpace(.sRGB), let b = rhs.usingColorSpace(.sRGB) else {
 		return false

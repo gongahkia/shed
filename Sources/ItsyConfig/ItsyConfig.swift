@@ -43,19 +43,25 @@ public struct ItsySettings: Equatable, Sendable {
 			public var lineNumbers: Bool?
 			public var tabWidth: Int?
 			public var useSpaces: Bool?
+			public var autoPairs: Bool?
+			public var smartIndent: Bool?
 
 			public init(
 				font: String? = nil,
 				fontSize: Double? = nil,
 				lineNumbers: Bool? = nil,
 				tabWidth: Int? = nil,
-				useSpaces: Bool? = nil
+				useSpaces: Bool? = nil,
+				autoPairs: Bool? = nil,
+				smartIndent: Bool? = nil
 			) {
 				self.font = font
 				self.fontSize = fontSize
 				self.lineNumbers = lineNumbers
 				self.tabWidth = tabWidth
 				self.useSpaces = useSpaces
+				self.autoPairs = autoPairs
+				self.smartIndent = smartIndent
 			}
 		}
 
@@ -84,6 +90,8 @@ public struct ItsySettings: Equatable, Sendable {
 		public var lineNumberMode: LineNumberMode
 		public var tabWidth: Int
 		public var useSpaces: Bool
+		public var autoPairs: Bool
+		public var smartIndent: Bool
 		public var tabGroups: TabGroupScope
 		public var keymap: KeymapMode
 		public var wrap: WrapMode
@@ -98,6 +106,8 @@ public struct ItsySettings: Equatable, Sendable {
 			lineNumberMode: LineNumberMode? = nil,
 			tabWidth: Int = Self.defaultTabWidth,
 			useSpaces: Bool = false,
+			autoPairs: Bool = true,
+			smartIndent: Bool = true,
 			tabGroups: TabGroupScope = .window,
 			keymap: KeymapMode = .plain,
 			wrap: WrapMode = .none,
@@ -111,6 +121,8 @@ public struct ItsySettings: Equatable, Sendable {
 			self.lineNumberMode = lineNumberMode ?? (lineNumbers ? .absolute : .off)
 			self.tabWidth = tabWidth
 			self.useSpaces = useSpaces
+			self.autoPairs = autoPairs
+			self.smartIndent = smartIndent
 			self.tabGroups = tabGroups
 			self.keymap = keymap
 			self.wrap = wrap
@@ -275,6 +287,8 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 		editor.tabWidth = override.tabWidth ?? editor.tabWidth
 		editor.useSpaces = override.useSpaces ?? editor.useSpaces
+		editor.autoPairs = override.autoPairs ?? editor.autoPairs
+		editor.smartIndent = override.smartIndent ?? editor.smartIndent
 		return ItsySettings(editor: editor).normalized().editor
 	}
 
@@ -399,6 +413,8 @@ public final class ItsySettingsStore {
 		line_number_mode = "\(settings.editor.lineNumberMode.rawValue)"
 		tab_width = \(settings.editor.tabWidth)
 		use_spaces = \(settings.editor.useSpaces ? "true" : "false")
+		auto_pairs = \(settings.editor.autoPairs ? "true" : "false")
+		smart_indent = \(settings.editor.smartIndent ? "true" : "false")
 		keymap = "\(settings.editor.keymap.rawValue)"
 		tab_groups = "\(settings.editor.tabGroups.rawValue)"
 		wrap = "\(settings.editor.wrap.rawValue)"
@@ -467,6 +483,12 @@ public final class ItsySettingsStore {
 			}
 			if let useSpaces = settings.useSpaces {
 				lines.append("use_spaces = \(useSpaces ? "true" : "false")")
+			}
+			if let autoPairs = settings.autoPairs {
+				lines.append("auto_pairs = \(autoPairs ? "true" : "false")")
+			}
+			if let smartIndent = settings.smartIndent {
+				lines.append("smart_indent = \(smartIndent ? "true" : "false")")
 			}
 			return lines.joined(separator: "\n")
 		}.joined(separator: "\n") + "\n"
@@ -664,6 +686,18 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "editor.auto_pairs":
+			if case let .bool(autoPairs) = value {
+				settings.editor.autoPairs = autoPairs
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "editor.smart_indent":
+			if case let .bool(smartIndent) = value {
+				settings.editor.smartIndent = smartIndent
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
 		case "editor.keymap":
 			if case let .string(mode) = value, let mode = ItsySettings.KeymapMode(rawValue: mode.lowercased()) {
 				settings.editor.keymap = mode
@@ -786,6 +820,18 @@ struct ItsySettingsParser {
 		case "use_spaces":
 			if case let .bool(useSpaces) = value {
 				language.useSpaces = useSpaces
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "auto_pairs":
+			if case let .bool(autoPairs) = value {
+				language.autoPairs = autoPairs
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "smart_indent":
+			if case let .bool(smartIndent) = value {
+				language.smartIndent = smartIndent
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}

@@ -7,8 +7,10 @@ import ItsyEditor
 	private let documentController: ItsyDocumentController
 	private var projectFindPanel: NSPanel?
 	private var projectFindInputField: NSTextField?
+	private var projectReplaceInputField: NSTextField?
 	private var projectFindStatusLabel: NSTextField?
 	private var projectFindTableView: NSTableView?
+	private var projectReplacePreviewButton: NSButton?
 	private var projectFindMatches: [ProjectFindMatch] = []
 	private var projectFindGeneration = 0
 
@@ -74,6 +76,18 @@ import ItsyEditor
 		queryField.translatesAutoresizingMaskIntoConstraints = false
 		queryField.delegate = self
 		contentView.addSubview(queryField)
+		let replaceField = NSTextField(frame: .zero)
+		replaceField.placeholderString = L10n.string("Replace with")
+		replaceField.font = .systemFont(ofSize: 13)
+		replaceField.isBordered = true
+		replaceField.focusRingType = .default
+		replaceField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(replaceField)
+
+		let previewButton = NSButton(title: L10n.string("Preview Replace"), target: self, action: #selector(previewProjectReplace(_:)))
+		previewButton.bezelStyle = .rounded
+		previewButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(previewButton)
 
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
@@ -109,7 +123,13 @@ import ItsyEditor
 			queryField.heightAnchor.constraint(equalToConstant: 28),
 			statusLabel.leadingAnchor.constraint(equalTo: queryField.leadingAnchor),
 			statusLabel.trailingAnchor.constraint(equalTo: queryField.trailingAnchor),
-			statusLabel.topAnchor.constraint(equalTo: queryField.bottomAnchor, constant: 6),
+			replaceField.leadingAnchor.constraint(equalTo: queryField.leadingAnchor),
+			replaceField.trailingAnchor.constraint(equalTo: previewButton.leadingAnchor, constant: -8),
+			replaceField.topAnchor.constraint(equalTo: queryField.bottomAnchor, constant: 8),
+			replaceField.heightAnchor.constraint(equalToConstant: 26),
+			previewButton.trailingAnchor.constraint(equalTo: queryField.trailingAnchor),
+			previewButton.centerYAnchor.constraint(equalTo: replaceField.centerYAnchor),
+			statusLabel.topAnchor.constraint(equalTo: replaceField.bottomAnchor, constant: 6),
 			statusLabel.heightAnchor.constraint(equalToConstant: 16),
 			scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
 			scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
@@ -117,8 +137,10 @@ import ItsyEditor
 			scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -14),
 		])
 		projectFindInputField = queryField
+		projectReplaceInputField = replaceField
 		projectFindStatusLabel = statusLabel
 		projectFindTableView = tableView
+		projectReplacePreviewButton = previewButton
 	}
 
 	private func centerProjectFind(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -172,6 +194,74 @@ import ItsyEditor
 				}
 				self.setProjectFindResults(matches)
 				self.setProjectFindStatus(L10n.string("\(matches.count) matches"))
+			}
+		}
+	}
+
+	@objc private func previewProjectReplace(_ sender: Any?) {
+		guard let query = projectFindInputField?.stringValue, !query.isEmpty else {
+			setProjectFindStatus(L10n.string("Enter text to replace"))
+			return
+		}
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			setProjectFindStatus(L10n.string("Open a folder first"))
+			return
+		}
+		let replacement = projectReplaceInputField?.stringValue ?? ""
+		projectReplacePreviewButton?.isEnabled = false
+		setProjectFindStatus(L10n.string("Preparing replace preview..."))
+		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+			let preview = ProjectReplace.preview(root: root, options: ProjectReplaceOptions(query: query, replacement: replacement))
+			DispatchQueue.main.async { [weak self] in
+				guard let self else {
+					return
+				}
+				self.projectReplacePreviewButton?.isEnabled = true
+				self.confirmProjectReplace(preview)
+			}
+		}
+	}
+
+	private func confirmProjectReplace(_ preview: ProjectReplacePreview) {
+		guard !preview.files.isEmpty else {
+			setProjectFindStatus(L10n.string("No replacements"))
+			return
+		}
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Replace (preview.replacementCount) matches in (preview.files.count) files?")
+		alert.informativeText = preview.files.map { "\($0.relativePath) (\($0.replacementCount))" }.joined(separator: "\n")
+		alert.addButton(withTitle: L10n.string("Replace"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		guard alert.runModal() == .alertFirstButtonReturn else {
+			setProjectFindStatus(L10n.string("Replace cancelled"))
+			return
+		}
+		setProjectFindStatus(L10n.string("Replacing..."))
+		DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+			do {
+				let result = try ProjectReplace.apply(preview)
+				DispatchQueue.main.async {
+					if let journalURL = result.recoveryJournalURL {
+						self?.setProjectFindStatus(L10n.string("Replace complete; recovery journal: \(journalURL.path)"))
+					} else {
+						self?.setProjectFindStatus(L10n.string("Replaced \(result.replacementCount) matches in \(result.fileCount) files"))
+						self?.searchProjectFind(query: self?.projectFindInputField?.stringValue ?? "")
+					}
+				}
+			} catch let error as ProjectReplaceError {
+				DispatchQueue.main.async {
+					switch error {
+					case let .recoveryJournal(url):
+						self?.setProjectFindStatus(L10n.string("Replace failed; recovery journal: \(url.path)"))
+					default:
+						let description = String(describing: error)
+						self?.setProjectFindStatus(L10n.string("Replace failed: \(description)"))
+					}
+				}
+			} catch {
+				DispatchQueue.main.async {
+					self?.setProjectFindStatus(L10n.string("Replace failed: \(error.localizedDescription)"))
+				}
 			}
 		}
 	}

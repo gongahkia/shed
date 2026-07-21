@@ -51,6 +51,14 @@ import ItsyEditor
 		self.window = window
 	}
 
+	var focusView: NSView {
+		outlineView
+	}
+
+	func focus() {
+		window?.makeFirstResponder(outlineView)
+	}
+
 	func applyTheme(_ palette: AppThemePalette) {
 		view.layer?.backgroundColor = palette.sidebarBackground.cgColor
 		outlineView.backgroundColor = palette.sidebarBackground
@@ -129,6 +137,7 @@ import ItsyEditor
 		outlineView.addTableColumn(column)
 		outlineView.outlineTableColumn = column
 		outlineView.headerView = nil
+		outlineView.setAccessibilityLabel(L10n.string("Workspace files"))
 		outlineView.rowSizeStyle = .small
 		outlineView.usesAlternatingRowBackgroundColors = false
 

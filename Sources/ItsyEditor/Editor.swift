@@ -630,6 +630,7 @@ public enum EditorTextStorage: Sendable {
 }
 
 public struct Editor: Sendable {
+	public private(set) var retainsUndoTreeSnapshots: Bool
 	public var rope: Rope {
 		get {
 			switch textStorage {
@@ -654,6 +655,7 @@ public struct Editor: Sendable {
 	}
 
 	public init(text: String, storage: EditorStorageKind) {
+		retainsUndoTreeSnapshots = true
 		switch storage {
 		case .rope:
 			textStorage = .rope(Rope(text))
@@ -665,11 +667,12 @@ public struct Editor: Sendable {
 		history.resetTree(text: Data(text.utf8), selection: selections)
 	}
 
-	public init(pieceTree: PieceTree) {
+	public init(pieceTree: PieceTree, retainsUndoTreeSnapshots: Bool = true) {
+		self.retainsUndoTreeSnapshots = retainsUndoTreeSnapshots
 		textStorage = .pieceTree(pieceTree)
 		selections = SelectionSet()
 		history = UndoStack()
-		history.resetTree(text: fullTextData, selection: selections)
+		history.resetTree(text: retainsUndoTreeSnapshots ? fullTextData : Data(), selection: selections)
 	}
 
 	public static func resolveStorage(environment: [String: String], settings: ItsySettings) -> EditorStorageKind {
@@ -793,7 +796,8 @@ public struct Editor: Sendable {
 	}
 
 	public mutating func restoreUndoTreeNode(id: Int) -> Bool {
-		guard let node = history.tree.node(id: id),
+		guard retainsUndoTreeSnapshots,
+		      let node = history.tree.node(id: id),
 		      history.jumpToTreeNode(id)
 		else {
 			return false
@@ -842,7 +846,7 @@ public struct Editor: Sendable {
 			reverse: reverse,
 			selectionBefore: selectionBefore,
 			selectionAfter: selections,
-			snapshotText: fullTextData
+			snapshotText: retainsUndoTreeSnapshots ? fullTextData : Data()
 		)
 	}
 

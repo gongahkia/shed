@@ -275,6 +275,12 @@ import ItsyKeymap
 				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusEditor()
 				},
+				Command(id: "view.focusSidebar", title: L10n.string("Focus Sidebar"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusSidebar()
+				},
+				Command(id: "view.focusTabs", title: L10n.string("Focus Tabs"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusTabs()
+				},
 				Command(id: "view.zoomIn", title: L10n.string("Zoom In"), defaultKey: "Cmd-+") { [weak self] in
 					self?.zoomIn(nil)
 				},

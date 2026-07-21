@@ -42,7 +42,6 @@ final class DocumentSyntaxController {
 				syntaxTheme = try ItsyTheme.loadUserOrDefault().syntax
 			}
 			let spans: [HighlightSpan]
-			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
 			if case .rope = editor.textStorage,
 			   edits.count == 1,
 			   let edit = edits.first,
@@ -53,12 +52,19 @@ final class DocumentSyntaxController {
 				let newTree = try syntaxPipeline.parse(editor.rope, oldTree: tree)
 				syntaxTree = newTree
 				let queryRange = highlightByteRange(for: viewportLineRange, editor: editor)
+				let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
 				syntaxHighlightSpans = try syntaxPipeline.highlights(in: newTree, source: source, byteRange: queryRange, includeInjections: true)
 				spans = syntaxHighlightSpans
 			} else {
 				let tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
-				spans = try syntaxPipeline.highlights(in: tree, source: source, byteRange: highlightByteRange(for: viewportLineRange, editor: editor), includeInjections: true)
+				let byteRange = highlightByteRange(for: viewportLineRange, editor: editor)
+				if case .pieceTree = editor.textStorage {
+					spans = try syntaxPipeline.highlights(in: tree, byteRange: byteRange)
+				} else {
+					let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
+					spans = try syntaxPipeline.highlights(in: tree, source: source, byteRange: byteRange, includeInjections: true)
+				}
 				syntaxHighlightSpans = spans
 			}
 			let renderedSpans = spans.compactMap { span -> TextHighlightSpan? in
@@ -88,6 +94,9 @@ final class DocumentSyntaxController {
 				tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
 			}
+			if case .pieceTree = editor.textStorage {
+				return fallbackNewlineText(editor: editor)
+			}
 			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
 			return try syntaxPipeline.indentationAfterNewline(in: tree, source: source, offset: editor.selections.primary.head, tabWidth: tabWidth)
 		} catch {
@@ -102,6 +111,16 @@ final class DocumentSyntaxController {
 		case let .pieceTree(pieceTree):
 			return try syntaxPipeline.parse(pieceTree)
 		}
+	}
+
+	private func fallbackNewlineText(editor: Editor) -> String {
+		let storage = editor.textStorage
+		let offset = editor.selections.primary.head
+		let line = storage.line(forOffset: offset)
+		let range = storage.lineRange(line)
+		let prefix = storage.substring(range.lowerBound ..< min(offset, range.upperBound))
+		let indentation = prefix.prefix { $0 == " " || $0 == "\t" }
+		return "\n" + indentation
 	}
 
 	private func highlightByteRange(for viewportLineRange: Range<Int>?, editor: Editor) -> Range<Int>? {

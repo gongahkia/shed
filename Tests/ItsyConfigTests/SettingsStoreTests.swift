@@ -11,6 +11,8 @@ import Testing
 	line_numbers = true
 	line_number_mode = "relative"
 	tab_width = 2
+	auto_pairs = false
+	smart_indent = false
 	keymap = "vim"
 	tab_groups = "pane"
 	wrap = "soft"
@@ -40,6 +42,8 @@ import Testing
 	#expect(result.settings.editor.lineNumbers)
 	#expect(result.settings.editor.lineNumberMode == .relative)
 	#expect(result.settings.editor.tabWidth == 2)
+	#expect(!result.settings.editor.autoPairs)
+	#expect(!result.settings.editor.smartIndent)
 	#expect(result.settings.editor.keymap == .vim)
 	#expect(result.settings.editor.tabGroups == .pane)
 	#expect(result.settings.editor.wrap == .soft)
@@ -86,10 +90,14 @@ import Testing
 	line_numbers = false
 	tab_width = 8
 	use_spaces = false
+	auto_pairs = true
+	smart_indent = true
 
 	[editor.language.python]
 	tab_width = 4
 	use_spaces = true
+	auto_pairs = false
+	smart_indent = false
 	line_numbers = true
 	"""#
 	var parser = ItsySettingsParser()
@@ -103,6 +111,8 @@ import Testing
 	#expect(python.tabWidth == 4)
 	#expect(python.useSpaces)
 	#expect(python.lineNumbers)
+	#expect(!python.autoPairs)
+	#expect(!python.smartIndent)
 }
 
 @Test func settingsDefaultsUsePieceTreeStorage() {
@@ -112,6 +122,8 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
+	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
+	#expect(ItsySettingsStore.serialize(settings).contains("smart_indent = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"line_number_mode = "off""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"keymap = "plain""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"tab_groups = "window""#))

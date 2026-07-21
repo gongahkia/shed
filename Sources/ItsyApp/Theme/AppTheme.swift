@@ -63,6 +63,46 @@ struct AppThemePalette {
 		)
 	}
 
+	func contrastFailures(minimumRatio: CGFloat = 4.5) -> [String] {
+		let pairs: [(String, NSColor, NSColor)] = [
+			("editor", nsColor(editor.foreground), nsColor(editor.background)),
+			("panel", panelForeground, panelBackground),
+			("input", inputForeground, inputBackground),
+			("sidebar", sidebarForeground, sidebarBackground),
+			("tab-active", tabActiveForeground, tabActiveBackground),
+			("tab-inactive", tabInactiveForeground, tabInactiveBackground),
+			("status", statusForeground, statusBackground),
+			("button", buttonForeground, buttonBackground),
+		]
+		return pairs.compactMap { name, foreground, background in
+			Self.contrastRatio(foreground, background) >= minimumRatio ? nil : name
+		}
+	}
+
+	static func contrastRatio(_ foreground: NSColor, _ background: NSColor) -> CGFloat {
+		func components(_ color: NSColor) -> (red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {
+			let color = color.usingColorSpace(.sRGB) ?? color
+			return (color.redComponent, color.greenComponent, color.blueComponent, color.alphaComponent)
+		}
+		func luminance(_ color: (red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat)) -> CGFloat {
+			func linear(_ value: CGFloat) -> CGFloat {
+				value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4)
+			}
+			return 0.2126 * linear(color.red) + 0.7152 * linear(color.green) + 0.0722 * linear(color.blue)
+		}
+		let background = components(background)
+		let rawForeground = components(foreground)
+		let foreground = (
+			red: rawForeground.red * rawForeground.alpha + background.red * (1 - rawForeground.alpha),
+			green: rawForeground.green * rawForeground.alpha + background.green * (1 - rawForeground.alpha),
+			blue: rawForeground.blue * rawForeground.alpha + background.blue * (1 - rawForeground.alpha),
+			alpha: CGFloat(1)
+		)
+		let lighter = max(luminance(foreground), luminance(background))
+		let darker = min(luminance(foreground), luminance(background))
+		return (lighter + 0.05) / (darker + 0.05)
+	}
+
 	init(settings: ItsySettings) {
 		id = settings.theme.id
 		let theme = try? ItsyTheme.loadChoice(id: settings.theme.id)

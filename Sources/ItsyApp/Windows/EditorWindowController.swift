@@ -143,6 +143,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var activeLSPKey: LSPSessionKey?
 	private var lspStatusPanel: LSPStatusPanel?
 	private var undoTreePanel: UndoTreePanelController?
+	private(set) var focusTraversalTargetsForTesting: [NSView] = []
 
 	init(document: ItsyDocument) {
 		recordBenchStage("window_controller_init_begin")
@@ -219,6 +220,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recordBenchStage("window_controller_lsp_refresh_end")
 		ItsyWorkspaceController.register(self)
 		ItsyTabCoordinator.register(self)
+		rebuildFocusTraversal()
 		window.makeFirstResponder(editorView)
 		recordBenchStage("window_controller_init_end")
 	}
@@ -308,6 +310,20 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		setSidebarVisible(!sidebarVisible)
 	}
 
+	func focusSidebar() {
+		if !sidebarVisible {
+			setSidebarVisible(true)
+		}
+		fileTreeController.focus()
+	}
+
+	func focusTabs() {
+		guard let target = focusTarget(in: tabGroupScope == .pane ? paneCoordinator.activePane.tabBarController.view : tabBarView) else {
+			return
+		}
+		window?.makeFirstResponder(target)
+	}
+
 	private func setSidebarVisible(_ visible: Bool) {
 		guard visible != sidebarVisible else {
 			return
@@ -328,6 +344,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			sidebarWidthConstraint?.constant = 0
 		}
 		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
 	}
 
 	private func invalidateEditorShellLayout() {
@@ -407,6 +424,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			tabStackView.addArrangedSubview(makeTabView(tab, tag: index))
 		}
 		layoutTabContent()
+		rebuildFocusTraversal()
 	}
 
 	private func layoutTabContent() {
@@ -441,6 +459,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		selectButton.lineBreakMode = .byTruncatingMiddle
 		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		selectButton.toolTip = tab.title
+		selectButton.setAccessibilityLabel(L10n.string("Tab: \(tab.title)"))
 		selectButton.contentTintColor = tab.isSelected ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
 
 		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
@@ -448,6 +467,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
 		closeButton.toolTip = L10n.string("Close")
+		closeButton.setAccessibilityLabel(L10n.string("Close tab: \(tab.title)"))
 		closeButton.contentTintColor = AppTheme.palette.tabInactiveForeground
 
 		stack.addArrangedSubview(selectButton)
@@ -489,6 +509,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspButton.bezelStyle = .rounded
 		lspButton.controlSize = .small
 		lspButton.font = .systemFont(ofSize: 11)
+		lspButton.setAccessibilityLabel(L10n.string("Language server status"))
 		lspButton.translatesAutoresizingMaskIntoConstraints = false
 		statusBarView.addSubview(label)
 		statusBarView.addSubview(lspButton)
@@ -927,6 +948,54 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window?.makeFirstResponder(editorView)
 	}
 
+	private func rebuildFocusTraversal() {
+		var targets: [NSView] = []
+		if sidebarVisible {
+			targets.append(fileTreeController.focusView)
+		}
+		if !tabBarView.isHidden, let tab = focusTarget(in: tabBarView) {
+			targets.append(tab)
+		}
+		if let findBarController, !findBarController.view.isHidden {
+			targets.append(contentsOf: findBarController.focusableViews)
+		}
+		for pane in paneCoordinator.panes {
+			if !pane.tabBarController.view.isHidden, let tab = focusTarget(in: pane.tabBarController.view) {
+				targets.append(tab)
+			}
+			targets.append(pane.editorView)
+		}
+		if !lspMissingBanner.isHidden, let button = focusTarget(in: lspMissingBanner) {
+			targets.append(button)
+		}
+		if !lspStatusButton.isHidden {
+			targets.append(lspStatusButton)
+		}
+		focusTraversalTargetsForTesting = targets
+		guard let first = targets.first else {
+			return
+		}
+		guard targets.count > 1 else {
+			first.nextKeyView = first
+			return
+		}
+		for index in targets.indices {
+			targets[index].nextKeyView = targets[(index + 1) % targets.count]
+		}
+	}
+
+	private func focusTarget(in view: NSView) -> NSView? {
+		if view.canBecomeKeyView {
+			return view
+		}
+		for child in view.subviews {
+			if let target = focusTarget(in: child) {
+				return target
+			}
+		}
+		return nil
+	}
+
 	private func focusEditor(_ targetView: MetalTextView) {
 		paneCoordinator.focusPane(containing: targetView)
 		syncActiveDocumentToFocusedPane()
@@ -1080,7 +1149,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func applySettings(_ settings: ItsySettings) {
-		applyEditorPreferences(EditorPreferences(settings: settings.editorSettings(languageID: currentLanguageID())))
+		let editorSettings = settings.editorSettings(languageID: currentLanguageID())
+		applyEditorPreferences(EditorPreferences(settings: editorSettings))
+		let indentationUnit = editorSettings.useSpaces ? String(repeating: " ", count: editorSettings.tabWidth) : "\t"
+		for pane in paneCoordinator.panes {
+			pane.editorView.textEditBehaviorConfiguration = TextEditBehaviorConfiguration(
+				autoPairs: editorSettings.autoPairs,
+				smartIndent: editorSettings.smartIndent,
+				indentationUnit: indentationUnit
+			)
+		}
 		applyTheme(AppTheme.palette)
 		setTabGroupScope(settings.normalized().editor.tabGroups)
 	}
@@ -1162,6 +1240,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		for pane in paneCoordinator.panes {
 			pane.tabBarController.view.isHidden = tabGroupScope == .window
 		}
+		rebuildFocusTraversal()
 	}
 
 	private func refreshPaneTabBars() {
@@ -1182,6 +1261,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			pane.tabBarController.setTabs(tabs)
 			pane.tabBarController.view.isHidden = tabGroupScope == .window
 		}
+		rebuildFocusTraversal()
 	}
 
 	private func ensurePaneTabs(for pane: EditorPane, preferredDocument: ItsyDocument?) {
@@ -1330,7 +1410,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		controller.currentEditorView = { [weak self] in self?.editorView }
 		controller.focusEditor = { [weak self] in self?.focusEditor() }
+		controller.visibilityDidChange = { [weak self] in self?.rebuildFocusTraversal() }
 		findBarController = controller
+		rebuildFocusTraversal()
 		return controller
 	}
 

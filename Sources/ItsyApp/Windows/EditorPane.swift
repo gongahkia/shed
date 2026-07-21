@@ -106,6 +106,7 @@ import ItsyRender
 		selectButton.lineBreakMode = .byTruncatingMiddle
 		selectButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		selectButton.toolTip = tab.title
+		selectButton.setAccessibilityLabel(L10n.string("Tab: \(tab.title)"))
 		selectButton.contentTintColor = tab.isSelected ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
 
 		let closeButton = NSButton(title: L10n.string("X"), target: self, action: #selector(closeTab(_:)))
@@ -113,6 +114,7 @@ import ItsyRender
 		closeButton.isBordered = false
 		closeButton.font = .systemFont(ofSize: 11, weight: .regular)
 		closeButton.toolTip = L10n.string("Close")
+		closeButton.setAccessibilityLabel(L10n.string("Close tab: \(tab.title)"))
 		closeButton.contentTintColor = AppTheme.palette.tabInactiveForeground
 
 		stack.addArrangedSubview(selectButton)

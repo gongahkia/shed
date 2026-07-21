@@ -204,6 +204,7 @@ public struct UndoStack: Sendable, Equatable {
 	public private(set) var tree = UndoTree()
 	private var redoEdits: [UndoEntry] = []
 	private var entryByNodeID: [Int: UndoEntry] = [:]
+	private var entryIndexMayContainStaleEntries = false
 	private var activeGroupID: Int?
 	private var nextGroupID = 1
 
@@ -232,7 +233,16 @@ public struct UndoStack: Sendable, Equatable {
 		)
 		edits.append(entry)
 		entryByNodeID[nodeID] = entry
+		for redoEntry in redoEdits {
+			if let redoNodeID = redoEntry.treeNodeID {
+				entryByNodeID[redoNodeID] = nil
+			}
+		}
 		redoEdits.removeAll()
+		if entryIndexMayContainStaleEntries {
+			pruneEntryIndex()
+			entryIndexMayContainStaleEntries = false
+		}
 		trimUndoHistory()
 	}
 
@@ -241,6 +251,7 @@ public struct UndoStack: Sendable, Equatable {
 		entryByNodeID = [:]
 		edits = []
 		redoEdits = []
+		entryIndexMayContainStaleEntries = false
 	}
 
 	public mutating func replaceTree(_ tree: UndoTree) {
@@ -253,6 +264,7 @@ public struct UndoStack: Sendable, Equatable {
 			}
 			return (nodeID, entry)
 		})
+		entryIndexMayContainStaleEntries = false
 	}
 
 	public mutating func jumpToTreeNode(_ id: Int) -> Bool {
@@ -271,6 +283,7 @@ public struct UndoStack: Sendable, Equatable {
 		}
 		edits = path.compactMap { entryByNodeID[$0] }
 		redoEdits = []
+		entryIndexMayContainStaleEntries = true
 		return true
 	}
 
@@ -319,12 +332,16 @@ public struct UndoStack: Sendable, Equatable {
 	private mutating func trimUndoHistory() {
 		while edits.count + redoEdits.count > maxEditCount || retainedRemovedBytes > maxTotalRemovedBytes {
 			guard !edits.isEmpty else {
+				for redoEntry in redoEdits {
+					if let redoNodeID = redoEntry.treeNodeID {
+						entryByNodeID[redoNodeID] = nil
+					}
+				}
 				redoEdits.removeAll()
 				return
 			}
 			dropOldestUndoGroup()
 		}
-		pruneEntryIndex()
 	}
 
 	private var retainedRemovedBytes: Int {
@@ -341,11 +358,17 @@ public struct UndoStack: Sendable, Equatable {
 		}
 		let groupID = first.groupID
 		edits.removeFirst()
+		if let nodeID = first.treeNodeID {
+			entryByNodeID[nodeID] = nil
+		}
 		guard let groupID else {
 			return
 		}
-		while edits.first?.groupID == groupID {
+		while edits.first?.groupID == groupID, let entry = edits.first {
 			edits.removeFirst()
+			if let nodeID = entry.treeNodeID {
+				entryByNodeID[nodeID] = nil
+			}
 		}
 	}
 

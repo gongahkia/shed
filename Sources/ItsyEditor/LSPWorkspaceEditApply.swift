@@ -3,6 +3,7 @@ import ItsyLSP
 
 public enum LSPWorkspaceEditApplyError: Error, Equatable, Sendable {
 	case sourceMissing(uri: String)
+	case staleDocumentVersion(uri: String, expected: Int, received: Int)
 	case editFailed(uri: String, underlying: String)
 	case empty
 }
@@ -20,8 +21,10 @@ public enum LSPWorkspaceEditApply {
 
 	public static func apply(
 		_ edit: LSPWorkspaceEdit,
-		sources: [String: String]
+		sources: [String: String],
+		documentVersions: [String: Int] = [:]
 	) throws -> [ResolvedFile] {
+		try validateVersions(edit, documentVersions: documentVersions)
 		let groups = normalize(edit)
 		guard !groups.isEmpty else {
 			throw LSPWorkspaceEditApplyError.empty
@@ -41,6 +44,23 @@ public enum LSPWorkspaceEditApply {
 		}
 		results.sort { $0.uri < $1.uri }
 		return results
+	}
+
+	private static func validateVersions(_ edit: LSPWorkspaceEdit, documentVersions: [String: Int]) throws {
+		for change in edit.documentChanges ?? [] {
+			guard
+				let received = change.textDocument.version,
+				let expected = documentVersions[change.textDocument.uri],
+				expected != received
+			else {
+				continue
+			}
+			throw LSPWorkspaceEditApplyError.staleDocumentVersion(
+				uri: change.textDocument.uri,
+				expected: expected,
+				received: received
+			)
+		}
 	}
 
 	public static func normalize(_ edit: LSPWorkspaceEdit) -> [String: [LSPTextEdit]] {

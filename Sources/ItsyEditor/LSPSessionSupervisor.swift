@@ -1,6 +1,65 @@
 import Foundation
 import ItsyLSP
 
+public enum LSPHealthState: String, Equatable, Sendable {
+	case idle
+	case starting
+	case ready
+	case degraded
+	case crashed
+	case unavailable
+}
+
+public enum LSPSessionOutputKind: String, Equatable, Sendable {
+	case process
+	case protocolOutput = "protocol"
+}
+
+public struct LSPSessionOutput: Equatable, Sendable {
+	public var timestamp: Date
+	public var kind: LSPSessionOutputKind
+	public var text: String
+
+	public init(timestamp: Date = .init(), kind: LSPSessionOutputKind, text: String) {
+		self.timestamp = timestamp
+		self.kind = kind
+		self.text = text
+	}
+}
+
+public enum LSPLogRedactor {
+	public static func redact(_ text: String, environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
+		var redacted = text
+		for (name, value) in environment where isSensitive(name) && !value.isEmpty {
+			redacted = redacted.replacingOccurrences(of: value, with: "<redacted>")
+		}
+		redacted = replacing(
+			"(?i)\\b([A-Z][A-Z0-9_]*(?:TOKEN|SECRET|PASSWORD|API[_-]?KEY|AUTH(?:ORIZATION)?|COOKIE|CREDENTIAL)[A-Z0-9_]*)=([^\\s]+)",
+			with: "$1=<redacted>",
+			in: redacted
+		)
+		redacted = replacing(
+			"(?i)(\\\"(?:token|secret|password|api[_-]?key|authorization|cookie|credential)[^\\\"]*\\\"\\s*:\\s*\\\")[^\\\"]*\\\"",
+			with: "$1<redacted>\"",
+			in: redacted
+		)
+		return replacing("(?i)(Bearer\\s+)[^\\s]+", with: "$1<redacted>", in: redacted)
+	}
+
+	private static func isSensitive(_ name: String) -> Bool {
+		let name = name.lowercased()
+		return ["token", "secret", "password", "api_key", "apikey", "authorization", "cookie", "credential"].contains { name.contains($0) }
+	}
+
+	private static func replacing(_ pattern: String, with template: String, in text: String) -> String {
+		guard let expression = try? NSRegularExpression(pattern: pattern) else {
+			return text
+		}
+		let range = NSRange(text.startIndex..., in: text)
+		return expression.stringByReplacingMatches(in: text, range: range, withTemplate: template)
+	}
+}
+
 public struct LSPSessionFailureReason: Equatable, Sendable {
 	public var status: Int32
 	public var stderrTail: String
@@ -13,6 +72,7 @@ public struct LSPSessionFailureReason: Equatable, Sendable {
 
 public enum LSPSessionSupervisorEvent: Equatable, Sendable {
 	case diagnosticsUpdated(WorkspaceProblemSnapshot)
+	case output(LSPSessionOutput)
 	case sessionFailed(reason: LSPSessionFailureReason)
 	case workspaceEditRequested(id: JSONRPCID, params: LSPApplyWorkspaceEditParams)
 }
@@ -29,14 +89,20 @@ public actor LSPSessionSupervisor {
 	private var pumpTask: Task<Void, Never>?
 	private var ownedURIs: Set<String> = []
 	private var stderrTail = Data()
+	private let environment: [String: String]
 
-	public init(key: LSPSessionKey, client: LSPProcessClient) {
-		self.init(key: key, events: client.events)
+	public init(key: LSPSessionKey, client: LSPProcessClient, environment: [String: String] = ProcessInfo.processInfo.environment) {
+		self.init(key: key, events: client.events, environment: environment)
 	}
 
-	public init(key: LSPSessionKey, events clientEvents: AsyncStream<LSPProcessClientEvent>) {
+	public init(
+		key: LSPSessionKey,
+		events clientEvents: AsyncStream<LSPProcessClientEvent>,
+		environment: [String: String] = ProcessInfo.processInfo.environment
+	) {
 		self.key = key
 		self.clientEvents = clientEvents
+		self.environment = environment
 		diagnostics = LSPDiagnosticsAggregator(root: key.workspaceRoot)
 		var capturedContinuation: AsyncStream<LSPSessionSupervisorEvent>.Continuation?
 		events = AsyncStream { continuation in
@@ -72,16 +138,31 @@ public actor LSPSessionSupervisor {
 		ownedURIs.insert(uri)
 	}
 
+	public func recordDocumentVersion(_ version: Int, forURI uri: String) {
+		ownedURIs.insert(uri)
+		await diagnostics.recordDocumentVersion(version, forURI: uri)
+	}
+
+	public func clearDiagnostics(forURI uri: String, removingDocument: Bool = false) async {
+		if removingDocument {
+			ownedURIs.remove(uri)
+			await diagnostics.removeDocument(forURI: uri)
+		} else {
+			await diagnostics.reset(forURI: uri)
+		}
+		continuation.yield(.diagnosticsUpdated(await diagnostics.snapshot()))
+	}
+
 	private func handle(_ event: LSPProcessClientEvent) async {
 		switch event {
 		case let .server(.notification(notification)):
 			await handle(notification)
 		case let .stderr(data):
-			appendStderr(data)
+			continuation.yield(.output(recordOutput(data, kind: .process)))
 		case let .terminated(status):
 			await handleTermination(status)
 		case let .failure(message):
-			appendStderr(Data(message.utf8))
+			continuation.yield(.output(recordOutput(Data(message.utf8), kind: .protocolOutput)))
 		case let .server(.request(request)):
 			await handle(request)
 		}
@@ -94,7 +175,9 @@ public actor LSPSessionSupervisor {
 			return
 		}
 		ownedURIs.insert(params.uri)
-		await diagnostics.ingest(params, source: key.languageID)
+		guard await diagnostics.ingest(params, source: key.languageID) else {
+			return
+		}
 		let snapshot = await diagnostics.snapshot()
 		continuation.yield(.diagnosticsUpdated(snapshot))
 	}
@@ -109,12 +192,10 @@ public actor LSPSessionSupervisor {
 	}
 
 	private func handleTermination(_ status: Int32) async {
-		guard status != 0 else {
-			return
-		}
 		for uri in ownedURIs {
-			await diagnostics.reset(forURI: uri)
+			await diagnostics.removeDocument(forURI: uri)
 		}
+		ownedURIs.removeAll()
 		let snapshot = await diagnostics.snapshot()
 		continuation.yield(.diagnosticsUpdated(snapshot))
 		continuation.yield(.sessionFailed(reason: LSPSessionFailureReason(
@@ -123,11 +204,14 @@ public actor LSPSessionSupervisor {
 		)))
 	}
 
-	private func appendStderr(_ data: Data) {
-		stderrTail.append(data)
+	private func recordOutput(_ data: Data, kind: LSPSessionOutputKind) -> LSPSessionOutput {
+		let text = LSPLogRedactor.redact(String(decoding: data, as: UTF8.self), environment: environment)
+		let redactedData = Data(text.utf8)
+		stderrTail.append(redactedData)
 		if stderrTail.count > Self.stderrTailLimit {
 			stderrTail = Data(stderrTail.suffix(Self.stderrTailLimit))
 		}
+		return LSPSessionOutput(kind: kind, text: text)
 	}
 
 	private func finish() {

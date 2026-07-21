@@ -11,6 +11,18 @@ public enum LSPProcessClientError: Error, Equatable, Sendable {
 	case alreadyStarted
 }
 
+public protocol LSPProcessClientTransport: LSPClientTransport {
+	var events: AsyncStream<LSPProcessTransportEvent> { get }
+	var executableURL: URL { get }
+	var arguments: [String] { get }
+	var processIdentifier: Int32? { get }
+	var startDate: Date? { get }
+	func start() throws
+	func terminate()
+}
+
+extension LSPProcessTransport: LSPProcessClientTransport {}
+
 public actor LSPProcessEventRouter {
 	private let session: LSPClientSession
 
@@ -31,10 +43,13 @@ public actor LSPProcessEventRouter {
 }
 
 public final class LSPProcessClient: @unchecked Sendable {
+	private static let clientsLock = NSLock()
+	private static let liveClients = NSHashTable<LSPProcessClient>.weakObjects()
+
 	public let session: LSPClientSession
 	public let events: AsyncStream<LSPProcessClientEvent>
 
-	private let transport: LSPProcessTransport
+	private let transport: any LSPProcessClientTransport
 	private let router: LSPProcessEventRouter
 	private let continuation: AsyncStream<LSPProcessClientEvent>.Continuation
 	private let lock = NSLock()
@@ -50,7 +65,7 @@ public final class LSPProcessClient: @unchecked Sendable {
 		))
 	}
 
-	public init(transport: LSPProcessTransport) {
+	public init(transport: any LSPProcessClientTransport) {
 		self.transport = transport
 		session = LSPClientSession(transport: transport)
 		router = LSPProcessEventRouter(session: session)
@@ -59,6 +74,9 @@ public final class LSPProcessClient: @unchecked Sendable {
 			capturedContinuation = continuation
 		}
 		continuation = capturedContinuation!
+		Self.clientsLock.lock()
+		Self.liveClients.add(self)
+		Self.clientsLock.unlock()
 	}
 
 	public var executableURL: URL {
@@ -78,9 +96,21 @@ public final class LSPProcessClient: @unchecked Sendable {
 	}
 
 	deinit {
+		Self.clientsLock.lock()
+		Self.liveClients.remove(self)
+		Self.clientsLock.unlock()
 		pumpTask?.cancel()
 		transport.terminate()
 		continuation.finish()
+	}
+
+	public static func terminateAll() {
+		clientsLock.lock()
+		let clients = liveClients.allObjects
+		clientsLock.unlock()
+		for client in clients {
+			client.terminate()
+		}
 	}
 
 	public func start() throws {
@@ -223,6 +253,9 @@ public final class LSPProcessClient: @unchecked Sendable {
 	}
 
 	public func terminate() {
+		Task {
+			await session.cancelPendingRequests()
+		}
 		transport.terminate()
 	}
 }

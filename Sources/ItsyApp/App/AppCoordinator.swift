@@ -109,6 +109,7 @@ import ItsyKeymap
 	}
 
 	func applicationWillTerminate(_: Notification) {
+		EditorWindowController.shutdownAllLSP()
 		debuggerCoordinator.terminate()
 		terminalCoordinator.terminate()
 	}
@@ -927,6 +928,9 @@ import ItsyKeymap
 	private func installProblemsBridge() {
 		ItsyProblemsBridge.publishDiagnostics = { [weak self] snapshot, sourceID in
 			self?.problemsCoordinator.setProblems(snapshot, sourceID: sourceID)
+		}
+		ItsyProblemsBridge.resetProblems = { [weak self] root in
+			self?.problemsCoordinator.resetProblems(root: root)
 		}
 	}
 

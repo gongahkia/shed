@@ -4,12 +4,17 @@ import ItsyLSP
 public actor LSPDiagnosticsAggregator {
 	private let root: URL
 	private var problemsByURI: [String: [WorkspaceProblem]] = [:]
+	private var documentVersionsByURI: [String: Int] = [:]
 
 	public init(root: URL) {
 		self.root = root.standardizedFileURL
 	}
 
-	public func ingest(_ params: LSPPublishDiagnosticsParams, source: String? = nil) {
+	@discardableResult
+	public func ingest(_ params: LSPPublishDiagnosticsParams, source: String? = nil) -> Bool {
+		if let expected = documentVersionsByURI[params.uri], let received = params.version, received != expected {
+			return false
+		}
 		let mapped = params.diagnostics.compactMap { diagnostic in
 			Self.toWorkspaceProblem(
 				diagnostic,
@@ -23,10 +28,20 @@ public actor LSPDiagnosticsAggregator {
 		} else {
 			problemsByURI[params.uri] = mapped
 		}
+		return true
+	}
+
+	public func recordDocumentVersion(_ version: Int, forURI uri: String) {
+		documentVersionsByURI[uri] = version
 	}
 
 	public func reset(forURI uri: String) {
 		problemsByURI.removeValue(forKey: uri)
+	}
+
+	public func removeDocument(forURI uri: String) {
+		problemsByURI.removeValue(forKey: uri)
+		documentVersionsByURI.removeValue(forKey: uri)
 	}
 
 	public func snapshot() -> WorkspaceProblemSnapshot {

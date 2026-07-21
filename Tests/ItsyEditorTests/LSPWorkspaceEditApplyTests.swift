@@ -144,3 +144,18 @@ import Testing
 	let result = try LSPWorkspaceEditApply.apply(edit, sources: ["file:///a.swift": "abc\n"])
 	#expect(result == [LSPWorkspaceEditApply.ResolvedFile(uri: "file:///a.swift", updatedText: "QQQ\n")])
 }
+
+@Test func workspaceEditApplyRejectsStaleVersionedDocumentChanges() {
+	let edit = LSPWorkspaceEdit(documentChanges: [
+		LSPTextDocumentEdit(
+			textDocument: LSPVersionedTextDocumentIdentifier(uri: "file:///a.swift", version: 4),
+			edits: [LSPTextEdit(
+				range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 0)),
+				newText: "stale"
+			)]
+		),
+	])
+	#expect(throws: LSPWorkspaceEditApplyError.staleDocumentVersion(uri: "file:///a.swift", expected: 5, received: 4)) {
+		try LSPWorkspaceEditApply.apply(edit, sources: ["file:///a.swift": "current"], documentVersions: ["file:///a.swift": 5])
+	}
+}

@@ -5,10 +5,12 @@ import ItsyEditor
 struct LSPStatusPanelSnapshot {
 	var key: LSPSessionKey
 	var status: String
+	var health: LSPHealthState
 	var server: String
 	var pid: Int32?
 	var startDate: Date?
 	var lastError: String
+	var output: [LSPSessionOutput]
 }
 
 @MainActor final class LSPStatusPanel: NSObject {
@@ -50,14 +52,14 @@ struct LSPStatusPanelSnapshot {
 		details.textColor = .labelColor
 		details.lineBreakMode = .byTruncatingMiddle
 
-		let errorLabel = NSTextField(labelWithString: L10n.string("Last stderr"))
+		let errorLabel = NSTextField(labelWithString: L10n.string("Process and protocol output"))
 		errorLabel.font = .systemFont(ofSize: 12, weight: .semibold)
 
 		let textView = NSTextView()
 		textView.isEditable = false
 		textView.isSelectable = true
 		textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
-		textView.string = snapshot.lastError.isEmpty ? L10n.string("No stderr captured") : snapshot.lastError
+		textView.string = Self.outputText(snapshot)
 		textView.drawsBackground = false
 
 		let scrollView = NSScrollView()
@@ -100,15 +102,26 @@ struct LSPStatusPanelSnapshot {
 		panel.setFrame(NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height), display: true)
 	}
 
-	private static func detailsText(_ snapshot: LSPStatusPanelSnapshot) -> String {
+	static func detailsText(_ snapshot: LSPStatusPanelSnapshot) -> String {
 		[
 			"Language: \(snapshot.key.languageID)",
 			"Workspace: \(snapshot.key.workspaceRoot.path)",
-			"Status: \(snapshot.status)",
-			"Server: \(snapshot.server)",
+			"Health: \(snapshot.health.rawValue)",
+			"Lifecycle: \(snapshot.status)",
+			"Command: \(snapshot.server)",
 			"PID: \(snapshot.pid.map(String.init) ?? "-")",
 			"Uptime: \(uptimeText(since: snapshot.startDate))",
 		].joined(separator: "\n")
+	}
+
+	static func outputText(_ snapshot: LSPStatusPanelSnapshot) -> String {
+		guard !snapshot.output.isEmpty else {
+			return snapshot.lastError.isEmpty ? L10n.string("No process or protocol output") : snapshot.lastError
+		}
+		let formatter = ISO8601DateFormatter()
+		return snapshot.output.map { output in
+			"[\(formatter.string(from: output.timestamp))] [\(output.kind.rawValue)] \(output.text)"
+		}.joined(separator: "\n")
 	}
 
 	private static func uptimeText(since startDate: Date?) -> String {

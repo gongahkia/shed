@@ -78,7 +78,11 @@ final class ItsyDocumentController: NSDocumentController {
 	}
 
 	override func removeDocument(_ document: NSDocument) {
+		let fileURL = (document as? ItsyDocument)?.fileURL
 		super.removeDocument(document)
+		if let fileURL {
+			EditorWindowController.documentDidClose(fileURL)
+		}
 		ItsyTabCoordinator.refresh()
 	}
 

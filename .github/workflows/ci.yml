@@ -45,7 +45,7 @@ jobs:
       - name: LSP smoke
         run: swift test --filter ItsyLSPSmokeTests
       - name: UI snapshots
-        run: swift test --filter ItsyUISnapshotTests --jobs 1
+        run: swift test --filter ItsyUISnapshotTests
       - name: Install DAP adapters
         run: |
           debugpy_dir="$RUNNER_TEMP/debugpy"
@@ -58,7 +58,7 @@ jobs:
       - name: DAP smoke
         run: bench/scripts/dap_smoke.sh
       - name: Integration tests
-        run: swift test --filter ItsyIntegrationTests --jobs 1
+        run: swift test --filter ItsyIntegrationTests
       - name: Bench smoke
         run: .build/release/ItsyBench --smoke --runs 1
       - name: Regression bench

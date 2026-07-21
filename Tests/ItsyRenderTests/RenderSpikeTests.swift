@@ -4,6 +4,7 @@ import os
 @testable import ItsyRender
 import Testing
 
+extension ItsyRenderTests {
 @Test func renderSpikeScrollsTenMillionLineBuffer() {
 	guard ProcessInfo.processInfo.environment["ITSY_RENDER_SPIKE"] == "1" else {
 		return
@@ -28,4 +29,5 @@ import Testing
 	let fps = Double(frames) / seconds
 	print("render_spike_fps=\(fps)")
 	#expect(fps >= 60)
+}
 }

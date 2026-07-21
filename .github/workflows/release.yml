@@ -47,7 +47,7 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$keychain"
           security find-identity -v -p codesigning "$keychain"
       - name: Test
-        run: swift test
+        run: scripts/test.sh
       - name: Build app
         env:
           ITSY_SPARKLE_FEED_URL: ${{ vars.ITSY_SPARKLE_FEED_URL }}

@@ -369,7 +369,7 @@ import ItsySyntax
 	private func syncSiblingEditorViews(source: MetalTextView, editor: Editor) {
 		for view in editorViews where view !== source {
 			var siblingEditor = editor
-			siblingEditor.selections = view.editor.selections
+			siblingEditor.setSelection(view.editor.selections)
 			view.editor = siblingEditor
 		}
 	}

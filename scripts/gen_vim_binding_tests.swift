@@ -157,6 +157,7 @@ do {
 	}
 	lines += [
 		"]",
+		"private let generatedVimBindingCaseCount = \(bindings.count)",
 		"",
 	]
 	let supportURL = repo.appendingPathComponent("scripts/vim_binding_regression_support.swift.txt")

@@ -508,7 +508,7 @@ public enum EditorTextStorage: Sendable {
 	public func substring(_ range: Range<Int>) -> String {
 		switch self {
 		case let .rope(rope):
-			return rope.substring(range)
+			return rope.slice(range)
 		case let .pieceTree(pieceTree):
 			return pieceTree.substring(range)
 		}
@@ -547,6 +547,15 @@ public enum EditorTextStorage: Sendable {
 			return rope.graphemeIndex(forOffset: offset)
 		case let .pieceTree(pieceTree):
 			return pieceTree.graphemeIndex(forOffset: offset)
+		}
+	}
+
+	public func isGraphemeBoundary(_ offset: Int) -> Bool {
+		switch self {
+		case let .rope(rope):
+			return rope.isGraphemeBoundary(offset)
+		case let .pieceTree(pieceTree):
+			return pieceTree.isGraphemeBoundary(offset)
 		}
 	}
 
@@ -635,7 +644,7 @@ public struct Editor: Sendable {
 		}
 	}
 	public private(set) var textStorage: EditorTextStorage
-	public var selections: SelectionSet
+	public private(set) var selections: SelectionSet
 	public var history: UndoStack
 	public private(set) var lastEditBatch: [Edit] = []
 	public var pageLineCount = 40
@@ -753,18 +762,12 @@ public struct Editor: Sendable {
 			}
 			return Selection(anchor: offset, head: offset, affinity: selection.affinity)
 		}
-		selections = SelectionSet(primary: moved[0], secondaries: Array(moved.dropFirst()))
+		selections = normalized(SelectionSet(primary: moved[0], secondaries: Array(moved.dropFirst())))
 	}
 
 	public mutating func setSelection(_ selectionSet: SelectionSet) {
 		lastEditBatch = []
-		selections = selectionSet
-		selections.merge()
-		#if DEBUG
-		if case let .pieceTree(pieceTree) = textStorage {
-			selections.validate("Editor.setSelection", against: pieceTree)
-		}
-		#endif
+		selections = normalized(selectionSet)
 	}
 
 	public mutating func undo() {
@@ -775,7 +778,7 @@ public struct Editor: Sendable {
 		for entry in entries {
 			apply(entry.reverse)
 		}
-		selections = entries.last?.selectionBefore ?? selections
+		selections = normalized(entries.last?.selectionBefore ?? selections)
 	}
 
 	public mutating func redo() {
@@ -786,7 +789,7 @@ public struct Editor: Sendable {
 		for entry in entries {
 			apply(entry.edit)
 		}
-		selections = entries.last?.selectionAfter ?? selections
+		selections = normalized(entries.last?.selectionAfter ?? selections)
 	}
 
 	public mutating func restoreUndoTreeNode(id: Int) -> Bool {
@@ -802,7 +805,7 @@ public struct Editor: Sendable {
 		case .pieceTree:
 			textStorage = .pieceTree(PieceTree(text))
 		}
-		selections = clamped(node.selection.selectionSet, length: textStorage.length)
+		selections = normalized(node.selection.selectionSet)
 		lastEditBatch = []
 		return true
 	}
@@ -813,31 +816,34 @@ public struct Editor: Sendable {
 	}
 
 	private mutating func replace(ranges: [Range<Int>], with string: String) {
-		let normalized = merge(ranges.filter { !$0.isEmpty || !string.isEmpty })
-		guard !normalized.isEmpty else {
+		let mergedRanges = merge(ranges.filter { !$0.isEmpty || !string.isEmpty })
+		guard !mergedRanges.isEmpty else {
 			return
 		}
 		let selectionBefore = selections
+		let historyRange = mergedRanges[0].lowerBound ..< mergedRanges[mergedRanges.count - 1].upperBound
+		let historyBefore = Data(textStorage.substring(historyRange).utf8)
 		var recordedEdits: [Edit] = []
-		var reverseEdits: [Edit] = []
-		for range in normalized.sorted(by: { $0.lowerBound > $1.lowerBound }) {
+		for range in mergedRanges.sorted(by: { $0.lowerBound > $1.lowerBound }) {
 			let reverse = textStorage.replace(range, with: string)
 			let edit = Edit(range: range, removed: reverse.inserted, inserted: reverse.removed, selectionBefore: selectionBefore)
 			recordedEdits.append(edit)
-			reverseEdits.append(reverse)
 		}
-		let carets = replacementCarets(for: normalized, insertedLength: string.utf8.count)
-		selections = SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst()))
+		let carets = replacementCarets(for: mergedRanges, insertedLength: string.utf8.count)
+		selections = normalized(SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst())))
 		lastEditBatch = Array(recordedEdits.reversed())
-		for (edit, reverse) in zip(recordedEdits.reversed(), reverseEdits.reversed()) {
-			history.record(
-				edit,
-				reverse: reverse,
-				selectionBefore: selectionBefore,
-				selectionAfter: selections,
-				snapshotText: fullTextData
-			)
-		}
+		let historyDelta = mergedRanges.reduce(0) { $0 + string.utf8.count - $1.count }
+		let historyAfterRange = historyRange.lowerBound ..< historyRange.upperBound + historyDelta
+		let historyAfter = Data(textStorage.substring(historyAfterRange).utf8)
+		let historyEdit = Edit(range: historyRange, removed: historyBefore, inserted: historyAfter, selectionBefore: selectionBefore)
+		let reverse = Edit(range: historyAfterRange, removed: historyAfter, inserted: historyBefore, selectionBefore: selections)
+		history.record(
+			historyEdit,
+			reverse: reverse,
+			selectionBefore: selectionBefore,
+			selectionAfter: selections,
+			snapshotText: fullTextData
+		)
 	}
 
 	private func replacementCarets(for ranges: [Range<Int>], insertedLength: Int) -> [Selection] {
@@ -859,15 +865,30 @@ public struct Editor: Sendable {
 		Data(textStorage.substring(0 ..< textStorage.length).utf8)
 	}
 
-	private func clamped(_ selectionSet: SelectionSet, length: Int) -> SelectionSet {
-		func clamp(_ selection: Selection) -> Selection {
+	private func normalized(_ selectionSet: SelectionSet) -> SelectionSet {
+		func normalize(_ offset: Int, affinity: Affinity) -> Int {
+			let clamped = min(max(offset, 0), textStorage.length)
+			guard !textStorage.isGraphemeBoundary(clamped) else {
+				return clamped
+			}
+			switch affinity {
+			case .upstream:
+				return textStorage.previousGraphemeBoundary(before: clamped)
+			case .downstream:
+				return textStorage.nextGraphemeBoundary(after: clamped)
+			}
+		}
+		func normalize(_ selection: Selection) -> Selection {
 			Selection(
-				anchor: min(max(selection.anchor, 0), length),
-				head: min(max(selection.head, 0), length),
+				anchor: normalize(selection.anchor, affinity: selection.affinity),
+				head: normalize(selection.head, affinity: selection.affinity),
 				affinity: selection.affinity
 			)
 		}
-		return SelectionSet(primary: clamp(selectionSet.primary), secondaries: selectionSet.secondaries.map(clamp))
+		var result = SelectionSet(primary: normalize(selectionSet.primary), secondaries: selectionSet.secondaries.map(normalize))
+		result.merge()
+		assert(([result.primary] + result.secondaries).allSatisfy { textStorage.isGraphemeBoundary($0.anchor) && textStorage.isGraphemeBoundary($0.head) }, "selection normalization produced a non-grapheme offset")
+		return result
 	}
 
 	private func previousCharacterRange(before offset: Int) -> Range<Int> {
@@ -1020,46 +1041,4 @@ private func merge(_ ranges: [Range<Int>]) -> [Range<Int>] {
 
 private func isAlphaNumeric(_ character: Character) -> Bool {
 	!character.unicodeScalars.isEmpty && character.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) }
-}
-
-private extension Rope {
-	func substring(_ range: Range<Int>) -> String {
-		slice(range)
-	}
-
-	func previousGraphemeBoundary(before offset: Int) -> Int {
-		guard offset > 0 else {
-			return 0
-		}
-		let text = slice(0 ..< length)
-		let index = text.index(atUTF8Offset: offset)
-		let previous = text.index(before: index)
-		guard let utf8Previous = previous.samePosition(in: text.utf8) else {
-			preconditionFailure("previous character must align with utf8")
-		}
-		return text.utf8.distance(from: text.utf8.startIndex, to: utf8Previous)
-	}
-
-	func nextGraphemeBoundary(after offset: Int) -> Int {
-		guard offset < length else {
-			return length
-		}
-		let text = slice(0 ..< length)
-		let index = text.index(atUTF8Offset: offset)
-		let next = text.index(after: index)
-		guard let utf8Next = next.samePosition(in: text.utf8) else {
-			preconditionFailure("next character must align with utf8")
-		}
-		return text.utf8.distance(from: text.utf8.startIndex, to: utf8Next)
-	}
-}
-
-private extension String {
-	func index(atUTF8Offset offset: Int) -> String.Index {
-		let utf8Index = utf8.index(utf8.startIndex, offsetBy: offset)
-		guard let index = String.Index(utf8Index, within: self) else {
-			preconditionFailure("utf8 offset must be a character boundary")
-		}
-		return index
-	}
 }

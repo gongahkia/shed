@@ -11,6 +11,7 @@ import ItsyEditor
 	private let workspaceSymbolProvider: @MainActor (String) async throws -> [WorkspaceSymbol]
 	private let fileSymbolProvider: @MainActor () async throws -> [WorkspaceSymbol]?
 	private var commandPalettePanel: NSPanel?
+	private var commandPaletteContentView: NSView?
 	private var commandPaletteInputField: NSTextField?
 	private var commandPaletteTableView: NSTableView?
 	private var commandPaletteCancelHandler: (() -> Void)?
@@ -132,7 +133,7 @@ import ItsyEditor
 		let panel = makeCommandPalettePanelIfNeeded()
 		commandPaletteCancelHandler = nil
 		commandPaletteRunText = nil
-		setCommandPaletteItems(commandRegistryProvider().commands)
+		loadCommandPaletteCommands()
 		if let prefill, !prefill.isEmpty {
 			commandPaletteInputField?.stringValue = prefill
 			filterCommandPaletteItems()
@@ -154,9 +155,7 @@ import ItsyEditor
 			backing: .buffered,
 			defer: false
 		)
-		let contentView = NSView(frame: NSRect(origin: .zero, size: size))
-		configureCommandPaletteView(contentView)
-		panel.contentView = contentView
+		panel.contentView = makeCommandPaletteContentView()
 		panel.title = L10n.string("Command Palette")
 		panel.titleVisibility = .hidden
 		panel.titlebarAppearsTransparent = true
@@ -166,6 +165,20 @@ import ItsyEditor
 		panel.delegate = self
 		commandPalettePanel = panel
 		return panel
+	}
+
+	func makeCommandPaletteContentView() -> NSView {
+		if let commandPaletteContentView {
+			return commandPaletteContentView
+		}
+		let contentView = NSView(frame: NSRect(origin: .zero, size: NSSize(width: 560, height: 280)))
+		configureCommandPaletteView(contentView)
+		commandPaletteContentView = contentView
+		return contentView
+	}
+
+	func loadCommandPaletteCommands() {
+		setCommandPaletteItems(commandRegistryProvider().commands)
 	}
 
 	private func configureCommandPaletteView(_ contentView: NSView) {

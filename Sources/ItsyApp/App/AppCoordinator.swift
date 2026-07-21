@@ -851,21 +851,39 @@ import ItsyKeymap
 			return false
 		}
 		var didOpen = false
+		var openedPaths = Set<String>()
 		for fileState in state.openFiles {
 			let url = URL(fileURLWithPath: fileState.path)
-			guard FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url) else {
+			guard openedPaths.insert(url.standardizedFileURL.path).inserted,
+			      FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			else {
 				continue
 			}
 			(documentController.document(for: url) as? ItsyDocument)?.restoreWorkspaceWindowFileState(fileState)
 			didOpen = true
 		}
+		for path in state.paneStates?.flatMap(\.openPaths) ?? [] {
+			let url = URL(fileURLWithPath: path)
+			guard openedPaths.insert(url.standardizedFileURL.path).inserted,
+			      FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			else {
+				continue
+			}
+			didOpen = true
+		}
 		if let selectedPath = state.selectedPath {
 			let url = URL(fileURLWithPath: selectedPath)
-			if FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url) {
+			if openedPaths.insert(url.standardizedFileURL.path).inserted,
+			   FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			{
 				didOpen = true
 			}
 		}
-		activeEditorWindowController()?.restoreWorkspacePaneLayout(state.paneLayout)
+		activeEditorWindowController()?.restoreWorkspacePaneLayout(
+			state.paneLayout,
+			paneStates: state.paneStates,
+			focusedPaneIndex: state.focusedPaneIndex
+		)
 		ItsyWorkspaceController.persistWindowState(from: activeEditorWindowController())
 		return didOpen
 	}

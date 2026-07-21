@@ -133,6 +133,7 @@ import Testing
 	for profile in KeymapProfile.allCases {
 		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
 		#expect(!bindings.isEmpty)
+		#expect(KeymapBindingMatrix(profile: profile, bindings: bindings).collisions.isEmpty)
 	}
 }
 
@@ -328,6 +329,54 @@ import Testing
 	let bindings = try KeymapConfiguration.load(profile: .plain, userConfigURL: fixture.url)
 	var engine = KeymapEngine(modeStack: [.insert], bindings: bindings)
 	#expect(engine.handle(try keyEvent("", keyCode: 123)) == .command("custom.moveLeft"))
+}
+
+@Test func keymapBindingMatrixReportsCoverageAndCollisions() throws {
+	let bindings = try KeymapConfiguration.bundledBindings(profile: .plain)
+	let matrix = KeymapBindingMatrix(profile: .plain, bindings: bindings)
+
+	#expect(matrix.collisions.isEmpty)
+	#expect(matrix.coverage(for: "editor.moveLeft") == .bound([KeymapBindingSlot(mode: .insert, chord: [Key("left")])]))
+	#expect(matrix.coverage(for: "vim.textObject.innerWord") == .unsupported)
+
+	let collision = KeymapBindingMatrix(profile: .plain, bindings: [
+		KeyBinding(mode: .insert, chord: [Key("x")], commandID: "first"),
+		KeyBinding(mode: .insert, chord: [Key("x")], commandID: "second"),
+	])
+	#expect(collision.collisions.count == 1)
+	#expect(collision.collisions[0].commandIDs == ["first", "second"])
+}
+
+@Test func userKeymapOverridesSurviveProfileSwitching() throws {
+	let fixture = try TemporaryKeymapFixture()
+	defer { fixture.cleanUp() }
+	try fixture.write("""
+	[mode.insert]
+	"Cmd-W" = "custom.close"
+	"Cmd-K" = "custom.prefix"
+
+	[mode.normal]
+	"Cmd-W" = "custom.close"
+
+	[mode.emacs]
+	"Cmd-W" = "custom.close"
+	""")
+
+	for profile in KeymapProfile.allCases {
+		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: fixture.url)
+		let matrix = KeymapBindingMatrix(profile: profile, bindings: bindings)
+		let mode: Mode = switch profile {
+		case .plain: .insert
+		case .vim: .normal
+		case .emacs: .emacs
+		}
+		var engine = KeymapEngine(modeStack: [mode], bindings: bindings)
+		#expect(matrix.collisions.isEmpty)
+		#expect(engine.handle(try keyEvent("w", modifiers: [.command])) == .command("custom.close"))
+		if profile == .plain {
+			#expect(engine.handle(try keyEvent("k", modifiers: [.command])) == .command("custom.prefix"))
+		}
+	}
 }
 
 @Test func keymapProfileParsesCommandLineFlag() throws {

@@ -1,6 +1,7 @@
 @testable import ItsyApp
 import AppKit
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import Testing
 
@@ -80,6 +81,126 @@ import Testing
 	#expect(splitView.arrangedSubviews.count == 2)
 	#expect(abs(splitView.arrangedSubviews[0].frame.width - 240) < 2)
 	#expect(splitView.arrangedSubviews[1].frame.minX > 200)
+}
+
+@MainActor
+@Test func workspacePaneRestoreRebuildsTopologyAndFallsBackFromInvalidLayout() {
+	let document = ItsyDocument()
+	let controller = EditorWindowController(document: document)
+	document.addWindowController(controller)
+	defer { controller.close() }
+
+	#expect(EditorPaneLayout.decode("V[L,L]")?.encoded == "V[L,L]")
+	var coordinator = EditorPaneCoordinator()
+	_ = coordinator.restore(layout: .split(vertical: true, children: [.leaf, .leaf]))
+	#expect(coordinator.panes.count == 2)
+	#expect(coordinator.layout().encoded == "V[V[L,L]]")
+	controller.restoreWorkspacePaneLayout("V[L,L]")
+	#expect(controller.paneLayoutEncoded == "V[V[L,L]]")
+
+	controller.restoreWorkspacePaneLayout("V[]")
+	#expect(controller.paneLayoutEncoded == "V[L]")
+}
+
+@MainActor
+@Test func workspacePaneRestoreReopensSelectedPaneDocumentsAndFocus() {
+	let first = ItsyDocument()
+	let second = ItsyDocument()
+	first.fileURL = URL(fileURLWithPath: "/tmp/itsy-pane-first.swift")
+	second.fileURL = URL(fileURLWithPath: "/tmp/itsy-pane-second.swift")
+	NSDocumentController.shared.addDocument(first)
+	NSDocumentController.shared.addDocument(second)
+	defer {
+		NSDocumentController.shared.removeDocument(first)
+		NSDocumentController.shared.removeDocument(second)
+	}
+
+	let controller = EditorWindowController(document: first)
+	first.addWindowController(controller)
+	defer { controller.close() }
+	var settings = ItsySettings()
+	settings.editor.tabGroups = .pane
+	controller.applySettings(settings)
+	let states = [
+		WorkspacePaneState(openPaths: [first.fileURL!.path], selectedPath: first.fileURL!.path),
+		WorkspacePaneState(openPaths: [second.fileURL!.path], selectedPath: second.fileURL!.path),
+	]
+
+	controller.restoreWorkspacePaneLayout("V[L,L]", paneStates: states, focusedPaneIndex: 1)
+	#expect(controller.workspacePaneStates == states)
+	#expect(controller.workspaceFocusedPaneIndex == 1)
+	#expect((controller.document as? ItsyDocument) === second)
+}
+
+@MainActor
+@Test func movingPaneTabPreservesDirtyDocumentAndRemainingTabs() {
+	let first = ItsyDocument()
+	let second = ItsyDocument()
+	first.fileURL = URL(fileURLWithPath: "/tmp/itsy-move-first.swift")
+	second.fileURL = URL(fileURLWithPath: "/tmp/itsy-move-second.swift")
+	NSDocumentController.shared.addDocument(first)
+	NSDocumentController.shared.addDocument(second)
+	defer {
+		NSDocumentController.shared.removeDocument(first)
+		NSDocumentController.shared.removeDocument(second)
+	}
+
+	let controller = EditorWindowController(document: first)
+	first.addWindowController(controller)
+	defer { controller.close() }
+	var settings = ItsySettings()
+	settings.editor.tabGroups = .pane
+	controller.applySettings(settings)
+	let initialStates = [
+		WorkspacePaneState(openPaths: [first.fileURL!.path, second.fileURL!.path], selectedPath: first.fileURL!.path),
+		WorkspacePaneState(openPaths: [second.fileURL!.path], selectedPath: second.fileURL!.path),
+	]
+	controller.restoreWorkspacePaneLayout("V[L,L]", paneStates: initialStates, focusedPaneIndex: 0)
+	first.updateChangeCount(.changeDone)
+	#expect(first.isDocumentEdited)
+
+	#expect(controller.moveActivePaneTab(toAdjacentPane: 1))
+	#expect(controller.workspacePaneStates == [
+		WorkspacePaneState(openPaths: [second.fileURL!.path], selectedPath: second.fileURL!.path),
+		WorkspacePaneState(openPaths: [second.fileURL!.path, first.fileURL!.path], selectedPath: first.fileURL!.path),
+	])
+	#expect(controller.workspaceFocusedPaneIndex == 1)
+	#expect((controller.document as? ItsyDocument) === first)
+	#expect(first.isDocumentEdited)
+	first.updateChangeCount(.changeCleared)
+	#expect(!first.isDocumentEdited)
+}
+
+@MainActor
+@Test func movingLastPaneTabClosesOnlyItsSourcePane() {
+	let first = ItsyDocument()
+	let second = ItsyDocument()
+	first.fileURL = URL(fileURLWithPath: "/tmp/itsy-last-pane-first.swift")
+	second.fileURL = URL(fileURLWithPath: "/tmp/itsy-last-pane-second.swift")
+	NSDocumentController.shared.addDocument(first)
+	NSDocumentController.shared.addDocument(second)
+	defer {
+		NSDocumentController.shared.removeDocument(first)
+		NSDocumentController.shared.removeDocument(second)
+	}
+
+	let controller = EditorWindowController(document: first)
+	first.addWindowController(controller)
+	defer { controller.close() }
+	var settings = ItsySettings()
+	settings.editor.tabGroups = .pane
+	controller.applySettings(settings)
+	controller.restoreWorkspacePaneLayout("V[L,L]", paneStates: [
+		WorkspacePaneState(openPaths: [first.fileURL!.path], selectedPath: first.fileURL!.path),
+		WorkspacePaneState(openPaths: [second.fileURL!.path], selectedPath: second.fileURL!.path),
+	], focusedPaneIndex: 0)
+
+	#expect(controller.moveActivePaneTab(toAdjacentPane: 1))
+	#expect(controller.paneLayoutEncoded == "V[L]")
+	#expect(controller.workspacePaneStates == [
+		WorkspacePaneState(openPaths: [second.fileURL!.path, first.fileURL!.path], selectedPath: first.fileURL!.path),
+	])
+	#expect(NSDocumentController.shared.documents.contains { $0 === first })
 }
 
 @MainActor

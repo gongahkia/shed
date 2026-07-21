@@ -23,16 +23,36 @@ public enum KeymapProfile: String, CaseIterable, Sendable {
 public enum KeymapConfigurationError: Error, Equatable {
 	case invalidProfile(String)
 	case missingBundledProfile(KeymapProfile)
+	case duplicateBundledBinding(KeymapProfile)
 }
 
 public enum KeymapConfiguration {
 	public static func load(profile: KeymapProfile, userConfigURL: URL? = defaultUserConfigURL()) throws -> [KeyBinding] {
-		var contents = try bundledProfileContents(profile)
-		if let userConfigURL, FileManager.default.fileExists(atPath: userConfigURL.path) {
-			contents += "\n"
-			contents += try String(contentsOf: userConfigURL, encoding: .utf8)
+		let bundledBindings = try bundledBindings(profile: profile)
+		let bundledMatrix = KeymapBindingMatrix(profile: profile, bindings: bundledBindings)
+		guard bundledMatrix.collisions.isEmpty else {
+			throw KeymapConfigurationError.duplicateBundledBinding(profile)
 		}
-		return try KeymapLoader.load(contents)
+		guard let userConfigURL, FileManager.default.fileExists(atPath: userConfigURL.path) else {
+			return bundledBindings
+		}
+		let userBindings = try KeymapLoader.load(String(contentsOf: userConfigURL, encoding: .utf8))
+		return resolvedBindings(bundledBindings + userBindings)
+	}
+
+	public static func bundledBindings(profile: KeymapProfile) throws -> [KeyBinding] {
+		try KeymapLoader.load(bundledProfileContents(profile))
+	}
+
+	public static func resolvedBindings(_ bindings: [KeyBinding]) -> [KeyBinding] {
+		var resolved: [KeyBinding] = []
+		for binding in bindings {
+			resolved.removeAll { existing in
+				existing.mode == binding.mode && (isPrefix(existing.chord, of: binding.chord) || isPrefix(binding.chord, of: existing.chord))
+			}
+			resolved.append(binding)
+		}
+		return resolved
 	}
 
 	public static func defaultUserConfigURL(homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL {
@@ -47,5 +67,9 @@ public enum KeymapConfiguration {
 			throw KeymapConfigurationError.missingBundledProfile(profile)
 		}
 		return try String(contentsOf: url, encoding: .utf8)
+	}
+
+	private static func isPrefix(_ candidate: [Key], of chord: [Key]) -> Bool {
+		candidate.count <= chord.count && candidate.elementsEqual(chord.prefix(candidate.count))
 	}
 }

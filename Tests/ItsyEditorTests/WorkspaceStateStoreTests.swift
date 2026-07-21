@@ -24,13 +24,30 @@ import Testing
 				selectionHead: 7,
 				foldedRanges: [WorkspaceRangeState(lowerBound: 3, upperBound: 9)]
 			),
-		]
+		],
+		paneStates: [
+			WorkspacePaneState(
+				openPaths: [fixture.root.appendingPathComponent("Sources/App.swift").path],
+				selectedPath: fixture.root.appendingPathComponent("Sources/App.swift").path
+			),
+			WorkspacePaneState(openPaths: [], selectedPath: nil),
+		],
+		focusedPaneIndex: 1
 	)
 	try store.saveWindowState(state, for: fixture.root)
 	let loadedState = try #require(store.loadWindowState(for: fixture.root))
 
 	#expect(loadedState == state)
 	#expect(FileManager.default.fileExists(atPath: fixture.root.appendingPathComponent(".itsy/state.json").path))
+}
+
+@Test func workspaceWindowStateDecodesPrePaneStateFiles() throws {
+	let data = Data("""
+	{"openFiles":[],"paneLayout":"L","selectedPath":null}
+	""".utf8)
+	let state = try JSONDecoder().decode(WorkspaceWindowState.self, from: data)
+	#expect(state.paneStates == nil)
+	#expect(state.focusedPaneIndex == nil)
 }
 
 private final class TemporaryWorkspaceStateStoreFixture {

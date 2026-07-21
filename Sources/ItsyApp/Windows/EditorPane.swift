@@ -226,6 +226,9 @@ struct EditorPaneLayout: Equatable {
 			return nil
 		}
 		index = value.index(after: index)
+		guard !children.isEmpty else {
+			return nil
+		}
 		return .split(vertical: marker == "V", children: children)
 	}
 }
@@ -234,6 +237,9 @@ struct EditorPaneLayout: Equatable {
 	let rootSplitViewController = NSSplitViewController()
 	private(set) var panes: [EditorPane] = []
 	private var activePaneIndex = 0
+	var focusedPaneIndex: Int {
+		activePaneIndex
+	}
 	var activePane: EditorPane {
 		panes[activePaneIndex]
 	}
@@ -308,6 +314,15 @@ struct EditorPaneLayout: Equatable {
 	@discardableResult
 	mutating func focusPane(containing editorView: MetalTextView) -> EditorPane? {
 		guard let index = panes.firstIndex(where: { $0.editorView === editorView }) else {
+			return nil
+		}
+		activePaneIndex = index
+		return panes[index]
+	}
+
+	@discardableResult
+	mutating func focusPane(at index: Int) -> EditorPane? {
+		guard panes.indices.contains(index) else {
 			return nil
 		}
 		activePaneIndex = index

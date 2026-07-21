@@ -5,6 +5,7 @@ import Foundation
 struct Binding {
 	let file: URL
 	let line: Int
+	let mode: String
 	let key: String
 	let commandID: String
 }
@@ -122,7 +123,7 @@ func keymapFiles() throws -> [URL] {
 func parseBindings(in file: URL) throws -> [Binding] {
 	let contents = try String(contentsOf: file, encoding: .utf8)
 	var bindings: [Binding] = []
-	var hasMode = false
+	var mode: String?
 	for (offset, rawLine) in contents.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
 		let lineNumber = offset + 1
 		let line = stripComment(String(rawLine))
@@ -130,10 +131,10 @@ func parseBindings(in file: URL) throws -> [Binding] {
 			continue
 		}
 		if line.hasPrefix("[") {
-			hasMode = true
+			mode = line
 			continue
 		}
-		guard hasMode else {
+		guard let mode else {
 			throw NSError(
 				domain: "validate_keymaps",
 				code: 1,
@@ -149,7 +150,7 @@ func parseBindings(in file: URL) throws -> [Binding] {
 		}
 		let key = try parseQuoted(String(line[..<equals]).trimmingCharacters(in: .whitespaces), file: file, line: lineNumber)
 		let commandID = try parseQuoted(String(line[line.index(after: equals)...]).trimmingCharacters(in: .whitespaces), file: file, line: lineNumber)
-		bindings.append(Binding(file: file, line: lineNumber, key: key, commandID: commandID))
+		bindings.append(Binding(file: file, line: lineNumber, mode: mode, key: key, commandID: commandID))
 	}
 	return bindings
 }
@@ -214,14 +215,25 @@ func relativePath(_ url: URL) -> String {
 do {
 	let bindings = try keymapFiles().flatMap(parseBindings(in:))
 	let registeredIDs = try literalCommandIDs(inSwiftFiles: swiftFiles(in: sourcesDir)).union(hiddenCatalogIDs())
-	let failures = bindings.filter { !registeredIDs.contains($0.commandID) }
-	if !failures.isEmpty {
-		for failure in failures {
+	let missingTargets = bindings.filter { !registeredIDs.contains($0.commandID) }
+	let collisions = Dictionary(grouping: bindings) { binding in
+		"\(binding.file.path)|\(binding.mode)|\(binding.key.lowercased())"
+	}.values.filter { bindings in
+		bindings.count > 1
+	}
+	if !missingTargets.isEmpty || !collisions.isEmpty {
+		for failure in missingTargets {
 			FileHandle.standardError.write(Data("\(relativePath(failure.file)):\(failure.line): unknown command id \"\(failure.commandID)\" for key \"\(failure.key)\"\n".utf8))
+		}
+		for collision in collisions {
+			let locations = collision.map { "\(relativePath($0.file)):\($0.line)" }.sorted().joined(separator: ", ")
+			let first = collision[0]
+			FileHandle.standardError.write(Data("\(locations): duplicate binding \"\(first.key)\" in \(first.mode)\n".utf8))
 		}
 		exit(EXIT_FAILURE)
 	}
-	print("Validated \(bindings.count) keymap bindings against \(registeredIDs.count) registered command ids.")
+	let profileCount = Set(bindings.map { $0.file.lastPathComponent }).count
+	print("Validated \(bindings.count) collision-free keymap bindings across \(profileCount) profiles against \(registeredIDs.count) registered command ids.")
 } catch {
 	fail("\(error.localizedDescription)")
 }

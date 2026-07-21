@@ -28,6 +28,7 @@ Generated keymap docs live at [docs/keymap-reference.md](docs/keymap-reference.m
 ## Build
 
 ```sh
+scripts/bootstrap.sh
 swift build -c release
 bench/scripts/make_app.sh
 open Itsy.app
@@ -38,6 +39,7 @@ open Itsy.app
 Local unsigned app build:
 
 ```sh
+scripts/bootstrap.sh
 swift build -c release
 bench/scripts/make_app.sh
 cp -R Itsy.app /Applications/Itsy.app

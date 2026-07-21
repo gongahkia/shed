@@ -195,8 +195,8 @@ import Testing
 	#expect(config?.command == "/tmp/sourcekit-shim")
 	#expect(config?.args == ["--stdio", "--trace"])
 	#expect(config?.rootPatterns == ["Package.swift", ".git"])
-	#expect(config?.initOptions["toolchain"] == "debug")
-	#expect(config?.settings["index"] == "on")
+	#expect(config?.initOptions["toolchain"] == LSPConfigurationValue.string("debug"))
+	#expect(config?.settings["index"] == LSPConfigurationValue.string("on"))
 	#expect(registry.config(forLanguageID: "rust")?.command == "rust-analyzer")
 }
 
@@ -205,6 +205,42 @@ import Testing
 	let path = fixture.root.appendingPathComponent("missing.json")
 	let registry = LSPServerRegistryLoader.loadOrBundled(from: path)
 	#expect(registry.config(forLanguageID: "swift")?.command == "/usr/bin/xcrun")
+}
+
+@Test func lspServerRegistryLoaderMigratesPartialJSONAndPreservesTypedValues() throws {
+	let fixture = try TemporaryRegistryFixture()
+	let path = fixture.root.appendingPathComponent("lsp.json")
+	let json = #"""
+	{
+		"rust": {
+			"command": "rust-analyzer",
+			"initOptions": { "checkOnSave": true, "workerCount": 4 },
+			"settings": { "rust-analyzer.checkOnSave": true, "rust-analyzer.cargo.features": ["a", "b"] }
+		}
+	}
+	"""#
+	try json.write(to: path, atomically: true, encoding: .utf8)
+	let config = try #require(try LSPServerRegistryLoader.load(from: path).config(forLanguageID: "rust"))
+	#expect(config.languageId == "rust")
+	#expect(config.rootPatterns == [".git"])
+	#expect(config.initOptions["checkOnSave"] == .bool(true))
+	#expect(config.initOptions["workerCount"] == .int(4))
+	#expect(config.settings["rust-analyzer.checkOnSave"] == .bool(true))
+	#expect(config.settings["rust-analyzer.cargo.features"] == .array([.string("a"), .string("b")]))
+	#expect(config.initializationOptions == .object(["checkOnSave": .bool(true), "workerCount": .int(4)]))
+}
+
+@Test func lspServerRegistryLoaderRejectsInvalidRootPatternsPrecisely() throws {
+	let fixture = try TemporaryRegistryFixture()
+	let path = fixture.root.appendingPathComponent("lsp.toml")
+	try """
+	[swift]
+	command = "sourcekit-lsp"
+	root_patterns = []
+	""".write(to: path, atomically: true, encoding: .utf8)
+	#expect(throws: LSPServerRegistryLoaderError.decodeFailed("swift: rootPatterns must contain at least one pattern")) {
+		try LSPServerRegistryLoader.load(from: path)
+	}
 }
 
 private final class TemporaryRegistryFixture {

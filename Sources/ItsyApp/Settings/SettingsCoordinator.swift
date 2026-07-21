@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ItsyConfig
+import ItsyEditor
 import ItsySyntax
 
 @MainActor final class SettingsCoordinator: NSObject {
@@ -22,6 +23,7 @@ import ItsySyntax
 	private var settingsTerminalFontSizeStepper: NSStepper?
 	private var settingsTerminalScrollbackField: NSTextField?
 	private var settingsStatusLabel: NSTextField?
+	private var lspConfigurationPanel: LSPServerConfigurationPanel?
 	private let settingsStore: ItsySettingsStore
 	private var appSettings: ItsySettings
 	private var settingsWarnings: [ItsySettingsWarning]
@@ -327,6 +329,11 @@ import ItsySyntax
 		reloadButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(reloadButton)
 
+		let languageServersButton = NSButton(title: L10n.string("Language Servers…"), target: self, action: #selector(showLSPConfiguration(_:)))
+		languageServersButton.bezelStyle = .rounded
+		languageServersButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(languageServersButton)
+
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
 		statusLabel.textColor = .secondaryLabelColor
@@ -403,7 +410,9 @@ import ItsySyntax
 			zoomStack.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
 			reloadButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			reloadButton.topAnchor.constraint(equalTo: zoomStack.bottomAnchor, constant: 16),
-			reloadButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			languageServersButton.leadingAnchor.constraint(equalTo: reloadButton.trailingAnchor, constant: 8),
+			languageServersButton.centerYAnchor.constraint(equalTo: reloadButton.centerYAnchor),
+			languageServersButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
 			statusLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			statusLabel.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
 			statusLabel.topAnchor.constraint(equalTo: reloadButton.bottomAnchor, constant: 16),
@@ -529,13 +538,19 @@ import ItsySyntax
 		} else {
 			settingsStatusLabel?.textColor = .secondaryLabelColor
 			settingsStatusLabel?.stringValue = ItsyWorkspaceController.currentRootURL == nil
-				? L10n.string("Config: ~/.config/itsy/settings.toml")
-				: L10n.string("Config: global + workspace")
+				? L10n.string("Config: ~/.config/itsy/settings.toml · LSP: \(LSPServerRegistryLoader.defaultConfigURL.path)")
+				: L10n.string("Config: global + workspace · LSP: \(LSPServerRegistryLoader.defaultConfigURL.path)")
 		}
 	}
 
 	@objc private func reloadSettings(_ sender: Any?) {
 		reloadSettingsFromDisk()
+	}
+
+	@objc func showLSPConfiguration(_ sender: Any?) {
+		let panel = lspConfigurationPanel ?? LSPServerConfigurationPanel()
+		lspConfigurationPanel = panel
+		panel.show(relativeTo: settingsWindowController?.window)
 	}
 
 	private func reloadSettingsFromDisk() {
@@ -555,12 +570,15 @@ import ItsySyntax
 	private func restartSettingsWatcher() {
 		settingsWatcher?.stop()
 		var urls = [settingsStore.fileURL]
+		urls.append(LSPServerRegistryLoader.defaultConfigURL)
 		if let root = ItsyWorkspaceController.currentRootURL {
 			urls.append(ItsySettingsStore.workspaceFileURL(workspaceRoot: root))
+			urls.append(root.appendingPathComponent(".itsy/lsp.toml"))
 		}
 		let watcher = ItsySettingsWatcher(urls: urls) { [weak self] in
 			DispatchQueue.main.async {
 				self?.reloadSettingsFromDisk()
+				EditorWindowController.reloadLSPConfiguration()
 			}
 		}
 		_ = watcher.start()

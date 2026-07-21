@@ -63,3 +63,20 @@ import Testing
 	let any = LSPWorkspaceConfigurationHandler.respondLSPAny(to: params, using: config)
 	#expect(any == .array([.string("macosx"), .null]))
 }
+
+@Test func workspaceConfigurationPreservesTypedNestedValues() {
+	let config = LSPServerConfig(
+		languageId: "rust",
+		command: "rust-analyzer",
+		typedInitOptions: [:],
+		typedSettings: [
+			"rust-analyzer.checkOnSave": .bool(true),
+			"rust-analyzer.cargo.features": .array([.string("a"), .string("b")]),
+		]
+	)
+	let params = LSPConfigurationParams(items: [LSPConfigurationItem(section: "rust-analyzer")])
+	#expect(LSPWorkspaceConfigurationHandler.respond(to: params, using: config) == [.object([
+		"checkOnSave": .bool(true),
+		"cargo.features": .array([.string("a"), .string("b")]),
+	])])
+}

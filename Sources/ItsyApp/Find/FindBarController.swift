@@ -100,6 +100,7 @@ import ItsyRender
 		replaceField.placeholderString = L10n.string("Replace")
 		for field in [queryField, replaceField] {
 			field.font = .systemFont(ofSize: 12)
+			field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		}
 		for button in [regexButton, caseButton, wholeWordButton] {
 			button.font = .systemFont(ofSize: 11)

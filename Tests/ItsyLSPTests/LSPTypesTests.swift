@@ -404,3 +404,17 @@ import Testing
 		"capabilities": .object([:]),
 	]))
 }
+
+@Test func initializeParamsEncodeTypedInitializationOptions() throws {
+	let params = LSPInitializeParams(
+		processId: 1,
+		rootUri: "file:///tmp/project",
+		initializationOptions: .object(["enabled": .bool(true), "workers": .int(4)])
+	)
+	let value = try LSPAny(encoding: params)
+	guard case let .object(object) = value else {
+		Issue.record("expected initialize object")
+		return
+	}
+	#expect(object["initializationOptions"] == .object(["enabled": .bool(true), "workers": .int(4)]))
+}

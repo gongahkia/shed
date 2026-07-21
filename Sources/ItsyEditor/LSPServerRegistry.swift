@@ -1,13 +1,120 @@
 import Darwin
 import Foundation
+import ItsyLSP
+
+public indirect enum LSPConfigurationValue: Codable, Equatable, Sendable {
+	case null
+	case bool(Bool)
+	case int(Int)
+	case double(Double)
+	case string(String)
+	case array([LSPConfigurationValue])
+	case object([String: LSPConfigurationValue])
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		if container.decodeNil() {
+			self = .null
+		} else if let value = try? container.decode(Bool.self) {
+			self = .bool(value)
+		} else if let value = try? container.decode(Int.self) {
+			self = .int(value)
+		} else if let value = try? container.decode(Double.self) {
+			self = .double(value)
+		} else if let value = try? container.decode(String.self) {
+			self = .string(value)
+		} else if let value = try? container.decode([LSPConfigurationValue].self) {
+			self = .array(value)
+		} else {
+			self = .object(try container.decode([String: LSPConfigurationValue].self))
+		}
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case .null:
+			try container.encodeNil()
+		case let .bool(value):
+			try container.encode(value)
+		case let .int(value):
+			try container.encode(value)
+		case let .double(value):
+			try container.encode(value)
+		case let .string(value):
+			try container.encode(value)
+		case let .array(value):
+			try container.encode(value)
+		case let .object(value):
+			try container.encode(value)
+		}
+	}
+
+	public var lspAny: LSPAny {
+		switch self {
+		case .null:
+			return .null
+		case let .bool(value):
+			return .bool(value)
+		case let .int(value):
+			return .int(value)
+		case let .double(value):
+			return .double(value)
+		case let .string(value):
+			return .string(value)
+		case let .array(value):
+			return .array(value.map(\.lspAny))
+		case let .object(value):
+			return .object(value.mapValues(\.lspAny))
+		}
+	}
+}
+
+public enum LSPServerConfigValidationError: Error, Equatable, Sendable, CustomStringConvertible {
+	case emptyLanguageID
+	case emptyCommand(String)
+	case emptyArgument(String, Int)
+	case missingRootPatterns(String)
+	case emptyRootPattern(String, Int)
+	case emptyInitOptionKey(String)
+	case emptySettingKey(String)
+
+	public var description: String {
+		switch self {
+		case .emptyLanguageID:
+			return "languageId must not be empty"
+		case let .emptyCommand(languageID):
+			return "\(languageID): command must not be empty"
+		case let .emptyArgument(languageID, index):
+			return "\(languageID): args[\(index)] must not be empty"
+		case let .missingRootPatterns(languageID):
+			return "\(languageID): rootPatterns must contain at least one pattern"
+		case let .emptyRootPattern(languageID, index):
+			return "\(languageID): rootPatterns[\(index)] must not be empty"
+		case let .emptyInitOptionKey(languageID):
+			return "\(languageID): initOptions keys must not be empty"
+		case let .emptySettingKey(languageID):
+			return "\(languageID): settings keys must not be empty"
+		}
+	}
+}
 
 public struct LSPServerConfig: Codable, Equatable, Sendable {
 	public var languageId: String
 	public var command: String
 	public var args: [String]
 	public var rootPatterns: [String]
-	public var initOptions: [String: String]
-	public var settings: [String: String]
+	public var initOptions: [String: LSPConfigurationValue]
+	public var settings: [String: LSPConfigurationValue]
+
+	private enum CodingKeys: String, CodingKey {
+		case languageId
+		case command
+		case args
+		case rootPatterns
+		case initOptions
+		case settings
+	}
 
 	public init(
 		languageId: String,
@@ -21,8 +128,72 @@ public struct LSPServerConfig: Codable, Equatable, Sendable {
 		self.command = command
 		self.args = args
 		self.rootPatterns = rootPatterns
-		self.initOptions = initOptions
-		self.settings = settings
+		self.initOptions = initOptions.mapValues(LSPConfigurationValue.string)
+		self.settings = settings.mapValues(LSPConfigurationValue.string)
+	}
+
+	public init(
+		languageId: String,
+		command: String,
+		args: [String] = [],
+		rootPatterns: [String] = [".git"],
+		typedInitOptions: [String: LSPConfigurationValue],
+		typedSettings: [String: LSPConfigurationValue]
+	) {
+		self.languageId = languageId
+		self.command = command
+		self.args = args
+		self.rootPatterns = rootPatterns
+		initOptions = typedInitOptions
+		settings = typedSettings
+	}
+
+	public var initializationOptions: LSPAny? {
+		initOptions.isEmpty ? nil : .object(initOptions.mapValues(\.lspAny))
+	}
+
+	public init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		languageId = try container.decodeIfPresent(String.self, forKey: .languageId) ?? ""
+		command = try container.decodeIfPresent(String.self, forKey: .command) ?? ""
+		args = try container.decodeIfPresent([String].self, forKey: .args) ?? []
+		rootPatterns = try container.decodeIfPresent([String].self, forKey: .rootPatterns) ?? [".git"]
+		initOptions = try container.decodeIfPresent([String: LSPConfigurationValue].self, forKey: .initOptions) ?? [:]
+		settings = try container.decodeIfPresent([String: LSPConfigurationValue].self, forKey: .settings) ?? [:]
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var container = encoder.container(keyedBy: CodingKeys.self)
+		try container.encode(languageId, forKey: .languageId)
+		try container.encode(command, forKey: .command)
+		try container.encode(args, forKey: .args)
+		try container.encode(rootPatterns, forKey: .rootPatterns)
+		try container.encode(initOptions, forKey: .initOptions)
+		try container.encode(settings, forKey: .settings)
+	}
+
+	public func validate() throws {
+		guard !languageId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+			throw LSPServerConfigValidationError.emptyLanguageID
+		}
+		guard !command.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+			throw LSPServerConfigValidationError.emptyCommand(languageId)
+		}
+		for (index, arg) in args.enumerated() where arg.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			throw LSPServerConfigValidationError.emptyArgument(languageId, index)
+		}
+		guard !rootPatterns.isEmpty else {
+			throw LSPServerConfigValidationError.missingRootPatterns(languageId)
+		}
+		for (index, pattern) in rootPatterns.enumerated() where pattern.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+			throw LSPServerConfigValidationError.emptyRootPattern(languageId, index)
+		}
+		guard initOptions.keys.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+			throw LSPServerConfigValidationError.emptyInitOptionKey(languageId)
+		}
+		guard settings.keys.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
+			throw LSPServerConfigValidationError.emptySettingKey(languageId)
+		}
 	}
 }
 
@@ -71,6 +242,16 @@ public struct LSPServerRegistry: Equatable, Sendable {
 			config.command = resolvedCommand
 		}
 		return config
+	}
+
+	public func executableResolution(
+		forLanguageID languageID: String,
+		environment: [String: String] = ProcessInfo.processInfo.environment
+	) throws -> LSPExecutableResolution {
+		guard let config = config(forLanguageID: languageID) else {
+			throw LSPExecutableDetectionError.missingExecutable(languageID)
+		}
+		return try Self.executableResolution(for: config, environment: environment)
 	}
 
 	public func missingBinary(
@@ -178,203 +359,30 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		}
 	}
 
-	public static let bundledDefaults: [LSPServerConfig] = [
-		LSPServerConfig(
-			languageId: "swift",
-			command: "/usr/bin/xcrun",
-			args: ["sourcekit-lsp"],
-			rootPatterns: ["Package.swift", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "typescript",
-			command: "typescript-language-server",
-			args: ["--stdio"],
-			rootPatterns: ["tsconfig.json", "package.json", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "javascript",
-			command: "typescript-language-server",
-			args: ["--stdio"],
-			rootPatterns: ["package.json", "jsconfig.json", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "rust",
-			command: "rust-analyzer",
-			args: [],
-			rootPatterns: ["Cargo.toml", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "python",
-			command: "pyright-langserver",
-			args: ["--stdio"],
-			rootPatterns: ["pyproject.toml", "setup.py", "setup.cfg", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "go",
-			command: "gopls",
-			args: [],
-			rootPatterns: ["go.mod", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "c",
-			command: "clangd",
-			args: [],
-			rootPatterns: ["compile_commands.json", "compile_flags.txt", ".clangd", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "cpp",
-			command: "clangd",
-			args: [],
-			rootPatterns: ["compile_commands.json", "compile_flags.txt", ".clangd", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "zig",
-			command: "zls",
-			args: [],
-			rootPatterns: ["build.zig", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "elixir",
-			command: "elixir-ls",
-			args: [],
-			rootPatterns: ["mix.exs", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "kotlin",
-			command: "kotlin-language-server",
-			args: [],
-			rootPatterns: ["settings.gradle.kts", "settings.gradle", "build.gradle.kts", "build.gradle", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "csharp",
-			command: "omnisharp",
-			args: ["--languageserver"],
-			rootPatterns: ["omnisharp.json", "global.json", "Directory.Build.props", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "bash",
-			command: "bash-language-server",
-			args: ["start"],
-			rootPatterns: [".git"]
-		),
-		LSPServerConfig(
-			languageId: "dockerfile",
-			command: "docker-langserver",
-			args: ["--stdio"],
-			rootPatterns: [".git"]
-		),
-		LSPServerConfig(
-			languageId: "sql",
-			command: "sqls",
-			args: [],
-			rootPatterns: [".git"]
-		),
-		LSPServerConfig(
-			languageId: "dart",
-			command: "dart",
-			args: ["language-server", "--protocol=lsp"],
-			rootPatterns: ["pubspec.yaml", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "haskell",
-			command: "haskell-language-server-wrapper",
-			args: ["--lsp"],
-			rootPatterns: ["hie.yaml", "stack.yaml", "cabal.project", "package.yaml", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "lua",
-			command: "lua-language-server",
-			args: [],
-			rootPatterns: [".luarc.json", ".luarc.jsonc", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "ruby",
-			command: "ruby-lsp",
-			args: [],
-			rootPatterns: ["Gemfile", ".git"]
-		),
-		LSPServerConfig(
-			languageId: "terraform",
-			command: "terraform-ls",
-			args: ["serve"],
-			rootPatterns: [".terraform", ".git"]
-		),
-	]
+	public static let bundledDefaults: [LSPServerConfig] = BundledLanguageInventory.lspConfigs
 
-	public static let defaultExtensionMap: [String: String] = [
-		"swift": "swift",
-		"ts": "typescript",
-		"tsx": "typescript",
-		"mts": "typescript",
-		"cts": "typescript",
-		"js": "javascript",
-		"jsx": "javascript",
-		"mjs": "javascript",
-		"cjs": "javascript",
-		"rs": "rust",
-		"py": "python",
-		"pyi": "python",
-		"go": "go",
-		"c": "c",
-		"h": "c",
-		"cc": "cpp",
-		"cpp": "cpp",
-		"cxx": "cpp",
-		"hh": "cpp",
-		"hpp": "cpp",
-		"hxx": "cpp",
-		"java": "java",
-		"jl": "julia",
-		"zig": "zig",
-		"zon": "zig",
-		"ex": "elixir",
-		"exs": "elixir",
-		"kt": "kotlin",
-		"kts": "kotlin",
-		"cs": "csharp",
-		"csx": "csharp",
-		"bash": "bash",
-		"sh": "bash",
-		"zsh": "bash",
-		"graphql": "graphql",
-		"gql": "graphql",
-		"dockerfile": "dockerfile",
-		"sql": "sql",
-		"dart": "dart",
-		"hs": "haskell",
-		"lhs": "haskell",
-		"tex": "latex",
-		"sty": "latex",
-		"cls": "latex",
-		"lua": "lua",
-		"nix": "nix",
-		"ml": "ocaml",
-		"mli": "ocaml",
-		"php": "php",
-		"proto": "proto",
-		"r": "r",
-		"rb": "ruby",
-		"rake": "ruby",
-		"scss": "scss",
-		"svelte": "svelte",
-		"tf": "terraform",
-		"tfvars": "terraform",
-		"hcl": "terraform",
-		"vue": "vue",
-	]
+	public static let defaultExtensionMap: [String: String] = BundledLanguageInventory.fileExtensionMap
 
-	public static let defaultFileNameMap: [String: String] = [
-		"dockerfile": "dockerfile",
-		"containerfile": "dockerfile",
-		"gemfile": "ruby",
-		"rakefile": "ruby",
-	]
+	public static let defaultFileNameMap: [String: String] = BundledLanguageInventory.fileNameMap
 
 	private static func resolvedCommandPath(for config: LSPServerConfig, environment: [String: String]) -> String? {
+		try? executableResolution(for: config, environment: environment).executableURL.path
+	}
+
+	private static func executableResolution(for config: LSPServerConfig, environment: [String: String]) throws -> LSPExecutableResolution {
 		if isXcrunCommand(config.command), let tool = xcrunToolName(in: config.args), let xcrunPath = resolveExecutable(config.command, environment: environment) {
-			return resolveWithXcrun(tool: tool, xcrunPath: xcrunPath, environment: environment)
+			guard let toolPath = resolveWithXcrun(tool: tool, xcrunPath: xcrunPath, environment: environment) else {
+				throw LSPExecutableDetectionError.missingExecutable(tool)
+			}
+			return LSPExecutableResolution(executableURL: URL(fileURLWithPath: toolPath), source: .explicitCommand, version: nil)
 		}
-		return resolveExecutable(config.command, environment: environment)
+		let server = BundledLanguageInventory.server(forLanguageID: config.languageId)
+		let probe = server.flatMap { server in
+			server.command == config.command && server.args == config.args && server.rootPatterns == config.rootPatterns
+				? server.detectionProbe
+				: nil
+		}
+		return try LSPExecutableDetector.detect(command: config.command, probe: probe, environment: environment)
 	}
 
 	private static func resolveExecutable(_ command: String, environment: [String: String]) -> String? {
@@ -446,46 +454,8 @@ public struct LSPServerRegistry: Equatable, Sendable {
 	}
 
 	private static func installHint(for command: String) -> String {
-		switch command {
-		case "sourcekit-lsp":
-			return "part of Xcode, install via `xcode-select --install`"
-		case "typescript-language-server":
-			return "`npm i -g typescript typescript-language-server`"
-		case "rust-analyzer":
-			return "`rustup component add rust-analyzer`"
-		case "pyright-langserver":
-			return "`npm i -g pyright`"
-		case "gopls":
-			return "`go install golang.org/x/tools/gopls@latest`"
-		case "clangd":
-			return "`brew install llvm` and add LLVM's bin directory to PATH"
-		case "zls":
-			return "`brew install zls`"
-		case "elixir-ls":
-			return "`brew install elixir-ls`"
-		case "kotlin-language-server":
-			return "`brew install fwcd/kotlin-language-server/kotlin-language-server`"
-		case "omnisharp":
-			return "`brew install omnisharp`"
-		case "bash-language-server":
-			return "`npm i -g bash-language-server`"
-		case "docker-langserver":
-			return "`npm i -g dockerfile-language-server-nodejs`"
-		case "sqls":
-			return "`brew install sqls`"
-		case "dart":
-			return "`brew install dart-sdk`"
-		case "haskell-language-server-wrapper":
-			return "`brew install haskell-language-server`"
-		case "lua-language-server":
-			return "`brew install lua-language-server`"
-		case "ruby-lsp":
-			return "`gem install ruby-lsp`"
-		case "terraform-ls":
-			return "`brew install hashicorp/tap/terraform-ls`"
-		default:
-			return "install `\(command)` and ensure it is executable"
-		}
+		BundledLanguageInventory.server(probing: command)?.installHint
+			?? "install `\(command)` and ensure it is executable"
 	}
 }
 
@@ -525,6 +495,7 @@ public enum LSPServerRegistryLoader {
 			for (languageID, config) in overrides {
 				var resolved = config
 				resolved.languageId = languageID
+				try resolved.validate()
 				registry.register(resolved)
 			}
 			return registry
@@ -560,8 +531,7 @@ public enum LSPServerRegistryLoader {
 
 private struct LSPRegistryTOMLParser {
 	private enum Value: Equatable {
-		case string(String)
-		case strings([String])
+		case configuration(LSPConfigurationValue)
 	}
 
 	func parse(_ text: String) throws -> LSPServerRegistry {
@@ -587,15 +557,21 @@ private struct LSPRegistryTOMLParser {
 			let languageID = section[0]
 			var config = configs[languageID] ?? LSPServerConfig(languageId: languageID, command: "")
 			switch (Array(section.dropFirst()), key, value) {
-			case ([], "command", let .string(command)):
+			case ([], "command", let .configuration(.string(command))):
 				config.command = command
-			case ([], "args", let .strings(args)):
+			case ([], "args", let .configuration(.array(values))):
+				guard let args = stringArray(values) else {
+					throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): args must be an array of strings")
+				}
 				config.args = args
-			case ([], "root_patterns", let .strings(patterns)), ([], "rootPatterns", let .strings(patterns)):
+			case ([], "root_patterns", let .configuration(.array(values))), ([], "rootPatterns", let .configuration(.array(values))):
+				guard let patterns = stringArray(values) else {
+					throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): rootPatterns must be an array of strings")
+				}
 				config.rootPatterns = patterns
-			case (["initOptions"], let optionKey, let .string(optionValue)):
+			case (["initOptions"], let optionKey, let .configuration(optionValue)):
 				config.initOptions[optionKey] = optionValue
-			case (["settings"], let settingKey, let .string(settingValue)):
+			case (["settings"], let settingKey, let .configuration(settingValue)):
 				config.settings[settingKey] = settingValue
 			default:
 				throw LSPServerRegistryLoaderError.decodeFailed("line \(offset + 1): unsupported key \(key)")
@@ -603,9 +579,11 @@ private struct LSPRegistryTOMLParser {
 			configs[languageID] = config
 		}
 		var registry = LSPServerRegistry()
-		for (languageID, config) in configs {
-			guard !config.command.isEmpty else {
-				throw LSPServerRegistryLoaderError.decodeFailed("\(languageID): command is required")
+		for (_, config) in configs {
+			do {
+				try config.validate()
+			} catch let error as LSPServerConfigValidationError {
+				throw LSPServerRegistryLoaderError.decodeFailed(error.description)
 			}
 			registry.register(config)
 		}
@@ -614,24 +592,46 @@ private struct LSPRegistryTOMLParser {
 
 	private func parseValue(_ raw: String) -> Value? {
 		if raw.hasPrefix("\""), raw.hasSuffix("\""), raw.count >= 2 {
-			return .string(unescape(String(raw.dropFirst().dropLast())))
+			return .configuration(.string(unescape(String(raw.dropFirst().dropLast()))))
+		}
+		if raw == "true" {
+			return .configuration(.bool(true))
+		}
+		if raw == "false" {
+			return .configuration(.bool(false))
+		}
+		if let value = Int(raw) {
+			return .configuration(.int(value))
+		}
+		if let value = Double(raw) {
+			return .configuration(.double(value))
 		}
 		if raw.hasPrefix("["), raw.hasSuffix("]") {
 			let inner = String(raw.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
 			guard !inner.isEmpty else {
-				return .strings([])
+				return .configuration(.array([]))
 			}
-			var values: [String] = []
+			var values: [LSPConfigurationValue] = []
 			for part in splitArray(inner) {
-				let trimmed = part.trimmingCharacters(in: .whitespaces)
-				guard trimmed.hasPrefix("\""), trimmed.hasSuffix("\""), trimmed.count >= 2 else {
+				guard case let .configuration(value)? = parseValue(part.trimmingCharacters(in: .whitespaces)) else {
 					return nil
 				}
-				values.append(unescape(String(trimmed.dropFirst().dropLast())))
+				values.append(value)
 			}
-			return .strings(values)
+			return .configuration(.array(values))
 		}
 		return nil
+	}
+
+	private func stringArray(_ values: [LSPConfigurationValue]) -> [String]? {
+		var strings: [String] = []
+		for value in values {
+			guard case let .string(string) = value else {
+				return nil
+			}
+			strings.append(string)
+		}
+		return strings
 	}
 
 	private func splitArray(_ value: String) -> [String] {

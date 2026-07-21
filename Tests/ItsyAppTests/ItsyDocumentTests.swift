@@ -72,6 +72,7 @@ import Testing
 	try document.read(from: url, ofType: "public.plain-text")
 	#expect(editorStorageString(document.editor) == "dirty recovery")
 	#expect(document.isDocumentEdited)
+	#expect(document.recoveredJournalFileURL == url)
 	try document.write(to: url, ofType: "public.plain-text")
 	#expect(store.load(fileURL: url, workspaceRoot: directory) == nil)
 

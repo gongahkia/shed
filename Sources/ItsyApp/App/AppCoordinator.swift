@@ -327,6 +327,12 @@ import ItsyKeymap
 				Command(id: "lsp.codeAction", title: L10n.string("Code Action"), defaultKey: "Cmd-.") { [weak self] in
 					_ = self?.activeEditorWindowController()?.showCodeActions(nil)
 				},
+				Command(id: "lsp.status", title: L10n.string("Language Server Status"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.showLSPStatus()
+				},
+				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"), defaultKey: nil) { [weak self] in
+					self?.settingsCoordinator.showLSPConfiguration(nil)
+				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},

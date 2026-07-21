@@ -55,6 +55,15 @@ public enum Language: Sendable, Hashable, CaseIterable {
 	case yaml
 	case zig
 
+	public var inventoryID: String {
+		switch self {
+		case .markdownInline:
+			return "markdown-inline"
+		default:
+			return String(describing: self)
+		}
+	}
+
 	var rawLanguage: OpaquePointer? {
 		GrammarLoader.language(for: self)
 	}

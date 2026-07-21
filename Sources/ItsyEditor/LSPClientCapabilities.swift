@@ -332,9 +332,9 @@ public struct ItsyClientCapabilities: Codable, Equatable, Sendable {
 }
 
 public extension LSPInitializeParams {
-	static func itsy(processID: Int? = Int(ProcessInfo.processInfo.processIdentifier), workspaceRoot: URL?) throws -> LSPInitializeParams {
+	static func itsy(processID: Int? = Int(ProcessInfo.processInfo.processIdentifier), workspaceRoot: URL?, initializationOptions: LSPAny? = nil) throws -> LSPInitializeParams {
 		let rootURI = workspaceRoot.map { $0.standardizedFileURL.absoluteString }
 		let capabilities = try ItsyClientCapabilities().toLSPAny()
-		return LSPInitializeParams(processId: processID, rootUri: rootURI, capabilities: capabilities)
+		return LSPInitializeParams(processId: processID, rootUri: rootURI, capabilities: capabilities, initializationOptions: initializationOptions)
 	}
 }

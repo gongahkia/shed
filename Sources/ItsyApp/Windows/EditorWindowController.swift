@@ -83,6 +83,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
 	private let lspMissingBanner = LSPMissingBanner()
+	private let recoveryBanner = RecoveryBanner()
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
@@ -136,6 +137,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var lspSurfaceGeneration = 0
 	private var lspMissingBannerGeneration = 0
 	private var lspStatusGeneration = 0
+	private var lspConfigurationGeneration = 0
 	private var indexingStatusText: String?
 	private var lspCrashStatusText: String?
 	private var lspRestartKey: LSPSessionKey?
@@ -156,6 +158,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
+		recoveryBanner.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.isHidden = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -170,6 +173,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		])
 		editorStack.addArrangedSubview(tabBarView)
 		editorStack.addArrangedSubview(lspMissingBanner)
+		editorStack.addArrangedSubview(recoveryBanner)
 		editorStack.addArrangedSubview(editorContainer)
 		editorStack.addArrangedSubview(statusBarView)
 
@@ -200,6 +204,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		configurePaneTabBar(paneCoordinator.activePane)
 		syncTabGroupVisibility()
 		configureLSPMissingBanner()
+		configureRecoveryBanner()
 		configureLSPStatusRestart()
 		fileTreeController.attach(to: window)
 		fileTreeController.openFile = { ItsyWorkspaceController.openFile(at: $0) }
@@ -216,6 +221,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		applyTheme(AppTheme.palette)
 		recordBenchStage("window_controller_install_pane_end")
 		refreshLSPMissingBanner(for: document)
+		refreshRecoveryBanner(for: document)
 		refreshLSPStatus(for: document)
 		recordBenchStage("window_controller_lsp_refresh_end")
 		ItsyWorkspaceController.register(self)
@@ -223,6 +229,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		rebuildFocusTraversal()
 		window.makeFirstResponder(editorView)
 		recordBenchStage("window_controller_init_end")
+	}
+
+	static func reloadLSPConfiguration() {
+		let registry = LSPServerRegistryLoader.loadOrBundled()
+		Task {
+			await lspManager.replaceRegistry(registry)
+			await MainActor.run {
+				ItsyWorkspaceController.lspConfigurationDidReload()
+			}
+		}
 	}
 
 	required init?(coder _: NSCoder) {
@@ -527,11 +543,28 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspMissingBanner.copyRequested = { [weak self] missingBinary in
 			self?.copyLSPInstallCommand(for: missingBinary)
 		}
+		lspMissingBanner.configurationRequested = { [weak self] in
+			self?.copyLSPConfigurationPath()
+		}
 		lspMissingBanner.dismissRequested = { [weak self] missingBinary in
 			Self.dismissedLSPMissingCommands.insert(missingBinary.command)
 			self?.lspMissingBanner.hide()
 			self?.focusEditor()
 		}
+	}
+
+	private func configureRecoveryBanner() {
+		recoveryBanner.dismissRequested = { [weak self] in
+			self?.focusEditor()
+		}
+	}
+
+	private func refreshRecoveryBanner(for document: ItsyDocument) {
+		guard let fileURL = document.recoveredJournalFileURL else {
+			recoveryBanner.hide()
+			return
+		}
+		recoveryBanner.show(fileURL: fileURL)
 	}
 
 	private func configureLSPStatusRestart() {
@@ -598,6 +631,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		focusEditor()
 	}
 
+	private func copyLSPConfigurationPath() {
+		let pasteboard = NSPasteboard.general
+		pasteboard.clearContents()
+		pasteboard.setString(LSPServerRegistryLoader.defaultConfigURL.path, forType: .string)
+		focusEditor()
+	}
+
 	private static func installCommand(from missingBinary: LSPServerRegistry.MissingBinary) -> String {
 		let hint = missingBinary.hint
 		guard
@@ -648,6 +688,38 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		lspStatusPanel = panel
 		panel.show(snapshot: snapshot, relativeTo: window)
+	}
+
+	func showLSPStatus() {
+		showLSPStatusPanel(lspStatusButton)
+	}
+
+	func lspConfigurationDidReload() {
+		lspConfigurationGeneration &+= 1
+		for task in lspSupervisorTasks.values {
+			task.cancel()
+		}
+		lspSyncCoordinators.removeAll()
+		lspSupervisors.removeAll()
+		lspSupervisorTasks.removeAll()
+		lspStatusEntries.removeAll()
+		completionTriggerCharactersBySession.removeAll()
+		signatureHelpTriggerCharactersBySession.removeAll()
+		completionResolveEnabledBySession.removeAll()
+		codeActionResolveEnabledBySession.removeAll()
+		callHierarchyEnabledBySession.removeAll()
+		typeHierarchyEnabledBySession.removeAll()
+		semanticSurfaceCapabilitiesBySession.removeAll()
+		activeLSPKey = nil
+		lspRestartKey = nil
+		lspRestartURL = nil
+		lspCrashStatusText = nil
+		if let document = document as? ItsyDocument {
+			refreshLSPMissingBanner(for: document)
+			refreshLSPStatus(for: document)
+		} else {
+			refreshStatusBar()
+		}
 	}
 
 	private func restartLSPFromStatusPanel(_ key: LSPSessionKey) {
@@ -968,6 +1040,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if !lspMissingBanner.isHidden, let button = focusTarget(in: lspMissingBanner) {
 			targets.append(button)
 		}
+		if !recoveryBanner.isHidden, let button = focusTarget(in: recoveryBanner) {
+			targets.append(button)
+		}
 		if !lspStatusButton.isHidden {
 			targets.append(lspStatusButton)
 		}
@@ -1174,6 +1249,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		statusBarLabel.textColor = palette.statusForeground
 		lspStatusButton.contentTintColor = palette.statusForeground
 		lspMissingBanner.applyTheme(palette)
+		recoveryBanner.applyTheme(palette)
 		findBarController?.applyTheme(palette)
 		fileTreeController.applyTheme(palette)
 		for pane in paneCoordinator.panes {
@@ -2725,7 +2801,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				try client.start()
 			} catch LSPProcessClientError.alreadyStarted {}
 			do {
-				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot)
+				let initializationOptions = await Self.lspManager.config(for: url)?.initializationOptions
+				let params = try LSPInitializeParams.itsy(workspaceRoot: key.workspaceRoot, initializationOptions: initializationOptions)
 				let result = try await client.initialize(params)
 				let capabilities = try? LSPInitializeResult(result: result).capabilities
 				let completionProvider = capabilities?.completionProvider
@@ -2837,18 +2914,27 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return
 		}
 		let supervisor = LSPSessionSupervisor(key: key, client: client)
+		let configurationGeneration = lspConfigurationGeneration
 		lspSupervisors[key] = supervisor
 		lspSupervisorTasks[key] = Task { [weak self, supervisor] in
 			await supervisor.start()
 			for await event in supervisor.events {
 				await MainActor.run { [weak self] in
-					self?.handleLSPSupervisorEvent(event, key: key, url: url)
+					self?.handleLSPSupervisorEvent(event, key: key, url: url, configurationGeneration: configurationGeneration)
 				}
 			}
 		}
 	}
 
-	private func handleLSPSupervisorEvent(_ event: LSPSessionSupervisorEvent, key: LSPSessionKey, url: URL) {
+	private func handleLSPSupervisorEvent(
+		_ event: LSPSessionSupervisorEvent,
+		key: LSPSessionKey,
+		url: URL,
+		configurationGeneration: Int
+	) {
+		guard configurationGeneration == lspConfigurationGeneration else {
+			return
+		}
 		switch event {
 		case let .diagnosticsUpdated(snapshot):
 			ItsyProblemsBridge.publishDiagnostics(snapshot, sourceID: "lsp:\(key.languageID):\(key.workspaceRoot.path)")

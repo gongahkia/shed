@@ -37,7 +37,7 @@ public actor LSPManager {
 	public let retryWindow: TimeInterval
 	public let maxSpawnsPerWindow: Int
 
-	private let registry: LSPServerRegistry
+	private var registry: LSPServerRegistry
 	private let clientFactory: ClientFactory
 	private var clients: [LSPSessionKey: LSPProcessClient] = [:]
 	private var statuses: [LSPSessionKey: LSPSessionStatus] = [:]
@@ -89,6 +89,10 @@ public actor LSPManager {
 
 	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
 		effectiveRegistry(for: url).missingBinary(for: url)
+	}
+
+	public func config(for url: URL) -> LSPServerConfig? {
+		effectiveRegistry(for: url).config(for: url)
 	}
 
 	public func ensureClient(for url: URL, now: Date = .init()) throws -> LSPProcessClient {
@@ -145,6 +149,14 @@ public actor LSPManager {
 		disabledKeys.remove(key)
 		spawnTimestamps[key] = []
 		statuses[key] = .idle
+	}
+
+	public func replaceRegistry(_ registry: LSPServerRegistry) async {
+		await shutdownAll()
+		self.registry = registry
+		statuses.removeAll()
+		spawnTimestamps.removeAll()
+		disabledKeys.removeAll()
 	}
 
 	public func shutdownAll() async {

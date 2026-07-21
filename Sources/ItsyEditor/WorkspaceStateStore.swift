@@ -32,15 +32,35 @@ public struct WorkspaceRangeState: Codable, Equatable, Sendable {
 	}
 }
 
+public struct WorkspacePaneState: Codable, Equatable, Sendable {
+	public var openPaths: [String]
+	public var selectedPath: String?
+
+	public init(openPaths: [String] = [], selectedPath: String? = nil) {
+		self.openPaths = openPaths
+		self.selectedPath = selectedPath
+	}
+}
+
 public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 	public var paneLayout: String
 	public var selectedPath: String?
 	public var openFiles: [WorkspaceWindowFileState]
+	public var paneStates: [WorkspacePaneState]?
+	public var focusedPaneIndex: Int?
 
-	public init(paneLayout: String = "L", selectedPath: String? = nil, openFiles: [WorkspaceWindowFileState] = []) {
+	public init(
+		paneLayout: String = "L",
+		selectedPath: String? = nil,
+		openFiles: [WorkspaceWindowFileState] = [],
+		paneStates: [WorkspacePaneState]? = nil,
+		focusedPaneIndex: Int? = nil
+	) {
 		self.paneLayout = paneLayout
 		self.selectedPath = selectedPath
 		self.openFiles = openFiles
+		self.paneStates = paneStates
+		self.focusedPaneIndex = focusedPaneIndex
 	}
 }
 

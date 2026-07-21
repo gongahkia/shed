@@ -819,45 +819,108 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		else {
 			return
 		}
-		for pane in paneCoordinator.panes {
-			document.detach(pane.editorView)
-		}
-		for pane in paneCoordinator.restore(layout: layout) {
-			configurePaneTabBar(pane)
-			installPane(pane, document: document)
-			ensurePaneTabs(for: pane, preferredDocument: document)
-		}
-		syncTabGroupVisibility()
-		refreshPaneTabBars()
-		refreshLSPMissingBanner(for: document)
-		refreshLSPStatus(for: document)
-		focusEditor()
+		restorePaneLayout(layout, fallbackDocument: document, paneStates: nil, focusedPaneIndex: nil)
 	}
 
 	var paneLayoutEncoded: String {
 		paneCoordinator.layout().encoded
 	}
 
-	func restoreWorkspacePaneLayout(_ encoded: String) {
-		guard
-			let layout = EditorPaneLayout.decode(encoded),
-			let document = document as? ItsyDocument
-		else {
+	var workspacePaneStates: [WorkspacePaneState]? {
+		guard tabGroupScope == .pane else {
+			return nil
+		}
+		return paneCoordinator.panes.map { pane in
+			let documents = paneTabDocuments[paneID(pane)] ?? [document as? ItsyDocument].compactMap { $0 }
+			let paths = documents.compactMap { $0.fileURL?.standardizedFileURL.path }
+			let selectedPath = selectedDocument(for: pane)?.fileURL?.standardizedFileURL.path
+			return WorkspacePaneState(openPaths: paths, selectedPath: selectedPath)
+		}
+	}
+
+	var workspaceFocusedPaneIndex: Int? {
+		tabGroupScope == .pane ? paneCoordinator.focusedPaneIndex : nil
+	}
+
+	func restoreWorkspacePaneLayout(
+		_ encoded: String,
+		paneStates: [WorkspacePaneState]? = nil,
+		focusedPaneIndex: Int? = nil
+	) {
+		guard let document = document as? ItsyDocument else {
 			return
 		}
-		for pane in paneCoordinator.panes {
-			document.detach(pane.editorView)
-		}
-		for pane in paneCoordinator.restore(layout: layout) {
+		restorePaneLayout(
+			EditorPaneLayout.decode(encoded) ?? .leaf,
+			fallbackDocument: document,
+			paneStates: paneStates,
+			focusedPaneIndex: focusedPaneIndex
+		)
+	}
+
+	private func restorePaneLayout(
+		_ layout: EditorPaneLayout,
+		fallbackDocument: ItsyDocument,
+		paneStates: [WorkspacePaneState]?,
+		focusedPaneIndex: Int?
+	) {
+		detachPaneDocuments()
+		paneTabDocuments = [:]
+		paneSelectedDocuments = [:]
+		let restoredPanes = paneCoordinator.restore(layout: layout)
+		let restoresPaneTabs = tabGroupScope == .pane && paneStates?.count == restoredPanes.count
+		for (index, pane) in restoredPanes.enumerated() {
 			configurePaneTabBar(pane)
-			installPane(pane, document: document)
-			ensurePaneTabs(for: pane, preferredDocument: document)
+			if restoresPaneTabs, let state = paneStates?[index] {
+				let documents = state.openPaths.compactMap(document(atPersistedPath:))
+				if let selected = document(atPersistedPath: state.selectedPath), documents.contains(where: { $0 === selected }) {
+					paneTabDocuments[paneID(pane)] = documents
+					paneSelectedDocuments[paneID(pane)] = ObjectIdentifier(selected)
+					installPane(pane, document: selected)
+					continue
+				}
+				if let selected = documents.first {
+					paneTabDocuments[paneID(pane)] = documents
+					paneSelectedDocuments[paneID(pane)] = ObjectIdentifier(selected)
+					installPane(pane, document: selected)
+					continue
+				}
+			}
+			paneTabDocuments[paneID(pane)] = [fallbackDocument]
+			paneSelectedDocuments[paneID(pane)] = ObjectIdentifier(fallbackDocument)
+			installPane(pane, document: fallbackDocument)
+		}
+		if tabGroupScope == .pane {
+			_ = paneCoordinator.focusPane(at: focusedPaneIndex ?? 0)
+			syncActiveDocumentToFocusedPane()
 		}
 		syncTabGroupVisibility()
 		refreshPaneTabBars()
-		refreshLSPMissingBanner(for: document)
-		refreshLSPStatus(for: document)
+		refreshLSPMissingBanner(for: document as? ItsyDocument ?? fallbackDocument)
+		refreshLSPStatus(for: document as? ItsyDocument ?? fallbackDocument)
 		focusEditor()
+	}
+
+	private func detachPaneDocuments() {
+		for pane in paneCoordinator.panes {
+			var documents = paneTabDocuments[paneID(pane)] ?? []
+			if let document = document as? ItsyDocument, !documents.contains(where: { $0 === document }) {
+				documents.append(document)
+			}
+			for document in documents {
+				document.detach(pane.editorView)
+			}
+		}
+	}
+
+	private func document(atPersistedPath path: String?) -> ItsyDocument? {
+		guard let path else {
+			return nil
+		}
+		let target = URL(fileURLWithPath: path).standardizedFileURL.path
+		return NSDocumentController.shared.documents.compactMap { $0 as? ItsyDocument }.first {
+			$0.fileURL?.standardizedFileURL.path == target
+		}
 	}
 
 	func focusEditor() {
@@ -1342,6 +1405,50 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		ItsyWorkspaceController.persistWindowState(from: self)
 	}
 
+	@discardableResult
+	func moveActivePaneTab(toAdjacentPane delta: Int) -> Bool {
+		guard tabGroupScope == .pane, paneCoordinator.panes.count > 1 else {
+			return false
+		}
+		let source = paneCoordinator.activePane
+		guard let document = selectedDocument(for: source), let sourceIndex = paneCoordinator.panes.firstIndex(where: { $0.editorView === source.editorView }) else {
+			return false
+		}
+		let destinationIndex = (sourceIndex + delta + paneCoordinator.panes.count) % paneCoordinator.panes.count
+		guard destinationIndex != sourceIndex else {
+			return false
+		}
+		let destination = paneCoordinator.panes[destinationIndex]
+		let sourceID = paneID(source)
+		var sourceDocuments = paneTabDocuments[sourceID] ?? []
+		guard let removedIndex = sourceDocuments.firstIndex(where: { $0 === document }) else {
+			return false
+		}
+		sourceDocuments.remove(at: removedIndex)
+		selectPaneDocument(document, in: destination, addIfMissing: true)
+
+		if sourceDocuments.isEmpty {
+			document.detach(source.editorView)
+			paneTabDocuments[sourceID] = nil
+			paneSelectedDocuments[sourceID] = nil
+			_ = paneCoordinator.focusPane(containing: source.editorView)
+			_ = paneCoordinator.closeActive()
+		} else {
+			let replacement = sourceDocuments[min(removedIndex, sourceDocuments.count - 1)]
+			paneTabDocuments[sourceID] = sourceDocuments
+			paneSelectedDocuments[sourceID] = ObjectIdentifier(replacement)
+			document.detach(source.editorView)
+			installPane(source, document: replacement)
+		}
+		_ = paneCoordinator.focusPane(containing: destination.editorView)
+		syncActiveDocumentToFocusedPane()
+		syncTabGroupVisibility()
+		refreshPaneTabBars()
+		focusEditor()
+		ItsyWorkspaceController.persistWindowState(from: self)
+		return true
+	}
+
 	private func focusAdjacentPane(delta: Int) {
 		_ = paneCoordinator.focusAdjacent(delta: delta)
 		syncActiveDocumentToFocusedPane()
@@ -1584,6 +1691,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			focusAdjacentPane(delta: 1)
 		case "pane.focusLeft", "pane.focusUp", "pane.focusPrevious":
 			focusAdjacentPane(delta: -1)
+		case "pane.moveTabNext":
+			return moveActivePaneTab(toAdjacentPane: 1)
+		case "pane.moveTabPrevious":
+			return moveActivePaneTab(toAdjacentPane: -1)
 		case "edit.find":
 			toggleFindBar()
 		case "edit.findNext":

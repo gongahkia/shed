@@ -3,7 +3,7 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 base_url="${UCD_BASE_URL:-https://www.unicode.org/Public/UCD/latest/ucd}"
-out="${1:-$repo_dir/Tests/Fixtures/UCD/GraphemeBreakTest.txt}"
+out="${1:-$repo_dir/Tests/ItsyEditorTests/Fixtures/UCD/GraphemeBreakTest.txt}"
 tmp="$(mktemp "${TMPDIR:-/tmp}/itsy-grapheme-break.XXXXXX")"
 
 cleanup() {

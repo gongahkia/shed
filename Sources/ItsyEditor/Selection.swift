@@ -43,6 +43,9 @@ public struct SelectionSet: Sendable, Equatable {
 	public mutating func merge() {
 		let selections = ([primary] + secondaries).sorted { lhs, rhs in
 			if lhs.range.lowerBound == rhs.range.lowerBound {
+				if lhs.range.upperBound == rhs.range.upperBound {
+					return lhs.affinity == .upstream && rhs.affinity == .downstream
+				}
 				return lhs.range.upperBound < rhs.range.upperBound
 			}
 			return lhs.range.lowerBound < rhs.range.lowerBound

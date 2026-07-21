@@ -14,7 +14,7 @@ public struct Rope: Sendable {
 	}
 
 	public var graphemeCount: Int {
-		return root.summary.graphemes
+		return graphemeBoundaries().count - 1
 	}
 
 	public mutating func insert(_ string: String, at offset: Int) {
@@ -22,7 +22,7 @@ public struct Rope: Sendable {
 		guard !string.isEmpty else {
 			return
 		}
-		root = RopeNode.buildTree(from: root.inserting(string, at: offset))
+		root = RopeNode.buildTree(from: root.inserting(string, at: offset)).normalizingRoot()
 	}
 
 	public mutating func remove(_ range: Range<Int>) {
@@ -31,7 +31,7 @@ public struct Rope: Sendable {
 			return
 		}
 		let nodes = root.removing(range)
-		root = nodes.isEmpty ? RopeNode(text: "") : RopeNode.buildTree(from: nodes)
+		root = nodes.isEmpty ? RopeNode(text: "") : RopeNode.buildTree(from: nodes).normalizingRoot()
 	}
 
 	public func slice(_ range: Range<Int>) -> String {
@@ -89,21 +89,34 @@ public struct Rope: Sendable {
 
 	public func graphemeIndex(forOffset offset: Int) -> Int {
 		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
-		var bytes = 0
-		var graphemes = 0
-		for character in root.text {
-			let next = bytes + String(character).utf8.count
-			if offset < next {
-				return graphemes
-			}
-			bytes = next
-			graphemes += 1
+		let bytes = Array(root.text.utf8)
+		return bytes.withUnsafeBufferPointer { UAX29GraphemeIterator.graphemeIndex(in: $0, before: offset) }
+	}
+
+	func isGraphemeBoundary(_ offset: Int) -> Bool {
+		guard (0 ... length).contains(offset) else {
+			return false
 		}
-		return graphemes
+		return graphemeBoundaries().contains(offset)
+	}
+
+	func previousGraphemeBoundary(before offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		return graphemeBoundaries().last { $0 < offset } ?? 0
+	}
+
+	func nextGraphemeBoundary(after offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		return graphemeBoundaries().first { $0 > offset } ?? length
 	}
 
 	func validateInvariants() -> Bool {
 		return root.validate()
+	}
+
+	private func graphemeBoundaries() -> [Int] {
+		let bytes = Array(root.text.utf8)
+		return bytes.withUnsafeBufferPointer { UAX29GraphemeIterator.boundaries(in: $0) }
 	}
 }
 
@@ -175,11 +188,15 @@ private indirect enum RopeNode: Sendable {
 
 	private static func packLevel(_ nodes: [RopeNode]) -> [RopeNode] {
 		var packed: [RopeNode] = []
-		var index = 0
-		while index < nodes.count {
-			let end = min(index + maxChildren, nodes.count)
-			packed.append(RopeNode(children: Array(nodes[index ..< end])))
-			index = end
+		let groupCount = (nodes.count + maxChildren - 1) / maxChildren
+		let baseSize = nodes.count / groupCount
+		let largerGroupCount = nodes.count % groupCount
+		var start = 0
+		for groupIndex in 0 ..< groupCount {
+			let size = baseSize + (groupIndex < largerGroupCount ? 1 : 0)
+			let end = start + size
+			packed.append(RopeNode(children: Array(nodes[start ..< end])))
+			start = end
 		}
 		return packed
 	}
@@ -189,6 +206,13 @@ private indirect enum RopeNode: Sendable {
 			return []
 		}
 		return packLevel(nodes)
+	}
+
+	func normalizingRoot() -> RopeNode {
+		guard case let .branch(children, _) = self, children.count == 1 else {
+			return self
+		}
+		return children[0].normalizingRoot()
 	}
 
 	func validate() -> Bool {

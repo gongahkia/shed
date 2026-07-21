@@ -37,6 +37,7 @@ import Testing
 		}
 		caseCount += 1
 		#expect(actual == test.boundaries, "line \(index + 1): \(codepointList(test.codepoints))")
+		assertStoragePathsMatchFixture(test, line: index + 1)
 	}
 	#expect(caseCount > 0)
 }
@@ -48,16 +49,38 @@ private func boundaries(_ text: String) -> [Int] {
 }
 
 private func graphemeBreakFixtureURL() throws -> URL {
-	let sharedURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-		.appendingPathComponent("Tests/Fixtures/UCD/GraphemeBreakTest.txt")
-	if FileManager.default.fileExists(atPath: sharedURL.path) {
-		return sharedURL
-	}
 	return try #require(Bundle.module.url(
 		forResource: "GraphemeBreakTest",
 		withExtension: "txt",
 		subdirectory: "Fixtures/UCD"
 	))
+}
+
+private func assertStoragePathsMatchFixture(_ test: (bytes: [UInt8], boundaries: [Int], codepoints: [UInt32]), line: Int) {
+	let text = String(decoding: test.bytes, as: UTF8.self)
+	func expectedText(afterDeleting range: Range<Int>) -> String {
+		var bytes = test.bytes
+		bytes.removeSubrange(range)
+		return String(decoding: bytes, as: UTF8.self)
+	}
+	let context = "line \(line): \(codepointList(test.codepoints))"
+	for storage in [EditorStorageKind.rope, .pieceTree] {
+		var editor = Editor(text: text, storage: storage)
+		let actual = (0 ... editor.textStorage.length).filter { editor.textStorage.isGraphemeBoundary($0) }
+		#expect(actual == test.boundaries, "\(storage): \(context)")
+		for (lower, upper) in zip(test.boundaries, test.boundaries.dropFirst()) {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: lower, head: lower)))
+			editor.moveCursor(.charForward)
+			#expect(editor.selections.primary.head == upper, "forward \(storage): \(context)")
+			editor.moveCursor(.charBackward)
+			#expect(editor.selections.primary.head == lower, "backward \(storage): \(context)")
+
+			var deletionEditor = Editor(text: text, storage: storage)
+			deletionEditor.setSelection(SelectionSet(primary: Selection(anchor: upper, head: upper)))
+			deletionEditor.deleteBackward()
+			#expect(deletionEditor.textStorage.substring(0 ..< deletionEditor.textStorage.length) == expectedText(afterDeleting: lower ..< upper), "delete \(storage): \(context)")
+		}
+	}
 }
 
 private func parseGraphemeBreakTestLine(_ line: String) throws -> (bytes: [UInt8], boundaries: [Int], codepoints: [UInt32]) {

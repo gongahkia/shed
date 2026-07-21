@@ -3,6 +3,7 @@ import Metal
 @testable import ItsyRender
 import Testing
 
+extension ItsyRenderTests {
 @Test func glyphAtlasUploadsCoreTextRaster() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
 	var atlas = try GlyphAtlas(device: device)
@@ -46,4 +47,5 @@ import Testing
 	#expect(atlas.texture.pixelFormat == .rgba8Unorm)
 	#expect(reference.bytesPerRow == entry.width * 4)
 	#expect(readback == reference.pixels)
+}
 }

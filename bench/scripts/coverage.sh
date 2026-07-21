@@ -18,8 +18,12 @@ mkdir -p "$results_dir"
 
 codecov_json="$(cd "$repo_dir" && swift test --enable-code-coverage --show-codecov-path)"
 codecov_dir="$(dirname "$codecov_json")"
+tmp_lcov="$(mktemp "${TMPDIR:-/tmp}/itsy-coverage.XXXXXX")"
 if [[ "$run_tests" != "0" ]]; then
-	(cd "$repo_dir" && swift test --enable-code-coverage)
+	raw_profiles_dir="$(mktemp -d "${TMPDIR:-/tmp}/itsy-coverage-profiles.XXXXXX")"
+	trap 'rm -rf "$tmp_lcov" "$raw_profiles_dir"' EXIT
+	ITSY_TEST_COVERAGE_DIR="$codecov_dir" ITSY_TEST_COVERAGE_RAW_DIR="$raw_profiles_dir" "$repo_dir/scripts/test.sh"
+	xcrun llvm-profdata merge -sparse "$raw_profiles_dir"/*.profraw -o "$codecov_dir/default.profdata"
 fi
 
 profdata="$codecov_dir/default.profdata"
@@ -38,8 +42,9 @@ if [[ -z "$baseline" ]]; then
 	baseline="$(find "$results_dir" -maxdepth 1 -name 'coverage-*.json' ! -name "$(basename "$json_out")" ! -name 'coverage-current.json' -print | sort | tail -1 || true)"
 fi
 
-tmp_lcov="$(mktemp "${TMPDIR:-/tmp}/itsy-coverage.XXXXXX")"
-trap 'rm -f "$tmp_lcov"' EXIT
+if [[ "$run_tests" == "0" ]]; then
+	trap 'rm -f "$tmp_lcov"' EXIT
+fi
 xcrun llvm-cov export \
 	--format=lcov \
 	--instr-profile "$profdata" \

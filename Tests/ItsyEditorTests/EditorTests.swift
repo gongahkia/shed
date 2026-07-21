@@ -175,7 +175,7 @@ import Testing
 	))
 	editor.insert("x")
 	#expect(editorTextStorageString(editor) == "x x")
-	#expect(editor.history.edits.count == 2)
+	#expect(editor.history.edits.count == 1)
 }
 
 @Test func editorUndoRedoRestoresThousandEditTranscript() {

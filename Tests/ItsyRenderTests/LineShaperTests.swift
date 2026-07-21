@@ -5,6 +5,7 @@ import os
 @testable import ItsyRender
 import Testing
 
+extension ItsyRenderTests {
 @Test func lineShaperShapesGlyphsWithAtlasUVs() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
 	var atlas = try GlyphAtlas(device: device)
@@ -42,4 +43,5 @@ import Testing
 	#if !DEBUG
 	#expect(Double(end - start) / 1_000_000 < 2.0)
 	#endif
+}
 }

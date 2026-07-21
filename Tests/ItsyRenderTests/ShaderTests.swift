@@ -17,6 +17,7 @@ private struct TestFragmentUniforms {
 	var atlasMode: UInt32
 }
 
+extension ItsyRenderTests {
 @Test func shadersRenderInstancedGlyphQuad() throws {
 	let device = try #require(MTLCreateSystemDefaultDevice())
 	let queue = try #require(device.makeCommandQueue())
@@ -171,4 +172,5 @@ private struct TestFragmentUniforms {
 		pixels[offset + 2] > 0 && pixels[offset + 1] == 0 && pixels[offset] == 0 && pixels[offset + 3] > 0
 	}
 	#expect(redOnlyPixelExists)
+}
 }

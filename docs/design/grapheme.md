@@ -7,7 +7,7 @@ Status: Phase 24 fixture baseline.
 Cursor motion, deletion, and selection validation use Unicode extended grapheme cluster boundaries from UAX #29. The conformance fixture is vendored at:
 
 ```text
-Tests/Fixtures/UCD/GraphemeBreakTest.txt
+Tests/ItsyEditorTests/Fixtures/UCD/GraphemeBreakTest.txt
 ```
 
 Regenerate it with:

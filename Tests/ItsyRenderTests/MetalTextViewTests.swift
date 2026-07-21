@@ -5,6 +5,7 @@ import struct ItsyVim.VimMarkStore
 @testable import ItsyRender
 import Testing
 
+extension ItsyRenderTests {
 @Test func dirtyFlagPreventsIdleDisplayLinkDraws() {
 	let view = MetalTextView(frame: .zero)
 	#expect(view.consumeDirtyForDisplayLink())
@@ -1359,6 +1360,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	let glyphs = view.textGlyphInstances(scale: 2)
 	#expect(glyphs.count == 11)
 	#expect(glyphs.allSatisfy { $0.size.x > 0 && $0.size.y > 0 })
+}
 }
 
 private let pasteboardTestLock = NSLock()

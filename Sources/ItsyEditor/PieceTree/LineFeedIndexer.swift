@@ -13,22 +13,23 @@ public enum LineFeedIndexer {
 		}
 		var starts = [0]
 		starts.reserveCapacity(estimatedLineCount(in: bytes.count))
-		var chunkStart = 0
-		while chunkStart < bytes.count {
-			let chunkEnd = min(bytes.count, chunkStart + strideBytes)
-			var cursor = chunkStart
-			while cursor < chunkEnd {
-				let remaining = chunkEnd - cursor
-				let raw = UnsafeRawPointer(baseAddress.advanced(by: cursor))
-				guard let match = memchr(raw, 10, remaining) else {
-					break
-				}
-				let pointer = match.assumingMemoryBound(to: UInt8.self)
-				let offset = baseAddress.distance(to: pointer)
-				starts.append(offset + 1)
-				cursor = offset + 1
+		var index = 0
+		while index + 8 <= bytes.count {
+			if baseAddress[index] == 10 { starts.append(index + 1) }
+			if baseAddress[index + 1] == 10 { starts.append(index + 2) }
+			if baseAddress[index + 2] == 10 { starts.append(index + 3) }
+			if baseAddress[index + 3] == 10 { starts.append(index + 4) }
+			if baseAddress[index + 4] == 10 { starts.append(index + 5) }
+			if baseAddress[index + 5] == 10 { starts.append(index + 6) }
+			if baseAddress[index + 6] == 10 { starts.append(index + 7) }
+			if baseAddress[index + 7] == 10 { starts.append(index + 8) }
+			index += 8
+		}
+		while index < bytes.count {
+			if baseAddress[index] == 10 {
+				starts.append(index + 1)
 			}
-			chunkStart = chunkEnd
+			index += 1
 		}
 		return starts
 	}

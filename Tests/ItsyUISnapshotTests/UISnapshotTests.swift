@@ -285,16 +285,9 @@ private final class TabsSnapshotView: NSView {
 		commandRegistryProvider: { registry },
 		activeDocumentProvider: { nil }
 	)
-	let host = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered, defer: false)
-	host.makeKeyAndOrderFront(nil)
-	coordinator.toggleCommandPalette(nil)
-	guard let panel = NSApp.windows.first(where: { $0.title == "Command Palette" }), let contentView = panel.contentView else {
-		throw SnapshotError.renderFailed
-	}
+	let contentView = coordinator.makeCommandPaletteContentView()
+	coordinator.loadCommandPaletteCommands()
 	contentView.frame = NSRect(x: 0, y: 0, width: 560, height: 280)
 	contentView.layoutSubtreeIfNeeded()
-	return SnapshotSubject(view: contentView, retained: [documentController, coordinator, host, panel], cleanup: {
-		panel.close()
-		host.close()
-	})
+	return SnapshotSubject(view: contentView, retained: [documentController, coordinator])
 }

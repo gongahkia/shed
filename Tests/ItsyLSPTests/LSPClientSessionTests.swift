@@ -50,6 +50,22 @@ import Testing
 	#expect(try await second.value == .string("definition"))
 }
 
+@Test func clientCancelsPendingRequestsOnTermination() async throws {
+	let (session, transport) = try await initializedSession()
+	let task = Task {
+		try await session.sendRequest(method: LSPMethod.textDocumentHover)
+	}
+	try await transport.waitForWriteCount(3)
+	await session.cancelPendingRequests()
+	do {
+		_ = try await task.value
+		Issue.record("expected cancelled request")
+	} catch let error as LSPClientError {
+		#expect(error == .cancelled)
+	}
+	#expect(await session.state == .exited)
+}
+
 @Test func clientWorkspaceSymbolSendsTypedRequest() async throws {
 	let (session, transport) = try await initializedSession()
 	let task = Task {

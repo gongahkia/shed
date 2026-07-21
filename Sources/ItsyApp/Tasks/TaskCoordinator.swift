@@ -314,7 +314,10 @@ import ItsyEditor
 			].filter { !$0.isEmpty }.joined(separator: "\n")
 			if let root {
 				let matchers = WorkspaceProblemMatcherDiscovery.discover(root: root)
-				problemsCoordinator.setProblems(WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers))
+				problemsCoordinator.setProblems(
+					WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers),
+					sourceID: "task:\(root.standardizedFileURL.path)"
+				)
 			}
 		case let .failure(error):
 			taskStatusLabel?.textColor = .systemRed

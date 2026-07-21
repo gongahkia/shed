@@ -17,6 +17,7 @@ public enum LSPClientError: Error, Equatable, Sendable {
 	case invalidState(expected: [LSPClientState], actual: LSPClientState)
 	case unexpectedResponseID(JSONRPCID)
 	case responseError(JSONRPCError)
+	case cancelled
 }
 
 public protocol LSPClientTransport: Sendable {
@@ -46,7 +47,9 @@ public actor LSPClientSession {
 			try writeNotificationUnchecked(method: LSPMethod.initialized, params: .object([:]))
 			return response.result ?? .null
 		} catch {
-			state = .idle
+			if state != .exited {
+				state = .idle
+			}
 			throw error
 		}
 	}
@@ -297,8 +300,21 @@ public actor LSPClientSession {
 			try writeNotificationUnchecked(method: LSPMethod.exit)
 			state = .exited
 		} catch {
-			state = .running
+			if state != .exited {
+				state = .running
+			}
 			throw error
+		}
+	}
+
+	public func cancelPendingRequests() {
+		let continuations = Array(pending.values)
+		pending.removeAll()
+		for continuation in continuations {
+			continuation.resume(throwing: LSPClientError.cancelled)
+		}
+		if state != .idle {
+			state = .exited
 		}
 	}
 

@@ -55,6 +55,63 @@ import Testing
 	#expect(counter.count == 1)
 }
 
+@Test func lspManagerTransitionsThroughStartFailureStopAndShutdownWithFakeTransport() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/App.swift", "")
+	let factory = LifecycleClientFactory()
+	let manager = LSPManager(registry: try fixture.swiftRegistry(), clientFactory: factory.makeFactory())
+	let url = fixture.root.appendingPathComponent("ws/Sources/App.swift")
+	let key = try #require(await manager.sessionKey(for: url))
+
+	let starting = try await manager.ensureClient(for: url)
+	#expect(await manager.status(of: key) == .starting)
+	#expect(await manager.existingClient(for: key) === starting)
+	await manager.markRunning(key)
+	#expect(await manager.status(of: key) == .running)
+	await manager.markFailed(key)
+	#expect(await manager.status(of: key) == .failed)
+	#expect(await manager.existingClient(for: key) == nil)
+
+	_ = try await manager.ensureClient(for: url)
+	await manager.stopSession(key)
+	#expect(await manager.status(of: key) == .exited)
+	#expect(await manager.existingClient(for: key) == nil)
+
+	_ = try await manager.ensureClient(for: url)
+	await manager.shutdownAll()
+	#expect(await manager.status(of: key) == .exited)
+	#expect(await manager.existingClient(for: key) == nil)
+	#expect(factory.count == 3)
+}
+
+@Test func lspManagerClosesDocumentsAndStopsOnlyAfterTheLastDocument() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/A.swift", "")
+	try fixture.write("ws/Sources/B.swift", "")
+	let factory = LifecycleClientFactory()
+	let manager = LSPManager(registry: try fixture.swiftRegistry(), clientFactory: factory.makeFactory())
+	let first = fixture.root.appendingPathComponent("ws/Sources/A.swift")
+	let second = fixture.root.appendingPathComponent("ws/Sources/B.swift")
+	let key = try #require(await manager.sessionKey(for: first))
+	_ = try await manager.ensureClient(for: first)
+	let sink = DocumentCloseSink()
+	let coordinator = LSPDocumentSyncCoordinator(sink: sink, debounceMillis: 0)
+	try await coordinator.didOpen(url: first, languageID: key.languageID, content: "")
+	try await coordinator.didOpen(url: second, languageID: key.languageID, content: "")
+	await manager.registerSynchronizedDocument(first, for: key)
+	await manager.registerSynchronizedDocument(second, for: key)
+
+	#expect(await manager.closeSynchronizedDocument(first, for: key, using: coordinator) == false)
+	#expect(await manager.status(of: key) == .starting)
+	#expect(await manager.existingClient(for: key) != nil)
+	#expect(await manager.closeSynchronizedDocument(second, for: key, using: coordinator))
+	#expect(await manager.status(of: key) == .exited)
+	#expect(await manager.existingClient(for: key) == nil)
+	#expect(await sink.methods == [LSPMethod.textDocumentDidOpen, LSPMethod.textDocumentDidOpen, LSPMethod.textDocumentDidClose, LSPMethod.textDocumentDidClose])
+}
+
 @Test func lspManagerUsesWorkspaceTOMLOverride() async throws {
 	let fixture = try TemporaryLSPManagerFixture()
 	try fixture.write("ws/Package.swift", "")
@@ -195,6 +252,52 @@ private final class SpawnCounter: @unchecked Sendable {
 			lock.unlock()
 			return LSPProcessClient(executableURL: URL(fileURLWithPath: "/usr/bin/true"))
 		}
+	}
+}
+
+private final class LifecycleClientFactory: @unchecked Sendable {
+	private let lock = NSLock()
+	private var value = 0
+
+	var count: Int {
+		lock.lock()
+		defer { lock.unlock() }
+		return value
+	}
+
+	func makeFactory() -> LSPManager.ClientFactory {
+		{ [self] _, _ in
+			lock.lock()
+			value += 1
+			lock.unlock()
+			return LSPProcessClient(transport: LifecycleTransport())
+		}
+	}
+}
+
+private final class LifecycleTransport: LSPProcessClientTransport, @unchecked Sendable {
+	let events: AsyncStream<LSPProcessTransportEvent>
+	let executableURL = URL(fileURLWithPath: "/usr/bin/true")
+	let arguments: [String] = []
+	let processIdentifier: Int32? = nil
+	let startDate: Date? = nil
+
+	init() {
+		var continuation: AsyncStream<LSPProcessTransportEvent>.Continuation?
+		events = AsyncStream { continuation = $0 }
+		continuation?.finish()
+	}
+
+	func write(_: Data) throws {}
+	func start() throws {}
+	func terminate() {}
+}
+
+private actor DocumentCloseSink: LSPNotificationSink {
+	private(set) var methods: [String] = []
+
+	func send(method: String, params _: LSPAny) async throws {
+		methods.append(method)
 	}
 }
 

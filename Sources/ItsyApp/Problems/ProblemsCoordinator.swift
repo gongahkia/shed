@@ -4,9 +4,14 @@ import ItsyEditor
 
 @MainActor enum ItsyProblemsBridge {
 	static var publishDiagnostics: ((WorkspaceProblemSnapshot, String) -> Void)?
+	static var resetProblems: ((URL) -> Void)?
 
 	static func publishDiagnostics(_ snapshot: WorkspaceProblemSnapshot, sourceID: String) {
 		publishDiagnostics?(snapshot, sourceID)
+	}
+
+	static func resetProblems(root: URL) {
+		resetProblems?(root)
 	}
 }
 
@@ -41,6 +46,10 @@ import ItsyEditor
 			.filter { $0.root == snapshot.root }
 			.flatMap(\.problems)
 		applyProblems(WorkspaceProblemSnapshot(root: snapshot.root, problems: problems))
+	}
+
+	func resetProblems(root: URL) {
+		setProblems(WorkspaceProblemSnapshot(root: root, problems: []))
 	}
 
 	@objc func showNextProblem(_ sender: Any?) {

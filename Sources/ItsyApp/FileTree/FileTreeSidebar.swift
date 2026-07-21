@@ -56,11 +56,24 @@ private let workspaceLogger = Logger(
 		}
 	}
 
+	static func lspDocumentDidClose(_ url: URL) {
+		for controller in controllers.allObjects {
+			controller.lspDocumentDidClose(url)
+		}
+	}
+
+	static func lspDocumentDidReload(_ url: URL, content: String) {
+		for controller in controllers.allObjects {
+			controller.lspDocumentDidReload(url, content: content)
+		}
+	}
+
 	static func openWorkspace(at url: URL) {
 		let root = url.standardizedFileURL
 		workspaceLogger.info("Opening workspace: \(root.lastPathComponent, privacy: .public)")
 		let descriptorRoots = workspaceStateStore.loadDescriptor(for: root)?.roots.map { URL(fileURLWithPath: $0).standardizedFileURL } ?? [root]
 		rootURLs = normalizedRoots([root] + descriptorRoots)
+		ItsyProblemsBridge.resetProblems(root: root)
 		persistWorkspaceDescriptor()
 		loadGitStatus()
 		refreshWorkspaceControllers()

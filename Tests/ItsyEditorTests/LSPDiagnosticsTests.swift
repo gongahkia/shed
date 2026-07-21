@@ -121,3 +121,32 @@ import Testing
 	))
 	#expect(await aggregator.snapshot().problems.isEmpty)
 }
+
+@Test func lspDiagnosticsAggregatorRejectsMismatchedDocumentVersions() async {
+	let root = URL(fileURLWithPath: "/tmp/itsy-diag")
+	let aggregator = LSPDiagnosticsAggregator(root: root)
+	let uri = "file:///tmp/itsy-diag/Sources/App.swift"
+	await aggregator.recordDocumentVersion(3, forURI: uri)
+	let stale = await aggregator.ingest(LSPPublishDiagnosticsParams(
+		uri: uri,
+		version: 2,
+		diagnostics: [LSPDiagnostic(
+			range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 1)),
+			severity: .error,
+			message: "stale"
+		)]
+	))
+	#expect(!stale)
+	#expect(await aggregator.snapshot().problems.isEmpty)
+	let current = await aggregator.ingest(LSPPublishDiagnosticsParams(
+		uri: uri,
+		version: 3,
+		diagnostics: [LSPDiagnostic(
+			range: LSPRange(start: LSPPosition(line: 1, character: 0), end: LSPPosition(line: 1, character: 1)),
+			severity: .warning,
+			message: "current"
+		)]
+	))
+	#expect(current)
+	#expect(await aggregator.snapshot().problems.map(\.message) == ["current"])
+}

@@ -593,6 +593,7 @@ import ItsySyntax
 		do {
 			try read(from: url, ofType: fileType ?? "public.data")
 			updateChangeCount(.changeCleared)
+			EditorWindowController.documentDidReload(url, content: editorStorageString(editor))
 		} catch {
 			presentError(error)
 		}

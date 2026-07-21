@@ -43,6 +43,7 @@ public actor LSPManager {
 	private var statuses: [LSPSessionKey: LSPSessionStatus] = [:]
 	private var spawnTimestamps: [LSPSessionKey: [Date]] = [:]
 	private var disabledKeys: Set<LSPSessionKey> = []
+	private var synchronizedDocuments: [LSPSessionKey: Set<URL>] = [:]
 
 	public init(
 		registry: LSPServerRegistry = LSPServerRegistry(),
@@ -142,7 +143,35 @@ public actor LSPManager {
 
 	public func markFailed(_ key: LSPSessionKey) {
 		statuses[key] = disabledKeys.contains(key) ? .disabled : .failed
-		clients.removeValue(forKey: key)
+		clients.removeValue(forKey: key)?.terminate()
+		synchronizedDocuments[key] = nil
+	}
+
+	public func stopSession(_ key: LSPSessionKey) {
+		clients.removeValue(forKey: key)?.terminate()
+		statuses[key] = .exited
+		synchronizedDocuments[key] = nil
+	}
+
+	public func registerSynchronizedDocument(_ url: URL, for key: LSPSessionKey) {
+		synchronizedDocuments[key, default: []].insert(url.standardizedFileURL)
+	}
+
+	public func closeSynchronizedDocument(
+		_ url: URL,
+		for key: LSPSessionKey,
+		using coordinator: LSPDocumentSyncCoordinator
+	) async -> Bool {
+		let url = url.standardizedFileURL
+		guard synchronizedDocuments[key]?.remove(url) != nil else {
+			return false
+		}
+		try? await coordinator.didClose(url: url)
+		if synchronizedDocuments[key]?.isEmpty == true {
+			stopSession(key)
+			return true
+		}
+		return false
 	}
 
 	public func enableSession(_ key: LSPSessionKey) {
@@ -157,6 +186,7 @@ public actor LSPManager {
 		statuses.removeAll()
 		spawnTimestamps.removeAll()
 		disabledKeys.removeAll()
+		synchronizedDocuments.removeAll()
 	}
 
 	public func shutdownAll() async {
@@ -166,10 +196,10 @@ public actor LSPManager {
 				continue
 			}
 			statuses[key] = .exited
-			try? await client.shutdown()
 			client.terminate()
 		}
 		clients.removeAll()
+		synchronizedDocuments.removeAll()
 	}
 
 	public func recentSpawnCount(for key: LSPSessionKey, now: Date = .init()) -> Int {

@@ -11,10 +11,12 @@ import ItsySyntax
 private struct LSPStatusEntry {
 	var key: LSPSessionKey
 	var status: String
+	var health: LSPHealthState
 	var server: String
 	var pid: Int32?
 	var startDate: Date?
 	var lastError: String
+	var output: [LSPSessionOutput]
 	var url: URL?
 	var client: LSPProcessClient?
 }
@@ -119,6 +121,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var referencesRequestGeneration = 0
 	private var referencesCoordinator: ReferencesCoordinator?
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
+	private var lspDocumentVersionsBySession: [LSPSessionKey: [String: Int]] = [:]
 	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
 	private var lspSupervisorTasks: [LSPSessionKey: Task<Void, Never>] = [:]
 	private var lspStatusEntries: [LSPSessionKey: LSPStatusEntry] = [:]
@@ -239,6 +242,21 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				ItsyWorkspaceController.lspConfigurationDidReload()
 			}
 		}
+	}
+
+	static func shutdownAllLSP() {
+		LSPProcessClient.terminateAll()
+		Task {
+			await lspManager.shutdownAll()
+		}
+	}
+
+	static func documentDidClose(_ url: URL) {
+		ItsyWorkspaceController.lspDocumentDidClose(url)
+	}
+
+	static func documentDidReload(_ url: URL, content: String) {
+		ItsyWorkspaceController.lspDocumentDidReload(url, content: content)
 	}
 
 	required init?(coder _: NSCoder) {
@@ -581,14 +599,21 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		Task { [weak self] in
 			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
+			let key = await Self.lspManager.sessionKey(for: fileURL)
 			await MainActor.run { [weak self] in
 				guard let self, generation == lspMissingBannerGeneration else {
 					return
 				}
 				if let missingBinary {
 					showLSPMissingBanner(missingBinary)
+					if let key {
+						setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: fileURL, server: missingBinary.command)
+					}
 				} else {
 					lspMissingBanner.hide()
+					if let key, lspStatusEntries[key]?.health == .unavailable {
+						setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
+					}
 				}
 			}
 		}
@@ -605,6 +630,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private func handleLSPRequestError(_ error: Error) {
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
 			showLSPMissingBanner(missingBinary)
+			if let key = activeLSPKey {
+				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspStatusEntries[key]?.url, server: missingBinary.command)
+			}
 		} else if case let LSPManagerError.serverDisabled(key) = error {
 			setLSPStatus(
 				key: key,
@@ -660,6 +688,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func showLSPCrashStatus(key: LSPSessionKey, url: URL, reason: LSPSessionFailureReason) {
+		appendLSPOutput(
+			LSPSessionOutput(kind: .process, text: "Server exited with status \(reason.status)"),
+			for: key,
+			url: url
+		)
 		setLSPStatus(key: key, status: "crashed", client: nil, lastError: reason.stderrTail, url: url)
 		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status))")
 		refreshStatusBar()
@@ -696,10 +729,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	func lspConfigurationDidReload() {
 		lspConfigurationGeneration &+= 1
+		for key in Set(lspSupervisors.keys).union(lspStatusEntries.keys) {
+			publishEmptyLSPDiagnostics(for: key)
+		}
 		for task in lspSupervisorTasks.values {
 			task.cancel()
 		}
 		lspSyncCoordinators.removeAll()
+		lspDocumentVersionsBySession.removeAll()
 		lspSupervisors.removeAll()
 		lspSupervisorTasks.removeAll()
 		lspStatusEntries.removeAll()
@@ -718,6 +755,69 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			refreshLSPMissingBanner(for: document)
 			refreshLSPStatus(for: document)
 		} else {
+			refreshStatusBar()
+		}
+	}
+
+	func lspDocumentDidClose(_ url: URL) {
+		forgetLSPDocumentVersion(url)
+		let coordinators = lspSyncCoordinators
+		let supervisors = lspSupervisors
+		Task {
+			for supervisor in supervisors.values {
+				await supervisor.clearDiagnostics(forURI: url.standardizedFileURL.absoluteString, removingDocument: true)
+			}
+			for (key, coordinator) in coordinators {
+				if await Self.lspManager.closeSynchronizedDocument(url, for: key, using: coordinator) {
+					discardLSPState(for: key)
+				}
+			}
+		}
+	}
+
+	func lspDocumentDidReload(_ url: URL, content: String) {
+		let coordinators = lspSyncCoordinators
+		let supervisors = lspSupervisors
+		let clients = lspStatusEntries.mapValues(\.client)
+		Task { [weak self] in
+			guard let self else {
+				return
+			}
+			for (key, supervisor) in supervisors {
+				if let version = await coordinators[key]?.currentVersion(for: url) {
+					await supervisor.recordDocumentVersion(version + 1, forURI: url.standardizedFileURL.absoluteString)
+				}
+				await supervisor.clearDiagnostics(forURI: url.standardizedFileURL.absoluteString)
+			}
+			for (key, coordinator) in coordinators {
+				guard let client = clients[key], await coordinator.currentVersion(for: url) != nil else {
+					continue
+				}
+				do {
+					try await self.syncLSPDocument(client: client, key: key, url: url, content: content)
+				} catch {
+					NSLog("lsp reload sync failed: \(error)")
+				}
+			}
+		}
+	}
+
+	private func discardLSPState(for key: LSPSessionKey) {
+		lspSyncCoordinators[key] = nil
+		lspDocumentVersionsBySession[key] = nil
+		lspSupervisorTasks[key]?.cancel()
+		lspSupervisorTasks[key] = nil
+		lspSupervisors[key] = nil
+		lspStatusEntries[key] = nil
+		completionTriggerCharactersBySession[key] = nil
+		signatureHelpTriggerCharactersBySession[key] = nil
+		completionResolveEnabledBySession[key] = nil
+		codeActionResolveEnabledBySession[key] = nil
+		callHierarchyEnabledBySession[key] = nil
+		typeHierarchyEnabledBySession[key] = nil
+		semanticSurfaceCapabilitiesBySession[key] = nil
+		if activeLSPKey == key {
+			activeLSPKey = nil
 			refreshStatusBar()
 		}
 	}
@@ -741,16 +841,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func stopLSPFromStatusPanel(_ key: LSPSessionKey) {
 		let entry = lspStatusEntries[key]
-		let client = entry?.client
 		let supervisor = lspSupervisors[key]
 		lspSyncCoordinators[key] = nil
+		lspDocumentVersionsBySession[key] = nil
 		lspSupervisorTasks[key]?.cancel()
 		lspSupervisorTasks[key] = nil
 		lspSupervisors[key] = nil
 		Task {
 			await supervisor?.stop()
-			client?.terminate()
-			await Self.lspManager.markFailed(key)
+			await Self.lspManager.stopSession(key)
 		}
 		setLSPStatus(key: key, status: "idle", client: nil, lastError: entry?.lastError, url: entry?.url)
 	}
@@ -787,17 +886,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		status: String,
 		client: LSPProcessClient?,
 		lastError: String?,
-		url: URL?
+		url: URL?,
+		server: String? = nil,
+		health: LSPHealthState? = nil
 	) {
 		let existing = lspStatusEntries[key]
-		let clearsClient = status == "idle" || status == "crashed" || status == "disabled"
+		let clearsClient = status == "idle" || status == "crashed" || status == "disabled" || status == "unavailable"
+		let resolvedHealth = health ?? (status == "running" && existing?.health == .degraded ? .degraded : Self.health(for: status))
 		lspStatusEntries[key] = LSPStatusEntry(
 			key: key,
 			status: status,
-			server: client.map(Self.serverName(for:)) ?? existing?.server ?? key.languageID,
-			pid: client?.processIdentifier ?? existing?.pid,
-			startDate: client?.startDate ?? existing?.startDate,
+			health: resolvedHealth,
+			server: server ?? client.map(Self.serverName(for:)) ?? existing?.server ?? key.languageID,
+			pid: clearsClient ? nil : client?.processIdentifier ?? existing?.pid,
+			startDate: clearsClient ? nil : client?.startDate ?? existing?.startDate,
 			lastError: lastError ?? existing?.lastError ?? "",
+			output: existing?.output ?? [],
 			url: url ?? existing?.url,
 			client: client ?? (clearsClient ? nil : existing?.client)
 		)
@@ -809,12 +913,49 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		refreshStatusBar()
 	}
 
+	private static func health(for status: String) -> LSPHealthState {
+		switch status {
+		case "starting":
+			return .starting
+		case "running", "ready":
+			return .ready
+		case "degraded", "disabled":
+			return .degraded
+		case "crashed":
+			return .crashed
+		case "unavailable":
+			return .unavailable
+		default:
+			return .idle
+		}
+	}
+
+	private func appendLSPOutput(_ output: LSPSessionOutput, for key: LSPSessionKey, url: URL?) {
+		guard var entry = lspStatusEntries[key] else {
+			setLSPStatus(key: key, status: "starting", client: nil, lastError: nil, url: url)
+			appendLSPOutput(output, for: key, url: url)
+			return
+		}
+		entry.output.append(output)
+		if entry.output.count > 200 {
+			entry.output.removeFirst(entry.output.count - 200)
+		}
+		if output.kind == .protocolOutput {
+			entry.status = "degraded"
+			entry.health = .degraded
+			entry.lastError = output.text
+		}
+		lspStatusEntries[key] = entry
+		activeLSPKey = key
+		refreshStatusBar()
+	}
+
 	private func refreshLSPStatusPill() {
 		guard let key = activeLSPKey, let entry = lspStatusEntries[key] else {
 			lspStatusButton.isHidden = true
 			return
 		}
-		lspStatusButton.title = L10n.string("LSP: \(entry.key.languageID) \(entry.status)")
+		lspStatusButton.title = L10n.string("LSP: \(entry.key.languageID) \(entry.health.rawValue)")
 		lspStatusButton.toolTip = L10n.string("LSP status")
 		lspStatusButton.isHidden = false
 	}
@@ -826,10 +967,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		return LSPStatusPanelSnapshot(
 			key: entry.key,
 			status: entry.status,
+			health: entry.health,
 			server: entry.server,
 			pid: entry.pid,
 			startDate: entry.startDate,
-			lastError: entry.lastError
+			lastError: entry.lastError,
+			output: entry.output
 		)
 	}
 
@@ -2860,9 +3003,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		if await coordinator.currentVersion(for: url) == nil {
 			try await coordinator.didOpen(url: url, languageID: key.languageID, content: content)
+			await Self.lspManager.registerSynchronizedDocument(url, for: key)
 		} else {
 			await coordinator.didChange(url: url, content: content)
 			await coordinator.flushPendingChange(for: url)
+		}
+		if let version = await coordinator.currentVersion(for: url) {
+			await supervisor?.recordDocumentVersion(version, forURI: url.standardizedFileURL.absoluteString)
+			rememberLSPDocumentVersion(version, for: key, url: url)
 		}
 	}
 
@@ -2887,12 +3035,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				self.lspSyncCoordinator(for: key, client: client)
 			}
 			do {
-				if await coordinator.currentVersion(for: fileURL) == nil {
+			if await coordinator.currentVersion(for: fileURL) == nil {
 					try await coordinator.didOpen(url: fileURL, languageID: key.languageID, content: content)
+					await Self.lspManager.registerSynchronizedDocument(fileURL, for: key)
 				} else {
 					await coordinator.didChange(url: fileURL, content: content)
 				}
 				try await coordinator.didSave(url: fileURL)
+				if let version = await coordinator.currentVersion(for: fileURL) {
+					await self.lspSupervisors[key]?.recordDocumentVersion(version, forURI: fileURL.standardizedFileURL.absoluteString)
+					await MainActor.run { [weak self] in
+						self?.rememberLSPDocumentVersion(version, for: key, url: fileURL)
+					}
+				}
 			} catch {
 				NSLog("lsp didSave failed: \(error)")
 			}
@@ -2906,6 +3061,32 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let coordinator = LSPDocumentSyncCoordinator(sink: LSPClientNotificationSink(client: client), debounceMillis: 0)
 		lspSyncCoordinators[key] = coordinator
 		return coordinator
+	}
+
+	private func rememberLSPDocumentVersion(_ version: Int, for key: LSPSessionKey, url: URL) {
+		var versions = lspDocumentVersionsBySession[key] ?? [:]
+		versions[url.standardizedFileURL.absoluteString] = version
+		lspDocumentVersionsBySession[key] = versions
+	}
+
+	private func forgetLSPDocumentVersion(_ url: URL) {
+		let uri = url.standardizedFileURL.absoluteString
+		for key in Array(lspDocumentVersionsBySession.keys) {
+			var versions = lspDocumentVersionsBySession[key] ?? [:]
+			versions[uri] = nil
+			if versions.isEmpty {
+				lspDocumentVersionsBySession[key] = nil
+			} else {
+				lspDocumentVersionsBySession[key] = versions
+			}
+		}
+	}
+
+	private func publishEmptyLSPDiagnostics(for key: LSPSessionKey) {
+		ItsyProblemsBridge.publishDiagnostics(
+			WorkspaceProblemSnapshot(root: key.workspaceRoot, problems: []),
+			sourceID: "lsp:\(key.languageID):\(key.workspaceRoot.path)"
+		)
 	}
 
 	private func installLSPSupervisor(for key: LSPSessionKey, client: LSPProcessClient, url: URL) {
@@ -2938,8 +3119,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		switch event {
 		case let .diagnosticsUpdated(snapshot):
 			ItsyProblemsBridge.publishDiagnostics(snapshot, sourceID: "lsp:\(key.languageID):\(key.workspaceRoot.path)")
+		case let .output(output):
+			appendLSPOutput(output, for: key, url: url)
 		case let .sessionFailed(reason):
 			lspSyncCoordinators[key] = nil
+			lspDocumentVersionsBySession[key] = nil
 			completionTriggerCharactersBySession[key] = nil
 			signatureHelpTriggerCharactersBySession[key] = nil
 			completionResolveEnabledBySession[key] = nil
@@ -3512,7 +3696,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			for uri in groups.keys {
 				sources[uri] = try sourceText(forURI: uri)
 			}
-			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources)
+			let documentVersions = lspDocumentVersionsBySession.values.reduce(into: [String: Int]()) { result, versions in
+				result.merge(versions) { current, _ in current }
+			}
+			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources, documentVersions: documentVersions)
 			for file in resolved {
 				try applyResolvedWorkspaceFile(file)
 			}

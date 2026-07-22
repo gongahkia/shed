@@ -59,6 +59,14 @@ final class GutterView: NSView {
 
 	override var isFlipped: Bool { true }
 	override var isOpaque: Bool { false }
+	override func isAccessibilityElement() -> Bool { true }
+	override func accessibilityRole() -> NSAccessibility.Role? { .group }
+	override func accessibilityLabel() -> String? { "Editor gutter" }
+	override func accessibilityValue() -> Any? {
+		var values = ["Line \(activeLineIndex + 1) of \(lineCount)"]
+		values += markerLayouts.map { "Line \($0.marker.line + 1): \($0.marker.severity) - \($0.marker.message)" }
+		return values.joined(separator: ". ")
+	}
 
 	override func hitTest(_ point: NSPoint) -> NSView? {
 		nil

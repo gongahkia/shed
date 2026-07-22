@@ -61,6 +61,23 @@ extension ItsyRenderTests {
 	#expect(try #require(view.accessibilityValue() as? String) == "Line 2: beta")
 }
 
+@Test func gutterExposesLineAndDiagnosticStateToAccessibility() throws {
+	let gutter = GutterView(frame: .zero)
+	gutter.activeLineIndex = 2
+	gutter.lineCount = 40
+	gutter.markerLayouts = [
+		GutterMarkerLayout(
+			marker: GutterMarker(id: "error", line: 4, severity: .error, message: "expected expression"),
+			rect: .zero
+		),
+	]
+
+	#expect(gutter.isAccessibilityElement())
+	#expect(gutter.accessibilityRole() == .group)
+	#expect(gutter.accessibilityLabel() == "Editor gutter")
+	#expect(try #require(gutter.accessibilityValue() as? String) == "Line 3 of 40. Line 5: error - expected expression")
+}
+
 @Test func cursorAndSelectionBuildSolidOverlayInstances() {
 	let view = MetalTextView(frame: .zero)
 	view.setSelectionRects([.init(x: 4, y: 8, width: 20, height: 10)])

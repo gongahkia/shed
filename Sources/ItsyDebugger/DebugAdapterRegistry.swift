@@ -33,6 +33,7 @@ public struct DebugAdapterRegistry: Equatable, Sendable {
 	public static let bundledDefaults: [DebugAdapterConfig] = [
 		DebugAdapterConfig(id: "debugpy", command: "python3", args: ["-m", "debugpy.adapter"]),
 		DebugAdapterConfig(id: "delve", command: "dlv", args: ["dap"]),
+		DebugAdapterConfig(id: "codelldb", command: "codelldb", kind: .codeLLDB),
 		DebugAdapterConfig(id: "lldb", command: "lldb-dap"),
 		DebugAdapterConfig(id: "lldb-dap", command: "lldb-dap"),
 		DebugAdapterConfig(id: "vscode-js-debug", command: "js-debug-adapter"),
@@ -128,6 +129,13 @@ private struct DebugAdapterRegistryTOMLParser {
 				adapter.type = type
 			case ("args", let .strings(args)):
 				adapter.args = args
+			case ("kind", let .string(kind)):
+				guard let parsedKind = DebugAdapterKind(rawValue: kind) else {
+					throw DebugAdapterRegistryLoaderError.decodeFailed("line \(offset + 1): unsupported adapter kind \(kind)")
+				}
+				adapter.kind = parsedKind
+			case ("remediation", let .string(remediation)):
+				adapter.remediation = remediation
 			default:
 				throw DebugAdapterRegistryLoaderError.decodeFailed("line \(offset + 1): unsupported key \(key)")
 			}

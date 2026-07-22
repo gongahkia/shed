@@ -6,6 +6,7 @@ public enum DAPClientState: Equatable, Sendable {
 	case configuring
 	case running
 	case stopped
+	case disconnecting
 	case terminated
 }
 
@@ -18,6 +19,7 @@ public enum DAPClientError: Error, Equatable, Sendable {
 	case invalidState(expected: [DAPClientState], actual: DAPClientState)
 	case unexpectedResponseSeq(Int)
 	case responseFailure(DAPResponseMessage)
+	case transportTerminated(Int32?)
 }
 
 public protocol DAPClientTransport: Sendable {
@@ -37,23 +39,19 @@ public actor DAPClientSession {
 	private var framer = DAPMessageFramer()
 	private var nextSeq = 1
 	private var pending: [Int: CheckedContinuation<DAPResponseMessage, Error>] = [:]
+	private var cancelledRequestSequences = Set<Int>()
+	private var ignoredResponseSequences = Set<Int>()
 	private var eventContinuations: [UUID: DAPEventSubscription] = [:]
 
 	public init(transport: any DAPClientTransport) {
 		self.transport = transport
 	}
 
-	deinit {
-		for subscription in eventContinuations.values {
-			subscription.continuation.finish()
-		}
-		for continuation in pending.values {
-			continuation.resume(throwing: CancellationError())
-		}
-	}
-
 	public func sendRequest(command: String, arguments: DAPAny? = nil) async throws -> DAPResponse {
-		try await sendRequestUnchecked(command: command, arguments: arguments)
+		guard state != .terminated, state != .disconnecting else {
+			throw DAPClientError.transportTerminated(nil)
+		}
+		return try await sendRequestUnchecked(command: command, arguments: arguments)
 	}
 
 	@discardableResult
@@ -70,13 +68,13 @@ public actor DAPClientSession {
 
 	@discardableResult
 	public func launch(arguments: DAPAny? = nil) async throws -> DAPResponse {
-		try requireState([.configuring])
+		try requireState([.initializing, .configuring])
 		return try await sendRequestUnchecked(command: DAPCommand.launch, arguments: arguments)
 	}
 
 	@discardableResult
 	public func attach(arguments: DAPAny? = nil) async throws -> DAPResponse {
-		try requireState([.configuring])
+		try requireState([.initializing, .configuring])
 		return try await sendRequestUnchecked(command: DAPCommand.attach, arguments: arguments)
 	}
 
@@ -98,20 +96,59 @@ public actor DAPClientSession {
 		return try await sendRequestUnchecked(command: DAPCommand.configurationDone, arguments: arguments)
 	}
 
+	public func allowConfigurationWithoutInitializedEvent() throws {
+		try requireState([.initializing, .configuring])
+		if state == .initializing {
+			state = .configuring
+		}
+	}
+
+	@discardableResult
+	public func disconnect(arguments: DAPDisconnectArguments = DAPDisconnectArguments()) async throws -> DAPResponse {
+		try requireState([.initializing, .configuring, .running, .stopped, .terminated])
+		state = .disconnecting
+		do {
+			return try await sendRequestUnchecked(command: DAPCommand.disconnect, arguments: try DAPAny(encoding: arguments))
+		} catch {
+			if state == .disconnecting {
+				transitionToTerminated(status: nil)
+			}
+			throw error
+		}
+	}
+
+	public func transportDidTerminate(status: Int32?) {
+		transitionToTerminated(status: status)
+	}
+
 	private func sendRequestUnchecked(command: String, arguments: DAPAny? = nil) async throws -> DAPResponse {
+		try Task.checkCancellation()
 		let seq = nextSeq
 		nextSeq += 1
 		let message = DAPMessage.request(DAPRequestMessage(seq: seq, command: command, arguments: arguments))
 		let frame = try DAPMessageFramer.frame(message: message, encoder: encoder)
-		return try await withCheckedThrowingContinuation { continuation in
-			pending[seq] = continuation
-			do {
-				try transport.write(frame)
-			} catch {
-				pending.removeValue(forKey: seq)
-				continuation.resume(throwing: error)
+		return try await withTaskCancellationHandler(operation: {
+			try await withCheckedThrowingContinuation { continuation in
+				guard state != .terminated else {
+					continuation.resume(throwing: DAPClientError.transportTerminated(nil))
+					return
+				}
+				guard cancelledRequestSequences.remove(seq) == nil else {
+					ignoredResponseSequences.insert(seq)
+					continuation.resume(throwing: CancellationError())
+					return
+				}
+				pending[seq] = continuation
+				do {
+					try transport.write(frame)
+				} catch {
+					pending.removeValue(forKey: seq)
+					continuation.resume(throwing: error)
+				}
 			}
-		}
+		}, onCancel: {
+			Task { await self.cancelPendingRequest(sequence: seq) }
+		})
 	}
 
 	public func on(event name: String? = nil) -> AsyncStream<DAPEventMessage> {
@@ -119,7 +156,7 @@ public actor DAPClientSession {
 		return AsyncStream { continuation in
 			eventContinuations[id] = DAPEventSubscription(name: name, continuation: continuation)
 			continuation.onTermination = { [weak self] _ in
-				Task {
+				Task { [weak self] in
 					await self?.removeEventContinuation(id)
 				}
 			}
@@ -127,16 +164,27 @@ public actor DAPClientSession {
 	}
 
 	public func receive(_ data: Data) throws -> [DAPClientEvent] {
+		guard state != .terminated else {
+			return []
+		}
 		let payloads = try framer.append(data)
 		var events: [DAPClientEvent] = []
 		for payload in payloads {
+			guard state != .terminated else {
+				break
+			}
 			let message = try decoder.decode(DAPMessage.self, from: payload)
 			switch message {
 			case let .request(request):
 				events.append(.request(request))
 			case let .event(event):
-				apply(event: event)
-				emit(event)
+				if event.event == DAPEvent.exited || event.event == DAPEvent.terminated {
+					emit(event)
+					apply(event: event)
+				} else {
+					apply(event: event)
+					emit(event)
+				}
 				events.append(.event(event))
 			case let .response(response):
 				try route(response)
@@ -147,6 +195,9 @@ public actor DAPClientSession {
 
 	private func route(_ response: DAPResponseMessage) throws {
 		guard let continuation = pending.removeValue(forKey: response.requestSeq) else {
+			if ignoredResponseSequences.remove(response.requestSeq) != nil {
+				return
+			}
 			throw DAPClientError.unexpectedResponseSeq(response.requestSeq)
 		}
 		if response.success {
@@ -176,7 +227,7 @@ public actor DAPClientSession {
 		case DAPEvent.continued where state != .terminated:
 			state = .running
 		case DAPEvent.exited, DAPEvent.terminated:
-			state = .terminated
+			transitionToTerminated(status: nil)
 		default:
 			break
 		}
@@ -186,9 +237,38 @@ public actor DAPClientSession {
 		switch response.command {
 		case DAPCommand.configurationDone where state == .configuring:
 			state = .running
+		case DAPCommand.disconnect:
+			transitionToTerminated(status: nil)
 		default:
 			break
 		}
+	}
+
+	private func cancelPendingRequest(sequence: Int) {
+		if let continuation = pending.removeValue(forKey: sequence) {
+			ignoredResponseSequences.insert(sequence)
+			continuation.resume(throwing: CancellationError())
+		} else {
+			cancelledRequestSequences.insert(sequence)
+		}
+	}
+
+	private func transitionToTerminated(status: Int32?) {
+		guard state != .terminated else {
+			return
+		}
+		state = .terminated
+		let pendingRequests = pending
+		pending.removeAll()
+		ignoredResponseSequences.formUnion(pendingRequests.keys)
+		for continuation in pendingRequests.values {
+			continuation.resume(throwing: DAPClientError.transportTerminated(status))
+		}
+		for subscription in eventContinuations.values {
+			subscription.continuation.onTermination = nil
+			subscription.continuation.finish()
+		}
+		eventContinuations.removeAll()
 	}
 
 	private func requireState(_ expected: [DAPClientState]) throws {

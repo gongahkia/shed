@@ -1,3 +1,4 @@
+import Darwin
 import Dispatch
 import Foundation
 import ItsyEditor
@@ -78,20 +79,71 @@ import Testing
 		command: "/bin/sh",
 		arguments: ["-c", "printf prepare"]
 	)
+	let compile = WorkspaceTask(
+		id: "workspace:compile",
+		label: "compile",
+		source: .workspaceTaskFile,
+		command: "/bin/sh",
+		arguments: ["-c", "printf compile"],
+		dependsOn: ["prepare"]
+	)
 	let build = WorkspaceTask(
 		id: "workspace:build",
 		label: "build",
 		source: .workspaceTaskFile,
 		command: "/bin/sh",
 		arguments: ["-c", "printf build"],
-		dependsOn: ["prepare"]
+		dependsOn: ["compile"]
 	)
 
-	let result = try WorkspaceTaskRunner().run(build, root: fixture.root, availableTasks: [build, prepare])
+	let result = try WorkspaceTaskRunner().run(build, root: fixture.root, availableTasks: [build, compile, prepare])
 
 	#expect(result.succeeded)
 	#expect(result.task == build)
-	#expect(result.stdout == "preparebuild")
+	#expect(result.stdout == "preparecompilebuild")
+}
+
+@Test func workspaceTaskRunnerStopsCompoundAfterFailedDependency() throws {
+	let fixture = try TemporaryTaskFixture()
+	let dependency = WorkspaceTask(
+		id: "workspace:dependency",
+		label: "dependency",
+		source: .workspaceTaskFile,
+		command: "/bin/sh",
+		arguments: ["-c", "printf dependency; exit 23"]
+	)
+	let root = WorkspaceTask(
+		id: "workspace:root",
+		label: "root",
+		source: .workspaceTaskFile,
+		command: "/bin/sh",
+		arguments: ["-c", "printf root"],
+		dependsOn: ["dependency"]
+	)
+
+	let result = try WorkspaceTaskRunner().run(root, root: fixture.root, availableTasks: [root, dependency])
+
+	#expect(result.task == root)
+	#expect(result.exitStatus == 23)
+	#expect(result.stdout == "dependency")
+	#expect(!result.succeeded)
+}
+
+@Test func workspaceTaskRunnerDrainsLargeOutputWithoutDeadlock() throws {
+	let fixture = try TemporaryTaskFixture()
+	let task = WorkspaceTask(
+		id: "large-output",
+		label: "large output",
+		source: .workspaceTaskFile,
+		command: "/bin/sh",
+		arguments: ["-c", "dd if=/dev/zero bs=65536 count=16 2>/dev/null | tr '\\000' o; dd if=/dev/zero bs=65536 count=16 2>/dev/null | tr '\\000' e >&2"]
+	)
+
+	let result = try WorkspaceTaskRunner().run(task, root: fixture.root)
+
+	#expect(result.succeeded)
+	#expect(result.stdout.utf8.count == 1_048_576)
+	#expect(result.stderr.utf8.count == 1_048_576)
 }
 
 @Test func workspaceTaskPlannerRejectsMissingAndCyclicDependencies() throws {
@@ -131,14 +183,64 @@ import Testing
 			Task {
 				await recorder.finish(result)
 			}
+		},
+		onReady: { _ in
+			Task {
+				await recorder.ready()
+			}
 		}
 	)
+	try await recorder.waitForReady()
+	#expect(handle.wasReady)
+	#expect(handle.state == .running)
 	try await recorder.waitForOutput(containing: "ready")
 	handle.cancel(escalationDelay: 0.05)
 	let result = try await recorder.waitForFinish()
 
 	#expect(result.stdout == "ready")
 	#expect(result.exitStatus != 0)
+	#expect(result.wasCancelled)
+	#expect(result.wasReady)
+	#expect(handle.state == .cancelled(result.exitStatus))
+}
+
+@Test func workspaceTaskHandleCancelsBeforeLaunch() async throws {
+	let fixture = try TemporaryTaskFixture()
+	let recorder = TaskRunRecorder()
+	let task = WorkspaceTask(
+		id: "deferred",
+		label: "deferred",
+		source: .workspaceTaskFile,
+		command: "/bin/sh",
+		arguments: ["-c", "printf should-not-run"]
+	)
+	let handle = WorkspaceTaskRunner().prepare(
+		task,
+		root: fixture.root,
+		onOutput: { output in
+			Task {
+				await recorder.append(output.text)
+			}
+		},
+		onFinish: { result in
+			Task {
+				await recorder.finish(result)
+			}
+		}
+	)
+
+	#expect(handle.state == .pending)
+	handle.cancel()
+	#expect(handle.state == .cancelling)
+	#expect(!handle.isRunning)
+	try handle.start()
+	let result = try await recorder.waitForFinish()
+
+	#expect(result.exitStatus == SIGTERM)
+	#expect(result.stdout.isEmpty)
+	#expect(result.wasCancelled)
+	#expect(!result.succeeded)
+	#expect(handle.state == .cancelled(SIGTERM))
 }
 
 @Test func workspaceTaskWatcherDebouncesFileChanges() async throws {
@@ -187,6 +289,7 @@ private final class TemporaryTaskFixture {
 private actor TaskRunRecorder {
 	private var output = ""
 	private var result: WorkspaceTaskResult?
+	private var didBecomeReady = false
 
 	func append(_ text: String) {
 		output += text
@@ -196,6 +299,20 @@ private actor TaskRunRecorder {
 		self.result = result
 	}
 
+	func ready() {
+		didBecomeReady = true
+	}
+
+	func waitForReady() async throws {
+		for _ in 0 ..< 200 {
+			if didBecomeReady {
+				return
+			}
+			try await Task.sleep(nanoseconds: 10_000_000)
+		}
+		throw TaskTestError.readyTimeout
+	}
+
 	func waitForOutput(containing needle: String) async throws {
 		for _ in 0 ..< 200 {
 			if output.contains(needle) {
@@ -203,7 +320,7 @@ private actor TaskRunRecorder {
 			}
 			try await Task.sleep(nanoseconds: 10_000_000)
 		}
-		throw TaskTestError.timeout
+		throw TaskTestError.outputTimeout
 	}
 
 	func waitForFinish() async throws -> WorkspaceTaskResult {
@@ -213,7 +330,7 @@ private actor TaskRunRecorder {
 			}
 			try await Task.sleep(nanoseconds: 10_000_000)
 		}
-		throw TaskTestError.timeout
+		throw TaskTestError.finishTimeout
 	}
 }
 
@@ -231,10 +348,13 @@ private actor WatchCounter {
 			}
 			try await Task.sleep(nanoseconds: 10_000_000)
 		}
-		throw TaskTestError.timeout
+		throw TaskTestError.watchTimeout
 	}
 }
 
 private enum TaskTestError: Error {
-	case timeout
+	case outputTimeout
+	case finishTimeout
+	case readyTimeout
+	case watchTimeout
 }

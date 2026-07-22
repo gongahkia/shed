@@ -21,6 +21,7 @@ open_json="$(mktemp)"
 lsp_json="$(mktemp)"
 memory_json="$(mktemp)"
 memory_md="$(mktemp)"
+input_latency_json="$(mktemp)"
 lsp_guard_dir="$(mktemp -d)"
 lsp_guard_home="$lsp_guard_dir/home"
 lsp_guard_marker="$lsp_guard_dir/sourcekit-lsp-spawned"
@@ -30,8 +31,13 @@ open_file="${ITSY_REGRESSION_OPEN_FILE:-$repo_dir/bench/corpus/huge-text.log}"
 open_timeout_ms="${ITSY_REGRESSION_OPEN_TIMEOUT_MS:-15000}"
 window_timeout_ms="${ITSY_REGRESSION_WINDOW_TIMEOUT_MS:-15000}"
 window_runs="${ITSY_REGRESSION_WINDOW_RUNS:-20}"
+input_latency_enabled="${ITSY_REGRESSION_INPUT_LATENCY:-1}"
+input_latency_runs="${ITSY_REGRESSION_INPUT_LATENCY_RUNS:-20}"
+input_latency_timeout_ms="${ITSY_REGRESSION_INPUT_LATENCY_TIMEOUT_MS:-5000}"
+input_latency_baseline="${ITSY_REGRESSION_INPUT_LATENCY_BASELINE:-$repo_dir/bench/results/input-latency-baseline.json}"
+input_latency_exit=0
 
-trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$memory_md"; rm -rf "$lsp_guard_dir"' EXIT
+trap 'rm -f "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$memory_md" "$input_latency_json"; rm -rf "$lsp_guard_dir"' EXIT
 
 setup_lsp_spawn_guard() {
 	local bin_dir="$lsp_guard_dir/bin"
@@ -128,6 +134,19 @@ if [[ -f "$open_file" ]]; then
 	"$itsybench" open --app "$itsyapp" --file "$open_file" --timeout-ms "$open_timeout_ms" >"$open_json"
 fi
 ITSY_MEMORY_JSON="$memory_json" ITSY_MEMORY_MD="$memory_md" "$script_dir/memory_audit.sh" >/dev/null
+if [[ "$input_latency_enabled" != "0" ]]; then
+	if ITSY_INPUT_LATENCY_APP="$itsyapp" \
+	ITSY_INPUT_LATENCY_BENCH="$itsybench" \
+	ITSY_INPUT_LATENCY_BASELINE="$input_latency_baseline" \
+	ITSY_INPUT_LATENCY_OUTPUT="$input_latency_json" \
+	ITSY_INPUT_LATENCY_RUNS="$input_latency_runs" \
+	ITSY_INPUT_LATENCY_TIMEOUT_MS="$input_latency_timeout_ms" \
+	"$script_dir/input_latency.sh" >/dev/null; then
+		:
+	else
+		input_latency_exit=$?
+	fi
+fi
 
 ruby -rjson -rtime -e '
 	def swift_loc(repo)
@@ -149,7 +168,7 @@ ruby -rjson -rtime -e '
 		value.to_s.gsub("%", "%25").gsub("\r", "%0D").gsub("\n", "%0A")
 	end
 
-	baseline_path, hyperfine_path, window_path, piecetree_path, open_path, lsp_path, memory_path, out_path, repo, binary, threshold_arg = ARGV
+	baseline_path, hyperfine_path, window_path, piecetree_path, open_path, lsp_path, memory_path, input_latency_path, input_latency_exit, out_path, repo, binary, threshold_arg = ARGV
 	baseline = JSON.parse(File.read(baseline_path))
 	hyperfine = JSON.parse(File.read(hyperfine_path))
 	window = File.size?(window_path) ? JSON.parse(File.read(window_path)) : {}
@@ -157,6 +176,7 @@ ruby -rjson -rtime -e '
 	open = File.size?(open_path) ? JSON.parse(File.read(open_path)) : {}
 	lsp = File.size?(lsp_path) ? JSON.parse(File.read(lsp_path)) : {}
 	memory = File.size?(memory_path) ? JSON.parse(File.read(memory_path)) : {}
+	input_latency = File.size?(input_latency_path) ? JSON.parse(File.read(input_latency_path)) : nil
 	bench = hyperfine.fetch("results").first
 	current = {
 		"cold_start_ready_ms" => bench.fetch("median").to_f * 1000.0,
@@ -202,7 +222,9 @@ ruby -rjson -rtime -e '
 		"runs" => hyperfine.fetch("results").first.fetch("times").length,
 		"piecetree_runs" => piecetree_runs.length,
 		"threshold" => default_threshold,
-		"metrics" => rows
+		"metrics" => rows,
+		"input_latency" => input_latency,
+		"input_latency_exit" => input_latency_exit.to_i
 	}
 	File.write(out_path, JSON.pretty_generate(report) + "\n")
 	lines = ["# Itsy regression", "", "| Metric | Baseline | Current | Limit | Status |", "|---|---:|---:|---:|---|"]
@@ -222,6 +244,11 @@ ruby -rjson -rtime -e '
 		File.open(ENV.fetch("GITHUB_STEP_SUMMARY"), "a") { |file| file.puts(lines.join("\n")) }
 	end
 	failures = rows.select { |row| row.fetch("status") == "fail" }
+	input_latency_status = if input_latency
+		input_latency.fetch("status", "failed")
+	elsif input_latency_exit.to_i != 0
+		"failed"
+	end
 	failures.each do |row|
 		message = format("%s regressed: current %s %s, limit %s %s, baseline %s %s",
 			row.fetch("name"),
@@ -237,7 +264,14 @@ ruby -rjson -rtime -e '
 			warn message
 		end
 	end
-	exit(failures.empty? ? 0 : 1)
-' "$baseline" "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$out" "$repo_dir" "$itsyapp" "$threshold"
+	if input_latency_status == "failed"
+		warn "input latency regression failed; inspect #{input_latency_path}"
+	elsif input_latency_status == "blocked"
+		warn "input latency gate blocked; inspect #{input_latency_path}"
+	end
+	exit 1 unless failures.empty? && input_latency_status != "failed"
+	exit 2 if input_latency_status == "blocked"
+	exit 0
+' "$baseline" "$hyperfine_json" "$window_json" "$piecetree_json" "$open_json" "$lsp_json" "$memory_json" "$input_latency_json" "$input_latency_exit" "$out" "$repo_dir" "$itsyapp" "$threshold"
 
 echo "$out"

@@ -264,6 +264,11 @@ public actor DebugSession {
 		try await client.sendRequest(command: DAPCommand.terminate, arguments: try DAPAny(encoding: DAPTerminateArguments()))
 	}
 
+	@discardableResult
+	public func disconnect(terminateDebuggee: Bool = false) async throws -> DAPResponse {
+		try await client.disconnect(arguments: DAPDisconnectArguments(terminateDebuggee: terminateDebuggee))
+	}
+
 	public func evaluate(expression: String, frameID: Int? = nil, context: String? = nil) async throws -> DebugValue {
 		let response = try await client.sendRequest(
 			command: DAPCommand.evaluate,

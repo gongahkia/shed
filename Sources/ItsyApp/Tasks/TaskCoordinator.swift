@@ -5,6 +5,7 @@ import ItsyEditor
 
 @MainActor final class TaskCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let problemsCoordinator: ProblemsCoordinator
+	private let activeDocumentProvider: () -> NSDocument?
 	private var taskPanel: NSPanel?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
@@ -13,10 +14,15 @@ import ItsyEditor
 	private var workspaceTasks: [WorkspaceTask] = []
 	private var taskRunGeneration = 0
 	private var activeTaskHandle: WorkspaceTaskHandle?
+	private var backgroundTaskHandles: [WorkspaceTaskHandle] = []
 	private var taskWatcher: WorkspaceTaskWatcher?
 
-	init(problemsCoordinator: ProblemsCoordinator) {
+	init(
+		problemsCoordinator: ProblemsCoordinator,
+		activeDocumentProvider: @escaping () -> NSDocument? = { nil }
+	) {
 		self.problemsCoordinator = problemsCoordinator
+		self.activeDocumentProvider = activeDocumentProvider
 	}
 
 	@objc func showTasks(_ sender: Any?) {
@@ -167,8 +173,7 @@ import ItsyEditor
 		taskRunGeneration += 1
 		taskWatcher?.stop()
 		taskWatcher = nil
-		activeTaskHandle?.cancel()
-		activeTaskHandle = nil
+		cancelActiveTaskHandles()
 		cancelButton?.isEnabled = false
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Cancelled")
@@ -187,8 +192,7 @@ import ItsyEditor
 	private func startTask(_ task: WorkspaceTask, root: URL, preserveWatch: Bool) {
 		taskRunGeneration += 1
 		let generation = taskRunGeneration
-		activeTaskHandle?.cancel()
-		activeTaskHandle = nil
+		cancelActiveTaskHandles()
 		let plan: [WorkspaceTask]
 		do {
 			plan = try WorkspaceTaskPlanner.executionPlan(for: task, in: workspaceTasks)
@@ -208,9 +212,9 @@ import ItsyEditor
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
 		if preserveWatch {
-			taskOutputTextView?.string += "\n$ \(task.commandLine)\n"
+			taskOutputTextView?.string += "\n"
 		} else {
-			taskOutputTextView?.string = "$ \(task.commandLine)\n"
+			taskOutputTextView?.string = ""
 		}
 		startPlannedTask(plan: plan, index: 0, root: root, generation: generation, rootTask: task, stdout: "", stderr: "")
 	}
@@ -227,7 +231,32 @@ import ItsyEditor
 		guard index < plan.count else {
 			return
 		}
-		let task = plan[index]
+		let sourceTask = plan[index]
+		let expansion: WorkspaceTaskExpansion
+		do {
+			expansion = try WorkspaceTaskExpander.expand(
+				sourceTask,
+				context: taskExpansionContext(root: root),
+				inputResolver: promptForTaskInput
+			)
+		} catch WorkspaceTaskExpansionError.inputCancelled {
+			taskRunGeneration += 1
+			taskWatcher?.stop()
+			taskWatcher = nil
+			cancelActiveTaskHandles()
+			cancelButton?.isEnabled = false
+			taskStatusLabel?.textColor = .secondaryLabelColor
+			taskStatusLabel?.stringValue = L10n.string("Cancelled")
+			return
+		} catch {
+			activeTaskHandle = nil
+			cancelButton?.isEnabled = taskWatcher != nil || !backgroundTaskHandles.isEmpty
+			applyTaskResult(.failure(error))
+			return
+		}
+		let task = expansion.task
+		let commandLine = sourceTask.presentation.showResolvedCommand ? expansion.previewCommandLine : sourceTask.commandLine
+		taskOutputTextView?.string += "$ \(commandLine)\n"
 		do {
 			activeTaskHandle = try WorkspaceTaskRunner().start(
 				task,
@@ -245,6 +274,24 @@ import ItsyEditor
 						guard let self, self.taskRunGeneration == generation else {
 							return
 						}
+						if task.isBackground, result.wasReady, index + 1 < plan.count {
+							self.backgroundTaskHandles.removeAll { !$0.isRunning }
+							guard !result.succeeded else {
+								return
+							}
+							self.taskRunGeneration += 1
+							self.cancelActiveTaskHandles()
+							self.cancelButton?.isEnabled = false
+							self.applyTaskResult(.success(WorkspaceTaskResult(
+								task: rootTask,
+								exitStatus: result.exitStatus,
+								stdout: stdout + result.stdout,
+								stderr: stderr + result.stderr,
+								wasCancelled: result.wasCancelled,
+								wasReady: result.wasReady
+							)), root: root)
+							return
+						}
 						let nextStdout = stdout + result.stdout
 						let nextStderr = stderr + result.stderr
 						if result.succeeded, index + 1 < plan.count {
@@ -260,7 +307,7 @@ import ItsyEditor
 							return
 						}
 						self.activeTaskHandle = nil
-						self.cancelButton?.isEnabled = self.taskWatcher != nil
+						self.cancelButton?.isEnabled = self.taskWatcher != nil || !self.backgroundTaskHandles.isEmpty
 						self.applyTaskResult(.success(WorkspaceTaskResult(
 							task: rootTask,
 							exitStatus: result.exitStatus,
@@ -269,7 +316,36 @@ import ItsyEditor
 						)), root: root)
 						if self.taskWatcher != nil {
 							self.taskStatusLabel?.stringValue = L10n.string("Watching \(rootTask.label)")
+						} else if !self.backgroundTaskHandles.isEmpty {
+							self.taskStatusLabel?.stringValue = L10n.string("Background task running")
 						}
+					}
+				},
+				onReady: { [weak self] handle in
+					Task { @MainActor [weak self] in
+						guard let self,
+						      self.taskRunGeneration == generation,
+						      task.isBackground,
+						      index + 1 < plan.count,
+						      !self.backgroundTaskHandles.contains(where: { $0 === handle })
+						else {
+							return
+						}
+						if handle.isRunning {
+							self.backgroundTaskHandles.append(handle)
+						}
+						if self.activeTaskHandle === handle {
+							self.activeTaskHandle = nil
+						}
+						self.startPlannedTask(
+							plan: plan,
+							index: index + 1,
+							root: root,
+							generation: generation,
+							rootTask: rootTask,
+							stdout: stdout,
+							stderr: stderr
+						)
 					}
 				}
 			)
@@ -278,6 +354,46 @@ import ItsyEditor
 			cancelButton?.isEnabled = taskWatcher != nil
 			applyTaskResult(.failure(error))
 		}
+	}
+
+	private func cancelActiveTaskHandles() {
+		activeTaskHandle?.cancel()
+		activeTaskHandle = nil
+		for handle in backgroundTaskHandles {
+			handle.cancel()
+		}
+		backgroundTaskHandles.removeAll()
+	}
+
+	private func taskExpansionContext(root: URL) -> WorkspaceTaskExpansionContext {
+		guard let document = activeDocumentProvider() as? ItsyDocument else {
+			return WorkspaceTaskExpansionContext(workspaceRoot: root)
+		}
+		let selection = document.editor.selections.primary.range
+		let length = document.editor.textStorage.length
+		let boundedSelection = max(0, min(selection.lowerBound, length)) ..< max(0, min(selection.upperBound, length))
+		return WorkspaceTaskExpansionContext(
+			workspaceRoot: root,
+			fileURL: document.fileURL,
+			selectedText: document.editor.textStorage.substring(boundedSelection)
+		)
+	}
+
+	private func promptForTaskInput(_ input: WorkspaceTaskInput) -> WorkspaceTaskInputResolution {
+		let alert = NSAlert()
+		alert.messageText = input.prompt
+		alert.informativeText = L10n.string("Task input: \(input.id)")
+		alert.addButton(withTitle: L10n.string("Continue"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		let field: NSTextField = input.secret ? NSSecureTextField() : NSTextField()
+		field.stringValue = input.defaultValue ?? ""
+		field.placeholderString = input.prompt
+		field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
+		alert.accessoryView = field
+		guard alert.runModal() == .alertFirstButtonReturn else {
+			return .cancelled
+		}
+		return .value(field.stringValue)
 	}
 
 	private func installWatchIfNeeded(for task: WorkspaceTask, root: URL) {
@@ -313,10 +429,10 @@ import ItsyEditor
 				taskResult.stderr,
 			].filter { !$0.isEmpty }.joined(separator: "\n")
 			if let root {
-				let matchers = WorkspaceProblemMatcherDiscovery.discover(root: root)
+				let matchers = WorkspaceProblemMatcherDiscovery.matchers(for: taskResult.task, root: root)
 				problemsCoordinator.setProblems(
 					WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers),
-					sourceID: "task:\(root.standardizedFileURL.path)"
+					sourceID: "task:\(root.standardizedFileURL.path):\(taskResult.task.id)"
 				)
 			}
 		case let .failure(error):

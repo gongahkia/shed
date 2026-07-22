@@ -44,17 +44,25 @@ public struct WorkspaceTaskPresentation: Codable, Equatable, Sendable {
 	public var reveal: WorkspaceTaskReveal
 	public var focus: Bool
 	public var dedicated: Bool
+	public var showResolvedCommand: Bool
 
-	public init(reveal: WorkspaceTaskReveal = .onFailure, focus: Bool = false, dedicated: Bool = false) {
+	public init(
+		reveal: WorkspaceTaskReveal = .onFailure,
+		focus: Bool = false,
+		dedicated: Bool = false,
+		showResolvedCommand: Bool = false
+	) {
 		self.reveal = reveal
 		self.focus = focus
 		self.dedicated = dedicated
+		self.showResolvedCommand = showResolvedCommand
 	}
 
 	private enum CodingKeys: String, CodingKey {
 		case reveal
 		case focus
 		case dedicated
+		case showResolvedCommand = "show_resolved_command"
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -62,6 +70,7 @@ public struct WorkspaceTaskPresentation: Codable, Equatable, Sendable {
 		reveal = try container.decodeIfPresent(WorkspaceTaskReveal.self, forKey: .reveal) ?? .onFailure
 		focus = try container.decodeIfPresent(Bool.self, forKey: .focus) ?? false
 		dedicated = try container.decodeIfPresent(Bool.self, forKey: .dedicated) ?? false
+		showResolvedCommand = try container.decodeIfPresent(Bool.self, forKey: .showResolvedCommand) ?? false
 	}
 }
 
@@ -217,8 +226,12 @@ public enum WorkspaceTaskConfigurationParser {
 				throw WorkspaceTaskConfigurationError.invalidField(taskID: task.id, field: "env.\(key)", reason: "must not contain control characters")
 			}
 		}
+		var inputIDs = Set<String>()
 		for input in task.inputs {
 			try validateIdentifier(input.id, taskID: task.id, field: "inputs.id")
+			guard inputIDs.insert(input.id).inserted else {
+				throw WorkspaceTaskConfigurationError.invalidField(taskID: task.id, field: "inputs", reason: "contains duplicate input id")
+			}
 			guard !input.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !containsControl(input.prompt) else {
 				throw WorkspaceTaskConfigurationError.invalidField(taskID: task.id, field: "inputs.\(input.id).prompt", reason: "must be non-empty plain text")
 			}

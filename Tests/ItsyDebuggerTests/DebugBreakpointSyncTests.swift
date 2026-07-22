@@ -48,7 +48,11 @@ import Testing
 		DAPBreakpoint(verified: true, line: 8),
 		DAPBreakpoint(verified: true, line: 14),
 	]))
-	try await syncTask.value
+	let verification = try await syncTask.value
+	#expect(verification == [
+		DebugBreakpointVerification(sourceURL: source.standardizedFileURL, requested: SourceBreakpoint(line: 8, column: 2, hitCondition: "3", logMessage: "hit"), adapterBreakpoint: DAPBreakpoint(verified: true, line: 8)),
+		DebugBreakpointVerification(sourceURL: source.standardizedFileURL, requested: SourceBreakpoint(line: 14, condition: "value > 0"), adapterBreakpoint: DAPBreakpoint(verified: true, line: 14)),
+	])
 	#expect(try transport.requests().map(\.command) == [DAPCommand.initialize, DAPCommand.setBreakpoints])
 
 	let doneTask = Task {
@@ -58,6 +62,37 @@ import Testing
 	#expect(try transport.request(at: 2).command == DAPCommand.configurationDone)
 	try await respond(session, request: try transport.request(at: 2), body: DAPAny.object([:]))
 	_ = try await doneTask.value
+}
+
+@Test func debugBreakpointSyncReconcilesMissingAndChangedAdapterStatus() async throws {
+	let fixture = try DebugBreakpointSyncFixture()
+	defer {
+		fixture.cleanup()
+	}
+	let source = fixture.workspaceRoot.appendingPathComponent("Sources/App.swift")
+	let store = BreakpointStore(fileURL: fixture.storeURL)
+	await store.replace([SourceBreakpoint(line: 8), SourceBreakpoint(line: 14)], for: source)
+	try await store.save()
+	let (session, transport) = try await configuredSession()
+	let syncTask = Task {
+		try await DebugBreakpointSync.syncPersistedBreakpoints(from: BreakpointStore(fileURL: fixture.storeURL), using: session, workspaceRoot: fixture.workspaceRoot)
+	}
+
+	try await transport.waitForWriteCount(2)
+	let request = try transport.request(at: 1)
+	try await respond(session, request: request, body: DAPSetBreakpointsResponseBody(breakpoints: [
+		DAPBreakpoint(id: 4, verified: false, message: "Pending symbols", line: 10),
+	]))
+	let verification = try await syncTask.value
+	#expect(verification == [
+		DebugBreakpointVerification(sourceURL: source.standardizedFileURL, requested: SourceBreakpoint(line: 8), adapterBreakpoint: DAPBreakpoint(id: 4, verified: false, message: "Pending symbols", line: 10)),
+		DebugBreakpointVerification(sourceURL: source.standardizedFileURL, requested: SourceBreakpoint(line: 14), adapterBreakpoint: DAPBreakpoint(verified: false, message: "Adapter returned no breakpoint status.", line: 14)),
+	])
+
+	let statusStore = DebugBreakpointVerificationStore()
+	await statusStore.replace(verification)
+	await statusStore.apply(DAPBreakpoint(id: 4, verified: true, line: 11))
+	#expect(await statusStore.snapshot().first?.adapterBreakpoint == DAPBreakpoint(id: 4, verified: true, line: 11))
 }
 
 private func configuredSession() async throws -> (DAPClientSession, RecordingDAPTransport) {

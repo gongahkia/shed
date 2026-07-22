@@ -41,7 +41,10 @@ import ItsyKeymap
 		documentController: documentController,
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
 	)
-	private lazy var taskCoordinator = TaskCoordinator(problemsCoordinator: problemsCoordinator)
+	private lazy var taskCoordinator = TaskCoordinator(
+		problemsCoordinator: problemsCoordinator,
+		activeDocumentProvider: { [weak self] in self?.activeDocument() }
+	)
 	private lazy var debuggerCoordinator = DebuggerCoordinator(documentController: documentController)
 	private lazy var terminalCoordinator = TerminalCoordinator(
 		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },

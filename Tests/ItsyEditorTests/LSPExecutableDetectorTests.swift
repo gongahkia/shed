@@ -17,6 +17,17 @@ import Testing
 	#expect(resolution.source == .path)
 }
 
+@Test func lspExecutableDetectorUsesApprovedLocationWithoutMutatingEnvironment() throws {
+	let fixture = try LSPExecutableDetectorFixture()
+	let fallback = try fixture.executable("fallback/test-server")
+	let probe = LSPExecutableProbe(executable: "test-server", approvedPlatformLocations: [fallback.deletingLastPathComponent().path])
+	let environment = ["PATH": fixture.root.appendingPathComponent("empty").path]
+	let resolution = try LSPExecutableDetector.detect(command: "test-server", probe: probe, environment: environment)
+	#expect(resolution.executableURL == fallback.standardizedFileURL)
+	#expect(resolution.source == .approvedPlatformLocation)
+	#expect(environment == ["PATH": fixture.root.appendingPathComponent("empty").path])
+}
+
 @Test func lspExecutableDetectorReportsMissingAndBadVersions() throws {
 	let fixture = try LSPExecutableDetectorFixture()
 	let probe = LSPExecutableProbe(executable: "test-server", approvedPlatformLocations: [])

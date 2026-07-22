@@ -4,9 +4,14 @@ import ItsyDebugger
 
 @MainActor final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let documentController: ItsyDocumentController
-	private lazy var launchCoordinator = DebugLaunchCoordinator { [weak self] session in
-		self?.debugSessionDidStart(session)
-	}
+	private lazy var launchCoordinator = DebugLaunchCoordinator(
+		onSessionStarted: { [weak self] session in
+			self?.debugSessionDidStart(session)
+		},
+		onSessionTerminated: { [weak self] status in
+			self?.debugSessionDidTerminate(status)
+		}
+	)
 	private lazy var variablesCoordinator = DebugVariablesCoordinator { [weak self] in
 		self?.activeSession
 	}
@@ -23,6 +28,7 @@ import ItsyDebugger
 	private var callStackNodes: [DebugCallStackThreadNode] = []
 	private var reverseContinueButton: NSButton?
 	private var stepBackButton: NSButton?
+	private var restartButton: NSButton?
 	private var callStackGeneration = 0
 
 	init(documentController: ItsyDocumentController) {
@@ -93,7 +99,7 @@ import ItsyDebugger
 		callStackGeneration += 1
 		activeSession = nil
 		launchCoordinator.terminate()
-		updateReverseDebugControls()
+		updateDebugControls()
 		variablesCoordinator.clear()
 		watchesCoordinator.clear()
 		consoleCoordinator.clear()
@@ -101,7 +107,7 @@ import ItsyDebugger
 
 	private func debugSessionDidStart(_ session: DebugAppSession) {
 		activeSession = session
-		updateReverseDebugControls()
+		updateDebugControls()
 		if callStackPanel?.isVisible == true {
 			refreshCallStack(nil)
 		}
@@ -145,7 +151,8 @@ import ItsyDebugger
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshCallStack(_:)))
 		reverseContinueButton = reverseButton
 		stepBackButton = backButton
-		updateReverseDebugControls()
+		self.restartButton = restartButton
+		updateDebugControls()
 		let buttonStack = NSStackView(views: [continueButton, reverseButton, overButton, backButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 6
@@ -202,11 +209,12 @@ import ItsyDebugger
 						return
 					}
 					if control == .stop {
-						session.terminate()
+						self.launchCoordinator.terminate()
 						self.activeSession = nil
 						self.variablesCoordinator.clear()
 						self.watchesCoordinator.clear()
 						self.consoleCoordinator.clear()
+						self.updateDebugControls()
 					}
 					self.setCallStackStatus(control.doneStatus, isError: false)
 				}
@@ -237,7 +245,11 @@ import ItsyDebugger
 		case .restart:
 			try await session.debugSession.restart()
 		case .stop:
-			_ = try? await session.debugSession.terminate()
+			if session.supportsTerminate {
+				try await session.debugSession.terminate()
+			} else {
+				try await session.debugSession.disconnect()
+			}
 		}
 	}
 
@@ -248,14 +260,25 @@ import ItsyDebugger
 		return threadID
 	}
 
-	private func updateReverseDebugControls() {
-		configureReverseDebugButton(reverseContinueButton, enabled: activeSession?.supportsReverseContinue == true)
-		configureReverseDebugButton(stepBackButton, enabled: activeSession?.supportsStepBack == true)
+	private func updateDebugControls() {
+		configureCapabilityButton(reverseContinueButton, enabled: activeSession?.supportsReverseContinue == true)
+		configureCapabilityButton(stepBackButton, enabled: activeSession?.supportsStepBack == true)
+		configureCapabilityButton(restartButton, enabled: activeSession?.supportsRestart == true)
 	}
 
-	private func configureReverseDebugButton(_ button: NSButton?, enabled: Bool) {
+	private func configureCapabilityButton(_ button: NSButton?, enabled: Bool) {
 		button?.isEnabled = enabled
 		button?.isHidden = !enabled
+	}
+
+	private func debugSessionDidTerminate(_ status: Int32) {
+		callStackGeneration += 1
+		activeSession = nil
+		updateDebugControls()
+		variablesCoordinator.clear()
+		watchesCoordinator.clear()
+		consoleCoordinator.clear()
+		setCallStackStatus(L10n.string("Debug adapter terminated (\(status))"), isError: true)
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
@@ -491,6 +514,8 @@ private enum DebugControl {
 		switch self {
 		case .stepBack, .reverseContinue:
 			return self == .stepBack ? session.supportsStepBack : session.supportsReverseContinue
+		case .restart:
+			return session.supportsRestart
 		default:
 			return true
 		}

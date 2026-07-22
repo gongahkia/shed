@@ -75,6 +75,55 @@ import Testing
 	#expect(config == DebugLaunchConfig())
 }
 
+@Test func debugLaunchConfigParserValidatesExecutableCWDEnvironmentAndSourceMaps() throws {
+	let valid = Data(#"""
+	{
+	  "adapters": [{ "id": "lldb", "command": "/usr/bin/lldb-dap", "kind": "lldb" }],
+	  "configurations": [{
+	    "name": "Debug",
+	    "type": "lldb",
+	    "request": "launch",
+	    "program": ".build/debug/App",
+	    "cwd": "${workspaceFolder}",
+	    "env": { "MODE": "debug" },
+	    "sourceMap": { "/remote/src": "${workspaceFolder}/Sources" },
+	    "adapterOptions": { "type": "lldb", "sourceLanguages": ["rust"] }
+	  }]
+	}
+	"""#.utf8)
+	let config = try DebugLaunchConfigParser.parse(data: valid)
+	#expect(config.adapters[0].kind == .lldb)
+	#expect(config.configurations[0].sourceMap == ["/remote/src": "${workspaceFolder}/Sources"])
+	#expect(config.configurations[0].adapterOptions == ["type": .string("lldb"), "sourceLanguages": .array([.string("rust")])])
+
+	let invalid = Data(#"""
+	{
+	  "configurations": [{
+	    "name": "Debug",
+	    "type": "lldb",
+	    "request": "launch",
+	    "program": "/usr/bin/true",
+	    "cwd": "bad\npath",
+	    "env": { "BAD-NAME": "1" },
+	    "sourceMap": { "": "/local" }
+	  }]
+	}
+	"""#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "Debug", field: "cwd", reason: "must be non-empty without control characters")) {
+		_ = try DebugLaunchConfigParser.parse(data: invalid)
+	}
+
+	let missingProgram = Data(#"{"configurations":[{"name":"Debug","type":"lldb","request":"launch"}]}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "Debug", field: "program", reason: "is required for launch and must not contain control characters")) {
+		_ = try DebugLaunchConfigParser.parse(data: missingProgram)
+	}
+
+	let reservedOption = Data(#"{"configurations":[{"name":"Debug","type":"lldb","request":"launch","program":"/usr/bin/true","adapterOptions":{"program":"/tmp/override"}}]}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "Debug", field: "adapterOptions.program", reason: "must use a non-reserved adapter option key")) {
+		_ = try DebugLaunchConfigParser.parse(data: reservedOption)
+	}
+}
+
 private struct DebugLaunchConfigFixture {
 	let root: URL
 	let workspaceRoot: URL

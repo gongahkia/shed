@@ -37,7 +37,9 @@ import Testing
 			request: DebugLaunchRequest.launch,
 			program: "${workspaceFolder}/.build/mock-debuggee",
 			cwd: "${workspaceFolder}",
-			exceptionFilters: ["swift"]
+			exceptionFilters: ["swift"],
+			sourceMap: ["/remote/source": "${workspaceFolder}/Sources"],
+			adapterOptions: ["type": .string("lldb"), "sourceLanguages": .array([.string("rust")])]
 		),
 		workspaceRoot: fixture.root,
 		breakpointStore: breakpointStore
@@ -64,6 +66,11 @@ import Testing
 	#expect(commands.contains(DAPCommand.configurationDone))
 	#expect(commands.contains(DAPCommand.continueExecution))
 	let setBreakpoints = try #require(requests.first { $0["command"] as? String == DAPCommand.setBreakpoints })
+	let launch = try #require(requests.first { $0["command"] as? String == DAPCommand.launch })
+	let launchArguments = try #require(launch["arguments"] as? [String: Any])
+	#expect(launchArguments["type"] as? String == "lldb")
+	#expect(launchArguments["sourceLanguages"] as? [String] == ["rust"])
+	#expect((launchArguments["sourceMap"] as? [String: String])?["/remote/source"] == fixture.root.appendingPathComponent("Sources").path)
 	let arguments = try #require(setBreakpoints["arguments"] as? [String: Any])
 	let source = try #require(arguments["source"] as? [String: Any])
 	let breakpoints = try #require(arguments["breakpoints"] as? [[String: Any]])

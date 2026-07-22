@@ -99,7 +99,9 @@ public struct WorkspaceProblemSnapshot: Equatable, Sendable {
 	}
 
 	public func url(for problem: WorkspaceProblem) -> URL {
-		root.appendingPathComponent(problem.path)
+		problem.path.hasPrefix("/")
+			? URL(fileURLWithPath: problem.path).standardizedFileURL
+			: root.appendingPathComponent(problem.path).standardizedFileURL
 	}
 }
 
@@ -144,6 +146,7 @@ public enum WorkspaceProblemMatcherLoaderError: Error, Equatable, Sendable {
 	case fileNotFound
 	case decodeFailed(String)
 	case invalidPattern(String)
+	case invalidCaptureGroup(matcherID: String, group: Int)
 }
 
 public enum WorkspaceProblemMatcherLoader {
@@ -164,6 +167,16 @@ public enum WorkspaceProblemMatcherLoader {
 public enum WorkspaceProblemMatcherDiscovery {
 	public static func discover(root: URL, fileManager: FileManager = .default) -> [WorkspaceProblemMatcher] {
 		workspaceMatchers(root: root, fileManager: fileManager) + extensionMatchers(root: root, fileManager: fileManager)
+	}
+
+	public static func matchers(for task: WorkspaceTask, root: URL, fileManager: FileManager = .default) -> [WorkspaceProblemMatcher] {
+		guard !task.problemMatchers.isEmpty else {
+			return []
+		}
+		let available = discover(root: root, fileManager: fileManager)
+		return task.problemMatchers.compactMap { identifier in
+			available.first { $0.id == identifier }
+		}
 	}
 
 	private static func workspaceMatchers(root: URL, fileManager: FileManager) -> [WorkspaceProblemMatcher] {
@@ -203,7 +216,7 @@ public enum WorkspaceProblemParser {
 		else {
 			return nil
 		}
-		if let column = Int(parts[2].trimmingCharacters(in: .whitespaces)), parts.count >= 5 {
+		if let column = Int(parts[2].trimmingCharacters(in: .whitespaces)), column > 0, parts.count >= 5 {
 			return problem(path: parts[0], line: lineNumber, column: column, severityText: parts[3], message: parts[4])
 		}
 		return problem(path: parts[0], line: lineNumber, column: nil, severityText: parts[2], message: parts[3])
@@ -213,6 +226,10 @@ public enum WorkspaceProblemParser {
 		guard let regex = try? NSRegularExpression(pattern: matcher.pattern) else {
 			return nil
 		}
+		let groups = [matcher.fileGroup, matcher.lineGroup, matcher.columnGroup, matcher.severityGroup, matcher.messageGroup].compactMap { $0 }
+		guard groups.allSatisfy({ $0 > 0 && $0 <= regex.numberOfCaptureGroups }) else {
+			return nil
+		}
 		let fullRange = NSRange(line.startIndex ..< line.endIndex, in: line)
 		guard let match = regex.firstMatch(in: line, range: fullRange) else {
 			return nil
@@ -220,14 +237,33 @@ public enum WorkspaceProblemParser {
 		guard let path = capture(matcher.fileGroup, in: line, match: match)?.trimmingCharacters(in: .whitespacesAndNewlines),
 		      !path.isEmpty,
 		      let lineText = capture(matcher.lineGroup, in: line, match: match)?.trimmingCharacters(in: .whitespacesAndNewlines),
-		      let lineNumber = Int(lineText)
+		      let lineNumber = Int(lineText),
+		      lineNumber > 0
 		else {
 			return nil
 		}
-		let column = capture(matcher.columnGroup, in: line, match: match)
-			.flatMap { Int($0.trimmingCharacters(in: .whitespacesAndNewlines)) }
-		let severity = capture(matcher.severityGroup, in: line, match: match)
-			.flatMap(severity(from:)) ?? matcher.defaultSeverity
+		let column: Int?
+		if let columnGroup = matcher.columnGroup,
+		   let columnText = capture(columnGroup, in: line, match: match)?.trimmingCharacters(in: .whitespacesAndNewlines)
+		{
+			guard let parsedColumn = Int(columnText), parsedColumn > 0 else {
+				return nil
+			}
+			column = parsedColumn
+		} else {
+			column = nil
+		}
+		let severity: WorkspaceProblemSeverity
+		if let severityGroup = matcher.severityGroup,
+		   let severityText = capture(severityGroup, in: line, match: match)?.trimmingCharacters(in: .whitespacesAndNewlines)
+		{
+			guard let parsedSeverity = Self.severity(from: severityText) else {
+				return nil
+			}
+			severity = parsedSeverity
+		} else {
+			severity = matcher.defaultSeverity
+		}
 		let message = capture(matcher.messageGroup, in: line, match: match)?
 			.trimmingCharacters(in: .whitespacesAndNewlines)
 		let resolvedMessage = message?.isEmpty == false ? message ?? matcher.label : matcher.label
@@ -256,7 +292,7 @@ public enum WorkspaceProblemParser {
 	}
 
 	private static func problem(path: String, line: Int, column: Int?, severityText: String, message: String) -> WorkspaceProblem? {
-		guard let severity = severity(from: severityText) else {
+		guard line > 0, let severity = severity(from: severityText) else {
 			return nil
 		}
 		return WorkspaceProblem(
@@ -337,22 +373,29 @@ private struct WorkspaceProblemMatcherTOMLParser {
 				throw WorkspaceProblemMatcherLoaderError.decodeFailed("\(id): pattern is required")
 			}
 			do {
-				_ = try NSRegularExpression(pattern: pattern)
+				let regex = try NSRegularExpression(pattern: pattern)
+				let groups = [draft.fileGroup, draft.lineGroup, draft.columnGroup, draft.severityGroup, draft.messageGroup].compactMap { $0 }
+				guard let invalidGroup = groups.first(where: { $0 <= 0 || $0 > regex.numberOfCaptureGroups }) else {
+					return WorkspaceProblemMatcher(
+						id: id,
+						label: draft.label ?? id,
+						pattern: pattern,
+						fileGroup: draft.fileGroup,
+						lineGroup: draft.lineGroup,
+						columnGroup: draft.columnGroup,
+						severityGroup: draft.severityGroup,
+						messageGroup: draft.messageGroup,
+						defaultSeverity: draft.defaultSeverity,
+						source: draft.source
+					)
+				}
+				throw WorkspaceProblemMatcherLoaderError.invalidCaptureGroup(matcherID: id, group: invalidGroup)
 			} catch {
+				if let error = error as? WorkspaceProblemMatcherLoaderError {
+					throw error
+				}
 				throw WorkspaceProblemMatcherLoaderError.invalidPattern(pattern)
 			}
-			return WorkspaceProblemMatcher(
-				id: id,
-				label: draft.label ?? id,
-				pattern: pattern,
-				fileGroup: draft.fileGroup,
-				lineGroup: draft.lineGroup,
-				columnGroup: draft.columnGroup,
-				severityGroup: draft.severityGroup,
-				messageGroup: draft.messageGroup,
-				defaultSeverity: draft.defaultSeverity,
-				source: draft.source
-			)
 		}
 	}
 

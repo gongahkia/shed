@@ -9,7 +9,32 @@ import Testing
 	#expect(registry.adapter(id: "lldb") == DebugAdapterConfig(id: "lldb", command: "lldb-dap"))
 	#expect(registry.adapter(id: "debugpy") == DebugAdapterConfig(id: "debugpy", command: "python3", args: ["-m", "debugpy.adapter"]))
 	#expect(registry.adapter(id: "delve") == DebugAdapterConfig(id: "delve", command: "dlv", args: ["dap"]))
+	#expect(registry.adapter(id: "codelldb") == DebugAdapterConfig(id: "codelldb", command: "codelldb", kind: .codeLLDB))
 	#expect(registry.adapter(id: "vscode-js-debug") == DebugAdapterConfig(id: "vscode-js-debug", command: "js-debug-adapter"))
+	#expect(registry.adapter(id: "lldb")?.kind == .lldb)
+	#expect(registry.adapter(id: "debugpy")?.kind == .debugpy)
+	#expect(registry.adapter(id: "vscode-js-debug")?.kind == .jsDebug)
+	#expect(registry.adapter(id: "delve")?.kind == .delve)
+	#expect(registry.adapter(id: "codelldb")?.kind == .codeLLDB)
+}
+
+@Test func debugAdapterDetectorReportsExecutableOrActionableRemediation() {
+	let available = DebugAdapterDetector.availability(for: DebugAdapterConfig(id: "custom", command: "/usr/bin/true"), environment: [:])
+	#expect(available == .available(URL(fileURLWithPath: "/usr/bin/true")))
+
+	let missing = DebugAdapterDetector.availability(for: DebugAdapterConfig(id: "debugpy", command: "missing-debugpy", kind: .debugpy), environment: ["PATH": ""])
+	#expect(missing == .missing(DebugAdapterRemediation(
+		adapterID: "debugpy",
+		command: "missing-debugpy",
+		hint: "Install debugpy with: python3 -m pip install debugpy"
+	)))
+
+	let missingCodeLLDB = DebugAdapterDetector.availability(for: DebugAdapterConfig(id: "codelldb", command: "missing-codelldb", kind: .codeLLDB), environment: ["PATH": ""])
+	#expect(missingCodeLLDB == .missing(DebugAdapterRemediation(
+		adapterID: "codelldb",
+		command: "missing-codelldb",
+		hint: "Install CodeLLDB and configure its codelldb adapter executable."
+	)))
 }
 
 @Test func debugAdapterRegistryLoaderMergesUserAndWorkspaceTOML() throws {
@@ -24,6 +49,8 @@ import Testing
 
 	[custom]
 	command = "/user/custom-dap"
+	kind = "custom"
+	remediation = "Install the custom adapter."
 	""")
 	try fixture.writeWorkspace("""
 	[lldb-dap]
@@ -38,7 +65,7 @@ import Testing
 	let registry = try loader.load(workspaceRoot: fixture.workspaceRoot)
 
 	#expect(registry.adapter(id: "lldb-dap") == DebugAdapterConfig(id: "lldb-dap", command: "/workspace/lldb-dap"))
-	#expect(registry.adapter(id: "custom") == DebugAdapterConfig(id: "custom", command: "/user/custom-dap"))
+	#expect(registry.adapter(id: "custom") == DebugAdapterConfig(id: "custom", command: "/user/custom-dap", remediation: "Install the custom adapter."))
 	#expect(registry.adapter(id: "debugpy") == DebugAdapterConfig(id: "debugpy", command: "/workspace/python", args: ["-m", "debugpy.adapter"]))
 	#expect(registry.adapter(id: "delve") == DebugAdapterConfig(id: "delve", command: "dlv", args: ["dap"]))
 }

@@ -45,6 +45,33 @@ import Testing
 	])
 }
 
+@Test func workspaceProblemParserHandlesMultipleFilesSeveritiesAndInvalidCaptures() {
+	let root = URL(fileURLWithPath: "/tmp/project", isDirectory: true)
+	let matcher = WorkspaceProblemMatcher(
+		id: "tool",
+		label: "Tool",
+		pattern: #"^(.+):(\d+):(\d+): (error|warning|info|hint): (.+)$"#,
+		severityGroup: 4,
+		messageGroup: 5,
+		source: "tool"
+	)
+	let snapshot = WorkspaceProblemParser.parse(
+		"Sources/B.swift:4:2: warning: second\nSources/A.swift:2:1: error: first\n/tmp/external.swift:8:3: hint: third",
+		root: root,
+		matchers: [matcher]
+	)
+
+	#expect(snapshot.problems == [
+		WorkspaceProblem(path: "/tmp/external.swift", line: 8, column: 3, severity: .hint, message: "third", source: "tool"),
+		WorkspaceProblem(path: "Sources/A.swift", line: 2, column: 1, severity: .error, message: "first", source: "tool"),
+		WorkspaceProblem(path: "Sources/B.swift", line: 4, column: 2, severity: .warning, message: "second", source: "tool"),
+	])
+	#expect(snapshot.url(for: snapshot.problems[0]).path == "/tmp/external.swift")
+
+	let invalid = WorkspaceProblemMatcher(id: "invalid", label: "Invalid", pattern: #"^(.+):(\d+)$"#, messageGroup: 3)
+	#expect(WorkspaceProblemParser.parse("Sources/App.swift:3", root: root, matchers: [invalid]).problems.isEmpty)
+}
+
 @Test func workspaceProblemMatcherLoaderReadsWorkspaceTOML() throws {
 	let fixture = try TemporaryProblemFixture()
 	try fixture.write(".itsy/matchers.toml", """
@@ -75,6 +102,38 @@ import Testing
 			source: "eslint"
 		),
 	])
+}
+
+@Test func workspaceProblemMatcherLoaderRejectsInvalidCaptureGroupsAndTaskSelection() throws {
+	let fixture = try TemporaryProblemFixture()
+	try fixture.write(".itsy/matchers.toml", """
+	[matcher.swift]
+	pattern = "^(.+):(\\\\d+): (.+)$"
+	column_group = 3
+	message_group = 3
+
+	[matcher.eslint]
+	pattern = "^(.+)\\\\((\\\\d+),(\\\\d+)\\\\): (.+)$"
+	message_group = 4
+	""")
+	let task = WorkspaceTask(
+		id: "project:lint",
+		label: "Lint",
+		source: .workspaceTaskFile,
+		command: "/usr/bin/true",
+		problemMatchers: ["eslint"]
+	)
+
+	let selected = WorkspaceProblemMatcherDiscovery.matchers(for: task, root: fixture.root)
+	#expect(selected.map(\.id) == ["eslint"])
+
+	try fixture.write(".itsy/invalid-matchers.toml", """
+	[matcher.bad]
+	pattern = "^(.+):(\\\\d+)$"
+	""")
+	#expect(throws: WorkspaceProblemMatcherLoaderError.invalidCaptureGroup(matcherID: "bad", group: 3)) {
+		_ = try WorkspaceProblemMatcherLoader.load(from: fixture.root.appendingPathComponent(".itsy/invalid-matchers.toml"))
+	}
 }
 
 @Test func workspaceProblemMatcherDiscoveryIncludesExtensionMatchers() throws {

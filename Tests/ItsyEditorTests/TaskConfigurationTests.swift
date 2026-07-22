@@ -17,7 +17,7 @@ import Testing
 	    "depends_on": ["prepare"],
 	    "is_background": true,
 	    "watch": { "paths": ["Sources"], "debounce_ms": 75 },
-	    "presentation": { "reveal": "always", "focus": true, "dedicated": true },
+	    "presentation": { "reveal": "always", "focus": true, "dedicated": true, "show_resolved_command": true },
 	    "problem_matchers": ["swiftc"]
 	  }]
 	}
@@ -28,7 +28,7 @@ import Testing
 
 	#expect(configuration.scope == .project)
 	#expect(configuration.tasks[0].environment == ["MODE": "debug"])
-	#expect(configuration.tasks[0].presentation == WorkspaceTaskPresentation(reveal: .always, focus: true, dedicated: true))
+	#expect(configuration.tasks[0].presentation == WorkspaceTaskPresentation(reveal: .always, focus: true, dedicated: true, showResolvedCommand: true))
 	#expect(task.id == "project:build.app")
 	#expect(task.workingDirectory == root.appendingPathComponent("App", isDirectory: true).standardizedFileURL)
 	#expect(task.inputs == [WorkspaceTaskInput(id: "target", prompt: "Target", defaultValue: "app")])
@@ -50,6 +50,9 @@ import Testing
 	}
 	#expect(throws: WorkspaceTaskConfigurationError.invalidField(taskID: "build", field: "arguments", reason: "must not contain control characters")) {
 		_ = try WorkspaceTaskConfigurationParser.parse(data: Data(#"{"version":1,"tasks":[{"id":"build","command":"swift","arguments":["bad\nvalue"]}]}"#.utf8), scope: .project)
+	}
+	#expect(throws: WorkspaceTaskConfigurationError.invalidField(taskID: "build", field: "inputs", reason: "contains duplicate input id")) {
+		_ = try WorkspaceTaskConfigurationParser.parse(data: Data(#"{"version":1,"tasks":[{"id":"build","command":"swift","inputs":[{"id":"target","prompt":"Target"},{"id":"target","prompt":"Target again"}]}]}"#.utf8), scope: .project)
 	}
 }
 

@@ -198,7 +198,9 @@ import ItsyEditor
 			return
 		}
 		let problem = workspaceProblems[index]
-		let url = problemsRootURL.appendingPathComponent(problem.path)
+		let url = problem.path.hasPrefix("/")
+			? URL(fileURLWithPath: problem.path).standardizedFileURL
+			: problemsRootURL.appendingPathComponent(problem.path).standardizedFileURL
 		_ = documentController.openDocument(at: url, line: problem.line, column: problem.column ?? 1)
 		if let document = documentController.document(for: url) as? ItsyDocument {
 			ItsyProblemGutterCoordinator.apply(to: document)
@@ -219,7 +221,9 @@ import ItsyEditor
 		guard let problemsRootURL else {
 			return
 		}
-		let url = problemsRootURL.appendingPathComponent(related.path)
+		let url = related.path.hasPrefix("/")
+			? URL(fileURLWithPath: related.path).standardizedFileURL
+			: problemsRootURL.appendingPathComponent(related.path).standardizedFileURL
 		_ = documentController.openDocument(at: url, line: related.line, column: related.column ?? 1)
 		if let document = documentController.document(for: url) as? ItsyDocument {
 			ItsyProblemGutterCoordinator.apply(to: document)

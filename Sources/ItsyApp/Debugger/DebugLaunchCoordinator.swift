@@ -16,15 +16,18 @@ import ItsyDebugger
 	private var launchGeneration = 0
 	private var suppressSelectionLaunch = false
 	private let onSessionStarted: (DebugAppSession) -> Void
+	private let onSessionTerminated: (Int32) -> Void
 
 	init(
 		loader: DebugLaunchConfigLoader = DebugLaunchConfigLoader(),
 		adapterRegistryLoader: DebugAdapterRegistryLoader = DebugAdapterRegistryLoader(),
-		onSessionStarted: @escaping (DebugAppSession) -> Void = { _ in }
+		onSessionStarted: @escaping (DebugAppSession) -> Void = { _ in },
+		onSessionTerminated: @escaping (Int32) -> Void = { _ in }
 	) {
 		self.loader = loader
 		self.adapterRegistryLoader = adapterRegistryLoader
 		self.onSessionStarted = onSessionStarted
+		self.onSessionTerminated = onSessionTerminated
 		super.init()
 	}
 
@@ -185,10 +188,23 @@ import ItsyDebugger
 		setStatus(L10n.string("Starting \(configuration.name)"), isError: false)
 		Task(priority: .userInitiated) { [weak self] in
 			do {
-				let session = try await DebugAppSession.start(adapter: adapter, configuration: configuration, workspaceRoot: root)
+				let session = try await DebugAppSession.start(
+					adapter: adapter,
+					configuration: configuration,
+					workspaceRoot: root,
+					onTerminated: { [weak self] status in
+						Task { @MainActor in
+							self?.sessionDidTerminate(generation: generation, status: status)
+						}
+					}
+				)
 				Task { @MainActor in
 					guard let self, self.launchGeneration == generation else {
 						session.terminate()
+						return
+					}
+					guard !(await session.isTerminated()) else {
+						self.setStatus(L10n.string("Debug adapter terminated during startup"), isError: true)
 						return
 					}
 					self.activeSession?.terminate()
@@ -205,6 +221,15 @@ import ItsyDebugger
 				}
 			}
 		}
+	}
+
+	private func sessionDidTerminate(generation: Int, status: Int32) {
+		guard launchGeneration == generation else {
+			return
+		}
+		activeSession = nil
+		setStatus(L10n.string("Debug adapter terminated (\(status))"), isError: true)
+		onSessionTerminated(status)
 	}
 
 	private func selectedConfiguration() -> DebugLaunchConfiguration? {
@@ -329,10 +354,13 @@ final class DebugAppSession: @unchecked Sendable {
 	let supportsSetVariable: Bool
 	let supportsStepBack: Bool
 	let supportsReverseContinue: Bool
+	let supportsRestart: Bool
+	let supportsTerminate: Bool
+	let breakpointVerificationStore: DebugBreakpointVerificationStore
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
@@ -341,6 +369,9 @@ final class DebugAppSession: @unchecked Sendable {
 		self.supportsSetVariable = supportsSetVariable
 		self.supportsStepBack = capabilities.supportsStepBack == true
 		self.supportsReverseContinue = (capabilities.supportsReverseContinue ?? capabilities.supportsStepBack) == true
+		self.supportsRestart = capabilities.supportsRestartRequest == true
+		self.supportsTerminate = capabilities.supportsTerminateRequest == true
+		self.breakpointVerificationStore = breakpointVerificationStore
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -353,13 +384,18 @@ final class DebugAppSession: @unchecked Sendable {
 		adapter: DebugAdapterConfig,
 		configuration: DebugLaunchConfiguration,
 		workspaceRoot: URL,
-		breakpointStore: BreakpointStore = BreakpointStore()
+		breakpointStore: BreakpointStore = BreakpointStore(),
+		onTerminated: @escaping @Sendable (Int32) -> Void = { _ in }
 	) async throws -> DebugAppSession {
 		guard adapter.type == DebugAdapterType.executable else {
 			throw DebugLaunchError.unsupportedAdapter(adapter.type)
 		}
-		guard let executableURL = resolveExecutable(adapter.command, workspaceRoot: workspaceRoot) else {
-			throw DebugLaunchError.missingExecutable(adapter.command)
+		let availability = DebugAdapterDetector.availability(for: adapter, workspaceRoot: workspaceRoot)
+		guard case let .available(executableURL) = availability else {
+			if case let .missing(remediation) = availability {
+				throw DebugLaunchError.missingExecutable(command: remediation.command, remediation: remediation.hint)
+			}
+			throw DebugLaunchError.missingExecutable(command: adapter.command, remediation: "Configure an executable adapter command.")
 		}
 		let transport = DAPProcessTransport(
 			executableURL: executableURL,
@@ -369,12 +405,21 @@ final class DebugAppSession: @unchecked Sendable {
 		)
 		let client = DAPClientSession(transport: transport)
 		let debugSession = DebugSession(client: client)
+		let breakpointVerificationStore = DebugBreakpointVerificationStore()
 		let eventPump = Task.detached(priority: .userInitiated) {
 			for await event in transport.events {
 				switch event {
 				case let .stdout(data):
 					do {
-						_ = try await client.receive(data)
+						let received = try await client.receive(data)
+						for clientEvent in received {
+							guard case let .event(message) = clientEvent,
+							      case let .breakpoint(body) = try? message.typed()
+							else {
+								continue
+							}
+							await breakpointVerificationStore.apply(body.breakpoint)
+						}
 					} catch {
 						NSLog("debug adapter receive failed: \(error)")
 					}
@@ -383,7 +428,9 @@ final class DebugAppSession: @unchecked Sendable {
 						NSLog("debug adapter stderr: \(text)")
 					}
 				case let .terminated(status):
+					await client.transportDidTerminate(status: status)
 					NSLog("debug adapter terminated: \(status)")
+					onTerminated(status)
 				}
 			}
 		}
@@ -407,21 +454,56 @@ final class DebugAppSession: @unchecked Sendable {
 			))
 			let capabilities = Self.capabilities(in: initializeResponse)
 			let supportsSetVariable = capabilities.supportsSetVariable == true
-			try await waitForInitialized(initializedTask)
+			let launchTask: Task<DAPResponse, Error>
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
-				try await client.launch(arguments: try DAPAny(encoding: launchArguments(for: configuration, workspaceRoot: workspaceRoot)))
+				let arguments = try launchArguments(for: configuration, workspaceRoot: workspaceRoot)
+				launchTask = Task {
+					try await client.launch(arguments: arguments)
+				}
 			case DebugLaunchRequest.attach:
-				try await client.attach(arguments: try DAPAny(encoding: attachArguments(for: configuration, workspaceRoot: workspaceRoot)))
+				let arguments = try attachArguments(for: configuration, workspaceRoot: workspaceRoot)
+				launchTask = Task {
+					try await client.attach(arguments: arguments)
+				}
 			default:
 				throw DebugLaunchError.unsupportedRequest(configuration.request)
 			}
-			try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot)
-			try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
-			try await client.configurationDone()
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, transport: transport, eventPump: eventPump)
+			await Task.yield()
+			if await client.state == .initializing {
+				do {
+					try await waitForInitialized(initializedTask)
+				} catch DebugLaunchError.timedOutWaitingForInitialized where adapter.kind == .lldb {
+					try await client.allowConfigurationWithoutInitializedEvent()
+				} catch {
+					throw error
+				}
+			} else {
+				initializedTask.cancel()
+			}
+			let breakpointTask = Task {
+				try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot)
+			}
+			await Task.yield()
+			let exceptionTask = Task {
+				try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
+			}
+			await Task.yield()
+			let configurationTask = capabilities.supportsConfigurationDoneRequest == true ? Task {
+				try await client.configurationDone()
+			} : nil
+			await Task.yield()
+			let verification = try await breakpointTask.value
+			await breakpointVerificationStore.replace(verification)
+			_ = try await exceptionTask.value
+			if let configurationTask {
+				_ = try await configurationTask.value
+			}
+			_ = try await launchTask.value
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
+			await client.transportDidTerminate(status: nil)
 			transport.terminate()
 			throw error
 		}
@@ -432,19 +514,36 @@ final class DebugAppSession: @unchecked Sendable {
 		transport.terminate()
 	}
 
-	private static func launchArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) -> DAPLaunchRequestArguments {
-		DAPLaunchRequestArguments(
+	func isTerminated() async -> Bool {
+		await client.state == .terminated
+	}
+
+	private static func launchArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) throws -> DAPAny {
+		try requestArguments(DAPLaunchRequestArguments(
 			noDebug: configuration.noDebug,
 			program: resolvePath(configuration.program, workspaceRoot: workspaceRoot),
 			args: configuration.args.isEmpty ? nil : configuration.args,
 			cwd: resolvePath(configuration.cwd, workspaceRoot: workspaceRoot) ?? workspaceRoot.path,
 			env: configuration.env.isEmpty ? nil : configuration.env,
 			stopOnEntry: configuration.stopOnEntry
-		)
+		), configuration: configuration, workspaceRoot: workspaceRoot)
 	}
 
-	private static func attachArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) -> DAPAttachRequestArguments {
-		DAPAttachRequestArguments(program: resolvePath(configuration.program, workspaceRoot: workspaceRoot))
+	private static func attachArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) throws -> DAPAny {
+		try requestArguments(DAPAttachRequestArguments(program: resolvePath(configuration.program, workspaceRoot: workspaceRoot)), configuration: configuration, workspaceRoot: workspaceRoot)
+	}
+
+	private static func requestArguments<Value: Encodable>(_ base: Value, configuration: DebugLaunchConfiguration, workspaceRoot: URL) throws -> DAPAny {
+		guard case var .object(arguments) = try DAPAny(encoding: base) else {
+			return try DAPAny(encoding: base)
+		}
+		for (key, value) in configuration.adapterOptions {
+			arguments[key] = value
+		}
+		if !configuration.sourceMap.isEmpty, arguments["sourceMap"] == nil {
+			arguments["sourceMap"] = .object(configuration.sourceMap.mapValues { .string(expandPath($0, workspaceRoot: workspaceRoot)) })
+		}
+		return .object(arguments)
 	}
 
 	private static func waitForFirstEvent(_ stream: AsyncStream<DAPEventMessage>) async throws {
@@ -483,26 +582,6 @@ final class DebugAppSession: @unchecked Sendable {
 		return capabilities
 	}
 
-	private static func resolveExecutable(_ command: String, workspaceRoot: URL) -> URL? {
-		let expanded = expandPath(command, workspaceRoot: workspaceRoot)
-		if expanded.contains("/") {
-			return executableURL(at: expanded)
-		}
-		let pathValue = ProcessInfo.processInfo.environment["PATH"] ?? ""
-		let searchPaths = pathValue.split(separator: ":").map(String.init) + ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", "/usr/sbin", "/sbin"]
-		for directory in searchPaths {
-			if let url = executableURL(at: URL(fileURLWithPath: directory).appendingPathComponent(expanded).path) {
-				return url
-			}
-		}
-		return nil
-	}
-
-	private static func executableURL(at path: String) -> URL? {
-		let url = URL(fileURLWithPath: path).standardizedFileURL
-		return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
-	}
-
 	private static func resolvePath(_ path: String?, workspaceRoot: URL) -> String? {
 		guard let path, !path.isEmpty else {
 			return nil
@@ -522,7 +601,7 @@ final class DebugAppSession: @unchecked Sendable {
 
 private enum DebugLaunchError: Error, CustomStringConvertible {
 	case missingAdapter(String)
-	case missingExecutable(String)
+	case missingExecutable(command: String, remediation: String)
 	case timedOutWaitingForInitialized
 	case unsupportedAdapter(String)
 	case unsupportedRequest(String)
@@ -530,9 +609,9 @@ private enum DebugLaunchError: Error, CustomStringConvertible {
 	var description: String {
 		switch self {
 		case let .missingAdapter(id):
-			return L10n.string("Missing debug adapter: \(id)")
-		case let .missingExecutable(command):
-			return L10n.string("Missing debug adapter executable: \(command)")
+			return L10n.string("Missing debug adapter: \(id). Configure it in .itsy/dap.toml.")
+		case let .missingExecutable(command, remediation):
+			return L10n.string("Missing debug adapter executable: \(command). Fix: \(remediation)")
 		case .timedOutWaitingForInitialized:
 			return L10n.string("Timed out waiting for debug adapter initialization")
 		case let .unsupportedAdapter(type):

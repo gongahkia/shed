@@ -2,6 +2,9 @@ import Darwin
 import Dispatch
 import Foundation
 
+@_silgen_name("proc_listchildpids")
+private func proc_listchildpids(_ parentPID: pid_t, _ buffer: UnsafeMutableRawPointer?, _ bufferSize: Int32) -> Int32
+
 public enum WorkspaceTaskSource: String, Codable, Equatable, Sendable {
 	case swiftPackage
 	case packageScript
@@ -364,21 +367,41 @@ public struct WorkspaceTaskResult: Equatable, Sendable {
 	public var exitStatus: Int32
 	public var stdout: String
 	public var stderr: String
+	public var wasCancelled: Bool
+	public var wasReady: Bool
 
-	public init(task: WorkspaceTask, exitStatus: Int32, stdout: String, stderr: String) {
+	public init(
+		task: WorkspaceTask,
+		exitStatus: Int32,
+		stdout: String,
+		stderr: String,
+		wasCancelled: Bool = false,
+		wasReady: Bool = false
+	) {
 		self.task = task
 		self.exitStatus = exitStatus
 		self.stdout = stdout
 		self.stderr = stderr
+		self.wasCancelled = wasCancelled
+		self.wasReady = wasReady
 	}
 
 	public var succeeded: Bool {
-		exitStatus == 0
+		exitStatus == 0 && !wasCancelled
 	}
 }
 
 public enum WorkspaceTaskRunError: Error, Equatable, Sendable {
 	case invalidOutput
+	case alreadyStarted
+}
+
+public enum WorkspaceTaskRunState: Equatable, Sendable {
+	case pending
+	case running
+	case cancelling
+	case finished(Int32)
+	case cancelled(Int32)
 }
 
 public enum WorkspaceTaskOutputKind: Sendable, Equatable {
@@ -399,38 +422,118 @@ public struct WorkspaceTaskOutput: Sendable, Equatable {
 public final class WorkspaceTaskHandle: @unchecked Sendable {
 	private let process: Process
 	private let task: WorkspaceTask
+	private let onOutput: @Sendable (WorkspaceTaskOutput) -> Void
+	private let onReady: @Sendable (WorkspaceTaskHandle) -> Void
+	private let onFinish: @Sendable (WorkspaceTaskResult) -> Void
+	private let closePipes: @Sendable () -> Void
+	private let cancelHandlers: @Sendable () -> Void
 	private let lock = NSLock()
 	private var stdout = Data()
 	private var stderr = Data()
+	private var stateStorage: WorkspaceTaskRunState = .pending
+	private var didStart = false
+	private var didBecomeReady = false
+	private var cancellationRequested = false
 	private var didFinish = false
 
-	fileprivate init(task: WorkspaceTask, process: Process) {
+	fileprivate init(
+		task: WorkspaceTask,
+		process: Process,
+		onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void,
+		onReady: @escaping @Sendable (WorkspaceTaskHandle) -> Void,
+		onFinish: @escaping @Sendable (WorkspaceTaskResult) -> Void,
+		closePipes: @escaping @Sendable () -> Void,
+		cancelHandlers: @escaping @Sendable () -> Void
+	) {
 		self.task = task
 		self.process = process
+		self.onOutput = onOutput
+		self.onReady = onReady
+		self.onFinish = onFinish
+		self.closePipes = closePipes
+		self.cancelHandlers = cancelHandlers
 	}
 
 	public var isRunning: Bool {
-		process.isRunning
+		lock.lock()
+		let isRunning = didStart && !didFinish && process.isRunning
+		lock.unlock()
+		return isRunning
+	}
+
+	public var state: WorkspaceTaskRunState {
+		lock.lock()
+		let state = stateStorage
+		lock.unlock()
+		return state
+	}
+
+	public var wasReady: Bool {
+		lock.lock()
+		let wasReady = didBecomeReady
+		lock.unlock()
+		return wasReady
+	}
+
+	public func start() throws {
+		lock.lock()
+		guard !didStart else {
+			lock.unlock()
+			throw WorkspaceTaskRunError.alreadyStarted
+		}
+		didStart = true
+		let wasCancelledBeforeStart = cancellationRequested
+		lock.unlock()
+		if wasCancelledBeforeStart {
+			cancelHandlers()
+			closePipes()
+			if let result = finish(status: SIGTERM) {
+				onFinish(result)
+			}
+			return
+		}
+		do {
+			try process.run()
+		} catch {
+			cancelHandlers()
+			closePipes()
+			markLaunchFailed()
+			throw error
+		}
+		closePipes()
+		let shouldAnnounceReadiness = markStarted()
+		if shouldAnnounceReadiness {
+			onReady(self)
+		}
+		if cancellationWasRequested() {
+			terminateProcessTree(escalationDelay: 1.0)
+		}
 	}
 
 	public func cancel(escalationDelay: TimeInterval = 1.0) {
-		guard process.isRunning else {
+		lock.lock()
+		guard !didFinish else {
+			lock.unlock()
 			return
 		}
-		process.terminate()
-		let pid = process.processIdentifier
-		DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + escalationDelay) {
-			if self.process.isRunning {
-				kill(pid, SIGKILL)
-			}
+		cancellationRequested = true
+		stateStorage = .cancelling
+		let hasStarted = didStart
+		lock.unlock()
+		if hasStarted {
+			terminateProcessTree(escalationDelay: escalationDelay)
 		}
 	}
 
-	fileprivate func append(_ data: Data, kind: WorkspaceTaskOutputKind, onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void) {
+	fileprivate func append(_ data: Data, kind: WorkspaceTaskOutputKind) {
 		guard !data.isEmpty else {
 			return
 		}
 		lock.lock()
+		guard !didFinish else {
+			lock.unlock()
+			return
+		}
 		switch kind {
 		case .stdout:
 			stdout.append(data)
@@ -450,12 +553,100 @@ public final class WorkspaceTaskHandle: @unchecked Sendable {
 			return nil
 		}
 		didFinish = true
+		let wasCancelled = cancellationRequested
+		stateStorage = wasCancelled ? .cancelled(status) : .finished(status)
 		return WorkspaceTaskResult(
 			task: task,
 			exitStatus: status,
 			stdout: String(decoding: stdout, as: UTF8.self),
-			stderr: String(decoding: stderr, as: UTF8.self)
+			stderr: String(decoding: stderr, as: UTF8.self),
+			wasCancelled: wasCancelled,
+			wasReady: didBecomeReady
 		)
+	}
+
+	private func markStarted() -> Bool {
+		lock.lock()
+		defer { lock.unlock() }
+		guard !didFinish else {
+			return false
+		}
+		if cancellationRequested {
+			stateStorage = .cancelling
+			return false
+		}
+		stateStorage = .running
+		guard task.isBackground else {
+			return false
+		}
+		didBecomeReady = true
+		return true
+	}
+
+	private func markLaunchFailed() {
+		lock.lock()
+		defer { lock.unlock() }
+		didFinish = true
+		stateStorage = .finished(127)
+	}
+
+	private func cancellationWasRequested() -> Bool {
+		lock.lock()
+		let cancellationRequested = self.cancellationRequested
+		lock.unlock()
+		return cancellationRequested
+	}
+
+	private func terminateProcessTree(escalationDelay: TimeInterval) {
+		let pid = process.processIdentifier
+		guard pid > 0 else {
+			return
+		}
+		Self.signalDescendants(of: pid, signal: SIGTERM)
+		process.terminate()
+		DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + max(0, escalationDelay)) {
+			guard self.process.isRunning else {
+				return
+			}
+			Self.signalDescendants(of: pid, signal: SIGKILL)
+			_ = Darwin.kill(pid, SIGKILL)
+		}
+	}
+
+	private static func signalDescendants(of rootPID: pid_t, signal: Int32) {
+		for processID in descendantProcessIDs(of: rootPID).reversed() {
+			_ = Darwin.kill(processID, signal)
+		}
+	}
+
+	private static func descendantProcessIDs(of rootPID: pid_t) -> [pid_t] {
+		var descendants: [pid_t] = []
+		var pending: [pid_t] = [rootPID]
+		while let parentPID = pending.popLast() {
+			let children = childProcessIDs(of: parentPID)
+			descendants.append(contentsOf: children)
+			pending.append(contentsOf: children)
+		}
+		return descendants
+	}
+
+	private static func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
+		var capacity = 16
+		while capacity <= 4_096 {
+			var processIDs = [pid_t](repeating: 0, count: capacity)
+			let byteCount = processIDs.withUnsafeMutableBytes { buffer in
+				proc_listchildpids(parentPID, buffer.baseAddress, Int32(buffer.count))
+			}
+			guard byteCount > 0 else {
+				return []
+			}
+			let count = Int(byteCount) / MemoryLayout<pid_t>.stride
+			if count < capacity {
+				return processIDs.prefix(count).filter { $0 > 0 }
+			}
+			capacity *= 2
+		}
+		return []
 	}
 }
 
@@ -509,12 +700,13 @@ public struct WorkspaceTaskRunner: Sendable {
 		return WorkspaceTaskResult(task: task, exitStatus: exitStatus, stdout: stdout, stderr: stderr)
 	}
 
-	public func start(
+	public func prepare(
 		_ task: WorkspaceTask,
 		root: URL,
 		onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void,
-		onFinish: @escaping @Sendable (WorkspaceTaskResult) -> Void
-	) throws -> WorkspaceTaskHandle {
+		onFinish: @escaping @Sendable (WorkspaceTaskResult) -> Void,
+		onReady: @escaping @Sendable (WorkspaceTaskHandle) -> Void = { _ in }
+	) -> WorkspaceTaskHandle {
 		let process = Process()
 		process.executableURL = executableURL
 		process.arguments = [task.command] + task.arguments
@@ -524,28 +716,52 @@ public struct WorkspaceTaskRunner: Sendable {
 		let stderrPipe = Pipe()
 		process.standardOutput = stdoutPipe
 		process.standardError = stderrPipe
-		let handle = WorkspaceTaskHandle(task: task, process: process)
+		let handle = WorkspaceTaskHandle(
+			task: task,
+			process: process,
+			onOutput: onOutput,
+			onReady: onReady,
+			onFinish: onFinish,
+			closePipes: {
+				stdoutPipe.fileHandleForWriting.closeFile()
+				stderrPipe.fileHandleForWriting.closeFile()
+			},
+			cancelHandlers: {
+				stdoutPipe.fileHandleForReading.readabilityHandler = nil
+				stderrPipe.fileHandleForReading.readabilityHandler = nil
+				process.terminationHandler = nil
+			}
+		)
 		stdoutPipe.fileHandleForReading.readabilityHandler = { fileHandle in
-			handle.append(fileHandle.availableData, kind: .stdout, onOutput: onOutput)
+			handle.append(fileHandle.availableData, kind: .stdout)
 		}
 		stderrPipe.fileHandleForReading.readabilityHandler = { fileHandle in
-			handle.append(fileHandle.availableData, kind: .stderr, onOutput: onOutput)
+			handle.append(fileHandle.availableData, kind: .stderr)
 		}
 		process.terminationHandler = { process in
 			stdoutPipe.fileHandleForReading.readabilityHandler = nil
 			stderrPipe.fileHandleForReading.readabilityHandler = nil
-			handle.append(stdoutPipe.fileHandleForReading.availableData, kind: .stdout, onOutput: onOutput)
-			handle.append(stderrPipe.fileHandleForReading.availableData, kind: .stderr, onOutput: onOutput)
+			handle.append(stdoutPipe.fileHandleForReading.availableData, kind: .stdout)
+			handle.append(stderrPipe.fileHandleForReading.availableData, kind: .stderr)
 			if let result = handle.finish(status: process.terminationStatus) {
 				onFinish(result)
 			}
-		}
-		do {
-			try process.run()
-		} catch {
-			stdoutPipe.fileHandleForReading.readabilityHandler = nil
-			stderrPipe.fileHandleForReading.readabilityHandler = nil
 			process.terminationHandler = nil
+		}
+		return handle
+	}
+
+	public func start(
+		_ task: WorkspaceTask,
+		root: URL,
+		onOutput: @escaping @Sendable (WorkspaceTaskOutput) -> Void,
+		onFinish: @escaping @Sendable (WorkspaceTaskResult) -> Void,
+		onReady: @escaping @Sendable (WorkspaceTaskHandle) -> Void = { _ in }
+	) throws -> WorkspaceTaskHandle {
+		let handle = prepare(task, root: root, onOutput: onOutput, onFinish: onFinish, onReady: onReady)
+		do {
+			try handle.start()
+		} catch {
 			throw error
 		}
 		return handle

@@ -58,6 +58,16 @@ import Testing
 }
 
 @MainActor
+@Test func lspWorkspaceUpdateIsUndoableAsOneGroup() {
+	let document = ItsyDocument()
+	document.editor = Editor(text: "one")
+	document.applyLSPUpdatedText("two")
+	#expect(editorStorageString(document.editor) == "two")
+	document.editor.undo()
+	#expect(editorStorageString(document.editor) == "one")
+}
+
+@MainActor
 @Test func documentRestoresAndClearsDurableDirtyRecoveryJournal() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
 	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

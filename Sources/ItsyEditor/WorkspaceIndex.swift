@@ -7,6 +7,11 @@ public enum WorkspaceSymbolKind: String, Codable, Equatable, Sendable {
 	case variable
 }
 
+public enum WorkspaceSymbolSource: String, Codable, Equatable, Sendable {
+	case local
+	case languageServer
+}
+
 public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 	public var name: String
 	public var kind: WorkspaceSymbolKind
@@ -18,6 +23,7 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 	public var signature: String?
 	public var containerName: String?
 	public var documentation: String?
+	public var source: WorkspaceSymbolSource
 
 	public init(
 		name: String,
@@ -29,7 +35,8 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 		endColumn: Int? = nil,
 		signature: String? = nil,
 		containerName: String? = nil,
-		documentation: String? = nil
+		documentation: String? = nil,
+		source: WorkspaceSymbolSource = .local
 	) {
 		self.name = name
 		self.kind = kind
@@ -41,6 +48,70 @@ public struct WorkspaceSymbol: Codable, Equatable, Sendable {
 		self.signature = signature
 		self.containerName = containerName
 		self.documentation = documentation
+		self.source = source
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case name, kind, relativePath, line, column, endLine, endColumn, signature, containerName, documentation, source
+	}
+
+	public init(from decoder: Decoder) throws {
+		let values = try decoder.container(keyedBy: CodingKeys.self)
+		name = try values.decode(String.self, forKey: .name)
+		kind = try values.decode(WorkspaceSymbolKind.self, forKey: .kind)
+		relativePath = try values.decode(String.self, forKey: .relativePath)
+		line = try values.decode(Int.self, forKey: .line)
+		column = try values.decode(Int.self, forKey: .column)
+		endLine = try values.decodeIfPresent(Int.self, forKey: .endLine)
+		endColumn = try values.decodeIfPresent(Int.self, forKey: .endColumn)
+		signature = try values.decodeIfPresent(String.self, forKey: .signature)
+		containerName = try values.decodeIfPresent(String.self, forKey: .containerName)
+		documentation = try values.decodeIfPresent(String.self, forKey: .documentation)
+		source = try values.decodeIfPresent(WorkspaceSymbolSource.self, forKey: .source) ?? .local
+	}
+
+	public func encode(to encoder: Encoder) throws {
+		var values = encoder.container(keyedBy: CodingKeys.self)
+		try values.encode(name, forKey: .name)
+		try values.encode(kind, forKey: .kind)
+		try values.encode(relativePath, forKey: .relativePath)
+		try values.encode(line, forKey: .line)
+		try values.encode(column, forKey: .column)
+		try values.encodeIfPresent(endLine, forKey: .endLine)
+		try values.encodeIfPresent(endColumn, forKey: .endColumn)
+		try values.encodeIfPresent(signature, forKey: .signature)
+		try values.encodeIfPresent(containerName, forKey: .containerName)
+		try values.encodeIfPresent(documentation, forKey: .documentation)
+		try values.encode(source, forKey: .source)
+	}
+}
+
+public enum WorkspaceSymbolMerge {
+	public static func preferringLanguageServer(_ languageServer: [WorkspaceSymbol], over local: [WorkspaceSymbol]) -> [WorkspaceSymbol] {
+		let lsp = languageServer.map { symbol in
+			var symbol = symbol
+			symbol.source = .languageServer
+			return symbol
+		}
+		let identities = Set(lsp.map(identity(for:)))
+		let fallback = local.compactMap { symbol -> WorkspaceSymbol? in
+			guard !identities.contains(identity(for: symbol)) else {
+				return nil
+			}
+			var symbol = symbol
+			symbol.source = .local
+			return symbol
+		}
+		return lsp + fallback
+	}
+
+	private static func identity(for symbol: WorkspaceSymbol) -> String {
+		[
+			symbol.relativePath,
+			symbol.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current),
+			symbol.kind.rawValue,
+			symbol.containerName ?? "",
+		].joined(separator: "\u{1F}")
 	}
 }
 

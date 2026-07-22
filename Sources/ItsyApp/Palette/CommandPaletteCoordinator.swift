@@ -464,11 +464,9 @@ import ItsyEditor
 			: { $0.name }
 		switch scope {
 		case .workspace where commandPaletteLSPSymbols != nil:
-			let lspSymbols = Array((commandPaletteLSPSymbols ?? []).prefix(100))
-			let lspKeys = Set(lspSymbols.map(symbolRangeKey(_:)))
-			let fallback = commandPaletteBaseSymbols.filter { !lspKeys.contains(symbolRangeKey($0)) }
-			commandPaletteFilteredSymbols = lspSymbols + FuzzyMatcher.ranked(
-				fallback,
+			let merged = WorkspaceSymbolMerge.preferringLanguageServer(commandPaletteLSPSymbols ?? [], over: commandPaletteBaseSymbols)
+			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(
+				merged,
 				query: fuzzyQuery,
 				includeUnmatched: fuzzyQuery.isEmpty,
 				by: keyPath
@@ -492,16 +490,6 @@ import ItsyEditor
 		if !commandPaletteFilteredSymbols.isEmpty {
 			commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
 		}
-	}
-
-	private func symbolRangeKey(_ symbol: WorkspaceSymbol) -> String {
-		[
-			symbol.relativePath,
-			String(symbol.line),
-			String(symbol.column),
-			String(symbol.endLine ?? symbol.line),
-			String(symbol.endColumn ?? symbol.column),
-		].joined(separator: "\u{1f}")
 	}
 
 	private func moveCommandPaletteSelection(_ delta: Int) {

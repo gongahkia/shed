@@ -55,6 +55,7 @@ private enum OutlineCollapseStore {
 @MainActor final class OutlineCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
+	private let fileSymbolProvider: @MainActor () async throws -> [WorkspaceSymbol]?
 	private var outlinePanel: NSPanel?
 	private var outlineStatusLabel: NSTextField?
 	private var outlineOutlineView: NSOutlineView?
@@ -63,10 +64,17 @@ private enum OutlineCollapseStore {
 	private var outlineCollapseStateByURL: [String: Set<String>] = OutlineCollapseStore.load()
 	private var outlineActiveURLKey: String?
 	private var outlineSuppressPersist = false
+	private var outlineRefreshGeneration = 0
+	private var outlineSymbolRequest: Task<Void, Never>?
 
-	init(documentController: ItsyDocumentController, activeDocumentProvider: @escaping () -> NSDocument?) {
+	init(
+		documentController: ItsyDocumentController,
+		activeDocumentProvider: @escaping () -> NSDocument?,
+		fileSymbolProvider: @escaping @MainActor () async throws -> [WorkspaceSymbol]? = { nil }
+	) {
 		self.documentController = documentController
 		self.activeDocumentProvider = activeDocumentProvider
+		self.fileSymbolProvider = fileSymbolProvider
 	}
 
 	@objc func showOutline(_ sender: Any?) {
@@ -189,6 +197,9 @@ private enum OutlineCollapseStore {
 	}
 
 	private func refreshOutline() {
+		outlineRefreshGeneration += 1
+		outlineSymbolRequest?.cancel()
+		let generation = outlineRefreshGeneration
 		guard
 			let url = (activeDocumentProvider() as? ItsyDocument)?.fileURL,
 			let index = ItsyWorkspaceController.currentWorkspaceIndex,
@@ -202,9 +213,32 @@ private enum OutlineCollapseStore {
 		}
 		let symbols = index.symbolsForFile(relativePath: relative)
 		outlineActiveURLKey = url.absoluteString
+		applyOutlineSymbols(symbols, relativePath: relative)
+		requestLSPSymbols(for: url, relativePath: relative, fallback: symbols, generation: generation)
+	}
+
+	private func requestLSPSymbols(for url: URL, relativePath: String, fallback: [WorkspaceSymbol], generation: Int) {
+		let provider = fileSymbolProvider
+		outlineSymbolRequest = Task { [weak self] in
+			guard let symbols = try? await provider(), !Task.isCancelled else {
+				return
+			}
+			guard
+				let self,
+				generation == self.outlineRefreshGeneration,
+				self.outlinePanel?.isVisible == true,
+				(self.activeDocumentProvider() as? ItsyDocument)?.fileURL?.standardizedFileURL == url.standardizedFileURL
+			else {
+				return
+			}
+			self.applyOutlineSymbols(WorkspaceSymbolMerge.preferringLanguageServer(symbols, over: fallback), relativePath: relativePath)
+		}
+	}
+
+	private func applyOutlineSymbols(_ symbols: [WorkspaceSymbol], relativePath: String) {
 		if symbols.isEmpty {
 			outlineKindNodes = []
-			outlineStatusLabel?.stringValue = "\(relative) — \(L10n.string("No symbols in this file"))"
+			outlineStatusLabel?.stringValue = "\(relativePath) — \(L10n.string("No symbols in this file"))"
 			outlineOutlineView?.reloadData()
 			return
 		}
@@ -219,7 +253,7 @@ private enum OutlineCollapseStore {
 			}
 			return OutlineKindNode(kind: kind, symbols: nodes)
 		}
-		outlineStatusLabel?.stringValue = "\(relative) — \(symbols.count) \(L10n.string("symbols"))"
+		outlineStatusLabel?.stringValue = "\(relativePath) — \(symbols.count) \(L10n.string("symbols"))"
 		outlineOutlineView?.reloadData()
 		applyOutlineCollapseState()
 	}

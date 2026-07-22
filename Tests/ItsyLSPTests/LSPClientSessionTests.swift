@@ -66,6 +66,64 @@ import Testing
 	#expect(await session.state == .exited)
 }
 
+@Test func clientCancelsIndividualRequestsAndIgnoresLateResponses() async throws {
+	let (session, transport) = try await initializedSession()
+	let task = Task {
+		try await session.sendRequest(method: LSPMethod.textDocumentCompletion)
+	}
+	try await transport.waitForWriteCount(3)
+	task.cancel()
+	try await transport.waitForWriteCount(4)
+	#expect(try transport.message(at: 3) == .notification(JSONRPCNotificationMessage(
+		method: LSPMethod.cancelRequest,
+		params: .object(["id": .int(2)])
+	)))
+	do {
+		_ = try await task.value
+		Issue.record("expected cancellation")
+	} catch is CancellationError {}
+	let events = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .null
+	))))
+	#expect(events.isEmpty)
+	#expect(await session.state == .running)
+}
+
+@Test func clientSendsTypedNavigationRequests() async throws {
+	let (session, transport) = try await initializedSession()
+	let position = LSPPosition(line: 2, character: 4)
+	let uri = "file:///tmp/App.swift"
+	let tasks = [
+		Task { try await session.definition(uri: uri, position: position) },
+		Task { try await session.declaration(uri: uri, position: position) },
+		Task { try await session.typeDefinition(uri: uri, position: position) },
+		Task { try await session.implementation(uri: uri, position: position) },
+	]
+	try await transport.waitForWriteCount(6)
+	let requests = try (2 ..< 6).map { try transport.message(at: $0) }
+	#expect(Set(requests.compactMap { message -> String? in
+		guard case let .request(request) = message else {
+			return nil
+		}
+		return request.method
+	}) == Set([
+		LSPMethod.textDocumentDefinition,
+		LSPMethod.textDocumentDeclaration,
+		LSPMethod.textDocumentTypeDefinition,
+		LSPMethod.textDocumentImplementation,
+	]))
+	for message in requests {
+		guard case let .request(request) = message else {
+			continue
+		}
+		_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(id: request.id, result: .null))))
+	}
+	for task in tasks {
+		#expect(try await task.value == .none)
+	}
+}
+
 @Test func clientWorkspaceSymbolSendsTypedRequest() async throws {
 	let (session, transport) = try await initializedSession()
 	let task = Task {

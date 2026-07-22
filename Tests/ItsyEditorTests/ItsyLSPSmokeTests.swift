@@ -5,7 +5,7 @@ import Testing
 
 @Suite(.enabled(if: SmokeTooling.sourceKitLSPURL != nil), .timeLimit(.minutes(1)))
 struct ItsyLSPSmokeTests {
-	@Test func sourceKitPackagePublishesDiagnosticsCompletionAndDefinition() async throws {
+	@Test func sourceKitPackagePublishesDiagnosticsCompletionDefinitionRenameAndFormatting() async throws {
 		let sourceKitLSPURL = try #require(SmokeTooling.sourceKitLSPURL)
 		let fixture = try SourceKitSmokeFixture()
 		defer {
@@ -57,6 +57,17 @@ struct ItsyLSPSmokeTests {
 			fixture.matches(location: location) && location.range.start.line == 0
 		})
 
+		let rename = try await client.rename(uri: fixture.fileURI, position: fixture.renamePosition, newName: "renamedTargetFunction")
+		let renameEdits = rename?.changes?[fixture.fileURI] ?? rename?.documentChanges?.first {
+			$0.textDocument.uri == fixture.fileURI
+		}?.edits
+		#expect(renameEdits?.contains { $0.newText == "renamedTargetFunction" } == true)
+
+		_ = try await client.formatDocument(
+			uri: fixture.fileURI,
+			options: LSPFormattingOptions(tabSize: 4, insertSpaces: true)
+		)
+
 		try? await client.shutdown()
 	}
 }
@@ -85,6 +96,12 @@ private struct SourceKitSmokeFixture {
 	}
 
 	var definitionPosition: LSPPosition {
+		get throws {
+			try position(inside: "smokeTargetFunction(41)")
+		}
+	}
+
+	var renamePosition: LSPPosition {
 		get throws {
 			try position(inside: "smokeTargetFunction(41)")
 		}

@@ -8,3 +8,6 @@ docs:
 
 screenshots:
 	scripts/capture_screenshots.sh
+
+lsp-matrix:
+	scripts/lsp_matrix.sh $(ARGS)

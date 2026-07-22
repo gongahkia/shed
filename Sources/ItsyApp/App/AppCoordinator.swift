@@ -50,7 +50,10 @@ import ItsyKeymap
 	private lazy var problemsCoordinator = ProblemsCoordinator(documentController: documentController)
 	private lazy var outlineCoordinator = OutlineCoordinator(
 		documentController: documentController,
-		activeDocumentProvider: { [weak self] in self?.activeDocument() }
+		activeDocumentProvider: { [weak self] in self?.activeDocument() },
+		fileSymbolProvider: { [weak self] in
+			try await self?.activeEditorWindowController()?.fileSymbolsFromLSP()
+		}
 	)
 	private lazy var extensionsCoordinator = ExtensionsCoordinator()
 

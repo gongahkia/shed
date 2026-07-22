@@ -16,6 +16,8 @@ private let workspaceLogger = Logger(
 	private static let workspaceStateStore = WorkspaceStateStore()
 	private static var rootURLs: [URL] = []
 	private static var gitSnapshot: GitWorkspaceSnapshot?
+	private static let gitStatusRefreshCoordinator = GitStatusRefreshCoordinator()
+	private static var gitStatusRefreshTask: Task<Void, Never>?
 	private static var workspaceIndex: WorkspaceIndex?
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
@@ -195,11 +197,29 @@ private let workspaceLogger = Logger(
 	}
 
 	static func refreshGitStatus() {
-		loadGitStatus()
-		for controller in controllers.allObjects {
-			controller.setGitSnapshot(gitSnapshot)
+		gitStatusRefreshTask?.cancel()
+		guard let root = currentRootURL else {
+			gitSnapshot = nil
+			for controller in controllers.allObjects {
+				controller.setGitSnapshot(nil)
+			}
+			return
 		}
-		ItsyGitHunkGutterCoordinator.applyAll()
+		gitStatusRefreshTask = Task { [root] in
+			guard let result = await gitStatusRefreshCoordinator.refresh(root: root), !Task.isCancelled else {
+				return
+			}
+			switch result {
+			case let .snapshot(snapshot):
+				gitSnapshot = snapshot
+			case .failure:
+				gitSnapshot = nil
+			}
+			for controller in controllers.allObjects {
+				controller.setGitSnapshot(gitSnapshot)
+			}
+			ItsyGitHunkGutterCoordinator.applyAll()
+		}
 	}
 
 	static func revealInFileTree(_ url: URL) {
@@ -213,13 +233,7 @@ private let workspaceLogger = Logger(
 	}
 
 	private static func loadGitStatus() {
-		guard let rootURL = currentRootURL,
-		      let gitRoot = try? GitRepository.discoverRoot(containing: rootURL)
-		else {
-			gitSnapshot = nil
-			return
-		}
-		gitSnapshot = try? GitRepository(root: gitRoot).snapshot()
+		refreshGitStatus()
 	}
 
 	@discardableResult

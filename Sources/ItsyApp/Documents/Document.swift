@@ -282,6 +282,19 @@ import ItsySyntax
 		applyHighlightSpans()
 	}
 
+	func setLSPSemanticSurface(inlayHints: [TextInlineAnnotation], highlights: [Range<Int>]) {
+		for view in editorViews {
+			view.inlayHintAnnotations = inlayHints
+			view.setDocumentHighlightRanges(highlights)
+		}
+	}
+
+	func setLSPFoldedLineRanges(_ ranges: [Range<Int>]) {
+		for view in editorViews {
+			view.foldedLineRanges = ranges
+		}
+	}
+
 	private func refreshGutterDecorators() {
 		let decorators = [breakpointGutterDecorator, problemGutterDecorator, gitGutter.decorator, lspGutterDecorator]
 			.compactMap { $0 }
@@ -329,9 +342,22 @@ import ItsySyntax
 	}
 
 	func applyLSPUpdatedText(_ text: String) {
-		var updated = Editor(text: text)
-		updated.setSelection(clampedSelection(editor.selections, length: updated.textStorage.length))
-		installReadEditor(updated, fileURL: fileURL)
+		guard editorStorageString(editor) != text else {
+			return
+		}
+		let oldRope: Rope? = if case let .rope(rope) = editor.textStorage { rope } else { nil }
+		editor.beginUndoGroup()
+		editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: editor.textStorage.length)))
+		editor.insert(text)
+		editor.endUndoGroup()
+		let edits = editor.lastEditBatch
+		lspHighlightSpans = []
+		refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+		for view in editorViews {
+			view.editor = editor
+			view.undoTreeChanged?(editor.history.tree)
+		}
+		updateHandoffActivity()
 		updateChangeCount(.changeDone)
 		scheduleGitHunkGutterRefresh()
 	}

@@ -1,12 +1,17 @@
 import Foundation
 
-public enum BundledLanguageUnsupportedReason: String, Equatable, Sendable {
+public enum BundledLanguageUnsupportedReason: String, Codable, Equatable, Sendable {
 	case noBundledServer = "no_bundled_server"
 }
 
 public enum BundledLanguageSupport: Equatable, Sendable {
 	case supported
 	case unsupported(BundledLanguageUnsupportedReason)
+}
+
+public enum BundledLanguageLSPCapabilityState: String, Codable, Equatable, Sendable {
+	case declaredServer = "declared_server"
+	case unavailable
 }
 
 public struct BundledLanguageServer: Equatable, Sendable {
@@ -56,6 +61,15 @@ public struct BundledLanguage: Equatable, Sendable {
 		self.fixture = fixture
 		self.server = server
 		self.support = support
+	}
+
+	public var lspCapabilityState: BundledLanguageLSPCapabilityState {
+		switch support {
+		case .supported:
+			.declaredServer
+		case .unsupported:
+			.unavailable
+		}
 	}
 }
 
@@ -107,7 +121,7 @@ public enum BundledLanguageInventory {
 		supported("swift", extensions: ["swift"], fixture: "let value = 1\n", server: sourceKit),
 		supported("terraform", extensions: ["tf", "tfvars", "hcl"], fixture: "resource \"x\" \"y\" {}\n", server: terraform),
 		unsupported("toml", extensions: ["toml"], fixture: "value = 1\n"),
-		unsupported("tsx", extensions: ["tsx"], fixture: "const View = <main />;\n", languageID: "typescript"),
+		supported("tsx", extensions: ["tsx"], fixture: "const View = <main />;\n", languageID: "typescript", server: typescript),
 		supported("typescript", extensions: ["ts", "mts", "cts"], fixture: "const value: number = 1;\n", server: typescript),
 		unsupported("vue", extensions: ["vue"], fixture: "<template><main>Hello</main></template>\n"),
 		unsupported("yaml", extensions: ["yaml", "yml"], fixture: "value: true\n"),

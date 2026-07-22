@@ -15,6 +15,9 @@ public enum LSPMethod {
 	public static let textDocumentHover = "textDocument/hover"
 	public static let textDocumentSignatureHelp = "textDocument/signatureHelp"
 	public static let textDocumentDefinition = "textDocument/definition"
+	public static let textDocumentDeclaration = "textDocument/declaration"
+	public static let textDocumentTypeDefinition = "textDocument/typeDefinition"
+	public static let textDocumentImplementation = "textDocument/implementation"
 	public static let textDocumentDocumentSymbol = "textDocument/documentSymbol"
 	public static let textDocumentReferences = "textDocument/references"
 	public static let textDocumentPrepareRename = "textDocument/prepareRename"
@@ -38,6 +41,7 @@ public enum LSPMethod {
 	public static let typeHierarchySubtypes = "typeHierarchy/subtypes"
 	public static let workspaceExecuteCommand = "workspace/executeCommand"
 	public static let workspaceDidChangeWatchedFiles = "workspace/didChangeWatchedFiles"
+	public static let cancelRequest = "$/cancelRequest"
 }
 
 public struct LSPPosition: Codable, Equatable, Sendable {
@@ -383,6 +387,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 	public var filterText: String?
 	public var insertText: String?
 	public var insertTextFormat: LSPInsertTextFormat?
+	public var commitCharacters: [String]?
 	public var textEdit: LSPTextEdit?
 	public var data: LSPAny?
 
@@ -394,6 +399,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 		filterText: String? = nil,
 		insertText: String? = nil,
 		insertTextFormat: LSPInsertTextFormat? = nil,
+		commitCharacters: [String]? = nil,
 		textEdit: LSPTextEdit? = nil,
 		data: LSPAny? = nil
 	) {
@@ -404,6 +410,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 		self.filterText = filterText
 		self.insertText = insertText
 		self.insertTextFormat = insertTextFormat
+		self.commitCharacters = commitCharacters
 		self.textEdit = textEdit
 		self.data = data
 	}
@@ -817,6 +824,8 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 	public var completionProvider: LSPCompletionOptions?
 	public var signatureHelpProvider: LSPSignatureHelpOptions?
 	public var codeActionProvider: LSPCodeActionProviderCapability?
+	public var documentFormattingProvider: LSPBooleanCapability?
+	public var documentRangeFormattingProvider: LSPBooleanCapability?
 	public var semanticTokensProvider: LSPSemanticTokensOptions?
 	public var inlayHintProvider: LSPBooleanCapability?
 	public var foldingRangeProvider: LSPBooleanCapability?
@@ -828,6 +837,8 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 		completionProvider: LSPCompletionOptions? = nil,
 		signatureHelpProvider: LSPSignatureHelpOptions? = nil,
 		codeActionProvider: LSPCodeActionProviderCapability? = nil,
+		documentFormattingProvider: LSPBooleanCapability? = nil,
+		documentRangeFormattingProvider: LSPBooleanCapability? = nil,
 		semanticTokensProvider: LSPSemanticTokensOptions? = nil,
 		inlayHintProvider: LSPBooleanCapability? = nil,
 		foldingRangeProvider: LSPBooleanCapability? = nil,
@@ -838,6 +849,8 @@ public struct LSPServerCapabilities: Codable, Equatable, Sendable {
 		self.completionProvider = completionProvider
 		self.signatureHelpProvider = signatureHelpProvider
 		self.codeActionProvider = codeActionProvider
+		self.documentFormattingProvider = documentFormattingProvider
+		self.documentRangeFormattingProvider = documentRangeFormattingProvider
 		self.semanticTokensProvider = semanticTokensProvider
 		self.inlayHintProvider = inlayHintProvider
 		self.foldingRangeProvider = foldingRangeProvider

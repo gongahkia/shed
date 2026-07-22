@@ -159,6 +159,22 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.workspaceSymbol(query: query)
 	}
 
+	public func definition(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await session.definition(uri: uri, position: position)
+	}
+
+	public func declaration(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await session.declaration(uri: uri, position: position)
+	}
+
+	public func typeDefinition(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await session.typeDefinition(uri: uri, position: position)
+	}
+
+	public func implementation(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await session.implementation(uri: uri, position: position)
+	}
+
 	public func documentSymbol(textDocument: LSPTextDocumentIdentifier) async throws -> LSPDocumentSymbolResult {
 		try await session.documentSymbol(textDocument: textDocument)
 	}

@@ -138,7 +138,7 @@ public actor LSPSessionSupervisor {
 		ownedURIs.insert(uri)
 	}
 
-	public func recordDocumentVersion(_ version: Int, forURI uri: String) {
+	public func recordDocumentVersion(_ version: Int, forURI uri: String) async {
 		ownedURIs.insert(uri)
 		await diagnostics.recordDocumentVersion(version, forURI: uri)
 	}

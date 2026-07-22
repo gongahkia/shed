@@ -88,6 +88,26 @@ import Testing
 	])
 }
 
+@Test func diffTextRendererShowsBinaryAndModeChanges() {
+	let file = DiffFile(oldPath: "tool", newPath: "tool", oldMode: "100644", newMode: "100755", isBinary: true)
+	let rendered = DiffTextRenderer.unified(files: [file])
+
+	#expect(rendered.text.contains("old mode 100644"))
+	#expect(rendered.text.contains("new mode 100755"))
+	#expect(rendered.text.contains("Binary files tool and tool differ"))
+}
+
+@Test func diffSelectionMapperMapsRenderedRangesToExactHunkLines() {
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", oldMode: "100644", newMode: "100755", hunks: [
+		DiffHunk(oldStart: 2, oldCount: 1, newStart: 2, newCount: 1, lines: [.remove("old"), .add("new")]),
+	])
+	let document = DiffTextRenderer.unified(files: [file])
+	let contexts = DiffSelectionMapper.contexts(files: [file], document: document)
+
+	#expect(contexts.map(\.lineIndex) == [0, 1])
+	#expect(DiffSelectionMapper.lineIndexes(selection: contexts[1].range, fileIndex: 0, hunkIndex: 0, contexts: contexts) == IndexSet(integer: 1))
+}
+
 @Test func diffPatchBuilderBuildsSingleHunkPatchWithFileHeaders() {
 	let hunk = DiffHunk(oldStart: 7, oldCount: 2, newStart: 7, newCount: 2, lines: [
 		.context("same"),
@@ -109,6 +129,52 @@ import Testing
 	+new
 
 	""")
+}
+
+@Test func diffPatchBuilderPreservesRenameAndNoNewlineMarkers() {
+	let file = DiffFile(
+		oldPath: "Sources/Old.swift",
+		newPath: "Sources/New.swift",
+		hunks: [
+			DiffHunk(
+				oldStart: 1,
+				oldCount: 1,
+				newStart: 1,
+				newCount: 1,
+				lines: [.remove("old"), .add("new")],
+				noNewlineLineIndexes: [0, 1]
+			),
+		]
+	)
+
+	let patch = DiffPatchBuilder.patch(file: file, hunk: file.hunks[0])
+
+	#expect(patch == """
+	diff --git a/Sources/Old.swift b/Sources/New.swift
+	rename from Sources/Old.swift
+	rename to Sources/New.swift
+	--- a/Sources/Old.swift
+	+++ b/Sources/New.swift
+	@@ -1 +1 @@
+	-old
+	\\ No newline at end of file
+	+new
+	\\ No newline at end of file
+
+	""")
+}
+
+@Test func diffTextRendererShowsNoNewlineMarkersInBothModes() {
+	let file = DiffFile(oldPath: "file.txt", newPath: "file.txt", hunks: [
+		DiffHunk(oldStart: 1, oldCount: 1, newStart: 1, newCount: 1, lines: [.remove("old"), .add("new")], noNewlineLineIndexes: [0, 1]),
+	])
+
+	let unified = DiffTextRenderer.unified(files: [file])
+	let sideBySide = DiffTextRenderer.sideBySide(files: [file])
+
+	#expect(unified.text.components(separatedBy: "\\ No newline at end of file").count == 3)
+	#expect(sideBySide.old.text.contains("\\ No newline at end of file"))
+	#expect(sideBySide.new.text.contains("\\ No newline at end of file"))
 }
 
 @Test func diffPatchBuilderBuildsSelectedLinePatchForStaging() throws {

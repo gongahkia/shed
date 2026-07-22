@@ -32,6 +32,7 @@ public actor LSPClientSession {
 	private var framer = LSPMessageFramer()
 	private var nextRequestID = 1
 	private var pending: [JSONRPCID: CheckedContinuation<JSONRPCResponseMessage, Error>] = [:]
+	private var cancelledRequestIDs = Set<JSONRPCID>()
 
 	public init(transport: any LSPClientTransport) {
 		self.transport = transport
@@ -66,6 +67,22 @@ public actor LSPClientSession {
 			params: try LSPAny(encoding: LSPWorkspaceSymbolParams(query: query))
 		)
 		return try LSPWorkspaceSymbolResult(result: response.result)
+	}
+
+	public func definition(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await navigationResult(method: LSPMethod.textDocumentDefinition, uri: uri, position: position)
+	}
+
+	public func declaration(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await navigationResult(method: LSPMethod.textDocumentDeclaration, uri: uri, position: position)
+	}
+
+	public func typeDefinition(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await navigationResult(method: LSPMethod.textDocumentTypeDefinition, uri: uri, position: position)
+	}
+
+	public func implementation(uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		try await navigationResult(method: LSPMethod.textDocumentImplementation, uri: uri, position: position)
 	}
 
 	public func documentSymbol(textDocument: LSPTextDocumentIdentifier) async throws -> LSPDocumentSymbolResult {
@@ -338,17 +355,48 @@ public actor LSPClientSession {
 	private func sendRequestUnchecked(method: String, params: LSPAny? = nil) async throws -> JSONRPCResponseMessage {
 		let id = JSONRPCID.int(nextRequestID)
 		nextRequestID += 1
+		return try await sendRequestUnchecked(id: id, method: method, params: params)
+	}
+
+	private func navigationResult(method: String, uri: String, position: LSPPosition) async throws -> LSPDefinitionResult {
+		let response = try await sendRequest(
+			method: method,
+			params: try LSPAny(encoding: LSPTextDocumentPositionParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position
+			))
+		)
+		return try LSPDefinitionResult(decoding: JSONEncoder().encode(response.result ?? .null))
+	}
+
+	private func sendRequestUnchecked(id: JSONRPCID, method: String, params: LSPAny? = nil) async throws -> JSONRPCResponseMessage {
 		let message = JSONRPCMessage.request(JSONRPCRequestMessage(id: id, method: method, params: params))
 		let frame = try LSPMessageFramer.frame(message: message)
-		return try await withCheckedThrowingContinuation { continuation in
-			pending[id] = continuation
-			do {
-				try transport.write(frame)
-			} catch {
-				pending.removeValue(forKey: id)
-				continuation.resume(throwing: error)
+		return try await withTaskCancellationHandler {
+			try Task.checkCancellation()
+			return try await withCheckedThrowingContinuation { continuation in
+				pending[id] = continuation
+				do {
+					try transport.write(frame)
+				} catch {
+					pending.removeValue(forKey: id)
+					continuation.resume(throwing: error)
+				}
+			}
+		} onCancel: { [weak self] in
+			Task {
+				await self?.cancelRequest(id)
 			}
 		}
+	}
+
+	private func cancelRequest(_ id: JSONRPCID) {
+		guard let continuation = pending.removeValue(forKey: id) else {
+			return
+		}
+		cancelledRequestIDs.insert(id)
+		try? writeNotificationUnchecked(method: LSPMethod.cancelRequest, params: .object(["id": lspAny(for: id)]))
+		continuation.resume(throwing: CancellationError())
 	}
 
 	private func writeNotificationUnchecked(method: String, params: LSPAny? = nil) throws {
@@ -357,12 +405,28 @@ public actor LSPClientSession {
 
 	private func route(_ response: JSONRPCResponseMessage) throws {
 		guard let continuation = pending.removeValue(forKey: response.id) else {
+			if cancelledRequestIDs.remove(response.id) != nil {
+				return
+			}
 			throw LSPClientError.unexpectedResponseID(response.id)
 		}
 		if let error = response.error {
 			continuation.resume(throwing: LSPClientError.responseError(error))
 		} else {
 			continuation.resume(returning: response)
+		}
+	}
+
+	private func lspAny(for id: JSONRPCID) -> LSPAny {
+		switch id {
+		case let .string(value):
+			.string(value)
+		case let .int(value):
+			.int(value)
+		case let .double(value):
+			.double(value)
+		case .null:
+			.null
 		}
 	}
 

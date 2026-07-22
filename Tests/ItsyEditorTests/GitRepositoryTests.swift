@@ -50,6 +50,43 @@ import Testing
 	#expect(status.unstagedCount == 3)
 }
 
+@Test func gitStatusParserCoversEveryPorcelainV2FileRecordKind() throws {
+	let ordinaryStates = ["M.", ".M", "MM", "A.", "D.", "R.", "C."]
+	let unmergedStates = ["DD", "AU", "UD", "UA", "DU", "AA", "UU"]
+	let ordinaryRecords = ordinaryStates.enumerated().map { index, state in
+		"1 \(state) N... 100644 100644 100644 old\(index) new\(index) ordinary-\(state)"
+	}
+	let renamedRecords = ["R.", "C."].enumerated().map { index, state in
+		"2 \(state) N... 100644 100644 100644 old\(index) new\(index) R100 renamed-\(state)\toriginal-\(state)"
+	}
+	let unmergedRecords = unmergedStates.map { state in
+		"u \(state) N... 100644 100644 100644 100644 ancestor ours theirs conflict-\(state)"
+	}
+	let status = try GitStatusParser.parse((ordinaryRecords + renamedRecords + unmergedRecords + [
+		"? untracked.txt",
+		"! ignored.txt",
+	]).joined(separator: "\n"))
+
+	#expect(status.entries.map(\.kind) ==
+		Array(repeating: .ordinary, count: ordinaryStates.count) +
+		Array(repeating: .renamed, count: renamedRecords.count) +
+		Array(repeating: .unmerged, count: unmergedStates.count) + [.untracked, .ignored])
+	#expect(status.entries.prefix(ordinaryStates.count).map { "\($0.indexStatus ?? " ")\($0.worktreeStatus ?? " ")" } == ordinaryStates)
+	#expect(status.entries.dropFirst(ordinaryStates.count).prefix(renamedRecords.count).map { $0.originalPath } == ["original-R.", "original-C."])
+	#expect(status.entries.dropFirst(ordinaryStates.count + renamedRecords.count).prefix(unmergedStates.count).map { "\($0.indexStatus ?? " ")\($0.worktreeStatus ?? " ")" } == unmergedStates)
+	#expect(status.entries.suffix(2).map(\.kind) == [.untracked, .ignored])
+}
+
+@Test func gitRepositoryShellStatusRequestsIgnoredRecords() throws {
+	let runner = RecordingGitRunner(output: "! ignored.txt\n")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	let status = try repository.status()
+
+	#expect(status.entries == [GitStatusEntry(kind: .ignored, indexStatus: "!", worktreeStatus: "!", path: "ignored.txt")])
+	#expect(runner.recordedArguments == [["status", "--porcelain=v2", "--branch", "--untracked-files=all", "--ignored=matching"]])
+}
+
 @Test func gitRepositoryRunsStatusDiffStageAndUnstage() throws {
 	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
 		return
@@ -136,11 +173,101 @@ import Testing
 	#expect(root.standardizedFileURL.path == fixture.root.standardizedFileURL.path)
 }
 
+@Test func gitRepositoryPrefersNestedRepositoryRoot() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	try fixture.git(["init"])
+	let nestedRoot = fixture.root.appendingPathComponent("Vendor/Nested", isDirectory: true)
+	try FileManager.default.createDirectory(at: nestedRoot, withIntermediateDirectories: true)
+	_ = try ProcessGitCommandRunner().runGit(arguments: ["init"], root: nestedRoot)
+	let nestedFile = nestedRoot.appendingPathComponent("Sources/App.swift")
+	try FileManager.default.createDirectory(at: nestedFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try "let value = 1\n".write(to: nestedFile, atomically: true, encoding: .utf8)
+
+	let root = try GitRepository.discoverRoot(containing: nestedFile)
+
+	#expect(root.standardizedFileURL == nestedRoot.standardizedFileURL)
+}
+
+@Test func gitRepositoryDiscoversLinkedWorktreeRoot() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let worktree = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-git-worktree-\(UUID().uuidString)", isDirectory: true)
+	defer { try? FileManager.default.removeItem(at: worktree) }
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("tracked.txt", "one\n")
+	try fixture.git(["add", "tracked.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.git(["worktree", "add", "-b", "linked", worktree.path])
+	let nested = worktree.appendingPathComponent("nested", isDirectory: true)
+	try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+
+	let root = try GitRepository.discoverRoot(containing: nested)
+
+	#expect(root.standardizedFileURL == worktree.standardizedFileURL)
+}
+
+@Test func gitRepositoryRejectsBareRepositoriesAndReportsUnavailableGitRunner() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let bare = fixture.root.appendingPathComponent("bare.git", isDirectory: true)
+	try FileManager.default.createDirectory(at: bare, withIntermediateDirectories: true)
+	_ = try ProcessGitCommandRunner().runGit(arguments: ["init", "--bare"], root: bare)
+	#expect(throws: GitRepositoryDiscoveryError.bareRepository(bare.standardizedFileURL)) {
+		_ = try GitRepository.discoverRoot(containing: bare)
+	}
+
+	#expect(throws: GitCommandError.failed(status: 127, stderr: "git unavailable")) {
+		_ = try GitRepository.discoverRoot(containing: fixture.root, runner: UnavailableGitRunner())
+	}
+}
+
+@Test func gitRepositoryStatusIncludesIgnoredPaths() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	try fixture.git(["init"])
+	try fixture.write(".gitignore", "ignored.txt\n")
+	try fixture.write("ignored.txt", "ignored\n")
+
+	let status = try GitRepository(root: fixture.root).status()
+
+	#expect(status.entries.contains(GitStatusEntry(kind: .ignored, indexStatus: "!", worktreeStatus: "!", path: "ignored.txt")))
+}
+
+@Test func gitStatusRefreshCoordinatorRejectsStaleRapidRefresh() async throws {
+	let coordinator = GitStatusRefreshCoordinator()
+	let firstRoot = URL(fileURLWithPath: "/tmp/first")
+	let secondRoot = URL(fileURLWithPath: "/tmp/second")
+	let firstSnapshot = GitWorkspaceSnapshot(root: firstRoot, status: GitStatus())
+	let secondSnapshot = GitWorkspaceSnapshot(root: secondRoot, status: GitStatus())
+	let first = Task {
+		await coordinator.refresh(root: firstRoot) { _ in
+			Thread.sleep(forTimeInterval: 0.05)
+			return firstSnapshot
+		}
+	}
+	try await Task.sleep(nanoseconds: 5_000_000)
+	let second = await coordinator.refresh(root: secondRoot) { _ in secondSnapshot }
+
+	#expect(await first.value == nil)
+	#expect(second == .snapshot(secondSnapshot))
+}
+
 @Test func gitRepositoryCommitBuildsSeparateMessageArguments() throws {
 	let runner = RecordingGitRunner()
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
 
-	try repository.commit(summary: " Add composer ", body: "\nBody line\n", signoff: true, amend: true)
+	_ = try repository.commit(summary: " Add composer ", body: "\nBody line\n", signoff: true, amend: true)
 
 	#expect(runner.recordedArguments == [[
 		"commit",
@@ -161,6 +288,127 @@ import Testing
 
 	#expect(throws: GitCommitError.emptySummary) {
 		try repository.commit(summary: "  ")
+	}
+}
+
+@Test func gitRepositoryCommitReturnsStagedScopeAndRunsGit() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "content\n")
+	try fixture.git(["add", "file.txt"])
+
+	let result = try repository.commit(summary: "initial", body: "body")
+
+	#expect(result.stagedPaths == ["file.txt"])
+	#expect(!result.amended)
+	#expect(try fixture.git(["log", "-1", "--format=%s"]).trimmingCharacters(in: .whitespacesAndNewlines) == "initial")
+}
+
+@Test func gitRepositoryCommitRejectsEmptyIndex() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+
+	#expect(throws: GitCommitError.emptyIndex) {
+		try repository.commit(summary: "empty")
+	}
+}
+
+@Test func gitRepositoryCommitRejectsAmendWithoutHead() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "content\n")
+	try fixture.git(["add", "file.txt"])
+
+	#expect(throws: GitCommitError.amendWithoutCommit) {
+		try repository.commit(summary: "amend", amend: true)
+	}
+}
+
+@Test func gitRepositoryCommitPreservesRejectedHookOutput() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "content\n")
+	try fixture.git(["add", "file.txt"])
+	let hook = fixture.root.appendingPathComponent(".git/hooks/pre-commit")
+	try "#!/bin/sh\necho rejected-by-hook >&2\nexit 17\n".write(to: hook, atomically: true, encoding: .utf8)
+	try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: hook.path)
+
+	do {
+		_ = try repository.commit(summary: "blocked")
+		#expect(Bool(false))
+	} catch let error as GitCommandError {
+		switch error {
+		case let .failed(status, stderr):
+			#expect(status != 0)
+			#expect(stderr.contains("rejected-by-hook"))
+		default:
+			#expect(Bool(false))
+		}
+	} catch {
+		#expect(Bool(false))
+	}
+}
+
+@Test func gitRepositoryCommitAmendsHeadAndReportsAmendState() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "first\n")
+	try fixture.git(["add", "file.txt"])
+	_ = try repository.commit(summary: "initial")
+	try fixture.write("file.txt", "amended\n")
+	try fixture.git(["add", "file.txt"])
+
+	let result = try repository.commit(summary: "amended", amend: true)
+
+	#expect(result.amended)
+	#expect(result.stagedPaths == ["file.txt"])
+	#expect(try fixture.git(["log", "-1", "--format=%s"]).trimmingCharacters(in: .whitespacesAndNewlines) == "amended")
+}
+
+@Test func gitRepositoryCommitReportsAuthorFailures() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.name", ""])
+	try fixture.git(["config", "user.email", ""])
+	try fixture.write("file.txt", "content\n")
+	try fixture.git(["add", "file.txt"])
+
+	#expect(throws: GitCommandError.self) {
+		try repository.commit(summary: "author failure")
 	}
 }
 
@@ -241,6 +489,24 @@ import Testing
 	])
 }
 
+@Test func gitGraphParserReadsParentsAndReferences() {
+	let output = "merge\u{1f}main feature\u{1f}HEAD -> main, origin/main\u{1f}Ada\u{1f}ada@example.invalid\u{1f}1700000000\u{1f}merge feature\u{0}"
+
+	let entries = GitGraphParser.parse(output)
+
+	#expect(entries == [GitGraphEntry(
+		history: GitHistoryEntry(
+			oid: "merge",
+			author: "Ada",
+			authorEmail: "ada@example.invalid",
+			date: Date(timeIntervalSince1970: 1_700_000_000),
+			summary: "merge feature"
+		),
+		parentOIDs: ["main", "feature"],
+		references: ["HEAD -> main", "origin/main"]
+	)])
+}
+
 @Test func gitRepositoryRunsBlameAndHistoryCommandsWithInjectedRunner() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
@@ -251,9 +517,70 @@ import Testing
 
 	#expect(runner.recordedArguments == [
 		["blame", "--line-porcelain", "--", "file.txt"],
-		["log", "-2", "--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00", "--", "file.txt"],
+		["log", "-2", "--skip=0", "--follow", "--find-renames", "--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00", "--", "file.txt"],
 		["log", "-4", "--format=%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00", "--no-patch", "-L", "3,3:file.txt"],
 	])
+}
+
+@Test func gitHistoryPagerRejectsCanceledPage() async throws {
+	let pager = GitHistoryPager()
+	let task = Task {
+		try await pager.loadNext(limit: 1) { _, _ in
+			Thread.sleep(forTimeInterval: 0.05)
+			return [GitGraphEntry(history: GitHistoryEntry(oid: "one", author: "Ada", authorEmail: "ada@example.invalid", summary: "one"))]
+		}
+	}
+	try await Task.sleep(nanoseconds: 5_000_000)
+	await pager.cancel()
+
+	#expect(try await task.value == nil)
+}
+
+@Test func gitRepositoryHistorySupportsMergesDetachedHeadRemotesAndRenameFollowing() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("old.txt", "base\n")
+	try fixture.git(["add", "old.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.git(["checkout", "-b", "feature"])
+	try fixture.write("feature.txt", "feature\n")
+	try fixture.git(["add", "feature.txt"])
+	try fixture.git(["commit", "-m", "feature"])
+	try fixture.git(["checkout", "main"])
+	try fixture.git(["mv", "old.txt", "renamed.txt"])
+	try fixture.git(["commit", "-m", "rename file"])
+	try fixture.write("main.txt", "main\n")
+	try fixture.git(["add", "main.txt"])
+	try fixture.git(["commit", "-m", "main"])
+	try fixture.git(["merge", "--no-ff", "feature", "-m", "merge feature"])
+	try fixture.git(["remote", "add", "origin", "https://example.invalid/origin.git"])
+	try fixture.git(["remote", "add", "upstream", "https://example.invalid/upstream.git"])
+	try fixture.git(["update-ref", "refs/remotes/origin/main", "HEAD"])
+	try fixture.git(["update-ref", "refs/remotes/upstream/main", "HEAD"])
+
+	let firstPage = try repository.historyPage(limit: 2)
+	let secondPage = try repository.historyPage(limit: 2, offset: 2)
+	let renameTimeline = try repository.fileHistory(path: "renamed.txt", limit: 10)
+	let branches = try repository.branches()
+	try fixture.git(["checkout", "HEAD~1"])
+	let detachedStatus = try repository.status()
+
+	#expect(firstPage.entries.count == 2)
+	#expect(firstPage.hasMore)
+	#expect(secondPage.offset == 2)
+	#expect((firstPage.entries + secondPage.entries).contains { $0.history.summary == "merge feature" && $0.parentOIDs.count == 2 })
+	#expect(renameTimeline.map(\.summary).contains("rename file"))
+	#expect(renameTimeline.map(\.summary).contains("base"))
+	#expect(branches.contains { $0.name == "origin/main" && $0.kind == .remote })
+	#expect(branches.contains { $0.name == "upstream/main" && $0.kind == .remote })
+	#expect(detachedStatus.branch.head == nil)
 }
 
 @Test func gitBlameCacheReusesRepositoryResultsUntilInvalidated() throws {
@@ -322,6 +649,30 @@ import Testing
 			refname: "refs/remotes/origin/feature",
 			kind: .remote
 		),
+	])
+}
+
+@Test func gitWorktreeParserReadsLinkedAndBareWorktrees() {
+	let output = """
+	worktree /tmp/main
+	HEAD abc
+	branch refs/heads/main
+
+	worktree /tmp/feature
+	HEAD def
+	branch refs/heads/feature
+
+	worktree /tmp/bare
+	bare
+
+	"""
+
+	let worktrees = GitWorktreeParser.parse(output)
+
+	#expect(worktrees == [
+		GitWorktree(url: URL(fileURLWithPath: "/tmp/main", isDirectory: true).resolvingSymlinksInPath(), headOID: "abc", branch: "main"),
+		GitWorktree(url: URL(fileURLWithPath: "/tmp/feature", isDirectory: true).resolvingSymlinksInPath(), headOID: "def", branch: "feature"),
+		GitWorktree(url: URL(fileURLWithPath: "/tmp/bare", isDirectory: true).resolvingSymlinksInPath(), isBare: true),
 	])
 }
 
@@ -414,11 +765,104 @@ import Testing
 	#expect(runner.recordedArguments == [
 		["stash", "push", "-u", "-m", "itsy-autostash-feature"],
 		["switch", "feature"],
-		["stash", "pop"],
 		["stash", "push", "-u", "-m", "itsy-autostash-topic"],
 		["switch", "-c", "topic", "origin/topic"],
-		["stash", "pop"],
 	])
+}
+
+@Test func gitRepositoryStashesAndRestoresDirtyChangesOnBranchSwitch() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.git(["branch", "feature"])
+	try fixture.write("file.txt", "dirty\n")
+
+	try repository.switchBranch("feature", stashingDirtyChanges: true)
+
+	#expect(try repository.status().branch.head == "feature")
+	#expect(try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8) == "dirty\n")
+	#expect(try repository.stashes().isEmpty)
+}
+
+@Test func gitRepositoryRestoresDirtyChangesWhenCheckoutFailsAfterStashing() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.write("file.txt", "dirty\n")
+
+	#expect(throws: GitCommandError.self) {
+		try repository.switchBranch("missing-branch", stashingDirtyChanges: true)
+	}
+	#expect(try repository.status().branch.head == "main")
+	#expect(try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8) == "dirty\n")
+	#expect(try repository.stashes().isEmpty)
+}
+
+@Test func gitRepositoryRejectsBranchCheckedOutInAnotherWorktree() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	let linked = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-linked-worktree-\(UUID().uuidString)", isDirectory: true)
+	defer {
+		_ = try? fixture.git(["worktree", "remove", "--force", linked.path])
+		try? FileManager.default.removeItem(at: linked)
+	}
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.git(["branch", "feature"])
+	try fixture.git(["worktree", "add", linked.path, "feature"])
+
+	#expect(throws: GitBranchError.checkedOutInWorktree(linked.resolvingSymlinksInPath().standardizedFileURL)) {
+		try repository.switchBranch("feature")
+	}
+}
+
+@Test func gitRepositoryCreatesAppliesAndDropsStash() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.write("file.txt", "dirty\n")
+
+	try repository.stash(message: "work")
+	#expect(try repository.stashes().count == 1)
+	try repository.applyStash("stash@{0}")
+	#expect(try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8) == "dirty\n")
+	try repository.dropStash("stash@{0}")
+	#expect(try repository.stashes().isEmpty)
 }
 
 @Test func gitRepositoryBuildsRemoteOperationArguments() throws {
@@ -584,6 +1028,77 @@ import Testing
 	#expect(!unstaged.contains("+four changed"))
 }
 
+@Test func gitRepositoryStagesNoNewlinePatchWithoutAddingANewline() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "old")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "new")
+
+	let file = try #require(try repository.diffFiles(path: "file.txt").first)
+	let hunk = try #require(file.hunks.first)
+	try repository.stage(hunk: hunk, in: file)
+
+	#expect(hunk.noNewlineLineIndexes == [0, 1])
+	#expect(try fixture.git(["show", ":file.txt"]) == "new")
+}
+
+@Test func gitRepositoryRejectsStaleWorktreeBeforeStaging() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "one\ntwo selected\n")
+	let file = try #require(try repository.diffFiles(path: "file.txt").first)
+	let hunk = try #require(file.hunks.first)
+	try fixture.write("file.txt", "one\ntwo changed after selection\n")
+
+	#expect(throws: GitPatchApplicationError.staleWorktree) {
+		try repository.stage(hunk: hunk, in: file)
+	}
+	#expect(try repository.diff(path: "file.txt", staged: true).isEmpty)
+}
+
+@Test func gitRepositoryRejectsStaleIndexBeforeUnstaging() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\nthree\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	try fixture.write("file.txt", "one\ntwo selected\nthree\n")
+	try repository.stage(paths: ["file.txt"])
+	let file = try #require(try repository.diffFiles(path: "file.txt", staged: true).first)
+	let hunk = try #require(file.hunks.first)
+	try fixture.write("file.txt", "one\ntwo selected\nthree changed after selection\n")
+	try repository.stage(paths: ["file.txt"])
+	let before = try repository.diff(path: "file.txt", staged: true)
+
+	#expect(throws: GitPatchApplicationError.staleIndex) {
+		try repository.unstage(hunk: hunk, in: file)
+	}
+	#expect(try repository.diff(path: "file.txt", staged: true) == before)
+}
+
 @Test func gitRepositoryReadsConflictStageBlobsFromRealRepo() throws {
 	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
 		return
@@ -618,6 +1133,18 @@ import Testing
 	#expect(try repository.conflictBlob(path: "file.txt", stage: 2) == "ours\n")
 	#expect(try repository.conflictBlob(path: "file.txt", stage: 3) == "theirs\n")
 	#expect(GitConflictParser.parse(merged).count == 1)
+	#expect(try repository.conflictResolutionState() == GitConflictResolutionState(unresolvedPaths: ["file.txt"]))
+
+	try fixture.write("file.txt", "manual edit\n")
+	try repository.restoreConflictMarkers(path: "file.txt")
+	let restored = try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8)
+	let resolved = GitConflictParser.resolvedText(restored, regionIndex: 0, resolution: .both)
+	try fixture.write("file.txt", resolved)
+	try repository.stage(paths: ["file.txt"])
+
+	#expect(restored.contains("<<<<<<<"))
+	#expect(resolved == "ours\ntheirs\n")
+	#expect(try repository.conflictResolutionState().isComplete)
 }
 
 private func lineIndexes(in hunk: DiffHunk, containing values: Set<String>) -> IndexSet {
@@ -698,5 +1225,15 @@ private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 		inputs.append(input)
 		lock.unlock()
 		return output
+	}
+}
+
+private struct UnavailableGitRunner: GitCommandRunning {
+	func runGit(arguments: [String], root: URL) throws -> String {
+		throw GitCommandError.failed(status: 127, stderr: "git unavailable")
+	}
+
+	func runGit(arguments: [String], input: String, root: URL) throws -> String {
+		throw GitCommandError.failed(status: 127, stderr: "git unavailable")
 	}
 }

@@ -198,6 +198,23 @@ public struct LSPServerConfig: Codable, Equatable, Sendable {
 }
 
 public struct LSPServerRegistry: Equatable, Sendable {
+	public struct UnsupportedLanguage: Error, Equatable, Sendable {
+		public var languageID: String
+		public var reason: BundledLanguageUnsupportedReason
+
+		public init(languageID: String, reason: BundledLanguageUnsupportedReason) {
+			self.languageID = languageID
+			self.reason = reason
+		}
+
+		public var message: String {
+			switch reason {
+			case .noBundledServer:
+				"No bundled language server is declared for \(languageID)."
+			}
+		}
+	}
+
 	public struct MissingBinary: Error, Equatable, Sendable {
 		public var languageID: String
 		public var command: String
@@ -309,6 +326,17 @@ public struct LSPServerRegistry: Equatable, Sendable {
 			return nil
 		}
 		return missingBinary(forLanguageID: languageID, environment: environment)
+	}
+
+	public func unsupportedLanguage(for url: URL) -> UnsupportedLanguage? {
+		guard
+			let languageID = languageID(for: url),
+			let language = BundledLanguageInventory.languages.first(where: { $0.languageID == languageID }),
+			case let .unsupported(reason) = language.support
+		else {
+			return nil
+		}
+		return UnsupportedLanguage(languageID: languageID, reason: reason)
 	}
 
 	public func discoverWorkspaceRoot(for fileURL: URL, fileManager: FileManager = .default) -> URL? {

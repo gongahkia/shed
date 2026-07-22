@@ -24,13 +24,21 @@ public enum DiffPatchBuilder {
 		if file.isDeletedFile, let mode = file.oldMode {
 			lines.append("deleted file mode \(mode)")
 		}
+		if !file.isNewFile, !file.isDeletedFile, file.oldPath != file.newPath {
+			if let oldPath = file.oldPath {
+				lines.append("rename from \(oldPath)")
+			}
+			if let newPath = file.newPath {
+				lines.append("rename to \(newPath)")
+			}
+		}
 		if let indexLine = file.indexLine {
 			lines.append(indexLine)
 		}
 		lines.append("--- \(file.oldPath.map { "a/\($0)" } ?? "/dev/null")")
 		lines.append("+++ \(file.newPath.map { "b/\($0)" } ?? "/dev/null")")
 		lines.append("@@ -\(rangeText(start: hunk.oldStart, count: hunk.oldCount)) +\(rangeText(start: hunk.newStart, count: hunk.newCount)) @@")
-		for line in hunk.lines {
+		for (lineIndex, line) in hunk.lines.enumerated() {
 			switch line {
 			case .context(let content):
 				lines.append(" \(content)")
@@ -38,6 +46,9 @@ public enum DiffPatchBuilder {
 				lines.append("+\(content)")
 			case .remove(let content):
 				lines.append("-\(content)")
+			}
+			if hunk.noNewlineLineIndexes.contains(lineIndex) {
+				lines.append("\\ No newline at end of file")
 			}
 		}
 		return lines.joined(separator: "\n") + "\n"
@@ -69,9 +80,13 @@ public enum DiffPatchBuilder {
 		let oldStart = oldLine
 		let newStart = newLine
 		var lines: [DiffLine] = []
+		var noNewlineLineIndexes: Set<Int> = []
 		for index in window {
 			guard let transformed = transformedLine(hunk.lines[index], selected: selectedRange.contains(index), operation: operation) else {
 				continue
+			}
+			if hunk.noNewlineLineIndexes.contains(index) {
+				noNewlineLineIndexes.insert(lines.count)
 			}
 			lines.append(transformed)
 		}
@@ -86,7 +101,8 @@ public enum DiffPatchBuilder {
 			oldCount: oldCount,
 			newStart: newCount == 0 ? max(newStart - 1, 0) : newStart,
 			newCount: newCount,
-			lines: lines
+			lines: lines,
+			noNewlineLineIndexes: noNewlineLineIndexes
 		)
 	}
 

@@ -160,12 +160,14 @@ import Testing
 	#expect(initial.count >= 2)
 	for index in initial.indices {
 		#expect(initial[index].nextKeyView === initial[(index + 1) % initial.count])
+		#expect(initial[index].previousKeyView === initial[(index + initial.count - 1) % initial.count])
 	}
 	controller.toggleSidebar()
 	let withoutSidebar = controller.focusTraversalTargetsForTesting
 	#expect(withoutSidebar.count < initial.count)
 	for index in withoutSidebar.indices {
 		#expect(withoutSidebar[index].nextKeyView === withoutSidebar[(index + 1) % withoutSidebar.count])
+		#expect(withoutSidebar[index].previousKeyView === withoutSidebar[(index + withoutSidebar.count - 1) % withoutSidebar.count])
 	}
 }
 

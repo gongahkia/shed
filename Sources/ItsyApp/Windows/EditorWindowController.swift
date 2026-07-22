@@ -761,6 +761,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		)
 		setLSPStatus(key: key, status: "crashed", client: nil, lastError: reason.stderrTail, url: url)
 		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status))")
+		AccessibilityAnnouncement.post(.languageServerFailure(language: key.languageID))
 		refreshStatusBar()
 	}
 
@@ -771,6 +772,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspRestartKey = nil
 		lspRestartURL = nil
 		lspCrashStatusText = nil
+		AccessibilityAnnouncement.post(.languageServerRecovery(language: key.languageID))
 		refreshStatusBar()
 	}
 
@@ -1029,6 +1031,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		lspStatusButton.title = L10n.string("LSP: \(entry.key.languageID) \(entry.health.rawValue)")
 		lspStatusButton.toolTip = L10n.string("LSP status")
+		lspStatusButton.setAccessibilityValue(L10n.string("\(entry.key.languageID) \(entry.health.rawValue)"))
 		lspStatusButton.isHidden = false
 	}
 

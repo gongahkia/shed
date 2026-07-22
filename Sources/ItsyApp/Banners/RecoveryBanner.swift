@@ -18,6 +18,7 @@ final class RecoveryBanner: NSView {
 	func show(fileURL: URL) {
 		label.stringValue = L10n.string("Recovered unsaved edits for \(fileURL.lastPathComponent). Review and save when ready.")
 		isHidden = false
+		AccessibilityAnnouncement.post(.recoveredEdits(fileName: fileURL.lastPathComponent))
 	}
 
 	func hide() {

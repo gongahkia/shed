@@ -194,6 +194,7 @@ import ItsyEditor
 		inputField.isBordered = false
 		inputField.focusRingType = .none
 		inputField.backgroundColor = .clear
+		inputField.setAccessibilityLabel(L10n.string("Command palette search"))
 		inputField.translatesAutoresizingMaskIntoConstraints = false
 		inputField.delegate = self
 		contentView.addSubview(inputField)
@@ -206,6 +207,7 @@ import ItsyEditor
 		tableView.rowHeight = 30
 		tableView.intercellSpacing = NSSize(width: 0, height: 0)
 		tableView.usesAlternatingRowBackgroundColors = false
+		tableView.setAccessibilityLabel(L10n.string("Command palette results"))
 		tableView.dataSource = self
 		tableView.delegate = self
 		tableView.target = self

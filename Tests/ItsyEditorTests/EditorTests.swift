@@ -62,10 +62,16 @@ import Testing
 	editor.setSelection(selectionBefore)
 	editor.insert("!")
 	let entry = try #require(editor.history.edits.last)
+	let selectionAfter = editor.selections
 	#expect(entry.edit == Edit(range: 5 ..< 5, removed: Data(), inserted: Data("!".utf8), selectionBefore: selectionBefore))
-	#expect(entry.reverse == Edit(range: 5 ..< 6, removed: Data("!".utf8), inserted: Data()))
+	#expect(entry.reverse == Edit(range: 5 ..< 6, removed: Data("!".utf8), inserted: Data(), selectionBefore: selectionAfter))
 	#expect(entry.selectionBefore == selectionBefore)
-	#expect(entry.selectionAfter == editor.selections)
+	#expect(entry.selectionAfter == selectionAfter)
+
+	editor.undo()
+	#expect(editor.selections == selectionBefore)
+	editor.redo()
+	#expect(editor.selections == selectionAfter)
 }
 
 @Test func editorUndoTreeBranchesAndRestoresSnapshots() throws {

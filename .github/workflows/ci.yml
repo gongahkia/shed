@@ -15,6 +15,8 @@ jobs:
         run: scripts/verify_native_dependencies.sh
       - name: Test native dependency preflight
         run: scripts/test_native_dependency_preflight.sh
+      - name: Test bootstrap CLI
+        run: scripts/test_bootstrap.sh
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:

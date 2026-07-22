@@ -20,3 +20,18 @@ import Testing
 		#expect(LSPStatusPanel.outputText(snapshot).contains("[protocol] invalid response"))
 	}
 }
+
+@Test @MainActor func lspStatusPanelSurfacesCrashLoopErrorWhenNoOutputExists() {
+	let snapshot = LSPStatusPanelSnapshot(
+		key: LSPSessionKey(languageID: "swift", workspaceRoot: URL(fileURLWithPath: "/tmp/itsy-lsp")),
+		status: "disabled",
+		health: .degraded,
+		server: "sourcekit-lsp",
+		pid: nil,
+		startDate: nil,
+		lastError: "restart limit exceeded; use Restart to retry",
+		output: []
+	)
+	#expect(LSPStatusPanel.detailsText(snapshot).contains("Lifecycle: disabled"))
+	#expect(LSPStatusPanel.outputText(snapshot) == "restart limit exceeded; use Restart to retry")
+}

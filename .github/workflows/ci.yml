@@ -13,6 +13,8 @@ jobs:
           submodules: true
       - name: Verify native dependencies
         run: scripts/verify_native_dependencies.sh
+      - name: Test native dependency preflight
+        run: scripts/test_native_dependency_preflight.sh
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:

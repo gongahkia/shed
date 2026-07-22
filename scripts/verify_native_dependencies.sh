@@ -18,12 +18,13 @@ while IFS=$'\t' read -r expected path; do
 		failures=$((failures + 1))
 		continue
 	fi
-	actual=""
-	if git -C "$path" rev-parse --verify HEAD >/dev/null 2>&1; then
-		actual="$(git -C "$path" rev-parse --verify HEAD)"
+	if ! actual="$(git -C "$path" rev-parse --verify HEAD 2>/dev/null)"; then
+		printf 'unreadable\t%s\texpected=%s\tremediation=git submodule update --init --checkout\n' "$path" "$expected" >&2
+		failures=$((failures + 1))
+		continue
 	fi
 	if [[ "$actual" != "$expected" ]]; then
-		printf 'revision-mismatch\t%s\texpected=%s\tactual=%s\tremediation=git submodule update --init --checkout\n' "$path" "$expected" "${actual:-unreadable}" >&2
+		printf 'revision-mismatch\t%s\texpected=%s\tactual=%s\tremediation=git submodule update --init --checkout\n' "$path" "$expected" "$actual" >&2
 		failures=$((failures + 1))
 		continue
 	fi

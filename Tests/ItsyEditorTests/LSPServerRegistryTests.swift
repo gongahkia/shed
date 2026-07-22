@@ -243,6 +243,23 @@ import Testing
 	}
 }
 
+@Test func lspServerConfigValidationReportsEachInvalidFieldPrecisely() {
+	let cases: [(LSPServerConfig, LSPServerConfigValidationError)] = [
+		(LSPServerConfig(languageId: "", command: "server"), .emptyLanguageID),
+		(LSPServerConfig(languageId: "swift", command: ""), .emptyCommand("swift")),
+		(LSPServerConfig(languageId: "swift", command: "server", args: [" "]), .emptyArgument("swift", 0)),
+		(LSPServerConfig(languageId: "swift", command: "server", rootPatterns: []), .missingRootPatterns("swift")),
+		(LSPServerConfig(languageId: "swift", command: "server", rootPatterns: [" "]), .emptyRootPattern("swift", 0)),
+		(LSPServerConfig(languageId: "swift", command: "server", typedInitOptions: [" ": .bool(true)], typedSettings: [:]), .emptyInitOptionKey("swift")),
+		(LSPServerConfig(languageId: "swift", command: "server", typedInitOptions: [:], typedSettings: [" ": .bool(true)]), .emptySettingKey("swift")),
+	]
+	for (config, expectedError) in cases {
+		#expect(throws: expectedError) {
+			try config.validate()
+		}
+	}
+}
+
 private final class TemporaryRegistryFixture {
 	let root: URL
 

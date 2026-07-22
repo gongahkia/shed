@@ -13,7 +13,7 @@ gen_ts() {
 	local tmp="$out.tmp"
 	awk -v n="$lines" 'BEGIN {
 		for (i = 1; i <= n; i++) {
-			printf("export class ItsyFixture%06d { value = %d; render(): string { return `line-%06d`; } }\n", i, i, i)
+			printf("export class PicoFixture%06d { value = %d; render(): string { return `line-%06d`; } }\n", i, i, i)
 		}
 	}' > "$tmp"
 	mv "$tmp" "$out"
@@ -77,8 +77,14 @@ gen_huge_text() {
 
 huge_log_bytes="${ITSY_HUGE_LOG_BYTES:-1073741824}"
 huge_text_bytes="${ITSY_HUGE_TEXT_BYTES:-1073741824}"
+generate_huge_log="${ITSY_GENERATE_HUGE_LOG:-1}"
+generate_huge_text="${ITSY_GENERATE_HUGE_TEXT:-1}"
 
 gen_ts "$corpus_dir/small.ts" 1000
 gen_ts "$corpus_dir/large.ts" 100000
-gen_huge_log "$corpus_dir/huge.log" "$huge_log_bytes"
-gen_huge_text "$corpus_dir/huge-text.log" "$huge_text_bytes"
+if [[ "$generate_huge_log" != "0" ]]; then
+	gen_huge_log "$corpus_dir/huge.log" "$huge_log_bytes"
+fi
+if [[ "$generate_huge_text" != "0" ]]; then
+	gen_huge_text "$corpus_dir/huge-text.log" "$huge_text_bytes"
+fi

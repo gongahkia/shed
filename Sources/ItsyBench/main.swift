@@ -44,6 +44,8 @@ private struct PieceTreeOptions {
 	var sliceLength: Int
 	var mmapFile: String?
 	var requireMMapFile: Bool
+	var mmapContract: Bool
+	var mmapRSSBudgetKB: UInt64
 }
 
 private struct UndoOptions {
@@ -150,6 +152,12 @@ private struct PieceTreeBenchResult: Encodable {
 	var mmap_load_line_count: Int?
 	var mmap_load_ms: Double?
 	var mmap_load_path: String?
+	var mmap_contract_passed: Bool?
+	var mmap_edit_length: Int?
+	var mmap_peak_rss_delta_kb: UInt64?
+	var mmap_rss_budget_kb: UInt64?
+	var mmap_save_bytes: Int?
+	var mmap_search_offset: Int?
 	var operations: Int
 	var random_insert_ns_per_op: Double
 	var random_remove_ns_per_op: Double
@@ -157,6 +165,14 @@ private struct PieceTreeBenchResult: Encodable {
 	var slice_length: Int
 	var slice_ns_per_op: Double
 	var slice_checksum: Int
+}
+
+private struct MMapContractResult {
+	var editLength: Int
+	var passed: Bool
+	var peakRSSDeltaKB: UInt64
+	var saveBytes: Int
+	var searchOffset: Int?
 }
 
 private struct UndoBenchResult: Encodable {
@@ -610,6 +626,8 @@ enum ItsyBenchMain {
 		var sliceLength = 32
 		var mmapFile: String? = "bench/corpus/huge.log"
 		var requireMMapFile = false
+		var mmapContract = false
+		var mmapRSSBudgetKB: UInt64 = 1_572_864
 		var index = args.startIndex
 		while index < args.endIndex {
 			let arg = args[index]
@@ -636,6 +654,16 @@ enum ItsyBenchMain {
 				mmapFile = args[valueIndex]
 				requireMMapFile = true
 				index = args.index(after: valueIndex)
+			case "--mmap-contract":
+				mmapContract = true
+				index = args.index(after: index)
+			case "--mmap-rss-budget-kb":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt64(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --mmap-rss-budget-kb")
+				}
+				mmapRSSBudgetKB = value
+				index = args.index(after: valueIndex)
 			default:
 				throw BenchError.usage("unknown piecetree option: \(arg)")
 			}
@@ -644,7 +672,9 @@ enum ItsyBenchMain {
 			operations: operations,
 			sliceLength: sliceLength,
 			mmapFile: mmapFile,
-			requireMMapFile: requireMMapFile
+			requireMMapFile: requireMMapFile,
+			mmapContract: mmapContract,
+			mmapRSSBudgetKB: mmapRSSBudgetKB
 		)
 	}
 
@@ -1005,16 +1035,35 @@ enum ItsyBenchMain {
 		}
 		var mmapPath: String?
 		var mmapBytes: Int?
+		var mmapContractPassed: Bool?
+		var mmapEditLength: Int?
 		var mmapLineCount: Int?
 		var mmapLoadMS: Double?
+		var mmapPeakRSSDeltaKB: UInt64?
+		var mmapSaveBytes: Int?
+		var mmapSearchOffset: Int?
 		if let file = options.mmapFile {
 			let url = URL(fileURLWithPath: file)
 			if FileManager.default.fileExists(atPath: url.path) {
 				mmapPath = url.path
+				let mmapBaselineRSS = options.mmapContract ? try residentSizeKB(pid: getpid()) : nil
 				let loadNS = try measureNanoseconds {
-					let mapped = try PieceTree(readingMappedFile: url)
+					var mapped = try PieceTree(readingMappedFile: url)
 					mmapBytes = mapped.length
 					mmapLineCount = mapped.lineCount
+					if options.mmapContract {
+						let result = try mmapContract(
+							tree: &mapped,
+							sourceURL: url,
+							baselineRSS: mmapBaselineRSS ?? 0,
+							rssBudgetKB: options.mmapRSSBudgetKB
+						)
+						mmapContractPassed = result.passed
+						mmapEditLength = result.editLength
+						mmapPeakRSSDeltaKB = result.peakRSSDeltaKB
+						mmapSaveBytes = result.saveBytes
+						mmapSearchOffset = result.searchOffset
+					}
 				}
 				mmapLoadMS = Double(loadNS) / 1_000_000
 			} else if options.requireMMapFile {
@@ -1027,6 +1076,12 @@ enum ItsyBenchMain {
 			mmap_load_line_count: mmapLineCount,
 			mmap_load_ms: mmapLoadMS,
 			mmap_load_path: mmapPath,
+			mmap_contract_passed: mmapContractPassed,
+			mmap_edit_length: mmapEditLength,
+			mmap_peak_rss_delta_kb: mmapPeakRSSDeltaKB,
+			mmap_rss_budget_kb: options.mmapContract ? options.mmapRSSBudgetKB : nil,
+			mmap_save_bytes: mmapSaveBytes,
+			mmap_search_offset: mmapSearchOffset,
 			operations: operations,
 			random_insert_ns_per_op: Double(randomNS) / Double(operations),
 			random_remove_ns_per_op: Double(removeNS) / Double(operations),
@@ -1035,6 +1090,87 @@ enum ItsyBenchMain {
 			slice_ns_per_op: Double(sliceNS) / Double(operations),
 			slice_checksum: checksum
 		)
+	}
+
+	private static func mmapContract(
+		tree: inout PieceTree,
+		sourceURL: URL,
+		baselineRSS: UInt64,
+		rssBudgetKB: UInt64
+	) throws -> MMapContractResult {
+		var peakRSS = baselineRSS
+		let expectedLength = tree.length
+		let queryLength = min(64, expectedLength)
+		guard queryLength > 0 else {
+			return MMapContractResult(editLength: 0, passed: false, peakRSSDeltaKB: 0, saveBytes: 0, searchOffset: nil)
+		}
+		let queryOffset = min(max(0, expectedLength / 2), expectedLength - queryLength)
+		var query = [UInt8](repeating: 0, count: queryLength)
+		let copied = query.withUnsafeMutableBufferPointer { tree.copyUTF8(at: queryOffset, into: $0) }
+		query.removeSubrange(copied ..< query.count)
+		_ = try samplePeakRSS(pid: getpid(), peakRSS: &peakRSS)
+		let searchOffset = streamingSearch(query, in: tree)
+		_ = try samplePeakRSS(pid: getpid(), peakRSS: &peakRSS)
+
+		let insertion = Array("itsy-large-text-contract".utf8)
+		tree.insert(insertion, at: queryOffset)
+		tree.remove(queryOffset ..< queryOffset + insertion.count)
+		let editLength = tree.length
+		_ = try samplePeakRSS(pid: getpid(), peakRSS: &peakRSS)
+
+		let saveURL = sourceURL.deletingLastPathComponent()
+			.appendingPathComponent(".\(sourceURL.lastPathComponent).itsy-contract-\(UUID().uuidString)")
+		defer { try? FileManager.default.removeItem(at: saveURL) }
+		try AtomicFileWriter.write(to: saveURL) { descriptor in
+			try tree.write(to: descriptor, path: saveURL.path)
+		}
+		let saveBytes = try saveURL.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+		_ = try samplePeakRSS(pid: getpid(), peakRSS: &peakRSS)
+		let peakRSSDeltaKB = rssDeltaKB(peakRSS, baselineRSS)
+		return MMapContractResult(
+			editLength: editLength,
+			passed: searchOffset == queryOffset && editLength == expectedLength && saveBytes == expectedLength && peakRSSDeltaKB <= rssBudgetKB,
+			peakRSSDeltaKB: peakRSSDeltaKB,
+			saveBytes: saveBytes,
+			searchOffset: searchOffset
+		)
+	}
+
+	private static func streamingSearch(_ query: [UInt8], in tree: PieceTree) -> Int? {
+		guard !query.isEmpty else {
+			return 0
+		}
+		var failures = [Int](repeating: 0, count: query.count)
+		for index in 1 ..< query.count {
+			var candidate = failures[index - 1]
+			while candidate > 0, query[index] != query[candidate] {
+				candidate = failures[candidate - 1]
+			}
+			if query[index] == query[candidate] {
+				candidate += 1
+			}
+			failures[index] = candidate
+		}
+		var matched = 0
+		var offset = 0
+		var result: Int?
+		tree.iterateBytes(from: 0) { bytes in
+			for byte in bytes {
+				while matched > 0, byte != query[matched] {
+					matched = failures[matched - 1]
+				}
+				if byte == query[matched] {
+					matched += 1
+				}
+				if matched == query.count {
+					result = offset - query.count + 1
+					return false
+				}
+				offset += 1
+			}
+			return true
+		}
+		return result
 	}
 
 	private static func undo(_ options: UndoOptions) throws -> UndoBenchResult {

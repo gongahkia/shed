@@ -209,6 +209,50 @@ func pieceTreeGraphemeQueriesCrossPieceSeams(_ testCase: GraphemeSeamCase) {
 	])
 }
 
+@Test func pieceTreeMappedStorageStreamsEditAndAtomicSaveWithoutFlattening() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-piecetree-contract-\(UUID().uuidString)", isDirectory: true)
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let sourceURL = directory.appendingPathComponent("source.txt")
+	_ = FileManager.default.createFile(atPath: sourceURL.path, contents: nil)
+	let source = try FileHandle(forWritingTo: sourceURL)
+	let line = Data("abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789\n".utf8)
+	for _ in 0 ..< 65_536 {
+		try source.write(contentsOf: line)
+	}
+	try source.close()
+
+	var tree = try PieceTree(readingMappedFile: sourceURL)
+	let expectedLength = try #require(sourceURL.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+	let piece = try #require(tree.debugPieces().first)
+	#expect(tree.debugPieces().count == 1)
+	#expect(piece.buffer == .original(0))
+	#expect(piece.length == expectedLength)
+
+	let offset = expectedLength / 2
+	var query = [UInt8](repeating: 0, count: 64)
+	let copied = query.withUnsafeMutableBufferPointer { tree.copyUTF8(at: offset, into: $0) }
+	#expect(copied == query.count)
+	var streamed: [UInt8] = []
+	tree.iterateBytes(from: offset) { bytes in
+		streamed = Array(bytes.prefix(query.count))
+		return false
+	}
+	#expect(streamed == query)
+
+	let insertion = Array("itsy".utf8)
+	tree.insert(insertion, at: offset)
+	tree.remove(offset ..< offset + insertion.count)
+	#expect(tree.length == expectedLength)
+
+	let savedURL = directory.appendingPathComponent("saved.txt")
+	try AtomicFileWriter.write(to: savedURL) { descriptor in
+		try tree.write(to: descriptor, path: savedURL.path)
+	}
+	#expect(try savedURL.resourceValues(forKeys: [.fileSizeKey]).fileSize == expectedLength)
+	#expect(try fileSHA256(savedURL) == fileSHA256(sourceURL))
+}
+
 @Test func pieceTreeSaveToWritesHundredKPiecesWithMatchingSHA256() throws {
 	let fileManager = FileManager.default
 	let directory = fileManager.temporaryDirectory.appendingPathComponent("itsy-piecetree-save-\(UUID().uuidString)", isDirectory: true)
@@ -301,4 +345,14 @@ private func graphemeBoundaries(in text: String) -> [Int] {
 
 private func graphemeIndex(in boundaries: [Int], before offset: Int) -> Int {
 	boundaries.prefix(while: { $0 <= offset }).count - 1
+}
+
+private func fileSHA256(_ url: URL) throws -> SHA256.Digest {
+	let file = try FileHandle(forReadingFrom: url)
+	defer { try? file.close() }
+	var hasher = SHA256()
+	while let chunk = try file.read(upToCount: 64 * 1024), !chunk.isEmpty {
+		hasher.update(data: chunk)
+	}
+	return hasher.finalize()
 }

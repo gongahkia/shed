@@ -15,6 +15,7 @@
 - **Competitors:** Zed (latest stable), Sublime Text 4 (latest), VSCode (latest), CodeEdit (latest release), system `TextEdit` (control).
 - **Outputs:** JSON via `--export-json`, rendered to `bench/results/YYYY-MM-DD.md` and committed.
 - **Regression gate:** PR CI runs the harness against `itsy` only; fails if any KPI regresses >5% vs `main` baseline or `first_window_visible_ms` exceeds `150 ms`.
+- **Large-text gate:** PR CI generates a 1 GiB UTF-8 fixture, then verifies mmap-backed open, streamed search, edit/revert, atomic save, and a 1.5 GiB peak-RSS delta budget without flattening it.
 
 ## CLI
 
@@ -22,6 +23,7 @@
 itsybench display [--display <id>]
 itsybench measure --app <path> [--args <arg>] [--new-instance] [--runs <count>] [--staged] [--timeout-ms <ms>] [--warmup-purge]
 itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
+itsybench piecetree [--ops <count>] [--slice-length <bytes>] [--file <path>] [--mmap-contract] [--mmap-rss-budget-kb <kb>]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 ```
@@ -35,6 +37,14 @@ Memory audit:
 ```sh
 bench/scripts/memory_audit.sh
 ```
+
+Large-text contract:
+
+```sh
+bench/scripts/large_text_gate.sh
+```
+
+Use `ITSY_LARGE_TEXT_BYTES` and `ITSY_LARGE_TEXT_RSS_BUDGET_KB` for a local reduced-size rehearsal.
 
 This launches the release binary, waits for `first_draw`, samples `ItsyBench rss`, runs `vmmap -summary`, and writes `bench/results/memory-YYYY-MM-DD.{json,md}`.
 

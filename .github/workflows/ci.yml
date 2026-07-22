@@ -75,6 +75,9 @@ jobs:
         run: swift test --filter ItsyIntegrationTests
       - name: Bench smoke
         run: .build/release/ItsyBench --smoke --runs 1
+      - name: Large text release gate
+        if: github.event_name == 'pull_request'
+        run: bench/scripts/large_text_gate.sh
       - name: Regression bench
         if: github.event_name == 'pull_request'
         run: bench/scripts/regression.sh

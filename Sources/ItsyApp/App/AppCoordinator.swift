@@ -45,7 +45,8 @@ import ItsyKeymap
 	private lazy var debuggerCoordinator = DebuggerCoordinator(documentController: documentController)
 	private lazy var terminalCoordinator = TerminalCoordinator(
 		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },
-		activeDocumentProvider: { [weak self] in self?.activeDocument() }
+		activeDocumentProvider: { [weak self] in self?.activeDocument() },
+		openLocation: { [weak self] location in self?.openTerminalLocation(location) }
 	)
 	private lazy var problemsCoordinator = ProblemsCoordinator(documentController: documentController)
 	private lazy var outlineCoordinator = OutlineCoordinator(
@@ -753,6 +754,17 @@ import ItsyKeymap
 
 	@objc func revealTerminalCWD(_ sender: Any?) {
 		terminalCoordinator.revealTerminalCWDInFileTree(sender)
+	}
+
+	private func openTerminalLocation(_ location: TerminalOpenLocation) {
+		if location.isFile {
+			guard FileManager.default.fileExists(atPath: location.url.path) else {
+				return
+			}
+			_ = documentController.openDocument(at: location.url, line: location.line, column: location.column)
+			return
+		}
+		NSWorkspace.shared.open(location.url)
 	}
 
 	private func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {

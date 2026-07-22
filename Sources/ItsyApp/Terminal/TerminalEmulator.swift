@@ -26,6 +26,7 @@ struct TerminalTextAttributes: Equatable {
 struct TerminalCell: Equatable {
 	var character: Character
 	var attributes: TerminalTextAttributes
+	var isContinuation = false
 }
 
 enum TerminalMouseTrackingMode: Equatable {
@@ -40,6 +41,7 @@ struct TerminalSnapshot {
 	var cells: [[TerminalCell]]
 	var cursorRow: Int
 	var cursorColumn: Int
+	var cursorVisible: Bool
 	var alternateScreen: Bool
 	var bracketedPaste: Bool
 	var windowTitle: String?
@@ -67,6 +69,8 @@ final class ItsyTerminalEmulator {
 	private var maxScrollbackLines: Int
 	private var screen: [[TerminalCell]]
 	private var normalScreen: [[TerminalCell]] = []
+	private var normalCursor = (row: 0, column: 0)
+	private var normalAttributes = TerminalTextAttributes()
 	private var history: [[TerminalCell]] = []
 	private var cursorRow = 0
 	private var cursorColumn = 0
@@ -77,6 +81,7 @@ final class ItsyTerminalEmulator {
 	private var currentAttributes = TerminalTextAttributes()
 	private var currentHyperlink: String?
 	private(set) var alternateScreen = false
+	private(set) var cursorVisible = true
 	private(set) var bracketedPaste = false
 	private(set) var windowTitle: String?
 	private(set) var currentDirectory: String?
@@ -106,6 +111,7 @@ final class ItsyTerminalEmulator {
 		rows = newRows
 		screen = resizedScreen(screen, columns: newColumns, rows: newRows)
 		normalScreen = resizedScreen(normalScreen, columns: newColumns, rows: newRows)
+		normalCursor = (min(normalCursor.row, rows - 1), min(normalCursor.column, columns - 1))
 		cursorRow = min(cursorRow, rows - 1)
 		cursorColumn = min(cursorColumn, columns - 1)
 		scrollTop = 0
@@ -115,6 +121,8 @@ final class ItsyTerminalEmulator {
 	func reset() {
 		screen = Self.blankScreen(columns: columns, rows: rows)
 		normalScreen = []
+		normalCursor = (0, 0)
+		normalAttributes = TerminalTextAttributes()
 		history.removeAll(keepingCapacity: true)
 		cursorRow = 0
 		cursorColumn = 0
@@ -125,6 +133,7 @@ final class ItsyTerminalEmulator {
 		currentAttributes = TerminalTextAttributes()
 		currentHyperlink = nil
 		alternateScreen = false
+		cursorVisible = true
 		bracketedPaste = false
 		windowTitle = nil
 		currentDirectory = nil
@@ -179,6 +188,7 @@ final class ItsyTerminalEmulator {
 			cells: visibleCells,
 			cursorRow: cursorRow,
 			cursorColumn: cursorColumn,
+			cursorVisible: cursorVisible,
 			alternateScreen: alternateScreen,
 			bracketedPaste: bracketedPaste,
 			windowTitle: windowTitle,
@@ -207,6 +217,9 @@ final class ItsyTerminalEmulator {
 				state = .ground
 			} else if scalar.value == 0x1B {
 				state = .oscEscape(buffer)
+			} else if buffer.unicodeScalars.count >= 4096 {
+				recordUnsupportedSequence()
+				state = .ground
 			} else {
 				state = .osc(appendingOSC(scalar, to: buffer))
 			}
@@ -265,6 +278,7 @@ final class ItsyTerminalEmulator {
 			lineFeed()
 			state = .ground
 		default:
+			recordUnsupportedSequence()
 			state = .ground
 		}
 	}
@@ -272,6 +286,9 @@ final class ItsyTerminalEmulator {
 	private func handleCSI(_ scalar: UnicodeScalar, buffer: String) {
 		if scalar.value >= 0x40, scalar.value <= 0x7E {
 			applyCSI(buffer, final: Character(scalar))
+			state = .ground
+		} else if buffer.unicodeScalars.count >= 256 {
+			recordUnsupportedSequence()
 			state = .ground
 		} else {
 			state = .csi(buffer + String(scalar))
@@ -346,13 +363,17 @@ final class ItsyTerminalEmulator {
 		case "h":
 			if privateMode {
 				setPrivateModes(params, enabled: true)
+			} else {
+				recordUnsupportedSequence()
 			}
 		case "l":
 			if privateMode {
 				setPrivateModes(params, enabled: false)
+			} else {
+				recordUnsupportedSequence()
 			}
 		default:
-			return
+			recordUnsupportedSequence()
 		}
 	}
 
@@ -444,6 +465,8 @@ final class ItsyTerminalEmulator {
 	private func setPrivateModes(_ modes: [Int], enabled: Bool) {
 		for mode in modes {
 			switch mode {
+			case 25:
+				cursorVisible = enabled
 			case 1000:
 				mouseTrackingMode = enabled ? .normal : disabledMouseMode(.normal)
 			case 1002:
@@ -452,12 +475,18 @@ final class ItsyTerminalEmulator {
 				mouseTrackingMode = enabled ? .any : disabledMouseMode(.any)
 			case 1006:
 				sgrMouseMode = enabled
-			case 1049:
+			case 47, 1047, 1049:
 				setAlternateScreen(enabled)
+			case 1048:
+				if enabled {
+					saveCursor()
+				} else {
+					restoreCursor()
+				}
 			case 2004:
 				bracketedPaste = enabled
 			default:
-				continue
+				recordUnsupportedSequence()
 			}
 		}
 	}
@@ -472,14 +501,17 @@ final class ItsyTerminalEmulator {
 		}
 		if enabled {
 			normalScreen = screen
+			normalCursor = (cursorRow, cursorColumn)
+			normalAttributes = currentAttributes
 			screen = Self.blankScreen(columns: columns, rows: rows)
 			cursorRow = 0
 			cursorColumn = 0
 		} else {
 			screen = normalScreen.isEmpty ? Self.blankScreen(columns: columns, rows: rows) : normalScreen
 			normalScreen = []
-			cursorRow = min(cursorRow, rows - 1)
-			cursorColumn = min(cursorColumn, columns - 1)
+			cursorRow = min(normalCursor.row, rows - 1)
+			cursorColumn = min(normalCursor.column, columns - 1)
+			currentAttributes = normalAttributes
 		}
 		alternateScreen = enabled
 		scrollTop = 0
@@ -511,7 +543,7 @@ final class ItsyTerminalEmulator {
 		case "133":
 			promptMark = sanitizedOSCText(payload, maxLength: 512)
 		default:
-			return
+			recordUnsupportedSequence()
 		}
 	}
 
@@ -587,9 +619,6 @@ final class ItsyTerminalEmulator {
 	}
 
 	private func appendingOSC(_ scalar: UnicodeScalar, to buffer: String) -> String {
-		guard buffer.unicodeScalars.count < 4096 else {
-			return buffer
-		}
 		return buffer + String(scalar)
 	}
 
@@ -600,13 +629,67 @@ final class ItsyTerminalEmulator {
 		return String(String.UnicodeScalarView(scalars))
 	}
 
+	private func recordUnsupportedSequence() {
+		put("�")
+	}
+
+	private func appendToPreviousCell(_ character: Character) {
+		var row = cursorRow
+		var column = min(cursorColumn - 1, columns - 1)
+		if column < 0, row > 0 {
+			row -= 1
+			column = columns - 1
+		}
+		while column >= 0, screen[row][column].isContinuation {
+			column -= 1
+		}
+		guard column >= 0 else {
+			return
+		}
+		let existing = screen[row][column]
+		guard existing.character != " " else {
+			return
+		}
+		screen[row][column].character = Character(String(existing.character) + String(character))
+	}
+
+	private func displayWidth(of character: Character) -> Int {
+		guard let scalar = character.unicodeScalars.first else {
+			return 0
+		}
+		let value = scalar.value
+		if (0x0300 ... 0x036F).contains(value) || (0x1AB0 ... 0x1AFF).contains(value) ||
+			(0x1DC0 ... 0x1DFF).contains(value) || (0x20D0 ... 0x20FF).contains(value) ||
+			(0xFE00 ... 0xFE0F).contains(value) || value == 0x200D || (0x1F3FB ... 0x1F3FF).contains(value)
+		{
+			return 0
+		}
+		if (0x1100 ... 0x115F).contains(value) || (0x2329 ... 0x232A).contains(value) ||
+			(0x2E80 ... 0xA4CF).contains(value) || (0xAC00 ... 0xD7A3).contains(value) ||
+			(0xF900 ... 0xFAFF).contains(value) || (0xFE10 ... 0xFE19).contains(value) ||
+			(0xFE30 ... 0xFE6F).contains(value) || (0xFF00 ... 0xFF60).contains(value) ||
+			(0xFFE0 ... 0xFFE6).contains(value) || (0x1F300 ... 0x1FAFF).contains(value)
+		{
+			return 2
+		}
+		return 1
+	}
+
 	private func put(_ character: Character) {
-		if cursorColumn >= columns {
+		let width = displayWidth(of: character)
+		if width == 0 {
+			appendToPreviousCell(character)
+			return
+		}
+		if cursorColumn >= columns || cursorColumn + width > columns {
 			cursorColumn = 0
 			lineFeed()
 		}
 		screen[cursorRow][cursorColumn] = TerminalCell(character: character, attributes: currentCellAttributes())
-		cursorColumn += 1
+		if width == 2, cursorColumn + 1 < columns {
+			screen[cursorRow][cursorColumn + 1] = TerminalCell(character: " ", attributes: currentCellAttributes(), isContinuation: true)
+		}
+		cursorColumn += width
 		if cursorColumn >= columns {
 			cursorColumn = columns
 		}
@@ -779,10 +862,10 @@ final class ItsyTerminalEmulator {
 
 	private static func string(from line: [TerminalCell]) -> String {
 		var end = line.count
-		while end > 0, line[end - 1].character == " " {
+		while end > 0, (line[end - 1].character == " " || line[end - 1].isContinuation) {
 			end -= 1
 		}
-		return String(line.prefix(end).map(\.character))
+		return String(line.prefix(end).filter { !$0.isContinuation }.map(\.character))
 	}
 
 	private static func xtermPalette() -> [Int: TerminalRGB] {

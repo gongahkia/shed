@@ -1,0 +1,2 @@
+<ESC>[1mSources/App.swift:12:8:<ESC>[0m <ESC>[31merror:<ESC>[0m cannot convert value of type 'Int' to expected argument type 'String'
+<ESC>[2mnote:<ESC>[0m overloads for append are declared here

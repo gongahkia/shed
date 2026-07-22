@@ -9,6 +9,7 @@ public enum WorkspaceTaskSource: String, Codable, Equatable, Sendable {
 	case shellScript
 	case extensionManifest
 	case workspaceTaskFile
+	case globalTaskFile
 }
 
 public struct WorkspaceTask: Codable, Equatable, Sendable {
@@ -18,9 +19,13 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 	public var command: String
 	public var arguments: [String]
 	public var workingDirectory: URL?
+	public var environment: [String: String]
+	public var inputs: [WorkspaceTaskInput]
 	public var dependsOn: [String]
 	public var isBackground: Bool
 	public var watch: WorkspaceTaskWatch?
+	public var presentation: WorkspaceTaskPresentation
+	public var problemMatchers: [String]
 
 	public init(
 		id: String,
@@ -29,9 +34,13 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 		command: String,
 		arguments: [String] = [],
 		workingDirectory: URL? = nil,
+		environment: [String: String] = [:],
+		inputs: [WorkspaceTaskInput] = [],
 		dependsOn: [String] = [],
 		isBackground: Bool = false,
-		watch: WorkspaceTaskWatch? = nil
+		watch: WorkspaceTaskWatch? = nil,
+		presentation: WorkspaceTaskPresentation = WorkspaceTaskPresentation(),
+		problemMatchers: [String] = []
 	) {
 		self.id = id
 		self.label = label
@@ -39,9 +48,13 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 		self.command = command
 		self.arguments = arguments
 		self.workingDirectory = workingDirectory
+		self.environment = environment
+		self.inputs = inputs
 		self.dependsOn = dependsOn
 		self.isBackground = isBackground
 		self.watch = watch
+		self.presentation = presentation
+		self.problemMatchers = problemMatchers
 	}
 
 	private enum CodingKeys: String, CodingKey {
@@ -51,9 +64,13 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 		case command
 		case arguments
 		case workingDirectory
+		case environment
+		case inputs
 		case dependsOn = "depends_on"
 		case isBackground = "is_background"
 		case watch
+		case presentation
+		case problemMatchers
 	}
 
 	public init(from decoder: Decoder) throws {
@@ -64,9 +81,13 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 		command = try container.decode(String.self, forKey: .command)
 		arguments = try container.decodeIfPresent([String].self, forKey: .arguments) ?? []
 		workingDirectory = try container.decodeIfPresent(URL.self, forKey: .workingDirectory)
+		environment = try container.decodeIfPresent([String: String].self, forKey: .environment) ?? [:]
+		inputs = try container.decodeIfPresent([WorkspaceTaskInput].self, forKey: .inputs) ?? []
 		dependsOn = try container.decodeIfPresent([String].self, forKey: .dependsOn) ?? []
 		isBackground = try container.decodeIfPresent(Bool.self, forKey: .isBackground) ?? false
 		watch = try container.decodeIfPresent(WorkspaceTaskWatch.self, forKey: .watch)
+		presentation = try container.decodeIfPresent(WorkspaceTaskPresentation.self, forKey: .presentation) ?? WorkspaceTaskPresentation()
+		problemMatchers = try container.decodeIfPresent([String].self, forKey: .problemMatchers) ?? []
 	}
 
 	public var commandLine: String {
@@ -96,8 +117,13 @@ public struct WorkspaceTaskWatch: Codable, Equatable, Sendable {
 }
 
 public enum WorkspaceTaskDiscovery {
-	public static func discover(root: URL, fileManager: FileManager = .default) -> [WorkspaceTask] {
+	public static func discover(root: URL, globalConfigurationURL: URL? = nil, fileManager: FileManager = .default) -> [WorkspaceTask] {
 		var tasks: [WorkspaceTask] = []
+		if let globalConfigurationURL, let data = try? Data(contentsOf: globalConfigurationURL),
+		   let configuredTasks = try? configuredTasks(data: data, root: root, scope: .global)
+		{
+			tasks += configuredTasks
+		}
 		tasks += swiftPackageTasks(root: root, fileManager: fileManager)
 		tasks += packageJSONTasks(root: root)
 		tasks += makefileTasks(root: root)
@@ -191,10 +217,14 @@ public enum WorkspaceTaskDiscovery {
 		let url = root
 			.appendingPathComponent(".itsy", isDirectory: true)
 			.appendingPathComponent("tasks.json")
-		guard fileManager.fileExists(atPath: url.path),
-		      let data = try? Data(contentsOf: url),
-		      let file = try? JSONDecoder().decode(WorkspaceTaskFile.self, from: data)
+		guard fileManager.fileExists(atPath: url.path), let data = try? Data(contentsOf: url)
 		else {
+			return []
+		}
+		if let tasks = try? configuredTasks(data: data, root: root, scope: .project) {
+			return tasks
+		}
+		guard let file = try? JSONDecoder().decode(WorkspaceTaskFile.self, from: data) else {
 			return []
 		}
 		return file.tasks.map {
@@ -212,6 +242,32 @@ public enum WorkspaceTaskDiscovery {
 		}
 	}
 
+	public static func configuredTasks(
+		data: Data,
+		root: URL,
+		scope: WorkspaceTaskConfigurationScope
+	) throws -> [WorkspaceTask] {
+		let configuration = try WorkspaceTaskConfigurationParser.parse(data: data, scope: scope)
+		return configuration.tasks.map { definition in
+			let workingDirectory = definition.cwd.map { root.appendingPathComponent($0, isDirectory: true).standardizedFileURL } ?? root
+			return WorkspaceTask(
+				id: "\(scope.rawValue):\(definition.id)",
+				label: definition.label,
+				source: scope == .project ? .workspaceTaskFile : .globalTaskFile,
+				command: definition.command,
+				arguments: definition.arguments,
+				workingDirectory: workingDirectory,
+				environment: definition.environment,
+				inputs: definition.inputs,
+				dependsOn: definition.dependsOn,
+				isBackground: definition.isBackground,
+				watch: definition.watch,
+				presentation: definition.presentation,
+				problemMatchers: definition.problemMatchers
+			)
+		}
+	}
+
 	private static func relativePath(_ url: URL, root: URL) -> String? {
 		let rootPath = root.standardizedFileURL.path
 		let path = url.standardizedFileURL.path
@@ -224,10 +280,10 @@ public enum WorkspaceTaskDiscovery {
 }
 
 private struct WorkspaceTaskFile: Decodable {
-	var tasks: [WorkspaceTaskDefinition]
+	var tasks: [LegacyWorkspaceTaskDefinition]
 }
 
-private struct WorkspaceTaskDefinition: Decodable {
+private struct LegacyWorkspaceTaskDefinition: Decodable {
 	var id: String
 	var label: String
 	var command: String
@@ -415,6 +471,7 @@ public struct WorkspaceTaskRunner: Sendable {
 		process.executableURL = executableURL
 		process.arguments = [task.command] + task.arguments
 		process.currentDirectoryURL = task.workingDirectory ?? root
+		process.environment = ProcessInfo.processInfo.environment.merging(task.environment) { _, configured in configured }
 		let stdout = Pipe()
 		let stderr = Pipe()
 		process.standardOutput = stdout
@@ -462,6 +519,7 @@ public struct WorkspaceTaskRunner: Sendable {
 		process.executableURL = executableURL
 		process.arguments = [task.command] + task.arguments
 		process.currentDirectoryURL = task.workingDirectory ?? root
+		process.environment = ProcessInfo.processInfo.environment.merging(task.environment) { _, configured in configured }
 		let stdoutPipe = Pipe()
 		let stderrPipe = Pipe()
 		process.standardOutput = stdoutPipe

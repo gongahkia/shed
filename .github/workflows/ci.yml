@@ -10,7 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: true
+          submodules: recursive
       - name: Verify native dependencies
         run: scripts/verify_native_dependencies.sh
       - name: Test native dependency preflight

@@ -6,6 +6,7 @@ public struct DiffFile: Equatable, Sendable {
 	public var indexLine: String?
 	public var oldMode: String?
 	public var newMode: String?
+	public var isBinary: Bool
 	public var isNewFile: Bool
 	public var isDeletedFile: Bool
 	public var hunks: [DiffHunk]
@@ -16,6 +17,7 @@ public struct DiffFile: Equatable, Sendable {
 		indexLine: String? = nil,
 		oldMode: String? = nil,
 		newMode: String? = nil,
+		isBinary: Bool = false,
 		isNewFile: Bool = false,
 		isDeletedFile: Bool = false,
 		hunks: [DiffHunk] = []
@@ -25,6 +27,7 @@ public struct DiffFile: Equatable, Sendable {
 		self.indexLine = indexLine
 		self.oldMode = oldMode
 		self.newMode = newMode
+		self.isBinary = isBinary
 		self.isNewFile = isNewFile
 		self.isDeletedFile = isDeletedFile
 		self.hunks = hunks
@@ -37,13 +40,22 @@ public struct DiffHunk: Equatable, Sendable {
 	public var newStart: Int
 	public var newCount: Int
 	public var lines: [DiffLine]
+	public var noNewlineLineIndexes: Set<Int>
 
-	public init(oldStart: Int, oldCount: Int, newStart: Int, newCount: Int, lines: [DiffLine] = []) {
+	public init(
+		oldStart: Int,
+		oldCount: Int,
+		newStart: Int,
+		newCount: Int,
+		lines: [DiffLine] = [],
+		noNewlineLineIndexes: Set<Int> = []
+	) {
 		self.oldStart = oldStart
 		self.oldCount = oldCount
 		self.newStart = newStart
 		self.newCount = newCount
 		self.lines = lines
+		self.noNewlineLineIndexes = noNewlineLineIndexes
 	}
 }
 
@@ -138,6 +150,12 @@ public enum UnifiedDiffParser {
 	}
 
 	private static func appendHunkLine(_ line: String, to hunk: inout DiffHunk?) {
+		if line == "\\ No newline at end of file" {
+			if let index = hunk?.lines.indices.last {
+				hunk?.noNewlineLineIndexes.insert(index)
+			}
+			return
+		}
 		guard !line.isEmpty, let marker = line.first else {
 			return
 		}
@@ -171,6 +189,8 @@ public enum UnifiedDiffParser {
 			file?.oldPath = String(line.dropFirst("rename from ".count))
 		} else if line.hasPrefix("rename to ") {
 			file?.newPath = String(line.dropFirst("rename to ".count))
+		} else if line == "GIT binary patch" || line.hasPrefix("Binary files ") {
+			file?.isBinary = true
 		} else if line.hasPrefix("--- ") {
 			file?.oldPath = pathHeaderValue(line)
 		} else if line.hasPrefix("+++ ") {

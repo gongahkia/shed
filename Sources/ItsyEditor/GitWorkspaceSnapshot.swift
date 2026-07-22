@@ -41,4 +41,15 @@ public struct GitWorkspaceSnapshot: Equatable, Sendable {
 	public var branchLabel: String {
 		status.branch.head ?? "detached"
 	}
+
+	public var syncLabel: String {
+		var label = branchLabel
+		if let ahead = status.branch.ahead, ahead > 0 {
+			label += " ↑\(ahead)"
+		}
+		if let behind = status.branch.behind, behind > 0 {
+			label += " ↓\(behind)"
+		}
+		return label
+	}
 }

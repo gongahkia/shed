@@ -2,6 +2,7 @@
 import ItsyEditor
 import ItsyLSP
 import Testing
+import AppKit
 
 @Test func snippetCompletionMapperFiltersByPrefixAndMarksLocalItems() {
 	let snippets = [
@@ -30,4 +31,14 @@ import Testing
 	#expect(session.move(direction: 1, currentSelectionRanges: [6 ..< 9]) == [13 ..< 18])
 	#expect(session.move(direction: 1, currentSelectionRanges: [13 ..< 16]) == [20 ..< 20])
 	#expect(session.move(direction: -1, currentSelectionRanges: [20 ..< 20]) == [13 ..< 16])
+}
+
+@MainActor
+@Test func completionPopupPlacementStaysInsideTheVisibleFrame() {
+	let frame = CompletionPopupController.panelFrame(
+		caret: NSRect(x: 190, y: 5, width: 2, height: 14),
+		preferredSize: NSSize(width: 340, height: 220),
+		visibleFrame: NSRect(x: 0, y: 0, width: 200, height: 100)
+	)
+	#expect(frame == NSRect(x: 0, y: 0, width: 200, height: 100))
 }

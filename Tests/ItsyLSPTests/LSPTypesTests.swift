@@ -127,6 +127,14 @@ import Testing
 	])
 }
 
+@Test func completionItemDecodesCommitCharacters() throws {
+	let item = try LSPCompletionItem(resolveResult: .object([
+		"label": .string("print"),
+		"commitCharacters": .array([.string("("), .string(".")]),
+	]))
+	#expect(item.commitCharacters == ["(", "."])
+}
+
 @Test func initializeResultDecodesCompletionTriggerCharacters() throws {
 	let result = try LSPInitializeResult(result: .object([
 		"capabilities": .object([
@@ -143,6 +151,17 @@ import Testing
 	#expect(result.capabilities.completionProvider?.triggerCharacters == [".", ":"])
 	#expect(result.capabilities.completionProvider?.resolveProvider == true)
 	#expect(result.capabilities.signatureHelpProvider?.triggerCharacters == ["(", ","])
+}
+
+@Test func initializeResultDecodesFormattingCapabilities() throws {
+	let result = try LSPInitializeResult(result: .object([
+		"capabilities": .object([
+			"documentFormattingProvider": .bool(true),
+			"documentRangeFormattingProvider": .bool(false),
+		]),
+	]))
+	#expect(result.capabilities.documentFormattingProvider?.isEnabled == true)
+	#expect(result.capabilities.documentRangeFormattingProvider?.isEnabled == false)
 }
 
 @Test func completionItemResolveDecodesMarkupAndPreservesData() throws {

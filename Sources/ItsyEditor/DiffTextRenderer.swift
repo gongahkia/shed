@@ -57,12 +57,22 @@ public enum DiffTextRenderer {
 			}
 			if file.isDeletedFile, let mode = file.oldMode {
 				builder.append(kind: .header, line: "deleted file mode \(mode)")
+			} else if !file.isNewFile, !file.isDeletedFile, file.oldMode != file.newMode {
+				if let mode = file.oldMode {
+					builder.append(kind: .header, line: "old mode \(mode)")
+				}
+				if let mode = file.newMode {
+					builder.append(kind: .header, line: "new mode \(mode)")
+				}
+			}
+			if file.isBinary {
+				builder.append(kind: .header, line: "Binary files \(oldPath) and \(newPath) differ")
 			}
 			builder.append(kind: .header, line: "--- \(file.oldPath.map { "a/\($0)" } ?? "/dev/null")")
 			builder.append(kind: .header, line: "+++ \(file.newPath.map { "b/\($0)" } ?? "/dev/null")")
 			for hunk in file.hunks {
 				builder.append(kind: .header, line: hunkHeader(hunk))
-				for line in hunk.lines {
+				for (lineIndex, line) in hunk.lines.enumerated() {
 					switch line {
 					case .context(let content):
 						builder.append(kind: .context, prefix: " ", content: content)
@@ -70,6 +80,9 @@ public enum DiffTextRenderer {
 						builder.append(kind: .addition, prefix: "+", content: content)
 					case .remove(let content):
 						builder.append(kind: .removal, prefix: "-", content: content)
+					}
+					if hunk.noNewlineLineIndexes.contains(lineIndex) {
+						builder.append(kind: .header, line: "\\ No newline at end of file")
 					}
 				}
 			}
@@ -88,6 +101,14 @@ public enum DiffTextRenderer {
 			}
 			oldBuilder.append(kind: .header, line: "--- \(file.oldPath ?? "/dev/null")")
 			newBuilder.append(kind: .header, line: "+++ \(file.newPath ?? "/dev/null")")
+			if !file.isNewFile, !file.isDeletedFile, file.oldMode != file.newMode {
+				oldBuilder.append(kind: .header, line: "old mode \(file.oldMode ?? "unknown")")
+				newBuilder.append(kind: .header, line: "new mode \(file.newMode ?? "unknown")")
+			}
+			if file.isBinary {
+				oldBuilder.append(kind: .header, line: "Binary file")
+				newBuilder.append(kind: .header, line: "Binary file")
+			}
 			for hunk in file.hunks {
 				let header = hunkHeader(hunk)
 				oldBuilder.append(kind: .header, line: header)
@@ -122,6 +143,9 @@ public enum DiffTextRenderer {
 			case .context(let content):
 				old.append(kind: .context, prefix: sidePrefix(number: oldLine, width: width, marker: " "), content: content)
 				new.append(kind: .context, prefix: sidePrefix(number: newLine, width: width, marker: " "), content: content)
+				if hunk.noNewlineLineIndexes.contains(index) {
+					appendNoNewlineMarker(old: &old, new: &new)
+				}
 				oldLine += 1
 				newLine += 1
 				index += 1
@@ -148,6 +172,9 @@ public enum DiffTextRenderer {
 				}
 				let rowCount = max(removes.count, adds.count)
 				for row in 0 ..< rowCount {
+					let hasNoNewlineMarker =
+						(row < removes.count && hunk.noNewlineLineIndexes.contains(start + row)) ||
+						(row < adds.count && hunk.noNewlineLineIndexes.contains(addStart + row))
 					if row < removes.count {
 						old.append(kind: .removal, prefix: sidePrefix(number: oldLine, width: width, marker: "-"), content: removes[row])
 						oldLine += 1
@@ -160,14 +187,25 @@ public enum DiffTextRenderer {
 					} else {
 						new.append(kind: .blank, line: sidePrefix(number: nil, width: width, marker: " "))
 					}
+					if hasNoNewlineMarker {
+						appendNoNewlineMarker(old: &old, new: &new)
+					}
 				}
 			case .add(let content):
 				old.append(kind: .blank, line: sidePrefix(number: nil, width: width, marker: " "))
 				new.append(kind: .addition, prefix: sidePrefix(number: newLine, width: width, marker: "+"), content: content)
+				if hunk.noNewlineLineIndexes.contains(index) {
+					appendNoNewlineMarker(old: &old, new: &new)
+				}
 				newLine += 1
 				index += 1
 			}
 		}
+	}
+
+	private static func appendNoNewlineMarker(old: inout DiffDocumentBuilder, new: inout DiffDocumentBuilder) {
+		old.append(kind: .header, line: "\\ No newline at end of file")
+		new.append(kind: .header, line: "\\ No newline at end of file")
 	}
 
 	private static func hunkHeader(_ hunk: DiffHunk) -> String {

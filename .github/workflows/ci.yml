@@ -44,6 +44,14 @@ jobs:
             bench/results/coverage-current.md
       - name: LSP smoke
         run: swift test --filter ItsyLSPSmokeTests
+      - name: Canonical LSP matrix
+        run: scripts/lsp_matrix.sh --artifacts .build/lsp-matrix
+      - name: Upload LSP matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsp-matrix
+          path: .build/lsp-matrix
       - name: UI snapshots
         run: swift test --filter ItsyUISnapshotTests
       - name: Install DAP adapters

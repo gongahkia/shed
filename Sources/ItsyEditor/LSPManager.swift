@@ -22,6 +22,7 @@ public enum LSPSessionStatus: Equatable, Sendable {
 
 public enum LSPManagerError: Error, Equatable, Sendable {
 	case noConfigForDocument
+	case unsupportedLanguage(LSPServerRegistry.UnsupportedLanguage)
 	case workspaceRootNotFound
 	case missingBinary(LSPServerRegistry.MissingBinary)
 	case retryLimitExceeded
@@ -92,6 +93,10 @@ public actor LSPManager {
 		effectiveRegistry(for: url).missingBinary(for: url)
 	}
 
+	public func unsupportedLanguage(for url: URL) -> LSPServerRegistry.UnsupportedLanguage? {
+		effectiveRegistry(for: url).unsupportedLanguage(for: url)
+	}
+
 	public func config(for url: URL) -> LSPServerConfig? {
 		effectiveRegistry(for: url).config(for: url)
 	}
@@ -101,6 +106,9 @@ public actor LSPManager {
 		guard let config = effectiveRegistry.resolvedConfig(for: url) else {
 			if let missingBinary = effectiveRegistry.missingBinary(for: url) {
 				throw LSPManagerError.missingBinary(missingBinary)
+			}
+			if let unsupportedLanguage = effectiveRegistry.unsupportedLanguage(for: url) {
+				throw LSPManagerError.unsupportedLanguage(unsupportedLanguage)
 			}
 			throw LSPManagerError.noConfigForDocument
 		}

@@ -49,7 +49,7 @@ import Testing
 			),
 		]
 	), source: "sourcekit-lsp")
-	problemsCoordinator.setProblems(await aggregator.snapshot())
+	problemsCoordinator.setProblems(await aggregator.snapshot(), sourceID: "lsp:swift:\(fixture.root.path)")
 	problemsCoordinator.showProblemsForTesting()
 	#expect(problemsCoordinator.problemCountForTesting == 2)
 	#expect(problemsCoordinator.statusTextForTesting == "1 errors, 1 warnings, 2 total")
@@ -69,10 +69,11 @@ import Testing
 	let taskResult = try WorkspaceTaskRunner().run(task, root: fixture.root)
 	#expect(!taskResult.succeeded)
 	taskCoordinator.applyTaskResultForTesting(taskResult, root: fixture.root)
-	#expect(problemsCoordinator.problemCountForTesting == 1)
+	#expect(problemsCoordinator.problemCountForTesting == 3)
 
-	problemsCoordinator.focusProblemForTesting(index: 0)
-	#expect(problemsCoordinator.selectedProblemIndexForTesting == 0)
+	let taskIndex = try #require(problemsCoordinator.problemsForTesting.firstIndex { $0.message == "compile failed" })
+	problemsCoordinator.focusProblemForTesting(index: taskIndex)
+	#expect(problemsCoordinator.selectedProblemIndexForTesting == taskIndex)
 	problemsCoordinator.openSelectedProblemForTesting()
 	let reopened = try #require(documentController.document(for: sourceURL) as? ItsyDocument)
 	let expectedOffset = reopened.editor.textStorage.offset(forLine: 3) + 6

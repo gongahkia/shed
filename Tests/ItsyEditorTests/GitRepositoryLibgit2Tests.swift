@@ -95,7 +95,7 @@ import Testing
 	try fixture.write("committed.txt", "from libgit2\n")
 	try fixture.git(["add", "committed.txt"])
 
-	try GitRepository(root: fixture.root).commit(summary: "libgit2 commit")
+	_ = try GitRepository(root: fixture.root).commit(summary: "libgit2 commit")
 	let blame = try GitRepository(root: fixture.root).blame(path: "file.txt")
 	let subject = try fixture.git(["log", "-1", "--format=%s"]).trimmingCharacters(in: .whitespacesAndNewlines)
 

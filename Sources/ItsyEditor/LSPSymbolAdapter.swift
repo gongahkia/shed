@@ -49,7 +49,8 @@ public enum LSPSymbolAdapter {
 				endLine: max(1, symbol.selectionRange.end.line + 1),
 				endColumn: max(1, symbol.selectionRange.end.character + 1),
 				signature: symbol.detail,
-				containerName: containerName
+				containerName: containerName,
+				source: .languageServer
 			))
 			if let children = symbol.children, !children.isEmpty {
 				collect(children, relativePath: relativePath, containerName: symbol.name, into: &output)
@@ -69,7 +70,8 @@ public enum LSPSymbolAdapter {
 			column: max(1, location.range.start.character + 1),
 			endLine: max(1, location.range.end.line + 1),
 			endColumn: max(1, location.range.end.character + 1),
-			containerName: containerName
+			containerName: containerName,
+			source: .languageServer
 		)
 	}
 }

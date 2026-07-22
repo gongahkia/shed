@@ -45,6 +45,34 @@ public extension GitRepository {
 				return Repository(raw: raw, path: path)
 			}
 
+			public static func discover(from path: URL) throws -> Repository {
+				try Runtime.retain()
+				var buffer = git_buf()
+				defer {
+					git_buf_dispose(&buffer)
+					Runtime.release()
+				}
+				let result = path.withUnsafeFileSystemRepresentation { fileSystemPath in
+					git_repository_discover(&buffer, fileSystemPath, 0, nil)
+				}
+				try check(result)
+				guard let discoveredPath = buffer.ptr else {
+					throw Failure(code: -1, message: "git_repository_discover returned nil")
+				}
+				return try open(at: URL(fileURLWithPath: String(cString: discoveredPath), isDirectory: true))
+			}
+
+			public var isBare: Bool {
+				git_repository_is_bare(raw) == 1
+			}
+
+			public var worktreeURL: URL? {
+				guard let path = git_repository_workdir(raw) else {
+					return nil
+				}
+				return URL(fileURLWithPath: String(cString: path), isDirectory: true).standardizedFileURL
+			}
+
 			public func status(pathspec: [String] = []) throws -> StatusList {
 				var options = git_status_options()
 				try Libgit2.check(git_status_options_init(&options, 1))
@@ -433,10 +461,11 @@ private final class Libgit2RuntimeState: @unchecked Sendable {
 
 private enum Libgit2StatusOption {
 	static let includeUntracked: UInt32 = 1 << 0
+	static let includeIgnored: UInt32 = 1 << 1
 	static let recurseUntrackedDirs: UInt32 = 1 << 4
 	static let renamesHeadToIndex: UInt32 = 1 << 7
 	static let renamesIndexToWorkdir: UInt32 = 1 << 8
-	static let defaults = includeUntracked | recurseUntrackedDirs | renamesHeadToIndex | renamesIndexToWorkdir
+	static let defaults = includeUntracked | includeIgnored | recurseUntrackedDirs | renamesHeadToIndex | renamesIndexToWorkdir
 }
 
 private enum Libgit2StatusFlag {

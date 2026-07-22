@@ -33,9 +33,26 @@ private struct LSPSemanticSurfaceCapabilities {
 	var documentHighlight: Bool
 }
 
+private struct LSPFormattingCapabilities {
+	var document: Bool
+	var range: Bool
+}
+
+private enum LSPFormattingRequestError: Error {
+	case documentFormattingDisabled
+	case rangeFormattingDisabled
+}
+
 private struct LSPSemanticTokenState {
 	var resultId: String?
 	var data: [Int]
+}
+
+private enum LSPNavigationOperation {
+	case definition
+	case declaration
+	case typeDefinition
+	case implementation
 }
 
 private final class LSPFoldGutterDecorator: GutterDecorator {
@@ -104,6 +121,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var tabBoundsObserver: NSObjectProtocol?
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
+	private var completionRequestTask: Task<Void, Never>?
 	private weak var snippetTabStopView: MetalTextView?
 	private var snippetTabStopSession: SnippetTabStopSession?
 	private var hoverPopover: NSPopover?
@@ -112,14 +130,21 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var hoverTargetOffset = 0
 	private var hoverTargetRect = NSRect.zero
 	private var hoverRequestGeneration = 0
+	private var hoverRequestTask: Task<Void, Never>?
 	private var renamePopover: NSPopover?
 	private var codeActionPopover: NSPopover?
 	private var codeActionRequestGeneration = 0
+	private var codeActionRequestTask: Task<Void, Never>?
+	private var formattingRequestGeneration = 0
+	private var formattingRequestTask: Task<Void, Never>?
 	private weak var contextMenuEditorView: MetalTextView?
 	private var signatureHelpPopover: NSPopover?
 	private var signatureHelpRequestGeneration = 0
+	private var signatureHelpRequestTask: Task<Void, Never>?
 	private var referencesRequestGeneration = 0
 	private var referencesCoordinator: ReferencesCoordinator?
+	private var navigationRequestGeneration = 0
+	private var lspNavigationHistory = LSPNavigationHistory()
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var lspDocumentVersionsBySession: [LSPSessionKey: [String: Int]] = [:]
 	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
@@ -132,6 +157,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var callHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var typeHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var semanticSurfaceCapabilitiesBySession: [LSPSessionKey: LSPSemanticSurfaceCapabilities] = [:]
+	private var formattingCapabilitiesBySession: [LSPSessionKey: LSPFormattingCapabilities] = [:]
 	private var semanticTokenStateByURI: [String: LSPSemanticTokenState] = [:]
 	private var foldingRangesByURI: [String: [LSPFoldingRange]] = [:]
 	private var collapsedFoldStartsByURI: [String: Set<Int>] = [:]
@@ -266,11 +292,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	deinit {
 		MainActor.assumeIsolated {
 			completionPopup?.dismiss()
+			completionRequestTask?.cancel()
 			hoverTimer?.invalidate()
 			hoverPopover?.close()
+			hoverRequestTask?.cancel()
 			renamePopover?.close()
 			codeActionPopover?.close()
+			codeActionRequestTask?.cancel()
+			formattingRequestTask?.cancel()
 			signatureHelpPopover?.close()
+			signatureHelpRequestTask?.cancel()
 			undoTreePanel = nil
 			lspSurfaceRefreshTask?.cancel()
 			for task in lspSupervisorTasks.values {
@@ -569,6 +600,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			self?.lspMissingBanner.hide()
 			self?.focusEditor()
 		}
+		lspMissingBanner.unavailableDismissRequested = { [weak self] unavailableLanguage in
+			Self.dismissedLSPMissingCommands.insert("unsupported:\(unavailableLanguage.languageID)")
+			self?.lspMissingBanner.hide()
+			self?.focusEditor()
+		}
 	}
 
 	private func configureRecoveryBanner() {
@@ -599,6 +635,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		Task { [weak self] in
 			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
+			let unavailableLanguage = await Self.lspManager.unsupportedLanguage(for: fileURL)
 			let key = await Self.lspManager.sessionKey(for: fileURL)
 			await MainActor.run { [weak self] in
 				guard let self, generation == lspMissingBannerGeneration else {
@@ -609,6 +646,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					if let key {
 						setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: fileURL, server: missingBinary.command)
 					}
+				} else if let unavailableLanguage {
+					showLSPUnavailableBanner(unavailableLanguage)
 				} else {
 					lspMissingBanner.hide()
 					if let key, lspStatusEntries[key]?.health == .unavailable {
@@ -627,12 +666,23 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspMissingBanner.show(missingBinary: missingBinary)
 	}
 
+	private func showLSPUnavailableBanner(_ unavailableLanguage: LSPServerRegistry.UnsupportedLanguage) {
+		let dismissalKey = "unsupported:\(unavailableLanguage.languageID)"
+		if Self.dismissedLSPMissingCommands.contains(dismissalKey) {
+			lspMissingBanner.hide()
+			return
+		}
+		lspMissingBanner.show(unavailableLanguage: unavailableLanguage)
+	}
+
 	private func handleLSPRequestError(_ error: Error) {
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
 			showLSPMissingBanner(missingBinary)
 			if let key = activeLSPKey {
 				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspStatusEntries[key]?.url, server: missingBinary.command)
 			}
+		} else if case let LSPManagerError.unsupportedLanguage(unavailableLanguage) = error {
+			showLSPUnavailableBanner(unavailableLanguage)
 		} else if case let LSPManagerError.serverDisabled(key) = error {
 			setLSPStatus(
 				key: key,
@@ -650,6 +700,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				url: lspStatusEntries[key]?.url
 			)
 		}
+	}
+
+	private func showLSPOperationFailure(_ operation: String, error: Error) {
+		let message = "LSP \(operation) failed: \(error)"
+		lspCrashStatusText = message
+		if let key = activeLSPKey, let entry = lspStatusEntries[key] {
+			setLSPStatus(
+				key: key,
+				status: entry.status,
+				client: entry.client,
+				lastError: message,
+				url: entry.url,
+				health: .degraded
+			)
+		}
+		refreshStatusBar()
 	}
 
 	private func copyLSPInstallCommand(for missingBinary: LSPServerRegistry.MissingBinary) {
@@ -747,6 +813,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		callHierarchyEnabledBySession.removeAll()
 		typeHierarchyEnabledBySession.removeAll()
 		semanticSurfaceCapabilitiesBySession.removeAll()
+		formattingCapabilitiesBySession.removeAll()
 		activeLSPKey = nil
 		lspRestartKey = nil
 		lspRestartURL = nil
@@ -778,7 +845,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	func lspDocumentDidReload(_ url: URL, content: String) {
 		let coordinators = lspSyncCoordinators
 		let supervisors = lspSupervisors
-		let clients = lspStatusEntries.mapValues(\.client)
+		let clients = lspStatusEntries.reduce(into: [LSPSessionKey: LSPProcessClient]()) { result, entry in
+			if let client = entry.value.client {
+				result[entry.key] = client
+			}
+		}
 		Task { [weak self] in
 			guard let self else {
 				return
@@ -816,6 +887,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		callHierarchyEnabledBySession[key] = nil
 		typeHierarchyEnabledBySession[key] = nil
 		semanticSurfaceCapabilitiesBySession[key] = nil
+		formattingCapabilitiesBySession[key] = nil
 		if activeLSPKey == key {
 			activeLSPKey = nil
 			refreshStatusBar()
@@ -1226,7 +1298,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let view = pane.editorView
 		document.attach(view)
 		document.setLSPGutterDecorator(lspFoldGutterDecorator)
-		document.lspSurfaceRefreshRequested = { [weak self] in
+		document.lspSurfaceRefreshRequested = { [weak self, weak document] in
+			if let document {
+				self?.invalidateLSPSemanticState(for: document)
+			}
 			self?.scheduleLSPSemanticSurfaceRefresh()
 		}
 		document.lspDocumentSaved = { [weak self] in
@@ -1861,10 +1936,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return item
 		}
 
-		addItem("Go to Definition", action: nil, enabled: false)
-		addItem("Go to Declaration", action: nil, enabled: false)
-		addItem("Go to Type Definition", action: nil, enabled: false)
-		addItem("Go to Implementation", action: nil, enabled: false)
+		addItem("Go to Definition", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.definition")
+		addItem("Go to Declaration", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.declaration")
+		addItem("Go to Type Definition", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.typeDefinition")
+		addItem("Go to Implementation", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.implementation")
 		addItem("Find All References", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.references")
 		menu.addItem(NSMenuItem.separator())
 		addItem("Rename Symbol", action: #selector(runContextCommand(_:)), enabled: hasFileURL, commandID: "lsp.rename")
@@ -2017,6 +2092,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		case "lsp.hover":
 			let offset = editorView.editor.selections.primary.head
 			return requestHover(at: offset, positioningRect: editorView.positioningRectForUTF8Offset(offset), in: editorView)
+		case "lsp.definition":
+			return requestNavigation(.definition, in: editorView)
+		case "lsp.declaration":
+			return requestNavigation(.declaration, in: editorView)
+		case "lsp.typeDefinition":
+			return requestNavigation(.typeDefinition, in: editorView)
+		case "lsp.implementation":
+			return requestNavigation(.implementation, in: editorView)
+		case "nav.back":
+			return navigateBack()
+		case "nav.forward":
+			return navigateForward()
 		case "lsp.references":
 			return findAllReferences(nil)
 		case "lsp.callHierarchy":
@@ -2182,9 +2269,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspFoldGutterDecorator.ranges = ranges
 		lspFoldGutterDecorator.collapsedStartLines = collapsedStarts
 		document.setLSPGutterDecorator(lspFoldGutterDecorator)
-		for pane in paneCoordinator.panes {
-			pane.editorView.foldedLineRanges = hidden
-		}
+		document.setLSPFoldedLineRanges(hidden)
 	}
 
 	@MainActor
@@ -2252,15 +2337,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
 		let context = completionContext(triggerCharacter: triggerCharacter, forIncomplete: forIncomplete)
+		cancelCompletionRequest()
 		completionRequestGeneration += 1
 		let generation = completionRequestGeneration
-		Task { [weak self, weak targetView] in
+		completionRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				guard formattingCapabilitiesBySession[session.key]?.document == true else {
+					throw LSPFormattingRequestError.documentFormattingDisabled
+				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
 				let params = LSPCompletionParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -2272,23 +2364,29 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let result = try LSPCompletionResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == completionRequestGeneration else {
+					guard
+						let self,
+						let targetView,
+						generation == completionRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					showCompletionPopup(
 						result: completionResult(result, appending: snippetItems),
 						in: targetView,
-						sessionKey: session.key
+						sessionKey: session.key,
+						requestContext: requestContext
 					)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == completionRequestGeneration else {
+					guard let self, generation == completionRequestGeneration, !Task.isCancelled else {
 						return
 					}
 					let result = completionResult(.none, appending: snippetItems)
 					if !result.items.isEmpty, let targetView {
-						showCompletionPopup(result: result, in: targetView, sessionKey: nil)
+						showCompletionPopup(result: result, in: targetView, sessionKey: nil, requestContext: nil)
 					} else {
 						completionPopup?.dismiss()
 					}
@@ -2298,6 +2396,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			}
 		}
 		return true
+	}
+
+	private func cancelCompletionRequest() {
+		completionRequestTask?.cancel()
+		completionRequestTask = nil
 	}
 
 	private func completionContext(triggerCharacter: String?, forIncomplete: Bool) -> LSPCompletionContext {
@@ -2364,6 +2467,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				guard formattingCapabilitiesBySession[session.key]?.range == true else {
+					throw LSPFormattingRequestError.rangeFormattingDisabled
+				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				let prepared = try? await session.client.prepareRename(uri: uri, position: position)
 				await MainActor.run { [weak self, weak targetView] in
@@ -2463,22 +2569,41 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return false
 		}
 		let content = editorStorageString(targetView.editor)
+		let cursorOffset = targetView.editor.selections.primary.head
 		let uri = fileURL.standardizedFileURL.absoluteString
 		let options = lspFormattingOptions()
-		Task { [weak self] in
+		cancelFormattingRequest()
+		formattingRequestGeneration += 1
+		let generation = formattingRequestGeneration
+		formattingRequestTask = Task { [weak self, weak targetView] in
 			do {
-				guard let self else {
+				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
 				let edits = try await session.client.formatDocument(uri: uri, options: options)
-				await MainActor.run { [weak self] in
-					self?.applyTextEdits(edits, uri: uri)
+				await MainActor.run { [weak self, weak targetView] in
+					guard
+						let self,
+						let targetView,
+						generation == formattingRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
+						return
+					}
+					applyTextEdits(edits, uri: uri)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					self?.handleLSPRequestError(error)
+					guard let self, generation == formattingRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					showLSPOperationFailure("format document", error: error)
+					handleLSPRequestError(error)
 					NSLog("format document failed: \(error)")
 				}
 			}
@@ -2496,25 +2621,44 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return false
 		}
 		let content = editorStorageString(targetView.editor)
+		let cursorOffset = targetView.editor.selections.primary.head
 		let selection = targetView.editor.selections.primary.range
 		let range = selection.isEmpty ? currentLineRange(in: targetView.editor) : selection
 		let uri = fileURL.standardizedFileURL.absoluteString
 		let options = lspFormattingOptions()
 		let lspRange = lspRange(forUTF8Range: range, in: content)
-		Task { [weak self] in
+		cancelFormattingRequest()
+		formattingRequestGeneration += 1
+		let generation = formattingRequestGeneration
+		formattingRequestTask = Task { [weak self, weak targetView] in
 			do {
-				guard let self else {
+				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
 				let edits = try await session.client.formatRange(uri: uri, range: lspRange, options: options)
-				await MainActor.run { [weak self] in
-					self?.applyTextEdits(edits, uri: uri)
+				await MainActor.run { [weak self, weak targetView] in
+					guard
+						let self,
+						let targetView,
+						generation == formattingRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
+						return
+					}
+					applyTextEdits(edits, uri: uri)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					self?.handleLSPRequestError(error)
+					guard let self, generation == formattingRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					showLSPOperationFailure("format selection", error: error)
+					handleLSPRequestError(error)
 					NSLog("format range failed: \(error)")
 				}
 			}
@@ -2538,35 +2682,45 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let uri = fileURL.standardizedFileURL.absoluteString
 		let lspRange = lspRange(forUTF8Range: range, in: content)
 		let rect = targetView.positioningRectForUTF8Offset(cursorOffset)
+		cancelCodeActionRequest()
 		codeActionRequestGeneration += 1
 		let generation = codeActionRequestGeneration
-		Task { [weak self, weak targetView] in
+		codeActionRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
 				let response = try await session.client.codeActions(
 					uri: uri,
 					range: lspRange,
 					context: LSPCodeActionContext(diagnostics: [])
 				)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == codeActionRequestGeneration else {
+					guard
+						let self,
+						let targetView,
+						generation == codeActionRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					showCodeActionPopover(
 						entries: response.entries,
 						sessionKey: session.key,
 						fileURL: fileURL,
+						requestContext: requestContext,
 						positioningRect: rect,
 						in: targetView
 					)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == codeActionRequestGeneration else {
+					guard let self, generation == codeActionRequestGeneration, !Task.isCancelled else {
 						return
 					}
 					closeCodeActionPopover()
@@ -2582,6 +2736,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		entries: [LSPCodeActionEntry],
 		sessionKey: LSPSessionKey,
 		fileURL: URL,
+		requestContext: LSPRequestContext,
 		positioningRect: NSRect,
 		in targetView: MetalTextView
 	) {
@@ -2600,7 +2755,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let controller = CodeActionPopoverController(entries: enabled) { [weak self] entry in
 			popover.close()
 			self?.codeActionPopover = nil
-			self?.applyCodeActionEntry(entry, sessionKey: sessionKey, fileURL: fileURL)
+			self?.applyCodeActionEntry(entry, sessionKey: sessionKey, fileURL: fileURL, requestContext: requestContext, targetView: targetView)
 		}
 		popover = NSPopover()
 		popover.behavior = .transient
@@ -2610,11 +2765,25 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		codeActionPopover = popover
 	}
 
-	private func applyCodeActionEntry(_ entry: LSPCodeActionEntry, sessionKey: LSPSessionKey, fileURL: URL) {
+	private func applyCodeActionEntry(
+		_ entry: LSPCodeActionEntry,
+		sessionKey: LSPSessionKey,
+		fileURL: URL,
+		requestContext: LSPRequestContext,
+		targetView: MetalTextView
+	) {
 		let resolveProvider = codeActionResolveEnabledBySession[sessionKey] == true
 		Task { [weak self] in
 			do {
 				guard let self else {
+					return
+				}
+				guard isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView) else {
+					showLSPOperationFailure("code action", error: LSPWorkspaceEditApplyError.staleDocumentVersion(
+						uri: requestContext.uri,
+						expected: requestContext.documentVersion,
+						received: lspDocumentVersionsBySession[sessionKey]?[requestContext.uri] ?? -1
+					))
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
@@ -2622,8 +2791,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				case let .action(action):
 					let resolved = try await resolvedCodeAction(action, client: session.client, resolveProvider: resolveProvider)
 					await MainActor.run { [weak self] in
+						guard let self, isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView) else {
+							return
+						}
 						if let edit = resolved.edit {
-							_ = self?.applyWorkspaceEdit(edit)
+							_ = applyWorkspaceEdit(edit)
 						}
 					}
 					if let command = resolved.command {
@@ -2659,6 +2831,17 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		_ = applyWorkspaceEdit(LSPWorkspaceEdit(changes: [uri: edits]))
 		focusEditor()
+	}
+
+	private func cancelFormattingRequest() {
+		formattingRequestTask?.cancel()
+		formattingRequestTask = nil
+	}
+
+	private func cancelCodeActionRequest() {
+		codeActionRequestGeneration += 1
+		codeActionRequestTask?.cancel()
+		codeActionRequestTask = nil
 	}
 
 	private func lspFormattingOptions() -> LSPFormattingOptions {
@@ -2698,6 +2881,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				requestLSPSemanticSurface(generation: generation)
 			}
 		}
+	}
+
+	private func invalidateLSPSemanticState(for document: ItsyDocument) {
+		guard let uri = document.fileURL?.standardizedFileURL.absoluteString else {
+			return
+		}
+		semanticTokenStateByURI[uri] = nil
+		document.setLSPSemanticHighlightSpans([])
+		document.setLSPSemanticSurface(inlayHints: [], highlights: [])
 	}
 
 	private func requestLSPSemanticSurface(generation: Int) {
@@ -2925,13 +3117,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let validStarts = Set(foldingRanges.map(\.startLine))
 		collapsedFoldStartsByURI[uri] = collapsedFoldStartsByURI[uri, default: []].intersection(validStarts)
 		applyFoldState(uri: uri, document: document)
-		for pane in paneCoordinator.panes {
-			pane.editorView.inlayHintAnnotations = annotations
-			pane.editorView.setDocumentHighlightRanges(highlightRanges)
-		}
+		document.setLSPSemanticSurface(inlayHints: annotations, highlights: highlightRanges)
 	}
 
 	private func ensureLSPSession(for url: URL) async throws -> (client: LSPProcessClient, key: LSPSessionKey) {
+		if let unavailableLanguage = await Self.lspManager.unsupportedLanguage(for: url) {
+			throw LSPManagerError.unsupportedLanguage(unavailableLanguage)
+		}
 		guard let key = await Self.lspManager.sessionKey(for: url) else {
 			throw LSPManagerError.noConfigForDocument
 		}
@@ -2961,6 +3153,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					foldingRange: capabilities?.foldingRangeProvider?.isEnabled ?? false,
 					documentHighlight: capabilities?.documentHighlightProvider?.isEnabled ?? false
 				)
+				let formattingCapabilities = LSPFormattingCapabilities(
+					document: capabilities?.documentFormattingProvider?.isEnabled ?? false,
+					range: capabilities?.documentRangeFormattingProvider?.isEnabled ?? false
+				)
 				await Self.lspManager.markRunning(key)
 				await MainActor.run { [weak self] in
 					guard let self else {
@@ -2973,6 +3169,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
 					setHierarchyCapabilities(callHierarchy: callHierarchyProvider, typeHierarchy: typeHierarchyProvider, for: key)
 					setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
+					setFormattingCapabilities(formattingCapabilities, for: key)
 					clearLSPCrashStatus(for: key)
 				}
 			} catch {
@@ -3012,6 +3209,36 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			await supervisor?.recordDocumentVersion(version, forURI: url.standardizedFileURL.absoluteString)
 			rememberLSPDocumentVersion(version, for: key, url: url)
 		}
+	}
+
+	private func lspRequestContext(
+		for key: LSPSessionKey,
+		url: URL,
+		content: String,
+		cursorOffset: Int
+	) -> LSPRequestContext? {
+		let uri = url.standardizedFileURL.absoluteString
+		guard let version = lspDocumentVersionsBySession[key]?[uri] else {
+			return nil
+		}
+		return LSPRequestContext(uri: uri, documentVersion: version, content: content, cursorOffset: cursorOffset)
+	}
+
+	private func isLSPRequestCurrent(_ context: LSPRequestContext, for key: LSPSessionKey, in targetView: MetalTextView) -> Bool {
+		guard
+			targetView === paneCoordinator.activePane.editorView,
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let version = lspDocumentVersionsBySession[key]?[context.uri]
+		else {
+			return false
+		}
+		return context.matches(
+			uri: fileURL.standardizedFileURL.absoluteString,
+			documentVersion: version,
+			content: editorStorageString(targetView.editor),
+			cursorOffset: targetView.editor.selections.primary.head
+		)
 	}
 
 	private func notifyLSPDidSave() {
@@ -3131,6 +3358,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			callHierarchyEnabledBySession[key] = nil
 			typeHierarchyEnabledBySession[key] = nil
 			semanticSurfaceCapabilitiesBySession[key] = nil
+			formattingCapabilitiesBySession[key] = nil
 			lspSupervisors[key] = nil
 			lspSupervisorTasks[key] = nil
 			Task {
@@ -3211,6 +3439,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		semanticSurfaceCapabilitiesBySession[key] = capabilities
 	}
 
+	private func setFormattingCapabilities(_ capabilities: LSPFormattingCapabilities, for key: LSPSessionKey) {
+		formattingCapabilitiesBySession[key] = capabilities
+	}
+
 	private func installCompletionTriggersIfKnown(for view: MetalTextView, document: ItsyDocument) {
 		view.completionTriggerCharacters = []
 		guard let fileURL = document.fileURL else {
@@ -3244,7 +3476,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private func showCompletionPopup(
 		result: LSPCompletionResult,
 		in targetView: MetalTextView,
-		sessionKey: LSPSessionKey?
+		sessionKey: LSPSessionKey?,
+		requestContext: LSPRequestContext?
 	) {
 		let popup = completionPopup ?? CompletionPopupController()
 		completionPopup = popup
@@ -3264,6 +3497,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				_ = self?.requestCompletion(triggerCharacter: nil, forIncomplete: true, in: targetView)
 			},
 			resolve: resolve,
+			isRequestCurrent: { [weak self, weak targetView] in
+				guard let self, let targetView else {
+					return false
+				}
+				if let requestContext, let sessionKey {
+					return self.isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView)
+				}
+				return targetView === self.paneCoordinator.activePane.editorView
+			},
+			requestInvalidated: { [weak self] in
+				self?.cancelCompletionRequest()
+			},
 			accept: { [weak self, weak targetView] item in
 				guard let self, let targetView else {
 					return
@@ -3329,9 +3574,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func moveSnippetTabStop(direction: Int, in targetView: MetalTextView?) -> Bool {
+		guard targetView === snippetTabStopView else {
+			snippetTabStopSession = nil
+			snippetTabStopView = nil
+			return false
+		}
 		guard
 			let targetView,
-			targetView === snippetTabStopView,
 			var session = snippetTabStopSession
 		else {
 			return false
@@ -3351,6 +3600,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private func scheduleHover(_ candidate: TextHoverCandidate?, in targetView: MetalTextView?) {
 		hoverTimer?.invalidate()
 		hoverTimer = nil
+		cancelHoverRequest()
 		guard
 			let candidate,
 			let targetView,
@@ -3384,15 +3634,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		let content = editorStorageString(targetView.editor)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
+		cancelHoverRequest()
 		hoverRequestGeneration += 1
 		let generation = hoverRequestGeneration
-		Task { [weak self, weak targetView] in
+		hoverRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: offset) else {
+					return
+				}
 				let params = LSPHoverParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position
@@ -3403,14 +3657,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let result = try LSPHoverResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == hoverRequestGeneration else {
+					guard
+						let self,
+						let targetView,
+						generation == hoverRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					showHoverPopover(result: result, positioningRect: positioningRect, in: targetView)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == hoverRequestGeneration else {
+					guard let self, generation == hoverRequestGeneration, !Task.isCancelled else {
 						return
 					}
 					closeHoverPopover()
@@ -3420,6 +3679,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			}
 		}
 		return true
+	}
+
+	private func cancelHoverRequest() {
+		hoverRequestGeneration += 1
+		hoverRequestTask?.cancel()
+		hoverRequestTask = nil
 	}
 
 	private func showHoverPopover(result: LSPHoverResult, positioningRect: NSRect, in targetView: MetalTextView) {
@@ -3437,6 +3702,150 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	@discardableResult
+	private func requestNavigation(_ operation: LSPNavigationOperation, in targetView: MetalTextView?) -> Bool {
+		guard
+			let document = document as? ItsyDocument,
+			let fileURL = document.fileURL,
+			let targetView
+		else {
+			return false
+		}
+		let content = editorStorageString(targetView.editor)
+		let cursorOffset = targetView.editor.selections.primary.head
+		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
+		navigationRequestGeneration += 1
+		let generation = navigationRequestGeneration
+		Task { [weak self, weak targetView] in
+			do {
+				guard let self, let targetView else {
+					return
+				}
+				let session = try await ensureLSPSession(for: fileURL)
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
+				let result: LSPDefinitionResult = switch operation {
+				case .definition:
+					try await session.client.definition(uri: fileURL.standardizedFileURL.absoluteString, position: position)
+				case .declaration:
+					try await session.client.declaration(uri: fileURL.standardizedFileURL.absoluteString, position: position)
+				case .typeDefinition:
+					try await session.client.typeDefinition(uri: fileURL.standardizedFileURL.absoluteString, position: position)
+				case .implementation:
+					try await session.client.implementation(uri: fileURL.standardizedFileURL.absoluteString, position: position)
+				}
+				await MainActor.run { [weak self, weak targetView] in
+					guard
+						let self,
+						let targetView,
+						generation == navigationRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
+						return
+					}
+					navigate(to: result.locations)
+				}
+			} catch {
+				await MainActor.run { [weak self] in
+					guard let self, generation == navigationRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					handleLSPRequestError(error)
+					NSLog("lsp navigation failed: \(error)")
+				}
+			}
+		}
+		return true
+	}
+
+	private func navigate(to locations: [LSPLocation]) {
+		let destinations = locations.compactMap(navigationLocation(for:))
+		guard !destinations.isEmpty else {
+			return
+		}
+		if destinations.count == 1 {
+			navigate(to: destinations[0], recordingHistory: true)
+			return
+		}
+		let currentFileURL = (document as? ItsyDocument)?.fileURL ?? URL(fileURLWithPath: "/")
+		let snapshot = LSPReferencesSnapshot(
+			locations: locations,
+			rootURL: ItsyWorkspaceController.currentRootURL,
+			currentFileURL: currentFileURL,
+			currentText: editorStorageString(editorView.editor)
+		)
+		let panel = referencesCoordinator ?? ReferencesCoordinator()
+		referencesCoordinator = panel
+		panel.show(snapshot: snapshot, relativeTo: window) { [weak self] entry in
+			guard let location = locations.first(where: {
+				$0.uri == entry.url.absoluteString
+					&& $0.range.start.line + 1 == entry.line
+					&& $0.range.start.character + 1 == entry.column
+			}) else {
+				return
+			}
+			self?.navigationLocation(for: location).map { destination in
+				self?.navigate(to: destination, recordingHistory: true)
+			}
+		}
+	}
+
+	private func navigationLocation(for location: LSPLocation) -> LSPNavigationLocation? {
+		guard let url = fileURL(forLSPURI: location.uri) else {
+			return nil
+		}
+		let text: String
+		if let document = openDocument(forURI: location.uri) {
+			text = editorStorageString(document.editor)
+		} else {
+			text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+		}
+		guard let range = LSPTextEditApply.utf8Range(for: location.range, in: text) else {
+			return nil
+		}
+		return LSPNavigationLocation(uri: location.uri, selection: range)
+	}
+
+	private func navigate(to destination: LSPNavigationLocation, recordingHistory: Bool) {
+		guard let origin = currentNavigationLocation(), let url = fileURL(forLSPURI: destination.uri) else {
+			return
+		}
+		guard let controller = NSDocumentController.shared as? ItsyDocumentController, controller.openDocument(at: url) else {
+			return
+		}
+		let length = editorView.editor.textStorage.length
+		let range = min(max(destination.selection.lowerBound, 0), length) ..< min(max(destination.selection.upperBound, 0), length)
+		editorView.selectUTF8Range(range)
+		if recordingHistory {
+			lspNavigationHistory.recordJump(from: origin, to: destination)
+		}
+	}
+
+	private func currentNavigationLocation() -> LSPNavigationLocation? {
+		guard let url = (document as? ItsyDocument)?.fileURL?.standardizedFileURL else {
+			return nil
+		}
+		return LSPNavigationLocation(uri: url.absoluteString, selection: editorView.editor.selections.primary.range)
+	}
+
+	private func navigateBack() -> Bool {
+		guard let current = currentNavigationLocation(), let destination = lspNavigationHistory.goBack(from: current) else {
+			return false
+		}
+		navigate(to: destination, recordingHistory: false)
+		return true
+	}
+
+	private func navigateForward() -> Bool {
+		guard let current = currentNavigationLocation(), let destination = lspNavigationHistory.goForward(from: current) else {
+			return false
+		}
+		navigate(to: destination, recordingHistory: false)
+		return true
+	}
+
+	@discardableResult
 	private func requestSignatureHelp(triggerCharacter: String?, in targetView: MetalTextView?) -> Bool {
 		guard
 			let document = document as? ItsyDocument,
@@ -3449,15 +3858,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let cursorOffset = targetView.editor.selections.primary.head
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
 		let context = signatureHelpContext(triggerCharacter: triggerCharacter)
+		cancelSignatureHelpRequest()
 		signatureHelpRequestGeneration += 1
 		let generation = signatureHelpRequestGeneration
-		Task { [weak self, weak targetView] in
+		signatureHelpRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
+					return
+				}
 				let params = LSPSignatureHelpParams(
 					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
 					position: position,
@@ -3469,14 +3882,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				)
 				let result = try LSPSignatureHelpResult(result: response.result)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView, generation == signatureHelpRequestGeneration else {
+					guard
+						let self,
+						let targetView,
+						generation == signatureHelpRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					showSignatureHelpPopover(result: result, in: targetView)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == signatureHelpRequestGeneration else {
+					guard let self, generation == signatureHelpRequestGeneration, !Task.isCancelled else {
 						return
 					}
 					closeSignatureHelpPopover()
@@ -3486,6 +3904,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			}
 		}
 		return true
+	}
+
+	private func cancelSignatureHelpRequest() {
+		signatureHelpRequestGeneration += 1
+		signatureHelpRequestTask?.cancel()
+		signatureHelpRequestTask = nil
 	}
 
 	private func signatureHelpContext(triggerCharacter: String?) -> LSPSignatureHelpContext {
@@ -3669,18 +4093,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func closeHoverPopover() {
+		cancelHoverRequest()
 		hoverPopover?.close()
 		hoverPopover = nil
 	}
 
 	private func closeSignatureHelpPopover() {
-		signatureHelpRequestGeneration += 1
+		cancelSignatureHelpRequest()
 		signatureHelpPopover?.close()
 		signatureHelpPopover = nil
 	}
 
 	private func closeCodeActionPopover() {
-		codeActionRequestGeneration += 1
+		cancelCodeActionRequest()
 		codeActionPopover?.close()
 		codeActionPopover = nil
 	}
@@ -3700,15 +4125,39 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				result.merge(versions) { current, _ in current }
 			}
 			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources, documentVersions: documentVersions)
-			for file in resolved {
-				try applyResolvedWorkspaceFile(file)
+			let preview = try LSPWorkspaceEditPreview(resolved: resolved, sources: sources)
+			guard confirmWorkspaceEdit(preview) else {
+				return false
 			}
+			try LSPWorkspaceEditTransaction.commit(
+				preview.files,
+				apply: { file in
+					try applyResolvedWorkspaceFile(.init(uri: file.uri, updatedText: file.updatedText))
+				},
+				rollback: { file in
+					try applyResolvedWorkspaceFile(.init(uri: file.uri, updatedText: file.originalText))
+				}
+			)
 			return true
 		} catch {
 			handleLSPRequestError(error)
 			NSLog("workspace edit apply failed: \(error)")
 			return false
 		}
+	}
+
+	private func confirmWorkspaceEdit(_ preview: LSPWorkspaceEditPreview) -> Bool {
+		guard preview.requiresConfirmation else {
+			return true
+		}
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Preview workspace edit")
+		alert.informativeText = preview.files.map { file in
+			URL(string: file.uri)?.lastPathComponent ?? file.uri
+		}.joined(separator: "\n")
+		alert.addButton(withTitle: L10n.string("Apply"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		return alert.runModal() == .alertFirstButtonReturn
 	}
 
 	private func sourceText(forURI uri: String) throws -> String {

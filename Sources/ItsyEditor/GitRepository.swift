@@ -178,6 +178,61 @@ public struct GitHistoryEntry: Equatable, Sendable {
 	}
 }
 
+public struct GitGraphEntry: Equatable, Sendable {
+	public var history: GitHistoryEntry
+	public var parentOIDs: [String]
+	public var references: [String]
+
+	public init(history: GitHistoryEntry, parentOIDs: [String] = [], references: [String] = []) {
+		self.history = history
+		self.parentOIDs = parentOIDs
+		self.references = references
+	}
+}
+
+public struct GitHistoryPage: Equatable, Sendable {
+	public var offset: Int
+	public var entries: [GitGraphEntry]
+	public var hasMore: Bool
+
+	public init(offset: Int, entries: [GitGraphEntry], hasMore: Bool) {
+		self.offset = offset
+		self.entries = entries
+		self.hasMore = hasMore
+	}
+}
+
+public actor GitHistoryPager {
+	public typealias Loader = @Sendable (_ offset: Int, _ limit: Int) throws -> [GitGraphEntry]
+	private var generation = 0
+	private var nextOffset = 0
+
+	public init() {}
+
+	public func reset() {
+		generation += 1
+		nextOffset = 0
+	}
+
+	public func cancel() {
+		generation += 1
+	}
+
+	public func loadNext(limit: Int = 100, loader: @escaping Loader) async throws -> GitHistoryPage? {
+		let offset = nextOffset
+		let expectedGeneration = generation
+		let boundedLimit = max(1, limit)
+		let entries = try await Task.detached(priority: .userInitiated) {
+			try loader(offset, boundedLimit)
+		}.value
+		guard !Task.isCancelled, generation == expectedGeneration else {
+			return nil
+		}
+		nextOffset += entries.count
+		return GitHistoryPage(offset: offset, entries: entries, hasMore: entries.count == boundedLimit)
+	}
+}
+
 public struct GitConflictEntry: Equatable, Sendable {
 	public var path: String
 	public var ancestorPath: String?
@@ -189,6 +244,18 @@ public struct GitConflictEntry: Equatable, Sendable {
 		self.ancestorPath = ancestorPath
 		self.oursPath = oursPath
 		self.theirsPath = theirsPath
+	}
+}
+
+public struct GitConflictResolutionState: Equatable, Sendable {
+	public var unresolvedPaths: [String]
+
+	public init(unresolvedPaths: [String]) {
+		self.unresolvedPaths = unresolvedPaths
+	}
+
+	public var isComplete: Bool {
+		unresolvedPaths.isEmpty
 	}
 }
 
@@ -324,12 +391,52 @@ public enum GitCommandError: Error, Equatable, Sendable {
 	case stdinUnsupported
 }
 
+public enum GitPatchApplicationError: Error, Equatable, Sendable {
+	case staleWorktree
+	case staleIndex
+}
+
+public enum GitRepositoryDiscoveryError: Error, Equatable, Sendable {
+	case bareRepository(URL)
+}
+
 public enum GitCommitError: Error, Equatable, Sendable {
 	case emptySummary
+	case emptyIndex
+	case amendWithoutCommit
+}
+
+public struct GitCommitResult: Equatable, Sendable {
+	public var stagedPaths: [String]
+	public var output: String
+	public var amended: Bool
+
+	public init(stagedPaths: [String], output: String, amended: Bool) {
+		self.stagedPaths = stagedPaths
+		self.output = output
+		self.amended = amended
+	}
 }
 
 public enum GitBranchError: Error, Equatable, Sendable {
 	case emptyName
+	case checkedOutInWorktree(URL)
+	case stashRestoreFailed(String)
+	case checkoutAndStashRestoreFailed(String)
+}
+
+public struct GitWorktree: Equatable, Sendable {
+	public var url: URL
+	public var headOID: String?
+	public var branch: String?
+	public var isBare: Bool
+
+	public init(url: URL, headOID: String? = nil, branch: String? = nil, isBare: Bool = false) {
+		self.url = url
+		self.headOID = headOID
+		self.branch = branch
+		self.isBare = isBare
+	}
 }
 
 public struct GitStashEntry: Equatable, Sendable {
@@ -385,6 +492,40 @@ public enum GitBranchParser {
 				kind: refname.hasPrefix("refs/remotes/") ? .remote : .local
 			)
 		}
+	}
+}
+
+public enum GitWorktreeParser {
+	public static func parse(_ output: String) -> [GitWorktree] {
+		var worktrees: [GitWorktree] = []
+		var url: URL?
+		var headOID: String?
+		var branch: String?
+		var isBare = false
+		func finish() {
+			guard let url else {
+				return
+			}
+			worktrees.append(GitWorktree(url: url, headOID: headOID, branch: branch, isBare: isBare))
+		}
+		for line in output.components(separatedBy: .newlines) + [""] {
+			if line.isEmpty {
+				finish()
+				url = nil
+				headOID = nil
+				branch = nil
+				isBare = false
+			} else if line.hasPrefix("worktree ") {
+				url = URL(fileURLWithPath: String(line.dropFirst("worktree ".count)), isDirectory: true).resolvingSymlinksInPath()
+			} else if line.hasPrefix("HEAD ") {
+				headOID = String(line.dropFirst("HEAD ".count))
+			} else if line.hasPrefix("branch refs/heads/") {
+				branch = String(line.dropFirst("branch refs/heads/".count))
+			} else if line == "bare" {
+				isBare = true
+			}
+		}
+		return worktrees
 	}
 }
 
@@ -453,6 +594,31 @@ public enum GitHistoryParser {
 				date: Double(fields[3]).map { Date(timeIntervalSince1970: $0) },
 				summary: fields[4]
 			)
+		}
+	}
+}
+
+public enum GitGraphParser {
+	public static func parse(_ output: String) -> [GitGraphEntry] {
+		output.split(separator: "\0", omittingEmptySubsequences: true).compactMap { rawRecord in
+			let record = rawRecord.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !record.isEmpty else {
+				return nil
+			}
+			let fields = record.split(separator: "\u{1f}", maxSplits: 6, omittingEmptySubsequences: false).map(String.init)
+			guard fields.count == 7 else {
+				return nil
+			}
+			let history = GitHistoryEntry(
+				oid: fields[0],
+				author: fields[3],
+				authorEmail: fields[4],
+				date: Double(fields[5]).map { Date(timeIntervalSince1970: $0) },
+				summary: fields[6]
+			)
+			let parents = fields[1].split(separator: " ").map(String.init)
+			let references = fields[2].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+			return GitGraphEntry(history: history, parentOIDs: parents, references: references)
 		}
 	}
 }
@@ -569,7 +735,7 @@ public struct GitRepository: Sendable {
 
 	private func shellStatus() throws -> GitStatus {
 		let output = try runner.runGit(
-			arguments: ["status", "--porcelain=v2", "--branch", "--untracked-files=all"],
+			arguments: ["status", "--porcelain=v2", "--branch", "--untracked-files=all", "--ignored=matching"],
 			root: root
 		)
 		return try GitStatusParser.parse(output)
@@ -631,6 +797,17 @@ public struct GitRepository: Sendable {
 			.map { GitConflictEntry(path: $0.path) }
 	}
 
+	public func conflictResolutionState() throws -> GitConflictResolutionState {
+		try GitConflictResolutionState(unresolvedPaths: status().entries.filter(\.isConflict).map(\.path))
+	}
+
+	public func restoreConflictMarkers(path: String) throws {
+		guard !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+			throw GitCommandError.invalidOutput
+		}
+		_ = try runner.runGit(arguments: ["checkout", "--conflict=merge", "--", path], root: root)
+	}
+
 	public func stage(paths: [String]) throws {
 		guard !paths.isEmpty else {
 			return
@@ -646,19 +823,23 @@ public struct GitRepository: Sendable {
 	}
 
 	public func stage(hunk: DiffHunk, in file: DiffFile) throws {
+		try validateWorkingTree(file)
 		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: false)
 	}
 
 	public func unstage(hunk: DiffHunk, in file: DiffFile) throws {
+		try validateIndex(file)
 		try applyCachedPatch(DiffPatchBuilder.patch(file: file, hunk: hunk), reverse: true)
 	}
 
 	public func stage(lineIndexes: IndexSet, in hunk: DiffHunk, file: DiffFile) throws {
+		try validateWorkingTree(file)
 		let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: lineIndexes, operation: .stage)
 		try applyCachedPatch(patch, reverse: false)
 	}
 
 	public func unstage(lineIndexes: IndexSet, in hunk: DiffHunk, file: DiffFile) throws {
+		try validateIndex(file)
 		let patch = try DiffPatchBuilder.patch(file: file, hunk: hunk, selectedLineIndexes: lineIndexes, operation: .unstage)
 		try applyCachedPatch(patch, reverse: true)
 	}
@@ -668,13 +849,8 @@ public struct GitRepository: Sendable {
 		guard !name.isEmpty else {
 			throw GitBranchError.emptyName
 		}
-		if stashingDirtyChanges {
-			try stashForBranch(name)
-		}
-		_ = try runner.runGit(arguments: ["switch", name], root: root)
-		if stashingDirtyChanges {
-			try popStash()
-		}
+		try rejectCheckedOutWorktree(branch: name)
+		try switchTransactional(arguments: ["switch", name], stashName: name, stashingDirtyChanges: stashingDirtyChanges)
 	}
 
 	public func createBranch(
@@ -686,17 +862,11 @@ public struct GitRepository: Sendable {
 		guard !name.isEmpty else {
 			throw GitBranchError.emptyName
 		}
-		if stashingDirtyChanges {
-			try stashForBranch(name)
-		}
 		var arguments = ["switch", "-c", name]
 		if let startPoint, !startPoint.isEmpty {
 			arguments.append(startPoint)
 		}
-		_ = try runner.runGit(arguments: arguments, root: root)
-		if stashingDirtyChanges {
-			try popStash()
-		}
+		try switchTransactional(arguments: arguments, stashName: name, stashingDirtyChanges: stashingDirtyChanges)
 	}
 
 	public func deleteBranch(_ name: String, force: Bool = false) throws {
@@ -736,6 +906,11 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["stash", "push", "-u", "-m", "itsy-autostash-\(name)"], root: root)
 	}
 
+	public func worktrees() throws -> [GitWorktree] {
+		let output = try runner.runGit(arguments: ["worktree", "list", "--porcelain"], root: root)
+		return GitWorktreeParser.parse(output)
+	}
+
 	public func stashes() throws -> [GitStashEntry] {
 		let output = try runner.runGit(arguments: ["stash", "list", "--format=%gd|%ai|%s"], root: root)
 		return GitStashParser.parse(output)
@@ -773,16 +948,24 @@ public struct GitRepository: Sendable {
 		return try runner.runGit(arguments: ["stash", "show", "--patch", ref], root: root)
 	}
 
-	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws {
+	public func commit(summary: String, body: String = "", signoff: Bool = false, amend: Bool = false) throws -> GitCommitResult {
 		let summary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
 		guard !summary.isEmpty else {
 			throw GitCommitError.emptySummary
 		}
 		let body = body.trimmingCharacters(in: .whitespacesAndNewlines)
-		if runner is ProcessGitCommandRunner, !signoff, !amend {
-			let message = body.isEmpty ? summary : "\(summary)\n\n\(body)"
-			_ = try Libgit2.Repository.open(at: root).commit(message: message)
-			return
+		let stagedPaths: [String]
+		if runner is ProcessGitCommandRunner {
+			let status = try status()
+			stagedPaths = status.entries.filter(\.isStaged).map(\.path)
+			guard amend || !stagedPaths.isEmpty else {
+				throw GitCommitError.emptyIndex
+			}
+			if amend, status.branch.oid == "(initial)" {
+				throw GitCommitError.amendWithoutCommit
+			}
+		} else {
+			stagedPaths = []
 		}
 		var arguments = ["commit"]
 		if signoff {
@@ -795,7 +978,8 @@ public struct GitRepository: Sendable {
 		if !body.isEmpty {
 			arguments += ["-m", body]
 		}
-		_ = try runner.runGit(arguments: arguments, root: root)
+		let output = try runner.runGit(arguments: arguments, root: root)
+		return GitCommitResult(stagedPaths: stagedPaths, output: output, amended: amend)
 	}
 
 	public func recentCommitMessages(limit: Int = 10) throws -> [String] {
@@ -813,12 +997,37 @@ public struct GitRepository: Sendable {
 		return GitBlameParser.parse(output)
 	}
 
-	public func fileHistory(path: String, limit: Int = 50) throws -> [GitHistoryEntry] {
+	public func fileHistory(path: String, limit: Int = 50, offset: Int = 0) throws -> [GitHistoryEntry] {
 		let output = try runner.runGit(
-			arguments: ["log", "-\(max(1, limit))", "--format=\(Self.historyFormat)", "--", path],
+			arguments: [
+				"log",
+				"-\(max(1, limit))",
+				"--skip=\(max(0, offset))",
+				"--follow",
+				"--find-renames",
+				"--format=\(Self.historyFormat)",
+				"--",
+				path,
+			],
 			root: root
 		)
 		return GitHistoryParser.parse(output)
+	}
+
+	public func historyPage(limit: Int = 100, offset: Int = 0) throws -> GitHistoryPage {
+		let limit = max(1, limit)
+		let offset = max(0, offset)
+		let output = try runner.runGit(arguments: [
+			"log",
+			"--all",
+			"--topo-order",
+			"--decorate=short",
+			"-\(limit)",
+			"--skip=\(offset)",
+			"--format=\(Self.graphHistoryFormat)",
+		], root: root)
+		let entries = GitGraphParser.parse(output)
+		return GitHistoryPage(offset: offset, entries: entries, hasMore: entries.count == limit)
 	}
 
 	public func lineHistory(path: String, line: Int, limit: Int = 50) throws -> [GitHistoryEntry] {
@@ -840,6 +1049,86 @@ public struct GitRepository: Sendable {
 			throw GitStashError.emptyRef
 		}
 		return ref
+	}
+
+	private func rejectCheckedOutWorktree(branch: String) throws {
+		guard runner is ProcessGitCommandRunner else {
+			return
+		}
+		let root = root.resolvingSymlinksInPath().standardizedFileURL
+		if let conflict = try worktrees().first(where: {
+			$0.branch == branch && $0.url.resolvingSymlinksInPath().standardizedFileURL != root
+		}) {
+			throw GitBranchError.checkedOutInWorktree(conflict.url)
+		}
+	}
+
+	private func switchTransactional(arguments: [String], stashName: String, stashingDirtyChanges: Bool) throws {
+		let stash = try makeBranchStash(named: stashName, enabled: stashingDirtyChanges)
+		do {
+			_ = try runner.runGit(arguments: arguments, root: root)
+		} catch {
+			guard let stash else {
+				throw error
+			}
+			do {
+				try popStash(stash.ref)
+			} catch {
+				throw GitBranchError.checkoutAndStashRestoreFailed(String(describing: error))
+			}
+			throw error
+		}
+		guard let stash else {
+			return
+		}
+		do {
+			try popStash(stash.ref)
+		} catch {
+			throw GitBranchError.stashRestoreFailed(String(describing: error))
+		}
+	}
+
+	private func makeBranchStash(named name: String, enabled: Bool) throws -> GitStashEntry? {
+		guard enabled else {
+			return nil
+		}
+		guard runner is ProcessGitCommandRunner else {
+			try stashForBranch(name)
+			return nil
+		}
+		let refs = Set(try stashes().map(\.ref))
+		try stashForBranch(name)
+		return try stashes().first(where: { !refs.contains($0.ref) })
+	}
+
+	private func validateWorkingTree(_ file: DiffFile) throws {
+		guard runner is ProcessGitCommandRunner else {
+			return
+		}
+		guard let path = file.newPath ?? file.oldPath else {
+			throw GitPatchApplicationError.staleWorktree
+		}
+		let current: [DiffFile]
+		if file.isNewFile, file.oldPath == nil {
+			let contents = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
+			current = [DiffTextRenderer.newFile(path: path, contents: contents)]
+		} else {
+			current = try diffFiles(path: path)
+		}
+		guard current == [file] else {
+			throw GitPatchApplicationError.staleWorktree
+		}
+	}
+
+	private func validateIndex(_ file: DiffFile) throws {
+		guard runner is ProcessGitCommandRunner else {
+			return
+		}
+		guard let path = file.newPath ?? file.oldPath,
+		      try diffFiles(path: path, staged: true) == [file]
+		else {
+			throw GitPatchApplicationError.staleIndex
+		}
 	}
 
 	private func applyCachedPatch(_ patch: String, reverse: Bool) throws {
@@ -866,9 +1155,17 @@ public struct GitRepository: Sendable {
 	{
 		let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
 		let root = values?.isDirectory == true ? url : url.deletingLastPathComponent()
+		if runner is ProcessGitCommandRunner {
+			let repository = try Libgit2.Repository.discover(from: root)
+			guard let worktree = repository.worktreeURL else {
+				throw GitRepositoryDiscoveryError.bareRepository(root.standardizedFileURL)
+			}
+			return worktree
+		}
 		let output = try runner.runGit(arguments: ["rev-parse", "--show-toplevel"], root: root)
 		return URL(fileURLWithPath: output.trimmingCharacters(in: .whitespacesAndNewlines), isDirectory: true)
 	}
 
 	private static let historyFormat = "%H%x1f%an%x1f%ae%x1f%at%x1f%s%x00"
+	private static let graphHistoryFormat = "%H%x1f%P%x1f%D%x1f%an%x1f%ae%x1f%at%x1f%s%x00"
 }

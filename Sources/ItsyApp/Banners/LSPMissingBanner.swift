@@ -5,12 +5,14 @@ final class LSPMissingBanner: NSView {
 	var copyRequested: ((LSPServerRegistry.MissingBinary) -> Void)?
 	var configurationRequested: (() -> Void)?
 	var dismissRequested: ((LSPServerRegistry.MissingBinary) -> Void)?
+	var unavailableDismissRequested: ((LSPServerRegistry.UnsupportedLanguage) -> Void)?
 
 	private let label = NSTextField(labelWithString: "")
 	private let copyButton = NSButton(title: L10n.string("Copy command"), target: nil, action: nil)
 	private let configurationButton = NSButton(title: L10n.string("Copy config path"), target: nil, action: nil)
 	private let dismissButton = NSButton(title: L10n.string("Dismiss (session)"), target: nil, action: nil)
 	private var missingBinary: LSPServerRegistry.MissingBinary?
+	private var unavailableLanguage: LSPServerRegistry.UnsupportedLanguage?
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -23,12 +25,24 @@ final class LSPMissingBanner: NSView {
 
 	func show(missingBinary: LSPServerRegistry.MissingBinary) {
 		self.missingBinary = missingBinary
+		unavailableLanguage = nil
+		copyButton.isHidden = false
 		label.stringValue = L10n.string("LSP server \(missingBinary.command) unavailable. \(missingBinary.hint)")
+		isHidden = false
+	}
+
+	func show(unavailableLanguage: LSPServerRegistry.UnsupportedLanguage) {
+		missingBinary = nil
+		self.unavailableLanguage = unavailableLanguage
+		copyButton.isHidden = true
+		label.stringValue = L10n.string("LSP unavailable for \(unavailableLanguage.languageID). \(unavailableLanguage.message)")
 		isHidden = false
 	}
 
 	func hide() {
 		missingBinary = nil
+		unavailableLanguage = nil
+		copyButton.isHidden = false
 		isHidden = true
 	}
 
@@ -100,9 +114,10 @@ final class LSPMissingBanner: NSView {
 	}
 
 	@objc private func dismiss(_ sender: NSButton) {
-		guard let missingBinary else {
-			return
+		if let missingBinary {
+			dismissRequested?(missingBinary)
+		} else if let unavailableLanguage {
+			unavailableDismissRequested?(unavailableLanguage)
 		}
-		dismissRequested?(missingBinary)
 	}
 }

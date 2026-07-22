@@ -16,6 +16,8 @@ import ItsyRender
 	private var lastPrefix = ""
 	private var requestAgain: (() -> Void)?
 	private var acceptItem: ((LSPCompletionItem) -> Void)?
+	private var isRequestCurrent: (() -> Bool)?
+	private var requestInvalidated: (() -> Void)?
 	private var resolveItem: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
 	private var resolvedItemsByKey: [String: LSPCompletionItem] = [:]
 	private var pendingResolveKeys = Set<String>()
@@ -46,6 +48,8 @@ import ItsyRender
 		editorView: MetalTextView,
 		requestAgain: @escaping () -> Void,
 		resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?,
+		isRequestCurrent: @escaping () -> Bool,
+		requestInvalidated: @escaping () -> Void,
 		accept: @escaping (LSPCompletionItem) -> Void
 	) {
 		if !panel.isVisible {
@@ -56,6 +60,8 @@ import ItsyRender
 		self.editorView = editorView
 		self.requestAgain = requestAgain
 		resolveItem = resolve
+		self.isRequestCurrent = isRequestCurrent
+		self.requestInvalidated = requestInvalidated
 		acceptItem = accept
 		allItems = result.items
 		isIncomplete = result.isIncomplete
@@ -86,6 +92,8 @@ import ItsyRender
 		filteredItems = []
 		requestAgain = nil
 		resolveItem = nil
+		isRequestCurrent = nil
+		requestInvalidated = nil
 		acceptItem = nil
 		resolvedItemsByKey = [:]
 		pendingResolveKeys = []
@@ -194,6 +202,10 @@ import ItsyRender
 				self.acceptSelected()
 				return nil
 			default:
+				if self.shouldCommitSelectedItem(with: event) {
+					self.acceptSelected()
+					return event
+				}
 				DispatchQueue.main.async { [weak self] in
 					self?.refreshAfterEditorInput()
 				}
@@ -210,6 +222,11 @@ import ItsyRender
 	}
 
 	private func refreshAfterEditorInput() {
+		guard isRequestCurrent?() != false else {
+			requestInvalidated?()
+			dismiss()
+			return
+		}
 		guard let editorView else {
 			dismiss()
 			return
@@ -261,6 +278,11 @@ import ItsyRender
 	}
 
 	private func acceptSelected() {
+		guard isRequestCurrent?() != false else {
+			requestInvalidated?()
+			dismiss()
+			return
+		}
 		let row = tableView.selectedRow
 		guard row >= 0, row < filteredItems.count else {
 			return
@@ -268,6 +290,20 @@ import ItsyRender
 		let item = displayItem(for: filteredItems[row])
 		dismiss()
 		acceptItem?(item)
+	}
+
+	private func shouldCommitSelectedItem(with event: NSEvent) -> Bool {
+		let row = tableView.selectedRow
+		guard
+			event.modifierFlags.intersection([.command, .control, .option]).isEmpty,
+			let characters = event.characters,
+			characters.count == 1,
+			filteredItems.indices.contains(row),
+			let commitCharacters = displayItem(for: filteredItems[row]).commitCharacters
+		else {
+			return false
+		}
+		return commitCharacters.contains(characters)
 	}
 
 	private func scheduleResolveForSelection() {
@@ -430,15 +466,26 @@ import ItsyRender
 
 	private func position(relativeTo editorView: MetalTextView, hostWindow: NSWindow?) {
 		let rowCount = min(max(filteredItems.count, 1), 10)
-		let size = NSSize(width: 340, height: CGFloat(rowCount) * tableView.rowHeight + 2)
 		let caret = editorView.firstRect(forCharacterRange: editorView.selectedRange(), actualRange: nil)
 		let screen = hostWindow?.screen ?? NSScreen.main
 		let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
-		let x = min(max(caret.minX, visible.minX), visible.maxX - size.width)
-		let belowY = caret.minY - size.height - 3
+		panel.setFrame(Self.panelFrame(
+			caret: caret,
+			preferredSize: NSSize(width: 340, height: CGFloat(rowCount) * tableView.rowHeight + 2),
+			visibleFrame: visible
+		), display: false)
+	}
+
+	static func panelFrame(caret: NSRect, preferredSize: NSSize, visibleFrame: NSRect) -> NSRect {
+		let width = min(preferredSize.width, visibleFrame.width)
+		let height = min(preferredSize.height, visibleFrame.height)
+		let x = min(max(caret.minX, visibleFrame.minX), visibleFrame.maxX - width)
+		let belowY = caret.minY - height - 3
 		let aboveY = caret.maxY + 3
-		let y = belowY >= visible.minY ? belowY : min(aboveY, visible.maxY - size.height)
-		panel.setFrame(NSRect(origin: NSPoint(x: x, y: y), size: size), display: false)
+		let y = belowY >= visibleFrame.minY
+			? belowY
+			: min(max(aboveY, visibleFrame.minY), visibleFrame.maxY - height)
+		return NSRect(x: x, y: y, width: width, height: height)
 	}
 
 	private func comparisonText(for item: LSPCompletionItem) -> String {

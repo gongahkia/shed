@@ -264,6 +264,10 @@ import ItsyEditor
 		workspaceProblems.count
 	}
 
+	var problemsForTesting: [WorkspaceProblem] {
+		workspaceProblems
+	}
+
 	var selectedProblemIndexForTesting: Int? {
 		guard let selectedRow = problemsTableView?.selectedRow, selectedRow >= 0 else {
 			return nil

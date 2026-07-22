@@ -98,7 +98,8 @@ import Testing
 			lines: [
 				.remove("let value = old()"),
 				.add("let value = new()"),
-			]
+			],
+			noNewlineLineIndexes: [1]
 		),
 	])
 }
@@ -117,4 +118,17 @@ import Testing
 	let file = try #require(try UnifiedDiffParser.parse(diff).first)
 
 	#expect(file.indexLine == "index 1111111..2222222 100644")
+}
+
+@Test func unifiedDiffParserMarksBinaryDiffs() throws {
+	let diff = """
+	diff --git a/image.png b/image.png
+	index 1111111..2222222 100644
+	Binary files a/image.png and b/image.png differ
+	"""
+
+	let file = try #require(try UnifiedDiffParser.parse(diff).first)
+
+	#expect(file.isBinary)
+	#expect(file.hunks.isEmpty)
 }

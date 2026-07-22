@@ -10,6 +10,18 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct ItsyUISnapshotTests {
+	@Test(arguments: ThemeSnapshotCase.all)
+	func editorThemeAndAccessibilitySizeMatrixMatchesGolden(_ testCase: ThemeSnapshotCase) throws {
+		try SnapshotHarness.assertSnapshot(named: testCase.fixtureName) {
+			let palette = AppThemePalette(settings: ItsySettings(theme: .init(id: testCase.themeID)))
+			return SnapshotSubject(view: ThemedEditorSnapshotView(
+				frame: NSRect(x: 0, y: 0, width: 640, height: 260),
+				palette: palette,
+				fontSize: testCase.fontSize
+			))
+		}
+	}
+
 	@Test func mainEditorWithSelectionAndCursorMatchesGolden() throws {
 		try SnapshotHarness.assertSnapshot(named: "main-editor") {
 			SnapshotSubject(view: EditorSnapshotView(frame: NSRect(x: 0, y: 0, width: 640, height: 260)))
@@ -308,6 +320,62 @@ private final class EditorSnapshotView: NSView {
 			"\(index + 1)".draw(at: NSPoint(x: 28, y: y), withAttributes: numberAttributes)
 			line.draw(at: NSPoint(x: 76, y: y), withAttributes: lineAttributes)
 		}
+	}
+}
+
+struct ThemeSnapshotCase: CustomTestStringConvertible {
+	let themeID: String
+	let fontSize: CGFloat
+
+	static let all = [
+		"bundled:default-dark", "bundled:default-light", "bundled:solarized-dark", "bundled:solarized-light",
+		"bundled:gruvbox-dark", "bundled:gruvbox-light", "bundled:nord", "bundled:catppuccin-mocha",
+		"bundled:catppuccin-latte", "bundled:tokyo-night",
+	].flatMap { themeID in
+		[CGFloat(15), CGFloat(28)].map { ThemeSnapshotCase(themeID: themeID, fontSize: $0) }
+	}
+
+	var fixtureName: String {
+		"theme-\(themeID.replacingOccurrences(of: "bundled:", with: ""))-\(Int(fontSize))"
+	}
+
+	var testDescription: String { fixtureName }
+}
+
+private final class ThemedEditorSnapshotView: NSView {
+	private let palette: AppThemePalette
+	private let fontSize: CGFloat
+	private let lines = ["import AppKit", "let message = \"Hello, Itsy\"", "view.render(selection: range)"]
+
+	init(frame: NSRect, palette: AppThemePalette, fontSize: CGFloat) {
+		self.palette = palette
+		self.fontSize = fontSize
+		super.init(frame: frame)
+	}
+
+	required init?(coder: NSCoder) { nil }
+	override var isFlipped: Bool { true }
+
+	override func draw(_ dirtyRect: NSRect) {
+		color(palette.editor.background).setFill()
+		dirtyRect.fill()
+		palette.sidebarBackground.setFill()
+		NSRect(x: 0, y: 0, width: 58, height: bounds.height).fill()
+		let font = NSFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+		let lineHeight = max(fontSize * 1.45, 24)
+		let textAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color(palette.editor.foreground)]
+		let numberAttributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: palette.secondaryForeground]
+		palette.listSelectionBackground.withAlphaComponent(0.7).setFill()
+		NSRect(x: 70, y: 14 + lineHeight, width: bounds.width - 84, height: lineHeight).fill()
+		for (index, line) in lines.enumerated() {
+			let y = 14 + CGFloat(index) * lineHeight
+			"\(index + 1)".draw(at: NSPoint(x: 28, y: y), withAttributes: numberAttributes)
+			line.draw(at: NSPoint(x: 72, y: y), withAttributes: textAttributes)
+		}
+	}
+
+	private func color(_ value: SIMD4<Float>) -> NSColor {
+		NSColor(srgbRed: CGFloat(value.x), green: CGFloat(value.y), blue: CGFloat(value.z), alpha: CGFloat(value.w))
 	}
 }
 

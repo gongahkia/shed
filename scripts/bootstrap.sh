@@ -1,9 +1,44 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+	printf '%s\n' \
+		'usage: scripts/bootstrap.sh [--help]' \
+		'' \
+		'Initializes pinned native submodules, verifies their revisions, and resolves SwiftPM dependencies.' \
+		'Runs only on macOS. It does not build the app or alter user configuration.' \
+		'' \
+		'environment:' \
+		'  ITSY_SUBMODULE_JOBS   positive parallel submodule-update count (default: 8)' \
+		'  ITSY_BOOTSTRAP_SKIP_SWIFTPM=1   skip SwiftPM dependency resolution' \
+		'' \
+		'exit codes:' \
+		'  0  bootstrap completed' \
+		'  2  unsupported platform, missing tool, or invalid argument/configuration' \
+		'  other nonzero  failure propagated from preflight, Git, or SwiftPM'
+}
+
+case "${1:-}" in
+	'')
+		;;
+	-h|--help)
+		usage
+		exit 0
+		;;
+	*)
+		printf 'error: unknown argument: %s\n' "$1" >&2
+		usage >&2
+		exit 2
+		;;
+esac
+
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 
+if [[ "$(uname -s)" != 'Darwin' ]]; then
+	printf 'error: scripts/bootstrap.sh supports macOS only\n' >&2
+	exit 2
+fi
 if ! command -v git >/dev/null 2>&1; then
 	printf 'error: missing command: git\n' >&2
 	exit 2

@@ -78,6 +78,7 @@ import Testing
 	try store.save(RecoveryJournal(fileURL: url, text: "dirty recovery"), workspaceRoot: directory)
 
 	let document = ItsyDocument()
+	defer { document.fileURL = nil }
 	document.fileURL = url
 	try document.read(from: url, ofType: "public.plain-text")
 	#expect(editorStorageString(document.editor) == "dirty recovery")

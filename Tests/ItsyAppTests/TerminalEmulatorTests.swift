@@ -112,6 +112,7 @@ import Testing
 	var input = Data()
 
 	view.onInput = { input = $0 }
+	view.confirmPaste = { _ in true }
 	view.ingest(Data("\u{1B}[?2004h".utf8))
 	NSPasteboard.general.clearContents()
 	NSPasteboard.general.setString("one\ntwo", forType: .string)

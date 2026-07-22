@@ -7,9 +7,24 @@ struct TerminalWorkspaceState: Codable, Equatable {
 	var tabs: [TerminalTabState]
 }
 
+struct TerminalCoordinatorState: Equatable {
+	var tabCount: Int
+	var selectedTabIndex: Int
+	var paneCount: Int
+	var activePaneIndex: Int?
+	var processIdentifiers: [Int32?]
+}
+
 struct TerminalTabState: Codable, Equatable {
 	var currentDirectoryPath: String
 	var layout: String
+	var paneCurrentDirectoryPaths: [String]?
+
+	init(currentDirectoryPath: String, layout: String, paneCurrentDirectoryPaths: [String]? = nil) {
+		self.currentDirectoryPath = currentDirectoryPath
+		self.layout = layout
+		self.paneCurrentDirectoryPaths = paneCurrentDirectoryPaths
+	}
 }
 
 struct TerminalPaneLayout: Equatable {
@@ -74,9 +89,14 @@ struct TerminalPaneLayout: Equatable {
 @MainActor final class TerminalCoordinator: NSObject {
 	@MainActor private final class TerminalPane {
 		let id = UUID()
+		let emulator = ItsyTerminalEmulator()
 		let view: ItsyTerminalView
+		var session: ItsyTerminalSession?
+		var currentDirectoryURL: URL
+		var hasOSC7CWD = false
 
-		init(emulator: ItsyTerminalEmulator) {
+		init(currentDirectoryURL: URL) {
+			self.currentDirectoryURL = currentDirectoryURL
 			view = ItsyTerminalView(emulator: emulator)
 		}
 	}
@@ -85,12 +105,12 @@ struct TerminalPaneLayout: Equatable {
 		case leaf(TerminalPane)
 		case split(vertical: Bool, children: [TerminalPaneNode])
 
-		static func make(layout: TerminalPaneLayout, emulator: ItsyTerminalEmulator) -> TerminalPaneNode {
+		static func make(layout: TerminalPaneLayout, currentDirectoryURL: URL) -> TerminalPaneNode {
 			guard let vertical = layout.vertical else {
-				return .leaf(TerminalPane(emulator: emulator))
+				return .leaf(TerminalPane(currentDirectoryURL: currentDirectoryURL))
 			}
 			let children = layout.children.isEmpty ? [TerminalPaneLayout.leaf] : layout.children
-			return .split(vertical: vertical, children: children.map { make(layout: $0, emulator: emulator) })
+			return .split(vertical: vertical, children: children.map { make(layout: $0, currentDirectoryURL: currentDirectoryURL) })
 		}
 
 		var panes: [TerminalPane] {
@@ -111,16 +131,41 @@ struct TerminalPaneLayout: Equatable {
 			}
 		}
 
-		mutating func splitPane(id: UUID, vertical: Bool, emulator: ItsyTerminalEmulator) -> TerminalPane? {
+		func pane(id: UUID) -> TerminalPane? {
+			switch self {
+			case let .leaf(pane):
+				return pane.id == id ? pane : nil
+			case let .split(_, children):
+				return children.lazy.compactMap { $0.pane(id: id) }.first
+			}
+		}
+
+		func removingPane(id: UUID) -> TerminalPaneNode? {
+			switch self {
+			case let .leaf(pane):
+				return pane.id == id ? nil : self
+			case let .split(vertical, children):
+				let remaining = children.compactMap { $0.removingPane(id: id) }
+				if remaining.count == children.count {
+					return self
+				}
+				if remaining.count == 1 {
+					return remaining[0]
+				}
+				return .split(vertical: vertical, children: remaining)
+			}
+		}
+
+		mutating func splitPane(id: UUID, vertical: Bool, currentDirectoryURL: URL) -> TerminalPane? {
 			switch self {
 			case let .leaf(pane) where pane.id == id:
-				let newPane = TerminalPane(emulator: emulator)
+				let newPane = TerminalPane(currentDirectoryURL: currentDirectoryURL)
 				self = .split(vertical: vertical, children: [.leaf(pane), .leaf(newPane)])
 				return newPane
 			case let .split(currentVertical, children):
 				var updated = children
 				for index in updated.indices {
-					if let pane = updated[index].splitPane(id: id, vertical: vertical, emulator: emulator) {
+				if let pane = updated[index].splitPane(id: id, vertical: vertical, currentDirectoryURL: currentDirectoryURL) {
 						self = .split(vertical: currentVertical, children: updated)
 						return pane
 					}
@@ -134,20 +179,18 @@ struct TerminalPaneLayout: Equatable {
 
 	@MainActor private final class TerminalTab {
 		let id = UUID()
-		let emulator = ItsyTerminalEmulator()
 		var root: TerminalPaneNode
-		var session: ItsyTerminalSession?
-		var currentDirectoryURL: URL
-		var hasOSC7CWD = false
 		var title: String
 		var activePaneID: UUID
 
-		init(currentDirectoryURL: URL, layout: TerminalPaneLayout = .leaf) {
-			self.currentDirectoryURL = currentDirectoryURL
+		init(currentDirectoryURL: URL, layout: TerminalPaneLayout = .leaf, paneCurrentDirectoryURLs: [URL] = []) {
 			title = currentDirectoryURL.lastPathComponent.isEmpty
 				? currentDirectoryURL.path
 				: currentDirectoryURL.lastPathComponent
-			root = TerminalPaneNode.make(layout: layout, emulator: emulator)
+			root = TerminalPaneNode.make(layout: layout, currentDirectoryURL: currentDirectoryURL)
+			for (index, pane) in root.panes.enumerated() where paneCurrentDirectoryURLs.indices.contains(index) {
+				pane.currentDirectoryURL = paneCurrentDirectoryURLs[index]
+			}
 			activePaneID = root.panes.first?.id ?? UUID()
 		}
 
@@ -157,6 +200,10 @@ struct TerminalPaneLayout: Equatable {
 
 		var activePane: TerminalPane? {
 			panes.first { $0.id == activePaneID } ?? panes.first
+		}
+
+		var currentDirectoryURL: URL {
+			activePane?.currentDirectoryURL ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
 		}
 	}
 
@@ -172,13 +219,33 @@ struct TerminalPaneLayout: Equatable {
 	private var selectedTabIndex = 0
 	private let settingsProvider: () -> ItsySettings.TerminalSettings
 	private let activeDocumentProvider: () -> NSDocument?
+	private let sessionFactory: (URL) -> ItsyTerminalSession
+	private let openLocation: (TerminalOpenLocation) -> Void
 
 	init(
 		settingsProvider: @escaping () -> ItsySettings.TerminalSettings,
-		activeDocumentProvider: @escaping () -> NSDocument?
+		activeDocumentProvider: @escaping () -> NSDocument?,
+		sessionFactory: @escaping (URL) -> ItsyTerminalSession = { ItsyTerminalSession(currentDirectoryURL: $0) },
+		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) }
 	) {
 		self.settingsProvider = settingsProvider
 		self.activeDocumentProvider = activeDocumentProvider
+		self.sessionFactory = sessionFactory
+		self.openLocation = openLocation
+	}
+
+	var state: TerminalCoordinatorState {
+		guard let tab = activeTab else {
+			return TerminalCoordinatorState(tabCount: tabs.count, selectedTabIndex: selectedTabIndex, paneCount: 0, activePaneIndex: nil, processIdentifiers: [])
+		}
+		let panes = tab.panes
+		return TerminalCoordinatorState(
+			tabCount: tabs.count,
+			selectedTabIndex: selectedTabIndex,
+			paneCount: panes.count,
+			activePaneIndex: panes.firstIndex { $0.id == tab.activePaneID },
+			processIdentifiers: panes.map { $0.session?.processIdentifier }
+		)
 	}
 
 	@objc func showTerminal(_: Any?) {
@@ -187,7 +254,7 @@ struct TerminalPaneLayout: Equatable {
 
 	@objc func newTerminalTab(_: Any?) {
 		showTerminal(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
-		let cwd = activeTab?.currentDirectoryURL ?? terminalWorkingDirectory()
+		let cwd = activeTab?.activePane?.currentDirectoryURL ?? terminalWorkingDirectory()
 		appendTab(currentDirectoryURL: cwd, select: true)
 		persistTerminalState()
 	}
@@ -235,7 +302,9 @@ struct TerminalPaneLayout: Equatable {
 
 	func terminate() {
 		for tab in tabs {
-			tab.session?.terminate()
+			for pane in tab.panes {
+				pane.session?.terminate()
+			}
 		}
 	}
 
@@ -317,19 +386,27 @@ struct TerminalPaneLayout: Equatable {
 		tabStack.orientation = .horizontal
 		tabStack.spacing = 4
 		let newTabButton = NSButton(title: L10n.string("+"), target: self, action: #selector(newTerminalTab(_:)))
+		newTabButton.identifier = NSUserInterfaceItemIdentifier("terminal.new-tab")
 		let splitHButton = NSButton(
 			title: L10n.string("Split H"),
 			target: self,
 			action: #selector(splitTerminalHorizontal(_:))
 		)
 		let splitVButton = NSButton(title: L10n.string("Split V"), target: self, action: #selector(splitTerminalVertical(_:)))
+		splitHButton.identifier = NSUserInterfaceItemIdentifier("terminal.split-horizontal")
+		splitVButton.identifier = NSUserInterfaceItemIdentifier("terminal.split-vertical")
+		let closePaneButton = NSButton(title: L10n.string("Close Pane"), target: self, action: #selector(closeTerminalPane(_:)))
+		closePaneButton.identifier = NSUserInterfaceItemIdentifier("terminal.close-pane")
 		let findButton = NSButton(title: L10n.string("Find"), target: self, action: #selector(showTerminalFind(_:)))
+		findButton.identifier = NSUserInterfaceItemIdentifier("terminal.find")
 		let clearButton = NSButton(title: L10n.string("Clear"), target: self, action: #selector(clearTerminal(_:)))
 		let restartButton = NSButton(title: L10n.string("Restart"), target: self, action: #selector(restartTerminal(_:)))
+		restartButton.identifier = NSUserInterfaceItemIdentifier("terminal.restart")
 		let buttonStack = NSStackView(views: [
 			newTabButton,
 			splitHButton,
 			splitVButton,
+			closePaneButton,
 			findButton,
 			clearButton,
 			restartButton,
@@ -395,10 +472,14 @@ struct TerminalPaneLayout: Equatable {
 		panel.setFrame(frame, display: true)
 	}
 
-	private func appendTab(currentDirectoryURL: URL, layout: TerminalPaneLayout = .leaf, select: Bool,
-	                       start: Bool = true)
+	private func appendTab(currentDirectoryURL: URL, layout: TerminalPaneLayout = .leaf,
+	                       paneCurrentDirectoryURLs: [URL] = [], select: Bool, start: Bool = true)
 	{
-		let tab = TerminalTab(currentDirectoryURL: currentDirectoryURL, layout: layout)
+		let tab = TerminalTab(
+			currentDirectoryURL: currentDirectoryURL,
+			layout: layout,
+			paneCurrentDirectoryURLs: paneCurrentDirectoryURLs
+		)
 		configurePanes(for: tab)
 		tabs.append(tab)
 		if select {
@@ -415,14 +496,24 @@ struct TerminalPaneLayout: Equatable {
 		for pane in tab.panes {
 			pane.view.applyTerminalSettings(settingsProvider())
 			pane.view.applyTerminalTheme(AppTheme.palette.terminal)
-			pane.view.onInput = { [weak tab] data in
-				tab?.session?.send(data)
+			pane.view.onInput = { [weak pane] data in
+				pane?.session?.send(data)
 			}
-			pane.view.onResize = { [weak tab] columns, rows in
-				tab?.session?.resize(columns: columns, rows: rows)
+			pane.view.onResize = { [weak pane] columns, rows in
+				pane?.session?.resize(columns: columns, rows: rows)
 			}
-			pane.view.onFocus = { [weak tab] in
-				tab?.activePaneID = pane.id
+			pane.view.onFocus = { [weak self, weak tab, weak pane] in
+				guard let self, let tab, let pane else {
+					return
+				}
+				tab.activePaneID = pane.id
+				if self.activeTab === tab {
+					self.applySearch()
+					self.updateTerminalStatus()
+				}
+			}
+			pane.view.onOpenLocation = { [weak self] location in
+				self?.openLocation(location)
 			}
 			pane.view.onCommand = { [weak self] command in
 				switch command {
@@ -449,11 +540,20 @@ struct TerminalPaneLayout: Equatable {
 		for (index, tab) in tabs.enumerated() {
 			let button = NSButton(title: tab.title, target: self, action: #selector(selectTerminalTab(_:)))
 			button.tag = index
+			button.identifier = NSUserInterfaceItemIdentifier("terminal.tab.\(index)")
 			button.bezelStyle = index == selectedTabIndex ? .rounded : .recessed
 			button.font = .systemFont(ofSize: 11, weight: index == selectedTabIndex ? .semibold : .regular)
 			button.contentTintColor = index == selectedTabIndex ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
 			button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-			terminalTabStack.addArrangedSubview(button)
+			let closeButton = NSButton(title: L10n.string("×"), target: self, action: #selector(closeTerminalTab(_:)))
+			closeButton.tag = index
+			closeButton.identifier = NSUserInterfaceItemIdentifier("terminal.close-tab.\(index)")
+			closeButton.bezelStyle = .inline
+			closeButton.toolTip = L10n.string("Close Terminal Tab")
+			let tabControls = NSStackView(views: [button, closeButton])
+			tabControls.orientation = .horizontal
+			tabControls.spacing = 2
+			terminalTabStack.addArrangedSubview(tabControls)
 		}
 	}
 
@@ -466,6 +566,26 @@ struct TerminalPaneLayout: Equatable {
 		rebuildTerminalLayout()
 		startTerminalIfNeeded()
 		terminalPanel?.makeFirstResponder(activeView)
+		persistTerminalState()
+	}
+
+	@objc private func closeTerminalTab(_ sender: NSButton) {
+		guard tabs.indices.contains(sender.tag) else {
+			return
+		}
+		let tab = tabs.remove(at: sender.tag)
+		for pane in tab.panes {
+			pane.session?.terminate()
+			pane.session = nil
+		}
+		if tabs.isEmpty {
+			selectedTabIndex = 0
+		} else {
+			selectedTabIndex = min(sender.tag, tabs.count - 1)
+		}
+		rebuildTabBar()
+		rebuildTerminalLayout()
+		startTerminalIfNeeded()
 		persistTerminalState()
 	}
 
@@ -514,13 +634,32 @@ struct TerminalPaneLayout: Equatable {
 			return
 		}
 		let activeID = tab.activePaneID
-		guard let newPane = tab.root.splitPane(id: activeID, vertical: vertical, emulator: tab.emulator) else {
+		let currentDirectoryURL = tab.activePane?.currentDirectoryURL ?? terminalWorkingDirectory()
+		guard let newPane = tab.root.splitPane(id: activeID, vertical: vertical, currentDirectoryURL: currentDirectoryURL) else {
 			return
 		}
 		configurePanes(for: tab)
 		tab.activePaneID = newPane.id
 		rebuildTerminalLayout()
+		startTerminalIfNeeded(in: newPane, tab: tab)
 		terminalPanel?.makeFirstResponder(newPane.view)
+		persistTerminalState()
+	}
+
+	@objc private func closeTerminalPane(_: Any?) {
+		guard let tab = activeTab, tab.panes.count > 1, let pane = tab.root.pane(id: tab.activePaneID),
+		      let root = tab.root.removingPane(id: pane.id)
+		else {
+			return
+		}
+		pane.session?.terminate()
+		pane.session = nil
+		tab.root = root
+		tab.activePaneID = root.panes.first?.id ?? UUID()
+		configurePanes(for: tab)
+		rebuildTerminalLayout()
+		startTerminalIfNeeded()
+		terminalPanel?.makeFirstResponder(activeView)
 		persistTerminalState()
 	}
 
@@ -528,52 +667,57 @@ struct TerminalPaneLayout: Equatable {
 		guard let tab = activeTab else {
 			return
 		}
-		guard tab.session?.isRunning != true else {
-			updateTerminalStatus()
+		for pane in tab.panes {
+			startTerminalIfNeeded(in: pane, tab: tab)
+		}
+		updateTerminalStatus()
+	}
+
+	private func startTerminalIfNeeded(in pane: TerminalPane, tab: TerminalTab) {
+		guard pane.session?.isRunning != true else {
 			return
 		}
-		let size = activeView?.terminalSize ?? (columns: 80, rows: 24)
-		let session = ItsyTerminalSession(currentDirectoryURL: tab.currentDirectoryURL)
-		session.onOutput = { [weak self, weak tab] data in
+		let size = pane.view.terminalSize
+		let session = sessionFactory(pane.currentDirectoryURL)
+		session.onOutput = { [weak self, weak tab, weak pane, weak session] data in
 			DispatchQueue.main.async {
-				guard let self, let tab else {
+				guard let self, let tab, let pane, let session, pane.session === session else {
 					return
 				}
-				self.ingest(data, into: tab)
+				self.ingest(data, into: pane, tab: tab)
 			}
 		}
-		session.onExit = { [weak self, weak tab] status in
+		session.onExit = { [weak self, weak tab, weak pane, weak session] status in
 			DispatchQueue.main.async {
-				guard let self, let tab else {
+				guard let self, let tab, let pane, let session, pane.session === session else {
 					return
 				}
+				pane.session = nil
 				if let activeTab = self.activeTab, activeTab === tab {
 					self.terminalStatusLabel?.textColor = .systemRed
 					self.terminalStatusLabel?.stringValue = L10n.string("Shell exited \(status)")
 				}
 			}
 		}
+		pane.session = session
 		do {
 			try session.start(columns: size.columns, rows: size.rows)
-			tab.session = session
-			updateTerminalStatus()
 		} catch {
+			pane.session = nil
 			terminalStatusLabel?.textColor = .systemRed
 			terminalStatusLabel?.stringValue = String(describing: error)
-			tab.activePane?.view.ingest(Data("failed to start shell: \(error)\r\n".utf8))
+			pane.view.ingest(Data("failed to start shell: \(error)\r\n".utf8))
 		}
 	}
 
-	private func ingest(_ data: Data, into tab: TerminalTab) {
-		tab.emulator.feed(data)
-		for pane in tab.panes {
-			pane.view.refreshAfterEmulatorUpdate()
+	private func ingest(_ data: Data, into pane: TerminalPane, tab: TerminalTab) {
+		pane.emulator.feed(data)
+		pane.view.refreshAfterEmulatorUpdate()
+		if let cwd = pane.view.currentDirectoryURL {
+			pane.currentDirectoryURL = cwd
+			pane.hasOSC7CWD = true
 		}
-		if let cwd = tab.activePane?.view.currentDirectoryURL {
-			tab.currentDirectoryURL = cwd
-			tab.hasOSC7CWD = true
-		}
-		if let title = tab.emulator.snapshot(scrollbackOffset: 0).windowTitle, !title.isEmpty {
+		if tab.activePane === pane, let title = pane.emulator.snapshot(scrollbackOffset: 0).windowTitle, !title.isEmpty {
 			tab.title = title
 			rebuildTabBar()
 		}
@@ -585,26 +729,22 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	@objc private func clearTerminal(_: Any?) {
-		guard let tab = activeTab else {
+		guard let pane = activeTab?.activePane else {
 			return
 		}
-		tab.emulator.clearScrollback()
-		for pane in tab.panes {
-			pane.view.clearScrollback()
-		}
+		pane.emulator.clearScrollback()
+		pane.view.clearScrollback()
 	}
 
 	@objc private func restartTerminal(_: Any?) {
-		guard let tab = activeTab else {
+		guard let tab = activeTab, let pane = tab.activePane else {
 			return
 		}
-		tab.session?.terminate()
-		tab.session = nil
-		tab.emulator.reset()
-		for pane in tab.panes {
-			pane.view.reset()
-		}
-		startTerminalIfNeeded()
+		pane.session?.terminate()
+		pane.session = nil
+		pane.emulator.reset()
+		pane.view.reset()
+		startTerminalIfNeeded(in: pane, tab: tab)
 		terminalPanel?.makeFirstResponder(activeView)
 	}
 
@@ -663,7 +803,16 @@ struct TerminalPaneLayout: Equatable {
 		for tab in state.tabs {
 			let cwd = URL(fileURLWithPath: tab.currentDirectoryPath, isDirectory: true)
 			let layout = TerminalPaneLayout.decode(tab.layout) ?? .leaf
-			appendTab(currentDirectoryURL: cwd, layout: layout, select: false, start: false)
+			let paneDirectories = (tab.paneCurrentDirectoryPaths ?? []).map {
+				URL(fileURLWithPath: $0, isDirectory: true)
+			}
+			appendTab(
+				currentDirectoryURL: cwd,
+				layout: layout,
+				paneCurrentDirectoryURLs: paneDirectories,
+				select: false,
+				start: false
+			)
 		}
 		selectedTabIndex = min(max(0, state.selectedTabIndex), max(0, tabs.count - 1))
 		rebuildTabBar()
@@ -679,7 +828,8 @@ struct TerminalPaneLayout: Equatable {
 			tabs: tabs.map {
 				TerminalTabState(
 					currentDirectoryPath: $0.currentDirectoryURL.path,
-					layout: $0.root.layout.encoded
+					layout: $0.root.layout.encoded,
+					paneCurrentDirectoryPaths: $0.panes.map { $0.currentDirectoryURL.path }
 				)
 			}
 		)

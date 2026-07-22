@@ -18,11 +18,15 @@ final class ItsyTerminalView: NSView {
 	private var searchQuery = ""
 	private var searchUsesRegex = false
 	private var selectedSearchMatch = 0
+	private var selectionAnchor: TerminalCellPosition?
+	private var selectionHead: TerminalCellPosition?
 	private var theme = AppTheme.palette.terminal
 	var onInput: ((Data) -> Void)?
 	var onResize: ((Int, Int) -> Void)?
 	var onFocus: (() -> Void)?
 	var onCommand: ((TerminalViewCommand) -> Bool)?
+	var onOpenLocation: ((TerminalOpenLocation) -> Void)?
+	var confirmPaste: ((TerminalPasteRisk) -> Bool)?
 
 	init(emulator: ItsyTerminalEmulator = ItsyTerminalEmulator(), frame frameRect: NSRect = .zero) {
 		self.emulator = emulator
@@ -70,6 +74,8 @@ final class ItsyTerminalView: NSView {
 	func reset() {
 		emulator.reset()
 		scrollbackOffset = 0
+		selectionAnchor = nil
+		selectionHead = nil
 		needsDisplay = true
 	}
 
@@ -163,6 +169,7 @@ final class ItsyTerminalView: NSView {
 		for (row, cells) in snapshot.cells.enumerated() {
 			drawBackgrounds(cells, row: row, snapshot: snapshot)
 		}
+		drawSelection(snapshot)
 		drawSearchHighlights(snapshot)
 		for (row, cells) in snapshot.cells.enumerated() {
 			attributedLine(cells, snapshot: snapshot).draw(at: NSPoint(x: 4, y: CGFloat(row) * characterSize.height + 2))
@@ -188,6 +195,12 @@ final class ItsyTerminalView: NSView {
 			return false
 		}
 		switch event.keyCode {
+		case 8:
+			copy(nil)
+			return true
+		case 9:
+			paste(nil)
+			return true
 		case 3:
 			return onCommand?(.find) ?? false
 		case 5:
@@ -220,15 +233,24 @@ final class ItsyTerminalView: NSView {
 	}
 
 	override func mouseDown(with event: NSEvent) {
-		if !sendMouse(event, button: 0, pressed: true) {
-			super.mouseDown(with: event)
+		if sendMouse(event, button: 0, pressed: true) {
+			return
 		}
+		if event.modifierFlags.contains(.command), openLocation(at: terminalCellLocation(for: event)) {
+			return
+		}
+		let point = terminalCellLocation(for: event)
+		selectionAnchor = TerminalCellPosition(row: point.row, column: point.column)
+		selectionHead = selectionAnchor
+		needsDisplay = true
 	}
 
 	override func mouseUp(with event: NSEvent) {
-		if !sendMouse(event, button: 0, pressed: false) {
-			super.mouseUp(with: event)
+		if sendMouse(event, button: 0, pressed: false) {
+			return
 		}
+		selectionHead = TerminalCellPosition(row: terminalCellLocation(for: event).row, column: terminalCellLocation(for: event).column)
+		needsDisplay = true
 	}
 
 	override func rightMouseDown(with event: NSEvent) {
@@ -256,9 +278,11 @@ final class ItsyTerminalView: NSView {
 	}
 
 	override func mouseDragged(with event: NSEvent) {
-		if !sendMouseMotion(event, button: 0) {
-			super.mouseDragged(with: event)
+		if sendMouseMotion(event, button: 0) {
+			return
 		}
+		selectionHead = TerminalCellPosition(row: terminalCellLocation(for: event).row, column: terminalCellLocation(for: event).column)
+		needsDisplay = true
 	}
 
 	override func rightMouseDragged(with event: NSEvent) {
@@ -279,15 +303,59 @@ final class ItsyTerminalView: NSView {
 		}
 	}
 
+	@objc func copy(_: Any?) {
+		let snapshot = emulator.snapshot(scrollbackOffset: scrollbackOffset)
+		let text = selectedText(in: snapshot) ?? snapshot.lines.joined(separator: "\n")
+		guard !text.isEmpty else {
+			return
+		}
+		let pasteboard = NSPasteboard.general
+		pasteboard.clearContents()
+		pasteboard.setString(text, forType: .string)
+	}
+
 	@objc func paste(_ sender: Any?) {
 		guard let text = NSPasteboard.general.string(forType: .string) else {
 			return
+		}
+		paste(text)
+	}
+
+	func paste(_ text: String) {
+		let risk = TerminalPastePolicy.risk(for: text)
+		if risk.requiresConfirmation {
+			guard confirmPaste?(risk) ?? confirmPasteWithAlert(risk) else {
+				return
+			}
 		}
 		if emulator.bracketedPaste {
 			onInput?(Data("\u{1B}[200~\(text)\u{1B}[201~".utf8))
 		} else {
 			onInput?(Data(text.utf8))
 		}
+	}
+
+	@discardableResult
+	func openLocation(at position: (row: Int, column: Int)) -> Bool {
+		let snapshot = emulator.snapshot(scrollbackOffset: scrollbackOffset)
+		guard snapshot.cells.indices.contains(position.row), snapshot.cells[position.row].indices.contains(position.column) else {
+			return false
+		}
+		let location: TerminalOpenLocation?
+		if let rawURL = snapshot.cells[position.row][position.column].attributes.hyperlink, let url = URL(string: rawURL) {
+			location = TerminalOpenLocation(url: url, line: nil, column: nil)
+		} else {
+			location = TerminalLinkDetector.location(
+				in: snapshot.lines[position.row],
+				column: position.column,
+				relativeTo: currentDirectoryURL
+			)
+		}
+		guard let location else {
+			return false
+		}
+		onOpenLocation?(location)
+		return true
 	}
 
 	private func commonInit() {
@@ -309,7 +377,7 @@ final class ItsyTerminalView: NSView {
 	}
 
 	private func drawCursor(_ snapshot: TerminalSnapshot) {
-		guard window?.firstResponder === self, scrollbackOffset == 0 else {
+		guard snapshot.cursorVisible, window?.firstResponder === self, scrollbackOffset == 0 else {
 			return
 		}
 		let x = 4 + CGFloat(min(snapshot.cursorColumn, emulator.columns - 1)) * characterSize.width
@@ -317,6 +385,70 @@ final class ItsyTerminalView: NSView {
 		let rect = NSRect(x: x, y: y, width: max(2, characterSize.width), height: characterSize.height)
 		theme.cursor.withAlphaComponent(0.24).setFill()
 		rect.fill()
+	}
+
+	private struct TerminalCellPosition: Comparable {
+		var row: Int
+		var column: Int
+
+		static func < (lhs: TerminalCellPosition, rhs: TerminalCellPosition) -> Bool {
+			lhs.row == rhs.row ? lhs.column < rhs.column : lhs.row < rhs.row
+		}
+	}
+
+	private func drawSelection(_ snapshot: TerminalSnapshot) {
+		guard let range = selectionRange() else {
+			return
+		}
+		NSColor.selectedTextBackgroundColor.withAlphaComponent(0.25).setFill()
+		for row in range.lowerBound.row ... range.upperBound.row where snapshot.cells.indices.contains(row) {
+			let start = row == range.lowerBound.row ? range.lowerBound.column : 0
+			let end = row == range.upperBound.row ? range.upperBound.column : emulator.columns - 1
+			guard end >= start else {
+				continue
+			}
+			NSRect(
+				x: 4 + CGFloat(start) * characterSize.width,
+				y: CGFloat(row) * characterSize.height + 2,
+				width: CGFloat(end - start + 1) * characterSize.width,
+				height: characterSize.height
+			).fill()
+		}
+	}
+
+	private func selectedText(in snapshot: TerminalSnapshot) -> String? {
+		guard let range = selectionRange() else {
+			return nil
+		}
+		var lines: [String] = []
+		for row in range.lowerBound.row ... range.upperBound.row where snapshot.cells.indices.contains(row) {
+			let start = row == range.lowerBound.row ? range.lowerBound.column : 0
+			let end = row == range.upperBound.row ? range.upperBound.column : emulator.columns - 1
+			guard end >= start else {
+				continue
+			}
+			let cells = snapshot.cells[row][start ... end].filter { !$0.isContinuation }
+			lines.append(String(cells.map(\.character)))
+		}
+		return lines.joined(separator: "\n")
+	}
+
+	private func selectionRange() -> ClosedRange<TerminalCellPosition>? {
+		guard let anchor = selectionAnchor, let head = selectionHead else {
+			return nil
+		}
+		return min(anchor, head) ... max(anchor, head)
+	}
+
+	private func confirmPasteWithAlert(_ risk: TerminalPasteRisk) -> Bool {
+		let alert = NSAlert()
+		alert.alertStyle = .warning
+		alert.messageText = L10n.string("Paste into Terminal?")
+		let controlWarning = risk.containsControlCharacters ? L10n.string(" and control characters") : ""
+		alert.informativeText = L10n.string("This paste contains \(risk.lineCount) lines\(controlWarning).")
+		alert.addButton(withTitle: L10n.string("Paste"))
+		alert.addButton(withTitle: L10n.string("Cancel"))
+		return alert.runModal() == .alertFirstButtonReturn
 	}
 
 	private struct SearchMatch {
@@ -408,6 +540,9 @@ final class ItsyTerminalView: NSView {
 	private func attributedLine(_ cells: [TerminalCell], snapshot: TerminalSnapshot) -> NSAttributedString {
 		let result = NSMutableAttributedString()
 		for cell in cells {
+			guard !cell.isContinuation else {
+				continue
+			}
 			var attributes: [NSAttributedString.Key: Any] = [
 				.font: font(for: cell.attributes),
 				.foregroundColor: resolvedColors(for: cell.attributes, snapshot: snapshot).foreground,

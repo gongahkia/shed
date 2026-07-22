@@ -1222,7 +1222,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		guard case let .failed(failure) = outcome else {
 			return L10n.string("complete")
 		}
-		switch failure {
+		return switch failure {
 		case .authenticationRequired:
 			L10n.string("needs authentication")
 		case .nonFastForward:

@@ -3,15 +3,26 @@ import Darwin
 import Dispatch
 import Foundation
 
+@_silgen_name("proc_listchildpids")
+private func proc_listchildpids(_ parentPID: pid_t, _ buffer: UnsafeMutableRawPointer?, _ bufferSize: Int32) -> Int32
+
+@_silgen_name("proc_listpids")
+private func proc_listpids(_ type: UInt32, _ typeInfo: UInt32, _ buffer: UnsafeMutableRawPointer?, _ bufferSize: Int32) -> Int32
+
 final class ItsyTerminalSession {
 	let currentDirectoryURL: URL
 	private let shellURL: URL
 	private let baseEnvironment: [String: String]
 	private let queue = DispatchQueue(label: "dev.itsy.terminal.session", qos: .userInitiated)
+	private let stateLock = NSLock()
 	private var masterFD: Int32 = -1
 	private var childPID: pid_t = -1
 	private var readSource: DispatchSourceRead?
+	private var writeSource: DispatchSourceWrite?
 	private var waitSource: DispatchSourceProcess?
+	private var pendingInput = Data()
+	private var isTerminating = false
+	private var lifetimeRetainer: ItsyTerminalSession?
 	var onOutput: ((Data) -> Void)?
 	var onExit: ((Int32) -> Void)?
 
@@ -23,7 +34,15 @@ final class ItsyTerminalSession {
 	}
 
 	var isRunning: Bool {
-		childPID > 0 && kill(childPID, 0) == 0
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return childPID > 0
+	}
+
+	var processIdentifier: pid_t? {
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return childPID > 0 ? childPID : nil
 	}
 
 	func start(columns: Int, rows: Int) throws {
@@ -72,97 +91,301 @@ final class ItsyTerminalSession {
 		guard pid >= 0 else {
 			throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
 		}
+		let flags = fcntl(master, F_GETFL)
+		guard flags >= 0, fcntl(master, F_SETFL, flags | O_NONBLOCK) == 0 else {
+			let failure = POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+			Self.signalProcessGroup(pid, signal: SIGHUP)
+			Darwin.close(master)
+			var status: Int32 = 0
+			_ = waitpid(pid, &status, 0)
+			throw failure
+		}
+		stateLock.lock()
 		masterFD = master
 		childPID = pid
-		startReadSource()
-		startWaitSource(pid: pid)
+		isTerminating = false
+		lifetimeRetainer = self
+		stateLock.unlock()
+		startReadSource(fileDescriptor: master)
+		startWaitSource(pid: pid, fileDescriptor: master)
 	}
 
 	func send(_ data: Data) {
-		guard masterFD >= 0, !data.isEmpty else {
+		guard !data.isEmpty else {
 			return
 		}
-		data.withUnsafeBytes { bytes in
-			guard let base = bytes.baseAddress else {
-				return
-			}
-			var sent = 0
-			while sent < data.count {
-				let count = Darwin.write(masterFD, base.advanced(by: sent), data.count - sent)
-				if count <= 0 {
-					return
-				}
-				sent += count
-			}
+		queue.async { [weak self] in
+			self?.enqueueInput(data)
 		}
 	}
 
 	func resize(columns: Int, rows: Int) {
-		guard masterFD >= 0 else {
-			return
-		}
-		var size = winsize(
-			ws_row: UInt16(max(1, rows)),
-			ws_col: UInt16(max(1, columns)),
-			ws_xpixel: 0,
-			ws_ypixel: 0
-		)
-		_ = ioctl(masterFD, TIOCSWINSZ, &size)
-		if childPID > 0 {
-			_ = kill(childPID, SIGWINCH)
+		queue.async { [weak self] in
+			guard let self, let fileDescriptor = self.currentMasterFD(), let pid = self.currentProcessID() else {
+				return
+			}
+			var size = winsize(
+				ws_row: UInt16(max(1, rows)),
+				ws_col: UInt16(max(1, columns)),
+				ws_xpixel: 0,
+				ws_ypixel: 0
+			)
+			guard self.isCurrentMaster(fileDescriptor) else {
+				return
+			}
+			_ = ioctl(fileDescriptor, TIOCSWINSZ, &size)
+			Self.signalProcessGroup(pid, signal: SIGWINCH)
 		}
 	}
 
 	func terminate() {
-		if childPID > 0 {
-			_ = kill(childPID, SIGHUP)
+		guard let pid = currentProcessID() else {
+			return
 		}
-		closeMaster()
+		stateLock.lock()
+		isTerminating = true
+		stateLock.unlock()
+		Self.signalProcessTree(pid, signal: SIGHUP)
+		Self.signalProcessTree(pid, signal: SIGTERM)
+		queue.async { [weak self] in
+			self?.stopIO()
+		}
+		queue.asyncAfter(deadline: .now() + .milliseconds(750)) { [weak self] in
+			guard let self, self.isTerminatingProcess(pid) else {
+				return
+			}
+			Self.signalProcessTree(pid, signal: SIGKILL)
+		}
 	}
 
-	private func startReadSource() {
-		let source = DispatchSource.makeReadSource(fileDescriptor: masterFD, queue: queue)
+	deinit {
+		terminate()
+	}
+
+	private func startReadSource(fileDescriptor: Int32) {
+		let source = DispatchSource.makeReadSource(fileDescriptor: fileDescriptor, queue: queue)
 		source.setEventHandler { [weak self] in
-			self?.readAvailableBytes()
+			self?.readAvailableBytes(fileDescriptor: fileDescriptor)
 		}
 		source.setCancelHandler { [weak self] in
-			self?.closeMaster()
+			self?.closeMaster(fileDescriptor)
 		}
 		readSource = source
 		source.resume()
 	}
 
-	private func startWaitSource(pid: pid_t) {
+	private func startWaitSource(pid: pid_t, fileDescriptor: Int32) {
 		let source = DispatchSource.makeProcessSource(identifier: pid, eventMask: .exit, queue: queue)
 		source.setEventHandler { [weak self] in
-			var status: Int32 = 0
-			_ = waitpid(pid, &status, WNOHANG)
-			let code = Self.exitCode(fromWaitStatus: status)
-			self?.childPID = -1
-			self?.readSource?.cancel()
-			self?.readSource = nil
-			self?.onExit?(code)
+			self?.reapProcess(pid: pid, fileDescriptor: fileDescriptor)
 		}
 		waitSource = source
 		source.resume()
 	}
 
-	private func readAvailableBytes() {
-		var buffer = [UInt8](repeating: 0, count: 16384)
-		while masterFD >= 0 {
-			let count = Darwin.read(masterFD, &buffer, buffer.count)
-			if count > 0 {
-				onOutput?(Data(buffer.prefix(count)))
-			} else {
-				break
+	private func enqueueInput(_ data: Data) {
+		guard let fileDescriptor = currentMasterFD() else {
+			return
+		}
+		pendingInput.append(data)
+		drainPendingInput(fileDescriptor: fileDescriptor)
+		guard !pendingInput.isEmpty, writeSource == nil else {
+			return
+		}
+		let source = DispatchSource.makeWriteSource(fileDescriptor: fileDescriptor, queue: queue)
+		source.setEventHandler { [weak self] in
+			self?.drainPendingInput(fileDescriptor: fileDescriptor)
+		}
+		writeSource = source
+		source.resume()
+	}
+
+	private func drainPendingInput(fileDescriptor: Int32) {
+		while !pendingInput.isEmpty, isCurrentMaster(fileDescriptor) {
+			let count = pendingInput.withUnsafeBytes { bytes -> Int in
+				guard let base = bytes.baseAddress else {
+					return 0
+				}
+				return Darwin.write(fileDescriptor, base, pendingInput.count)
 			}
+			if count > 0 {
+				pendingInput.removeFirst(count)
+				continue
+			}
+			if count < 0, errno == EINTR {
+				continue
+			}
+			if count < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+				return
+			}
+			pendingInput.removeAll(keepingCapacity: false)
+			writeSource?.cancel()
+			writeSource = nil
+			return
+		}
+		if pendingInput.isEmpty {
+			writeSource?.cancel()
+			writeSource = nil
 		}
 	}
 
-	private func closeMaster() {
-		if masterFD >= 0 {
-			Darwin.close(masterFD)
-			masterFD = -1
+	private func readAvailableBytes(fileDescriptor: Int32) {
+		var buffer = [UInt8](repeating: 0, count: 16384)
+		while isCurrentMaster(fileDescriptor) {
+			let count = Darwin.read(fileDescriptor, &buffer, buffer.count)
+			if count > 0 {
+				onOutput?(Data(buffer.prefix(count)))
+				continue
+			}
+			if count < 0, errno == EINTR {
+				continue
+			}
+			if count == 0 || (count < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+				closeMaster(fileDescriptor)
+				readSource?.cancel()
+				readSource = nil
+			}
+			break
+		}
+	}
+
+	private func stopIO() {
+		pendingInput.removeAll(keepingCapacity: false)
+		writeSource?.cancel()
+		writeSource = nil
+		readSource?.cancel()
+		readSource = nil
+		if let fileDescriptor = currentMasterFD() {
+			closeMaster(fileDescriptor)
+		}
+	}
+
+	private func reapProcess(pid: pid_t, fileDescriptor: Int32) {
+		var status: Int32 = 0
+		var result: pid_t = -1
+		repeat {
+			result = waitpid(pid, &status, 0)
+		} while result < 0 && errno == EINTR
+		guard result == pid else {
+			return
+		}
+		stateLock.lock()
+		guard childPID == pid else {
+			stateLock.unlock()
+			return
+		}
+		childPID = -1
+		isTerminating = false
+		let exitHandler = onExit
+		lifetimeRetainer = nil
+		stateLock.unlock()
+		stopIO()
+		waitSource?.cancel()
+		waitSource = nil
+		exitHandler?(Self.exitCode(fromWaitStatus: status))
+	}
+
+	private func currentMasterFD() -> Int32? {
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return masterFD >= 0 ? masterFD : nil
+	}
+
+	private func currentProcessID() -> pid_t? {
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return childPID > 0 ? childPID : nil
+	}
+
+	private func isCurrentMaster(_ fileDescriptor: Int32) -> Bool {
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return masterFD == fileDescriptor
+	}
+
+	private func isTerminatingProcess(_ pid: pid_t) -> Bool {
+		stateLock.lock()
+		defer { stateLock.unlock() }
+		return childPID == pid && isTerminating
+	}
+
+	private func closeMaster(_ fileDescriptor: Int32) {
+		stateLock.lock()
+		guard masterFD == fileDescriptor else {
+			stateLock.unlock()
+			return
+		}
+		masterFD = -1
+		stateLock.unlock()
+		Darwin.close(fileDescriptor)
+	}
+
+	private static func signalProcessGroup(_ pid: pid_t, signal: Int32) {
+		guard pid > 0 else {
+			return
+		}
+		let processGroup = getpgid(pid)
+		if processGroup > 0, Darwin.kill(-processGroup, signal) == 0 {
+			return
+		}
+		if Darwin.kill(-pid, signal) != 0 {
+			_ = Darwin.kill(pid, signal)
+		}
+	}
+
+	private static func signalProcessTree(_ pid: pid_t, signal: Int32) {
+		var processIDs = Set(descendantProcessIDs(of: pid))
+		if getsid(pid) == pid {
+			processIDs.formUnion(sessionProcessIDs(sessionID: pid))
+		}
+		processIDs.insert(pid)
+		for childPID in processIDs {
+			signalProcessGroup(childPID, signal: signal)
+		}
+	}
+
+	private static func descendantProcessIDs(of rootPID: pid_t) -> [pid_t] {
+		var descendants: [pid_t] = []
+		var pending: [pid_t] = [rootPID]
+		while let parentPID = pending.popLast() {
+			let children = childProcessIDs(of: parentPID)
+			descendants.append(contentsOf: children)
+			pending.append(contentsOf: children)
+		}
+		return descendants
+	}
+
+	private static func childProcessIDs(of parentPID: pid_t) -> [pid_t] {
+		var capacity = 16
+		while capacity <= 4_096 {
+			var processIDs = [pid_t](repeating: 0, count: capacity)
+			let byteCount = processIDs.withUnsafeMutableBytes { buffer in
+				proc_listchildpids(parentPID, buffer.baseAddress, Int32(buffer.count))
+			}
+			guard byteCount > 0 else {
+				return []
+			}
+			let count = Int(byteCount) / MemoryLayout<pid_t>.stride
+			if count < capacity {
+				return processIDs.prefix(count).filter { $0 > 0 }
+			}
+			capacity *= 2
+		}
+		return []
+	}
+
+	private static func sessionProcessIDs(sessionID: pid_t) -> [pid_t] {
+		let capacity = 8_192
+		var processIDs = [pid_t](repeating: 0, count: capacity)
+		let byteCount = processIDs.withUnsafeMutableBytes { buffer in
+			proc_listpids(1, 0, buffer.baseAddress, Int32(buffer.count))
+		}
+		guard byteCount > 0 else {
+			return []
+		}
+		let count = min(Int(byteCount) / MemoryLayout<pid_t>.stride, capacity)
+		return processIDs.prefix(count).filter { processID in
+			processID > 0 && getsid(processID) == sessionID
 		}
 	}
 

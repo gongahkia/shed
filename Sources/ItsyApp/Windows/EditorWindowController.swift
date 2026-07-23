@@ -2349,9 +2349,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
-				guard formattingCapabilitiesBySession[session.key]?.document == true else {
-					throw LSPFormattingRequestError.documentFormattingDisabled
-				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
 					return

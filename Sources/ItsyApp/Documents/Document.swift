@@ -312,12 +312,16 @@ import ItsySyntax
 	}
 
 	private func currentEditorSettings() -> ItsySettings.EditorSettings {
-		let settings = ItsySettingsStore().load(
+		let settings = currentSettings()
+		let languageID = fileURL.flatMap { Self.settingsLanguageRegistry.languageID(for: $0) }
+		return settings.editorSettings(languageID: languageID)
+	}
+
+	private func currentSettings() -> ItsySettings {
+		ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
 			fallback: EditorPreferences.legacySettings()
 		).settings
-		let languageID = fileURL.flatMap { Self.settingsLanguageRegistry.languageID(for: $0) }
-		return settings.editorSettings(languageID: languageID)
 	}
 
 	private func configureTextEditBehavior() {
@@ -528,7 +532,7 @@ import ItsySyntax
 	}
 
 	private func scheduleRecoveryJournal() {
-		guard let fileURL, editor.retainsUndoTreeSnapshots else {
+		guard let fileURL, editor.retainsUndoTreeSnapshots, currentSettings().recovery.journalEnabled else {
 			return
 		}
 		let journal = RecoveryJournal(fileURL: fileURL, text: editorStorageString(editor))

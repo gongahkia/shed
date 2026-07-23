@@ -13,6 +13,7 @@ import Testing
 	tab_width = 2
 	auto_pairs = false
 	smart_indent = false
+	multiple_selections = false
 	keymap = "vim"
 	tab_groups = "pane"
 	wrap = "soft"
@@ -33,6 +34,14 @@ import Testing
 	[terminal]
 	font_size = 13
 	scrollback_lines = 20000
+
+	[find]
+	uses_regex = true
+	case_sensitive = true
+	whole_word = true
+
+	[recovery]
+	journal_enabled = false
 	"""#
 	var parser = ItsySettingsParser()
 	let result = parser.parse(contents)
@@ -44,6 +53,7 @@ import Testing
 	#expect(result.settings.editor.tabWidth == 2)
 	#expect(!result.settings.editor.autoPairs)
 	#expect(!result.settings.editor.smartIndent)
+	#expect(!result.settings.editor.multipleSelections)
 	#expect(result.settings.editor.keymap == .vim)
 	#expect(result.settings.editor.tabGroups == .pane)
 	#expect(result.settings.editor.wrap == .soft)
@@ -57,6 +67,8 @@ import Testing
 	#expect(result.settings.syntax.preloadGrammars == .all)
 	#expect(result.settings.terminal.fontSize == 13)
 	#expect(result.settings.terminal.scrollbackLines == 20000)
+	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
+	#expect(!result.settings.recovery.journalEnabled)
 }
 
 @Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
@@ -92,7 +104,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 1)
+	#expect(ItsySettingsSchema.currentVersion == 2)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -113,12 +125,14 @@ import Testing
 	use_spaces = false
 	auto_pairs = true
 	smart_indent = true
+	multiple_selections = true
 
 	[editor.language.python]
 	tab_width = 4
 	use_spaces = true
 	auto_pairs = false
 	smart_indent = false
+	multiple_selections = false
 	line_numbers = true
 	"""#
 	var parser = ItsySettingsParser()
@@ -134,6 +148,7 @@ import Testing
 	#expect(python.lineNumbers)
 	#expect(!python.autoPairs)
 	#expect(!python.smartIndent)
+	#expect(!python.multipleSelections)
 }
 
 @Test func settingsDefaultsUsePieceTreeStorage() {
@@ -141,16 +156,19 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 1"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 2"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains("smart_indent = true"))
+	#expect(ItsySettingsStore.serialize(settings).contains("multiple_selections = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"line_number_mode = "off""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"keymap = "plain""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"tab_groups = "window""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"wrap = "none""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("wrap_column = 100"))
+	#expect(ItsySettingsStore.serialize(settings).contains("[find]"))
+	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 
@@ -244,6 +262,8 @@ import Testing
 	[editor]
 	tab_width = 2
 	wrap = "soft"
+	multiple_selections = false
+	keymap = "vim"
 
 	[editor.language.python]
 	tab_width = 3
@@ -251,13 +271,21 @@ import Testing
 	try """
 	[editor]
 	tab_width = 4
+	multiple_selections = true
+
+	[find]
+	uses_regex = true
+	whole_word = true
+
+	[recovery]
+	journal_enabled = false
 
 	[editor.language.python]
 	use_spaces = true
 	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
 	let session = ItsySettingsSessionLayer(
-		settings: ItsySettings(editor: .init(wrap: .hard, language: ["python": .init(tabWidth: 7)])),
-		assignedKeys: ["editor.wrap", "editor.language.python.tab_width"]
+		settings: ItsySettings(editor: .init(wrap: .hard, language: ["python": .init(tabWidth: 7, multipleSelections: false)])),
+		assignedKeys: ["editor.wrap", "editor.language.python.tab_width", "editor.language.python.multiple_selections"]
 	)
 	let store = ItsySettingsStore(fileURL: globalURL)
 	let resolved = store.resolve(workspaceRoot: workspaceRoot, session: session)
@@ -266,11 +294,17 @@ import Testing
 	let python = resolved.settings.editorSettings(languageID: "python")
 	#expect(python.tabWidth == 7)
 	#expect(python.useSpaces)
+	#expect(!python.multipleSelections)
+	#expect(resolved.settings.editor.keymap == .vim)
+	#expect(resolved.settings.editor.multipleSelections)
+	#expect(resolved.settings.find == .init(usesRegex: true, isCaseSensitive: false, matchesWholeWord: true))
+	#expect(!resolved.settings.recovery.journalEnabled)
 	#expect(resolved.source(for: "editor.tab_width") == .workspace)
 	#expect(resolved.source(for: "editor.wrap") == .session)
 	#expect(resolved.source(for: "editor.tab_width", languageID: "python") == .language)
 	#expect(resolved.sources["editor.language.python.tab_width"] == .session)
 	#expect(resolved.sources["editor.language.python.use_spaces"] == .workspace)
+	#expect(resolved.source(for: "editor.multiple_selections", languageID: "python") == .language)
 
 	try "[editor]\ntab_width = 6\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
 	let reloaded = store.resolve(workspaceRoot: workspaceRoot, session: session)

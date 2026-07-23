@@ -381,6 +381,9 @@ extension MetalTextView {
 	}
 
 	func addNextSelectionMatch() {
+		guard allowsMultipleSelections else {
+			return
+		}
 		let selectedRanges = selectedNonEmptyRanges()
 		let queryRange: Range<Int>
 		if let selectedRange = selectedRanges.first {

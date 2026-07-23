@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 1
+	public static let currentVersion = 2
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -54,6 +54,7 @@ public struct ItsySettings: Equatable, Sendable {
 			public var useSpaces: Bool?
 			public var autoPairs: Bool?
 			public var smartIndent: Bool?
+			public var multipleSelections: Bool?
 
 			public init(
 				font: String? = nil,
@@ -62,7 +63,8 @@ public struct ItsySettings: Equatable, Sendable {
 				tabWidth: Int? = nil,
 				useSpaces: Bool? = nil,
 				autoPairs: Bool? = nil,
-				smartIndent: Bool? = nil
+				smartIndent: Bool? = nil,
+				multipleSelections: Bool? = nil
 			) {
 				self.font = font
 				self.fontSize = fontSize
@@ -71,6 +73,7 @@ public struct ItsySettings: Equatable, Sendable {
 				self.useSpaces = useSpaces
 				self.autoPairs = autoPairs
 				self.smartIndent = smartIndent
+				self.multipleSelections = multipleSelections
 			}
 		}
 
@@ -101,6 +104,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public var useSpaces: Bool
 		public var autoPairs: Bool
 		public var smartIndent: Bool
+		public var multipleSelections: Bool
 		public var tabGroups: TabGroupScope
 		public var keymap: KeymapMode
 		public var wrap: WrapMode
@@ -117,6 +121,7 @@ public struct ItsySettings: Equatable, Sendable {
 			useSpaces: Bool = false,
 			autoPairs: Bool = true,
 			smartIndent: Bool = true,
+			multipleSelections: Bool = true,
 			tabGroups: TabGroupScope = .window,
 			keymap: KeymapMode = .plain,
 			wrap: WrapMode = .none,
@@ -132,6 +137,7 @@ public struct ItsySettings: Equatable, Sendable {
 			self.useSpaces = useSpaces
 			self.autoPairs = autoPairs
 			self.smartIndent = smartIndent
+			self.multipleSelections = multipleSelections
 			self.tabGroups = tabGroups
 			self.keymap = keymap
 			self.wrap = wrap
@@ -198,23 +204,49 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public struct FindSettings: Equatable, Sendable {
+		public var usesRegex: Bool
+		public var isCaseSensitive: Bool
+		public var matchesWholeWord: Bool
+
+		public init(usesRegex: Bool = false, isCaseSensitive: Bool = false, matchesWholeWord: Bool = false) {
+			self.usesRegex = usesRegex
+			self.isCaseSensitive = isCaseSensitive
+			self.matchesWholeWord = matchesWholeWord
+		}
+	}
+
+	public struct RecoverySettings: Equatable, Sendable {
+		public var journalEnabled: Bool
+
+		public init(journalEnabled: Bool = true) {
+			self.journalEnabled = journalEnabled
+		}
+	}
+
 	public static let `default` = ItsySettings()
 
 	public var editor: EditorSettings
 	public var theme: ThemeSettings
 	public var syntax: SyntaxSettings
 	public var terminal: TerminalSettings
+	public var find: FindSettings
+	public var recovery: RecoverySettings
 
 	public init(
 		editor: EditorSettings = EditorSettings(),
 		theme: ThemeSettings = ThemeSettings(),
 		syntax: SyntaxSettings = SyntaxSettings(),
-		terminal: TerminalSettings = TerminalSettings()
+		terminal: TerminalSettings = TerminalSettings(),
+		find: FindSettings = FindSettings(),
+		recovery: RecoverySettings = RecoverySettings()
 	) {
 		self.editor = editor
 		self.theme = theme
 		self.syntax = syntax
 		self.terminal = terminal
+		self.find = find
+		self.recovery = recovery
 	}
 
 	public func normalized() -> ItsySettings {
@@ -298,6 +330,7 @@ public struct ItsySettings: Equatable, Sendable {
 		editor.useSpaces = override.useSpaces ?? editor.useSpaces
 		editor.autoPairs = override.autoPairs ?? editor.autoPairs
 		editor.smartIndent = override.smartIndent ?? editor.smartIndent
+		editor.multipleSelections = override.multipleSelections ?? editor.multipleSelections
 		return ItsySettings(editor: editor).normalized().editor
 	}
 
@@ -483,6 +516,7 @@ public final class ItsySettingsStore {
 		use_spaces = \(settings.editor.useSpaces ? "true" : "false")
 		auto_pairs = \(settings.editor.autoPairs ? "true" : "false")
 		smart_indent = \(settings.editor.smartIndent ? "true" : "false")
+		multiple_selections = \(settings.editor.multipleSelections ? "true" : "false")
 		keymap = "\(settings.editor.keymap.rawValue)"
 		tab_groups = "\(settings.editor.tabGroups.rawValue)"
 		wrap = "\(settings.editor.wrap.rawValue)"
@@ -503,6 +537,14 @@ public final class ItsySettingsStore {
 		[terminal]
 		font_size = \(format(settings.terminal.fontSize))
 		scrollback_lines = \(settings.terminal.scrollbackLines)
+
+		[find]
+		uses_regex = \(settings.find.usesRegex ? "true" : "false")
+		case_sensitive = \(settings.find.isCaseSensitive ? "true" : "false")
+		whole_word = \(settings.find.matchesWholeWord ? "true" : "false")
+
+		[recovery]
+		journal_enabled = \(settings.recovery.journalEnabled ? "true" : "false")
 		""" + serializeLanguageSettings(settings.editor.language)
 	}
 
@@ -558,6 +600,9 @@ public final class ItsySettingsStore {
 			if let smartIndent = settings.smartIndent {
 				lines.append("smart_indent = \(smartIndent ? "true" : "false")")
 			}
+			if let multipleSelections = settings.multipleSelections {
+				lines.append("multiple_selections = \(multipleSelections ? "true" : "false")")
+			}
 			return lines.joined(separator: "\n")
 		}.joined(separator: "\n") + "\n"
 	}
@@ -569,9 +614,10 @@ public extension Notification.Name {
 
 public enum ItsySettingsResolver {
 	private static let defaultKeys: Set<String> = [
-		"editor.font", "editor.font_size", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
+		"editor.font", "editor.font_size", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.multiple_selections", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
 		"theme.id", "theme.git.gutter.added", "theme.git.gutter.modified", "theme.git.gutter.removed",
 		"syntax.preload_grammars", "terminal.font_size", "terminal.scrollback_lines",
+		"find.uses_regex", "find.case_sensitive", "find.whole_word", "recovery.journal_enabled",
 	]
 
 	public static func resolve(defaults: ItsySettings = .default, global: ItsySettingsLoadResult? = nil, workspace: ItsySettingsLoadResult? = nil, session: ItsySettingsSessionLayer? = nil) -> ItsySettingsResolution {
@@ -599,6 +645,7 @@ public enum ItsySettingsResolver {
 		case "editor.use_spaces": target.editor.useSpaces = source.editor.useSpaces
 		case "editor.auto_pairs": target.editor.autoPairs = source.editor.autoPairs
 		case "editor.smart_indent": target.editor.smartIndent = source.editor.smartIndent
+		case "editor.multiple_selections": target.editor.multipleSelections = source.editor.multipleSelections
 		case "editor.keymap": target.editor.keymap = source.editor.keymap
 		case "editor.tab_groups": target.editor.tabGroups = source.editor.tabGroups
 		case "editor.wrap": target.editor.wrap = source.editor.wrap
@@ -611,6 +658,10 @@ public enum ItsySettingsResolver {
 		case "syntax.preload_grammars": target.syntax.preloadGrammars = source.syntax.preloadGrammars
 		case "terminal.font_size": target.terminal.fontSize = source.terminal.fontSize
 		case "terminal.scrollback_lines": target.terminal.scrollbackLines = source.terminal.scrollbackLines
+		case "find.uses_regex": target.find.usesRegex = source.find.usesRegex
+		case "find.case_sensitive": target.find.isCaseSensitive = source.find.isCaseSensitive
+		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
+		case "recovery.journal_enabled": target.recovery.journalEnabled = source.recovery.journalEnabled
 		default: applyLanguage(key: key, from: source, to: &target)
 		}
 	}
@@ -632,6 +683,7 @@ public enum ItsySettingsResolver {
 		case "use_spaces": targetLanguage.useSpaces = sourceLanguage.useSpaces
 		case "auto_pairs": targetLanguage.autoPairs = sourceLanguage.autoPairs
 		case "smart_indent": targetLanguage.smartIndent = sourceLanguage.smartIndent
+		case "multiple_selections": targetLanguage.multipleSelections = sourceLanguage.multipleSelections
 		default: return
 		}
 		target.editor.language[languageID] = targetLanguage
@@ -762,7 +814,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal"].contains(section),
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery"].contains(section),
 				   !section.hasPrefix("editor.language.")
 				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
@@ -863,6 +915,12 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "editor.multiple_selections":
+			if case let .bool(multipleSelections) = value {
+				settings.editor.multipleSelections = multipleSelections
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
 		case "editor.keymap":
 			if case let .string(mode) = value, let mode = ItsySettings.KeymapMode(rawValue: mode.lowercased()) {
 				settings.editor.keymap = mode
@@ -941,6 +999,30 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "integer")
 			}
+		case "find.uses_regex":
+			if case let .bool(usesRegex) = value {
+				settings.find.usesRegex = usesRegex
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "find.case_sensitive":
+			if case let .bool(isCaseSensitive) = value {
+				settings.find.isCaseSensitive = isCaseSensitive
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "find.whole_word":
+			if case let .bool(matchesWholeWord) = value {
+				settings.find.matchesWholeWord = matchesWholeWord
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "recovery.journal_enabled":
+			if case let .bool(journalEnabled) = value {
+				settings.recovery.journalEnabled = journalEnabled
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
 		default:
 			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
 		}
@@ -1007,6 +1089,12 @@ struct ItsySettingsParser {
 		case "smart_indent":
 			if case let .bool(smartIndent) = value {
 				language.smartIndent = smartIndent
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "multiple_selections":
+			if case let .bool(multipleSelections) = value {
+				language.multipleSelections = multipleSelections
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}

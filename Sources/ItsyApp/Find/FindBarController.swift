@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ItsyConfig
 import ItsyRender
 
 @MainActor final class FindBarController: NSObject, NSTextFieldDelegate {
@@ -56,6 +57,21 @@ import ItsyRender
 		for button in [regexButton, caseButton, wholeWordButton, closeButton] {
 			button.contentTintColor = palette.foreground
 		}
+	}
+
+	func applyDefaultOptions(_ settings: ItsySettings.FindSettings) {
+		regexButton.state = settings.usesRegex ? .on : .off
+		caseButton.state = settings.isCaseSensitive ? .on : .off
+		wholeWordButton.state = settings.matchesWholeWord ? .on : .off
+		findStateDidChange()
+	}
+
+	var selectedOptions: ItsySettings.FindSettings {
+		ItsySettings.FindSettings(
+			usesRegex: regexButton.state == .on,
+			isCaseSensitive: caseButton.state == .on,
+			matchesWholeWord: wholeWordButton.state == .on
+		)
 	}
 
 	func toggle() {

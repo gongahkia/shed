@@ -64,20 +64,6 @@ record_missing() {
 	printf '%s\tmissing\t\t\t%s\n' "$gate" "$(remediation_for "$gate")" >>"$rows"
 }
 
-clean_checkout() {
-	if [[ -n "$checkout_error" ]]; then
-		printf '%s\n' "$checkout_error" >&2
-		echo "could not inspect repository cleanliness" >&2
-		return 1
-	fi
-	if [[ -n "$checkout_changes" ]]; then
-		printf '%s\n' "$checkout_changes" >&2
-		echo "repository must be clean before alpha promotion" >&2
-		return 1
-	fi
-	printf '%s\n' "$checkout_revision"
-}
-
 run_gate() {
 	local gate="$1"
 	shift
@@ -97,7 +83,23 @@ run_gate() {
 }
 
 checkout_ready=1
-if ! run_gate clean-checkout clean_checkout; then
+if ! run_gate clean-checkout env \
+	"ITSY_ALPHA_CHECKOUT_ERROR=$checkout_error" \
+	"ITSY_ALPHA_CHECKOUT_CHANGES=$checkout_changes" \
+	"ITSY_ALPHA_CHECKOUT_REVISION=$checkout_revision" \
+	/bin/bash -c '
+		if [[ -n "$ITSY_ALPHA_CHECKOUT_ERROR" ]]; then
+			printf "%s\\n" "$ITSY_ALPHA_CHECKOUT_ERROR" >&2
+			echo "could not inspect repository cleanliness" >&2
+			exit 1
+		fi
+		if [[ -n "$ITSY_ALPHA_CHECKOUT_CHANGES" ]]; then
+			printf "%s\\n" "$ITSY_ALPHA_CHECKOUT_CHANGES" >&2
+			echo "repository must be clean before alpha promotion" >&2
+			exit 1
+		fi
+		printf "%s\\n" "$ITSY_ALPHA_CHECKOUT_REVISION"
+	'; then
 	checkout_ready=0
 fi
 

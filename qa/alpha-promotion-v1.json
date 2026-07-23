@@ -2,6 +2,7 @@
   "schemaVersion": 1,
   "suite": "alpha-promotion-v1",
   "gates": [
+    {"id":"clean-checkout","required":true,"remediation":"Commit, stash, or remove every tracked and untracked workspace change, then rerun from that revision."},
     {"id":"preflight","required":true,"remediation":"Run scripts/private_alpha_preflight.sh and satisfy every required blocked row."},
     {"id":"build","required":true,"remediation":"Resolve release build failures with swift build -c release."},
     {"id":"tests","required":true,"remediation":"Resolve the failing swift test log."},

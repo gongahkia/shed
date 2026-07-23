@@ -57,6 +57,8 @@ jobs:
         run: scripts/test_bootstrap.sh
       - name: Test CI shard CLI
         run: scripts/test_ci_shard.sh
+      - name: Test alpha promotion gate
+        run: scripts/test_alpha_promotion.sh
       - name: Resolve pinned SwiftPM dependencies
         run: swift package resolve
       - name: Verify dependency metadata

@@ -83,6 +83,27 @@ import Testing
 	#expect(result.warnings.map(\.description).contains("line 4: unknown setting editor.nope"))
 }
 
+@Test func settingsSchemaVersionDiagnosticsRetainFallbackAndProvenance() {
+	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
+	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
+	let result = parser.parse("""
+	schema_version = 9
+	[editor]
+	font_size = 80
+	unknown_toggle = true
+	""")
+	#expect(ItsySettingsSchema.currentVersion == 1)
+	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
+	#expect(result.settings.editor.fontSize == 15)
+	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
+	#expect(fontWarning?.source == "/workspace/.itsy/settings.toml")
+	#expect(fontWarning?.expected == "number between 9.0 and 36.0")
+	#expect(fontWarning?.retainedFallback == true)
+	let versionWarning = result.warnings.first { $0.key == "schema_version" }
+	#expect(versionWarning?.retainedFallback == true)
+	#expect(result.warnings.contains { $0.key == "editor.unknown_toggle" && $0.retainedFallback })
+}
+
 @Test func settingsParserReadsPerLanguageEditorOverrides() {
 	let contents = #"""
 	[editor]
@@ -120,6 +141,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 1"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))

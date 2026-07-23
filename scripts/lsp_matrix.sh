@@ -6,11 +6,14 @@ repo_dir="$(cd "$script_dir/.." && pwd)"
 only_languages="${ITSY_LSP_MATRIX_LANGUAGES:-}"
 artifacts_dir="${ITSY_LSP_MATRIX_ARTIFACTS:-$repo_dir/.build/lsp-matrix}"
 summary_path=""
+all_languages=false
+list_only=false
 
-languages=(bash c cpp csharp css dart dockerfile elixir go graphql haskell html java javascript julia json kotlin latex lua markdown markdown-inline nix ocaml php proto python r ruby rust scss sql svelte swift terraform toml tsx typescript vue yaml zig)
+core_languages=(c cpp csharp javascript python tsx typescript)
+all_supported_languages=(bash c cpp csharp css dart dockerfile elixir go graphql haskell html java javascript julia json kotlin latex lua markdown markdown-inline nix ocaml php proto python r ruby rust scss sql svelte swift terraform toml tsx typescript vue yaml zig)
 
 usage() {
-	echo "usage: $0 [--only grammar[,grammar...]] [--artifacts directory] [--summary path] [--list]" >&2
+	echo "usage: $0 [--all] [--only grammar[,grammar...]] [--artifacts directory] [--summary path] [--list]" >&2
 }
 
 server_probe() {
@@ -40,7 +43,7 @@ server_probe() {
 contains_language() {
 	local candidate="$1"
 	local language
-	for language in "${languages[@]}"; do
+	for language in "${all_supported_languages[@]}"; do
 		[[ "$language" == "$candidate" ]] && return 0
 	done
 	return 1
@@ -48,6 +51,10 @@ contains_language() {
 
 while [[ "$#" -gt 0 ]]; do
 	case "$1" in
+	--all)
+		all_languages=true
+		shift
+		;;
 	--only)
 		only_languages="$2"
 		shift 2
@@ -61,10 +68,8 @@ while [[ "$#" -gt 0 ]]; do
 		shift 2
 		;;
 	--list)
-		for language in "${languages[@]}"; do
-			printf '%s\t%s\n' "$language" "$(server_probe "$language")"
-		done
-		exit 0
+		list_only=true
+		shift
 		;;
 	*)
 		usage
@@ -72,6 +77,18 @@ while [[ "$#" -gt 0 ]]; do
 		;;
 	esac
 done
+
+if [[ "$list_only" == true ]]; then
+	if [[ "$all_languages" == true ]]; then
+		listed=("${all_supported_languages[@]}")
+	else
+		listed=("${core_languages[@]}")
+	fi
+	for language in "${listed[@]}"; do
+		printf '%s\t%s\n' "$language" "$(server_probe "$language")"
+	done
+	exit 0
+fi
 
 selected=()
 if [[ -n "$only_languages" ]]; then
@@ -83,7 +100,11 @@ if [[ -n "$only_languages" ]]; then
 		fi
 	done
 else
-	selected=("${languages[@]}")
+	if [[ "$all_languages" == true ]]; then
+		selected=("${all_supported_languages[@]}")
+	else
+		selected=("${core_languages[@]}")
+	fi
 fi
 
 mkdir -p "$artifacts_dir"

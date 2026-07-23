@@ -1,5 +1,6 @@
 import Foundation
 import ItsyDebugger
+import ItsyEditor
 import Testing
 
 @Test func debugAdapterRegistryBundledDefaultsIncludeCommonAdapters() {
@@ -26,15 +27,36 @@ import Testing
 	#expect(missing == .missing(DebugAdapterRemediation(
 		adapterID: "debugpy",
 		command: "missing-debugpy",
-		hint: "Install debugpy with: python3 -m pip install debugpy"
+		hint: "Open Language & Debugger Support in Itsy."
 	)))
 
 	let missingCodeLLDB = DebugAdapterDetector.availability(for: DebugAdapterConfig(id: "codelldb", command: "missing-codelldb", kind: .codeLLDB), environment: ["PATH": ""])
 	#expect(missingCodeLLDB == .missing(DebugAdapterRemediation(
 		adapterID: "codelldb",
 		command: "missing-codelldb",
-		hint: "Install CodeLLDB and configure its codelldb adapter executable."
+		hint: "Open Language & Debugger Support in Itsy."
 	)))
+}
+
+@Test func onDemandDebugAdaptersRequireItsyEnablement() throws {
+	let component = try #require(ManagedSupportCatalog.bundled.component(id: "delve"))
+	let key = "itsy.support.enabled.\(component.id)"
+	let previous = UserDefaults.standard.object(forKey: key)
+	defer {
+		if let previous {
+			UserDefaults.standard.set(previous, forKey: key)
+		} else {
+			UserDefaults.standard.removeObject(forKey: key)
+		}
+	}
+	ManagedSupportEnablement.setEnabled(false, for: component)
+	let fixture = try DebugAdapterRegistryFixture()
+	defer { fixture.cleanup() }
+	let executable = fixture.workspaceRoot.appendingPathComponent("dlv")
+	try "#!/bin/sh\nexit 0\n".write(to: executable, atomically: true, encoding: .utf8)
+	try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+	let result = DebugAdapterDetector.availability(for: DebugAdapterConfig(id: "delve", command: "dlv", args: ["dap"]), environment: ["PATH": fixture.workspaceRoot.path])
+	#expect(result == .missing(DebugAdapterRemediation(adapterID: "delve", command: "dlv", hint: "Open Language & Debugger Support in Itsy.")))
 }
 
 @Test func debugAdapterRegistryLoaderMergesUserAndWorkspaceTOML() throws {

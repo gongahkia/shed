@@ -54,7 +54,7 @@ let package = Package(
 		.target(name: "ItsyVim", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyLSP", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyDAP", swiftSettings: releaseSwiftSettings),
-		.target(name: "ItsyDebugger", dependencies: ["ItsyDAP"], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyDebugger", dependencies: ["ItsyDAP", "ItsyEditor"], swiftSettings: releaseSwiftSettings),
 		.executableTarget(name: "ItsyBench", dependencies: ["ItsyEditor", "ItsyRender", "ItsySyntax"], swiftSettings: releaseSwiftSettings),
 		.target(
 			name: "CLibgit2",

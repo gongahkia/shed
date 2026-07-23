@@ -248,11 +248,31 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		configsByLanguageID[languageID]
 	}
 
+	public func supportComponent(forLanguageID languageID: String) -> ManagedSupportComponent? {
+		Self.supportCatalog.component(languageID: languageID, kind: .languageServer)
+	}
+
 	public func resolvedConfig(
 		forLanguageID languageID: String,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> LSPServerConfig? {
-		guard var config = config(forLanguageID: languageID), let resolvedCommand = Self.resolvedCommandPath(for: config, environment: environment) else {
+		guard var config = config(forLanguageID: languageID) else {
+			return nil
+		}
+		if let bundled = BundledLanguageInventory.server(forLanguageID: languageID), bundled.command == config.command, bundled.args == config.args, bundled.rootPatterns == config.rootPatterns,
+			let component = supportComponent(forLanguageID: languageID) {
+			guard ManagedSupportEnablement.isEnabled(component) else {
+				return nil
+			}
+			if let managed = ManagedSupportResolver.executableURL(for: component) {
+				config.command = managed.path
+				return config
+			}
+			if component.installMode == .managed, component.tier == .onDemand {
+				return nil
+			}
+		}
+		guard let resolvedCommand = Self.resolvedCommandPath(for: config, environment: environment) else {
 			return nil
 		}
 		if !Self.isXcrunCommand(config.command) {
@@ -388,6 +408,8 @@ public struct LSPServerRegistry: Equatable, Sendable {
 	}
 
 	public static let bundledDefaults: [LSPServerConfig] = BundledLanguageInventory.lspConfigs
+
+	public static let supportCatalog = ManagedSupportCatalog.bundled
 
 	public static let defaultExtensionMap: [String: String] = BundledLanguageInventory.fileExtensionMap
 

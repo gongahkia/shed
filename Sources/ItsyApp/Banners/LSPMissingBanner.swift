@@ -3,13 +3,13 @@ import ItsyEditor
 
 final class LSPMissingBanner: NSView {
 	var copyRequested: ((LSPServerRegistry.MissingBinary) -> Void)?
-	var configurationRequested: (() -> Void)?
+	var supportRequested: ((String?) -> Void)?
 	var dismissRequested: ((LSPServerRegistry.MissingBinary) -> Void)?
 	var unavailableDismissRequested: ((LSPServerRegistry.UnsupportedLanguage) -> Void)?
 
 	private let label = NSTextField(labelWithString: "")
 	private let copyButton = NSButton(title: L10n.string("Copy command"), target: nil, action: nil)
-	private let configurationButton = NSButton(title: L10n.string("Copy config path"), target: nil, action: nil)
+	private let supportButton = NSButton(title: L10n.string("Manage support"), target: nil, action: nil)
 	private let dismissButton = NSButton(title: L10n.string("Dismiss (session)"), target: nil, action: nil)
 	private var missingBinary: LSPServerRegistry.MissingBinary?
 	private var unavailableLanguage: LSPServerRegistry.UnsupportedLanguage?
@@ -50,7 +50,7 @@ final class LSPMissingBanner: NSView {
 		layer?.backgroundColor = palette.bannerBackground.cgColor
 		label.textColor = palette.bannerForeground
 		copyButton.contentTintColor = palette.buttonForeground
-		configurationButton.contentTintColor = palette.buttonForeground
+		supportButton.contentTintColor = palette.buttonForeground
 		dismissButton.contentTintColor = palette.buttonForeground
 	}
 
@@ -73,11 +73,11 @@ final class LSPMissingBanner: NSView {
 		copyButton.controlSize = .small
 		copyButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-		configurationButton.target = self
-		configurationButton.action = #selector(copyConfigurationPath(_:))
-		configurationButton.bezelStyle = .rounded
-		configurationButton.controlSize = .small
-		configurationButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+		supportButton.target = self
+		supportButton.action = #selector(requestSupport(_:))
+		supportButton.bezelStyle = .rounded
+		supportButton.controlSize = .small
+		supportButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
 		dismissButton.target = self
 		dismissButton.action = #selector(dismiss(_:))
@@ -85,7 +85,7 @@ final class LSPMissingBanner: NSView {
 		dismissButton.controlSize = .small
 		dismissButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 
-		let stack = NSStackView(views: [label, copyButton, configurationButton, dismissButton])
+		let stack = NSStackView(views: [label, copyButton, supportButton, dismissButton])
 		stack.orientation = .horizontal
 		stack.alignment = .centerY
 		stack.spacing = 8
@@ -109,8 +109,8 @@ final class LSPMissingBanner: NSView {
 		copyRequested?(missingBinary)
 	}
 
-	@objc private func copyConfigurationPath(_: NSButton) {
-		configurationRequested?()
+	@objc private func requestSupport(_: NSButton) {
+		supportRequested?(missingBinary?.command)
 	}
 
 	@objc private func dismiss(_ sender: NSButton) {

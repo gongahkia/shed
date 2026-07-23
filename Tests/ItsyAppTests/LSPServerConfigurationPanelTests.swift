@@ -19,19 +19,19 @@ import Testing
 	#expect(typescript.remediation?.contains("install `/missing/typescript-language-server`") == true)
 }
 
-@Test @MainActor func lspMissingBannerOffersCopyableRemediationAndConfigurationAccess() throws {
+@Test @MainActor func lspMissingBannerOffersCopyableRemediationAndSupportAccess() throws {
 	let missing = LSPServerRegistry.MissingBinary(languageID: "typescript", command: "typescript-language-server", hint: "npm i -g typescript-language-server")
 	let banner = LSPMissingBanner(frame: NSRect(x: 0, y: 0, width: 640, height: 38))
 	var copied: LSPServerRegistry.MissingBinary?
-	var configurationRequests = 0
+	var supportRequests = 0
 	banner.copyRequested = { copied = $0 }
-	banner.configurationRequested = { configurationRequests += 1 }
+	banner.supportRequested = { _ in supportRequests += 1 }
 	banner.show(missingBinary: missing)
 	let buttons = banner.subviews.flatMap(\.subviews).compactMap { $0 as? NSButton }
 	let copyButton = try #require(buttons.first { $0.title == "Copy command" })
-	let configurationButton = try #require(buttons.first { $0.title == "Copy config path" })
+	let supportButton = try #require(buttons.first { $0.title == "Manage support" })
 	copyButton.performClick(nil)
-	configurationButton.performClick(nil)
+	supportButton.performClick(nil)
 	#expect(copied == missing)
-	#expect(configurationRequests == 1)
+	#expect(supportRequests == 1)
 }

@@ -1,9 +1,11 @@
 import AppKit
 import Foundation
 
+
 @MainActor final class ExtensionsCoordinator: NSObject {
 	private var panel: NSPanel?
 	private let extensionRootProvider: () -> URL
+	private lazy var packagePanel = DeclarativePackagePanel(workspaceRootProvider: { ItsyWorkspaceController.currentRootURL })
 
 	init(extensionRootProvider: @escaping () -> URL = ExtensionsCoordinator.defaultExtensionRoot) {
 		self.extensionRootProvider = extensionRootProvider
@@ -44,16 +46,20 @@ import Foundation
 		scrollView.borderType = .bezelBorder
 		scrollView.documentView = textView
 		let refresh = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshPanel(_:)))
-		for view in [title, scrollView, refresh] {
+		let packages = NSButton(title: L10n.string("Packages…"), target: self, action: #selector(showPackages(_:)))
+		let actions = NSStackView(views: [packages, refresh])
+		actions.orientation = .horizontal
+		actions.spacing = 8
+		for view in [title, scrollView, actions] {
 			view.translatesAutoresizingMaskIntoConstraints = false
 			root.addSubview(view)
 		}
 		NSLayoutConstraint.activate([
 			title.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
-			title.trailingAnchor.constraint(equalTo: refresh.leadingAnchor, constant: -12),
+			title.trailingAnchor.constraint(equalTo: actions.leadingAnchor, constant: -12),
 			title.topAnchor.constraint(equalTo: root.topAnchor, constant: 16),
-			refresh.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
-			refresh.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+			actions.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
+			actions.centerYAnchor.constraint(equalTo: title.centerYAnchor),
 			scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 16),
 			scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -16),
 			scrollView.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 12),
@@ -64,6 +70,10 @@ import Foundation
 
 	@objc private func refreshPanel(_ sender: Any?) {
 		panel?.contentView = makeContentView()
+	}
+
+	@objc private func showPackages(_ sender: Any?) {
+		packagePanel.show(relativeTo: panel)
 	}
 
 	private func installedExtensionSummary(fileManager: FileManager = .default) -> String {

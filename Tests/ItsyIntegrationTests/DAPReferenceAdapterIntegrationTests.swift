@@ -468,7 +468,9 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 		case .delve:
 			arguments["mode"] = .string("debug")
 			arguments["program"] = .string(fixture.sourceURL.path)
-		case .debugpy, .jsDebug, .lldbC, .lldbCPP:
+		case .jsDebug:
+			arguments["autoAttachChildProcesses"] = .bool(false)
+		case .debugpy, .lldbC, .lldbCPP:
 			break
 		case .codelldb:
 			arguments["sourceLanguages"] = .array([.string("rust")])

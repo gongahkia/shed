@@ -104,7 +104,11 @@ requirement_available() {
 		available_executable git
 		;;
 	debugpy)
-		available_executable python3 && python3 -c 'import debugpy' >/dev/null 2>&1
+		if [[ -n "${ITSY_DAP_DEBUGPY:-}" && -x "${ITSY_DAP_DEBUGPY:-}" ]]; then
+			"${ITSY_DAP_DEBUGPY}" -c 'import debugpy' >/dev/null 2>&1
+		else
+			available_executable python3 && python3 -c 'import debugpy' >/dev/null 2>&1
+		fi
 		;;
 	js-debug)
 		[[ -n "${ITSY_DAP_JS_DEBUG:-}" && -r "${ITSY_DAP_JS_DEBUG:-}" ]] && available_executable "${ITSY_DAP_NODE:-node}"

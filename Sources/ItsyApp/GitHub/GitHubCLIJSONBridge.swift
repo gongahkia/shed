@@ -28,6 +28,7 @@ public enum GitHubCLIPullRequestJSONField: String, CaseIterable, Equatable, Send
 	case state
 	case isDraft
 	case headRefName
+	case headRepositoryOwner
 	case baseRefName
 	case author
 	case reviewDecision

@@ -45,7 +45,7 @@ struct GitHubCLIGraphQLReviewThreadsRequest: GitHubCLIJSONRequest {
 	      reviewThreads(first: 100, after: $endCursor) {
 	        nodes {
 	          id path line originalLine startLine originalStartLine diffSide startDiffSide isResolved isOutdated
-	          comments(first: 100) { nodes { id body createdAt url author { login } } }
+	          comments(first: 100) { nodes { id fullDatabaseId body createdAt url author { login } } }
 	        }
 	        pageInfo { hasNextPage endCursor }
 	      }
@@ -57,6 +57,7 @@ struct GitHubCLIGraphQLReviewThreadsRequest: GitHubCLIJSONRequest {
 
 public struct GitHubReviewThreadComment: Codable, Equatable, Sendable {
 	public let id: String
+	public let fullDatabaseId: Int64?
 	public let body: String
 	public let createdAt: String
 	public let url: URL

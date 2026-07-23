@@ -239,17 +239,26 @@ public struct GitHubCLIJSONBridge: Sendable {
 		try await executeRequest(command, as: Response.self, workspaceURL: workspaceURL)
 	}
 
+	func executeRequest<Request: GitHubCLIJSONRequest>(_ request: Request, workspaceURL: URL?) async throws {
+		_ = try await executeRaw(request, workspaceURL: workspaceURL)
+	}
+
 	func executeRequest<Response: Decodable & Sendable, Request: GitHubCLIJSONRequest>(_ request: Request, as _: Response.Type, workspaceURL: URL?) async throws -> Response {
+		let result = try await executeRaw(request, workspaceURL: workspaceURL)
+		do {
+			return try JSONDecoder().decode(Response.self, from: Data(result.process.standardOutput.utf8))
+		} catch {
+			throw GitHubCLIJSONBridgeError.invalidJSON(GitHubCLIJSONDiagnostics(arguments: result.arguments, result: result.process, environment: environment))
+		}
+	}
+
+	private func executeRaw<Request: GitHubCLIJSONRequest>(_ request: Request, workspaceURL: URL?) async throws -> (arguments: [String], process: GitHubCLIProcessResult) {
 		let arguments = try request.arguments()
 		do {
 			let result = try await executor.run(executableURL: executableURL, arguments: arguments, workingDirectoryURL: workspaceURL)
 			let diagnostics = GitHubCLIJSONDiagnostics(arguments: arguments, result: result, environment: environment)
 			guard result.exitStatus == 0 else { throw GitHubCLIJSONBridgeError.processFailure(diagnostics) }
-			do {
-				return try JSONDecoder().decode(Response.self, from: Data(result.standardOutput.utf8))
-			} catch {
-				throw GitHubCLIJSONBridgeError.invalidJSON(diagnostics)
-			}
+			return (arguments, result)
 		} catch is CancellationError {
 			throw CancellationError()
 		} catch let error as GitHubCLIJSONBridgeError {

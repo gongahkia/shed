@@ -339,11 +339,48 @@ public struct ItsySettingsLoadResult: Equatable, Sendable {
 	public var settings: ItsySettings
 	public var warnings: [ItsySettingsWarning]
 	public var loadedFromFile: Bool
+	public var assignedKeys: Set<String>
 
-	public init(settings: ItsySettings, warnings: [ItsySettingsWarning] = [], loadedFromFile: Bool = false) {
+	public init(settings: ItsySettings, warnings: [ItsySettingsWarning] = [], loadedFromFile: Bool = false, assignedKeys: Set<String> = []) {
 		self.settings = settings
 		self.warnings = warnings
 		self.loadedFromFile = loadedFromFile
+		self.assignedKeys = assignedKeys
+	}
+}
+
+public enum ItsySettingsScope: String, Equatable, Sendable {
+	case `default`
+	case global
+	case workspace
+	case language
+	case session
+}
+
+public struct ItsySettingsSessionLayer: Equatable, Sendable {
+	public let settings: ItsySettings
+	public let assignedKeys: Set<String>
+
+	public init(settings: ItsySettings, assignedKeys: Set<String>) {
+		self.settings = settings
+		self.assignedKeys = assignedKeys
+	}
+}
+
+public struct ItsySettingsResolution: Equatable, Sendable {
+	public let settings: ItsySettings
+	public let sources: [String: ItsySettingsScope]
+
+	public init(settings: ItsySettings, sources: [String: ItsySettingsScope]) {
+		self.settings = settings
+		self.sources = sources
+	}
+
+	public func source(for key: String, languageID: String? = nil) -> ItsySettingsScope? {
+		if let languageID, key.hasPrefix("editor."), sources["editor.language.\(languageID).\(key.dropFirst("editor.".count))"] != nil {
+			return .language
+		}
+		return sources[key]
 	}
 }
 
@@ -384,7 +421,8 @@ public final class ItsySettingsStore {
 			return ItsySettingsLoadResult(
 				settings: result.settings.normalized(),
 				warnings: result.warnings,
-				loadedFromFile: true
+				loadedFromFile: true,
+				assignedKeys: result.assignedKeys
 			)
 		} catch {
 			return ItsySettingsLoadResult(
@@ -408,8 +446,20 @@ public final class ItsySettingsStore {
 		return ItsySettingsLoadResult(
 			settings: workspace.settings,
 			warnings: global.warnings + workspace.warnings,
-			loadedFromFile: global.loadedFromFile || workspace.loadedFromFile
+			loadedFromFile: global.loadedFromFile || workspace.loadedFromFile,
+			assignedKeys: global.assignedKeys.union(workspace.assignedKeys)
 		)
+	}
+
+	public func resolve(workspaceRoot: URL? = nil, fallback: ItsySettings = .default, session: ItsySettingsSessionLayer? = nil) -> ItsySettingsResolution {
+		let global = load(fallback: fallback)
+		let workspace: ItsySettingsLoadResult?
+		if let workspaceRoot {
+			workspace = ItsySettingsStore(fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot), fileManager: fileManager).load(fallback: global.settings)
+		} else {
+			workspace = nil
+		}
+		return ItsySettingsResolver.resolve(defaults: fallback.normalized(), global: global, workspace: workspace, session: session)
 	}
 
 	public func save(_ settings: ItsySettings) throws {
@@ -515,6 +565,77 @@ public final class ItsySettingsStore {
 
 public extension Notification.Name {
 	static let itsySettingsChanged = Notification.Name("dev.itsy.settings.changed")
+}
+
+public enum ItsySettingsResolver {
+	private static let defaultKeys: Set<String> = [
+		"editor.font", "editor.font_size", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
+		"theme.id", "theme.git.gutter.added", "theme.git.gutter.modified", "theme.git.gutter.removed",
+		"syntax.preload_grammars", "terminal.font_size", "terminal.scrollback_lines",
+	]
+
+	public static func resolve(defaults: ItsySettings = .default, global: ItsySettingsLoadResult? = nil, workspace: ItsySettingsLoadResult? = nil, session: ItsySettingsSessionLayer? = nil) -> ItsySettingsResolution {
+		let globalSettings = global?.settings ?? defaults
+		var settings = workspace?.settings ?? globalSettings
+		var sources = Dictionary(uniqueKeysWithValues: defaultKeys.map { ($0, ItsySettingsScope.default) })
+		global?.assignedKeys.forEach { sources[$0] = .global }
+		workspace?.assignedKeys.forEach { sources[$0] = .workspace }
+		if let session {
+			for key in session.assignedKeys {
+				apply(key: key, from: session.settings, to: &settings)
+				sources[key] = .session
+			}
+		}
+		return ItsySettingsResolution(settings: settings.normalized(), sources: sources)
+	}
+
+	private static func apply(key: String, from source: ItsySettings, to target: inout ItsySettings) {
+		switch key {
+		case "editor.font": target.editor.font = source.editor.font
+		case "editor.font_size": target.editor.fontSize = source.editor.fontSize
+		case "editor.line_numbers": target.editor.lineNumbers = source.editor.lineNumbers
+		case "editor.line_number_mode": target.editor.lineNumberMode = source.editor.lineNumberMode
+		case "editor.tab_width": target.editor.tabWidth = source.editor.tabWidth
+		case "editor.use_spaces": target.editor.useSpaces = source.editor.useSpaces
+		case "editor.auto_pairs": target.editor.autoPairs = source.editor.autoPairs
+		case "editor.smart_indent": target.editor.smartIndent = source.editor.smartIndent
+		case "editor.keymap": target.editor.keymap = source.editor.keymap
+		case "editor.tab_groups": target.editor.tabGroups = source.editor.tabGroups
+		case "editor.wrap": target.editor.wrap = source.editor.wrap
+		case "editor.wrap_column": target.editor.wrapColumn = source.editor.wrapColumn
+		case "editor.experimental.storage": target.editor.experimental.storage = source.editor.experimental.storage
+		case "theme.id": target.theme.id = source.theme.id
+		case "theme.git.gutter.added": target.theme.gitGutter.added = source.theme.gitGutter.added
+		case "theme.git.gutter.modified": target.theme.gitGutter.modified = source.theme.gitGutter.modified
+		case "theme.git.gutter.removed": target.theme.gitGutter.removed = source.theme.gitGutter.removed
+		case "syntax.preload_grammars": target.syntax.preloadGrammars = source.syntax.preloadGrammars
+		case "terminal.font_size": target.terminal.fontSize = source.terminal.fontSize
+		case "terminal.scrollback_lines": target.terminal.scrollbackLines = source.terminal.scrollbackLines
+		default: applyLanguage(key: key, from: source, to: &target)
+		}
+	}
+
+	private static func applyLanguage(key: String, from source: ItsySettings, to target: inout ItsySettings) {
+		let prefix = "editor.language."
+		guard key.hasPrefix(prefix) else { return }
+		let suffix = key.dropFirst(prefix.count)
+		guard let dot = suffix.firstIndex(of: ".") else { return }
+		let languageID = String(suffix[..<dot])
+		let property = String(suffix[suffix.index(after: dot)...])
+		guard let sourceLanguage = source.editor.language[languageID] else { return }
+		var targetLanguage = target.editor.language[languageID] ?? ItsySettings.EditorSettings.LanguageSettings()
+		switch property {
+		case "font": targetLanguage.font = sourceLanguage.font
+		case "font_size": targetLanguage.fontSize = sourceLanguage.fontSize
+		case "line_numbers": targetLanguage.lineNumbers = sourceLanguage.lineNumbers
+		case "tab_width": targetLanguage.tabWidth = sourceLanguage.tabWidth
+		case "use_spaces": targetLanguage.useSpaces = sourceLanguage.useSpaces
+		case "auto_pairs": targetLanguage.autoPairs = sourceLanguage.autoPairs
+		case "smart_indent": targetLanguage.smartIndent = sourceLanguage.smartIndent
+		default: return
+		}
+		target.editor.language[languageID] = targetLanguage
+	}
 }
 
 public enum ItsySettingsNotificationUserInfoKey {
@@ -623,6 +744,7 @@ enum ItsySettingsValue: Equatable {
 struct ItsySettingsParser {
 	private var settings: ItsySettings
 	private var warnings: [ItsySettingsWarning] = []
+	private var assignedKeys: Set<String> = []
 	private let source: String?
 
 	init(settings: ItsySettings = .default, source: String? = nil) {
@@ -662,9 +784,13 @@ struct ItsySettingsParser {
 				assignSchemaVersion(value, line: lineNumber)
 				continue
 			}
+			let warningCount = warnings.count
 			assign(value, key: key, line: lineNumber)
+			if warnings.count == warningCount {
+				assignedKeys.insert(key)
+			}
 		}
-		return ItsySettingsLoadResult(settings: settings, warnings: warnings, loadedFromFile: true)
+		return ItsySettingsLoadResult(settings: settings, warnings: warnings, loadedFromFile: true, assignedKeys: assignedKeys)
 	}
 
 	private mutating func assignSchemaVersion(_ value: ItsySettingsValue, line: Int) {

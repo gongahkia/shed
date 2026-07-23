@@ -233,6 +233,51 @@ import Testing
 	#expect(python.useSpaces)
 }
 
+@Test func settingsResolverTracksGlobalWorkspaceLanguageAndSessionPrecedence() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-resolution-\(UUID().uuidString)", isDirectory: true)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let globalURL = directory.appendingPathComponent("settings.toml")
+	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
+	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
+	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try """
+	[editor]
+	tab_width = 2
+	wrap = "soft"
+
+	[editor.language.python]
+	tab_width = 3
+	""".write(to: globalURL, atomically: true, encoding: .utf8)
+	try """
+	[editor]
+	tab_width = 4
+
+	[editor.language.python]
+	use_spaces = true
+	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	let session = ItsySettingsSessionLayer(
+		settings: ItsySettings(editor: .init(wrap: .hard, language: ["python": .init(tabWidth: 7)])),
+		assignedKeys: ["editor.wrap", "editor.language.python.tab_width"]
+	)
+	let store = ItsySettingsStore(fileURL: globalURL)
+	let resolved = store.resolve(workspaceRoot: workspaceRoot, session: session)
+	#expect(resolved.settings.editor.tabWidth == 4)
+	#expect(resolved.settings.editor.wrap == .hard)
+	let python = resolved.settings.editorSettings(languageID: "python")
+	#expect(python.tabWidth == 7)
+	#expect(python.useSpaces)
+	#expect(resolved.source(for: "editor.tab_width") == .workspace)
+	#expect(resolved.source(for: "editor.wrap") == .session)
+	#expect(resolved.source(for: "editor.tab_width", languageID: "python") == .language)
+	#expect(resolved.sources["editor.language.python.tab_width"] == .session)
+	#expect(resolved.sources["editor.language.python.use_spaces"] == .workspace)
+
+	try "[editor]\ntab_width = 6\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	let reloaded = store.resolve(workspaceRoot: workspaceRoot, session: session)
+	#expect(reloaded.settings.editor.tabWidth == 6)
+	#expect(reloaded.source(for: "editor.tab_width") == .workspace)
+}
+
 @Test func settingsWatcherPublishesFileChangesForHotReload() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
 		"itsy-settings-watch-\(UUID().uuidString)",

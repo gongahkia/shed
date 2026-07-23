@@ -448,14 +448,11 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 			try await self.client.sendRequest(command: DAPCommand.next, arguments: try DAPAny(encoding: DAPNextArguments(threadId: thread.id)))
 		}
 		_ = try await nextEvent(nextStopped, step: "step stopped event")
-		let terminated = await client.on(event: DAPEvent.terminated)
+		let lifecycle = await client.on()
 		_ = try await request("continue") {
 			try await self.client.sendRequest(command: DAPCommand.continueExecution, arguments: try DAPAny(encoding: DAPContinueArguments(threadId: thread.id)))
 		}
-		_ = try await nextEvent(terminated, step: "terminated event")
-		_ = try await request("disconnect") {
-			try await self.client.disconnect()
-		}
+		_ = try await nextTerminationEvent(lifecycle)
 	}
 
 	private func launchArguments(_ scenario: DAPReferenceScenario) -> [String: DAPAny] {
@@ -532,6 +529,30 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 			throw error
 		} catch {
 			throw self.error(step: step, underlying: error)
+		}
+	}
+
+	private func nextTerminationEvent(_ stream: AsyncStream<DAPEventMessage>) async throws -> DAPEventMessage {
+		do {
+			return try await withThrowingTaskGroup(of: DAPEventMessage.self) { group in
+				group.addTask {
+					for await event in stream where event.event == DAPEvent.exited || event.event == DAPEvent.terminated {
+						return event
+					}
+					throw DAPReferenceAdapterError(adapter: self.adapter, step: "termination event", logURL: self.fixture.logURL, underlying: "Adapter event stream ended.")
+				}
+				group.addTask {
+					try await Task.sleep(nanoseconds: 15_000_000_000)
+					throw DAPReferenceAdapterError(adapter: self.adapter, step: "termination event", logURL: self.fixture.logURL, underlying: "Timed out after 15 seconds.")
+				}
+				let event = try await group.next()!
+				group.cancelAll()
+				return event
+			}
+		} catch let error as DAPReferenceAdapterError {
+			throw error
+		} catch {
+			throw self.error(step: "termination event", underlying: error)
 		}
 	}
 

@@ -11,6 +11,7 @@ import ItsySyntax
 	private var settingsWindowController: NSWindowController?
 	private var settingsThemePopup: NSPopUpButton?
 	private var settingsFontPopup: NSPopUpButton?
+	private var settingsFontRenderingPopup: NSPopUpButton?
 	private var settingsKeymapPopup: NSPopUpButton?
 	private var settingsTabGroupsPopup: NSPopUpButton?
 	private var settingsLineNumberModePopup: NSPopUpButton?
@@ -27,6 +28,14 @@ import ItsySyntax
 	private var settingsFindCaseButton: NSButton?
 	private var settingsFindWholeWordButton: NSButton?
 	private var settingsRecoveryJournalButton: NSButton?
+	private var settingsSidebarVisibleButton: NSButton?
+	private var settingsSidebarPositionPopup: NSPopUpButton?
+	private var settingsSidebarWidthField: NSTextField?
+	private var settingsSidebarWidthStepper: NSStepper?
+	private var settingsTabBarVisibleButton: NSButton?
+	private var settingsStatusBarVisibleButton: NSButton?
+	private var settingsInterfaceScaleField: NSTextField?
+	private var settingsInterfaceScaleStepper: NSStepper?
 	private var settingsFontSizeField: NSTextField?
 	private var settingsFontSizeStepper: NSStepper?
 	private var settingsTerminalFontSizeField: NSTextField?
@@ -137,15 +146,19 @@ import ItsySyntax
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 760))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_040))
+		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 680, height: 720))
+		scrollView.hasVerticalScroller = true
+		scrollView.autohidesScrollers = true
+		scrollView.documentView = contentView
 		let window = NSWindow(
-			contentRect: contentView.frame,
+			contentRect: scrollView.frame,
 			styleMask: [.titled, .closable],
 			backing: .buffered,
 			defer: false
 		)
 		window.title = L10n.string("Settings")
-		window.contentView = contentView
+		window.contentView = scrollView
 		let controller = NSWindowController(window: window)
 		configureSettings(contentView)
 		settingsWindowController = controller
@@ -210,6 +223,18 @@ import ItsySyntax
 		sizeStepper.action = #selector(settingsFontSizeDidChange(_:))
 		sizeStepper.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(sizeStepper)
+
+		let fontRenderingLabel = settingsLabel("Font Rendering")
+		contentView.addSubview(fontRenderingLabel)
+		let fontRenderingPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		fontRenderingPopup.addItem(withTitle: L10n.string("Grayscale"))
+		fontRenderingPopup.lastItem?.representedObject = ItsySettings.FontRenderingMode.grayscale.rawValue
+		fontRenderingPopup.addItem(withTitle: L10n.string("Subpixel"))
+		fontRenderingPopup.lastItem?.representedObject = ItsySettings.FontRenderingMode.subpixel.rawValue
+		fontRenderingPopup.target = self
+		fontRenderingPopup.action = #selector(settingsFontRenderingDidChange(_:))
+		fontRenderingPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(fontRenderingPopup)
 
 		let lineNumberModeLabel = settingsLabel("Line Numbers")
 		contentView.addSubview(lineNumberModeLabel)
@@ -322,6 +347,70 @@ import ItsySyntax
 		let recoveryJournalButton = settingsCheckbox("Keep Recovery Journal", action: #selector(settingsRecoveryJournalDidChange(_:)))
 		contentView.addSubview(recoveryJournalButton)
 
+		let sidebarVisibleButton = settingsCheckbox("Show Sidebar", action: #selector(settingsSidebarVisibleDidChange(_:)))
+		contentView.addSubview(sidebarVisibleButton)
+		let sidebarPositionLabel = settingsLabel("Sidebar Position")
+		contentView.addSubview(sidebarPositionLabel)
+		let sidebarPositionPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		sidebarPositionPopup.addItem(withTitle: L10n.string("Leading"))
+		sidebarPositionPopup.lastItem?.representedObject = ItsySettings.SidebarPosition.leading.rawValue
+		sidebarPositionPopup.addItem(withTitle: L10n.string("Trailing"))
+		sidebarPositionPopup.lastItem?.representedObject = ItsySettings.SidebarPosition.trailing.rawValue
+		sidebarPositionPopup.target = self
+		sidebarPositionPopup.action = #selector(settingsSidebarPositionDidChange(_:))
+		sidebarPositionPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(sidebarPositionPopup)
+
+		let sidebarWidthLabel = settingsLabel("Sidebar Width")
+		contentView.addSubview(sidebarWidthLabel)
+		let sidebarWidthField = NSTextField(frame: .zero)
+		sidebarWidthField.alignment = .right
+		let sidebarWidthFormatter = NumberFormatter()
+		sidebarWidthFormatter.minimum = NSNumber(value: ItsySettings.LayoutSettings.minSidebarWidth)
+		sidebarWidthFormatter.maximum = NSNumber(value: ItsySettings.LayoutSettings.maxSidebarWidth)
+		sidebarWidthFormatter.allowsFloats = false
+		sidebarWidthField.formatter = sidebarWidthFormatter
+		sidebarWidthField.target = self
+		sidebarWidthField.action = #selector(settingsSidebarWidthDidChange(_:))
+		sidebarWidthField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(sidebarWidthField)
+		let sidebarWidthStepper = NSStepper()
+		sidebarWidthStepper.minValue = Double(ItsySettings.LayoutSettings.minSidebarWidth)
+		sidebarWidthStepper.maxValue = Double(ItsySettings.LayoutSettings.maxSidebarWidth)
+		sidebarWidthStepper.increment = 10
+		sidebarWidthStepper.target = self
+		sidebarWidthStepper.action = #selector(settingsSidebarWidthDidChange(_:))
+		sidebarWidthStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(sidebarWidthStepper)
+
+		let tabBarVisibleButton = settingsCheckbox("Show Tab Bar", action: #selector(settingsTabBarVisibleDidChange(_:)))
+		let statusBarVisibleButton = settingsCheckbox("Show Status Bar", action: #selector(settingsStatusBarVisibleDidChange(_:)))
+		contentView.addSubview(tabBarVisibleButton)
+		contentView.addSubview(statusBarVisibleButton)
+
+		let interfaceScaleLabel = settingsLabel("Interface Scale")
+		contentView.addSubview(interfaceScaleLabel)
+		let interfaceScaleField = NSTextField(frame: .zero)
+		interfaceScaleField.alignment = .right
+		let interfaceScaleFormatter = NumberFormatter()
+		interfaceScaleFormatter.minimum = NSNumber(value: ItsySettings.LayoutSettings.minInterfaceScale)
+		interfaceScaleFormatter.maximum = NSNumber(value: ItsySettings.LayoutSettings.maxInterfaceScale)
+		interfaceScaleFormatter.minimumFractionDigits = 1
+		interfaceScaleFormatter.maximumFractionDigits = 2
+		interfaceScaleField.formatter = interfaceScaleFormatter
+		interfaceScaleField.target = self
+		interfaceScaleField.action = #selector(settingsInterfaceScaleDidChange(_:))
+		interfaceScaleField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(interfaceScaleField)
+		let interfaceScaleStepper = NSStepper()
+		interfaceScaleStepper.minValue = ItsySettings.LayoutSettings.minInterfaceScale
+		interfaceScaleStepper.maxValue = ItsySettings.LayoutSettings.maxInterfaceScale
+		interfaceScaleStepper.increment = 0.1
+		interfaceScaleStepper.target = self
+		interfaceScaleStepper.action = #selector(settingsInterfaceScaleDidChange(_:))
+		interfaceScaleStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(interfaceScaleStepper)
+
 		let terminalFontSizeLabel = settingsLabel("Terminal Size")
 		contentView.addSubview(terminalFontSizeLabel)
 
@@ -431,8 +520,14 @@ import ItsySyntax
 			sizeField.centerYAnchor.constraint(equalTo: sizeLabel.centerYAnchor),
 			sizeStepper.leadingAnchor.constraint(equalTo: sizeField.trailingAnchor, constant: 8),
 			sizeStepper.centerYAnchor.constraint(equalTo: sizeField.centerYAnchor),
+			fontRenderingLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			fontRenderingLabel.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			fontRenderingLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			fontRenderingPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			fontRenderingPopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			fontRenderingPopup.centerYAnchor.constraint(equalTo: fontRenderingLabel.centerYAnchor),
 			lineNumberModeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			lineNumberModeLabel.topAnchor.constraint(equalTo: sizeField.bottomAnchor, constant: 18),
+			lineNumberModeLabel.topAnchor.constraint(equalTo: fontRenderingPopup.bottomAnchor, constant: 18),
 			lineNumberModeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			lineNumberModePopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			lineNumberModePopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
@@ -477,8 +572,36 @@ import ItsySyntax
 			findStack.centerYAnchor.constraint(equalTo: findDefaultsLabel.centerYAnchor),
 			recoveryJournalButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			recoveryJournalButton.topAnchor.constraint(equalTo: findStack.bottomAnchor, constant: 12),
+			sidebarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			sidebarVisibleButton.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 16),
+			sidebarPositionLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			sidebarPositionLabel.topAnchor.constraint(equalTo: sidebarVisibleButton.bottomAnchor, constant: 12),
+			sidebarPositionLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			sidebarPositionPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			sidebarPositionPopup.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			sidebarPositionPopup.centerYAnchor.constraint(equalTo: sidebarPositionLabel.centerYAnchor),
+			sidebarWidthLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			sidebarWidthLabel.topAnchor.constraint(equalTo: sidebarPositionPopup.bottomAnchor, constant: 18),
+			sidebarWidthLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			sidebarWidthField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			sidebarWidthField.widthAnchor.constraint(equalToConstant: 72),
+			sidebarWidthField.centerYAnchor.constraint(equalTo: sidebarWidthLabel.centerYAnchor),
+			sidebarWidthStepper.leadingAnchor.constraint(equalTo: sidebarWidthField.trailingAnchor, constant: 8),
+			sidebarWidthStepper.centerYAnchor.constraint(equalTo: sidebarWidthField.centerYAnchor),
+			tabBarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			tabBarVisibleButton.topAnchor.constraint(equalTo: sidebarWidthField.bottomAnchor, constant: 12),
+			statusBarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			statusBarVisibleButton.topAnchor.constraint(equalTo: tabBarVisibleButton.bottomAnchor, constant: 8),
+			interfaceScaleLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			interfaceScaleLabel.topAnchor.constraint(equalTo: statusBarVisibleButton.bottomAnchor, constant: 16),
+			interfaceScaleLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			interfaceScaleField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			interfaceScaleField.widthAnchor.constraint(equalToConstant: 72),
+			interfaceScaleField.centerYAnchor.constraint(equalTo: interfaceScaleLabel.centerYAnchor),
+			interfaceScaleStepper.leadingAnchor.constraint(equalTo: interfaceScaleField.trailingAnchor, constant: 8),
+			interfaceScaleStepper.centerYAnchor.constraint(equalTo: interfaceScaleField.centerYAnchor),
 			terminalFontSizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			terminalFontSizeLabel.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.topAnchor.constraint(equalTo: interfaceScaleField.bottomAnchor, constant: 18),
 			terminalFontSizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			terminalFontSizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			terminalFontSizeField.widthAnchor.constraint(equalToConstant: 72),
@@ -508,6 +631,7 @@ import ItsySyntax
 		])
 		settingsThemePopup = themePopup
 		settingsFontPopup = fontPopup
+		settingsFontRenderingPopup = fontRenderingPopup
 		settingsKeymapPopup = keymapPopup
 		settingsTabGroupsPopup = tabGroupsPopup
 		settingsLineNumberModePopup = lineNumberModePopup
@@ -524,6 +648,14 @@ import ItsySyntax
 		settingsFindCaseButton = findCaseButton
 		settingsFindWholeWordButton = findWholeWordButton
 		settingsRecoveryJournalButton = recoveryJournalButton
+		settingsSidebarVisibleButton = sidebarVisibleButton
+		settingsSidebarPositionPopup = sidebarPositionPopup
+		settingsSidebarWidthField = sidebarWidthField
+		settingsSidebarWidthStepper = sidebarWidthStepper
+		settingsTabBarVisibleButton = tabBarVisibleButton
+		settingsStatusBarVisibleButton = statusBarVisibleButton
+		settingsInterfaceScaleField = interfaceScaleField
+		settingsInterfaceScaleStepper = interfaceScaleStepper
 		settingsFontSizeField = sizeField
 		settingsFontSizeStepper = sizeStepper
 		settingsTerminalFontSizeField = terminalFontSizeField
@@ -612,6 +744,9 @@ import ItsySyntax
 		}
 		settingsFontSizeField?.doubleValue = Double(preferences.fontSize)
 		settingsFontSizeStepper?.doubleValue = Double(preferences.fontSize)
+		if let item = settingsFontRenderingPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.editor.fontRendering.rawValue }) {
+			settingsFontRenderingPopup?.select(item)
+		}
 		if let item = settingsKeymapPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.editor.keymap.rawValue }) {
 			settingsKeymapPopup?.select(item)
 		}
@@ -636,6 +771,16 @@ import ItsySyntax
 		settingsFindCaseButton?.state = appSettings.find.isCaseSensitive ? .on : .off
 		settingsFindWholeWordButton?.state = appSettings.find.matchesWholeWord ? .on : .off
 		settingsRecoveryJournalButton?.state = appSettings.recovery.journalEnabled ? .on : .off
+		settingsSidebarVisibleButton?.state = appSettings.layout.sidebarVisible ? .on : .off
+		if let item = settingsSidebarPositionPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.layout.sidebarPosition.rawValue }) {
+			settingsSidebarPositionPopup?.select(item)
+		}
+		settingsSidebarWidthField?.integerValue = appSettings.layout.sidebarWidth
+		settingsSidebarWidthStepper?.integerValue = appSettings.layout.sidebarWidth
+		settingsTabBarVisibleButton?.state = appSettings.layout.tabBarVisible ? .on : .off
+		settingsStatusBarVisibleButton?.state = appSettings.layout.statusBarVisible ? .on : .off
+		settingsInterfaceScaleField?.doubleValue = appSettings.layout.interfaceScale
+		settingsInterfaceScaleStepper?.doubleValue = appSettings.layout.interfaceScale
 	}
 
 	private func refreshSettingsTerminalControls() {
@@ -748,6 +893,17 @@ import ItsySyntax
 		saveAndApplyEditorPreferences(preferences)
 	}
 
+	@objc private func settingsFontRenderingDidChange(_: Any?) {
+		guard
+			let rawValue = settingsFontRenderingPopup?.selectedItem?.representedObject as? String,
+			let fontRendering = ItsySettings.FontRenderingMode(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.editor.fontRendering = fontRendering
+		saveAndApplyBehaviorSettings()
+	}
+
 	@objc private func settingsKeymapDidChange(_ sender: Any?) {
 		guard
 			let rawValue = settingsKeymapPopup?.selectedItem?.representedObject as? String,
@@ -856,6 +1012,58 @@ import ItsySyntax
 
 	@objc private func settingsRecoveryJournalDidChange(_: Any?) {
 		appSettings.recovery.journalEnabled = settingsRecoveryJournalButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsSidebarVisibleDidChange(_: Any?) {
+		appSettings.layout.sidebarVisible = settingsSidebarVisibleButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsSidebarPositionDidChange(_: Any?) {
+		guard
+			let rawValue = settingsSidebarPositionPopup?.selectedItem?.representedObject as? String,
+			let sidebarPosition = ItsySettings.SidebarPosition(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.layout.sidebarPosition = sidebarPosition
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsSidebarWidthDidChange(_ sender: Any?) {
+		let value = if sender as? NSStepper === settingsSidebarWidthStepper {
+			settingsSidebarWidthStepper?.integerValue ?? appSettings.layout.sidebarWidth
+		} else {
+			settingsSidebarWidthField?.integerValue ?? appSettings.layout.sidebarWidth
+		}
+		appSettings.layout.sidebarWidth = min(
+			max(value, ItsySettings.LayoutSettings.minSidebarWidth),
+			ItsySettings.LayoutSettings.maxSidebarWidth
+		)
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsTabBarVisibleDidChange(_: Any?) {
+		appSettings.layout.tabBarVisible = settingsTabBarVisibleButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsStatusBarVisibleDidChange(_: Any?) {
+		appSettings.layout.statusBarVisible = settingsStatusBarVisibleButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsInterfaceScaleDidChange(_ sender: Any?) {
+		let value = if sender as? NSStepper === settingsInterfaceScaleStepper {
+			settingsInterfaceScaleStepper?.doubleValue ?? appSettings.layout.interfaceScale
+		} else {
+			settingsInterfaceScaleField?.doubleValue ?? appSettings.layout.interfaceScale
+		}
+		appSettings.layout.interfaceScale = min(
+			max(value, ItsySettings.LayoutSettings.minInterfaceScale),
+			ItsySettings.LayoutSettings.maxInterfaceScale
+		)
 		saveAndApplyBehaviorSettings()
 	}
 

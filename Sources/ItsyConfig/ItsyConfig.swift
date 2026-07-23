@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 2
+	public static let currentVersion = 3
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -45,6 +45,16 @@ public struct ItsySettings: Equatable, Sendable {
 		case hard
 	}
 
+	public enum FontRenderingMode: String, Equatable, Sendable {
+		case grayscale
+		case subpixel
+	}
+
+	public enum SidebarPosition: String, Equatable, Sendable {
+		case leading
+		case trailing
+	}
+
 	public struct EditorSettings: Equatable, Sendable {
 		public struct LanguageSettings: Equatable, Sendable {
 			public var font: String?
@@ -55,6 +65,7 @@ public struct ItsySettings: Equatable, Sendable {
 			public var autoPairs: Bool?
 			public var smartIndent: Bool?
 			public var multipleSelections: Bool?
+			public var fontRendering: FontRenderingMode?
 
 			public init(
 				font: String? = nil,
@@ -64,7 +75,8 @@ public struct ItsySettings: Equatable, Sendable {
 				useSpaces: Bool? = nil,
 				autoPairs: Bool? = nil,
 				smartIndent: Bool? = nil,
-				multipleSelections: Bool? = nil
+				multipleSelections: Bool? = nil,
+				fontRendering: FontRenderingMode? = nil
 			) {
 				self.font = font
 				self.fontSize = fontSize
@@ -74,6 +86,7 @@ public struct ItsySettings: Equatable, Sendable {
 				self.autoPairs = autoPairs
 				self.smartIndent = smartIndent
 				self.multipleSelections = multipleSelections
+				self.fontRendering = fontRendering
 			}
 		}
 
@@ -98,6 +111,7 @@ public struct ItsySettings: Equatable, Sendable {
 
 		public var font: String
 		public var fontSize: Double
+		public var fontRendering: FontRenderingMode
 		public var lineNumbers: Bool
 		public var lineNumberMode: LineNumberMode
 		public var tabWidth: Int
@@ -115,6 +129,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public init(
 			font: String = Self.defaultFont,
 			fontSize: Double = Self.defaultFontSize,
+			fontRendering: FontRenderingMode = .grayscale,
 			lineNumbers: Bool = false,
 			lineNumberMode: LineNumberMode? = nil,
 			tabWidth: Int = Self.defaultTabWidth,
@@ -131,6 +146,7 @@ public struct ItsySettings: Equatable, Sendable {
 		) {
 			self.font = font
 			self.fontSize = fontSize
+			self.fontRendering = fontRendering
 			self.lineNumbers = lineNumbers
 			self.lineNumberMode = lineNumberMode ?? (lineNumbers ? .absolute : .off)
 			self.tabWidth = tabWidth
@@ -224,6 +240,38 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public struct LayoutSettings: Equatable, Sendable {
+		public static let defaultSidebarWidth = 240
+		public static let minSidebarWidth = 160
+		public static let maxSidebarWidth = 480
+		public static let defaultInterfaceScale = 1.0
+		public static let minInterfaceScale = 0.8
+		public static let maxInterfaceScale = 2.0
+
+		public var sidebarVisible: Bool
+		public var sidebarPosition: SidebarPosition
+		public var sidebarWidth: Int
+		public var tabBarVisible: Bool
+		public var statusBarVisible: Bool
+		public var interfaceScale: Double
+
+		public init(
+			sidebarVisible: Bool = true,
+			sidebarPosition: SidebarPosition = .leading,
+			sidebarWidth: Int = Self.defaultSidebarWidth,
+			tabBarVisible: Bool = true,
+			statusBarVisible: Bool = true,
+			interfaceScale: Double = Self.defaultInterfaceScale
+		) {
+			self.sidebarVisible = sidebarVisible
+			self.sidebarPosition = sidebarPosition
+			self.sidebarWidth = sidebarWidth
+			self.tabBarVisible = tabBarVisible
+			self.statusBarVisible = statusBarVisible
+			self.interfaceScale = interfaceScale
+		}
+	}
+
 	public static let `default` = ItsySettings()
 
 	public var editor: EditorSettings
@@ -232,6 +280,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var terminal: TerminalSettings
 	public var find: FindSettings
 	public var recovery: RecoverySettings
+	public var layout: LayoutSettings
 
 	public init(
 		editor: EditorSettings = EditorSettings(),
@@ -239,7 +288,8 @@ public struct ItsySettings: Equatable, Sendable {
 		syntax: SyntaxSettings = SyntaxSettings(),
 		terminal: TerminalSettings = TerminalSettings(),
 		find: FindSettings = FindSettings(),
-		recovery: RecoverySettings = RecoverySettings()
+		recovery: RecoverySettings = RecoverySettings(),
+		layout: LayoutSettings = LayoutSettings()
 	) {
 		self.editor = editor
 		self.theme = theme
@@ -247,6 +297,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.terminal = terminal
 		self.find = find
 		self.recovery = recovery
+		self.layout = layout
 	}
 
 	public func normalized() -> ItsySettings {
@@ -309,6 +360,16 @@ public struct ItsySettings: Equatable, Sendable {
 			min: TerminalSettings.minScrollbackLines,
 			max: TerminalSettings.maxScrollbackLines
 		)
+		copy.layout.sidebarWidth = Self.clamp(
+			copy.layout.sidebarWidth,
+			min: LayoutSettings.minSidebarWidth,
+			max: LayoutSettings.maxSidebarWidth
+		)
+		copy.layout.interfaceScale = Self.clamp(
+			copy.layout.interfaceScale,
+			min: LayoutSettings.minInterfaceScale,
+			max: LayoutSettings.maxInterfaceScale
+		)
 		return copy
 	}
 
@@ -331,6 +392,7 @@ public struct ItsySettings: Equatable, Sendable {
 		editor.autoPairs = override.autoPairs ?? editor.autoPairs
 		editor.smartIndent = override.smartIndent ?? editor.smartIndent
 		editor.multipleSelections = override.multipleSelections ?? editor.multipleSelections
+		editor.fontRendering = override.fontRendering ?? editor.fontRendering
 		return ItsySettings(editor: editor).normalized().editor
 	}
 
@@ -510,6 +572,7 @@ public final class ItsySettingsStore {
 		[editor]
 		font = "\(escape(settings.editor.font))"
 		font_size = \(format(settings.editor.fontSize))
+		font_rendering = "\(settings.editor.fontRendering.rawValue)"
 		line_numbers = \(settings.editor.lineNumbers ? "true" : "false")
 		line_number_mode = "\(settings.editor.lineNumberMode.rawValue)"
 		tab_width = \(settings.editor.tabWidth)
@@ -545,6 +608,14 @@ public final class ItsySettingsStore {
 
 		[recovery]
 		journal_enabled = \(settings.recovery.journalEnabled ? "true" : "false")
+
+		[layout]
+		sidebar_visible = \(settings.layout.sidebarVisible ? "true" : "false")
+		sidebar_position = "\(settings.layout.sidebarPosition.rawValue)"
+		sidebar_width = \(settings.layout.sidebarWidth)
+		tab_bar_visible = \(settings.layout.tabBarVisible ? "true" : "false")
+		status_bar_visible = \(settings.layout.statusBarVisible ? "true" : "false")
+		interface_scale = \(format(settings.layout.interfaceScale))
 		""" + serializeLanguageSettings(settings.editor.language)
 	}
 
@@ -585,6 +656,9 @@ public final class ItsySettingsStore {
 			if let fontSize = settings.fontSize {
 				lines.append("font_size = \(format(fontSize))")
 			}
+			if let fontRendering = settings.fontRendering {
+				lines.append("font_rendering = \"\(fontRendering.rawValue)\"")
+			}
 			if let lineNumbers = settings.lineNumbers {
 				lines.append("line_numbers = \(lineNumbers ? "true" : "false")")
 			}
@@ -614,10 +688,11 @@ public extension Notification.Name {
 
 public enum ItsySettingsResolver {
 	private static let defaultKeys: Set<String> = [
-		"editor.font", "editor.font_size", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.multiple_selections", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
+		"editor.font", "editor.font_size", "editor.font_rendering", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.multiple_selections", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
 		"theme.id", "theme.git.gutter.added", "theme.git.gutter.modified", "theme.git.gutter.removed",
 		"syntax.preload_grammars", "terminal.font_size", "terminal.scrollback_lines",
 		"find.uses_regex", "find.case_sensitive", "find.whole_word", "recovery.journal_enabled",
+		"layout.sidebar_visible", "layout.sidebar_position", "layout.sidebar_width", "layout.tab_bar_visible", "layout.status_bar_visible", "layout.interface_scale",
 	]
 
 	public static func resolve(defaults: ItsySettings = .default, global: ItsySettingsLoadResult? = nil, workspace: ItsySettingsLoadResult? = nil, session: ItsySettingsSessionLayer? = nil) -> ItsySettingsResolution {
@@ -639,6 +714,7 @@ public enum ItsySettingsResolver {
 		switch key {
 		case "editor.font": target.editor.font = source.editor.font
 		case "editor.font_size": target.editor.fontSize = source.editor.fontSize
+		case "editor.font_rendering": target.editor.fontRendering = source.editor.fontRendering
 		case "editor.line_numbers": target.editor.lineNumbers = source.editor.lineNumbers
 		case "editor.line_number_mode": target.editor.lineNumberMode = source.editor.lineNumberMode
 		case "editor.tab_width": target.editor.tabWidth = source.editor.tabWidth
@@ -662,6 +738,12 @@ public enum ItsySettingsResolver {
 		case "find.case_sensitive": target.find.isCaseSensitive = source.find.isCaseSensitive
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
 		case "recovery.journal_enabled": target.recovery.journalEnabled = source.recovery.journalEnabled
+		case "layout.sidebar_visible": target.layout.sidebarVisible = source.layout.sidebarVisible
+		case "layout.sidebar_position": target.layout.sidebarPosition = source.layout.sidebarPosition
+		case "layout.sidebar_width": target.layout.sidebarWidth = source.layout.sidebarWidth
+		case "layout.tab_bar_visible": target.layout.tabBarVisible = source.layout.tabBarVisible
+		case "layout.status_bar_visible": target.layout.statusBarVisible = source.layout.statusBarVisible
+		case "layout.interface_scale": target.layout.interfaceScale = source.layout.interfaceScale
 		default: applyLanguage(key: key, from: source, to: &target)
 		}
 	}
@@ -678,6 +760,7 @@ public enum ItsySettingsResolver {
 		switch property {
 		case "font": targetLanguage.font = sourceLanguage.font
 		case "font_size": targetLanguage.fontSize = sourceLanguage.fontSize
+		case "font_rendering": targetLanguage.fontRendering = sourceLanguage.fontRendering
 		case "line_numbers": targetLanguage.lineNumbers = sourceLanguage.lineNumbers
 		case "tab_width": targetLanguage.tabWidth = sourceLanguage.tabWidth
 		case "use_spaces": targetLanguage.useSpaces = sourceLanguage.useSpaces
@@ -814,7 +897,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery"].contains(section),
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery", "layout"].contains(section),
 				   !section.hasPrefix("editor.language.")
 				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
@@ -874,6 +957,12 @@ struct ItsySettingsParser {
 				warnType(key, line: line, expected: "number between \(ItsySettings.EditorSettings.minFontSize) and \(ItsySettings.EditorSettings.maxFontSize)")
 			} else {
 				warnType(key, line: line, expected: "number")
+			}
+		case "editor.font_rendering":
+			if case let .string(mode) = value, let mode = ItsySettings.FontRenderingMode(rawValue: mode.lowercased()) {
+				settings.editor.fontRendering = mode
+			} else {
+				warnType(key, line: line, expected: #""grayscale" or "subpixel""#)
 			}
 		case "editor.line_numbers":
 			if case let .bool(lineNumbers) = value {
@@ -1023,6 +1112,46 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "layout.sidebar_visible":
+			if case let .bool(sidebarVisible) = value {
+				settings.layout.sidebarVisible = sidebarVisible
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "layout.sidebar_position":
+			if case let .string(position) = value, let position = ItsySettings.SidebarPosition(rawValue: position.lowercased()) {
+				settings.layout.sidebarPosition = position
+			} else {
+				warnType(key, line: line, expected: #""leading" or "trailing""#)
+			}
+		case "layout.sidebar_width":
+			if let integer = intValue(value), (ItsySettings.LayoutSettings.minSidebarWidth ... ItsySettings.LayoutSettings.maxSidebarWidth).contains(integer) {
+				settings.layout.sidebarWidth = integer
+			} else if intValue(value) != nil {
+				warnType(key, line: line, expected: "integer between \(ItsySettings.LayoutSettings.minSidebarWidth) and \(ItsySettings.LayoutSettings.maxSidebarWidth)")
+			} else {
+				warnType(key, line: line, expected: "integer")
+			}
+		case "layout.tab_bar_visible":
+			if case let .bool(tabBarVisible) = value {
+				settings.layout.tabBarVisible = tabBarVisible
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "layout.status_bar_visible":
+			if case let .bool(statusBarVisible) = value {
+				settings.layout.statusBarVisible = statusBarVisible
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "layout.interface_scale":
+			if let number = doubleValue(value), (ItsySettings.LayoutSettings.minInterfaceScale ... ItsySettings.LayoutSettings.maxInterfaceScale).contains(number) {
+				settings.layout.interfaceScale = number
+			} else if doubleValue(value) != nil {
+				warnType(key, line: line, expected: "number between \(ItsySettings.LayoutSettings.minInterfaceScale) and \(ItsySettings.LayoutSettings.maxInterfaceScale)")
+			} else {
+				warnType(key, line: line, expected: "number")
+			}
 		default:
 			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
 		}
@@ -1059,6 +1188,12 @@ struct ItsySettingsParser {
 				warnType(key, line: line, expected: "number between \(ItsySettings.EditorSettings.minFontSize) and \(ItsySettings.EditorSettings.maxFontSize)")
 			} else {
 				warnType(key, line: line, expected: "number")
+			}
+		case "font_rendering":
+			if case let .string(mode) = value, let mode = ItsySettings.FontRenderingMode(rawValue: mode.lowercased()) {
+				language.fontRendering = mode
+			} else {
+				warnType(key, line: line, expected: #""grayscale" or "subpixel""#)
 			}
 		case "line_numbers":
 			if case let .bool(lineNumbers) = value {

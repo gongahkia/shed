@@ -33,6 +33,14 @@ extension ItsyRenderTests {
 	#expect(view.clearColor.blue == 1.0)
 }
 
+@Test func editorSupportsConfiguredFontRenderingModes() {
+	let view = MetalTextView(frame: .zero)
+	view.fontRenderingMode = .subpixel
+	#expect(view.fontRenderingMode == .subpixel)
+	view.fontRenderingMode = .grayscale
+	#expect(view.fontRenderingMode == .grayscale)
+}
+
 @Test func editorAppearanceConfigurationUpdatesFontAndLineNumbers() throws {
 	let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "a\nb\n")

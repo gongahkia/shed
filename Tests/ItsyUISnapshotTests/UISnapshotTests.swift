@@ -84,6 +84,30 @@ struct ItsyUISnapshotTests {
 		}
 	}
 
+	@Test(arguments: EditorLayoutSnapshotCase.all)
+	func editorLayoutOverrideAndThemeFallbackMatchGolden(_ testCase: EditorLayoutSnapshotCase) throws {
+		try SnapshotHarness.assertSnapshot(named: testCase.fixtureName, size: NSSize(width: 640, height: 260)) {
+			let document = ItsyDocument()
+			let controller = EditorWindowController(document: document)
+			let tabID = SnapshotTabIdentity()
+			AppTheme.update(settings: testCase.settings)
+			controller.applySettings(testCase.settings)
+			controller.setTabs([ItsyTab(id: ObjectIdentifier(tabID), title: "Editor.swift", isDirty: true, isSelected: true)])
+			controller.setIndexingStatus("Indexing workspace")
+			guard let window = controller.window, let contentView = window.contentView else {
+				throw SnapshotError.renderFailed
+			}
+			return SnapshotSubject(
+				view: contentView,
+				retained: [document, controller, tabID, window],
+				cleanup: {
+					window.orderOut(nil)
+					AppTheme.update(settings: .default)
+				}
+			)
+		}
+	}
+
 	@Test func recoveryBannerMatchesGolden() throws {
 		try SnapshotHarness.assertSnapshot(named: "recovery-banner", size: NSSize(width: 640, height: 38)) {
 			let banner = RecoveryBanner(frame: NSRect(x: 0, y: 0, width: 640, height: 38))
@@ -338,6 +362,25 @@ struct ThemeSnapshotCase: CustomTestStringConvertible {
 	var fixtureName: String {
 		"theme-\(themeID.replacingOccurrences(of: "bundled:", with: ""))-\(Int(fontSize))"
 	}
+
+	var testDescription: String { fixtureName }
+}
+
+struct EditorLayoutSnapshotCase: CustomTestStringConvertible {
+	let fixtureName: String
+	let settings: ItsySettings
+
+	static let all = [
+		EditorLayoutSnapshotCase(fixtureName: "layout-default", settings: .default),
+		EditorLayoutSnapshotCase(
+			fixtureName: "layout-override",
+			settings: ItsySettings(layout: .init(sidebarPosition: .trailing, sidebarWidth: 300, tabBarVisible: false, statusBarVisible: false, interfaceScale: 1.25))
+		),
+		EditorLayoutSnapshotCase(
+			fixtureName: "layout-theme-fallback",
+			settings: ItsySettings(theme: .init(id: "user:missing-theme"))
+		),
+	]
 
 	var testDescription: String { fixtureName }
 }

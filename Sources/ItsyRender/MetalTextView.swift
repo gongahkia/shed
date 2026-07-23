@@ -280,6 +280,15 @@ public final class MetalTextView: NSView {
 	}
 	public var newlineInsertionTextProvider: ((Editor) -> String)?
 	public var textEditBehaviorConfiguration = TextEditBehaviorConfiguration()
+	public var fontRenderingMode = GlyphAtlas.RenderingMode.grayscale {
+		didSet {
+			guard oldValue != fontRenderingMode else {
+				return
+			}
+			resetGlyphCacheForCurrentScale()
+			markDirty()
+		}
+	}
 	public var allowsMultipleSelections = true {
 		didSet {
 			guard oldValue != allowsMultipleSelections else {
@@ -1700,8 +1709,8 @@ public final class MetalTextView: NSView {
 		lineShapeCache.removeAll(keepingCapacity: true)
 	}
 
-	private func glyphRenderingMode(scale: CGFloat) -> GlyphAtlas.RenderingMode {
-		.grayscale
+	private func glyphRenderingMode(scale _: CGFloat) -> GlyphAtlas.RenderingMode {
+		fontRenderingMode
 	}
 
 	private static func makeDefaultTextFont() -> CTFont {

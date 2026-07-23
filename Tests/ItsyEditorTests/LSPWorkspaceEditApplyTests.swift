@@ -159,3 +159,29 @@ import Testing
 		try LSPWorkspaceEditApply.apply(edit, sources: ["file:///a.swift": "current"], documentVersions: ["file:///a.swift": 5])
 	}
 }
+
+@Test func workspaceEditApplyRejectsAnyStaleFileBeforeResolvingMultiFileEdit() {
+	let edit = LSPWorkspaceEdit(documentChanges: [
+		LSPTextDocumentEdit(
+			textDocument: LSPVersionedTextDocumentIdentifier(uri: "file:///a.swift", version: 2),
+			edits: [LSPTextEdit(
+				range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 0)),
+				newText: "A"
+			)]
+		),
+		LSPTextDocumentEdit(
+			textDocument: LSPVersionedTextDocumentIdentifier(uri: "file:///b.swift", version: 4),
+			edits: [LSPTextEdit(
+				range: LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 0)),
+				newText: "B"
+			)]
+		),
+	])
+	#expect(throws: LSPWorkspaceEditApplyError.staleDocumentVersion(uri: "file:///b.swift", expected: 5, received: 4)) {
+		try LSPWorkspaceEditApply.apply(
+			edit,
+			sources: ["file:///a.swift": "a", "file:///b.swift": "b"],
+			documentVersions: ["file:///a.swift": 2, "file:///b.swift": 5]
+		)
+	}
+}

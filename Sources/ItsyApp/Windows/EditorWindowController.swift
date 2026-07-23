@@ -2467,13 +2467,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
-				guard formattingCapabilitiesBySession[session.key]?.range == true else {
-					throw LSPFormattingRequestError.rangeFormattingDisabled
-				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard let requestContext = lspRequestContext(
+					for: session.key,
+					url: fileURL,
+					content: content,
+					cursorOffset: cursorOffset
+				) else {
+					return
+				}
 				let prepared = try? await session.client.prepareRename(uri: uri, position: position)
 				await MainActor.run { [weak self, weak targetView] in
-					guard let self, let targetView else {
+					guard
+						let self,
+						let targetView,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					let range = prepared?.range.flatMap { LSPTextEditApply.utf8Range(for: $0, in: content) } ?? fallbackRange
@@ -2482,7 +2491,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 						weak self,
 						weak targetView
 					] newName in
-						self?.requestRenameApply(newName: newName, fileURL: fileURL, uri: uri, position: position, in: targetView)
+						self?.requestRenameApply(
+							newName: newName,
+							fileURL: fileURL,
+							uri: uri,
+							position: position,
+							requestContext: requestContext,
+							sessionKey: session.key,
+							in: targetView
+						)
 					}
 				}
 			} catch {
@@ -2529,25 +2546,38 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		fileURL: URL,
 		uri: String,
 		position: LSPPosition,
+		requestContext: LSPRequestContext,
+		sessionKey: LSPSessionKey,
 		in targetView: MetalTextView?
 	) {
 		guard let targetView else {
 			return
 		}
-		let content = editorStorageString(targetView.editor)
-		Task { [weak self] in
+		Task { [weak self, weak targetView] in
 			do {
-				guard let self else {
+				guard
+					let self,
+					let targetView,
+					isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView)
+				else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
-				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
+				guard session.key == sessionKey else {
+					return
+				}
+				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: requestContext.content)
 				let edit = try await session.client.rename(uri: uri, position: position, newName: newName)
-				await MainActor.run { [weak self] in
-					guard let self, let edit else {
+				await MainActor.run { [weak self, weak targetView] in
+					guard
+						let self,
+						let targetView,
+						let edit,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
-					_ = applyWorkspaceEdit(edit)
+					_ = applyWorkspaceEdit(edit, sessionKey: session.key)
 					focusEditor()
 				}
 			} catch {
@@ -2795,7 +2825,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 							return
 						}
 						if let edit = resolved.edit {
-							_ = applyWorkspaceEdit(edit)
+							_ = applyWorkspaceEdit(edit, sessionKey: sessionKey)
 						}
 					}
 					if let command = resolved.command {
@@ -3367,7 +3397,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			showLSPCrashStatus(key: key, url: url, reason: reason)
 			NSLog("lsp session failed: \(key.languageID) exit \(reason.status) \(reason.stderrTail)")
 		case let .workspaceEditRequested(id, params):
-			let applied = applyWorkspaceEdit(params.edit)
+			let applied = applyWorkspaceEdit(params.edit, sessionKey: key)
 			let response = LSPApplyWorkspaceEditResponse(
 				applied: applied,
 				failureReason: applied ? nil : "unable to apply workspace edit"
@@ -4111,7 +4141,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	@discardableResult
-	private func applyWorkspaceEdit(_ edit: LSPWorkspaceEdit) -> Bool {
+	private func applyWorkspaceEdit(_ edit: LSPWorkspaceEdit, sessionKey: LSPSessionKey? = nil) -> Bool {
 		do {
 			let groups = LSPWorkspaceEditApply.normalize(edit)
 			guard !groups.isEmpty else {
@@ -4121,8 +4151,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			for uri in groups.keys {
 				sources[uri] = try sourceText(forURI: uri)
 			}
-			let documentVersions = lspDocumentVersionsBySession.values.reduce(into: [String: Int]()) { result, versions in
-				result.merge(versions) { current, _ in current }
+			let documentVersions = if let sessionKey {
+				lspDocumentVersionsBySession[sessionKey] ?? [:]
+			} else {
+				lspDocumentVersionsBySession.values.reduce(into: [String: Int]()) { result, versions in
+					result.merge(versions) { current, _ in current }
+				}
 			}
 			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources, documentVersions: documentVersions)
 			let preview = try LSPWorkspaceEditPreview(resolved: resolved, sources: sources)

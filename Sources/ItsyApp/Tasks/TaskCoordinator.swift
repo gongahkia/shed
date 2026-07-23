@@ -202,7 +202,7 @@ import ItsyEditor
 				taskWatcher = nil
 			}
 			cancelButton?.isEnabled = false
-			applyTaskResult(.failure(error))
+			applyTaskResult(.failure(error), root: root, task: task)
 			return
 		}
 		if !preserveWatch {
@@ -251,7 +251,7 @@ import ItsyEditor
 		} catch {
 			activeTaskHandle = nil
 			cancelButton?.isEnabled = taskWatcher != nil || !backgroundTaskHandles.isEmpty
-			applyTaskResult(.failure(error))
+			applyTaskResult(.failure(error), root: root, task: rootTask)
 			return
 		}
 		let task = expansion.task
@@ -352,7 +352,7 @@ import ItsyEditor
 		} catch {
 			activeTaskHandle = nil
 			cancelButton?.isEnabled = taskWatcher != nil
-			applyTaskResult(.failure(error))
+			applyTaskResult(.failure(error), root: root, task: rootTask)
 		}
 	}
 
@@ -414,11 +414,7 @@ import ItsyEditor
 		watcher.start()
 	}
 
-	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>) {
-		applyTaskResult(result, root: ItsyWorkspaceController.currentRootURL)
-	}
-
-	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?) {
+	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?, task: WorkspaceTask? = nil) {
 		switch result {
 		case let .success(taskResult):
 			taskStatusLabel?.textColor = taskResult.succeeded ? .secondaryLabelColor : .systemRed
@@ -438,6 +434,12 @@ import ItsyEditor
 		case let .failure(error):
 			taskStatusLabel?.textColor = .systemRed
 			taskStatusLabel?.stringValue = String(describing: error)
+			if let root, let task {
+				problemsCoordinator.setProblems(
+					WorkspaceProblemSnapshot(root: root, problems: []),
+					sourceID: "task:\(root.standardizedFileURL.path):\(task.id)"
+				)
+			}
 		}
 	}
 
@@ -476,6 +478,10 @@ import ItsyEditor
 	#if DEBUG
 	func applyTaskResultForTesting(_ result: WorkspaceTaskResult, root: URL) {
 		applyTaskResult(.success(result), root: root)
+	}
+
+	func applyTaskFailureForTesting(_ error: Error, task: WorkspaceTask, root: URL) {
+		applyTaskResult(.failure(error), root: root, task: task)
 	}
 	#endif
 }

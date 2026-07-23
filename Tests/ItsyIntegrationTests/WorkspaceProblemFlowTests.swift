@@ -70,13 +70,16 @@ import Testing
 	#expect(!taskResult.succeeded)
 	taskCoordinator.applyTaskResultForTesting(taskResult, root: fixture.root)
 	#expect(problemsCoordinator.problemCountForTesting == 3)
+	taskCoordinator.applyTaskFailureForTesting(WorkspaceTaskRunError.invalidOutput, task: task, root: fixture.root)
+	#expect(problemsCoordinator.problemCountForTesting == 2)
+	#expect(!problemsCoordinator.problemsForTesting.contains { $0.message == "compile failed" })
 
-	let taskIndex = try #require(problemsCoordinator.problemsForTesting.firstIndex { $0.message == "compile failed" })
-	problemsCoordinator.focusProblemForTesting(index: taskIndex)
-	#expect(problemsCoordinator.selectedProblemIndexForTesting == taskIndex)
+	let lspIndex = try #require(problemsCoordinator.problemsForTesting.firstIndex { $0.message == "expected expression" })
+	problemsCoordinator.focusProblemForTesting(index: lspIndex)
+	#expect(problemsCoordinator.selectedProblemIndexForTesting == lspIndex)
 	problemsCoordinator.openSelectedProblemForTesting()
 	let reopened = try #require(documentController.document(for: sourceURL) as? ItsyDocument)
-	let expectedOffset = reopened.editor.textStorage.offset(forLine: 3) + 6
+	let expectedOffset = reopened.editor.textStorage.offset(forLine: 1) + 4
 	#expect(reopened.editor.selections.primary.head == expectedOffset)
 }
 

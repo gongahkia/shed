@@ -636,8 +636,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspMissingBanner.copyRequested = { [weak self] missingBinary in
 			self?.copyLSPInstallCommand(for: missingBinary)
 		}
-		lspMissingBanner.configurationRequested = { [weak self] in
-			self?.copyLSPConfigurationPath()
+		lspMissingBanner.supportRequested = { command in
+			let componentID = command.flatMap { ManagedSupportCatalog.bundled.component(command: $0, kind: .languageServer)?.id }
+			NSApp.sendAction(#selector(AppCoordinator.showManagedSupport(_:)), to: nil, from: ManagedSupportRequest(componentID: componentID))
 		}
 		lspMissingBanner.dismissRequested = { [weak self] missingBinary in
 			Self.dismissedLSPMissingCommands.insert(missingBinary.command)
@@ -766,13 +767,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let pasteboard = NSPasteboard.general
 		pasteboard.clearContents()
 		pasteboard.setString(Self.installCommand(from: missingBinary), forType: .string)
-		focusEditor()
-	}
-
-	private func copyLSPConfigurationPath() {
-		let pasteboard = NSPasteboard.general
-		pasteboard.clearContents()
-		pasteboard.setString(LSPServerRegistryLoader.defaultConfigURL.path, forType: .string)
 		focusEditor()
 	}
 

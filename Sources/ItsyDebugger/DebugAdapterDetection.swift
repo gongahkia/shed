@@ -1,4 +1,5 @@
 import Foundation
+import ItsyEditor
 
 public struct DebugAdapterRemediation: Equatable, Sendable {
 	public var adapterID: String
@@ -24,6 +25,15 @@ public enum DebugAdapterDetector {
 		environment: [String: String] = ProcessInfo.processInfo.environment,
 		fileManager: FileManager = .default
 	) -> DebugAdapterAvailability {
+		if let component = ManagedSupportCatalog.bundled.component(id: adapter.id), component.kind == .debugAdapter,
+			component.command == adapter.command, component.arguments == adapter.args {
+			guard ManagedSupportEnablement.isEnabled(component) else {
+				return .missing(DebugAdapterRemediation(adapterID: adapter.id, command: adapter.command, hint: "Open Language & Debugger Support in Itsy."))
+			}
+			if let executable = ManagedSupportResolver.executableURL(for: component, fileManager: fileManager) {
+				return .available(executable)
+			}
+		}
 		if let executable = executableURL(for: adapter.command, workspaceRoot: workspaceRoot, environment: environment, fileManager: fileManager) {
 			return .available(executable)
 		}
@@ -65,13 +75,13 @@ public enum DebugAdapterDetector {
 		case .lldb:
 			return "Install Xcode Command Line Tools to provide lldb-dap."
 		case .debugpy:
-			return "Install debugpy with: python3 -m pip install debugpy"
+			return "Open Language & Debugger Support in Itsy."
 		case .jsDebug:
-			return "Configure a js-debug adapter executable in .itsy/dap.toml."
+			return "Open Language & Debugger Support in Itsy."
 		case .delve:
-			return "Install Delve to provide dlv dap."
+			return "Open Language & Debugger Support in Itsy."
 		case .codeLLDB:
-			return "Install CodeLLDB and configure its codelldb adapter executable."
+			return "Open Language & Debugger Support in Itsy."
 		case .custom:
 			return "Configure an executable adapter command in .itsy/dap.toml."
 		}

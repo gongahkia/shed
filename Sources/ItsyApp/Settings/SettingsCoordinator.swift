@@ -24,6 +24,7 @@ import ItsySyntax
 	private var settingsTerminalScrollbackField: NSTextField?
 	private var settingsStatusLabel: NSTextField?
 	private var lspConfigurationPanel: LSPServerConfigurationPanel?
+	private var managedSupportPanel: ManagedSupportPanel?
 	private let settingsStore: ItsySettingsStore
 	private var appSettings: ItsySettings
 	private var settingsWarnings: [ItsySettingsWarning]
@@ -334,6 +335,11 @@ import ItsySyntax
 		languageServersButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(languageServersButton)
 
+		let supportButton = NSButton(title: L10n.string("Language & Debugger Support…"), target: self, action: #selector(showManagedSupport(_:)))
+		supportButton.bezelStyle = .rounded
+		supportButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(supportButton)
+
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
 		statusLabel.textColor = .secondaryLabelColor
@@ -412,7 +418,9 @@ import ItsySyntax
 			reloadButton.topAnchor.constraint(equalTo: zoomStack.bottomAnchor, constant: 16),
 			languageServersButton.leadingAnchor.constraint(equalTo: reloadButton.trailingAnchor, constant: 8),
 			languageServersButton.centerYAnchor.constraint(equalTo: reloadButton.centerYAnchor),
-			languageServersButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			supportButton.leadingAnchor.constraint(equalTo: languageServersButton.trailingAnchor, constant: 8),
+			supportButton.centerYAnchor.constraint(equalTo: reloadButton.centerYAnchor),
+			supportButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
 			statusLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			statusLabel.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
 			statusLabel.topAnchor.constraint(equalTo: reloadButton.bottomAnchor, constant: 16),
@@ -551,6 +559,12 @@ import ItsySyntax
 		let panel = lspConfigurationPanel ?? LSPServerConfigurationPanel()
 		lspConfigurationPanel = panel
 		panel.show(relativeTo: settingsWindowController?.window)
+	}
+
+	@objc func showManagedSupport(_ sender: Any?) {
+		let panel = managedSupportPanel ?? ManagedSupportPanel(workspaceRootProvider: { ItsyWorkspaceController.currentRootURL })
+		managedSupportPanel = panel
+		panel.show(relativeTo: settingsWindowController?.window, selecting: (sender as? ManagedSupportRequest)?.componentID)
 	}
 
 	private func reloadSettingsFromDisk() {

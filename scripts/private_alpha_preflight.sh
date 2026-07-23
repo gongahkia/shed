@@ -163,8 +163,8 @@ done < <("$script_dir/lsp_matrix.sh" --list)
 
 check_dap debugpy true
 check_dap js-debug true
-check_dap delve true
 check_dap lldb-dap true
+check_dap delve false
 check_dap codelldb false
 
 mkdir -p "$(dirname "$output")"

@@ -341,6 +341,9 @@ import ItsyKeymap
 				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"), defaultKey: nil) { [weak self] in
 					self?.settingsCoordinator.showLSPConfiguration(nil)
 				},
+				Command(id: "support.manage", title: L10n.string("Language & Debugger Support"), defaultKey: nil) { [weak self] in
+					self?.showManagedSupport(nil)
+				},
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},
@@ -801,6 +804,10 @@ import ItsyKeymap
 
 	@objc func showSettings(_ sender: Any?) {
 		settingsCoordinator.showSettings(sender)
+	}
+
+	@objc func showManagedSupport(_ sender: Any?) {
+		settingsCoordinator.showManagedSupport(sender)
 	}
 
 	private func openInitialDocument() {

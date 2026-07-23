@@ -31,31 +31,18 @@ import Testing
 	#expect(missing == LSPServerRegistry.MissingBinary(
 		languageID: "typescript",
 		command: "typescript-language-server",
-		hint: "`npm i -g typescript typescript-language-server`"
+		hint: "Open Language & Debugger Support in Itsy."
 	))
 }
 
 @Test func lspServerRegistryReportsInstallHintsForBundledCommands() {
-	let expectedHints: [String: String] = [
-		"clangd": "`brew install llvm` and add LLVM's bin directory to PATH",
-		"zls": "`brew install zls`",
-		"elixir-ls": "`brew install elixir-ls`",
-		"kotlin-language-server": "`brew install fwcd/kotlin-language-server/kotlin-language-server`",
-		"omnisharp": "`brew install omnisharp`",
-		"bash-language-server": "`npm i -g bash-language-server`",
-		"docker-langserver": "`npm i -g dockerfile-language-server-nodejs`",
-		"sqls": "`brew install sqls`",
-		"dart": "`brew install dart-sdk`",
-		"haskell-language-server-wrapper": "`brew install haskell-language-server`",
-		"lua-language-server": "`brew install lua-language-server`",
-		"ruby-lsp": "`gem install ruby-lsp`",
-		"terraform-ls": "`brew install hashicorp/tap/terraform-ls`",
-	]
-	let configs = expectedHints.map { command, _ in
+	let expectedHints = ["clangd", "zls", "elixir-ls", "kotlin-language-server", "omnisharp", "bash-language-server", "docker-langserver", "sqls", "dart", "haskell-language-server-wrapper", "lua-language-server", "ruby-lsp", "terraform-ls"]
+	let configs = expectedHints.map { command in
 		LSPServerConfig(languageId: command, command: command)
 	}
 	let registry = LSPServerRegistry(configs: configs)
-	for (command, hint) in expectedHints {
+	for command in expectedHints {
+		let hint = command == "clangd" ? "Open Language & Debugger Support in Itsy to install Xcode Command Line Tools." : "Open Language & Debugger Support in Itsy."
 		#expect(registry.missingBinary(forLanguageID: command, environment: ["PATH": ""]) == LSPServerRegistry.MissingBinary(
 			languageID: command,
 			command: command,

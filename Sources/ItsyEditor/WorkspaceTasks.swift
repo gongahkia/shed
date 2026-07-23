@@ -98,24 +98,33 @@ public struct WorkspaceTask: Codable, Equatable, Sendable {
 	}
 }
 
+public enum WorkspaceTaskWatchPolicy: String, Codable, Equatable, Sendable {
+	case manual
+	case onChange = "on_change"
+}
+
 public struct WorkspaceTaskWatch: Codable, Equatable, Sendable {
 	public var paths: [String]
 	public var debounceMillis: Int
+	public var policy: WorkspaceTaskWatchPolicy
 
-	public init(paths: [String], debounceMillis: Int = 300) {
+	public init(paths: [String], debounceMillis: Int = 300, policy: WorkspaceTaskWatchPolicy = .manual) {
 		self.paths = paths
 		self.debounceMillis = debounceMillis
+		self.policy = policy
 	}
 
 	private enum CodingKeys: String, CodingKey {
 		case paths
 		case debounceMillis = "debounce_ms"
+		case policy
 	}
 
 	public init(from decoder: Decoder) throws {
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		paths = try container.decodeIfPresent([String].self, forKey: .paths) ?? []
 		debounceMillis = try container.decodeIfPresent(Int.self, forKey: .debounceMillis) ?? 300
+		policy = try container.decodeIfPresent(WorkspaceTaskWatchPolicy.self, forKey: .policy) ?? .manual
 	}
 }
 

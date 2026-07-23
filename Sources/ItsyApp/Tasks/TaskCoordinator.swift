@@ -82,9 +82,10 @@ import ItsyEditor
 		statusLabel.textColor = .secondaryLabelColor
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshTasks(_:)))
 		let runButton = NSButton(title: L10n.string("Run"), target: self, action: #selector(runSelectedTask(_:)))
+		let dryRunButton = NSButton(title: L10n.string("Dry Run"), target: self, action: #selector(dryRunSelectedTask(_:)))
 		let cancelButton = NSButton(title: L10n.string("Cancel"), target: self, action: #selector(cancelRunningTask(_:)))
 		cancelButton.isEnabled = false
-		let buttonStack = NSStackView(views: [refreshButton, runButton, cancelButton])
+		let buttonStack = NSStackView(views: [refreshButton, dryRunButton, runButton, cancelButton])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
 		let header = NSStackView(views: [statusLabel, buttonStack])
@@ -167,6 +168,20 @@ import ItsyEditor
 			return
 		}
 		startTask(task, root: root, preserveWatch: false)
+	}
+
+	@objc private func dryRunSelectedTask(_ sender: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL, let task = selectedTask() else {
+			return
+		}
+		do {
+			let dryRun = try WorkspaceTaskDryRunInspector.inspect(task: task, in: workspaceTasks, context: taskExpansionContext(root: root))
+			taskStatusLabel?.textColor = .secondaryLabelColor
+			taskStatusLabel?.stringValue = L10n.string("Dry run · no command executed")
+			taskOutputTextView?.string = dryRunOutput(dryRun)
+		} catch {
+			applyTaskResult(.failure(error), root: root, task: task)
+		}
 	}
 
 	@objc private func cancelRunningTask(_ sender: Any?) {
@@ -415,7 +430,7 @@ import ItsyEditor
 	private func installWatchIfNeeded(for task: WorkspaceTask, root: URL) {
 		taskWatcher?.stop()
 		taskWatcher = nil
-		guard let watch = task.watch, !watch.paths.isEmpty else {
+		guard let watch = task.watch, watch.policy == .onChange, !watch.paths.isEmpty else {
 			return
 		}
 		let watcher = WorkspaceTaskWatcher(root: root, watch: watch) { [weak self] in
@@ -428,6 +443,22 @@ import ItsyEditor
 		}
 		taskWatcher = watcher
 		watcher.start()
+	}
+
+	private func dryRunOutput(_ dryRun: WorkspaceTaskDryRun) -> String {
+		([L10n.string("Dry run — no command executed")] + dryRun.steps.flatMap { step -> [String] in
+			var lines = ["$ \(step.commandLine)", "cwd: \(step.workingDirectory.path)"]
+			if !step.environmentKeys.isEmpty {
+				lines.append("env keys: \(step.environmentKeys.joined(separator: ", "))")
+			}
+			if let watchPolicy = step.watchPolicy {
+				lines.append("file-event policy: \(watchPolicy.rawValue)")
+			}
+			if !step.unresolvedInputs.isEmpty {
+				lines.append("inputs required at run time: \(step.unresolvedInputs.joined(separator: ", "))")
+			}
+			return lines
+		}).joined(separator: "\n")
 	}
 
 	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?, task: WorkspaceTask? = nil) {

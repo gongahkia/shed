@@ -16,7 +16,7 @@ import Testing
 	    "inputs": [{ "id": "target", "prompt": "Target", "default": "app" }],
 	    "depends_on": ["prepare"],
 	    "is_background": true,
-	    "watch": { "paths": ["Sources"], "debounce_ms": 75 },
+	    "watch": { "paths": ["Sources"], "debounce_ms": 75, "policy": "on_change" },
 	    "presentation": { "reveal": "always", "focus": true, "dedicated": true, "show_resolved_command": true },
 	    "problem_matchers": ["swiftc"]
 	  }]
@@ -33,6 +33,7 @@ import Testing
 	#expect(task.workingDirectory == root.appendingPathComponent("App", isDirectory: true).standardizedFileURL)
 	#expect(task.inputs == [WorkspaceTaskInput(id: "target", prompt: "Target", defaultValue: "app")])
 	#expect(task.problemMatchers == ["swiftc"])
+	#expect(task.watch == WorkspaceTaskWatch(paths: ["Sources"], debounceMillis: 75, policy: .onChange))
 
 	let global = try WorkspaceTaskConfigurationParser.parse(data: data, scope: .global)
 	#expect(global.scope == .global)
@@ -75,6 +76,7 @@ import Testing
 	#expect(legacy.dependsOn == ["prepare"])
 	#expect(legacy.isBackground)
 	#expect(legacy.watch == WorkspaceTaskWatch(paths: ["Sources"], debounceMillis: 50))
+	#expect(legacy.watch?.policy == .manual)
 	#expect(legacy.environment.isEmpty)
 	#expect(legacy.inputs.isEmpty)
 	#expect(legacy.problemMatchers.isEmpty)

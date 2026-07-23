@@ -1126,6 +1126,9 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitRemoteWasCancelled = true
 		gitStatusLabel?.textColor = .secondaryLabelColor
 		gitStatusLabel?.stringValue = L10n.string("Canceling Git remote command...")
+		if let gitRootURL {
+			reportGitRemoteHealth(root: gitRootURL, lifecycle: .stopping, state: .retrying)
+		}
 		process.terminate()
 	}
 
@@ -1149,6 +1152,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitRemoteLog = "$ git \(arguments.joined(separator: " "))\n"
 		gitStatusLabel?.textColor = .secondaryLabelColor
 		gitStatusLabel?.stringValue = "\(title)..."
+		reportGitRemoteHealth(root: gitRootURL, lifecycle: .starting, state: .retrying)
 		stdout.fileHandleForReading.readabilityHandler = { [weak self] handle in
 			let data = handle.availableData
 			Task { @MainActor [weak self] in
@@ -1174,11 +1178,13 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 					gitRemoteWasCancelled = false
 					gitStatusLabel?.textColor = .secondaryLabelColor
 					gitStatusLabel?.stringValue = "\(title) canceled"
+					self.reportGitRemoteHealth(root: gitRootURL, lifecycle: .stopped, state: .healthy)
 					return
 				}
 				if process.terminationStatus == 0 {
 					gitStatusLabel?.textColor = .secondaryLabelColor
 					gitStatusLabel?.stringValue = "\(title) complete"
+					self.reportGitRemoteHealth(root: gitRootURL, lifecycle: .stopped, state: .healthy)
 					refreshGitChanges(nil)
 				} else {
 					let outcome = GitRemoteOperationClassifier.classify(
@@ -1186,6 +1192,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 					)
 					gitStatusLabel?.textColor = .systemRed
 					gitStatusLabel?.stringValue = "\(title) \(gitRemoteFailureDescription(outcome))"
+					self.reportGitRemoteHealth(root: gitRootURL, lifecycle: .stopped, state: .degraded, lastError: "\(title) failed.", remediation: self.gitRemoteRemediation(outcome))
 					showGitRemoteFailure(title: "\(title) \(gitRemoteFailureDescription(outcome))")
 				}
 			}
@@ -1198,6 +1205,14 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			gitRemoteWasCancelled = false
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
+			reportGitRemoteHealth(root: gitRootURL, lifecycle: .stopped, state: .degraded, lastError: "\(title) could not start.", remediation: "Verify Git is installed and retry.")
+		}
+	}
+
+	private func reportGitRemoteHealth(root: URL, lifecycle: IntegrationLifecycle, state: IntegrationHealthState, lastError: String? = nil, remediation: String? = nil) {
+		let path = root.standardizedFileURL.path
+		Task {
+			await IntegrationHealthStore.shared.report(service: .git, identifier: path, lifecycle: lifecycle, state: state, lastError: lastError, remediation: remediation, detailLogReference: "git://\(path)/remote")
 		}
 	}
 
@@ -1233,6 +1248,24 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			L10n.string("canceled")
 		case .commandFailed:
 			L10n.string("failed")
+		}
+	}
+
+	private func gitRemoteRemediation(_ outcome: GitRemoteOperationOutcome) -> String {
+		guard case let .failed(failure) = outcome else {
+			return "Retry the Git operation."
+		}
+		return switch failure {
+		case .authenticationRequired:
+			"Authenticate Git, then retry."
+		case .nonFastForward:
+			"Pull remote changes before pushing."
+		case .networkUnavailable:
+			"Check the network connection, then retry."
+		case .cancelled:
+			"Retry the Git operation when ready."
+		case .commandFailed:
+			"Review the Git command output and retry."
 		}
 	}
 

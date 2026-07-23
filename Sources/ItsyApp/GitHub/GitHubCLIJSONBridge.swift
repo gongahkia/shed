@@ -258,16 +258,23 @@ public struct GitHubCLIJSONBridge: Sendable {
 
 	private func executeRaw<Request: GitHubCLIJSONRequest>(_ request: Request, workspaceURL: URL?) async throws -> (arguments: [String], process: GitHubCLIProcessResult) {
 		let arguments = try request.arguments()
+		let workspace = workspaceURL?.standardizedFileURL.path ?? "default"
+		let detailLogReference = "github://\(workspace)/cli"
+		await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .starting, state: .retrying, detailLogReference: detailLogReference)
 		do {
 			let result = try await executor.run(executableURL: executableURL, arguments: arguments, workingDirectoryURL: workspaceURL)
 			let diagnostics = GitHubCLIJSONDiagnostics(arguments: arguments, result: result, environment: environment)
 			guard result.exitStatus == 0 else { throw GitHubCLIJSONBridgeError.processFailure(diagnostics) }
+			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: .healthy, detailLogReference: detailLogReference)
 			return (arguments, result)
 		} catch is CancellationError {
+			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: .healthy, detailLogReference: detailLogReference)
 			throw CancellationError()
 		} catch let error as GitHubCLIJSONBridgeError {
+			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: .degraded, lastError: String(describing: error), remediation: "Review GitHub CLI authentication and repository access, then retry.", detailLogReference: detailLogReference)
 			throw error
 		} catch {
+			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: .unavailable, lastError: "GitHub CLI is unavailable.", remediation: "Check GitHub CLI and retry.", detailLogReference: detailLogReference)
 			throw GitHubCLIJSONBridgeError.unavailable
 		}
 	}

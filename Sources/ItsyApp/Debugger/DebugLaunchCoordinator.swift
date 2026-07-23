@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import ItsyDAP
 import ItsyDebugger
+import ItsyEditor
 
 @MainActor final class DebugLaunchCoordinator: NSObject, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
 	private let loader: DebugLaunchConfigLoader
@@ -387,16 +388,22 @@ final class DebugAppSession: @unchecked Sendable {
 		breakpointStore: BreakpointStore = BreakpointStore(),
 		onTerminated: @escaping @Sendable (Int32) -> Void = { _ in }
 	) async throws -> DebugAppSession {
+		let healthIdentifier = "\(adapter.id):\(workspaceRoot.path)"
+		let logReference = "dap://\(adapter.id)/\(workspaceRoot.path)"
 		guard adapter.type == DebugAdapterType.executable else {
+			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .stopped, state: .unavailable, lastError: "Unsupported adapter type \(adapter.type).", remediation: "Configure an executable debug adapter.", detailLogReference: logReference)
 			throw DebugLaunchError.unsupportedAdapter(adapter.type)
 		}
 		let availability = DebugAdapterDetector.availability(for: adapter, workspaceRoot: workspaceRoot)
 		guard case let .available(executableURL) = availability else {
 			if case let .missing(remediation) = availability {
+				await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .stopped, state: .unavailable, lastError: "Adapter command unavailable: \(remediation.command).", remediation: remediation.hint, detailLogReference: logReference)
 				throw DebugLaunchError.missingExecutable(command: remediation.command, remediation: remediation.hint)
 			}
+			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .stopped, state: .unavailable, lastError: "Adapter command unavailable: \(adapter.command).", remediation: "Configure an executable debug adapter.", detailLogReference: logReference)
 			throw DebugLaunchError.missingExecutable(command: adapter.command, remediation: "Configure an executable adapter command.")
 		}
+		await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .starting, state: .retrying, detailLogReference: logReference)
 		let transport = DAPProcessTransport(
 			executableURL: executableURL,
 			arguments: adapter.args,
@@ -429,6 +436,7 @@ final class DebugAppSession: @unchecked Sendable {
 					}
 				case let .terminated(status):
 					await client.transportDidTerminate(status: status)
+					await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .stopped, state: .degraded, lastError: "Debug adapter terminated with status \(status).", remediation: "Restart debugging.", detailLogReference: logReference)
 					NSLog("debug adapter terminated: \(status)")
 					onTerminated(status)
 				}
@@ -496,11 +504,13 @@ final class DebugAppSession: @unchecked Sendable {
 				_ = try await client.configurationDone()
 			}
 			_ = try await launchTask.value
+			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .running, state: .healthy, detailLogReference: logReference)
 			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			await client.transportDidTerminate(status: nil)
 			transport.terminate()
+			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .stopped, state: .degraded, lastError: String(describing: error), remediation: "Check the debug adapter configuration and retry.", detailLogReference: logReference)
 			throw error
 		}
 	}

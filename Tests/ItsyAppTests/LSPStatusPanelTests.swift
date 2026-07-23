@@ -35,3 +35,21 @@ import Testing
 	#expect(LSPStatusPanel.detailsText(snapshot).contains("Lifecycle: disabled"))
 	#expect(LSPStatusPanel.outputText(snapshot) == "restart limit exceeded; use Restart to retry")
 }
+
+@Test @MainActor func integrationHealthPanelRendersEveryHealthStateWithLocalDetails() {
+	for state in IntegrationHealthState.allCases {
+		let snapshot = IntegrationHealthPanelSnapshot(records: [IntegrationHealthRecord(
+			key: IntegrationHealthKey(service: .dap, identifier: "debugpy"),
+			lifecycle: .running,
+			state: state,
+			lastError: "adapter exited",
+			remediation: "Restart debugging",
+			detailLogReference: "dap://debugpy/session.log"
+		)])
+		let text = IntegrationHealthPanel.text(snapshot)
+		#expect(text.contains("State: \(state.rawValue)"))
+		#expect(text.contains("Last error: adapter exited"))
+		#expect(text.contains("Remediation: Restart debugging"))
+		#expect(text.contains("Log: dap://debugpy/session.log"))
+	}
+}

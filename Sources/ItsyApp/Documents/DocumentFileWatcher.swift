@@ -29,6 +29,7 @@ import ItsyEditor
 		}
 		let descriptor = open(url.path, O_EVTONLY)
 		guard descriptor >= 0 else {
+			reportHealth(url: url, lifecycle: .stopped, state: .unavailable, lastError: "Unable to watch the file.", remediation: "Reopen the document or verify file permissions.")
 			return
 		}
 		let nextSource = DispatchSource.makeFileSystemObjectSource(
@@ -46,11 +47,16 @@ import ItsyEditor
 		}
 		source = nextSource
 		nextSource.resume()
+		reportHealth(url: url, lifecycle: .running, state: .healthy)
 	}
 
 	func stop() {
+		let url = fileURL()
 		source?.cancel()
 		source = nil
+		if let url {
+			reportHealth(url: url, lifecycle: .stopped, state: .healthy)
+		}
 	}
 
 	private func externalFileDidChange() {
@@ -134,6 +140,7 @@ import ItsyEditor
 	}
 
 	private func presentUnreadableChange(url: URL) {
+		reportHealth(url: url, lifecycle: .running, state: .degraded, lastError: "The file changed to an unsupported format.", remediation: "Keep the buffer or reopen a supported file format.")
 		let alert = NSAlert()
 		alert.messageText = L10n.string("\(displayName(url)) changed to an unsupported format")
 		alert.informativeText = L10n.string("The current buffer was kept unchanged.")
@@ -146,6 +153,21 @@ import ItsyEditor
 			alert.beginSheetModal(for: window, completionHandler: complete)
 		} else {
 			complete(alert.runModal())
+		}
+	}
+
+	private func reportHealth(url: URL, lifecycle: IntegrationLifecycle, state: IntegrationHealthState, lastError: String? = nil, remediation: String? = nil) {
+		let path = url.standardizedFileURL.path
+		Task {
+			await IntegrationHealthStore.shared.report(
+				service: .fileWatch,
+				identifier: path,
+				lifecycle: lifecycle,
+				state: state,
+				lastError: lastError,
+				remediation: remediation,
+				detailLogReference: "file-watch://\(path)"
+			)
 		}
 	}
 }

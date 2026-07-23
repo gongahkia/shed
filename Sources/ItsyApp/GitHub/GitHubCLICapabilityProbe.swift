@@ -1,4 +1,5 @@
 import Foundation
+import ItsyEditor
 
 public struct GitHubCLIVersion: Codable, Comparable, Equatable, Sendable {
 	public var major: Int
@@ -115,26 +116,50 @@ public enum GitHubCLICapabilityProbe {
 		locateExecutable: ([String: String]) -> URL? = { GitHubCLIExecutableLocator.executableURL(environment: $0) }
 	) -> GitHubCLIProbeStatus {
 		guard let executableURL = executableURL ?? locateExecutable(environment) else {
-			return .missingExecutable
+			return finish(.missingExecutable, workspaceURL: workspaceURL)
 		}
 		guard let versionResult = executor.run(executableURL: executableURL, arguments: ["--version"], workingDirectoryURL: nil), versionResult.exitStatus == 0,
 			let version = GitHubCLIVersion.parse(versionResult.standardOutput)
 		else {
-			return .unavailable
+			return finish(.unavailable, workspaceURL: workspaceURL)
 		}
 		guard version >= minimumVersion else {
-			return .unsupportedVersion(found: version, minimum: minimumVersion)
+			return finish(.unsupportedVersion(found: version, minimum: minimumVersion), workspaceURL: workspaceURL)
 		}
 		guard let authentication = executor.run(executableURL: executableURL, arguments: ["auth", "status", "--hostname", "github.com"], workingDirectoryURL: workspaceURL), authentication.exitStatus == 0 else {
-			return .unauthenticated
+			return finish(.unauthenticated, workspaceURL: workspaceURL)
 		}
 		guard let workspaceURL,
 			let repository = executor.run(executableURL: executableURL, arguments: ["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"], workingDirectoryURL: workspaceURL), repository.exitStatus == 0,
 			isRepositoryName(repository.standardOutput)
 		else {
-			return .inaccessibleRepository
+			return finish(.inaccessibleRepository, workspaceURL: workspaceURL)
 		}
-		return .ready(GitHubCLICapability(executableURL: executableURL, version: version, repository: repository.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines)))
+		return finish(.ready(GitHubCLICapability(executableURL: executableURL, version: version, repository: repository.standardOutput.trimmingCharacters(in: .whitespacesAndNewlines))), workspaceURL: workspaceURL)
+	}
+
+	private static func finish(_ status: GitHubCLIProbeStatus, workspaceURL: URL?) -> GitHubCLIProbeStatus {
+		let workspace = workspaceURL?.standardizedFileURL.path ?? "default"
+		let detailLogReference = "github://\(workspace)/capability"
+		let report: (IntegrationHealthState, String?, String?)
+		switch status {
+		case .ready:
+			report = (.healthy, nil, nil)
+		case .missingExecutable:
+			report = (.unavailable, "GitHub CLI is unavailable.", "Install GitHub CLI and retry.")
+		case let .unsupportedVersion(found, minimum):
+			report = (.unavailable, "GitHub CLI \(found.major).\(found.minor).\(found.patch) is below \(minimum.major).\(minimum.minor).\(minimum.patch).", "Upgrade GitHub CLI and retry.")
+		case .unauthenticated:
+			report = (.degraded, "GitHub CLI is not authenticated.", "Run gh auth login, then retry.")
+		case .inaccessibleRepository:
+			report = (.degraded, "GitHub repository is inaccessible.", "Check repository access and retry.")
+		case .unavailable:
+			report = (.unavailable, "GitHub CLI could not be queried.", "Check GitHub CLI and retry.")
+		}
+		Task {
+			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: report.0, lastError: report.1, remediation: report.2, detailLogReference: detailLogReference)
+		}
+		return status
 	}
 
 	private static func isRepositoryName(_ value: String) -> Bool {

@@ -68,10 +68,48 @@ public actor GitRemoteOperationCoordinator {
 
 	public func run(operation: GitRemoteOperation, root: URL, runner: any GitRemoteCommandRunning) async -> GitRemoteOperationOutcome? {
 		let expectedGeneration = generation
+		let rootPath = root.standardizedFileURL.path
+		let operationID = operation.identifier
+		await IntegrationHealthStore.shared.report(service: .git, identifier: rootPath, lifecycle: .starting, state: .retrying, detailLogReference: "git://\(rootPath)/\(operationID)")
 		let result = await runner.run(operation: operation, root: root)
 		guard !Task.isCancelled, generation == expectedGeneration else {
 			return nil
 		}
-		return GitRemoteOperationClassifier.classify(result)
+		let outcome = GitRemoteOperationClassifier.classify(result)
+		switch outcome {
+		case .succeeded:
+			await IntegrationHealthStore.shared.report(service: .git, identifier: rootPath, lifecycle: .stopped, state: .healthy, detailLogReference: "git://\(rootPath)/\(operationID)")
+		case let .failed(failure):
+			await IntegrationHealthStore.shared.report(service: .git, identifier: rootPath, lifecycle: .stopped, state: .degraded, lastError: String(describing: failure), remediation: remediation(for: failure), detailLogReference: "git://\(rootPath)/\(operationID)")
+		}
+		return outcome
+	}
+
+	private func remediation(for failure: GitRemoteFailure) -> String {
+		switch failure {
+		case .authenticationRequired:
+			"Authenticate Git, then retry."
+		case .networkUnavailable:
+			"Check the network connection, then retry."
+		case .nonFastForward:
+			"Pull remote changes before pushing."
+		case .cancelled:
+			"Retry the Git operation when ready."
+		case .commandFailed:
+			"Review the Git command output and retry."
+		}
+	}
+}
+
+private extension GitRemoteOperation {
+	var identifier: String {
+		switch self {
+		case .fetch:
+			"fetch"
+		case .pull:
+			"pull"
+		case .push:
+			"push"
+		}
 	}
 }

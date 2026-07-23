@@ -1005,7 +1005,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let existing = lspStatusEntries[key]
 		let clearsClient = status == "idle" || status == "crashed" || status == "disabled" || status == "unavailable"
 		let resolvedHealth = health ?? (status == "running" && existing?.health == .degraded ? .degraded : Self.health(for: status))
-		lspStatusEntries[key] = LSPStatusEntry(
+		let entry = LSPStatusEntry(
 			key: key,
 			status: status,
 			health: resolvedHealth,
@@ -1017,6 +1017,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			url: url ?? existing?.url,
 			client: client ?? (clearsClient ? nil : existing?.client)
 		)
+		lspStatusEntries[key] = entry
+		Task {
+			await IntegrationHealthStore.shared.report(
+				service: .lsp,
+				identifier: "\(key.languageID):\(key.workspaceRoot.path)",
+				lifecycle: Self.integrationLifecycle(for: status),
+				state: Self.integrationState(for: resolvedHealth),
+				lastError: entry.lastError.isEmpty ? nil : entry.lastError,
+				remediation: Self.integrationRemediation(for: status),
+				detailLogReference: "lsp://\(key.languageID)/\(key.workspaceRoot.path)"
+			)
+		}
 		activeLSPKey = key
 		if status == "crashed" || status == "disabled" {
 			lspRestartKey = key
@@ -1039,6 +1051,43 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return .unavailable
 		default:
 			return .idle
+		}
+	}
+
+	private static func integrationLifecycle(for status: String) -> IntegrationLifecycle {
+		switch status {
+		case "starting":
+			.starting
+		case "running", "ready", "degraded":
+			.running
+		case "crashed", "disabled", "unavailable":
+			.stopped
+		default:
+			.inactive
+		}
+	}
+
+	private static func integrationState(for health: LSPHealthState) -> IntegrationHealthState {
+		switch health {
+		case .degraded, .crashed:
+			.degraded
+		case .unavailable:
+			.unavailable
+		case .starting:
+			.retrying
+		case .idle, .ready:
+			.healthy
+		}
+	}
+
+	private static func integrationRemediation(for status: String) -> String? {
+		switch status {
+		case "crashed", "disabled":
+			"Restart the language server."
+		case "unavailable":
+			"Open Language Server Configuration."
+		default:
+			nil
 		}
 	}
 

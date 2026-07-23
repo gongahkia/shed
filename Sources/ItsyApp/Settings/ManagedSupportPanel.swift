@@ -289,13 +289,36 @@ final class ManagedSupportRequest: NSObject {
 		statusLabel.stringValue = L10n.string("Downloading \(component.displayName)…")
 		let request = ManagedSupportInstallRequest(component: component, artifact: artifact)
 		Task { [weak self] in
-				do {
+			await IntegrationHealthStore.shared.report(
+				service: .package,
+				identifier: component.id,
+				lifecycle: .starting,
+				state: .retrying,
+				detailLogReference: "package://\(component.id)/\(artifact.version)"
+			)
+			do {
 				_ = try await ManagedSupportInstaller.downloadAndInstall(request)
+				await IntegrationHealthStore.shared.report(
+					service: .package,
+					identifier: component.id,
+					lifecycle: .stopped,
+					state: .healthy,
+					detailLogReference: "package://\(component.id)/\(artifact.version)"
+				)
 				guard let self else { return }
 				ManagedSupportEnablement.setEnabled(true, for: component)
 				statusLabel.stringValue = L10n.string("Installed \(component.displayName) in Itsy.")
 				refreshDetails()
 			} catch {
+				await IntegrationHealthStore.shared.report(
+					service: .package,
+					identifier: component.id,
+					lifecycle: .stopped,
+					state: .degraded,
+					lastError: String(describing: error),
+					remediation: "Review the verified download details and retry.",
+					detailLogReference: "package://\(component.id)/\(artifact.version)"
+				)
 				guard let self else { return }
 				statusLabel.stringValue = L10n.string("Installation failed: \(String(describing: error))")
 				refreshDetails()

@@ -2,6 +2,7 @@
 import Darwin
 import Dispatch
 import Foundation
+import ItsyEditor
 
 @_silgen_name("proc_listchildpids")
 private func proc_listchildpids(_ parentPID: pid_t, _ buffer: UnsafeMutableRawPointer?, _ bufferSize: Int32) -> Int32
@@ -66,6 +67,7 @@ final class ItsyTerminalSession {
 			}
 		}
 		guard let shellCString, let cwdCString, let loginCString, !envStorage.contains(where: { $0 == nil }) else {
+			reportHealth(lifecycle: .stopped, state: .unavailable, lastError: "Unable to allocate terminal startup resources.", remediation: "Close unused applications and retry.")
 			throw POSIXError(.ENOMEM)
 		}
 		var argv: [UnsafeMutablePointer<CChar>?] = [shellCString, loginCString, nil]
@@ -89,6 +91,7 @@ final class ItsyTerminalSession {
 			}
 		}
 		guard pid >= 0 else {
+			reportHealth(lifecycle: .stopped, state: .unavailable, lastError: "Terminal process could not start.", remediation: "Verify the configured shell and retry.")
 			throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
 		}
 		let flags = fcntl(master, F_GETFL)
@@ -98,6 +101,7 @@ final class ItsyTerminalSession {
 			Darwin.close(master)
 			var status: Int32 = 0
 			_ = waitpid(pid, &status, 0)
+			reportHealth(lifecycle: .stopped, state: .degraded, lastError: "Terminal process setup failed.", remediation: "Restart the terminal.")
 			throw failure
 		}
 		stateLock.lock()
@@ -108,6 +112,7 @@ final class ItsyTerminalSession {
 		stateLock.unlock()
 		startReadSource(fileDescriptor: master)
 		startWaitSource(pid: pid, fileDescriptor: master)
+		reportHealth(lifecycle: .running, state: .healthy)
 	}
 
 	func send(_ data: Data) {
@@ -145,6 +150,7 @@ final class ItsyTerminalSession {
 		stateLock.lock()
 		isTerminating = true
 		stateLock.unlock()
+		reportHealth(lifecycle: .stopping, state: .retrying)
 		Self.signalProcessTree(pid, signal: SIGHUP)
 		Self.signalProcessTree(pid, signal: SIGTERM)
 		queue.async { [weak self] in
@@ -275,6 +281,7 @@ final class ItsyTerminalSession {
 			return
 		}
 		childPID = -1
+		let terminatedByUser = isTerminating
 		isTerminating = false
 		let exitHandler = onExit
 		lifetimeRetainer = nil
@@ -282,7 +289,29 @@ final class ItsyTerminalSession {
 		stopIO()
 		waitSource?.cancel()
 		waitSource = nil
-		exitHandler?(Self.exitCode(fromWaitStatus: status))
+		let exitCode = Self.exitCode(fromWaitStatus: status)
+		exitHandler?(exitCode)
+		reportHealth(
+			lifecycle: .stopped,
+			state: terminatedByUser || exitCode == 0 ? .healthy : .degraded,
+			lastError: terminatedByUser || exitCode == 0 ? nil : "Terminal exited with status \(exitCode).",
+			remediation: terminatedByUser || exitCode == 0 ? nil : "Restart the terminal."
+		)
+	}
+
+	private func reportHealth(lifecycle: IntegrationLifecycle, state: IntegrationHealthState, lastError: String? = nil, remediation: String? = nil) {
+		let directory = currentDirectoryURL.path
+		Task {
+			await IntegrationHealthStore.shared.report(
+				service: .terminal,
+				identifier: directory,
+				lifecycle: lifecycle,
+				state: state,
+				lastError: lastError,
+				remediation: remediation,
+				detailLogReference: "terminal://\(directory)"
+			)
+		}
 	}
 
 	private func currentMasterFD() -> Int32? {

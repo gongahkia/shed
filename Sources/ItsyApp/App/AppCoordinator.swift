@@ -68,6 +68,7 @@ import ItsyKeymap
 		}
 	)
 	private lazy var extensionsCoordinator = ExtensionsCoordinator()
+	private var integrationHealthPanel: IntegrationHealthPanel?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -353,6 +354,9 @@ import ItsyKeymap
 				},
 				Command(id: "lsp.status", title: L10n.string("Language Server Status"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.showLSPStatus()
+				},
+				Command(id: "integration.health", title: L10n.string("Integration Health"), defaultKey: nil) { [weak self] in
+					self?.showIntegrationHealth(nil)
 				},
 				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"), defaultKey: nil) { [weak self] in
 					self?.settingsCoordinator.showLSPConfiguration(nil)
@@ -824,6 +828,18 @@ import ItsyKeymap
 
 	@objc func showManagedSupport(_ sender: Any?) {
 		settingsCoordinator.showManagedSupport(sender)
+	}
+
+	@objc func showIntegrationHealth(_ sender: Any?) {
+		Task { [weak self] in
+			let records = await IntegrationHealthStore.shared.allRecords()
+			guard let self else {
+				return
+			}
+			let panel = integrationHealthPanel ?? IntegrationHealthPanel()
+			integrationHealthPanel = panel
+			panel.show(snapshot: IntegrationHealthPanelSnapshot(records: records), relativeTo: activeEditorWindowController()?.window)
+		}
 	}
 
 	private func openInitialDocument() {

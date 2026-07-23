@@ -203,6 +203,7 @@ import ItsyEditor
 			}
 			cancelButton?.isEnabled = false
 			applyTaskResult(.failure(error), root: root, task: task)
+			reportTaskHealth(task, root: root, lifecycle: .stopped, state: .degraded, lastError: String(describing: error), remediation: "Review the task configuration and retry.")
 			return
 		}
 		if !preserveWatch {
@@ -211,6 +212,7 @@ import ItsyEditor
 		cancelButton?.isEnabled = true
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
+		reportTaskHealth(task, root: root, lifecycle: .running, state: .healthy)
 		if preserveWatch {
 			taskOutputTextView?.string += "\n"
 		} else {
@@ -247,6 +249,7 @@ import ItsyEditor
 			cancelButton?.isEnabled = false
 			taskStatusLabel?.textColor = .secondaryLabelColor
 			taskStatusLabel?.stringValue = L10n.string("Cancelled")
+			reportTaskHealth(rootTask, root: root, lifecycle: .stopped, state: .healthy)
 			return
 		} catch {
 			activeTaskHandle = nil
@@ -430,6 +433,14 @@ import ItsyEditor
 					WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers),
 					sourceID: "task:\(root.standardizedFileURL.path):\(taskResult.task.id)"
 				)
+				reportTaskHealth(
+					taskResult.task,
+					root: root,
+					lifecycle: .stopped,
+					state: taskResult.succeeded ? .healthy : .degraded,
+					lastError: taskResult.succeeded ? nil : taskResult.stderr,
+					remediation: taskResult.succeeded ? nil : "Review the task output and retry."
+				)
 			}
 		case let .failure(error):
 			taskStatusLabel?.textColor = .systemRed
@@ -439,7 +450,23 @@ import ItsyEditor
 					WorkspaceProblemSnapshot(root: root, problems: []),
 					sourceID: "task:\(root.standardizedFileURL.path):\(task.id)"
 				)
+				reportTaskHealth(task, root: root, lifecycle: .stopped, state: .degraded, lastError: String(describing: error), remediation: "Review the task configuration and retry.")
 			}
+		}
+	}
+
+	private func reportTaskHealth(_ task: WorkspaceTask, root: URL, lifecycle: IntegrationLifecycle, state: IntegrationHealthState, lastError: String? = nil, remediation: String? = nil) {
+		let rootPath = root.standardizedFileURL.path
+		Task {
+			await IntegrationHealthStore.shared.report(
+				service: .task,
+				identifier: "\(rootPath):\(task.id)",
+				lifecycle: lifecycle,
+				state: state,
+				lastError: lastError,
+				remediation: remediation,
+				detailLogReference: "task://\(rootPath)/\(task.id)"
+			)
 		}
 	}
 

@@ -243,6 +243,10 @@ public struct GitHubCLIJSONBridge: Sendable {
 		_ = try await executeRaw(request, workspaceURL: workspaceURL)
 	}
 
+	func executeTextRequest<Request: GitHubCLIJSONRequest>(_ request: Request, workspaceURL: URL?) async throws -> String {
+		try await executeRaw(request, workspaceURL: workspaceURL).process.standardOutput
+	}
+
 	func executeRequest<Response: Decodable & Sendable, Request: GitHubCLIJSONRequest>(_ request: Request, as _: Response.Type, workspaceURL: URL?) async throws -> Response {
 		let result = try await executeRaw(request, workspaceURL: workspaceURL)
 		do {

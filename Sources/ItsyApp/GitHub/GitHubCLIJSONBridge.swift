@@ -61,7 +61,11 @@ public enum GitHubCLIPullRequestCheckJSONField: String, CaseIterable, Equatable,
 	case workflow
 }
 
-public enum GitHubCLIJSONCommand: Equatable, Sendable {
+protocol GitHubCLIJSONRequest: Sendable {
+	func arguments() throws -> [String]
+}
+
+public enum GitHubCLIJSONCommand: Equatable, Sendable, GitHubCLIJSONRequest {
 	case repository(fields: [GitHubCLIRepositoryJSONField])
 	case pullRequest(number: Int?, fields: [GitHubCLIPullRequestJSONField])
 	case pullRequestList(limit: Int, headRefName: GitHubCLIReferenceName?, fields: [GitHubCLIPullRequestJSONField])
@@ -231,8 +235,12 @@ public struct GitHubCLIJSONBridge: Sendable {
 		self.executor = executor
 	}
 
-	public func execute<Response: Decodable & Sendable>(_ command: GitHubCLIJSONCommand, as _: Response.Type, workspaceURL: URL?) async throws -> Response {
-		let arguments = try command.arguments()
+	func execute<Response: Decodable & Sendable>(_ command: GitHubCLIJSONCommand, as _: Response.Type, workspaceURL: URL?) async throws -> Response {
+		try await executeRequest(command, as: Response.self, workspaceURL: workspaceURL)
+	}
+
+	func executeRequest<Response: Decodable & Sendable, Request: GitHubCLIJSONRequest>(_ request: Request, as _: Response.Type, workspaceURL: URL?) async throws -> Response {
+		let arguments = try request.arguments()
 		do {
 			let result = try await executor.run(executableURL: executableURL, arguments: arguments, workingDirectoryURL: workspaceURL)
 			let diagnostics = GitHubCLIJSONDiagnostics(arguments: arguments, result: result, environment: environment)

@@ -17,6 +17,27 @@ jobs:
         run: scripts/test_native_dependency_preflight.sh
       - name: Test bootstrap CLI
         run: scripts/test_bootstrap.sh
+      - name: Resolve pinned SwiftPM dependencies
+        run: swift package resolve
+      - name: Verify dependency metadata
+        run: scripts/verify_dependency_metadata.sh --require-native
+      - name: Test dependency verification
+        run: scripts/test_dependency_verification.sh
+      - name: Require review for dependency pin changes
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          changed="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
+          if ! grep -Eq '^(Package\.resolved|\.gitmodules|docs/dependency-metadata\.json)$' <<<"$changed"; then
+            exit 0
+          fi
+          labels="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"
+          grep -Fxq 'dependency-update' <<<"$labels" || {
+            printf 'error: dependency pin changes require the dependency-update PR label\n' >&2
+            exit 1
+          }
       - name: Cache SwiftPM
         uses: actions/cache@v4
         with:

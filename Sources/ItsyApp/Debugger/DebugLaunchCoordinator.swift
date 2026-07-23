@@ -457,7 +457,7 @@ final class DebugAppSession: @unchecked Sendable {
 			let launchTask: Task<DAPResponse, Error>
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
-				let arguments = try launchArguments(for: configuration, workspaceRoot: workspaceRoot)
+				let arguments = try launchArguments(for: configuration, adapter: adapter, workspaceRoot: workspaceRoot)
 				launchTask = Task {
 					try await client.launch(arguments: arguments)
 				}
@@ -489,15 +489,11 @@ final class DebugAppSession: @unchecked Sendable {
 				try await client.setExceptionBreakpoints(DAPSetExceptionBreakpointsArguments(filters: configuration.exceptionFilters))
 			}
 			await Task.yield()
-			let configurationTask = capabilities.supportsConfigurationDoneRequest == true ? Task {
-				try await client.configurationDone()
-			} : nil
-			await Task.yield()
 			let verification = try await breakpointTask.value
 			await breakpointVerificationStore.replace(verification)
 			_ = try await exceptionTask.value
-			if let configurationTask {
-				_ = try await configurationTask.value
+			if capabilities.supportsConfigurationDoneRequest == true {
+				_ = try await client.configurationDone()
 			}
 			_ = try await launchTask.value
 			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
@@ -518,8 +514,8 @@ final class DebugAppSession: @unchecked Sendable {
 		await client.state == .terminated
 	}
 
-	private static func launchArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) throws -> DAPAny {
-		try requestArguments(DAPLaunchRequestArguments(
+	private static func launchArguments(for configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL) throws -> DAPAny {
+		let encoded = try requestArguments(DAPLaunchRequestArguments(
 			noDebug: configuration.noDebug,
 			program: resolvePath(configuration.program, workspaceRoot: workspaceRoot),
 			args: configuration.args.isEmpty ? nil : configuration.args,
@@ -527,6 +523,14 @@ final class DebugAppSession: @unchecked Sendable {
 			env: configuration.env.isEmpty ? nil : configuration.env,
 			stopOnEntry: configuration.stopOnEntry
 		), configuration: configuration, workspaceRoot: workspaceRoot)
+		guard adapter.kind == .jsDebug,
+		      configuration.adapterOptions["autoAttachChildProcesses"] == nil,
+		      case var .object(arguments) = encoded
+		else {
+			return encoded
+		}
+		arguments["autoAttachChildProcesses"] = .bool(false)
+		return .object(arguments)
 	}
 
 	private static func attachArguments(for configuration: DebugLaunchConfiguration, workspaceRoot: URL) throws -> DAPAny {

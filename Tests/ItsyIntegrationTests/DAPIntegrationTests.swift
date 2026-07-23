@@ -30,7 +30,7 @@ import Testing
 	try await breakpointStore.save()
 
 	let session = try await DebugAppSession.start(
-		adapter: DebugAdapterConfig(id: "mock", command: adapterURL.path, args: [logURL.path, sourceURL.path, "\(breakLine)"]),
+		adapter: DebugAdapterConfig(id: "vscode-js-debug", command: adapterURL.path, args: [logURL.path, sourceURL.path, "\(breakLine)"]),
 		configuration: DebugLaunchConfiguration(
 			name: "Mock DAP",
 			type: "mock",
@@ -70,6 +70,7 @@ import Testing
 	let launchArguments = try #require(launch["arguments"] as? [String: Any])
 	#expect(launchArguments["type"] as? String == "lldb")
 	#expect(launchArguments["sourceLanguages"] as? [String] == ["rust"])
+	#expect(launchArguments["autoAttachChildProcesses"] as? Bool == false)
 	#expect((launchArguments["sourceMap"] as? [String: String])?["/remote/source"] == fixture.root.appendingPathComponent("Sources").path)
 	let arguments = try #require(setBreakpoints["arguments"] as? [String: Any])
 	let source = try #require(arguments["source"] as? [String: Any])

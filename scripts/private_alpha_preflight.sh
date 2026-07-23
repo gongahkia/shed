@@ -115,6 +115,10 @@ check_dap() {
 	local guidance=""
 	case "$name" in
 	debugpy)
+		if [[ -n "${ITSY_DAP_DEBUGPY:-}" && -x "${ITSY_DAP_DEBUGPY:-}" ]] && "${ITSY_DAP_DEBUGPY}" -c 'import debugpy' >/dev/null 2>&1; then
+			record dap "$name" "$required" ready "$ITSY_DAP_DEBUGPY" ""
+			return
+		fi
 		if ! available python3 || ! python3 -c 'import debugpy' >/dev/null 2>&1; then
 			is_available=0; detail="python3 -m debugpy.adapter unavailable"; guidance="Install: python3 -m pip install debugpy"
 		fi

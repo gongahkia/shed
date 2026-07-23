@@ -5,6 +5,44 @@ on:
   pull_request:
 
 jobs:
+  capability-shards:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [unit, ui, integration, performance]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Verify native dependencies
+        run: scripts/verify_native_dependencies.sh
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-${{ runner.arch }}-ci-${{ matrix.shard }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ci-${{ matrix.shard }}-
+      - name: Install integration adapters
+        if: matrix.shard == 'integration'
+        run: |
+          debugpy_dir="$RUNNER_TEMP/debugpy"
+          python3 -m pip install --target "$debugpy_dir" debugpy
+          echo "PYTHONPATH=$debugpy_dir${PYTHONPATH:+:$PYTHONPATH}" >> "$GITHUB_ENV"
+          if ! /usr/bin/xcrun --find lldb-dap >/dev/null 2>&1 && ! command -v lldb-dap >/dev/null 2>&1; then
+            brew install llvm
+            echo "$(brew --prefix llvm)/bin" >> "$GITHUB_PATH"
+          fi
+      - name: Run capability shard
+        run: scripts/ci_shard.sh --shard '${{ matrix.shard }}' --artifacts .build/ci-shards
+      - name: Upload capability shard artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-${{ matrix.shard }}
+          path: .build/ci-shards
+
   build:
     runs-on: macos-14
     steps:
@@ -17,6 +55,8 @@ jobs:
         run: scripts/test_native_dependency_preflight.sh
       - name: Test bootstrap CLI
         run: scripts/test_bootstrap.sh
+      - name: Test CI shard CLI
+        run: scripts/test_ci_shard.sh
       - name: Resolve pinned SwiftPM dependencies
         run: swift package resolve
       - name: Verify dependency metadata

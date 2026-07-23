@@ -44,8 +44,10 @@ import ItsySyntax
 	private var settingsStatusLabel: NSTextField?
 	private var lspConfigurationPanel: LSPServerConfigurationPanel?
 	private var managedSupportPanel: ManagedSupportPanel?
+	private var settingsInspectorPanel: SettingsInspectorPanel?
 	private let settingsStore: ItsySettingsStore
 	private var appSettings: ItsySettings
+	private var settingsResolution: ItsySettingsResolution
 	private var settingsWarnings: [ItsySettingsWarning]
 	private var settingsWatcher: ItsySettingsWatcher?
 	private var settingsFontChoicesLoaded = false
@@ -61,12 +63,15 @@ import ItsySyntax
 		onTerminalSettingsChange: @escaping (ItsySettings.TerminalSettings) -> Void
 	) {
 		let store = ItsySettingsStore()
-		let loadedSettings = store.load(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
+		let fallback = Self.legacySettingsFromDefaults()
+		let loadedSettings = store.load(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: fallback)
+		let resolution = store.resolve(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: fallback)
 		self.documentController = documentController
 		self.onSettingsChange = onSettingsChange
 		self.onTerminalSettingsChange = onTerminalSettingsChange
 		settingsStore = store
-		appSettings = loadedSettings.settings
+		appSettings = resolution.settings
+		settingsResolution = resolution
 		settingsWarnings = loadedSettings.warnings
 		Self.mirrorSettingsToDefaults(appSettings)
 		super.init()
@@ -115,6 +120,7 @@ import ItsySyntax
 	private func saveAppSettings() {
 		do {
 			try settingsStore.save(appSettings)
+			settingsResolution = settingsStore.resolve(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
 			settingsWarnings.removeAll()
 			Self.mirrorSettingsToDefaults(appSettings)
 			setDefaultSettingsStatus()
@@ -146,7 +152,7 @@ import ItsySyntax
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_040))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_080))
 		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 680, height: 720))
 		scrollView.hasVerticalScroller = true
 		scrollView.autohidesScrollers = true
@@ -486,6 +492,11 @@ import ItsySyntax
 		supportButton.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(supportButton)
 
+		let catalogButton = NSButton(title: L10n.string("Settings Catalog…"), target: self, action: #selector(showSettingsCatalog(_:)))
+		catalogButton.bezelStyle = .rounded
+		catalogButton.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(catalogButton)
+
 		let statusLabel = NSTextField(labelWithString: "")
 		statusLabel.font = .systemFont(ofSize: 11)
 		statusLabel.textColor = .secondaryLabelColor
@@ -624,9 +635,11 @@ import ItsySyntax
 			supportButton.leadingAnchor.constraint(equalTo: languageServersButton.trailingAnchor, constant: 8),
 			supportButton.centerYAnchor.constraint(equalTo: reloadButton.centerYAnchor),
 			supportButton.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			catalogButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			catalogButton.topAnchor.constraint(equalTo: reloadButton.bottomAnchor, constant: 12),
 			statusLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			statusLabel.trailingAnchor.constraint(equalTo: themePopup.trailingAnchor),
-			statusLabel.topAnchor.constraint(equalTo: reloadButton.bottomAnchor, constant: 16),
+			statusLabel.topAnchor.constraint(equalTo: catalogButton.bottomAnchor, constant: 16),
 			statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -20),
 		])
 		settingsThemePopup = themePopup
@@ -818,9 +831,24 @@ import ItsySyntax
 		panel.show(relativeTo: settingsWindowController?.window, selecting: (sender as? ManagedSupportRequest)?.componentID)
 	}
 
+	@objc private func showSettingsCatalog(_: Any?) {
+		let panel = settingsInspectorPanel ?? SettingsInspectorPanel(
+			resetEntry: { [weak self] key in
+				self?.resetCatalogEntry(key) ?? []
+			},
+			updateEntry: { [weak self] key, value in
+				self?.updateCatalogEntry(key, value: value) ?? .init(items: [], validationError: "Settings are unavailable.")
+			}
+		)
+		settingsInspectorPanel = panel
+		panel.update(items: settingsCatalogItems())
+		panel.show(relativeTo: settingsWindowController?.window)
+	}
+
 	private func reloadSettingsFromDisk() {
 		let result = settingsStore.load(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
-		appSettings = result.settings
+		settingsResolution = settingsStore.resolve(workspaceRoot: ItsyWorkspaceController.currentRootURL, fallback: Self.legacySettingsFromDefaults())
+		appSettings = settingsResolution.settings
 		settingsWarnings = result.warnings
 		Self.mirrorSettingsToDefaults(appSettings)
 		refreshSettingsThemes()
@@ -830,6 +858,72 @@ import ItsySyntax
 		onTerminalSettingsChange(appSettings.terminal)
 		reloadSyntaxThemes()
 		publishSettingsChanged()
+		settingsInspectorPanel?.update(items: settingsCatalogItems())
+	}
+
+	private func settingsCatalogItems() -> [SettingsInspectorPanel.Item] {
+		let workspaceRoot = ItsyWorkspaceController.currentRootURL
+		return ItsySettingsCatalog.entries.map { entry in
+			let scope = settingsResolution.sources[entry.key] ?? .default
+			var source: (String, URL?)
+			switch scope {
+			case .global:
+				source = (L10n.string("Global"), settingsStore.fileURL)
+			case .workspace:
+				source = (L10n.string("Workspace"), workspaceRoot.map { ItsySettingsStore.workspaceFileURL(workspaceRoot: $0) })
+			case .language:
+				source = (L10n.string("Language"), nil)
+			case .session:
+				source = (L10n.string("Session"), nil)
+			case .default:
+				source = (L10n.string("Built-in Default"), nil)
+			}
+			if entry.isLanguageTemplate {
+				source = (L10n.string("Language Template"), nil)
+			}
+			return SettingsInspectorPanel.Item(
+				entry: entry,
+				effectiveValue: ItsySettingsCatalog.effectiveValue(for: entry.key, in: settingsResolution.settings),
+				sourceLabel: source.0,
+				sourceURL: source.1
+			)
+		}
+	}
+
+	private func resetCatalogEntry(_ key: String) -> [SettingsInspectorPanel.Item] {
+		guard ItsySettingsCatalog.reset(key, in: &appSettings) else {
+			return settingsCatalogItems()
+		}
+		commitCatalogSettingsChange()
+		return settingsCatalogItems()
+	}
+
+	private func updateCatalogEntry(_ key: String, value: String) -> SettingsInspectorPanel.UpdateResult {
+		var updated = appSettings
+		if let error = ItsySettingsCatalog.update(value: value, for: key, in: &updated) {
+			return .init(items: settingsCatalogItems(), validationError: error)
+		}
+		if key == "theme.id" {
+			do {
+				_ = try ItsyTheme.loadChoice(id: updated.theme.id)
+			} catch {
+				return .init(items: settingsCatalogItems(), validationError: L10n.string("Theme could not be loaded."))
+			}
+		}
+		appSettings = updated
+		commitCatalogSettingsChange()
+		return .init(items: settingsCatalogItems(), validationError: nil)
+	}
+
+	private func commitCatalogSettingsChange() {
+		appSettings = appSettings.normalized()
+		saveAppSettings()
+		refreshSettingsThemes()
+		refreshSettingsEditorControls()
+		refreshSettingsTerminalControls()
+		onSettingsChange(appSettings)
+		onTerminalSettingsChange(appSettings.terminal)
+		reloadSyntaxThemes()
 	}
 
 	private func restartSettingsWatcher() {

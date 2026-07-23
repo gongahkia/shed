@@ -687,13 +687,7 @@ public extension Notification.Name {
 }
 
 public enum ItsySettingsResolver {
-	private static let defaultKeys: Set<String> = [
-		"editor.font", "editor.font_size", "editor.font_rendering", "editor.line_numbers", "editor.line_number_mode", "editor.tab_width", "editor.use_spaces", "editor.auto_pairs", "editor.smart_indent", "editor.multiple_selections", "editor.keymap", "editor.tab_groups", "editor.wrap", "editor.wrap_column", "editor.experimental.storage",
-		"theme.id", "theme.git.gutter.added", "theme.git.gutter.modified", "theme.git.gutter.removed",
-		"syntax.preload_grammars", "terminal.font_size", "terminal.scrollback_lines",
-		"find.uses_regex", "find.case_sensitive", "find.whole_word", "recovery.journal_enabled",
-		"layout.sidebar_visible", "layout.sidebar_position", "layout.sidebar_width", "layout.tab_bar_visible", "layout.status_bar_visible", "layout.interface_scale",
-	]
+	private static let defaultKeys = Set(ItsySettingsCatalog.baseEntries.map(\.key))
 
 	public static func resolve(defaults: ItsySettings = .default, global: ItsySettingsLoadResult? = nil, workspace: ItsySettingsLoadResult? = nil, session: ItsySettingsSessionLayer? = nil) -> ItsySettingsResolution {
 		let globalSettings = global?.settings ?? defaults

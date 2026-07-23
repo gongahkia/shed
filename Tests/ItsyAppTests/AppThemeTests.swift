@@ -31,6 +31,13 @@ import Testing
 	#expect(abs(AppThemePalette.contrastRatio(.white, .black) - 21) < 0.01)
 }
 
+@Test @MainActor func invalidThemeAssetFallsBackToReadableDefaultPalette() {
+	let fallback = AppThemePalette(settings: ItsySettings(theme: .init(id: "user:missing.toml")))
+	#expect(fallback.id == "user:missing.toml")
+	#expect(fallback.contrastFailures().isEmpty)
+	#expect(close(fallback.panelBackground, to: NSColor(srgbRed: 0xF3 / 255, green: 0xF3 / 255, blue: 0xF3 / 255, alpha: 1)))
+}
+
 private func close(_ lhs: NSColor, to rhs: NSColor) -> Bool {
 	guard let a = lhs.usingColorSpace(.sRGB), let b = rhs.usingColorSpace(.sRGB) else {
 		return false

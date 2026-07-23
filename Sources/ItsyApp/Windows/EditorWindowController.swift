@@ -143,6 +143,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private var findBarController: FindBarController?
 	private var findSettings = ItsySettings.FindSettings()
+	private var layoutSettings = ItsySettings.LayoutSettings()
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
@@ -153,7 +154,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
+	private var tabBarHeightConstraint: NSLayoutConstraint?
+	private var statusBarHeightConstraint: NSLayoutConstraint?
 	private var sidebarVisible = true
+	private var sidebarPosition = ItsySettings.SidebarPosition.leading
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -228,8 +232,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
-		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
-		Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
+		tabBarHeightConstraint = Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
+		statusBarHeightConstraint = Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
 		recoveryBanner.setContentHuggingPriority(.required, for: .vertical)
@@ -271,10 +275,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.isRestorable = true
 		window.contentView = rootSplitView
 		super.init(window: window)
-		tabGroupScope = ItsySettingsStore().load(
+		let initialSettings = ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
 			fallback: EditorPreferences.legacySettings()
-		).settings.normalized().editor.tabGroups
+		).settings.normalized()
+		tabGroupScope = initialSettings.editor.tabGroups
 		configurePaneTabBar(paneCoordinator.activePane)
 		syncTabGroupVisibility()
 		configureLSPMissingBanner()
@@ -292,6 +297,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		installTabBoundsObserver()
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
+		applyLayoutSettings(initialSettings.layout)
 		applyTheme(AppTheme.palette)
 		recordBenchStage("window_controller_install_pane_end")
 		refreshLSPMissingBanner(for: document)
@@ -434,16 +440,42 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window?.makeFirstResponder(target)
 	}
 
+	private func applyLayoutSettings(_ settings: ItsySettings.LayoutSettings) {
+		layoutSettings = settings
+		let scale = CGFloat(settings.interfaceScale)
+		tabBarHeightConstraint?.constant = 32 * scale
+		statusBarHeightConstraint?.constant = 20 * scale
+		sidebarWidthConstraint?.constant = settings.sidebarVisible ? CGFloat(settings.sidebarWidth) * scale : 0
+		setSidebarPosition(settings.sidebarPosition)
+		setSidebarVisible(settings.sidebarVisible)
+		syncTabGroupVisibility()
+		refreshStatusBar()
+		invalidateEditorShellLayout()
+	}
+
+	private func setSidebarPosition(_ position: ItsySettings.SidebarPosition) {
+		guard position != sidebarPosition else {
+			return
+		}
+		sidebarPosition = position
+		guard sidebarVisible, rootSplitView.arrangedSubviews.contains(fileTreeController.view) else {
+			return
+		}
+		rootSplitView.removeArrangedSubview(fileTreeController.view)
+		fileTreeController.view.removeFromSuperview()
+		rootSplitView.insertArrangedSubview(fileTreeController.view, at: position == .leading ? 0 : 1)
+	}
+
 	private func setSidebarVisible(_ visible: Bool) {
 		guard visible != sidebarVisible else {
 			return
 		}
 		sidebarVisible = visible
 		if visible {
-			sidebarWidthConstraint?.constant = 240
+			sidebarWidthConstraint?.constant = CGFloat(layoutSettings.sidebarWidth) * CGFloat(layoutSettings.interfaceScale)
 			fileTreeController.view.isHidden = false
 			if !rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
-				rootSplitView.insertArrangedSubview(fileTreeController.view, at: 0)
+				rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarPosition == .leading ? 0 : 1)
 			}
 		} else {
 			if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
@@ -481,7 +513,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		refreshStatusBar()
 	}
 
-	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) {
+	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) -> NSLayoutConstraint {
 		tabBarView.wantsLayer = true
 		tabBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		scrollView.drawsBackground = false
@@ -498,13 +530,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		stackView.edgeInsets = NSEdgeInsets(top: 3, left: 6, bottom: 3, right: 6)
 		scrollView.documentView = stackView
 		tabBarView.addSubview(scrollView)
+		let heightConstraint = tabBarView.heightAnchor.constraint(equalToConstant: 32)
 		NSLayoutConstraint.activate([
 			scrollView.leadingAnchor.constraint(equalTo: tabBarView.leadingAnchor),
 			scrollView.trailingAnchor.constraint(equalTo: tabBarView.trailingAnchor),
 			scrollView.topAnchor.constraint(equalTo: tabBarView.topAnchor),
 			scrollView.bottomAnchor.constraint(equalTo: tabBarView.bottomAnchor),
-			tabBarView.heightAnchor.constraint(equalToConstant: 32),
+			heightConstraint,
 		])
+		return heightConstraint
 	}
 
 	private func installTabBoundsObserver() {
@@ -608,7 +642,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		ItsyTabCoordinator.closeDocument(tabID)
 	}
 
-	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField, lspButton: NSButton) {
+	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField, lspButton: NSButton) -> NSLayoutConstraint {
 		statusBarView.wantsLayer = true
 		statusBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		label.font = .systemFont(ofSize: 11)
@@ -623,14 +657,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspButton.translatesAutoresizingMaskIntoConstraints = false
 		statusBarView.addSubview(label)
 		statusBarView.addSubview(lspButton)
+		let heightConstraint = statusBarView.heightAnchor.constraint(equalToConstant: 20)
 		NSLayoutConstraint.activate([
 			label.leadingAnchor.constraint(equalTo: statusBarView.leadingAnchor, constant: 10),
 			label.trailingAnchor.constraint(lessThanOrEqualTo: lspButton.leadingAnchor, constant: -8),
 			label.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
 			lspButton.trailingAnchor.constraint(equalTo: statusBarView.trailingAnchor, constant: -10),
 			lspButton.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
-			statusBarView.heightAnchor.constraint(equalToConstant: 20),
+			heightConstraint,
 		])
+		return heightConstraint
 	}
 
 	private func configureLSPMissingBanner() {
@@ -789,7 +825,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		} else {
 			statusBarLabel.stringValue = ""
 		}
-		statusBarView.isHidden = statusBarLabel.stringValue.isEmpty && lspStatusButton.isHidden
+		statusBarView.isHidden = !layoutSettings.statusBarVisible || (statusBarLabel.stringValue.isEmpty && lspStatusButton.isHidden)
 	}
 
 	private func showLSPCrashStatus(key: LSPSessionKey, url: URL, reason: LSPSessionFailureReason) {
@@ -1428,6 +1464,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			hardWrapColumn: preferences.wrapColumn
 		)
 		view.allowsMultipleSelections = editorSettings.multipleSelections
+		view.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
 		view.applyEditorColorPalette(AppTheme.palette.editor)
 		recordBenchStage("editor_pane_appearance_end")
 		recordBenchStage("editor_pane_keymap_begin")
@@ -1544,6 +1581,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
+	private static func glyphRenderingMode(_ mode: ItsySettings.FontRenderingMode) -> GlyphAtlas.RenderingMode {
+		switch mode {
+		case .grayscale:
+			return .grayscale
+		case .subpixel:
+			return .subpixel
+		}
+	}
+
 	func applySettings(_ settings: ItsySettings) {
 		let settings = settings.normalized()
 		let editorSettings = settings.editorSettings(languageID: currentLanguageID())
@@ -1556,11 +1602,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				indentationUnit: indentationUnit
 			)
 			pane.editorView.allowsMultipleSelections = editorSettings.multipleSelections
+			pane.editorView.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
 		}
 		findSettings = settings.find
 		findBarController?.applyDefaultOptions(findSettings)
 		applyTheme(AppTheme.palette)
 		setTabGroupScope(settings.editor.tabGroups)
+		applyLayoutSettings(settings.layout)
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -1637,9 +1685,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func syncTabGroupVisibility() {
-		tabBarView.isHidden = tabGroupScope == .pane
+		tabBarView.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .pane
 		for pane in paneCoordinator.panes {
-			pane.tabBarController.view.isHidden = tabGroupScope == .window
+			pane.tabBarController.view.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .window
 		}
 		rebuildFocusTraversal()
 	}
@@ -1660,7 +1708,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			let selectedID = paneSelectedDocuments[id]
 			let tabs = documents.map { tab(for: $0, selected: ObjectIdentifier($0) == selectedID) }
 			pane.tabBarController.setTabs(tabs)
-			pane.tabBarController.view.isHidden = tabGroupScope == .window
+			pane.tabBarController.view.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .window
 		}
 		rebuildFocusTraversal()
 	}

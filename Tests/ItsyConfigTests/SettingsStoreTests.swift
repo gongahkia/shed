@@ -8,6 +8,7 @@ import Testing
 	[editor]
 	font = "Monaco" # installed on macOS
 	font_size = 16.5
+	font_rendering = "subpixel"
 	line_numbers = true
 	line_number_mode = "relative"
 	tab_width = 2
@@ -42,12 +43,21 @@ import Testing
 
 	[recovery]
 	journal_enabled = false
+
+	[layout]
+	sidebar_visible = false
+	sidebar_position = "trailing"
+	sidebar_width = 320
+	tab_bar_visible = false
+	status_bar_visible = false
+	interface_scale = 1.4
 	"""#
 	var parser = ItsySettingsParser()
 	let result = parser.parse(contents)
 	#expect(result.warnings.isEmpty)
 	#expect(result.settings.editor.font == "Monaco")
 	#expect(result.settings.editor.fontSize == 16.5)
+	#expect(result.settings.editor.fontRendering == .subpixel)
 	#expect(result.settings.editor.lineNumbers)
 	#expect(result.settings.editor.lineNumberMode == .relative)
 	#expect(result.settings.editor.tabWidth == 2)
@@ -69,6 +79,7 @@ import Testing
 	#expect(result.settings.terminal.scrollbackLines == 20000)
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
+	#expect(result.settings.layout == .init(sidebarVisible: false, sidebarPosition: .trailing, sidebarWidth: 320, tabBarVisible: false, statusBarVisible: false, interfaceScale: 1.4))
 }
 
 @Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
@@ -104,7 +115,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 2)
+	#expect(ItsySettingsSchema.currentVersion == 3)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -120,6 +131,7 @@ import Testing
 	let contents = #"""
 	[editor]
 	font_size = 15
+	font_rendering = "grayscale"
 	line_numbers = false
 	tab_width = 8
 	use_spaces = false
@@ -133,6 +145,7 @@ import Testing
 	auto_pairs = false
 	smart_indent = false
 	multiple_selections = false
+	font_rendering = "subpixel"
 	line_numbers = true
 	"""#
 	var parser = ItsySettingsParser()
@@ -143,6 +156,7 @@ import Testing
 	#expect(!result.settings.editor.useSpaces)
 	let python = result.settings.editorSettings(languageID: "python")
 	#expect(python.fontSize == 15)
+	#expect(python.fontRendering == .subpixel)
 	#expect(python.tabWidth == 4)
 	#expect(python.useSpaces)
 	#expect(python.lineNumbers)
@@ -156,7 +170,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 2"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 3"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
@@ -169,6 +183,8 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains("wrap_column = 100"))
 	#expect(ItsySettingsStore.serialize(settings).contains("[find]"))
 	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
+	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
+	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
 	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 
@@ -280,6 +296,10 @@ import Testing
 	[recovery]
 	journal_enabled = false
 
+	[layout]
+	sidebar_position = "trailing"
+	interface_scale = 1.25
+
 	[editor.language.python]
 	use_spaces = true
 	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
@@ -299,6 +319,8 @@ import Testing
 	#expect(resolved.settings.editor.multipleSelections)
 	#expect(resolved.settings.find == .init(usesRegex: true, isCaseSensitive: false, matchesWholeWord: true))
 	#expect(!resolved.settings.recovery.journalEnabled)
+	#expect(resolved.settings.layout.sidebarPosition == .trailing)
+	#expect(resolved.settings.layout.interfaceScale == 1.25)
 	#expect(resolved.source(for: "editor.tab_width") == .workspace)
 	#expect(resolved.source(for: "editor.wrap") == .session)
 	#expect(resolved.source(for: "editor.tab_width", languageID: "python") == .language)

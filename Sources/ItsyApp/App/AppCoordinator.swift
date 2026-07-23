@@ -41,6 +41,14 @@ import ItsyKeymap
 		documentController: documentController,
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
 	)
+	private lazy var gitReviewWorkspaceCoordinator = GitReviewWorkspaceCoordinator(
+		persistWorkspaceState: { [weak self] in
+			ItsyWorkspaceController.persistWindowState(from: self?.activeEditorWindowController())
+		},
+		openWorkspace: { [weak self] url in
+			self?.openWorkspace(at: url) ?? false
+		}
+	)
 	private lazy var taskCoordinator = TaskCoordinator(
 		problemsCoordinator: problemsCoordinator,
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
@@ -197,6 +205,14 @@ import ItsyKeymap
 
 	@objc func showLinePalette(_ sender: Any?) {
 		commandPaletteCoordinator.showLinePalette(sender)
+	}
+
+	func enterGitReviewWorkspace(_ session: GitReviewModeSession) -> GitReviewWorkspaceTransition {
+		gitReviewWorkspaceCoordinator.enter(session)
+	}
+
+	func exitGitReviewWorkspace(_ result: GitReviewModeExitResult) -> GitReviewWorkspaceTransition {
+		gitReviewWorkspaceCoordinator.exit(result)
 	}
 
 	private func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {

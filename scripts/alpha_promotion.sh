@@ -30,6 +30,17 @@ fi
 [[ -f "$manifest" ]] || { echo "missing manifest: $manifest" >&2; exit 1; }
 command -v ruby >/dev/null 2>&1 || { echo "missing command: ruby" >&2; exit 2; }
 
+checkout_error=""
+checkout_changes=""
+checkout_revision="unknown"
+if ! checkout_changes="$(git -C "$repo_dir" status --porcelain=v1 --untracked-files=all 2>&1)"; then
+	checkout_error="$checkout_changes"
+fi
+if ! checkout_revision="$(git -C "$repo_dir" rev-parse --verify HEAD 2>&1)"; then
+	checkout_error="${checkout_error:+$checkout_error$'\n'}$checkout_revision"
+	checkout_revision="unknown"
+fi
+
 mkdir -p "$artifacts_dir"
 artifacts_dir="$(cd "$artifacts_dir" && pwd)"
 run_dir="$artifacts_dir/run-$(date -u +%Y%m%dT%H%M%SZ)-$$"
@@ -53,6 +64,20 @@ record_missing() {
 	printf '%s\tmissing\t\t\t%s\n' "$gate" "$(remediation_for "$gate")" >>"$rows"
 }
 
+clean_checkout() {
+	if [[ -n "$checkout_error" ]]; then
+		printf '%s\n' "$checkout_error" >&2
+		echo "could not inspect repository cleanliness" >&2
+		return 1
+	fi
+	if [[ -n "$checkout_changes" ]]; then
+		printf '%s\n' "$checkout_changes" >&2
+		echo "repository must be clean before alpha promotion" >&2
+		return 1
+	fi
+	printf '%s\n' "$checkout_revision"
+}
+
 run_gate() {
 	local gate="$1"
 	shift
@@ -71,12 +96,21 @@ run_gate() {
 	return "$run_exit"
 }
 
-preflight_ready=1
-if ! run_gate preflight "$script_dir/private_alpha_preflight.sh" --output "$evidence_dir/preflight-matrix.json"; then
-	preflight_ready=0
+checkout_ready=1
+if ! run_gate clean-checkout clean_checkout; then
+	checkout_ready=0
 fi
 
-if [[ "$preflight_ready" == 1 ]]; then
+preflight_ready=1
+if [[ "$checkout_ready" == 1 ]]; then
+	if ! run_gate preflight "$script_dir/private_alpha_preflight.sh" --output "$evidence_dir/preflight-matrix.json"; then
+		preflight_ready=0
+	fi
+else
+	record_missing preflight
+fi
+
+if [[ "$checkout_ready" == 1 && "$preflight_ready" == 1 ]]; then
 	run_gate build swift build -c release || true
 	run_gate tests swift test --jobs "$jobs" || true
 	run_gate lsp-matrix "$script_dir/lsp_matrix.sh" --artifacts "$evidence_dir/lsp-matrix" || true
@@ -93,7 +127,7 @@ fi
 
 result="$run_dir/result.json"
 ruby -rjson -rtime -e '
-	rows_path, result_path, repro = ARGV
+	rows_path, result_path, repro, revision = ARGV
 	evidence = File.readlines(rows_path, chomp: true).reject(&:empty?).map do |line|
 		id, status, report, log, remediation = line.split("\t", 5)
 		{"id" => id, "status" => status, "report" => report, "log" => log, "remediation" => remediation}
@@ -106,8 +140,9 @@ ruby -rjson -rtime -e '
 		"blocked"
 	end
 	failed = evidence.find { |entry| entry.fetch("status") != "passed" }
-	puts JSON.pretty_generate({"schema" => 1, "generated_at" => Time.now.utc.iso8601, "status" => status, "repro" => repro, "failed_evidence" => failed, "evidence" => evidence})
-' "$rows" "$result" "$repro" >"$result"
+	failed_scenario = failed && {"id" => failed.fetch("id"), "report" => failed.fetch("report"), "log" => failed.fetch("log"), "remediation" => failed.fetch("remediation")}
+	puts JSON.pretty_generate({"schema" => 1, "generated_at" => Time.now.utc.iso8601, "revision" => revision, "status" => status, "repro" => repro, "failed_scenario" => failed_scenario, "failed_evidence" => failed, "evidence" => evidence})
+' "$rows" "$result" "$repro" "$checkout_revision" >"$result"
 
 status="$(ruby -rjson -e 'print JSON.parse(File.read(ARGV[0])).fetch("status")' "$result")"
 if [[ "$status" == passed ]]; then
@@ -115,6 +150,6 @@ if [[ "$status" == passed ]]; then
 	exit 0
 fi
 failed="$(ruby -rjson -e 'entry = JSON.parse(File.read(ARGV[0])).fetch("failed_evidence"); print "gate=#{entry.fetch("id")} status=#{entry.fetch("status")} log=#{entry.fetch("log")} remediation=#{entry.fetch("remediation")}"' "$result")"
-echo "$(status_label "$status") promotion=private-alpha result=$result $failed" >&2
+echo "$(status_label "$status") promotion=private-alpha result=$result scenario=$failed" >&2
 [[ "$status" == failed ]] && exit 1
 exit 2

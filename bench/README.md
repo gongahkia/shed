@@ -49,6 +49,14 @@ bench/scripts/editor_workflows.sh --record-baseline
 
 Each metric stores five samples, mean, variance, ownership, and a lower-is-better policy: a 10% relative tolerance floor or three combined standard deviations, whichever is larger.
 
+Soak gate:
+
+```sh
+bench/scripts/soak.sh
+```
+
+The gate uses a disposable Git workspace and drives documents plus pane actions in the app. During each configured component cycle it exercises LSP restart, DAP restart, terminal sessions, tasks, Git refresh, and recovery journals. It fails on app exit, new Itsy crash reports, component failure, cleanup failure, more than 10% peak RSS growth, more than 16 additional FDs, or more than two additional app-owned processes. It writes CSV samples and JSON crash/component evidence under `bench/results/`; use a short local rehearsal with `ITSY_SOAK_DURATION=60 ITSY_SOAK_SETTLE=5 ITSY_SOAK_COMPONENT_CYCLES=1`.
+
 Memory audit:
 
 ```sh

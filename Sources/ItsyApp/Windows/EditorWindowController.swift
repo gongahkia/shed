@@ -33,12 +33,26 @@ private struct LSPSemanticSurfaceCapabilities {
 	var documentHighlight: Bool
 }
 
-private struct LSPFormattingCapabilities {
+struct LSPFormattingCapabilities {
 	var document: Bool
 	var range: Bool
+
+	func requestError(for operation: LSPFormattingOperation) -> LSPFormattingRequestError? {
+		switch operation {
+		case .document:
+			document ? nil : .documentFormattingDisabled
+		case .range:
+			range ? nil : .rangeFormattingDisabled
+		}
+	}
 }
 
-private enum LSPFormattingRequestError: Error {
+enum LSPFormattingOperation {
+	case document
+	case range
+}
+
+enum LSPFormattingRequestError: Error, Equatable {
 	case documentFormattingDisabled
 	case rangeFormattingDisabled
 }
@@ -2603,7 +2617,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let uri = fileURL.standardizedFileURL.absoluteString
 		let options = lspFormattingOptions()
 		cancelFormattingRequest()
-		formattingRequestGeneration += 1
 		let generation = formattingRequestGeneration
 		formattingRequestTask = Task { [weak self, weak targetView] in
 			do {
@@ -2611,6 +2624,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				if let error = formattingCapabilitiesBySession[session.key]?.requestError(for: .document) {
+					throw error
+				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
 					return
@@ -2625,7 +2641,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					else {
 						return
 					}
-					applyTextEdits(edits, uri: uri)
+					_ = applyTextEdits(edits, uri: uri, sessionKey: session.key, operation: "format document")
 				}
 			} catch {
 				await MainActor.run { [weak self] in
@@ -2658,7 +2674,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let options = lspFormattingOptions()
 		let lspRange = lspRange(forUTF8Range: range, in: content)
 		cancelFormattingRequest()
-		formattingRequestGeneration += 1
 		let generation = formattingRequestGeneration
 		formattingRequestTask = Task { [weak self, weak targetView] in
 			do {
@@ -2666,6 +2681,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				if let error = formattingCapabilitiesBySession[session.key]?.requestError(for: .range) {
+					throw error
+				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
 					return
@@ -2680,7 +2698,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					else {
 						return
 					}
-					applyTextEdits(edits, uri: uri)
+					_ = applyTextEdits(edits, uri: uri, sessionKey: session.key, operation: "format selection")
 				}
 			} catch {
 				await MainActor.run { [weak self] in
@@ -2817,16 +2835,23 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				guard session.key == sessionKey, isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView) else {
+					return
+				}
 				switch entry {
 				case let .action(action):
 					let resolved = try await resolvedCodeAction(action, client: session.client, resolveProvider: resolveProvider)
-					await MainActor.run { [weak self] in
+					let applied = await MainActor.run { [weak self] in
 						guard let self, isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView) else {
-							return
+							return false
 						}
 						if let edit = resolved.edit {
-							_ = applyWorkspaceEdit(edit, sessionKey: sessionKey)
+							return applyWorkspaceEdit(edit, sessionKey: sessionKey, operation: "code action")
 						}
+						return true
+					}
+					guard applied else {
+						return
 					}
 					if let command = resolved.command {
 						try await session.client.executeCommand(command)
@@ -2839,6 +2864,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				}
 			} catch {
 				await MainActor.run { [weak self] in
+					self?.showLSPOperationFailure("code action", error: error)
 					self?.handleLSPRequestError(error)
 					NSLog("code action apply failed: \(error)")
 				}
@@ -2855,15 +2881,29 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		return action
 	}
 
-	private func applyTextEdits(_ edits: [LSPTextEdit], uri: String) {
+	@discardableResult
+	private func applyTextEdits(
+		_ edits: [LSPTextEdit],
+		uri: String,
+		sessionKey: LSPSessionKey,
+		operation: String
+	) -> Bool {
 		guard !edits.isEmpty else {
-			return
+			return true
 		}
-		_ = applyWorkspaceEdit(LSPWorkspaceEdit(changes: [uri: edits]))
-		focusEditor()
+		let applied = applyWorkspaceEdit(
+			LSPWorkspaceEdit(changes: [uri: edits]),
+			sessionKey: sessionKey,
+			operation: operation
+		)
+		if applied {
+			focusEditor()
+		}
+		return applied
 	}
 
 	private func cancelFormattingRequest() {
+		formattingRequestGeneration += 1
 		formattingRequestTask?.cancel()
 		formattingRequestTask = nil
 	}
@@ -4141,7 +4181,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	@discardableResult
-	private func applyWorkspaceEdit(_ edit: LSPWorkspaceEdit, sessionKey: LSPSessionKey? = nil) -> Bool {
+	private func applyWorkspaceEdit(
+		_ edit: LSPWorkspaceEdit,
+		sessionKey: LSPSessionKey? = nil,
+		operation: String? = nil
+	) -> Bool {
 		do {
 			let groups = LSPWorkspaceEditApply.normalize(edit)
 			guard !groups.isEmpty else {
@@ -4174,6 +4218,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			)
 			return true
 		} catch {
+			if let operation {
+				showLSPOperationFailure(operation, error: error)
+			}
 			handleLSPRequestError(error)
 			NSLog("workspace edit apply failed: \(error)")
 			return false

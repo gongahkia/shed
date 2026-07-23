@@ -57,9 +57,39 @@ enum LSPFormattingRequestError: Error, Equatable {
 	case rangeFormattingDisabled
 }
 
-private struct LSPSemanticTokenState {
+struct LSPSemanticTokenState: Equatable {
 	var resultId: String?
 	var data: [Int]
+}
+
+struct LSPSemanticTokenCache {
+	private var states: [String: LSPSemanticTokenState] = [:]
+
+	func state(for uri: String) -> LSPSemanticTokenState? {
+		states[uri]
+	}
+
+	mutating func invalidate(_ uri: String) {
+		states[uri] = nil
+	}
+
+	@discardableResult mutating func replace(
+		_ state: LSPSemanticTokenState?,
+		for uri: String,
+		generation: Int,
+		currentGeneration: Int
+	) -> Bool {
+		guard generation == currentGeneration else {
+			return false
+		}
+		states[uri] = state
+		return true
+	}
+}
+
+private struct LSPSemanticHighlightResult {
+	var spans: [TextHighlightSpan]
+	var tokenState: LSPSemanticTokenState?
 }
 
 private enum LSPNavigationOperation {
@@ -172,7 +202,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var typeHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var semanticSurfaceCapabilitiesBySession: [LSPSessionKey: LSPSemanticSurfaceCapabilities] = [:]
 	private var formattingCapabilitiesBySession: [LSPSessionKey: LSPFormattingCapabilities] = [:]
-	private var semanticTokenStateByURI: [String: LSPSemanticTokenState] = [:]
+	private var semanticTokenCache = LSPSemanticTokenCache()
 	private var foldingRangesByURI: [String: [LSPFoldingRange]] = [:]
 	private var collapsedFoldStartsByURI: [String: Set<Int>] = [:]
 	private let lspFoldGutterDecorator = LSPFoldGutterDecorator()
@@ -2957,7 +2987,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		guard let uri = document.fileURL?.standardizedFileURL.absoluteString else {
 			return
 		}
-		semanticTokenStateByURI[uri] = nil
+		semanticTokenCache.invalidate(uri)
 		document.setLSPSemanticHighlightSpans([])
 		document.setLSPSemanticSurface(inlayHints: [], highlights: [])
 	}
@@ -2985,7 +3015,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				let capabilities = await MainActor.run {
 					self.semanticSurfaceCapabilitiesBySession[session.key]
 				}
-				let semanticSpans = try await semanticHighlightSpans(
+				let semanticResult = try await semanticHighlightResult(
 					client: session.client,
 					uri: uri,
 					content: content,
@@ -3005,11 +3035,17 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					guard let self, generation == lspSurfaceGeneration else {
 						return
 					}
+					semanticTokenCache.replace(
+						semanticResult.tokenState,
+						for: uri,
+						generation: generation,
+						currentGeneration: lspSurfaceGeneration
+					)
 					applyLSPSemanticSurface(
 						uri: uri,
 						content: content,
 						document: document,
-						semanticSpans: semanticSpans,
+						semanticSpans: semanticResult.spans,
 						inlayHints: inlayHints,
 						foldingRanges: foldingRanges,
 						documentHighlights: documentHighlights
@@ -3036,60 +3072,55 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		return lower ..< max(lower, upper)
 	}
 
-	private func semanticHighlightSpans(
+	private func semanticHighlightResult(
 		client: LSPProcessClient,
 		uri: String,
 		content: String,
 		visibleRange: LSPRange,
 		capability: LSPSemanticTokensOptions?
-	) async throws -> [TextHighlightSpan] {
+	) async throws -> LSPSemanticHighlightResult {
 		guard let capability else {
-			await MainActor.run {
-				self.semanticTokenStateByURI[uri] = nil
-			}
-			return []
+			return LSPSemanticHighlightResult(spans: [], tokenState: nil)
 		}
 		let tokens: LSPSemanticTokens?
+		let tokenState: LSPSemanticTokenState?
 		if capability.full?.isEnabled == true {
 			let previous = await MainActor.run {
-				self.semanticTokenStateByURI[uri]
+				self.semanticTokenCache.state(for: uri)
 			}
 			if capability.full?.supportsDelta == true, let previous, let resultId = previous.resultId {
 				let result = try await client.semanticTokensDelta(uri: uri, previousResultId: resultId)
 				switch result {
 				case let .tokens(full):
 					tokens = full
-					await MainActor.run {
-						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(resultId: full.resultId, data: full.data)
-					}
+					tokenState = LSPSemanticTokenState(resultId: full.resultId, data: full.data)
 				case let .delta(delta):
 					let data = Self.applySemanticTokenDelta(delta, to: previous.data)
 					tokens = LSPSemanticTokens(resultId: delta.resultId ?? previous.resultId, data: data)
-					await MainActor.run {
-						self.semanticTokenStateByURI[uri] = LSPSemanticTokenState(
-							resultId: delta.resultId ?? previous.resultId,
-							data: data
-						)
-					}
+					tokenState = LSPSemanticTokenState(resultId: delta.resultId ?? previous.resultId, data: data)
 				case .none:
 					tokens = nil
+					tokenState = nil
 				}
 			} else {
 				let full = try await client.semanticTokensFull(uri: uri)
 				tokens = full
-				await MainActor.run {
-					self.semanticTokenStateByURI[uri] = full.map { LSPSemanticTokenState(resultId: $0.resultId, data: $0.data) }
-				}
+				tokenState = full.map { LSPSemanticTokenState(resultId: $0.resultId, data: $0.data) }
 			}
 		} else if capability.range?.isEnabled == true {
 			tokens = try await client.semanticTokensRange(uri: uri, range: visibleRange)
+			tokenState = nil
 		} else {
 			tokens = nil
+			tokenState = nil
 		}
 		guard let tokens else {
-			return []
+			return LSPSemanticHighlightResult(spans: [], tokenState: tokenState)
 		}
-		return Self.semanticHighlightSpans(from: tokens, legend: capability.legend, content: content)
+		return LSPSemanticHighlightResult(
+			spans: Self.semanticHighlightSpans(from: tokens, legend: capability.legend, content: content),
+			tokenState: tokenState
+		)
 	}
 
 	private static func applySemanticTokenDelta(_ delta: LSPSemanticTokensDelta, to previous: [Int]) -> [Int] {

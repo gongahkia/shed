@@ -523,6 +523,21 @@ extension ItsyRenderTests {
 	#expect(Array(view.gutterView.visibleLineNumberLabels.prefix(4)) == ["1", "2", "5", "6"])
 }
 
+@Test func foldedLineRangesPreserveSelectionAndScrollPosition() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: (0 ..< 20).map(String.init).joined(separator: "\n"))
+	view.lineHeight = 20
+	view.selectUTF8Range(24 ..< 24)
+	view.scroll(deltaX: 0, deltaY: -80)
+	let selection = view.editor.selections
+	let topLineIndex = view.topLineIndex
+
+	view.foldedLineRanges = [2 ..< 4]
+
+	#expect(view.editor.selections == selection)
+	#expect(view.topLineIndex == topLineIndex)
+}
+
 @Test func relativeLineNumbersUseActiveLineDistance() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "a\nb\nc\n")

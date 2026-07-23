@@ -154,6 +154,32 @@ import Testing
 	#expect(reference == "two")
 }
 
+@Test func lspDocumentSyncFlushesAllInFlightChangesBeforeSave() async throws {
+	let sink = DelayedNotificationSink()
+	let coordinator = LSPDocumentSyncCoordinator(sink: sink, debounceMillis: 0)
+	let url = URL(fileURLWithPath: "/tmp/itsy-sync-save-race.swift")
+	try await coordinator.didOpen(url: url, languageID: "swift", content: "zero")
+	let firstChange = Task {
+		await coordinator.didChange(url: url, content: "one")
+	}
+	try await sink.waitForChangeStart()
+	await coordinator.didChange(url: url, content: "two")
+	try await coordinator.didSave(url: url)
+	await firstChange.value
+
+	let calls = await sink.recordedCalls()
+	#expect(calls.map(\.method) == [
+		LSPMethod.textDocumentDidOpen,
+		LSPMethod.textDocumentDidChange,
+		LSPMethod.textDocumentDidChange,
+		LSPMethod.textDocumentDidSave,
+	])
+	let versions = try calls
+		.filter { $0.method == LSPMethod.textDocumentDidChange }
+		.map { try decodeChangeParams($0.params).textDocument.version }
+	#expect(versions == [2, 3])
+}
+
 private actor RecordingNotificationSink: LSPNotificationSink {
 	private var calls: [(method: String, params: LSPAny)] = []
 

@@ -100,7 +100,7 @@ public actor LSPDocumentSyncCoordinator {
 		guard states[url] != nil else {
 			return
 		}
-		await flush(url: url)
+		await flushPendingChange(for: url)
 		let params = LSPDidSaveTextDocumentParams(
 			textDocument: LSPTextDocumentIdentifier(uri: Self.uri(for: url)),
 			text: text

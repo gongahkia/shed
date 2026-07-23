@@ -260,11 +260,24 @@ import ItsyEditor
 		let task = expansion.task
 		let commandLine = sourceTask.presentation.showResolvedCommand ? expansion.previewCommandLine : sourceTask.commandLine
 		taskOutputTextView?.string += "$ \(commandLine)\n"
+		let outputIdentifier = "\(root.standardizedFileURL.path):\(rootTask.id)"
+		Task {
+			await IntegrationOutputConsole.shared.append(service: .task, identifier: outputIdentifier, kind: .command, text: commandLine, errorReference: "task://\(outputIdentifier)")
+		}
 		do {
 			activeTaskHandle = try WorkspaceTaskRunner().start(
 				task,
 				root: root,
 				onOutput: { [weak self] output in
+					Task {
+						await IntegrationOutputConsole.shared.append(
+							service: .task,
+							identifier: outputIdentifier,
+							kind: output.kind == .stderr ? .standardError : .standardOutput,
+							text: output.text,
+							errorReference: output.kind == .stderr ? "task://\(outputIdentifier)" : nil
+						)
+					}
 					Task { @MainActor [weak self] in
 						guard let self, self.taskRunGeneration == generation else {
 							return

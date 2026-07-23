@@ -1221,6 +1221,12 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			return
 		}
 		gitRemoteLog += text
+		if let root = gitRootURL {
+			let path = root.standardizedFileURL.path
+			Task {
+				await IntegrationOutputConsole.shared.append(service: .git, identifier: path, kind: .standardOutput, text: text, errorReference: "git://\(path)/remote")
+			}
+		}
 		let line = text.split(whereSeparator: \.isNewline).last.map(String.init) ?? text
 			.trimmingCharacters(in: .whitespacesAndNewlines)
 		if !line.isEmpty {

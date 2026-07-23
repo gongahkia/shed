@@ -69,6 +69,7 @@ import ItsyKeymap
 	)
 	private lazy var extensionsCoordinator = ExtensionsCoordinator()
 	private var integrationHealthPanel: IntegrationHealthPanel?
+	private var integrationOutputConsolePanel: IntegrationOutputConsolePanel?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -357,6 +358,9 @@ import ItsyKeymap
 				},
 				Command(id: "integration.health", title: L10n.string("Integration Health"), defaultKey: nil) { [weak self] in
 					self?.showIntegrationHealth(nil)
+				},
+				Command(id: "integration.output", title: L10n.string("Integration Output"), defaultKey: nil) { [weak self] in
+					self?.showIntegrationOutput(nil)
 				},
 				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"), defaultKey: nil) { [weak self] in
 					self?.settingsCoordinator.showLSPConfiguration(nil)
@@ -839,6 +843,21 @@ import ItsyKeymap
 			let panel = integrationHealthPanel ?? IntegrationHealthPanel()
 			integrationHealthPanel = panel
 			panel.show(snapshot: IntegrationHealthPanelSnapshot(records: records), relativeTo: activeEditorWindowController()?.window)
+		}
+	}
+
+	@objc func showIntegrationOutput(_ sender: Any?) {
+		Task { [weak self] in
+			let snapshot = IntegrationOutputConsolePanelSnapshot(
+				entries: await IntegrationOutputConsole.shared.entries(),
+				scopes: await IntegrationOutputConsole.shared.scopes()
+			)
+			guard let self else {
+				return
+			}
+			let panel = integrationOutputConsolePanel ?? IntegrationOutputConsolePanel()
+			integrationOutputConsolePanel = panel
+			panel.show(snapshot: snapshot, relativeTo: activeEditorWindowController()?.window)
 		}
 	}
 

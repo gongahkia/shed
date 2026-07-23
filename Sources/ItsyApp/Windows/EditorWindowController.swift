@@ -1107,6 +1107,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			entry.lastError = output.text
 		}
 		lspStatusEntries[key] = entry
+		Task {
+			await IntegrationOutputConsole.shared.append(
+				service: .lsp,
+				identifier: "\(key.languageID):\(key.workspaceRoot.path)",
+				kind: output.kind == .protocolOutput ? .protocolOutput : .standardError,
+				text: output.text,
+				errorReference: output.kind == .protocolOutput ? "lsp://\(key.languageID)/\(key.workspaceRoot.path)" : nil,
+				timestamp: output.timestamp
+			)
+		}
 		activeLSPKey = key
 		refreshStatusBar()
 	}

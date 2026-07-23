@@ -350,6 +350,7 @@ final class DebugAppSession: @unchecked Sendable {
 	let debugSession: DebugSession
 	let configuration: DebugLaunchConfiguration
 	let adapter: DebugAdapterConfig
+	let workspaceRoot: URL
 	let client: DAPClientSession
 	let capabilities: DAPCapabilities
 	let supportsSetVariable: Bool
@@ -361,10 +362,11 @@ final class DebugAppSession: @unchecked Sendable {
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
+		self.workspaceRoot = workspaceRoot
 		self.client = client
 		self.capabilities = capabilities
 		self.supportsSetVariable = supportsSetVariable
@@ -432,6 +434,7 @@ final class DebugAppSession: @unchecked Sendable {
 					}
 				case let .stderr(data):
 					if let text = String(data: data, encoding: .utf8), !text.isEmpty {
+						await IntegrationOutputConsole.shared.append(service: .dap, identifier: healthIdentifier, kind: .standardError, text: text, errorReference: logReference)
 						NSLog("debug adapter stderr: \(text)")
 					}
 				case let .terminated(status):
@@ -505,7 +508,7 @@ final class DebugAppSession: @unchecked Sendable {
 			}
 			_ = try await launchTask.value
 			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .running, state: .healthy, detailLogReference: logReference)
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, workspaceRoot: workspaceRoot, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			await client.transportDidTerminate(status: nil)

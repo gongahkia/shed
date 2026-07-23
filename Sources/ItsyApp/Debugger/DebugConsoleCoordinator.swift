@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import ItsyDAP
 import ItsyDebugger
+import ItsyEditor
 
 @MainActor final class DebugConsoleCoordinator: NSObject, NSTextFieldDelegate {
 	private let activeSessionProvider: () -> DebugAppSession?
@@ -120,6 +121,18 @@ import ItsyDebugger
 	}
 
 	private func appendOutput(_ body: DAPOutputEventBody) {
+		if let session = activeSessionProvider() {
+			let identifier = "\(session.adapter.id):\(session.workspaceRoot.path)"
+			Task {
+				await IntegrationOutputConsole.shared.append(
+					service: .dap,
+					identifier: identifier,
+					kind: body.category == DAPOutputCategory.stderr ? .standardError : .event,
+					text: body.output,
+					errorReference: body.category == DAPOutputCategory.stderr ? "dap://\(session.adapter.id)/\(session.workspaceRoot.path)" : nil
+				)
+			}
+		}
 		append(body.output, category: body.category)
 	}
 

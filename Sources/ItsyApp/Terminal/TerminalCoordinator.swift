@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ItsyConfig
+import ItsyEditor
 
 struct TerminalWorkspaceState: Codable, Equatable {
 	var selectedTabIndex: Int
@@ -683,6 +684,16 @@ struct TerminalPaneLayout: Equatable {
 			DispatchQueue.main.async {
 				guard let self, let tab, let pane, let session, pane.session === session else {
 					return
+				}
+				let output = String(decoding: data, as: UTF8.self)
+				Task {
+					await IntegrationOutputConsole.shared.append(
+						service: .terminal,
+						identifier: pane.currentDirectoryURL.path,
+						kind: .standardOutput,
+						text: output,
+						errorReference: "terminal://\(pane.currentDirectoryURL.path)"
+					)
 				}
 				self.ingest(data, into: pane, tab: tab)
 			}

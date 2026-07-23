@@ -144,14 +144,7 @@ public struct GitHubCLIJSONDiagnostics: Equatable, Sendable {
 	}
 
 	private static func redact(_ output: String, environment: [String: String]) -> String {
-		var redacted = LSPLogRedactor.redact(output, environment: environment)
-		for pattern in ["\\bgh[pousr]_[A-Za-z0-9_]+\\b", "\\bgithub_pat_[A-Za-z0-9_]+\\b", "(?i)(https?://)[^/@\\s]+@"] {
-			guard let expression = try? NSRegularExpression(pattern: pattern) else { continue }
-			let range = NSRange(redacted.startIndex..., in: redacted)
-			let template = pattern.hasPrefix("(?i)") ? "$1<redacted>@" : "<redacted>"
-			redacted = expression.stringByReplacingMatches(in: redacted, range: range, withTemplate: template)
-		}
-		return redacted
+		IntegrationOutputRedactor.redact(output, environment: environment)
 	}
 }
 
@@ -264,6 +257,9 @@ public struct GitHubCLIJSONBridge: Sendable {
 		do {
 			let result = try await executor.run(executableURL: executableURL, arguments: arguments, workingDirectoryURL: workspaceURL)
 			let diagnostics = GitHubCLIJSONDiagnostics(arguments: arguments, result: result, environment: environment)
+			await IntegrationOutputConsole.shared.append(service: .gitHub, identifier: workspace, kind: .command, text: "gh \(arguments.joined(separator: " "))", errorReference: detailLogReference)
+			await IntegrationOutputConsole.shared.append(service: .gitHub, identifier: workspace, kind: .standardOutput, text: diagnostics.standardOutput, errorReference: detailLogReference)
+			await IntegrationOutputConsole.shared.append(service: .gitHub, identifier: workspace, kind: .standardError, text: diagnostics.standardError, errorReference: detailLogReference)
 			guard result.exitStatus == 0 else { throw GitHubCLIJSONBridgeError.processFailure(diagnostics) }
 			await IntegrationHealthStore.shared.report(service: .gitHub, identifier: workspace, lifecycle: .stopped, state: .healthy, detailLogReference: detailLogReference)
 			return (arguments, result)

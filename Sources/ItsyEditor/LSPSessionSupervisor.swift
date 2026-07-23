@@ -10,7 +10,7 @@ public enum LSPHealthState: String, Equatable, Sendable {
 	case unavailable
 }
 
-public enum LSPSessionOutputKind: String, Equatable, Sendable {
+public enum LSPSessionOutputKind: String, CaseIterable, Equatable, Sendable {
 	case process
 	case protocolOutput = "protocol"
 }
@@ -30,7 +30,7 @@ public struct LSPSessionOutput: Equatable, Sendable {
 public enum LSPLogRedactor {
 	public static func redact(_ text: String, environment: [String: String] = ProcessInfo.processInfo.environment) -> String {
 		var redacted = text
-		for (name, value) in environment where isSensitive(name) && !value.isEmpty {
+		for value in sensitiveValues(in: environment) {
 			redacted = redacted.replacingOccurrences(of: value, with: "<redacted>")
 		}
 		redacted = replacing(
@@ -44,6 +44,67 @@ public enum LSPLogRedactor {
 			in: redacted
 		)
 		return replacing("(?i)(Bearer\\s+)[^\\s]+", with: "$1<redacted>", in: redacted)
+	}
+
+	public struct Stream {
+		private let environment: [String: String]
+		private let sensitiveValues: [String]
+		private var lineBuffer = ""
+		private var pending = ""
+
+		public init(environment: [String: String] = ProcessInfo.processInfo.environment) {
+			self.environment = environment
+			sensitiveValues = LSPLogRedactor.sensitiveValues(in: environment)
+		}
+
+		public mutating func append(_ text: String) -> String {
+			lineBuffer.append(text)
+			guard let lineEnd = lineBuffer.lastIndex(of: "\n") else {
+				return ""
+			}
+			let nextLine = lineBuffer.index(after: lineEnd)
+			pending.append(contentsOf: lineBuffer[..<nextLine])
+			lineBuffer.removeSubrange(..<nextLine)
+			return drain(flushing: false)
+		}
+
+		public mutating func finish() -> String {
+			pending.append(lineBuffer)
+			lineBuffer = ""
+			return drain(flushing: true)
+		}
+
+		private mutating func drain(flushing: Bool) -> String {
+			guard !sensitiveValues.isEmpty else {
+				let text = pending
+				pending = ""
+				return LSPLogRedactor.redact(text, environment: environment)
+			}
+			var output = ""
+			while !pending.isEmpty {
+				let completed = sensitiveValues.filter { pending.hasPrefix($0) }
+				let partial = sensitiveValues.filter { $0.hasPrefix(pending) }
+				if let value = completed.max(by: { $0.count < $1.count }),
+				   partial.allSatisfy({ $0.count <= value.count })
+				{
+					output += "<redacted>"
+					pending.removeFirst(value.count)
+					continue
+				}
+				if !partial.isEmpty, !flushing {
+					break
+				}
+				output.append(pending.removeFirst())
+			}
+			return LSPLogRedactor.redact(output, environment: environment)
+		}
+	}
+
+	private static func sensitiveValues(in environment: [String: String]) -> [String] {
+		environment
+			.filter { isSensitive($0.key) && !$0.value.isEmpty }
+			.map(\.value)
+			.sorted { $0.count == $1.count ? $0 > $1 : $0.count > $1.count }
 	}
 
 	private static func isSensitive(_ name: String) -> Bool {
@@ -90,6 +151,7 @@ public actor LSPSessionSupervisor {
 	private var ownedURIs: Set<String> = []
 	private var stderrTail = Data()
 	private let environment: [String: String]
+	private var outputRedactors: [LSPSessionOutputKind: LSPLogRedactor.Stream]
 
 	public init(key: LSPSessionKey, client: LSPProcessClient, environment: [String: String] = ProcessInfo.processInfo.environment) {
 		self.init(key: key, events: client.events, environment: environment)
@@ -103,6 +165,9 @@ public actor LSPSessionSupervisor {
 		self.key = key
 		self.clientEvents = clientEvents
 		self.environment = environment
+		outputRedactors = Dictionary(uniqueKeysWithValues: LSPSessionOutputKind.allCases.map {
+			($0, LSPLogRedactor.Stream(environment: environment))
+		})
 		diagnostics = LSPDiagnosticsAggregator(root: key.workspaceRoot)
 		var capturedContinuation: AsyncStream<LSPSessionSupervisorEvent>.Continuation?
 		events = AsyncStream { continuation in
@@ -158,11 +223,11 @@ public actor LSPSessionSupervisor {
 		case let .server(.notification(notification)):
 			await handle(notification)
 		case let .stderr(data):
-			continuation.yield(.output(recordOutput(data, kind: .process)))
+			recordOutput(data, kind: .process)
 		case let .terminated(status):
 			await handleTermination(status)
 		case let .failure(message):
-			continuation.yield(.output(recordOutput(Data(message.utf8), kind: .protocolOutput)))
+			recordOutput(Data(message.utf8), kind: .protocolOutput)
 		case let .server(.request(request)):
 			await handle(request)
 		}
@@ -192,6 +257,7 @@ public actor LSPSessionSupervisor {
 	}
 
 	private func handleTermination(_ status: Int32) async {
+		flushOutput()
 		for uri in ownedURIs {
 			await diagnostics.removeDocument(forURI: uri)
 		}
@@ -204,14 +270,36 @@ public actor LSPSessionSupervisor {
 		)))
 	}
 
-	private func recordOutput(_ data: Data, kind: LSPSessionOutputKind) -> LSPSessionOutput {
-		let text = LSPLogRedactor.redact(String(decoding: data, as: UTF8.self), environment: environment)
+	private func recordOutput(_ data: Data, kind: LSPSessionOutputKind) {
+		guard var redactor = outputRedactors[kind] else {
+			return
+		}
+		let text = redactor.append(String(decoding: data, as: UTF8.self))
+		outputRedactors[kind] = redactor
+		emitOutput(text, kind: kind)
+	}
+
+	private func flushOutput() {
+		for kind in LSPSessionOutputKind.allCases {
+			guard var redactor = outputRedactors[kind] else {
+				continue
+			}
+			let text = redactor.finish()
+			outputRedactors[kind] = redactor
+			emitOutput(text, kind: kind)
+		}
+	}
+
+	private func emitOutput(_ text: String, kind: LSPSessionOutputKind) {
+		guard !text.isEmpty else {
+			return
+		}
 		let redactedData = Data(text.utf8)
 		stderrTail.append(redactedData)
 		if stderrTail.count > Self.stderrTailLimit {
 			stderrTail = Data(stderrTail.suffix(Self.stderrTailLimit))
 		}
-		return LSPSessionOutput(kind: kind, text: text)
+		continuation.yield(.output(LSPSessionOutput(kind: kind, text: text)))
 	}
 
 	private func finish() {

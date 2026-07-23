@@ -79,8 +79,8 @@ import Testing
 	source.yield(.stderr(Data("tail".utf8)))
 	source.yield(.terminated(7))
 
-	let events = try await collector.waitForCount(4)
-	guard case let .sessionFailed(reason) = events[3] else {
+	let events = try await collector.waitForCount(3)
+	guard case let .sessionFailed(reason) = events[2] else {
 		Issue.record("expected sessionFailed")
 		return
 	}
@@ -108,8 +108,9 @@ import Testing
 	}
 
 	await supervisor.start()
-	source.yield(.stderr(Data("API_TOKEN=top-secret Authorization: Bearer top-secret\n".utf8)))
-	source.yield(.failure("protocol payload {\"token\":\"top-secret\"}"))
+	source.yield(.stderr(Data("API_TOKEN=top-".utf8)))
+	source.yield(.stderr(Data("secret Authorization: Bearer top-secret\n".utf8)))
+	source.yield(.failure("protocol payload {\"token\":\"top-secret\"}\n"))
 	let events = try await collector.waitForCount(2)
 	let output = events.compactMap { event -> LSPSessionOutput? in
 		guard case let .output(output) = event else {
@@ -118,8 +119,29 @@ import Testing
 		return output
 	}
 	#expect(output.map(\.kind) == [.process, .protocolOutput])
-	#expect(output.allSatisfy { !$0.text.contains("top-secret") })
-	#expect(output.allSatisfy { $0.text.contains("<redacted>") })
+	let rendered = output.map(\.text).joined()
+	#expect(!rendered.contains("top-secret"))
+	#expect(rendered.contains("<redacted>"))
+}
+
+@Test func lspLogRedactionStreamPrioritizesOverlappingSecrets() {
+	var redactor = LSPLogRedactor.Stream(environment: ["API_TOKEN": "top-secret", "AUTH_TOKEN": "top"])
+	let output = [redactor.append("token=top-"), redactor.append("secret")].joined()
+		+ redactor.finish()
+
+	#expect(!output.contains("top-secret"))
+	#expect(!output.contains("top"))
+	#expect(output == "token=<redacted>")
+}
+
+@Test func lspLogRedactionStreamRedactsChunkedBearerCredentials() {
+	var redactor = LSPLogRedactor.Stream(environment: [:])
+	let output = redactor.append("Authorization: Bearer top-")
+		+ redactor.append("secret\n")
+		+ redactor.finish()
+
+	#expect(!output.contains("top-secret"))
+	#expect(output == "Authorization: Bearer <redacted>\n")
 }
 
 @Test func lspSessionSupervisorTreatsUnexpectedZeroExitAsFailure() async throws {

@@ -134,6 +134,8 @@ jobs:
         run: swift test --filter ItsyIntegrationTests
       - name: Bench smoke
         run: .build/release/ItsyBench --smoke --runs 1
+      - name: Workflow benchmark contract
+        run: .build/release/ItsyBench workflow --file bench/corpus/small.ts --repeats 1 >/dev/null
       - name: Large text release gate
         if: github.event_name == 'pull_request'
         run: bench/scripts/large_text_gate.sh

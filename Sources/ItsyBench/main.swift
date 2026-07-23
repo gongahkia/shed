@@ -68,6 +68,12 @@ private struct WorkspaceIndexOptions {
 	var ignoredFiles: Int
 }
 
+private struct WorkflowOptions {
+	var file: String
+	var repeats: Int
+	var paneTransitions: Int
+}
+
 private struct DisplayOptions {
 	var displayID: CGDirectDisplayID
 }
@@ -227,6 +233,25 @@ private struct WorkspaceIndexBenchResult: Encodable {
 	var save_ms: Double
 }
 
+private struct WorkflowSample: Encodable {
+	var edit_ms: Double
+	var open_ms: Double
+	var pane_transition_ms: Double
+	var rss_delta_kb: UInt64
+	var save_ms: Double
+	var search_ms: Double
+}
+
+private struct WorkflowBenchResult: Encodable {
+	var corpus_bytes: Int
+	var corpus_path: String
+	var owner: String
+	var repeats: Int
+	var samples: [WorkflowSample]
+	var variance_ms2: [String: Double]
+	var means_ms: [String: Double]
+}
+
 private struct HighlightSmokeSample {
 	var filename: String
 	var source: String
@@ -381,6 +406,8 @@ enum ItsyBenchMain {
 			try printJSON(workspaceFSEvents(parseWorkspaceFSEvents(Array(args.dropFirst()))))
 		case "workspace-index":
 			try printJSON(workspaceIndex(parseWorkspaceIndex(Array(args.dropFirst()))))
+		case "workflow":
+			try printJSON(workflow(parseWorkflow(Array(args.dropFirst()))))
 		default:
 			throw BenchError.usage("unknown command: \(command)")
 		}
@@ -676,6 +703,44 @@ enum ItsyBenchMain {
 			mmapContract: mmapContract,
 			mmapRSSBudgetKB: mmapRSSBudgetKB
 		)
+	}
+
+	private static func parseWorkflow(_ args: [String]) throws -> WorkflowOptions {
+		var file: String?
+		var repeats = 5
+		var paneTransitions = 200
+		var index = args.startIndex
+		while index < args.endIndex {
+			switch args[index] {
+			case "--file":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, !args[valueIndex].isEmpty else {
+					throw BenchError.usage("missing value for --file")
+				}
+				file = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--repeats":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --repeats")
+				}
+				repeats = value
+				index = args.index(after: valueIndex)
+			case "--pane-transitions":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = Int(args[valueIndex]), value > 0 else {
+					throw BenchError.usage("invalid --pane-transitions")
+				}
+				paneTransitions = value
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown workflow option: \(args[index])")
+			}
+		}
+		guard let file else {
+			throw BenchError.usage("usage: itsybench workflow --file <path> [--repeats <count>] [--pane-transitions <count>]")
+		}
+		return WorkflowOptions(file: file, repeats: repeats, paneTransitions: paneTransitions)
 	}
 
 	private static func parseUndo(_ args: [String]) throws -> UndoOptions {
@@ -996,6 +1061,92 @@ enum ItsyBenchMain {
 			slice_length: sliceLength,
 			slice_ns_per_op: Double(sliceNS) / Double(operations),
 			slice_checksum: checksum
+		)
+	}
+
+	private static func workflow(_ options: WorkflowOptions) throws -> WorkflowBenchResult {
+		let fileURL = URL(fileURLWithPath: options.file)
+		let source = try Data(contentsOf: fileURL)
+		guard !source.isEmpty else {
+			throw BenchError.smokeFailed("workflow corpus is empty: \(fileURL.path)")
+		}
+		let queryLength = min(64, source.count)
+		let queryStart = max(0, (source.count - queryLength) / 2)
+		let query = Array(source[queryStart ..< queryStart + queryLength])
+		let paneLayouts = ["L", "V[L,L]", "H[L,L]", "V[H[L,L],L]"]
+		var samples: [WorkflowSample] = []
+		for _ in 0 ..< options.repeats {
+			let baselineRSS = try residentSizeKB(pid: getpid())
+			var tree = PieceTree()
+			let openNS = measureNanoseconds {
+				tree = PieceTree(bytes: Array(source))
+			}
+			let editOffset = tree.length / 2
+			let editNS = measureNanoseconds {
+				tree.insert("itsy-workflow-edit", at: editOffset)
+				tree.remove(editOffset ..< editOffset + "itsy-workflow-edit".utf8.count)
+			}
+			let searchNS = measureNanoseconds {
+				_ = streamingSearch(query, in: tree)
+			}
+			guard streamingSearch(query, in: tree) != nil else {
+				throw BenchError.smokeFailed("workflow search missed corpus content")
+			}
+			let saveURL = FileManager.default.temporaryDirectory
+				.appendingPathComponent("itsy-workflow-\(UUID().uuidString)-\(fileURL.lastPathComponent)")
+			let saveNS = try measureNanoseconds {
+				try AtomicFileWriter.write(to: saveURL) { descriptor in
+					try tree.write(to: descriptor, path: saveURL.path)
+				}
+			}
+			defer { try? FileManager.default.removeItem(at: saveURL) }
+			guard (try saveURL.resourceValues(forKeys: [.fileSizeKey]).fileSize) == source.count else {
+				throw BenchError.smokeFailed("workflow save changed corpus length")
+			}
+			let paneNS = try measureNanoseconds {
+				var state = WorkspaceWindowState()
+				for transition in 0 ..< options.paneTransitions {
+					state.paneLayout = paneLayouts[transition % paneLayouts.count]
+					state.paneStates = [
+						WorkspacePaneState(openPaths: [fileURL.path], selectedPath: fileURL.path),
+						WorkspacePaneState(openPaths: [fileURL.path], selectedPath: fileURL.path),
+					]
+					state.focusedPaneIndex = transition % 2
+					state = try JSONDecoder().decode(WorkspaceWindowState.self, from: JSONEncoder().encode(state))
+				}
+			}
+			let currentRSS = try residentSizeKB(pid: getpid())
+			samples.append(WorkflowSample(
+				edit_ms: Double(editNS) / 1_000_000,
+				open_ms: Double(openNS) / 1_000_000,
+				pane_transition_ms: Double(paneNS) / 1_000_000 / Double(options.paneTransitions),
+				rss_delta_kb: rssDeltaKB(currentRSS, baselineRSS),
+				save_ms: Double(saveNS) / 1_000_000,
+				search_ms: Double(searchNS) / 1_000_000
+			))
+		}
+		let metrics: [(String, [Double])] = [
+			("open_ms", samples.map(\.open_ms)),
+			("edit_ms", samples.map(\.edit_ms)),
+			("search_ms", samples.map(\.search_ms)),
+			("save_ms", samples.map(\.save_ms)),
+			("pane_transition_ms", samples.map(\.pane_transition_ms)),
+		]
+		let means = Dictionary(uniqueKeysWithValues: metrics.map { name, values in
+			(name, values.reduce(0, +) / Double(values.count))
+		})
+		let variance = Dictionary(uniqueKeysWithValues: metrics.map { name, values in
+			let mean = means[name] ?? 0
+			return (name, values.reduce(0) { $0 + ($1 - mean) * ($1 - mean) } / Double(values.count))
+		})
+		return WorkflowBenchResult(
+			corpus_bytes: source.count,
+			corpus_path: fileURL.path,
+			owner: "app",
+			repeats: options.repeats,
+			samples: samples,
+			variance_ms2: variance,
+			means_ms: means
 		)
 	}
 
@@ -1708,6 +1859,7 @@ enum ItsyBenchMain {
 	  itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 	  itsybench workspace-fsevents [--timeout-ms <ms>]
 	  itsybench workspace-index [--files <count>] [--ignored-files <count>]
+	  itsybench workflow --file <path> [--repeats <count>] [--pane-transitions <count>]
 	"""
 }
 

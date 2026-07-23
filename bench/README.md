@@ -26,11 +26,28 @@ itsybench open --file <path> [--app <path>] [--timeout-ms <ms>] [--warmup-purge]
 itsybench piecetree [--ops <count>] [--slice-length <bytes>] [--file <path>] [--mmap-contract] [--mmap-rss-budget-kb <kb>]
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
+itsybench workflow --file <path> [--repeats <count>] [--pane-transitions <count>]
 ```
 
 `display` reports CGDisplay mode dimensions plus CVDisplayLink actual/nominal refresh Hz for ProMotion verification.
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
+
+Representative workflow gate:
+
+```sh
+bench/scripts/editor_workflows.sh
+```
+
+The fixed `small.ts`, `large.ts`, and `Sources/ItsyBench/main.swift` corpora cover app-owned open, edit, search, save, persisted pane-state transitions, and SourceKit-LSP diagnostics. Git status refresh and task output are labeled `environment` because their timing includes an external executable. Existing launch, first-window, RSS, and input-latency gates remain separately app-staged in `regression.sh`.
+
+Record a baseline only on a controlled Mac:
+
+```sh
+bench/scripts/editor_workflows.sh --record-baseline
+```
+
+Each metric stores five samples, mean, variance, ownership, and a lower-is-better policy: a 10% relative tolerance floor or three combined standard deviations, whichever is larger.
 
 Memory audit:
 

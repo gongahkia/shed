@@ -10,6 +10,7 @@ bench/corpus/huge-text.log
 bench/results/*.json
 !bench/results/baseline-itsy-current.json
 !bench/results/input-latency-baseline.json
+!bench/results/editor-workflows-baseline.json
 !bench/results/coverage-*.json
 !bench/results/nightly-competitors-*.json
 !.gitkeep

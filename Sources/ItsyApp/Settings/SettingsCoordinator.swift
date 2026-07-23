@@ -17,6 +17,16 @@ import ItsySyntax
 	private var settingsWrapPopup: NSPopUpButton?
 	private var settingsWrapColumnField: NSTextField?
 	private var settingsWrapColumnStepper: NSStepper?
+	private var settingsTabWidthField: NSTextField?
+	private var settingsTabWidthStepper: NSStepper?
+	private var settingsUseSpacesButton: NSButton?
+	private var settingsAutoPairsButton: NSButton?
+	private var settingsSmartIndentButton: NSButton?
+	private var settingsMultipleSelectionsButton: NSButton?
+	private var settingsFindRegexButton: NSButton?
+	private var settingsFindCaseButton: NSButton?
+	private var settingsFindWholeWordButton: NSButton?
+	private var settingsRecoveryJournalButton: NSButton?
 	private var settingsFontSizeField: NSTextField?
 	private var settingsFontSizeStepper: NSStepper?
 	private var settingsTerminalFontSizeField: NSTextField?
@@ -127,7 +137,7 @@ import ItsySyntax
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 570))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 760))
 		let window = NSWindow(
 			contentRect: contentView.frame,
 			styleMask: [.titled, .closable],
@@ -265,6 +275,53 @@ import ItsySyntax
 		wrapColumnStepper.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(wrapColumnStepper)
 
+		let tabWidthLabel = settingsLabel("Tab Width")
+		contentView.addSubview(tabWidthLabel)
+
+		let tabWidthField = NSTextField(frame: .zero)
+		tabWidthField.alignment = .right
+		let tabWidthFormatter = NumberFormatter()
+		tabWidthFormatter.minimum = NSNumber(value: ItsySettings.EditorSettings.minTabWidth)
+		tabWidthFormatter.maximum = NSNumber(value: ItsySettings.EditorSettings.maxTabWidth)
+		tabWidthFormatter.allowsFloats = false
+		tabWidthField.formatter = tabWidthFormatter
+		tabWidthField.target = self
+		tabWidthField.action = #selector(settingsTabWidthDidChange(_:))
+		tabWidthField.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(tabWidthField)
+
+		let tabWidthStepper = NSStepper()
+		tabWidthStepper.minValue = Double(ItsySettings.EditorSettings.minTabWidth)
+		tabWidthStepper.maxValue = Double(ItsySettings.EditorSettings.maxTabWidth)
+		tabWidthStepper.increment = 1
+		tabWidthStepper.target = self
+		tabWidthStepper.action = #selector(settingsTabWidthDidChange(_:))
+		tabWidthStepper.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(tabWidthStepper)
+
+		let useSpacesButton = settingsCheckbox("Indent Using Spaces", action: #selector(settingsUseSpacesDidChange(_:)))
+		let autoPairsButton = settingsCheckbox("Auto Pairs", action: #selector(settingsAutoPairsDidChange(_:)))
+		let smartIndentButton = settingsCheckbox("Smart Indent", action: #selector(settingsSmartIndentDidChange(_:)))
+		let multipleSelectionsButton = settingsCheckbox("Multiple Cursors", action: #selector(settingsMultipleSelectionsDidChange(_:)))
+		for button in [useSpacesButton, autoPairsButton, smartIndentButton, multipleSelectionsButton] {
+			contentView.addSubview(button)
+		}
+
+		let findDefaultsLabel = settingsLabel("Find Defaults")
+		contentView.addSubview(findDefaultsLabel)
+		let findRegexButton = settingsCheckbox("Regex", action: #selector(settingsFindDidChange(_:)))
+		let findCaseButton = settingsCheckbox("Case", action: #selector(settingsFindDidChange(_:)))
+		let findWholeWordButton = settingsCheckbox("Word", action: #selector(settingsFindDidChange(_:)))
+		let findStack = NSStackView(views: [findRegexButton, findCaseButton, findWholeWordButton])
+		findStack.orientation = .horizontal
+		findStack.alignment = .centerY
+		findStack.spacing = 12
+		findStack.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(findStack)
+
+		let recoveryJournalButton = settingsCheckbox("Keep Recovery Journal", action: #selector(settingsRecoveryJournalDidChange(_:)))
+		contentView.addSubview(recoveryJournalButton)
+
 		let terminalFontSizeLabel = settingsLabel("Terminal Size")
 		contentView.addSubview(terminalFontSizeLabel)
 
@@ -397,8 +454,31 @@ import ItsySyntax
 			wrapColumnStepper.leadingAnchor.constraint(equalTo: wrapColumnField.trailingAnchor, constant: 8),
 			wrapColumnStepper.centerYAnchor.constraint(equalTo: wrapColumnField.centerYAnchor),
 			wrapColumnStepper.trailingAnchor.constraint(lessThanOrEqualTo: themePopup.trailingAnchor),
+			tabWidthLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			tabWidthLabel.topAnchor.constraint(equalTo: wrapPopup.bottomAnchor, constant: 18),
+			tabWidthLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			tabWidthField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			tabWidthField.widthAnchor.constraint(equalToConstant: 72),
+			tabWidthField.centerYAnchor.constraint(equalTo: tabWidthLabel.centerYAnchor),
+			tabWidthStepper.leadingAnchor.constraint(equalTo: tabWidthField.trailingAnchor, constant: 8),
+			tabWidthStepper.centerYAnchor.constraint(equalTo: tabWidthField.centerYAnchor),
+			useSpacesButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			useSpacesButton.topAnchor.constraint(equalTo: tabWidthField.bottomAnchor, constant: 12),
+			autoPairsButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			autoPairsButton.topAnchor.constraint(equalTo: useSpacesButton.bottomAnchor, constant: 8),
+			smartIndentButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			smartIndentButton.topAnchor.constraint(equalTo: autoPairsButton.bottomAnchor, constant: 8),
+			multipleSelectionsButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			multipleSelectionsButton.topAnchor.constraint(equalTo: smartIndentButton.bottomAnchor, constant: 8),
+			findDefaultsLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			findDefaultsLabel.topAnchor.constraint(equalTo: multipleSelectionsButton.bottomAnchor, constant: 16),
+			findDefaultsLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			findStack.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			findStack.centerYAnchor.constraint(equalTo: findDefaultsLabel.centerYAnchor),
+			recoveryJournalButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			recoveryJournalButton.topAnchor.constraint(equalTo: findStack.bottomAnchor, constant: 12),
 			terminalFontSizeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			terminalFontSizeLabel.topAnchor.constraint(equalTo: wrapPopup.bottomAnchor, constant: 18),
+			terminalFontSizeLabel.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 18),
 			terminalFontSizeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			terminalFontSizeField.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			terminalFontSizeField.widthAnchor.constraint(equalToConstant: 72),
@@ -434,6 +514,16 @@ import ItsySyntax
 		settingsWrapPopup = wrapPopup
 		settingsWrapColumnField = wrapColumnField
 		settingsWrapColumnStepper = wrapColumnStepper
+		settingsTabWidthField = tabWidthField
+		settingsTabWidthStepper = tabWidthStepper
+		settingsUseSpacesButton = useSpacesButton
+		settingsAutoPairsButton = autoPairsButton
+		settingsSmartIndentButton = smartIndentButton
+		settingsMultipleSelectionsButton = multipleSelectionsButton
+		settingsFindRegexButton = findRegexButton
+		settingsFindCaseButton = findCaseButton
+		settingsFindWholeWordButton = findWholeWordButton
+		settingsRecoveryJournalButton = recoveryJournalButton
 		settingsFontSizeField = sizeField
 		settingsFontSizeStepper = sizeStepper
 		settingsTerminalFontSizeField = terminalFontSizeField
@@ -447,6 +537,12 @@ import ItsySyntax
 		label.font = .systemFont(ofSize: 13, weight: .semibold)
 		label.translatesAutoresizingMaskIntoConstraints = false
 		return label
+	}
+
+	private func settingsCheckbox(_ title: String.LocalizationValue, action: Selector) -> NSButton {
+		let button = NSButton(checkboxWithTitle: L10n.string(title), target: self, action: action)
+		button.translatesAutoresizingMaskIntoConstraints = false
+		return button
 	}
 
 	private func refreshSettingsThemes() {
@@ -530,6 +626,16 @@ import ItsySyntax
 		}
 		settingsWrapColumnField?.integerValue = preferences.wrapColumn
 		settingsWrapColumnStepper?.integerValue = preferences.wrapColumn
+		settingsTabWidthField?.integerValue = appSettings.editor.tabWidth
+		settingsTabWidthStepper?.integerValue = appSettings.editor.tabWidth
+		settingsUseSpacesButton?.state = appSettings.editor.useSpaces ? .on : .off
+		settingsAutoPairsButton?.state = appSettings.editor.autoPairs ? .on : .off
+		settingsSmartIndentButton?.state = appSettings.editor.smartIndent ? .on : .off
+		settingsMultipleSelectionsButton?.state = appSettings.editor.multipleSelections ? .on : .off
+		settingsFindRegexButton?.state = appSettings.find.usesRegex ? .on : .off
+		settingsFindCaseButton?.state = appSettings.find.isCaseSensitive ? .on : .off
+		settingsFindWholeWordButton?.state = appSettings.find.matchesWholeWord ? .on : .off
+		settingsRecoveryJournalButton?.state = appSettings.recovery.journalEnabled ? .on : .off
 	}
 
 	private func refreshSettingsTerminalControls() {
@@ -704,6 +810,60 @@ import ItsySyntax
 			ItsySettings.EditorSettings.maxWrapColumn
 		)
 		saveAndApplyEditorPreferences(preferences)
+	}
+
+	@objc private func settingsTabWidthDidChange(_ sender: Any?) {
+		let value = if sender as? NSStepper === settingsTabWidthStepper {
+			settingsTabWidthStepper?.integerValue ?? appSettings.editor.tabWidth
+		} else {
+			settingsTabWidthField?.integerValue ?? appSettings.editor.tabWidth
+		}
+		appSettings.editor.tabWidth = min(
+			max(value, ItsySettings.EditorSettings.minTabWidth),
+			ItsySettings.EditorSettings.maxTabWidth
+		)
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsUseSpacesDidChange(_: Any?) {
+		appSettings.editor.useSpaces = settingsUseSpacesButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsAutoPairsDidChange(_: Any?) {
+		appSettings.editor.autoPairs = settingsAutoPairsButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsSmartIndentDidChange(_: Any?) {
+		appSettings.editor.smartIndent = settingsSmartIndentButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsMultipleSelectionsDidChange(_: Any?) {
+		appSettings.editor.multipleSelections = settingsMultipleSelectionsButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsFindDidChange(_: Any?) {
+		appSettings.find = ItsySettings.FindSettings(
+			usesRegex: settingsFindRegexButton?.state == .on,
+			isCaseSensitive: settingsFindCaseButton?.state == .on,
+			matchesWholeWord: settingsFindWholeWordButton?.state == .on
+		)
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsRecoveryJournalDidChange(_: Any?) {
+		appSettings.recovery.journalEnabled = settingsRecoveryJournalButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	private func saveAndApplyBehaviorSettings() {
+		appSettings = appSettings.normalized()
+		saveAppSettings()
+		refreshSettingsEditorControls()
+		onSettingsChange(appSettings)
 	}
 
 	@objc private func settingsTerminalFontSizeDidChange(_ sender: Any?) {

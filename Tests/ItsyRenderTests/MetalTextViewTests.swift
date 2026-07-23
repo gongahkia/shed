@@ -364,6 +364,21 @@ extension ItsyRenderTests {
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func disablingMultipleSelectionsCollapsesAndRejectsAdditionalCursors() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abcdef")
+	view.toggleAdditionalCursor(at: 3)
+	view.allowsMultipleSelections = false
+	#expect(view.editor.selections.secondaries.isEmpty)
+	view.selectUTF8Ranges([0 ..< 2, 3 ..< 5])
+	#expect(view.editor.selections.primary == Selection(anchor: 0, head: 2))
+	#expect(view.editor.selections.secondaries.isEmpty)
+	view.toggleAdditionalCursor(at: 4)
+	view.updateColumnCursors(anchor: 1, head: 4)
+	#expect(view.editor.selections.primary == Selection(anchor: 0, head: 2))
+	#expect(view.editor.selections.secondaries.isEmpty)
+}
+
 @Test func optionDragBuildsColumnCursors() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "abc\nde\nfghi\n")

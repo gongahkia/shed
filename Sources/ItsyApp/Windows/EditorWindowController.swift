@@ -142,6 +142,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private var findBarController: FindBarController?
+	private var findSettings = ItsySettings.FindSettings()
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
@@ -1412,7 +1413,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		recordBenchStage("editor_pane_attach_end")
 		recordBenchStage("editor_pane_preferences_begin")
-		let preferences = currentEditorPreferences()
+		let editorSettings = currentEditorSettings()
+		let preferences = EditorPreferences(settings: editorSettings)
 		recordBenchStage("editor_pane_preferences_end")
 		recordBenchStage("editor_pane_appearance_begin")
 		view.configureEditorAppearance(
@@ -1425,6 +1427,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			wrapMode: Self.metalWrapMode(preferences.wrap),
 			hardWrapColumn: preferences.wrapColumn
 		)
+		view.allowsMultipleSelections = editorSettings.multipleSelections
 		view.applyEditorColorPalette(AppTheme.palette.editor)
 		recordBenchStage("editor_pane_appearance_end")
 		recordBenchStage("editor_pane_keymap_begin")
@@ -1542,6 +1545,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func applySettings(_ settings: ItsySettings) {
+		let settings = settings.normalized()
 		let editorSettings = settings.editorSettings(languageID: currentLanguageID())
 		applyEditorPreferences(EditorPreferences(settings: editorSettings))
 		let indentationUnit = editorSettings.useSpaces ? String(repeating: " ", count: editorSettings.tabWidth) : "\t"
@@ -1551,9 +1555,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				smartIndent: editorSettings.smartIndent,
 				indentationUnit: indentationUnit
 			)
+			pane.editorView.allowsMultipleSelections = editorSettings.multipleSelections
 		}
+		findSettings = settings.find
+		findBarController?.applyDefaultOptions(findSettings)
 		applyTheme(AppTheme.palette)
-		setTabGroupScope(settings.normalized().editor.tabGroups)
+		setTabGroupScope(settings.editor.tabGroups)
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -1791,6 +1798,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if let findBarController {
 			return findBarController
 		}
+		findSettings = currentSettings().find
 		let controller = FindBarController()
 		controller.view.translatesAutoresizingMaskIntoConstraints = false
 		editorContainer.addSubview(controller.view)
@@ -1805,6 +1813,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		controller.currentEditorView = { [weak self] in self?.editorView }
 		controller.focusEditor = { [weak self] in self?.focusEditor() }
 		controller.visibilityDidChange = { [weak self] in self?.rebuildFocusTraversal() }
+		controller.applyDefaultOptions(findSettings)
 		findBarController = controller
 		rebuildFocusTraversal()
 		return controller
@@ -4429,16 +4438,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		return String(text[start ..< cursor])
 	}
 
-	private func currentEditorPreferences() -> EditorPreferences {
-		EditorPreferences(settings: currentEditorSettings())
+	private func currentEditorSettings() -> ItsySettings.EditorSettings {
+		currentSettings().editorSettings(languageID: currentLanguageID())
 	}
 
-	private func currentEditorSettings() -> ItsySettings.EditorSettings {
-		let settings = ItsySettingsStore().load(
+	private func currentSettings() -> ItsySettings {
+		ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
 			fallback: EditorPreferences.legacySettings()
 		).settings
-		return settings.editorSettings(languageID: currentLanguageID())
 	}
 
 	private func currentLanguageID() -> String? {

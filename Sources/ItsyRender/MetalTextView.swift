@@ -280,6 +280,17 @@ public final class MetalTextView: NSView {
 	}
 	public var newlineInsertionTextProvider: ((Editor) -> String)?
 	public var textEditBehaviorConfiguration = TextEditBehaviorConfiguration()
+	public var allowsMultipleSelections = true {
+		didSet {
+			guard oldValue != allowsMultipleSelections else {
+				return
+			}
+			if !allowsMultipleSelections, !editor.selections.secondaries.isEmpty {
+				editor.setSelection(SelectionSet(primary: editor.selections.primary))
+				syncEditorState()
+			}
+		}
+	}
 	public var topContentInset: CGFloat = 0 {
 		didSet { syncEditorState() }
 	}
@@ -734,7 +745,7 @@ public final class MetalTextView: NSView {
 		guard let primary = selections.first else {
 			return
 		}
-		editor.setSelection(SelectionSet(primary: primary, secondaries: Array(selections.dropFirst())))
+		editor.setSelection(SelectionSet(primary: primary, secondaries: allowsMultipleSelections ? Array(selections.dropFirst()) : []))
 		syncEditorState()
 	}
 
@@ -805,6 +816,9 @@ public final class MetalTextView: NSView {
 	}
 
 	func toggleAdditionalCursor(at offset: Int) {
+		guard allowsMultipleSelections else {
+			return
+		}
 		let clamped = min(max(offset, 0), editor.textStorage.length)
 		var selections = [editor.selections.primary] + editor.selections.secondaries
 		if let index = selections.firstIndex(where: { $0.isCaret && $0.head == clamped }) {
@@ -820,6 +834,9 @@ public final class MetalTextView: NSView {
 	}
 
 	func updateColumnCursors(anchor: Int, head: Int) {
+		guard allowsMultipleSelections else {
+			return
+		}
 		editor.setSelection(columnCursorSelection(anchor: anchor, head: head))
 		syncEditorState()
 	}
@@ -859,12 +876,12 @@ public final class MetalTextView: NSView {
 			mouseSelectionAnchor = nil
 			return
 		}
-		if event.modifierFlags.contains(.command) {
+		if allowsMultipleSelections, event.modifierFlags.contains(.command) {
 			mouseSelectionAnchor = nil
 			toggleAdditionalCursor(at: utf8Offset(forMouseEvent: event))
 			return
 		}
-		if event.modifierFlags.contains(.option) {
+		if allowsMultipleSelections, event.modifierFlags.contains(.option) {
 			mouseSelectionAnchor = nil
 			optionDragAnchor = utf8Offset(forMouseEvent: event)
 			updateColumnCursors(anchor: optionDragAnchor ?? 0, head: optionDragAnchor ?? 0)

@@ -474,8 +474,9 @@ import ItsyEditor
 				by: keyPath
 			)
 		case .file where commandPaletteLSPSymbols != nil:
+			let merged = WorkspaceSymbolMerge.preferringLanguageServer(commandPaletteLSPSymbols ?? [], over: commandPaletteBaseSymbols)
 			commandPaletteFilteredSymbols = FuzzyMatcher.ranked(
-				commandPaletteLSPSymbols ?? [],
+				merged,
 				query: fuzzyQuery,
 				includeUnmatched: fuzzyQuery.isEmpty,
 				by: keyPath

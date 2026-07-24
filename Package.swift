@@ -16,6 +16,7 @@ let package = Package(
 	],
 	products: [
 		.executable(name: "ItsyApp", targets: ["ItsyApp"]),
+		.executable(name: "itsy", targets: ["ItsyConfigCLI"]),
 		.executable(name: "ItsyBench", targets: ["ItsyBench"]),
 		.library(name: "ItsyConfig", type: .static, targets: ["ItsyConfig"]),
 		.library(name: "ItsyRender", type: .static, targets: ["ItsyRender"]),
@@ -46,6 +47,7 @@ let package = Package(
 				.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"]),
 			]
 		),
+		.executableTarget(name: "ItsyConfigCLI", dependencies: ["ItsyConfig"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap", "ItsyVim"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyEditor", dependencies: ["CLibgit2", "ItsyConfig", "ItsyLSP"], swiftSettings: releaseSwiftSettings),

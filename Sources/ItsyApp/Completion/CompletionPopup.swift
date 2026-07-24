@@ -26,8 +26,9 @@ import ItsyRender
 	private var detailPopover: NSPopover?
 
 	override init() {
+		let size = ItsyUIConfiguration.size("completion", defaultWidth: 340, defaultHeight: 220)
 		panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 340, height: 220),
+			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.nonactivatingPanel, .fullSizeContentView],
 			backing: .buffered,
 			defer: false
@@ -111,7 +112,7 @@ import ItsyRender
 		let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
 		cell.identifier = identifier
 		let label = cell.textField ?? NSTextField(labelWithString: "")
-		label.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+		label.font = .monospacedSystemFont(ofSize: ItsyUIConfiguration.fontSize("completion", default: 12), weight: .regular)
 		label.lineBreakMode = .byTruncatingTail
 		label.translatesAutoresizingMaskIntoConstraints = false
 		if label.superview == nil {
@@ -144,13 +145,14 @@ import ItsyRender
 	}
 
 	private func configurePanel() {
+		panel.title = L10n.string("Completion")
 		panel.isReleasedWhenClosed = false
 		panel.hasShadow = true
 		panel.level = .floating
 		panel.collectionBehavior = [.transient, .ignoresCycle]
 		panel.hidesOnDeactivate = true
 		panel.backgroundColor = .clear
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 340, height: 220))
+		let contentView = NSView(frame: NSRect(origin: .zero, size: ItsyUIConfiguration.size("completion", defaultWidth: 340, defaultHeight: 220)))
 		contentView.wantsLayer = true
 		contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		contentView.layer?.cornerRadius = 6
@@ -161,7 +163,7 @@ import ItsyRender
 		scrollView.hasVerticalScroller = true
 		scrollView.borderType = .noBorder
 		tableView.headerView = nil
-		tableView.rowHeight = 22
+		tableView.rowHeight = ItsyUIConfiguration.rowHeight("completion", default: 22)
 		tableView.usesAlternatingRowBackgroundColors = false
 		tableView.selectionHighlightStyle = .regular
 		tableView.dataSource = self
@@ -471,7 +473,7 @@ import ItsyRender
 		let visible = screen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
 		panel.setFrame(Self.panelFrame(
 			caret: caret,
-			preferredSize: NSSize(width: 340, height: CGFloat(rowCount) * tableView.rowHeight + 2),
+			preferredSize: NSSize(width: ItsyUIConfiguration.size("completion", defaultWidth: 340, defaultHeight: 220).width, height: CGFloat(rowCount) * tableView.rowHeight + 2),
 			visibleFrame: visible
 		), display: false)
 	}

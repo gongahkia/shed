@@ -6,11 +6,66 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 3
+	public static let currentVersion = 4
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
 public struct ItsySettings: Equatable, Sendable {
+	public enum UIDensity: String, Equatable, Sendable {
+		case compact
+		case regular
+		case comfortable
+	}
+
+	public struct UISettings: Equatable, Sendable {
+		public struct SurfaceSettings: Equatable, Sendable {
+			public var width: Double?
+			public var height: Double?
+			public var rowHeight: Double?
+			public var inputFontSize: Double?
+			public var itemFontSize: Double?
+
+			public init(width: Double? = nil, height: Double? = nil, rowHeight: Double? = nil, inputFontSize: Double? = nil, itemFontSize: Double? = nil) {
+				self.width = width
+				self.height = height
+				self.rowHeight = rowHeight
+				self.inputFontSize = inputFontSize
+				self.itemFontSize = itemFontSize
+			}
+		}
+
+		public static let minFontScale = 0.75
+		public static let maxFontScale = 2.0
+		public static let minCornerRadius = 0.0
+		public static let maxCornerRadius = 32.0
+		public static let minBorderWidth = 0.0
+		public static let maxBorderWidth = 8.0
+		public static let minPadding = 0.0
+		public static let maxPadding = 48.0
+		public static let knownSurfaceIDs = [
+			"command_palette", "completion", "find", "project_find", "terminal", "outline", "problems", "references", "tasks", "undo_tree", "git", "git_graph", "git_stash", "debugger", "debug_console", "debug_variables", "debug_watches", "debug_launch", "lsp_status", "integration_health", "integration_output", "extensions", "settings_catalog", "lsp_configuration", "managed_support", "github_pull_request", "github_review_thread",
+		]
+
+		public var fontScale: Double
+		public var density: UIDensity
+		public var cornerRadius: Double
+		public var borderWidth: Double
+		public var padding: Double
+		public var surfaces: [String: SurfaceSettings]
+
+		public init(fontScale: Double = 1, density: UIDensity = .regular, cornerRadius: Double = 8, borderWidth: Double = 1, padding: Double = 8, surfaces: [String: SurfaceSettings] = [:]) {
+			self.fontScale = fontScale
+			self.density = density
+			self.cornerRadius = cornerRadius
+			self.borderWidth = borderWidth
+			self.padding = padding
+			self.surfaces = surfaces
+		}
+
+		public func surface(_ id: String) -> SurfaceSettings {
+			surfaces[id] ?? SurfaceSettings()
+		}
+	}
 	public enum EditorStorage: String, Equatable, Sendable {
 		case rope
 		case pieceTree = "piecetree"
@@ -281,6 +336,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var find: FindSettings
 	public var recovery: RecoverySettings
 	public var layout: LayoutSettings
+	public var ui: UISettings
 
 	public init(
 		editor: EditorSettings = EditorSettings(),
@@ -289,7 +345,8 @@ public struct ItsySettings: Equatable, Sendable {
 		terminal: TerminalSettings = TerminalSettings(),
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
-		layout: LayoutSettings = LayoutSettings()
+		layout: LayoutSettings = LayoutSettings(),
+		ui: UISettings = UISettings()
 	) {
 		self.editor = editor
 		self.theme = theme
@@ -298,6 +355,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.find = find
 		self.recovery = recovery
 		self.layout = layout
+		self.ui = ui
 	}
 
 	public func normalized() -> ItsySettings {
@@ -370,6 +428,21 @@ public struct ItsySettings: Equatable, Sendable {
 			min: LayoutSettings.minInterfaceScale,
 			max: LayoutSettings.maxInterfaceScale
 		)
+		copy.ui.fontScale = Self.clamp(copy.ui.fontScale, min: UISettings.minFontScale, max: UISettings.maxFontScale)
+		copy.ui.cornerRadius = Self.clamp(copy.ui.cornerRadius, min: UISettings.minCornerRadius, max: UISettings.maxCornerRadius)
+		copy.ui.borderWidth = Self.clamp(copy.ui.borderWidth, min: UISettings.minBorderWidth, max: UISettings.maxBorderWidth)
+		copy.ui.padding = Self.clamp(copy.ui.padding, min: UISettings.minPadding, max: UISettings.maxPadding)
+		copy.ui.surfaces = copy.ui.surfaces.reduce(into: [:]) { result, entry in
+			let id = entry.key.trimmingCharacters(in: .whitespacesAndNewlines)
+			guard !id.isEmpty else { return }
+			var value = entry.value
+			value.width = value.width.map { Self.clamp($0, min: 200, max: 2_400) }
+			value.height = value.height.map { Self.clamp($0, min: 120, max: 1_800) }
+			value.rowHeight = value.rowHeight.map { Self.clamp($0, min: 16, max: 80) }
+			value.inputFontSize = value.inputFontSize.map { Self.clamp($0, min: 9, max: 48) }
+			value.itemFontSize = value.itemFontSize.map { Self.clamp($0, min: 9, max: 48) }
+			result[id] = value
+		}
 		return copy
 	}
 
@@ -537,7 +610,15 @@ public final class ItsySettingsStore {
 			fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot),
 			fileManager: fileManager
 		)
-		let workspace = workspaceStore.load(fallback: global.settings)
+		var workspace = workspaceStore.load(fallback: global.settings)
+		let workspaceUIKeys = workspace.assignedKeys.filter { $0.hasPrefix("ui.") }
+		if !workspaceUIKeys.isEmpty {
+			workspace.settings.ui = global.settings.ui
+			workspace.assignedKeys.subtract(workspaceUIKeys)
+			workspace.warnings += workspaceUIKeys.sorted().map {
+				ItsySettingsWarning(key: $0, source: workspaceStore.fileURL.path, retainedFallback: true, message: "\($0) is user-only and is ignored in workspace settings")
+			}
+		}
 		return ItsySettingsLoadResult(
 			settings: workspace.settings,
 			warnings: global.warnings + workspace.warnings,
@@ -550,7 +631,14 @@ public final class ItsySettingsStore {
 		let global = load(fallback: fallback)
 		let workspace: ItsySettingsLoadResult?
 		if let workspaceRoot {
-			workspace = ItsySettingsStore(fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot), fileManager: fileManager).load(fallback: global.settings)
+			let workspaceStore = ItsySettingsStore(fileURL: Self.workspaceFileURL(workspaceRoot: workspaceRoot), fileManager: fileManager)
+			var loadedWorkspace = workspaceStore.load(fallback: global.settings)
+			let workspaceUIKeys = loadedWorkspace.assignedKeys.filter { $0.hasPrefix("ui.") }
+			if !workspaceUIKeys.isEmpty {
+				loadedWorkspace.settings.ui = global.settings.ui
+				loadedWorkspace.assignedKeys.subtract(workspaceUIKeys)
+			}
+			workspace = loadedWorkspace
 		} else {
 			workspace = nil
 		}
@@ -616,7 +704,14 @@ public final class ItsySettingsStore {
 		tab_bar_visible = \(settings.layout.tabBarVisible ? "true" : "false")
 		status_bar_visible = \(settings.layout.statusBarVisible ? "true" : "false")
 		interface_scale = \(format(settings.layout.interfaceScale))
-		""" + serializeLanguageSettings(settings.editor.language)
+
+		[ui]
+		font_scale = \(format(settings.ui.fontScale))
+		density = "\(settings.ui.density.rawValue)"
+		corner_radius = \(format(settings.ui.cornerRadius))
+		border_width = \(format(settings.ui.borderWidth))
+		padding = \(format(settings.ui.padding))
+		""" + serializeLanguageSettings(settings.editor.language) + serializeUISurfaces(settings.ui.surfaces)
 	}
 
 	private static func format(_ value: Double) -> String {
@@ -680,6 +775,19 @@ public final class ItsySettingsStore {
 			return lines.joined(separator: "\n")
 		}.joined(separator: "\n") + "\n"
 	}
+
+	private static func serializeUISurfaces(_ surfaces: [String: ItsySettings.UISettings.SurfaceSettings]) -> String {
+		surfaces.keys.sorted().compactMap { id in
+			guard let surface = surfaces[id] else { return nil }
+			var lines = ["", "[ui.surface.\(id)]"]
+			if let width = surface.width { lines.append("width = \(format(width))") }
+			if let height = surface.height { lines.append("height = \(format(height))") }
+			if let rowHeight = surface.rowHeight { lines.append("row_height = \(format(rowHeight))") }
+			if let inputFontSize = surface.inputFontSize { lines.append("input_font_size = \(format(inputFontSize))") }
+			if let itemFontSize = surface.itemFontSize { lines.append("item_font_size = \(format(itemFontSize))") }
+			return lines.joined(separator: "\n")
+		}.joined(separator: "\n") + (surfaces.isEmpty ? "" : "\n")
+	}
 }
 
 public extension Notification.Name {
@@ -738,6 +846,11 @@ public enum ItsySettingsResolver {
 		case "layout.tab_bar_visible": target.layout.tabBarVisible = source.layout.tabBarVisible
 		case "layout.status_bar_visible": target.layout.statusBarVisible = source.layout.statusBarVisible
 		case "layout.interface_scale": target.layout.interfaceScale = source.layout.interfaceScale
+		case "ui.font_scale": target.ui.fontScale = source.ui.fontScale
+		case "ui.density": target.ui.density = source.ui.density
+		case "ui.corner_radius": target.ui.cornerRadius = source.ui.cornerRadius
+		case "ui.border_width": target.ui.borderWidth = source.ui.borderWidth
+		case "ui.padding": target.ui.padding = source.ui.padding
 		default: applyLanguage(key: key, from: source, to: &target)
 		}
 	}
@@ -891,8 +1004,8 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery", "layout"].contains(section),
-				   !section.hasPrefix("editor.language.")
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery", "layout", "ui"].contains(section),
+				   !section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
 				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
@@ -935,6 +1048,9 @@ struct ItsySettingsParser {
 
 	private mutating func assign(_ value: ItsySettingsValue, key: String, line: Int) {
 		if assignLanguageEditor(value, key: key, line: line) {
+			return
+		}
+		if assignUISurface(value, key: key, line: line) {
 			return
 		}
 		switch key {
@@ -1146,9 +1262,65 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "number")
 			}
+		case "ui.font_scale":
+			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minFontScale ... ItsySettings.UISettings.maxFontScale) { settings.ui.fontScale = number }
+		case "ui.density":
+			if case let .string(density) = value, let density = ItsySettings.UIDensity(rawValue: density.lowercased()) {
+				settings.ui.density = density
+			} else {
+				warnType(key, line: line, expected: #""compact", "regular", or "comfortable""#)
+			}
+		case "ui.corner_radius":
+			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minCornerRadius ... ItsySettings.UISettings.maxCornerRadius) { settings.ui.cornerRadius = number }
+		case "ui.border_width":
+			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minBorderWidth ... ItsySettings.UISettings.maxBorderWidth) { settings.ui.borderWidth = number }
+		case "ui.padding":
+			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minPadding ... ItsySettings.UISettings.maxPadding) { settings.ui.padding = number }
 		default:
 			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
 		}
+	}
+
+	private mutating func validatedUIValue(_ value: ItsySettingsValue, key: String, line: Int, range: ClosedRange<Double>) -> Double? {
+		guard let number = doubleValue(value), range.contains(number) else {
+			warnType(key, line: line, expected: "number between \(range.lowerBound) and \(range.upperBound)")
+			return nil
+		}
+		return number
+	}
+
+	private mutating func assignUISurface(_ value: ItsySettingsValue, key: String, line: Int) -> Bool {
+		let prefix = "ui.surface."
+		guard key.hasPrefix(prefix) else { return false }
+		let suffix = key.dropFirst(prefix.count)
+		guard let dot = suffix.firstIndex(of: ".") else {
+			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
+			return true
+		}
+		let id = String(suffix[..<dot]).trimmingCharacters(in: .whitespacesAndNewlines)
+		let property = String(suffix[suffix.index(after: dot)...])
+		guard !id.isEmpty else {
+			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
+			return true
+		}
+		guard let number = doubleValue(value) else {
+			warnType(key, line: line, expected: "number")
+			return true
+		}
+		var surface = settings.ui.surfaces[id] ?? ItsySettings.UISettings.SurfaceSettings()
+		switch property {
+		case "width" where (200 ... 2_400).contains(number): surface.width = number
+		case "height" where (120 ... 1_800).contains(number): surface.height = number
+		case "row_height" where (16 ... 80).contains(number): surface.rowHeight = number
+		case "input_font_size" where (9 ... 48).contains(number): surface.inputFontSize = number
+		case "item_font_size" where (9 ... 48).contains(number): surface.itemFontSize = number
+		case "width", "height", "row_height", "input_font_size", "item_font_size": warnType(key, line: line, expected: "number in the supported range")
+		default:
+			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
+			return true
+		}
+		settings.ui.surfaces[id] = surface
+		return true
 	}
 
 	private mutating func assignLanguageEditor(_ value: ItsySettingsValue, key: String, line: Int) -> Bool {

@@ -67,6 +67,11 @@ public enum ItsySettingsCatalog {
 		.init(key: "layout.tab_bar_visible", title: "Show Tab Bar", description: "Shows document and pane tab bars."),
 		.init(key: "layout.status_bar_visible", title: "Show Status Bar", description: "Shows editor status information."),
 		.init(key: "layout.interface_scale", title: "Interface Scale", description: "Scales supported editor-shell dimensions."),
+		.init(key: "ui.font_scale", title: "UI Font Scale", description: "Scales first-party panel typography."),
+		.init(key: "ui.density", title: "UI Density", description: "Compact, regular, or comfortable panel spacing."),
+		.init(key: "ui.corner_radius", title: "UI Corner Radius", description: "Corner radius for configurable first-party panels."),
+		.init(key: "ui.border_width", title: "UI Border Width", description: "Border width for configurable first-party panels."),
+		.init(key: "ui.padding", title: "UI Padding", description: "Base padding for configurable first-party panels."),
 		.init(key: "editor.language.<language>.font", title: "Language Font Override", description: "Overrides the editor font for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.font_size", title: "Language Font Size Override", description: "Overrides editor font size for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.font_rendering", title: "Language Font Rendering Override", description: "Overrides glyph rendering for one language.", isLanguageTemplate: true),
@@ -76,7 +81,17 @@ public enum ItsySettingsCatalog {
 		.init(key: "editor.language.<language>.auto_pairs", title: "Language Auto Pairs Override", description: "Overrides automatic pairs for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.smart_indent", title: "Language Smart Indent Override", description: "Overrides smart indentation for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.multiple_selections", title: "Language Multiple Cursors Override", description: "Overrides multiple cursors for one language.", isLanguageTemplate: true),
-	]
+	] + surfaceEntries
+
+	private static let surfaceEntries: [Entry] = ItsySettings.UISettings.knownSurfaceIDs.flatMap { id in
+		[
+			.init(key: "ui.surface.\(id).width", title: "\(id) Width", description: "Default width for the \(id) panel."),
+			.init(key: "ui.surface.\(id).height", title: "\(id) Height", description: "Default height for the \(id) panel."),
+			.init(key: "ui.surface.\(id).row_height", title: "\(id) Row Height", description: "Row density for the \(id) panel."),
+			.init(key: "ui.surface.\(id).input_font_size", title: "\(id) Input Font Size", description: "Input typography for the \(id) panel."),
+			.init(key: "ui.surface.\(id).item_font_size", title: "\(id) Item Font Size", description: "Item typography for the \(id) panel."),
+		]
+	}
 
 	public static var baseEntries: [Entry] {
 		entries.filter { !$0.isLanguageTemplate && $0.isResettable }
@@ -96,6 +111,7 @@ public enum ItsySettingsCatalog {
 
 	public static func effectiveValue(for key: String, in settings: ItsySettings) -> String {
 		let settings = settings.normalized()
+		if let value = surfaceValue(for: key, in: settings) { return value }
 		return switch key {
 		case "schema_version": String(ItsySettingsSchema.currentVersion)
 		case "editor.font": settings.editor.font
@@ -130,11 +146,17 @@ public enum ItsySettingsCatalog {
 		case "layout.tab_bar_visible": bool(settings.layout.tabBarVisible)
 		case "layout.status_bar_visible": bool(settings.layout.statusBarVisible)
 		case "layout.interface_scale": number(settings.layout.interfaceScale)
+		case "ui.font_scale": number(settings.ui.fontScale)
+		case "ui.density": settings.ui.density.rawValue
+		case "ui.corner_radius": number(settings.ui.cornerRadius)
+		case "ui.border_width": number(settings.ui.borderWidth)
+		case "ui.padding": number(settings.ui.padding)
 		default: "Language override template"
 		}
 	}
 
 	@discardableResult public static func reset(_ key: String, in settings: inout ItsySettings) -> Bool {
+		if resetSurfaceValue(for: key, in: &settings) { return true }
 		let defaults = ItsySettings.default
 		switch key {
 		case "schema_version": return false
@@ -170,13 +192,19 @@ public enum ItsySettingsCatalog {
 		case "layout.tab_bar_visible": settings.layout.tabBarVisible = defaults.layout.tabBarVisible
 		case "layout.status_bar_visible": settings.layout.statusBarVisible = defaults.layout.statusBarVisible
 		case "layout.interface_scale": settings.layout.interfaceScale = defaults.layout.interfaceScale
+		case "ui.font_scale": settings.ui.fontScale = defaults.ui.fontScale
+		case "ui.density": settings.ui.density = defaults.ui.density
+		case "ui.corner_radius": settings.ui.cornerRadius = defaults.ui.cornerRadius
+		case "ui.border_width": settings.ui.borderWidth = defaults.ui.borderWidth
+		case "ui.padding": settings.ui.padding = defaults.ui.padding
 		default: return false
 		}
 		return true
 	}
 
 	public static func update(value rawValue: String, for key: String, in settings: inout ItsySettings) -> String? {
-		guard let entry = entries.first(where: { $0.key == key }), entry.isResettable, !entry.isLanguageTemplate else {
+		let isSurface = surfaceKey(key) != nil
+		guard isSurface || (entries.first(where: { $0.key == key }).map { $0.isResettable && !$0.isLanguageTemplate } == true) else {
 			return "This catalog entry is read-only."
 		}
 		let rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -195,6 +223,47 @@ public enum ItsySettingsCatalog {
 			warning = result.warnings.first
 		}
 		return warning?.description ?? "Invalid value."
+	}
+
+	private static func surfaceKey(_ key: String) -> (String, String)? {
+		let prefix = "ui.surface."
+		guard key.hasPrefix(prefix) else { return nil }
+		let suffix = key.dropFirst(prefix.count)
+		guard let separator = suffix.lastIndex(of: ".") else { return nil }
+		let id = String(suffix[..<separator])
+		let property = String(suffix[suffix.index(after: separator)...])
+		guard ItsySettings.UISettings.knownSurfaceIDs.contains(id), ["width", "height", "row_height", "input_font_size", "item_font_size"].contains(property) else { return nil }
+		return (id, property)
+	}
+
+	private static func surfaceValue(for key: String, in settings: ItsySettings) -> String? {
+		guard let (id, property) = surfaceKey(key) else { return nil }
+		let surface = settings.ui.surface(id)
+		let value: Double?
+		switch property {
+		case "width": value = surface.width
+		case "height": value = surface.height
+		case "row_height": value = surface.rowHeight
+		case "input_font_size": value = surface.inputFontSize
+		case "item_font_size": value = surface.itemFontSize
+		default: value = nil
+		}
+		return value.map(number) ?? "Default"
+	}
+
+	private static func resetSurfaceValue(for key: String, in settings: inout ItsySettings) -> Bool {
+		guard let (id, property) = surfaceKey(key) else { return false }
+		var surface = settings.ui.surface(id)
+		switch property {
+		case "width": surface.width = nil
+		case "height": surface.height = nil
+		case "row_height": surface.rowHeight = nil
+		case "input_font_size": surface.inputFontSize = nil
+		case "item_font_size": surface.itemFontSize = nil
+		default: return false
+		}
+		settings.ui.surfaces[id] = surface
+		return true
 	}
 
 	private static func bool(_ value: Bool) -> String {

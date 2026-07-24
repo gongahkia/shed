@@ -20,3 +20,4 @@ bench/results/*.json
 *.xcuserstate
 CLAUDE.md
 .claude/
+.codex/

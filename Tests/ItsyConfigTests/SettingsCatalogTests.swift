@@ -11,6 +11,7 @@ import Testing
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.language.<language>.font" && $0.isLanguageTemplate })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.language.<language>.multiple_selections" && $0.isLanguageTemplate })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "schema_version" && !$0.isResettable })
+	#expect(ItsySettingsCatalog.entries.contains { $0.key == "ui.surface.command_palette.height" })
 }
 
 @Test func settingsCatalogSearchEffectiveValueAndResetAreDeterministic() {
@@ -38,6 +39,9 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "#12AB34", for: "theme.git.gutter.added", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "17", for: "editor.tab_width", in: &settings) != nil)
 	#expect(ItsySettingsCatalog.update(value: "value", for: "editor.language.<language>.font", in: &settings) != nil)
+	#expect(ItsySettingsCatalog.update(value: "340", for: "ui.surface.command_palette.height", in: &settings) == nil)
+	#expect(ItsySettingsCatalog.effectiveValue(for: "ui.surface.command_palette.height", in: settings) == "340.0")
+	#expect(ItsySettingsCatalog.reset("ui.surface.command_palette.height", in: &settings))
 	#expect(settings.editor.tabWidth == 8)
 	#expect(settings.editor.lineNumbers)
 	#expect(settings.editor.lineNumberMode == .relative)

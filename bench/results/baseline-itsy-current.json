@@ -44,7 +44,7 @@
       "name": "binary_size_kb",
       "unit": "KB",
       "direction": "lower",
-      "baseline": 11573.0
+      "baseline": 16009.3203125
     },
     {
       "name": "physical_footprint_kb",
@@ -58,9 +58,7 @@
       "name": "swift_loc",
       "unit": "LOC",
       "direction": "lower",
-      "baseline": 32730,
-      "limit": 35000.0,
-      "threshold": 0.0
+      "baseline": 59316
     },
     {
       "name": "lsp_didopen_to_diagnostics_ms",

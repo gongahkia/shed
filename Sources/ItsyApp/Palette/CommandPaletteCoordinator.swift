@@ -148,7 +148,7 @@ import ItsyEditor
 		if let panel = commandPalettePanel {
 			return panel
 		}
-		let size = NSSize(width: 560, height: 280)
+		let size = ItsyUIConfiguration.size("command_palette", defaultWidth: 560, defaultHeight: 280)
 		let panel = NSPanel(
 			contentRect: NSRect(origin: .zero, size: size),
 			styleMask: [.titled, .fullSizeContentView],
@@ -171,7 +171,7 @@ import ItsyEditor
 		if let commandPaletteContentView {
 			return commandPaletteContentView
 		}
-		let contentView = NSView(frame: NSRect(origin: .zero, size: NSSize(width: 560, height: 280)))
+		let contentView = NSView(frame: NSRect(origin: .zero, size: ItsyUIConfiguration.size("command_palette", defaultWidth: 560, defaultHeight: 280)))
 		configureCommandPaletteView(contentView)
 		commandPaletteContentView = contentView
 		return contentView
@@ -181,16 +181,26 @@ import ItsyEditor
 		setCommandPaletteItems(commandRegistryProvider().commands)
 	}
 
+	func applyUISettings() {
+		guard let contentView = commandPaletteContentView else { return }
+		ItsyUIConfiguration.applyPanelStyle(to: contentView)
+		commandPaletteInputField?.font = .systemFont(ofSize: ItsyUIConfiguration.fontSize("command_palette", default: 18, input: true))
+		commandPaletteTableView?.rowHeight = ItsyUIConfiguration.rowHeight("command_palette", default: 30)
+		commandPaletteTableView?.reloadData()
+		guard let panel = commandPalettePanel else { return }
+		let size = ItsyUIConfiguration.size("command_palette", defaultWidth: 560, defaultHeight: 280)
+		let frame = NSRect(x: panel.frame.midX - size.width / 2, y: panel.frame.midY - size.height / 2, width: size.width, height: size.height)
+		panel.setFrame(frame, display: panel.isVisible)
+	}
+
 	private func configureCommandPaletteView(_ contentView: NSView) {
 		contentView.wantsLayer = true
 		contentView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
-		contentView.layer?.cornerRadius = 8
-		contentView.layer?.borderWidth = 1
-		contentView.layer?.borderColor = NSColor.separatorColor.cgColor
+		ItsyUIConfiguration.applyPanelStyle(to: contentView)
 
 		let inputField = NSTextField(frame: .zero)
 		inputField.placeholderString = L10n.string("Command")
-		inputField.font = .systemFont(ofSize: 18)
+		inputField.font = .systemFont(ofSize: ItsyUIConfiguration.fontSize("command_palette", default: 18, input: true))
 		inputField.isBordered = false
 		inputField.focusRingType = .none
 		inputField.backgroundColor = .clear
@@ -204,7 +214,7 @@ import ItsyEditor
 		column.resizingMask = .autoresizingMask
 		tableView.addTableColumn(column)
 		tableView.headerView = nil
-		tableView.rowHeight = 30
+		tableView.rowHeight = ItsyUIConfiguration.rowHeight("command_palette", default: 30)
 		tableView.intercellSpacing = NSSize(width: 0, height: 0)
 		tableView.usesAlternatingRowBackgroundColors = false
 		tableView.setAccessibilityLabel(L10n.string("Command palette results"))
@@ -236,8 +246,9 @@ import ItsyEditor
 
 	private func centerCommandPalette(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {
 		let hostFrame = hostWindow?.frame ?? NSScreen.main?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1024, height: 768)
-		let width = min(560, max(360, hostFrame.width - 80))
-		let height: CGFloat = 280
+		let size = ItsyUIConfiguration.size("command_palette", defaultWidth: 560, defaultHeight: 280)
+		let width = min(size.width, max(360, hostFrame.width - 80))
+		let height = size.height
 		let frame = NSRect(
 			x: hostFrame.midX - width / 2,
 			y: hostFrame.midY - height / 2,
@@ -633,7 +644,7 @@ import ItsyEditor
 		let cell = tableView.makeView(withIdentifier: identifier, owner: self) as? NSTableCellView ?? NSTableCellView()
 		cell.identifier = identifier
 		let textField = cell.textField ?? NSTextField(labelWithString: "")
-		textField.font = .systemFont(ofSize: 13)
+		textField.font = .systemFont(ofSize: ItsyUIConfiguration.fontSize("command_palette", default: 13))
 		textField.textColor = AppTheme.palette.foreground
 		textField.lineBreakMode = .byTruncatingTail
 		if let scope = commandPaletteSymbolScope {

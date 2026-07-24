@@ -115,7 +115,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 3)
+	#expect(ItsySettingsSchema.currentVersion == 4)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -125,6 +125,29 @@ import Testing
 	let versionWarning = result.warnings.first { $0.key == "schema_version" }
 	#expect(versionWarning?.retainedFallback == true)
 	#expect(result.warnings.contains { $0.key == "editor.unknown_toggle" && $0.retainedFallback })
+}
+
+@Test func settingsParserReadsGlobalUIAndSurfaceOverrides() {
+	var parser = ItsySettingsParser()
+	let result = parser.parse("""
+	[ui]
+	font_scale = 1.2
+	density = "compact"
+	corner_radius = 4
+	border_width = 2
+	padding = 10
+
+	[ui.surface.command_palette]
+	width = 680
+	height = 340
+	row_height = 28
+	input_font_size = 20
+	item_font_size = 14
+	""")
+	#expect(result.warnings.isEmpty)
+	#expect(result.settings.ui.fontScale == 1.2)
+	#expect(result.settings.ui.density == .compact)
+	#expect(result.settings.ui.surface("command_palette") == .init(width: 680, height: 340, rowHeight: 28, inputFontSize: 20, itemFontSize: 14))
 }
 
 @Test func settingsParserReadsPerLanguageEditorOverrides() {
@@ -170,7 +193,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 3"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 4"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
@@ -265,6 +288,20 @@ import Testing
 	#expect(python.fontSize == 18)
 	#expect(python.tabWidth == 3)
 	#expect(python.useSpaces)
+}
+
+@Test func workspaceUIOverridesAreIgnored() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-ui-scope-\(UUID().uuidString)", isDirectory: true)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let globalURL = directory.appendingPathComponent("settings.toml")
+	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
+	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
+	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try "[ui]\nfont_scale = 1.25\n".write(to: globalURL, atomically: true, encoding: .utf8)
+	try "[ui]\nfont_scale = 1.75\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	let result = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
+	#expect(result.settings.ui.fontScale == 1.25)
+	#expect(result.warnings.contains { $0.key == "ui.font_scale" && $0.message.contains("user-only") })
 }
 
 @Test func settingsResolverTracksGlobalWorkspaceLanguageAndSessionPrecedence() throws {

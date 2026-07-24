@@ -14,6 +14,8 @@ Workspace overrides are loaded from:
 
 Both files hot-reload while Itsy is running. The merge order is global, then workspace, then per-language editor overrides for the current buffer. Unknown keys are ignored with a warning in the Settings window. Bad values keep the previous/default value.
 
+Personal UI settings are global-only: `[ui]` entries in a workspace file are ignored with a warning.
+
 ```toml
 [editor]
 font = "Menlo"
@@ -38,6 +40,33 @@ preload_grammars = "opened"
 [terminal]
 font_size = 12
 scrollback_lines = 10000
+
+[ui]
+font_scale = 1
+density = "regular" # compact, regular, comfortable
+corner_radius = 8
+border_width = 1
+padding = 8
+
+[ui.surface.command_palette]
+width = 560
+height = 280
+row_height = 30
+input_font_size = 18
+item_font_size = 13
+```
+
+Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
+
+Use the command palette actions **Settings: Open User TOML**, **Settings: Open Workspace TOML**, and **Settings: Open Catalog** to edit or inspect configuration.
+
+For automation, the bundled CLI exposes validated settings operations:
+
+```text
+Itsy.app/Contents/Helpers/itsy config path
+Itsy.app/Contents/Helpers/itsy config get ui.font_scale --json
+Itsy.app/Contents/Helpers/itsy config set ui.surface.command_palette.height 340
+Itsy.app/Contents/Helpers/itsy config reset ui.surface.command_palette.height
 ```
 
 Theme ids:

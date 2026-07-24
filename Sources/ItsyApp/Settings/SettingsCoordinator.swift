@@ -831,7 +831,7 @@ import ItsySyntax
 		panel.show(relativeTo: settingsWindowController?.window, selecting: (sender as? ManagedSupportRequest)?.componentID)
 	}
 
-	@objc private func showSettingsCatalog(_: Any?) {
+	@objc func showSettingsCatalog(_: Any?) {
 		let panel = settingsInspectorPanel ?? SettingsInspectorPanel(
 			resetEntry: { [weak self] key in
 				self?.resetCatalogEntry(key) ?? []
@@ -843,6 +843,27 @@ import ItsySyntax
 		settingsInspectorPanel = panel
 		panel.update(items: settingsCatalogItems())
 		panel.show(relativeTo: settingsWindowController?.window)
+	}
+
+	func openSettingsFile(workspace: Bool) {
+		let url: URL
+		if workspace {
+			guard let root = ItsyWorkspaceController.currentRootURL else { return }
+			url = ItsySettingsStore.workspaceFileURL(workspaceRoot: root)
+		} else {
+			url = settingsStore.fileURL
+		}
+		if !FileManager.default.fileExists(atPath: url.path) {
+			do {
+				try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+				try "# Itsy settings. Changes reload while Itsy is running.\n\n".write(to: url, atomically: true, encoding: .utf8)
+			} catch {
+				settingsStatusLabel?.textColor = .systemRed
+				settingsStatusLabel?.stringValue = L10n.string("Failed to create settings file: \(String(describing: error))")
+				return
+			}
+		}
+		_ = documentController.openDocument(at: url)
 	}
 
 	private func reloadSettingsFromDisk() {

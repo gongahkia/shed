@@ -5,15 +5,23 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/../.." && pwd)"
 app_dir="${APP_DIR:-$repo_dir/Itsy.app}"
 binary="$repo_dir/.build/release/ItsyApp"
+config_cli="$repo_dir/.build/release/itsy"
 
 if [[ ! -x "$binary" ]]; then
 	(cd "$repo_dir" && swift build -c release)
 fi
+if [[ ! -x "$config_cli" ]]; then
+	(cd "$repo_dir" && swift build -c release --product itsy)
+fi
 
 rm -rf "$app_dir"
-mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Frameworks"
+mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Frameworks" "$app_dir/Contents/Helpers"
 cp "$binary" "$app_dir/Contents/MacOS/Itsy"
 chmod +x "$app_dir/Contents/MacOS/Itsy"
+if [[ -x "$config_cli" ]]; then
+	cp "$config_cli" "$app_dir/Contents/Helpers/itsy"
+	chmod +x "$app_dir/Contents/Helpers/itsy"
+fi
 for bundle in "$repo_dir"/.build/release/Itsy_Itsy*.bundle; do
 	[[ -d "$bundle" ]] || continue
 	cp -R "$bundle" "$app_dir/"

@@ -99,6 +99,8 @@ import ItsyKeymap
 		_ = settingsCoordinator.currentSettings
 		AppTheme.install()
 		AppTheme.update(settings: settingsCoordinator.currentSettings)
+		ItsyUIConfiguration.install()
+		ItsyUIConfiguration.update(settingsCoordinator.currentSettings.ui)
 		recordBenchStage("delegate_settings_end")
 		recordBenchStage("delegate_palette_bridge_begin")
 		commandPaletteCoordinator.installBridge()
@@ -371,6 +373,15 @@ import ItsyKeymap
 				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
 					self?.showSettings(nil)
 				},
+				Command(id: "app.settingsCatalog", title: L10n.string("Settings: Open Catalog"), defaultKey: nil) { [weak self] in
+					self?.settingsCoordinator.showSettingsCatalog(nil)
+				},
+				Command(id: "app.settingsUserFile", title: L10n.string("Settings: Open User TOML"), defaultKey: nil) { [weak self] in
+					self?.settingsCoordinator.openSettingsFile(workspace: false)
+				},
+				Command(id: "app.settingsWorkspaceFile", title: L10n.string("Settings: Open Workspace TOML"), defaultKey: nil) { [weak self] in
+					self?.settingsCoordinator.openSettingsFile(workspace: true)
+				},
 				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"),
 				        defaultKey: "Cmd-K Cmd-S")
 				{ [weak self] in
@@ -614,6 +625,8 @@ import ItsyKeymap
 
 	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
 		AppTheme.update(settings: settings)
+		ItsyUIConfiguration.update(settings.ui)
+		commandPaletteCoordinator.applyUISettings()
 		applyKeymapSettings(settings)
 		for document in documentController.documents {
 			for controller in document.windowControllers {

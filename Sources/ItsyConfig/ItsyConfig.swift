@@ -882,6 +882,8 @@ public enum ItsySettingsResolver {
 		case "syntax.preload_grammars": target.syntax.preloadGrammars = source.syntax.preloadGrammars
 		case "terminal.font_size": target.terminal.fontSize = source.terminal.fontSize
 		case "terminal.scrollback_lines": target.terminal.scrollbackLines = source.terminal.scrollbackLines
+		case "terminal.presentation": target.terminal.presentation = source.terminal.presentation
+		case "git.presentation": target.git.presentation = source.git.presentation
 		case "find.uses_regex": target.find.usesRegex = source.find.usesRegex
 		case "find.case_sensitive": target.find.isCaseSensitive = source.find.isCaseSensitive
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord

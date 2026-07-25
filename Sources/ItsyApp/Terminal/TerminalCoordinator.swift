@@ -209,6 +209,9 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private var terminalPanel: NSPanel?
+	private var terminalContentView: NSView?
+	private var terminalEmbeddingConstraints: [NSLayoutConstraint] = []
+	private var embeddedTerminalVisible = false
 	private var terminalStatusLabel: NSTextField?
 	private var terminalContainer: NSView?
 	private var terminalTabStack: NSStackView?
@@ -222,17 +225,23 @@ struct TerminalPaneLayout: Equatable {
 	private let activeDocumentProvider: () -> NSDocument?
 	private let sessionFactory: (URL) -> ItsyTerminalSession
 	private let openLocation: (TerminalOpenLocation) -> Void
+	private let embeddedHostProvider: () -> NSView?
+	private let setEmbeddedTerminalVisible: (Bool) -> Void
 
 	init(
 		settingsProvider: @escaping () -> ItsySettings.TerminalSettings,
 		activeDocumentProvider: @escaping () -> NSDocument?,
 		sessionFactory: @escaping (URL) -> ItsyTerminalSession = { ItsyTerminalSession(currentDirectoryURL: $0) },
-		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) }
+		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) },
+		embeddedHostProvider: @escaping () -> NSView? = { nil },
+		setEmbeddedTerminalVisible: @escaping (Bool) -> Void = { _ in }
 	) {
 		self.settingsProvider = settingsProvider
 		self.activeDocumentProvider = activeDocumentProvider
 		self.sessionFactory = sessionFactory
 		self.openLocation = openLocation
+		self.embeddedHostProvider = embeddedHostProvider
+		self.setEmbeddedTerminalVisible = setEmbeddedTerminalVisible
 	}
 
 	var state: TerminalCoordinatorState {
@@ -271,7 +280,7 @@ struct TerminalPaneLayout: Equatable {
 	@objc func showTerminalFind(_: Any?) {
 		showTerminal(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 		searchStack?.isHidden = false
-		terminalPanel?.makeFirstResponder(searchField)
+		terminalHostWindow()?.makeFirstResponder(searchField)
 		applySearch()
 	}
 
@@ -315,6 +324,11 @@ struct TerminalPaneLayout: Equatable {
 				pane.view.applyTerminalSettings(settings)
 			}
 		}
+		if settings.presentation == .window, embeddedTerminalVisible {
+			embeddedTerminalVisible = false
+			setEmbeddedTerminalVisible(false)
+			detachEmbeddedTerminalContent()
+		}
 	}
 
 	func applyTerminalTheme(_ theme: TerminalThemePalette) {
@@ -340,14 +354,30 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func toggleTerminal(relativeTo hostWindow: NSWindow?) {
-		if terminalPanel?.isVisible == true {
-			terminalPanel?.close()
-			return
+		switch settingsProvider().presentation {
+		case .bottom:
+			toggleEmbeddedTerminal(relativeTo: hostWindow)
+		case .window:
+			if terminalPanel?.isVisible == true {
+				terminalPanel?.close()
+				return
+			}
+			showDetachedTerminal(relativeTo: hostWindow)
 		}
-		showTerminal(relativeTo: hostWindow)
 	}
 
 	private func showTerminal(relativeTo hostWindow: NSWindow?) {
+		switch settingsProvider().presentation {
+		case .bottom:
+			showEmbeddedTerminal(relativeTo: hostWindow)
+		case .window:
+			showDetachedTerminal(relativeTo: hostWindow)
+		}
+	}
+
+	private func showDetachedTerminal(relativeTo hostWindow: NSWindow?) {
+		embeddedTerminalVisible = false
+		setEmbeddedTerminalVisible(false)
 		let panel = makeTerminalPanelIfNeeded()
 		restoreTerminalStateIfNeeded()
 		if tabs.isEmpty {
@@ -356,26 +386,93 @@ struct TerminalPaneLayout: Equatable {
 		centerTerminalPanel(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		startTerminalIfNeeded()
-		terminalPanel?.makeFirstResponder(activeView)
+		panel.makeFirstResponder(activeView)
+	}
+
+	private func toggleEmbeddedTerminal(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedTerminal(relativeTo: hostWindow)
+			return
+		}
+		if embeddedTerminalVisible, terminalContentView?.superview === host {
+			embeddedTerminalVisible = false
+			setEmbeddedTerminalVisible(false)
+			return
+		}
+		showEmbeddedTerminal(relativeTo: hostWindow)
+	}
+
+	private func showEmbeddedTerminal(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedTerminal(relativeTo: hostWindow)
+			return
+		}
+		let contentView = makeTerminalContentViewIfNeeded()
+		terminalPanel?.orderOut(nil)
+		embedTerminalContent(contentView, in: host)
+		embeddedTerminalVisible = true
+		setEmbeddedTerminalVisible(true)
+		restoreTerminalStateIfNeeded()
+		if tabs.isEmpty {
+			appendTab(currentDirectoryURL: terminalWorkingDirectory(), select: true)
+		}
+		startTerminalIfNeeded()
+		terminalHostWindow()?.makeFirstResponder(activeView)
 	}
 
 	private func makeTerminalPanelIfNeeded() -> NSPanel {
-		if let panel = terminalPanel {
-			return panel
+		let panel: NSPanel
+		if let terminalPanel {
+			panel = terminalPanel
+		} else {
+			panel = NSPanel(
+				contentRect: NSRect(x: 0, y: 0, width: 760, height: 420),
+				styleMask: [.titled, .closable, .resizable, .utilityWindow],
+				backing: .buffered,
+				defer: false
+			)
+			panel.title = L10n.string("Terminal")
+			panel.isReleasedWhenClosed = false
+			terminalPanel = panel
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 760, height: 420),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Terminal")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		let contentView = makeTerminalContentViewIfNeeded()
+		detachEmbeddedTerminalContent()
+		contentView.removeFromSuperview()
 		panel.contentView = contentView
-		configureTerminalView(contentView)
-		terminalPanel = panel
 		return panel
+	}
+
+	private func makeTerminalContentViewIfNeeded() -> NSView {
+		if let terminalContentView {
+			return terminalContentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 760, height: 420))
+		configureTerminalView(contentView)
+		terminalContentView = contentView
+		return contentView
+	}
+
+	private func embedTerminalContent(_ contentView: NSView, in host: NSView) {
+		detachEmbeddedTerminalContent()
+		contentView.removeFromSuperview()
+		contentView.translatesAutoresizingMaskIntoConstraints = false
+		host.addSubview(contentView)
+		terminalEmbeddingConstraints = [
+			contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+			contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+			contentView.topAnchor.constraint(equalTo: host.topAnchor),
+			contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+		]
+		NSLayoutConstraint.activate(terminalEmbeddingConstraints)
+	}
+
+	private func detachEmbeddedTerminalContent() {
+		NSLayoutConstraint.deactivate(terminalEmbeddingConstraints)
+		terminalEmbeddingConstraints = []
+	}
+
+	private func terminalHostWindow() -> NSWindow? {
+		terminalContentView?.window ?? terminalPanel
 	}
 
 	private func configureTerminalView(_ contentView: NSView) {
@@ -566,7 +663,7 @@ struct TerminalPaneLayout: Equatable {
 		rebuildTabBar()
 		rebuildTerminalLayout()
 		startTerminalIfNeeded()
-		terminalPanel?.makeFirstResponder(activeView)
+		terminalHostWindow()?.makeFirstResponder(activeView)
 		persistTerminalState()
 	}
 
@@ -643,7 +740,7 @@ struct TerminalPaneLayout: Equatable {
 		tab.activePaneID = newPane.id
 		rebuildTerminalLayout()
 		startTerminalIfNeeded(in: newPane, tab: tab)
-		terminalPanel?.makeFirstResponder(newPane.view)
+		terminalHostWindow()?.makeFirstResponder(newPane.view)
 		persistTerminalState()
 	}
 
@@ -660,7 +757,7 @@ struct TerminalPaneLayout: Equatable {
 		configurePanes(for: tab)
 		rebuildTerminalLayout()
 		startTerminalIfNeeded()
-		terminalPanel?.makeFirstResponder(activeView)
+		terminalHostWindow()?.makeFirstResponder(activeView)
 		persistTerminalState()
 	}
 
@@ -756,7 +853,7 @@ struct TerminalPaneLayout: Equatable {
 		pane.emulator.reset()
 		pane.view.reset()
 		startTerminalIfNeeded(in: pane, tab: tab)
-		terminalPanel?.makeFirstResponder(activeView)
+		terminalHostWindow()?.makeFirstResponder(activeView)
 	}
 
 	@objc private func searchFieldChanged(_: Any?) {
@@ -767,7 +864,7 @@ struct TerminalPaneLayout: Equatable {
 		searchStack?.isHidden = true
 		searchField?.stringValue = ""
 		applySearch()
-		terminalPanel?.makeFirstResponder(activeView)
+		terminalHostWindow()?.makeFirstResponder(activeView)
 	}
 
 	private func applySearch() {

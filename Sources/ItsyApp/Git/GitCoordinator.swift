@@ -1,6 +1,7 @@
 import AppKit
 import Dispatch
 import Foundation
+import ItsyConfig
 import ItsyEditor
 import ItsyRender
 import ItsySyntax
@@ -79,6 +80,12 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
 	private var gitPanel: NSPanel?
+	private var gitContentView: NSView?
+	private var gitEmbeddingConstraints: [NSLayoutConstraint] = []
+	private var embeddedGitVisible = false
+	private let settingsProvider: () -> ItsySettings.GitSettings
+	private let embeddedHostProvider: () -> NSView?
+	private let setEmbeddedGitVisible: (Bool) -> Void
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
 	private var gitBranchButton: NSButton?
@@ -155,9 +162,18 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	private var gitConflictStateLabel: NSTextField?
 	private var gitConflictSelectedRegionIndex = 0
 
-	init(documentController: ItsyDocumentController, activeDocumentProvider: @escaping () -> NSDocument?) {
+	init(
+		documentController: ItsyDocumentController,
+		activeDocumentProvider: @escaping () -> NSDocument?,
+		settingsProvider: @escaping () -> ItsySettings.GitSettings = { ItsySettings.GitSettings() },
+		embeddedHostProvider: @escaping () -> NSView? = { nil },
+		setEmbeddedGitVisible: @escaping (Bool) -> Void = { _ in }
+	) {
 		self.documentController = documentController
 		self.activeDocumentProvider = activeDocumentProvider
+		self.settingsProvider = settingsProvider
+		self.embeddedHostProvider = embeddedHostProvider
+		self.setEmbeddedGitVisible = setEmbeddedGitVisible
 		super.init()
 	}
 
@@ -185,16 +201,29 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 	}
 
+	func applyGitSettings(_ settings: ItsySettings.GitSettings) {
+		if settings.presentation == .window, embeddedGitVisible {
+			embeddedGitVisible = false
+			setEmbeddedGitVisible(false)
+			detachEmbeddedGitContent()
+		}
+	}
+
 	@objc func showGitChanges(_: Any?) {
 		toggleGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	private func toggleGitChanges(relativeTo hostWindow: NSWindow?) {
-		if gitPanel?.isVisible == true {
-			closeGitChanges()
-			return
+		switch settingsProvider().presentation {
+		case .sidebar:
+			toggleEmbeddedGitChanges(relativeTo: hostWindow)
+		case .window:
+			if gitPanel?.isVisible == true {
+				closeGitChanges()
+				return
+			}
+			showDetachedGitChanges(relativeTo: hostWindow)
 		}
-		showGitChanges(relativeTo: hostWindow)
 	}
 
 	private func closeGitChanges() {
@@ -202,29 +231,98 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	}
 
 	private func showGitChanges(relativeTo hostWindow: NSWindow?) {
+		switch settingsProvider().presentation {
+		case .sidebar:
+			showEmbeddedGitChanges(relativeTo: hostWindow)
+		case .window:
+			showDetachedGitChanges(relativeTo: hostWindow)
+		}
+	}
+
+	private func showDetachedGitChanges(relativeTo hostWindow: NSWindow?) {
+		embeddedGitVisible = false
+		setEmbeddedGitVisible(false)
 		let panel = makeGitPanelIfNeeded()
 		centerGitPanel(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
 		refreshGitChanges(nil)
 	}
 
-	private func makeGitPanelIfNeeded() -> NSPanel {
-		if let panel = gitPanel {
-			return panel
+	private func toggleEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedGitChanges(relativeTo: hostWindow)
+			return
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 980, height: 560),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Git Changes")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		if embeddedGitVisible, gitContentView?.superview === host {
+			embeddedGitVisible = false
+			setEmbeddedGitVisible(false)
+			return
+		}
+		showEmbeddedGitChanges(relativeTo: hostWindow)
+	}
+
+	private func showEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedGitChanges(relativeTo: hostWindow)
+			return
+		}
+		let contentView = makeGitContentViewIfNeeded()
+		gitPanel?.orderOut(nil)
+		embedGitContent(contentView, in: host)
+		embeddedGitVisible = true
+		setEmbeddedGitVisible(true)
+		refreshGitChanges(nil)
+	}
+
+	private func makeGitPanelIfNeeded() -> NSPanel {
+		let panel: NSPanel
+		if let gitPanel {
+			panel = gitPanel
+		} else {
+			panel = NSPanel(
+				contentRect: NSRect(x: 0, y: 0, width: 980, height: 560),
+				styleMask: [.titled, .closable, .resizable, .utilityWindow],
+				backing: .buffered,
+				defer: false
+			)
+			panel.title = L10n.string("Git Changes")
+			panel.isReleasedWhenClosed = false
+			gitPanel = panel
+		}
+		let contentView = makeGitContentViewIfNeeded()
+		detachEmbeddedGitContent()
+		contentView.removeFromSuperview()
 		panel.contentView = contentView
-		configureGitView(contentView)
-		gitPanel = panel
 		return panel
+	}
+
+	private func makeGitContentViewIfNeeded() -> NSView {
+		if let gitContentView {
+			return gitContentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 980, height: 560))
+		configureGitView(contentView)
+		gitContentView = contentView
+		return contentView
+	}
+
+	private func embedGitContent(_ contentView: NSView, in host: NSView) {
+		detachEmbeddedGitContent()
+		contentView.removeFromSuperview()
+		contentView.translatesAutoresizingMaskIntoConstraints = false
+		host.addSubview(contentView)
+		gitEmbeddingConstraints = [
+			contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+			contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+			contentView.topAnchor.constraint(equalTo: host.topAnchor),
+			contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+		]
+		NSLayoutConstraint.activate(gitEmbeddingConstraints)
+	}
+
+	private func detachEmbeddedGitContent() {
+		NSLayoutConstraint.deactivate(gitEmbeddingConstraints)
+		gitEmbeddingConstraints = []
 	}
 
 	private func configureGitView(_ contentView: NSView) {

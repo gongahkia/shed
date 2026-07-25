@@ -41,10 +41,11 @@ import Testing
 	#expect(searchField.superview?.isHidden == false)
 	#expect(terminalViews[0].setSearch(query: "search-target", regex: false) == 1)
 
-	let processBeforeRestart = try #require(coordinator.state.processIdentifiers[0])
+	let activePaneIndex = try #require(coordinator.state.activePaneIndex)
+	let processBeforeRestart = try #require(coordinator.state.processIdentifiers[activePaneIndex])
 	let restart = try #require(terminalButton(in: contentView, identifier: "terminal.restart"))
 	restart.performClick(nil)
-	#expect(try #require(coordinator.state.processIdentifiers[0]) != processBeforeRestart)
+	#expect(try #require(coordinator.state.processIdentifiers[activePaneIndex]) != processBeforeRestart)
 
 	let closePane = try #require(terminalButton(in: contentView, identifier: "terminal.close-pane"))
 	closePane.performClick(nil)
@@ -70,6 +71,29 @@ import Testing
 	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: data) == state)
 	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("pid"))
 	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("session"))
+}
+
+@Test @MainActor func terminalCoordinatorEmbedsByDefault() {
+	_ = NSApplication.shared
+	let host = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var visibility: [Bool] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { ItsySettings.TerminalSettings() },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { host },
+		setEmbeddedTerminalVisible: { visibility.append($0) }
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	#expect(coordinator.state.tabCount == 1)
+	#expect(host.subviews.count == 1)
+	#expect(visibility == [true])
+	#expect(!NSApp.windows.compactMap { $0 as? NSPanel }.contains { $0.title == "Terminal" && $0.isVisible })
+
+	coordinator.showTerminal(nil)
+	#expect(visibility == [true, false])
 }
 
 @MainActor private func terminalCoordinatorTestSession(_ directory: URL) -> ItsyTerminalSession {

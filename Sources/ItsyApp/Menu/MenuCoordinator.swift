@@ -244,8 +244,8 @@ import ItsyRender
 
 		let terminalMenu = NSMenu(title: L10n.string("Terminal"))
 		terminalMenu.disableAutomaticWritingToolsItems()
-		let terminalShowItem = terminalMenu.addItem(withTitle: L10n.string("Terminal"), action: #selector(AppCoordinator.showTerminal(_:)), keyEquivalent: "`")
-		terminalShowItem.keyEquivalentModifierMask = [.command, .shift]
+		let terminalShowItem = terminalMenu.addItem(withTitle: L10n.string("Terminal"), action: #selector(AppCoordinator.showTerminal(_:)), keyEquivalent: "j")
+		terminalShowItem.keyEquivalentModifierMask = [.command]
 		terminalShowItem.target = actionTarget
 		terminalItem.submenu = terminalMenu
 

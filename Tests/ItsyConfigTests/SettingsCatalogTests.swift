@@ -22,7 +22,7 @@ import Testing
 	settings.layout.sidebarPosition = .trailing
 	settings.layout.interfaceScale = 1.25
 	#expect(ItsySettingsCatalog.matching("side bar") == [])
-	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == ["layout.sidebar_visible", "layout.sidebar_position", "layout.sidebar_width"])
+	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == ["git.presentation", "layout.sidebar_visible", "layout.sidebar_position", "layout.sidebar_width"])
 	#expect(ItsySettingsCatalog.effectiveValue(for: "editor.tab_width", in: settings) == "8")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.sidebar_position", in: settings) == "trailing")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.interface_scale", in: settings) == "1.25")

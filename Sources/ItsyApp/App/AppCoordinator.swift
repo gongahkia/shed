@@ -494,7 +494,7 @@ import ItsyKeymap
 				Command(id: "debug.stop", title: L10n.string("Stop"), defaultKey: nil) { [weak self] in
 					self?.stopDebug(nil)
 				},
-				Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-Shift-`") { [weak self] in
+				Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-J") { [weak self] in
 					self?.showTerminal(nil)
 				},
 				Command(id: "terminal.newTab", title: L10n.string("Terminal: New Tab"), defaultKey: nil) { [weak self] in

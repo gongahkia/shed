@@ -16,6 +16,7 @@ import Testing
 	smart_indent = false
 	multiple_selections = false
 	keymap = "vim"
+	cursor_style = "block"
 	tab_groups = "pane"
 	wrap = "soft"
 	wrap_column = 88
@@ -65,6 +66,7 @@ import Testing
 	#expect(!result.settings.editor.smartIndent)
 	#expect(!result.settings.editor.multipleSelections)
 	#expect(result.settings.editor.keymap == .vim)
+	#expect(result.settings.editor.cursorStyle == .block)
 	#expect(result.settings.editor.tabGroups == .pane)
 	#expect(result.settings.editor.wrap == .soft)
 	#expect(result.settings.editor.wrapColumn == 88)
@@ -115,7 +117,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 5)
+	#expect(ItsySettingsSchema.currentVersion == 6)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -195,7 +197,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 5"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 6"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))

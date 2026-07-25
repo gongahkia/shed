@@ -1499,6 +1499,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		)
 		view.allowsMultipleSelections = editorSettings.multipleSelections
 		view.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
+		view.cursorStyle = Self.metalCursorStyle(for: editorSettings)
 		view.applyEditorColorPalette(AppTheme.palette.editor)
 		recordBenchStage("editor_pane_appearance_end")
 		recordBenchStage("editor_pane_keymap_begin")
@@ -1615,6 +1616,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
+	private static func metalCursorStyle(for settings: ItsySettings.EditorSettings) -> MetalCursorStyle {
+		switch settings.cursorStyle {
+		case .block: return .block
+		case .bar: return .bar
+		case .automatic:
+			switch settings.keymap {
+			case .vim, .emacs: return .block
+			case .plain: return .bar
+			}
+		}
+	}
+
 	private static func glyphRenderingMode(_ mode: ItsySettings.FontRenderingMode) -> GlyphAtlas.RenderingMode {
 		switch mode {
 		case .grayscale:
@@ -1637,6 +1650,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			)
 			pane.editorView.allowsMultipleSelections = editorSettings.multipleSelections
 			pane.editorView.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
+			pane.editorView.cursorStyle = Self.metalCursorStyle(for: editorSettings)
 		}
 		findSettings = settings.find
 		findBarController?.applyDefaultOptions(findSettings)

@@ -60,7 +60,7 @@ item_font_size = 13
 
 Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
 
-In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge.
+In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge. LSP notices expand with **Details** and can copy a diagnostic report; when no server process started, the report explicitly says that no process log is available.
 
 `editor.cursor_style = "automatic"` uses a block cursor for Vim and Emacs keymaps, and a thin bar for Plain. Set `block` or `bar` to override that behavior; `immediate` is accepted as an alias for `bar`.
 

@@ -34,6 +34,7 @@ import Testing
 	preload_grammars = "all"
 
 	[terminal]
+	font = "Monaco"
 	font_size = 13
 	scrollback_lines = 20000
 	presentation = "window"
@@ -81,13 +82,21 @@ import Testing
 	#expect(result.settings.theme.gitGutter.modified == "#abcdef")
 	#expect(result.settings.theme.gitGutter.removed == "#fedcba")
 	#expect(result.settings.syntax.preloadGrammars == .all)
+	#expect(result.settings.terminal.font == "Monaco")
 	#expect(result.settings.terminal.fontSize == 13)
 	#expect(result.settings.terminal.scrollbackLines == 20000)
 	#expect(result.settings.terminal.presentation == .window)
 	#expect(result.settings.git.presentation == .window)
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
-	#expect(result.settings.layout == .init(sidebarVisible: false, sidebarPosition: .trailing, sidebarWidth: 320, tabBarVisible: false, statusBarVisible: false, interfaceScale: 1.4))
+	#expect(result.settings.layout == .init(
+		sidebarVisible: false,
+		sidebarPosition: .trailing,
+		sidebarWidth: 320,
+		tabBarVisible: false,
+		statusBarVisible: false,
+		interfaceScale: 1.4
+	))
 }
 
 @Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
@@ -123,7 +132,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 7)
+	#expect(ItsySettingsSchema.currentVersion == 8)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -157,7 +166,13 @@ import Testing
 	#expect(result.settings.ui.fontScale == 1.2)
 	#expect(result.settings.ui.density == .compact)
 	#expect(result.settings.ui.notificationPosition == .topRight)
-	#expect(result.settings.ui.surface("command_palette") == .init(width: 680, height: 340, rowHeight: 28, inputFontSize: 20, itemFontSize: 14))
+	#expect(result.settings.ui.surface("command_palette") == .init(
+		width: 680,
+		height: 340,
+		rowHeight: 28,
+		inputFontSize: 20,
+		itemFontSize: 14
+	))
 }
 
 @Test func settingsParserReadsPerLanguageEditorOverrides() {
@@ -203,7 +218,8 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 7"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 8"))
+	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
@@ -234,16 +250,33 @@ import Testing
 	let url = directory.appendingPathComponent("settings.toml")
 	let store = ItsySettingsStore(fileURL: url)
 	let settings = ItsySettings(
-		editor: .init(font: "Monaco", fontSize: 18, lineNumbers: true, lineNumberMode: .relative, tabWidth: 8, tabGroups: .pane, keymap: .emacs, wrap: .hard, wrapColumn: 72, experimental: .init(storage: .pieceTree)),
+		editor: .init(
+			font: "Monaco",
+			fontSize: 18,
+			lineNumbers: true,
+			lineNumberMode: .relative,
+			tabWidth: 8,
+			tabGroups: .pane,
+			keymap: .emacs,
+			wrap: .hard,
+			wrapColumn: 72,
+			experimental: .init(storage: .pieceTree)
+		),
 		theme: .init(id: "user:night.toml", gitGutter: .init(added: "#101010", modified: "#202020", removed: "#303030")),
 		syntax: .init(preloadGrammars: .none),
-		terminal: .init(fontSize: 14, scrollbackLines: 1234)
+		terminal: .init(fontSize: 14, scrollbackLines: 1234, font: "Monaco")
 	)
 	try store.save(settings)
 	let loaded = store.load()
 	#expect(loaded.loadedFromFile)
 	#expect(loaded.warnings.isEmpty)
 	#expect(loaded.settings == settings)
+}
+
+@Test func terminalFontInheritsEditorFontUnlessOverridden() {
+	let terminal = ItsySettings.TerminalSettings()
+	#expect(terminal.resolvedFontName(inheriting: "Monaco") == "Monaco")
+	#expect(ItsySettings.TerminalSettings(font: "Menlo").resolvedFontName(inheriting: "Monaco") == "Menlo")
 }
 
 @Test func settingsStoreUsesFallbackWhenFileIsMissing() {
@@ -303,12 +336,18 @@ import Testing
 }
 
 @Test func workspaceUIOverridesAreIgnored() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-ui-scope-\(UUID().uuidString)", isDirectory: true)
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-ui-scope-\(UUID().uuidString)",
+		isDirectory: true
+	)
 	defer { try? FileManager.default.removeItem(at: directory) }
 	let globalURL = directory.appendingPathComponent("settings.toml")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
-	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try FileManager.default.createDirectory(
+		at: workspaceURL.deletingLastPathComponent(),
+		withIntermediateDirectories: true
+	)
 	try "[ui]\nfont_scale = 1.25\n".write(to: globalURL, atomically: true, encoding: .utf8)
 	try "[ui]\nfont_scale = 1.75\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
 	let result = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
@@ -317,12 +356,18 @@ import Testing
 }
 
 @Test func settingsResolverTracksGlobalWorkspaceLanguageAndSessionPrecedence() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-settings-resolution-\(UUID().uuidString)", isDirectory: true)
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-resolution-\(UUID().uuidString)",
+		isDirectory: true
+	)
 	defer { try? FileManager.default.removeItem(at: directory) }
 	let globalURL = directory.appendingPathComponent("settings.toml")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
-	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try FileManager.default.createDirectory(
+		at: workspaceURL.deletingLastPathComponent(),
+		withIntermediateDirectories: true
+	)
 	try """
 	[editor]
 	tab_width = 2
@@ -353,7 +398,10 @@ import Testing
 	use_spaces = true
 	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
 	let session = ItsySettingsSessionLayer(
-		settings: ItsySettings(editor: .init(wrap: .hard, language: ["python": .init(tabWidth: 7, multipleSelections: false)])),
+		settings: ItsySettings(editor: .init(
+			wrap: .hard,
+			language: ["python": .init(tabWidth: 7, multipleSelections: false)]
+		)),
 		assignedKeys: ["editor.wrap", "editor.language.python.tab_width", "editor.language.python.multiple_selections"]
 	)
 	let store = ItsySettingsStore(fileURL: globalURL)

@@ -11,7 +11,10 @@ enum TerminalViewCommand {
 
 final class ItsyTerminalView: NSView {
 	private let emulator: ItsyTerminalEmulator
-	private var font = NSFont.monospacedSystemFont(ofSize: CGFloat(ItsySettings.TerminalSettings.defaultFontSize), weight: .regular)
+	private var font = NSFont.monospacedSystemFont(
+		ofSize: CGFloat(ItsySettings.TerminalSettings.defaultFontSize),
+		weight: .regular
+	)
 	private var characterSize = CGSize(width: 7, height: 15)
 	private var scrollbackOffset = 0
 	private var trackingArea: NSTrackingArea?
@@ -136,9 +139,15 @@ final class ItsyTerminalView: NSView {
 		return selectedSearchMatch
 	}
 
-	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+	func applyTerminalSettings(
+		_ settings: ItsySettings.TerminalSettings,
+		inheriting editorFontName: String = ItsySettings.EditorSettings.defaultFont
+	) {
 		let settings = ItsySettings(terminal: settings).normalized().terminal
-		font = NSFont.monospacedSystemFont(ofSize: CGFloat(settings.fontSize), weight: .regular)
+		let fontName = settings.resolvedFontName(inheriting: editorFontName)
+		font = NSFont(name: fontName, size: CGFloat(settings.fontSize))
+			?? NSFont(name: editorFontName, size: CGFloat(settings.fontSize))
+			?? NSFont.monospacedSystemFont(ofSize: CGFloat(settings.fontSize), weight: .regular)
 		emulator.setMaxScrollbackLines(settings.scrollbackLines)
 		measureCharacterSize()
 		syncSize()
@@ -227,7 +236,12 @@ final class ItsyTerminalView: NSView {
 		if let trackingArea {
 			removeTrackingArea(trackingArea)
 		}
-		let area = NSTrackingArea(rect: .zero, options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved], owner: self, userInfo: nil)
+		let area = NSTrackingArea(
+			rect: .zero,
+			options: [.activeInKeyWindow, .inVisibleRect, .mouseMoved],
+			owner: self,
+			userInfo: nil
+		)
 		addTrackingArea(area)
 		trackingArea = area
 	}
@@ -249,7 +263,10 @@ final class ItsyTerminalView: NSView {
 		if sendMouse(event, button: 0, pressed: false) {
 			return
 		}
-		selectionHead = TerminalCellPosition(row: terminalCellLocation(for: event).row, column: terminalCellLocation(for: event).column)
+		selectionHead = TerminalCellPosition(
+			row: terminalCellLocation(for: event).row,
+			column: terminalCellLocation(for: event).column
+		)
 		needsDisplay = true
 	}
 
@@ -281,7 +298,10 @@ final class ItsyTerminalView: NSView {
 		if sendMouseMotion(event, button: 0) {
 			return
 		}
-		selectionHead = TerminalCellPosition(row: terminalCellLocation(for: event).row, column: terminalCellLocation(for: event).column)
+		selectionHead = TerminalCellPosition(
+			row: terminalCellLocation(for: event).row,
+			column: terminalCellLocation(for: event).column
+		)
 		needsDisplay = true
 	}
 
@@ -314,7 +334,7 @@ final class ItsyTerminalView: NSView {
 		pasteboard.setString(text, forType: .string)
 	}
 
-	@objc func paste(_ sender: Any?) {
+	@objc func paste(_: Any?) {
 		guard let text = NSPasteboard.general.string(forType: .string) else {
 			return
 		}
@@ -338,14 +358,17 @@ final class ItsyTerminalView: NSView {
 	@discardableResult
 	func openLocation(at position: (row: Int, column: Int)) -> Bool {
 		let snapshot = emulator.snapshot(scrollbackOffset: scrollbackOffset)
-		guard snapshot.cells.indices.contains(position.row), snapshot.cells[position.row].indices.contains(position.column) else {
+		guard snapshot.cells.indices.contains(position.row),
+		      snapshot.cells[position.row].indices.contains(position.column)
+		else {
 			return false
 		}
-		let location: TerminalOpenLocation?
-		if let rawURL = snapshot.cells[position.row][position.column].attributes.hyperlink, let url = URL(string: rawURL) {
-			location = TerminalOpenLocation(url: url, line: nil, column: nil)
+		let location: TerminalOpenLocation? = if let rawURL = snapshot.cells[position.row][position.column].attributes
+			.hyperlink, let url = URL(string: rawURL)
+		{
+			TerminalOpenLocation(url: url, line: nil, column: nil)
 		} else {
-			location = TerminalLinkDetector.location(
+			TerminalLinkDetector.location(
 				in: snapshot.lines[position.row],
 				column: position.column,
 				relativeTo: currentDirectoryURL
@@ -566,8 +589,11 @@ final class ItsyTerminalView: NSView {
 		return NSFontManager.shared.convert(font, toHaveTrait: traits)
 	}
 
-	private func resolvedColors(for attributes: TerminalTextAttributes, snapshot: TerminalSnapshot) -> (foreground: NSColor, background: NSColor?) {
-		var foreground = color(for: attributes.foreground, snapshot: snapshot) ?? color(for: snapshot.defaultForeground) ?? theme.foreground
+	private func resolvedColors(for attributes: TerminalTextAttributes,
+	                            snapshot: TerminalSnapshot) -> (foreground: NSColor, background: NSColor?)
+	{
+		var foreground = color(for: attributes.foreground, snapshot: snapshot) ?? color(for: snapshot.defaultForeground) ??
+			theme.foreground
 		var background = color(for: attributes.background, snapshot: snapshot) ?? color(for: snapshot.defaultBackground)
 		if attributes.inverse {
 			let originalForeground = foreground
@@ -605,10 +631,18 @@ final class ItsyTerminalView: NSView {
 	}
 
 	func encodedMouseInput(button: Int, row: Int, column: Int, pressed: Bool) -> Data? {
-		encodedMouseInput(button: button, row: row, column: column, pressed: pressed, snapshot: emulator.snapshot(scrollbackOffset: 0))
+		encodedMouseInput(
+			button: button,
+			row: row,
+			column: column,
+			pressed: pressed,
+			snapshot: emulator.snapshot(scrollbackOffset: 0)
+		)
 	}
 
-	private func encodedMouseInput(button: Int, row: Int, column: Int, pressed: Bool, snapshot: TerminalSnapshot) -> Data? {
+	private func encodedMouseInput(button: Int, row: Int, column: Int, pressed: Bool,
+	                               snapshot: TerminalSnapshot) -> Data?
+	{
 		guard snapshot.mouseTrackingMode != .none else {
 			return nil
 		}
@@ -632,7 +666,13 @@ final class ItsyTerminalView: NSView {
 		}
 		let point = terminalCellLocation(for: event)
 		let code = mouseButtonCode(button: button, event: event)
-		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: pressed, snapshot: snapshot) else {
+		guard let data = encodedMouseInput(
+			button: code,
+			row: point.row,
+			column: point.column,
+			pressed: pressed,
+			snapshot: snapshot
+		) else {
 			return false
 		}
 		onInput?(data)
@@ -650,7 +690,13 @@ final class ItsyTerminalView: NSView {
 		}
 		let point = terminalCellLocation(for: event)
 		let code = mouseButtonCode(button: button, event: event) + 32
-		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: true, snapshot: snapshot) else {
+		guard let data = encodedMouseInput(
+			button: code,
+			row: point.row,
+			column: point.column,
+			pressed: true,
+			snapshot: snapshot
+		) else {
 			return false
 		}
 		onInput?(data)
@@ -666,7 +712,13 @@ final class ItsyTerminalView: NSView {
 		let point = terminalCellLocation(for: event)
 		let base = event.scrollingDeltaY > 0 ? 64 : 65
 		let code = base + mouseModifierCode(event)
-		guard let data = encodedMouseInput(button: code, row: point.row, column: point.column, pressed: true, snapshot: snapshot) else {
+		guard let data = encodedMouseInput(
+			button: code,
+			row: point.row,
+			column: point.column,
+			pressed: true,
+			snapshot: snapshot
+		) else {
 			return false
 		}
 		onInput?(data)
@@ -732,57 +784,57 @@ final class ItsyTerminalView: NSView {
 	private func encodedSpecialKey(_ event: NSEvent) -> Data? {
 		switch event.keyCode {
 		case 36:
-			return Data([13])
+			Data([13])
 		case 48:
-			return Data([9])
+			Data([9])
 		case 51:
-			return Data([127])
+			Data([127])
 		case 53:
-			return Data([27])
+			Data([27])
 		case 117:
-			return Data("\u{1B}[3~".utf8)
+			Data("\u{1B}[3~".utf8)
 		case 115:
-			return Data("\u{1B}[1~".utf8)
+			Data("\u{1B}[1~".utf8)
 		case 119:
-			return Data("\u{1B}[4~".utf8)
+			Data("\u{1B}[4~".utf8)
 		case 116:
-			return Data("\u{1B}[5~".utf8)
+			Data("\u{1B}[5~".utf8)
 		case 121:
-			return Data("\u{1B}[6~".utf8)
+			Data("\u{1B}[6~".utf8)
 		case 123:
-			return Data("\u{1B}[D".utf8)
+			Data("\u{1B}[D".utf8)
 		case 124:
-			return Data("\u{1B}[C".utf8)
+			Data("\u{1B}[C".utf8)
 		case 125:
-			return Data("\u{1B}[B".utf8)
+			Data("\u{1B}[B".utf8)
 		case 126:
-			return Data("\u{1B}[A".utf8)
+			Data("\u{1B}[A".utf8)
 		case 122:
-			return Data("\u{1B}OP".utf8)
+			Data("\u{1B}OP".utf8)
 		case 120:
-			return Data("\u{1B}OQ".utf8)
+			Data("\u{1B}OQ".utf8)
 		case 99:
-			return Data("\u{1B}OR".utf8)
+			Data("\u{1B}OR".utf8)
 		case 118:
-			return Data("\u{1B}OS".utf8)
+			Data("\u{1B}OS".utf8)
 		case 96:
-			return Data("\u{1B}[15~".utf8)
+			Data("\u{1B}[15~".utf8)
 		case 97:
-			return Data("\u{1B}[17~".utf8)
+			Data("\u{1B}[17~".utf8)
 		case 98:
-			return Data("\u{1B}[18~".utf8)
+			Data("\u{1B}[18~".utf8)
 		case 100:
-			return Data("\u{1B}[19~".utf8)
+			Data("\u{1B}[19~".utf8)
 		case 101:
-			return Data("\u{1B}[20~".utf8)
+			Data("\u{1B}[20~".utf8)
 		case 109:
-			return Data("\u{1B}[21~".utf8)
+			Data("\u{1B}[21~".utf8)
 		case 103:
-			return Data("\u{1B}[23~".utf8)
+			Data("\u{1B}[23~".utf8)
 		case 111:
-			return Data("\u{1B}[24~".utf8)
+			Data("\u{1B}[24~".utf8)
 		default:
-			return nil
+			nil
 		}
 	}
 }

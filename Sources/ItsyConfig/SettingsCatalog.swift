@@ -21,9 +21,18 @@ public enum ItsySettingsCatalog {
 		public let isLanguageTemplate: Bool
 		public let isResettable: Bool
 
-		public var id: String { key }
+		public var id: String {
+			key
+		}
 
-		public init(key: String, title: String, description: String, reloadBehavior: ReloadBehavior = .hotReload, isLanguageTemplate: Bool = false, isResettable: Bool = true) {
+		public init(
+			key: String,
+			title: String,
+			description: String,
+			reloadBehavior: ReloadBehavior = .hotReload,
+			isLanguageTemplate: Bool = false,
+			isResettable: Bool = true
+		) {
 			self.key = key
 			self.title = title
 			self.description = description
@@ -34,66 +43,202 @@ public enum ItsySettingsCatalog {
 	}
 
 	public static let entries: [Entry] = [
-		.init(key: "schema_version", title: "Schema Version", description: "Version used to validate settings.toml.", isResettable: false),
+		.init(
+			key: "schema_version",
+			title: "Schema Version",
+			description: "Version used to validate settings.toml.",
+			isResettable: false
+		),
 		.init(key: "editor.font", title: "Editor Font", description: "Font family for editor text."),
 		.init(key: "editor.font_size", title: "Editor Font Size", description: "Point size for editor text."),
 		.init(key: "editor.font_rendering", title: "Font Rendering", description: "Glyph atlas rendering mode."),
 		.init(key: "editor.line_numbers", title: "Line Numbers", description: "Shows line numbers in the editor gutter."),
-		.init(key: "editor.line_number_mode", title: "Line Number Mode", description: "Off, absolute, or relative line numbers."),
+		.init(
+			key: "editor.line_number_mode",
+			title: "Line Number Mode",
+			description: "Off, absolute, or relative line numbers."
+		),
 		.init(key: "editor.tab_width", title: "Tab Width", description: "Columns inserted or displayed for a tab."),
-		.init(key: "editor.use_spaces", title: "Indent Using Spaces", description: "Uses spaces instead of tab characters for indentation."),
+		.init(
+			key: "editor.use_spaces",
+			title: "Indent Using Spaces",
+			description: "Uses spaces instead of tab characters for indentation."
+		),
 		.init(key: "editor.auto_pairs", title: "Auto Pairs", description: "Inserts matching brackets and quotes."),
 		.init(key: "editor.smart_indent", title: "Smart Indent", description: "Carries indentation into a new line."),
-		.init(key: "editor.multiple_selections", title: "Multiple Cursors", description: "Enables multiple selections and cursors."),
+		.init(
+			key: "editor.multiple_selections",
+			title: "Multiple Cursors",
+			description: "Enables multiple selections and cursors."
+		),
 		.init(key: "editor.keymap", title: "Keymap", description: "Plain, Vim, or Emacs editing commands."),
-		.init(key: "editor.cursor_style", title: "Cursor Style", description: "Automatic uses a block cursor for Vim and Emacs; choose block or bar to override it."),
-		.init(key: "editor.tab_groups", title: "Tab Groups", description: "Shares tabs across a window or keeps them per pane."),
+		.init(
+			key: "editor.cursor_style",
+			title: "Cursor Style",
+			description: "Automatic uses a block cursor for Vim and Emacs; choose block or bar to override it."
+		),
+		.init(
+			key: "editor.tab_groups",
+			title: "Tab Groups",
+			description: "Shares tabs across a window or keeps them per pane."
+		),
 		.init(key: "editor.wrap", title: "Wrap Mode", description: "No wrapping, soft wrapping, or hard wrapping."),
 		.init(key: "editor.wrap_column", title: "Wrap Column", description: "Column used for hard wrapping."),
-		.init(key: "editor.experimental.storage", title: "Editor Storage", description: "Text storage implementation for newly opened documents.", reloadBehavior: .restartRequired),
+		.init(
+			key: "editor.experimental.storage",
+			title: "Editor Storage",
+			description: "Text storage implementation for newly opened documents.",
+			reloadBehavior: .restartRequired
+		),
 		.init(key: "theme.id", title: "Theme", description: "Color theme identifier."),
 		.init(key: "theme.git.gutter.added", title: "Git Added Color", description: "Gutter color for added lines."),
 		.init(key: "theme.git.gutter.modified", title: "Git Modified Color", description: "Gutter color for modified lines."),
 		.init(key: "theme.git.gutter.removed", title: "Git Removed Color", description: "Gutter color for removed lines."),
-		.init(key: "syntax.preload_grammars", title: "Syntax Grammar Preload", description: "Controls when syntax grammars are loaded."),
+		.init(
+			key: "syntax.preload_grammars",
+			title: "Syntax Grammar Preload",
+			description: "Controls when syntax grammars are loaded."
+		),
+		.init(
+			key: "terminal.font",
+			title: "Terminal Font",
+			description: "Terminal font family; unset inherits the editor font."
+		),
 		.init(key: "terminal.font_size", title: "Terminal Font Size", description: "Point size for terminal text."),
-		.init(key: "terminal.scrollback_lines", title: "Terminal Scrollback", description: "Maximum retained terminal lines."),
-		.init(key: "terminal.presentation", title: "Terminal Presentation", description: "Shows the terminal at the bottom of the editor or in a separate window."),
-		.init(key: "git.presentation", title: "Git Presentation", description: "Shows Git Changes in the right sidebar or in a separate window."),
+		.init(
+			key: "terminal.scrollback_lines",
+			title: "Terminal Scrollback",
+			description: "Maximum retained terminal lines."
+		),
+		.init(
+			key: "terminal.presentation",
+			title: "Terminal Presentation",
+			description: "Shows the terminal at the bottom of the editor or in a separate window."
+		),
+		.init(
+			key: "git.presentation",
+			title: "Git Presentation",
+			description: "Shows Git Changes in the right sidebar or in a separate window."
+		),
 		.init(key: "find.uses_regex", title: "Find Uses Regex", description: "Uses regular expressions by default."),
 		.init(key: "find.case_sensitive", title: "Find Case Sensitive", description: "Matches case by default."),
 		.init(key: "find.whole_word", title: "Find Whole Word", description: "Matches complete words by default."),
-		.init(key: "recovery.journal_enabled", title: "Recovery Journal", description: "Keeps local crash-recovery journals."),
+		.init(
+			key: "recovery.journal_enabled",
+			title: "Recovery Journal",
+			description: "Keeps local crash-recovery journals."
+		),
 		.init(key: "layout.sidebar_visible", title: "Show Sidebar", description: "Shows the workspace sidebar."),
-		.init(key: "layout.sidebar_position", title: "Sidebar Position", description: "Places the sidebar at the leading or trailing edge."),
-		.init(key: "layout.sidebar_width", title: "Sidebar Width", description: "Sidebar width in points before interface scale."),
+		.init(
+			key: "layout.sidebar_position",
+			title: "Sidebar Position",
+			description: "Places the sidebar at the leading or trailing edge."
+		),
+		.init(
+			key: "layout.sidebar_width",
+			title: "Sidebar Width",
+			description: "Sidebar width in points before interface scale."
+		),
 		.init(key: "layout.tab_bar_visible", title: "Show Tab Bar", description: "Shows document and pane tab bars."),
 		.init(key: "layout.status_bar_visible", title: "Show Status Bar", description: "Shows editor status information."),
-		.init(key: "layout.interface_scale", title: "Interface Scale", description: "Scales supported editor-shell dimensions."),
+		.init(
+			key: "layout.interface_scale",
+			title: "Interface Scale",
+			description: "Scales supported editor-shell dimensions."
+		),
 		.init(key: "ui.font_scale", title: "UI Font Scale", description: "Scales first-party panel typography."),
 		.init(key: "ui.density", title: "UI Density", description: "Compact, regular, or comfortable panel spacing."),
-		.init(key: "ui.corner_radius", title: "UI Corner Radius", description: "Corner radius for configurable first-party panels."),
-		.init(key: "ui.border_width", title: "UI Border Width", description: "Border width for configurable first-party panels."),
+		.init(
+			key: "ui.corner_radius",
+			title: "UI Corner Radius",
+			description: "Corner radius for configurable first-party panels."
+		),
+		.init(
+			key: "ui.border_width",
+			title: "UI Border Width",
+			description: "Border width for configurable first-party panels."
+		),
 		.init(key: "ui.padding", title: "UI Padding", description: "Base padding for configurable first-party panels."),
-		.init(key: "ui.notification_position", title: "Notification Position", description: "Places in-app notifications at the bottom-right or top-right of the editor."),
-		.init(key: "editor.language.<language>.font", title: "Language Font Override", description: "Overrides the editor font for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.font_size", title: "Language Font Size Override", description: "Overrides editor font size for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.font_rendering", title: "Language Font Rendering Override", description: "Overrides glyph rendering for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.line_numbers", title: "Language Line Numbers Override", description: "Overrides line-number visibility for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.tab_width", title: "Language Tab Width Override", description: "Overrides tab width for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.use_spaces", title: "Language Indent Override", description: "Overrides spaces-versus-tabs for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.auto_pairs", title: "Language Auto Pairs Override", description: "Overrides automatic pairs for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.smart_indent", title: "Language Smart Indent Override", description: "Overrides smart indentation for one language.", isLanguageTemplate: true),
-		.init(key: "editor.language.<language>.multiple_selections", title: "Language Multiple Cursors Override", description: "Overrides multiple cursors for one language.", isLanguageTemplate: true),
+		.init(
+			key: "ui.notification_position",
+			title: "Notification Position",
+			description: "Places in-app notifications at the bottom-right or top-right of the editor."
+		),
+		.init(
+			key: "editor.language.<language>.font",
+			title: "Language Font Override",
+			description: "Overrides the editor font for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.font_size",
+			title: "Language Font Size Override",
+			description: "Overrides editor font size for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.font_rendering",
+			title: "Language Font Rendering Override",
+			description: "Overrides glyph rendering for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.line_numbers",
+			title: "Language Line Numbers Override",
+			description: "Overrides line-number visibility for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.tab_width",
+			title: "Language Tab Width Override",
+			description: "Overrides tab width for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.use_spaces",
+			title: "Language Indent Override",
+			description: "Overrides spaces-versus-tabs for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.auto_pairs",
+			title: "Language Auto Pairs Override",
+			description: "Overrides automatic pairs for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.smart_indent",
+			title: "Language Smart Indent Override",
+			description: "Overrides smart indentation for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
+			key: "editor.language.<language>.multiple_selections",
+			title: "Language Multiple Cursors Override",
+			description: "Overrides multiple cursors for one language.",
+			isLanguageTemplate: true
+		),
 	] + surfaceEntries
 
 	private static let surfaceEntries: [Entry] = ItsySettings.UISettings.knownSurfaceIDs.flatMap { id in
 		[
 			.init(key: "ui.surface.\(id).width", title: "\(id) Width", description: "Default width for the \(id) panel."),
 			.init(key: "ui.surface.\(id).height", title: "\(id) Height", description: "Default height for the \(id) panel."),
-			.init(key: "ui.surface.\(id).row_height", title: "\(id) Row Height", description: "Row density for the \(id) panel."),
-			.init(key: "ui.surface.\(id).input_font_size", title: "\(id) Input Font Size", description: "Input typography for the \(id) panel."),
-			.init(key: "ui.surface.\(id).item_font_size", title: "\(id) Item Font Size", description: "Item typography for the \(id) panel."),
+			.init(
+				key: "ui.surface.\(id).row_height",
+				title: "\(id) Row Height",
+				description: "Row density for the \(id) panel."
+			),
+			.init(
+				key: "ui.surface.\(id).input_font_size",
+				title: "\(id) Input Font Size",
+				description: "Input typography for the \(id) panel."
+			),
+			.init(
+				key: "ui.surface.\(id).item_font_size",
+				title: "\(id) Item Font Size",
+				description: "Item typography for the \(id) panel."
+			),
 		]
 	}
 
@@ -115,7 +260,9 @@ public enum ItsySettingsCatalog {
 
 	public static func effectiveValue(for key: String, in settings: ItsySettings) -> String {
 		let settings = settings.normalized()
-		if let value = surfaceValue(for: key, in: settings) { return value }
+		if let value = surfaceValue(for: key, in: settings) {
+			return value
+		}
 		return switch key {
 		case "schema_version": String(ItsySettingsSchema.currentVersion)
 		case "editor.font": settings.editor.font
@@ -139,6 +286,7 @@ public enum ItsySettingsCatalog {
 		case "theme.git.gutter.modified": settings.theme.gitGutter.modified
 		case "theme.git.gutter.removed": settings.theme.gitGutter.removed
 		case "syntax.preload_grammars": settings.syntax.preloadGrammars.rawValue
+		case "terminal.font": settings.terminal.font ?? "Inherited: \(settings.editor.font)"
 		case "terminal.font_size": number(settings.terminal.fontSize)
 		case "terminal.scrollback_lines": String(settings.terminal.scrollbackLines)
 		case "terminal.presentation": settings.terminal.presentation.rawValue
@@ -164,7 +312,9 @@ public enum ItsySettingsCatalog {
 	}
 
 	@discardableResult public static func reset(_ key: String, in settings: inout ItsySettings) -> Bool {
-		if resetSurfaceValue(for: key, in: &settings) { return true }
+		if resetSurfaceValue(for: key, in: &settings) {
+			return true
+		}
 		let defaults = ItsySettings.default
 		switch key {
 		case "schema_version": return false
@@ -189,6 +339,7 @@ public enum ItsySettingsCatalog {
 		case "theme.git.gutter.modified": settings.theme.gitGutter.modified = defaults.theme.gitGutter.modified
 		case "theme.git.gutter.removed": settings.theme.gitGutter.removed = defaults.theme.gitGutter.removed
 		case "syntax.preload_grammars": settings.syntax.preloadGrammars = defaults.syntax.preloadGrammars
+		case "terminal.font": settings.terminal.font = defaults.terminal.font
 		case "terminal.font_size": settings.terminal.fontSize = defaults.terminal.fontSize
 		case "terminal.scrollback_lines": settings.terminal.scrollbackLines = defaults.terminal.scrollbackLines
 		case "terminal.presentation": settings.terminal.presentation = defaults.terminal.presentation
@@ -216,7 +367,9 @@ public enum ItsySettingsCatalog {
 
 	public static func update(value rawValue: String, for key: String, in settings: inout ItsySettings) -> String? {
 		let isSurface = surfaceKey(key) != nil
-		guard isSurface || (entries.first(where: { $0.key == key }).map { $0.isResettable && !$0.isLanguageTemplate } == true) else {
+		guard isSurface ||
+			(entries.first(where: { $0.key == key }).map { $0.isResettable && !$0.isLanguageTemplate } == true)
+		else {
 			return "This catalog entry is read-only."
 		}
 		let rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -244,21 +397,26 @@ public enum ItsySettingsCatalog {
 		guard let separator = suffix.lastIndex(of: ".") else { return nil }
 		let id = String(suffix[..<separator])
 		let property = String(suffix[suffix.index(after: separator)...])
-		guard ItsySettings.UISettings.knownSurfaceIDs.contains(id), ["width", "height", "row_height", "input_font_size", "item_font_size"].contains(property) else { return nil }
+		guard ItsySettings.UISettings.knownSurfaceIDs.contains(id), [
+			"width",
+			"height",
+			"row_height",
+			"input_font_size",
+			"item_font_size",
+		].contains(property) else { return nil }
 		return (id, property)
 	}
 
 	private static func surfaceValue(for key: String, in settings: ItsySettings) -> String? {
 		guard let (id, property) = surfaceKey(key) else { return nil }
 		let surface = settings.ui.surface(id)
-		let value: Double?
-		switch property {
-		case "width": value = surface.width
-		case "height": value = surface.height
-		case "row_height": value = surface.rowHeight
-		case "input_font_size": value = surface.inputFontSize
-		case "item_font_size": value = surface.itemFontSize
-		default: value = nil
+		let value: Double? = switch property {
+		case "width": surface.width
+		case "height": surface.height
+		case "row_height": surface.rowHeight
+		case "input_font_size": surface.inputFontSize
+		case "item_font_size": surface.itemFontSize
+		default: nil
 		}
 		return value.map(number) ?? "Default"
 	}

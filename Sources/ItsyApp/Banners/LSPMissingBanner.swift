@@ -14,6 +14,7 @@ final class LSPMissingBanner: NSView {
 	private let dismissButton = NSButton(title: L10n.string("Dismiss (session)"), target: nil, action: nil)
 	private let detailsLabel = NSTextField(wrappingLabelWithString: "")
 	private let copyDiagnosticsButton = NSButton(title: L10n.string("Copy diagnostics"), target: nil, action: nil)
+	private let detailsContainer = NSView()
 	private let detailsStack = NSStackView()
 	private var missingBinary: LSPServerRegistry.MissingBinary?
 	private var unavailableLanguage: LSPServerRegistry.UnsupportedLanguage?
@@ -31,9 +32,9 @@ final class LSPMissingBanner: NSView {
 	func show(missingBinary: LSPServerRegistry.MissingBinary, fileURL: URL? = nil) {
 		self.missingBinary = missingBinary
 		unavailableLanguage = nil
-		self.fileURL = fileURL
+		self.fileURL = fileURL ?? self.fileURL
 		copyButton.isHidden = false
-		label.stringValue = L10n.string("LSP server \(missingBinary.command) unavailable. \(missingBinary.hint)")
+		label.stringValue = L10n.string("LSP server \(missingBinary.command) unavailable")
 		updateDetails()
 		setDetailsExpanded(false)
 		isHidden = false
@@ -42,9 +43,9 @@ final class LSPMissingBanner: NSView {
 	func show(unavailableLanguage: LSPServerRegistry.UnsupportedLanguage, fileURL: URL? = nil) {
 		missingBinary = nil
 		self.unavailableLanguage = unavailableLanguage
-		self.fileURL = fileURL
+		self.fileURL = fileURL ?? self.fileURL
 		copyButton.isHidden = true
-		label.stringValue = L10n.string("LSP unavailable for \(unavailableLanguage.languageID). \(unavailableLanguage.message)")
+		label.stringValue = L10n.string("LSP unavailable for \(unavailableLanguage.languageID)")
 		updateDetails()
 		setDetailsExpanded(false)
 		isHidden = false
@@ -60,7 +61,7 @@ final class LSPMissingBanner: NSView {
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
-		layer?.backgroundColor = palette.bannerBackground.cgColor
+		layer?.backgroundColor = palette.bannerBackground.withAlphaComponent(1).cgColor
 		label.textColor = palette.bannerForeground
 		copyButton.contentTintColor = palette.buttonForeground
 		supportButton.contentTintColor = palette.buttonForeground
@@ -72,7 +73,7 @@ final class LSPMissingBanner: NSView {
 
 	private func configure() {
 		wantsLayer = true
-		layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.14).cgColor
+		layer?.backgroundColor = NSColor.controlAccentColor.cgColor
 		setContentHuggingPriority(.required, for: .vertical)
 		setContentCompressionResistancePriority(.required, for: .vertical)
 		isHidden = true
@@ -108,7 +109,8 @@ final class LSPMissingBanner: NSView {
 		detailsButton.setContentCompressionResistancePriority(.required, for: .horizontal)
 		detailsButton.setAccessibilityLabel(L10n.string("Show LSP diagnostic details"))
 
-		detailsLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+		detailsLabel.font = .systemFont(ofSize: 12)
+		detailsLabel.alignment = .left
 		detailsLabel.lineBreakMode = .byWordWrapping
 		detailsLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
@@ -126,12 +128,21 @@ final class LSPMissingBanner: NSView {
 
 		detailsStack.orientation = .vertical
 		detailsStack.alignment = .leading
-		detailsStack.spacing = 6
+		detailsStack.spacing = 8
 		detailsStack.addArrangedSubview(detailsLabel)
 		detailsStack.addArrangedSubview(copyDiagnosticsButton)
-		detailsStack.isHidden = true
+		detailsStack.translatesAutoresizingMaskIntoConstraints = false
+		detailsContainer.addSubview(detailsStack)
+		detailsContainer.isHidden = true
+		NSLayoutConstraint.activate([
+			detailsStack.leadingAnchor.constraint(equalTo: detailsContainer.leadingAnchor),
+			detailsStack.trailingAnchor.constraint(equalTo: detailsContainer.trailingAnchor),
+			detailsStack.topAnchor.constraint(equalTo: detailsContainer.topAnchor),
+			detailsStack.bottomAnchor.constraint(equalTo: detailsContainer.bottomAnchor),
+			detailsLabel.widthAnchor.constraint(equalTo: detailsStack.widthAnchor),
+		])
 
-		let contentStack = NSStackView(views: [summaryStack, detailsStack])
+		let contentStack = NSStackView(views: [summaryStack, detailsContainer])
 		contentStack.orientation = .vertical
 		contentStack.alignment = .width
 		contentStack.spacing = 8
@@ -145,7 +156,6 @@ final class LSPMissingBanner: NSView {
 			contentStack.trailingAnchor.constraint(equalTo: trailingAnchor),
 			contentStack.topAnchor.constraint(equalTo: topAnchor),
 			contentStack.bottomAnchor.constraint(equalTo: bottomAnchor),
-			detailsLabel.widthAnchor.constraint(equalTo: detailsStack.widthAnchor),
 			heightAnchor.constraint(greaterThanOrEqualToConstant: 34),
 		])
 	}
@@ -162,7 +172,7 @@ final class LSPMissingBanner: NSView {
 	}
 
 	@objc private func toggleDetails(_: NSButton) {
-		setDetailsExpanded(detailsStack.isHidden)
+		setDetailsExpanded(detailsContainer.isHidden)
 	}
 
 	@objc private func copyDiagnostics(_: NSButton) {
@@ -181,7 +191,7 @@ final class LSPMissingBanner: NSView {
 	}
 
 	private func setDetailsExpanded(_ expanded: Bool) {
-		detailsStack.isHidden = !expanded
+		detailsContainer.isHidden = !expanded
 		detailsButton.title = L10n.string(expanded ? "Hide details" : "Details")
 		detailsButton.setAccessibilityLabel(L10n.string(expanded ? "Hide LSP diagnostic details" : "Show LSP diagnostic details"))
 		superview?.needsLayout = true

@@ -43,6 +43,18 @@ import Testing
 	#expect(NSPasteboard.general.string(forType: .string)?.contains("file: /workspace/Project/app.ts") == true)
 }
 
+@Test @MainActor func lspBannerRetainsActiveFileForARequestErrorWithoutFileContext() throws {
+	let banner = LSPMissingBanner(frame: NSRect(x: 0, y: 0, width: 640, height: 38))
+	let url = URL(fileURLWithPath: "/workspace/Project/config.toml")
+	banner.show(unavailableLanguage: .init(languageID: "toml", reason: .noBundledServer), fileURL: url)
+	banner.show(unavailableLanguage: .init(languageID: "toml", reason: .noBundledServer))
+	let detailsButton = try #require(buttons(in: banner).first { $0.title == "Details" })
+	detailsButton.performClick(nil)
+	let copyDiagnosticsButton = try #require(buttons(in: banner).first { $0.title == "Copy diagnostics" })
+	copyDiagnosticsButton.performClick(nil)
+	#expect(NSPasteboard.general.string(forType: .string)?.contains("file: /workspace/Project/config.toml") == true)
+}
+
 private func buttons(in view: NSView) -> [NSButton] {
 	(view.subviews.compactMap { $0 as? NSButton } + view.subviews.flatMap(buttons(in:)))
 }

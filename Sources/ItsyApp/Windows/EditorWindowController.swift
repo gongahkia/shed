@@ -216,6 +216,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var lspSurfaceRefreshTask: Task<Void, Never>?
 	private var lspSurfaceGeneration = 0
 	private var lspMissingBannerGeneration = 0
+	private var lspBannerDocumentURL: URL?
 	private var lspStatusGeneration = 0
 	private var lspConfigurationGeneration = 0
 	private var indexingStatusText: String?
@@ -746,9 +747,11 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspMissingBannerGeneration += 1
 		let generation = lspMissingBannerGeneration
 		guard let fileURL = document.fileURL else {
+			lspBannerDocumentURL = nil
 			lspMissingBanner.hide()
 			return
 		}
+		lspBannerDocumentURL = fileURL
 		Task { [weak self] in
 			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
 			let unavailableLanguage = await Self.lspManager.unsupportedLanguage(for: fileURL)
@@ -792,13 +795,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func handleLSPRequestError(_ error: Error) {
+		let fileURL = activeLSPKey.flatMap { lspStatusEntries[$0]?.url } ?? lspBannerDocumentURL ?? (document as? ItsyDocument)?.fileURL
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
-			showLSPMissingBanner(missingBinary, fileURL: activeLSPKey.flatMap { lspStatusEntries[$0]?.url })
+			showLSPMissingBanner(missingBinary, fileURL: fileURL)
 			if let key = activeLSPKey {
 				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspStatusEntries[key]?.url, server: missingBinary.command)
 			}
 		} else if case let LSPManagerError.unsupportedLanguage(unavailableLanguage) = error {
-			showLSPUnavailableBanner(unavailableLanguage, fileURL: activeLSPKey.flatMap { lspStatusEntries[$0]?.url })
+			showLSPUnavailableBanner(unavailableLanguage, fileURL: fileURL)
 		} else if case let LSPManagerError.serverDisabled(key) = error {
 			setLSPStatus(
 				key: key,

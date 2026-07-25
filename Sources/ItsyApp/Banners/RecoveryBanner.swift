@@ -26,14 +26,14 @@ final class RecoveryBanner: NSView {
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
-		layer?.backgroundColor = palette.bannerBackground.cgColor
+		layer?.backgroundColor = palette.bannerBackground.withAlphaComponent(1).cgColor
 		label.textColor = palette.bannerForeground
 		dismissButton.contentTintColor = palette.buttonForeground
 	}
 
 	private func configure() {
 		wantsLayer = true
-		layer?.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.14).cgColor
+		layer?.backgroundColor = NSColor.controlAccentColor.cgColor
 		setContentHuggingPriority(.required, for: .vertical)
 		setContentCompressionResistancePriority(.required, for: .vertical)
 		isHidden = true

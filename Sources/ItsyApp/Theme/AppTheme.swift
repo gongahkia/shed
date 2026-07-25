@@ -150,7 +150,7 @@ struct AppThemePalette {
 		tabBorder = color("tab.border", border)
 		statusBackground = color("statusBar.background", seed.statusBackground)
 		statusForeground = Self.readable(color("statusBar.foreground", seed.statusForeground), against: statusBackground)
-		bannerBackground = color("itsy.banner.background", accent.withAlphaComponent(0.14))
+		bannerBackground = color("itsy.banner.background", seed.panelBackground)
 		bannerForeground = color("itsy.banner.foreground", foreground)
 		gitAdded = color("itsy.git.added", Self.nsColor(hex: settings.theme.gitGutter.added, fallback: seed.success))
 		gitModified = color("itsy.git.modified", Self.nsColor(hex: settings.theme.gitGutter.modified, fallback: seed.warning))

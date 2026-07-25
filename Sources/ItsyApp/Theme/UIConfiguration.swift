@@ -58,6 +58,14 @@ import ObjectiveC
 		view.layer?.borderColor = AppTheme.palette.border.cgColor
 	}
 
+	static func applyToastStyle(to view: NSView) {
+		applyPanelStyle(to: view)
+		view.layer?.shadowColor = NSColor.black.cgColor
+		view.layer?.shadowOpacity = 0.2
+		view.layer?.shadowRadius = 10
+		view.layer?.shadowOffset = CGSize(width: 0, height: -2)
+	}
+
 	static func apply(to panel: NSPanel) {
 		guard let contentView = panel.contentView else { return }
 		applyPanelStyle(to: contentView)

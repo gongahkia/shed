@@ -149,6 +149,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let tabStackView = NSStackView()
 	private let lspMissingBanner = LSPMissingBanner()
 	private let recoveryBanner = RecoveryBanner()
+	private let notificationStack = NSStackView()
+	private var notificationPositionConstraints: [NSLayoutConstraint] = []
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
@@ -249,9 +251,23 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			paneCoordinator.view.topAnchor.constraint(equalTo: editorContainer.topAnchor),
 			paneCoordinator.view.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor),
 		])
+		notificationStack.orientation = .vertical
+		notificationStack.alignment = .trailing
+		notificationStack.distribution = .fill
+		notificationStack.spacing = 8
+		notificationStack.translatesAutoresizingMaskIntoConstraints = false
+		notificationStack.addArrangedSubview(lspMissingBanner)
+		notificationStack.addArrangedSubview(recoveryBanner)
+		editorContainer.addSubview(notificationStack)
+		let preferredNotificationWidth = notificationStack.widthAnchor.constraint(equalToConstant: 560)
+		preferredNotificationWidth.priority = .defaultHigh
+		NSLayoutConstraint.activate([
+			notificationStack.trailingAnchor.constraint(equalTo: editorContainer.trailingAnchor, constant: -16),
+			notificationStack.widthAnchor.constraint(lessThanOrEqualTo: editorContainer.widthAnchor, constant: -32),
+			notificationStack.widthAnchor.constraint(lessThanOrEqualToConstant: 620),
+			preferredNotificationWidth,
+		])
 		editorStack.addArrangedSubview(tabBarView)
-		editorStack.addArrangedSubview(lspMissingBanner)
-		editorStack.addArrangedSubview(recoveryBanner)
 		editorStack.addArrangedSubview(editorContainer)
 		editorStack.addArrangedSubview(statusBarView)
 
@@ -298,6 +314,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
 		applyLayoutSettings(initialSettings.layout)
+		applyNotificationPosition(initialSettings.ui)
 		applyTheme(AppTheme.palette)
 		recordBenchStage("window_controller_install_pane_end")
 		refreshLSPMissingBanner(for: document)
@@ -693,6 +710,20 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		recoveryBanner.dismissRequested = { [weak self] in
 			self?.focusEditor()
 		}
+	}
+
+	private func applyNotificationPosition(_ settings: ItsySettings.UISettings) {
+		NSLayoutConstraint.deactivate(notificationPositionConstraints)
+		let inset = max(CGFloat(settings.padding) * 2, 12)
+		notificationPositionConstraints = switch settings.notificationPosition {
+		case .bottomRight:
+			[notificationStack.bottomAnchor.constraint(equalTo: editorContainer.bottomAnchor, constant: -inset)]
+		case .topRight:
+			[notificationStack.topAnchor.constraint(equalTo: editorContainer.topAnchor, constant: inset)]
+		}
+		NSLayoutConstraint.activate(notificationPositionConstraints)
+		ItsyUIConfiguration.applyToastStyle(to: lspMissingBanner)
+		ItsyUIConfiguration.applyToastStyle(to: recoveryBanner)
 	}
 
 	private func refreshRecoveryBanner(for document: ItsyDocument) {
@@ -1609,6 +1640,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		applyTheme(AppTheme.palette)
 		setTabGroupScope(settings.editor.tabGroups)
 		applyLayoutSettings(settings.layout)
+		applyNotificationPosition(settings.ui)
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -1623,6 +1655,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		lspStatusButton.contentTintColor = palette.statusForeground
 		lspMissingBanner.applyTheme(palette)
 		recoveryBanner.applyTheme(palette)
+		ItsyUIConfiguration.applyToastStyle(to: lspMissingBanner)
+		ItsyUIConfiguration.applyToastStyle(to: recoveryBanner)
 		findBarController?.applyTheme(palette)
 		fileTreeController.applyTheme(palette)
 		for pane in paneCoordinator.panes {

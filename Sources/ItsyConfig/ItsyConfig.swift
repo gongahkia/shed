@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 4
+	public static let currentVersion = 5
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -15,6 +15,11 @@ public struct ItsySettings: Equatable, Sendable {
 		case compact
 		case regular
 		case comfortable
+	}
+
+	public enum UINotificationPosition: String, Equatable, Sendable {
+		case bottomRight = "bottom_right"
+		case topRight = "top_right"
 	}
 
 	public struct UISettings: Equatable, Sendable {
@@ -51,14 +56,16 @@ public struct ItsySettings: Equatable, Sendable {
 		public var cornerRadius: Double
 		public var borderWidth: Double
 		public var padding: Double
+		public var notificationPosition: UINotificationPosition
 		public var surfaces: [String: SurfaceSettings]
 
-		public init(fontScale: Double = 1, density: UIDensity = .regular, cornerRadius: Double = 8, borderWidth: Double = 1, padding: Double = 8, surfaces: [String: SurfaceSettings] = [:]) {
+		public init(fontScale: Double = 1, density: UIDensity = .regular, cornerRadius: Double = 8, borderWidth: Double = 1, padding: Double = 8, notificationPosition: UINotificationPosition = .bottomRight, surfaces: [String: SurfaceSettings] = [:]) {
 			self.fontScale = fontScale
 			self.density = density
 			self.cornerRadius = cornerRadius
 			self.borderWidth = borderWidth
 			self.padding = padding
+			self.notificationPosition = notificationPosition
 			self.surfaces = surfaces
 		}
 
@@ -711,6 +718,7 @@ public final class ItsySettingsStore {
 		corner_radius = \(format(settings.ui.cornerRadius))
 		border_width = \(format(settings.ui.borderWidth))
 		padding = \(format(settings.ui.padding))
+		notification_position = "\(settings.ui.notificationPosition.rawValue)"
 		""" + serializeLanguageSettings(settings.editor.language) + serializeUISurfaces(settings.ui.surfaces)
 	}
 
@@ -851,6 +859,7 @@ public enum ItsySettingsResolver {
 		case "ui.corner_radius": target.ui.cornerRadius = source.ui.cornerRadius
 		case "ui.border_width": target.ui.borderWidth = source.ui.borderWidth
 		case "ui.padding": target.ui.padding = source.ui.padding
+		case "ui.notification_position": target.ui.notificationPosition = source.ui.notificationPosition
 		default: applyLanguage(key: key, from: source, to: &target)
 		}
 	}
@@ -1276,6 +1285,12 @@ struct ItsySettingsParser {
 			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minBorderWidth ... ItsySettings.UISettings.maxBorderWidth) { settings.ui.borderWidth = number }
 		case "ui.padding":
 			if let number = validatedUIValue(value, key: key, line: line, range: ItsySettings.UISettings.minPadding ... ItsySettings.UISettings.maxPadding) { settings.ui.padding = number }
+		case "ui.notification_position":
+			if case let .string(position) = value, let position = ItsySettings.UINotificationPosition(rawValue: position.lowercased()) {
+				settings.ui.notificationPosition = position
+			} else {
+				warnType(key, line: line, expected: #""bottom_right" or "top_right""#)
+			}
 		default:
 			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
 		}

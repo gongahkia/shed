@@ -46,6 +46,7 @@ public enum ItsySettingsCatalog {
 		.init(key: "editor.smart_indent", title: "Smart Indent", description: "Carries indentation into a new line."),
 		.init(key: "editor.multiple_selections", title: "Multiple Cursors", description: "Enables multiple selections and cursors."),
 		.init(key: "editor.keymap", title: "Keymap", description: "Plain, Vim, or Emacs editing commands."),
+		.init(key: "editor.cursor_style", title: "Cursor Style", description: "Automatic uses a block cursor for Vim and Emacs; choose block or bar to override it."),
 		.init(key: "editor.tab_groups", title: "Tab Groups", description: "Shares tabs across a window or keeps them per pane."),
 		.init(key: "editor.wrap", title: "Wrap Mode", description: "No wrapping, soft wrapping, or hard wrapping."),
 		.init(key: "editor.wrap_column", title: "Wrap Column", description: "Column used for hard wrapping."),
@@ -126,6 +127,7 @@ public enum ItsySettingsCatalog {
 		case "editor.smart_indent": bool(settings.editor.smartIndent)
 		case "editor.multiple_selections": bool(settings.editor.multipleSelections)
 		case "editor.keymap": settings.editor.keymap.rawValue
+		case "editor.cursor_style": settings.editor.cursorStyle.rawValue
 		case "editor.tab_groups": settings.editor.tabGroups.rawValue
 		case "editor.wrap": settings.editor.wrap.rawValue
 		case "editor.wrap_column": String(settings.editor.wrapColumn)
@@ -173,6 +175,7 @@ public enum ItsySettingsCatalog {
 		case "editor.smart_indent": settings.editor.smartIndent = defaults.editor.smartIndent
 		case "editor.multiple_selections": settings.editor.multipleSelections = defaults.editor.multipleSelections
 		case "editor.keymap": settings.editor.keymap = defaults.editor.keymap
+		case "editor.cursor_style": settings.editor.cursorStyle = defaults.editor.cursorStyle
 		case "editor.tab_groups": settings.editor.tabGroups = defaults.editor.tabGroups
 		case "editor.wrap": settings.editor.wrap = defaults.editor.wrap
 		case "editor.wrap_column": settings.editor.wrapColumn = defaults.editor.wrapColumn

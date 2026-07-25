@@ -21,6 +21,11 @@ public enum MetalWrapMode: String, Sendable, Equatable {
 	case hard
 }
 
+public enum MetalCursorStyle: Sendable, Equatable {
+	case bar
+	case block
+}
+
 struct MetalGlyphInstance {
 	var screenOrigin: SIMD2<Float>
 	var size: SIMD2<Float>
@@ -190,6 +195,9 @@ public final class MetalTextView: NSView {
 	private var cursorRect: CGRect?
 	private var cursorBlinkVisible = true
 	private var cursorBlinkTimer: Timer?
+	public var cursorStyle: MetalCursorStyle = .bar {
+		didSet { syncEditorState() }
+	}
 	private var selectionRects: [CGRect] = []
 	var findMatchRanges: [Range<Int>] = []
 	var findMatchRects: [CGRect] = []
@@ -595,8 +603,8 @@ public final class MetalTextView: NSView {
 		return true
 	}
 
-	func setCursor(x: CGFloat, y: CGFloat, height: CGFloat) {
-		cursorRect = CGRect(x: x, y: y, width: 2, height: height)
+	func setCursor(x: CGFloat, y: CGFloat, width: CGFloat = 2, height: CGFloat) {
+		cursorRect = CGRect(x: x, y: y, width: width, height: height)
 		cursorBlinkVisible = true
 		markDirty()
 	}
@@ -1761,13 +1769,21 @@ public final class MetalTextView: NSView {
 		let prefix = storage.substring(cursorRange.lowerBound ..< min(head, cursorRange.upperBound))
 		let cursorX = textInset.x + typographicWidth(prefix) - xOffset
 		let cursorY = topContentInset + textInset.y + CGFloat(slot?.row ?? line - topLineIndex) * lineHeight
-		setCursor(x: cursorX, y: cursorY, height: lineHeight)
+		setCursor(x: cursorX, y: cursorY, width: cursorWidth(at: head, in: cursorRange), height: lineHeight)
 		setSelectionRects(selectionRects(for: editor.selections))
 		refreshFindMatchRects()
 		refreshDocumentHighlightRects()
 		refreshGutterMarkerRects()
 		refreshAccessibilityValue()
 		markDirty()
+	}
+
+	private func cursorWidth(at head: Int, in range: Range<Int>) -> CGFloat {
+		guard cursorStyle == .block else { return 2 }
+		guard head < range.upperBound else { return textFontAdvance }
+		let suffix = editor.textStorage.substring(head ..< range.upperBound)
+		guard let character = suffix.first, character != "\n" else { return textFontAdvance }
+		return max(typographicWidth(String(character)), 2)
 	}
 
 	private func accessibilityCurrentLineValue() -> String {

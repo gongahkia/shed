@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 5
+	public static let currentVersion = 6
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -93,6 +93,12 @@ public struct ItsySettings: Equatable, Sendable {
 		case plain
 		case vim
 		case emacs
+	}
+
+	public enum CursorStyle: String, Equatable, Sendable {
+		case automatic
+		case block
+		case bar
 	}
 
 	public enum LineNumberMode: String, Equatable, Sendable {
@@ -183,6 +189,7 @@ public struct ItsySettings: Equatable, Sendable {
 		public var multipleSelections: Bool
 		public var tabGroups: TabGroupScope
 		public var keymap: KeymapMode
+		public var cursorStyle: CursorStyle
 		public var wrap: WrapMode
 		public var wrapColumn: Int
 		public var language: [String: LanguageSettings]
@@ -201,6 +208,7 @@ public struct ItsySettings: Equatable, Sendable {
 			multipleSelections: Bool = true,
 			tabGroups: TabGroupScope = .window,
 			keymap: KeymapMode = .plain,
+			cursorStyle: CursorStyle = .automatic,
 			wrap: WrapMode = .none,
 			wrapColumn: Int = Self.defaultWrapColumn,
 			language: [String: LanguageSettings] = [:],
@@ -218,6 +226,7 @@ public struct ItsySettings: Equatable, Sendable {
 			self.multipleSelections = multipleSelections
 			self.tabGroups = tabGroups
 			self.keymap = keymap
+			self.cursorStyle = cursorStyle
 			self.wrap = wrap
 			self.wrapColumn = wrapColumn
 			self.language = language
@@ -676,6 +685,7 @@ public final class ItsySettingsStore {
 		smart_indent = \(settings.editor.smartIndent ? "true" : "false")
 		multiple_selections = \(settings.editor.multipleSelections ? "true" : "false")
 		keymap = "\(settings.editor.keymap.rawValue)"
+		cursor_style = "\(settings.editor.cursorStyle.rawValue)"
 		tab_groups = "\(settings.editor.tabGroups.rawValue)"
 		wrap = "\(settings.editor.wrap.rawValue)"
 		wrap_column = \(settings.editor.wrapColumn)
@@ -833,6 +843,7 @@ public enum ItsySettingsResolver {
 		case "editor.smart_indent": target.editor.smartIndent = source.editor.smartIndent
 		case "editor.multiple_selections": target.editor.multipleSelections = source.editor.multipleSelections
 		case "editor.keymap": target.editor.keymap = source.editor.keymap
+		case "editor.cursor_style": target.editor.cursorStyle = source.editor.cursorStyle
 		case "editor.tab_groups": target.editor.tabGroups = source.editor.tabGroups
 		case "editor.wrap": target.editor.wrap = source.editor.wrap
 		case "editor.wrap_column": target.editor.wrapColumn = source.editor.wrapColumn
@@ -1134,6 +1145,19 @@ struct ItsySettingsParser {
 				settings.editor.keymap = mode
 			} else {
 				warnType(key, line: line, expected: #""plain", "vim", or "emacs""#)
+			}
+		case "editor.cursor_style":
+			if case let .string(style) = value {
+				let style = style.lowercased()
+				if let cursorStyle = ItsySettings.CursorStyle(rawValue: style) {
+					settings.editor.cursorStyle = cursorStyle
+				} else if style == "immediate" {
+					settings.editor.cursorStyle = .bar
+				} else {
+					warnType(key, line: line, expected: #""automatic", "block", or "bar""#)
+				}
+			} else {
+				warnType(key, line: line, expected: #""automatic", "block", or "bar""#)
 			}
 		case "editor.tab_groups":
 			if case let .string(scope) = value, let scope = ItsySettings.TabGroupScope(rawValue: scope.lowercased()) {

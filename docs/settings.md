@@ -22,6 +22,7 @@ font = "Menlo"
 font_size = 14.95
 line_number_mode = "absolute" # off, absolute, relative
 keymap = "plain" # plain, vim, emacs
+cursor_style = "automatic" # automatic, block, bar
 wrap = "none" # none, soft, hard
 wrap_column = 100
 tab_width = 4
@@ -60,6 +61,8 @@ item_font_size = 13
 Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
 
 In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge.
+
+`editor.cursor_style = "automatic"` uses a block cursor for Vim and Emacs keymaps, and a thin bar for Plain. Set `block` or `bar` to override that behavior; `immediate` is accepted as an alias for `bar`.
 
 Use the command palette actions **Settings: Open User TOML**, **Settings: Open Workspace TOML**, and **Settings: Open Catalog** to edit or inspect configuration.
 

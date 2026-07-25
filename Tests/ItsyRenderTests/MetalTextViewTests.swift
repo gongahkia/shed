@@ -97,6 +97,14 @@ extension ItsyRenderTests {
 	#expect(instances[1].size == SIMD2<Float>(4, 20))
 }
 
+@Test func blockCursorMatchesTheCurrentCharacterWidth() throws {
+	let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "a")
+	view.cursorStyle = .block
+	let cursor = try #require(view.solidOverlayInstances(scale: 2).last)
+	#expect(abs(CGFloat(cursor.size.x) - view.textFontAdvance * 2) < 0.001)
+}
+
 @Test func editorColorPaletteUpdatesBackgroundTextSelectionAndCursor() throws {
 	let palette = EditorColorPalette(
 		background: SIMD4<Float>(0.10, 0.11, 0.12, 1),

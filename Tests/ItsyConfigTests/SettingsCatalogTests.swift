@@ -22,6 +22,7 @@ import Testing
 	settings.editor.tabWidth = 8
 	settings.layout.sidebarPosition = .trailing
 	settings.layout.interfaceScale = 1.25
+	settings.updates.automaticallyCheck = true
 	#expect(ItsySettingsCatalog.matching("side bar") == [])
 	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == [
 		"git.presentation",
@@ -33,6 +34,7 @@ import Testing
 	#expect(ItsySettingsCatalog.effectiveValue(for: "terminal.font", in: settings) == "Inherited: Menlo")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.sidebar_position", in: settings) == "trailing")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.interface_scale", in: settings) == "1.25")
+	#expect(ItsySettingsCatalog.effectiveValue(for: "updates.automatically_check", in: settings) == "true")
 	#expect(ItsySettingsCatalog.reset("editor.tab_width", in: &settings))
 	#expect(ItsySettingsCatalog.reset("layout.sidebar_position", in: &settings))
 	#expect(!ItsySettingsCatalog.reset("editor.language.<language>.font", in: &settings))
@@ -47,6 +49,7 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "relative", for: "editor.line_number_mode", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "block", for: "editor.cursor_style", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "Monaco", for: "terminal.font", in: &settings) == nil)
+	#expect(ItsySettingsCatalog.update(value: "true", for: "updates.automatically_check", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "#12AB34", for: "theme.git.gutter.added", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "17", for: "editor.tab_width", in: &settings) != nil)
 	#expect(ItsySettingsCatalog.update(value: "value", for: "editor.language.<language>.font", in: &settings) != nil)
@@ -57,6 +60,7 @@ import Testing
 	#expect(ItsySettingsCatalog.effectiveValue(for: "terminal.font", in: settings) == "Monaco")
 	#expect(ItsySettingsCatalog.reset("editor.cursor_style", in: &settings))
 	#expect(ItsySettingsCatalog.reset("terminal.font", in: &settings))
+	#expect(ItsySettingsCatalog.reset("updates.automatically_check", in: &settings))
 	#expect(ItsySettingsCatalog.effectiveValue(for: "ui.notification_position", in: settings) == "top_right")
 	#expect(ItsySettingsCatalog.reset("ui.notification_position", in: &settings))
 	#expect(ItsySettingsCatalog.reset("ui.surface.command_palette.height", in: &settings))
@@ -65,6 +69,7 @@ import Testing
 	#expect(settings.editor.lineNumberMode == .relative)
 	#expect(settings.editor.cursorStyle == .automatic)
 	#expect(settings.terminal.font == nil)
+	#expect(!settings.updates.automaticallyCheck)
 	#expect(settings.theme.gitGutter.added == "#12AB34")
 	#expect(settings.ui.notificationPosition == .bottomRight)
 }

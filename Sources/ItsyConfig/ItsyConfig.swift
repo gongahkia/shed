@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 8
+	public static let currentVersion = 9
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -367,6 +367,14 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public struct UpdateSettings: Equatable, Sendable {
+		public var automaticallyCheck: Bool
+
+		public init(automaticallyCheck: Bool = false) {
+			self.automaticallyCheck = automaticallyCheck
+		}
+	}
+
 	public struct LayoutSettings: Equatable, Sendable {
 		public static let defaultSidebarWidth = 240
 		public static let minSidebarWidth = 160
@@ -408,6 +416,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var git: GitSettings
 	public var find: FindSettings
 	public var recovery: RecoverySettings
+	public var updates: UpdateSettings
 	public var layout: LayoutSettings
 	public var ui: UISettings
 
@@ -419,6 +428,7 @@ public struct ItsySettings: Equatable, Sendable {
 		git: GitSettings = GitSettings(),
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
+		updates: UpdateSettings = UpdateSettings(),
 		layout: LayoutSettings = LayoutSettings(),
 		ui: UISettings = UISettings()
 	) {
@@ -429,6 +439,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.git = git
 		self.find = find
 		self.recovery = recovery
+		self.updates = updates
 		self.layout = layout
 		self.ui = ui
 	}
@@ -707,11 +718,12 @@ public final class ItsySettingsStore {
 			fileManager: fileManager
 		)
 		var workspace = workspaceStore.load(fallback: global.settings)
-		let workspaceUIKeys = workspace.assignedKeys.filter { $0.hasPrefix("ui.") }
-		if !workspaceUIKeys.isEmpty {
+		let workspacePersonalKeys = workspace.assignedKeys.filter { $0.hasPrefix("ui.") || $0.hasPrefix("updates.") }
+		if !workspacePersonalKeys.isEmpty {
 			workspace.settings.ui = global.settings.ui
-			workspace.assignedKeys.subtract(workspaceUIKeys)
-			workspace.warnings += workspaceUIKeys.sorted().map {
+			workspace.settings.updates = global.settings.updates
+			workspace.assignedKeys.subtract(workspacePersonalKeys)
+			workspace.warnings += workspacePersonalKeys.sorted().map {
 				ItsySettingsWarning(
 					key: $0,
 					source: workspaceStore.fileURL.path,
@@ -741,10 +753,11 @@ public final class ItsySettingsStore {
 				fileManager: fileManager
 			)
 			var loadedWorkspace = workspaceStore.load(fallback: global.settings)
-			let workspaceUIKeys = loadedWorkspace.assignedKeys.filter { $0.hasPrefix("ui.") }
-			if !workspaceUIKeys.isEmpty {
+			let workspacePersonalKeys = loadedWorkspace.assignedKeys.filter { $0.hasPrefix("ui.") || $0.hasPrefix("updates.") }
+			if !workspacePersonalKeys.isEmpty {
 				loadedWorkspace.settings.ui = global.settings.ui
-				loadedWorkspace.assignedKeys.subtract(workspaceUIKeys)
+				loadedWorkspace.settings.updates = global.settings.updates
+				loadedWorkspace.assignedKeys.subtract(workspacePersonalKeys)
 			}
 			workspace = loadedWorkspace
 		} else {
@@ -815,6 +828,9 @@ public final class ItsySettingsStore {
 
 		[recovery]
 		journal_enabled = \(settings.recovery.journalEnabled ? "true" : "false")
+
+		[updates]
+		automatically_check = \(settings.updates.automaticallyCheck ? "true" : "false")
 
 		[layout]
 		sidebar_visible = \(settings.layout.sidebarVisible ? "true" : "false")
@@ -979,6 +995,7 @@ public enum ItsySettingsResolver {
 		case "find.case_sensitive": target.find.isCaseSensitive = source.find.isCaseSensitive
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
 		case "recovery.journal_enabled": target.recovery.journalEnabled = source.recovery.journalEnabled
+		case "updates.automatically_check": target.updates.automaticallyCheck = source.updates.automaticallyCheck
 		case "layout.sidebar_visible": target.layout.sidebarVisible = source.layout.sidebarVisible
 		case "layout.sidebar_position": target.layout.sidebarPosition = source.layout.sidebarPosition
 		case "layout.sidebar_width": target.layout.sidebarWidth = source.layout.sidebarWidth
@@ -1144,7 +1161,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "layout", "ui"]
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "updates", "layout", "ui"]
 					.contains(section),
 					!section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
 				{
@@ -1444,6 +1461,12 @@ struct ItsySettingsParser {
 		case "recovery.journal_enabled":
 			if case let .bool(journalEnabled) = value {
 				settings.recovery.journalEnabled = journalEnabled
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
+		case "updates.automatically_check":
+			if case let .bool(automaticallyCheck) = value {
+				settings.updates.automaticallyCheck = automaticallyCheck
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}

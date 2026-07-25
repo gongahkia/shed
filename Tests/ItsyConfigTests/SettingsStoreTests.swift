@@ -36,6 +36,10 @@ import Testing
 	[terminal]
 	font_size = 13
 	scrollback_lines = 20000
+	presentation = "window"
+
+	[git]
+	presentation = "window"
 
 	[find]
 	uses_regex = true
@@ -79,6 +83,8 @@ import Testing
 	#expect(result.settings.syntax.preloadGrammars == .all)
 	#expect(result.settings.terminal.fontSize == 13)
 	#expect(result.settings.terminal.scrollbackLines == 20000)
+	#expect(result.settings.terminal.presentation == .window)
+	#expect(result.settings.git.presentation == .window)
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
 	#expect(result.settings.layout == .init(sidebarVisible: false, sidebarPosition: .trailing, sidebarWidth: 320, tabBarVisible: false, statusBarVisible: false, interfaceScale: 1.4))
@@ -117,7 +123,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 6)
+	#expect(ItsySettingsSchema.currentVersion == 7)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -197,7 +203,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 6"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 7"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
@@ -212,6 +218,8 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
 	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"presentation = "bottom""#))
+	#expect(ItsySettingsStore.serialize(settings).contains(#"[git]\npresentation = "sidebar""#))
 	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 

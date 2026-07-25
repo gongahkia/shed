@@ -7,7 +7,7 @@ import Testing
 @Test @MainActor func terminalCoordinatorManagesTabsPanesFocusSearchCloseAndRestart() throws {
 	_ = NSApplication.shared
 	let coordinator = TerminalCoordinator(
-		settingsProvider: { ItsySettings.TerminalSettings() },
+		settingsProvider: { ItsySettings.TerminalSettings(presentation: .window) },
 		activeDocumentProvider: { nil },
 		sessionFactory: terminalCoordinatorTestSession
 	)

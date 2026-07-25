@@ -255,6 +255,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		notificationStack.alignment = .trailing
 		notificationStack.distribution = .fill
 		notificationStack.spacing = 8
+		notificationStack.detachesHiddenViews = true
+		notificationStack.setContentHuggingPriority(.required, for: .vertical)
+		notificationStack.setContentCompressionResistancePriority(.required, for: .vertical)
 		notificationStack.translatesAutoresizingMaskIntoConstraints = false
 		notificationStack.addArrangedSubview(lspMissingBanner)
 		notificationStack.addArrangedSubview(recoveryBanner)

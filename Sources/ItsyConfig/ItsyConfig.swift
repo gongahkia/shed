@@ -6,7 +6,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 6
+	public static let currentVersion = 7
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -275,6 +275,11 @@ public struct ItsySettings: Equatable, Sendable {
 	}
 
 	public struct TerminalSettings: Equatable, Sendable {
+		public enum Presentation: String, Equatable, Sendable {
+			case bottom
+			case window
+		}
+
 		public static let defaultFontSize = 12.0
 		public static let minFontSize = 8.0
 		public static let maxFontSize = 36.0
@@ -284,10 +289,25 @@ public struct ItsySettings: Equatable, Sendable {
 
 		public var fontSize: Double
 		public var scrollbackLines: Int
+		public var presentation: Presentation
 
-		public init(fontSize: Double = Self.defaultFontSize, scrollbackLines: Int = Self.defaultScrollbackLines) {
+		public init(fontSize: Double = Self.defaultFontSize, scrollbackLines: Int = Self.defaultScrollbackLines, presentation: Presentation = .bottom) {
 			self.fontSize = fontSize
 			self.scrollbackLines = scrollbackLines
+			self.presentation = presentation
+		}
+	}
+
+	public struct GitSettings: Equatable, Sendable {
+		public enum Presentation: String, Equatable, Sendable {
+			case sidebar
+			case window
+		}
+
+		public var presentation: Presentation
+
+		public init(presentation: Presentation = .sidebar) {
+			self.presentation = presentation
 		}
 	}
 
@@ -349,6 +369,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var theme: ThemeSettings
 	public var syntax: SyntaxSettings
 	public var terminal: TerminalSettings
+	public var git: GitSettings
 	public var find: FindSettings
 	public var recovery: RecoverySettings
 	public var layout: LayoutSettings
@@ -359,6 +380,7 @@ public struct ItsySettings: Equatable, Sendable {
 		theme: ThemeSettings = ThemeSettings(),
 		syntax: SyntaxSettings = SyntaxSettings(),
 		terminal: TerminalSettings = TerminalSettings(),
+		git: GitSettings = GitSettings(),
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
 		layout: LayoutSettings = LayoutSettings(),
@@ -368,6 +390,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.theme = theme
 		self.syntax = syntax
 		self.terminal = terminal
+		self.git = git
 		self.find = find
 		self.recovery = recovery
 		self.layout = layout
@@ -705,6 +728,10 @@ public final class ItsySettingsStore {
 		[terminal]
 		font_size = \(format(settings.terminal.fontSize))
 		scrollback_lines = \(settings.terminal.scrollbackLines)
+		presentation = "\(settings.terminal.presentation.rawValue)"
+
+		[git]
+		presentation = "\(settings.git.presentation.rawValue)"
 
 		[find]
 		uses_regex = \(settings.find.usesRegex ? "true" : "false")
@@ -1024,7 +1051,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "find", "recovery", "layout", "ui"].contains(section),
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "layout", "ui"].contains(section),
 				   !section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
 				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
@@ -1230,6 +1257,18 @@ struct ItsySettingsParser {
 				warnType(key, line: line, expected: "integer between \(ItsySettings.TerminalSettings.minScrollbackLines) and \(ItsySettings.TerminalSettings.maxScrollbackLines)")
 			} else {
 				warnType(key, line: line, expected: "integer")
+			}
+		case "terminal.presentation":
+			if case let .string(presentation) = value, let presentation = ItsySettings.TerminalSettings.Presentation(rawValue: presentation.lowercased()) {
+				settings.terminal.presentation = presentation
+			} else {
+				warnType(key, line: line, expected: #""bottom" or "window""#)
+			}
+		case "git.presentation":
+			if case let .string(presentation) = value, let presentation = ItsySettings.GitSettings.Presentation(rawValue: presentation.lowercased()) {
+				settings.git.presentation = presentation
+			} else {
+				warnType(key, line: line, expected: #""sidebar" or "window""#)
 			}
 		case "find.uses_regex":
 			if case let .bool(usesRegex) = value {

@@ -62,7 +62,12 @@ import ItsyKeymap
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
 		openLocation: { [weak self] location in self?.openTerminalLocation(location) },
 		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedTerminalHostView },
-		setEmbeddedTerminalVisible: { [weak self] visible in self?.activeEditorWindowController()?.setEmbeddedTerminalVisible(visible) }
+		setEmbeddedTerminalVisible: { [weak self] visible in
+			self?.activeEditorWindowController()?.setEmbeddedTerminalVisible(visible)
+		},
+		editorFontProvider: { [weak self] in
+			self?.settingsCoordinator.currentSettings.editor.font ?? ItsySettings.EditorSettings.defaultFont
+		}
 	)
 	private lazy var problemsCoordinator = ProblemsCoordinator(documentController: documentController)
 	private lazy var outlineCoordinator = OutlineCoordinator(
@@ -255,7 +260,9 @@ import ItsyKeymap
 				Command(id: "file.nextBuffer", title: L10n.string("Next Tab"), defaultKey: "Ctrl-Tab") { [weak self] in
 					self?.selectAdjacentTab(delta: 1)
 				},
-				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"), defaultKey: "Ctrl-Shift-Tab") { [weak self] in
+				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"),
+				        defaultKey: "Ctrl-Shift-Tab")
+				{ [weak self] in
 					self?.selectAdjacentTab(delta: -1)
 				},
 				Command(id: "file.selectTab.1", title: L10n.string("Select Tab 1"), defaultKey: "Cmd-1") { [weak self] in
@@ -369,7 +376,9 @@ import ItsyKeymap
 				Command(id: "integration.output", title: L10n.string("Integration Output"), defaultKey: nil) { [weak self] in
 					self?.showIntegrationOutput(nil)
 				},
-				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"), defaultKey: nil) { [weak self] in
+				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"),
+				        defaultKey: nil)
+				{ [weak self] in
 					self?.settingsCoordinator.showLSPConfiguration(nil)
 				},
 				Command(id: "support.manage", title: L10n.string("Language & Debugger Support"), defaultKey: nil) { [weak self] in
@@ -381,10 +390,14 @@ import ItsyKeymap
 				Command(id: "app.settingsCatalog", title: L10n.string("Settings: Open Catalog"), defaultKey: nil) { [weak self] in
 					self?.settingsCoordinator.showSettingsCatalog(nil)
 				},
-				Command(id: "app.settingsUserFile", title: L10n.string("Settings: Open User TOML"), defaultKey: nil) { [weak self] in
+				Command(id: "app.settingsUserFile", title: L10n.string("Settings: Open User TOML"),
+				        defaultKey: nil)
+				{ [weak self] in
 					self?.settingsCoordinator.openSettingsFile(workspace: false)
 				},
-				Command(id: "app.settingsWorkspaceFile", title: L10n.string("Settings: Open Workspace TOML"), defaultKey: nil) { [weak self] in
+				Command(id: "app.settingsWorkspaceFile", title: L10n.string("Settings: Open Workspace TOML"),
+				        defaultKey: nil)
+				{ [weak self] in
 					self?.settingsCoordinator.openSettingsFile(workspace: true)
 				},
 				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"),
@@ -858,7 +871,7 @@ import ItsyKeymap
 		settingsCoordinator.showManagedSupport(sender)
 	}
 
-	@objc func showIntegrationHealth(_ sender: Any?) {
+	@objc func showIntegrationHealth(_: Any?) {
 		Task { [weak self] in
 			let records = await IntegrationHealthStore.shared.allRecords()
 			guard let self else {
@@ -866,15 +879,18 @@ import ItsyKeymap
 			}
 			let panel = integrationHealthPanel ?? IntegrationHealthPanel()
 			integrationHealthPanel = panel
-			panel.show(snapshot: IntegrationHealthPanelSnapshot(records: records), relativeTo: activeEditorWindowController()?.window)
+			panel.show(
+				snapshot: IntegrationHealthPanelSnapshot(records: records),
+				relativeTo: activeEditorWindowController()?.window
+			)
 		}
 	}
 
-	@objc func showIntegrationOutput(_ sender: Any?) {
+	@objc func showIntegrationOutput(_: Any?) {
 		Task { [weak self] in
-			let snapshot = IntegrationOutputConsolePanelSnapshot(
-				entries: await IntegrationOutputConsole.shared.entries(),
-				scopes: await IntegrationOutputConsole.shared.scopes()
+			let snapshot = await IntegrationOutputConsolePanelSnapshot(
+				entries: IntegrationOutputConsole.shared.entries(),
+				scopes: IntegrationOutputConsole.shared.scopes()
 			)
 			guard let self else {
 				return

@@ -111,7 +111,10 @@ struct TerminalPaneLayout: Equatable {
 				return .leaf(TerminalPane(currentDirectoryURL: currentDirectoryURL))
 			}
 			let children = layout.children.isEmpty ? [TerminalPaneLayout.leaf] : layout.children
-			return .split(vertical: vertical, children: children.map { make(layout: $0, currentDirectoryURL: currentDirectoryURL) })
+			return .split(
+				vertical: vertical,
+				children: children.map { make(layout: $0, currentDirectoryURL: currentDirectoryURL) }
+			)
 		}
 
 		var panes: [TerminalPane] {
@@ -135,9 +138,9 @@ struct TerminalPaneLayout: Equatable {
 		func pane(id: UUID) -> TerminalPane? {
 			switch self {
 			case let .leaf(pane):
-				return pane.id == id ? pane : nil
+				pane.id == id ? pane : nil
 			case let .split(_, children):
-				return children.lazy.compactMap { $0.pane(id: id) }.first
+				children.lazy.compactMap { $0.pane(id: id) }.first
 			}
 		}
 
@@ -166,7 +169,7 @@ struct TerminalPaneLayout: Equatable {
 			case let .split(currentVertical, children):
 				var updated = children
 				for index in updated.indices {
-				if let pane = updated[index].splitPane(id: id, vertical: vertical, currentDirectoryURL: currentDirectoryURL) {
+					if let pane = updated[index].splitPane(id: id, vertical: vertical, currentDirectoryURL: currentDirectoryURL) {
 						self = .split(vertical: currentVertical, children: updated)
 						return pane
 					}
@@ -222,6 +225,7 @@ struct TerminalPaneLayout: Equatable {
 	private var tabs: [TerminalTab] = []
 	private var selectedTabIndex = 0
 	private let settingsProvider: () -> ItsySettings.TerminalSettings
+	private let editorFontProvider: () -> String
 	private let activeDocumentProvider: () -> NSDocument?
 	private let sessionFactory: (URL) -> ItsyTerminalSession
 	private let openLocation: (TerminalOpenLocation) -> Void
@@ -234,9 +238,11 @@ struct TerminalPaneLayout: Equatable {
 		sessionFactory: @escaping (URL) -> ItsyTerminalSession = { ItsyTerminalSession(currentDirectoryURL: $0) },
 		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
-		setEmbeddedTerminalVisible: @escaping (Bool) -> Void = { _ in }
+		setEmbeddedTerminalVisible: @escaping (Bool) -> Void = { _ in },
+		editorFontProvider: @escaping () -> String = { ItsySettings.EditorSettings.defaultFont }
 	) {
 		self.settingsProvider = settingsProvider
+		self.editorFontProvider = editorFontProvider
 		self.activeDocumentProvider = activeDocumentProvider
 		self.sessionFactory = sessionFactory
 		self.openLocation = openLocation
@@ -246,7 +252,13 @@ struct TerminalPaneLayout: Equatable {
 
 	var state: TerminalCoordinatorState {
 		guard let tab = activeTab else {
-			return TerminalCoordinatorState(tabCount: tabs.count, selectedTabIndex: selectedTabIndex, paneCount: 0, activePaneIndex: nil, processIdentifiers: [])
+			return TerminalCoordinatorState(
+				tabCount: tabs.count,
+				selectedTabIndex: selectedTabIndex,
+				paneCount: 0,
+				activePaneIndex: nil,
+				processIdentifiers: []
+			)
 		}
 		let panes = tab.panes
 		return TerminalCoordinatorState(
@@ -319,9 +331,10 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+		let editorFontName = editorFontProvider()
 		for tab in tabs {
 			for pane in tab.panes {
-				pane.view.applyTerminalSettings(settings)
+				pane.view.applyTerminalSettings(settings, inheriting: editorFontName)
 			}
 		}
 		if settings.presentation == .window, embeddedTerminalVisible {
@@ -493,7 +506,11 @@ struct TerminalPaneLayout: Equatable {
 		let splitVButton = NSButton(title: L10n.string("Split V"), target: self, action: #selector(splitTerminalVertical(_:)))
 		splitHButton.identifier = NSUserInterfaceItemIdentifier("terminal.split-horizontal")
 		splitVButton.identifier = NSUserInterfaceItemIdentifier("terminal.split-vertical")
-		let closePaneButton = NSButton(title: L10n.string("Close Pane"), target: self, action: #selector(closeTerminalPane(_:)))
+		let closePaneButton = NSButton(
+			title: L10n.string("Close Pane"),
+			target: self,
+			action: #selector(closeTerminalPane(_:))
+		)
 		closePaneButton.identifier = NSUserInterfaceItemIdentifier("terminal.close-pane")
 		let findButton = NSButton(title: L10n.string("Find"), target: self, action: #selector(showTerminalFind(_:)))
 		findButton.identifier = NSUserInterfaceItemIdentifier("terminal.find")
@@ -591,8 +608,10 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func configurePanes(for tab: TerminalTab) {
+		let settings = settingsProvider()
+		let editorFontName = editorFontProvider()
 		for pane in tab.panes {
-			pane.view.applyTerminalSettings(settingsProvider())
+			pane.view.applyTerminalSettings(settings, inheriting: editorFontName)
 			pane.view.applyTerminalTheme(AppTheme.palette.terminal)
 			pane.view.onInput = { [weak pane] data in
 				pane?.session?.send(data)
@@ -605,9 +624,9 @@ struct TerminalPaneLayout: Equatable {
 					return
 				}
 				tab.activePaneID = pane.id
-				if self.activeTab === tab {
-					self.applySearch()
-					self.updateTerminalStatus()
+				if activeTab === tab {
+					applySearch()
+					updateTerminalStatus()
 				}
 			}
 			pane.view.onOpenLocation = { [weak self] location in
@@ -641,7 +660,8 @@ struct TerminalPaneLayout: Equatable {
 			button.identifier = NSUserInterfaceItemIdentifier("terminal.tab.\(index)")
 			button.bezelStyle = index == selectedTabIndex ? .rounded : .recessed
 			button.font = .systemFont(ofSize: 11, weight: index == selectedTabIndex ? .semibold : .regular)
-			button.contentTintColor = index == selectedTabIndex ? AppTheme.palette.tabActiveForeground : AppTheme.palette.tabInactiveForeground
+			button.contentTintColor = index == selectedTabIndex ? AppTheme.palette.tabActiveForeground : AppTheme.palette
+				.tabInactiveForeground
 			button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 			let closeButton = NSButton(title: L10n.string("×"), target: self, action: #selector(closeTerminalTab(_:)))
 			closeButton.tag = index
@@ -733,7 +753,8 @@ struct TerminalPaneLayout: Equatable {
 		}
 		let activeID = tab.activePaneID
 		let currentDirectoryURL = tab.activePane?.currentDirectoryURL ?? terminalWorkingDirectory()
-		guard let newPane = tab.root.splitPane(id: activeID, vertical: vertical, currentDirectoryURL: currentDirectoryURL) else {
+		guard let newPane = tab.root.splitPane(id: activeID, vertical: vertical, currentDirectoryURL: currentDirectoryURL)
+		else {
 			return
 		}
 		configurePanes(for: tab)
@@ -937,7 +958,7 @@ struct TerminalPaneLayout: Equatable {
 				TerminalTabState(
 					currentDirectoryPath: $0.currentDirectoryURL.path,
 					layout: $0.root.layout.encoded,
-					paneCurrentDirectoryPaths: $0.panes.map { $0.currentDirectoryURL.path }
+					paneCurrentDirectoryPaths: $0.panes.map(\.currentDirectoryURL.path)
 				)
 			}
 		)

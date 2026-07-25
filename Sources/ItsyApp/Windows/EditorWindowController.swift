@@ -140,7 +140,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let fileTreeController = FileTreeSidebarController()
 	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
+	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+	private let embeddedTerminalContainer = NSView()
+	private let embeddedGitContainer = NSView()
 	private var findBarController: FindBarController?
 	private var findSettings = ItsySettings.FindSettings()
 	private var layoutSettings = ItsySettings.LayoutSettings()
@@ -156,6 +159,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
+	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
+	private var embeddedGitWidthConstraint: NSLayoutConstraint?
+	private var embeddedGitVisible = false
 	private var tabBarHeightConstraint: NSLayoutConstraint?
 	private var statusBarHeightConstraint: NSLayoutConstraint?
 	private var sidebarVisible = true
@@ -230,7 +236,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	init(document: ItsyDocument) {
 		recordBenchStage("window_controller_init_begin")
-		let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 		editorStack.orientation = .vertical
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
@@ -244,6 +249,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		statusBarView.isHidden = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
+		embeddedTerminalContainer.translatesAutoresizingMaskIntoConstraints = false
+		embeddedTerminalContainer.isHidden = true
+		embeddedTerminalContainer.setContentHuggingPriority(.required, for: .vertical)
+		embeddedTerminalHeightConstraint = embeddedTerminalContainer.heightAnchor.constraint(equalToConstant: 0)
+		embeddedTerminalHeightConstraint?.isActive = true
+		embeddedGitContainer.translatesAutoresizingMaskIntoConstraints = false
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
 		editorContainer.addSubview(paneCoordinator.view)
 		NSLayoutConstraint.activate([
@@ -273,6 +284,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		])
 		editorStack.addArrangedSubview(tabBarView)
 		editorStack.addArrangedSubview(editorContainer)
+		editorStack.addArrangedSubview(embeddedTerminalContainer)
 		editorStack.addArrangedSubview(statusBarView)
 
 		rootSplitView.isVertical = true
@@ -447,6 +459,47 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		setSidebarVisible(!sidebarVisible)
 	}
 
+	var embeddedTerminalHostView: NSView {
+		embeddedTerminalContainer
+	}
+
+	var embeddedGitHostView: NSView {
+		embeddedGitContainer
+	}
+
+	func setEmbeddedTerminalVisible(_ visible: Bool) {
+		embeddedTerminalContainer.isHidden = !visible
+		embeddedTerminalHeightConstraint?.constant = visible ? 280 * CGFloat(layoutSettings.interfaceScale) : 0
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
+	func setEmbeddedGitVisible(_ visible: Bool) {
+		guard visible != embeddedGitVisible else {
+			return
+		}
+		embeddedGitVisible = visible
+		if visible {
+			if !rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
+				rootSplitView.addArrangedSubview(embeddedGitContainer)
+			}
+			if embeddedGitWidthConstraint == nil {
+				let constraint = embeddedGitContainer.widthAnchor.constraint(equalToConstant: 640 * CGFloat(layoutSettings.interfaceScale))
+				constraint.isActive = true
+				embeddedGitWidthConstraint = constraint
+			}
+		} else {
+			if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
+				rootSplitView.removeArrangedSubview(embeddedGitContainer)
+				embeddedGitContainer.removeFromSuperview()
+			}
+			embeddedGitWidthConstraint?.isActive = false
+			embeddedGitWidthConstraint = nil
+		}
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
 	func focusSidebar() {
 		if !sidebarVisible {
 			setSidebarVisible(true)
@@ -467,6 +520,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		tabBarHeightConstraint?.constant = 32 * scale
 		statusBarHeightConstraint?.constant = 20 * scale
 		sidebarWidthConstraint?.constant = settings.sidebarVisible ? CGFloat(settings.sidebarWidth) * scale : 0
+		if !embeddedTerminalContainer.isHidden {
+			embeddedTerminalHeightConstraint?.constant = 280 * scale
+		}
+		if embeddedGitVisible {
+			embeddedGitWidthConstraint?.constant = 640 * scale
+		}
 		setSidebarPosition(settings.sidebarPosition)
 		setSidebarVisible(settings.sidebarVisible)
 		syncTabGroupVisibility()
@@ -484,7 +543,14 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		rootSplitView.removeArrangedSubview(fileTreeController.view)
 		fileTreeController.view.removeFromSuperview()
-		rootSplitView.insertArrangedSubview(fileTreeController.view, at: position == .leading ? 0 : 1)
+		rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarInsertionIndex(for: position))
+	}
+
+	private func sidebarInsertionIndex(for position: ItsySettings.SidebarPosition) -> Int {
+		if position == .leading {
+			return 0
+		}
+		return rootSplitView.arrangedSubviews.firstIndex(of: embeddedGitContainer) ?? rootSplitView.arrangedSubviews.count
 	}
 
 	private func setSidebarVisible(_ visible: Bool) {
@@ -496,7 +562,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			sidebarWidthConstraint?.constant = CGFloat(layoutSettings.sidebarWidth) * CGFloat(layoutSettings.interfaceScale)
 			fileTreeController.view.isHidden = false
 			if !rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
-				rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarPosition == .leading ? 0 : 1)
+				rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarInsertionIndex(for: sidebarPosition))
 			}
 		} else {
 			if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
@@ -522,7 +588,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			pane.viewController.view.layoutSubtreeIfNeeded()
 			pane.editorView.needsDisplay = true
 		}
+		embeddedTerminalContainer.needsLayout = true
+		embeddedTerminalContainer.layoutSubtreeIfNeeded()
+		embeddedGitContainer.needsLayout = true
+		embeddedGitContainer.layoutSubtreeIfNeeded()
 		layoutTabContent()
+	}
+
+	private func invalidateEditorShellLayoutAfterWindowTransition() {
+		DispatchQueue.main.async { [weak self] in
+			guard let self else {
+				return
+			}
+			window?.contentView?.needsLayout = true
+			window?.contentView?.layoutSubtreeIfNeeded()
+			invalidateEditorShellLayout()
+		}
 	}
 
 	func toggleHiddenFiles() {
@@ -1435,6 +1516,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		if !lspStatusButton.isHidden {
 			targets.append(lspStatusButton)
+		}
+		if !embeddedTerminalContainer.isHidden, let terminal = focusTarget(in: embeddedTerminalContainer) {
+			targets.append(terminal)
+		}
+		if embeddedGitVisible, let git = focusTarget(in: embeddedGitContainer) {
+			targets.append(git)
 		}
 		focusTraversalTargetsForTesting = targets
 		guard let first = targets.first else {
@@ -4740,6 +4827,22 @@ extension EditorWindowController: NSWindowDelegate {
 
 	func windowDidBecomeMain(_: Notification) {
 		ItsyTabCoordinator.refresh()
+	}
+
+	func windowDidResize(_: Notification) {
+		invalidateEditorShellLayout()
+	}
+
+	func windowDidEndLiveResize(_: Notification) {
+		invalidateEditorShellLayoutAfterWindowTransition()
+	}
+
+	func windowDidEnterFullScreen(_: Notification) {
+		invalidateEditorShellLayoutAfterWindowTransition()
+	}
+
+	func windowDidExitFullScreen(_: Notification) {
+		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 
 	func windowWillClose(_: Notification) {

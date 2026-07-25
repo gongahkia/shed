@@ -39,7 +39,10 @@ import ItsyKeymap
 	private lazy var projectFindCoordinator = ProjectFindCoordinator(documentController: documentController)
 	private lazy var gitCoordinator = GitCoordinator(
 		documentController: documentController,
-		activeDocumentProvider: { [weak self] in self?.activeDocument() }
+		activeDocumentProvider: { [weak self] in self?.activeDocument() },
+		settingsProvider: { [weak self] in self?.currentGitSettings() ?? ItsySettings.GitSettings() },
+		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedGitHostView },
+		setEmbeddedGitVisible: { [weak self] visible in self?.activeEditorWindowController()?.setEmbeddedGitVisible(visible) }
 	)
 	private lazy var gitReviewWorkspaceCoordinator = GitReviewWorkspaceCoordinator(
 		persistWorkspaceState: { [weak self] in
@@ -57,7 +60,9 @@ import ItsyKeymap
 	private lazy var terminalCoordinator = TerminalCoordinator(
 		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
-		openLocation: { [weak self] location in self?.openTerminalLocation(location) }
+		openLocation: { [weak self] location in self?.openTerminalLocation(location) },
+		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedTerminalHostView },
+		setEmbeddedTerminalVisible: { [weak self] visible in self?.activeEditorWindowController()?.setEmbeddedTerminalVisible(visible) }
 	)
 	private lazy var problemsCoordinator = ProblemsCoordinator(documentController: documentController)
 	private lazy var outlineCoordinator = OutlineCoordinator(
@@ -635,6 +640,8 @@ import ItsyKeymap
 		}
 		ItsyGitHunkGutterCoordinator.applyAll()
 		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
+		gitCoordinator.applyGitSettings(settings.git)
+		terminalCoordinator.applyTerminalSettings(settings.terminal)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
 	}
 
@@ -817,6 +824,10 @@ import ItsyKeymap
 
 	private func currentTerminalSettings() -> ItsySettings.TerminalSettings {
 		settingsCoordinator.currentSettings.terminal
+	}
+
+	private func currentGitSettings() -> ItsySettings.GitSettings {
+		settingsCoordinator.currentSettings.git
 	}
 
 	@objc func showProblems(_ sender: Any?) {

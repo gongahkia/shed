@@ -11,7 +11,57 @@ scripts/gen_keymap_docs.swift
 ## Plain
 
 - Source: `Sources/ItsyKeymap/Resources/keys.plain.toml`
-- Bindings: `54`
+- Bindings: `99`
+
+### mode.global
+
+| Key | Command |
+|---|---|
+| `Cmd-Z` | `edit.undo` |
+| `Cmd-Shift-Z` | `edit.redo` |
+| `Cmd-X` | `edit.cut` |
+| `Cmd-C` | `edit.copy` |
+| `Cmd-V` | `edit.paste` |
+| `Cmd-A` | `edit.selectAll` |
+| `Cmd-S` | `file.save` |
+| `Cmd-Shift-S` | `file.saveAs` |
+| `Cmd-N` | `file.new` |
+| `Cmd-O` | `file.open` |
+| `Cmd-W` | `pane.close` |
+| `Cmd-Q` | `app.quit` |
+| `Cmd-F` | `edit.find` |
+| `Cmd-G` | `edit.findNext` |
+| `Cmd-Shift-G` | `edit.findPrevious` |
+| `Cmd-,` | `app.settings` |
+| `Cmd-Shift-P` | `view.commandPalette` |
+| `Cmd-P` | `nav.gotoFile` |
+| `Cmd-B` | `view.sidebar.toggle` |
+| `Cmd-J` | `terminal.toggle` |
+| `Cmd-Shift-N` | `file.newWindow` |
+| `Cmd-Shift-F` | `edit.findInProject` |
+| `Cmd-D` | `editor.addNextSelection` |
+| `Cmd-Ctrl-G` | `edit.selectAllFindMatches` |
+| `Cmd-T` | `nav.gotoSymbolWorkspace` |
+| `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Ctrl-G` | `nav.gotoLine` |
+| `Ctrl-Tab` | `file.nextBuffer` |
+| `Ctrl-Shift-Tab` | `file.previousBuffer` |
+| `Cmd-1` | `file.selectTab.1` |
+| `Cmd-2` | `file.selectTab.2` |
+| `Cmd-3` | `file.selectTab.3` |
+| `Cmd-4` | `file.selectTab.4` |
+| `Cmd-5` | `file.selectTab.5` |
+| `Cmd-6` | `file.selectTab.6` |
+| `Cmd-7` | `file.selectTab.7` |
+| `Cmd-8` | `file.selectTab.8` |
+| `Cmd-9` | `file.selectTab.9` |
+| `Cmd-\` | `pane.splitHorizontal` |
+| `Cmd-Opt-\` | `pane.splitVertical` |
+| `Cmd-Opt-Left` | `pane.focusLeft` |
+| `Cmd-Opt-Right` | `pane.focusRight` |
+| `Cmd-Opt-Up` | `pane.focusUp` |
+| `Cmd-Opt-Down` | `pane.focusDown` |
+| `Cmd-K Cmd-S` | `app.keyboardShortcuts` |
 
 ### mode.insert
 
@@ -75,7 +125,57 @@ scripts/gen_keymap_docs.swift
 ## Vim
 
 - Source: `Sources/ItsyKeymap/Resources/keys.vim.toml`
-- Bindings: `306`
+- Bindings: `364`
+
+### mode.global
+
+| Key | Command |
+|---|---|
+| `Cmd-Z` | `edit.undo` |
+| `Cmd-Shift-Z` | `edit.redo` |
+| `Cmd-X` | `edit.cut` |
+| `Cmd-C` | `edit.copy` |
+| `Cmd-V` | `edit.paste` |
+| `Cmd-A` | `edit.selectAll` |
+| `Cmd-S` | `file.save` |
+| `Cmd-Shift-S` | `file.saveAs` |
+| `Cmd-N` | `file.new` |
+| `Cmd-O` | `file.open` |
+| `Cmd-W` | `pane.close` |
+| `Cmd-Q` | `app.quit` |
+| `Cmd-F` | `edit.find` |
+| `Cmd-G` | `edit.findNext` |
+| `Cmd-Shift-G` | `edit.findPrevious` |
+| `Cmd-,` | `app.settings` |
+| `Cmd-Shift-P` | `view.commandPalette` |
+| `Cmd-P` | `nav.gotoFile` |
+| `Cmd-B` | `view.sidebar.toggle` |
+| `Cmd-J` | `terminal.toggle` |
+| `Cmd-Shift-N` | `file.newWindow` |
+| `Cmd-Shift-F` | `edit.findInProject` |
+| `Cmd-D` | `editor.addNextSelection` |
+| `Cmd-Ctrl-G` | `edit.selectAllFindMatches` |
+| `Cmd-T` | `nav.gotoSymbolWorkspace` |
+| `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Ctrl-G` | `nav.gotoLine` |
+| `Ctrl-Tab` | `file.nextBuffer` |
+| `Ctrl-Shift-Tab` | `file.previousBuffer` |
+| `Cmd-1` | `file.selectTab.1` |
+| `Cmd-2` | `file.selectTab.2` |
+| `Cmd-3` | `file.selectTab.3` |
+| `Cmd-4` | `file.selectTab.4` |
+| `Cmd-5` | `file.selectTab.5` |
+| `Cmd-6` | `file.selectTab.6` |
+| `Cmd-7` | `file.selectTab.7` |
+| `Cmd-8` | `file.selectTab.8` |
+| `Cmd-9` | `file.selectTab.9` |
+| `Cmd-\` | `pane.splitHorizontal` |
+| `Cmd-Opt-\` | `pane.splitVertical` |
+| `Cmd-Opt-Left` | `pane.focusLeft` |
+| `Cmd-Opt-Right` | `pane.focusRight` |
+| `Cmd-Opt-Up` | `pane.focusUp` |
+| `Cmd-Opt-Down` | `pane.focusDown` |
+| `Cmd-K Cmd-S` | `app.keyboardShortcuts` |
 
 ### mode.normal
 
@@ -230,6 +330,19 @@ scripts/gen_keymap_docs.swift
 | `Shift-2` | `vim.macro.replayPrefix` |
 | `p` | `vim.pasteAfter` |
 | `Shift-P` | `vim.pasteBefore` |
+| `Shift-I` | `vim.insert.lineStart` |
+| `a` | `vim.append.afterCursor` |
+| `Shift-A` | `vim.append.lineEnd` |
+| `o` | `vim.openLineBelow` |
+| `Shift-O` | `vim.openLineAbove` |
+| `x` | `vim.delete.char` |
+| `Shift-X` | `vim.delete.charBackward` |
+| `Shift-D` | `vim.delete.toLineEnd` |
+| `Shift-C` | `vim.change.toLineEnd` |
+| `s` | `vim.substitute.char` |
+| `Shift-S` | `vim.change.line` |
+| `Shift-J` | `vim.joinLines` |
+| `Shift-Y` | `vim.yank.line` |
 | `r` | `vim.replace.char` |
 | `Shift-R` | `vim.replace.mode` |
 | `Shift-\`` | `vim.case.toggle` |
@@ -406,7 +519,57 @@ scripts/gen_keymap_docs.swift
 ## Emacs
 
 - Source: `Sources/ItsyKeymap/Resources/keys.emacs.toml`
-- Bindings: `70`
+- Bindings: `120`
+
+### mode.global
+
+| Key | Command |
+|---|---|
+| `Cmd-Z` | `edit.undo` |
+| `Cmd-Shift-Z` | `edit.redo` |
+| `Cmd-X` | `edit.cut` |
+| `Cmd-C` | `edit.copy` |
+| `Cmd-V` | `edit.paste` |
+| `Cmd-A` | `edit.selectAll` |
+| `Cmd-S` | `file.save` |
+| `Cmd-Shift-S` | `file.saveAs` |
+| `Cmd-N` | `file.new` |
+| `Cmd-O` | `file.open` |
+| `Cmd-W` | `pane.close` |
+| `Cmd-Q` | `app.quit` |
+| `Cmd-F` | `edit.find` |
+| `Cmd-G` | `edit.findNext` |
+| `Cmd-Shift-G` | `edit.findPrevious` |
+| `Cmd-,` | `app.settings` |
+| `Cmd-Shift-P` | `view.commandPalette` |
+| `Cmd-P` | `nav.gotoFile` |
+| `Cmd-B` | `view.sidebar.toggle` |
+| `Cmd-J` | `terminal.toggle` |
+| `Cmd-Shift-N` | `file.newWindow` |
+| `Cmd-Shift-F` | `edit.findInProject` |
+| `Cmd-D` | `editor.addNextSelection` |
+| `Cmd-Ctrl-G` | `edit.selectAllFindMatches` |
+| `Cmd-T` | `nav.gotoSymbolWorkspace` |
+| `Cmd-Shift-O` | `nav.gotoSymbolFile` |
+| `Ctrl-G` | `nav.gotoLine` |
+| `Ctrl-Tab` | `file.nextBuffer` |
+| `Ctrl-Shift-Tab` | `file.previousBuffer` |
+| `Cmd-1` | `file.selectTab.1` |
+| `Cmd-2` | `file.selectTab.2` |
+| `Cmd-3` | `file.selectTab.3` |
+| `Cmd-4` | `file.selectTab.4` |
+| `Cmd-5` | `file.selectTab.5` |
+| `Cmd-6` | `file.selectTab.6` |
+| `Cmd-7` | `file.selectTab.7` |
+| `Cmd-8` | `file.selectTab.8` |
+| `Cmd-9` | `file.selectTab.9` |
+| `Cmd-\` | `pane.splitHorizontal` |
+| `Cmd-Opt-\` | `pane.splitVertical` |
+| `Cmd-Opt-Left` | `pane.focusLeft` |
+| `Cmd-Opt-Right` | `pane.focusRight` |
+| `Cmd-Opt-Up` | `pane.focusUp` |
+| `Cmd-Opt-Down` | `pane.focusDown` |
+| `Cmd-K Cmd-S` | `app.keyboardShortcuts` |
 
 ### mode.emacs
 
@@ -434,6 +597,11 @@ scripts/gen_keymap_docs.swift
 | `M-w` | `emacs.copyRegion` |
 | `C-y` | `emacs.yank` |
 | `M-y` | `emacs.yankPop` |
+| `C-d` | `emacs.deleteForward` |
+| `C-h` | `emacs.deleteBackward` |
+| `C-k` | `emacs.killLine` |
+| `M-d` | `emacs.killWordForward` |
+| `M-Delete` | `emacs.killWordBackward` |
 | `C-t` | `emacs.transposeChars` |
 | `M-t` | `emacs.transposeWords` |
 | `M-u` | `emacs.uppercaseWord` |

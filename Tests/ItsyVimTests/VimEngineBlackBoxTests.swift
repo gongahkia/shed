@@ -404,9 +404,8 @@ private let commandActionCases: [CommandActionCase] = [
 	CommandActionCase(commandID: "vim.indent.right", action: .lineOperator(.indentRight)),
 	CommandActionCase(commandID: "vim.indent.left", action: .lineOperator(.indentLeft)),
 	CommandActionCase(commandID: "vim.repeatChange", action: .repeatLastChange),
-	CommandActionCase(commandID: "vim.fold.close", action: .handled),
-	CommandActionCase(commandID: "vim.replace.char", action: .handled),
-	CommandActionCase(commandID: "vim.searchHistory.forward", action: .handled),
+	CommandActionCase(commandID: "vim.replace.char", action: .replaceCharacter),
+	CommandActionCase(commandID: "vim.searchHistory.forward", action: .search("edit.findNext", recordsJump: false)),
 	CommandActionCase(commandID: "vim.textObject.innerSentence", action: .normalMode),
 ]
 

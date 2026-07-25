@@ -398,6 +398,7 @@ public final class MetalTextView: NSView {
 	public var contextMenuProvider: ((TextContextMenuRequest) -> NSMenu?)?
 	public var exCommandRequested: ((String) -> Bool)?
 	public var exCommandLineRequested: ((@escaping (String?) -> Void) -> Bool)?
+	public var emacsRectangleStringRequested: ((@escaping (String?) -> Void) -> Bool)?
 	public var exCommandCompletionsProvider: (() -> [String])?
 	public var undoTreeChanged: ((UndoTree) -> Void)?
 	public var fileDropRequested: (([URL]) -> Bool)?
@@ -418,6 +419,7 @@ public final class MetalTextView: NSView {
 	var insertUndoGroupActive = false
 	var killRing = KillRing()
 	var lastYankRange: Range<Int>?
+	var emacsMark: Int?
 	var vimPendingChordEvents: [RecordedKey] = []
 	var vimPendingChangePrefixEvents: [RecordedKey] = []
 	var vimCurrentChangeEvents: [RecordedKey]?
@@ -824,6 +826,30 @@ public final class MetalTextView: NSView {
 		syncEditorState()
 		editorDidChange?(editor)
 		return true
+	}
+
+	@objc public func undo(_: Any?) {
+		_ = performKeymapCommand("edit.undo")
+	}
+
+	@objc public func redo(_: Any?) {
+		_ = performKeymapCommand("edit.redo")
+	}
+
+	@objc public func cut(_: Any?) {
+		_ = performKeymapCommand("edit.cut")
+	}
+
+	@objc public func copy(_: Any?) {
+		_ = performKeymapCommand("edit.copy")
+	}
+
+	@objc public func paste(_: Any?) {
+		_ = performKeymapCommand("edit.paste")
+	}
+
+	@objc public override func selectAll(_: Any?) {
+		_ = performKeymapCommand("edit.selectAll")
 	}
 
 	private var nonEmptySelectionRanges: [Range<Int>] {

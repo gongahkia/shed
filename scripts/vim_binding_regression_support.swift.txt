@@ -140,6 +140,8 @@ private func eventModifiers(for modifiers: ItsyKeymap.KeyModifiers) -> NSEvent.M
 
 private func vimMode(for mode: ItsyKeymap.Mode) -> ItsyVim.Mode {
 	switch mode {
+	case .global:
+		return .normal
 	case .normal:
 		return .normal
 	case .insert:
@@ -226,6 +228,36 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 		return .paste(after: true)
 	case "vim.pasteBefore":
 		return .paste(after: false)
+	case "vim.insert.lineStart":
+		return .insertLineStart
+	case "vim.append.afterCursor":
+		return .appendAfterCursor
+	case "vim.append.lineEnd":
+		return .appendLineEnd
+	case "vim.openLineBelow":
+		return .openLine(after: true)
+	case "vim.openLineAbove":
+		return .openLine(after: false)
+	case "vim.delete.char":
+		return .deleteCharacter(backward: false, count: 1)
+	case "vim.delete.charBackward":
+		return .deleteCharacter(backward: true, count: 1)
+	case "vim.delete.toLineEnd":
+		return .deleteToLineEnd(change: false)
+	case "vim.change.toLineEnd":
+		return .deleteToLineEnd(change: true)
+	case "vim.substitute.char":
+		return .substituteCharacter(count: 1)
+	case "vim.change.line":
+		return .lineOperator(.change)
+	case "vim.joinLines":
+		return .joinLines
+	case "vim.yank.line":
+		return .lineOperator(.yank)
+	case "vim.replace.char":
+		return .replaceCharacter
+	case "vim.replace.mode":
+		return .replaceMode
 	case "vim.ex.start":
 		return .exStart
 	case "vim.visual.char":
@@ -240,8 +272,18 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 		return .lineOperator(.change)
 	case "vim.operator.line.yank":
 		return .lineOperator(.yank)
+	case "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
+	     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
+	     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll":
+		return .hostCommand(commandID)
+	case "vim.searchHistory.forward":
+		return .search("edit.findNext", recordsJump: false)
+	case "vim.searchHistory.backward":
+		return .search("edit.findPrevious", recordsJump: false)
+	case "vim.commandHistory":
+		return .hostCommand("view.commandPalette")
 	case "edit.findNext", "edit.findPrevious", "vim.searchForward", "vim.searchBackward":
-		return .search(commandID, recordsJump: mode == .normal)
+		return .search(commandID, recordsJump: mode == .normal || mode == .global)
 	case "file.save":
 		return .save
 	case "file.close":
@@ -255,7 +297,7 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 	case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
 		return .normalMode
 	default:
-		return handledCommandIDs.contains(commandID) ? .handled : nil
+		return nil
 	}
 }
 
@@ -303,28 +345,4 @@ private let textObjectCommandIDs: Set<String> = [
 	"vim.textObject.aroundParagraph",
 	"vim.textObject.innerTag",
 	"vim.textObject.aroundTag",
-]
-
-private let handledCommandIDs: Set<String> = [
-	"vim.jumpOlder",
-	"vim.jumpNewer",
-	"lsp.definition",
-	"lsp.declaration",
-	"file.openUnderCursor",
-	"vim.replace.char",
-	"vim.replace.mode",
-	"vim.format.operator",
-	"vim.format.line",
-	"vim.format.reflowOperator",
-	"vim.fold.close",
-	"vim.fold.open",
-	"vim.fold.toggle",
-	"vim.fold.closeRecursive",
-	"vim.fold.openRecursive",
-	"vim.fold.toggleRecursive",
-	"vim.fold.closeAll",
-	"vim.fold.openAll",
-	"vim.searchHistory.forward",
-	"vim.searchHistory.backward",
-	"vim.commandHistory",
 ]

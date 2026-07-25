@@ -1013,6 +1013,148 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.editor.selections.primary.head == 3)
 }
 
+@Test func emacsStructuralAndRectangleCommandsEditText() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.emacs], bindings: [
+		KeyBinding(mode: .emacs, chord: [Key("t", modifiers: .control)], commandID: "emacs.transposeChars"),
+		KeyBinding(mode: .emacs, chord: [Key("t", modifiers: .option)], commandID: "emacs.transposeWords"),
+		KeyBinding(mode: .emacs, chord: [Key("u", modifiers: .option)], commandID: "emacs.uppercaseWord"),
+		KeyBinding(mode: .emacs, chord: [Key("d", modifiers: .control)], commandID: "emacs.deleteForward"),
+		KeyBinding(mode: .emacs, chord: [Key("h", modifiers: .control)], commandID: "emacs.deleteBackward"),
+		KeyBinding(mode: .emacs, chord: [Key("k", modifiers: .control)], commandID: "emacs.killLine"),
+		KeyBinding(mode: .emacs, chord: [Key("d", modifiers: .option)], commandID: "emacs.killWordForward"),
+		KeyBinding(mode: .emacs, chord: [Key("f", modifiers: [.control, .option])], commandID: "emacs.forwardSexp"),
+		KeyBinding(mode: .emacs, chord: [Key("b", modifiers: [.control, .option])], commandID: "emacs.backwardSexp"),
+		KeyBinding(mode: .emacs, chord: [Key("k", modifiers: [.control, .option])], commandID: "emacs.killSexp"),
+		KeyBinding(mode: .emacs, chord: [Key("x", modifiers: .control), Key("r"), Key("t")], commandID: "emacs.rectangle.string"),
+	])
+
+	view.editor = Editor(text: "abc")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.handleKey(characters: "\u{14}", charactersIgnoringModifiers: "t", keyCode: 0, modifierFlags: .control))
+	#expect(editorStorageString(view.editor) == "bac")
+	view.editor = Editor(text: "one two")
+	view.selectUTF8Range(4 ..< 4)
+	#expect(view.handleKey(characters: "t", charactersIgnoringModifiers: "t", keyCode: 0, modifierFlags: .option))
+	#expect(editorStorageString(view.editor) == "two one")
+	view.editor = Editor(text: "hello")
+	#expect(view.handleKey(characters: "u", charactersIgnoringModifiers: "u", keyCode: 0, modifierFlags: .option))
+	#expect(editorStorageString(view.editor) == "HELLO")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "\u{04}", charactersIgnoringModifiers: "d", keyCode: 0, modifierFlags: .control))
+	#expect(editorStorageString(view.editor) == "bc")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.handleKey(characters: "\u{08}", charactersIgnoringModifiers: "h", keyCode: 0, modifierFlags: .control))
+	#expect(editorStorageString(view.editor) == "c")
+	view.editor = Editor(text: "abc\ndef")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.handleKey(characters: "\u{0B}", charactersIgnoringModifiers: "k", keyCode: 0, modifierFlags: .control))
+	#expect(editorStorageString(view.editor) == "a\ndef")
+	view.editor = Editor(text: "one two")
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0, modifierFlags: .option))
+	#expect(editorStorageString(view.editor) == "two")
+	view.editor = Editor(text: "(ab) cd")
+	#expect(view.handleKey(characters: "f", charactersIgnoringModifiers: "f", keyCode: 0, modifierFlags: [.control, .option]))
+	#expect(view.editor.selections.primary.head == 4)
+	#expect(view.handleKey(characters: "b", charactersIgnoringModifiers: "b", keyCode: 0, modifierFlags: [.control, .option]))
+	#expect(view.editor.selections.primary.head == 0)
+	#expect(view.handleKey(characters: "k", charactersIgnoringModifiers: "k", keyCode: 0, modifierFlags: [.control, .option]))
+	#expect(editorStorageString(view.editor) == " cd")
+	view.editor = Editor(text: "abc\nabc\n")
+	view.selectUTF8Range(1 ..< 6)
+	view.emacsRectangleStringRequested = { completion in
+		completion("X")
+		return true
+	}
+	#expect(view.handleKey(characters: "\u{18}", charactersIgnoringModifiers: "x", keyCode: 0, modifierFlags: .control))
+	#expect(view.handleKey(characters: "r", charactersIgnoringModifiers: "r", keyCode: 0))
+	#expect(view.handleKey(characters: "t", charactersIgnoringModifiers: "t", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "aXc\naXc\n")
+}
+
+@Test func vimStandardInsertDeleteAndReplaceCommandsEditText() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("i", modifiers: .shift)], commandID: "vim.insert.lineStart"),
+		KeyBinding(mode: .normal, chord: [Key("a")], commandID: "vim.append.afterCursor"),
+		KeyBinding(mode: .normal, chord: [Key("a", modifiers: .shift)], commandID: "vim.append.lineEnd"),
+		KeyBinding(mode: .normal, chord: [Key("o")], commandID: "vim.openLineBelow"),
+		KeyBinding(mode: .normal, chord: [Key("o", modifiers: .shift)], commandID: "vim.openLineAbove"),
+		KeyBinding(mode: .normal, chord: [Key("x")], commandID: "vim.delete.char"),
+		KeyBinding(mode: .normal, chord: [Key("x", modifiers: .shift)], commandID: "vim.delete.charBackward"),
+		KeyBinding(mode: .normal, chord: [Key("d", modifiers: .shift)], commandID: "vim.delete.toLineEnd"),
+		KeyBinding(mode: .normal, chord: [Key("c", modifiers: .shift)], commandID: "vim.change.toLineEnd"),
+		KeyBinding(mode: .normal, chord: [Key("s")], commandID: "vim.substitute.char"),
+		KeyBinding(mode: .normal, chord: [Key("s", modifiers: .shift)], commandID: "vim.change.line"),
+		KeyBinding(mode: .normal, chord: [Key("j", modifiers: .shift)], commandID: "vim.joinLines"),
+		KeyBinding(mode: .normal, chord: [Key("r")], commandID: "vim.replace.char"),
+		KeyBinding(mode: .normal, chord: [Key("r", modifiers: .shift)], commandID: "vim.replace.mode"),
+		KeyBinding(mode: .insert, chord: [Key("escape")], commandID: "mode.normal"),
+	])
+
+	view.editor = Editor(text: "  alpha")
+	#expect(view.handleKey(characters: "I", charactersIgnoringModifiers: "i", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.selections.primary.head == 2)
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "  Xalpha")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "A", charactersIgnoringModifiers: "a", keyCode: 0, modifierFlags: .shift))
+	#expect(view.editor.selections.primary.head == 3)
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "abcX")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.editor.selections.primary.head == 1)
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "aXbc")
+	view.editor = Editor(text: "abc\n")
+	#expect(view.handleKey(characters: "o", charactersIgnoringModifiers: "o", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "abc\nx\n")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "c")
+	view.editor = Editor(text: "abc")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.handleKey(characters: "D", charactersIgnoringModifiers: "d", keyCode: 0, modifierFlags: .shift))
+	#expect(editorStorageString(view.editor) == "a")
+	view.editor = Editor(text: "abc")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.handleKey(characters: "C", charactersIgnoringModifiers: "c", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "aX")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "s", charactersIgnoringModifiers: "s", keyCode: 0))
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "Xbc")
+	view.editor = Editor(text: "abc\ndef")
+	#expect(view.handleKey(characters: "S", charactersIgnoringModifiers: "s", keyCode: 0, modifierFlags: .shift))
+	#expect(view.handleKey(characters: "X", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "X\ndef")
+	view.editor = Editor(text: "one\n two")
+	#expect(view.handleKey(characters: "J", charactersIgnoringModifiers: "j", keyCode: 0, modifierFlags: .shift))
+	#expect(editorStorageString(view.editor) == "one two")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "2", charactersIgnoringModifiers: "2", keyCode: 0))
+	#expect(view.handleKey(characters: "r", charactersIgnoringModifiers: "r", keyCode: 0))
+	#expect(view.handleKey(characters: "x", charactersIgnoringModifiers: "x", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "xxc")
+	view.editor = Editor(text: "abc")
+	#expect(view.handleKey(characters: "R", charactersIgnoringModifiers: "r", keyCode: 0, modifierFlags: .shift))
+	view.insertText("x", replacementRange: NSRange(location: NSNotFound, length: 0))
+	view.insertText("y", replacementRange: NSRange(location: NSNotFound, length: 0))
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(editorStorageString(view.editor) == "xyc")
+}
+
 @Test func vimUndoRedoTreatsInsertSessionAsOneUndoUnit() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
@@ -1069,7 +1211,7 @@ private final class TestGutterDecorator: GutterDecorator {
 	view.editor = Editor(text: "alpha\nbeta\n")
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
 	#expect(view.handleKey(characters: "c", charactersIgnoringModifiers: "c", keyCode: 0))
-	#expect(editorStorageString(view.editor) == "beta\n")
+	#expect(editorStorageString(view.editor) == "\nbeta\n")
 	#expect(view.keymapEngine.mode == .insert)
 }
 

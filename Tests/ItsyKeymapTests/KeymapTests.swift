@@ -161,6 +161,27 @@ import Testing
 	}
 }
 
+@Test func bundledProfilesApplyMacCommandsInEveryEditorMode() throws {
+	for profile in KeymapProfile.allCases {
+		let bindings = try KeymapConfiguration.load(profile: profile, userConfigURL: nil)
+		let modes: [Mode] = profile == .vim ? [.normal, .visual, .operatorPending, .insert, .command] : profile == .emacs ? [.emacs] : [.insert]
+		for mode in modes {
+			var engine = KeymapEngine(modeStack: [mode], bindings: bindings)
+			#expect(engine.handle(try keyEvent("z", modifiers: [.command])) == .command("edit.undo"))
+			#expect(engine.handle(try keyEvent("z", modifiers: [.command, .shift])) == .command("edit.redo"))
+			#expect(engine.handle(try keyEvent("x", modifiers: [.command])) == .command("edit.cut"))
+			#expect(engine.handle(try keyEvent("c", modifiers: [.command])) == .command("edit.copy"))
+			#expect(engine.handle(try keyEvent("v", modifiers: [.command])) == .command("edit.paste"))
+			#expect(engine.handle(try keyEvent("a", modifiers: [.command])) == .command("edit.selectAll"))
+			#expect(engine.handle(try keyEvent("s", modifiers: [.command])) == .command("file.save"))
+			#expect(engine.handle(try keyEvent("s", modifiers: [.command, .shift])) == .command("file.saveAs"))
+			#expect(engine.handle(try keyEvent("f", modifiers: [.command, .shift])) == .command("edit.findInProject"))
+			#expect(engine.handle(try keyEvent("k", modifiers: [.command])) == .partial)
+			#expect(engine.handle(try keyEvent("s", modifiers: [.command])) == .command("app.keyboardShortcuts"))
+		}
+	}
+}
+
 @Test func bundledPlainProfileDefinesMacStandardAppBindings() throws {
 	let bindings = try KeymapConfiguration.load(profile: .plain, userConfigURL: nil)
 	var engine = KeymapEngine(modeStack: [.insert], bindings: bindings)

@@ -1,6 +1,7 @@
 import AppKit
 
 public enum Mode: Sendable, Equatable, Hashable {
+	case global
 	case normal
 	case insert
 	case visual
@@ -182,6 +183,7 @@ public struct KeymapEngine: Sendable {
 
 	private mutating func resolve(_ key: Key) -> KeymapResult {
 		let bindings = bindingsByMode[mode] ?? [:]
+		let globalBindings = bindingsByMode[.global] ?? [:]
 		let chord = pendingChord + [key]
 		if hasPrefix(chord, in: bindings) {
 			if let commandID = bindings[chord], !hasLongerMatch(chord, in: bindings) {
@@ -200,6 +202,14 @@ public struct KeymapEngine: Sendable {
 		if let commandID = bindings[[key]] {
 			lastCommandCount = 1
 			return .command(commandID)
+		}
+		if hasPrefix(chord, in: globalBindings) {
+			if let commandID = globalBindings[chord], !hasLongerMatch(chord, in: globalBindings) {
+				lastCommandCount = 1
+				return .command(commandID)
+			}
+			pendingChord = chord
+			return .partial
 		}
 		return .passthrough
 	}

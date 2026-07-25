@@ -758,12 +758,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 					return
 				}
 				if let missingBinary {
-					showLSPMissingBanner(missingBinary)
+					showLSPMissingBanner(missingBinary, fileURL: fileURL)
 					if let key {
 						setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: fileURL, server: missingBinary.command)
 					}
 				} else if let unavailableLanguage {
-					showLSPUnavailableBanner(unavailableLanguage)
+					showLSPUnavailableBanner(unavailableLanguage, fileURL: fileURL)
 				} else {
 					lspMissingBanner.hide()
 					if let key, lspStatusEntries[key]?.health == .unavailable {
@@ -774,31 +774,31 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func showLSPMissingBanner(_ missingBinary: LSPServerRegistry.MissingBinary) {
+	private func showLSPMissingBanner(_ missingBinary: LSPServerRegistry.MissingBinary, fileURL: URL? = nil) {
 		if Self.dismissedLSPMissingCommands.contains(missingBinary.command) {
 			lspMissingBanner.hide()
 			return
 		}
-		lspMissingBanner.show(missingBinary: missingBinary)
+		lspMissingBanner.show(missingBinary: missingBinary, fileURL: fileURL)
 	}
 
-	private func showLSPUnavailableBanner(_ unavailableLanguage: LSPServerRegistry.UnsupportedLanguage) {
+	private func showLSPUnavailableBanner(_ unavailableLanguage: LSPServerRegistry.UnsupportedLanguage, fileURL: URL? = nil) {
 		let dismissalKey = "unsupported:\(unavailableLanguage.languageID)"
 		if Self.dismissedLSPMissingCommands.contains(dismissalKey) {
 			lspMissingBanner.hide()
 			return
 		}
-		lspMissingBanner.show(unavailableLanguage: unavailableLanguage)
+		lspMissingBanner.show(unavailableLanguage: unavailableLanguage, fileURL: fileURL)
 	}
 
 	private func handleLSPRequestError(_ error: Error) {
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
-			showLSPMissingBanner(missingBinary)
+			showLSPMissingBanner(missingBinary, fileURL: activeLSPKey.flatMap { lspStatusEntries[$0]?.url })
 			if let key = activeLSPKey {
 				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspStatusEntries[key]?.url, server: missingBinary.command)
 			}
 		} else if case let LSPManagerError.unsupportedLanguage(unavailableLanguage) = error {
-			showLSPUnavailableBanner(unavailableLanguage)
+			showLSPUnavailableBanner(unavailableLanguage, fileURL: activeLSPKey.flatMap { lspStatusEntries[$0]?.url })
 		} else if case let LSPManagerError.serverDisabled(key) = error {
 			setLSPStatus(
 				key: key,

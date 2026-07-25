@@ -26,12 +26,23 @@ import Testing
 	var supportRequests = 0
 	banner.copyRequested = { copied = $0 }
 	banner.supportRequested = { _ in supportRequests += 1 }
-	banner.show(missingBinary: missing)
-	let buttons = banner.subviews.flatMap(\.subviews).compactMap { $0 as? NSButton }
-	let copyButton = try #require(buttons.first { $0.title == "Copy command" })
-	let supportButton = try #require(buttons.first { $0.title == "Manage support" })
+	banner.show(missingBinary: missing, fileURL: URL(fileURLWithPath: "/workspace/Project/app.ts"))
+	let bannerButtons = buttons(in: banner)
+	let copyButton = try #require(bannerButtons.first { $0.title == "Copy command" })
+	let supportButton = try #require(bannerButtons.first { $0.title == "Manage support" })
+	let detailsButton = try #require(bannerButtons.first { $0.title == "Details" })
 	copyButton.performClick(nil)
 	supportButton.performClick(nil)
+	detailsButton.performClick(nil)
+	let copyDiagnosticsButton = try #require(buttons(in: banner).first { $0.title == "Copy diagnostics" })
+	copyDiagnosticsButton.performClick(nil)
 	#expect(copied == missing)
 	#expect(supportRequests == 1)
+	#expect(detailsButton.title == "Hide details")
+	#expect(NSPasteboard.general.string(forType: .string)?.contains("language: typescript") == true)
+	#expect(NSPasteboard.general.string(forType: .string)?.contains("file: /workspace/Project/app.ts") == true)
+}
+
+private func buttons(in view: NSView) -> [NSButton] {
+	(view.subviews.compactMap { $0 as? NSButton } + view.subviews.flatMap(buttons(in:)))
 }

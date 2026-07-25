@@ -261,9 +261,20 @@ public enum VimCommandAction: Sendable, Equatable {
 	case macroRecordPrefix
 	case macroReplayPrefix
 	case paste(after: Bool)
+	case insertLineStart
+	case appendAfterCursor
+	case appendLineEnd
+	case openLine(after: Bool)
+	case deleteCharacter(backward: Bool, count: Int)
+	case deleteToLineEnd(change: Bool)
+	case substituteCharacter(count: Int)
+	case joinLines
+	case replaceCharacter
+	case replaceMode
 	case exStart
 	case beginVisualMode(VisualMode)
 	case search(String, recordsJump: Bool)
+	case hostCommand(String)
 	case save
 	case close
 	case normalMode
@@ -338,6 +349,8 @@ public struct VimEngine: Sendable {
 	public var awaitingMacroReplayRegister: Bool
 	public var replayingMacro: Bool
 	public var pendingExCommand: String?
+	public var pendingReplacementCount: Int?
+	public var replaceMode: Bool
 	private var pendingChord: [Key]
 	private var awaitingMarkSet: Bool
 	private var awaitingMarkJump: Bool
@@ -380,6 +393,8 @@ public struct VimEngine: Sendable {
 		self.awaitingMacroReplayRegister = false
 		self.replayingMacro = false
 		self.pendingExCommand = nil
+		self.pendingReplacementCount = nil
+		self.replaceMode = false
 		pendingChord = []
 		awaitingMarkSet = false
 		awaitingMarkJump = false
@@ -496,6 +511,38 @@ public struct VimEngine: Sendable {
 			return .paste(after: true)
 		case "vim.pasteBefore":
 			return .paste(after: false)
+		case "vim.insert.lineStart":
+			return .insertLineStart
+		case "vim.append.afterCursor":
+			return .appendAfterCursor
+		case "vim.append.lineEnd":
+			return .appendLineEnd
+		case "vim.openLineBelow":
+			return .openLine(after: true)
+		case "vim.openLineAbove":
+			return .openLine(after: false)
+		case "vim.delete.char":
+			return .deleteCharacter(backward: false, count: max(1, count))
+		case "vim.delete.charBackward":
+			return .deleteCharacter(backward: true, count: max(1, count))
+		case "vim.delete.toLineEnd":
+			return .deleteToLineEnd(change: false)
+		case "vim.change.toLineEnd":
+			return .deleteToLineEnd(change: true)
+		case "vim.substitute.char":
+			return .substituteCharacter(count: max(1, count))
+		case "vim.change.line":
+			return .lineOperator(.change)
+		case "vim.joinLines":
+			return .joinLines
+		case "vim.yank.line":
+			return .lineOperator(.yank)
+		case "vim.replace.char":
+			pendingReplacementCount = max(1, count)
+			return .replaceCharacter
+		case "vim.replace.mode":
+			replaceMode = true
+			return .replaceMode
 		case "vim.ex.start":
 			pendingExCommand = ""
 			return .exStart
@@ -527,12 +574,16 @@ public struct VimEngine: Sendable {
 			pendingOperator = nil
 			mode = .normal
 			return .normalMode
-		case "vim.jumpOlder", "vim.jumpNewer", "lsp.definition", "lsp.declaration", "file.openUnderCursor",
-		     "vim.replace.char", "vim.replace.mode", "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
+		case "vim.format.operator", "vim.format.reflowOperator", "vim.format.line",
 		     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
-		     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll", "vim.searchHistory.forward",
-		     "vim.searchHistory.backward", "vim.commandHistory":
-			return .handled
+		     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll":
+			return .hostCommand(commandID)
+		case "vim.searchHistory.forward":
+			return .search("edit.findNext", recordsJump: false)
+		case "vim.searchHistory.backward":
+			return .search("edit.findPrevious", recordsJump: false)
+		case "vim.commandHistory":
+			return .hostCommand("view.commandPalette")
 		default:
 			return nil
 		}

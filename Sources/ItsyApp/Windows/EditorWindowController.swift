@@ -1564,6 +1564,23 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		view.exCommandLineRequested = { [weak self] completion in
 			ItsyCommandPaletteBridge.requestExCommand(relativeTo: self?.window, completion: completion)
 		}
+		view.emacsRectangleStringRequested = { [weak self] completion in
+			guard let window = self?.window else {
+				return false
+			}
+			let alert = NSAlert()
+			alert.messageText = L10n.string("String Rectangle")
+			alert.informativeText = L10n.string("Replace each row of the selected rectangle with:")
+			let field = NSTextField(string: "")
+			field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
+			alert.accessoryView = field
+			alert.addButton(withTitle: L10n.string("Replace"))
+			alert.addButton(withTitle: L10n.string("Cancel"))
+			alert.beginSheetModal(for: window) { response in
+				completion(response == .alertFirstButtonReturn ? field.stringValue : nil)
+			}
+			return true
+		}
 		view.vimMarksWorkspaceRoot = ItsyWorkspaceController.currentRootURL
 		view.undoTreeChanged = { [weak self] tree in
 			self?.undoTreePanel?.update(tree: tree)
@@ -2225,6 +2242,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			NSDocumentController.shared.newDocument(nil)
 		case "file.open":
 			NSDocumentController.shared.openDocument(nil)
+		case "file.saveAs":
+			(document as? NSDocument)?.saveAs(nil)
 		case "file.newWindow":
 			return NSApp.sendAction(#selector(AppCoordinator.newWindow(_:)), to: nil, from: self)
 		case "app.quit":
@@ -2289,6 +2308,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			findNext()
 		case "edit.findPrevious":
 			findPrevious()
+		case "emacs.queryReplace":
+			ensureFindBarController().beginQueryReplace(query: editorView.selectedText())
 		case "vim.searchForward":
 			startIncrementalSearch(direction: 1)
 		case "vim.searchBackward":
@@ -2316,6 +2337,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return navigateBack()
 		case "nav.forward":
 			return navigateForward()
+		case "vim.jumpOlder":
+			return navigateBack()
+		case "vim.jumpNewer":
+			return navigateForward()
+		case "file.openUnderCursor":
+			return openFileUnderCursor()
 		case "lsp.references":
 			return findAllReferences(nil)
 		case "lsp.callHierarchy":
@@ -2324,7 +2351,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return renameSymbol(nil)
 		case "lsp.formatDocument":
 			return formatDocument(nil)
-		case "lsp.formatSelection", "vim.format.line":
+		case "lsp.formatSelection", "vim.format.line", "vim.format.operator", "vim.format.reflowOperator":
 			return formatSelection(nil)
 		case "git.stashSave", "git.stashCurrent":
 			return NSApp.sendAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)), to: nil, from: self)
@@ -2342,6 +2369,16 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return openFoldAtCursor()
 		case "vim.fold.toggle":
 			return toggleFoldAtCursor()
+		case "vim.fold.closeRecursive":
+			return setFoldSubtreeAtCursor(collapsed: true)
+		case "vim.fold.openRecursive":
+			return setFoldSubtreeAtCursor(collapsed: false)
+		case "vim.fold.toggleRecursive":
+			return toggleFoldSubtreeAtCursor()
+		case "vim.fold.closeAll":
+			return setAllFolds(collapsed: true)
+		case "vim.fold.openAll":
+			return setAllFolds(collapsed: false)
 		default:
 			if commandID.hasPrefix("extension:") {
 				return ItsyAppCommandBridge.requestRunCommand(commandID)
@@ -2444,6 +2481,80 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		collapsedFoldStartsByURI[uri] = starts
 		applyFoldState(uri: uri, document: document)
 		ItsyWorkspaceController.persistWindowState(from: self)
+	}
+
+	private func setFoldSubtreeAtCursor(collapsed: Bool) -> Bool {
+		guard let context = foldContextAtCursor() else {
+			return false
+		}
+		let starts = context.ranges
+			.filter { $0.startLine >= context.range.startLine && $0.endLine <= context.range.endLine }
+			.map(\.startLine)
+		guard !starts.isEmpty else {
+			return false
+		}
+		var collapsedStarts = collapsedFoldStartsByURI[context.uri, default: []]
+		if collapsed {
+			collapsedStarts.formUnion(starts)
+		} else {
+			collapsedStarts.subtract(starts)
+		}
+		collapsedFoldStartsByURI[context.uri] = collapsedStarts
+		applyFoldState(uri: context.uri, document: context.document)
+		ItsyWorkspaceController.persistWindowState(from: self)
+		return true
+	}
+
+	private func toggleFoldSubtreeAtCursor() -> Bool {
+		guard let context = foldContextAtCursor() else {
+			return false
+		}
+		let collapsed = collapsedFoldStartsByURI[context.uri, default: []].contains(context.range.startLine)
+		return setFoldSubtreeAtCursor(collapsed: !collapsed)
+	}
+
+	private func setAllFolds(collapsed: Bool) -> Bool {
+		guard let document = document as? ItsyDocument, let uri = document.fileURL?.standardizedFileURL.absoluteString else {
+			return false
+		}
+		let starts = Set(foldingRangesByURI[uri, default: []].map(\.startLine))
+		guard !starts.isEmpty else {
+			return false
+		}
+		collapsedFoldStartsByURI[uri] = collapsed ? starts : []
+		applyFoldState(uri: uri, document: document)
+		ItsyWorkspaceController.persistWindowState(from: self)
+		return true
+	}
+
+	private func foldContextAtCursor() -> (document: ItsyDocument, uri: String, range: LSPFoldingRange, ranges: [LSPFoldingRange])? {
+		guard let document = document as? ItsyDocument,
+		      let uri = document.fileURL?.standardizedFileURL.absoluteString,
+		      let range = foldRangeAtCursor(uri: uri)
+		else {
+			return nil
+		}
+		return (document, uri, range, foldingRangesByURI[uri, default: []])
+	}
+
+	private func openFileUnderCursor() -> Bool {
+		let text = editorStorageString(editorView.editor)
+		let offset = editorView.editor.selections.primary.head
+		guard let index = String.Index(text.utf8.index(text.utf8.startIndex, offsetBy: min(offset, text.utf8.count)), within: text) else {
+			return false
+		}
+		let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "._-/~"))
+		let token = text[index...].prefix { $0.unicodeScalars.allSatisfy(allowed.contains) }
+		guard !token.isEmpty else {
+			return false
+		}
+		let rawPath = String(token)
+		let base = document?.fileURL?.deletingLastPathComponent() ?? ItsyWorkspaceController.currentRootURL ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+		let url = rawPath.hasPrefix("/") ? URL(fileURLWithPath: rawPath) : base.appendingPathComponent(rawPath)
+		guard FileManager.default.fileExists(atPath: url.path) else {
+			return false
+		}
+		return ItsyWorkspaceController.openFile(at: url)
 	}
 
 	private func openDroppedFiles(_ urls: [URL]) -> Bool {

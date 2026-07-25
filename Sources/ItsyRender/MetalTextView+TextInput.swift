@@ -17,7 +17,8 @@ extension MetalTextView: @MainActor NSTextInputClient {
 	public func insertText(_ string: Any, replacementRange: NSRange) {
 		lastYankRange = nil
 		let text = plainString(from: string)
-		let range = replacementUTF8Range(replacementRange) ?? markedRangeUTF8 ?? editor.selections.primary.range
+		let baseRange = replacementUTF8Range(replacementRange) ?? markedRangeUTF8 ?? editor.selections.primary.range
+		let range = vimEngine.replaceMode && baseRange.isEmpty ? vimCharacterRange(backward: false) : baseRange
 		let operation = editor.selections.secondaries.isEmpty && markedRangeUTF8 == nil
 			? TextEditBehavior.insertion(
 				text: text,

@@ -68,6 +68,7 @@ public struct KeymapBindingMatrix: Sendable {
 
 	private static func slotSignature(_ slot: KeymapBindingSlot) -> String {
 		let mode: String = switch slot.mode {
+		case .global: "global"
 		case .normal: "normal"
 		case .insert: "insert"
 		case .visual: "visual"

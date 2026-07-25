@@ -10,6 +10,8 @@ import ItsyRender
 	private let regexButton = NSButton(checkboxWithTitle: L10n.string("Regex"), target: nil, action: nil)
 	private let caseButton = NSButton(checkboxWithTitle: L10n.string("Case"), target: nil, action: nil)
 	private let wholeWordButton = NSButton(checkboxWithTitle: L10n.string("Word"), target: nil, action: nil)
+	private let replaceButton = NSButton(title: L10n.string("Replace"), target: nil, action: nil)
+	private let replaceAllButton = NSButton(title: L10n.string("Replace All"), target: nil, action: nil)
 	private let closeButton = NSButton(title: L10n.string("X"), target: nil, action: nil)
 	private weak var window: NSWindow?
 	private var keyMonitor: Any?
@@ -40,7 +42,7 @@ import ItsyRender
 	}
 
 	var focusableViews: [NSView] {
-		[queryField, replaceField, regexButton, caseButton, wholeWordButton, closeButton]
+		[queryField, replaceField, regexButton, caseButton, wholeWordButton, replaceButton, replaceAllButton, closeButton]
 	}
 
 	func applyTheme(_ palette: AppThemePalette) {
@@ -54,7 +56,7 @@ import ItsyRender
 				attributes: [.foregroundColor: palette.inputPlaceholder]
 			)
 		}
-		for button in [regexButton, caseButton, wholeWordButton, closeButton] {
+		for button in [regexButton, caseButton, wholeWordButton, replaceButton, replaceAllButton, closeButton] {
 			button.contentTintColor = palette.foreground
 		}
 	}
@@ -92,6 +94,15 @@ import ItsyRender
 		selectMatch(direction: direction, focusEditorAfterSelection: false)
 	}
 
+	func beginQueryReplace(query: String?) {
+		if let query, !query.isEmpty {
+			queryField.stringValue = query
+		}
+		setVisible(true)
+		window?.makeFirstResponder(replaceField)
+		replaceField.currentEditor()?.selectAll(nil)
+	}
+
 	func selectAllMatches() {
 		guard !view.isHidden else {
 			setVisible(true)
@@ -118,7 +129,7 @@ import ItsyRender
 			field.font = .systemFont(ofSize: 12)
 			field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 		}
-		for button in [regexButton, caseButton, wholeWordButton] {
+		for button in [regexButton, caseButton, wholeWordButton, replaceButton, replaceAllButton] {
 			button.font = .systemFont(ofSize: 11)
 			button.setContentCompressionResistancePriority(.required, for: .horizontal)
 		}
@@ -142,6 +153,8 @@ import ItsyRender
 		stack.addArrangedSubview(regexButton)
 		stack.addArrangedSubview(caseButton)
 		stack.addArrangedSubview(wholeWordButton)
+		stack.addArrangedSubview(replaceButton)
+		stack.addArrangedSubview(replaceAllButton)
 		stack.addArrangedSubview(closeButton)
 
 		NSLayoutConstraint.activate([
@@ -179,6 +192,10 @@ import ItsyRender
 			button.target = self
 			button.action = #selector(findOptionChanged(_:))
 		}
+		replaceButton.target = self
+		replaceButton.action = #selector(replaceCurrent(_:))
+		replaceAllButton.target = self
+		replaceAllButton.action = #selector(replaceAll(_:))
 		closeButton.target = self
 		closeButton.action = #selector(closeFindBar(_:))
 	}
@@ -242,22 +259,25 @@ import ItsyRender
 	}
 
 	private func refreshMatches() {
-		guard !view.isHidden, let expression = findRegularExpression(), let editorView = currentEditorView() else {
+		guard !view.isHidden, let matchData = findMatchData(), let editorView = currentEditorView() else {
 			matches = []
 			selectedMatchIndex = nil
 			currentEditorView()?.setFindMatchRanges([])
 			return
 		}
-		let text = editorStorageString(editorView.editor)
-		let fullRange = NSRange(text.startIndex ..< text.endIndex, in: text)
-		matches = expression.matches(in: text, range: fullRange).compactMap { result in
-			guard result.range.length > 0, let range = Range(result.range, in: text) else {
-				return nil
-			}
-			return utf8Range(range, in: text)
-		}
+		matches = matchData.results.compactMap { utf8Range($0.range, in: matchData.text) }
 		selectedMatchIndex = nil
 		editorView.setFindMatchRanges(matches)
+	}
+
+	private func findMatchData() -> (text: String, expression: NSRegularExpression, results: [NSTextCheckingResult])? {
+		guard let expression = findRegularExpression(), let editorView = currentEditorView() else {
+			return nil
+		}
+		let text = editorStorageString(editorView.editor)
+		let fullRange = NSRange(text.startIndex ..< text.endIndex, in: text)
+		let results = expression.matches(in: text, range: fullRange).filter { $0.range.length > 0 }
+		return (text, expression, results)
 	}
 
 	private func selectMatchFromFindBar(direction: Int) {
@@ -308,12 +328,49 @@ import ItsyRender
 		return lower ..< upper
 	}
 
+	private func utf8Range(_ range: NSRange, in text: String) -> Range<Int>? {
+		guard let stringRange = Range(range, in: text) else {
+			return nil
+		}
+		return utf8Range(stringRange, in: text)
+	}
+
 	@objc private func closeFindBar(_ sender: Any?) {
 		setVisible(false)
 	}
 
 	@objc private func findOptionChanged(_ sender: Any?) {
 		findStateDidChange()
+	}
+
+	@objc private func replaceCurrent(_ sender: Any?) {
+		guard let editorView = currentEditorView() else {
+			return
+		}
+		if selectedMatchIndex == nil {
+			selectMatch(direction: 1, focusEditorAfterSelection: false)
+		}
+		guard let index = selectedMatchIndex, let matchData = findMatchData(), matchData.results.indices.contains(index), let range = utf8Range(matchData.results[index].range, in: matchData.text) else {
+			return
+		}
+		let replacement = matchData.expression.replacementString(for: matchData.results[index], in: matchData.text, offset: 0, template: findState.replacement)
+		editorView.replaceUTF8Range(range, with: replacement)
+		refreshMatches()
+		selectMatch(direction: 1, refreshBeforeSelecting: false, focusEditorAfterSelection: false)
+	}
+
+	@objc private func replaceAll(_ sender: Any?) {
+		guard let editorView = currentEditorView(), let matchData = findMatchData() else {
+			return
+		}
+		for result in matchData.results.reversed() {
+			guard let range = utf8Range(result.range, in: matchData.text) else {
+				continue
+			}
+			let replacement = matchData.expression.replacementString(for: result, in: matchData.text, offset: 0, template: findState.replacement)
+			editorView.replaceUTF8Range(range, with: replacement)
+		}
+		refreshMatches()
 	}
 
 	func controlTextDidChange(_ notification: Notification) {
@@ -329,7 +386,11 @@ import ItsyRender
 		}
 		switch commandSelector {
 		case #selector(NSResponder.insertNewline(_:)):
-			selectMatchFromFindBar(direction: 1)
+			if control === replaceField {
+				replaceCurrent(control)
+			} else {
+				selectMatchFromFindBar(direction: 1)
+			}
 			return true
 		case #selector(NSResponder.cancelOperation(_:)):
 			setVisible(false)

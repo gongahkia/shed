@@ -48,6 +48,8 @@ public enum KeymapLoader {
 
 	private static func parseMode(_ name: String) throws -> Mode {
 		switch name {
+		case "global":
+			return .global
 		case "normal":
 			return .normal
 		case "insert":

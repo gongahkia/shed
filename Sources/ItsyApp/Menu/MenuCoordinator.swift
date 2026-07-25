@@ -1,4 +1,5 @@
 import AppKit
+import ItsyRender
 
 @MainActor final class MenuCoordinator: NSObject, NSMenuDelegate {
 	private let documentController: ItsyDocumentController
@@ -117,6 +118,15 @@ import AppKit
 
 		let editMenu = NSMenu(title: L10n.string("Edit"))
 		editMenu.disableAutomaticWritingToolsItems()
+		editMenu.addItem(withTitle: L10n.string("Undo"), action: #selector(MetalTextView.undo(_:)), keyEquivalent: "z")
+		let redoItem = editMenu.addItem(withTitle: L10n.string("Redo"), action: #selector(MetalTextView.redo(_:)), keyEquivalent: "Z")
+		redoItem.keyEquivalentModifierMask = [.command, .shift]
+		editMenu.addItem(.separator())
+		editMenu.addItem(withTitle: L10n.string("Cut"), action: #selector(MetalTextView.cut(_:)), keyEquivalent: "x")
+		editMenu.addItem(withTitle: L10n.string("Copy"), action: #selector(MetalTextView.copy(_:)), keyEquivalent: "c")
+		editMenu.addItem(withTitle: L10n.string("Paste"), action: #selector(MetalTextView.paste(_:)), keyEquivalent: "v")
+		editMenu.addItem(withTitle: L10n.string("Select All"), action: #selector(MetalTextView.selectAll(_:)), keyEquivalent: "a")
+		editMenu.addItem(.separator())
 		let findItem = editMenu.addItem(withTitle: L10n.string("Find"), action: #selector(AppCoordinator.toggleFindBar(_:)), keyEquivalent: "f")
 		findItem.target = actionTarget
 		let findNextItem = editMenu.addItem(withTitle: L10n.string("Find Next"), action: #selector(AppCoordinator.findNext(_:)), keyEquivalent: "g")

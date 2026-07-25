@@ -157,8 +157,34 @@ extension MetalTextView {
 			return applyVimCommandAction(action)
 		}
 		switch commandID {
+		case "edit.cut":
+			return cutSelectedText()
+		case "edit.copy":
+			return copySelectedText()
+		case "edit.paste":
+			return pasteTextFromPasteboard()
+		case "edit.selectAll":
+			let end = editor.rope.length
+			editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: end)))
+			syncEditorState()
+			return true
 		case "emacs.killRegion":
 			killSelectedText(delete: true)
+			return true
+		case "emacs.deleteForward":
+			deleteEmacsCharacter(backward: false)
+			return true
+		case "emacs.deleteBackward":
+			deleteEmacsCharacter(backward: true)
+			return true
+		case "emacs.killLine":
+			killEmacsLine()
+			return true
+		case "emacs.killWordForward":
+			killEmacsWord(forward: true)
+			return true
+		case "emacs.killWordBackward":
+			killEmacsWord(forward: false)
 			return true
 		case "emacs.copyRegion":
 			killSelectedText(delete: false)
@@ -169,12 +195,63 @@ extension MetalTextView {
 		case "emacs.yankPop":
 			yankPopFromKillRing()
 			return true
-		case "emacs.setMark", "emacs.exchangePointMark", "emacs.transposeChars", "emacs.transposeWords",
-		     "emacs.uppercaseWord", "emacs.lowercaseWord", "emacs.capitalizeWord", "emacs.forwardSexp",
-		     "emacs.backwardSexp", "emacs.killSexp", "emacs.markSexp", "emacs.macro.start",
-		     "emacs.macro.end", "emacs.macro.run", "emacs.rectangle.kill", "emacs.rectangle.yank",
-		     "emacs.rectangle.string", "emacs.queryReplace":
+		case "emacs.setMark":
+			emacsMark = editor.selections.primary.head
 			return true
+		case "emacs.exchangePointMark":
+			guard let mark = emacsMark else { return true }
+			let point = editor.selections.primary.head
+			emacsMark = point
+			editor.setSelection(SelectionSet(primary: Selection(anchor: mark, head: mark)))
+			syncEditorState()
+			return true
+		case "emacs.transposeChars":
+			transposeEmacsCharacters()
+			return true
+		case "emacs.transposeWords":
+			transposeEmacsWords()
+			return true
+		case "emacs.uppercaseWord":
+			transformEmacsWord(using: { $0.uppercased() })
+			return true
+		case "emacs.lowercaseWord":
+			transformEmacsWord(using: { $0.lowercased() })
+			return true
+		case "emacs.capitalizeWord":
+			transformEmacsWord(using: { $0.capitalized })
+			return true
+		case "emacs.forwardSexp":
+			moveEmacsSexp(forward: true)
+			return true
+		case "emacs.backwardSexp":
+			moveEmacsSexp(forward: false)
+			return true
+		case "emacs.killSexp":
+			killEmacsSexp()
+			return true
+		case "emacs.markSexp":
+			markEmacsSexp()
+			return true
+		case "emacs.macro.start":
+			startMacroRecording("emacs")
+			return true
+		case "emacs.macro.end":
+			stopEmacsMacroRecording()
+			return true
+		case "emacs.macro.run":
+			replayMacro("emacs")
+			return true
+		case "emacs.rectangle.kill":
+			killEmacsRectangle()
+			return true
+		case "emacs.rectangle.yank":
+			yankEmacsRectangle()
+			return true
+		case "emacs.rectangle.string":
+			stringEmacsRectangle()
+			return true
+		case "emacs.queryReplace":
+			return performHostCommand("emacs.queryReplace")
 		case "editor.extendLeft":
 			extendSelection(motion: .charBackward)
 			return true
@@ -198,7 +275,11 @@ extension MetalTextView {
 			guard let motion = motion(for: commandID) else {
 				return false
 			}
-			repeatMotion(motion)
+			if keymapEngine.mode == .emacs, let mark = emacsMark {
+				extendEmacsMark(mark, motion: motion)
+			} else {
+				repeatMotion(motion)
+			}
 		case .visualMotion(let commandID):
 			guard let motion = motion(for: commandID) else {
 				return false
@@ -256,6 +337,29 @@ extension MetalTextView {
 			return true
 		case .paste(let after):
 			pasteRegister(after: after)
+		case .insertLineStart:
+			enterInsertMode(at: firstNonWhitespaceOffsetInCurrentLine())
+		case .appendAfterCursor:
+			enterInsertMode(at: vimAppendOffsetAfterCursor())
+		case .appendLineEnd:
+			enterInsertMode(at: lineEndOffsetInCurrentLine())
+		case .openLine(let after):
+			openVimLine(after: after)
+		case .deleteCharacter(let backward, let count):
+			deleteVimCharacter(backward: backward, count: count)
+		case .deleteToLineEnd(let change):
+			deleteToLineEnd(change: change)
+		case .substituteCharacter(let count):
+			substituteVimCharacters(count: count)
+		case .joinLines:
+			joinVimLines()
+		case .replaceCharacter:
+			return true
+		case .replaceMode:
+			beginInsertUndoGroup()
+			keymapEngine.setMode(.insert)
+			vimEngine.mode = .insert
+			return true
 		case .exStart:
 			keymapEngine.setMode(.command)
 			vimEngine.mode = .command
@@ -269,6 +373,8 @@ extension MetalTextView {
 			beginVisualMode(mode)
 		case .search(let commandID, let recordsJump):
 			return performHostCommand(commandID, recordsJump: recordsJump)
+		case .hostCommand(let commandID):
+			return performHostCommand(commandID)
 		case .save:
 			saveRequested?()
 			return true
@@ -277,6 +383,8 @@ extension MetalTextView {
 			return true
 		case .normalMode:
 			endInsertUndoGroup()
+			vimEngine.replaceMode = false
+			vimEngine.pendingReplacementCount = nil
 			leaveVisualMode(collapse: true)
 			keymapEngine.setMode(.normal)
 			vimEngine.mode = .normal
@@ -284,6 +392,7 @@ extension MetalTextView {
 			return true
 		case .insertMode:
 			beginInsertUndoGroup()
+			vimEngine.replaceMode = false
 			keymapEngine.setMode(.insert)
 			vimEngine.mode = .insert
 			return true
@@ -327,6 +436,135 @@ extension MetalTextView {
 		insertUndoGroupActive = true
 	}
 
+	func enterInsertMode(at offset: Int) {
+		let clamped = min(max(offset, 0), editor.rope.length)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: clamped, head: clamped)))
+		beginInsertUndoGroup()
+		keymapEngine.setMode(.insert)
+		vimEngine.mode = .insert
+		syncEditorState()
+	}
+
+	func firstNonWhitespaceOffsetInCurrentLine() -> Int {
+		let range = currentLineRange(count: 1)
+		let text = editor.rope.slice(range)
+		var offset = range.lowerBound
+		for character in text where character != "\n" {
+			if !character.isWhitespace {
+				return offset
+			}
+			offset += String(character).utf8.count
+		}
+		return lineEndOffsetInCurrentLine()
+	}
+
+	func lineEndOffsetInCurrentLine() -> Int {
+		let range = currentLineRange(count: 1)
+		let text = editor.rope.slice(range)
+		guard let newline = text.firstIndex(of: "\n") else {
+			return range.lowerBound + text.utf8.count
+		}
+		return range.lowerBound + text[..<newline].utf8.count
+	}
+
+	func vimAppendOffsetAfterCursor() -> Int {
+		let head = editor.selections.primary.head
+		let lineEnd = lineEndOffsetInCurrentLine()
+		guard let character = characterOffsets().first(where: { $0.offset >= head }), character.offset < lineEnd else {
+			return lineEnd
+		}
+		return min(lineEnd, currentOffsetAfter(character))
+	}
+
+	func openVimLine(after: Bool) {
+		let range = currentLineRange(count: 1)
+		let offset: Int
+		if after {
+			let text = editor.rope.slice(range)
+			offset = text.hasSuffix("\n") ? max(range.lowerBound, range.upperBound - 1) : range.upperBound
+		} else {
+			offset = range.lowerBound
+		}
+		replace(range: offset ..< offset, with: "\n")
+		enterInsertMode(at: after ? offset + 1 : offset)
+		editorDidChange?(editor)
+	}
+
+	func deleteVimCharacter(backward: Bool, count: Int) {
+		let range = vimCharacterRange(backward: backward, count: count)
+		guard !range.isEmpty else {
+			return
+		}
+		let text = editor.rope.slice(range)
+		writeRegister(text, operation: .delete)
+		replace(range: range, with: "")
+		syncEditorState()
+		editorDidChange?(editor)
+		finishVimChangeRecording()
+	}
+
+	func deleteToLineEnd(change: Bool) {
+		let head = editor.selections.primary.head
+		let end = lineEndOffsetInCurrentLine()
+		guard head < end else {
+			if change { enterInsertMode(at: head) }
+			return
+		}
+		let range = head ..< end
+		writeRegister(editor.rope.slice(range), operation: .delete)
+		replace(range: range, with: "")
+		if change {
+			enterInsertMode(at: head)
+		} else {
+			syncEditorState()
+			finishVimChangeRecording()
+		}
+		editorDidChange?(editor)
+	}
+
+	func substituteVimCharacters(count: Int) {
+		let range = vimCharacterRange(backward: false, count: count)
+		guard !range.isEmpty else {
+			return
+		}
+		writeRegister(editor.rope.slice(range), operation: .delete)
+		replace(range: range, with: "")
+		enterInsertMode(at: range.lowerBound)
+		editorDidChange?(editor)
+	}
+
+	func joinVimLines() {
+		let range = currentLineRange(count: 1)
+		guard range.upperBound > range.lowerBound, editor.rope.slice(range).hasSuffix("\n") else {
+			return
+		}
+		let newline = range.upperBound - 1
+		let text = editorStorageString(editor)
+		let suffix = text.utf8.dropFirst(min(text.utf8.count, newline + 1))
+		let whitespaceCount = suffix.prefix { $0 == 32 || $0 == 9 }.count
+		let replacement = newline > range.lowerBound && text.utf8[text.utf8.index(text.utf8.startIndex, offsetBy: newline - 1)] == 32 ? "" : " "
+		replace(range: newline ..< min(editor.rope.length, newline + 1 + whitespaceCount), with: replacement)
+		editor.setSelection(SelectionSet(primary: Selection(anchor: newline, head: newline)))
+		syncEditorState()
+		editorDidChange?(editor)
+		finishVimChangeRecording()
+	}
+
+	func vimCharacterRange(backward: Bool, count: Int = 1) -> Range<Int> {
+		let offsets = characterOffsets()
+		let head = editor.selections.primary.head
+		let lineRange = editor.rope.lineRange(editor.rope.line(forOffset: head))
+		let lineOffsets = offsets.filter { lineRange.contains($0.offset) && $0.character != "\n" }
+		if backward {
+			let selected = Array(lineOffsets.filter { $0.offset < head }.suffix(max(1, count)))
+			guard let first = selected.first, let last = selected.last else { return head ..< head }
+			return first.offset ..< currentOffsetAfter(last)
+		}
+		let selected = Array(lineOffsets.filter { $0.offset >= head }.prefix(max(1, count)))
+		guard let first = selected.first, let last = selected.last else { return head ..< head }
+		return first.offset ..< currentOffsetAfter(last)
+	}
+
 	func endInsertUndoGroup() {
 		guard insertUndoGroupActive else {
 			return
@@ -349,6 +587,47 @@ extension MetalTextView {
 			syncEditorState()
 			editorDidChange?(editor)
 		}
+	}
+
+	func deleteEmacsCharacter(backward: Bool) {
+		let range = vimCharacterRange(backward: backward)
+		guard !range.isEmpty else { return }
+		replace(range: range, with: "")
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func killEmacsLine() {
+		let head = editor.selections.primary.head
+		let lineRange = currentLineRange(count: 1)
+		let lineEnd = lineEndOffsetInCurrentLine()
+		let end = head < lineEnd ? lineEnd : min(lineRange.upperBound, editor.rope.length)
+		guard head < end else { return }
+		let range = head ..< end
+		let text = editor.rope.slice(range)
+		killRing.push(text)
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		replace(range: range, with: "")
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func killEmacsWord(forward: Bool) {
+		let start = editor.selections.primary.head
+		var projected = editor
+		projected.moveCursor(forward ? .wordForward : .wordBackward)
+		let end = projected.selections.primary.head
+		let range = min(start, end) ..< max(start, end)
+		guard !range.isEmpty else { return }
+		let text = editor.rope.slice(range)
+		killRing.push(text)
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		replace(range: range, with: "")
+		editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
+		syncEditorState()
+		editorDidChange?(editor)
 	}
 
 	func yankFromKillRing() {
@@ -378,6 +657,256 @@ extension MetalTextView {
 			.map(\.range)
 			.filter { !$0.isEmpty }
 			.sorted { $0.lowerBound < $1.lowerBound }
+	}
+
+	func extendEmacsMark(_ mark: Int, motion: Motion) {
+		var projected = editor
+		for _ in 0 ..< keymapRepeatCount {
+			projected.moveCursor(motion)
+		}
+		let point = projected.selections.primary.head
+		editor.setSelection(SelectionSet(primary: Selection(anchor: mark, head: point)))
+		syncEditorState()
+	}
+
+	func transposeEmacsCharacters() {
+		let offsets = characterOffsets()
+		let head = editor.selections.primary.head
+		let rightIndex = offsets.firstIndex(where: { $0.offset >= head }) ?? max(0, offsets.count - 1)
+		guard rightIndex > 0 else {
+			return
+		}
+		let left = offsets[rightIndex - 1]
+		let right = offsets[rightIndex]
+		guard left.character != "\n", right.character != "\n" else { return }
+		let end = right.offset + String(right.character).utf8.count
+		replace(range: left.offset ..< end, with: String(right.character) + String(left.character))
+		editor.setSelection(SelectionSet(primary: Selection(anchor: end, head: end)))
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func transposeEmacsWords() {
+		let text = editorStorageString(editor)
+		let ranges = wordRanges(in: text)
+		let point = editor.selections.primary.head
+		let rightIndex = ranges.firstIndex(where: { $0.lowerBound >= point || $0.contains(point) }) ?? max(0, ranges.count - 1)
+		guard rightIndex > 0 else {
+			return
+		}
+		let leftRange = ranges[rightIndex - 1]
+		let rightRange = ranges[rightIndex]
+		let separator = textSlice(leftRange.upperBound ..< rightRange.lowerBound)
+		let rightWord = textSlice(rightRange)
+		let replacement = rightWord + separator + textSlice(leftRange)
+		replace(range: leftRange.lowerBound ..< rightRange.upperBound, with: replacement)
+		let pointAfterReplacement = leftRange.lowerBound + rightWord.utf8.count + separator.utf8.count
+		editor.setSelection(SelectionSet(primary: Selection(anchor: pointAfterReplacement, head: pointAfterReplacement)))
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func transformEmacsWord(using transform: (String) -> String) {
+		let point = editor.selections.primary.head
+		guard let range = wordRanges(in: editorStorageString(editor)).first(where: { $0.upperBound > point }) else {
+			return
+		}
+		replace(range: range, with: transform(textSlice(range)))
+		editor.setSelection(SelectionSet(primary: Selection(anchor: range.upperBound, head: range.upperBound)))
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func wordRanges(in text: String) -> [Range<Int>] {
+		var ranges: [Range<Int>] = []
+		var start: Int?
+		var offset = 0
+		for character in text {
+			let width = String(character).utf8.count
+			if isTextObjectWordCharacter(character) {
+				start = start ?? offset
+		} else if let lower = start {
+			ranges.append(lower ..< offset)
+			start = nil
+			}
+			offset += width
+		}
+		if let start { ranges.append(start ..< offset) }
+		return ranges
+	}
+
+	func textSlice(_ range: Range<Int>) -> String {
+		editor.rope.slice(range)
+	}
+
+	func rectangleRanges() -> [Range<Int>] {
+		let selection = editor.selections.primary
+		let startLine = editor.rope.line(forOffset: selection.anchor)
+		let endLine = editor.rope.line(forOffset: selection.head)
+		let lowerLine = min(startLine, endLine)
+		let upperLine = max(startLine, endLine)
+		let lowerColumn = selection.anchor - editor.rope.offset(forLine: startLine)
+		let upperColumn = selection.head - editor.rope.offset(forLine: endLine)
+		let left = min(lowerColumn, upperColumn)
+		let right = max(lowerColumn, upperColumn)
+		return (lowerLine ... upperLine).map { line in
+			let lineStart = editor.rope.offset(forLine: line)
+			let lineEnd = editor.rope.lineRange(line).upperBound
+			return min(lineStart + left, lineEnd) ..< min(lineStart + right, lineEnd)
+		}
+	}
+
+	func killEmacsRectangle() {
+		let ranges = rectangleRanges()
+		guard !ranges.isEmpty else { return }
+		let text = ranges.map(textSlice).joined(separator: "\n")
+		killRing.push(text)
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		for range in ranges.reversed() where !range.isEmpty {
+			replace(range: range, with: "")
+		}
+		editor.setSelection(SelectionSet(primary: Selection(anchor: ranges[0].lowerBound, head: ranges[0].lowerBound)))
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func yankEmacsRectangle() {
+		guard let text = killRing.current ?? NSPasteboard.general.string(forType: .string) else { return }
+		let lines = text.components(separatedBy: "\n")
+		guard !lines.isEmpty else { return }
+		let point = editor.selections.primary.head
+		let startLine = editor.rope.line(forOffset: point)
+		let column = point - editor.rope.offset(forLine: startLine)
+		while editor.rope.lineCount < startLine + lines.count {
+			replace(range: editor.rope.length ..< editor.rope.length, with: "\n")
+		}
+		for (index, line) in lines.enumerated().reversed() {
+			let lineStart = editor.rope.offset(forLine: startLine + index)
+			let lineEnd = editor.rope.lineRange(startLine + index).upperBound
+			let insertion = min(lineStart + column, lineEnd)
+			replace(range: insertion ..< insertion, with: line)
+		}
+		lastYankRange = point ..< point + lines[0].utf8.count
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func stringEmacsRectangle() {
+		guard let request = emacsRectangleStringRequested else { return }
+		_ = request { [weak self] text in
+			guard let self, let text else { return }
+			self.applyEmacsRectangleString(text)
+		}
+	}
+
+	func applyEmacsRectangleString(_ text: String) {
+		let ranges = rectangleRanges()
+		guard !ranges.isEmpty else { return }
+		for range in ranges.reversed() {
+			replace(range: range, with: text)
+		}
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func moveEmacsSexp(forward: Bool) {
+		guard let destination = emacsSexpDestination(forward: forward) else {
+			return
+		}
+		if let mark = emacsMark {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: mark, head: destination)))
+		} else {
+			editor.setSelection(SelectionSet(primary: Selection(anchor: destination, head: destination)))
+		}
+		syncEditorState()
+	}
+
+	func killEmacsSexp() {
+		let start = editor.selections.primary.head
+		guard let end = emacsSexpDestination(forward: true), start != end else {
+			return
+		}
+		let range = min(start, end) ..< max(start, end)
+		let text = textSlice(range)
+		killRing.push(text)
+		NSPasteboard.general.clearContents()
+		NSPasteboard.general.setString(text, forType: .string)
+		replace(range: range, with: "")
+		syncEditorState()
+		editorDidChange?(editor)
+	}
+
+	func markEmacsSexp() {
+		let start = editor.selections.primary.head
+		guard let end = emacsSexpDestination(forward: true) else {
+			return
+		}
+		emacsMark = start
+		editor.setSelection(SelectionSet(primary: Selection(anchor: start, head: end)))
+		syncEditorState()
+	}
+
+	func emacsSexpDestination(forward: Bool) -> Int? {
+		let characters = characterOffsets()
+		let point = editor.selections.primary.head
+		guard !characters.isEmpty else { return 0 }
+		if forward {
+			guard let index = characters.firstIndex(where: { $0.offset >= point }) else { return editor.rope.length }
+			let current = characters[index].character
+			if let close = matchingDelimiter(for: current) {
+				var depth = 0
+				for entry in characters[index...] {
+					if entry.character == current { depth += 1 }
+					if entry.character == close {
+						depth -= 1
+						if depth == 0 { return entry.offset + String(entry.character).utf8.count }
+					}
+				}
+			}
+			if isTextObjectWordCharacter(current) {
+				return characters[index...].first(where: { !isTextObjectWordCharacter($0.character) })?.offset ?? editor.rope.length
+			}
+			return min(editor.rope.length, currentOffsetAfter(characters[index]))
+		}
+		guard let index = characters.lastIndex(where: { $0.offset < point }) else { return 0 }
+		let current = characters[index].character
+		if let open = openingDelimiter(for: current) {
+			var depth = 0
+			for entry in characters[...index].reversed() {
+				if entry.character == current { depth += 1 }
+				if entry.character == open {
+					depth -= 1
+					if depth == 0 { return entry.offset }
+				}
+			}
+		}
+		if isTextObjectWordCharacter(current) {
+			return characters[...index].reversed().first(where: { !isTextObjectWordCharacter($0.character) }).map { currentOffsetAfter($0) } ?? 0
+		}
+		return characters[index].offset
+	}
+
+	func currentOffsetAfter(_ entry: (offset: Int, character: Character)) -> Int {
+		entry.offset + String(entry.character).utf8.count
+	}
+
+	func matchingDelimiter(for character: Character) -> Character? {
+		switch character {
+		case "(": return ")"
+		case "[": return "]"
+		case "{": return "}"
+		default: return nil
+		}
+	}
+
+	func openingDelimiter(for character: Character) -> Character? {
+		switch character {
+		case ")": return "("
+		case "]": return "["
+		case "}": return "{"
+		default: return nil
+		}
 	}
 
 	func addNextSelectionMatch() {
@@ -584,7 +1113,8 @@ extension MetalTextView {
 			finishVimChangeRecording()
 		case .change:
 			writeRegister(text, operation: .delete)
-			replace(range: range, with: "")
+			replace(range: range, with: text.hasSuffix("\n") ? "\n" : "")
+			editor.setSelection(SelectionSet(primary: Selection(anchor: range.lowerBound, head: range.lowerBound)))
 			beginInsertUndoGroup()
 			keymapEngine.setMode(.insert)
 			vimEngine.mode = .insert
@@ -824,6 +1354,16 @@ extension MetalTextView {
 		macroRegisters[register] = currentMacroEvents
 		recordingMacroRegister = nil
 		currentMacroEvents = []
+	}
+
+	func stopEmacsMacroRecording() {
+		guard recordingMacroRegister == "emacs" else {
+			return
+		}
+		if currentMacroEvents.count >= 2 {
+			currentMacroEvents.removeLast(2)
+		}
+		stopMacroRecording()
 	}
 
 	func replayMacro(_ register: String) {
@@ -1204,6 +1744,14 @@ extension MetalTextView {
 	}
 
 	func handlePendingCharacterMotion(_ event: NSEvent) -> Bool {
+		if let count = vimEngine.pendingReplacementCount,
+		   let key = Key(event: event), key.modifiers.isEmpty, key.value.count == 1,
+		   let replacement = key.value.first
+		{
+			vimEngine.pendingReplacementCount = nil
+			replaceVimCharacters(with: replacement, count: count)
+			return true
+		}
 		guard let motion = pendingCharacterMotion, let key = Key(event: event), key.modifiers.isEmpty, key.value.count == 1, let value = key.value.first else {
 			return false
 		}
@@ -1211,6 +1759,25 @@ extension MetalTextView {
 		moveToCharacter(value, motion: motion, count: keymapRepeatCount)
 		lastCharacterMotion = (motion, value)
 		return true
+	}
+
+	func replaceVimCharacters(with replacement: Character, count: Int) {
+		let start = editor.selections.primary.head
+		let lineEnd = lineEndOffsetInCurrentLine()
+		let offsets = characterOffsets().filter { $0.offset >= start && $0.offset < lineEnd && $0.character != "\n" }
+		guard let first = offsets.first else {
+			return
+		}
+		let selected = Array(offsets.prefix(max(1, count)))
+		guard let last = selected.last else {
+			return
+		}
+		let end = last.offset + String(last.character).utf8.count
+		replace(range: first.offset ..< end, with: String(repeating: String(replacement), count: selected.count))
+		editor.setSelection(SelectionSet(primary: Selection(anchor: first.offset, head: first.offset)))
+		syncEditorState()
+		editorDidChange?(editor)
+		finishVimChangeRecording()
 	}
 
 	func repeatLastCharacterMotion(reversed: Bool) {
@@ -1412,7 +1979,8 @@ extension MetalTextView {
 
 	func vimCommandStartsChange(_ commandID: String) -> Bool {
 		switch commandID {
-		case "mode.insert", "vim.operator.delete", "vim.operator.change",
+		case "mode.insert", "vim.insert.lineStart", "vim.append.afterCursor", "vim.append.lineEnd", "vim.openLineBelow", "vim.openLineAbove",
+		     "vim.operator.delete", "vim.operator.change", "vim.delete.char", "vim.delete.charBackward", "vim.delete.toLineEnd", "vim.change.toLineEnd", "vim.change.line", "vim.substitute.char", "vim.joinLines", "vim.replace.char", "vim.replace.mode",
 		     "vim.case.toggle", "vim.case.toggleOperator", "vim.case.lowerOperator", "vim.case.upperOperator",
 		     "vim.indent.right", "vim.indent.left", "vim.pasteAfter", "vim.pasteBefore":
 			return true

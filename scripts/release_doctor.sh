@@ -5,6 +5,7 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mode="${ITSY_RELEASE_MODE:-signed}"
 app_dir="${ITSY_APP_DIR:-$repo_dir/Itsy.app}"
 expected_bundle_id="${ITSY_EXPECTED_BUNDLE_ID:-dev.itsy.editor}"
+expected_sparkle_feed_url="${ITSY_EXPECTED_SPARKLE_FEED_URL:-https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml}"
 failures=()
 
 fail() {
@@ -56,8 +57,16 @@ if [[ -d "$app_dir" ]]; then
 		if [[ "$mode" == "signed" ]]; then
 			sparkle_feed_url="$(/usr/libexec/PlistBuddy -c 'Print :SUFeedURL' "$plist" 2>/dev/null || true)"
 			sparkle_public_key="$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$plist" 2>/dev/null || true)"
-			[[ -n "$sparkle_feed_url" ]] || fail "missing Sparkle SUFeedURL; set ITSY_SPARKLE_FEED_URL before bench/scripts/make_app.sh"
+			sparkle_automatic_checks="$(/usr/libexec/PlistBuddy -c 'Print :SUEnableAutomaticChecks' "$plist" 2>/dev/null || true)"
+			sparkle_automatic_downloads="$(/usr/libexec/PlistBuddy -c 'Print :SUAllowsAutomaticUpdates' "$plist" 2>/dev/null || true)"
+			sparkle_requires_signed_feed="$(/usr/libexec/PlistBuddy -c 'Print :SURequireSignedFeed' "$plist" 2>/dev/null || true)"
+			sparkle_shows_release_notes="$(/usr/libexec/PlistBuddy -c 'Print :SUShowReleaseNotes' "$plist" 2>/dev/null || true)"
+			[[ "$sparkle_feed_url" == "$expected_sparkle_feed_url" ]] || fail "unexpected Sparkle SUFeedURL: $sparkle_feed_url"
 			[[ -n "$sparkle_public_key" ]] || fail "missing Sparkle SUPublicEDKey; set ITSY_SPARKLE_PUBLIC_ED_KEY before bench/scripts/make_app.sh"
+			[[ "$sparkle_automatic_checks" == "false" ]] || fail "Sparkle SUEnableAutomaticChecks must be false"
+			[[ "$sparkle_automatic_downloads" == "false" ]] || fail "Sparkle SUAllowsAutomaticUpdates must be false"
+			[[ "$sparkle_requires_signed_feed" == "true" ]] || fail "Sparkle SURequireSignedFeed must be true"
+			[[ "$sparkle_shows_release_notes" == "true" ]] || fail "Sparkle SUShowReleaseNotes must be true"
 			require_path "$app_dir/Contents/Frameworks/Sparkle.framework"
 			require_path "$app_dir/Contents/Frameworks/Sparkle.framework/Versions/Current/XPCServices/Installer.xpc"
 		fi

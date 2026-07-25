@@ -14,7 +14,7 @@ Workspace overrides are loaded from:
 
 Both files hot-reload while Itsy is running. The merge order is global, then workspace, then per-language editor overrides for the current buffer. Unknown keys are ignored with a warning in the Settings window. Bad values keep the previous/default value.
 
-Personal UI settings are global-only: `[ui]` entries in a workspace file are ignored with a warning.
+Personal UI and update settings are global-only: `[ui]` and `[updates]` entries in a workspace file are ignored with a warning.
 
 ```toml
 [editor]
@@ -47,6 +47,9 @@ presentation = "bottom" # bottom, window
 [git]
 presentation = "sidebar" # sidebar, window
 
+[updates]
+automatically_check = false # opt in to background checks for stable releases
+
 [ui]
 font_scale = 1
 density = "regular" # compact, regular, comfortable
@@ -66,6 +69,8 @@ item_font_size = 13
 Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
 
 The terminal opens in the editor's bottom split by default; Git Changes opens in the right sidebar. Set `terminal.presentation = "window"` or `git.presentation = "window"` to detach either surface. `terminal.font` is optional and inherits `editor.font` until explicitly set.
+
+`updates.automatically_check` defaults to `false`. When enabled, Itsy checks the signed appcast for the latest stable GitHub Release in the background. Updates are always downloaded and installed only after the user confirms the Sparkle prompt. **Check for Updates…** remains available from the app menu regardless of this setting.
 
 In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge. LSP notices expand with **Details** and can copy a diagnostic report; when no server process started, the report explicitly says that no process log is available.
 

@@ -1,6 +1,11 @@
 # Changelog
 
-## 2026-07-08
+## [v0.1.0] - 2026-07-08
+
+### Updates
+
+- Added opt-in stable-release checks through Sparkle.
+- Added signed appcasts and versioned release notes derived from this section.
 
 ### Phase 36 D8: Competitor perf automation
 

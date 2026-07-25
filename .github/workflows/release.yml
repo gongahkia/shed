@@ -50,7 +50,6 @@ jobs:
         run: scripts/test.sh
       - name: Build app
         env:
-          ITSY_SPARKLE_FEED_URL: ${{ vars.ITSY_SPARKLE_FEED_URL }}
           ITSY_SPARKLE_PUBLIC_ED_KEY: ${{ vars.ITSY_SPARKLE_PUBLIC_ED_KEY }}
         run: |
           swift build -c release
@@ -60,6 +59,16 @@ jobs:
         run: |
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
           test "v$version" = "$GITHUB_REF_NAME"
+      - name: Extract versioned release notes
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
+          release_tag="${GITHUB_REF_NAME:-v$version}"
+          case "$release_tag" in
+            v*) ;;
+            *) release_tag="v$version" ;;
+          esac
+          scripts/extract_release_notes.sh "$release_tag" "dist/release-notes/Itsy-$version.md"
       - name: Release prerequisite check
         env:
           ITSY_CODESIGN_IDENTITY: ${{ secrets.DEVELOPER_ID_APPLICATION_IDENTITY }}
@@ -93,14 +102,16 @@ jobs:
             v*) ;;
             *) release_tag="v$version" ;;
           esac
-          SPARKLE_DOWNLOAD_URL_PREFIX="https://github.com/${GITHUB_REPOSITORY}/releases/download/$release_tag/" scripts/make_appcast.sh
+          SPARKLE_DOWNLOAD_URL_PREFIX="https://github.com/${GITHUB_REPOSITORY}/releases/download/$release_tag/" SPARKLE_RELEASE_NOTES_PATH="dist/release-notes/Itsy-$version.md" SPARKLE_REQUIRE_RELEASE_NOTES=1 scripts/make_appcast.sh
           ITSY_RELEASE_TAG="$release_tag" scripts/make_homebrew_cask.sh
       - name: Verify release assets
         run: |
           set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
           test "$(find dist -maxdepth 1 -name '*.dmg' | wc -l | tr -d ' ')" = "1"
           test "$(find dist -maxdepth 1 -name '*.sha256' | wc -l | tr -d ' ')" = "1"
           test -f dist/sparkle/appcast.xml
+          test -f "dist/sparkle/Itsy-$version.md"
           test -f dist/itsy.rb
           shasum -c dist/*.sha256
           scripts/verify_dmg.sh dist/*.dmg
@@ -115,8 +126,12 @@ jobs:
             dist/*.sha256
             dist/*.rb
             dist/sparkle/*.xml
+            dist/sparkle/*.md
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.sha256 dist/*.rb dist/sparkle/*.xml --verify-tag --title "$GITHUB_REF_NAME" --notes "Itsy $GITHUB_REF_NAME"
+        run: |
+          set -euo pipefail
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Itsy.app/Contents/Info.plist)"
+          gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.sha256 dist/*.rb dist/sparkle/*.xml dist/sparkle/*.md --verify-tag --title "$GITHUB_REF_NAME" --notes-file "dist/release-notes/Itsy-$version.md"

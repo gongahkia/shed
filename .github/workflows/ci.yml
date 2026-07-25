@@ -58,6 +58,10 @@ jobs:
         run: scripts/test_external_tool_fixtures.sh
       - name: Test alpha promotion gate
         run: scripts/test_alpha_promotion.sh
+      - name: Test release-note extraction
+        run: scripts/test_release_notes.sh
+      - name: Test appcast release-note packaging
+        run: scripts/test_make_appcast.sh
       - name: Resolve pinned SwiftPM dependencies
         run: swift package resolve
       - name: Verify dependency metadata

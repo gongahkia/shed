@@ -106,12 +106,16 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 </plist>
 PLIST
 if [[ -n "${ITSY_SPARKLE_FEED_URL:-}" || -n "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
-	if [[ -z "${ITSY_SPARKLE_FEED_URL:-}" || -z "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
-		echo "ITSY_SPARKLE_FEED_URL and ITSY_SPARKLE_PUBLIC_ED_KEY must be set together" >&2
+	if [[ -z "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]; then
+		echo "ITSY_SPARKLE_PUBLIC_ED_KEY is required to enable Sparkle" >&2
 		exit 1
 	fi
-	/usr/libexec/PlistBuddy -c "Add :SUFeedURL string ${ITSY_SPARKLE_FEED_URL}" "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c 'Add :SUFeedURL string https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml' "$app_dir/Contents/Info.plist"
 	/usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string ${ITSY_SPARKLE_PUBLIC_ED_KEY}" "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c 'Add :SUEnableAutomaticChecks bool false' "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c 'Add :SUAllowsAutomaticUpdates bool false' "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c 'Add :SURequireSignedFeed bool true' "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c 'Add :SUShowReleaseNotes bool true' "$app_dir/Contents/Info.plist"
 	if [[ "${ITSY_SPARKLE_ENABLE_INSTALLER_XPC:-1}" == "1" ]]; then
 		/usr/libexec/PlistBuddy -c "Add :SUEnableInstallerLauncherService bool true" "$app_dir/Contents/Info.plist"
 	fi

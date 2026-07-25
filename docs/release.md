@@ -10,7 +10,8 @@ This page is the Phase 16 release checklist. It is intentionally explicit becaus
 - Release DMG path: `dist/Itsy-0.1.0.dmg`.
 - Local unsigned release smoke is supported.
 - Signed release is blocked until a `Developer ID Application` identity and notary credentials are available.
-- Sparkle is linked and bundled, but remains inactive unless `SUFeedURL` and `SUPublicEDKey` are present.
+- Signed builds use the stable appcast at `https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml`.
+- Background update checks are opt-in; installs require an explicit Sparkle confirmation.
 - Homebrew cask submission is blocked until the signed/notarized GitHub Release DMG and final SHA-256 exist.
 
 ## Required Secrets
@@ -40,7 +41,6 @@ or:
 
 Signed Sparkle release config expects:
 
-- `ITSY_SPARKLE_FEED_URL`
 - `ITSY_SPARKLE_PUBLIC_ED_KEY`
 
 ## Local Smoke
@@ -60,7 +60,6 @@ This validates app layout, DMG integrity, mounted bundle layout, and checksum. I
 ## Signed Release
 
 ```sh
-export ITSY_SPARKLE_FEED_URL=https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml
 export ITSY_SPARKLE_PUBLIC_ED_KEY=<sparkle-public-ed-key>
 swift build -c release
 bench/scripts/make_app.sh
@@ -80,24 +79,22 @@ Expected properties:
 - `scripts/notarize.sh` uses `xcrun notarytool`, staples the DMG, validates the staple, and runs `spctl`.
 - `.github/workflows/release.yml` uploads `dist/*.dmg` and `dist/*.sha256` and publishes a GitHub Release for `v*.*.*` tags.
 
-## Sparkle Gate
+## Sparkle Release Flow
 
-Before Sparkle can ship:
-
-- Pick the production appcast URL.
-- Generate and store the Sparkle EdDSA public key.
-- Build the app with `ITSY_SPARKLE_FEED_URL` and `ITSY_SPARKLE_PUBLIC_ED_KEY` set together.
-- Confirm `Sparkle.framework` and its XPC services are present under `Itsy.app/Contents/Frameworks`.
-- Ensure the Sparkle framework and XPC services are signed before the app bundle via `scripts/codesign.sh`.
-- Generate the appcast from signed release assets.
-
-Candidate appcast URL shape:
+The production feed is fixed to:
 
 ```text
 https://github.com/gongahkia/itsy/releases/latest/download/appcast.xml
 ```
 
-Do not enable automatic updates until the URL and signing key are final.
+Before the first Sparkle release:
+
+- Generate and store the Sparkle EdDSA public key.
+- Build the app with `ITSY_SPARKLE_PUBLIC_ED_KEY`; the packaging script supplies the fixed feed URL in CI.
+- Confirm `Sparkle.framework` and its XPC services are present under `Itsy.app/Contents/Frameworks`.
+- Ensure the Sparkle framework and XPC services are signed before the app bundle via `scripts/codesign.sh`.
+
+For each `v*.*.*` tag, the release workflow extracts the matching `## [vX.Y.Z]` changelog section, uses it as the GitHub Release body, uploads a same-version Markdown asset, and generates a signed appcast whose release-notes link points to that asset. The app forces signed feeds, disables automatic downloads, and defaults automatic checks to off.
 
 After the signed DMG and EdDSA key are available, generate the appcast with:
 
@@ -108,6 +105,7 @@ scripts/make_appcast.sh
 Set `SPARKLE_GENERATE_APPCAST` only if overriding the SwiftPM artifact tool path.
 Set `SPARKLE_PRIVATE_KEY` or `SPARKLE_ED_KEY_FILE` for non-Keychain signing.
 Set `SPARKLE_REQUIRE_ED_KEY=1` in CI so appcast generation cannot silently omit EdDSA signatures.
+Set `SPARKLE_RELEASE_NOTES_PATH` to a version-matched Markdown file; `SPARKLE_REQUIRE_RELEASE_NOTES=1` makes this mandatory.
 
 ## Homebrew Cask Gate
 

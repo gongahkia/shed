@@ -94,7 +94,7 @@ Itsy is intentionally narrow:
 | Tasks/extensions | Built-in task discovery/run panel; extension manifests contribute tasks only | No executable plugin runtime or marketplace |
 | Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | GitHub issues track follow-up slices |
 | Docs/QA | Generated keymap reference, screenshot capture script, changelog, coverage gate, Vim binding regression suite | Screenshot capture requires local GUI permissions |
-| Distribution | Local unsigned app, DMG workflow, GitHub Release workflow | Developer ID signing/notarization, Sparkle, Homebrew cask, final name/domain |
+| Distribution | Local unsigned app, DMG workflow, signed Sparkle appcast/release-note workflow | Developer ID signing/notarization credentials, first published release, Homebrew cask, final name/domain |
 
 ## Formatting
 

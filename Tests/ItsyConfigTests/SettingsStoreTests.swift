@@ -219,7 +219,7 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
 	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"presentation = "bottom""#))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"[git]\npresentation = "sidebar""#))
+	#expect(ItsySettingsStore.serialize(settings).contains("[git]\npresentation = \"sidebar\""))
 	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 

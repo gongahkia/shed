@@ -131,6 +131,32 @@ import Testing
 }
 
 @MainActor
+@Test func editorWindowHostsTerminalBelowAndGitAtTrailingEdge() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
+	splitView.layoutSubtreeIfNeeded()
+
+	controller.setEmbeddedTerminalVisible(true)
+	#expect(!controller.embeddedTerminalHostView.isHidden)
+	#expect(controller.embeddedTerminalHostView.frame.height > 200)
+
+	controller.setEmbeddedGitVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+	#expect(splitView.arrangedSubviews.count == 3)
+	#expect(splitView.arrangedSubviews.last === controller.embeddedGitHostView)
+	#expect(controller.embeddedGitHostView.frame.width > 600)
+
+	controller.setEmbeddedTerminalVisible(false)
+	controller.setEmbeddedGitVisible(false)
+	splitView.layoutSubtreeIfNeeded()
+	#expect(controller.embeddedTerminalHostView.isHidden)
+	#expect(splitView.arrangedSubviews.count == 2)
+}
+
+@MainActor
 @Test func workspacePaneRestoreRebuildsTopologyAndFallsBackFromInvalidLayout() {
 	let document = ItsyDocument()
 	let controller = EditorWindowController(document: document)

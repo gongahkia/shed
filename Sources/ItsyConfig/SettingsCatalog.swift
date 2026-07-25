@@ -72,6 +72,7 @@ public enum ItsySettingsCatalog {
 		.init(key: "ui.corner_radius", title: "UI Corner Radius", description: "Corner radius for configurable first-party panels."),
 		.init(key: "ui.border_width", title: "UI Border Width", description: "Border width for configurable first-party panels."),
 		.init(key: "ui.padding", title: "UI Padding", description: "Base padding for configurable first-party panels."),
+		.init(key: "ui.notification_position", title: "Notification Position", description: "Places in-app notifications at the bottom-right or top-right of the editor."),
 		.init(key: "editor.language.<language>.font", title: "Language Font Override", description: "Overrides the editor font for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.font_size", title: "Language Font Size Override", description: "Overrides editor font size for one language.", isLanguageTemplate: true),
 		.init(key: "editor.language.<language>.font_rendering", title: "Language Font Rendering Override", description: "Overrides glyph rendering for one language.", isLanguageTemplate: true),
@@ -151,6 +152,7 @@ public enum ItsySettingsCatalog {
 		case "ui.corner_radius": number(settings.ui.cornerRadius)
 		case "ui.border_width": number(settings.ui.borderWidth)
 		case "ui.padding": number(settings.ui.padding)
+		case "ui.notification_position": settings.ui.notificationPosition.rawValue
 		default: "Language override template"
 		}
 	}
@@ -197,6 +199,7 @@ public enum ItsySettingsCatalog {
 		case "ui.corner_radius": settings.ui.cornerRadius = defaults.ui.cornerRadius
 		case "ui.border_width": settings.ui.borderWidth = defaults.ui.borderWidth
 		case "ui.padding": settings.ui.padding = defaults.ui.padding
+		case "ui.notification_position": settings.ui.notificationPosition = defaults.ui.notificationPosition
 		default: return false
 		}
 		return true

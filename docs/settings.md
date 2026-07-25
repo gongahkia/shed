@@ -47,6 +47,7 @@ density = "regular" # compact, regular, comfortable
 corner_radius = 8
 border_width = 1
 padding = 8
+notification_position = "bottom_right" # bottom_right, top_right
 
 [ui.surface.command_palette]
 width = 560
@@ -57,6 +58,8 @@ item_font_size = 13
 ```
 
 Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
+
+In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge.
 
 Use the command palette actions **Settings: Open User TOML**, **Settings: Open Workspace TOML**, and **Settings: Open Catalog** to edit or inspect configuration.
 

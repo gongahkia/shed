@@ -115,7 +115,7 @@ import Testing
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 4)
+	#expect(ItsySettingsSchema.currentVersion == 5)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -136,6 +136,7 @@ import Testing
 	corner_radius = 4
 	border_width = 2
 	padding = 10
+	notification_position = "top_right"
 
 	[ui.surface.command_palette]
 	width = 680
@@ -147,6 +148,7 @@ import Testing
 	#expect(result.warnings.isEmpty)
 	#expect(result.settings.ui.fontScale == 1.2)
 	#expect(result.settings.ui.density == .compact)
+	#expect(result.settings.ui.notificationPosition == .topRight)
 	#expect(result.settings.ui.surface("command_palette") == .init(width: 680, height: 340, rowHeight: 28, inputFontSize: 20, itemFontSize: 14))
 }
 
@@ -193,7 +195,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 4"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 5"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))

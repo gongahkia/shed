@@ -125,7 +125,7 @@ import ItsyKeymap
 		recordBenchStage("app_did_finish_launching")
 		installServicesProvider()
 		menuCoordinator.installMainMenu()
-		sparkleUpdateCoordinator.start()
+		sparkleUpdateCoordinator.start(automaticallyChecks: settingsCoordinator.currentSettings.updates.automaticallyCheck)
 		recordBenchStage("main_menu_installed")
 		recordBenchStage("initial_document_open_begin")
 		openInitialDocument()
@@ -656,6 +656,7 @@ import ItsyKeymap
 		gitCoordinator.applyGitSettings(settings.git)
 		terminalCoordinator.applyTerminalSettings(settings.terminal)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
+		sparkleUpdateCoordinator.apply(settings.updates)
 	}
 
 	private func applyKeymapSettings(_ settings: ItsySettings) {

@@ -50,6 +50,9 @@ import Testing
 	[recovery]
 	journal_enabled = false
 
+	[updates]
+	automatically_check = true
+
 	[layout]
 	sidebar_visible = false
 	sidebar_position = "trailing"
@@ -89,6 +92,7 @@ import Testing
 	#expect(result.settings.git.presentation == .window)
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
+	#expect(result.settings.updates.automaticallyCheck)
 	#expect(result.settings.layout == .init(
 		sidebarVisible: false,
 		sidebarPosition: .trailing,
@@ -127,12 +131,12 @@ import Testing
 	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
 	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
 	let result = parser.parse("""
-	schema_version = 9
+	schema_version = 10
 	[editor]
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 8)
+	#expect(ItsySettingsSchema.currentVersion == 9)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -218,7 +222,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 8"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 9"))
 	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
@@ -232,6 +236,7 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains("wrap_column = 100"))
 	#expect(ItsySettingsStore.serialize(settings).contains("[find]"))
 	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
+	#expect(ItsySettingsStore.serialize(settings).contains("[updates]\nautomatically_check = false"))
 	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
 	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"presentation = "bottom""#))
@@ -348,11 +353,13 @@ import Testing
 		at: workspaceURL.deletingLastPathComponent(),
 		withIntermediateDirectories: true
 	)
-	try "[ui]\nfont_scale = 1.25\n".write(to: globalURL, atomically: true, encoding: .utf8)
-	try "[ui]\nfont_scale = 1.75\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	try "[ui]\nfont_scale = 1.25\n\n[updates]\nautomatically_check = true\n".write(to: globalURL, atomically: true, encoding: .utf8)
+	try "[ui]\nfont_scale = 1.75\n\n[updates]\nautomatically_check = false\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
 	let result = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
 	#expect(result.settings.ui.fontScale == 1.25)
+	#expect(result.settings.updates.automaticallyCheck)
 	#expect(result.warnings.contains { $0.key == "ui.font_scale" && $0.message.contains("user-only") })
+	#expect(result.warnings.contains { $0.key == "updates.automatically_check" && $0.message.contains("user-only") })
 }
 
 @Test func settingsResolverTracksGlobalWorkspaceLanguageAndSessionPrecedence() throws {
@@ -377,6 +384,9 @@ import Testing
 
 	[editor.language.python]
 	tab_width = 3
+
+	[updates]
+	automatically_check = true
 	""".write(to: globalURL, atomically: true, encoding: .utf8)
 	try """
 	[editor]
@@ -389,6 +399,9 @@ import Testing
 
 	[recovery]
 	journal_enabled = false
+
+	[updates]
+	automatically_check = false
 
 	[layout]
 	sidebar_position = "trailing"
@@ -416,6 +429,7 @@ import Testing
 	#expect(resolved.settings.editor.multipleSelections)
 	#expect(resolved.settings.find == .init(usesRegex: true, isCaseSensitive: false, matchesWholeWord: true))
 	#expect(!resolved.settings.recovery.journalEnabled)
+	#expect(resolved.settings.updates.automaticallyCheck)
 	#expect(resolved.settings.layout.sidebarPosition == .trailing)
 	#expect(resolved.settings.layout.interfaceScale == 1.25)
 	#expect(resolved.source(for: "editor.tab_width") == .workspace)
@@ -423,6 +437,7 @@ import Testing
 	#expect(resolved.source(for: "editor.tab_width", languageID: "python") == .language)
 	#expect(resolved.sources["editor.language.python.tab_width"] == .session)
 	#expect(resolved.sources["editor.language.python.use_spaces"] == .workspace)
+	#expect(resolved.source(for: "updates.automatically_check") == .global)
 	#expect(resolved.source(for: "editor.multiple_selections", languageID: "python") == .language)
 
 	try "[editor]\ntab_width = 6\n".write(to: workspaceURL, atomically: true, encoding: .utf8)

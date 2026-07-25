@@ -28,6 +28,7 @@ import ItsySyntax
 	private var settingsFindCaseButton: NSButton?
 	private var settingsFindWholeWordButton: NSButton?
 	private var settingsRecoveryJournalButton: NSButton?
+	private var settingsAutomaticallyCheckForUpdatesButton: NSButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
 	private var settingsSidebarWidthField: NSTextField?
@@ -352,6 +353,8 @@ import ItsySyntax
 
 		let recoveryJournalButton = settingsCheckbox("Keep Recovery Journal", action: #selector(settingsRecoveryJournalDidChange(_:)))
 		contentView.addSubview(recoveryJournalButton)
+		let automaticallyCheckForUpdatesButton = settingsCheckbox("Automatically Check for Updates", action: #selector(settingsAutomaticallyCheckForUpdatesDidChange(_:)))
+		contentView.addSubview(automaticallyCheckForUpdatesButton)
 
 		let sidebarVisibleButton = settingsCheckbox("Show Sidebar", action: #selector(settingsSidebarVisibleDidChange(_:)))
 		contentView.addSubview(sidebarVisibleButton)
@@ -583,8 +586,10 @@ import ItsySyntax
 			findStack.centerYAnchor.constraint(equalTo: findDefaultsLabel.centerYAnchor),
 			recoveryJournalButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			recoveryJournalButton.topAnchor.constraint(equalTo: findStack.bottomAnchor, constant: 12),
+			automaticallyCheckForUpdatesButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			automaticallyCheckForUpdatesButton.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 8),
 			sidebarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			sidebarVisibleButton.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 16),
+			sidebarVisibleButton.topAnchor.constraint(equalTo: automaticallyCheckForUpdatesButton.bottomAnchor, constant: 16),
 			sidebarPositionLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			sidebarPositionLabel.topAnchor.constraint(equalTo: sidebarVisibleButton.bottomAnchor, constant: 12),
 			sidebarPositionLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
@@ -661,6 +666,7 @@ import ItsySyntax
 		settingsFindCaseButton = findCaseButton
 		settingsFindWholeWordButton = findWholeWordButton
 		settingsRecoveryJournalButton = recoveryJournalButton
+		settingsAutomaticallyCheckForUpdatesButton = automaticallyCheckForUpdatesButton
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
 		settingsSidebarWidthField = sidebarWidthField
@@ -784,6 +790,7 @@ import ItsySyntax
 		settingsFindCaseButton?.state = appSettings.find.isCaseSensitive ? .on : .off
 		settingsFindWholeWordButton?.state = appSettings.find.matchesWholeWord ? .on : .off
 		settingsRecoveryJournalButton?.state = appSettings.recovery.journalEnabled ? .on : .off
+		settingsAutomaticallyCheckForUpdatesButton?.state = appSettings.updates.automaticallyCheck ? .on : .off
 		settingsSidebarVisibleButton?.state = appSettings.layout.sidebarVisible ? .on : .off
 		if let item = settingsSidebarPositionPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.layout.sidebarPosition.rawValue }) {
 			settingsSidebarPositionPopup?.select(item)
@@ -1127,6 +1134,11 @@ import ItsySyntax
 
 	@objc private func settingsRecoveryJournalDidChange(_: Any?) {
 		appSettings.recovery.journalEnabled = settingsRecoveryJournalButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsAutomaticallyCheckForUpdatesDidChange(_: Any?) {
+		appSettings.updates.automaticallyCheck = settingsAutomaticallyCheckForUpdatesButton?.state == .on
 		saveAndApplyBehaviorSettings()
 	}
 

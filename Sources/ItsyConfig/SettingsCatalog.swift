@@ -128,6 +128,11 @@ public enum ItsySettingsCatalog {
 			title: "Recovery Journal",
 			description: "Keeps local crash-recovery journals."
 		),
+		.init(
+			key: "updates.automatically_check",
+			title: "Automatically Check for Updates",
+			description: "Checks for stable Itsy releases in the background."
+		),
 		.init(key: "layout.sidebar_visible", title: "Show Sidebar", description: "Shows the workspace sidebar."),
 		.init(
 			key: "layout.sidebar_position",
@@ -295,6 +300,7 @@ public enum ItsySettingsCatalog {
 		case "find.case_sensitive": bool(settings.find.isCaseSensitive)
 		case "find.whole_word": bool(settings.find.matchesWholeWord)
 		case "recovery.journal_enabled": bool(settings.recovery.journalEnabled)
+		case "updates.automatically_check": bool(settings.updates.automaticallyCheck)
 		case "layout.sidebar_visible": bool(settings.layout.sidebarVisible)
 		case "layout.sidebar_position": settings.layout.sidebarPosition.rawValue
 		case "layout.sidebar_width": String(settings.layout.sidebarWidth)
@@ -348,6 +354,7 @@ public enum ItsySettingsCatalog {
 		case "find.case_sensitive": settings.find.isCaseSensitive = defaults.find.isCaseSensitive
 		case "find.whole_word": settings.find.matchesWholeWord = defaults.find.matchesWholeWord
 		case "recovery.journal_enabled": settings.recovery.journalEnabled = defaults.recovery.journalEnabled
+		case "updates.automatically_check": settings.updates.automaticallyCheck = defaults.updates.automaticallyCheck
 		case "layout.sidebar_visible": settings.layout.sidebarVisible = defaults.layout.sidebarVisible
 		case "layout.sidebar_position": settings.layout.sidebarPosition = defaults.layout.sidebarPosition
 		case "layout.sidebar_width": settings.layout.sidebarWidth = defaults.layout.sidebarWidth

@@ -16,6 +16,8 @@ download_url_prefix="${SPARKLE_DOWNLOAD_URL_PREFIX:-}"
 private_key="${SPARKLE_PRIVATE_KEY:-}"
 ed_key_file="${SPARKLE_ED_KEY_FILE:-}"
 require_ed_key="${SPARKLE_REQUIRE_ED_KEY:-0}"
+release_notes_path="${SPARKLE_RELEASE_NOTES_PATH:-}"
+require_release_notes="${SPARKLE_REQUIRE_RELEASE_NOTES:-0}"
 default_generate_appcast="$repo_dir/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
 generate_appcast="${SPARKLE_GENERATE_APPCAST:-}"
 if [[ -z "$generate_appcast" ]]; then
@@ -41,8 +43,23 @@ if [[ "$require_ed_key" == "1" && -z "$private_key" && -z "$ed_key_file" ]]; the
 	exit 1
 fi
 
+if [[ "$require_release_notes" == "1" && -z "$release_notes_path" ]]; then
+	echo "missing versioned release notes; set SPARKLE_RELEASE_NOTES_PATH" >&2
+	exit 1
+fi
+
+if [[ -n "$release_notes_path" && ! -f "$release_notes_path" ]]; then
+	echo "missing release notes: $release_notes_path" >&2
+	exit 1
+fi
+
 mkdir -p "$updates_dir"
 cp "$dmg_path" "$updates_dir/"
+if [[ -n "$release_notes_path" ]]; then
+	archive_name="$(basename "$dmg_path")"
+	release_notes_name="${archive_name%.*}.md"
+	cp "$release_notes_path" "$updates_dir/$release_notes_name"
+fi
 appcast_args=()
 if [[ -n "$download_url_prefix" ]]; then
 	appcast_args+=(--download-url-prefix "$download_url_prefix")
@@ -60,4 +77,4 @@ else
 	"$generate_appcast" "${appcast_args[@]}"
 fi
 
-find "$updates_dir" -maxdepth 1 \( -name '*.xml' -o -name 'appcast*.rss' \) -print
+find "$updates_dir" -maxdepth 1 \( -name '*.xml' -o -name 'appcast*.rss' -o -name '*.md' \) -print

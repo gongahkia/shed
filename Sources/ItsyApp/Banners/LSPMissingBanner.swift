@@ -19,6 +19,7 @@ final class LSPMissingBanner: NSView {
 	private var missingBinary: LSPServerRegistry.MissingBinary?
 	private var unavailableLanguage: LSPServerRegistry.UnsupportedLanguage?
 	private var fileURL: URL?
+	private var copyDiagnosticsFeedbackGeneration = 0
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -36,6 +37,7 @@ final class LSPMissingBanner: NSView {
 		copyButton.isHidden = false
 		label.stringValue = L10n.string("LSP server \(missingBinary.command) unavailable")
 		updateDetails()
+		resetCopyDiagnosticsFeedback()
 		setDetailsExpanded(false)
 		isHidden = false
 	}
@@ -47,6 +49,7 @@ final class LSPMissingBanner: NSView {
 		copyButton.isHidden = true
 		label.stringValue = L10n.string("LSP unavailable for \(unavailableLanguage.languageID)")
 		updateDetails()
+		resetCopyDiagnosticsFeedback()
 		setDetailsExpanded(false)
 		isHidden = false
 	}
@@ -56,6 +59,7 @@ final class LSPMissingBanner: NSView {
 		unavailableLanguage = nil
 		fileURL = nil
 		copyButton.isHidden = false
+		resetCopyDiagnosticsFeedback()
 		setDetailsExpanded(false)
 		isHidden = true
 	}
@@ -179,7 +183,8 @@ final class LSPMissingBanner: NSView {
 		guard missingBinary != nil || unavailableLanguage != nil else { return }
 		let pasteboard = NSPasteboard.general
 		pasteboard.clearContents()
-		pasteboard.setString(diagnosticReport(), forType: .string)
+		guard pasteboard.setString(diagnosticReport(), forType: .string) else { return }
+		showCopyDiagnosticsFeedback()
 	}
 
 	@objc private func dismiss(_ sender: NSButton) {
@@ -199,6 +204,24 @@ final class LSPMissingBanner: NSView {
 
 	private func updateDetails() {
 		detailsLabel.stringValue = diagnosticReport()
+	}
+
+	private func showCopyDiagnosticsFeedback() {
+		copyDiagnosticsFeedbackGeneration += 1
+		let generation = copyDiagnosticsFeedbackGeneration
+		copyDiagnosticsButton.title = L10n.string("Copied")
+		copyDiagnosticsButton.setAccessibilityLabel(L10n.string("Diagnostics copied"))
+		DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+			guard let self, copyDiagnosticsFeedbackGeneration == generation else { return }
+			copyDiagnosticsButton.title = L10n.string("Copy diagnostics")
+			copyDiagnosticsButton.setAccessibilityLabel(L10n.string("Copy LSP diagnostics"))
+		}
+	}
+
+	private func resetCopyDiagnosticsFeedback() {
+		copyDiagnosticsFeedbackGeneration += 1
+		copyDiagnosticsButton.title = L10n.string("Copy diagnostics")
+		copyDiagnosticsButton.setAccessibilityLabel(L10n.string("Copy LSP diagnostics"))
 	}
 
 	private func diagnosticReport() -> String {

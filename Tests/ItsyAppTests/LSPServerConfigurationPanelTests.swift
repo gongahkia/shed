@@ -39,6 +39,7 @@ import Testing
 	#expect(copied == missing)
 	#expect(supportRequests == 1)
 	#expect(detailsButton.title == "Hide details")
+	#expect(copyDiagnosticsButton.title == "Copied")
 	#expect(NSPasteboard.general.string(forType: .string)?.contains("language: typescript") == true)
 	#expect(NSPasteboard.general.string(forType: .string)?.contains("file: /workspace/Project/app.ts") == true)
 }

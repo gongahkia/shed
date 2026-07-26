@@ -1069,7 +1069,7 @@ extension Notification.Name {
 
 	private func configureSettingsBanner() {
 		settingsBanner.openSettingsRequested = {
-			NSApp.sendAction(#selector(AppCoordinator.showSettings(_:)), to: nil, from: nil)
+			NSApp.sendAction(#selector(AppCoordinator.openSettingsFile(_:)), to: nil, from: nil)
 		}
 	}
 

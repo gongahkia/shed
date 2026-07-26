@@ -49,6 +49,32 @@ public struct ManagedSupportArtifacts: Codable, Equatable, Sendable {
 	}
 }
 
+public struct ManagedNodePackageArtifact: Codable, Equatable, Sendable {
+	public var packageName: String
+	public var version: String
+	public var archiveURL: URL
+	public var integrity: String
+
+	public init(packageName: String, version: String, archiveURL: URL, integrity: String) {
+		self.packageName = packageName
+		self.version = version
+		self.archiveURL = archiveURL
+		self.integrity = integrity
+	}
+}
+
+public struct ManagedNodeSupport: Codable, Equatable, Sendable {
+	public var version: String
+	public var packages: [ManagedNodePackageArtifact]
+	public var executablePath: String
+
+	public init(version: String, packages: [ManagedNodePackageArtifact], executablePath: String) {
+		self.version = version
+		self.packages = packages
+		self.executablePath = executablePath
+	}
+}
+
 public enum ManagedSupportEnablement {
 	private static let prefix = "itsy.support.enabled."
 
@@ -73,6 +99,7 @@ public struct ManagedSupportComponent: Codable, Equatable, Sendable, Identifiabl
 	public var officialURL: URL
 	public var systemInstallHint: String?
 	public var artifacts: ManagedSupportArtifacts
+	public var nodeSupport: ManagedNodeSupport?
 
 	public init(
 		id: String,
@@ -85,7 +112,8 @@ public struct ManagedSupportComponent: Codable, Equatable, Sendable, Identifiabl
 		installMode: ManagedSupportInstallMode,
 		officialURL: URL,
 		systemInstallHint: String? = nil,
-		artifacts: ManagedSupportArtifacts = .init()
+		artifacts: ManagedSupportArtifacts = .init(),
+		nodeSupport: ManagedNodeSupport? = nil
 	) {
 		self.id = id
 		self.displayName = displayName
@@ -98,6 +126,7 @@ public struct ManagedSupportComponent: Codable, Equatable, Sendable, Identifiabl
 		self.officialURL = officialURL
 		self.systemInstallHint = systemInstallHint
 		self.artifacts = artifacts
+		self.nodeSupport = nodeSupport
 	}
 }
 
@@ -128,7 +157,14 @@ public struct ManagedSupportCatalog: Codable, Equatable, Sendable {
 
 	public static let bundled = ManagedSupportCatalog(components: [
 		Self.component("pyright", "Pyright", .languageServer, .core, ["python"], "pyright-langserver", ["--stdio"], .managed, "https://github.com/microsoft/pyright"),
-		Self.component("typescript-language-server", "TypeScript Language Server", .languageServer, .core, ["javascript", "typescript"], "typescript-language-server", ["--stdio"], .managed, "https://github.com/typescript-language-server/typescript-language-server"),
+		Self.component("typescript-language-server", "TypeScript Language Server", .languageServer, .core, ["javascript", "typescript"], "typescript-language-server", ["--stdio"], .managed, "https://github.com/typescript-language-server/typescript-language-server", nodeSupport: .init(
+			version: "5.3.0",
+			packages: [
+				.init(packageName: "typescript", version: "5.9.3", archiveURL: URL(string: "https://registry.npmjs.org/typescript/-/typescript-5.9.3.tgz")!, integrity: "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="),
+				.init(packageName: "typescript-language-server", version: "5.3.0", archiveURL: URL(string: "https://registry.npmjs.org/typescript-language-server/-/typescript-language-server-5.3.0.tgz")!, integrity: "sha512-5puofxZHgFdAYtfNpmwCAvgtaYgg8wrUnH30m7Ze3QuguId5RNRadKASpOpyDxTyUdAF51FjhTdjntLw/EuWcQ=="),
+			],
+			executablePath: "node_modules/typescript-language-server/lib/cli.mjs"
+		)),
 		Self.component("omnisharp", "OmniSharp", .languageServer, .core, ["csharp"], "omnisharp", ["--languageserver"], .managed, "https://github.com/OmniSharp/omnisharp-roslyn", artifacts: .init(
 			arm64: .init(version: "1.39.15", archiveURL: URL(string: "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v1.39.15/omnisharp-osx-arm64-net6.0.zip")!, sha256: "678be5bb972d04bbf5e1426e5e7562261e176fa781784d0f13877d8c4391ec3e", format: .zip, executablePaths: ["OmniSharp"]),
 			x86_64: .init(version: "1.39.15", archiveURL: URL(string: "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v1.39.15/omnisharp-osx-x64-net6.0.zip")!, sha256: "6ac1f8b1dfb1e4515f61d120f2cb5ab8404134ec62c441e4ab70ef30e0ac6d07", format: .zip, executablePaths: ["OmniSharp"])
@@ -176,7 +212,8 @@ public struct ManagedSupportCatalog: Codable, Equatable, Sendable {
 		_ installMode: ManagedSupportInstallMode,
 		_ officialURL: String,
 		_ systemInstallHint: String? = nil,
-		artifacts: ManagedSupportArtifacts = .init()
+		artifacts: ManagedSupportArtifacts = .init(),
+		nodeSupport: ManagedNodeSupport? = nil
 	) -> ManagedSupportComponent {
 		ManagedSupportComponent(
 			id: id,
@@ -189,7 +226,8 @@ public struct ManagedSupportCatalog: Codable, Equatable, Sendable {
 			installMode: installMode,
 			officialURL: URL(string: officialURL)!,
 			systemInstallHint: systemInstallHint,
-			artifacts: artifacts
+			artifacts: artifacts,
+			nodeSupport: nodeSupport
 		)
 	}
 }

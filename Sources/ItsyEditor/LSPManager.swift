@@ -59,6 +59,14 @@ public actor LSPManager {
 	}
 
 	public static let defaultClientFactory: ClientFactory = { config, root in
+		if requiresNodeRuntime(config), let runtime = NodeRuntimeDetector.resolve() {
+			return LSPProcessClient(
+				executableURL: runtime.executableURL,
+				arguments: [config.command] + config.args,
+				currentDirectoryURL: root,
+				environment: NodeRuntimeDetector.launchEnvironment(for: runtime)
+			)
+		}
 		let executableURL: URL
 		let arguments: [String]
 		if config.command.hasPrefix("/") {
@@ -90,7 +98,15 @@ public actor LSPManager {
 	}
 
 	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
-		effectiveRegistry(for: url).missingBinary(for: url)
+		let registry = effectiveRegistry(for: url)
+		if let config = registry.resolvedConfig(for: url), Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
+			return LSPServerRegistry.MissingBinary(
+				languageID: config.languageId,
+				command: "node",
+				hint: "Install Node.js 20 or newer, then restart Itsy."
+			)
+		}
+		return registry.missingBinary(for: url)
 	}
 
 	public func unsupportedLanguage(for url: URL) -> LSPServerRegistry.UnsupportedLanguage? {
@@ -111,6 +127,13 @@ public actor LSPManager {
 				throw LSPManagerError.unsupportedLanguage(unsupportedLanguage)
 			}
 			throw LSPManagerError.noConfigForDocument
+		}
+		if Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
+			throw LSPManagerError.missingBinary(.init(
+				languageID: config.languageId,
+				command: "node",
+				hint: "Install Node.js 20 or newer, then restart Itsy."
+			))
 		}
 		guard let root = effectiveRegistry.discoverWorkspaceRoot(for: url) else {
 			throw LSPManagerError.workspaceRootNotFound
@@ -238,5 +261,9 @@ public actor LSPManager {
 			return registry
 		}
 		return registry.merging(override)
+	}
+
+	private static func requiresNodeRuntime(_ config: LSPServerConfig) -> Bool {
+		URL(fileURLWithPath: config.command).pathExtension.lowercased() == "mjs"
 	}
 }

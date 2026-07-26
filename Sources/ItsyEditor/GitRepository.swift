@@ -1136,12 +1136,6 @@ public struct GitRepository: Sendable {
 			try Libgit2.Repository.open(at: root).applyCachedPatch(patch)
 			return
 		}
-		var checkArguments = ["apply", "--cached", "--check"]
-		if reverse {
-			checkArguments.append("--reverse")
-		}
-		checkArguments.append("-")
-		_ = try runner.runGit(arguments: checkArguments, input: patch, root: root)
 		var applyArguments = ["apply", "--cached"]
 		if reverse {
 			applyArguments.append("--reverse")

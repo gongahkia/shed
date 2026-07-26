@@ -182,6 +182,7 @@ extension Notification.Name {
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
 	private var paneCoordinator = EditorPaneCoordinator()
+	private let paneLifecycle = EditorPaneLifecycleController()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
 	private var secondarySidebarWidthConstraint: NSLayoutConstraint?
@@ -1891,9 +1892,17 @@ extension Notification.Name {
 	}
 
 	private func installPane(_ pane: EditorPane, document: ItsyDocument) {
-		recordBenchStage("editor_pane_install_begin")
-		let view = pane.editorView
-		document.attach(view)
+		paneLifecycle.install(
+			pane,
+			document: document,
+			configuration: .init(editorSettings: currentEditorSettings(), palette: AppTheme.palette.editor),
+			configureInteractions: { [weak self] view, document in
+				self?.configurePaneInteractions(view, document: document)
+			}
+		)
+	}
+
+	private func configurePaneInteractions(_ view: MetalTextView, document: ItsyDocument) {
 		document.setLSPGutterDecorator(lspFoldGutterDecorator)
 		document.lspSurfaceRefreshRequested = { [weak self, weak document] in
 			if let document {
@@ -1907,30 +1916,6 @@ extension Notification.Name {
 		lspFoldGutterDecorator.toggleFold = { [weak self] line in
 			self?.toggleFold(startLine: line)
 		}
-		recordBenchStage("editor_pane_attach_end")
-		recordBenchStage("editor_pane_preferences_begin")
-		let editorSettings = currentEditorSettings()
-		let preferences = EditorPreferences(settings: editorSettings)
-		recordBenchStage("editor_pane_preferences_end")
-		recordBenchStage("editor_pane_appearance_begin")
-		view.configureEditorAppearance(
-			fontName: preferences.fontName,
-			fontSize: preferences.fontSize,
-			showsLineNumbers: preferences.showLineNumbers
-		)
-		view.configureEditorBehavior(
-			lineNumberMode: Self.metalLineNumberMode(preferences.lineNumberMode),
-			wrapMode: Self.metalWrapMode(preferences.wrap),
-			hardWrapColumn: preferences.wrapColumn
-		)
-		view.allowsMultipleSelections = editorSettings.multipleSelections
-		view.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
-		view.cursorStyle = Self.metalCursorStyle(for: editorSettings)
-		view.applyEditorColorPalette(AppTheme.palette.editor)
-		recordBenchStage("editor_pane_appearance_end")
-		recordBenchStage("editor_pane_keymap_begin")
-		view.keymapEngine = ItsyAppKeymap.makeEngine()
-		recordBenchStage("editor_pane_keymap_end")
 		recordBenchStage("editor_pane_callbacks_begin")
 		view.commandRequested = { [weak self] commandID in
 			self?.performKeymapCommand(commandID) ?? false
@@ -2012,89 +1997,21 @@ extension Notification.Name {
 		}
 		scheduleLSPSemanticSurfaceRefresh()
 		recordBenchStage("editor_pane_callbacks_end")
-		recordBenchStage("editor_pane_install_end")
 	}
 
 	func applyEditorPreferences(_ preferences: EditorPreferences) {
-		for pane in paneCoordinator.panes {
-			pane.editorView.configureEditorAppearance(
-				fontName: preferences.fontName,
-				fontSize: preferences.fontSize,
-				showsLineNumbers: preferences.showLineNumbers
-			)
-			pane.editorView.configureEditorBehavior(
-				lineNumberMode: Self.metalLineNumberMode(preferences.lineNumberMode),
-				wrapMode: Self.metalWrapMode(preferences.wrap),
-				hardWrapColumn: preferences.wrapColumn
-			)
-			pane.editorView.applyEditorColorPalette(AppTheme.palette.editor)
-		}
+		paneLifecycle.applyEditorPreferences(preferences, palette: AppTheme.palette.editor, to: paneCoordinator.panes)
 	}
 
 	func reloadKeymap() {
-		for pane in paneCoordinator.panes {
-			pane.editorView.keymapEngine = ItsyAppKeymap.makeEngine()
-		}
-	}
-
-	private static func metalLineNumberMode(_ mode: ItsySettings.LineNumberMode) -> MetalLineNumberMode {
-		switch mode {
-		case .off:
-			return .off
-		case .absolute:
-			return .absolute
-		case .relative:
-			return .relative
-		}
-	}
-
-	private static func metalWrapMode(_ mode: ItsySettings.WrapMode) -> MetalWrapMode {
-		switch mode {
-		case .none:
-			return .none
-		case .soft:
-			return .soft
-		case .hard:
-			return .hard
-		}
-	}
-
-	private static func metalCursorStyle(for settings: ItsySettings.EditorSettings) -> MetalCursorStyle {
-		switch settings.cursorStyle {
-		case .block: return .block
-		case .bar: return .bar
-		case .automatic:
-			switch settings.keymap {
-			case .vim, .emacs: return .block
-			case .plain: return .bar
-			}
-		}
-	}
-
-	private static func glyphRenderingMode(_ mode: ItsySettings.FontRenderingMode) -> GlyphAtlas.RenderingMode {
-		switch mode {
-		case .grayscale:
-			return .grayscale
-		case .subpixel:
-			return .subpixel
-		}
+		paneLifecycle.reloadKeymap(in: paneCoordinator.panes)
 	}
 
 	func applySettings(_ settings: ItsySettings) {
 		let settings = settings.normalized()
 		let editorSettings = settings.editorSettings(languageID: currentLanguageID())
 		applyEditorPreferences(EditorPreferences(settings: editorSettings))
-		let indentationUnit = editorSettings.useSpaces ? String(repeating: " ", count: editorSettings.tabWidth) : "\t"
-		for pane in paneCoordinator.panes {
-			pane.editorView.textEditBehaviorConfiguration = TextEditBehaviorConfiguration(
-				autoPairs: editorSettings.autoPairs,
-				smartIndent: editorSettings.smartIndent,
-				indentationUnit: indentationUnit
-			)
-			pane.editorView.allowsMultipleSelections = editorSettings.multipleSelections
-			pane.editorView.fontRenderingMode = Self.glyphRenderingMode(editorSettings.fontRendering)
-			pane.editorView.cursorStyle = Self.metalCursorStyle(for: editorSettings)
-		}
+		paneLifecycle.applyEditorSettings(editorSettings, to: paneCoordinator.panes)
 		findSettings = settings.find
 		findBarController?.applyDefaultOptions(findSettings)
 		applyTheme(AppTheme.palette)
@@ -2122,8 +2039,8 @@ extension Notification.Name {
 		fileTreeController.applyTheme(palette)
 		for pane in paneCoordinator.panes {
 			pane.tabBarController.applyTheme(palette)
-			pane.editorView.applyEditorColorPalette(palette.editor)
 		}
+		paneLifecycle.applyTheme(palette.editor, to: paneCoordinator.panes)
 		refreshPaneTabBars()
 	}
 

@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+	<title id="title">Itsy Architecture</title>
+	<desc id="desc">Layered architecture for Itsy: AppKit shell, Metal text view, editor core, Tree-sitter, and keymap engine.</desc>
+	<defs>
+		<style>
+			.bg { fill: #f8fafc; }
+			.title { font: 700 30px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+			.subtitle { font: 500 14px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4b5563; }
+			.layer-title { font: 700 18px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+			.layer-body { font: 500 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #243447; }
+			.note-title { font: 700 15px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+			.note-body { font: 500 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #374151; }
+			.shell { fill: #e0f2fe; stroke: #0369a1; }
+			.render { fill: #dcfce7; stroke: #15803d; }
+			.core { fill: #fff7ed; stroke: #c2410c; }
+			.syntax { fill: #ede9fe; stroke: #6d28d9; }
+			.keymap { fill: #fee2e2; stroke: #b91c1c; }
+			.note { fill: #ffffff; stroke: #cbd5e1; }
+			.arrow { stroke: #475569; stroke-width: 2.3; fill: none; marker-end: url(#arrowhead); }
+			.badge { fill: #111827; }
+			.badge-text { font: 700 11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: #ffffff; }
+		</style>
+		<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+			<polygon points="0 0, 10 3.5, 0 7" fill="#475569"/>
+		</marker>
+	</defs>
+
+	<rect class="bg" x="0" y="0" width="1000" height="1000"/>
+	<text class="title" x="64" y="52">Itsy Architecture</text>
+	<text class="subtitle" x="64" y="78">macOS-only editor: AppKit shell, Metal renderer, Swift core, Tree-sitter, modal keymaps</text>
+
+	<g transform="translate(64 112)">
+		<rect class="shell" x="0" y="0" width="872" height="90" rx="14"/>
+		<rect class="badge" x="22" y="20" width="76" height="24" rx="12"/>
+		<text class="badge-text" x="42" y="36">ItsyApp</text>
+		<text class="layer-title" x="122" y="38">AppKit shell</text>
+		<text class="layer-body" x="32" y="65">NSApplication / NSWindow / NSMenu / NSToolbar</text>
+		<text class="layer-body" x="32" y="84">ItsyDocument, file tree, tabs, command palette, find panels</text>
+	</g>
+
+	<g transform="translate(64 226)">
+		<rect class="render" x="0" y="0" width="872" height="96" rx="14"/>
+		<rect class="badge" x="22" y="20" width="100" height="24" rx="12"/>
+		<text class="badge-text" x="41" y="36">ItsyRender</text>
+		<text class="layer-title" x="146" y="38">Text view and renderer</text>
+		<text class="layer-body" x="32" y="65">Custom NSView backed by CAMetalLayer</text>
+		<text class="layer-body" x="32" y="84">CoreText shaping, glyph atlas, dirty redraw, NSResponder input</text>
+	</g>
+
+	<g transform="translate(64 346)">
+		<rect class="core" x="0" y="0" width="872" height="96" rx="14"/>
+		<rect class="badge" x="22" y="20" width="96" height="24" rx="12"/>
+		<text class="badge-text" x="42" y="36">ItsyEditor</text>
+		<text class="layer-title" x="142" y="38">Editor core</text>
+		<text class="layer-body" x="32" y="65">Pure Swift buffer, selections, commands, undo</text>
+		<text class="layer-body" x="32" y="84">Rope B-tree with summary metrics; no AppKit imports</text>
+	</g>
+
+	<g transform="translate(64 466)">
+		<rect class="syntax" x="0" y="0" width="872" height="96" rx="14"/>
+		<rect class="badge" x="22" y="20" width="98" height="24" rx="12"/>
+		<text class="badge-text" x="42" y="36">ItsySyntax</text>
+		<text class="layer-title" x="144" y="38">Tree-sitter</text>
+		<text class="layer-body" x="32" y="65">Vendored C runtime and grammars</text>
+		<text class="layer-body" x="32" y="84">Incremental parse after edits; highlights as ranges</text>
+	</g>
+
+	<g transform="translate(64 586)">
+		<rect class="keymap" x="0" y="0" width="872" height="96" rx="14"/>
+		<rect class="badge" x="22" y="20" width="102" height="24" rx="12"/>
+		<text class="badge-text" x="42" y="36">ItsyKeymap</text>
+		<text class="layer-title" x="148" y="38">Modal keymap engine</text>
+		<text class="layer-body" x="32" y="65">Profiles: plain, vim, emacs</text>
+		<text class="layer-body" x="32" y="84">Chord state, mode stack, user overlay from keys.toml</text>
+	</g>
+
+	<path class="arrow" d="M500 202 L500 226"/>
+	<path class="arrow" d="M500 322 L500 346"/>
+	<path class="arrow" d="M500 442 L500 466"/>
+	<path class="arrow" d="M500 562 L500 586"/>
+
+	<g transform="translate(64 720)">
+		<rect class="note" x="0" y="0" width="872" height="64" rx="14"/>
+		<text class="note-title" x="24" y="38">Runtime</text>
+		<text class="note-body" x="156" y="38">AppKit opens file -> text view requests viewport -> Metal redraws dirty regions</text>
+	</g>
+
+	<g transform="translate(64 804)">
+		<rect class="note" x="0" y="0" width="872" height="64" rx="14"/>
+		<text class="note-title" x="24" y="38">Input</text>
+		<text class="note-body" x="156" y="38">NSResponder key event -> ItsyKeymap command -> ItsyEditor mutation</text>
+	</g>
+
+	<g transform="translate(64 888)">
+		<rect class="note" x="0" y="0" width="872" height="64" rx="14"/>
+		<text class="note-title" x="24" y="38">Constraints</text>
+		<text class="note-body" x="156" y="38">No Electron, plugin host, telemetry, portability shim, or helper daemon</text>
+	</g>
+
+	<text class="subtitle" x="64" y="980">SwiftPM targets: ItsyApp, ItsyRender, ItsyEditor, ItsySyntax, ItsyKeymap, ItsyBench, CTreeSitter, CTSGrammars</text>
+</svg>

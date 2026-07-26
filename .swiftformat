@@ -1,9 +1,8 @@
---swiftversion 5.9
---indent 4
---linebreak lf
---maxwidth 120
---wraparguments before-first
---wrapparameters before-first
---wrapcollections before-first
---disable fileHeader
---exclude .build,.swiftpm
+--swift-version 5.9
+--indent tab
+--max-width 120
+--enable sortImports
+--disable trailingClosures
+--exclude .build
+--exclude Sources/CTreeSitter/upstream
+--exclude Sources/CTSGrammars/grammars

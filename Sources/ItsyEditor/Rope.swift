@@ -1,0 +1,514 @@
+public struct Rope: Sendable {
+	private var root: RopeNode
+
+	public init(_ string: String = "") {
+		root = RopeNode.build(from: string)
+	}
+
+	public var length: Int {
+		return root.summary.utf8Bytes
+	}
+
+	public var lineCount: Int {
+		return root.summary.lines + 1
+	}
+
+	public var graphemeCount: Int {
+		return graphemeBoundaries().count - 1
+	}
+
+	public mutating func insert(_ string: String, at offset: Int) {
+		precondition((0 ... length).contains(offset), "insert offset out of bounds")
+		guard !string.isEmpty else {
+			return
+		}
+		root = RopeNode.buildTree(from: root.inserting(string, at: offset)).normalizingRoot()
+	}
+
+	public mutating func remove(_ range: Range<Int>) {
+		precondition(range.lowerBound >= 0 && range.upperBound <= length, "remove range out of bounds")
+		guard !range.isEmpty else {
+			return
+		}
+		let nodes = root.removing(range)
+		root = nodes.isEmpty ? RopeNode(text: "") : RopeNode.buildTree(from: nodes).normalizingRoot()
+	}
+
+	public func slice(_ range: Range<Int>) -> String {
+		precondition(range.lowerBound >= 0 && range.upperBound <= length, "slice range out of bounds")
+		var result = ""
+		result.reserveCapacity(range.count)
+		root.appendSlice(range, into: &result)
+		return result
+	}
+
+	public func chunk(at offset: Int, maxBytes: Int) -> String {
+		precondition((0 ... length).contains(offset), "chunk offset out of bounds")
+		precondition(maxBytes > 0, "chunk size must be positive")
+		guard offset < length else {
+			return ""
+		}
+		var chunk = ""
+		chunk.reserveCapacity(maxBytes)
+		_ = root.appendChunk(at: offset, maxBytes: maxBytes, into: &chunk)
+		return chunk
+	}
+
+	public func copyUTF8Chunk(at offset: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		precondition((0 ... length).contains(offset), "chunk offset out of bounds")
+		precondition(maxBytes > 0, "chunk size must be positive")
+		guard offset < length else {
+			return 0
+		}
+		return root.copyUTF8Chunk(at: offset, maxBytes: maxBytes, into: buffer)
+	}
+
+	public func lineRange(_ index: Int) -> Range<Int> {
+		precondition(index >= 0, "line index out of bounds")
+		guard index < lineCount else {
+			return length ..< length
+		}
+		let start = offset(forLine: index)
+		let next = index + 1 < lineCount ? offset(forLine: index + 1) : length
+		let end = index + 1 < lineCount ? max(start, next - 1) : next
+		return start ..< end
+	}
+
+	public func offset(forLine line: Int) -> Int {
+		precondition(line >= 0, "line index out of bounds")
+		guard line < lineCount else {
+			return length
+		}
+		return root.offset(forLine: line)
+	}
+
+	public func line(forOffset offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
+		return root.line(forOffset: offset)
+	}
+
+	public func graphemeIndex(forOffset offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "utf8 offset out of bounds")
+		let bytes = Array(root.text.utf8)
+		return bytes.withUnsafeBufferPointer { UAX29GraphemeIterator.graphemeIndex(in: $0, before: offset) }
+	}
+
+	func isGraphemeBoundary(_ offset: Int) -> Bool {
+		guard (0 ... length).contains(offset) else {
+			return false
+		}
+		return graphemeBoundaries().contains(offset)
+	}
+
+	func previousGraphemeBoundary(before offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		return graphemeBoundaries().last { $0 < offset } ?? 0
+	}
+
+	func nextGraphemeBoundary(after offset: Int) -> Int {
+		precondition((0 ... length).contains(offset), "grapheme offset out of bounds")
+		return graphemeBoundaries().first { $0 > offset } ?? length
+	}
+
+	func validateInvariants() -> Bool {
+		return root.validate()
+	}
+
+	private func graphemeBoundaries() -> [Int] {
+		let bytes = Array(root.text.utf8)
+		return bytes.withUnsafeBufferPointer { UAX29GraphemeIterator.boundaries(in: $0) }
+	}
+}
+
+private indirect enum RopeNode: Sendable {
+	private static let maxLeafBytes = 1024
+	private static let maxChildren = 8
+
+	case leaf(String, RopeSummary)
+	case branch([RopeNode], RopeSummary)
+
+	var summary: RopeSummary {
+		switch self {
+		case let .leaf(_, summary), let .branch(_, summary):
+			return summary
+		}
+	}
+
+	var text: String {
+		switch self {
+		case let .leaf(leafText, _):
+			return leafText
+		case let .branch(children, _):
+			return children.map(\.text).joined()
+		}
+	}
+
+	init(text: String) {
+		self = .leaf(text, RopeSummary(text))
+	}
+
+	private init(children: [RopeNode]) {
+		self = .branch(children, children.reduce(.zero) { $0 + $1.summary })
+	}
+
+	static func build(from text: String) -> RopeNode {
+		buildTree(from: leaves(from: text))
+	}
+
+	static func buildTree(from nodes: [RopeNode]) -> RopeNode {
+		guard !nodes.isEmpty else {
+			return RopeNode(text: "")
+		}
+		var level = nodes
+		while level.count > 1 {
+			level = packLevel(level)
+		}
+		return level[0]
+	}
+
+	private static func leaves(from text: String) -> [RopeNode] {
+		var leaves: [RopeNode] = []
+		var chunk = ""
+		var chunkBytes = 0
+		for character in text {
+			let bytes = String(character).utf8.count
+			if chunkBytes > 0, chunkBytes + bytes > maxLeafBytes {
+				leaves.append(RopeNode(text: chunk))
+				chunk = ""
+				chunkBytes = 0
+			}
+			chunk.append(character)
+			chunkBytes += bytes
+		}
+		if !chunk.isEmpty || leaves.isEmpty {
+			leaves.append(RopeNode(text: chunk))
+		}
+		return leaves
+	}
+
+	private static func packLevel(_ nodes: [RopeNode]) -> [RopeNode] {
+		var packed: [RopeNode] = []
+		let groupCount = (nodes.count + maxChildren - 1) / maxChildren
+		let baseSize = nodes.count / groupCount
+		let largerGroupCount = nodes.count % groupCount
+		var start = 0
+		for groupIndex in 0 ..< groupCount {
+			let size = baseSize + (groupIndex < largerGroupCount ? 1 : 0)
+			let end = start + size
+			packed.append(RopeNode(children: Array(nodes[start ..< end])))
+			start = end
+		}
+		return packed
+	}
+
+	private static func packChildren(_ nodes: [RopeNode]) -> [RopeNode] {
+		guard !nodes.isEmpty else {
+			return []
+		}
+		return packLevel(nodes)
+	}
+
+	func normalizingRoot() -> RopeNode {
+		guard case let .branch(children, _) = self, children.count == 1 else {
+			return self
+		}
+		return children[0].normalizingRoot()
+	}
+
+	func validate() -> Bool {
+		switch self {
+		case let .leaf(leafText, summary):
+			return leafText.utf8.count <= Self.maxLeafBytes && summary == RopeSummary(leafText)
+		case let .branch(children, summary):
+			guard (1 ... Self.maxChildren).contains(children.count) else {
+				return false
+			}
+			return summary == children.reduce(.zero) { $0 + $1.summary } && children.allSatisfy { $0.validate() }
+		}
+	}
+
+	func inserting(_ string: String, at target: Int) -> [RopeNode] {
+		switch self {
+		case let .leaf(leafText, _):
+			var text = leafText
+			text.insert(contentsOf: string, at: text.index(atUTF8Offset: target))
+			return Self.leaves(from: text)
+		case let .branch(children, _):
+			var offset = 0
+			var inserted = false
+			var next: [RopeNode] = []
+			for child in children {
+				let childEnd = offset + child.summary.utf8Bytes
+				if !inserted, target <= childEnd {
+					next += child.inserting(string, at: target - offset)
+					inserted = true
+				} else {
+					next.append(child)
+				}
+				offset = childEnd
+			}
+			return Self.packChildren(next)
+		}
+	}
+
+	func removing(_ range: Range<Int>) -> [RopeNode] {
+		switch self {
+		case let .leaf(leafText, _):
+			var text = leafText
+			let lower = text.index(atUTF8Offset: range.lowerBound)
+			let upper = text.index(atUTF8Offset: range.upperBound)
+			text.removeSubrange(lower ..< upper)
+			return text.isEmpty ? [] : Self.leaves(from: text)
+		case let .branch(children, _):
+			var offset = 0
+			var next: [RopeNode] = []
+			for child in children {
+				let childStart = offset
+				let childEnd = offset + child.summary.utf8Bytes
+				if range.upperBound <= childStart || range.lowerBound >= childEnd {
+					next.append(child)
+				} else {
+					let lower = max(0, range.lowerBound - childStart)
+					let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
+					next += child.removing(lower ..< upper)
+				}
+				offset = childEnd
+			}
+			return Self.packChildren(next)
+		}
+	}
+
+	func offset(forLine line: Int) -> Int {
+		switch self {
+		case let .leaf(leafText, _):
+			return leafText.offset(forLine: line)
+		case let .branch(children, summary):
+			var remaining = line
+			var offset = 0
+			for child in children {
+				if remaining <= child.summary.lines {
+					return offset + child.offset(forLine: remaining)
+				}
+				remaining -= child.summary.lines
+				offset += child.summary.utf8Bytes
+			}
+			return summary.utf8Bytes
+		}
+	}
+
+	func line(forOffset target: Int) -> Int {
+		switch self {
+		case let .leaf(leafText, _):
+			return leafText.line(forOffset: target)
+		case let .branch(children, _):
+			var offset = 0
+			var line = 0
+			for child in children {
+				let next = offset + child.summary.utf8Bytes
+				if target <= next {
+					return line + child.line(forOffset: target - offset)
+				}
+				offset = next
+				line += child.summary.lines
+			}
+			return line
+		}
+	}
+
+	func appendChunk(at target: Int, maxBytes: Int, into chunk: inout String) -> Int {
+		switch self {
+		case let .leaf(leafText, _):
+			let text = leafText.chunk(at: target, maxBytes: maxBytes)
+			chunk += text
+			return text.utf8.count
+		case let .branch(children, _):
+			var skipped = target
+			var bytes = 0
+			for child in children {
+				if skipped >= child.summary.utf8Bytes {
+					skipped -= child.summary.utf8Bytes
+					continue
+				}
+				bytes += child.appendChunk(at: skipped, maxBytes: maxBytes - bytes, into: &chunk)
+				if bytes >= maxBytes {
+					break
+				}
+				skipped = 0
+			}
+			return bytes
+		}
+	}
+
+	func appendSlice(_ range: Range<Int>, into result: inout String) {
+		guard !range.isEmpty else {
+			return
+		}
+		switch self {
+		case let .leaf(leafText, _):
+			let lower = leafText.index(atUTF8Offset: range.lowerBound)
+			let upper = leafText.index(atUTF8Offset: range.upperBound)
+			result += leafText[lower ..< upper]
+		case let .branch(children, _):
+			var offset = 0
+			for child in children {
+				let childStart = offset
+				let childEnd = offset + child.summary.utf8Bytes
+				if range.upperBound <= childStart {
+					break
+				}
+				if range.lowerBound < childEnd {
+					let lower = max(0, range.lowerBound - childStart)
+					let upper = min(child.summary.utf8Bytes, range.upperBound - childStart)
+					child.appendSlice(lower ..< upper, into: &result)
+				}
+				offset = childEnd
+			}
+		}
+	}
+
+	func copyUTF8Chunk(at target: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		switch self {
+		case let .leaf(leafText, _):
+			return leafText.copyUTF8Chunk(at: target, maxBytes: maxBytes, into: buffer)
+		case let .branch(children, _):
+			var skipped = target
+			var bytes = 0
+			for child in children {
+				if skipped >= child.summary.utf8Bytes {
+					skipped -= child.summary.utf8Bytes
+					continue
+				}
+				bytes += child.copyUTF8Chunk(at: skipped, maxBytes: maxBytes - bytes, into: buffer.advanced(by: bytes))
+				if bytes >= maxBytes {
+					break
+				}
+				skipped = 0
+			}
+			return bytes
+		}
+	}
+}
+
+private struct RopeSummary: Equatable, Sendable {
+	var utf8Bytes: Int
+	var lines: Int
+	var scalars: Int
+	var graphemes: Int
+
+	static let zero = RopeSummary(utf8Bytes: 0, lines: 0, scalars: 0, graphemes: 0)
+
+	init(utf8Bytes: Int, lines: Int, scalars: Int, graphemes: Int) {
+		self.utf8Bytes = utf8Bytes
+		self.lines = lines
+		self.scalars = scalars
+		self.graphemes = graphemes
+	}
+
+	init(_ text: String) {
+		utf8Bytes = text.utf8.count
+		lines = text.utf8.reduce(0) { $1 == 10 ? $0 + 1 : $0 }
+		scalars = text.unicodeScalars.count
+		graphemes = text.count
+	}
+
+	static func + (lhs: RopeSummary, rhs: RopeSummary) -> RopeSummary {
+		RopeSummary(
+			utf8Bytes: lhs.utf8Bytes + rhs.utf8Bytes,
+			lines: lhs.lines + rhs.lines,
+			scalars: lhs.scalars + rhs.scalars,
+			graphemes: lhs.graphemes + rhs.graphemes
+		)
+	}
+}
+
+private extension String {
+	func index(atUTF8Offset offset: Int) -> String.Index {
+		precondition((0 ... utf8.count).contains(offset), "utf8 offset out of bounds")
+		let utf8Index = utf8.index(utf8.startIndex, offsetBy: offset)
+		guard let index = String.Index(utf8Index, within: self) else {
+			preconditionFailure("utf8 offset must be a character boundary")
+		}
+		return index
+	}
+
+	func offset(forLine line: Int) -> Int {
+		guard line > 0 else {
+			return 0
+		}
+		var currentLine = 0
+		for (offset, byte) in utf8.enumerated() {
+			if byte == 10 {
+				currentLine += 1
+				if currentLine == line {
+					return offset + 1
+				}
+			}
+		}
+		return utf8.count
+	}
+
+	func line(forOffset offset: Int) -> Int {
+		guard offset > 0 else {
+			return 0
+		}
+		var line = 0
+		for byte in utf8.prefix(offset) where byte == 10 {
+			line += 1
+		}
+		return line
+	}
+
+	func chunk(at offset: Int, maxBytes: Int) -> String {
+		guard offset < utf8.count else {
+			return ""
+		}
+		let start = index(atUTF8Offset: offset)
+		var end = start
+		var bytes = 0
+		while end < endIndex {
+			let next = index(after: end)
+			let byteCount = self[end ..< next].utf8.count
+			if bytes > 0, bytes + byteCount > maxBytes {
+				break
+			}
+			bytes += byteCount
+			end = next
+			if bytes >= maxBytes {
+				break
+			}
+		}
+		return String(self[start ..< end])
+	}
+
+	func copyUTF8Chunk(at offset: Int, maxBytes: Int, into buffer: UnsafeMutablePointer<UInt8>) -> Int {
+		guard offset < utf8.count else {
+			return 0
+		}
+		let view = utf8
+		let start = view.index(view.startIndex, offsetBy: offset)
+		var end = view.index(start, offsetBy: min(maxBytes, view.distance(from: start, to: view.endIndex)))
+		while end > start, end < view.endIndex, view[end].isUTF8Continuation {
+			end = view.index(before: end)
+		}
+		if end == start {
+			end = view.index(after: start)
+			while end < view.endIndex, view[end].isUTF8Continuation {
+				end = view.index(after: end)
+			}
+		}
+		var index = start
+		var bytes = 0
+		while index < end {
+			buffer[bytes] = view[index]
+			bytes += 1
+			index = view.index(after: index)
+		}
+		return bytes
+	}
+}
+
+private extension UInt8 {
+	var isUTF8Continuation: Bool {
+		(self & 0b1100_0000) == 0b1000_0000
+	}
+}

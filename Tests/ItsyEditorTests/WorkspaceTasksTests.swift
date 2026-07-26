@@ -266,6 +266,28 @@ import Testing
 	try await counter.waitForCount(1)
 }
 
+@Test func workspaceTaskWatcherObservesPathCreatedAfterStart() async throws {
+	let fixture = try TemporaryTaskFixture()
+	let counter = WatchCounter()
+	let watcher = WorkspaceTaskWatcher(
+		root: fixture.root,
+		watch: WorkspaceTaskWatch(paths: ["generated/output.txt"], debounceMillis: 50),
+		queue: DispatchQueue(label: "dev.itsy.tests.task-watch-created")
+	) {
+		Task {
+			await counter.increment()
+		}
+	}
+	watcher.start()
+	defer {
+		watcher.stop()
+	}
+
+	try fixture.write("generated/output.txt", "created")
+
+	try await counter.waitForCount(1)
+}
+
 private final class TemporaryTaskFixture {
 	let root: URL
 

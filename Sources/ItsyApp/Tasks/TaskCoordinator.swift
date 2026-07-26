@@ -17,6 +17,7 @@ import ItsyWorkbenchLayout
 	private var activeTaskHandle: WorkspaceTaskHandle?
 	private var backgroundTaskHandles: [WorkspaceTaskHandle] = []
 	private var taskWatcher: WorkspaceTaskWatcher?
+	private var activeTaskDiagnostics: TaskDiagnosticsPublisher?
 
 	init(
 		problemsCoordinator: ProblemsCoordinator,
@@ -24,6 +25,15 @@ import ItsyWorkbenchLayout
 	) {
 		self.problemsCoordinator = problemsCoordinator
 		self.activeDocumentProvider = activeDocumentProvider
+	}
+
+	func terminate() {
+		taskRunGeneration += 1
+		taskWatcher?.stop()
+		taskWatcher = nil
+		cancelActiveTaskHandles()
+		clearTaskDiagnostics()
+		cancelButton?.isEnabled = false
 	}
 
 	@objc func showTasks(_ sender: Any?) {
@@ -181,6 +191,7 @@ import ItsyWorkbenchLayout
 		taskWatcher?.stop()
 		taskWatcher = nil
 		cancelActiveTaskHandles()
+		clearTaskDiagnostics()
 		cancelButton?.isEnabled = false
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Cancelled")
@@ -200,6 +211,7 @@ import ItsyWorkbenchLayout
 		taskRunGeneration += 1
 		let generation = taskRunGeneration
 		cancelActiveTaskHandles()
+		clearTaskDiagnostics()
 		let plan: [WorkspaceTask]
 		do {
 			plan = try WorkspaceTaskPlanner.executionPlan(for: task, in: workspaceTasks)
@@ -216,6 +228,9 @@ import ItsyWorkbenchLayout
 		if !preserveWatch {
 			installWatchIfNeeded(for: task, root: root)
 		}
+		let diagnostics = TaskDiagnosticsPublisher(problemsCoordinator: problemsCoordinator, task: task, root: root)
+		diagnostics.clear()
+		activeTaskDiagnostics = diagnostics
 		cancelButton?.isEnabled = true
 		taskStatusLabel?.textColor = .secondaryLabelColor
 		taskStatusLabel?.stringValue = L10n.string("Running \(task.label)")
@@ -225,7 +240,7 @@ import ItsyWorkbenchLayout
 		} else {
 			taskOutputTextView?.string = ""
 		}
-		startPlannedTask(plan: plan, index: 0, root: root, generation: generation, rootTask: task, stdout: "", stderr: "")
+		startPlannedTask(plan: plan, index: 0, root: root, generation: generation, rootTask: task, diagnostics: diagnostics, stdout: "", stderr: "")
 	}
 
 	private func startPlannedTask(
@@ -234,6 +249,7 @@ import ItsyWorkbenchLayout
 		root: URL,
 		generation: Int,
 		rootTask: WorkspaceTask,
+		diagnostics: TaskDiagnosticsPublisher,
 		stdout: String,
 		stderr: String
 	) {
@@ -253,6 +269,7 @@ import ItsyWorkbenchLayout
 			taskWatcher?.stop()
 			taskWatcher = nil
 			cancelActiveTaskHandles()
+			clearTaskDiagnostics()
 			cancelButton?.isEnabled = false
 			taskStatusLabel?.textColor = .secondaryLabelColor
 			taskStatusLabel?.stringValue = L10n.string("Cancelled")
@@ -289,6 +306,7 @@ import ItsyWorkbenchLayout
 						guard let self, self.taskRunGeneration == generation else {
 							return
 						}
+						diagnostics.append(output)
 						self.taskOutputTextView?.string += output.text
 					}
 				},
@@ -312,7 +330,7 @@ import ItsyWorkbenchLayout
 								stderr: stderr + result.stderr,
 								wasCancelled: result.wasCancelled,
 								wasReady: result.wasReady
-							)), root: root)
+							)), root: root, publishDiagnostics: false)
 							return
 						}
 						let nextStdout = stdout + result.stdout
@@ -324,6 +342,7 @@ import ItsyWorkbenchLayout
 								root: root,
 								generation: generation,
 								rootTask: rootTask,
+								diagnostics: diagnostics,
 								stdout: nextStdout,
 								stderr: nextStderr
 							)
@@ -336,7 +355,7 @@ import ItsyWorkbenchLayout
 							exitStatus: result.exitStatus,
 							stdout: nextStdout,
 							stderr: nextStderr
-						)), root: root)
+						)), root: root, publishDiagnostics: false)
 						if self.taskWatcher != nil {
 							self.taskStatusLabel?.stringValue = L10n.string("Watching \(rootTask.label)")
 						} else if !self.backgroundTaskHandles.isEmpty {
@@ -366,6 +385,7 @@ import ItsyWorkbenchLayout
 							root: root,
 							generation: generation,
 							rootTask: rootTask,
+							diagnostics: diagnostics,
 							stdout: stdout,
 							stderr: stderr
 						)
@@ -386,6 +406,11 @@ import ItsyWorkbenchLayout
 			handle.cancel()
 		}
 		backgroundTaskHandles.removeAll()
+	}
+
+	private func clearTaskDiagnostics() {
+		activeTaskDiagnostics?.clear()
+		activeTaskDiagnostics = nil
 	}
 
 	private func taskExpansionContext(root: URL) -> WorkspaceTaskExpansionContext {
@@ -453,7 +478,7 @@ import ItsyWorkbenchLayout
 		}).joined(separator: "\n")
 	}
 
-	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?, task: WorkspaceTask? = nil) {
+	private func applyTaskResult(_ result: Result<WorkspaceTaskResult, Error>, root: URL?, task: WorkspaceTask? = nil, publishDiagnostics: Bool = true) {
 		switch result {
 		case let .success(taskResult):
 			taskStatusLabel?.textColor = taskResult.succeeded ? .secondaryLabelColor : .systemRed
@@ -464,11 +489,9 @@ import ItsyWorkbenchLayout
 				taskResult.stderr,
 			].filter { !$0.isEmpty }.joined(separator: "\n")
 			if let root {
-				let matchers = WorkspaceProblemMatcherDiscovery.matchers(for: taskResult.task, root: root)
-				problemsCoordinator.setProblems(
-					WorkspaceProblemParser.parse(taskResult.stdout + "\n" + taskResult.stderr, root: root, matchers: matchers),
-					sourceID: "task:\(root.standardizedFileURL.path):\(taskResult.task.id)"
-				)
+				if publishDiagnostics {
+					TaskDiagnosticsPublisher(problemsCoordinator: problemsCoordinator, task: taskResult.task, root: root).replace(stdout: taskResult.stdout, stderr: taskResult.stderr)
+				}
 				reportTaskHealth(
 					taskResult.task,
 					root: root,
@@ -482,10 +505,9 @@ import ItsyWorkbenchLayout
 			taskStatusLabel?.textColor = .systemRed
 			taskStatusLabel?.stringValue = String(describing: error)
 			if let root, let task {
-				problemsCoordinator.setProblems(
-					WorkspaceProblemSnapshot(root: root, problems: []),
-					sourceID: "task:\(root.standardizedFileURL.path):\(task.id)"
-				)
+				if publishDiagnostics {
+					TaskDiagnosticsPublisher(problemsCoordinator: problemsCoordinator, task: task, root: root).clear()
+				}
 				reportTaskHealth(task, root: root, lifecycle: .stopped, state: .degraded, lastError: String(describing: error), remediation: "Review the task configuration and retry.")
 			}
 		}

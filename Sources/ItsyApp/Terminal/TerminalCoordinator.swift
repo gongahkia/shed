@@ -256,7 +256,6 @@ struct TerminalPaneLayout: Equatable {
 		let id = UUID()
 		let emulator = ItsyTerminalEmulator()
 		let view: ItsyTerminalView
-		var session: ItsyTerminalSession?
 		var currentDirectoryURL: URL
 		var hasOSC7CWD = false
 
@@ -430,7 +429,7 @@ struct TerminalPaneLayout: Equatable {
 	private let settingsProvider: () -> ItsySettings.TerminalSettings
 	private let editorFontProvider: () -> String
 	private let activeDocumentProvider: () -> NSDocument?
-	private let sessionFactory: (URL) -> ItsyTerminalSession
+	private let sessionLifecycle: TerminalSessionLifecycle
 	private let openLocation: (TerminalOpenLocation) -> Void
 	private let embeddedHostProvider: () -> NSView?
 	private let setEmbeddedTerminalVisible: (NSView, Bool) -> Void
@@ -439,7 +438,7 @@ struct TerminalPaneLayout: Equatable {
 	init(
 		settingsProvider: @escaping () -> ItsySettings.TerminalSettings,
 		activeDocumentProvider: @escaping () -> NSDocument?,
-		sessionFactory: @escaping (URL) -> ItsyTerminalSession = { ItsyTerminalSession(currentDirectoryURL: $0) },
+		sessionFactory: @escaping TerminalSessionLifecycle.SessionFactory = { ItsyTerminalSession(currentDirectoryURL: $0) },
 		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
 		setEmbeddedTerminalVisible: @escaping (NSView, Bool) -> Void = { _, _ in },
@@ -448,7 +447,7 @@ struct TerminalPaneLayout: Equatable {
 		self.settingsProvider = settingsProvider
 		self.editorFontProvider = editorFontProvider
 		self.activeDocumentProvider = activeDocumentProvider
-		self.sessionFactory = sessionFactory
+		sessionLifecycle = TerminalSessionLifecycle(sessionFactory: sessionFactory)
 		self.openLocation = openLocation
 		self.embeddedHostProvider = embeddedHostProvider
 		self.setEmbeddedTerminalVisible = setEmbeddedTerminalVisible
@@ -470,7 +469,7 @@ struct TerminalPaneLayout: Equatable {
 			selectedTabIndex: selectedTabIndex,
 			paneCount: panes.count,
 			activePaneIndex: panes.firstIndex { $0.id == tab.activePaneID },
-			processIdentifiers: panes.map { $0.session?.processIdentifier }
+			processIdentifiers: panes.map { sessionLifecycle.processIdentifier(for: $0.id) }
 		)
 	}
 
@@ -527,11 +526,7 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	func terminate() {
-		for tab in tabs {
-			for pane in tab.panes {
-				pane.session?.terminate()
-			}
-		}
+		sessionLifecycle.terminateAll()
 	}
 
 	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
@@ -846,11 +841,13 @@ struct TerminalPaneLayout: Equatable {
 		for pane in tab.panes {
 			pane.view.applyTerminalSettings(settings, inheriting: editorFontName)
 			pane.view.applyTerminalTheme(AppTheme.palette.terminal)
-			pane.view.onInput = { [weak pane] data in
-				pane?.session?.send(data)
+			pane.view.onInput = { [weak self, weak pane] data in
+				guard let self, let pane else { return }
+				self.sessionLifecycle.send(data, to: pane.id)
 			}
-			pane.view.onResize = { [weak pane] columns, rows in
-				pane?.session?.resize(columns: columns, rows: rows)
+			pane.view.onResize = { [weak self, weak pane] columns, rows in
+				guard let self, let pane else { return }
+				self.sessionLifecycle.resize(columns: columns, rows: rows, for: pane.id)
 			}
 			pane.view.onFocus = { [weak self, weak tab, weak pane] in
 				guard let self, let tab, let pane else {
@@ -926,8 +923,7 @@ struct TerminalPaneLayout: Equatable {
 		}
 		let tab = tabs.remove(at: sender.tag)
 		for pane in tab.panes {
-			pane.session?.terminate()
-			pane.session = nil
+			sessionLifecycle.terminate(for: pane.id)
 		}
 		if tabs.isEmpty {
 			selectedTabIndex = 0
@@ -1004,8 +1000,7 @@ struct TerminalPaneLayout: Equatable {
 		else {
 			return
 		}
-		pane.session?.terminate()
-		pane.session = nil
+		sessionLifecycle.terminate(for: pane.id)
 		tab.root = root
 		tab.activePaneID = root.panes.first?.id ?? UUID()
 		configurePanes(for: tab)
@@ -1025,17 +1020,14 @@ struct TerminalPaneLayout: Equatable {
 		updateTerminalStatus()
 	}
 
-	private func startTerminalIfNeeded(in pane: TerminalPane, tab: TerminalTab) {
-		guard pane.session?.isRunning != true else {
+	private func startTerminalIfNeeded(in pane: TerminalPane, tab: TerminalTab, restarting: Bool = false) {
+		guard restarting || !sessionLifecycle.isRunning(for: pane.id) else {
 			return
 		}
 		let size = pane.view.terminalSize
-		let session = sessionFactory(pane.currentDirectoryURL)
-		session.onOutput = { [weak self, weak tab, weak pane, weak session] data in
-			DispatchQueue.main.async {
-				guard let self, let tab, let pane, let session, pane.session === session else {
-					return
-				}
+		let callbacks = TerminalSessionLifecycle.Callbacks(
+			onOutput: { [weak self, weak tab, weak pane] data in
+				guard let self, let tab, let pane else { return }
 				let output = String(decoding: data, as: UTF8.self)
 				Task {
 					await IntegrationOutputConsole.shared.append(
@@ -1047,28 +1039,25 @@ struct TerminalPaneLayout: Equatable {
 					)
 				}
 				self.ingest(data, into: pane, tab: tab)
-			}
-		}
-		session.onExit = { [weak self, weak tab, weak pane, weak session] status in
-			DispatchQueue.main.async {
-				guard let self, let tab, let pane, let session, pane.session === session else {
-					return
-				}
-				pane.session = nil
+			},
+			onExit: { [weak self, weak tab] status in
+				guard let self, let tab else { return }
 				if let activeTab = self.activeTab, activeTab === tab {
 					self.terminalStatusLabel?.textColor = .systemRed
 					self.terminalStatusLabel?.stringValue = L10n.string("Shell exited \(status)")
 				}
+			},
+			onStartFailure: { [weak self, weak pane] error in
+				guard let self, let pane else { return }
+				self.terminalStatusLabel?.textColor = .systemRed
+				self.terminalStatusLabel?.stringValue = String(describing: error)
+				pane.view.ingest(Data("failed to start shell: \(error)\r\n".utf8))
 			}
-		}
-		pane.session = session
-		do {
-			try session.start(columns: size.columns, rows: size.rows)
-		} catch {
-			pane.session = nil
-			terminalStatusLabel?.textColor = .systemRed
-			terminalStatusLabel?.stringValue = String(describing: error)
-			pane.view.ingest(Data("failed to start shell: \(error)\r\n".utf8))
+		)
+		if restarting {
+			sessionLifecycle.restart(paneID: pane.id, currentDirectoryURL: pane.currentDirectoryURL, columns: size.columns, rows: size.rows, callbacks: callbacks)
+		} else {
+			sessionLifecycle.startIfNeeded(paneID: pane.id, currentDirectoryURL: pane.currentDirectoryURL, columns: size.columns, rows: size.rows, callbacks: callbacks)
 		}
 	}
 
@@ -1102,11 +1091,9 @@ struct TerminalPaneLayout: Equatable {
 		guard let tab = activeTab, let pane = tab.activePane else {
 			return
 		}
-		pane.session?.terminate()
-		pane.session = nil
 		pane.emulator.reset()
 		pane.view.reset()
-		startTerminalIfNeeded(in: pane, tab: tab)
+		startTerminalIfNeeded(in: pane, tab: tab, restarting: true)
 		terminalHostWindow()?.makeFirstResponder(activeView)
 	}
 

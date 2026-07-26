@@ -71,6 +71,28 @@ import Testing
 	#expect(!lifecycle.hasSession(for: runningPaneID))
 }
 
+@Test @MainActor func terminalSessionLifecycleTerminatesOnlyClosedPaneSession() {
+	let first = TerminalSessionLifecycleFixture(processIdentifier: 300)
+	let second = TerminalSessionLifecycleFixture(processIdentifier: 301)
+	var remaining = [first, second]
+	let lifecycle = TerminalSessionLifecycle { _ in remaining.removeFirst() }
+	let firstPaneID = UUID()
+	let secondPaneID = UUID()
+	let callbacks = TerminalSessionLifecycle.Callbacks(
+		onOutput: { _ in Issue.record("unexpected terminal output") },
+		onExit: { _ in Issue.record("unexpected terminal exit") },
+		onStartFailure: { _ in Issue.record("unexpected terminal start failure") }
+	)
+
+	lifecycle.startIfNeeded(paneID: firstPaneID, currentDirectoryURL: URL(fileURLWithPath: "/workspace"), columns: 80, rows: 24, callbacks: callbacks)
+	lifecycle.startIfNeeded(paneID: secondPaneID, currentDirectoryURL: URL(fileURLWithPath: "/workspace"), columns: 80, rows: 24, callbacks: callbacks)
+	lifecycle.terminate(for: firstPaneID)
+	#expect(first.terminated)
+	#expect(!lifecycle.hasSession(for: firstPaneID))
+	#expect(!second.terminated)
+	#expect(lifecycle.hasSession(for: secondPaneID))
+}
+
 @MainActor private func terminalLifecycleEventually(_ predicate: @escaping @MainActor () -> Bool) async -> Bool {
 	for _ in 0 ..< 50 {
 		if predicate() { return true }

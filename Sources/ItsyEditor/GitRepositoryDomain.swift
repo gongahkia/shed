@@ -24,9 +24,13 @@ public struct GitRepositoryDomain: Sendable {
 	public func stashes(at root: URL) throws -> [GitStashEntry] { try repository(at: root).stashes() }
 	public func stash(message: String, at root: URL) throws { try repository(at: root).stash(message: message) }
 	public func applyStash(_ ref: String, at root: URL) throws { try repository(at: root).applyStash(ref) }
+	public func applyStash(_ entry: GitStashEntry, at root: URL) throws { try repository(at: root).applyStash(entry) }
 	public func popStash(_ ref: String, at root: URL) throws { try repository(at: root).popStash(ref) }
+	public func popStash(_ entry: GitStashEntry, at root: URL) throws { try repository(at: root).popStash(entry) }
 	public func dropStash(_ ref: String, at root: URL) throws { try repository(at: root).dropStash(ref) }
+	public func dropStash(_ entry: GitStashEntry, at root: URL) throws { try repository(at: root).dropStash(entry) }
 	public func stashDiff(_ ref: String, at root: URL) throws -> String { try repository(at: root).stashDiff(ref) }
+	public func stashDiff(_ entry: GitStashEntry, at root: URL) throws -> String { try repository(at: root).stashDiff(entry) }
 	public func fetchArguments(at root: URL) -> [String] { repository(at: root).fetchArguments() }
 	public func pullArguments(at root: URL, mode: GitPullMode = .ffOnly) -> [String] { repository(at: root).pullArguments(mode: mode) }
 	public func pushArguments(at root: URL) throws -> [String] { try repository(at: root).pushArguments() }

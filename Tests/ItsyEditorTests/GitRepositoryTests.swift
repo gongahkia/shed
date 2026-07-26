@@ -678,16 +678,16 @@ import Testing
 
 @Test func gitStashParserReadsFormattedRows() {
 	let output = """
-	stash@{0}|2026-06-30 10:11:12 +0800|WIP on main: one
-	stash@{1}|2026-06-29 09:00:00 +0800|message with | pipe
+	stash@{0}|a1b2c3|2026-06-30 10:11:12 +0800|WIP on main: one
+	stash@{1}|d4e5f6|2026-06-29 09:00:00 +0800|message with | pipe
 	invalid
 	"""
 
 	let entries = GitStashParser.parse(output)
 
 	#expect(entries == [
-		GitStashEntry(ref: "stash@{0}", date: "2026-06-30 10:11:12 +0800", message: "WIP on main: one"),
-		GitStashEntry(ref: "stash@{1}", date: "2026-06-29 09:00:00 +0800", message: "message with | pipe"),
+		GitStashEntry(ref: "stash@{0}", objectID: "a1b2c3", date: "2026-06-30 10:11:12 +0800", message: "WIP on main: one"),
+		GitStashEntry(ref: "stash@{1}", objectID: "d4e5f6", date: "2026-06-29 09:00:00 +0800", message: "message with | pipe"),
 	])
 }
 
@@ -717,27 +717,44 @@ import Testing
 }
 
 @Test func gitRepositoryRunsStashListAndActions() throws {
-	let runner = RecordingGitRunner(output: "stash@{0}|2026-06-30 10:11:12 +0800|work\n")
+	let runner = RecordingGitRunner(output: "stash@{0}|a1b2c3|2026-06-30 10:11:12 +0800|work\n")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
 
 	let entries = try repository.stashes()
 	try repository.stash(message: " work in progress ")
-	try repository.applyStash(" stash@{0} ")
-	try repository.popStash("stash@{0}")
-	try repository.dropStash("stash@{0}")
-	let diff = try repository.stashDiff("stash@{0}")
+	try repository.applyStash(entries[0])
+	try repository.popStash(entries[0])
+	try repository.dropStash(entries[0])
+	let diff = try repository.stashDiff(entries[0])
 
 	#expect(entries == [
-		GitStashEntry(ref: "stash@{0}", date: "2026-06-30 10:11:12 +0800", message: "work"),
+		GitStashEntry(ref: "stash@{0}", objectID: "a1b2c3", date: "2026-06-30 10:11:12 +0800", message: "work"),
 	])
-	#expect(diff == "stash@{0}|2026-06-30 10:11:12 +0800|work\n")
+	#expect(diff == "stash@{0}|a1b2c3|2026-06-30 10:11:12 +0800|work\n")
 	#expect(runner.recordedArguments == [
-		["stash", "list", "--format=%gd|%ai|%s"],
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 		["stash", "push", "-u", "-m", "work in progress"],
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 		["stash", "apply", "stash@{0}"],
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 		["stash", "pop", "stash@{0}"],
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 		["stash", "drop", "stash@{0}"],
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 		["stash", "show", "--patch", "stash@{0}"],
+	])
+}
+
+@Test func gitRepositoryRejectsStaleStashEntryBeforeActing() throws {
+	let entry = GitStashEntry(ref: "stash@{0}", objectID: "a1b2c3", date: "2026-06-30 10:11:12 +0800", message: "work")
+	let runner = RecordingGitRunner(output: "stash@{0}|d4e5f6|2026-06-30 10:11:12 +0800|replacement\n")
+	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
+
+	#expect(throws: GitStashError.staleEntry) {
+		try repository.dropStash(entry)
+	}
+	#expect(runner.recordedArguments == [
+		["stash", "list", "--format=%gd|%H|%ai|%s"],
 	])
 }
 
@@ -859,10 +876,37 @@ import Testing
 
 	try repository.stash(message: "work")
 	#expect(try repository.stashes().count == 1)
-	try repository.applyStash("stash@{0}")
+	try repository.applyStash(try #require(repository.stashes().first))
 	#expect(try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8) == "dirty\n")
-	try repository.dropStash("stash@{0}")
+	try repository.dropStash(try #require(repository.stashes().first))
 	#expect(try repository.stashes().isEmpty)
+}
+
+@Test func gitRepositoryKeepsStashWhenApplyConflicts() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["checkout", "-b", "main"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "base\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "base"])
+	try fixture.write("file.txt", "stashed\n")
+	try repository.stash(message: "work")
+	let entry = try #require(repository.stashes().first)
+	try fixture.write("file.txt", "current\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "current"])
+
+	#expect(throws: GitCommandError.self) {
+		try repository.applyStash(entry)
+	}
+	#expect(try repository.stashes().contains(entry))
+	#expect(!(try repository.conflictResolutionState()).isComplete)
 }
 
 @Test func gitRepositoryBuildsRemoteOperationArguments() throws {

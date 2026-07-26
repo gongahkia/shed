@@ -1134,9 +1134,13 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try runGitStashAction(action, ref: "stash@{0}", at: root)
-			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
-		} catch {
+			guard let entry = try repositoryDomain.stashes(at: root).first else {
+				throw GitStashError.noStashes
+		}
+		try runGitStashAction(action, entry: entry, at: root)
+		refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
+	} catch {
+			refreshGitStateAfterStashFailure()
 			setGitStashStatus(String(describing: error), isError: true)
 			showGitStashAlert(title: L10n.string("\(title) failed"), message: String(describing: error))
 		}
@@ -1167,13 +1171,14 @@ struct GitResponsiveViewState: Equatable {
 		}
 		let entry = gitStashEntries[sender.tag]
 		do {
-			let diff = try repositoryDomain.stashDiff(entry.ref, at: root)
+			let diff = try repositoryDomain.stashDiff(entry, at: root)
 			showGitTextPanel(
 				title: L10n.string("Stash Diff"),
 				subtitle: "\(entry.ref)  \(entry.message)",
 				text: diff.isEmpty ? L10n.string("No stash diff") : diff
 			)
 		} catch {
+			refreshGitStashes(nil)
 			setGitStashStatus(String(describing: error), isError: true)
 		}
 	}
@@ -1188,21 +1193,22 @@ struct GitResponsiveViewState: Equatable {
 		}
 		let entry = gitStashEntries[row]
 		do {
-			try runGitStashAction(action, ref: entry.ref, at: root)
+			try runGitStashAction(action, entry: entry, at: root)
 			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
 		} catch {
+			refreshGitStateAfterStashFailure()
 			setGitStashStatus(String(describing: error), isError: true)
 		}
 	}
 
-	private func runGitStashAction(_ action: GitStashAction, ref: String, at root: URL) throws {
+	private func runGitStashAction(_ action: GitStashAction, entry: GitStashEntry, at root: URL) throws {
 		switch action {
 		case .apply:
-			try repositoryDomain.applyStash(ref, at: root)
+			try repositoryDomain.applyStash(entry, at: root)
 		case .pop:
-			try repositoryDomain.popStash(ref, at: root)
+			try repositoryDomain.popStash(entry, at: root)
 		case .drop:
-			try repositoryDomain.dropStash(ref, at: root)
+			try repositoryDomain.dropStash(entry, at: root)
 		}
 	}
 
@@ -1219,6 +1225,15 @@ struct GitResponsiveViewState: Equatable {
 	private func refreshGitStateAfterStashChange(status: String) {
 		refreshGitStashes(nil)
 		setGitStashStatus(status, isError: false)
+		refreshGitChangesAfterStashAttempt()
+	}
+
+	private func refreshGitStateAfterStashFailure() {
+		refreshGitStashes(nil)
+		refreshGitChangesAfterStashAttempt()
+	}
+
+	private func refreshGitChangesAfterStashAttempt() {
 		if ItsyWorkspaceController.currentRootURL != nil {
 			refreshGitChanges(nil)
 		} else {

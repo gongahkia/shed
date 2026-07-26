@@ -410,13 +410,19 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 		_ = try await request("launch") {
 			try await launchTask.value
 		}
-		_ = try await nextEvent(firstStopped, step: "first stopped event")
+		let firstStoppedEvent = try await nextEvent(firstStopped, step: "first stopped event")
+		guard case let .stopped(firstStoppedBody) = try firstStoppedEvent.typed(), firstStoppedBody.reason == "breakpoint" else {
+			throw error(step: "first stopped event", underlying: "Adapter did not stop for the requested breakpoint.")
+		}
 		let threads = try await request("threads") {
 			let response = try await self.client.sendRequest(command: DAPCommand.threads)
 			return try self.decode(response, as: DAPThreadsResponseBody.self)
 		}
 		guard let thread = threads.threads.first else {
 			throw error(step: "threads", underlying: "Adapter returned no threads.")
+		}
+		guard firstStoppedBody.threadId == nil || firstStoppedBody.threadId == thread.id else {
+			throw error(step: "threads", underlying: "Stopped event thread did not match the active thread.")
 		}
 		let frames = try await request("stack trace") {
 			let response = try await self.client.sendRequest(command: DAPCommand.stackTrace, arguments: try DAPAny(encoding: DAPStackTraceArguments(threadId: thread.id)))
@@ -425,6 +431,12 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 		guard let frame = frames.stackFrames.first else {
 			throw error(step: "stack trace", underlying: "Adapter returned no stack frames.")
 		}
+		guard let sourcePath = frame.source?.path,
+		      URL(fileURLWithPath: sourcePath).resolvingSymlinksInPath().path == fixture.sourceURL.resolvingSymlinksInPath().path,
+		      frame.line == scenario.breakpointLine
+		else {
+			throw error(step: "stack trace", underlying: "Top frame did not match the fixture breakpoint.")
+		}
 		let scopes = try await request("scopes") {
 			let response = try await self.client.sendRequest(command: DAPCommand.scopes, arguments: try DAPAny(encoding: DAPScopesArguments(frameId: frame.id)))
 			return try self.decode(response, as: DAPScopesResponseBody.self)
@@ -432,22 +444,28 @@ private final class DAPReferenceAdapterDriver: @unchecked Sendable {
 		guard let scope = scopes.scopes.first(where: { $0.variablesReference > 0 }) else {
 			throw error(step: "scopes", underlying: "Adapter returned no expandable scope.")
 		}
-		_ = try await request("variables") {
+		let variables = try await request("variables") {
 			let response = try await self.client.sendRequest(command: DAPCommand.variables, arguments: try DAPAny(encoding: DAPVariablesArguments(variablesReference: scope.variablesReference)))
 			return try self.decode(response, as: DAPVariablesResponseBody.self)
+		}
+		guard variables.variables.contains(where: { $0.name == "value" }) else {
+			throw error(step: "variables", underlying: "Adapter did not expose the fixture value.")
 		}
 		let value = try await request("evaluate") {
 			let response = try await self.client.sendRequest(command: DAPCommand.evaluate, arguments: try DAPAny(encoding: DAPEvaluateArguments(expression: "value", frameId: frame.id, context: "watch")))
 			return try self.decode(response, as: DAPEvaluateResponseBody.self)
 		}
-		guard !value.result.isEmpty else {
-			throw error(step: "evaluate", underlying: "Adapter returned an empty result.")
+		guard value.result.contains("40") else {
+			throw error(step: "evaluate", underlying: "Adapter returned \(value.result) instead of the fixture value.")
 		}
 		let nextStopped = await client.on(event: DAPEvent.stopped)
 		_ = try await request("step") {
 			try await self.client.sendRequest(command: DAPCommand.next, arguments: try DAPAny(encoding: DAPNextArguments(threadId: thread.id)))
 		}
-		_ = try await nextEvent(nextStopped, step: "step stopped event")
+		let stepStoppedEvent = try await nextEvent(nextStopped, step: "step stopped event")
+		guard case let .stopped(stepStoppedBody) = try stepStoppedEvent.typed(), stepStoppedBody.reason == "step" else {
+			throw error(step: "step stopped event", underlying: "Adapter did not stop after stepping.")
+		}
 		let lifecycle = await client.on()
 		_ = try await request("continue") {
 			try await self.client.sendRequest(command: DAPCommand.continueExecution, arguments: try DAPAny(encoding: DAPContinueArguments(threadId: thread.id)))

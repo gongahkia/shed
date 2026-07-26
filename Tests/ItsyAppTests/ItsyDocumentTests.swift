@@ -131,6 +131,22 @@ import Testing
 }
 
 @MainActor
+@Test func fileTreeUsesWorkbenchComponentHostAcrossSidebarMounts() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let hostedView = try #require(controller.fileTreeHostView.subviews.first)
+	#expect(controller.fileTreeComponentLifecycle == .visible)
+
+	controller.toggleSidebar()
+	#expect(controller.fileTreeComponentLifecycle == .unmounted)
+	#expect(controller.fileTreeHostView.subviews.isEmpty)
+
+	controller.toggleSidebar()
+	#expect(controller.fileTreeComponentLifecycle == .visible)
+	#expect(controller.fileTreeHostView.subviews.first === hostedView)
+}
+
+@MainActor
 @Test func editorWindowHostsTerminalBelowAndGitAtTrailingEdge() throws {
 	let controller = EditorWindowController(document: ItsyDocument())
 	defer { controller.close() }

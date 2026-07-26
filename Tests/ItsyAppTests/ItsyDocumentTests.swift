@@ -205,7 +205,8 @@ private func editorWindowDescendants(in view: NSView) -> [NSView] {
 	#expect(controller.embeddedDebuggerHostView.isHidden)
 
 	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
-	controller.windowDidResize(Notification(name: NSWindow.didResizeNotification, object: window))
+	let lifecycle = try #require(window.delegate as? EditorWindowLifecycleCoordinator)
+	lifecycle.windowDidResize(Notification(name: NSWindow.didResizeNotification, object: window))
 	splitView.layoutSubtreeIfNeeded()
 	#expect(splitView.arrangedSubviews.count == 3)
 	#expect(!controller.embeddedDebuggerHostView.isHidden)

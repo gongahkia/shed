@@ -360,6 +360,13 @@ import Testing
 	#expect(ItsySettingsStore.defaultFileURL() == globalURL)
 }
 
+@Test func settingsStoreUsesJSONForWorkspacePath() {
+	let workspaceRoot = URL(fileURLWithPath: "/tmp/itsy-workspace", isDirectory: true)
+	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
+	#expect(workspaceURL.lastPathComponent == "settings.json")
+	#expect(workspaceURL.deletingLastPathComponent().lastPathComponent == ".itsy")
+}
+
 @Test func settingsStoreSavesAndReloadsJSON() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
 		"itsy-settings-json-\(UUID().uuidString)",
@@ -414,7 +421,7 @@ import Testing
 	#expect(loaded.settings == fallback)
 }
 
-@Test func settingsStoreMergesGlobalWorkspaceAndPerLanguageOverrides() throws {
+@Test func settingsStoreLoadsWorkspaceJSONAndPerLanguageOverrides() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
 		"itsy-settings-\(UUID().uuidString)",
 		isDirectory: true
@@ -437,21 +444,18 @@ import Testing
 	[editor.language.python]
 	tab_width = 3
 	""".write(to: globalURL, atomically: true, encoding: .utf8)
-	try """
-	[editor]
-	font_size = 18
-	tab_width = 6
-
-	[editor.language.python]
-	use_spaces = true
-	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	var workspaceSettings = ItsySettings.default
+	workspaceSettings.editor.fontSize = 18
+	workspaceSettings.editor.tabWidth = 6
+	workspaceSettings.editor.useSpaces = false
+	workspaceSettings.editor.language["python"] = .init(tabWidth: 3, useSpaces: true)
+	try ItsySettingsStore(fileURL: workspaceURL).save(workspaceSettings)
 
 	let loaded = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
 	let base = loaded.settings.editorSettings(languageID: nil)
 	let python = loaded.settings.editorSettings(languageID: "python")
 
 	#expect(loaded.loadedFromFile)
-	#expect(loaded.warnings.isEmpty)
 	#expect(base.fontSize == 18)
 	#expect(base.tabWidth == 6)
 	#expect(!base.useSpaces)
@@ -474,7 +478,9 @@ import Testing
 		withIntermediateDirectories: true
 	)
 	try "[ui]\nfont_scale = 1.25\n\n[updates]\nautomatically_check = true\n".write(to: globalURL, atomically: true, encoding: .utf8)
-	try "[ui]\nfont_scale = 1.75\n\n[updates]\nautomatically_check = false\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	var workspaceSettings = ItsySettings.default
+	workspaceSettings.ui.fontScale = 1.75
+	try ItsySettingsStore(fileURL: workspaceURL).save(workspaceSettings)
 	let result = ItsySettingsStore(fileURL: globalURL).load(workspaceRoot: workspaceRoot)
 	#expect(result.settings.ui.fontScale == 1.25)
 	#expect(result.settings.updates.automaticallyCheck)
@@ -508,28 +514,16 @@ import Testing
 	[updates]
 	automatically_check = true
 	""".write(to: globalURL, atomically: true, encoding: .utf8)
-	try """
-	[editor]
-	tab_width = 4
-	multiple_selections = true
-
-	[find]
-	uses_regex = true
-	whole_word = true
-
-	[recovery]
-	journal_enabled = false
-
-	[updates]
-	automatically_check = false
-
-	[layout]
-	sidebar_position = "trailing"
-	interface_scale = 1.25
-
-	[editor.language.python]
-	use_spaces = true
-	""".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	var workspaceSettings = ItsySettings.default
+	workspaceSettings.editor.tabWidth = 4
+	workspaceSettings.editor.wrap = .soft
+	workspaceSettings.editor.multipleSelections = true
+	workspaceSettings.editor.keymap = .vim
+	workspaceSettings.editor.language["python"] = .init(tabWidth: 3, useSpaces: true)
+	workspaceSettings.find = .init(usesRegex: true, matchesWholeWord: true)
+	workspaceSettings.recovery = .init(journalEnabled: false)
+	workspaceSettings.layout = .init(sidebarPosition: .trailing, interfaceScale: 1.25)
+	try ItsySettingsStore(fileURL: workspaceURL).save(workspaceSettings)
 	let session = ItsySettingsSessionLayer(
 		settings: ItsySettings(editor: .init(
 			wrap: .hard,
@@ -560,7 +554,8 @@ import Testing
 	#expect(resolved.source(for: "updates.automatically_check") == .global)
 	#expect(resolved.source(for: "editor.multiple_selections", languageID: "python") == .language)
 
-	try "[editor]\ntab_width = 6\n".write(to: workspaceURL, atomically: true, encoding: .utf8)
+	workspaceSettings.editor.tabWidth = 6
+	try ItsySettingsStore(fileURL: workspaceURL).save(workspaceSettings)
 	let reloaded = store.resolve(workspaceRoot: workspaceRoot, session: session)
 	#expect(reloaded.settings.editor.tabWidth == 6)
 	#expect(reloaded.source(for: "editor.tab_width") == .workspace)

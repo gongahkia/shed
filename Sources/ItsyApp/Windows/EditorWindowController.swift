@@ -52,6 +52,44 @@ private enum LSPNavigationOperation {
 	case implementation
 }
 
+private enum LSPRenameRequestError: LocalizedError {
+	case unavailable
+	case noChanges
+
+	var errorDescription: String? {
+		switch self {
+		case .unavailable:
+			"Rename is not available at this location."
+		case .noChanges:
+			"Rename did not produce any changes."
+		}
+	}
+}
+
+private enum LSPWorkspaceEditApplicationResult {
+	case applied
+	case declined
+	case failed(Error)
+
+	var applied: Bool {
+		if case .applied = self {
+			return true
+		}
+		return false
+	}
+
+	var failureReason: String? {
+		switch self {
+		case .applied:
+			nil
+		case .declined:
+			"Workspace edit was cancelled."
+		case let .failed(error):
+			String(describing: error)
+		}
+	}
+}
+
 private enum SecondarySidebarSurface: String {
 	case git
 	case debugger
@@ -170,6 +208,8 @@ extension Notification.Name {
 	private var hoverRequestGeneration = 0
 	private var hoverRequestTask: Task<Void, Never>?
 	private var renamePopover: NSPopover?
+	private var renameRequestGeneration = 0
+	private var renameRequestTask: Task<Void, Never>?
 	private var codeActionPopover: NSPopover?
 	private var codeActionRequestGeneration = 0
 	private var codeActionRequestTask: Task<Void, Never>?
@@ -180,8 +220,10 @@ extension Notification.Name {
 	private var signatureHelpRequestGeneration = 0
 	private var signatureHelpRequestTask: Task<Void, Never>?
 	private var referencesRequestGeneration = 0
+	private var referencesRequestTask: Task<Void, Never>?
 	private var referencesCoordinator: ReferencesCoordinator?
 	private var navigationRequestGeneration = 0
+	private var navigationRequestTask: Task<Void, Never>?
 	private var lspNavigationHistory = LSPNavigationHistory()
 	private var lspSyncCoordinators: [LSPSessionKey: LSPDocumentSyncCoordinator] = [:]
 	private var lspDocumentVersionsBySession: [LSPSessionKey: [String: Int]] = [:]
@@ -380,11 +422,14 @@ extension Notification.Name {
 			hoverPopover?.close()
 			hoverRequestTask?.cancel()
 			renamePopover?.close()
+			renameRequestTask?.cancel()
 			codeActionPopover?.close()
 			codeActionRequestTask?.cancel()
 			formattingRequestTask?.cancel()
 			signatureHelpPopover?.close()
 			signatureHelpRequestTask?.cancel()
+			referencesRequestTask?.cancel()
+			navigationRequestTask?.cancel()
 			undoTreePanel = nil
 			lspSurfaceRefreshTask?.cancel()
 			for task in lspSupervisorTasks.values {
@@ -3148,8 +3193,9 @@ extension Notification.Name {
 		let renameOffset = min(max(cursorOffset, fallbackRange.lowerBound), fallbackRange.upperBound - 1)
 		let uri = fileURL.standardizedFileURL.absoluteString
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: renameOffset, in: content)
-		let rect = targetView.positioningRectForUTF8Offset(fallbackRange.lowerBound)
-		Task { [weak self, weak targetView] in
+		cancelRenameRequest()
+		let generation = renameRequestGeneration
+		renameRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
@@ -3164,18 +3210,42 @@ extension Notification.Name {
 				) else {
 					return
 				}
-				let prepared = try? await session.client.prepareRename(uri: uri, position: position)
+				let prepared = try await session.client.prepareRename(uri: uri, position: position)
+				let range: Range<Int>
+				let initialName: String
+				switch prepared {
+				case let .range(lspRange):
+					guard let resolvedRange = LSPTextEditApply.utf8Range(for: lspRange, in: content) else {
+						throw LSPRenameRequestError.unavailable
+					}
+					range = resolvedRange
+					initialName = substring(in: content, range: resolvedRange)
+				case let .placeholder(lspRange, placeholder):
+					guard let resolvedRange = LSPTextEditApply.utf8Range(for: lspRange, in: content) else {
+						throw LSPRenameRequestError.unavailable
+					}
+					range = resolvedRange
+					initialName = placeholder
+				case .defaultBehavior(true):
+					range = fallbackRange
+					initialName = substring(in: content, range: fallbackRange)
+				case .defaultBehavior(false), .none:
+					throw LSPRenameRequestError.unavailable
+				}
 				await MainActor.run { [weak self, weak targetView] in
 					guard
 						let self,
 						let targetView,
+						generation == renameRequestGeneration,
 						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
 					else {
 						return
 					}
-					let range = prepared?.range.flatMap { LSPTextEditApply.utf8Range(for: $0, in: content) } ?? fallbackRange
-					let initialName = prepared?.placeholder ?? substring(in: content, range: range)
-					showRenamePopover(initialName: initialName, positioningRect: rect, in: targetView) { [
+					showRenamePopover(
+						initialName: initialName,
+						positioningRect: targetView.positioningRectForUTF8Offset(range.lowerBound),
+						in: targetView
+					) { [
 						weak self,
 						weak targetView
 					] newName in
@@ -3192,12 +3262,22 @@ extension Notification.Name {
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					self?.handleLSPRequestError(error)
+					guard let self, generation == renameRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					showLSPOperationFailure("rename", error: error)
+					handleLSPRequestError(error)
 					NSLog("rename prepare failed: \(error)")
 				}
 			}
 		}
 		return true
+	}
+
+	private func cancelRenameRequest() {
+		renameRequestGeneration += 1
+		renameRequestTask?.cancel()
+		renameRequestTask = nil
 	}
 
 	private func showRenamePopover(
@@ -3241,11 +3321,14 @@ extension Notification.Name {
 		guard let targetView else {
 			return
 		}
-		Task { [weak self, weak targetView] in
+		cancelRenameRequest()
+		let generation = renameRequestGeneration
+		renameRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard
 					let self,
 					let targetView,
+					generation == renameRequestGeneration,
 					isLSPRequestCurrent(requestContext, for: sessionKey, in: targetView)
 				else {
 					return
@@ -3255,22 +3338,31 @@ extension Notification.Name {
 					return
 				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: requestContext.content)
-				let edit = try await session.client.rename(uri: uri, position: position, newName: newName)
+				guard let edit = try await session.client.rename(uri: uri, position: position, newName: newName),
+			      LSPWorkspaceEditApply.normalize(edit).values.contains(where: { !$0.isEmpty })
+				else {
+					throw LSPRenameRequestError.noChanges
+				}
 				await MainActor.run { [weak self, weak targetView] in
 					guard
 						let self,
 						let targetView,
-						let edit,
+						generation == renameRequestGeneration,
 						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
 					else {
 						return
 					}
-					_ = applyWorkspaceEdit(edit, sessionKey: session.key)
-					focusEditor()
+					if applyWorkspaceEdit(edit, sessionKey: session.key, operation: "rename").applied {
+						focusEditor()
+					}
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					self?.handleLSPRequestError(error)
+					guard let self, generation == renameRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					showLSPOperationFailure("rename", error: error)
+					handleLSPRequestError(error)
 					NSLog("rename failed: \(error)")
 				}
 			}
@@ -3520,7 +3612,7 @@ extension Notification.Name {
 							return false
 						}
 						if let edit = resolved.edit {
-							return applyWorkspaceEdit(edit, sessionKey: sessionKey, operation: "code action")
+							return applyWorkspaceEdit(edit, sessionKey: sessionKey, operation: "code action").applied
 						}
 						return true
 					}
@@ -3569,7 +3661,7 @@ extension Notification.Name {
 			LSPWorkspaceEdit(changes: [uri: edits]),
 			sessionKey: sessionKey,
 			operation: operation
-		)
+		).applied
 		if applied {
 			focusEditor()
 		}
@@ -4044,10 +4136,10 @@ extension Notification.Name {
 			showLSPCrashStatus(key: key, url: url, reason: reason)
 			NSLog("lsp session failed: \(key.languageID) exit \(reason.status) \(reason.stderrTail)")
 		case let .workspaceEditRequested(id, params):
-			let applied = applyWorkspaceEdit(params.edit, sessionKey: key)
+			let result = applyWorkspaceEdit(params.edit, sessionKey: key, operation: params.label ?? "workspace edit")
 			let response = LSPApplyWorkspaceEditResponse(
-				applied: applied,
-				failureReason: applied ? nil : "unable to apply workspace edit"
+				applied: result.applied,
+				failureReason: result.failureReason
 			)
 			guard let client = lspPresentation.entries[key]?.client else {
 				return
@@ -4415,9 +4507,9 @@ extension Notification.Name {
 		let content = editorStorageString(targetView.editor)
 		let cursorOffset = targetView.editor.selections.primary.head
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: cursorOffset, in: content)
-		navigationRequestGeneration += 1
+		cancelNavigationRequest()
 		let generation = navigationRequestGeneration
-		Task { [weak self, weak targetView] in
+		navigationRequestTask = Task { [weak self, weak targetView] in
 			do {
 				guard let self, let targetView else {
 					return
@@ -4459,6 +4551,12 @@ extension Notification.Name {
 			}
 		}
 		return true
+	}
+
+	private func cancelNavigationRequest() {
+		navigationRequestGeneration += 1
+		navigationRequestTask?.cancel()
+		navigationRequestTask = nil
 	}
 
 	private func navigate(to locations: [LSPLocation]) {
@@ -4652,12 +4750,12 @@ extension Notification.Name {
 		let content = editorStorageString(targetView.editor)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
 		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
-		referencesRequestGeneration += 1
+		cancelReferencesRequest()
 		let generation = referencesRequestGeneration
 		let panel = referencesCoordinator ?? ReferencesCoordinator()
 		referencesCoordinator = panel
 		panel.showCallHierarchyLoading(relativeTo: window)
-		Task { [weak self] in
+		referencesRequestTask = Task { [weak self] in
 			do {
 				guard let self else {
 					return
@@ -4736,43 +4834,49 @@ extension Notification.Name {
 		let content = editorStorageString(targetView.editor)
 		let position = LSPTextEditApply.utf16Position(forUTF8Offset: offset, in: content)
 		let rootURL = ItsyWorkspaceController.currentRootURL ?? fileURL.deletingLastPathComponent()
-		referencesRequestGeneration += 1
+		cancelReferencesRequest()
 		let generation = referencesRequestGeneration
 		let panel = referencesCoordinator ?? ReferencesCoordinator()
 		referencesCoordinator = panel
 		panel.showLoading(relativeTo: window)
-		Task { [weak self] in
+		referencesRequestTask = Task { [weak self, weak targetView] in
 			do {
-				guard let self else {
+				guard let self, let targetView else {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
-				let params = LSPReferenceParams(
-					textDocument: LSPTextDocumentIdentifier(uri: fileURL.standardizedFileURL.absoluteString),
-					position: position,
-					context: LSPReferenceContext(includeDeclaration: true)
+				guard let requestContext = lspRequestContext(
+					for: session.key,
+					url: fileURL,
+					content: content,
+					cursorOffset: offset
+				) else {
+					return
+				}
+				let locations = try await session.client.references(
+					uri: fileURL.standardizedFileURL.absoluteString,
+					position: position
 				)
-				let response = try await session.client.sendRequest(
-					method: LSPMethod.textDocumentReferences,
-					params: LSPAny(encoding: params)
-				)
-				let result = try LSPReferencesResult(result: response.result)
 				let snapshot = LSPReferencesSnapshot(
-					locations: result.locations,
+					locations: locations,
 					rootURL: rootURL,
 					currentFileURL: fileURL,
 					currentText: content
 				)
 				await MainActor.run { [weak self] in
-					guard let self, generation == referencesRequestGeneration else {
+					guard
+						let self,
+						generation == referencesRequestGeneration,
+						isLSPRequestCurrent(requestContext, for: session.key, in: targetView)
+					else {
 						return
 					}
 					showReferences(snapshot)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					guard let self, generation == referencesRequestGeneration else {
+					guard let self, generation == referencesRequestGeneration, !Task.isCancelled else {
 						return
 					}
 					handleLSPRequestError(error)
@@ -4781,6 +4885,12 @@ extension Notification.Name {
 			}
 		}
 		return true
+	}
+
+	private func cancelReferencesRequest() {
+		referencesRequestGeneration += 1
+		referencesRequestTask?.cancel()
+		referencesRequestTask = nil
 	}
 
 	private func showReferences(_ snapshot: LSPReferencesSnapshot) {
@@ -4817,11 +4927,11 @@ extension Notification.Name {
 		_ edit: LSPWorkspaceEdit,
 		sessionKey: LSPSessionKey? = nil,
 		operation: String? = nil
-	) -> Bool {
+	) -> LSPWorkspaceEditApplicationResult {
 		do {
 			let groups = LSPWorkspaceEditApply.normalize(edit)
 			guard !groups.isEmpty else {
-				return true
+				return .applied
 			}
 			var sources: [String: String] = [:]
 			for uri in groups.keys {
@@ -4837,7 +4947,7 @@ extension Notification.Name {
 			let resolved = try LSPWorkspaceEditApply.apply(edit, sources: sources, documentVersions: documentVersions)
 			let preview = try LSPWorkspaceEditPreview(resolved: resolved, sources: sources)
 			guard confirmWorkspaceEdit(preview) else {
-				return false
+				return .declined
 			}
 			try LSPWorkspaceEditTransaction.commit(
 				preview.files,
@@ -4848,14 +4958,14 @@ extension Notification.Name {
 					try applyResolvedWorkspaceFile(.init(uri: file.uri, updatedText: file.originalText))
 				}
 			)
-			return true
+			return .applied
 		} catch {
 			if let operation {
 				showLSPOperationFailure(operation, error: error)
 			}
 			handleLSPRequestError(error)
 			NSLog("workspace edit apply failed: \(error)")
-			return false
+			return .failed(error)
 		}
 	}
 

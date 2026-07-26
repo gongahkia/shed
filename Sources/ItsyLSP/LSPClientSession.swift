@@ -101,6 +101,22 @@ public actor LSPClientSession {
 		return try item.mergingResolvedFields(from: LSPCompletionItem(resolveResult: response.result))
 	}
 
+	public func references(
+		uri: String,
+		position: LSPPosition,
+		includeDeclaration: Bool = true
+	) async throws -> [LSPLocation] {
+		let response = try await sendRequest(
+			method: LSPMethod.textDocumentReferences,
+			params: try LSPAny(encoding: LSPReferenceParams(
+				textDocument: LSPTextDocumentIdentifier(uri: uri),
+				position: position,
+				context: LSPReferenceContext(includeDeclaration: includeDeclaration)
+			))
+		)
+		return try LSPReferencesResult(result: response.result).locations
+	}
+
 	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
 		let response = try await sendRequest(
 			method: LSPMethod.textDocumentPrepareRename,

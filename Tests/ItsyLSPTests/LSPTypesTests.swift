@@ -308,6 +308,23 @@ import Testing
 	#expect(none.locations.isEmpty)
 }
 
+@Test func prepareRenameAndWorkspaceEditFailureResponsesDecode() throws {
+	let unavailable = try LSPPrepareRenameResult(decoding: Data("null".utf8))
+	let fallback = try LSPPrepareRenameResult(decoding: Data(#"{"defaultBehavior":true}"#.utf8))
+	let response = try JSONDecoder().decode(
+		LSPApplyWorkspaceEditResponse.self,
+		from: Data(#"{"applied":false,"failureReason":"stale document","failedChange":2}"#.utf8)
+	)
+
+	#expect(unavailable == .none)
+	#expect(fallback == .defaultBehavior(true))
+	#expect(response == LSPApplyWorkspaceEditResponse(
+		applied: false,
+		failureReason: "stale document",
+		failedChange: 2
+	))
+}
+
 @Test func documentSymbolParamsEncodeAndResultDecodesHierarchyOrFlatList() throws {
 	let params = try LSPAny(encoding: LSPDocumentSymbolParams(textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift")))
 	let hierarchy = try LSPDocumentSymbolResult(decoding: Data(#"""

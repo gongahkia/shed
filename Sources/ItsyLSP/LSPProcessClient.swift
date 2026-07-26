@@ -183,6 +183,14 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.resolveCompletion(item)
 	}
 
+	public func references(
+		uri: String,
+		position: LSPPosition,
+		includeDeclaration: Bool = true
+	) async throws -> [LSPLocation] {
+		try await session.references(uri: uri, position: position, includeDeclaration: includeDeclaration)
+	}
+
 	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
 		try await session.prepareRename(uri: uri, position: position)
 	}

@@ -165,6 +165,7 @@ private let workspaceLogger = Logger(
 	}
 
 	fileprivate static func applyIndexFileChanges(_ batch: WorkspaceFileEventBatch) {
+		refreshGitStatus()
 		for controller in controllers.allObjects {
 			controller.notifyLSPWatchedFiles(batch)
 		}

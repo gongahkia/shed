@@ -9,7 +9,7 @@ public actor GitStatusRefreshCoordinator {
 	public typealias Loader = @Sendable (URL) throws -> GitWorkspaceSnapshot
 
 	private var generation = 0
-	private var activeTask: Task<GitStatusRefreshResult, Never>?
+	private var activeTask: Task<GitStatusRefreshResult?, Never>?
 
 	public init() {}
 
@@ -21,18 +21,19 @@ public actor GitStatusRefreshCoordinator {
 		generation += 1
 		let requestGeneration = generation
 		activeTask?.cancel()
-		let task: Task<GitStatusRefreshResult, Never> = Task.detached(priority: .userInitiated) {
-			do {
-				return GitStatusRefreshResult.snapshot(try loader(root))
-			} catch {
-				return GitStatusRefreshResult.failure(String(describing: error))
-			}
+		let task: Task<GitStatusRefreshResult?, Never> = Task.detached(priority: .userInitiated) { // keep blocking git I/O off the coordinator actor
+			await Self.load(root: root, loader: loader)
 		}
 		activeTask = task
-		let result = await task.value
+		let result = await withTaskCancellationHandler(operation: {
+			await task.value
+		}, onCancel: {
+			task.cancel()
+		})
 		guard requestGeneration == generation, !Task.isCancelled else {
 			return nil
 		}
+		activeTask = nil
 		return result
 	}
 
@@ -45,5 +46,32 @@ public actor GitStatusRefreshCoordinator {
 	private static let defaultLoader: Loader = { root in
 		let gitRoot = try GitRepository.discoverRoot(containing: root)
 		return try GitRepository(root: gitRoot).snapshot()
+	}
+
+	private static func load(root: URL, loader: @escaping Loader) async -> GitStatusRefreshResult? {
+		var failure: String?
+		for attempt in 0 ..< 2 {
+			guard !Task.isCancelled else {
+				return nil
+			}
+			do {
+				let snapshot = try loader(root)
+				guard !Task.isCancelled else {
+					return nil
+				}
+				return .snapshot(snapshot)
+			} catch {
+				failure = String(describing: error)
+				guard attempt == 0, !Task.isCancelled else {
+					break
+				}
+				do {
+					try await Task.sleep(nanoseconds: 50_000_000)
+				} catch {
+					return nil
+				}
+			}
+		}
+		return failure.map(GitStatusRefreshResult.failure)
 	}
 }

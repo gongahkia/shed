@@ -263,6 +263,42 @@ import Testing
 	#expect(second == .snapshot(secondSnapshot))
 }
 
+@Test func gitStatusRefreshCoordinatorDiscardsCancelledRefreshAndAcceptsRecovery() async throws {
+	let coordinator = GitStatusRefreshCoordinator()
+	let root = URL(fileURLWithPath: "/tmp/itsy-refresh-cancel", isDirectory: true)
+	let snapshot = GitWorkspaceSnapshot(root: root, status: GitStatus())
+	let attempts = GitRefreshAttemptCounter()
+	let pending = Task {
+		await coordinator.refresh(root: root) { _ in
+			_ = attempts.next()
+			throw GitCommandError.failed(status: 128, stderr: "repository changed")
+		}
+	}
+	try await Task.sleep(nanoseconds: 5_000_000)
+	pending.cancel()
+
+	#expect(await pending.value == nil)
+	#expect(attempts.value == 1)
+	#expect(await coordinator.refresh(root: root) { _ in snapshot } == .snapshot(snapshot))
+}
+
+@Test func gitStatusRefreshCoordinatorRecoversFromTransientRepositoryChange() async {
+	let coordinator = GitStatusRefreshCoordinator()
+	let root = URL(fileURLWithPath: "/tmp/itsy-refresh-recovery", isDirectory: true)
+	let snapshot = GitWorkspaceSnapshot(root: root, status: GitStatus())
+	let attempts = GitRefreshAttemptCounter()
+
+	let result = await coordinator.refresh(root: root) { _ in
+		guard attempts.next() > 1 else {
+			throw GitCommandError.failed(status: 128, stderr: "repository changed")
+		}
+		return snapshot
+	}
+
+	#expect(result == .snapshot(snapshot))
+	#expect(attempts.value == 2)
+}
+
 @Test func gitRepositoryCommitBuildsSeparateMessageArguments() throws {
 	let runner = RecordingGitRunner()
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
@@ -1302,6 +1338,24 @@ private final class RecordingGitRunner: GitCommandRunning, @unchecked Sendable {
 		inputs.append(input)
 		lock.unlock()
 		return output
+	}
+}
+
+private final class GitRefreshAttemptCounter: @unchecked Sendable { // lock guards mutable test state
+	private let lock = NSLock()
+	private var storage = 0
+
+	func next() -> Int {
+		lock.lock()
+		defer { lock.unlock() }
+		storage += 1
+		return storage
+	}
+
+	var value: Int {
+		lock.lock()
+		defer { lock.unlock() }
+		return storage
 	}
 }
 

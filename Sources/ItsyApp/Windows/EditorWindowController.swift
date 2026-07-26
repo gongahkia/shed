@@ -126,6 +126,7 @@ extension Notification.Name {
 	private var sessionSidebarWidth: CGFloat?
 	private var sessionGitWidth: CGFloat?
 	private var sessionDebuggerWidth: CGFloat?
+	private var sessionTerminalHeight: CGFloat?
 	private var activeSecondarySidebarSurface: SecondarySidebarSurface = .git
 	private var isApplyingWorkbenchLayout = false
 	private var workbenchPersistenceWorkItem: DispatchWorkItem?
@@ -812,7 +813,7 @@ extension Notification.Name {
 		sidebarWidthConstraint?.constant = result.showsFileTree ? result.sidebarWidth : 0
 		applySidebarVisibility()
 		setTerminalVisible(result.showsTerminal)
-		embeddedTerminalHeightConstraint?.constant = result.terminalHeight
+		embeddedTerminalHeightConstraint?.constant = resolvedTerminalHeight(for: result)
 		let gitAllowed = workbenchConfiguration.git != .hidden
 		let gitRequested = gitRequestedVisible && gitAllowed
 		let debuggerRequested = debuggerRequestedVisible
@@ -840,6 +841,18 @@ extension Notification.Name {
 		setActualEmbeddedGitVisible(secondaryFits && gitRequested && activeSecondarySidebarSurface == .git)
 		setActualEmbeddedDebuggerVisible(secondaryFits && debuggerRequested && activeSecondarySidebarSurface == .debugger)
 		updateSecondarySidebarHeader()
+	}
+
+	private func resolvedTerminalHeight(for result: WorkbenchLayoutResult) -> CGFloat {
+		guard result.showsTerminal else {
+			return 0
+		}
+		guard let sessionTerminalHeight else {
+			return result.terminalHeight
+		}
+		let scale = max(CGFloat(layoutSettings.interfaceScale), 0.8)
+		let minimum = (WorkbenchComponents.registry[.terminal]?.minimumHeight ?? 140) * scale
+		return min(max(sessionTerminalHeight, minimum), rootSplitView.bounds.height * 0.42)
 	}
 
 	private func invalidateEditorShellLayout() {
@@ -1664,11 +1677,77 @@ extension Notification.Name {
 		)
 	}
 
+	var workspaceWorkbenchComponentState: WorkspaceWorkbenchLayoutState {
+		WorkspaceWorkbenchLayoutState(components: [
+			WorkbenchComponentID.fileTree.rawValue: .init(isVisible: sidebarVisible, width: sessionSidebarWidth.map(Double.init)),
+			WorkbenchComponentID.terminal.rawValue: .init(isVisible: terminalRequestedVisible, height: sessionTerminalHeight.map(Double.init)),
+			WorkbenchComponentID.git.rawValue: .init(isVisible: gitRequestedVisible, isSelected: activeSecondarySidebarSurface == .git, width: sessionGitWidth.map(Double.init)),
+			WorkbenchComponentID.debugger.rawValue: .init(isVisible: debuggerRequestedVisible, isSelected: activeSecondarySidebarSurface == .debugger, width: sessionDebuggerWidth.map(Double.init)),
+			WorkbenchComponentID.tabBar.rawValue: .init(isVisible: layoutSettings.tabBarVisible),
+			WorkbenchComponentID.statusBar.rawValue: .init(isVisible: layoutSettings.statusBarVisible),
+		])
+	}
+
 	func restoreWorkspaceWorkbenchDividerState(_ state: WorkspaceWorkbenchDividerState?) {
 		sessionSidebarWidth = state?.sidebarWidth.map { CGFloat($0) }
 		sessionGitWidth = state?.gitWidth.map { CGFloat($0) }
 		sessionDebuggerWidth = state?.debuggerWidth.map { CGFloat($0) }
 		applyResponsiveWorkbenchLayout()
+	}
+
+	func restoreWorkspaceWorkbenchComponentState(_ state: WorkspaceWorkbenchLayoutState) {
+		func dimension(_ value: Double?) -> CGFloat? {
+			guard let value, value.isFinite, value > 0 else {
+				return nil
+			}
+			return CGFloat(value)
+		}
+		let fileTree = state.componentState(for: WorkbenchComponentID.fileTree.rawValue)
+		let terminal = state.componentState(for: WorkbenchComponentID.terminal.rawValue)
+		let git = state.componentState(for: WorkbenchComponentID.git.rawValue)
+		let debugger = state.componentState(for: WorkbenchComponentID.debugger.rawValue)
+		let tabBar = state.componentState(for: WorkbenchComponentID.tabBar.rawValue)
+		let statusBar = state.componentState(for: WorkbenchComponentID.statusBar.rawValue)
+		if let fileTree {
+			if let visible = fileTree.isVisible {
+				sidebarVisible = visible
+			}
+			sessionSidebarWidth = dimension(fileTree.width)
+		}
+		if let terminal {
+			if let visible = terminal.isVisible {
+				terminalRequestedVisible = visible
+			}
+			sessionTerminalHeight = dimension(terminal.height)
+		}
+		if let git {
+			if let visible = git.isVisible {
+				gitRequestedVisible = visible
+			}
+			sessionGitWidth = dimension(git.width)
+		}
+		if let debugger {
+			if let visible = debugger.isVisible {
+				debuggerRequestedVisible = visible
+			}
+			sessionDebuggerWidth = dimension(debugger.width)
+		}
+		if debugger?.isSelected == true {
+			activeSecondarySidebarSurface = .debugger
+		} else if git?.isSelected == true {
+			activeSecondarySidebarSurface = .git
+		}
+		if let visible = tabBar?.isVisible {
+			layoutSettings.tabBarVisible = visible
+		}
+		if let visible = statusBar?.isVisible {
+			layoutSettings.statusBarVisible = visible
+		}
+		applyResponsiveWorkbenchLayout()
+		syncTabGroupVisibility()
+		refreshStatusBar()
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
 	}
 
 	func restoreWorkspacePaneLayout(

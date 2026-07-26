@@ -33,7 +33,12 @@ import Testing
 			WorkspacePaneState(openPaths: [], selectedPath: nil),
 		],
 		focusedPaneIndex: 1,
-		workbenchDividers: .init(sidebarWidth: 300, gitWidth: 520, debuggerWidth: 380)
+		workbenchDividers: .init(sidebarWidth: 300, gitWidth: 520, debuggerWidth: 380),
+		workbenchComponents: .init(components: [
+			"file_tree": .init(isVisible: true, width: 300),
+			"terminal": .init(isVisible: true, height: 220),
+			"git": .init(isVisible: true, isSelected: true, width: 520),
+		])
 	)
 	try store.saveWindowState(state, for: fixture.root)
 	let loadedState = try #require(store.loadWindowState(for: fixture.root))
@@ -50,6 +55,7 @@ import Testing
 	#expect(state.paneStates == nil)
 	#expect(state.focusedPaneIndex == nil)
 	#expect(state.workbenchDividers == nil)
+	#expect(state.workbenchComponents == nil)
 }
 
 private final class TemporaryWorkspaceStateStoreFixture {

@@ -308,7 +308,8 @@ private let workspaceLogger = Logger(
 			openFiles: files,
 			paneStates: controller?.workspacePaneStates,
 			focusedPaneIndex: controller?.workspaceFocusedPaneIndex,
-			workbenchDividers: controller?.workspaceWorkbenchDividerState
+			workbenchDividers: controller?.workspaceWorkbenchDividerState,
+			workbenchComponents: controller?.workspaceWorkbenchComponentState
 		)
 		saveWindowState(state)
 	}

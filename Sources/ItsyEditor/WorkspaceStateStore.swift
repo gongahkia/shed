@@ -54,6 +54,37 @@ public struct WorkspaceWorkbenchDividerState: Codable, Equatable, Sendable {
 	}
 }
 
+public struct WorkspaceWorkbenchComponentLayoutState: Codable, Equatable, Sendable {
+	public var isVisible: Bool?
+	public var isSelected: Bool?
+	public var width: Double?
+	public var height: Double?
+
+	public init(
+		isVisible: Bool? = nil,
+		isSelected: Bool? = nil,
+		width: Double? = nil,
+		height: Double? = nil
+	) {
+		self.isVisible = isVisible
+		self.isSelected = isSelected
+		self.width = width
+		self.height = height
+	}
+}
+
+public struct WorkspaceWorkbenchLayoutState: Codable, Equatable, Sendable {
+	public var components: [String: WorkspaceWorkbenchComponentLayoutState]
+
+	public init(components: [String: WorkspaceWorkbenchComponentLayoutState] = [:]) {
+		self.components = components
+	}
+
+	public func componentState(for id: String) -> WorkspaceWorkbenchComponentLayoutState? {
+		components[id]
+	}
+}
+
 public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 	public var paneLayout: String
 	public var selectedPath: String?
@@ -61,6 +92,7 @@ public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 	public var paneStates: [WorkspacePaneState]?
 	public var focusedPaneIndex: Int?
 	public var workbenchDividers: WorkspaceWorkbenchDividerState?
+	public var workbenchComponents: WorkspaceWorkbenchLayoutState?
 
 	public init(
 		paneLayout: String = "L",
@@ -68,7 +100,8 @@ public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 		openFiles: [WorkspaceWindowFileState] = [],
 		paneStates: [WorkspacePaneState]? = nil,
 		focusedPaneIndex: Int? = nil,
-		workbenchDividers: WorkspaceWorkbenchDividerState? = nil
+		workbenchDividers: WorkspaceWorkbenchDividerState? = nil,
+		workbenchComponents: WorkspaceWorkbenchLayoutState? = nil
 	) {
 		self.paneLayout = paneLayout
 		self.selectedPath = selectedPath
@@ -76,6 +109,7 @@ public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 		self.paneStates = paneStates
 		self.focusedPaneIndex = focusedPaneIndex
 		self.workbenchDividers = workbenchDividers
+		self.workbenchComponents = workbenchComponents
 	}
 }
 

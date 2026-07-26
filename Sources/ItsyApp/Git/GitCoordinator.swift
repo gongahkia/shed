@@ -95,15 +95,25 @@ struct GitResponsiveViewState: Equatable {
 
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
-	private var gitPanel: NSPanel?
 	private var gitContentView: NSView?
-	private var gitEmbeddingConstraints: [NSLayoutConstraint] = []
-	private var embeddedGitVisible = false
 	private let settingsProvider: () -> ItsySettings.GitSettings
 	private let embeddedHostProvider: () -> NSView?
 	private let setEmbeddedGitVisible: (NSView, Bool) -> Void
 	private let repositoryDomain: GitRepositoryDomain
-	private weak var presentationHost: NSView?
+	private lazy var presentationCoordinator = GitPresentationCoordinator(
+		settingsProvider: settingsProvider,
+		contentViewProvider: { [weak self] in
+			guard let self else {
+				return NSView()
+			}
+			return self.makeGitContentViewIfNeeded()
+		},
+		refresh: { [weak self] in
+			self?.refreshGitChanges(nil)
+		},
+		embeddedHostProvider: embeddedHostProvider,
+		setEmbeddedVisible: setEmbeddedGitVisible
+	)
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
 	private var gitBranchButton: NSButton?
@@ -125,8 +135,7 @@ struct GitResponsiveViewState: Equatable {
 	private var gitCommitOutputButton: NSButton?
 	private var gitComposerStatusLabel: NSTextField?
 	private var gitComposerFooter: NSStackView?
-	private enum GitDiffMode { case unified, sideBySide }
-	private var gitDiffMode: GitDiffMode = .unified
+	private let gitDiffOrchestrator = GitDiffOrchestrator()
 	private var gitDiffModeControl: NSSegmentedControl?
 	private var gitCompactPaneControl: NSSegmentedControl?
 	private var gitDiffStatusLabel: NSTextField?
@@ -150,20 +159,6 @@ struct GitResponsiveViewState: Equatable {
 	private var gitWorkbenchMode: WorkbenchGitLayoutMode = .full
 	private var gitResponsiveWidth: CGFloat = 0
 	private var gitFocusTraversalTargets: [NSView] = []
-	private struct GitDiffHunkItem {
-		var fileIndex: Int
-		var hunkIndex: Int
-		var title: String
-		var isStaged: Bool
-	}
-
-	private typealias GitDiffLineItem = DiffSelectionContext
-
-	private enum GitLineSelectionError: Error {
-		case unifiedModeRequired
-		case noChangedLinesSelected
-	}
-
 	private enum GitStashAction {
 		case apply
 		case pop
@@ -178,10 +173,6 @@ struct GitResponsiveViewState: Equatable {
 	private var gitRootURL: URL?
 	private let gitStatusRefreshCoordinator = GitStatusRefreshCoordinator()
 	private var gitStatusRefreshTask: Task<Void, Never>?
-	private var gitDiffFiles: [DiffFile] = []
-	private var gitDiffPath: String?
-	private var gitHunkItems: [GitDiffHunkItem] = []
-	private var gitUnifiedLineItems: [GitDiffLineItem] = []
 	private var gitRemoteProcess: Process?
 	private var gitRemoteCancelButton: NSButton?
 	private var gitRemoteWasCancelled = false
@@ -239,26 +230,15 @@ struct GitResponsiveViewState: Equatable {
 			showsLineNumbers: preferences.showLineNumbers
 		)
 		gitSideNewDiffView?.applyEditorColorPalette(AppTheme.palette.editor)
-		if let panel = gitPanel {
-			AppThemeApplier.apply(AppTheme.palette, to: panel)
-		}
+		presentationCoordinator.applyTheme()
 	}
 
 	func applyGitSettings(_ settings: ItsySettings.GitSettings) {
-		switch settings.presentation {
-		case .sidebar:
-			if gitPanel?.isVisible == true {
-				showEmbeddedGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
-			}
-		case .window:
-			if embeddedGitVisible {
-				showDetachedGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
-			}
-		}
+		presentationCoordinator.applySettings(settings)
 	}
 
 	func ensureGitChangesVisible() {
-		showGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		presentationCoordinator.ensureVisible()
 	}
 
 	func makeGitContentViewForTesting(width: CGFloat) -> NSView {
@@ -292,107 +272,11 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc func showGitChanges(_: Any?) {
-		toggleGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
-	}
-
-	private func toggleGitChanges(relativeTo hostWindow: NSWindow?) {
-		capturePresentationHostIfNeeded()
-		switch settingsProvider().presentation {
-		case .sidebar:
-			toggleEmbeddedGitChanges(relativeTo: hostWindow)
-		case .window:
-			if gitPanel?.isVisible == true {
-				closeGitChanges()
-				return
-			}
-			showDetachedGitChanges(relativeTo: hostWindow)
-		}
+		presentationCoordinator.toggle()
 	}
 
 	func closeEmbeddedGitChanges() {
-		guard embeddedGitVisible, let host = presentationHost else { return }
-		embeddedGitVisible = false
-		setEmbeddedGitVisible(host, false)
-	}
-
-	private func closeGitChanges() {
-		gitPanel?.close()
-	}
-
-	private func showGitChanges(relativeTo hostWindow: NSWindow?) {
-		capturePresentationHostIfNeeded()
-		switch settingsProvider().presentation {
-		case .sidebar:
-			showEmbeddedGitChanges(relativeTo: hostWindow)
-		case .window:
-			showDetachedGitChanges(relativeTo: hostWindow)
-		}
-	}
-
-	private func showDetachedGitChanges(relativeTo hostWindow: NSWindow?) {
-		embeddedGitVisible = false
-		if let host = presentationHost ?? embeddedHostProvider() {
-			presentationHost = host
-			setEmbeddedGitVisible(host, false)
-		}
-		let panel = makeGitPanelIfNeeded()
-		centerGitPanel(panel, relativeTo: hostWindow)
-		panel.makeKeyAndOrderFront(nil)
-		refreshGitChanges(nil)
-	}
-
-	private func toggleEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
-		guard let host = presentationHost ?? embeddedHostProvider() else {
-			showDetachedGitChanges(relativeTo: hostWindow)
-			return
-		}
-		presentationHost = host
-		if embeddedGitVisible, gitContentView?.superview === host {
-			closeEmbeddedGitChanges()
-			return
-		}
-		showEmbeddedGitChanges(relativeTo: hostWindow)
-	}
-
-	private func showEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
-		guard let host = presentationHost ?? embeddedHostProvider() else {
-			showDetachedGitChanges(relativeTo: hostWindow)
-			return
-		}
-		presentationHost = host
-		let contentView = makeGitContentViewIfNeeded()
-		gitPanel?.orderOut(nil)
-		setEmbeddedGitVisible(host, true)
-		embedGitContent(contentView, in: host)
-		embeddedGitVisible = true
-		refreshGitChanges(nil)
-	}
-
-	private func capturePresentationHostIfNeeded() {
-		guard !embeddedGitVisible, gitPanel?.isVisible != true else { return }
-		presentationHost = embeddedHostProvider()
-	}
-
-	private func makeGitPanelIfNeeded() -> NSPanel {
-		let panel: NSPanel
-		if let gitPanel {
-			panel = gitPanel
-		} else {
-			panel = NSPanel(
-				contentRect: NSRect(x: 0, y: 0, width: 980, height: 560),
-				styleMask: [.titled, .closable, .resizable, .utilityWindow],
-				backing: .buffered,
-				defer: false
-			)
-			panel.title = L10n.string("Git Changes")
-			panel.isReleasedWhenClosed = false
-			gitPanel = panel
-		}
-		let contentView = makeGitContentViewIfNeeded()
-		detachEmbeddedGitContent()
-		contentView.removeFromSuperview()
-		panel.contentView = contentView
-		return panel
+		presentationCoordinator.closeEmbedded()
 	}
 
 	private func makeGitContentViewIfNeeded() -> NSView {
@@ -406,25 +290,6 @@ struct GitResponsiveViewState: Equatable {
 		configureGitView(contentView)
 		gitContentView = contentView
 		return contentView
-	}
-
-	private func embedGitContent(_ contentView: NSView, in host: NSView) {
-		detachEmbeddedGitContent()
-		contentView.removeFromSuperview()
-		contentView.translatesAutoresizingMaskIntoConstraints = false
-		host.addSubview(contentView)
-		gitEmbeddingConstraints = [
-			contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
-			contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
-			contentView.topAnchor.constraint(equalTo: host.topAnchor),
-			contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
-		]
-		NSLayoutConstraint.activate(gitEmbeddingConstraints)
-	}
-
-	private func detachEmbeddedGitContent() {
-		NSLayoutConstraint.deactivate(gitEmbeddingConstraints)
-		gitEmbeddingConstraints = []
 	}
 
 	private func configureGitView(_ contentView: NSView) {
@@ -898,7 +763,7 @@ struct GitResponsiveViewState: Equatable {
 			footer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
 		])
 		panel.contentView = contentView
-		centerGitPanel(panel, relativeTo: gitPanel ?? NSApp.keyWindow ?? NSApp.mainWindow)
+		centerGitPanel(panel, relativeTo: presentationCoordinator.auxiliaryPanelHost)
 		gitGraphPanel = panel
 		gitGraphTextView = textView
 		gitGraphLoadMoreButton = loadMoreButton
@@ -1795,8 +1660,8 @@ struct GitResponsiveViewState: Equatable {
 		setGitHunkVisible(isFull)
 		gitDiffModeControl?.setEnabled(isFull, forSegment: 1)
 		gitCompactPaneControl?.setAccessibilityValue(mode == .diff ? L10n.string("Diff") : L10n.string("Files"))
-		if !isFull, gitDiffMode == .sideBySide {
-			gitDiffMode = .unified
+		if !isFull, gitDiffOrchestrator.mode == .sideBySide {
+			gitDiffOrchestrator.mode = .unified
 			gitDiffModeControl?.selectedSegment = 0
 			renderGitDiff()
 		}
@@ -1879,7 +1744,7 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc private func changeGitDiffMode(_: Any?) {
-		gitDiffMode = gitDiffModeControl?.selectedSegment == 1 ? .sideBySide : .unified
+		gitDiffOrchestrator.mode = gitDiffModeControl?.selectedSegment == 1 ? .sideBySide : .unified
 		renderGitDiff()
 	}
 
@@ -1889,79 +1754,54 @@ struct GitResponsiveViewState: Equatable {
 		      tableView.selectedRow >= 0,
 		      tableView.selectedRow < gitEntries.count
 		else {
-			gitDiffPath = nil
+			gitDiffOrchestrator.clear(path: nil)
 			setGitDiffMessage(L10n.string("No file selected"))
 			return
 		}
 		let entry = gitEntries[tableView.selectedRow]
 		do {
-			let files: [DiffFile]
+			let load = try gitDiffOrchestrator.load(entry: entry, root: gitRootURL, repositoryDomain: repositoryDomain)
 			let label: String
-			let isStagedDiff: Bool
 			if entry.kind == .untracked {
-				let contents = try String(contentsOf: gitRootURL.appendingPathComponent(entry.path), encoding: .utf8)
-				files = [DiffTextRenderer.newFile(path: entry.path, contents: contents)]
 				label = L10n.string("untracked")
-				isStagedDiff = false
 			} else {
-				let staged = entry.isStaged && !entry.isUnstaged
-				files = try repositoryDomain.diffFiles(path: entry.path, at: gitRootURL, staged: staged)
-				label = staged ? L10n.string("staged") : L10n.string("unstaged")
-				isStagedDiff = staged
+				label = load.isStaged ? L10n.string("staged") : L10n.string("unstaged")
 			}
-			gitDiffFiles = files
-			gitDiffPath = entry.path
-			setGitHunkItems(files: files, isStaged: isStagedDiff)
+			gitHunkTableView?.reloadData()
 			gitDiffStatusLabel?.textColor = .secondaryLabelColor
-			gitDiffStatusLabel?.stringValue = files.flatMap(\.hunks).isEmpty ? L10n.string("No text diff") : "\(entry.path) (\(label))"
+			gitDiffStatusLabel?.stringValue = load.hasTextDiff ? "\(entry.path) (\(label))" : L10n.string("No text diff")
 			renderGitDiff()
 		} catch {
-			gitDiffFiles = []
-			gitDiffPath = entry.path
+			gitDiffOrchestrator.clear(path: entry.path)
 			setGitDiffMessage(String(describing: error), isError: true)
 		}
 	}
 
 	private func setGitDiffMessage(_ message: String, isError: Bool = false) {
-		gitDiffFiles = []
-		gitHunkItems = []
-		gitUnifiedLineItems = []
+		gitDiffOrchestrator.clear(path: gitDiffOrchestrator.path)
 		gitHunkTableView?.reloadData()
 		gitDiffStatusLabel?.textColor = isError ? .systemRed : .secondaryLabelColor
 		gitDiffStatusLabel?.stringValue = message
 		let document = RenderedDiffDocument(text: "\(message)\n", lines: [
 			RenderedDiffLine(kind: .header, fullRange: 0 ..< message.utf8.count),
 		])
-		applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffPath)
-		applyGitDiff(document, to: gitSideOldDiffView, path: gitDiffPath)
-		applyGitDiff(document, to: gitSideNewDiffView, path: gitDiffPath)
-	}
-
-	private func setGitHunkItems(files: [DiffFile], isStaged: Bool) {
-		gitHunkItems = files.enumerated().flatMap { fileIndex, file in
-			file.hunks.enumerated().map { hunkIndex, hunk in
-				let title = "\(file.newPath ?? file.oldPath ?? "file"):\(hunk.oldStart)->\(hunk.newStart)"
-				return GitDiffHunkItem(fileIndex: fileIndex, hunkIndex: hunkIndex, title: title, isStaged: isStaged)
-			}
-		}
-		gitHunkTableView?.reloadData()
+		applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffOrchestrator.path)
+		applyGitDiff(document, to: gitSideOldDiffView, path: gitDiffOrchestrator.path)
+		applyGitDiff(document, to: gitSideNewDiffView, path: gitDiffOrchestrator.path)
 	}
 
 	@objc private func applyGitHunk(_ sender: NSButton) {
-		guard let gitRootURL, sender.tag >= 0, sender.tag < gitHunkItems.count else {
+		guard let gitRootURL,
+		      let item = gitDiffOrchestrator.item(at: sender.tag),
+		      let selection = gitDiffOrchestrator.fileAndHunk(for: item)
+		else {
 			return
 		}
-		let item = gitHunkItems[sender.tag]
-		guard item.fileIndex < gitDiffFiles.count, item.hunkIndex < gitDiffFiles[item.fileIndex].hunks.count else {
-			return
-		}
-		let file = gitDiffFiles[item.fileIndex]
-		let hunk = file.hunks[item.hunkIndex]
 		do {
 			if item.isStaged {
-				try repositoryDomain.unstage(hunk: hunk, in: file, at: gitRootURL)
+				try repositoryDomain.unstage(hunk: selection.hunk, in: selection.file, at: gitRootURL)
 			} else {
-				try repositoryDomain.stage(hunk: hunk, in: file, at: gitRootURL)
+				try repositoryDomain.stage(hunk: selection.hunk, in: selection.file, at: gitRootURL)
 			}
 			refreshGitChanges(nil)
 		} catch {
@@ -1971,21 +1811,18 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc private func applyGitSelectedLines(_ sender: NSButton) {
-		guard let gitRootURL, sender.tag >= 0, sender.tag < gitHunkItems.count else {
+		guard let gitRootURL,
+		      let item = gitDiffOrchestrator.item(at: sender.tag),
+		      let selection = gitDiffOrchestrator.fileAndHunk(for: item)
+		else {
 			return
 		}
-		let item = gitHunkItems[sender.tag]
-		guard item.fileIndex < gitDiffFiles.count, item.hunkIndex < gitDiffFiles[item.fileIndex].hunks.count else {
-			return
-		}
-		let file = gitDiffFiles[item.fileIndex]
-		let hunk = file.hunks[item.hunkIndex]
 		do {
 			let lineIndexes = try selectedGitLineIndexes(for: item)
 			if item.isStaged {
-				try repositoryDomain.unstage(lineIndexes: lineIndexes, in: hunk, file: file, at: gitRootURL)
+				try repositoryDomain.unstage(lineIndexes: lineIndexes, in: selection.hunk, file: selection.file, at: gitRootURL)
 			} else {
-				try repositoryDomain.stage(lineIndexes: lineIndexes, in: hunk, file: file, at: gitRootURL)
+				try repositoryDomain.stage(lineIndexes: lineIndexes, in: selection.hunk, file: selection.file, at: gitRootURL)
 			}
 			refreshGitChanges(nil)
 		} catch {
@@ -1995,47 +1832,26 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	private func renderGitDiff() {
-		let hasSideBySide = gitDiffMode == .sideBySide
+		let hasSideBySide = gitDiffOrchestrator.mode == .sideBySide
 		gitUnifiedDiffView?.isHidden = hasSideBySide
 		gitSideBySideSplitView?.isHidden = !hasSideBySide
-		guard !gitDiffFiles.isEmpty else {
-			gitUnifiedLineItems = []
+		guard let rendered = gitDiffOrchestrator.render() else {
 			return
 		}
-		switch gitDiffMode {
-		case .unified:
-			let document = DiffTextRenderer.unified(files: gitDiffFiles)
-			gitUnifiedLineItems = unifiedGitDiffLineItems(files: gitDiffFiles, document: document)
-			applyGitDiff(document, to: gitUnifiedDiffView, path: gitDiffPath)
-		case .sideBySide:
-			gitUnifiedLineItems = []
-			let rendered = DiffTextRenderer.sideBySide(files: gitDiffFiles)
-			applyGitDiff(rendered.old, to: gitSideOldDiffView, path: gitDiffFiles.first?.oldPath ?? gitDiffPath)
-			applyGitDiff(rendered.new, to: gitSideNewDiffView, path: gitDiffFiles.first?.newPath ?? gitDiffPath)
+		switch rendered {
+		case let .unified(document, path):
+			applyGitDiff(document, to: gitUnifiedDiffView, path: path)
+		case let .sideBySide(old, oldPath, new, newPath):
+			applyGitDiff(old, to: gitSideOldDiffView, path: oldPath)
+			applyGitDiff(new, to: gitSideNewDiffView, path: newPath)
 		}
 	}
 
-	private func unifiedGitDiffLineItems(files: [DiffFile], document: RenderedDiffDocument) -> [GitDiffLineItem] {
-		DiffSelectionMapper.contexts(files: files, document: document)
-	}
-
-	private func selectedGitLineIndexes(for item: GitDiffHunkItem) throws -> IndexSet {
-		guard gitDiffMode == .unified else {
-			throw GitLineSelectionError.unifiedModeRequired
-		}
-		guard let selection = gitUnifiedDiffView?.editor.selections.primary else {
-			throw GitLineSelectionError.noChangedLinesSelected
-		}
-		let indexes = DiffSelectionMapper.lineIndexes(
-			selection: selection.range,
-			fileIndex: item.fileIndex,
-			hunkIndex: item.hunkIndex,
-			contexts: gitUnifiedLineItems
+	private func selectedGitLineIndexes(for item: GitDiffOrchestrator.HunkItem) throws -> IndexSet {
+		try gitDiffOrchestrator.selectedLineIndexes(
+			selection: gitUnifiedDiffView?.editor.selections.primary.range,
+			for: item
 		)
-		guard !indexes.isEmpty else {
-			throw GitLineSelectionError.noChangedLinesSelected
-		}
-		return indexes
 	}
 
 	private func applyGitDiff(_ document: RenderedDiffDocument, to view: MetalTextView?, path: String?) {
@@ -2780,7 +2596,7 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 			return gitStashEntries.count
 		}
 		if tableView === gitHunkTableView {
-			return gitHunkItems.count
+			return gitDiffOrchestrator.hunkItems.count
 		}
 		return 0
 	}
@@ -2814,7 +2630,7 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 			return cell
 		}
 		if tableView === gitHunkTableView {
-			let item = gitHunkItems[row]
+			let item = gitDiffOrchestrator.hunkItems[row]
 			let cell = NSTableCellView()
 			let hunkButton = NSButton(
 				title: item.isStaged ? L10n.string("Unstage Hunk") : L10n.string("Stage Hunk"),

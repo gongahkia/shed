@@ -642,6 +642,7 @@ public struct Editor: Sendable {
 		}
 		set {
 			textStorage = .rope(newValue)
+			setNormalizedSelections(selections)
 		}
 	}
 	public private(set) var textStorage: EditorTextStorage
@@ -768,12 +769,12 @@ public struct Editor: Sendable {
 			}
 			return Selection(anchor: offset, head: offset, affinity: selection.affinity)
 		}
-		selections = normalized(SelectionSet(primary: moved[0], secondaries: Array(moved.dropFirst())))
+		setNormalizedSelections(SelectionSet(primary: moved[0], secondaries: Array(moved.dropFirst())))
 	}
 
 	public mutating func setSelection(_ selectionSet: SelectionSet) {
 		lastEditBatch = []
-		selections = normalized(selectionSet)
+		setNormalizedSelections(selectionSet)
 	}
 
 	public mutating func undo() {
@@ -784,7 +785,7 @@ public struct Editor: Sendable {
 		for entry in entries {
 			apply(entry.reverse)
 		}
-		selections = normalized(entries.last?.selectionBefore ?? selections)
+		setNormalizedSelections(entries.last?.selectionBefore ?? selections)
 	}
 
 	public mutating func redo() {
@@ -795,7 +796,7 @@ public struct Editor: Sendable {
 		for entry in entries {
 			apply(entry.edit)
 		}
-		selections = normalized(entries.last?.selectionAfter ?? selections)
+		setNormalizedSelections(entries.last?.selectionAfter ?? selections)
 	}
 
 	public mutating func restoreUndoTreeNode(id: Int) -> Bool {
@@ -812,7 +813,7 @@ public struct Editor: Sendable {
 		case .pieceTree:
 			textStorage = .pieceTree(PieceTree(text))
 		}
-		selections = normalized(node.selection.selectionSet)
+		setNormalizedSelections(node.selection.selectionSet)
 		lastEditBatch = []
 		return true
 	}
@@ -838,7 +839,7 @@ public struct Editor: Sendable {
 			recordedEdits.append(edit)
 		}
 		let carets = replacementCarets(for: mergedRanges, insertedLength: string.utf8.count)
-		selections = normalized(SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst())))
+		setNormalizedSelections(SelectionSet(primary: carets[0], secondaries: Array(carets.dropFirst())))
 		lastEditBatch = Array(recordedEdits.reversed())
 		let historyDelta = mergedRanges.reduce(0) { $0 + string.utf8.count - $1.count }
 		let historyAfterRange = historyRange.lowerBound ..< historyRange.upperBound + historyDelta
@@ -876,6 +877,10 @@ public struct Editor: Sendable {
 
 	private var fullTextData: Data {
 		Data(textStorage.substring(0 ..< textStorage.length).utf8)
+	}
+
+	private mutating func setNormalizedSelections(_ selectionSet: SelectionSet) {
+		selections = normalized(selectionSet)
 	}
 
 	private func normalized(_ selectionSet: SelectionSet) -> SelectionSet {

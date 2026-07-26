@@ -19,6 +19,21 @@ import Testing
 	}
 }
 
+@Test func editorNormalizesEveryMultiSelectionAfterTextStorageReplacement() {
+	var editor = Editor(text: "ab", storage: .rope)
+	editor.setSelection(SelectionSet(
+		primary: Selection(anchor: 1, head: 1, affinity: .upstream),
+		secondaries: [Selection(anchor: 2, head: 2, affinity: .downstream)]
+	))
+	editor.rope = Rope("a\u{301}b")
+
+	#expect(editor.selections == SelectionSet(
+		primary: Selection(anchor: 0, head: 0, affinity: .upstream),
+		secondaries: [Selection(anchor: 3, head: 3, affinity: .downstream)]
+	))
+	assertSelectionInvariants(editor)
+}
+
 @Test func editorSelectionInvariantsSurviveRandomEditsAndHistory() {
 	for storage in [EditorStorageKind.rope, .pieceTree] {
 		var rng = SelectionInvariantRNG(0x51EC710)

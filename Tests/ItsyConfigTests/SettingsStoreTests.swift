@@ -21,6 +21,34 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	#expect(try ItsySettingsJSONCodec.decode(data) == settings.normalized())
 }
 
+@Test func settingsJSONCodecMergesPartialLayerAndLanguageOverrides() throws {
+	var fallback = ItsySettings.default.normalized()
+	fallback.editor.font = "Monaco"
+	fallback.editor.language["swift"] = .init(useSpaces: false)
+	let data = Data(#"""
+	{
+	  "schema_version": 12,
+	  "settings": {
+	    "editor": {
+	      "font_size": 18,
+	      "language": { "swift": { "tab_width": 2 } }
+	    },
+	    "layout": { "sidebar_position": "trailing" }
+	  }
+	}
+	"""#.utf8)
+	let layer = try ItsySettingsJSONCodec.decodeLayer(data, fallback: fallback)
+	#expect(layer.settings.editor.font == "Monaco")
+	#expect(layer.settings.editor.fontSize == 18)
+	#expect(layer.settings.editor.language["swift"] == .init(tabWidth: 2, useSpaces: false))
+	#expect(layer.settings.layout.sidebarPosition == .trailing)
+	#expect(layer.assignedKeys == [
+		"editor.font_size",
+		"editor.language.swift.tab_width",
+		"layout.sidebar_position",
+	])
+}
+
 @Test func settingsJSONCodecRejectsUnknownSchemaVersion() throws {
 	let encoded = try ItsySettingsJSONCodec.encode(.default)
 	let document = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
@@ -525,6 +553,43 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	#expect(python.fontSize == 18)
 	#expect(python.tabWidth == 3)
 	#expect(python.useSpaces)
+}
+
+@Test func settingsStoreMergesGlobalAndWorkspaceJSONLayers() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-json-layers-\(UUID().uuidString)",
+		isDirectory: true
+	)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let globalURL = directory.appendingPathComponent("settings.json")
+	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
+	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
+	var globalSettings = ItsySettings.default.normalized()
+	globalSettings.editor.font = "Monaco"
+	globalSettings.editor.tabWidth = 2
+	globalSettings.editor.language["swift"] = .init(useSpaces: false)
+	try ItsySettingsStore(fileURL: globalURL).save(globalSettings)
+	try FileManager.default.createDirectory(at: workspaceURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+	try #"""
+	{
+	  "schema_version": 12,
+	  "settings": {
+	    "editor": {
+	      "font_size": 18,
+	      "language": { "swift": { "tab_width": 3 } }
+	    }
+	  }
+	}
+	"""#.write(to: workspaceURL, atomically: true, encoding: .utf8)
+	let resolution = ItsySettingsStore(fileURL: globalURL).resolve(workspaceRoot: workspaceRoot)
+	#expect(resolution.settings.editor.font == "Monaco")
+	#expect(resolution.settings.editor.tabWidth == 2)
+	#expect(resolution.settings.editor.fontSize == 18)
+	#expect(resolution.settings.editorSettings(languageID: "swift").tabWidth == 3)
+	#expect(!resolution.settings.editorSettings(languageID: "swift").useSpaces)
+	#expect(resolution.source(for: "editor.font") == .global)
+	#expect(resolution.source(for: "editor.font_size") == .workspace)
+	#expect(resolution.sources["editor.language.swift.tab_width"] == .workspace)
 }
 
 @Test func workspaceUIOverridesAreIgnored() throws {

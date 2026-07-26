@@ -102,6 +102,7 @@ struct GitResponsiveViewState: Equatable {
 	private let settingsProvider: () -> ItsySettings.GitSettings
 	private let embeddedHostProvider: () -> NSView?
 	private let setEmbeddedGitVisible: (NSView, Bool) -> Void
+	private let repositoryDomain: GitRepositoryDomain
 	private weak var presentationHost: NSView?
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
@@ -163,6 +164,12 @@ struct GitResponsiveViewState: Equatable {
 		case noChangedLinesSelected
 	}
 
+	private enum GitStashAction {
+		case apply
+		case pop
+		case drop
+	}
+
 	private var gitDraftRootURL: URL?
 	private var gitDraftBeforeHistory: GitCommitDraft?
 	private var gitRecentCommitMessages: [GitCommitDraft] = []
@@ -201,13 +208,15 @@ struct GitResponsiveViewState: Equatable {
 		activeDocumentProvider: @escaping () -> NSDocument?,
 		settingsProvider: @escaping () -> ItsySettings.GitSettings = { ItsySettings.GitSettings() },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
-		setEmbeddedGitVisible: @escaping (NSView, Bool) -> Void = { _, _ in }
+		setEmbeddedGitVisible: @escaping (NSView, Bool) -> Void = { _, _ in },
+		repositoryDomain: GitRepositoryDomain = .init()
 	) {
 		self.documentController = documentController
 		self.activeDocumentProvider = activeDocumentProvider
 		self.settingsProvider = settingsProvider
 		self.embeddedHostProvider = embeddedHostProvider
 		self.setEmbeddedGitVisible = setEmbeddedGitVisible
+		self.repositoryDomain = repositoryDomain
 		super.init()
 	}
 
@@ -828,7 +837,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let worktrees = try GitRepository(root: gitRootURL).worktrees()
+			let worktrees = try repositoryDomain.worktrees(at: gitRootURL)
 			let text = worktrees.map { worktree in
 				let branch = worktree.branch ?? L10n.string("detached")
 				let kind = worktree.isBare ? L10n.string("bare") : branch
@@ -931,7 +940,7 @@ struct GitResponsiveViewState: Equatable {
 			}
 			do {
 				guard let page = try await gitHistoryPager.loadNext(loader: { offset, limit in
-					try GitRepository(root: root).historyPage(limit: limit, offset: offset).entries
+					try self.repositoryDomain.historyPage(at: root, limit: limit, offset: offset).entries
 				}), !Task.isCancelled else {
 					return
 				}
@@ -965,7 +974,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			gitBranches = try GitRepository(root: gitRootURL).branches()
+			gitBranches = try repositoryDomain.branches(at: gitRootURL)
 			gitBranchTableView?.reloadData()
 			if let current = gitBranches.first(where: \.isCurrent) {
 				gitBranchButton?.title = current.name
@@ -982,11 +991,10 @@ struct GitResponsiveViewState: Equatable {
 		}
 		let branch = gitBranches[sender.tag]
 		do {
-			let repository = GitRepository(root: gitRootURL)
-			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: branch.name, repository: repository) else {
+			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: branch.name, root: gitRootURL) else {
 				return
 			}
-			try repository.switchBranch(branch.name, stashingDirtyChanges: shouldStash)
+			try repositoryDomain.switchBranch(branch.name, at: gitRootURL, stashingDirtyChanges: shouldStash)
 			gitBranchPopover?.close()
 			refreshGitChanges(nil)
 		} catch {
@@ -1004,11 +1012,10 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let repository = GitRepository(root: gitRootURL)
-			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: name, repository: repository) else {
+			guard let shouldStash = try shouldStashBeforeBranchChange(targetBranch: name, root: gitRootURL) else {
 				return
 			}
-			try repository.createBranch(named: name, from: source.name, stashingDirtyChanges: shouldStash)
+			try repositoryDomain.createBranch(named: name, from: source.name, at: gitRootURL, stashingDirtyChanges: shouldStash)
 			gitBranchPopover?.close()
 			refreshGitChanges(nil)
 		} catch {
@@ -1017,8 +1024,8 @@ struct GitResponsiveViewState: Equatable {
 		}
 	}
 
-	private func shouldStashBeforeBranchChange(targetBranch: String, repository: GitRepository) throws -> Bool? {
-		guard try repository.status().hasChanges else {
+	private func shouldStashBeforeBranchChange(targetBranch: String, root: URL) throws -> Bool? {
+		guard try repositoryDomain.status(at: root).hasChanges else {
 			return false
 		}
 		return confirmStashAndSwitch(targetBranch) ? true : nil
@@ -1030,7 +1037,7 @@ struct GitResponsiveViewState: Equatable {
 		}
 		let branch = gitBranches[sender.tag]
 		do {
-			try GitRepository(root: gitRootURL).deleteBranch(branch.name)
+			try repositoryDomain.deleteBranch(branch.name, at: gitRootURL)
 			refreshGitBranches()
 			refreshGitChanges(nil)
 		} catch {
@@ -1040,7 +1047,7 @@ struct GitResponsiveViewState: Equatable {
 				return
 			}
 			do {
-				try GitRepository(root: gitRootURL).deleteBranch(branch.name, force: true)
+				try repositoryDomain.deleteBranch(branch.name, at: gitRootURL, force: true)
 				refreshGitBranches()
 				refreshGitChanges(nil)
 			} catch {
@@ -1174,7 +1181,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let entries = try GitRepository(root: root).stashes()
+			let entries = try repositoryDomain.stashes(at: root)
 			let count = entries.count == 1 ? L10n.string("1 stash") : L10n.string("\(entries.count) stashes")
 			setGitStashes(entries, root: root, status: "\(root.path) - \(count)", isError: false)
 		} catch {
@@ -1199,12 +1206,12 @@ struct GitResponsiveViewState: Equatable {
 
 	private func currentGitRootURL() -> URL? {
 		if let root = ItsyWorkspaceController.currentRootURL,
-		   let gitRoot = try? GitRepository.discoverRoot(containing: root)
+		   let gitRoot = try? repositoryDomain.discoverRoot(containing: root)
 		{
 			return gitRoot
 		}
 		if let fileURL = (activeDocumentProvider() as? ItsyDocument)?.fileURL,
-		   let gitRoot = try? GitRepository.discoverRoot(containing: fileURL)
+		   let gitRoot = try? repositoryDomain.discoverRoot(containing: fileURL)
 		{
 			return gitRoot
 		}
@@ -1223,7 +1230,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try GitRepository(root: root).stash(message: message)
+			try repositoryDomain.stash(message: message, at: root)
 			refreshGitStateAfterStashChange(status: L10n.string("Stash saved"))
 		} catch {
 			setGitStashStatus(String(describing: error), isError: true)
@@ -1249,24 +1256,20 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc func applyLatestGitStash(_: Any?) {
-		runLatestGitStashAction(title: L10n.string("Apply")) { repository in
-			try repository.applyStash("stash@{0}")
-		}
+		runLatestGitStashAction(title: L10n.string("Apply"), action: .apply)
 	}
 
 	@objc func popLatestGitStash(_: Any?) {
-		runLatestGitStashAction(title: L10n.string("Pop")) { repository in
-			try repository.popStash("stash@{0}")
-		}
+		runLatestGitStashAction(title: L10n.string("Pop"), action: .pop)
 	}
 
-	private func runLatestGitStashAction(title: String, action: (GitRepository) throws -> Void) {
+	private func runLatestGitStashAction(title: String, action: GitStashAction) {
 		guard let root = currentGitRootURL() else {
 			showGitStashAlert(title: L10n.string("\(title) failed"), message: L10n.string("Open a Git repository first"))
 			return
 		}
 		do {
-			try action(GitRepository(root: root))
+			try runGitStashAction(action, ref: "stash@{0}", at: root)
 			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
 		} catch {
 			setGitStashStatus(String(describing: error), isError: true)
@@ -1275,15 +1278,11 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc private func applyGitStashFromRow(_ sender: NSButton) {
-		runGitStashEntryAction(row: sender.tag, title: L10n.string("Apply")) { repository, entry in
-			try repository.applyStash(entry.ref)
-		}
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Apply"), action: .apply)
 	}
 
 	@objc private func popGitStashFromRow(_ sender: NSButton) {
-		runGitStashEntryAction(row: sender.tag, title: L10n.string("Pop")) { repository, entry in
-			try repository.popStash(entry.ref)
-		}
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Pop"), action: .pop)
 	}
 
 	@objc private func dropGitStashFromRow(_ sender: NSButton) {
@@ -1294,9 +1293,7 @@ struct GitResponsiveViewState: Equatable {
 		guard confirmDropGitStash(entry) else {
 			return
 		}
-		runGitStashEntryAction(row: sender.tag, title: L10n.string("Drop")) { repository, entry in
-			try repository.dropStash(entry.ref)
-		}
+		runGitStashEntryAction(row: sender.tag, title: L10n.string("Drop"), action: .drop)
 	}
 
 	@objc private func showGitStashDiffFromRow(_ sender: NSButton) {
@@ -1305,7 +1302,7 @@ struct GitResponsiveViewState: Equatable {
 		}
 		let entry = gitStashEntries[sender.tag]
 		do {
-			let diff = try GitRepository(root: root).stashDiff(entry.ref)
+			let diff = try repositoryDomain.stashDiff(entry.ref, at: root)
 			showGitTextPanel(
 				title: L10n.string("Stash Diff"),
 				subtitle: "\(entry.ref)  \(entry.message)",
@@ -1319,17 +1316,28 @@ struct GitResponsiveViewState: Equatable {
 	private func runGitStashEntryAction(
 		row: Int,
 		title: String,
-		action: (GitRepository, GitStashEntry) throws -> Void
+		action: GitStashAction
 	) {
 		guard let root = gitStashRootURL, row >= 0, row < gitStashEntries.count else {
 			return
 		}
 		let entry = gitStashEntries[row]
 		do {
-			try action(GitRepository(root: root), entry)
+			try runGitStashAction(action, ref: entry.ref, at: root)
 			refreshGitStateAfterStashChange(status: L10n.string("\(title) complete"))
 		} catch {
 			setGitStashStatus(String(describing: error), isError: true)
+		}
+	}
+
+	private func runGitStashAction(_ action: GitStashAction, ref: String, at root: URL) throws {
+		switch action {
+		case .apply:
+			try repositoryDomain.applyStash(ref, at: root)
+		case .pop:
+			try repositoryDomain.popStash(ref, at: root)
+		case .drop:
+			try repositoryDomain.dropStash(ref, at: root)
 		}
 	}
 
@@ -1366,24 +1374,21 @@ struct GitResponsiveViewState: Equatable {
 		guard let gitRootURL else {
 			return
 		}
-		let repository = GitRepository(root: gitRootURL)
-		runGitRemoteOperation(title: L10n.string("Fetch"), arguments: repository.fetchArguments())
+		runGitRemoteOperation(title: L10n.string("Fetch"), arguments: repositoryDomain.fetchArguments(at: gitRootURL))
 	}
 
 	@objc func pullGitRemote(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
-		let repository = GitRepository(root: gitRootURL)
-		runGitRemoteOperation(title: L10n.string("Pull"), arguments: repository.pullArguments())
+		runGitRemoteOperation(title: L10n.string("Pull"), arguments: repositoryDomain.pullArguments(at: gitRootURL))
 	}
 
 	@objc func pullGitRemoteRebase(_: Any?) {
 		guard let gitRootURL else {
 			return
 		}
-		let repository = GitRepository(root: gitRootURL)
-		runGitRemoteOperation(title: L10n.string("Pull Rebase"), arguments: repository.pullArguments(mode: .rebase))
+		runGitRemoteOperation(title: L10n.string("Pull Rebase"), arguments: repositoryDomain.pullArguments(at: gitRootURL, mode: .rebase))
 	}
 
 	@objc func pushGitRemote(_: Any?) {
@@ -1391,8 +1396,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let repository = GitRepository(root: gitRootURL)
-			try runGitRemoteOperation(title: L10n.string("Push"), arguments: repository.pushArguments())
+			try runGitRemoteOperation(title: L10n.string("Push"), arguments: repositoryDomain.pushArguments(at: gitRootURL))
 		} catch {
 			gitStatusLabel?.textColor = .systemRed
 			gitStatusLabel?.stringValue = String(describing: error)
@@ -1575,7 +1579,7 @@ struct GitResponsiveViewState: Equatable {
 	@objc func showGitBlame(_: Any?) {
 		do {
 			let context = try currentGitFileContext()
-			let lines = try GitRepository(root: context.root).blame(path: context.path)
+			let lines = try repositoryDomain.blame(path: context.path, at: context.root)
 			let text = lines.map { line in
 				"\(line.line)\t\(shortOID(line.oid))\t\(line.author)\t\(line.summary)"
 			}.joined(separator: "\n")
@@ -1592,7 +1596,7 @@ struct GitResponsiveViewState: Equatable {
 	@objc func showGitFileHistory(_: Any?) {
 		do {
 			let context = try currentGitFileContext()
-			let entries = try GitRepository(root: context.root).fileHistory(path: context.path)
+			let entries = try repositoryDomain.fileHistory(path: context.path, at: context.root)
 			showGitTextPanel(title: L10n.string("File History"), subtitle: context.path, text: renderGitHistory(entries))
 		} catch {
 			showGitTextPanel(title: L10n.string("File History"), subtitle: "", text: String(describing: error))
@@ -1603,7 +1607,7 @@ struct GitResponsiveViewState: Equatable {
 		do {
 			let context = try currentGitFileContext()
 			let line = context.document.editor.textStorage.line(forOffset: context.document.editor.selections.primary.head) + 1
-			let entries = try GitRepository(root: context.root).lineHistory(path: context.path, line: line)
+			let entries = try repositoryDomain.lineHistory(path: context.path, line: line, at: context.root)
 			showGitTextPanel(
 				title: L10n.string("Line History"),
 				subtitle: "\(context.path):\(line)",
@@ -1618,7 +1622,7 @@ struct GitResponsiveViewState: Equatable {
 		guard let document = activeDocumentProvider() as? ItsyDocument, let fileURL = document.fileURL else {
 			throw GitNavigationError.noActiveFile
 		}
-		let root = try GitRepository.discoverRoot(containing: fileURL)
+		let root = try repositoryDomain.discoverRoot(containing: fileURL)
 		return try (document, root, relativeGitPath(fileURL: fileURL, root: root))
 	}
 
@@ -1901,7 +1905,7 @@ struct GitResponsiveViewState: Equatable {
 				isStagedDiff = false
 			} else {
 				let staged = entry.isStaged && !entry.isUnstaged
-				files = try GitRepository(root: gitRootURL).diffFiles(path: entry.path, staged: staged)
+				files = try repositoryDomain.diffFiles(path: entry.path, at: gitRootURL, staged: staged)
 				label = staged ? L10n.string("staged") : L10n.string("unstaged")
 				isStagedDiff = staged
 			}
@@ -1954,11 +1958,10 @@ struct GitResponsiveViewState: Equatable {
 		let file = gitDiffFiles[item.fileIndex]
 		let hunk = file.hunks[item.hunkIndex]
 		do {
-			let repository = GitRepository(root: gitRootURL)
 			if item.isStaged {
-				try repository.unstage(hunk: hunk, in: file)
+				try repositoryDomain.unstage(hunk: hunk, in: file, at: gitRootURL)
 			} else {
-				try repository.stage(hunk: hunk, in: file)
+				try repositoryDomain.stage(hunk: hunk, in: file, at: gitRootURL)
 			}
 			refreshGitChanges(nil)
 		} catch {
@@ -1979,11 +1982,10 @@ struct GitResponsiveViewState: Equatable {
 		let hunk = file.hunks[item.hunkIndex]
 		do {
 			let lineIndexes = try selectedGitLineIndexes(for: item)
-			let repository = GitRepository(root: gitRootURL)
 			if item.isStaged {
-				try repository.unstage(lineIndexes: lineIndexes, in: hunk, file: file)
+				try repositoryDomain.unstage(lineIndexes: lineIndexes, in: hunk, file: file, at: gitRootURL)
 			} else {
-				try repository.stage(lineIndexes: lineIndexes, in: hunk, file: file)
+				try repositoryDomain.stage(lineIndexes: lineIndexes, in: hunk, file: file, at: gitRootURL)
 			}
 			refreshGitChanges(nil)
 		} catch {
@@ -2204,11 +2206,12 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let result = try GitRepository(root: gitRootURL).commit(
+			let result = try repositoryDomain.commit(
 				summary: summary,
 				body: body,
 				signoff: gitSignoffButton?.state == .on,
-				amend: amend
+				amend: amend,
+				at: gitRootURL
 			)
 			gitCommitLog = commitCommandLog(summary: summary, body: body, signoff: gitSignoffButton?.state == .on, amend: amend, output: result.output)
 			gitCommitOutputButton?.isEnabled = true
@@ -2253,7 +2256,7 @@ struct GitResponsiveViewState: Equatable {
 		if gitRecentCommitIndex == nil {
 			gitDraftBeforeHistory = currentGitCommitDraft()
 			do {
-				gitRecentCommitMessages = try GitRepository(root: gitRootURL).recentCommitMessages().map(commitDraft(from:))
+				gitRecentCommitMessages = try repositoryDomain.recentCommitMessages(at: gitRootURL).map(commitDraft(from:))
 			} catch {
 				gitComposerStatusLabel?.stringValue = String(describing: error)
 				return true
@@ -2295,7 +2298,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try GitRepository(root: gitRootURL).stage(paths: paths)
+			try repositoryDomain.stage(paths: paths, at: gitRootURL)
 			refreshGitChanges(nil)
 		} catch {
 			setGitEntries(
@@ -2317,7 +2320,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try GitRepository(root: gitRootURL).unstage(paths: paths)
+			try repositoryDomain.unstage(paths: paths, at: gitRootURL)
 			refreshGitChanges(nil)
 		} catch {
 			setGitEntries(
@@ -2359,10 +2362,9 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	private func showGitConflict(entry: GitStatusEntry, root: URL) {
-		let repository = GitRepository(root: root)
-		let base = (try? repository.conflictBlob(path: entry.path, stage: 1)) ?? ""
-		let ours = (try? repository.conflictBlob(path: entry.path, stage: 2)) ?? ""
-		let theirs = (try? repository.conflictBlob(path: entry.path, stage: 3)) ?? ""
+		let base = (try? repositoryDomain.conflictBlob(path: entry.path, stage: 1, at: root)) ?? ""
+		let ours = (try? repositoryDomain.conflictBlob(path: entry.path, stage: 2, at: root)) ?? ""
+		let theirs = (try? repositoryDomain.conflictBlob(path: entry.path, stage: 3, at: root)) ?? ""
 		let mergedURL = root.appendingPathComponent(entry.path)
 		let merged = (try? String(contentsOf: mergedURL, encoding: .utf8)) ?? ""
 		gitConflictPanel?.close()
@@ -2597,7 +2599,7 @@ struct GitResponsiveViewState: Equatable {
 		}
 		do {
 			try textView.string.write(to: root.appendingPathComponent(path), atomically: true, encoding: .utf8)
-			try GitRepository(root: root).stage(paths: [path])
+			try repositoryDomain.stage(paths: [path], at: root)
 			refreshGitConflictRegions()
 			refreshGitConflictResolutionState()
 			refreshGitChanges(nil)
@@ -2626,7 +2628,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try GitRepository(root: root).restoreConflictMarkers(path: path)
+			try repositoryDomain.restoreConflictMarkers(path: path, at: root)
 			reloadGitConflict(nil)
 			refreshGitChanges(nil)
 		} catch {
@@ -2640,7 +2642,7 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			let state = try GitRepository(root: root).conflictResolutionState()
+			let state = try repositoryDomain.conflictResolutionState(at: root)
 			gitConflictStateLabel?.textColor = .secondaryLabelColor
 			gitConflictStateLabel?.stringValue = state.isComplete
 				? L10n.string("Resolved in index")

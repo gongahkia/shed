@@ -2,6 +2,32 @@ import Foundation
 @testable import ItsyConfig
 import Testing
 
+@Test func settingsJSONCodecRoundTripsNormalizedSettings() throws {
+	var settings = ItsySettings.default
+	settings.editor.font = "JetBrains Mono"
+	settings.editor.language["swift"] = .init(tabWidth: 2, useSpaces: true)
+	settings.ui.surfaces["terminal"] = .init(width: 860, height: 320)
+	settings.lsp.modes["swift"] = .system
+
+	let data = try ItsySettingsJSONCodec.encode(settings)
+	let document = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+	#expect(document["schema_version"] as? Int == ItsySettingsSchema.currentVersion)
+	#expect(try ItsySettingsJSONCodec.decode(data) == settings.normalized())
+}
+
+@Test func settingsJSONCodecRejectsUnknownSchemaVersion() throws {
+	let encoded = try ItsySettingsJSONCodec.encode(.default)
+	let document = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+	let settings = try #require(document["settings"])
+	let data = try JSONSerialization.data(withJSONObject: [
+		"schema_version": ItsySettingsSchema.currentVersion + 1,
+		"settings": settings,
+	])
+	#expect(throws: ItsySettingsJSONCodecError.unsupportedSchemaVersion(ItsySettingsSchema.currentVersion + 1)) {
+		try ItsySettingsJSONCodec.decode(data)
+	}
+}
+
 @Test func settingsParserReadsKnownSectionsAndComments() {
 	let contents = #"""
 	# user-editable config

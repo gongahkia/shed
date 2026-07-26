@@ -58,7 +58,7 @@ public enum WorkbenchComponents {
 	]
 }
 
-public struct WorkbenchLayoutConfiguration: Equatable, Sendable {
+public struct WorkbenchLayoutConfiguration: Codable, Equatable, Sendable {
 	public var profile: WorkbenchProfile
 	public var fileTree: WorkbenchVisibility
 	public var terminal: WorkbenchVisibility

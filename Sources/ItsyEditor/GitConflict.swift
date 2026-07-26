@@ -29,6 +29,13 @@ public enum GitConflictResolution: Equatable, Sendable {
 }
 
 public enum GitConflictParser {
+	public static func hasUnresolvedMarkers(_ text: String) -> Bool {
+		let markerPrefixes = ["<<<<<<<", "|||||||", "=======", ">>>>>>>"]
+		return splitLines(text).contains { line in
+			markerPrefixes.contains { line.hasPrefix($0) }
+		}
+	}
+
 	public static func parse(_ text: String) -> [GitConflictRegion] {
 		let lines = splitLines(text)
 		var regions: [GitConflictRegion] = []

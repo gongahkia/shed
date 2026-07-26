@@ -94,9 +94,6 @@ final class DocumentSyntaxController {
 				tree = try parse(editor: editor, using: &syntaxPipeline)
 				syntaxTree = tree
 			}
-			if case .pieceTree = editor.textStorage {
-				return fallbackNewlineText(editor: editor)
-			}
 			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
 			return try syntaxPipeline.indentationAfterNewline(in: tree, source: source, offset: editor.selections.primary.head, tabWidth: tabWidth)
 		} catch {
@@ -111,16 +108,6 @@ final class DocumentSyntaxController {
 		case let .pieceTree(pieceTree):
 			return try syntaxPipeline.parse(pieceTree)
 		}
-	}
-
-	private func fallbackNewlineText(editor: Editor) -> String {
-		let storage = editor.textStorage
-		let offset = editor.selections.primary.head
-		let line = storage.line(forOffset: offset)
-		let range = storage.lineRange(line)
-		let prefix = storage.substring(range.lowerBound ..< min(offset, range.upperBound))
-		let indentation = prefix.prefix { $0 == " " || $0 == "\t" }
-		return "\n" + indentation
 	}
 
 	private func highlightByteRange(for viewportLineRange: Range<Int>?, editor: Editor) -> Range<Int>? {

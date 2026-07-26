@@ -51,7 +51,33 @@ import Testing
 	#expect(recoveryLabels.contains("Workbench layout is disabled"))
 }
 
+@MainActor
+@Test func settingsExposeExplicitWorkbenchComponentOverrides() {
+	_ = NSApplication.shared
+	let coordinator = SettingsCoordinator(
+		documentController: ItsyDocumentController(),
+		onSettingsChange: { _ in },
+		onTerminalSettingsChange: { _ in }
+	)
+	let popups = accessibilityDescendants(in: coordinator.settingsContentViewForTesting()).compactMap { $0 as? NSPopUpButton }
+	let expected = [
+		("workbench.file_tree", "Workbench file tree visibility"),
+		("workbench.terminal", "Workbench terminal visibility"),
+		("workbench.git", "Workbench Git visibility"),
+	]
+
+	for (identifier, label) in expected {
+		let popup = popups.first { $0.identifier?.rawValue == identifier }
+		#expect(popup?.accessibilityLabel() == label)
+		#expect(popup?.itemArray.compactMap { $0.representedObject as? String } == ["automatic", "visible", "hidden"])
+	}
+}
+
 private func accessibilityLabels(in view: NSView) -> [String] {
 	let label = view.accessibilityLabel().map { [$0] } ?? []
 	return label + view.subviews.flatMap(accessibilityLabels)
+}
+
+private func accessibilityDescendants(in view: NSView) -> [NSView] {
+	view.subviews + view.subviews.flatMap(accessibilityDescendants)
 }

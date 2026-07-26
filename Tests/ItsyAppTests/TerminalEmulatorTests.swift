@@ -150,8 +150,22 @@ import Testing
 	let state = TerminalWorkspaceState(
 		selectedTabIndex: 1,
 		tabs: [
-			TerminalTabState(currentDirectoryPath: "/tmp/one", layout: "L"),
-			TerminalTabState(currentDirectoryPath: "/tmp/two", layout: "H[L,L]"),
+			TerminalTabState(
+				title: "one",
+				activePaneIndex: 0,
+				rootPane: .leaf(currentDirectoryPath: "/tmp/one")
+			),
+			TerminalTabState(
+				title: "two",
+				activePaneIndex: 1,
+				rootPane: .split(
+					orientation: .horizontal,
+					children: [
+						.leaf(currentDirectoryPath: "/tmp/two"),
+						.leaf(currentDirectoryPath: "/tmp/two/tests"),
+					]
+				)
+			),
 		]
 	)
 	let data = try JSONEncoder().encode(state)

@@ -50,6 +50,13 @@ struct TerminalWorkspaceState: Codable, Equatable {
 		let selectedTabIndex = tabs.isEmpty ? 0 : min(max(0, legacy.selectedTabIndex), tabs.count - 1)
 		return TerminalWorkspaceState(selectedTabIndex: selectedTabIndex, tabs: tabs)
 	}
+
+	static func requiresMigration(for data: Data) -> Bool {
+		guard let object = try? JSONSerialization.jsonObject(with: data), let dictionary = object as? [String: Any] else {
+			return false
+		}
+		return dictionary["schemaVersion"] == nil
+	}
 }
 
 struct TerminalCoordinatorState: Equatable {
@@ -1139,6 +1146,9 @@ struct TerminalPaneLayout: Equatable {
 		selectedTabIndex = min(max(0, state.selectedTabIndex), max(0, tabs.count - 1))
 		rebuildTabBar()
 		rebuildTerminalLayout()
+		if TerminalWorkspaceState.requiresMigration(for: data) {
+			persistTerminalState()
+		}
 	}
 
 	private func persistTerminalState() {

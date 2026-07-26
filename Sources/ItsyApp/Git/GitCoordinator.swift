@@ -122,6 +122,7 @@ struct GitResponsiveViewState: Equatable {
 	private var gitAmendButton: NSButton?
 	private var gitCommitOutputButton: NSButton?
 	private var gitComposerStatusLabel: NSTextField?
+	private var gitComposerFooter: NSStackView?
 	private enum GitDiffMode { case unified, sideBySide }
 	private var gitDiffMode: GitDiffMode = .unified
 	private var gitDiffModeControl: NSSegmentedControl?
@@ -449,11 +450,15 @@ struct GitResponsiveViewState: Equatable {
 		compactPaneControl.setAccessibilityLabel(L10n.string("Git compact pane"))
 		compactPaneControl.setAccessibilityHelp(L10n.string("Choose Files or Diff with the arrow keys."))
 		compactPaneControl.isHidden = true
+		compactPaneControl.setContentHuggingPriority(.required, for: .horizontal)
+		compactPaneControl.setContentCompressionResistancePriority(.required, for: .horizontal)
 		let overflow = NSPopUpButton(frame: .zero, pullsDown: false)
 		overflow.addItem(withTitle: L10n.string("More"))
 		overflow.identifier = NSUserInterfaceItemIdentifier("git.more-actions")
 		overflow.setAccessibilityLabel(L10n.string("Git actions"))
 		overflow.setAccessibilityHelp(L10n.string("Additional Git actions."))
+		overflow.setContentHuggingPriority(.required, for: .horizontal)
+		overflow.setContentCompressionResistancePriority(.required, for: .horizontal)
 		for (title, action) in [
 			(L10n.string("Worktrees"), #selector(showGitWorktrees(_:))),
 			(L10n.string("History"), #selector(showGitRepositoryHistory(_:))),
@@ -463,6 +468,8 @@ struct GitResponsiveViewState: Equatable {
 			(L10n.string("Refresh"), #selector(refreshGitChanges(_:))),
 			(L10n.string("Stage"), #selector(stageSelectedGitEntries(_:))),
 			(L10n.string("Unstage"), #selector(unstageSelectedGitEntries(_:))),
+			(L10n.string("Toggle --amend"), #selector(toggleGitAmend(_:))),
+			(L10n.string("Commit Output"), #selector(showGitCommitOutput(_:))),
 		] {
 			let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
 			item.target = self
@@ -704,6 +711,7 @@ struct GitResponsiveViewState: Equatable {
 		footer.alignment = .centerY
 		footer.spacing = 8
 		footer.distribution = .fill
+		footer.detachesHiddenViews = true
 		for item in [summaryRow, bodyHint, bodyScrollView, footer] {
 			item.translatesAutoresizingMaskIntoConstraints = false
 			container.addSubview(item)
@@ -733,6 +741,7 @@ struct GitResponsiveViewState: Equatable {
 		gitAmendButton = amendButton
 		gitCommitOutputButton = outputButton
 		gitComposerStatusLabel = statusLabel
+		gitComposerFooter = footer
 		updateGitComposerState()
 		return container
 	}
@@ -1739,6 +1748,11 @@ struct GitResponsiveViewState: Equatable {
 		let isTwoPane = isFull || mode == .compact
 		gitCompactPaneControl?.isHidden = isTwoPane
 		gitToolbarOverflow?.isHidden = isFull
+		let isNarrow = !isTwoPane
+		gitComposerStatusLabel?.isHidden = isNarrow
+		gitAmendButton?.isHidden = isNarrow
+		gitCommitOutputButton?.isHidden = isNarrow
+		gitComposerFooter?.spacing = isNarrow ? 4 : 8
 		for view in gitToolbarCollapsibleViews {
 			view.isHidden = !isFull
 		}
@@ -2071,6 +2085,12 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	@objc private func updateGitComposerStateAction(_: Any?) {
+		updateGitComposerState()
+	}
+
+	@objc private func toggleGitAmend(_: Any?) {
+		guard let gitAmendButton else { return }
+		gitAmendButton.state = gitAmendButton.state == .on ? .off : .on
 		updateGitComposerState()
 	}
 

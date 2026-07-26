@@ -30,6 +30,8 @@ import Testing
 	#expect(files.visiblePaneIdentifiers == ["git.files"])
 	#expect(files.focusIdentifiers.contains("git.compact-pane"))
 	#expect(!files.focusIdentifiers.contains("git.diff-mode"))
+	#expect(!files.focusIdentifiers.contains("git.amend"))
+	#expect(!files.focusIdentifiers.contains("git.commit-output"))
 	#expect(coordinator.gitFocusTraversalIsClosedForTesting())
 
 	coordinator.selectGitCompactPaneForTesting(.diff)

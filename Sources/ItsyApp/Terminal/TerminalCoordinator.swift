@@ -1144,43 +1144,35 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func restoreTerminalStateIfNeeded() {
-		guard tabs.isEmpty, let url = terminalStateURL(), let data = try? Data(contentsOf: url),
-		      let state = try? JSONDecoder().decode(TerminalWorkspaceState.self, from: data)
+		guard tabs.isEmpty, let store = terminalStateStore(), let restoration = store.restore(fallbackDirectoryURL: terminalWorkingDirectory())
 		else {
 			return
 		}
-		for tab in state.tabs {
+		for tab in restoration.state.tabs {
 			appendTab(workspaceState: tab, select: false, start: false)
 		}
-		selectedTabIndex = min(max(0, state.selectedTabIndex), max(0, tabs.count - 1))
+		selectedTabIndex = min(max(0, restoration.state.selectedTabIndex), max(0, tabs.count - 1))
 		rebuildTabBar()
 		rebuildTerminalLayout()
-		if TerminalWorkspaceState.requiresMigration(for: data) {
-			persistTerminalState()
+		if restoration.requiresPersistence {
+			try? store.save(restoration.state)
 		}
 	}
 
 	private func persistTerminalState() {
-		guard let url = terminalStateURL(), !tabs.isEmpty else {
+		guard let store = terminalStateStore() else { return }
+		guard !tabs.isEmpty else {
+			store.remove()
 			return
 		}
 		let state = TerminalWorkspaceState(
 			selectedTabIndex: selectedTabIndex,
 			tabs: tabs.map(\.workspaceState)
 		)
-		do {
-			try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-			let encoder = JSONEncoder()
-			encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-			try encoder.encode(state).write(to: url, options: .atomic)
-		} catch {
-			return
-		}
+		try? store.save(state)
 	}
 
-	private func terminalStateURL() -> URL? {
-		ItsyWorkspaceController.currentRootURL?
-			.appendingPathComponent(".itsy", isDirectory: true)
-			.appendingPathComponent("terminal.json")
+	private func terminalStateStore() -> TerminalWorkspaceStateStore? {
+		ItsyWorkspaceController.currentRootURL.map { TerminalWorkspaceStateStore(workspaceURL: $0) }
 	}
 }

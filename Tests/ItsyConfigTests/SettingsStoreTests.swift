@@ -269,7 +269,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 11"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 12"))
 	#expect(ItsySettingsStore.serialize(settings).contains("[debugger]\npresentation = \"sidebar\""))
 	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))

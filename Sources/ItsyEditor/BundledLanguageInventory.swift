@@ -106,7 +106,7 @@ public enum BundledLanguageInventory {
 		unsupported("latex", extensions: ["tex", "sty", "cls"], fixture: "\\section{Hi}\n"),
 		supported("lua", extensions: ["lua"], fixture: "local value = 1\n", server: lua),
 		supported("markdown", extensions: ["md", "markdown"], fixture: "# Heading\n", server: markdown),
-		supported("markdown-inline", extensions: [], fixture: "**inline**", languageID: "markdown", server: markdown),
+		unsupported("markdown-inline", extensions: [], fixture: "**inline**", languageID: "markdown"),
 		unsupported("nix", extensions: ["nix"], fixture: "{ value = 1; }\n"),
 		unsupported("ocaml", extensions: ["ml", "mli"], fixture: "let value = 1\n"),
 		supported("php", extensions: ["php"], fixture: "<?php echo \"hi\";\n", server: php),

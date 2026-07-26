@@ -22,3 +22,14 @@ import Testing
 		try ManagedSupportCatalogUpdateClient.verify(data, publicKey: key.publicKey.rawRepresentation)
 	}
 }
+
+@Test func releaseCatalogSourceIsCompatible() throws {
+	let root = URL(fileURLWithPath: #filePath)
+		.deletingLastPathComponent()
+		.deletingLastPathComponent()
+		.deletingLastPathComponent()
+	let data = try Data(contentsOf: root.appendingPathComponent("docs/lsp-catalog.json"))
+	let catalog = try JSONDecoder().decode(ManagedSupportCatalog.self, from: data)
+	try ManagedSupportCatalogStore.validate(catalog)
+	#expect(Set(catalog.components.map(\.id)) == ["pyright", "typescript-language-server"])
+}

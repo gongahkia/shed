@@ -542,7 +542,7 @@ final class ManagedSupportRequest: NSObject {
 			: L10n.string("Set up \(component.displayName) on this Mac?")
 		alert.informativeText = xcodeTool
 			? L10n.string("macOS will handle this installation. Itsy will not install third-party tools globally.")
-			: L10n.string(component.systemInstallHint ?? "Itsy will open the official installation instructions; it does not install third-party tools globally.")
+			: (component.systemInstallHint ?? L10n.string("Itsy will open the official installation instructions; it does not install third-party tools globally."))
 		alert.addButton(withTitle: xcodeTool ? L10n.string("Continue") : L10n.string("Open instructions"))
 		alert.addButton(withTitle: L10n.string("Cancel"))
 		guard alert.runModal() == .alertFirstButtonReturn else { return }

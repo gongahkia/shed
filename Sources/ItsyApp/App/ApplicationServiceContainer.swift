@@ -23,6 +23,7 @@ import ItsyEditor
 
 @MainActor final class ApplicationServiceContainer {
 	let documentController: ItsyDocumentController
+	let eventBus = ApplicationEventBus()
 	private weak var host: (any ApplicationServiceHost)?
 	private var didConnect = false
 
@@ -74,6 +75,7 @@ import ItsyEditor
 		documentController: documentController,
 		onSettingsChange: { [weak self] settings in
 			self?.resolvedHost.applySettingsToOpenWindows(settings)
+			self?.eventBus.publish(ApplicationEvents.SettingsApplied(settings: settings))
 		},
 		onTerminalSettingsChange: { [weak self] settings in
 			self?.resolvedHost.applyTerminalSettings(settings)

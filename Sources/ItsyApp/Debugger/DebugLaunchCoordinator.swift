@@ -353,6 +353,7 @@ final class DebugAppSession: @unchecked Sendable {
 	let workspaceRoot: URL
 	let client: DAPClientSession
 	let capabilities: DAPCapabilities
+	let negotiatedCapabilities: Set<DebugAdapterCapability>
 	let supportsSetVariable: Bool
 	let supportsStepBack: Bool
 	let supportsReverseContinue: Bool
@@ -362,18 +363,19 @@ final class DebugAppSession: @unchecked Sendable {
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL, client: DAPClientSession, capabilities: DAPCapabilities, supportsSetVariable: Bool, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL, client: DAPClientSession, capabilities: DAPCapabilities, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
 		self.workspaceRoot = workspaceRoot
 		self.client = client
 		self.capabilities = capabilities
-		self.supportsSetVariable = supportsSetVariable
-		self.supportsStepBack = capabilities.supportsStepBack == true
-		self.supportsReverseContinue = (capabilities.supportsReverseContinue ?? capabilities.supportsStepBack) == true
-		self.supportsRestart = capabilities.supportsRestartRequest == true
-		self.supportsTerminate = capabilities.supportsTerminateRequest == true
+		negotiatedCapabilities = DebugAdapterCapabilityMatrix.negotiatedCapabilities(from: capabilities)
+		supportsSetVariable = negotiatedCapabilities.contains(.setVariable)
+		supportsStepBack = negotiatedCapabilities.contains(.stepBack)
+		supportsReverseContinue = negotiatedCapabilities.contains(.reverseContinue)
+		supportsRestart = negotiatedCapabilities.contains(.restart)
+		supportsTerminate = negotiatedCapabilities.contains(.terminate)
 		self.breakpointVerificationStore = breakpointVerificationStore
 		self.transport = transport
 		self.eventPump = eventPump
@@ -464,7 +466,7 @@ final class DebugAppSession: @unchecked Sendable {
 				supportsInvalidatedEvent: true
 			))
 			let capabilities = Self.capabilities(in: initializeResponse)
-			let supportsSetVariable = capabilities.supportsSetVariable == true
+			let negotiatedCapabilities = DebugAdapterCapabilityMatrix.negotiatedCapabilities(from: capabilities)
 			let launchTask: Task<DAPResponse, Error>
 			switch configuration.request {
 			case DebugLaunchRequest.launch:
@@ -503,12 +505,12 @@ final class DebugAppSession: @unchecked Sendable {
 			let verification = try await breakpointTask.value
 			await breakpointVerificationStore.replace(verification)
 			_ = try await exceptionTask.value
-			if capabilities.supportsConfigurationDoneRequest == true {
+			if negotiatedCapabilities.contains(.configurationDone) {
 				_ = try await client.configurationDone()
 			}
 			_ = try await launchTask.value
 			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .running, state: .healthy, detailLogReference: logReference)
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, workspaceRoot: workspaceRoot, client: client, capabilities: capabilities, supportsSetVariable: supportsSetVariable, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, workspaceRoot: workspaceRoot, client: client, capabilities: capabilities, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			await client.transportDidTerminate(status: nil)

@@ -101,6 +101,10 @@ public struct ManagedSupportComponent: Codable, Equatable, Sendable, Identifiabl
 	public var artifacts: ManagedSupportArtifacts
 	public var nodeSupport: ManagedNodeSupport?
 
+	public var hasVerifiedManagedInstall: Bool {
+		artifacts.artifact(for: .current ?? .arm64) != nil || nodeSupport != nil
+	}
+
 	public init(
 		id: String,
 		displayName: String,

@@ -145,7 +145,10 @@ extension Notification.Name {
 
 @MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
-	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
+	private static let lspManager = LSPManager(
+		registry: LSPServerRegistryLoader.loadOrBundled(),
+		lspSettings: ItsySettingsStore().load(workspaceRoot: ItsyWorkspaceController.currentRootURL).settings.lsp
+	)
 	private static let snippetLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let fileTreeController = FileTreeSidebarController()
@@ -398,10 +401,15 @@ extension Notification.Name {
 		recordBenchStage("window_controller_init_end")
 	}
 
-	static func reloadLSPConfiguration() {
+	static func reloadLSPConfiguration(settings: ItsySettings? = nil) {
 		let registry = LSPServerRegistryLoader.loadOrBundled()
+		let lspSettings = settings?.lsp ?? ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings.lsp
 		Task {
 			await lspManager.replaceRegistry(registry)
+			await lspManager.replaceLSPSettings(lspSettings)
 			await MainActor.run {
 				ItsyWorkspaceController.lspConfigurationDidReload()
 			}

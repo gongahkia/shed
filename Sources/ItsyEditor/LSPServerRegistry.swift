@@ -1,5 +1,6 @@
 import Darwin
 import Foundation
+import ItsyConfig
 import ItsyLSP
 
 public indirect enum LSPConfigurationValue: Codable, Equatable, Sendable {
@@ -254,30 +255,27 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	public func resolvedConfig(
 		forLanguageID languageID: String,
+		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> LSPServerConfig? {
 		guard var config = config(forLanguageID: languageID) else {
 			return nil
 		}
-		if let bundled = BundledLanguageInventory.server(forLanguageID: languageID), bundled.command == config.command, bundled.args == config.args, bundled.rootPatterns == config.rootPatterns,
-			let component = supportComponent(forLanguageID: languageID) {
-			guard ManagedSupportEnablement.isEnabled(component) else {
-				return nil
+		guard mode != .disabled else { return nil }
+		if mode != .managed, let resolvedCommand = Self.resolvedCommandPath(for: config, environment: environment) {
+			if !Self.isXcrunCommand(config.command) {
+				config.command = resolvedCommand
 			}
-			if let managed = ManagedSupportResolver.executableURL(for: component) {
-				config.command = managed.path
-				return config
-			}
-			if component.installMode == .managed, component.tier == .onDemand {
-				return nil
-			}
+			return config
 		}
-		guard let resolvedCommand = Self.resolvedCommandPath(for: config, environment: environment) else {
+		guard mode != .system, isBundledManagedConfig(config, languageID: languageID),
+		      let component = supportComponent(forLanguageID: languageID),
+		      ManagedSupportEnablement.isEnabled(component),
+		      let managed = ManagedSupportResolver.executableURL(for: component)
+		else {
 			return nil
 		}
-		if !Self.isXcrunCommand(config.command) {
-			config.command = resolvedCommand
-		}
+		config.command = managed.path
 		return config
 	}
 
@@ -293,10 +291,20 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	public func missingBinary(
 		forLanguageID languageID: String,
+		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> MissingBinary? {
-		guard let config = config(forLanguageID: languageID), Self.resolvedCommandPath(for: config, environment: environment) == nil else {
+		guard mode != .disabled, let config = config(forLanguageID: languageID),
+		      resolvedConfig(forLanguageID: languageID, mode: mode, environment: environment) == nil
+		else {
 			return nil
+		}
+		if mode == .managed, let component = supportComponent(forLanguageID: languageID), !component.hasVerifiedManagedInstall {
+			return MissingBinary(
+				languageID: languageID,
+				command: component.command,
+				hint: "No verified managed download is bundled for \(component.displayName); choose System or configure lsp.toml."
+			)
 		}
 		let command = Self.resolutionCommandName(for: config)
 		return MissingBinary(languageID: languageID, command: command, hint: Self.installHint(for: command))
@@ -330,22 +338,24 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	public func resolvedConfig(
 		for url: URL,
+		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> LSPServerConfig? {
 		guard let languageID = languageID(for: url) else {
 			return nil
 		}
-		return resolvedConfig(forLanguageID: languageID, environment: environment)
+		return resolvedConfig(forLanguageID: languageID, mode: mode, environment: environment)
 	}
 
 	public func missingBinary(
 		for url: URL,
+		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> MissingBinary? {
 		guard let languageID = languageID(for: url) else {
 			return nil
 		}
-		return missingBinary(forLanguageID: languageID, environment: environment)
+		return missingBinary(forLanguageID: languageID, mode: mode, environment: environment)
 	}
 
 	public func unsupportedLanguage(for url: URL) -> UnsupportedLanguage? {
@@ -417,6 +427,11 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	private static func resolvedCommandPath(for config: LSPServerConfig, environment: [String: String]) -> String? {
 		try? executableResolution(for: config, environment: environment).executableURL.path
+	}
+
+	private func isBundledManagedConfig(_ config: LSPServerConfig, languageID: String) -> Bool {
+		guard let bundled = BundledLanguageInventory.server(forLanguageID: languageID) else { return false }
+		return bundled.command == config.command && bundled.args == config.args && bundled.rootPatterns == config.rootPatterns
 	}
 
 	private static func executableResolution(for config: LSPServerConfig, environment: [String: String]) throws -> LSPExecutableResolution {

@@ -138,6 +138,11 @@ public enum ItsySettingsCatalog {
 			title: "Automatically Check for Updates",
 			description: "Checks for stable Itsy releases in the background."
 		),
+		.init(
+			key: "lsp.catalog_automatically_check",
+			title: "Automatically Check Language Server Catalog",
+			description: "Checks the signed language-server catalog without downloading updates."
+		),
 		.init(key: "workbench.profile", title: "Workbench Profile", description: "Workbench, Focus, or Review layout profile."),
 		.init(key: "workbench.file_tree", title: "File Tree Visibility", description: "Automatic, visible, or hidden in the active workbench profile."),
 		.init(key: "workbench.terminal", title: "Terminal Visibility", description: "Automatic, visible, or hidden in the active workbench profile."),
@@ -177,6 +182,12 @@ public enum ItsySettingsCatalog {
 			key: "ui.notification_position",
 			title: "Notification Position",
 			description: "Places in-app notifications at the bottom-right or top-right of the editor."
+		),
+		.init(
+			key: "lsp.<language>.mode",
+			title: "Language Server Mode",
+			description: "Auto, system-only, managed-only, or disabled for one language.",
+			isLanguageTemplate: true
 		),
 		.init(
 			key: "editor.language.<language>.font",
@@ -311,6 +322,7 @@ public enum ItsySettingsCatalog {
 		case "find.whole_word": bool(settings.find.matchesWholeWord)
 		case "recovery.journal_enabled": bool(settings.recovery.journalEnabled)
 		case "updates.automatically_check": bool(settings.updates.automaticallyCheck)
+		case "lsp.catalog_automatically_check": bool(settings.lsp.catalogAutomaticallyCheck)
 		case "workbench.profile": settings.workbench.profile.rawValue
 		case "workbench.file_tree": settings.workbench.fileTree.rawValue
 		case "workbench.terminal": settings.workbench.terminal.rawValue
@@ -370,6 +382,7 @@ public enum ItsySettingsCatalog {
 		case "find.whole_word": settings.find.matchesWholeWord = defaults.find.matchesWholeWord
 		case "recovery.journal_enabled": settings.recovery.journalEnabled = defaults.recovery.journalEnabled
 		case "updates.automatically_check": settings.updates.automaticallyCheck = defaults.updates.automaticallyCheck
+		case "lsp.catalog_automatically_check": settings.lsp.catalogAutomaticallyCheck = defaults.lsp.catalogAutomaticallyCheck
 		case "workbench.profile": settings.workbench.profile = defaults.workbench.profile
 		case "workbench.file_tree": settings.workbench.fileTree = defaults.workbench.fileTree
 		case "workbench.terminal": settings.workbench.terminal = defaults.workbench.terminal

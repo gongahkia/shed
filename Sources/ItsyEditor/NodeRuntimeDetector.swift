@@ -79,6 +79,9 @@ public enum NodeRuntimeDetector {
 			suffix: ["installation", "bin", "node"],
 			fileManager: fileManager
 		)
+		if let managed = ManagedNodeRuntimeInstaller.executableURL(fileManager: fileManager) {
+			paths.append(managed.path)
+		}
 		paths += versionManagedCandidates(
 			in: homeDirectory.appendingPathComponent(".nvm/versions/node", isDirectory: true),
 			suffix: ["bin", "node"],

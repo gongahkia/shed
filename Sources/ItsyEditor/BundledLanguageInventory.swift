@@ -129,9 +129,7 @@ public enum BundledLanguageInventory {
 	]
 
 	public static var lspConfigs: [LSPServerConfig] {
-		languages.compactMap { language in
-			language.server.map { $0.config(languageID: language.languageID) }
-		}
+		LSPServerRegistrationCatalog.bundled.map(\.config)
 	}
 
 	public static var fileExtensionMap: [String: String] {

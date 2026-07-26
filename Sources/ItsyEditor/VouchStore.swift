@@ -1,14 +1,34 @@
 import Foundation
 
+public enum VouchPackageKind: String, Equatable, Sendable {
+	case extensionPackage = "extension"
+	case luaPlugin = "lua-plugin"
+}
+
+public enum VouchPackageScope: String, Equatable, Sendable {
+	case global
+	case workspace
+}
+
 public struct VouchSubject: Equatable, Sendable {
 	public var sha256: String
 	public var identifier: String
 	public var version: String
+	public var packageKind: VouchPackageKind
+	public var packageScope: VouchPackageScope?
 
-	public init(sha256: String, identifier: String, version: String) {
+	public init(
+		sha256: String,
+		identifier: String,
+		version: String,
+		packageKind: VouchPackageKind = .extensionPackage,
+		packageScope: VouchPackageScope? = nil
+	) {
 		self.sha256 = sha256.lowercased()
 		self.identifier = identifier
 		self.version = version
+		self.packageKind = packageKind
+		self.packageScope = packageScope
 	}
 }
 
@@ -22,6 +42,8 @@ public struct VouchRecord: Equatable, Sendable {
 	public var sha256: String
 	public var identifier: String
 	public var version: String?
+	public var packageKind: VouchPackageKind?
+	public var packageScope: VouchPackageScope?
 	public var signer: String?
 	public var reason: String?
 	public var source: URL?
@@ -32,6 +54,8 @@ public struct VouchRecord: Equatable, Sendable {
 		sha256: String,
 		identifier: String,
 		version: String? = nil,
+		packageKind: VouchPackageKind? = nil,
+		packageScope: VouchPackageScope? = nil,
 		signer: String? = nil,
 		reason: String? = nil,
 		source: URL? = nil,
@@ -41,6 +65,8 @@ public struct VouchRecord: Equatable, Sendable {
 		self.sha256 = sha256.lowercased()
 		self.identifier = identifier
 		self.version = version
+		self.packageKind = packageKind
+		self.packageScope = packageScope
 		self.signer = signer
 		self.reason = reason
 		self.source = source
@@ -58,7 +84,12 @@ public enum VouchParseError: Error, Equatable, Sendable {
 	case unknownDirective(line: Int, value: String)
 	case malformedField(line: Int, value: String)
 	case missingField(line: Int, field: String)
+	case duplicateField(line: Int, field: String)
 	case invalidSHA256(line: Int, value: String)
+	case invalidPackageKind(line: Int, value: String)
+	case invalidPackageScope(line: Int, value: String)
+	case scopeRequiresLuaPlugin(line: Int)
+	case luaPluginScopeRequired(line: Int)
 }
 
 public struct VouchStore: Equatable, Sendable {
@@ -111,6 +142,7 @@ public struct VouchStore: Equatable, Sendable {
 			record.sha256 == subject.sha256
 				&& record.identifier == subject.identifier
 				&& (record.version == nil || record.version == subject.version)
+				&& matchesPackage(record, subject: subject)
 		}
 		if let denied = matching.first(where: { $0.directive == .deny }) {
 			return .deny(denied)
@@ -154,6 +186,9 @@ public struct VouchStore: Equatable, Sendable {
 			guard !key.isEmpty, !value.isEmpty else {
 				throw VouchParseError.malformedField(line: lineNumber, value: part)
 			}
+			guard fields[key] == nil else {
+				throw VouchParseError.duplicateField(line: lineNumber, field: key)
+			}
 			fields[key] = value
 			index += 1
 		}
@@ -164,6 +199,30 @@ public struct VouchStore: Equatable, Sendable {
 		}
 		let identifier = try requireField("id", in: fields, line: lineNumber)
 		let version = fields["version"]
+		let packageKind: VouchPackageKind?
+		if let value = fields["kind"] {
+			guard let kind = VouchPackageKind(rawValue: value) else {
+				throw VouchParseError.invalidPackageKind(line: lineNumber, value: value)
+			}
+			packageKind = kind
+		} else {
+			packageKind = nil
+		}
+		let packageScope: VouchPackageScope?
+		if let value = fields["scope"] {
+			guard let scope = VouchPackageScope(rawValue: value) else {
+				throw VouchParseError.invalidPackageScope(line: lineNumber, value: value)
+			}
+			packageScope = scope
+		} else {
+			packageScope = nil
+		}
+		if packageScope != nil, packageKind != .luaPlugin {
+			throw VouchParseError.scopeRequiresLuaPlugin(line: lineNumber)
+		}
+		if packageKind == .luaPlugin, packageScope == nil {
+			throw VouchParseError.luaPluginScopeRequired(line: lineNumber)
+		}
 		if directive == .allow {
 			_ = try requireField("version", in: fields, line: lineNumber)
 			_ = try requireField("signer", in: fields, line: lineNumber)
@@ -173,6 +232,8 @@ public struct VouchStore: Equatable, Sendable {
 			sha256: sha256,
 			identifier: identifier,
 			version: version,
+			packageKind: packageKind,
+			packageScope: packageScope,
 			signer: fields["signer"],
 			reason: fields["reason"],
 			source: source,
@@ -193,5 +254,16 @@ public struct VouchStore: Equatable, Sendable {
 		}
 		let hex = Set("0123456789abcdefABCDEF")
 		return value.allSatisfy { hex.contains($0) }
+	}
+
+	private func matchesPackage(_ record: VouchRecord, subject: VouchSubject) -> Bool {
+		if record.directive == .deny {
+			return (record.packageKind == nil || record.packageKind == subject.packageKind)
+				&& (record.packageScope == nil || record.packageScope == subject.packageScope)
+		}
+		if subject.packageKind == .luaPlugin {
+			return record.packageKind == .luaPlugin && record.packageScope == subject.packageScope
+		}
+		return (record.packageKind == nil || record.packageKind == subject.packageKind) && record.packageScope == nil
 	}
 }

@@ -32,6 +32,9 @@ import ItsyWorkbenchLayout
 	private var settingsRecoveryJournalButton: NSButton?
 	private var settingsAutomaticallyCheckForUpdatesButton: NSButton?
 	private var settingsWorkbenchProfilePopup: NSPopUpButton?
+	private var settingsWorkbenchFileTreePopup: NSPopUpButton?
+	private var settingsWorkbenchTerminalPopup: NSPopUpButton?
+	private var settingsWorkbenchGitPopup: NSPopUpButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
 	private var settingsSidebarWidthField: NSTextField?
@@ -160,7 +163,7 @@ import ItsyWorkbenchLayout
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_080))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_180))
 		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 680, height: 720))
 		scrollView.hasVerticalScroller = true
 		scrollView.autohidesScrollers = true
@@ -373,6 +376,21 @@ import ItsyWorkbenchLayout
 		workbenchProfilePopup.action = #selector(settingsWorkbenchProfileDidChange(_:))
 		workbenchProfilePopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(workbenchProfilePopup)
+		let workbenchFileTreeLabel = settingsLabel("File Tree")
+		contentView.addSubview(workbenchFileTreeLabel)
+		let workbenchFileTreePopup = workbenchVisibilityPopup(identifier: "workbench.file_tree", label: "Workbench file tree visibility")
+		workbenchFileTreePopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(workbenchFileTreePopup)
+		let workbenchTerminalLabel = settingsLabel("Terminal")
+		contentView.addSubview(workbenchTerminalLabel)
+		let workbenchTerminalPopup = workbenchVisibilityPopup(identifier: "workbench.terminal", label: "Workbench terminal visibility")
+		workbenchTerminalPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(workbenchTerminalPopup)
+		let workbenchGitLabel = settingsLabel("Git")
+		contentView.addSubview(workbenchGitLabel)
+		let workbenchGitPopup = workbenchVisibilityPopup(identifier: "workbench.git", label: "Workbench Git visibility")
+		workbenchGitPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(workbenchGitPopup)
 
 		let sidebarVisibleButton = settingsCheckbox("Show Sidebar", action: #selector(settingsSidebarVisibleDidChange(_:)))
 		contentView.addSubview(sidebarVisibleButton)
@@ -611,8 +629,23 @@ import ItsyWorkbenchLayout
 			workbenchProfileLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			workbenchProfilePopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			workbenchProfilePopup.centerYAnchor.constraint(equalTo: workbenchProfileLabel.centerYAnchor),
+			workbenchFileTreeLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			workbenchFileTreeLabel.topAnchor.constraint(equalTo: workbenchProfilePopup.bottomAnchor, constant: 12),
+			workbenchFileTreeLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			workbenchFileTreePopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			workbenchFileTreePopup.centerYAnchor.constraint(equalTo: workbenchFileTreeLabel.centerYAnchor),
+			workbenchTerminalLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			workbenchTerminalLabel.topAnchor.constraint(equalTo: workbenchFileTreePopup.bottomAnchor, constant: 12),
+			workbenchTerminalLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			workbenchTerminalPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			workbenchTerminalPopup.centerYAnchor.constraint(equalTo: workbenchTerminalLabel.centerYAnchor),
+			workbenchGitLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			workbenchGitLabel.topAnchor.constraint(equalTo: workbenchTerminalPopup.bottomAnchor, constant: 12),
+			workbenchGitLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			workbenchGitPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			workbenchGitPopup.centerYAnchor.constraint(equalTo: workbenchGitLabel.centerYAnchor),
 			sidebarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			sidebarVisibleButton.topAnchor.constraint(equalTo: workbenchProfilePopup.bottomAnchor, constant: 16),
+			sidebarVisibleButton.topAnchor.constraint(equalTo: workbenchGitPopup.bottomAnchor, constant: 16),
 			sidebarPositionLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			sidebarPositionLabel.topAnchor.constraint(equalTo: sidebarVisibleButton.bottomAnchor, constant: 12),
 			sidebarPositionLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
@@ -691,6 +724,9 @@ import ItsyWorkbenchLayout
 		settingsRecoveryJournalButton = recoveryJournalButton
 		settingsAutomaticallyCheckForUpdatesButton = automaticallyCheckForUpdatesButton
 		settingsWorkbenchProfilePopup = workbenchProfilePopup
+		settingsWorkbenchFileTreePopup = workbenchFileTreePopup
+		settingsWorkbenchTerminalPopup = workbenchTerminalPopup
+		settingsWorkbenchGitPopup = workbenchGitPopup
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
 		settingsSidebarWidthField = sidebarWidthField
@@ -818,6 +854,9 @@ import ItsyWorkbenchLayout
 		if let item = settingsWorkbenchProfilePopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.workbench.profile.rawValue }) {
 			settingsWorkbenchProfilePopup?.select(item)
 		}
+		syncWorkbenchVisibilityPopup(settingsWorkbenchFileTreePopup, visibility: appSettings.workbench.fileTree)
+		syncWorkbenchVisibilityPopup(settingsWorkbenchTerminalPopup, visibility: appSettings.workbench.terminal)
+		syncWorkbenchVisibilityPopup(settingsWorkbenchGitPopup, visibility: appSettings.workbench.git)
 		settingsSidebarVisibleButton?.state = appSettings.layout.sidebarVisible ? .on : .off
 		if let item = settingsSidebarPositionPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.layout.sidebarPosition.rawValue }) {
 			settingsSidebarPositionPopup?.select(item)
@@ -1204,6 +1243,44 @@ import ItsyWorkbenchLayout
 		}
 		appSettings.workbench.profile = profile
 		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsWorkbenchVisibilityDidChange(_ sender: NSPopUpButton) {
+		guard let rawValue = sender.selectedItem?.representedObject as? String,
+		      let visibility = WorkbenchVisibility(rawValue: rawValue)
+		else {
+			return
+		}
+		switch sender.identifier?.rawValue {
+		case "workbench.file_tree":
+			appSettings.workbench.fileTree = visibility
+		case "workbench.terminal":
+			appSettings.workbench.terminal = visibility
+		case "workbench.git":
+			appSettings.workbench.git = visibility
+		default:
+			return
+		}
+		saveAndApplyBehaviorSettings()
+	}
+
+	private func workbenchVisibilityPopup(identifier: String, label: String) -> NSPopUpButton {
+		let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+		for visibility in WorkbenchVisibility.allCases {
+			popup.addItem(withTitle: visibility.rawValue.capitalized)
+			popup.lastItem?.representedObject = visibility.rawValue
+		}
+		popup.identifier = NSUserInterfaceItemIdentifier(identifier)
+		popup.setAccessibilityLabel(label)
+		popup.target = self
+		popup.action = #selector(settingsWorkbenchVisibilityDidChange(_:))
+		return popup
+	}
+
+	private func syncWorkbenchVisibilityPopup(_ popup: NSPopUpButton?, visibility: WorkbenchVisibility) {
+		if let item = popup?.itemArray.first(where: { $0.representedObject as? String == visibility.rawValue }) {
+			popup?.select(item)
+		}
 	}
 
 	@objc private func settingsSidebarVisibleDidChange(_: Any?) {

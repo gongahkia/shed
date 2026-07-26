@@ -4,6 +4,7 @@ import Foundation
 @testable import ItsyApp
 import ItsyConfig
 import ItsyEditor
+import ItsyWorkbenchLayout
 @testable import ItsyRender
 import Testing
 
@@ -138,6 +139,21 @@ struct ItsyUISnapshotTests {
 			window.contentView = terminal
 			window.makeFirstResponder(terminal)
 			return SnapshotSubject(view: terminal, retained: [window])
+		}
+	}
+
+	@Test(arguments: GitSnapshotCase.all)
+	func gitResponsiveModesMatchGolden(_ testCase: GitSnapshotCase) throws {
+		try SnapshotHarness.assertSnapshot(named: testCase.fixtureName, size: NSSize(width: testCase.width, height: 560)) {
+			try gitSnapshotSubject(width: testCase.width, compactMode: testCase.compactMode)
+		}
+	}
+
+	@Test func workbenchRecoveryMatchesGolden() throws {
+		try SnapshotHarness.assertSnapshot(named: "workbench-recovery", size: NSSize(width: 520, height: 220)) {
+			let panel = WorkbenchRecoveryPanel(openSettings: {}, restoreDefaults: {}, generateDoctor: { nil })
+			let view = panel.contentViewForTesting(diagnostic: "workbench.profile = \"focus\" cannot force file_tree = \"visible\"")
+			return windowedSnapshotSubject(view: view, size: NSSize(width: 520, height: 220), retained: [panel])
 		}
 	}
 
@@ -385,6 +401,21 @@ struct EditorLayoutSnapshotCase: CustomTestStringConvertible {
 	var testDescription: String { fixtureName }
 }
 
+struct GitSnapshotCase: CustomTestStringConvertible {
+	let fixtureName: String
+	let width: CGFloat
+	let compactMode: WorkbenchGitLayoutMode?
+
+	static let all = [
+		GitSnapshotCase(fixtureName: "git-full", width: 960, compactMode: nil),
+		GitSnapshotCase(fixtureName: "git-compact", width: 640, compactMode: nil),
+		GitSnapshotCase(fixtureName: "git-files", width: 400, compactMode: .files),
+		GitSnapshotCase(fixtureName: "git-diff", width: 400, compactMode: .diff),
+	]
+
+	var testDescription: String { fixtureName }
+}
+
 private final class ThemedEditorSnapshotView: NSView {
 	private let palette: AppThemePalette
 	private let fontSize: CGFloat
@@ -471,4 +502,18 @@ private final class TabsSnapshotView: NSView {
 	contentView.frame = NSRect(x: 0, y: 0, width: 560, height: 280)
 	contentView.layoutSubtreeIfNeeded()
 	return SnapshotSubject(view: contentView, retained: [documentController, coordinator])
+}
+
+@MainActor private func gitSnapshotSubject(width: CGFloat, compactMode: WorkbenchGitLayoutMode?) throws -> SnapshotSubject {
+	let documentController = ItsyDocumentController()
+	let coordinator = GitCoordinator(
+		documentController: documentController,
+		activeDocumentProvider: { nil },
+		settingsProvider: { ItsySettings.GitSettings(presentation: .sidebar) }
+	)
+	let contentView = coordinator.makeGitContentViewForTesting(width: width)
+	if let compactMode {
+		coordinator.selectGitCompactPaneForTesting(compactMode)
+	}
+	return windowedSnapshotSubject(view: contentView, size: NSSize(width: width, height: 560), retained: [documentController, coordinator])
 }

@@ -46,6 +46,9 @@ import Testing
 	defer { controller.close() }
 	let window = try #require(controller.window)
 	#expect(accessibilityLabels(in: window.contentView ?? NSView()).contains("Language server status"))
+	let recovery = WorkbenchRecoveryPanel(openSettings: {}, restoreDefaults: {}, generateDoctor: { nil })
+	let recoveryLabels = accessibilityLabels(in: recovery.contentViewForTesting(diagnostic: "workbench.profile is invalid"))
+	#expect(recoveryLabels.contains("Workbench layout is disabled"))
 }
 
 private func accessibilityLabels(in view: NSView) -> [String] {

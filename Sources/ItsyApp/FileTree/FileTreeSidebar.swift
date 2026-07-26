@@ -307,7 +307,8 @@ private let workspaceLogger = Logger(
 			selectedPath: (controller?.document as? ItsyDocument)?.fileURL?.standardizedFileURL.path,
 			openFiles: files,
 			paneStates: controller?.workspacePaneStates,
-			focusedPaneIndex: controller?.workspaceFocusedPaneIndex
+			focusedPaneIndex: controller?.workspaceFocusedPaneIndex,
+			workbenchDividers: controller?.workspaceWorkbenchDividerState
 		)
 		saveWindowState(state)
 	}

@@ -28,6 +28,12 @@ import Foundation
 		panel?.orderOut(nil)
 	}
 
+	func contentViewForTesting(diagnostic: String) -> NSView {
+		let panel = makePanelIfNeeded()
+		diagnosticLabel?.stringValue = diagnostic
+		return panel.contentView ?? NSView()
+	}
+
 	private func makePanelIfNeeded() -> NSPanel {
 		if let panel { return panel }
 		let panel = NSPanel(
@@ -40,13 +46,18 @@ import Foundation
 		panel.isReleasedWhenClosed = false
 		let content = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
 		let title = NSTextField(labelWithString: "Workbench layout is disabled")
+		title.setAccessibilityLabel("Workbench layout is disabled")
 		title.font = .systemFont(ofSize: 16, weight: .semibold)
 		let diagnostic = NSTextField(wrappingLabelWithString: "")
+		diagnostic.setAccessibilityLabel("Workbench layout diagnostic")
 		diagnostic.textColor = .secondaryLabelColor
 		diagnostic.maximumNumberOfLines = 3
 		let open = NSButton(title: "Open TOML", target: self, action: #selector(openSettings(_:)))
+		open.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.open-toml")
 		let doctor = NSButton(title: "Generate Doctor", target: self, action: #selector(generateDoctorFile(_:)))
+		doctor.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.generate-doctor")
 		let restore = NSButton(title: "Restore Defaults", target: self, action: #selector(restoreWorkbenchDefaults(_:)))
+		restore.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.restore-defaults")
 		let buttons = NSStackView(views: [open, doctor, restore])
 		buttons.orientation = .horizontal
 		buttons.spacing = 8

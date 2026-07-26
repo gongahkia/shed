@@ -4,8 +4,52 @@ import ItsyConfig
 import ItsyEditor
 
 struct TerminalWorkspaceState: Codable, Equatable {
+	static let currentSchemaVersion = 2
+
+	var schemaVersion: Int
 	var selectedTabIndex: Int
 	var tabs: [TerminalTabState]
+
+	init(selectedTabIndex: Int, tabs: [TerminalTabState]) {
+		schemaVersion = Self.currentSchemaVersion
+		self.selectedTabIndex = selectedTabIndex
+		self.tabs = tabs
+	}
+
+	private enum CodingKeys: String, CodingKey {
+		case schemaVersion
+		case selectedTabIndex
+		case tabs
+	}
+
+	init(from decoder: Decoder) throws {
+		let container = try decoder.container(keyedBy: CodingKeys.self)
+		guard container.contains(.schemaVersion) else {
+			self = try Self.migrating(from: TerminalWorkspaceStateV1(from: decoder))
+			return
+		}
+		schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
+		selectedTabIndex = try container.decode(Int.self, forKey: .selectedTabIndex)
+		tabs = try container.decode([TerminalTabState].self, forKey: .tabs)
+		guard schemaVersion == Self.currentSchemaVersion, isValid else {
+			throw DecodingError.dataCorruptedError(
+				forKey: .schemaVersion,
+				in: container,
+				debugDescription: "Unsupported or invalid terminal workspace state."
+			)
+		}
+	}
+
+	private var isValid: Bool {
+		guard tabs.allSatisfy(\.isValid) else { return false }
+		return tabs.isEmpty ? selectedTabIndex == 0 : tabs.indices.contains(selectedTabIndex)
+	}
+
+	private static func migrating(from legacy: TerminalWorkspaceStateV1) throws -> TerminalWorkspaceState {
+		let tabs = try legacy.tabs.map(TerminalTabState.migrating)
+		let selectedTabIndex = tabs.isEmpty ? 0 : min(max(0, legacy.selectedTabIndex), tabs.count - 1)
+		return TerminalWorkspaceState(selectedTabIndex: selectedTabIndex, tabs: tabs)
+	}
 }
 
 struct TerminalCoordinatorState: Equatable {
@@ -17,15 +61,128 @@ struct TerminalCoordinatorState: Equatable {
 }
 
 struct TerminalTabState: Codable, Equatable {
+	var title: String
+	var activePaneIndex: Int
+	var rootPane: TerminalPaneState
+
+	init(title: String, activePaneIndex: Int, rootPane: TerminalPaneState) {
+		self.title = title
+		self.activePaneIndex = activePaneIndex
+		self.rootPane = rootPane
+	}
+
+	fileprivate var isValid: Bool {
+		!title.isEmpty && rootPane.isValid && (0..<rootPane.paneCount).contains(activePaneIndex)
+	}
+
+	fileprivate static func migrating(from legacy: TerminalTabStateV1) throws -> TerminalTabState {
+		guard TerminalPaneState.isValidDirectoryPath(legacy.currentDirectoryPath),
+		      let layout = TerminalPaneLayout.decode(legacy.layout)
+		else {
+			throw DecodingError.dataCorrupted(.init(codingPath: [], debugDescription: "Invalid terminal v1 tab state."))
+		}
+		var paneIndex = 0
+		let rootPane = migratePane(
+			layout,
+			fallbackDirectoryPath: legacy.currentDirectoryPath,
+			paneDirectoryPaths: legacy.paneCurrentDirectoryPaths ?? [],
+			paneIndex: &paneIndex
+		)
+		let title = URL(fileURLWithPath: legacy.currentDirectoryPath).lastPathComponent
+		return TerminalTabState(
+			title: title.isEmpty ? legacy.currentDirectoryPath : title,
+			activePaneIndex: 0,
+			rootPane: rootPane
+		)
+	}
+
+	private static func migratePane(
+		_ layout: TerminalPaneLayout,
+		fallbackDirectoryPath: String,
+		paneDirectoryPaths: [String],
+		paneIndex: inout Int
+	) -> TerminalPaneState {
+		guard let vertical = layout.vertical else {
+			let path = paneDirectoryPaths.indices.contains(paneIndex) ? paneDirectoryPaths[paneIndex] : fallbackDirectoryPath
+			paneIndex += 1
+			return .leaf(currentDirectoryPath: TerminalPaneState.isValidDirectoryPath(path) ? path : fallbackDirectoryPath)
+		}
+		let children = layout.children.map {
+			migratePane(
+				$0,
+				fallbackDirectoryPath: fallbackDirectoryPath,
+				paneDirectoryPaths: paneDirectoryPaths,
+				paneIndex: &paneIndex
+			)
+		}
+		switch children.count {
+		case 0:
+			return .leaf(currentDirectoryPath: fallbackDirectoryPath)
+		case 1:
+			return children[0]
+		default:
+			return .split(orientation: vertical ? .vertical : .horizontal, children: children)
+		}
+	}
+}
+
+struct TerminalPaneState: Codable, Equatable {
+	enum Kind: String, Codable, Equatable {
+		case leaf
+		case split
+	}
+
+	enum Orientation: String, Codable, Equatable {
+		case horizontal
+		case vertical
+	}
+
+	var kind: Kind
+	var currentDirectoryPath: String?
+	var orientation: Orientation?
+	var children: [TerminalPaneState]?
+
+	static func leaf(currentDirectoryPath: String) -> TerminalPaneState {
+		TerminalPaneState(kind: .leaf, currentDirectoryPath: currentDirectoryPath, orientation: nil, children: nil)
+	}
+
+	static func split(orientation: Orientation, children: [TerminalPaneState]) -> TerminalPaneState {
+		TerminalPaneState(kind: .split, currentDirectoryPath: nil, orientation: orientation, children: children)
+	}
+
+	fileprivate static func isValidDirectoryPath(_ path: String) -> Bool {
+		path.hasPrefix("/")
+	}
+
+	fileprivate var paneCount: Int {
+		switch kind {
+		case .leaf:
+			1
+		case .split:
+			children?.reduce(0) { $0 + $1.paneCount } ?? 0
+		}
+	}
+
+	fileprivate var isValid: Bool {
+		switch kind {
+		case .leaf:
+			return currentDirectoryPath.map(Self.isValidDirectoryPath) == true && orientation == nil && (children == nil || children?.isEmpty == true)
+		case .split:
+			guard currentDirectoryPath == nil, orientation != nil, let children, children.count >= 2 else { return false }
+			return children.allSatisfy(\.isValid)
+		}
+	}
+}
+
+private struct TerminalWorkspaceStateV1: Decodable {
+	var selectedTabIndex: Int
+	var tabs: [TerminalTabStateV1]
+}
+
+private struct TerminalTabStateV1: Decodable {
 	var currentDirectoryPath: String
 	var layout: String
 	var paneCurrentDirectoryPaths: [String]?
-
-	init(currentDirectoryPath: String, layout: String, paneCurrentDirectoryPaths: [String]? = nil) {
-		self.currentDirectoryPath = currentDirectoryPath
-		self.layout = layout
-		self.paneCurrentDirectoryPaths = paneCurrentDirectoryPaths
-	}
 }
 
 struct TerminalPaneLayout: Equatable {
@@ -117,6 +274,18 @@ struct TerminalPaneLayout: Equatable {
 			)
 		}
 
+		static func make(workspaceState: TerminalPaneState) -> TerminalPaneNode {
+			switch workspaceState.kind {
+			case .leaf:
+				return .leaf(TerminalPane(currentDirectoryURL: URL(fileURLWithPath: workspaceState.currentDirectoryPath!, isDirectory: true)))
+			case .split:
+				return .split(
+					vertical: workspaceState.orientation == .vertical,
+					children: workspaceState.children!.map(make(workspaceState:))
+				)
+			}
+		}
+
 		var panes: [TerminalPane] {
 			switch self {
 			case let .leaf(pane):
@@ -132,6 +301,18 @@ struct TerminalPaneLayout: Equatable {
 				.leaf
 			case let .split(vertical, children):
 				.split(vertical: vertical, children: children.map(\.layout))
+			}
+		}
+
+		var workspaceState: TerminalPaneState {
+			switch self {
+			case let .leaf(pane):
+				return .leaf(currentDirectoryPath: pane.currentDirectoryURL.path)
+			case let .split(vertical, children):
+				return .split(
+					orientation: vertical ? .vertical : .horizontal,
+					children: children.map(\.workspaceState)
+				)
 			}
 		}
 
@@ -198,6 +379,13 @@ struct TerminalPaneLayout: Equatable {
 			activePaneID = root.panes.first?.id ?? UUID()
 		}
 
+		init(workspaceState: TerminalTabState) {
+			title = workspaceState.title
+			root = TerminalPaneNode.make(workspaceState: workspaceState.rootPane)
+			let panes = root.panes
+			activePaneID = panes[workspaceState.activePaneIndex].id
+		}
+
 		var panes: [TerminalPane] {
 			root.panes
 		}
@@ -208,6 +396,14 @@ struct TerminalPaneLayout: Equatable {
 
 		var currentDirectoryURL: URL {
 			activePane?.currentDirectoryURL ?? URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+		}
+
+		var workspaceState: TerminalTabState {
+			TerminalTabState(
+				title: title,
+				activePaneIndex: panes.firstIndex { $0.id == activePaneID } ?? 0,
+				rootPane: root.workspaceState
+			)
 		}
 	}
 
@@ -595,6 +791,14 @@ struct TerminalPaneLayout: Equatable {
 			layout: layout,
 			paneCurrentDirectoryURLs: paneCurrentDirectoryURLs
 		)
+		appendTab(tab, select: select, start: start)
+	}
+
+	private func appendTab(workspaceState: TerminalTabState, select: Bool, start: Bool = true) {
+		appendTab(TerminalTab(workspaceState: workspaceState), select: select, start: start)
+	}
+
+	private func appendTab(_ tab: TerminalTab, select: Bool, start: Bool) {
 		configurePanes(for: tab)
 		tabs.append(tab)
 		if select {
@@ -930,18 +1134,7 @@ struct TerminalPaneLayout: Equatable {
 			return
 		}
 		for tab in state.tabs {
-			let cwd = URL(fileURLWithPath: tab.currentDirectoryPath, isDirectory: true)
-			let layout = TerminalPaneLayout.decode(tab.layout) ?? .leaf
-			let paneDirectories = (tab.paneCurrentDirectoryPaths ?? []).map {
-				URL(fileURLWithPath: $0, isDirectory: true)
-			}
-			appendTab(
-				currentDirectoryURL: cwd,
-				layout: layout,
-				paneCurrentDirectoryURLs: paneDirectories,
-				select: false,
-				start: false
-			)
+			appendTab(workspaceState: tab, select: false, start: false)
 		}
 		selectedTabIndex = min(max(0, state.selectedTabIndex), max(0, tabs.count - 1))
 		rebuildTabBar()
@@ -954,13 +1147,7 @@ struct TerminalPaneLayout: Equatable {
 		}
 		let state = TerminalWorkspaceState(
 			selectedTabIndex: selectedTabIndex,
-			tabs: tabs.map {
-				TerminalTabState(
-					currentDirectoryPath: $0.currentDirectoryURL.path,
-					layout: $0.root.layout.encoded,
-					paneCurrentDirectoryPaths: $0.panes.map(\.currentDirectoryURL.path)
-				)
-			}
+			tabs: tabs.map(\.workspaceState)
 		)
 		do {
 			try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

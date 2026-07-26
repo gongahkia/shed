@@ -80,6 +80,12 @@ private final class ResponsiveGitContentView: NSView {
 	}
 }
 
+struct GitResponsiveViewState: Equatable {
+	var mode: WorkbenchGitLayoutMode
+	var visiblePaneIdentifiers: [String]
+	var focusIdentifiers: [String]
+}
+
 @MainActor final class GitCoordinator: NSObject {
 	private static let historyDateFormatter: DateFormatter = {
 		let formatter = DateFormatter()
@@ -140,6 +146,7 @@ private final class ResponsiveGitContentView: NSView {
 	private var gitToolbarCollapsibleViews: [NSView] = []
 	private var gitWorkbenchMode: WorkbenchGitLayoutMode = .full
 	private var gitResponsiveWidth: CGFloat = 0
+	private var gitFocusTraversalTargets: [NSView] = []
 	private struct GitDiffHunkItem {
 		var fileIndex: Int
 		var hunkIndex: Int
@@ -231,6 +238,36 @@ private final class ResponsiveGitContentView: NSView {
 			embeddedGitVisible = false
 			setEmbeddedGitVisible(false)
 			detachEmbeddedGitContent()
+		}
+	}
+
+	func makeGitContentViewForTesting(width: CGFloat) -> NSView {
+		let contentView = makeGitContentViewIfNeeded()
+		contentView.frame.size.width = width
+		contentView.layoutSubtreeIfNeeded()
+		applyResponsiveGitLayout(width: width)
+		return contentView
+	}
+
+	func gitResponsiveViewStateForTesting(width: CGFloat) -> GitResponsiveViewState {
+		_ = makeGitContentViewForTesting(width: width)
+		return GitResponsiveViewState(
+			mode: gitWorkbenchMode,
+			visiblePaneIdentifiers: gitMainSplitView?.arrangedSubviews.compactMap { $0.identifier?.rawValue } ?? [],
+			focusIdentifiers: gitFocusTraversalTargets.compactMap { $0.identifier?.rawValue }
+		)
+	}
+
+	func selectGitCompactPaneForTesting(_ mode: WorkbenchGitLayoutMode) {
+		guard mode == .files || mode == .diff else { return }
+		gitCompactPaneControl?.selectedSegment = mode == .files ? 0 : 1
+		applyResponsiveGitLayout(width: gitResponsiveWidth)
+	}
+
+	func gitFocusTraversalIsClosedForTesting() -> Bool {
+		guard !gitFocusTraversalTargets.isEmpty else { return true }
+		return gitFocusTraversalTargets.indices.allSatisfy { index in
+			gitFocusTraversalTargets[index].nextKeyView === gitFocusTraversalTargets[(index + 1) % gitFocusTraversalTargets.count]
 		}
 	}
 
@@ -356,23 +393,35 @@ private final class ResponsiveGitContentView: NSView {
 	private func configureGitView(_ contentView: NSView) {
 		let composer = makeGitComposerView()
 		let statusLabel = NSTextField(labelWithString: "")
+		statusLabel.identifier = NSUserInterfaceItemIdentifier("git.status")
+		statusLabel.setAccessibilityLabel(L10n.string("Git status"))
 		statusLabel.font = .systemFont(ofSize: 12)
 		statusLabel.textColor = .secondaryLabelColor
 		let branchButton = NSButton(title: L10n.string("Branch"), target: self, action: #selector(showGitBranches(_:)))
+		branchButton.identifier = NSUserInterfaceItemIdentifier("git.branch")
 		let worktreesButton = NSButton(title: L10n.string("Worktrees"), target: self, action: #selector(showGitWorktrees(_:)))
+		worktreesButton.identifier = NSUserInterfaceItemIdentifier("git.worktrees")
 		let historyButton = NSButton(title: L10n.string("History"), target: self, action: #selector(showGitRepositoryHistory(_:)))
+		historyButton.identifier = NSUserInterfaceItemIdentifier("git.history")
 		let fetchButton = NSButton(title: L10n.string("Fetch"), target: self, action: #selector(fetchGitRemote(_:)))
+		fetchButton.identifier = NSUserInterfaceItemIdentifier("git.fetch")
 		let pullButton = NSButton(title: L10n.string("Pull"), target: self, action: #selector(pullGitRemote(_:)))
+		pullButton.identifier = NSUserInterfaceItemIdentifier("git.pull")
 		let pushButton = NSButton(title: L10n.string("Push"), target: self, action: #selector(pushGitRemote(_:)))
+		pushButton.identifier = NSUserInterfaceItemIdentifier("git.push")
 		let cancelButton = NSButton(title: L10n.string("Cancel"), target: self, action: #selector(cancelGitRemote(_:)))
+		cancelButton.identifier = NSUserInterfaceItemIdentifier("git.cancel")
 		cancelButton.isEnabled = false
 		let refreshButton = NSButton(title: L10n.string("Refresh"), target: self, action: #selector(refreshGitChanges(_:)))
+		refreshButton.identifier = NSUserInterfaceItemIdentifier("git.refresh")
 		let stageButton = NSButton(title: L10n.string("Stage"), target: self, action: #selector(stageSelectedGitEntries(_:)))
+		stageButton.identifier = NSUserInterfaceItemIdentifier("git.stage")
 		let unstageButton = NSButton(
 			title: L10n.string("Unstage"),
 			target: self,
 			action: #selector(unstageSelectedGitEntries(_:))
 		)
+		unstageButton.identifier = NSUserInterfaceItemIdentifier("git.unstage")
 		let buttonStack = NSStackView(views: [
 			branchButton,
 			worktreesButton,
@@ -396,9 +445,15 @@ private final class ResponsiveGitContentView: NSView {
 		)
 		compactPaneControl.segmentStyle = .rounded
 		compactPaneControl.selectedSegment = 0
+		compactPaneControl.identifier = NSUserInterfaceItemIdentifier("git.compact-pane")
+		compactPaneControl.setAccessibilityLabel(L10n.string("Git compact pane"))
+		compactPaneControl.setAccessibilityHelp(L10n.string("Choose Files or Diff with the arrow keys."))
 		compactPaneControl.isHidden = true
 		let overflow = NSPopUpButton(frame: .zero, pullsDown: false)
 		overflow.addItem(withTitle: L10n.string("More"))
+		overflow.identifier = NSUserInterfaceItemIdentifier("git.more-actions")
+		overflow.setAccessibilityLabel(L10n.string("Git actions"))
+		overflow.setAccessibilityHelp(L10n.string("Additional Git actions."))
 		for (title, action) in [
 			(L10n.string("Worktrees"), #selector(showGitWorktrees(_:))),
 			(L10n.string("History"), #selector(showGitRepositoryHistory(_:))),
@@ -431,11 +486,16 @@ private final class ResponsiveGitContentView: NSView {
 		tableView.delegate = self
 		tableView.target = self
 		tableView.doubleAction = #selector(openSelectedGitEntry(_:))
+		tableView.identifier = NSUserInterfaceItemIdentifier("git.files")
+		tableView.setAccessibilityLabel(L10n.string("Changed files"))
 		let listScrollView = NSScrollView()
+		listScrollView.identifier = NSUserInterfaceItemIdentifier("git.files")
 		listScrollView.documentView = tableView
 		listScrollView.hasVerticalScroller = true
 		listScrollView.drawsBackground = false
 		let diffPane = makeGitDiffPane()
+		diffPane.identifier = NSUserInterfaceItemIdentifier("git.diff")
+		diffPane.setAccessibilityLabel(L10n.string("Git diff"))
 		let splitView = NSSplitView()
 		splitView.isVertical = true
 		splitView.dividerStyle = .thin
@@ -496,6 +556,8 @@ private final class ResponsiveGitContentView: NSView {
 		)
 		modeControl.selectedSegment = 0
 		modeControl.segmentStyle = .rounded
+		modeControl.identifier = NSUserInterfaceItemIdentifier("git.diff-mode")
+		modeControl.setAccessibilityLabel(L10n.string("Git diff presentation"))
 		let header = NSStackView(views: [titleLabel, statusLabel, modeControl])
 		header.orientation = .horizontal
 		header.alignment = .centerY
@@ -520,6 +582,8 @@ private final class ResponsiveGitContentView: NSView {
 		sideSplitView.addArrangedSubview(newView)
 		let diffContentView = NSView()
 		let hunkTableView = NSTableView()
+		hunkTableView.identifier = NSUserInterfaceItemIdentifier("git.hunks")
+		hunkTableView.setAccessibilityLabel(L10n.string("Git diff hunks"))
 		let hunkColumn = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("hunk"))
 		hunkColumn.title = L10n.string("Hunks")
 		hunkColumn.resizingMask = .autoresizingMask
@@ -529,6 +593,7 @@ private final class ResponsiveGitContentView: NSView {
 		hunkTableView.dataSource = self
 		hunkTableView.delegate = self
 		let hunkScrollView = NSScrollView()
+		hunkScrollView.identifier = NSUserInterfaceItemIdentifier("git.hunks")
 		hunkScrollView.documentView = hunkTableView
 		hunkScrollView.hasVerticalScroller = true
 		hunkScrollView.drawsBackground = false
@@ -585,6 +650,8 @@ private final class ResponsiveGitContentView: NSView {
 		let container = NSView()
 		let summaryField = NSTextField()
 		summaryField.placeholderString = L10n.string("Summary 50")
+		summaryField.identifier = NSUserInterfaceItemIdentifier("git.commit-summary")
+		summaryField.setAccessibilityLabel(L10n.string("Git commit summary"))
 		summaryField.font = .systemFont(ofSize: 12)
 		summaryField.delegate = self
 		let summaryHint = NSTextField(labelWithString: L10n.string("50"))
@@ -595,6 +662,8 @@ private final class ResponsiveGitContentView: NSView {
 		summaryRow.alignment = .centerY
 		summaryRow.spacing = 8
 		let bodyTextView = NSTextView()
+		bodyTextView.identifier = NSUserInterfaceItemIdentifier("git.commit-body")
+		bodyTextView.setAccessibilityLabel(L10n.string("Git commit body"))
 		bodyTextView.font = .systemFont(ofSize: 12)
 		bodyTextView.isRichText = false
 		bodyTextView.allowsUndo = true
@@ -618,13 +687,17 @@ private final class ResponsiveGitContentView: NSView {
 			target: self,
 			action: #selector(updateGitComposerStateAction(_:))
 		)
+		signoffButton.identifier = NSUserInterfaceItemIdentifier("git.signoff")
 		let amendButton = NSButton(
 			checkboxWithTitle: L10n.string("--amend"),
 			target: self,
 			action: #selector(updateGitComposerStateAction(_:))
 		)
+		amendButton.identifier = NSUserInterfaceItemIdentifier("git.amend")
 		let commitButton = NSButton(title: L10n.string("Commit"), target: self, action: #selector(commitGitChanges(_:)))
+		commitButton.identifier = NSUserInterfaceItemIdentifier("git.commit")
 		let outputButton = NSButton(title: L10n.string("Output"), target: self, action: #selector(showGitCommitOutput(_:)))
+		outputButton.identifier = NSUserInterfaceItemIdentifier("git.commit-output")
 		outputButton.isEnabled = false
 		let footer = NSStackView(views: [statusLabel, signoffButton, amendButton, outputButton, commitButton])
 		footer.orientation = .horizontal
@@ -1675,10 +1748,15 @@ private final class ResponsiveGitContentView: NSView {
 		setGitMainPanes(isTwoPane ? [listScrollView, diffPane] : mode == .files ? [listScrollView] : [diffPane], in: splitView)
 		setGitHunkVisible(isFull)
 		gitDiffModeControl?.setEnabled(isFull, forSegment: 1)
+		gitCompactPaneControl?.setAccessibilityValue(mode == .diff ? L10n.string("Diff") : L10n.string("Files"))
 		if !isFull, gitDiffMode == .sideBySide {
 			gitDiffMode = .unified
 			gitDiffModeControl?.selectedSegment = 0
 			renderGitDiff()
+		}
+		rebuildGitFocusTraversal()
+		if let gitContentView {
+			NSAccessibility.post(element: gitContentView, notification: .layoutChanged)
 		}
 	}
 
@@ -1714,6 +1792,37 @@ private final class ResponsiveGitContentView: NSView {
 			bodySplitView.addArrangedSubview(view)
 		}
 		gitHunkWidthConstraint?.isActive = visible
+	}
+
+	private func rebuildGitFocusTraversal() {
+		var targets: [NSView] = []
+		if let gitBranchButton, !gitBranchButton.isHidden { targets.append(gitBranchButton) }
+		if let gitCompactPaneControl, !gitCompactPaneControl.isHidden { targets.append(gitCompactPaneControl) }
+		if let gitToolbarOverflow, !gitToolbarOverflow.isHidden { targets.append(gitToolbarOverflow) }
+		targets += gitToolbarCollapsibleViews.filter { !$0.isHidden }
+		if let gitTableView, gitMainSplitView?.arrangedSubviews.contains(where: { $0.identifier?.rawValue == "git.files" }) == true {
+			targets.append(gitTableView)
+		}
+		if let gitDiffModeControl, gitMainSplitView?.arrangedSubviews.contains(where: { $0.identifier?.rawValue == "git.diff" }) == true {
+			targets.append(gitDiffModeControl)
+		}
+		if let gitHunkTableView, gitHunkScrollView?.superview != nil { targets.append(gitHunkTableView) }
+		if let gitUnifiedDiffView, !gitUnifiedDiffView.isHidden, gitDiffContentView?.superview != nil {
+			targets.append(gitUnifiedDiffView)
+		}
+		if let gitSummaryField { targets.append(gitSummaryField) }
+		if let gitBodyTextView { targets.append(gitBodyTextView) }
+		for button in [gitSignoffButton, gitAmendButton, gitCommitOutputButton, gitCommitButton] {
+			if let button, !button.isHidden { targets.append(button) }
+		}
+		guard !targets.isEmpty else {
+			gitFocusTraversalTargets = []
+			return
+		}
+		for index in targets.indices {
+			targets[index].nextKeyView = targets[(index + 1) % targets.count]
+		}
+		gitFocusTraversalTargets = targets
 	}
 
 	@objc private func changeGitCompactPane(_: Any?) {

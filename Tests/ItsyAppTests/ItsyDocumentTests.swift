@@ -173,6 +173,9 @@ import Testing
 
 	controller.restoreWorkspacePaneLayout("V[]")
 	#expect(controller.paneLayoutEncoded == "V[L]")
+	let dividers = WorkspaceWorkbenchDividerState(sidebarWidth: 300, gitWidth: 520)
+	controller.restoreWorkspaceWorkbenchDividerState(dividers)
+	#expect(controller.workspaceWorkbenchDividerState == dividers)
 }
 
 @MainActor

@@ -389,6 +389,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 	public var insertTextFormat: LSPInsertTextFormat?
 	public var commitCharacters: [String]?
 	public var textEdit: LSPTextEdit?
+	public var additionalTextEdits: [LSPTextEdit]?
 	public var data: LSPAny?
 
 	public init(
@@ -401,6 +402,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 		insertTextFormat: LSPInsertTextFormat? = nil,
 		commitCharacters: [String]? = nil,
 		textEdit: LSPTextEdit? = nil,
+		additionalTextEdits: [LSPTextEdit]? = nil,
 		data: LSPAny? = nil
 	) {
 		self.label = label
@@ -412,6 +414,7 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 		self.insertTextFormat = insertTextFormat
 		self.commitCharacters = commitCharacters
 		self.textEdit = textEdit
+		self.additionalTextEdits = additionalTextEdits
 		self.data = data
 	}
 
@@ -425,11 +428,19 @@ public struct LSPCompletionItem: Codable, Equatable, Sendable {
 	}
 
 	public func mergingResolvedFields(from resolved: LSPCompletionItem) -> LSPCompletionItem {
-		var item = resolved
-		if let data {
-			item.data = data
-		}
-		return item
+		LSPCompletionItem(
+			label: resolved.label,
+			detail: resolved.detail ?? detail,
+			documentation: resolved.documentation ?? documentation,
+			sortText: resolved.sortText ?? sortText,
+			filterText: resolved.filterText ?? filterText,
+			insertText: resolved.insertText ?? insertText,
+			insertTextFormat: resolved.insertTextFormat ?? insertTextFormat,
+			commitCharacters: resolved.commitCharacters ?? commitCharacters,
+			textEdit: resolved.textEdit ?? textEdit,
+			additionalTextEdits: resolved.additionalTextEdits ?? additionalTextEdits,
+			data: data ?? resolved.data
+		)
 	}
 }
 

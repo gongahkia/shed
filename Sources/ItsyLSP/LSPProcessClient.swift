@@ -179,6 +179,10 @@ public final class LSPProcessClient: @unchecked Sendable {
 		try await session.documentSymbol(textDocument: textDocument)
 	}
 
+	public func resolveCompletion(_ item: LSPCompletionItem) async throws -> LSPCompletionItem {
+		try await session.resolveCompletion(item)
+	}
+
 	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
 		try await session.prepareRename(uri: uri, position: position)
 	}

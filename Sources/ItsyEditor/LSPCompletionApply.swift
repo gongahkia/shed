@@ -18,86 +18,201 @@ public struct LSPSnippetExpansion: Equatable, Sendable {
 
 public enum LSPSnippetExpander {
 	public static func expand(_ snippet: String) -> LSPSnippetExpansion {
+		var parser = Parser(snippet: snippet)
+		_ = parser.parse()
+		return LSPSnippetExpansion(text: parser.output, tabStops: parser.tabStops)
+	}
+
+	private struct Parser {
+		let snippet: String
+		var index: String.Index
 		var output = ""
 		var tabStops: [Int: [Range<Int>]] = [:]
-		var index = snippet.startIndex
-		while index < snippet.endIndex {
-			if snippet[index] == "$" {
-				let next = snippet.index(after: index)
-				if next < snippet.endIndex, snippet[next].isNumber {
-					let parsed = parseNumber(in: snippet, from: next)
-					tabStops[parsed.value, default: []].append(output.utf8.count ..< output.utf8.count)
-					index = parsed.index
+
+		init(snippet: String) {
+			self.snippet = snippet
+			index = snippet.startIndex
+		}
+
+		mutating func parse(until terminator: Character? = nil) -> Bool {
+			while index < snippet.endIndex {
+				let character = snippet[index]
+				if character == terminator {
+					index = snippet.index(after: index)
+					return true
+				}
+				if character == "\\" {
+					appendEscapedCharacter()
 					continue
 				}
-				if next < snippet.endIndex, snippet[next] == "{" {
-					if let parsed = parsePlaceholder(in: snippet, from: snippet.index(after: next)) {
-						let start = output.utf8.count
-						output.append(parsed.placeholder)
-						tabStops[parsed.value, default: []].append(start ..< output.utf8.count)
-						index = parsed.index
-						continue
-					}
+				if character == "$", parseDollar() {
+					continue
 				}
-			}
-			output.append(snippet[index])
-			index = snippet.index(after: index)
-		}
-		return LSPSnippetExpansion(text: output, tabStops: tabStops)
-	}
-
-	private static func parseNumber(in snippet: String, from start: String.Index) -> (value: Int, index: String.Index) {
-		var index = start
-		var value = 0
-		while index < snippet.endIndex, let digit = snippet[index].wholeNumberValue {
-			value = value * 10 + digit
-			index = snippet.index(after: index)
-		}
-		return (value, index)
-	}
-
-	private static func parsePlaceholder(in snippet: String, from start: String.Index) -> (value: Int, placeholder: String, index: String.Index)? {
-		let parsed = parseNumber(in: snippet, from: start)
-		guard parsed.index < snippet.endIndex else {
-			return nil
-		}
-		var index = parsed.index
-		var placeholder = ""
-		if snippet[index] == ":" {
-			index = snippet.index(after: index)
-			while index < snippet.endIndex, snippet[index] != "}" {
-				placeholder.append(snippet[index])
+				output.append(character)
 				index = snippet.index(after: index)
 			}
+			return terminator == nil
 		}
-		guard index < snippet.endIndex, snippet[index] == "}" else {
-			return nil
+
+		private mutating func parseDollar() -> Bool {
+			let dollar = index
+			let next = snippet.index(after: index)
+			guard next < snippet.endIndex else {
+				return false
+			}
+			if let value = number(from: next) {
+				tabStops[value.value, default: []].append(output.utf8.count ..< output.utf8.count)
+				index = value.index
+				return true
+			}
+			guard snippet[next] == "{" else {
+				return false
+			}
+			let savedOutput = output
+			let savedTabStops = tabStops
+			index = snippet.index(after: next)
+			guard parseBraced() else {
+				output = savedOutput
+				tabStops = savedTabStops
+				index = dollar
+				return false
+			}
+			return true
 		}
-		return (parsed.value, placeholder, snippet.index(after: index))
+
+		private mutating func parseBraced() -> Bool {
+			guard let parsed = number(from: index) else {
+				return false
+			}
+			index = parsed.index
+			guard index < snippet.endIndex else {
+				return false
+			}
+			switch snippet[index] {
+			case "}":
+				index = snippet.index(after: index)
+				tabStops[parsed.value, default: []].append(output.utf8.count ..< output.utf8.count)
+				return true
+			case ":":
+				index = snippet.index(after: index)
+				let start = output.utf8.count
+				guard parse(until: "}") else {
+					return false
+				}
+				tabStops[parsed.value, default: []].append(start ..< output.utf8.count)
+				return true
+			case "|":
+				index = snippet.index(after: index)
+				return parseChoice(tabStop: parsed.value)
+			default:
+				return false
+			}
+		}
+
+		private mutating func parseChoice(tabStop: Int) -> Bool {
+			let start = output.utf8.count
+			var selectedFirst = true
+			while index < snippet.endIndex {
+				let character = snippet[index]
+				if character == "\\" {
+					if selectedFirst {
+						appendEscapedCharacter()
+					} else {
+						skipEscapedCharacter()
+					}
+					continue
+				}
+				if character == "," {
+					selectedFirst = false
+					index = snippet.index(after: index)
+					continue
+				}
+				if character == "|" {
+					let next = snippet.index(after: index)
+					guard next < snippet.endIndex, snippet[next] == "}" else {
+						return false
+					}
+					index = snippet.index(after: next)
+					tabStops[tabStop, default: []].append(start ..< output.utf8.count)
+					return true
+				}
+				guard character != "}" else {
+					return false
+				}
+				if selectedFirst {
+					output.append(character)
+				}
+				index = snippet.index(after: index)
+			}
+			return false
+		}
+
+		private mutating func appendEscapedCharacter() {
+			let next = snippet.index(after: index)
+			guard next < snippet.endIndex else {
+				output.append("\\")
+				index = next
+				return
+			}
+			let character = snippet[next]
+			if "\\$},|".contains(character) {
+				output.append(character)
+				index = snippet.index(after: next)
+				return
+			}
+			output.append("\\")
+			index = next
+		}
+
+		private mutating func skipEscapedCharacter() {
+			let next = snippet.index(after: index)
+			index = next < snippet.endIndex ? snippet.index(after: next) : next
+		}
+
+		private func number(from start: String.Index) -> (value: Int, index: String.Index)? {
+			guard start < snippet.endIndex, snippet[start].isNumber else {
+				return nil
+			}
+			var index = start
+			var value = 0
+			while index < snippet.endIndex, let digit = snippet[index].wholeNumberValue {
+				value = value * 10 + digit
+				index = snippet.index(after: index)
+			}
+			return (value, index)
+		}
 	}
 }
 
 public struct LSPCompletionApplication: Equatable, Sendable {
 	public var replacementRange: Range<Int>
 	public var replacementText: String
+	public var transactionRange: Range<Int>
+	public var transactionText: String
 	public var selectionRanges: [Range<Int>]
 	public var tabStopRanges: [Int: [Range<Int>]]
 
 	public init(
 		replacementRange: Range<Int>,
 		replacementText: String,
+		transactionRange: Range<Int>? = nil,
+		transactionText: String? = nil,
 		selectionRanges: [Range<Int>],
 		tabStopRanges: [Int: [Range<Int>]] = [:]
 	) {
 		self.replacementRange = replacementRange
 		self.replacementText = replacementText
+		self.transactionRange = transactionRange ?? replacementRange
+		self.transactionText = transactionText ?? replacementText
 		self.selectionRanges = selectionRanges
 		self.tabStopRanges = tabStopRanges
 	}
 }
 
 public enum LSPCompletionApply {
-	public static func application(for item: LSPCompletionItem, in text: String, cursorOffset: Int) -> LSPCompletionApplication? {
+	public static func application(for item: LSPCompletionItem, in text: String,
+	                               cursorOffset: Int) -> LSPCompletionApplication?
+	{
 		let source = item.textEdit?.newText ?? item.insertText ?? item.label
 		let replacementRange: Range<Int>
 		if let edit = item.textEdit {
@@ -112,21 +227,80 @@ public enum LSPCompletionApply {
 		let expansion = item.insertTextFormat == .snippet
 			? LSPSnippetExpander.expand(source)
 			: LSPSnippetExpansion(text: source, tabStops: [:])
+		let primaryEdit = CompletionTextEdit(range: replacementRange, text: expansion.text)
+		let additionalEdits = item.additionalTextEdits?.compactMap { edit -> CompletionTextEdit? in
+			guard let range = LSPTextEditApply.utf8Range(for: edit.range, in: text) else {
+				return nil
+			}
+			return CompletionTextEdit(range: range, text: edit.newText)
+		} ?? []
+		guard (item.additionalTextEdits?.count ?? 0) == additionalEdits.count,
+		      let transaction = transaction(for: [primaryEdit] + additionalEdits, in: text)
+		else {
+			return nil
+		}
+		let selectionOffset = additionalEdits
+			.filter { $0.range.upperBound <= replacementRange.lowerBound }
+			.reduce(0) { $0 + $1.text.utf8.count - $1.range.count }
 		let selections = expansion.firstTabStopRanges.map {
-			(replacementRange.lowerBound + $0.lowerBound) ..< (replacementRange.lowerBound + $0.upperBound)
+			(replacementRange.lowerBound + selectionOffset + $0.lowerBound) ..<
+				(replacementRange.lowerBound + selectionOffset + $0.upperBound)
 		}
 		let tabStopRanges = expansion.tabStops.mapValues { ranges in
 			ranges.map {
-				(replacementRange.lowerBound + $0.lowerBound) ..< (replacementRange.lowerBound + $0.upperBound)
+				(replacementRange.lowerBound + selectionOffset + $0.lowerBound) ..<
+					(replacementRange.lowerBound + selectionOffset + $0.upperBound)
 			}
 		}
-		let fallback = replacementRange.lowerBound + expansion.text.utf8.count
+		let fallback = replacementRange.lowerBound + selectionOffset + expansion.text.utf8.count
 		return LSPCompletionApplication(
 			replacementRange: replacementRange,
 			replacementText: expansion.text,
+			transactionRange: transaction.range,
+			transactionText: transaction.text,
 			selectionRanges: selections.isEmpty ? [fallback ..< fallback] : selections,
 			tabStopRanges: tabStopRanges
 		)
+	}
+
+	private struct CompletionTextEdit {
+		var range: Range<Int>
+		var text: String
+	}
+
+	private static func transaction(for edits: [CompletionTextEdit],
+	                                in source: String) -> (range: Range<Int>, text: String)?
+	{
+		guard let first = edits.min(by: { $0.range.lowerBound < $1.range.lowerBound }),
+		      let last = edits.max(by: { $0.range.upperBound < $1.range.upperBound })
+		else {
+			return nil
+		}
+		let ordered = edits.sorted {
+			if $0.range.lowerBound != $1.range.lowerBound {
+				return $0.range.lowerBound < $1.range.lowerBound
+			}
+			return $0.range.upperBound < $1.range.upperBound
+		}
+		for index in 1 ..< ordered.count {
+			let previous = ordered[index - 1].range
+			let next = ordered[index].range
+			guard previous.upperBound <= next.lowerBound,
+			      previous != next,
+			      !(previous.lowerBound == next.lowerBound && (previous.isEmpty || next.isEmpty))
+			else {
+				return nil
+			}
+		}
+		let range = first.range.lowerBound ..< last.range.upperBound
+		let sourceBytes = Array(source.utf8)
+		var bytes = Array(sourceBytes[range])
+		for edit in ordered.reversed() {
+			let lower = edit.range.lowerBound - range.lowerBound
+			let upper = edit.range.upperBound - range.lowerBound
+			bytes.replaceSubrange(lower ..< upper, with: edit.text.utf8)
+		}
+		return (range, String(decoding: bytes, as: UTF8.self))
 	}
 
 	private static func completionPrefixRange(in text: String, cursorOffset: Int) -> Range<Int> {

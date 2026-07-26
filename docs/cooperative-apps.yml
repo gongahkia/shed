@@ -1,0 +1,83 @@
+version: 1
+defaults:
+  - name: Alcove
+    bundle_id: com.lowtechguys.Alcove
+    category: notch
+  - name: NotchNook
+    bundle_id: com.akashpawar.notchnook
+    category: notch
+  - name: Boring Notch
+    bundle_id: com.tymmesyde.boring-notch
+    category: notch
+  - name: MewNotch
+    bundle_id: com.monuk7735.mew.notch
+    category: notch
+  - name: NotchFlow
+    bundle_id: com.lukegrubb.NotchFlow
+    category: notch
+  - name: TopNotch
+    bundle_id: com.codykerns.TopNotch
+    category: notch
+  - name: Notchmeister
+    bundle_id: com.notchmeister.Notchmeister
+    category: notch
+  - name: Brow
+    bundle_id: com.brow-app.Brow
+    category: notch
+  - name: DynamicLake Pro
+    bundle_id: com.dynamiclake.pro
+    category: notch
+  - name: Bartender
+    bundle_id: com.surteesstudios.Bartender
+    category: menu-bar
+  - name: Hidden Bar
+    bundle_id: com.dwarvesf.hidden
+    category: menu-bar
+  - name: Ice
+    bundle_id: com.jordanbaird.Ice
+    category: menu-bar
+  - name: Alfred
+    bundle_id: com.runningwithcrayons.Alfred
+    category: launcher
+  - name: Raycast
+    bundle_id: com.raycast.macos
+    category: launcher
+  - name: LaunchBar
+    bundle_id: at.obdev.LaunchBar
+    category: launcher
+  - name: SketchyBar
+    bundle_id: com.felixkratz.SketchyBar
+    category: status-bar
+  - name: Ubersicht
+    bundle_id: de.tracesof.Uebersicht
+    category: status-bar
+  - name: JankyBorders
+    bundle_id: com.felixkratz.JankyBorders
+    category: overlay
+  - name: Klack
+    bundle_id: com.tryklack.Klack
+    category: keyboard-sound
+  - name: Klakk
+    bundle_id: com.klakk.macos
+    category: keyboard-sound
+  - name: OBS
+    bundle_id: com.obsproject.obs-studio
+    category: screen-capture
+  - name: ScreenFlow
+    bundle_id: com.araelium.screenflow6
+    category: screen-capture
+  - name: CleanShot X
+    bundle_id: pl.maketheweb.cleanshotx
+    category: screen-capture
+  - name: Karabiner-EventViewer
+    bundle_id: org.pqrs.Karabiner-EventViewer
+    category: hotkey-daemon
+  - name: skhd
+    bundle_id: com.koekeishiya.skhd
+    category: hotkey-daemon
+  - name: BetterTouchTool
+    bundle_id: com.hegenberg.BetterTouchTool
+    category: hotkey-daemon
+  - name: Hammerspoon
+    bundle_id: org.hammerspoon.Hammerspoon
+    category: hotkey-daemon

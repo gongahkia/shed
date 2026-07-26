@@ -1,4 +1,0 @@
-module CLibgit2 [system] {
-	header "include/CLibgit2.h"
-	export *
-}

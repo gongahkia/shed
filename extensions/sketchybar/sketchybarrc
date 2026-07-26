@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+OLLY_SKETCHYBAR_DIR="${OLLY_SKETCHYBAR_DIR:-$HOME/.config/sketchybar/olly}"
+OLLY_PLUGIN_DIR="${OLLY_PLUGIN_DIR:-$OLLY_SKETCHYBAR_DIR/plugins}"
+OLLY_EVENTS_PIDFILE="${OLLY_EVENTS_PIDFILE:-/tmp/olly-sketchybar-events.pid}"
+
+sketchybar --add event olly_update
+
+sketchybar --add item olly.mode left \
+  --set olly.mode \
+    icon="olly" \
+    label="waiting" \
+    update_freq=0 \
+    script="$OLLY_PLUGIN_DIR/olly_item.sh" \
+  --subscribe olly.mode olly_update mouse.clicked
+
+if ! [ -f "$OLLY_EVENTS_PIDFILE" ] || ! kill -0 "$(cat "$OLLY_EVENTS_PIDFILE")" 2>/dev/null; then
+  "$OLLY_PLUGIN_DIR/olly_events.sh" >/tmp/olly-sketchybar-events.log 2>&1 &
+  printf '%s\n' "$!" >"$OLLY_EVENTS_PIDFILE"
+fi

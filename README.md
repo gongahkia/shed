@@ -1,105 +1,245 @@
-# Itsy
+# Olly
 
-<div align="center">
-    <img src="./asset/logo/itsy-logo.png" width="30%">
-</div>
+![Olly workflow preview](docs/demo.gif)
 
-macOS-native code editor targeting instant launch, low RSS, and modal editing.
+> Status: pre-alpha. `main` builds and tests, but v0.1.0 is not released yet.
+> The final release is gated on signed/notarized distribution assets and a runtime
+> smoke test for the app IPC service.
 
-[![status](https://img.shields.io/badge/status-pre--release-orange.svg)](#)
+Olly is a pure-Swift macOS window manager experiment built around hot-swappable
+layout engines, River-style tags, and a Swift DSL config. The v0.x constraint is
+strict: Accessibility APIs only, no SIP-off requirement, and no private windowing
+APIs.
 
-![Itsy editor window](docs/screenshots/itsy-main.png)
+## Why Olly
 
-## Status
+- One package, many layout models: floating, BSP, Niri-style scrolling columns,
+  master-stack, manual split trees, monocle, grid, spiral, tabbed, stacked, and
+  more.
+- Per-tag engine binding: use BSP for code, scrolling columns for browsers,
+  floating for calls, and a different layout again on another display.
+- Swift DSL config: typed tags, rules, keybinds, safe zones, animations, hooks,
+  and cooperative app behavior.
+- IPC-first design: newline-delimited JSON over a Unix-domain socket, with
+  `ollyctl` and first-party extension examples.
+- Ecosystem posture: yield screen real estate and emit events instead of
+  competing with menu bars, launchers, borders, notch utilities, hotkey daemons,
+  and capture tools.
 
-Pre-release. Do not ship the current release candidate.
+## Current Shape
 
-- Current cold start misses the `<150 ms` target.
-- Full Zed/Sublime/VSCode/CodeEdit comparison is not locally available.
-- Distribution signing and notarization are blocked until a Developer ID Application certificate is installed.
-
-Remaining work is tracked in [GitHub issues](https://github.com/gongahkia/itsy/issues).
-
-## Config
-
-Itsy reads user settings from `~/.config/itsy/settings.toml`; see [docs/settings.md](docs/settings.md).
-Generated keymap docs live at [docs/keymap-reference.md](docs/keymap-reference.md).
-
-## Build
-
-```sh
-scripts/bootstrap.sh
-swift build -c release
-bench/scripts/make_app.sh
-open Itsy.app
-```
+| Area | State |
+|---|---|
+| AX/window layer | Permission checks, display discovery, window snapshots, movement, wake handling, and AX tests. |
+| Workspace model | River-style tag bitsets, per-display active tags, MRU history, persistence, and dispatch tests. |
+| Layout engines | Shared `LayoutEngine` protocol, registry, placement diffing, and built-in engines. |
+| DSL | Result-builder config, rules, keybinds, safe zones, migrations, examples, and diagnostics. |
+| IPC | Protocol schema, Unix socket client/server library, event envelopes, and `ollyctl`. |
+| App shell | Menu bar item, AX onboarding, settings, overview mode, and command palette UI. |
+| Release | Local ad-hoc DMG smoke test passes; final Developer ID signing/notarization is not configured. |
 
 ## Install
 
-Local unsigned app build:
+Current source build:
 
 ```sh
-scripts/bootstrap.sh
+./scripts/bootstrap-dev.sh
 swift build -c release
-bench/scripts/make_app.sh
-cp -R Itsy.app /Applications/Itsy.app
+swift test
+.build/release/ollyApp
 ```
 
-Release DMG install, after the signed/notarized release flow is complete:
+Planned v0.1.0 release paths:
 
 ```sh
-scripts/release_doctor.sh
-open Itsy-0.1.0.dmg
+brew install --cask olly
 ```
 
-Release readiness and blocked external prerequisites are tracked in [docs/release.md](docs/release.md).
+or download `Olly-v0.1.0.dmg` from the GitHub release and drag `Olly.app` to
+`/Applications`.
 
-Homebrew cask install, after a cask is published:
+No public v0.1.0 DMG or Homebrew cask exists yet. See
+[`docs/release-readiness.md`](docs/release-readiness.md) for the current gate.
+
+## Config
+
+Create `~/.config/olly/Config.swift`:
+
+```swift
+import CoreGraphics
+import ollyCore
+import ollyDSL
+
+public func ollyConfig() -> Config {
+    Config {
+        Workspaces {
+            Tag.named("code")
+            Tag.named("web")
+            Tag.named("chat")
+        }
+
+        Engines {
+            EngineDeclaration.bsp
+            EngineDeclaration.niriScroll
+            EngineDeclaration.masterStack
+            Monocle()
+            Spiral()
+            Grid(.squareish)
+            ThreeCol(masterRatio: 0.5)
+            Accordion()
+            EngineDeclaration.floating
+        }
+
+        SafeZones {
+            notchPadding(16)
+            reserve(rect: CGRect(x: 0, y: 900, width: 1512, height: 82), on: 1)
+        }
+
+        Keybinds {
+            Keybind(KeyChord([.command, .option], .one), do: .switchTag(0))
+            Keybind(KeyChord([.command, .option], .two), do: .switchTag(1))
+            Keybind(KeyChord([.command, .option], .space), do: .cycleEngine)
+            Keybind(KeyChord([.option], .j), do: .focus(.down))
+            Keybind(KeyChord([.option], .k), do: .focus(.up))
+        }
+
+        Rules {
+            Rule(
+                match: RuleMatch(bundleID: "com.apple.dt.Xcode"),
+                apply: RuleApply(tags: tag(0), engine: .bsp)
+            )
+            Rule(
+                match: RuleMatch(bundleID: "com.apple.Safari"),
+                apply: RuleApply(tags: tag(1), engine: .niriScroll)
+            )
+            Rule(
+                match: RuleMatch(subrole: "AXDialog"),
+                apply: RuleApply(engine: .floating, floating: true)
+            )
+        }
+    }
+}
+```
+
+More configs live in [`examples/`](examples/):
+
+- `minimal.swift`
+- `niri-only.swift`
+- `master-stack-heavy.swift`
+- `ultrawide-3col.swift`
+- `multi-display-tags.swift`
+- `plugin-author.swift`
+
+## CLI
+
+`ollyctl` is the scriptable surface for a running Olly IPC service:
 
 ```sh
-brew install --cask itsy
+ollyctl state --json
+ollyctl list-windows
+ollyctl list-displays
+ollyctl switch-tag 1
+ollyctl set-engine bsp
+ollyctl cycle-engine
+ollyctl bsp-tree flip-axis
+ollyctl manual-preselect right
+ollyctl focus next
+ollyctl toggle-floating
+ollyctl snap-window left-half
+ollyctl dispatch-gesture fourFingerHorizontal right
+ollyctl move-to-tag 2
+ollyctl move-to-display 69734272
+ollyctl doctor
+ollyctl init-config --profile starter
+ollyctl events --replay-current-state
+ollyctl migrate-config --config ~/.config/olly/Config.swift
 ```
 
-Draft the cask locally with `scripts/make_homebrew_cask.sh` after building the release DMG.
+The protocol is documented in [`docs/ipc.md`](docs/ipc.md).
 
-## Bench
+## Layout Engines
 
-Latest committed release-candidate result: [bench/results/release-candidate.md](bench/results/release-candidate.md).
-No benchmark was rerun for this docs-only scope update.
+| Engine ID | Model |
+|---|---|
+| `floating` | Pass-through frames for untiled windows and dialogs. |
+| `master-stack` | Tall-style master pane plus stacked siblings. |
+| `manual` | User-shaped split tree. |
+| `bsp` | Binary-space-partition tree. |
+| `niri-scroll` | Horizontal scrolling column strip. |
+| `paperwm-scroll` | PaperWM-style variable-width scrolling columns. |
+| `monocle` | Focused window fullscreen, siblings hidden offscreen. |
+| `spiral` | Recursive golden-ratio split of the remaining rect. |
+| `grid` | Square-ish or fixed row/column auto-pack. |
+| `three-col` | Centered master with balanced side stacks. |
+| `accordion` | Focused window expanded, siblings collapsed to strips. |
+| `tabbed` | Focused window below an app-rendered tab strip. |
+| `stacked` | Focused window beside an app-rendered full-height title rail. |
+| `tree-tab` | Focused window beside an app-rendered nested side tree. |
+| `vertical-tile` | Master/full-height layout for rotated displays. |
+| `ratio-tile` | Aspect-ratio-aware tile packing. |
+| `frame` | Recursive frame tree host. |
+| `pseudotile.*` | Wrapper that centers a preferred-size tile inside another engine. |
+| `pinned-columns.*` | Wrapper that pins columns inside a scrolling engine. |
 
-Environment: Apple M3, macOS 26.5.1 25F80, AC power, 20 runs, no `sudo purge`.
+Layout snapshots are tested under
+[`Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots`](Tests/ollyLayoutsTests/Fixtures/LayoutSnapshots).
 
-| App | Version/source | Runs | Mean startup ms | Min startup ms | Max startup ms | Mean RSS KB | Status |
-|---|---|---:|---:|---:|---:|---:|---|
-| Itsy | local `Itsy.app`, current editor/LSP/Git/tasks scope | 20 | 272.661 | 237.908 | 326.350 | 86467 | current release candidate; misses `<150 ms` target |
-| Zed | 1.8.2, committed baseline | 20 | 470.856 | 330.977 | 679.386 | 182062 | historical same-version baseline; current rerun blocked by running Zed session |
-| Sublime Text | not installed locally | - | - | - | - | - | not measured |
-| VSCode | not installed locally | - | - | - | - | - | not measured |
-| CodeEdit | not installed locally | - | - | - | - | - | not measured |
+## Ecosystem
 
-Against the committed same-version Zed baseline, Itsy is `42.1%` faster on mean startup and uses `52.5%` less RSS at first-window measurement. Current Zed comparison cannot be verified without closing the user's running Zed session.
+- Menu/status bars: [`extensions/sketchybar/`](extensions/sketchybar/),
+  [`extensions/ubersicht/`](extensions/ubersicht/).
+- Launchers: [`extensions/alfred/`](extensions/alfred/),
+  [`extensions/raycast/`](extensions/raycast/).
+- Borders: [`extensions/jankyborders/`](extensions/jankyborders/).
+- Hotkey daemons: [`docs/hotkey-delegation.md`](docs/hotkey-delegation.md).
+- Cooperative apps: [`docs/cooperative-apps.yml`](docs/cooperative-apps.yml).
+- Full integration matrix:
+  [`docs/menubar-notch-integration.md`](docs/menubar-notch-integration.md).
 
-## Feature Matrix
-
-Itsy is intentionally narrow:
-
-| Area | Current scope | Not in current release |
-|---|---|---|
-| Native editor | AppKit shell, Metal text view, Swift rope buffer, split panes, tabs, file tree, lazy PTY terminal | No Electron, collaboration, or telemetry |
-| Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings | Named Vim marks deferred |
-| Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.toml` editor/theme/terminal prefs | Additional grammars/themes are incremental |
-| LSP | Lazy external server sessions, document sync, diagnostics gutter, completion/resolve, hover, references panel, signature help, workspace edits/config, smoke/bench coverage | Full LSP surface is incomplete |
-| DAP | Protocol types and message framing | No integrated debugger UI |
-| Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |
-| Tasks/extensions | Built-in task discovery/run panel; extension manifests contribute tasks only | No executable plugin runtime or marketplace |
-| Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | GitHub issues track follow-up slices |
-| Docs/QA | Generated keymap reference, screenshot capture script, changelog, coverage gate, Vim binding regression suite | Screenshot capture requires local GUI permissions |
-| Distribution | Local unsigned app, DMG workflow, signed Sparkle appcast/release-note workflow | Developer ID signing/notarization credentials, first published release, Homebrew cask, final name/domain |
-
-## Formatting
-
-Swift source uses SwiftFormat with `.swiftformat`:
+## Development
 
 ```sh
-swiftformat --lint .
+./scripts/bootstrap-dev.sh
+swiftlint lint --config .swiftlint.yml --strict
+./scripts/check-no-private-api.sh
+swift build -c release
+swift test
+./scripts/smoke-app-ipc.sh
 ```
+
+SwiftPM products:
+
+- `ollyApp`: menu bar app target.
+- `ollyctl`: CLI client.
+- `PerfBench`: layout/config benchmark runner.
+- `SoakHarness`: long-running AX/window movement harness.
+- `ollyKit`, `ollyCore`, `ollyLayouts`, `ollyDSL`, `ollyIPC`, `ollyDiagnostics`: library targets.
+
+Useful docs:
+
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/dsl-cookbook.md`](docs/dsl-cookbook.md)
+- [`docs/dsl-reference.md`](docs/dsl-reference.md)
+- [`docs/doctor.md`](docs/doctor.md)
+- [`docs/first-run.md`](docs/first-run.md)
+- [`docs/performance.md`](docs/performance.md)
+- [`docs/plugin-authoring.md`](docs/plugin-authoring.md)
+- [`docs/homebrew-cask-pr.md`](docs/homebrew-cask-pr.md)
+
+## Inspiration Credits
+
+Per `NORTHSTAR.md` section 3, Olly studies and credits:
+
+- [niri](https://github.com/niri-wm/niri): scrollable tiling model.
+- [macniri](https://github.com/J-x-Z/macniri): cautionary macOS port reference.
+- [river](https://github.com/riverwm/river): external layout generator architecture.
+- [AeroSpace](https://github.com/nikitabobko/AeroSpace): virtual workspace emulation on macOS.
+- [Hiro / OmniWM](https://github.com/BarutSRB/OmniWM): macOS multi-layout precedent.
+- [Nehir](https://github.com/apphane-dev/nehir): IPC, live config, and command palette precedent.
+- [Paneru](https://github.com/karinushka/paneru): Lua scripting and sliding layout precedent.
+- [Hammerspoon](https://github.com/Hammerspoon/hammerspoon): macOS extension ecosystem reference.
+- [Swindler](https://github.com/tmandry/Swindler): Swift AX abstraction reference.
+
+## Name
+
+The name references Olruggio from *Witch Hat Atelier*, where window-ways are common.

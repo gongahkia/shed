@@ -1,0 +1,20 @@
+included:
+  - Package.swift
+  - Sources
+
+excluded:
+  - .build
+  - .swiftpm
+
+disabled_rules:
+  - file_header
+
+opt_in_rules:
+  - force_unwrapping
+
+line_length:
+  warning: 120
+  error: 120
+
+force_unwrapping:
+  severity: error

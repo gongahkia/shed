@@ -157,6 +157,7 @@ public enum GitHubPullRequestMergeResult: Equatable, Sendable {
 	case cancelled
 	case notMergeable(GitHubPullRequestMergePreflight)
 	case failed(GitHubCLIJSONBridgeError)
+	case recovered(error: GitHubCLIJSONBridgeError, pullRequest: GitHubPullRequestDetailQueryState, gitStatus: GitStatus?, cleanup: GitHubPullRequestCleanupResult)
 	case completed(pullRequest: GitHubPullRequestDetailQueryState, gitStatus: GitStatus?, cleanup: GitHubPullRequestCleanupResult)
 }
 
@@ -196,10 +197,24 @@ public struct GitHubPullRequestMergeService: Sendable {
 		} catch is CancellationError {
 			throw CancellationError()
 		} catch let error as GitHubCLIJSONBridgeError {
-			return .failed(error)
+			return try await recover(after: error, confirmation: confirmation, cleanup: cleanup, workspaceURL: workspaceURL)
 		} catch {
-			return .failed(.unavailable)
+			return try await recover(after: .unavailable, confirmation: confirmation, cleanup: cleanup, workspaceURL: workspaceURL)
 		}
+	}
+
+	private func recover(after error: GitHubCLIJSONBridgeError, confirmation: GitHubPullRequestMergeConfirmation, cleanup: GitHubPullRequestCleanupOption, workspaceURL: URL) async throws -> GitHubPullRequestMergeResult {
+		let refreshedPullRequest = try await detailQuery.refresh(number: confirmation.intent.pullRequestNumber, workspaceURL: workspaceURL)
+		let gitStatus: GitStatus?
+		do {
+			gitStatus = try await gitRefresher.refresh(workspaceURL: workspaceURL)
+		} catch is CancellationError {
+			throw CancellationError()
+		} catch {
+			gitStatus = nil
+		}
+		let cleanupResult = try await performCleanup(after: refreshedPullRequest, option: cleanup, workspaceURL: workspaceURL)
+		return .recovered(error: error, pullRequest: refreshedPullRequest, gitStatus: gitStatus, cleanup: cleanupResult)
 	}
 
 	private func performCleanup(after state: GitHubPullRequestDetailQueryState, option: GitHubPullRequestCleanupOption, workspaceURL: URL) async throws -> GitHubPullRequestCleanupResult {

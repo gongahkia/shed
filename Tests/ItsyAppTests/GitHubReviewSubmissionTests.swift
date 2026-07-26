@@ -63,6 +63,61 @@ import Testing
 	}
 }
 
+@Test func gitHubReviewDraftSubmissionRemovesOnlyConfirmedThreadDrafts() async throws {
+	let fixture = try GitHubReviewSubmissionDraftFixture()
+	let store = GitHubReviewDraftStore(workspaceURL: fixture.root)
+	let location = try GitHubReviewLineLocation(path: "Sources/File.swift", range: 4 ... 4, side: .right, commitOID: GitHubGitObjectID("0123456789abcdef0123456789abcdef01234567"))
+	let draft = try GitHubReviewDraft(pullRequestNumber: 7, target: .inline(location), body: "Please revise")
+	try store.save([draft])
+	let executor = GitHubReviewSubmissionFixtureExecutor([
+		.init(exitStatus: 1, standardError: "temporary failure"),
+		.init(exitStatus: 0, standardOutput: #"{"id":55}"#),
+	])
+	let service = GitHubReviewDraftSubmissionService(bridge: GitHubCLIJSONBridge(executableURL: URL(fileURLWithPath: "/fixture/gh"), executor: executor))
+	let repository = try GitHubRepositoryName("owner/repo")
+	guard case .failed(.processFailure) = try await service.submit(draft: draft, repository: repository, workspaceURL: fixture.root, store: store) else {
+		Issue.record("expected retained remote-delivery failure")
+		return
+	}
+	#expect(store.load().map(\.id) == [draft.id])
+	#expect(try await service.submit(draft: draft, repository: repository, workspaceURL: fixture.root, store: store) == .submitted(.comment(commentID: 55)))
+	#expect(store.load().isEmpty)
+	#expect(try await service.submit(draft: draft, reviewAction: .approve, repository: repository, workspaceURL: fixture.root, store: store) == .failed(.invalidCommand))
+}
+
+@Test func gitHubReviewDraftSubmissionSubmitsReviewsAndReportsLocalRecovery() async throws {
+	let fixture = try GitHubReviewSubmissionDraftFixture()
+	let store = GitHubReviewDraftStore(workspaceURL: fixture.root)
+	let draft = try GitHubReviewDraft(pullRequestNumber: 7, target: .review, body: "Approved")
+	try store.save([draft])
+	let executor = GitHubReviewSubmissionFixtureExecutor([
+		.init(exitStatus: 0),
+		.init(exitStatus: 0, standardOutput: detailJSON()),
+		.init(exitStatus: 0, standardOutput: #"[]"#),
+	])
+	let service = GitHubReviewDraftSubmissionService(bridge: GitHubCLIJSONBridge(executableURL: URL(fileURLWithPath: "/fixture/gh"), executor: executor))
+	let repository = try GitHubRepositoryName("owner/repo")
+	#expect(try await service.submit(draft: draft, repository: repository, workspaceURL: fixture.root, store: store) == .requiresReviewAction)
+	guard case let .submitted(.review(action, refreshed)) = try await service.submit(draft: draft, reviewAction: .approve, repository: repository, workspaceURL: fixture.root, store: store) else {
+		Issue.record("expected persisted review submission")
+		return
+	}
+	#expect(action == .approve)
+	guard case let .ready(detail) = refreshed else {
+		Issue.record("expected refreshed submitted review")
+		return
+	}
+	#expect(detail.reviewDecision == "APPROVED")
+	#expect(store.load().isEmpty)
+
+	let invalidStore = GitHubReviewDraftStore(workspaceURL: fixture.fileURL)
+	let retainedExecutor = GitHubReviewSubmissionFixtureExecutor([.init(exitStatus: 0, standardOutput: #"{"id":56}"#)])
+	let retainedService = GitHubReviewDraftSubmissionService(bridge: GitHubCLIJSONBridge(executableURL: URL(fileURLWithPath: "/fixture/gh"), executor: retainedExecutor))
+	let inline = try GitHubReviewDraft(pullRequestNumber: 7, target: .inline(try GitHubReviewLineLocation(path: "Sources/File.swift", range: 5 ... 5, side: .right, commitOID: GitHubGitObjectID("0123456789abcdef0123456789abcdef01234567"))), body: "Retained locally")
+	#expect(try await retainedService.submit(draft: inline, repository: repository, workspaceURL: fixture.root, store: invalidStore) == .submittedButRetained(.comment(commentID: 56)))
+	#expect(!retainedService.persistRemoval(of: inline, in: invalidStore))
+}
+
 private func detailJSON() -> String {
 	#"{"number":7,"url":"https://github.com/owner/repo/pull/7","title":"Review fixture","body":"Body","state":"OPEN","isDraft":false,"headRefName":"feature","headRepositoryOwner":{"login":"owner"},"baseRefName":"main","reviewDecision":"APPROVED","mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","commits":[],"files":[]}"#
 }
@@ -83,5 +138,20 @@ private actor GitHubReviewSubmissionFixtureExecutor: GitHubCLIJSONExecuting {
 		recorded.append(arguments)
 		if throwsCancellation { throw CancellationError() }
 		return results.isEmpty ? GitHubCLIProcessResult(exitStatus: 1) : results.removeFirst()
+	}
+}
+
+private final class GitHubReviewSubmissionDraftFixture {
+	let root = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-review-submission-\(UUID().uuidString)", isDirectory: true)
+	let fileURL: URL
+
+	init() throws {
+		try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+		fileURL = root.appendingPathComponent("not-a-workspace")
+		try Data().write(to: fileURL)
+	}
+
+	deinit {
+		try? FileManager.default.removeItem(at: root)
 	}
 }

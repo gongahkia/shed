@@ -64,6 +64,18 @@ public enum GitHubReviewSubmissionResult: Equatable, Sendable {
 	case failed(action: GitHubReviewSubmissionAction, error: GitHubCLIJSONBridgeError)
 }
 
+public enum GitHubReviewDraftSubmissionReceipt: Equatable, Sendable {
+	case review(action: GitHubReviewSubmissionAction, refreshed: GitHubPullRequestDetailQueryState)
+	case comment(commentID: Int64)
+}
+
+public enum GitHubReviewDraftSubmissionResult: Equatable, Sendable {
+	case requiresReviewAction
+	case failed(GitHubCLIJSONBridgeError)
+	case submitted(GitHubReviewDraftSubmissionReceipt)
+	case submittedButRetained(GitHubReviewDraftSubmissionReceipt)
+}
+
 public struct GitHubReviewSubmissionService: Sendable {
 	private let bridge: GitHubCLIJSONBridge
 	private let detailQuery: GitHubPullRequestDetailQuery
@@ -88,6 +100,66 @@ public struct GitHubReviewSubmissionService: Sendable {
 			return .failed(action: confirmation.action, error: error)
 		} catch {
 			return .failed(action: confirmation.action, error: .unavailable)
+		}
+	}
+}
+
+public struct GitHubReviewDraftSubmissionService: Sendable {
+	private let reviewSubmission: GitHubReviewSubmissionService
+	private let delivery: GitHubReviewDraftDelivery
+
+	public init(bridge: GitHubCLIJSONBridge) {
+		reviewSubmission = GitHubReviewSubmissionService(bridge: bridge)
+		delivery = GitHubReviewDraftDelivery(bridge: bridge)
+	}
+
+	public func submit(
+		draft: GitHubReviewDraft,
+		reviewAction: GitHubReviewSubmissionAction? = nil,
+		repository: GitHubRepositoryName,
+		workspaceURL: URL,
+		store: GitHubReviewDraftStore
+	) async throws -> GitHubReviewDraftSubmissionResult {
+		let receipt: GitHubReviewDraftSubmissionReceipt
+		switch draft.target {
+		case .review:
+			guard let reviewAction else { return .requiresReviewAction }
+			let confirmation: GitHubReviewSubmissionConfirmation
+			do {
+				confirmation = GitHubReviewSubmissionPlanner.requestConfirmation(for: try GitHubReviewSubmissionIntent(draft: draft, action: reviewAction))
+			} catch let error as GitHubCLIJSONBridgeError {
+				return .failed(error)
+			} catch {
+				return .failed(.unavailable)
+			}
+			switch try await reviewSubmission.submit(confirmation, repository: repository, workspaceURL: workspaceURL) {
+			case let .submitted(action, refreshed):
+				receipt = .review(action: action, refreshed: refreshed)
+			case .cancelled:
+				return .failed(.unavailable)
+			case let .failed(_, error):
+				return .failed(error)
+			}
+		case .inline, .reply:
+			guard reviewAction == nil else { return .failed(.invalidCommand) }
+			switch try await delivery.submit(draft: draft, repository: repository, workspaceURL: workspaceURL) {
+			case let .submitted(commentID):
+				receipt = .comment(commentID: commentID)
+			case .queuedForReview:
+				return .failed(.invalidCommand)
+			case let .failed(error):
+				return .failed(error)
+			}
+		}
+		return persistRemoval(of: draft, in: store) ? .submitted(receipt) : .submittedButRetained(receipt)
+	}
+
+	public func persistRemoval(of draft: GitHubReviewDraft, in store: GitHubReviewDraftStore) -> Bool {
+		do {
+			try store.save(store.load().filter { $0.id != draft.id })
+			return true
+		} catch {
+			return false
 		}
 	}
 }

@@ -38,6 +38,33 @@ import Testing
 	#expect(host.component(for: .terminal) === terminal)
 }
 
+@MainActor @Test func componentHostIsolatesFailedMountAndRetriesFromRecoveryView() throws {
+	let mountPoint = NSView(frame: .init(x: 0, y: 0, width: 640, height: 240))
+	let host = WorkbenchComponentHostController(mountPoints: [.terminal: mountPoint])
+	let component = RecoverableWorkbenchComponent(id: .terminal)
+
+	host.setVisible(true, for: .terminal)
+	#expect(!host.mount(component))
+	#expect(host.lifecycle(for: .terminal) == .unmounted)
+	#expect(host.failure(for: .terminal) == .init(component: .terminal, reason: .mountDidNotAttach))
+	let recoveryView = try #require(host.recoveryView(for: .terminal))
+	#expect(!recoveryView.isHidden)
+	#expect(recoveryView.accessibilityLabel() == "Terminal unavailable")
+	let retryButton = try #require(workbenchRecoveryDescendants(in: recoveryView).compactMap { $0 as? NSButton }.first)
+	#expect(retryButton.accessibilityLabel() == "Retry Terminal unavailable")
+
+	component.canMount = true
+	retryButton.performClick(nil)
+	#expect(host.failure(for: .terminal) == nil)
+	#expect(host.recoveryView(for: .terminal) == nil)
+	#expect(host.lifecycle(for: .terminal) == .visible)
+	#expect(component.view.superview === mountPoint)
+}
+
+@MainActor private func workbenchRecoveryDescendants(in view: NSView) -> [NSView] {
+	view.subviews + view.subviews.flatMap(workbenchRecoveryDescendants)
+}
+
 @MainActor private final class StatefulWorkbenchComponent: WorkbenchComponent {
 	let id: WorkbenchComponentID
 	let view = NSView()
@@ -79,4 +106,36 @@ import Testing
 	func mount(in _: any WorkbenchComponentHost) {}
 	func setVisible(_: Bool) {}
 	func unmount() {}
+}
+
+@MainActor private final class RecoverableWorkbenchComponent: WorkbenchComponent {
+	let id: WorkbenchComponentID
+	let view = NSView()
+	private(set) var lifecycle: WorkbenchComponentLifecycle = .unmounted
+	private weak var host: (any WorkbenchComponentHost)?
+	var canMount = false
+
+	init(id: WorkbenchComponentID) {
+		self.id = id
+	}
+
+	func mount(in host: any WorkbenchComponentHost) {
+		guard canMount else {
+			return
+		}
+		self.host = host
+		host.attach(view, for: id)
+		lifecycle = .hidden
+	}
+
+	func setVisible(_ visible: Bool) {
+		host?.setVisible(visible, for: id)
+		lifecycle = visible ? .visible : .hidden
+	}
+
+	func unmount() {
+		host?.detach(component: id)
+		host = nil
+		lifecycle = .unmounted
+	}
 }

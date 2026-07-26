@@ -1,0 +1,240 @@
+import AppKit
+import ItsyEditor
+
+struct GutterMarkerLayout: Equatable {
+	var marker: GutterMarker
+	var rect: CGRect
+}
+
+final class GutterView: NSView {
+	private static let defaultFont = NSFont.monospacedSystemFont(ofSize: 14.95, weight: .regular)
+
+	var colors = EditorColorPalette.defaultLight.gutter {
+		didSet { needsDisplay = true }
+	}
+	var showsLineNumbers = false {
+		didSet { needsDisplay = true }
+	}
+	var lineNumberMode = MetalLineNumberMode.absolute {
+		didSet { needsDisplay = true }
+	}
+	var activeLineIndex = 0 {
+		didSet { needsDisplay = true }
+	}
+	var lineCount = 0 {
+		didSet { needsDisplay = true }
+	}
+	var visibleLineRange: Range<Int> = 0 ..< 0 {
+		didSet { needsDisplay = true }
+	}
+	var visibleLineSlots: [Int] = [] {
+		didSet { needsDisplay = true }
+	}
+	var topLineIndex = 0 {
+		didSet { needsDisplay = true }
+	}
+	var topContentInset: CGFloat = 0 {
+		didSet { needsDisplay = true }
+	}
+	var textInsetY: CGFloat = 6 {
+		didSet { needsDisplay = true }
+	}
+	var lineHeight: CGFloat = 20 {
+		didSet { needsDisplay = true }
+	}
+	var lineNumberRightEdge: CGFloat = 0 {
+		didSet { needsDisplay = true }
+	}
+	var fontName = "Menlo" {
+		didSet { cachedFont = nil; needsDisplay = true }
+	}
+	var fontSize: CGFloat = 14.95 {
+		didSet { cachedFont = nil; needsDisplay = true }
+	}
+	var markerLayouts: [GutterMarkerLayout] = [] {
+		didSet { needsDisplay = true }
+	}
+
+	private var cachedFont: NSFont?
+
+	override var isFlipped: Bool { true }
+	override var isOpaque: Bool { false }
+	override func isAccessibilityElement() -> Bool { true }
+	override func accessibilityRole() -> NSAccessibility.Role? { .group }
+	override func accessibilityLabel() -> String? { "Editor gutter" }
+	override func accessibilityValue() -> Any? {
+		var values = ["Line \(activeLineIndex + 1) of \(lineCount)"]
+		values += markerLayouts.map { "Line \($0.marker.line + 1): \($0.marker.severity) - \($0.marker.message)" }
+		return values.joined(separator: ". ")
+	}
+
+	override func hitTest(_ point: NSPoint) -> NSView? {
+		nil
+	}
+
+	func marker(atLocalPoint point: NSPoint) -> GutterMarker? {
+		markerLayouts.first { $0.rect.insetBy(dx: -3, dy: -2).contains(point) }?.marker
+	}
+
+	func rect(forMarkerID id: String) -> CGRect? {
+		markerLayouts.first { $0.marker.id == id }?.rect
+	}
+
+	var visibleLineNumberLabels: [String] {
+		guard showsLineNumbers else {
+			return []
+		}
+		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
+		var seenLines = Set<Int>()
+		return lines.map { line in
+			guard seenLines.insert(line).inserted else {
+				return ""
+			}
+			switch lineNumberMode {
+			case .off:
+				return ""
+			case .absolute:
+				return "\(line + 1)"
+			case .relative:
+				return "\(abs(line - activeLineIndex))"
+			}
+		}
+	}
+
+	override func draw(_ dirtyRect: NSRect) {
+		super.draw(dirtyRect)
+		drawLineNumbers(in: dirtyRect)
+		drawMarkers(in: dirtyRect)
+	}
+
+	private func drawLineNumbers(in dirtyRect: NSRect) {
+		guard showsLineNumbers else {
+			return
+		}
+		let attributes = lineNumberAttributes
+		let lines = visibleLineSlots.isEmpty ? Array(visibleLineRange) : visibleLineSlots
+		var seenLines = Set<Int>()
+		for (row, lineIndex) in lines.enumerated() {
+			guard seenLines.insert(lineIndex).inserted else {
+				continue
+			}
+			let label: String
+			switch lineNumberMode {
+			case .off:
+				continue
+			case .absolute:
+				label = "\(lineIndex + 1)"
+			case .relative:
+				label = "\(abs(lineIndex - activeLineIndex))"
+			}
+			let size = label.size(withAttributes: attributes)
+			let origin = CGPoint(
+				x: lineNumberRightEdge - size.width,
+				y: topContentInset + textInsetY + CGFloat(row) * lineHeight + max(0, (lineHeight - size.height) / 2)
+			)
+			let rect = CGRect(origin: origin, size: size)
+			guard rect.intersects(dirtyRect) else {
+				continue
+			}
+			label.draw(at: origin, withAttributes: attributes)
+		}
+	}
+
+	private func drawMarkers(in dirtyRect: NSRect) {
+		guard let context = NSGraphicsContext.current?.cgContext else {
+			return
+		}
+		for layout in markerLayouts where layout.rect.intersects(dirtyRect) {
+			let color = layout.marker.color ?? markerColor(for: layout.marker.severity)
+			context.setFillColor(Self.cgColor(from: color))
+			if layout.marker.shape == .dot {
+				context.fillEllipse(in: layout.rect)
+			} else if layout.marker.shape == .foldOpen {
+				context.addPath(Self.foldOpenPath(in: layout.rect))
+				context.fillPath()
+			} else if layout.marker.shape == .foldClosed {
+				context.addPath(Self.foldClosedPath(in: layout.rect))
+				context.fillPath()
+			} else if layout.marker.placement == .betweenLines {
+				for slice in caretSlices(for: layout.rect) where slice.width > 0 {
+					context.fill(slice)
+				}
+			} else {
+				context.fill(layout.rect)
+			}
+		}
+	}
+
+	private var lineNumberAttributes: [NSAttributedString.Key: Any] {
+		[
+			.font: font,
+			.foregroundColor: Self.nsColor(from: colors.lineNumber),
+		]
+	}
+
+	private var font: NSFont {
+		if let cachedFont {
+			return cachedFont
+		}
+		let font = NSFont(name: fontName, size: fontSize) ?? Self.defaultFont
+		cachedFont = font
+		return font
+	}
+
+	private func caretSlices(for rect: CGRect) -> [CGRect] {
+		[
+			CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: 2),
+			CGRect(x: rect.minX + 1, y: rect.minY + 2, width: rect.width - 2, height: 2),
+			CGRect(x: rect.minX + 3, y: rect.minY + 4, width: rect.width - 6, height: 2),
+		]
+	}
+
+	private func markerColor(for severity: WorkspaceProblemSeverity) -> SIMD4<Float> {
+		switch severity {
+		case .error:
+			return colors.error
+		case .warning:
+			return colors.warning
+		case .info:
+			return colors.info
+		case .hint:
+			return colors.hint
+		}
+	}
+
+	private static func cgColor(from color: SIMD4<Float>) -> CGColor {
+		CGColor(
+			red: CGFloat(color.x),
+			green: CGFloat(color.y),
+			blue: CGFloat(color.z),
+			alpha: CGFloat(color.w)
+		)
+	}
+
+	private static func nsColor(from color: SIMD4<Float>) -> NSColor {
+		NSColor(
+			srgbRed: CGFloat(color.x),
+			green: CGFloat(color.y),
+			blue: CGFloat(color.z),
+			alpha: CGFloat(color.w)
+		)
+	}
+
+	private static func foldOpenPath(in rect: CGRect) -> CGPath {
+		let path = CGMutablePath()
+		path.move(to: CGPoint(x: rect.minX + 1, y: rect.minY + 3))
+		path.addLine(to: CGPoint(x: rect.maxX - 1, y: rect.minY + 3))
+		path.addLine(to: CGPoint(x: rect.midX, y: rect.maxY - 2))
+		path.closeSubpath()
+		return path
+	}
+
+	private static func foldClosedPath(in rect: CGRect) -> CGPath {
+		let path = CGMutablePath()
+		path.move(to: CGPoint(x: rect.minX + 3, y: rect.minY + 1))
+		path.addLine(to: CGPoint(x: rect.maxX - 2, y: rect.midY))
+		path.addLine(to: CGPoint(x: rect.minX + 3, y: rect.maxY - 1))
+		path.closeSubpath()
+		return path
+	}
+}

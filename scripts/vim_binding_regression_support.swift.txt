@@ -1,0 +1,348 @@
+struct GeneratedVimBindingCase: CustomTestStringConvertible {
+	let line: Int
+	let mode: ItsyKeymap.Mode
+	let key: String
+	let commandID: String
+
+	var testDescription: String {
+		"line \(line) \(mode) \(key) -> \(commandID)"
+	}
+
+	func binding() throws -> ItsyKeymap.KeyBinding {
+		try ItsyKeymap.KeymapLoader.binding(mode: mode, key: key, commandID: commandID)
+	}
+}
+
+@Test func generatedVimBindingCasesMatchBundledProfile() throws {
+	let actual = try bundledVimBindings().map(bindingSignature(_:))
+	let expected = try generatedVimBindingCases.map { try bindingSignature($0.binding()) }
+	#expect(actual == expected)
+	#expect(expected.count == generatedVimBindingCaseCount)
+}
+
+@Test(arguments: generatedVimBindingCases)
+func generatedVimBindingResolvesBundledKeymap(_ testCase: GeneratedVimBindingCase) throws {
+	let bindings = try bundledVimBindings()
+	let binding = try testCase.binding()
+	#expect(bindings.contains(binding))
+	var engine = ItsyKeymap.KeymapEngine(modeStack: [binding.mode], bindings: bindings)
+	var result = ItsyKeymap.KeymapResult.passthrough
+	for key in binding.chord {
+		result = engine.handle(try keyEvent(for: key))
+	}
+	if hasLongerBindingPrefix(binding, in: bindings) {
+		#expect(result == .partial)
+		#expect(engine.pendingChord == binding.chord)
+	} else {
+		#expect(result == .command(binding.commandID))
+		#expect(engine.pendingChord.isEmpty)
+	}
+}
+
+@Test(arguments: generatedVimBindingCases)
+func generatedVimBindingCommandRouteIsStable(_ testCase: GeneratedVimBindingCase) {
+	var engine = ItsyVim.VimEngine(
+		mode: vimMode(for: testCase.mode),
+		pendingOperator: testCase.mode == .operatorPending ? .delete : nil
+	)
+	if testCase.mode == .visual {
+		engine.visualMode = .character
+	}
+	let action = engine.handle(commandID: testCase.commandID, count: 1, hasSelection: testCase.mode == .visual)
+	#expect(action == expectedCommandAction(for: testCase.commandID, mode: testCase.mode))
+}
+
+private func bundledVimBindings() throws -> [ItsyKeymap.KeyBinding] {
+	try ItsyKeymap.KeymapConfiguration.load(profile: .vim, userConfigURL: nil)
+}
+
+private func bindingSignature(_ binding: ItsyKeymap.KeyBinding) -> String {
+	let chord = binding.chord.map(keySignature(_:)).joined(separator: " ")
+	return "\(binding.mode)|\(chord)|\(binding.commandID)"
+}
+
+private func keySignature(_ key: ItsyKeymap.Key) -> String {
+	let modifiers: [(ItsyKeymap.KeyModifiers, String)] = [
+		(.command, "cmd"),
+		(.control, "ctrl"),
+		(.option, "opt"),
+		(.shift, "shift"),
+	]
+	let prefix = modifiers.compactMap { key.modifiers.contains($0.0) ? $0.1 : nil }.joined(separator: "+")
+	return prefix.isEmpty ? key.value : "\(prefix)+\(key.value)"
+}
+
+private func hasLongerBindingPrefix(_ binding: ItsyKeymap.KeyBinding, in bindings: [ItsyKeymap.KeyBinding]) -> Bool {
+	bindings.contains {
+		$0.mode == binding.mode &&
+			$0.chord.count > binding.chord.count &&
+			Array($0.chord.prefix(binding.chord.count)) == binding.chord
+	}
+}
+
+private func keyEvent(for key: ItsyKeymap.Key) throws -> NSEvent {
+	let keyInfo = eventKeyInfo(for: key.value)
+	return try #require(NSEvent.keyEvent(
+		with: .keyDown,
+		location: .zero,
+		modifierFlags: eventModifiers(for: key.modifiers),
+		timestamp: 0,
+		windowNumber: 0,
+		context: nil,
+		characters: keyInfo.characters,
+		charactersIgnoringModifiers: keyInfo.charactersIgnoringModifiers,
+		isARepeat: false,
+		keyCode: keyInfo.keyCode
+	))
+}
+
+private func eventKeyInfo(for value: String) -> (characters: String, charactersIgnoringModifiers: String, keyCode: UInt16) {
+	switch value {
+	case "escape":
+		return ("\u{1B}", "\u{1B}", 53)
+	case "space":
+		return (" ", " ", 49)
+	case "left":
+		return ("", "", 123)
+	case "right":
+		return ("", "", 124)
+	case "down":
+		return ("", "", 125)
+	case "up":
+		return ("", "", 126)
+	case "return":
+		return ("\r", "\r", 36)
+	case "tab":
+		return ("\t", "\t", 48)
+	case "delete":
+		return ("\u{7F}", "\u{7F}", 51)
+	default:
+		return (value, value.lowercased(), 0)
+	}
+}
+
+private func eventModifiers(for modifiers: ItsyKeymap.KeyModifiers) -> NSEvent.ModifierFlags {
+	var flags: NSEvent.ModifierFlags = []
+	if modifiers.contains(.command) {
+		flags.insert(.command)
+	}
+	if modifiers.contains(.shift) {
+		flags.insert(.shift)
+	}
+	if modifiers.contains(.option) {
+		flags.insert(.option)
+	}
+	if modifiers.contains(.control) {
+		flags.insert(.control)
+	}
+	return flags
+}
+
+private func vimMode(for mode: ItsyKeymap.Mode) -> ItsyVim.Mode {
+	switch mode {
+	case .global:
+		return .normal
+	case .normal:
+		return .normal
+	case .insert:
+		return .insert
+	case .visual:
+		return .visual(.character)
+	case .operatorPending:
+		return .operatorPending
+	case .command, .emacs:
+		return .normal
+	}
+}
+
+private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode) -> ItsyVim.VimCommandAction? {
+	if let mark = suffix(commandID, after: "vim.mark.set."), mark.count == 1, let character = mark.first {
+		return .setMark(character)
+	}
+	if let mark = suffix(commandID, after: "vim.mark.jump.") ?? suffix(commandID, after: "vim.mark.jumpLine."), mark.count == 1, let character = mark.first {
+		return .jumpToMark(character)
+	}
+	if let register = suffix(commandID, after: "vim.macro.record.") {
+		return .macroRecord(register)
+	}
+	if motionCommandIDs.contains(commandID) {
+		if mode == .visual {
+			return .visualMotion(commandID)
+		}
+		if mode == .operatorPending {
+			return .applyPendingOperatorMotion(commandID)
+		}
+		return .motion(commandID)
+	}
+	if textObjectCommandIDs.contains(commandID), mode == .operatorPending {
+		return .applyPendingOperatorTextObject(commandID)
+	}
+	switch commandID {
+	case "editor.findCharForward":
+		return .beginCharacterMotion(.findForward)
+	case "editor.findCharBackward":
+		return .beginCharacterMotion(.findBackward)
+	case "editor.tillCharForward":
+		return .beginCharacterMotion(.tillForward)
+	case "editor.tillCharBackward":
+		return .beginCharacterMotion(.tillBackward)
+	case "editor.repeatCharFind":
+		return .repeatCharacterMotion(reversed: false)
+	case "editor.repeatCharFindReverse":
+		return .repeatCharacterMotion(reversed: true)
+	case "edit.undo":
+		return .undo
+	case "edit.redo":
+		return .redo
+	case "editor.addNextSelection":
+		return .addNextSelection
+	case "vim.operator.delete":
+		return mode == .visual ? .applySelectionOperator(.delete) : .beginOperator(.delete)
+	case "vim.operator.change":
+		return mode == .visual ? .applySelectionOperator(.change) : .beginOperator(.change)
+	case "vim.operator.yank":
+		return mode == .visual ? .applySelectionOperator(.yank) : .beginOperator(.yank)
+	case "vim.case.toggle":
+		return .toggleCaseAtCursor
+	case "vim.case.toggleOperator":
+		return mode == .visual ? .applySelectionOperator(.toggleCase) : .beginOperator(.toggleCase)
+	case "vim.case.lowerOperator":
+		return mode == .visual ? .applySelectionOperator(.lowercase) : .beginOperator(.lowercase)
+	case "vim.case.upperOperator":
+		return mode == .visual ? .applySelectionOperator(.uppercase) : .beginOperator(.uppercase)
+	case "vim.indent.right":
+		return mode == .visual ? .applySelectionOperator(.indentRight) : .lineOperator(.indentRight)
+	case "vim.indent.left":
+		return mode == .visual ? .applySelectionOperator(.indentLeft) : .lineOperator(.indentLeft)
+	case "vim.repeatChange":
+		return .repeatLastChange
+	case "vim.registerPrefix":
+		return .handled
+	case "vim.jumpBack":
+		return .jumpBack
+	case "vim.macro.recordPrefix":
+		return .macroRecordPrefix
+	case "vim.macro.replayPrefix":
+		return .macroReplayPrefix
+	case "vim.pasteAfter":
+		return .paste(after: true)
+	case "vim.pasteBefore":
+		return .paste(after: false)
+	case "vim.insert.lineStart":
+		return .insertLineStart
+	case "vim.append.afterCursor":
+		return .appendAfterCursor
+	case "vim.append.lineEnd":
+		return .appendLineEnd
+	case "vim.openLineBelow":
+		return .openLine(after: true)
+	case "vim.openLineAbove":
+		return .openLine(after: false)
+	case "vim.delete.char":
+		return .deleteCharacter(backward: false, count: 1)
+	case "vim.delete.charBackward":
+		return .deleteCharacter(backward: true, count: 1)
+	case "vim.delete.toLineEnd":
+		return .deleteToLineEnd(change: false)
+	case "vim.change.toLineEnd":
+		return .deleteToLineEnd(change: true)
+	case "vim.substitute.char":
+		return .substituteCharacter(count: 1)
+	case "vim.change.line":
+		return .lineOperator(.change)
+	case "vim.joinLines":
+		return .joinLines
+	case "vim.yank.line":
+		return .lineOperator(.yank)
+	case "vim.replace.char":
+		return .replaceCharacter
+	case "vim.replace.mode":
+		return .replaceMode
+	case "vim.ex.start":
+		return .exStart
+	case "vim.visual.char":
+		return .beginVisualMode(.character)
+	case "vim.visual.line":
+		return .beginVisualMode(.line)
+	case "vim.visual.block":
+		return .beginVisualMode(.block)
+	case "vim.operator.line.delete":
+		return .lineOperator(.delete)
+	case "vim.operator.line.change":
+		return .lineOperator(.change)
+	case "vim.operator.line.yank":
+		return .lineOperator(.yank)
+	case "vim.format.operator", "vim.format.line", "vim.format.reflowOperator",
+	     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
+	     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll":
+		return .hostCommand(commandID)
+	case "vim.searchHistory.forward":
+		return .search("edit.findNext", recordsJump: false)
+	case "vim.searchHistory.backward":
+		return .search("edit.findPrevious", recordsJump: false)
+	case "vim.commandHistory":
+		return .hostCommand("view.commandPalette")
+	case "edit.findNext", "edit.findPrevious", "vim.searchForward", "vim.searchBackward":
+		return .search(commandID, recordsJump: mode == .normal || mode == .global)
+	case "file.save":
+		return .save
+	case "file.close":
+		return .close
+	case "mode.normal":
+		return .normalMode
+	case "mode.insert":
+		return .insertMode
+	case "mode.emacs":
+		return .emacsMode
+	case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
+		return .normalMode
+	default:
+		return nil
+	}
+}
+
+private func suffix(_ value: String, after prefix: String) -> String? {
+	guard value.hasPrefix(prefix) else {
+		return nil
+	}
+	let suffix = String(value.dropFirst(prefix.count))
+	return suffix.isEmpty ? nil : suffix
+}
+
+private let motionCommandIDs: Set<String> = [
+	"editor.moveLeft",
+	"editor.moveRight",
+	"editor.moveDown",
+	"editor.moveUp",
+	"editor.moveWordForward",
+	"editor.moveWordBackward",
+	"editor.moveWordEnd",
+	"editor.moveBigWordForward",
+	"editor.moveBigWordBackward",
+	"editor.moveBigWordEnd",
+	"editor.moveLineStart",
+	"editor.moveLineEnd",
+	"editor.moveBufferStart",
+	"editor.moveBufferEnd",
+	"editor.moveParagraphForward",
+	"editor.moveParagraphBackward",
+]
+
+private let textObjectCommandIDs: Set<String> = [
+	"vim.textObject.innerWord",
+	"vim.textObject.aroundWord",
+	"vim.textObject.innerDoubleQuote",
+	"vim.textObject.aroundDoubleQuote",
+	"vim.textObject.innerSingleQuote",
+	"vim.textObject.aroundSingleQuote",
+	"vim.textObject.innerParen",
+	"vim.textObject.aroundParen",
+	"vim.textObject.innerBracket",
+	"vim.textObject.aroundBracket",
+	"vim.textObject.innerBrace",
+	"vim.textObject.aroundBrace",
+	"vim.textObject.innerParagraph",
+	"vim.textObject.aroundParagraph",
+	"vim.textObject.innerTag",
+	"vim.textObject.aroundTag",
+]

@@ -1,6 +1,7 @@
 import AppKit
 import ItsyEditor
 import ItsyKeymap
+import ItsyVim
 import struct ItsyVim.VimMarkStore
 @testable import ItsyRender
 import Testing
@@ -1308,6 +1309,33 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "j", charactersIgnoringModifiers: "j", keyCode: 0))
 	#expect(view.editor.selections.primary.range == 0 ..< 1)
 	#expect(view.editor.selections.secondaries == [Selection(anchor: 3, head: 4)])
+}
+
+@Test func vimVisualModeRendersSelectionAndClearsStateOnEscape() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc")
+	view.cursorStyle = .block
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("v")], commandID: "vim.visual.char"),
+		KeyBinding(mode: .visual, chord: [Key("l")], commandID: "editor.moveRight"),
+		KeyBinding(mode: .visual, chord: [Key("escape")], commandID: "mode.normal"),
+	])
+
+	#expect(view.handleKey(characters: "v", charactersIgnoringModifiers: "v", keyCode: 0))
+	#expect(view.vimEngine.mode == .visual(.character))
+	#expect(view.vimEngine.visualAnchor == 0)
+	#expect(view.keymapEngine.mode == .visual)
+	#expect(view.handleKey(characters: "l", charactersIgnoringModifiers: "l", keyCode: 0))
+	#expect(view.editor.selections.primary.range == 0 ..< 1)
+	#expect(view.solidOverlayInstances(scale: 1).count == 2)
+
+	#expect(view.handleKey(characters: "\u{1b}", charactersIgnoringModifiers: "\u{1b}", keyCode: 53))
+	#expect(view.vimEngine.mode == .normal)
+	#expect(view.vimEngine.visualAnchor == nil)
+	#expect(view.vimEngine.visualHead == nil)
+	#expect(view.editor.selections.primary.isCaret)
+	#expect(view.keymapEngine.mode == .normal)
+	#expect(view.solidOverlayInstances(scale: 1).count == 1)
 }
 
 @Test func vimRegistersYankAndPasteNamedRegister() {

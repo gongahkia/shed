@@ -8,7 +8,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 10
+	public static let currentVersion = 11
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -349,6 +349,19 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public struct DebuggerSettings: Equatable, Sendable {
+		public enum Presentation: String, Equatable, Sendable {
+			case sidebar
+			case window
+		}
+
+		public var presentation: Presentation
+
+		public init(presentation: Presentation = .sidebar) {
+			self.presentation = presentation
+		}
+	}
+
 	public struct FindSettings: Equatable, Sendable {
 		public var usesRegex: Bool
 		public var isCaseSensitive: Bool
@@ -416,6 +429,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var syntax: SyntaxSettings
 	public var terminal: TerminalSettings
 	public var git: GitSettings
+	public var debugger: DebuggerSettings
 	public var find: FindSettings
 	public var recovery: RecoverySettings
 	public var updates: UpdateSettings
@@ -429,6 +443,7 @@ public struct ItsySettings: Equatable, Sendable {
 		syntax: SyntaxSettings = SyntaxSettings(),
 		terminal: TerminalSettings = TerminalSettings(),
 		git: GitSettings = GitSettings(),
+		debugger: DebuggerSettings = DebuggerSettings(),
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
 		updates: UpdateSettings = UpdateSettings(),
@@ -441,6 +456,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.syntax = syntax
 		self.terminal = terminal
 		self.git = git
+		self.debugger = debugger
 		self.find = find
 		self.recovery = recovery
 		self.updates = updates
@@ -826,6 +842,9 @@ public final class ItsySettingsStore {
 		[git]
 		presentation = "\(settings.git.presentation.rawValue)"
 
+		[debugger]
+		presentation = "\(settings.debugger.presentation.rawValue)"
+
 		[find]
 		uses_regex = \(settings.find.usesRegex ? "true" : "false")
 		case_sensitive = \(settings.find.isCaseSensitive ? "true" : "false")
@@ -1002,6 +1021,7 @@ public enum ItsySettingsResolver {
 		case "terminal.scrollback_lines": target.terminal.scrollbackLines = source.terminal.scrollbackLines
 		case "terminal.presentation": target.terminal.presentation = source.terminal.presentation
 		case "git.presentation": target.git.presentation = source.git.presentation
+		case "debugger.presentation": target.debugger.presentation = source.debugger.presentation
 		case "find.uses_regex": target.find.usesRegex = source.find.usesRegex
 		case "find.case_sensitive": target.find.isCaseSensitive = source.find.isCaseSensitive
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
@@ -1461,6 +1481,14 @@ struct ItsySettingsParser {
 			   let presentation = ItsySettings.GitSettings.Presentation(rawValue: presentation.lowercased())
 			{
 				settings.git.presentation = presentation
+			} else {
+				warnType(key, line: line, expected: #""sidebar" or "window""#)
+			}
+		case "debugger.presentation":
+			if case let .string(presentation) = value,
+			   let presentation = ItsySettings.DebuggerSettings.Presentation(rawValue: presentation.lowercased())
+			{
+				settings.debugger.presentation = presentation
 			} else {
 				warnType(key, line: line, expected: #""sidebar" or "window""#)
 			}

@@ -61,7 +61,14 @@ import ItsyKeymap
 		problemsCoordinator: problemsCoordinator,
 		activeDocumentProvider: { [weak self] in self?.activeDocument() }
 	)
-	private lazy var debuggerCoordinator = DebuggerCoordinator(documentController: documentController)
+	private lazy var debuggerCoordinator = DebuggerCoordinator(
+		documentController: documentController,
+		settingsProvider: { [weak self] in self?.currentDebuggerSettings() ?? ItsySettings.DebuggerSettings() },
+		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedDebuggerHostView },
+		setEmbeddedDebuggerVisible: { [weak self] visible in
+			self?.activeEditorWindowController()?.setEmbeddedDebuggerVisible(visible)
+		}
+	)
 	private lazy var terminalCoordinator = TerminalCoordinator(
 		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
@@ -660,6 +667,7 @@ import ItsyKeymap
 		ItsyGitHunkGutterCoordinator.applyAll()
 		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
 		gitCoordinator.applyGitSettings(settings.git)
+		debuggerCoordinator.applyDebuggerSettings(settings.debugger)
 		terminalCoordinator.applyTerminalSettings(settings.terminal)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
 		if settings.workbench.git == .visible {
@@ -868,6 +876,10 @@ import ItsyKeymap
 
 	private func currentGitSettings() -> ItsySettings.GitSettings {
 		settingsCoordinator.currentSettings.git
+	}
+
+	private func currentDebuggerSettings() -> ItsySettings.DebuggerSettings {
+		settingsCoordinator.currentSettings.debugger
 	}
 
 	@objc func showProblems(_ sender: Any?) {

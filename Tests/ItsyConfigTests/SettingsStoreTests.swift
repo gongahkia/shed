@@ -42,6 +42,9 @@ import Testing
 	[git]
 	presentation = "window"
 
+	[debugger]
+	presentation = "window"
+
 	[find]
 	uses_regex = true
 	case_sensitive = true
@@ -96,6 +99,7 @@ import Testing
 	#expect(result.settings.terminal.scrollbackLines == 20000)
 	#expect(result.settings.terminal.presentation == .window)
 	#expect(result.settings.git.presentation == .window)
+	#expect(result.settings.debugger.presentation == .window)
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
 	#expect(result.settings.updates.automaticallyCheck)
@@ -141,12 +145,12 @@ import Testing
 	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
 	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
 	let result = parser.parse("""
-	schema_version = 11
+	schema_version = 12
 	[editor]
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 10)
+	#expect(ItsySettingsSchema.currentVersion == 11)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -244,7 +248,8 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 10"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 11"))
+	#expect(ItsySettingsStore.serialize(settings).contains("[debugger]\npresentation = \"sidebar\""))
 	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))

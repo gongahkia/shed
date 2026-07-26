@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import ItsyConfig
 import ItsyDebugger
 
 @MainActor final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
@@ -23,6 +24,12 @@ import ItsyDebugger
 	}
 	private var activeSession: DebugAppSession?
 	private var callStackPanel: NSPanel?
+	private var callStackContentView: NSView?
+	private var callStackEmbeddingConstraints: [NSLayoutConstraint] = []
+	private var embeddedCallStackVisible = false
+	private let settingsProvider: () -> ItsySettings.DebuggerSettings
+	private let embeddedHostProvider: () -> NSView?
+	private let setEmbeddedDebuggerVisible: (Bool) -> Void
 	private var callStackStatusLabel: NSTextField?
 	private var callStackOutlineView: NSOutlineView?
 	private var callStackNodes: [DebugCallStackThreadNode] = []
@@ -31,8 +38,16 @@ import ItsyDebugger
 	private var restartButton: NSButton?
 	private var callStackGeneration = 0
 
-	init(documentController: ItsyDocumentController) {
+	init(
+		documentController: ItsyDocumentController,
+		settingsProvider: @escaping () -> ItsySettings.DebuggerSettings = { ItsySettings.DebuggerSettings() },
+		embeddedHostProvider: @escaping () -> NSView? = { nil },
+		setEmbeddedDebuggerVisible: @escaping (Bool) -> Void = { _ in }
+	) {
 		self.documentController = documentController
+		self.settingsProvider = settingsProvider
+		self.embeddedHostProvider = embeddedHostProvider
+		self.setEmbeddedDebuggerVisible = setEmbeddedDebuggerVisible
 		super.init()
 	}
 
@@ -41,10 +56,7 @@ import ItsyDebugger
 	}
 
 	@objc func showCallStack(_ sender: Any?) {
-		let panel = makeCallStackPanelIfNeeded()
-		center(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
-		panel.makeKeyAndOrderFront(nil)
-		refreshCallStack(nil)
+		toggleCallStack(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	@objc func showVariables(_ sender: Any?) {
@@ -105,10 +117,18 @@ import ItsyDebugger
 		consoleCoordinator.clear()
 	}
 
+	func applyDebuggerSettings(_ settings: ItsySettings.DebuggerSettings) {
+		if settings.presentation == .window, embeddedCallStackVisible {
+			embeddedCallStackVisible = false
+			setEmbeddedDebuggerVisible(false)
+			detachEmbeddedCallStackContent()
+		}
+	}
+
 	private func debugSessionDidStart(_ session: DebugAppSession) {
 		activeSession = session
 		updateDebugControls()
-		if callStackPanel?.isVisible == true {
+		if callStackPanel?.isVisible == true || embeddedCallStackVisible {
 			refreshCallStack(nil)
 		}
 		variablesCoordinator.refreshIfVisible()
@@ -117,22 +137,102 @@ import ItsyDebugger
 	}
 
 	private func makeCallStackPanelIfNeeded() -> NSPanel {
+		let panel: NSPanel
 		if let callStackPanel {
-			return callStackPanel
+			panel = callStackPanel
+		} else {
+			panel = NSPanel(
+				contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
+				styleMask: [.titled, .closable, .resizable, .utilityWindow],
+				backing: .buffered,
+				defer: false
+			)
+			panel.title = L10n.string("Debugger")
+			panel.isReleasedWhenClosed = false
+			callStackPanel = panel
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 560, height: 460),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Call Stack")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		let contentView = makeCallStackContentViewIfNeeded()
+		detachEmbeddedCallStackContent()
+		contentView.removeFromSuperview()
 		panel.contentView = contentView
-		configureCallStackView(contentView)
-		callStackPanel = panel
 		return panel
+	}
+
+	private func toggleCallStack(relativeTo hostWindow: NSWindow?) {
+		switch settingsProvider().presentation {
+		case .sidebar:
+			toggleEmbeddedCallStack(relativeTo: hostWindow)
+		case .window:
+			if callStackPanel?.isVisible == true {
+				callStackPanel?.close()
+				return
+			}
+			showDetachedCallStack(relativeTo: hostWindow)
+		}
+	}
+
+	private func showDetachedCallStack(relativeTo hostWindow: NSWindow?) {
+		embeddedCallStackVisible = false
+		setEmbeddedDebuggerVisible(false)
+		let panel = makeCallStackPanelIfNeeded()
+		center(panel, relativeTo: hostWindow)
+		panel.makeKeyAndOrderFront(nil)
+		refreshCallStack(nil)
+	}
+
+	private func toggleEmbeddedCallStack(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedCallStack(relativeTo: hostWindow)
+			return
+		}
+		if embeddedCallStackVisible, callStackContentView?.superview === host {
+			embeddedCallStackVisible = false
+			setEmbeddedDebuggerVisible(false)
+			return
+		}
+		showEmbeddedCallStack(relativeTo: hostWindow)
+	}
+
+	private func showEmbeddedCallStack(relativeTo hostWindow: NSWindow?) {
+		guard let host = embeddedHostProvider() else {
+			showDetachedCallStack(relativeTo: hostWindow)
+			return
+		}
+		let contentView = makeCallStackContentViewIfNeeded()
+		callStackPanel?.orderOut(nil)
+		embedCallStackContent(contentView, in: host)
+		embeddedCallStackVisible = true
+		setEmbeddedDebuggerVisible(true)
+		refreshCallStack(nil)
+	}
+
+	private func makeCallStackContentViewIfNeeded() -> NSView {
+		if let callStackContentView {
+			return callStackContentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 560, height: 460))
+		configureCallStackView(contentView)
+		callStackContentView = contentView
+		return contentView
+	}
+
+	private func embedCallStackContent(_ contentView: NSView, in host: NSView) {
+		detachEmbeddedCallStackContent()
+		contentView.removeFromSuperview()
+		contentView.translatesAutoresizingMaskIntoConstraints = false
+		host.addSubview(contentView)
+		callStackEmbeddingConstraints = [
+			contentView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+			contentView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+			contentView.topAnchor.constraint(equalTo: host.topAnchor),
+			contentView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+		]
+		NSLayoutConstraint.activate(callStackEmbeddingConstraints)
+	}
+
+	private func detachEmbeddedCallStackContent() {
+		NSLayoutConstraint.deactivate(callStackEmbeddingConstraints)
+		callStackEmbeddingConstraints = []
 	}
 
 	private func configureCallStackView(_ contentView: NSView) {

@@ -74,7 +74,7 @@ item_font_size = 13
 
 Every first-party panel has the same optional `ui.surface.<id>` fields. Valid ids include `command_palette`, `completion`, `find`, `project_find`, `terminal`, `outline`, `problems`, `references`, `tasks`, `undo_tree`, `git`, `git_graph`, `git_stash`, `debugger`, `debug_console`, `debug_variables`, `debug_watches`, `debug_launch`, `lsp_status`, `integration_health`, `integration_output`, `extensions`, `settings_catalog`, `lsp_configuration`, `managed_support`, `github_pull_request`, and `github_review_thread`.
 
-The terminal opens in the editor's bottom split by default; Git Changes opens in the right sidebar. Set `terminal.presentation = "window"` or `git.presentation = "window"` to detach either surface. `terminal.font` is optional and inherits `editor.font` until explicitly set.
+The terminal opens in the editor's bottom split by default; Git Changes and Debugger Call Stack open in right sidebars. Set `terminal.presentation = "window"`, `git.presentation = "window"`, or `debugger.presentation = "window"` to detach a surface. `terminal.font` is optional and inherits `editor.font` until explicitly set.
 
 Each workspace stores restorable terminal state at `.itsy/terminal.json`. Schema v2 preserves tab titles, the selected tab and pane, the pane tree, and each pane’s working directory. Legacy unversioned files are migrated and rewritten on first restore. Process IDs, shell output, scrollback, and presentation are never persisted; presentation remains controlled by `[terminal]` TOML.
 

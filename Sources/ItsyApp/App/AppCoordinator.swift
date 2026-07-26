@@ -4,99 +4,40 @@ import ItsyConfig
 import ItsyEditor
 import ItsyKeymap
 
-@MainActor final class AppCoordinator: NSObject {
+@MainActor final class AppCoordinator: NSObject, ApplicationServiceHost {
 	private let documentController: ItsyDocumentController
+	private let services: ApplicationServiceContainer
 	private var activeKeymapProfile = KeymapProfile.plain
 	private var commandLineKeymapProfile: KeymapProfile?
-	private lazy var sparkleUpdateCoordinator = SparkleUpdateCoordinator()
 	private lazy var menuCoordinator = MenuCoordinator(
 		documentController: documentController,
 		actionTarget: self,
 		gitTarget: gitCoordinator,
 		updateTarget: sparkleUpdateCoordinator
 	)
-	private lazy var commandRegistry = makeCommandRegistry()
-	private lazy var commandPaletteCoordinator = CommandPaletteCoordinator(
-		documentController: documentController,
-		commandRegistryProvider: { [weak self] in self?.commandRegistry ?? CommandRegistry() },
-		activeDocumentProvider: { [weak self] in self?.activeDocument() },
-		workspaceSymbolProvider: { [weak self] query in
-			try await self?.activeEditorWindowController()?.workspaceSymbols(matching: query) ?? []
-		},
-		fileSymbolProvider: { [weak self] in
-			try await self?.activeEditorWindowController()?.fileSymbolsFromLSP()
-		}
-	)
-	private lazy var settingsCoordinator = SettingsCoordinator(
-		documentController: documentController,
-		onSettingsChange: { [weak self] settings in
-			self?.applySettingsToOpenWindows(settings)
-		},
-		onTerminalSettingsChange: { [weak self] settings in
-			self?.applyTerminalSettings(settings)
-		}
-	)
-	private lazy var workbenchRecoveryPanel = WorkbenchRecoveryPanel(
-		openSettings: { [weak self] in self?.settingsCoordinator.openSettingsFile(workspace: false) },
-		restoreDefaults: { [weak self] in self?.settingsCoordinator.restoreWorkbenchDefaults() },
-		generateDoctor: { [weak self] in self?.settingsCoordinator.generateWorkbenchDoctorFile() }
-	)
-	private lazy var projectFindCoordinator = ProjectFindCoordinator(documentController: documentController)
-	private lazy var gitCoordinator = GitCoordinator(
-		documentController: documentController,
-		activeDocumentProvider: { [weak self] in self?.activeDocument() },
-		settingsProvider: { [weak self] in self?.currentGitSettings() ?? ItsySettings.GitSettings() },
-		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedGitHostView },
-		setEmbeddedGitVisible: { [weak self] host, visible in
-			self?.editorWindowController(gitHost: host)?.setEmbeddedGitVisible(visible)
-		}
-	)
-	private lazy var gitReviewWorkspaceCoordinator = GitReviewWorkspaceCoordinator(
-		persistWorkspaceState: { [weak self] in
-			ItsyWorkspaceController.persistWindowState(from: self?.activeEditorWindowController())
-		},
-		openWorkspace: { [weak self] url in
-			self?.openWorkspace(at: url) ?? false
-		}
-	)
-	private lazy var taskCoordinator = TaskCoordinator(
-		problemsCoordinator: problemsCoordinator,
-		activeDocumentProvider: { [weak self] in self?.activeDocument() }
-	)
-	private lazy var debuggerCoordinator = DebuggerCoordinator(
-		documentController: documentController,
-		settingsProvider: { [weak self] in self?.currentDebuggerSettings() ?? ItsySettings.DebuggerSettings() },
-		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedDebuggerHostView },
-		setEmbeddedDebuggerVisible: { [weak self] host, visible in
-			self?.editorWindowController(debuggerHost: host)?.setEmbeddedDebuggerVisible(visible)
-		}
-	)
-	private lazy var terminalCoordinator = TerminalCoordinator(
-		settingsProvider: { [weak self] in self?.currentTerminalSettings() ?? ItsySettings.TerminalSettings() },
-		activeDocumentProvider: { [weak self] in self?.activeDocument() },
-		openLocation: { [weak self] location in self?.openTerminalLocation(location) },
-		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedTerminalHostView },
-		setEmbeddedTerminalVisible: { [weak self] host, visible in
-			self?.editorWindowController(terminalHost: host)?.setEmbeddedTerminalVisible(visible)
-		},
-		editorFontProvider: { [weak self] in
-			self?.settingsCoordinator.currentSettings.editor.font ?? ItsySettings.EditorSettings.defaultFont
-		}
-	)
-	private lazy var problemsCoordinator = ProblemsCoordinator(documentController: documentController)
-	private lazy var outlineCoordinator = OutlineCoordinator(
-		documentController: documentController,
-		activeDocumentProvider: { [weak self] in self?.activeDocument() },
-		fileSymbolProvider: { [weak self] in
-			try await self?.activeEditorWindowController()?.fileSymbolsFromLSP()
-		}
-	)
-	private lazy var extensionsCoordinator = ExtensionsCoordinator()
+	private var sparkleUpdateCoordinator: SparkleUpdateCoordinator { services.sparkleUpdateCoordinator }
+	private var commandRegistry: CommandRegistry {
+		get { services.commandRegistry }
+		set { services.commandRegistry = newValue }
+	}
+	private var commandPaletteCoordinator: CommandPaletteCoordinator { services.commandPaletteCoordinator }
+	private var settingsCoordinator: SettingsCoordinator { services.settingsCoordinator }
+	private var workbenchRecoveryPanel: WorkbenchRecoveryPanel { services.workbenchRecoveryPanel }
+	private var projectFindCoordinator: ProjectFindCoordinator { services.projectFindCoordinator }
+	private var gitCoordinator: GitCoordinator { services.gitCoordinator }
+	private var gitReviewWorkspaceCoordinator: GitReviewWorkspaceCoordinator { services.gitReviewWorkspaceCoordinator }
+	private var taskCoordinator: TaskCoordinator { services.taskCoordinator }
+	private var debuggerCoordinator: DebuggerCoordinator { services.debuggerCoordinator }
+	private var terminalCoordinator: TerminalCoordinator { services.terminalCoordinator }
+	private var problemsCoordinator: ProblemsCoordinator { services.problemsCoordinator }
+	private var outlineCoordinator: OutlineCoordinator { services.outlineCoordinator }
+	private var extensionsCoordinator: ExtensionsCoordinator { services.extensionsCoordinator }
 	private var integrationHealthPanel: IntegrationHealthPanel?
 	private var integrationOutputConsolePanel: IntegrationOutputConsolePanel?
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
+		services = ApplicationServiceContainer(documentController: documentController)
 		recordBenchStage("delegate_init")
 		recordBenchStage("delegate_keymap_begin")
 		let initialSettings = ItsySettingsStore().load(
@@ -119,6 +60,11 @@ import ItsyKeymap
 		}
 		recordBenchStage("delegate_keymap_end")
 		super.init()
+		do {
+			try services.connect(host: self)
+		} catch {
+			preconditionFailure("failed to connect application services: \(error)")
+		}
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(closeSecondarySidebar(_:)),
@@ -268,7 +214,7 @@ import ItsyKeymap
 		gitReviewWorkspaceCoordinator.exit(result)
 	}
 
-	private func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {
+	func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {
 		let workspaceRoot = workspaceRoot ?? ItsyWorkspaceController.currentRootURL
 		var registry = CommandRegistry()
 		do {
@@ -642,11 +588,11 @@ import ItsyKeymap
 		)
 	}
 
-	private func activeDocument() -> NSDocument? {
+	func activeDocument() -> NSDocument? {
 		NSApp.keyWindow?.windowController?.document as? NSDocument ?? documentController.currentDocument
 	}
 
-	private func activeEditorWindowController() -> EditorWindowController? {
+	func activeEditorWindowController() -> EditorWindowController? {
 		NSApp.keyWindow?.windowController as? EditorWindowController
 			?? documentController.currentDocument?.windowControllers.first as? EditorWindowController
 	}
@@ -655,15 +601,15 @@ import ItsyKeymap
 		documentController.documents.flatMap(\.windowControllers).compactMap { $0 as? EditorWindowController }
 	}
 
-	private func editorWindowController(gitHost: NSView) -> EditorWindowController? {
+	func editorWindowController(gitHost: NSView) -> EditorWindowController? {
 		editorWindowControllers.first { $0.embeddedGitHostView === gitHost }
 	}
 
-	private func editorWindowController(debuggerHost: NSView) -> EditorWindowController? {
+	func editorWindowController(debuggerHost: NSView) -> EditorWindowController? {
 		editorWindowControllers.first { $0.embeddedDebuggerHostView === debuggerHost }
 	}
 
-	private func editorWindowController(terminalHost: NSView) -> EditorWindowController? {
+	func editorWindowController(terminalHost: NSView) -> EditorWindowController? {
 		editorWindowControllers.first { $0.embeddedTerminalHostView === terminalHost }
 	}
 
@@ -714,7 +660,7 @@ import ItsyKeymap
 		settingsCoordinator.openSettingsFile(workspace: false)
 	}
 
-	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
+	func applySettingsToOpenWindows(_ settings: ItsySettings) {
 		EditorWindowController.reloadLSPConfiguration(settings: settings)
 		AppTheme.update(settings: settings)
 		ItsyUIConfiguration.update(settings.ui)
@@ -915,7 +861,7 @@ import ItsyKeymap
 		terminalCoordinator.revealTerminalCWDInFileTree(sender)
 	}
 
-	private func openTerminalLocation(_ location: TerminalOpenLocation) {
+	func openTerminalLocation(_ location: TerminalOpenLocation) {
 		if location.isFile {
 			guard FileManager.default.fileExists(atPath: location.url.path) else {
 				return
@@ -926,21 +872,9 @@ import ItsyKeymap
 		NSWorkspace.shared.open(location.url)
 	}
 
-	private func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
 		terminalCoordinator.applyTerminalSettings(settings)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
-	}
-
-	private func currentTerminalSettings() -> ItsySettings.TerminalSettings {
-		settingsCoordinator.currentSettings.terminal
-	}
-
-	private func currentGitSettings() -> ItsySettings.GitSettings {
-		settingsCoordinator.currentSettings.git
-	}
-
-	private func currentDebuggerSettings() -> ItsySettings.DebuggerSettings {
-		settingsCoordinator.currentSettings.debugger
 	}
 
 	@objc func showProblems(_ sender: Any?) {
@@ -1058,7 +992,7 @@ import ItsyKeymap
 		return documentController.openDocument(at: url)
 	}
 
-	private func openWorkspace(at url: URL) -> Bool {
+	func openWorkspace(at url: URL) -> Bool {
 		ItsyWorkspaceController.openWorkspace(at: url)
 		settingsCoordinator.workspaceDidChange()
 		commandRegistry = makeCommandRegistry(workspaceRoot: url)

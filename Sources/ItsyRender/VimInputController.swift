@@ -25,6 +25,8 @@ enum RegisterOperation {
 enum TextObject {
 	case innerWord
 	case aroundWord
+	case innerSentence
+	case aroundSentence
 	case innerPair(Character, Character)
 	case aroundPair(Character, Character)
 	case innerParagraph
@@ -1027,6 +1029,10 @@ extension MetalTextView {
 			return .innerWord
 		case "vim.textObject.aroundWord":
 			return .aroundWord
+		case "vim.textObject.innerSentence":
+			return .innerSentence
+		case "vim.textObject.aroundSentence":
+			return .aroundSentence
 		case "vim.textObject.innerDoubleQuote":
 			return .innerPair("\"", "\"")
 		case "vim.textObject.aroundDoubleQuote":
@@ -1540,6 +1546,10 @@ extension MetalTextView {
 			return wordTextObjectRange(includeWhitespace: false)
 		case .aroundWord:
 			return wordTextObjectRange(includeWhitespace: true)
+		case .innerSentence:
+			return sentenceTextObjectRange(includeWhitespace: false)
+		case .aroundSentence:
+			return sentenceTextObjectRange(includeWhitespace: true)
 		case .innerPair(let open, let close):
 			return pairTextObjectRange(open: open, close: close, includeDelimiters: false)
 		case .aroundPair(let open, let close):
@@ -1590,6 +1600,55 @@ extension MetalTextView {
 			}
 		}
 		return lower ..< upper
+	}
+
+	func sentenceTextObjectRange(includeWhitespace: Bool) -> Range<Int>? {
+		let offsets = characterOffsets()
+		guard !offsets.isEmpty else {
+			return nil
+		}
+		let head = editor.selections.primary.head
+		let currentIndex = offsets.lastIndex { $0.offset <= head } ?? 0
+		let index: Int
+		if offsets[currentIndex].character.isWhitespace,
+		   let next = offsets[currentIndex...].firstIndex(where: { !$0.character.isWhitespace })
+		{
+			index = next
+		} else {
+			index = currentIndex
+		}
+		var lowerIndex = index
+		while lowerIndex > 0, !isSentenceTerminator(offsets, at: lowerIndex - 1) {
+			lowerIndex -= 1
+		}
+		while lowerIndex < offsets.count, offsets[lowerIndex].character.isWhitespace {
+			lowerIndex += 1
+		}
+		guard lowerIndex < offsets.count else {
+			return nil
+		}
+		var upperIndex = index
+		while upperIndex < offsets.count, !isSentenceTerminator(offsets, at: upperIndex) {
+			upperIndex += 1
+		}
+		if upperIndex < offsets.count {
+			upperIndex += 1
+		}
+		if includeWhitespace {
+			while upperIndex < offsets.count, offsets[upperIndex].character.isWhitespace {
+				upperIndex += 1
+			}
+		}
+		let lower = offsets[lowerIndex].offset
+		let upper = upperIndex < offsets.count ? offsets[upperIndex].offset : editor.rope.length
+		return lower ..< upper
+	}
+
+	func isSentenceTerminator(_ offsets: [(offset: Int, character: Character)], at index: Int) -> Bool {
+		guard [".", "!", "?"].contains(offsets[index].character) else {
+			return false
+		}
+		return index + 1 == offsets.count || offsets[index + 1].character.isWhitespace
 	}
 
 	func pairTextObjectRange(open: Character, close: Character, includeDelimiters: Bool) -> Range<Int>? {

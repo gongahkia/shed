@@ -668,8 +668,6 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 		return .insertMode
 	case "mode.emacs":
 		return .emacsMode
-	case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
-		return .normalMode
 	default:
 		return nil
 	}
@@ -705,6 +703,8 @@ private let motionCommandIDs: Set<String> = [
 private let textObjectCommandIDs: Set<String> = [
 	"vim.textObject.innerWord",
 	"vim.textObject.aroundWord",
+	"vim.textObject.innerSentence",
+	"vim.textObject.aroundSentence",
 	"vim.textObject.innerDoubleQuote",
 	"vim.textObject.aroundDoubleQuote",
 	"vim.textObject.innerSingleQuote",

@@ -354,6 +354,8 @@ private let commandMotionCases: [CommandMotionCase] = [
 private let textObjectCommandIDs = [
 	"vim.textObject.innerWord",
 	"vim.textObject.aroundWord",
+	"vim.textObject.innerSentence",
+	"vim.textObject.aroundSentence",
 	"vim.textObject.innerDoubleQuote",
 	"vim.textObject.aroundDoubleQuote",
 	"vim.textObject.innerSingleQuote",
@@ -406,7 +408,6 @@ private let commandActionCases: [CommandActionCase] = [
 	CommandActionCase(commandID: "vim.repeatChange", action: .repeatLastChange),
 	CommandActionCase(commandID: "vim.replace.char", action: .replaceCharacter),
 	CommandActionCase(commandID: "vim.searchHistory.forward", action: .search("edit.findNext", recordsJump: false)),
-	CommandActionCase(commandID: "vim.textObject.innerSentence", action: .normalMode),
 ]
 
 struct CharacterMotionCommandCase: Sendable {

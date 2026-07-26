@@ -308,6 +308,8 @@ public struct VimEngine: Sendable {
 	private static let textObjectCommandIDs: [String: String] = [
 		"vim.textObject.innerWord": "vim.textObject.innerWord",
 		"vim.textObject.aroundWord": "vim.textObject.aroundWord",
+		"vim.textObject.innerSentence": "vim.textObject.innerSentence",
+		"vim.textObject.aroundSentence": "vim.textObject.aroundSentence",
 		"vim.textObject.innerDoubleQuote": "vim.textObject.innerDoubleQuote",
 		"vim.textObject.aroundDoubleQuote": "vim.textObject.aroundDoubleQuote",
 		"vim.textObject.innerSingleQuote": "vim.textObject.innerSingleQuote",
@@ -570,10 +572,6 @@ public struct VimEngine: Sendable {
 			return .insertMode
 		case "mode.emacs":
 			return .emacsMode
-		case "vim.textObject.innerSentence", "vim.textObject.aroundSentence":
-			pendingOperator = nil
-			mode = .normal
-			return .normalMode
 		case "vim.format.operator", "vim.format.reflowOperator", "vim.format.line",
 		     "vim.fold.close", "vim.fold.open", "vim.fold.toggle", "vim.fold.closeRecursive", "vim.fold.openRecursive",
 		     "vim.fold.toggleRecursive", "vim.fold.closeAll", "vim.fold.openAll":

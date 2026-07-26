@@ -11,3 +11,6 @@ screenshots:
 
 lsp-matrix:
 	scripts/lsp_matrix.sh $(ARGS)
+
+lint-feature-boundaries:
+	bash scripts/lint_feature_boundaries.sh

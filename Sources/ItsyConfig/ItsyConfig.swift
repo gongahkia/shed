@@ -714,7 +714,7 @@ public final class ItsySettingsStore {
 	private let fileManager: FileManager
 
 	public convenience init(fileManager: FileManager = .default) {
-		self.init(fileURL: Self.defaultFileURL(fileManager: fileManager), fileManager: fileManager)
+		self.init(fileURL: Self.globalFileURL(fileManager: fileManager), fileManager: fileManager)
 	}
 
 	public init(fileURL: URL, fileManager: FileManager = .default) {
@@ -722,11 +722,15 @@ public final class ItsySettingsStore {
 		self.fileManager = fileManager
 	}
 
-	public static func defaultFileURL(fileManager: FileManager = .default) -> URL {
+	public static func globalFileURL(fileManager: FileManager = .default) -> URL {
 		fileManager.homeDirectoryForCurrentUser
 			.appendingPathComponent(".config", isDirectory: true)
 			.appendingPathComponent("itsy", isDirectory: true)
-			.appendingPathComponent("settings.toml")
+			.appendingPathComponent("settings.json")
+	}
+
+	public static func defaultFileURL(fileManager: FileManager = .default) -> URL {
+		globalFileURL(fileManager: fileManager)
 	}
 
 	public static func workspaceFileURL(workspaceRoot: URL) -> URL {
@@ -740,6 +744,12 @@ public final class ItsySettingsStore {
 			return ItsySettingsLoadResult(settings: fallback.normalized(), loadedFromFile: false)
 		}
 		do {
+			if usesJSONCodec {
+				return ItsySettingsLoadResult(
+					settings: try ItsySettingsJSONCodec.decode(Data(contentsOf: fileURL)),
+					loadedFromFile: true
+				)
+			}
 			let contents = try String(contentsOf: fileURL, encoding: .utf8)
 			var parser = ItsySettingsParser(settings: fallback, source: fileURL.path)
 			let result = parser.parse(contents)
@@ -830,7 +840,15 @@ public final class ItsySettingsStore {
 	public func save(_ settings: ItsySettings) throws {
 		let directory = fileURL.deletingLastPathComponent()
 		try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+		if usesJSONCodec {
+			try ItsySettingsJSONCodec.encode(settings).write(to: fileURL, options: .atomic)
+			return
+		}
 		try Self.serialize(settings.normalized()).write(to: fileURL, atomically: true, encoding: .utf8)
+	}
+
+	private var usesJSONCodec: Bool {
+		fileURL.pathExtension.lowercased() == "json"
 	}
 
 	public static func serialize(_ settings: ItsySettings) -> String {

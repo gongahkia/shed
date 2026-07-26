@@ -353,6 +353,51 @@ import Testing
 	#expect(loaded.settings == settings)
 }
 
+@Test func settingsStoreUsesJSONForGlobalPath() {
+	let globalURL = ItsySettingsStore.globalFileURL()
+	#expect(globalURL.lastPathComponent == "settings.json")
+	#expect(globalURL.deletingLastPathComponent().lastPathComponent == "itsy")
+	#expect(ItsySettingsStore.defaultFileURL() == globalURL)
+}
+
+@Test func settingsStoreSavesAndReloadsJSON() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-json-\(UUID().uuidString)",
+		isDirectory: true
+	)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	let url = directory.appendingPathComponent("settings.json")
+	let settings = ItsySettings(
+		editor: .init(font: "Monaco", fontSize: 18, tabWidth: 2),
+		theme: .init(id: "bundled:default-dark"),
+		terminal: .init(fontSize: 14, scrollbackLines: 1234)
+	)
+	let store = ItsySettingsStore(fileURL: url)
+	try store.save(settings)
+	let document = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+	#expect(document["schema_version"] as? Int == ItsySettingsSchema.currentVersion)
+	let loaded = store.load()
+	#expect(loaded.loadedFromFile)
+	#expect(loaded.warnings.isEmpty)
+	#expect(loaded.settings == settings)
+}
+
+@Test func settingsStoreFallsBackForMalformedJSON() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-json-invalid-\(UUID().uuidString)",
+		isDirectory: true
+	)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	let url = directory.appendingPathComponent("settings.json")
+	try "{".write(to: url, atomically: true, encoding: .utf8)
+	let fallback = ItsySettings(editor: .init(font: "Monaco"))
+	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
+	#expect(loaded.loadedFromFile)
+	#expect(loaded.settings == fallback)
+	#expect(loaded.warnings.first?.message.contains("failed to read \(url.path)") == true)
+}
+
 @Test func terminalFontInheritsEditorFontUnlessOverridden() {
 	let terminal = ItsySettings.TerminalSettings()
 	#expect(terminal.resolvedFontName(inheriting: "Monaco") == "Monaco")

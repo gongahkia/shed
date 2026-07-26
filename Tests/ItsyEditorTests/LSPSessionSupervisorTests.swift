@@ -167,6 +167,33 @@ import Testing
 	#expect(events[1] == .sessionFailed(reason: LSPSessionFailureReason(status: 0, stderrTail: "")))
 }
 
+@Test func lspSessionSupervisorIgnoresRepeatedTerminationEvents() async throws {
+	let source = ManualLSPClientEvents()
+	let supervisor = LSPSessionSupervisor(
+		key: LSPSessionKey(languageID: "swift", workspaceRoot: URL(fileURLWithPath: "/tmp/itsy-supervisor")),
+		events: source.stream
+	)
+	let collector = SupervisorEventCollector()
+	let eventTask = Task {
+		for await event in supervisor.events {
+			await collector.append(event)
+		}
+	}
+	defer {
+		eventTask.cancel()
+		source.finish()
+	}
+
+	await supervisor.start()
+	source.yield(.terminated(9))
+	source.yield(.terminated(10))
+	let events = try await collector.waitForCount(2)
+	#expect(events == [
+		.diagnosticsUpdated(WorkspaceProblemSnapshot(root: URL(fileURLWithPath: "/tmp/itsy-supervisor"), problems: [])),
+		.sessionFailed(reason: LSPSessionFailureReason(status: 9, stderrTail: "")),
+	])
+}
+
 @Test func lspSessionSupervisorRejectsStaleDiagnosticsAndClearsReloadedDocuments() async throws {
 	let root = URL(fileURLWithPath: "/tmp/itsy-supervisor")
 	let uri = "file:///tmp/itsy-supervisor/App.swift"

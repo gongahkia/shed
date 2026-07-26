@@ -186,7 +186,10 @@ public actor LSPManager {
 		statuses[key] = .running
 	}
 
-	public func markFailed(_ key: LSPSessionKey) {
+	public func markFailed(_ key: LSPSessionKey, matching client: LSPProcessClient? = nil) {
+		guard client == nil || clients[key] === client else {
+			return
+		}
 		statuses[key] = disabledKeys.contains(key) ? .disabled : .failed
 		clients.removeValue(forKey: key)?.terminate()
 		synchronizedDocuments[key] = nil
@@ -198,6 +201,14 @@ public actor LSPManager {
 		synchronizedDocuments[key] = nil
 	}
 
+	public func restartSession(_ key: LSPSessionKey) {
+		clients.removeValue(forKey: key)?.terminate()
+		statuses[key] = .idle
+		spawnTimestamps[key] = []
+		disabledKeys.remove(key)
+		synchronizedDocuments[key] = nil
+	}
+
 	public func registerSynchronizedDocument(_ url: URL, for key: LSPSessionKey) {
 		synchronizedDocuments[key, default: []].insert(url.standardizedFileURL)
 	}
@@ -205,7 +216,8 @@ public actor LSPManager {
 	public func closeSynchronizedDocument(
 		_ url: URL,
 		for key: LSPSessionKey,
-		using coordinator: LSPDocumentSyncCoordinator
+		using coordinator: LSPDocumentSyncCoordinator,
+		stoppingSessionOnLastDocument: Bool = true
 	) async -> Bool {
 		let url = url.standardizedFileURL
 		guard synchronizedDocuments[key]?.remove(url) != nil else {
@@ -213,7 +225,9 @@ public actor LSPManager {
 		}
 		try? await coordinator.didClose(url: url)
 		if synchronizedDocuments[key]?.isEmpty == true {
-			stopSession(key)
+			if stoppingSessionOnLastDocument {
+				stopSession(key)
+			}
 			return true
 		}
 		return false

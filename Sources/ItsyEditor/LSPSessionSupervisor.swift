@@ -150,6 +150,7 @@ public actor LSPSessionSupervisor {
 	private var pumpTask: Task<Void, Never>?
 	private var ownedURIs: Set<String> = []
 	private var stderrTail = Data()
+	private var terminated = false
 	private let environment: [String: String]
 	private var outputRedactors: [LSPSessionOutputKind: LSPLogRedactor.Stream]
 
@@ -182,7 +183,7 @@ public actor LSPSessionSupervisor {
 	}
 
 	public func start() {
-		guard pumpTask == nil else {
+		guard pumpTask == nil, !terminated else {
 			return
 		}
 		pumpTask = Task { [weak self, clientEvents] in
@@ -194,6 +195,7 @@ public actor LSPSessionSupervisor {
 	}
 
 	public func stop() {
+		terminated = true
 		pumpTask?.cancel()
 		pumpTask = nil
 		continuation.finish()
@@ -257,6 +259,10 @@ public actor LSPSessionSupervisor {
 	}
 
 	private func handleTermination(_ status: Int32) async {
+		guard !terminated else {
+			return
+		}
+		terminated = true
 		flushOutput()
 		for uri in ownedURIs {
 			await diagnostics.removeDocument(forURI: uri)

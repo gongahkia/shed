@@ -185,6 +185,7 @@ extension Notification.Name {
 	private var lspDocumentVersionsBySession: [LSPSessionKey: [String: Int]] = [:]
 	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
 	private var lspSupervisorTasks: [LSPSessionKey: Task<Void, Never>] = [:]
+	private var lspSupervisorGenerations: [LSPSessionKey: UInt] = [:]
 	private let lspPresentation = LSPPresentationState()
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
@@ -1334,6 +1335,7 @@ extension Notification.Name {
 		lspDocumentVersionsBySession.removeAll()
 		lspSupervisors.removeAll()
 		lspSupervisorTasks.removeAll()
+		lspSupervisorGenerations.removeAll()
 		lspPresentation.resetForConfigurationReload()
 		completionTriggerCharactersBySession.removeAll()
 		signatureHelpTriggerCharactersBySession.removeAll()
@@ -1360,7 +1362,15 @@ extension Notification.Name {
 				await supervisor.clearDiagnostics(forURI: url.standardizedFileURL.absoluteString, removingDocument: true)
 			}
 			for (key, coordinator) in coordinators {
-				if await Self.lspManager.closeSynchronizedDocument(url, for: key, using: coordinator) {
+				if await Self.lspManager.closeSynchronizedDocument(
+					url,
+					for: key,
+					using: coordinator,
+					stoppingSessionOnLastDocument: false
+				) {
+					await supervisors[key]?.stop()
+					await Self.lspManager.stopSession(key)
+					publishEmptyLSPDiagnostics(for: key)
 					discardLSPState(for: key)
 				}
 			}
@@ -1399,6 +1409,7 @@ extension Notification.Name {
 	}
 
 	private func discardLSPState(for key: LSPSessionKey) {
+		lspSupervisorGenerations[key] = (lspSupervisorGenerations[key] ?? 0) &+ 1
 		lspSyncCoordinators[key] = nil
 		lspDocumentVersionsBySession[key] = nil
 		lspSupervisorTasks[key]?.cancel()
@@ -1423,10 +1434,14 @@ extension Notification.Name {
 		guard let url = lspPresentation.entries[key]?.url ?? lspPresentation.restartURL else {
 			return
 		}
+		let supervisor = lspSupervisors[key]
 		lspPresentation.restartKey = key
 		lspPresentation.restartURL = url
+		publishEmptyLSPDiagnostics(for: key)
+		discardLSPState(for: key)
 		Task { [weak self] in
-			await Self.lspManager.enableSession(key)
+			await supervisor?.stop()
+			await Self.lspManager.restartSession(key)
 			await MainActor.run { [weak self] in
 				guard let self else {
 					return
@@ -1439,11 +1454,13 @@ extension Notification.Name {
 	private func stopLSPFromStatusPanel(_ key: LSPSessionKey) {
 		let entry = lspPresentation.entries[key]
 		let supervisor = lspSupervisors[key]
+		lspSupervisorGenerations[key] = (lspSupervisorGenerations[key] ?? 0) &+ 1
 		lspSyncCoordinators[key] = nil
 		lspDocumentVersionsBySession[key] = nil
 		lspSupervisorTasks[key]?.cancel()
 		lspSupervisorTasks[key] = nil
 		lspSupervisors[key] = nil
+		publishEmptyLSPDiagnostics(for: key)
 		Task {
 			await supervisor?.stop()
 			await Self.lspManager.stopSession(key)
@@ -3966,11 +3983,20 @@ extension Notification.Name {
 		let supervisor = LSPSessionSupervisor(key: key, client: client)
 		let configurationGeneration = lspPresentation.configurationGeneration
 		lspSupervisors[key] = supervisor
+		let supervisorGeneration = (lspSupervisorGenerations[key] ?? 0) &+ 1
+		lspSupervisorGenerations[key] = supervisorGeneration
 		lspSupervisorTasks[key] = Task { [weak self, supervisor] in
 			await supervisor.start()
 			for await event in supervisor.events {
 				await MainActor.run { [weak self] in
-					self?.handleLSPSupervisorEvent(event, key: key, url: url, configurationGeneration: configurationGeneration)
+					self?.handleLSPSupervisorEvent(
+						event,
+						key: key,
+						client: client,
+						url: url,
+						configurationGeneration: configurationGeneration,
+						supervisorGeneration: supervisorGeneration
+					)
 				}
 			}
 		}
@@ -3979,10 +4005,15 @@ extension Notification.Name {
 	private func handleLSPSupervisorEvent(
 		_ event: LSPSessionSupervisorEvent,
 		key: LSPSessionKey,
+		client: LSPProcessClient,
 		url: URL,
-		configurationGeneration: Int
+		configurationGeneration: Int,
+		supervisorGeneration: UInt
 	) {
-		guard configurationGeneration == lspPresentation.configurationGeneration else {
+		guard
+			configurationGeneration == lspPresentation.configurationGeneration,
+			supervisorGeneration == lspSupervisorGenerations[key]
+		else {
 			return
 		}
 		switch event {
@@ -3991,6 +4022,7 @@ extension Notification.Name {
 		case let .output(output):
 			appendLSPOutput(output, for: key, url: url)
 		case let .sessionFailed(reason):
+			lspSupervisorGenerations[key] = (lspSupervisorGenerations[key] ?? 0) &+ 1
 			lspSyncCoordinators[key] = nil
 			lspDocumentVersionsBySession[key] = nil
 			completionTriggerCharactersBySession[key] = nil
@@ -4004,7 +4036,7 @@ extension Notification.Name {
 			lspSupervisors[key] = nil
 			lspSupervisorTasks[key] = nil
 			Task {
-				await Self.lspManager.markFailed(key)
+				await Self.lspManager.markFailed(key, matching: client)
 			}
 			showLSPCrashStatus(key: key, url: url, reason: reason)
 			NSLog("lsp session failed: \(key.languageID) exit \(reason.status) \(reason.stderrTail)")

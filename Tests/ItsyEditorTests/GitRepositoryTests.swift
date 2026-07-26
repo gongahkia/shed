@@ -885,7 +885,7 @@ import Testing
 	#expect(try trackingRepository.pushArguments() == ["push"])
 }
 
-@Test func gitRepositoryStageAndUnstageHunkValidateBeforeApplyingPatch() throws {
+@Test func gitRepositoryStageAndUnstageHunksUseSingleCachedPatchTransactions() throws {
 	let runner = RecordingGitRunner(output: "")
 	let repository = GitRepository(root: URL(fileURLWithPath: "/tmp/project", isDirectory: true), runner: runner)
 	let hunk = DiffHunk(oldStart: 1, oldCount: 1, newStart: 1, newCount: 1, lines: [
@@ -918,23 +918,15 @@ import Testing
 	try repository.unstage(lineIndexes: IndexSet(integersIn: 0 ..< 2), in: hunk, file: file)
 
 	#expect(runner.recordedArguments == [
-		["apply", "--cached", "--check", "-"],
 		["apply", "--cached", "-"],
-		["apply", "--cached", "--check", "--reverse", "-"],
 		["apply", "--cached", "--reverse", "-"],
-		["apply", "--cached", "--check", "-"],
 		["apply", "--cached", "-"],
-		["apply", "--cached", "--check", "--reverse", "-"],
 		["apply", "--cached", "--reverse", "-"],
 	])
 	#expect(runner.recordedInputs == [
 		patch,
 		patch,
-		patch,
-		patch,
 		linePatch,
-		linePatch,
-		reverseLinePatch,
 		reverseLinePatch,
 	])
 }
@@ -1095,6 +1087,45 @@ import Testing
 
 	#expect(throws: GitPatchApplicationError.staleIndex) {
 		try repository.unstage(hunk: hunk, in: file)
+	}
+	#expect(try repository.diff(path: "file.txt", staged: true) == before)
+}
+
+@Test func gitRepositoryPreservesIndexWhenSelectedStageOrUnstageLinesAreStale() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	try fixture.write("file.txt", "one\ntwo\nthree\nfour\nfive\n")
+	try fixture.git(["add", "file.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+
+	try fixture.write("file.txt", "one\ntwo selected\nthree\nfour selected\nfive\n")
+	let workingFile = try #require(try repository.diffFiles(path: "file.txt").first)
+	let workingHunk = try #require(workingFile.hunks.first)
+	let selected = lineIndexes(in: workingHunk, containing: ["two", "two selected"])
+	try fixture.write("file.txt", "one\ntwo changed after selection\nthree\nfour selected\nfive\n")
+
+	#expect(throws: GitPatchApplicationError.staleWorktree) {
+		try repository.stage(lineIndexes: selected, in: workingHunk, file: workingFile)
+	}
+	#expect(try repository.diff(path: "file.txt", staged: true).isEmpty)
+
+	try fixture.write("file.txt", "one\ntwo selected\nthree\nfour selected\nfive\n")
+	try repository.stage(paths: ["file.txt"])
+	let indexedFile = try #require(try repository.diffFiles(path: "file.txt", staged: true).first)
+	let indexedHunk = try #require(indexedFile.hunks.first)
+	let indexedSelection = lineIndexes(in: indexedHunk, containing: ["four", "four selected"])
+	try fixture.write("file.txt", "one\ntwo selected\nthree\nfour changed after selection\nfive\n")
+	try repository.stage(paths: ["file.txt"])
+	let before = try repository.diff(path: "file.txt", staged: true)
+
+	#expect(throws: GitPatchApplicationError.staleIndex) {
+		try repository.unstage(lineIndexes: indexedSelection, in: indexedHunk, file: indexedFile)
 	}
 	#expect(try repository.diff(path: "file.txt", staged: true) == before)
 }

@@ -250,9 +250,6 @@ public extension GitRepository {
 				}
 				var options = git_apply_options()
 				try Libgit2.check(git_apply_options_init(&options, 1))
-				options.flags = UInt32(GIT_APPLY_CHECK.rawValue)
-				try Libgit2.check(git_apply(raw, diff, GIT_APPLY_LOCATION_INDEX, &options))
-				options.flags = 0
 				try Libgit2.check(git_apply(raw, diff, GIT_APPLY_LOCATION_INDEX, &options))
 			}
 

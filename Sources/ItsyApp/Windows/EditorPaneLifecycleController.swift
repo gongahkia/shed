@@ -47,7 +47,8 @@ import ItsyRender
 			pane.editorView.textEditBehaviorConfiguration = TextEditBehaviorConfiguration(
 				autoPairs: settings.autoPairs,
 				smartIndent: settings.smartIndent,
-				indentationUnit: indentationUnit
+				indentationUnit: indentationUnit,
+				detectIndentation: settings.detectIndentation
 			)
 			pane.editorView.allowsMultipleSelections = settings.multipleSelections
 			pane.editorView.fontRenderingMode = glyphRenderingMode(settings.fontRendering)

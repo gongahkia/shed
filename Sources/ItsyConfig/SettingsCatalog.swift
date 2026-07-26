@@ -65,6 +65,7 @@ public enum ItsySettingsCatalog {
 			title: "Indent Using Spaces",
 			description: "Uses spaces instead of tab characters for indentation."
 		),
+		.init(key: "editor.detect_indentation", title: "Detect Indentation", description: "Detects indentation from the current document."),
 		.init(key: "editor.auto_pairs", title: "Auto Pairs", description: "Inserts matching brackets and quotes."),
 		.init(key: "editor.smart_indent", title: "Smart Indent", description: "Carries indentation into a new line."),
 		.init(
@@ -227,6 +228,12 @@ public enum ItsySettingsCatalog {
 			isLanguageTemplate: true
 		),
 		.init(
+			key: "editor.language.<language>.detect_indentation",
+			title: "Language Indentation Detection Override",
+			description: "Overrides indentation detection for one language.",
+			isLanguageTemplate: true
+		),
+		.init(
 			key: "editor.language.<language>.auto_pairs",
 			title: "Language Auto Pairs Override",
 			description: "Overrides automatic pairs for one language.",
@@ -298,6 +305,7 @@ public enum ItsySettingsCatalog {
 		case "editor.line_number_mode": settings.editor.lineNumberMode.rawValue
 		case "editor.tab_width": String(settings.editor.tabWidth)
 		case "editor.use_spaces": bool(settings.editor.useSpaces)
+		case "editor.detect_indentation": bool(settings.editor.detectIndentation)
 		case "editor.auto_pairs": bool(settings.editor.autoPairs)
 		case "editor.smart_indent": bool(settings.editor.smartIndent)
 		case "editor.multiple_selections": bool(settings.editor.multipleSelections)
@@ -358,6 +366,7 @@ public enum ItsySettingsCatalog {
 		case "editor.line_number_mode": settings.editor.lineNumberMode = defaults.editor.lineNumberMode
 		case "editor.tab_width": settings.editor.tabWidth = defaults.editor.tabWidth
 		case "editor.use_spaces": settings.editor.useSpaces = defaults.editor.useSpaces
+		case "editor.detect_indentation": settings.editor.detectIndentation = defaults.editor.detectIndentation
 		case "editor.auto_pairs": settings.editor.autoPairs = defaults.editor.autoPairs
 		case "editor.smart_indent": settings.editor.smartIndent = defaults.editor.smartIndent
 		case "editor.multiple_selections": settings.editor.multipleSelections = defaults.editor.multipleSelections
@@ -429,6 +438,7 @@ public enum ItsySettingsCatalog {
 		case "editor.line_number_mode": guard let mode = ItsySettings.LineNumberMode(rawValue: value.lowercased()) else { return "Invalid line number mode." }; updated.editor.lineNumberMode = mode; updated.editor.lineNumbers = mode != .off
 		case "editor.tab_width": guard let integer else { return "An integer is required." }; updated.editor.tabWidth = integer
 		case "editor.use_spaces": guard let boolean else { return "A boolean is required." }; updated.editor.useSpaces = boolean
+		case "editor.detect_indentation": guard let boolean else { return "A boolean is required." }; updated.editor.detectIndentation = boolean
 		case "editor.auto_pairs": guard let boolean else { return "A boolean is required." }; updated.editor.autoPairs = boolean
 		case "editor.smart_indent": guard let boolean else { return "A boolean is required." }; updated.editor.smartIndent = boolean
 		case "editor.multiple_selections": guard let boolean else { return "A boolean is required." }; updated.editor.multipleSelections = boolean

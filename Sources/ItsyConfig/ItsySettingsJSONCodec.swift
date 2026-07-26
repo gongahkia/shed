@@ -100,6 +100,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 		let lineNumberMode: ItsySettings.LineNumberMode?
 		let tabWidth: Int?
 		let useSpaces: Bool?
+		let detectIndentation: Bool?
 		let autoPairs: Bool?
 		let smartIndent: Bool?
 		let multipleSelections: Bool?
@@ -118,6 +119,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 			let lineNumbers: Bool?
 			let tabWidth: Int?
 			let useSpaces: Bool?
+			let detectIndentation: Bool?
 			let autoPairs: Bool?
 			let smartIndent: Bool?
 			let multipleSelections: Bool?
@@ -225,6 +227,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 			if let lineNumberMode = editor.lineNumberMode { settings.editor.lineNumberMode = lineNumberMode; assignedKeys.insert("editor.line_number_mode") }
 			if let tabWidth = editor.tabWidth { settings.editor.tabWidth = tabWidth; assignedKeys.insert("editor.tab_width") }
 			if let useSpaces = editor.useSpaces { settings.editor.useSpaces = useSpaces; assignedKeys.insert("editor.use_spaces") }
+			if let detectIndentation = editor.detectIndentation { settings.editor.detectIndentation = detectIndentation; assignedKeys.insert("editor.detect_indentation") }
 			if let autoPairs = editor.autoPairs { settings.editor.autoPairs = autoPairs; assignedKeys.insert("editor.auto_pairs") }
 			if let smartIndent = editor.smartIndent { settings.editor.smartIndent = smartIndent; assignedKeys.insert("editor.smart_indent") }
 			if let multipleSelections = editor.multipleSelections { settings.editor.multipleSelections = multipleSelections; assignedKeys.insert("editor.multiple_selections") }
@@ -243,6 +246,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 				if let lineNumbers = language.lineNumbers { target.lineNumbers = lineNumbers; assignedKeys.insert(prefix + "line_numbers") }
 				if let tabWidth = language.tabWidth { target.tabWidth = tabWidth; assignedKeys.insert(prefix + "tab_width") }
 				if let useSpaces = language.useSpaces { target.useSpaces = useSpaces; assignedKeys.insert(prefix + "use_spaces") }
+				if let detectIndentation = language.detectIndentation { target.detectIndentation = detectIndentation; assignedKeys.insert(prefix + "detect_indentation") }
 				if let autoPairs = language.autoPairs { target.autoPairs = autoPairs; assignedKeys.insert(prefix + "auto_pairs") }
 				if let smartIndent = language.smartIndent { target.smartIndent = smartIndent; assignedKeys.insert(prefix + "smart_indent") }
 				if let multipleSelections = language.multipleSelections { target.multipleSelections = multipleSelections; assignedKeys.insert(prefix + "multiple_selections") }

@@ -4,11 +4,13 @@ public struct TextEditBehaviorConfiguration: Equatable, Sendable {
 	public var autoPairs: Bool
 	public var smartIndent: Bool
 	public var indentationUnit: String
+	public var detectIndentation: Bool
 
-	public init(autoPairs: Bool = true, smartIndent: Bool = true, indentationUnit: String = "\t") {
+	public init(autoPairs: Bool = true, smartIndent: Bool = true, indentationUnit: String = "\t", detectIndentation: Bool = false) {
 		self.autoPairs = autoPairs
 		self.smartIndent = smartIndent
 		self.indentationUnit = indentationUnit
+		self.detectIndentation = detectIndentation
 	}
 }
 
@@ -68,11 +70,14 @@ public enum TextEditBehavior {
 			return nil
 		}
 		let baseIndentation = indentation(in: bytes, before: range.lowerBound)
+		let indentationUnit = configuration.detectIndentation
+			? IndentationDetector.indentationUnit(in: content, fallback: configuration.indentationUnit)
+			: configuration.indentationUnit
 		if let opening = byte(at: range.lowerBound - 1, in: bytes),
 		   let closing = closingPair(for: opening),
 		   byte(at: range.lowerBound, in: bytes) == closing
 		{
-			let innerIndentation = baseIndentation + configuration.indentationUnit
+			let innerIndentation = baseIndentation + indentationUnit
 			let text = "\n\(innerIndentation)\n\(baseIndentation)"
 			let caret = range.lowerBound + 1 + innerIndentation.utf8.count
 			return .replace(range: range, text: text, selection: caret ..< caret)

@@ -112,8 +112,10 @@ func vimEngineMarksCanBeSetAndJumped(testCase: MarkCase) {
 	#expect(engine.handle(Key("m"), buffer: blackBoxBuffer).isEmpty)
 	#expect(engine.handle(testCase.key, buffer: blackBoxBuffer) == [.setMark(testCase.name, Position(offset: 0))])
 	#expect(engine.marks[testCase.name] == Position(offset: 0))
-	#expect(engine.handle(Key("'"), buffer: blackBoxBuffer).isEmpty)
+	#expect(engine.handle(Key("`"), buffer: blackBoxBuffer).isEmpty)
 	#expect(engine.handle(testCase.key, buffer: blackBoxBuffer) == [.jumpToMark(testCase.name)])
+	#expect(engine.handle(Key("'"), buffer: blackBoxBuffer).isEmpty)
+	#expect(engine.handle(testCase.key, buffer: blackBoxBuffer) == [.jumpToMarkLine(testCase.name)])
 }
 
 @Test(arguments: searchKeyCases)
@@ -397,7 +399,7 @@ private let commandActionCases: [CommandActionCase] = [
 	CommandActionCase(commandID: "mode.emacs", action: .emacsMode),
 	CommandActionCase(commandID: "vim.mark.set.a", action: .setMark("a")),
 	CommandActionCase(commandID: "vim.mark.jump.z", action: .jumpToMark("z")),
-	CommandActionCase(commandID: "vim.mark.jumpLine.b", action: .jumpToMark("b")),
+	CommandActionCase(commandID: "vim.mark.jumpLine.b", action: .jumpToMarkLine("b")),
 	CommandActionCase(commandID: "vim.macro.record.a", action: .macroRecord("a")),
 	CommandActionCase(commandID: "vim.case.toggle", action: .toggleCaseAtCursor),
 	CommandActionCase(commandID: "vim.case.toggleOperator", action: .beginOperator(.toggleCase)),

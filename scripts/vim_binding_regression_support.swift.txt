@@ -159,8 +159,11 @@ private func expectedCommandAction(for commandID: String, mode: ItsyKeymap.Mode)
 	if let mark = suffix(commandID, after: "vim.mark.set."), mark.count == 1, let character = mark.first {
 		return .setMark(character)
 	}
-	if let mark = suffix(commandID, after: "vim.mark.jump.") ?? suffix(commandID, after: "vim.mark.jumpLine."), mark.count == 1, let character = mark.first {
+	if let mark = suffix(commandID, after: "vim.mark.jump."), mark.count == 1, let character = mark.first {
 		return .jumpToMark(character)
+	}
+	if let mark = suffix(commandID, after: "vim.mark.jumpLine."), mark.count == 1, let character = mark.first {
+		return .jumpToMarkLine(character)
 	}
 	if let register = suffix(commandID, after: "vim.macro.record.") {
 		return .macroRecord(register)

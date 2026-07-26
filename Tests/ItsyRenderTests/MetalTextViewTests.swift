@@ -1572,8 +1572,8 @@ private final class TestGutterDecorator: GutterDecorator {
 	let first = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	first.vimMarkStore = store
 	first.vimMarksWorkspaceRoot = workspace
-	first.editor = Editor(text: "abc")
-	first.selectUTF8Range(2 ..< 2)
+	first.editor = Editor(text: "  alpha\nbeta")
+	first.selectUTF8Range(5 ..< 5)
 	first.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
 		KeyBinding(mode: .normal, chord: [Key("m"), Key("a")], commandID: "vim.mark.set.a"),
 	])
@@ -1584,7 +1584,27 @@ private final class TestGutterDecorator: GutterDecorator {
 	let second = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	second.vimMarkStore = store
 	second.vimMarksWorkspaceRoot = workspace
-	#expect(second.vimEngine.marks["a"]?.offset == 2)
+	second.editor = Editor(text: "  alpha\nbeta")
+	second.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("`"), Key("a")], commandID: "vim.mark.jump.a"),
+		KeyBinding(mode: .normal, chord: [Key("'"), Key("a")], commandID: "vim.mark.jumpLine.a"),
+	])
+	#expect(second.vimEngine.marks["a"]?.offset == 5)
+
+	#expect(second.handleKey(characters: "`", charactersIgnoringModifiers: "`", keyCode: 0))
+	#expect(second.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(second.editor.selections.primary.head == 5)
+
+	second.selectUTF8Range(0 ..< 0)
+	#expect(second.handleKey(characters: "'", charactersIgnoringModifiers: "'", keyCode: 0))
+	#expect(second.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(second.editor.selections.primary.head == 2)
+
+	second.vimEngine.marks["z"] = Position(offset: 99)
+	#expect(second.performKeymapCommand("vim.mark.jump.z"))
+	#expect(second.editor.selections.primary.head == second.editor.rope.length)
+	#expect(second.performKeymapCommand("vim.mark.jump.b"))
+	#expect(second.editor.selections.primary.head == second.editor.rope.length)
 }
 
 @Test func textInputClientCommitsAndMarksIMEText() {

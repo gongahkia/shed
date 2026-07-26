@@ -11,10 +11,13 @@ import Testing
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.language.<language>.font" && $0.isLanguageTemplate })
 	#expect(ItsySettingsCatalog.entries
 		.contains { $0.key == "editor.language.<language>.multiple_selections" && $0.isLanguageTemplate })
+	#expect(ItsySettingsCatalog.entries
+		.contains { $0.key == "editor.language.<language>.detect_indentation" && $0.isLanguageTemplate })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "schema_version" && !$0.isResettable })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "ui.surface.command_palette.height" })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "ui.notification_position" })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.cursor_style" })
+	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.detect_indentation" })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "workbench.profile" })
 }
 
@@ -52,6 +55,7 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "false", for: "editor.line_numbers", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "relative", for: "editor.line_number_mode", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "block", for: "editor.cursor_style", in: &settings) == nil)
+	#expect(ItsySettingsCatalog.update(value: "false", for: "editor.detect_indentation", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "Monaco", for: "terminal.font", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "window", for: "debugger.presentation", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "true", for: "updates.automatically_check", in: &settings) == nil)
@@ -63,8 +67,10 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "top_right", for: "ui.notification_position", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.effectiveValue(for: "ui.surface.command_palette.height", in: settings) == "340.0")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "editor.cursor_style", in: settings) == "block")
+	#expect(ItsySettingsCatalog.effectiveValue(for: "editor.detect_indentation", in: settings) == "false")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "terminal.font", in: settings) == "Monaco")
 	#expect(ItsySettingsCatalog.reset("editor.cursor_style", in: &settings))
+	#expect(ItsySettingsCatalog.reset("editor.detect_indentation", in: &settings))
 	#expect(ItsySettingsCatalog.reset("terminal.font", in: &settings))
 	#expect(ItsySettingsCatalog.reset("updates.automatically_check", in: &settings))
 	#expect(ItsySettingsCatalog.reset("workbench.profile", in: &settings))
@@ -75,8 +81,18 @@ import Testing
 	#expect(settings.editor.lineNumbers)
 	#expect(settings.editor.lineNumberMode == .relative)
 	#expect(settings.editor.cursorStyle == .automatic)
+	#expect(settings.editor.detectIndentation)
 	#expect(settings.terminal.font == nil)
 	#expect(!settings.updates.automaticallyCheck)
 	#expect(settings.theme.gitGutter.added == "#12AB34")
 	#expect(settings.ui.notificationPosition == .bottomRight)
+}
+
+@Test func indentationDetectionCanBeOverriddenPerLanguage() {
+	var settings = ItsySettings()
+	settings.editor.detectIndentation = false
+	settings.editor.language["swift"] = .init(detectIndentation: true)
+
+	#expect(!settings.editorSettings(languageID: nil).detectIndentation)
+	#expect(settings.editorSettings(languageID: "swift").detectIndentation)
 }

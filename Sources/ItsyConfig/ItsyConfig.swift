@@ -153,6 +153,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 			public var lineNumbers: Bool?
 			public var tabWidth: Int?
 			public var useSpaces: Bool?
+			public var detectIndentation: Bool?
 			public var autoPairs: Bool?
 			public var smartIndent: Bool?
 			public var multipleSelections: Bool?
@@ -164,6 +165,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 				lineNumbers: Bool? = nil,
 				tabWidth: Int? = nil,
 				useSpaces: Bool? = nil,
+				detectIndentation: Bool? = nil,
 				autoPairs: Bool? = nil,
 				smartIndent: Bool? = nil,
 				multipleSelections: Bool? = nil,
@@ -174,6 +176,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 				self.lineNumbers = lineNumbers
 				self.tabWidth = tabWidth
 				self.useSpaces = useSpaces
+				self.detectIndentation = detectIndentation
 				self.autoPairs = autoPairs
 				self.smartIndent = smartIndent
 				self.multipleSelections = multipleSelections
@@ -207,6 +210,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 		public var lineNumberMode: LineNumberMode
 		public var tabWidth: Int
 		public var useSpaces: Bool
+		public var detectIndentation: Bool
 		public var autoPairs: Bool
 		public var smartIndent: Bool
 		public var multipleSelections: Bool
@@ -226,6 +230,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 			lineNumberMode: LineNumberMode? = nil,
 			tabWidth: Int = Self.defaultTabWidth,
 			useSpaces: Bool = false,
+			detectIndentation: Bool = true,
 			autoPairs: Bool = true,
 			smartIndent: Bool = true,
 			multipleSelections: Bool = true,
@@ -244,6 +249,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 			self.lineNumberMode = lineNumberMode ?? (lineNumbers ? .absolute : .off)
 			self.tabWidth = tabWidth
 			self.useSpaces = useSpaces
+			self.detectIndentation = detectIndentation
 			self.autoPairs = autoPairs
 			self.smartIndent = smartIndent
 			self.multipleSelections = multipleSelections
@@ -605,6 +611,7 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 		}
 		editor.tabWidth = override.tabWidth ?? editor.tabWidth
 		editor.useSpaces = override.useSpaces ?? editor.useSpaces
+		editor.detectIndentation = override.detectIndentation ?? editor.detectIndentation
 		editor.autoPairs = override.autoPairs ?? editor.autoPairs
 		editor.smartIndent = override.smartIndent ?? editor.smartIndent
 		editor.multipleSelections = override.multipleSelections ?? editor.multipleSelections
@@ -906,6 +913,7 @@ public enum ItsySettingsResolver {
 		case "editor.line_number_mode": target.editor.lineNumberMode = source.editor.lineNumberMode
 		case "editor.tab_width": target.editor.tabWidth = source.editor.tabWidth
 		case "editor.use_spaces": target.editor.useSpaces = source.editor.useSpaces
+		case "editor.detect_indentation": target.editor.detectIndentation = source.editor.detectIndentation
 		case "editor.auto_pairs": target.editor.autoPairs = source.editor.autoPairs
 		case "editor.smart_indent": target.editor.smartIndent = source.editor.smartIndent
 		case "editor.multiple_selections": target.editor.multipleSelections = source.editor.multipleSelections
@@ -984,6 +992,7 @@ public enum ItsySettingsResolver {
 		case "line_numbers": targetLanguage.lineNumbers = sourceLanguage.lineNumbers
 		case "tab_width": targetLanguage.tabWidth = sourceLanguage.tabWidth
 		case "use_spaces": targetLanguage.useSpaces = sourceLanguage.useSpaces
+		case "detect_indentation": targetLanguage.detectIndentation = sourceLanguage.detectIndentation
 		case "auto_pairs": targetLanguage.autoPairs = sourceLanguage.autoPairs
 		case "smart_indent": targetLanguage.smartIndent = sourceLanguage.smartIndent
 		case "multiple_selections": targetLanguage.multipleSelections = sourceLanguage.multipleSelections

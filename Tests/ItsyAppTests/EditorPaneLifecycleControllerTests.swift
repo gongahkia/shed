@@ -51,7 +51,7 @@ import Testing
 	lifecycle.applyEditorSettings(settings, to: [first, second])
 
 	for pane in [first, second] {
-		#expect(pane.editorView.textEditBehaviorConfiguration == .init(autoPairs: false, smartIndent: false, indentationUnit: "  "))
+		#expect(pane.editorView.textEditBehaviorConfiguration == .init(autoPairs: false, smartIndent: false, indentationUnit: "  ", detectIndentation: true))
 		#expect(pane.editorView.cursorStyle == .bar)
 	}
 }

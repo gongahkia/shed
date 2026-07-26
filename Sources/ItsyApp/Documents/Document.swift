@@ -193,8 +193,11 @@ import ItsySyntax
 			guard let self else {
 				return "\n"
 			}
-			let tabWidth = currentEditorSettings().tabWidth
-			return syntax.newlineText(editor: editor, tabWidth: tabWidth)
+			let settings = currentEditorSettings()
+			return syntax.newlineText(
+				editor: editor,
+				indentationUnit: indentationUnit(for: settings, in: editorStorageString(editor))
+			)
 		}
 		syntax.configure(fileURL: fileURL)
 		refreshSyntaxHighlights()
@@ -337,8 +340,17 @@ import ItsySyntax
 		return TextEditBehaviorConfiguration(
 			autoPairs: settings.autoPairs,
 			smartIndent: settings.smartIndent,
-			indentationUnit: indentationUnit
+			indentationUnit: indentationUnit,
+			detectIndentation: settings.detectIndentation
 		)
+	}
+
+	private func indentationUnit(for settings: ItsySettings.EditorSettings, in text: String) -> String {
+		let fallback = settings.useSpaces ? String(repeating: " ", count: settings.tabWidth) : "\t"
+		guard settings.detectIndentation else {
+			return fallback
+		}
+		return IndentationDetector.indentationUnit(in: text, fallback: fallback)
 	}
 
 	func scheduleGitHunkGutterRefresh() {

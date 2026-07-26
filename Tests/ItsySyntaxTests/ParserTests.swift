@@ -439,6 +439,14 @@ struct ParserTests {
 	}
 }
 
+@Test func indentQueriesUseConfiguredIndentationUnit() throws {
+	let source = "func main() {}"
+	var pipeline = SyntaxPipeline(language: .swift)
+	let tree = try pipeline.parse(Rope(source))
+	let offset = try #require(byteRange(of: "{", in: source)?.upperBound)
+	#expect(try pipeline.indentationAfterNewline(in: tree, source: source, offset: offset, indentationUnit: "\t") == "\n\t")
+}
+
 @Test func markdownFenceHighlightsEmbeddedSwift() throws {
 	let source = "```swift\nlet value = 1\n```\n"
 	var pipeline = SyntaxPipeline(language: .markdown)

@@ -30,6 +30,7 @@ Personal UI, update, and LSP provisioning settings are global-only: `ui`, `updat
       "wrap_column": 100,
       "tab_width": 4,
       "use_spaces": false,
+		"detect_indentation": true,
       "language": {
         "python": {
           "tab_width": 4,
@@ -80,6 +81,8 @@ TypeScript, JavaScript, and Python have pinned, SHA-512-verified private npm pro
 `lsp.catalog_automatically_check` is opt-in. A release-configured Ed25519 public key verifies every catalog envelope before it is cached. Automatic checks only stage a pending catalog; the Support panel is the only place that applies it. Applying metadata never downloads a server. Builds without `ITSYLSPCatalogURL` and `ITSYLSPCatalogPublicKey` disable this feature.
 
 `editor.cursor_style = "automatic"` uses a block cursor for Vim and Emacs keymaps, and a thin bar for Plain. Set `block` or `bar` to override that behavior; `immediate` is accepted as an alias for `bar`.
+
+`editor.detect_indentation` defaults to `true`. It derives tabs or a space width from indented, non-blank lines in the current document; set it to `false` to always use `editor.use_spaces` and `editor.tab_width`.
 
 Use the command palette actions **Settings: Open User JSON**, **Settings: Open Workspace JSON**, and **Settings: Open Catalog** to edit or inspect configuration.
 

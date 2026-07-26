@@ -80,6 +80,10 @@ final class DocumentSyntaxController {
 	}
 
 	func newlineText(editor: Editor, tabWidth: Int) -> String {
+		newlineText(editor: editor, indentationUnit: String(repeating: " ", count: min(max(tabWidth, 1), 16)))
+	}
+
+	func newlineText(editor: Editor, indentationUnit: String) -> String {
 		guard editor.selections.primary.isCaret, var syntaxPipeline else {
 			return "\n"
 		}
@@ -95,7 +99,7 @@ final class DocumentSyntaxController {
 				syntaxTree = tree
 			}
 			let source = editor.textStorage.substring(0 ..< editor.textStorage.length)
-			return try syntaxPipeline.indentationAfterNewline(in: tree, source: source, offset: editor.selections.primary.head, tabWidth: tabWidth)
+			return try syntaxPipeline.indentationAfterNewline(in: tree, source: source, offset: editor.selections.primary.head, indentationUnit: indentationUnit)
 		} catch {
 			return "\n"
 		}

@@ -975,6 +975,10 @@ final class IndentQuery {
 	}
 
 	func indentationAfterNewline(in tree: Tree, source: String, offset: Int, tabWidth: Int) throws -> String {
+		try indentationAfterNewline(in: tree, source: source, offset: offset, indentationUnit: String(repeating: " ", count: min(max(tabWidth, 1), 16)))
+	}
+
+	func indentationAfterNewline(in tree: Tree, source: String, offset: Int, indentationUnit: String) throws -> String {
 		let bytes = Array(source.utf8)
 		let clampedOffset = min(max(offset, 0), bytes.count)
 		let lineStart = Self.lineStart(before: clampedOffset, bytes: bytes)
@@ -985,8 +989,7 @@ final class IndentQuery {
 				capture.capture == "indent.begin" && capture.node.byteRange.contains(byte)
 			}
 		} ?? false
-		let width = min(max(tabWidth, 1), 16)
-		return "\n" + baseIndent + (shouldIndent ? String(repeating: " ", count: width) : "")
+		return "\n" + baseIndent + (shouldIndent ? indentationUnit : "")
 	}
 
 	private static func lineStart(before offset: Int, bytes: [UInt8]) -> Int {
@@ -1336,6 +1339,11 @@ public struct SyntaxPipeline {
 	public mutating func indentationAfterNewline(in tree: Tree, source: String, offset: Int, tabWidth: Int) throws -> String {
 		let query = try ensureIndentQuery()
 		return try query.indentationAfterNewline(in: tree, source: source, offset: offset, tabWidth: tabWidth)
+	}
+
+	public mutating func indentationAfterNewline(in tree: Tree, source: String, offset: Int, indentationUnit: String) throws -> String {
+		let query = try ensureIndentQuery()
+		return try query.indentationAfterNewline(in: tree, source: source, offset: offset, indentationUnit: indentationUnit)
 	}
 
 	private mutating func ensureParser() throws -> Parser {

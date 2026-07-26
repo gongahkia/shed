@@ -1758,6 +1758,7 @@ struct GitResponsiveViewState: Equatable {
 		}
 		gitListMinimumWidthConstraint?.constant = isFull ? 220 : 160
 		gitListMaximumWidthConstraint?.constant = isFull ? 360 : 240
+		gitListMaximumWidthConstraint?.isActive = isTwoPane
 		gitDiffMinimumWidthConstraint?.constant = isFull ? 420 : 220
 		setGitMainPanes(isTwoPane ? [listScrollView, diffPane] : mode == .files ? [listScrollView] : [diffPane], in: splitView)
 		setGitHunkVisible(isFull)

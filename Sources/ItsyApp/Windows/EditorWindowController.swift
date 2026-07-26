@@ -35,14 +35,40 @@ struct LSPFormattingCapabilities {
 	}
 }
 
+struct LSPCodeActionCapabilities {
+	var provider: Bool
+	var resolve: Bool
+
+	var requestError: LSPCodeActionRequestError? {
+		provider ? nil : .providerDisabled
+	}
+}
+
 enum LSPFormattingOperation {
 	case document
 	case range
 }
 
-enum LSPFormattingRequestError: Error, Equatable {
+enum LSPFormattingRequestError: LocalizedError, Equatable {
 	case documentFormattingDisabled
 	case rangeFormattingDisabled
+
+	var errorDescription: String? {
+		switch self {
+		case .documentFormattingDisabled:
+			"The language server does not support document formatting."
+		case .rangeFormattingDisabled:
+			"The language server does not support selection formatting."
+		}
+	}
+}
+
+enum LSPCodeActionRequestError: LocalizedError, Equatable {
+	case providerDisabled
+
+	var errorDescription: String? {
+		"The language server does not support code actions."
+	}
 }
 
 private enum LSPNavigationOperation {
@@ -234,7 +260,7 @@ extension Notification.Name {
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
-	private var codeActionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
+	private var codeActionCapabilitiesBySession: [LSPSessionKey: LSPCodeActionCapabilities] = [:]
 	private var callHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var typeHierarchyEnabledBySession: [LSPSessionKey: Bool] = [:]
 	private var semanticSurfaceCapabilitiesBySession: [LSPSessionKey: LSPSemanticSurfaceCapabilities] = [:]
@@ -1388,7 +1414,7 @@ extension Notification.Name {
 		completionTriggerCharactersBySession.removeAll()
 		signatureHelpTriggerCharactersBySession.removeAll()
 		completionResolveEnabledBySession.removeAll()
-		codeActionResolveEnabledBySession.removeAll()
+		codeActionCapabilitiesBySession.removeAll()
 		callHierarchyEnabledBySession.removeAll()
 		typeHierarchyEnabledBySession.removeAll()
 		semanticSurfaceCapabilitiesBySession.removeAll()
@@ -1467,7 +1493,7 @@ extension Notification.Name {
 		completionTriggerCharactersBySession[key] = nil
 		signatureHelpTriggerCharactersBySession[key] = nil
 		completionResolveEnabledBySession[key] = nil
-		codeActionResolveEnabledBySession[key] = nil
+		codeActionCapabilitiesBySession[key] = nil
 		callHierarchyEnabledBySession[key] = nil
 		typeHierarchyEnabledBySession[key] = nil
 		semanticSurfaceCapabilitiesBySession[key] = nil
@@ -3505,6 +3531,9 @@ extension Notification.Name {
 					return
 				}
 				let session = try await ensureLSPSession(for: fileURL)
+				if let error = codeActionCapabilitiesBySession[session.key]?.requestError {
+					throw error
+				}
 				try await syncLSPDocument(client: session.client, key: session.key, url: fileURL, content: content)
 				guard let requestContext = lspRequestContext(for: session.key, url: fileURL, content: content, cursorOffset: cursorOffset) else {
 					return
@@ -3538,6 +3567,7 @@ extension Notification.Name {
 						return
 					}
 					closeCodeActionPopover()
+					showLSPOperationFailure("code actions", error: error)
 					handleLSPRequestError(error)
 					NSLog("code actions failed: \(error)")
 				}
@@ -3586,7 +3616,7 @@ extension Notification.Name {
 		requestContext: LSPRequestContext,
 		targetView: MetalTextView
 	) {
-		let resolveProvider = codeActionResolveEnabledBySession[sessionKey] == true
+		let resolveProvider = codeActionCapabilitiesBySession[sessionKey]?.resolve == true
 		Task { [weak self] in
 			do {
 				guard let self else {
@@ -3898,7 +3928,10 @@ extension Notification.Name {
 				let triggers = completionProvider?.triggerCharacters.map(Set.init) ?? []
 				let resolveProvider = completionProvider?.resolveProvider ?? false
 				let signatureTriggers = capabilities?.signatureHelpProvider?.triggerCharacters.map(Set.init) ?? []
-				let codeActionResolveProvider = capabilities?.codeActionProvider?.resolveProvider ?? false
+				let codeActionCapabilities = LSPCodeActionCapabilities(
+					provider: capabilities?.codeActionProvider?.isEnabled ?? false,
+					resolve: capabilities?.codeActionProvider?.resolveProvider ?? false
+				)
 				let callHierarchyProvider = capabilities?.callHierarchyProvider?.isEnabled ?? false
 				let typeHierarchyProvider = capabilities?.typeHierarchyProvider?.isEnabled ?? false
 				let semanticSurfaceCapabilities = LSPSemanticSurfaceCapabilities(
@@ -3920,7 +3953,7 @@ extension Notification.Name {
 					setLSPStatus(key: key, status: "running", client: client, lastError: nil, url: url)
 					setCompletionCapabilities(triggerCharacters: triggers, resolveProvider: resolveProvider, for: key)
 					setSignatureHelpTriggerCharacters(signatureTriggers, for: key)
-					setCodeActionCapabilities(resolveProvider: codeActionResolveProvider, for: key)
+					setCodeActionCapabilities(codeActionCapabilities, for: key)
 					setHierarchyCapabilities(callHierarchy: callHierarchyProvider, typeHierarchy: typeHierarchyProvider, for: key)
 					setSemanticSurfaceCapabilities(semanticSurfaceCapabilities, for: key)
 					setFormattingCapabilities(formattingCapabilities, for: key)
@@ -4123,7 +4156,7 @@ extension Notification.Name {
 			completionTriggerCharactersBySession[key] = nil
 			signatureHelpTriggerCharactersBySession[key] = nil
 			completionResolveEnabledBySession[key] = nil
-			codeActionResolveEnabledBySession[key] = nil
+			codeActionCapabilitiesBySession[key] = nil
 			callHierarchyEnabledBySession[key] = nil
 			typeHierarchyEnabledBySession[key] = nil
 			semanticSurfaceCapabilitiesBySession[key] = nil
@@ -4195,8 +4228,8 @@ extension Notification.Name {
 		}
 	}
 
-	private func setCodeActionCapabilities(resolveProvider: Bool, for key: LSPSessionKey) {
-		codeActionResolveEnabledBySession[key] = resolveProvider
+	private func setCodeActionCapabilities(_ capabilities: LSPCodeActionCapabilities, for key: LSPSessionKey) {
+		codeActionCapabilitiesBySession[key] = capabilities
 	}
 
 	private func setHierarchyCapabilities(callHierarchy: Bool, typeHierarchy: Bool, for key: LSPSessionKey) {

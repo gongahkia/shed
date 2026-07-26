@@ -66,6 +66,65 @@ import Testing
 	}
 }
 
+@Test(arguments: [0x51EC_0001, 0x51EC_0002, 0x51EC_0003, 0x51EC_0004])
+func editorSelectionAndUndoFuzzMatchesAcrossStorage(seed: UInt64) {
+	var rng = SelectionInvariantRNG(seed)
+	var rope = Editor(text: "a👩‍💻e\u{301}\n", storage: .rope)
+	var pieceTree = Editor(text: "a👩‍💻e\u{301}\n", storage: .pieceTree)
+	let inserts = ["x", "👩‍💻", "e\u{301}", "\n", "[]"]
+	let motions: [Motion] = [.charForward, .charBackward, .wordForward, .wordBackward, .lineStart, .lineEnd, .bufferStart, .bufferEnd]
+
+	for _ in 0 ..< 250 {
+		switch rng.nextInt(7) {
+		case 0:
+			let selectionSet = randomSelectionSet(length: rope.textStorage.length, rng: &rng)
+			rope.setSelection(selectionSet)
+			pieceTree.setSelection(selectionSet)
+		case 1:
+			let inserted = inserts[rng.nextInt(inserts.count)]
+			rope.insert(inserted)
+			pieceTree.insert(inserted)
+		case 2:
+			rope.deleteBackward()
+			pieceTree.deleteBackward()
+		case 3:
+			rope.deleteForward()
+			pieceTree.deleteForward()
+		case 4:
+			let motion = motions[rng.nextInt(motions.count)]
+			rope.moveCursor(motion)
+			pieceTree.moveCursor(motion)
+		case 5:
+			rope.undo()
+			pieceTree.undo()
+		default:
+			rope.redo()
+			pieceTree.redo()
+		}
+		assertEquivalentEditorState(rope, pieceTree)
+	}
+
+	for _ in 0 ..< 250 {
+		rope.redo()
+		pieceTree.redo()
+		assertEquivalentEditorState(rope, pieceTree)
+	}
+	let expectedText = editorTextForSelectionInvariant(rope)
+	let expectedSelections = rope.selections
+	for _ in 0 ..< 250 {
+		rope.undo()
+		pieceTree.undo()
+		assertEquivalentEditorState(rope, pieceTree)
+	}
+	for _ in 0 ..< 250 {
+		rope.redo()
+		pieceTree.redo()
+		assertEquivalentEditorState(rope, pieceTree)
+	}
+	#expect(editorTextForSelectionInvariant(rope) == expectedText)
+	#expect(rope.selections == expectedSelections)
+}
+
 private func assertSelectionInvariants(_ editor: Editor) {
 	let selections = [editor.selections.primary] + editor.selections.secondaries
 	#expect(selections.allSatisfy {
@@ -78,6 +137,26 @@ private func assertSelectionInvariants(_ editor: Editor) {
 
 private func editorTextForSelectionInvariant(_ editor: Editor) -> String {
 	editor.textStorage.substring(0 ..< editor.textStorage.length)
+}
+
+private func randomSelectionSet(length: Int, rng: inout SelectionInvariantRNG) -> SelectionSet {
+	let count = 1 + rng.nextInt(4)
+	let selections = (0 ..< count).map { _ in
+		Selection(
+			anchor: rng.nextInt(length + 17) - 8,
+			head: rng.nextInt(length + 17) - 8,
+			affinity: rng.nextInt(2) == 0 ? .upstream : .downstream
+		)
+	}
+	return SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst()))
+}
+
+private func assertEquivalentEditorState(_ rope: Editor, _ pieceTree: Editor) {
+	#expect(editorTextForSelectionInvariant(rope) == editorTextForSelectionInvariant(pieceTree))
+	#expect(rope.selections == pieceTree.selections)
+	#expect(rope.history.edits == pieceTree.history.edits)
+	assertSelectionInvariants(rope)
+	assertSelectionInvariants(pieceTree)
 }
 
 private struct SelectionInvariantRNG {

@@ -9,7 +9,7 @@ import Testing
 	let workspace = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.workspace", source: "local value = 'loaded'\n")
 	try fixture.vouch(global, scope: .global)
 	try fixture.vouch(workspace, scope: .workspace)
-	let runtime = LuaPluginRuntime(configuration: fixture.configuration)
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
 
 	let loaded = await runtime.reload()
 
@@ -25,7 +25,7 @@ import Testing
 	defer { fixture.remove() }
 	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.broken", source: "error('boom')\n")
 	try fixture.vouch(packageRoot, scope: .workspace)
-	let runtime = LuaPluginRuntime(configuration: fixture.configuration)
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
 
 	let failed = await runtime.reload()
 
@@ -46,7 +46,7 @@ import Testing
 	let fixture = try LuaPluginRuntimeFixture()
 	defer { fixture.remove() }
 	_ = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.untrusted", source: "error('must not execute')\n")
-	let runtime = LuaPluginRuntime(configuration: fixture.configuration)
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
 
 	let snapshot = await runtime.reload()
 
@@ -60,13 +60,44 @@ import Testing
 	defer { fixture.remove() }
 	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.syntax", source: "local =\n")
 	try fixture.vouch(packageRoot, scope: .workspace)
-	let runtime = LuaPluginRuntime(configuration: fixture.configuration)
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
 
 	let snapshot = await runtime.reload()
 
 	#expect(snapshot.activePlugins.isEmpty)
 	#expect(snapshot.diagnostics.map(\.phase) == [.load])
 	#expect(snapshot.diagnostics[0].message.contains("syntax"))
+}
+
+@Test func luaPluginRuntimeExposesVersionedCommandEventSettingsEditorAndWorkspaceAPIs() async throws {
+	let fixture = try LuaPluginRuntimeFixture()
+	defer { fixture.remove() }
+	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.api", source: """
+		assert(itsy.api.version() == "1.0.0")
+		assert(itsy.settings.get("theme") == "night")
+		assert(itsy.workspace.root() == "\(fixture.workspace.path)")
+		assert(itsy.editor.active_document() == "\(fixture.workspace.appendingPathComponent("main.swift").path)")
+		itsy.commands.register("dev.example.api.hello", "Hello", function() end)
+		itsy.events.on("workspace.opened", function(event) assert(event == "workspace.opened") end)
+		""")
+	try fixture.vouch(packageRoot, scope: .workspace)
+	let documentURL = fixture.workspace.appendingPathComponent("main.swift")
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration(
+		settingValue: { $0 == "theme" ? "night" : nil },
+		activeEditorDocument: { documentURL }
+	))
+
+	let loaded = await runtime.reload()
+
+	#expect(loaded.diagnostics.isEmpty)
+	let commands = await runtime.commands()
+	#expect(commands == [
+		LuaPluginCommand(identifier: "dev.example.api.hello", title: "Hello", pluginIdentifier: "dev.example.api"),
+	])
+	let commandSnapshot = await runtime.invokeCommand(identifier: "dev.example.api.hello")
+	let eventSnapshot = await runtime.publish(event: "workspace.opened")
+	#expect(commandSnapshot.diagnostics.isEmpty)
+	#expect(eventSnapshot.diagnostics.isEmpty)
 }
 
 private final class LuaPluginRuntimeFixture {
@@ -85,8 +116,17 @@ private final class LuaPluginRuntimeFixture {
 		try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
 	}
 
-	var configuration: LuaPluginRuntimeConfiguration {
-		LuaPluginRuntimeConfiguration(repoRoot: repo, workspaceRoot: workspace, homeDirectory: home)
+	func configuration(
+		settingValue: @escaping @Sendable (String) -> String? = { _ in nil },
+		activeEditorDocument: @escaping @Sendable () -> URL? = { nil }
+	) -> LuaPluginRuntimeConfiguration {
+		LuaPluginRuntimeConfiguration(
+			repoRoot: repo,
+			workspaceRoot: workspace,
+			homeDirectory: home,
+			settingValue: settingValue,
+			activeEditorDocument: activeEditorDocument
+		)
 	}
 
 	func writePlugin(scope: LuaPluginScope, identifier: String, source: String) throws -> URL {

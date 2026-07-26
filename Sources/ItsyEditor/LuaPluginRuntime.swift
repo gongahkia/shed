@@ -7,6 +7,7 @@ public enum LuaPluginRuntimePhase: String, Equatable, Sendable {
 	case initialize
 	case load
 	case execute
+	case registration
 }
 
 public struct LuaPluginRuntimeDiagnostic: Equatable, Sendable {
@@ -56,23 +57,30 @@ public struct LuaPluginRuntimeConfiguration: Sendable {
 	public let workspaceRoot: URL
 	public let homeDirectory: URL
 	public let vouchEvidence: (@Sendable (VouchSubject) -> VouchDecision?)?
+	public let settingValue: @Sendable (String) -> String?
+	public let activeEditorDocument: @Sendable () -> URL?
 
 	public init(
 		repoRoot: URL,
 		workspaceRoot: URL,
 		homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
-		vouchEvidence: (@Sendable (VouchSubject) -> VouchDecision?)? = nil
+		vouchEvidence: (@Sendable (VouchSubject) -> VouchDecision?)? = nil,
+		settingValue: @escaping @Sendable (String) -> String? = { _ in nil },
+		activeEditorDocument: @escaping @Sendable () -> URL? = { nil }
 	) {
 		self.repoRoot = repoRoot.standardizedFileURL
 		self.workspaceRoot = workspaceRoot.standardizedFileURL
 		self.homeDirectory = homeDirectory.standardizedFileURL
 		self.vouchEvidence = vouchEvidence
+		self.settingValue = settingValue
+		self.activeEditorDocument = activeEditorDocument
 	}
 }
 
 public actor LuaPluginRuntime {
 	private let configuration: LuaPluginRuntimeConfiguration
 	private var states: [String: OpaquePointer] = [:]
+	private var bridges: [String: LuaPluginAPIBridge] = [:]
 	private var activePlugins: [LuaPluginRuntimePlugin] = []
 	private var diagnostics: [LuaPluginRuntimeDiagnostic] = []
 
@@ -82,6 +90,7 @@ public actor LuaPluginRuntime {
 
 	deinit {
 		for state in states.values {
+			LuaPluginAPIBridgeRegistry.remove(state)
 			lua_close(state)
 		}
 	}
@@ -118,6 +127,26 @@ public actor LuaPluginRuntime {
 		LuaPluginRuntimeSnapshot(activePlugins: activePlugins, diagnostics: diagnostics)
 	}
 
+	public func commands() -> [LuaPluginCommand] {
+		bridges.values.flatMap { $0.commands }.sorted { $0.identifier.localizedStandardCompare($1.identifier) == .orderedAscending }
+	}
+
+	public func invokeCommand(identifier: String) -> LuaPluginRuntimeSnapshot {
+		for (pluginID, bridge) in bridges where bridge.commands.contains(where: { $0.identifier == identifier }) {
+			invoke(pluginID: pluginID, reference: bridge.commandReference(identifier: identifier), argument: nil)
+		}
+		return snapshot()
+	}
+
+	public func publish(event: String) -> LuaPluginRuntimeSnapshot {
+		for (pluginID, bridge) in bridges {
+			for reference in bridge.eventReferences(named: event) {
+				invoke(pluginID: pluginID, reference: reference, argument: event)
+			}
+		}
+		return snapshot()
+	}
+
 	private func load(_ plugin: LuaDiscoveredPlugin) {
 		let manifest = plugin.manifest
 		do {
@@ -138,17 +167,27 @@ public actor LuaPluginRuntime {
 			return
 		}
 		luaL_openlibs(state)
+		let bridge = LuaPluginAPIBridge(
+			pluginIdentifier: manifest.identifier,
+			workspaceRoot: configuration.workspaceRoot,
+			settingValue: configuration.settingValue,
+			activeEditorDocument: configuration.activeEditorDocument
+		)
+		LuaPluginAPIBridgeRegistry.register(bridge, for: state)
+		LuaPluginAPIBridge.install(into: state)
 		let loadStatus = manifest.entrypointURL.path.withCString { entrypoint in
 			luaL_loadfilex(state, entrypoint, nil)
 		}
 		guard loadStatus == 0 else {
 			diagnostics.append(diagnostic(plugin, phase: .load, message: luaError(state)))
 			lua_close(state)
+			LuaPluginAPIBridgeRegistry.remove(state)
 			return
 		}
 		guard lua_pcallk(state, 0, 0, 0, 0, nil) == 0 else {
 			diagnostics.append(diagnostic(plugin, phase: .execute, message: luaError(state)))
 			lua_close(state)
+			LuaPluginAPIBridgeRegistry.remove(state)
 			return
 		}
 		let runtimePlugin = LuaPluginRuntimePlugin(
@@ -159,15 +198,21 @@ public actor LuaPluginRuntime {
 			entrypointURL: manifest.entrypointURL
 		)
 		states[manifest.identifier] = state
+		bridges[manifest.identifier] = bridge
+		for message in bridge.registrationDiagnostics {
+			diagnostics.append(diagnostic(plugin, phase: .registration, message: message))
+		}
 		activePlugins.append(runtimePlugin)
 		activePlugins.sort { $0.identifier.localizedStandardCompare($1.identifier) == .orderedAscending }
 	}
 
 	private func teardownStates() {
 		for state in states.values {
+			LuaPluginAPIBridgeRegistry.remove(state)
 			lua_close(state)
 		}
 		states = [:]
+		bridges = [:]
 	}
 
 	private func diagnostic(_ plugin: LuaDiscoveredPlugin, phase: LuaPluginRuntimePhase, message: String) -> LuaPluginRuntimeDiagnostic {
@@ -211,5 +256,23 @@ public actor LuaPluginRuntime {
 		default:
 			return "plugin trust check failed: \(error)"
 		}
+	}
+
+	private func invoke(pluginID: String, reference: Int32?, argument: String?) {
+		guard let state = states[pluginID], let reference else { return }
+		lua_rawgeti(state, -1001000, Int64(reference))
+		if let argument {
+			_ = argument.withCString { lua_pushstring(state, $0) }
+		}
+		let argumentCount: Int32 = argument == nil ? 0 : 1
+		guard lua_pcallk(state, argumentCount, 0, 0, 0, nil) != 0 else { return }
+		let plugin = activePlugins.first { $0.identifier == pluginID }
+		diagnostics.append(.init(
+			pluginIdentifier: pluginID,
+			scope: plugin?.scope,
+			path: plugin?.entrypointURL,
+			phase: .execute,
+			message: luaError(state)
+		))
 	}
 }

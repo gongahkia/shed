@@ -160,7 +160,13 @@ public struct ManagedSupportCatalog: Codable, Equatable, Sendable {
 	}
 
 	public static let bundled = ManagedSupportCatalog(components: [
-		Self.component("pyright", "Pyright", .languageServer, .core, ["python"], "pyright-langserver", ["--stdio"], .managed, "https://github.com/microsoft/pyright"),
+		Self.component("pyright", "Pyright", .languageServer, .core, ["python"], "pyright-langserver", ["--stdio"], .managed, "https://github.com/microsoft/pyright", nodeSupport: .init(
+			version: "1.1.410",
+			packages: [
+				.init(packageName: "pyright", version: "1.1.410", archiveURL: URL(string: "https://registry.npmjs.org/pyright/-/pyright-1.1.410.tgz")!, integrity: "sha512-3ImEV3F3YPMJZDwmouvKj3Ytxkw/adZFGlsOsNKiS+B97Th4h7TFElFKpBG/j1nqx6kXFPQjnzOU+zTBOkki2g=="),
+			],
+			executablePath: "node_modules/pyright/langserver.index.js"
+		)),
 		Self.component("typescript-language-server", "TypeScript Language Server", .languageServer, .core, ["javascript", "typescript"], "typescript-language-server", ["--stdio"], .managed, "https://github.com/typescript-language-server/typescript-language-server", nodeSupport: .init(
 			version: "5.3.0",
 			packages: [
@@ -174,27 +180,37 @@ public struct ManagedSupportCatalog: Codable, Equatable, Sendable {
 			x86_64: .init(version: "1.39.15", archiveURL: URL(string: "https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v1.39.15/omnisharp-osx-x64-net6.0.zip")!, sha256: "6ac1f8b1dfb1e4515f61d120f2cb5ab8404134ec62c441e4ab70ef30e0ac6d07", format: .zip, executablePaths: ["OmniSharp"])
 		)),
 		Self.component("clangd", "clangd", .languageServer, .core, ["c", "cpp"], "clangd", [], .system, "https://clangd.llvm.org/installation.html", "Install Xcode Command Line Tools."),
-		Self.component("debugpy", "debugpy", .debugAdapter, .core, ["python"], "python3", ["-m", "debugpy.adapter"], .managed, "https://github.com/microsoft/debugpy"),
-		Self.component("vscode-js-debug", "VS Code JavaScript Debugger", .debugAdapter, .core, ["javascript", "typescript"], "js-debug-adapter", [], .managed, "https://github.com/microsoft/vscode-js-debug"),
+		Self.component("vscode-css-language-server", "VS Code CSS Language Server", .languageServer, .onDemand, ["css", "scss"], "vscode-css-language-server", ["--stdio"], .system, "https://github.com/microsoft/vscode/tree/main/extensions/css-language-features", "Install `vscode-langservers-extracted` with a Node package manager."),
+		Self.component("vscode-html-language-server", "VS Code HTML Language Server", .languageServer, .onDemand, ["html"], "vscode-html-language-server", ["--stdio"], .system, "https://github.com/microsoft/vscode/tree/main/extensions/html-language-features", "Install `vscode-langservers-extracted` with a Node package manager."),
+		Self.component("vscode-json-language-server", "VS Code JSON Language Server", .languageServer, .onDemand, ["json"], "vscode-json-language-server", ["--stdio"], .system, "https://github.com/microsoft/vscode/tree/main/extensions/json-language-features", "Install `vscode-langservers-extracted` with a Node package manager."),
+		Self.component("yaml-language-server", "YAML Language Server", .languageServer, .onDemand, ["yaml"], "yaml-language-server", ["--stdio"], .system, "https://github.com/redhat-developer/yaml-language-server", "Install `yaml-language-server` with a Node package manager."),
+		Self.component("taplo", "Taplo", .languageServer, .onDemand, ["toml"], "taplo", ["lsp", "stdio"], .system, "https://taplo.tamasfe.dev/", "Install Taplo with its official installer or package manager."),
+		Self.component("marksman", "Marksman", .languageServer, .onDemand, ["markdown"], "marksman", ["server"], .system, "https://github.com/artempyanykh/marksman", "Install Marksman with its official installer or package manager."),
+		Self.component("intelephense", "Intelephense", .languageServer, .onDemand, ["php"], "intelephense", ["--stdio"], .system, "https://intelephense.com/", "Install `intelephense` with a Node package manager."),
+		Self.component("jdtls", "Eclipse JDT Language Server", .languageServer, .onDemand, ["java"], "jdtls", [], .system, "https://github.com/eclipse-jdtls/eclipse.jdt.ls", "Install JDT LS with its official installer or package manager."),
+		Self.component("svelte-language-server", "Svelte Language Server", .languageServer, .onDemand, ["svelte"], "svelteserver", ["--stdio"], .system, "https://github.com/sveltejs/language-tools", "Install `svelte-language-server` with a Node package manager."),
+		Self.component("vue-language-server", "Vue Language Server", .languageServer, .onDemand, ["vue"], "vue-language-server", ["--stdio"], .system, "https://github.com/vuejs/language-tools", "Install `@vue/language-server` with a Node package manager."),
+		Self.component("debugpy", "debugpy", .debugAdapter, .core, ["python"], "python3", ["-m", "debugpy.adapter"], .system, "https://github.com/microsoft/debugpy"),
+		Self.component("vscode-js-debug", "VS Code JavaScript Debugger", .debugAdapter, .core, ["javascript", "typescript"], "js-debug-adapter", [], .system, "https://github.com/microsoft/vscode-js-debug"),
 		Self.component("lldb-dap", "LLDB-DAP", .debugAdapter, .core, ["c", "cpp"], "lldb-dap", [], .system, "https://lldb.llvm.org/use/lldbdap.html", "Install Xcode Command Line Tools."),
 		Self.component("sourcekit-lsp", "SourceKit-LSP", .languageServer, .onDemand, ["swift"], "/usr/bin/xcrun", ["sourcekit-lsp"], .system, "https://developer.apple.com/documentation/xcode/xcode-command-line-tool-reference", "Install Xcode Command Line Tools."),
-		Self.component("rust-analyzer", "rust-analyzer", .languageServer, .onDemand, ["rust"], "rust-analyzer", [], .managed, "https://github.com/rust-lang/rust-analyzer"),
-		Self.component("gopls", "gopls", .languageServer, .onDemand, ["go"], "gopls", [], .managed, "https://pkg.go.dev/golang.org/x/tools/gopls"),
-		Self.component("zls", "ZLS", .languageServer, .onDemand, ["zig"], "zls", [], .managed, "https://github.com/zigtools/zls"),
-		Self.component("elixir-ls", "ElixirLS", .languageServer, .onDemand, ["elixir"], "elixir-ls", [], .managed, "https://github.com/elixir-lsp/elixir-ls"),
-		Self.component("kotlin-language-server", "Kotlin Language Server", .languageServer, .onDemand, ["kotlin"], "kotlin-language-server", [], .managed, "https://github.com/fwcd/kotlin-language-server"),
-		Self.component("bash-language-server", "Bash Language Server", .languageServer, .onDemand, ["bash"], "bash-language-server", ["start"], .managed, "https://github.com/bash-lsp/bash-language-server"),
-		Self.component("docker-langserver", "Dockerfile Language Server", .languageServer, .onDemand, ["dockerfile"], "docker-langserver", ["--stdio"], .managed, "https://github.com/rcjsuen/dockerfile-language-server-nodejs"),
+		Self.component("rust-analyzer", "rust-analyzer", .languageServer, .onDemand, ["rust"], "rust-analyzer", [], .system, "https://github.com/rust-lang/rust-analyzer"),
+		Self.component("gopls", "gopls", .languageServer, .onDemand, ["go"], "gopls", [], .system, "https://pkg.go.dev/golang.org/x/tools/gopls"),
+		Self.component("zls", "ZLS", .languageServer, .onDemand, ["zig"], "zls", [], .system, "https://github.com/zigtools/zls"),
+		Self.component("elixir-ls", "ElixirLS", .languageServer, .onDemand, ["elixir"], "elixir-ls", [], .system, "https://github.com/elixir-lsp/elixir-ls"),
+		Self.component("kotlin-language-server", "Kotlin Language Server", .languageServer, .onDemand, ["kotlin"], "kotlin-language-server", [], .system, "https://github.com/fwcd/kotlin-language-server"),
+		Self.component("bash-language-server", "Bash Language Server", .languageServer, .onDemand, ["bash"], "bash-language-server", ["start"], .system, "https://github.com/bash-lsp/bash-language-server"),
+		Self.component("docker-langserver", "Dockerfile Language Server", .languageServer, .onDemand, ["dockerfile"], "docker-langserver", ["--stdio"], .system, "https://github.com/rcjsuen/dockerfile-language-server-nodejs"),
 		Self.component("sqls", "sqls", .languageServer, .onDemand, ["sql"], "sqls", [], .managed, "https://github.com/sqls-server/sqls", artifacts: .init(
 			arm64: .init(version: "0.2.48", archiveURL: URL(string: "https://github.com/sqls-server/sqls/releases/download/v0.2.48/sqls-darwin-0.2.48.zip")!, sha256: "b44165ca597a4b4298d56657bc911aa3ca8a591befefde4e29566923c6229f3d", format: .zip, executablePaths: ["sqls"]),
 			x86_64: .init(version: "0.2.48", archiveURL: URL(string: "https://github.com/sqls-server/sqls/releases/download/v0.2.48/sqls-darwin-0.2.48.zip")!, sha256: "b44165ca597a4b4298d56657bc911aa3ca8a591befefde4e29566923c6229f3d", format: .zip, executablePaths: ["sqls"])
 		)),
-		Self.component("dart", "Dart", .languageServer, .onDemand, ["dart"], "dart", ["language-server", "--protocol=lsp"], .managed, "https://dart.dev/tools/sdk"),
-		Self.component("haskell-language-server", "Haskell Language Server", .languageServer, .onDemand, ["haskell"], "haskell-language-server-wrapper", ["--lsp"], .managed, "https://github.com/haskell/haskell-language-server"),
-		Self.component("lua-language-server", "Lua Language Server", .languageServer, .onDemand, ["lua"], "lua-language-server", [], .managed, "https://github.com/LuaLS/lua-language-server"),
-		Self.component("ruby-lsp", "Ruby LSP", .languageServer, .onDemand, ["ruby"], "ruby-lsp", [], .managed, "https://github.com/Shopify/ruby-lsp"),
-		Self.component("terraform-ls", "Terraform Language Server", .languageServer, .onDemand, ["terraform"], "terraform-ls", ["serve"], .managed, "https://github.com/hashicorp/terraform-ls"),
-		Self.component("delve", "Delve", .debugAdapter, .onDemand, ["go"], "dlv", ["dap"], .managed, "https://github.com/go-delve/delve"),
+		Self.component("dart", "Dart", .languageServer, .onDemand, ["dart"], "dart", ["language-server", "--protocol=lsp"], .system, "https://dart.dev/tools/sdk"),
+		Self.component("haskell-language-server", "Haskell Language Server", .languageServer, .onDemand, ["haskell"], "haskell-language-server-wrapper", ["--lsp"], .system, "https://github.com/haskell/haskell-language-server"),
+		Self.component("lua-language-server", "Lua Language Server", .languageServer, .onDemand, ["lua"], "lua-language-server", [], .system, "https://github.com/LuaLS/lua-language-server"),
+		Self.component("ruby-lsp", "Ruby LSP", .languageServer, .onDemand, ["ruby"], "ruby-lsp", [], .system, "https://github.com/Shopify/ruby-lsp"),
+		Self.component("terraform-ls", "Terraform Language Server", .languageServer, .onDemand, ["terraform"], "terraform-ls", ["serve"], .system, "https://github.com/hashicorp/terraform-ls"),
+		Self.component("delve", "Delve", .debugAdapter, .onDemand, ["go"], "dlv", ["dap"], .system, "https://github.com/go-delve/delve"),
 		Self.component("codelldb", "CodeLLDB", .debugAdapter, .onDemand, ["rust"], "codelldb", [], .managed, "https://github.com/vadimcn/codelldb", artifacts: .init(
 			arm64: .init(version: "1.12.2", archiveURL: URL(string: "https://github.com/vadimcn/codelldb/releases/download/v1.12.2/codelldb-darwin-arm64.vsix")!, sha256: "c836b81c6f2da467b5920a376a7bfc849dc4b4d81b19779dedf1c685cb4aa1a0", format: .zip, executablePaths: Self.codeLLDBExecutablePaths),
 			x86_64: .init(version: "1.12.2", archiveURL: URL(string: "https://github.com/vadimcn/codelldb/releases/download/v1.12.2/codelldb-darwin-x64.vsix")!, sha256: "8270a342929bdc0deb6d7d3931c08d5ba6018265f840dd0508c4247fb8d32e8d", format: .zip, executablePaths: Self.codeLLDBExecutablePaths)

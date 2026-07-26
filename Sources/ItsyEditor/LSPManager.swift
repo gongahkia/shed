@@ -64,7 +64,7 @@ public actor LSPManager {
 	}
 
 	public static let defaultClientFactory: ClientFactory = { config, root in
-		if requiresNodeRuntime(config), let runtime = NodeRuntimeDetector.resolve() {
+		if requiresNodeRuntime(config), let runtime = nodeRuntime(for: config) {
 			return LSPProcessClient(
 				executableURL: runtime.executableURL,
 				arguments: [config.command] + config.args,
@@ -106,11 +106,11 @@ public actor LSPManager {
 	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
 		let registry = effectiveRegistry(for: url)
 		let mode = mode(for: url, registry: registry)
-		if let config = registry.resolvedConfig(for: url, mode: mode), Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
+		if let config = registry.resolvedConfig(for: url, mode: mode), Self.requiresNodeRuntime(config), Self.nodeRuntime(for: config) == nil {
 			return LSPServerRegistry.MissingBinary(
 				languageID: config.languageId,
 				command: "node",
-				hint: "Install Node.js 20 or newer, then restart Itsy."
+				hint: Self.nodeRuntimeHint(for: config)
 			)
 		}
 		return registry.missingBinary(for: url, mode: mode)
@@ -139,11 +139,11 @@ public actor LSPManager {
 			}
 			throw LSPManagerError.noConfigForDocument
 		}
-		if Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
+		if Self.requiresNodeRuntime(config), Self.nodeRuntime(for: config) == nil {
 			throw LSPManagerError.missingBinary(.init(
 				languageID: config.languageId,
 				command: "node",
-				hint: "Install Node.js 20 or newer, then restart Itsy."
+				hint: Self.nodeRuntimeHint(for: config)
 			))
 		}
 		guard let root = effectiveRegistry.discoverWorkspaceRoot(for: url) else {
@@ -292,6 +292,21 @@ public actor LSPManager {
 	}
 
 	private static func requiresNodeRuntime(_ config: LSPServerConfig) -> Bool {
-		URL(fileURLWithPath: config.command).pathExtension.lowercased() == "mjs"
+		["js", "mjs"].contains(URL(fileURLWithPath: config.command).pathExtension.lowercased())
+	}
+
+	private static func nodeRuntime(for config: LSPServerConfig) -> NodeRuntime? {
+		let managedRoot = ManagedSupportInstaller.defaultInstallRoot().standardizedFileURL.path + "/"
+		if config.command.hasPrefix(managedRoot) {
+			return NodeRuntimeDetector.managedRuntime()
+		}
+		return NodeRuntimeDetector.resolve()
+	}
+
+	private static func nodeRuntimeHint(for config: LSPServerConfig) -> String {
+		let managedRoot = ManagedSupportInstaller.defaultInstallRoot().standardizedFileURL.path + "/"
+		return config.command.hasPrefix(managedRoot)
+			? "Open Language & Debugger Support in Itsy to repair the private Node.js runtime."
+			: "Install Node.js 20 or newer, then restart Itsy."
 	}
 }

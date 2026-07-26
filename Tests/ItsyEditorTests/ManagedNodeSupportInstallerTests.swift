@@ -115,6 +115,23 @@ import Testing
 	#expect(runtime?.version == LSPServerVersion(major: 20, minor: 1))
 }
 
+@Test func managedNodeRuntimeInstallerExtractsOnlyTheNodeBinary() throws {
+	let fixture = try ManagedNodeSupportFixture()
+	defer { fixture.cleanup() }
+	let version = "22.23.1"
+	let archive = try fixture.nodeRuntimeArchive(version: version)
+	let artifact = ManagedSupportArtifact(
+		version: version,
+		archiveURL: try #require(URL(string: "https://example.invalid/node-v\(version)-darwin-arm64.tar.gz")),
+		sha256: try ManagedSupportInstaller.sha256(url: archive),
+		format: .directory,
+		executablePaths: ["node"]
+	)
+	let node = try ManagedNodeRuntimeInstaller.install(archiveURL: archive, artifact: artifact, installRoot: fixture.installRoot)
+	#expect(node.path == fixture.installRoot.appendingPathComponent("node-runtime/\(version)/node").path)
+	#expect(FileManager.default.isExecutableFile(atPath: node.path))
+}
+
 private final class ManagedNodeSupportFixture {
 	let root: URL
 	let installRoot: URL
@@ -170,6 +187,22 @@ private final class ManagedNodeSupportFixture {
 		try contents.write(to: file, atomically: true, encoding: .utf8)
 		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: file.path)
 		return file.standardizedFileURL
+	}
+
+	func nodeRuntimeArchive(version: String) throws -> URL {
+		let name = "node-v\(version)-darwin-arm64"
+		let node = root.appendingPathComponent("\(name)/bin/node")
+		try FileManager.default.createDirectory(at: node.deletingLastPathComponent(), withIntermediateDirectories: true)
+		try "#!/bin/sh\necho v22.23.1\n".write(to: node, atomically: true, encoding: .utf8)
+		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: node.path)
+		let archive = root.appendingPathComponent("\(name).tar.gz")
+		let process = Process()
+		process.executableURL = URL(fileURLWithPath: "/usr/bin/tar")
+		process.arguments = ["-czf", archive.path, "-C", root.path, name]
+		try process.run()
+		process.waitUntilExit()
+		guard process.terminationStatus == 0 else { throw CocoaError(.fileWriteUnknown) }
+		return archive
 	}
 
 	func integrity(of archive: URL) throws -> String {

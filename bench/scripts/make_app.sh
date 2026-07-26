@@ -120,4 +120,16 @@ if [[ -n "${ITSY_SPARKLE_FEED_URL:-}" || -n "${ITSY_SPARKLE_PUBLIC_ED_KEY:-}" ]]
 		/usr/libexec/PlistBuddy -c "Add :SUEnableInstallerLauncherService bool true" "$app_dir/Contents/Info.plist"
 	fi
 fi
+if [[ -n "${ITSY_LSP_CATALOG_URL:-}" || -n "${ITSY_LSP_CATALOG_PUBLIC_ED_KEY:-}" ]]; then
+	if [[ -z "${ITSY_LSP_CATALOG_PUBLIC_ED_KEY:-}" ]]; then
+		echo "ITSY_LSP_CATALOG_PUBLIC_ED_KEY is required to enable signed LSP catalog updates" >&2
+		exit 1
+	fi
+	if [[ -z "${ITSY_LSP_CATALOG_URL:-}" ]]; then
+		echo "ITSY_LSP_CATALOG_URL is required to enable signed LSP catalog updates" >&2
+		exit 1
+	fi
+	/usr/libexec/PlistBuddy -c "Add :ITSYLSPCatalogURL string ${ITSY_LSP_CATALOG_URL}" "$app_dir/Contents/Info.plist"
+	/usr/libexec/PlistBuddy -c "Add :ITSYLSPCatalogPublicKey string ${ITSY_LSP_CATALOG_PUBLIC_ED_KEY}" "$app_dir/Contents/Info.plist"
+fi
 echo "$app_dir"

@@ -117,6 +117,27 @@ import Testing
 	))
 }
 
+@Test func settingsParserReadsAndSerializesGlobalLSPModes() {
+	var parser = ItsySettingsParser()
+	let parsed = parser.parse("""
+	[lsp]
+	catalog_automatically_check = true
+
+	[lsp.python]
+	mode = "managed"
+
+	[lsp.typescript]
+	mode = "disabled"
+	""")
+	#expect(parsed.warnings.isEmpty)
+	#expect(parsed.settings.lsp.catalogAutomaticallyCheck)
+	#expect(parsed.settings.lsp.mode(for: "python") == .managed)
+	#expect(parsed.settings.lsp.mode(for: "typescript") == .disabled)
+	let serialized = ItsySettingsStore.serialize(parsed.settings)
+	let roundTrip = parser.parse(serialized)
+	#expect(roundTrip.settings.lsp == parsed.settings.lsp)
+}
+
 @Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
 	let fallback = ItsySettings(
 		editor: .init(font: "Menlo", fontSize: 15, lineNumbers: false, tabWidth: 4),
@@ -145,12 +166,12 @@ import Testing
 	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
 	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
 	let result = parser.parse("""
-	schema_version = 12
+	schema_version = 13
 	[editor]
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 11)
+	#expect(ItsySettingsSchema.currentVersion == 12)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }

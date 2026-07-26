@@ -90,41 +90,41 @@ public enum BundledLanguageInventory {
 		supported("c", extensions: ["c", "h"], fixture: "int main(void) { return 0; }\n", server: clangd),
 		supported("cpp", extensions: ["cc", "cpp", "cxx", "hh", "hpp", "hxx"], fixture: "int main() { return 0; }\n", server: clangd),
 		supported("csharp", extensions: ["cs", "csx"], fixture: "class Program { static void Main() {} }\n", server: omnisharp),
-		unsupported("css", extensions: ["css"], fixture: ".app { color: red; }\n"),
+		supported("css", extensions: ["css"], fixture: ".app { color: red; }\n", server: css),
 		supported("dart", extensions: ["dart"], fixture: "void main() {}\n", server: dart),
 		supported("dockerfile", extensions: ["dockerfile"], fileNames: ["dockerfile", "containerfile"], fixture: "FROM scratch\n", server: docker),
 		supported("elixir", extensions: ["ex", "exs"], fixture: "value = 1\n", server: elixir),
 		supported("go", extensions: ["go"], fixture: "package main\nfunc main() {}\n", server: gopls),
 		unsupported("graphql", extensions: ["graphql", "gql"], fixture: "type Query { hello: String }\n"),
 		supported("haskell", extensions: ["hs", "lhs"], fixture: "main = putStrLn \"hi\"\n", server: haskell),
-		unsupported("html", extensions: ["html", "htm"], fixture: "<main>hello</main>\n"),
-		unsupported("java", extensions: ["java"], fixture: "class Main { void run() {} }\n"),
+		supported("html", extensions: ["html", "htm"], fixture: "<main>hello</main>\n", server: html),
+		supported("java", extensions: ["java"], fixture: "class Main { void run() {} }\n", server: java),
 		supported("javascript", extensions: ["js", "jsx", "mjs", "cjs"], fixture: "const value = 1;\n", server: javascript),
 		unsupported("julia", extensions: ["jl"], fixture: "value = 1\n"),
-		unsupported("json", extensions: ["json"], fixture: "{\"value\": true}\n"),
+		supported("json", extensions: ["json", "jsonc"], fixture: "{\"value\": true}\n", server: json),
 		supported("kotlin", extensions: ["kt", "kts"], fixture: "fun main() {}\n", server: kotlin),
 		unsupported("latex", extensions: ["tex", "sty", "cls"], fixture: "\\section{Hi}\n"),
 		supported("lua", extensions: ["lua"], fixture: "local value = 1\n", server: lua),
-		unsupported("markdown", extensions: ["md", "markdown"], fixture: "# Heading\n"),
-		unsupported("markdown-inline", extensions: [], fixture: "**inline**", languageID: "markdown"),
+		supported("markdown", extensions: ["md", "markdown"], fixture: "# Heading\n", server: markdown),
+		supported("markdown-inline", extensions: [], fixture: "**inline**", languageID: "markdown", server: markdown),
 		unsupported("nix", extensions: ["nix"], fixture: "{ value = 1; }\n"),
 		unsupported("ocaml", extensions: ["ml", "mli"], fixture: "let value = 1\n"),
-		unsupported("php", extensions: ["php"], fixture: "<?php echo \"hi\";\n"),
+		supported("php", extensions: ["php"], fixture: "<?php echo \"hi\";\n", server: php),
 		unsupported("proto", extensions: ["proto"], fixture: "syntax = \"proto3\"; message Value {}\n"),
 		supported("python", extensions: ["py", "pyi"], fixture: "value = 1\n", server: pyright),
 		unsupported("r", extensions: ["r"], fixture: "value <- 1\n"),
 		supported("ruby", extensions: ["rb", "rake"], fileNames: ["gemfile", "rakefile"], fixture: "value = 1\n", server: ruby),
 		supported("rust", extensions: ["rs"], fixture: "fn main() {}\n", server: rustAnalyzer),
-		unsupported("scss", extensions: ["scss"], fixture: "$color: red;\n"),
+		supported("scss", extensions: ["scss"], fixture: "$color: red;\n", server: scss),
 		supported("sql", extensions: ["sql"], fixture: "select 1;\n", server: sqls),
-		unsupported("svelte", extensions: ["svelte"], fixture: "<h1>Hello</h1>\n"),
+		supported("svelte", extensions: ["svelte"], fixture: "<h1>Hello</h1>\n", server: svelte),
 		supported("swift", extensions: ["swift"], fixture: "let value = 1\n", server: sourceKit),
 		supported("terraform", extensions: ["tf", "tfvars", "hcl"], fixture: "resource \"x\" \"y\" {}\n", server: terraform),
-		unsupported("toml", extensions: ["toml"], fixture: "value = 1\n"),
+		supported("toml", extensions: ["toml"], fixture: "value = 1\n", server: toml),
 		supported("tsx", extensions: ["tsx"], fixture: "const View = <main />;\n", languageID: "typescript", server: typescript),
 		supported("typescript", extensions: ["ts", "mts", "cts"], fixture: "const value: number = 1;\n", server: typescript),
-		unsupported("vue", extensions: ["vue"], fixture: "<template><main>Hello</main></template>\n"),
-		unsupported("yaml", extensions: ["yaml", "yml"], fixture: "value: true\n"),
+		supported("vue", extensions: ["vue"], fixture: "<template><main>Hello</main></template>\n", server: vue),
+		supported("yaml", extensions: ["yaml", "yml"], fixture: "value: true\n", server: yaml),
 		supported("zig", extensions: ["zig", "zon"], fixture: "pub fn main() void {}\n", server: zls),
 	]
 
@@ -198,7 +198,18 @@ public enum BundledLanguageInventory {
 	}
 
 	private static let sourceKit = BundledLanguageServer(id: "sourcekit-lsp", command: "/usr/bin/xcrun", args: ["sourcekit-lsp"], rootPatterns: ["Package.swift", ".git"], executableProbe: "sourcekit-lsp", installHint: "Open Language & Debugger Support in Itsy to install Xcode Command Line Tools.")
+	private static let css = BundledLanguageServer(id: "vscode-css-language-server", command: "vscode-css-language-server", args: ["--stdio"], rootPatterns: ["package.json", ".git"], executableProbe: "vscode-css-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let html = BundledLanguageServer(id: "vscode-html-language-server", command: "vscode-html-language-server", args: ["--stdio"], rootPatterns: ["package.json", ".git"], executableProbe: "vscode-html-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let java = BundledLanguageServer(id: "jdtls", command: "jdtls", args: [], rootPatterns: ["pom.xml", "build.gradle", "settings.gradle", ".git"], executableProbe: "jdtls", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let json = BundledLanguageServer(id: "vscode-json-language-server", command: "vscode-json-language-server", args: ["--stdio"], rootPatterns: ["package.json", ".git"], executableProbe: "vscode-json-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let markdown = BundledLanguageServer(id: "marksman", command: "marksman", args: ["server"], rootPatterns: [".marksman.toml", ".git"], executableProbe: "marksman", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let php = BundledLanguageServer(id: "intelephense", command: "intelephense", args: ["--stdio"], rootPatterns: ["composer.json", ".git"], executableProbe: "intelephense", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let scss = BundledLanguageServer(id: "vscode-css-language-server", command: "vscode-css-language-server", args: ["--stdio"], rootPatterns: ["package.json", ".git"], executableProbe: "vscode-css-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let svelte = BundledLanguageServer(id: "svelte-language-server", command: "svelteserver", args: ["--stdio"], rootPatterns: ["svelte.config.js", "package.json", ".git"], executableProbe: "svelteserver", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let toml = BundledLanguageServer(id: "taplo", command: "taplo", args: ["lsp", "stdio"], rootPatterns: ["Cargo.toml", ".git"], executableProbe: "taplo", installHint: "Open Language & Debugger Support in Itsy.")
 	private static let typescript = BundledLanguageServer(id: "typescript-language-server", command: "typescript-language-server", args: ["--stdio"], rootPatterns: ["tsconfig.json", "package.json", ".git"], executableProbe: "typescript-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let vue = BundledLanguageServer(id: "vue-language-server", command: "vue-language-server", args: ["--stdio"], rootPatterns: ["vite.config.ts", "vite.config.js", "package.json", ".git"], executableProbe: "vue-language-server", installHint: "Open Language & Debugger Support in Itsy.")
+	private static let yaml = BundledLanguageServer(id: "yaml-language-server", command: "yaml-language-server", args: ["--stdio"], rootPatterns: [".git"], executableProbe: "yaml-language-server", installHint: "Open Language & Debugger Support in Itsy.")
 	private static let javascript = BundledLanguageServer(id: "typescript-language-server", command: "typescript-language-server", args: ["--stdio"], rootPatterns: ["package.json", "jsconfig.json", ".git"], executableProbe: "typescript-language-server", installHint: "Open Language & Debugger Support in Itsy.")
 	private static let rustAnalyzer = BundledLanguageServer(id: "rust-analyzer", command: "rust-analyzer", args: [], rootPatterns: ["Cargo.toml", ".git"], executableProbe: "rust-analyzer", installHint: "Open Language & Debugger Support in Itsy.")
 	private static let pyright = BundledLanguageServer(id: "pyright", command: "pyright-langserver", args: ["--stdio"], rootPatterns: ["pyproject.toml", "setup.py", "setup.cfg", ".git"], executableProbe: "pyright-langserver", installHint: "Open Language & Debugger Support in Itsy.")

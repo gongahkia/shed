@@ -48,6 +48,23 @@ public enum NodeRuntimeDetector {
 		return environment
 	}
 
+	public static func managedRuntime(
+		environment: [String: String] = ProcessInfo.processInfo.environment,
+		fileManager: FileManager = .default,
+		versionReader: ((URL) -> String?)? = nil
+	) -> NodeRuntime? {
+		guard let candidate = ManagedNodeRuntimeInstaller.executableURL(fileManager: fileManager),
+		      fileManager.isExecutableFile(atPath: candidate.path)
+		else {
+			return nil
+		}
+		let output = versionReader?(candidate) ?? readVersion(at: candidate, environment: environment)
+		guard let output, let version = LSPServerVersion.parse(output), version >= minimumVersion else {
+			return nil
+		}
+		return NodeRuntime(executableURL: candidate, version: version)
+	}
+
 	private static func candidates(
 		environment: [String: String],
 		homeDirectory: URL,

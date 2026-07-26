@@ -26,6 +26,7 @@ GitHub Actions release flow expects:
 - `APPLE_TEAM_ID`
 - `APPLE_APP_SPECIFIC_PASSWORD`
 - `SPARKLE_PRIVATE_KEY`
+- `ITSY_LSP_CATALOG_PRIVATE_KEY`
 
 Local signing/notarization expects either:
 
@@ -42,6 +43,7 @@ or:
 Signed Sparkle release config expects:
 
 - `ITSY_SPARKLE_PUBLIC_ED_KEY`
+- `ITSY_LSP_CATALOG_PUBLIC_ED_KEY`
 
 ## Local Smoke
 
@@ -106,6 +108,10 @@ Set `SPARKLE_GENERATE_APPCAST` only if overriding the SwiftPM artifact tool path
 Set `SPARKLE_PRIVATE_KEY` or `SPARKLE_ED_KEY_FILE` for non-Keychain signing.
 Set `SPARKLE_REQUIRE_ED_KEY=1` in CI so appcast generation cannot silently omit EdDSA signatures.
 Set `SPARKLE_RELEASE_NOTES_PATH` to a version-matched Markdown file; `SPARKLE_REQUIRE_RELEASE_NOTES=1` makes this mandatory.
+
+## Signed LSP Catalog Flow
+
+The release workflow signs `docs/lsp-catalog.json` as `lsp-catalog.json` with a distinct Ed25519 key, publishes it with the release, and embeds its public key plus the stable latest-release URL in the app. The catalog envelope signs the exact JSON payload; Itsy rejects malformed, unsigned, incompatible, or unknown-component entries before caching. `scripts/sign_lsp_catalog.swift` expects `ITSY_LSP_CATALOG_PRIVATE_KEY` as a base64-encoded 32-byte Ed25519 private-key seed. Keep the private key only in GitHub Actions secrets and place the matching base64 public key in `ITSY_LSP_CATALOG_PUBLIC_ED_KEY` Actions variable.
 
 ## Homebrew Cask Gate
 

@@ -143,6 +143,7 @@ import ItsyKeymap
 
 	func applicationDidFinishLaunching(_: Notification) {
 		recordBenchStage("app_did_finish_launching")
+		prepareManagedSupportCatalog()
 		installServicesProvider()
 		menuCoordinator.installMainMenu()
 		sparkleUpdateCoordinator.start(automaticallyChecks: settingsCoordinator.currentSettings.updates.automaticallyCheck)
@@ -156,6 +157,23 @@ import ItsyKeymap
 		}
 		NSApp.activate(ignoringOtherApps: true)
 		recordBenchStage("app_activated")
+	}
+
+	private func prepareManagedSupportCatalog() {
+		guard let configuration = ManagedSupportCatalogUpdateConfiguration.bundled() else { return }
+		do {
+			_ = try ManagedSupportCatalogUpdateClient.loadActive(configuration: configuration)
+		} catch {
+			NSLog("failed to load signed LSP catalog: \(error)")
+		}
+		guard settingsCoordinator.currentSettings.lsp.catalogAutomaticallyCheck else { return }
+		Task {
+			do {
+				_ = try await ManagedSupportCatalogUpdateClient.check(configuration: configuration)
+			} catch {
+				NSLog("signed LSP catalog check failed: \(error)")
+			}
+		}
 	}
 
 	func applicationWillTerminate(_: Notification) {

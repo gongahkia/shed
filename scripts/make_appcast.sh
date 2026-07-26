@@ -18,6 +18,8 @@ ed_key_file="${SPARKLE_ED_KEY_FILE:-}"
 require_ed_key="${SPARKLE_REQUIRE_ED_KEY:-0}"
 release_notes_path="${SPARKLE_RELEASE_NOTES_PATH:-}"
 require_release_notes="${SPARKLE_REQUIRE_RELEASE_NOTES:-0}"
+lsp_catalog_source_path="${ITSY_LSP_CATALOG_SOURCE_PATH:-}"
+lsp_catalog_private_key="${ITSY_LSP_CATALOG_PRIVATE_KEY:-}"
 default_generate_appcast="$repo_dir/.build/artifacts/sparkle/Sparkle/bin/generate_appcast"
 generate_appcast="${SPARKLE_GENERATE_APPCAST:-}"
 if [[ -z "$generate_appcast" ]]; then
@@ -52,6 +54,10 @@ if [[ -n "$release_notes_path" && ! -f "$release_notes_path" ]]; then
 	echo "missing release notes: $release_notes_path" >&2
 	exit 1
 fi
+if [[ -n "$lsp_catalog_source_path" || -n "$lsp_catalog_private_key" ]]; then
+	[[ -n "$lsp_catalog_source_path" && -f "$lsp_catalog_source_path" ]] || { echo "missing ITSY_LSP_CATALOG_SOURCE_PATH" >&2; exit 1; }
+	[[ -n "$lsp_catalog_private_key" ]] || { echo "missing ITSY_LSP_CATALOG_PRIVATE_KEY" >&2; exit 1; }
+fi
 
 mkdir -p "$updates_dir"
 cp "$dmg_path" "$updates_dir/"
@@ -59,6 +65,9 @@ if [[ -n "$release_notes_path" ]]; then
 	archive_name="$(basename "$dmg_path")"
 	release_notes_name="${archive_name%.*}.md"
 	cp "$release_notes_path" "$updates_dir/$release_notes_name"
+fi
+if [[ -n "$lsp_catalog_source_path" ]]; then
+	ITSY_LSP_CATALOG_PRIVATE_KEY="$lsp_catalog_private_key" "$repo_dir/scripts/sign_lsp_catalog.swift" "$lsp_catalog_source_path" "$updates_dir/lsp-catalog.json"
 fi
 appcast_args=()
 if [[ -n "$download_url_prefix" ]]; then

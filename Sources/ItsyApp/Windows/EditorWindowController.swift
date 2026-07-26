@@ -145,6 +145,7 @@ extension Notification.Name {
 
 @MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
+	private static let lspInstallPromptPrefix = "dev.itsy.lsp.install-prompted."
 	private static let lspManager = LSPManager(
 		registry: LSPServerRegistryLoader.loadOrBundled(),
 		lspSettings: ItsySettingsStore().load(workspaceRoot: ItsyWorkspaceController.currentRootURL).settings.lsp
@@ -1155,6 +1156,33 @@ extension Notification.Name {
 			return
 		}
 		lspMissingBanner.show(missingBinary: missingBinary, fileURL: fileURL)
+		offerManagedLSPInstall(for: missingBinary)
+	}
+
+	private func offerManagedLSPInstall(for missingBinary: LSPServerRegistry.MissingBinary) {
+		guard let component = ManagedSupportCatalogStore.current().component(command: missingBinary.command, kind: .languageServer),
+		      component.hasVerifiedManagedInstall,
+		      let languageID = component.languageIDs.first,
+		      ItsySettingsStore().load(workspaceRoot: ItsyWorkspaceController.currentRootURL).settings.lsp.mode(for: languageID) != .system,
+		      let window,
+		      !UserDefaults.standard.bool(forKey: Self.lspInstallPromptPrefix + component.id + "." + managedVersion(for: component))
+		else {
+			return
+		}
+		let alert = NSAlert()
+		alert.messageText = L10n.string("Install \(component.displayName) in Itsy?")
+		alert.informativeText = L10n.string("A verified managed copy is available. Itsy installs it only in Application Support.")
+		alert.addButton(withTitle: L10n.string("Open Support"))
+		alert.addButton(withTitle: L10n.string("Not now"))
+		UserDefaults.standard.set(true, forKey: Self.lspInstallPromptPrefix + component.id + "." + managedVersion(for: component))
+		alert.beginSheetModal(for: window) { response in
+			guard response == .alertFirstButtonReturn else { return }
+			NSApp.sendAction(#selector(AppCoordinator.showManagedSupport(_:)), to: nil, from: ManagedSupportRequest(componentID: component.id))
+		}
+	}
+
+	private func managedVersion(for component: ManagedSupportComponent) -> String {
+		component.nodeSupport?.version ?? component.artifacts.artifact(for: .current ?? .arm64)?.version ?? "unknown"
 	}
 
 	private func showLSPUnavailableBanner(_ unavailableLanguage: LSPServerRegistry.UnsupportedLanguage, fileURL: URL? = nil) {

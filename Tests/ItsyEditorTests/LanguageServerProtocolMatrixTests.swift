@@ -147,11 +147,19 @@ import Testing
 	}
 }
 
-@Test func scientificAndDocumentGrammarsReportCodableUnavailableCapabilityState() throws {
-	for grammarID in ["julia", "r", "latex", "yaml", "toml", "proto"] {
+@Test func unsupportedScientificAndDocumentGrammarsReportCodableUnavailableCapabilityState() throws {
+	for grammarID in ["julia", "r", "latex", "proto"] {
 		let language = try #require(BundledLanguageInventory.languages.first { $0.grammarID == grammarID })
 		#expect(language.lspCapabilityState == .unavailable)
 		#expect(try JSONDecoder().decode(BundledLanguageLSPCapabilityState.self, from: JSONEncoder().encode(language.lspCapabilityState)) == .unavailable)
+	}
+}
+
+@Test func yamlAndTomlDeclareLSPCapabilityState() throws {
+	for grammarID in ["yaml", "toml"] {
+		let language = try #require(BundledLanguageInventory.languages.first { $0.grammarID == grammarID })
+		#expect(language.lspCapabilityState == .declaredServer)
+		#expect(try JSONDecoder().decode(BundledLanguageLSPCapabilityState.self, from: JSONEncoder().encode(language.lspCapabilityState)) == .declaredServer)
 	}
 }
 

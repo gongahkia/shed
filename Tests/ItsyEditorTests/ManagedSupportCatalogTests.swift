@@ -24,6 +24,31 @@ import Testing
 	}
 }
 
+@Test func managedSupportCatalogPinsPyrightForPrivateNodeProvisioning() throws {
+	let component = try #require(ManagedSupportCatalog.bundled.component(id: "pyright"))
+	let support = try #require(component.nodeSupport)
+	#expect(support.version == "1.1.410")
+	#expect(support.executablePath == "node_modules/pyright/langserver.index.js")
+	#expect(support.packages.map(\.packageName) == ["pyright"])
+	#expect(support.packages.allSatisfy { $0.integrity.hasPrefix("sha512-") })
+}
+
+@Test func provisioningModeDistinguishesDisabledManagedAndSystemOnlyServers() {
+	let registry = LSPServerRegistry()
+	#expect(registry.provisioningStatus(forLanguageID: "python", mode: .disabled) == .disabled)
+	switch registry.provisioningStatus(forLanguageID: "python", mode: .managed, environment: ["PATH": ""]) {
+	case let .availableToInstall(component), let .managed(_, component):
+		#expect(component.id == "pyright")
+	default:
+		Issue.record("expected Pyright to be provisionable")
+	}
+	if case let .systemRequired(component) = registry.provisioningStatus(forLanguageID: "yaml", mode: .automatic, environment: ["PATH": ""]) {
+		#expect(component.id == "yaml-language-server")
+	} else {
+		Issue.record("expected YAML to require a system server")
+	}
+}
+
 @Test func onDemandLanguageServersStayDisabledUntilItsyEnablesThem() throws {
 	let component = try #require(ManagedSupportCatalog.bundled.component(id: "gopls"))
 	let key = "itsy.support.enabled.\(component.id)"

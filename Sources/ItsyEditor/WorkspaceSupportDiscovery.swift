@@ -20,7 +20,7 @@ public enum WorkspaceSupportScanner {
 	public static func scan(
 		root: URL,
 		registry: LSPServerRegistry = LSPServerRegistry(),
-		catalog: ManagedSupportCatalog = .bundled,
+		catalog: ManagedSupportCatalog = ManagedSupportCatalogStore.current(),
 		fileManager: FileManager = .default
 	) -> WorkspaceSupportSnapshot {
 		let root = root.standardizedFileURL

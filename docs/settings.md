@@ -14,7 +14,7 @@ Workspace overrides are loaded from:
 
 Both files hot-reload while Itsy is running. The merge order is global, then workspace, then per-language editor overrides for the current buffer. Unknown keys are ignored with a warning in the Settings window. Bad values keep the previous/default value.
 
-Personal UI and update settings are global-only: `[ui]` and `[updates]` entries in a workspace file are ignored with a warning.
+Personal UI, update, and LSP provisioning settings are global-only: `[ui]`, `[updates]`, and `[lsp]` entries in a workspace file are ignored with a warning.
 
 ```toml
 [editor]
@@ -50,6 +50,12 @@ presentation = "sidebar" # sidebar, window
 [updates]
 automatically_check = false # opt in to background checks for stable releases
 
+[lsp]
+catalog_automatically_check = false # checks a signed catalog; applying it remains explicit
+
+[lsp.python]
+mode = "auto" # auto, system, managed, disabled
+
 [workbench]
 profile = "workbench" # workbench, focus, review
 file_tree = "automatic" # automatic, visible, hidden
@@ -84,7 +90,11 @@ Each workspace stores restorable terminal state at `.itsy/terminal.json`. Schema
 
 In-app notifications appear as editor toasts. `ui.notification_position` defaults to `bottom_right`; set it to `top_right` to place them at the upper-right edge. Settings reloads confirm the active Terminal, Git, and Debugger presentations; validation errors identify the first bad setting, state when a fallback value remains active, and provide **Open Config** for the global TOML file. LSP notices expand with **Details** and can copy a diagnostic report; when no server process started, the report explicitly says that no process log is available.
 
-For TypeScript and JavaScript, open **Settings → Language & Debugger Support**, choose **TypeScript Language Server**, then choose **Install in Itsy**. Itsy installs pinned, SHA-512-verified TypeScript `5.9.3` and TypeScript Language Server `5.3.0` only under `~/Library/Application Support/Itsy/Support`; it does not modify global npm state. The server requires Node.js 20 or newer. On reload, Itsy finds Node from the app environment, Homebrew, Volta, asdf, mise, fnm, or nvm; `ITSY_NODE_PATH` can set an absolute override. If Node is unavailable, the LSP notice identifies `node` rather than the already-installed server.
+Open **Settings → Language & Debugger Support** to choose each adapter’s `auto`, `system`, `managed`, or `disabled` mode. `auto` prefers an executable already on the system, then uses an enabled Itsy-managed copy; `system` never downloads; `managed` only uses a verified private copy; `disabled` does not start the language server. Workspace `.itsy/lsp.toml` remains an executable/arguments/settings override and never requests downloads or versions.
+
+TypeScript, JavaScript, and Python have pinned, SHA-512-verified private npm provisioning. Itsy downloads a pinned private Node.js runtime before installing a managed Node server, and launches managed `.js`/`.mjs` servers with that private runtime. The runtime and packages live only under `~/Library/Application Support/Itsy/Support`; global npm state is never modified. The other declared adapters use system runtimes until a future signed catalog provides a verified private artifact. When a verified managed copy is missing on first use, Itsy offers **Open Support**; installation is still explicit.
+
+`lsp.catalog_automatically_check` is opt-in. A release-configured Ed25519 public key verifies every catalog envelope before it is cached. Automatic checks only stage a pending catalog; the Support panel is the only place that applies it. Applying metadata never downloads a server. Builds without `ITSYLSPCatalogURL` and `ITSYLSPCatalogPublicKey` disable this feature.
 
 `editor.cursor_style = "automatic"` uses a block cursor for Vim and Emacs keymaps, and a thin bar for Plain. Set `block` or `bar` to override that behavior; `immediate` is accepted as an alias for `bar`.
 

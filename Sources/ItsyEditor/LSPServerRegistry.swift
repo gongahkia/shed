@@ -199,6 +199,14 @@ public struct LSPServerConfig: Codable, Equatable, Sendable {
 }
 
 public struct LSPServerRegistry: Equatable, Sendable {
+	public enum ProvisioningStatus: Equatable, Sendable {
+		case disabled
+		case system(LSPServerConfig)
+		case managed(LSPServerConfig, ManagedSupportComponent)
+		case availableToInstall(ManagedSupportComponent)
+		case systemRequired(ManagedSupportComponent)
+		case unavailable
+	}
 	public struct UnsupportedLanguage: Error, Equatable, Sendable {
 		public var languageID: String
 		public var reason: BundledLanguageUnsupportedReason
@@ -258,25 +266,39 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> LSPServerConfig? {
-		guard var config = config(forLanguageID: languageID) else {
+		switch provisioningStatus(forLanguageID: languageID, mode: mode, environment: environment) {
+		case let .system(config), let .managed(config, _):
+			return config
+		case .disabled, .availableToInstall, .systemRequired, .unavailable:
 			return nil
 		}
-		guard mode != .disabled else { return nil }
+	}
+
+	public func provisioningStatus(
+		forLanguageID languageID: String,
+		mode: ItsySettings.LSPMode = .automatic,
+		environment: [String: String] = ProcessInfo.processInfo.environment
+	) -> ProvisioningStatus {
+		guard mode != .disabled else { return .disabled }
+		guard var config = config(forLanguageID: languageID) else { return .unavailable }
 		if mode != .managed, let resolvedCommand = Self.resolvedCommandPath(for: config, environment: environment) {
 			if !Self.isXcrunCommand(config.command) {
 				config.command = resolvedCommand
 			}
-			return config
+			return .system(config)
 		}
 		guard mode != .system, isBundledManagedConfig(config, languageID: languageID),
-		      let component = supportComponent(forLanguageID: languageID),
-		      ManagedSupportEnablement.isEnabled(component),
-		      let managed = ManagedSupportResolver.executableURL(for: component)
+		      let component = supportComponent(forLanguageID: languageID)
 		else {
-			return nil
+			return .unavailable
 		}
-		config.command = managed.path
-		return config
+		if let managed = ManagedSupportResolver.executableURL(for: component),
+		   mode == .managed || ManagedSupportEnablement.isEnabled(component)
+		{
+			config.command = managed.path
+			return .managed(config, component)
+		}
+		return component.hasVerifiedManagedInstall ? .availableToInstall(component) : .systemRequired(component)
 	}
 
 	public func executableResolution(
@@ -294,17 +316,24 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		mode: ItsySettings.LSPMode = .automatic,
 		environment: [String: String] = ProcessInfo.processInfo.environment
 	) -> MissingBinary? {
-		guard mode != .disabled, let config = config(forLanguageID: languageID),
-		      resolvedConfig(forLanguageID: languageID, mode: mode, environment: environment) == nil
-		else {
+		guard let config = config(forLanguageID: languageID) else { return nil }
+		switch provisioningStatus(forLanguageID: languageID, mode: mode, environment: environment) {
+		case .disabled, .system, .managed:
 			return nil
-		}
-		if mode == .managed, let component = supportComponent(forLanguageID: languageID), !component.hasVerifiedManagedInstall {
+		case let .availableToInstall(component):
 			return MissingBinary(
 				languageID: languageID,
 				command: component.command,
+				hint: "Open Language & Debugger Support in Itsy to install (component.displayName)."
+			)
+		case let .systemRequired(component) where mode == .managed:
+			return MissingBinary(
+				languageID: languageID,
+				command: config.command,
 				hint: "No verified managed download is bundled for \(component.displayName); choose System or configure lsp.toml."
 			)
+		case .systemRequired, .unavailable:
+			break
 		}
 		let command = Self.resolutionCommandName(for: config)
 		return MissingBinary(languageID: languageID, command: command, hint: Self.installHint(for: command))
@@ -419,7 +448,7 @@ public struct LSPServerRegistry: Equatable, Sendable {
 
 	public static let bundledDefaults: [LSPServerConfig] = BundledLanguageInventory.lspConfigs
 
-	public static let supportCatalog = ManagedSupportCatalog.bundled
+	public static var supportCatalog: ManagedSupportCatalog { ManagedSupportCatalogStore.current() }
 
 	public static let defaultExtensionMap: [String: String] = BundledLanguageInventory.fileExtensionMap
 

@@ -70,6 +70,21 @@ extension ItsyRenderTests {
 	#expect(try #require(view.accessibilityValue() as? String) == "Line 2: beta")
 }
 
+@Test func textViewAccessibilityTracksBlankLinesAndEdits() throws {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "alpha\n\ngamma")
+
+	view.selectUTF8Range(6 ..< 6)
+	#expect(try #require(view.accessibilityValue() as? String) == "Line 2: blank")
+
+	view.selectUTF8Range(7 ..< 7)
+	view.replaceUTF8Range(7 ..< 12, with: "delta")
+	#expect(try #require(view.accessibilityValue() as? String) == "Line 3: delta")
+
+	view.editor = Editor()
+	#expect(try #require(view.accessibilityValue() as? String) == "Line 1: blank")
+}
+
 @Test func gutterExposesLineAndDiagnosticStateToAccessibility() throws {
 	let gutter = GutterView(frame: .zero)
 	gutter.activeLineIndex = 2

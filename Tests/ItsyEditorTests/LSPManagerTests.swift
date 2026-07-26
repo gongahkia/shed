@@ -85,6 +85,28 @@ import Testing
 	#expect(factory.count == 3)
 }
 
+@Test func lspManagerRestartReplacesTheClientAndRejectsStaleFailure() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/App.swift", "")
+	let factory = LifecycleClientFactory()
+	let manager = LSPManager(registry: try fixture.swiftRegistry(), clientFactory: factory.makeFactory())
+	let url = fixture.root.appendingPathComponent("ws/Sources/App.swift")
+	let key = try #require(await manager.sessionKey(for: url))
+
+	let first = try await manager.ensureClient(for: url)
+	await manager.registerSynchronizedDocument(url, for: key)
+	await manager.restartSession(key)
+	#expect(await manager.status(of: key) == .idle)
+	#expect(await manager.existingClient(for: key) == nil)
+
+	let replacement = try await manager.ensureClient(for: url)
+	await manager.markFailed(key, matching: first)
+	#expect(await manager.existingClient(for: key) === replacement)
+	#expect(await manager.status(of: key) == .starting)
+	#expect(factory.count == 2)
+}
+
 @Test func lspManagerClosesDocumentsAndStopsOnlyAfterTheLastDocument() async throws {
 	let fixture = try TemporaryLSPManagerFixture()
 	try fixture.write("ws/Package.swift", "")
@@ -110,6 +132,32 @@ import Testing
 	#expect(await manager.status(of: key) == .exited)
 	#expect(await manager.existingClient(for: key) == nil)
 	#expect(await sink.methods == [LSPMethod.textDocumentDidOpen, LSPMethod.textDocumentDidOpen, LSPMethod.textDocumentDidClose, LSPMethod.textDocumentDidClose])
+}
+
+@Test func lspManagerCanCloseTheLastDocumentBeforeTheCallerStopsTheSession() async throws {
+	let fixture = try TemporaryLSPManagerFixture()
+	try fixture.write("ws/Package.swift", "")
+	try fixture.write("ws/Sources/App.swift", "")
+	let factory = LifecycleClientFactory()
+	let manager = LSPManager(registry: try fixture.swiftRegistry(), clientFactory: factory.makeFactory())
+	let url = fixture.root.appendingPathComponent("ws/Sources/App.swift")
+	let key = try #require(await manager.sessionKey(for: url))
+	_ = try await manager.ensureClient(for: url)
+	let sink = DocumentCloseSink()
+	let coordinator = LSPDocumentSyncCoordinator(sink: sink, debounceMillis: 0)
+	try await coordinator.didOpen(url: url, languageID: key.languageID, content: "")
+	await manager.registerSynchronizedDocument(url, for: key)
+
+	#expect(await manager.closeSynchronizedDocument(
+		url,
+		for: key,
+		using: coordinator,
+		stoppingSessionOnLastDocument: false
+	))
+	#expect(await manager.status(of: key) == .starting)
+	#expect(await manager.existingClient(for: key) != nil)
+	await manager.stopSession(key)
+	#expect(await manager.status(of: key) == .exited)
 }
 
 @Test func lspManagerUsesWorkspaceTOMLOverride() async throws {

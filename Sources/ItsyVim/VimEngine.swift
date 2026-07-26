@@ -237,6 +237,7 @@ public enum VimAction: Sendable, Equatable {
 	case setRegister(Character)
 	case setMark(Character, Position)
 	case jumpToMark(Character)
+	case jumpToMarkLine(Character)
 	case search(SearchQuery)
 	case repeatSearch(reverse: Bool)
 	case command(String)
@@ -282,6 +283,7 @@ public enum VimCommandAction: Sendable, Equatable {
 	case emacsMode
 	case setMark(Character)
 	case jumpToMark(Character)
+	case jumpToMarkLine(Character)
 	case macroRecord(String)
 	case handled
 }
@@ -356,6 +358,7 @@ public struct VimEngine: Sendable {
 	private var pendingChord: [Key]
 	private var awaitingMarkSet: Bool
 	private var awaitingMarkJump: Bool
+	private var awaitingMarkLineJump: Bool
 	private var awaitingMacroRecord: Bool
 	private var awaitingMacroReplay: Bool
 
@@ -400,6 +403,7 @@ public struct VimEngine: Sendable {
 		pendingChord = []
 		awaitingMarkSet = false
 		awaitingMarkJump = false
+		awaitingMarkLineJump = false
 		awaitingMacroRecord = false
 		awaitingMacroReplay = false
 	}
@@ -438,8 +442,11 @@ public struct VimEngine: Sendable {
 		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.set.") {
 			return .setMark(mark)
 		}
-		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jump.") ?? Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jumpLine.") {
+		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jump.") {
 			return .jumpToMark(mark)
+		}
+		if let mark = Self.singleCharacterSuffix(in: commandID, after: "vim.mark.jumpLine.") {
+			return .jumpToMarkLine(mark)
 		}
 		if let register = Self.singleStringSuffix(in: commandID, after: "vim.macro.record.") {
 			return .macroRecord(register)
@@ -652,8 +659,11 @@ public struct VimEngine: Sendable {
 		case Key("m"):
 			awaitingMarkSet = true
 			return []
-		case Key("'"):
+		case Key("`"):
 			awaitingMarkJump = true
+			return []
+		case Key("'"):
+			awaitingMarkLineJump = true
 			return []
 		case Key("q"):
 			return toggleMacroRecording()
@@ -729,6 +739,7 @@ public struct VimEngine: Sendable {
 		awaitingRegister = false
 		awaitingMarkSet = false
 		awaitingMarkJump = false
+		awaitingMarkLineJump = false
 		awaitingMacroRecord = false
 		awaitingMacroReplay = false
 		mode = .normal
@@ -774,6 +785,13 @@ public struct VimEngine: Sendable {
 				return []
 			}
 			return [.jumpToMark(name)]
+		}
+		if awaitingMarkLineJump {
+			awaitingMarkLineJump = false
+			guard let name = markName(for: key) else {
+				return []
+			}
+			return [.jumpToMarkLine(name)]
 		}
 		return nil
 	}

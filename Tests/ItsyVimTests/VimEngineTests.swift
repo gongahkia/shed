@@ -53,8 +53,10 @@ import Testing
 	#expect(engine.handle(Key("m"), buffer: buffer).isEmpty)
 	#expect(engine.handle(Key("a"), buffer: buffer) == [.setMark("a", Position(offset: 0))])
 	#expect(engine.marks["a"] == Position(offset: 0))
-	#expect(engine.handle(Key("'"), buffer: buffer).isEmpty)
+	#expect(engine.handle(Key("`"), buffer: buffer).isEmpty)
 	#expect(engine.handle(Key("a"), buffer: buffer) == [.jumpToMark("a")])
+	#expect(engine.handle(Key("'"), buffer: buffer).isEmpty)
+	#expect(engine.handle(Key("a"), buffer: buffer) == [.jumpToMarkLine("a")])
 }
 
 @Test func vimMarkStorePersistsWorkspaceMarks() throws {

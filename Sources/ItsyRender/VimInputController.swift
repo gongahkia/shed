@@ -412,10 +412,9 @@ extension MetalTextView {
 			vimEngine.marks[mark] = Position(offset: editor.selections.primary.head)
 			savePersistedVimMarks()
 		case .jumpToMark(let mark):
-			if let position = vimEngine.marks[mark] {
-				editor.setSelection(SelectionSet(primary: Selection(anchor: position.offset, head: position.offset)))
-				syncEditorState()
-			}
+			jumpToVimMark(mark, linewise: false)
+		case .jumpToMarkLine(let mark):
+			jumpToVimMark(mark, linewise: true)
 		case .macroRecord(let register):
 			startMacroRecording(register)
 			return true
@@ -1521,6 +1520,31 @@ extension MetalTextView {
 
 	func lineStart(for offset: Int) -> Int {
 		editor.rope.offset(forLine: editor.rope.line(forOffset: offset))
+	}
+
+	func jumpToVimMark(_ mark: Character, linewise: Bool) {
+		guard let position = vimEngine.marks[mark] else {
+			return
+		}
+		let offset = min(max(position.offset, 0), editor.rope.length)
+		let target = linewise ? firstNonWhitespaceOffset(inLineContaining: offset) : offset
+		editor.setSelection(SelectionSet(primary: Selection(anchor: target, head: target)))
+		syncEditorState()
+	}
+
+	func firstNonWhitespaceOffset(inLineContaining offset: Int) -> Int {
+		let clamped = min(max(offset, 0), editor.rope.length)
+		let line = editor.rope.line(forOffset: clamped)
+		let range = editor.rope.lineRange(line)
+		let text = editor.rope.slice(range)
+		var current = range.lowerBound
+		for character in text where character != "\n" {
+			if !character.isWhitespace {
+				return current
+			}
+			current += String(character).utf8.count
+		}
+		return range.lowerBound
 	}
 
 	func lineEndIncludingNewline(for offset: Int) -> Int {

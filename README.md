@@ -86,7 +86,7 @@ Itsy is intentionally narrow:
 | Area | Current scope | Not in current release |
 |---|---|---|
 | Native editor | AppKit shell, Metal text view, Swift rope buffer, split panes, tabs, file tree, lazy PTY terminal | No Electron, collaboration, or telemetry |
-| Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings | Named Vim marks deferred |
+| Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings, workspace-persistent named Vim marks | — |
 | Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.json` editor/theme/terminal prefs | Additional grammars/themes are incremental |
 | LSP | Lazy external server sessions, document sync, diagnostics gutter, completion/resolve, hover, references panel, signature help, workspace edits/config, smoke/bench coverage | Full LSP surface is incomplete |
 | DAP | Debug launch/control, Call Stack, Variables, Watches, and Debug Console in the Debugger sidebar/window | Adapter-specific debugging coverage remains incremental |

@@ -35,7 +35,7 @@ private func apply(actions: [VimAction], buffer: inout VimFuzzBuffer, selection:
 			buffer.replace(clamped ..< clamped, with: text)
 			let head = clamped + text.utf8.count
 			selection = VimFuzzSelection(anchor: head, head: head)
-		case .jumpToMark(let name):
+		case .jumpToMark(let name), .jumpToMarkLine(let name):
 			if let position = engine.marks[name] {
 				let head = min(max(position.offset, 0), buffer.length)
 				selection = VimFuzzSelection(anchor: head, head: head)

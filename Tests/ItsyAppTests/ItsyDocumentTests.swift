@@ -149,8 +149,15 @@ import Testing
 	#expect(splitView.arrangedSubviews.last === controller.embeddedGitHostView)
 	#expect(controller.embeddedGitHostView.frame.width > 600)
 
+	controller.setEmbeddedDebuggerVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+	#expect(splitView.arrangedSubviews.count == 4)
+	#expect(splitView.arrangedSubviews.last === controller.embeddedDebuggerHostView)
+	#expect(controller.embeddedDebuggerHostView.frame.width > 300)
+
 	controller.setEmbeddedTerminalVisible(false)
 	controller.setEmbeddedGitVisible(false)
+	controller.setEmbeddedDebuggerVisible(false)
 	splitView.layoutSubtreeIfNeeded()
 	#expect(controller.embeddedTerminalHostView.isHidden)
 	#expect(splitView.arrangedSubviews.count == 2)

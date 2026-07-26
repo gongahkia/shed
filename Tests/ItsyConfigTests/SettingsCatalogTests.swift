@@ -27,6 +27,7 @@ import Testing
 	settings.workbench.profile = .review
 	#expect(ItsySettingsCatalog.matching("side bar") == [])
 	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == [
+		"debugger.presentation",
 		"git.presentation",
 		"layout.sidebar_visible",
 		"layout.sidebar_position",
@@ -52,6 +53,7 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "relative", for: "editor.line_number_mode", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "block", for: "editor.cursor_style", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "Monaco", for: "terminal.font", in: &settings) == nil)
+	#expect(ItsySettingsCatalog.update(value: "window", for: "debugger.presentation", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "true", for: "updates.automatically_check", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "focus", for: "workbench.profile", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "#12AB34", for: "theme.git.gutter.added", in: &settings) == nil)

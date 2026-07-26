@@ -35,6 +35,7 @@ import ItsyWorkbenchLayout
 	private var settingsWorkbenchFileTreePopup: NSPopUpButton?
 	private var settingsWorkbenchTerminalPopup: NSPopUpButton?
 	private var settingsWorkbenchGitPopup: NSPopUpButton?
+	private var settingsDebuggerPresentationPopup: NSPopUpButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
 	private var settingsSidebarWidthField: NSTextField?
@@ -167,7 +168,7 @@ import ItsyWorkbenchLayout
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_180))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_220))
 		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 680, height: 720))
 		scrollView.hasVerticalScroller = true
 		scrollView.autohidesScrollers = true
@@ -395,6 +396,19 @@ import ItsyWorkbenchLayout
 		let workbenchGitPopup = workbenchVisibilityPopup(identifier: "workbench.git", label: "Workbench Git visibility")
 		workbenchGitPopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(workbenchGitPopup)
+		let debuggerPresentationLabel = settingsLabel("Debugger Presentation")
+		contentView.addSubview(debuggerPresentationLabel)
+		let debuggerPresentationPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		for presentation in [ItsySettings.DebuggerSettings.Presentation.sidebar, .window] {
+			debuggerPresentationPopup.addItem(withTitle: presentation.rawValue.capitalized)
+			debuggerPresentationPopup.lastItem?.representedObject = presentation.rawValue
+		}
+		debuggerPresentationPopup.identifier = NSUserInterfaceItemIdentifier("debugger.presentation")
+		debuggerPresentationPopup.setAccessibilityLabel("Debugger presentation")
+		debuggerPresentationPopup.target = self
+		debuggerPresentationPopup.action = #selector(settingsDebuggerPresentationDidChange(_:))
+		debuggerPresentationPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(debuggerPresentationPopup)
 
 		let sidebarVisibleButton = settingsCheckbox("Show Sidebar", action: #selector(settingsSidebarVisibleDidChange(_:)))
 		contentView.addSubview(sidebarVisibleButton)
@@ -648,8 +662,13 @@ import ItsyWorkbenchLayout
 			workbenchGitLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			workbenchGitPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			workbenchGitPopup.centerYAnchor.constraint(equalTo: workbenchGitLabel.centerYAnchor),
+			debuggerPresentationLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			debuggerPresentationLabel.topAnchor.constraint(equalTo: workbenchGitPopup.bottomAnchor, constant: 12),
+			debuggerPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			debuggerPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			debuggerPresentationPopup.centerYAnchor.constraint(equalTo: debuggerPresentationLabel.centerYAnchor),
 			sidebarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			sidebarVisibleButton.topAnchor.constraint(equalTo: workbenchGitPopup.bottomAnchor, constant: 16),
+			sidebarVisibleButton.topAnchor.constraint(equalTo: debuggerPresentationPopup.bottomAnchor, constant: 16),
 			sidebarPositionLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			sidebarPositionLabel.topAnchor.constraint(equalTo: sidebarVisibleButton.bottomAnchor, constant: 12),
 			sidebarPositionLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
@@ -731,6 +750,7 @@ import ItsyWorkbenchLayout
 		settingsWorkbenchFileTreePopup = workbenchFileTreePopup
 		settingsWorkbenchTerminalPopup = workbenchTerminalPopup
 		settingsWorkbenchGitPopup = workbenchGitPopup
+		settingsDebuggerPresentationPopup = debuggerPresentationPopup
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
 		settingsSidebarWidthField = sidebarWidthField
@@ -861,6 +881,9 @@ import ItsyWorkbenchLayout
 		syncWorkbenchVisibilityPopup(settingsWorkbenchFileTreePopup, visibility: appSettings.workbench.fileTree)
 		syncWorkbenchVisibilityPopup(settingsWorkbenchTerminalPopup, visibility: appSettings.workbench.terminal)
 		syncWorkbenchVisibilityPopup(settingsWorkbenchGitPopup, visibility: appSettings.workbench.git)
+		if let item = settingsDebuggerPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.debugger.presentation.rawValue }) {
+			settingsDebuggerPresentationPopup?.select(item)
+		}
 		settingsSidebarVisibleButton?.state = appSettings.layout.sidebarVisible ? .on : .off
 		if let item = settingsSidebarPositionPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.layout.sidebarPosition.rawValue }) {
 			settingsSidebarPositionPopup?.select(item)
@@ -1285,6 +1308,17 @@ import ItsyWorkbenchLayout
 		if let item = popup?.itemArray.first(where: { $0.representedObject as? String == visibility.rawValue }) {
 			popup?.select(item)
 		}
+	}
+
+	@objc private func settingsDebuggerPresentationDidChange(_: Any?) {
+		guard
+			let rawValue = settingsDebuggerPresentationPopup?.selectedItem?.representedObject as? String,
+			let presentation = ItsySettings.DebuggerSettings.Presentation(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.debugger.presentation = presentation
+		saveAndApplyBehaviorSettings()
 	}
 
 	@objc private func settingsSidebarVisibleDidChange(_: Any?) {

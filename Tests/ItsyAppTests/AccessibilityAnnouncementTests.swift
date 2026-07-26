@@ -71,6 +71,9 @@ import Testing
 		#expect(popup?.accessibilityLabel() == label)
 		#expect(popup?.itemArray.compactMap { $0.representedObject as? String } == ["automatic", "visible", "hidden"])
 	}
+	let debuggerPopup = popups.first { $0.identifier?.rawValue == "debugger.presentation" }
+	#expect(debuggerPopup?.accessibilityLabel() == "Debugger presentation")
+	#expect(debuggerPopup?.itemArray.compactMap { $0.representedObject as? String } == ["sidebar", "window"])
 }
 
 private func accessibilityLabels(in view: NSView) -> [String] {

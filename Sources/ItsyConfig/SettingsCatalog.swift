@@ -120,6 +120,11 @@ public enum ItsySettingsCatalog {
 			title: "Git Presentation",
 			description: "Shows Git Changes in the right sidebar or in a separate window."
 		),
+		.init(
+			key: "debugger.presentation",
+			title: "Debugger Presentation",
+			description: "Shows the debugger Call Stack in the right sidebar or in a separate window."
+		),
 		.init(key: "find.uses_regex", title: "Find Uses Regex", description: "Uses regular expressions by default."),
 		.init(key: "find.case_sensitive", title: "Find Case Sensitive", description: "Matches case by default."),
 		.init(key: "find.whole_word", title: "Find Whole Word", description: "Matches complete words by default."),
@@ -300,6 +305,7 @@ public enum ItsySettingsCatalog {
 		case "terminal.scrollback_lines": String(settings.terminal.scrollbackLines)
 		case "terminal.presentation": settings.terminal.presentation.rawValue
 		case "git.presentation": settings.git.presentation.rawValue
+		case "debugger.presentation": settings.debugger.presentation.rawValue
 		case "find.uses_regex": bool(settings.find.usesRegex)
 		case "find.case_sensitive": bool(settings.find.isCaseSensitive)
 		case "find.whole_word": bool(settings.find.matchesWholeWord)
@@ -358,6 +364,7 @@ public enum ItsySettingsCatalog {
 		case "terminal.scrollback_lines": settings.terminal.scrollbackLines = defaults.terminal.scrollbackLines
 		case "terminal.presentation": settings.terminal.presentation = defaults.terminal.presentation
 		case "git.presentation": settings.git.presentation = defaults.git.presentation
+		case "debugger.presentation": settings.debugger.presentation = defaults.debugger.presentation
 		case "find.uses_regex": settings.find.usesRegex = defaults.find.usesRegex
 		case "find.case_sensitive": settings.find.isCaseSensitive = defaults.find.isCaseSensitive
 		case "find.whole_word": settings.find.matchesWholeWord = defaults.find.matchesWholeWord

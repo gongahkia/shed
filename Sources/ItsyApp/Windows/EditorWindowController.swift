@@ -145,6 +145,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private let embeddedTerminalContainer = NSView()
 	private let embeddedGitContainer = NSView()
+	private let embeddedDebuggerContainer = NSView()
 	private var findBarController: FindBarController?
 	private var findSettings = ItsySettings.FindSettings()
 	private var layoutSettings = ItsySettings.LayoutSettings()
@@ -162,9 +163,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var sidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
 	private var embeddedGitWidthConstraint: NSLayoutConstraint?
+	private var embeddedDebuggerWidthConstraint: NSLayoutConstraint?
 	private var embeddedGitVisible = false
+	private var embeddedDebuggerVisible = false
 	private var terminalRequestedVisible = false
 	private var gitRequestedVisible = false
+	private var debuggerRequestedVisible = false
 	private var tabBarHeightConstraint: NSLayoutConstraint?
 	private var statusBarHeightConstraint: NSLayoutConstraint?
 	private var sidebarVisible = true
@@ -265,6 +269,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		embeddedTerminalHeightConstraint = embeddedTerminalContainer.heightAnchor.constraint(equalToConstant: 0)
 		embeddedTerminalHeightConstraint?.isActive = true
 		embeddedGitContainer.translatesAutoresizingMaskIntoConstraints = false
+		embeddedDebuggerContainer.translatesAutoresizingMaskIntoConstraints = false
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
 		editorContainer.addSubview(paneCoordinator.view)
 		NSLayoutConstraint.activate([
@@ -480,6 +485,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		embeddedGitContainer
 	}
 
+	var embeddedDebuggerHostView: NSView {
+		embeddedDebuggerContainer
+	}
+
 	func setEmbeddedTerminalVisible(_ visible: Bool) {
 		terminalRequestedVisible = visible
 		applyResponsiveWorkbenchLayout()
@@ -489,6 +498,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	func setEmbeddedGitVisible(_ visible: Bool) {
 		gitRequestedVisible = visible
+		applyResponsiveWorkbenchLayout()
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
+	func setEmbeddedDebuggerVisible(_ visible: Bool) {
+		debuggerRequestedVisible = visible
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 		rebuildFocusTraversal()
@@ -509,7 +525,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		embeddedGitVisible = visible
 		if visible {
 			if !rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
-				rootSplitView.addArrangedSubview(embeddedGitContainer)
+				let index = rootSplitView.arrangedSubviews.firstIndex(of: embeddedDebuggerContainer)
+					?? rootSplitView.arrangedSubviews.count
+				rootSplitView.insertArrangedSubview(embeddedGitContainer, at: index)
 			}
 			if embeddedGitWidthConstraint == nil {
 				let constraint = embeddedGitContainer.widthAnchor.constraint(equalToConstant: width)
@@ -525,6 +543,32 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			}
 			embeddedGitWidthConstraint?.isActive = false
 			embeddedGitWidthConstraint = nil
+		}
+	}
+
+	private func setActualEmbeddedDebuggerVisible(_ visible: Bool, width: CGFloat) {
+		guard visible != embeddedDebuggerVisible || (visible && embeddedDebuggerWidthConstraint?.constant != width) else {
+			return
+		}
+		embeddedDebuggerVisible = visible
+		if visible {
+			if !rootSplitView.arrangedSubviews.contains(embeddedDebuggerContainer) {
+				rootSplitView.addArrangedSubview(embeddedDebuggerContainer)
+			}
+			if embeddedDebuggerWidthConstraint == nil {
+				let constraint = embeddedDebuggerContainer.widthAnchor.constraint(equalToConstant: width)
+				constraint.priority = .defaultHigh
+				constraint.isActive = true
+				embeddedDebuggerWidthConstraint = constraint
+			}
+			embeddedDebuggerWidthConstraint?.constant = width
+		} else {
+			if rootSplitView.arrangedSubviews.contains(embeddedDebuggerContainer) {
+				rootSplitView.removeArrangedSubview(embeddedDebuggerContainer)
+				embeddedDebuggerContainer.removeFromSuperview()
+			}
+			embeddedDebuggerWidthConstraint?.isActive = false
+			embeddedDebuggerWidthConstraint = nil
 		}
 	}
 
@@ -583,7 +627,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if position == .leading {
 			return 0
 		}
-		return rootSplitView.arrangedSubviews.firstIndex(of: embeddedGitContainer) ?? rootSplitView.arrangedSubviews.count
+		return rootSplitView.arrangedSubviews.firstIndex(of: embeddedGitContainer)
+			?? rootSplitView.arrangedSubviews.firstIndex(of: embeddedDebuggerContainer)
+			?? rootSplitView.arrangedSubviews.count
 	}
 
 	private func setSidebarVisible(_ visible: Bool) {
@@ -631,8 +677,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		applySidebarVisibility()
 		embeddedTerminalContainer.isHidden = !result.showsTerminal
 		embeddedTerminalHeightConstraint?.constant = result.terminalHeight
+		setActualEmbeddedDebuggerVisible(debuggerRequestedVisible, width: 340)
 		let gitAllowed = workbenchConfiguration.git != .hidden
-		let availableGitWidth = max(300, bounds.width - result.sidebarWidth - 240)
+		let debuggerWidth: CGFloat = embeddedDebuggerVisible ? 340 : 0
+		let availableGitWidth = max(300, bounds.width - result.sidebarWidth - debuggerWidth - 240)
 		let gitWidth = min(sessionGitWidth ?? result.gitWidth, availableGitWidth)
 		setActualEmbeddedGitVisible(gitRequestedVisible && gitAllowed, width: max(300, gitWidth))
 	}
@@ -653,6 +701,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		embeddedTerminalContainer.layoutSubtreeIfNeeded()
 		embeddedGitContainer.needsLayout = true
 		embeddedGitContainer.layoutSubtreeIfNeeded()
+		embeddedDebuggerContainer.needsLayout = true
+		embeddedDebuggerContainer.layoutSubtreeIfNeeded()
 		layoutTabContent()
 	}
 
@@ -1600,6 +1650,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		if embeddedGitVisible, let git = focusTarget(in: embeddedGitContainer) {
 			targets.append(git)
+		}
+		if embeddedDebuggerVisible, let debugger = focusTarget(in: embeddedDebuggerContainer) {
+			targets.append(debugger)
 		}
 		focusTraversalTargetsForTesting = targets
 		guard let first = targets.first else {

@@ -166,7 +166,7 @@ public actor LuaPluginRuntime {
 			diagnostics.append(diagnostic(plugin, phase: .initialize, message: "unable to create Lua state"))
 			return
 		}
-		luaL_openlibs(state)
+		openSandboxLibraries(state)
 		let bridge = LuaPluginAPIBridge(
 			pluginIdentifier: manifest.identifier,
 			workspaceRoot: configuration.workspaceRoot,
@@ -274,5 +274,24 @@ public actor LuaPluginRuntime {
 			phase: .execute,
 			message: luaError(state)
 		))
+	}
+
+	private func openSandboxLibraries(_ state: OpaquePointer) {
+		luaL_requiref(state, "_G", luaopen_base, 1)
+		lua_settop(state, 0)
+		luaL_requiref(state, "coroutine", luaopen_coroutine, 1)
+		lua_settop(state, 0)
+		luaL_requiref(state, "table", luaopen_table, 1)
+		lua_settop(state, 0)
+		luaL_requiref(state, "string", luaopen_string, 1)
+		lua_settop(state, 0)
+		luaL_requiref(state, "math", luaopen_math, 1)
+		lua_settop(state, 0)
+		luaL_requiref(state, "utf8", luaopen_utf8, 1)
+		lua_settop(state, 0)
+		lua_pushnil(state)
+		lua_setglobal(state, "dofile")
+		lua_pushnil(state)
+		lua_setglobal(state, "loadfile")
 	}
 }

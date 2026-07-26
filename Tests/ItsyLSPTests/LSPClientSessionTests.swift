@@ -155,6 +155,46 @@ import Testing
 	}
 }
 
+@Test func clientReferencesSendsTypedRequestAndDecodesLocations() async throws {
+	let (session, transport) = try await initializedSession()
+	let task = Task {
+		try await session.references(
+			uri: "file:///tmp/App.swift",
+			position: LSPPosition(line: 2, character: 4),
+			includeDeclaration: false
+		)
+	}
+
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.textDocumentReferences,
+		params: .object([
+			"textDocument": .object(["uri": .string("file:///tmp/App.swift")]),
+			"position": .object(["line": .int(2), "character": .int(4)]),
+			"context": .object(["includeDeclaration": .bool(false)]),
+		])
+	)))
+	_ = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .array([
+			.object([
+				"uri": .string("file:///tmp/App.swift"),
+				"range": .object([
+					"start": .object(["line": .int(2), "character": .int(4)]),
+					"end": .object(["line": .int(2), "character": .int(8)]),
+				]),
+			]),
+		])
+	))))
+	#expect(try await task.value == [
+		LSPLocation(
+			uri: "file:///tmp/App.swift",
+			range: LSPRange(start: LSPPosition(line: 2, character: 4), end: LSPPosition(line: 2, character: 8))
+		),
+	])
+}
+
 @Test func clientWorkspaceSymbolSendsTypedRequest() async throws {
 	let (session, transport) = try await initializedSession()
 	let task = Task {

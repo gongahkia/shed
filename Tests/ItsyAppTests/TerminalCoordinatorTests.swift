@@ -60,9 +60,15 @@ import Testing
 		selectedTabIndex: 0,
 		tabs: [
 			TerminalTabState(
-				currentDirectoryPath: "/tmp/project",
-				layout: "H[L,L]",
-				paneCurrentDirectoryPaths: ["/tmp/project", "/tmp/project/tests"]
+				title: "project",
+				activePaneIndex: 1,
+				rootPane: .split(
+					orientation: .horizontal,
+					children: [
+						.leaf(currentDirectoryPath: "/tmp/project"),
+						.leaf(currentDirectoryPath: "/tmp/project/tests"),
+					]
+				)
 			),
 		]
 	)
@@ -71,6 +77,50 @@ import Testing
 	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: data) == state)
 	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("pid"))
 	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("session"))
+}
+
+@Test func terminalWorkspaceStateMigratesV1LayoutJSONToV2PaneTree() throws {
+	let v1 = Data(
+		"""
+		{"selectedTabIndex":0,"tabs":[{"currentDirectoryPath":"/tmp/project","layout":"H[L,V[L,L]]","paneCurrentDirectoryPaths":["/tmp/project","/tmp/project/src","/tmp/project/tests"]}]}
+		""".utf8
+	)
+	let state = try JSONDecoder().decode(TerminalWorkspaceState.self, from: v1)
+
+	#expect(TerminalWorkspaceState.requiresMigration(for: v1))
+	#expect(state.schemaVersion == TerminalWorkspaceState.currentSchemaVersion)
+	#expect(state.selectedTabIndex == 0)
+	#expect(state.tabs[0].title == "project")
+	#expect(state.tabs[0].activePaneIndex == 0)
+	#expect(state.tabs[0].rootPane == .split(
+		orientation: .horizontal,
+		children: [
+			.leaf(currentDirectoryPath: "/tmp/project"),
+			.split(
+				orientation: .vertical,
+				children: [
+					.leaf(currentDirectoryPath: "/tmp/project/src"),
+					.leaf(currentDirectoryPath: "/tmp/project/tests"),
+				]
+			),
+		]
+	))
+	let encoded = try JSONEncoder().encode(state)
+	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: encoded) == state)
+	#expect(!TerminalWorkspaceState.requiresMigration(for: encoded))
+	#expect(!String(decoding: encoded, as: UTF8.self).contains("layout"))
+}
+
+@Test func terminalWorkspaceStateRejectsInvalidV2PaneTree() {
+	let invalid = Data(
+		"""
+		{"schemaVersion":2,"selectedTabIndex":0,"tabs":[{"title":"project","activePaneIndex":0,"rootPane":{"kind":"leaf","currentDirectoryPath":"project"}}]}
+		""".utf8
+	)
+
+	#expect(throws: DecodingError.self) {
+		try JSONDecoder().decode(TerminalWorkspaceState.self, from: invalid)
+	}
 }
 
 @Test @MainActor func terminalCoordinatorEmbedsByDefault() {

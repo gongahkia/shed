@@ -159,6 +159,10 @@ import ItsyWorkbenchLayout
 		loadSettingsFontChoicesIfNeeded()
 	}
 
+	func settingsContentViewForTesting() -> NSView {
+		makeSettingsWindowControllerIfNeeded().window?.contentView ?? NSView()
+	}
+
 	private func makeSettingsWindowControllerIfNeeded() -> NSWindowController {
 		if let controller = settingsWindowController {
 			return controller

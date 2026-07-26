@@ -1088,7 +1088,11 @@ extension MetalTextView {
 	}
 
 	func applyPendingOperator(textObject: TextObject) {
-		guard let pendingOperator, let range = textObjectRange(textObject) else {
+		guard let pendingOperator else {
+			return
+		}
+		guard let range = textObjectRange(textObject) else {
+			clearPendingOperator()
 			return
 		}
 		clearPendingOperator()
@@ -1685,15 +1689,73 @@ extension MetalTextView {
 	func pairTextObjectRange(open: Character, close: Character, includeDelimiters: Bool) -> Range<Int>? {
 		let offsets = characterOffsets()
 		let head = editor.selections.primary.head
-		guard let openIndex = offsets.lastIndex(where: { $0.offset <= head && $0.character == open }) else {
+		let indices: (open: Int, close: Int)?
+		if open == close {
+			var pendingOpen: Int?
+			var pair: (open: Int, close: Int)?
+			for index in offsets.indices where pair == nil {
+				guard offsets[index].character == open, !isEscapedDelimiter(at: offsets[index].offset) else {
+					continue
+				}
+				if let openIndex = pendingOpen {
+					if offsets[openIndex].offset <= head, head <= offsets[index].offset {
+						pair = (openIndex, index)
+					}
+					pendingOpen = nil
+				} else {
+					pendingOpen = index
+				}
+			}
+			indices = pair
+		} else {
+			var stack: [Int] = []
+			for index in offsets.indices where offsets[index].offset < head {
+				if offsets[index].character == open {
+					stack.append(index)
+				} else if offsets[index].character == close, !stack.isEmpty {
+					stack.removeLast()
+				}
+			}
+			guard let openIndex = stack.last else {
+				return nil
+			}
+			var depth = 0
+			var closeIndex: Int?
+			for index in offsets.indices.dropFirst(openIndex) {
+				if offsets[index].character == open {
+					depth += 1
+				} else if offsets[index].character == close {
+					depth -= 1
+					if depth == 0 {
+						closeIndex = index
+						break
+					}
+				}
+			}
+			indices = closeIndex.map { (openIndex, $0) }
+		}
+		guard let indices else {
 			return nil
 		}
-		guard let closeIndex = offsets.firstIndex(where: { $0.offset > head && $0.character == close }) else {
-			return nil
-		}
+		let openIndex = indices.open
+		let closeIndex = indices.close
 		let openEnd = offsets[openIndex].offset + String(offsets[openIndex].character).utf8.count
 		let closeEnd = offsets[closeIndex].offset + String(offsets[closeIndex].character).utf8.count
 		return includeDelimiters ? offsets[openIndex].offset ..< closeEnd : openEnd ..< offsets[closeIndex].offset
+	}
+
+	func isEscapedDelimiter(at offset: Int) -> Bool {
+		let bytes = Array(editorStorageString(editor).utf8)
+		guard bytes.indices.contains(offset) else {
+			return false
+		}
+		var count = 0
+		var index = offset
+		while index > 0, bytes[index - 1] == 92 {
+			count += 1
+			index -= 1
+		}
+		return !count.isMultiple(of: 2)
 	}
 
 	func paragraphTextObjectRange(includeBlankLine: Bool) -> Range<Int>? {

@@ -1265,6 +1265,27 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(editorStorageString(view.editor) == " tail")
 }
 
+@Test func vimPairTextObjectsHandleNestedAndEscapedDelimiters() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "(one (two) three)")
+	view.selectUTF8Range(1 ..< 1)
+	#expect(view.performKeymapCommand("vim.operator.delete"))
+	#expect(view.performKeymapCommand("vim.textObject.aroundParen"))
+	#expect(editorStorageString(view.editor).isEmpty)
+
+	view.editor = Editor(text: "\"outer \\\"inner\\\"\"")
+	view.selectUTF8Range(2 ..< 2)
+	#expect(view.performKeymapCommand("vim.operator.delete"))
+	#expect(view.performKeymapCommand("vim.textObject.aroundDoubleQuote"))
+	#expect(editorStorageString(view.editor).isEmpty)
+
+	view.editor = Editor(text: "value")
+	#expect(view.performKeymapCommand("vim.operator.delete"))
+	#expect(view.performKeymapCommand("vim.textObject.aroundParen"))
+	#expect(view.vimEngine.pendingOperator == nil)
+	#expect(view.vimEngine.mode == .normal)
+}
+
 @Test func vimVisualCharModeAppliesDeleteOperator() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc")

@@ -29,19 +29,33 @@ public enum TextEditBehavior {
 		guard configuration.autoPairs, let bytes = validBytes(content, range: range), text.utf8.count == 1, let input = text.utf8.first else {
 			return nil
 		}
-		if range.isEmpty, isClosingPair(input), byte(at: range.lowerBound, in: bytes) == input {
+		if range.isEmpty, isClosingPair(input), byte(at: range.lowerBound, in: bytes) == input, shouldSkipClosingPair(input, bytes: bytes, at: range.lowerBound) {
 			return .select(range.lowerBound + 1 ..< range.lowerBound + 1)
 		}
 		if let closing = closingPair(for: input) {
 			if range.isEmpty, isQuote(input), !shouldPairQuote(bytes, at: range.lowerBound, quote: input) {
 				return nil
 			}
-			let selected = String(decoding: bytes[range], as: UTF8.self)
-			let replacement = String(UnicodeScalar(input)) + selected + String(UnicodeScalar(closing))
-			let selection = range.lowerBound + 1 ..< range.upperBound + 1
-			return .replace(range: range, text: replacement, selection: selection)
+			return surround(bytes: bytes, range: range, opening: input, closing: closing)
 		}
 		return nil
+	}
+
+	public static func surround(
+		content: String,
+		range: Range<Int>,
+		opening: String,
+		configuration: TextEditBehaviorConfiguration
+	) -> TextEditOperation? {
+		guard configuration.autoPairs,
+		      opening.utf8.count == 1,
+		      let input = opening.utf8.first,
+		      let closing = closingPair(for: input),
+		      let bytes = validBytes(content, range: range)
+		else {
+			return nil
+		}
+		return surround(bytes: bytes, range: range, opening: input, closing: closing)
 	}
 
 	public static func deleteBackward(
@@ -116,6 +130,34 @@ public enum TextEditBehavior {
 		value == 34 || value == 39
 	}
 
+	private static func surround(bytes: [UInt8], range: Range<Int>, opening: UInt8, closing: UInt8) -> TextEditOperation {
+		let selected = String(decoding: bytes[range], as: UTF8.self)
+		let replacement = String(UnicodeScalar(opening)) + selected + String(UnicodeScalar(closing))
+		let selection = range.lowerBound + 1 ..< range.upperBound + 1
+		return .replace(range: range, text: replacement, selection: selection)
+	}
+
+	private static func shouldSkipClosingPair(_ closing: UInt8, bytes: [UInt8], at offset: Int) -> Bool {
+		if isQuote(closing) {
+			return unescapedQuoteCount(before: offset, in: bytes, quote: closing).isMultiple(of: 2) == false
+		}
+		guard let opening = openingPair(for: closing) else {
+			return false
+		}
+		var depth = 0
+		for byte in bytes[..<offset].reversed() {
+			if byte == closing {
+				depth += 1
+			} else if byte == opening {
+				if depth == 0 {
+					return true
+				}
+				depth -= 1
+			}
+		}
+		return false
+	}
+
 	private static func shouldPairQuote(_ bytes: [UInt8], at offset: Int, quote: UInt8) -> Bool {
 		guard byte(at: offset, in: bytes) != quote else {
 			return false
@@ -130,6 +172,22 @@ public enum TextEditBehavior {
 			return false
 		}
 		return !isWordByte(byte(at: offset - 1, in: bytes)) && !isWordByte(byte(at: offset, in: bytes))
+	}
+
+	private static func unescapedQuoteCount(before offset: Int, in bytes: [UInt8], quote: UInt8) -> Int {
+		var count = 0
+		for index in bytes.indices where index < offset && bytes[index] == quote {
+			var backslashCount = 0
+			var cursor = index
+			while cursor > 0, bytes[cursor - 1] == 92 {
+				backslashCount += 1
+				cursor -= 1
+			}
+			if backslashCount.isMultiple(of: 2) {
+				count += 1
+			}
+		}
+		return count
 	}
 
 	private static func indentation(in bytes: [UInt8], before offset: Int) -> String {
@@ -148,6 +206,15 @@ public enum TextEditBehavior {
 			return nil
 		}
 		return bytes[offset]
+	}
+
+	private static func openingPair(for closing: UInt8) -> UInt8? {
+		switch closing {
+		case 41: 40
+		case 93: 91
+		case 125: 123
+		default: nil
+		}
 	}
 
 	private static func isWordByte(_ value: UInt8?) -> Bool {

@@ -76,6 +76,36 @@ import Testing
 	#expect(await noMergeCleaner.deleted.isEmpty)
 }
 
+@Test func gitHubPullRequestMergeRecoversRemoteStateAfterAnAmbiguousFailure() async throws {
+	let executor = GitHubPullRequestMergeFixtureExecutor([
+		.init(exitStatus: 1, standardError: "merge status unavailable"),
+		.init(exitStatus: 0, standardOutput: detailJSONData(state: "MERGED", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN")),
+		.init(exitStatus: 0, standardOutput: #"[]"#),
+	])
+	let cleaner = GitHubPullRequestMergeCleaner()
+	let service = GitHubPullRequestMergeService(
+		bridge: GitHubCLIJSONBridge(executableURL: URL(fileURLWithPath: "/fixture/gh"), executor: executor),
+		gitRefresher: GitHubPullRequestMergeRefresher(status: GitStatus(branch: GitBranchStatus(head: "main", upstream: "origin/main"))),
+		branchCleaner: cleaner
+	)
+	let confirmation = GitHubPullRequestMergePlanner.requestConfirmation(for: try GitHubPullRequestMergeIntent(repository: GitHubRepositoryName("owner/repo"), pullRequestNumber: 7, method: .merge))
+	let metadata = GitHubPullRequestMergeMetadata(mergeCommitAllowed: true, squashMergeAllowed: false, rebaseMergeAllowed: false, autoMergeAllowed: false, isInMergeQueue: false)
+	guard case let .recovered(error, .ready(detail), gitStatus, cleanup) = try await service.merge(confirmation, detail: detailJSON(state: "OPEN", mergeable: "MERGEABLE", mergeStateStatus: "CLEAN"), metadata: metadata, cleanup: .deleteLocalBranch(try GitHubCLIReferenceName("feature")), workspaceURL: URL(fileURLWithPath: "/workspace")) else {
+		Issue.record("expected recovered merge state")
+		return
+	}
+	guard case .processFailure = error else {
+		Issue.record("expected merge process failure")
+		return
+	}
+	#expect(detail.state == "MERGED")
+	#expect(gitStatus?.branch.head == "main")
+	#expect(cleanup == .deleted)
+	#expect(await cleaner.deleted == ["feature"])
+	let calls = await executor.arguments
+	#expect(calls.map { Array($0.prefix(2)) } == [["pr", "merge"], ["pr", "view"], ["pr", "checks"]])
+}
+
 private func detailJSON(state: String, mergeable: String, mergeStateStatus: String) -> GitHubPullRequestDetail {
 	try! JSONDecoder().decode(GitHubPullRequestDetail.self, from: Data(detailJSONData(state: state, mergeable: mergeable, mergeStateStatus: mergeStateStatus).utf8))
 }

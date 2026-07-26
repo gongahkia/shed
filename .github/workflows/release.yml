@@ -53,9 +53,8 @@ jobs:
           ITSY_SPARKLE_PUBLIC_ED_KEY: ${{ vars.ITSY_SPARKLE_PUBLIC_ED_KEY }}
           ITSY_LSP_CATALOG_PUBLIC_ED_KEY: ${{ vars.ITSY_LSP_CATALOG_PUBLIC_ED_KEY }}
         run: |
-          if [[ -n "${ITSY_LSP_CATALOG_PUBLIC_ED_KEY:-}" ]]; then
-            export ITSY_LSP_CATALOG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/lsp-catalog.json"
-          fi
+          : "${ITSY_LSP_CATALOG_PUBLIC_ED_KEY:?missing ITSY_LSP_CATALOG_PUBLIC_ED_KEY}"
+          export ITSY_LSP_CATALOG_URL="https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/lsp-catalog.json"
           swift build -c release
           bench/scripts/make_app.sh
       - name: Verify tag version

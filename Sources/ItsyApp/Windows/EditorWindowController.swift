@@ -9,19 +9,6 @@ import ItsyRender
 import ItsySyntax
 import ItsyWorkbenchLayout
 
-private struct LSPStatusEntry {
-	var key: LSPSessionKey
-	var status: String
-	var health: LSPHealthState
-	var server: String
-	var pid: Int32?
-	var startDate: Date?
-	var lastError: String
-	var output: [LSPSessionOutput]
-	var url: URL?
-	var client: LSPProcessClient?
-}
-
 private enum LSPWorkspaceEditFileError: Error {
 	case invalidURI(String)
 	case nonUTF8(URL)
@@ -246,7 +233,7 @@ extension Notification.Name {
 	private var lspDocumentVersionsBySession: [LSPSessionKey: [String: Int]] = [:]
 	private var lspSupervisors: [LSPSessionKey: LSPSessionSupervisor] = [:]
 	private var lspSupervisorTasks: [LSPSessionKey: Task<Void, Never>] = [:]
-	private var lspStatusEntries: [LSPSessionKey: LSPStatusEntry] = [:]
+	private let lspPresentation = LSPPresentationState()
 	private var completionTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var signatureHelpTriggerCharactersBySession: [LSPSessionKey: Set<String>] = [:]
 	private var completionResolveEnabledBySession: [LSPSessionKey: Bool] = [:]
@@ -261,16 +248,6 @@ extension Notification.Name {
 	private let lspFoldGutterDecorator = LSPFoldGutterDecorator()
 	private var lspSurfaceRefreshTask: Task<Void, Never>?
 	private var lspSurfaceGeneration = 0
-	private var lspMissingBannerGeneration = 0
-	private var lspBannerDocumentURL: URL?
-	private var lspStatusGeneration = 0
-	private var lspConfigurationGeneration = 0
-	private var indexingStatusText: String?
-	private var lspCrashStatusText: String?
-	private var lspRestartKey: LSPSessionKey?
-	private var lspRestartURL: URL?
-	private var activeLSPKey: LSPSessionKey?
-	private var lspStatusPanel: LSPStatusPanel?
 	private var undoTreePanel: UndoTreePanelController?
 	private(set) var focusTraversalTargetsForTesting: [NSView] = []
 
@@ -483,7 +460,7 @@ extension Notification.Name {
 		guard !batch.events.isEmpty else {
 			return
 		}
-		for entry in lspStatusEntries.values {
+		for entry in lspPresentation.entries.values {
 			guard let client = entry.client else {
 				continue
 			}
@@ -890,7 +867,7 @@ extension Notification.Name {
 	}
 
 	func setIndexingStatus(_ text: String?) {
-		indexingStatusText = text.flatMap { $0.isEmpty ? nil : $0 }
+		lspPresentation.indexingStatusText = text.flatMap { $0.isEmpty ? nil : $0 }
 		refreshStatusBar()
 	}
 
@@ -1117,20 +1094,20 @@ extension Notification.Name {
 	}
 
 	private func refreshLSPMissingBanner(for document: ItsyDocument) {
-		lspMissingBannerGeneration += 1
-		let generation = lspMissingBannerGeneration
+		lspPresentation.missingBannerGeneration += 1
+		let generation = lspPresentation.missingBannerGeneration
 		guard let fileURL = document.fileURL else {
-			lspBannerDocumentURL = nil
+			lspPresentation.bannerDocumentURL = nil
 			lspMissingBanner.hide()
 			return
 		}
-		lspBannerDocumentURL = fileURL
+		lspPresentation.bannerDocumentURL = fileURL
 		Task { [weak self] in
 			let missingBinary = await Self.lspManager.missingBinary(for: fileURL)
 			let unavailableLanguage = await Self.lspManager.unsupportedLanguage(for: fileURL)
 			let key = await Self.lspManager.sessionKey(for: fileURL)
 			await MainActor.run { [weak self] in
-				guard let self, generation == lspMissingBannerGeneration else {
+				guard let self, generation == lspPresentation.missingBannerGeneration else {
 					return
 				}
 				if let missingBinary {
@@ -1142,7 +1119,7 @@ extension Notification.Name {
 					showLSPUnavailableBanner(unavailableLanguage, fileURL: fileURL)
 				} else {
 					lspMissingBanner.hide()
-					if let key, lspStatusEntries[key]?.health == .unavailable {
+					if let key, lspPresentation.entries[key]?.health == .unavailable {
 						setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
 					}
 				}
@@ -1195,11 +1172,11 @@ extension Notification.Name {
 	}
 
 	private func handleLSPRequestError(_ error: Error) {
-		let fileURL = activeLSPKey.flatMap { lspStatusEntries[$0]?.url } ?? lspBannerDocumentURL ?? (document as? ItsyDocument)?.fileURL
+		let fileURL = lspPresentation.activeKey.flatMap { lspPresentation.entries[$0]?.url } ?? lspPresentation.bannerDocumentURL ?? (document as? ItsyDocument)?.fileURL
 		if case let LSPManagerError.missingBinary(missingBinary) = error {
 			showLSPMissingBanner(missingBinary, fileURL: fileURL)
-			if let key = activeLSPKey {
-				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspStatusEntries[key]?.url, server: missingBinary.command)
+			if let key = lspPresentation.activeKey {
+				setLSPStatus(key: key, status: "unavailable", client: nil, lastError: missingBinary.hint, url: lspPresentation.entries[key]?.url, server: missingBinary.command)
 			}
 		} else if case let LSPManagerError.unsupportedLanguage(unavailableLanguage) = error {
 			showLSPUnavailableBanner(unavailableLanguage, fileURL: fileURL)
@@ -1208,24 +1185,24 @@ extension Notification.Name {
 				key: key,
 				status: "disabled",
 				client: nil,
-				lastError: lspStatusEntries[key]?.lastError,
-				url: lspStatusEntries[key]?.url
+				lastError: lspPresentation.entries[key]?.lastError,
+				url: lspPresentation.entries[key]?.url
 			)
-		} else if case LSPManagerError.retryLimitExceeded = error, let key = activeLSPKey {
+		} else if case LSPManagerError.retryLimitExceeded = error, let key = lspPresentation.activeKey {
 			setLSPStatus(
 				key: key,
 				status: "disabled",
 				client: nil,
-				lastError: lspStatusEntries[key]?.lastError,
-				url: lspStatusEntries[key]?.url
+				lastError: lspPresentation.entries[key]?.lastError,
+				url: lspPresentation.entries[key]?.url
 			)
 		}
 	}
 
 	private func showLSPOperationFailure(_ operation: String, error: Error) {
 		let message = "LSP \(operation) failed: \(error)"
-		lspCrashStatusText = message
-		if let key = activeLSPKey, let entry = lspStatusEntries[key] {
+		lspPresentation.crashStatusText = message
+		if let key = lspPresentation.activeKey, let entry = lspPresentation.entries[key] {
 			setLSPStatus(
 				key: key,
 				status: entry.status,
@@ -1258,7 +1235,7 @@ extension Notification.Name {
 
 	private func refreshStatusBar() {
 		refreshLSPStatusPill()
-		if let text = lspCrashStatusText ?? indexingStatusText {
+		if let text = lspPresentation.statusText {
 			statusBarLabel.stringValue = text
 		} else {
 			statusBarLabel.stringValue = ""
@@ -1273,18 +1250,18 @@ extension Notification.Name {
 			url: url
 		)
 		setLSPStatus(key: key, status: "crashed", client: nil, lastError: reason.stderrTail, url: url)
-		lspCrashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status))")
+		lspPresentation.crashStatusText = L10n.string("LSP: \(key.languageID) crashed (exit \(reason.status))")
 		AccessibilityAnnouncement.post(.languageServerFailure(language: key.languageID))
 		refreshStatusBar()
 	}
 
 	private func clearLSPCrashStatus(for key: LSPSessionKey) {
-		guard lspRestartKey == key else {
+		guard lspPresentation.restartKey == key else {
 			return
 		}
-		lspRestartKey = nil
-		lspRestartURL = nil
-		lspCrashStatusText = nil
+		lspPresentation.restartKey = nil
+		lspPresentation.restartURL = nil
+		lspPresentation.crashStatusText = nil
 		AccessibilityAnnouncement.post(.languageServerRecovery(language: key.languageID))
 		refreshStatusBar()
 	}
@@ -1293,14 +1270,14 @@ extension Notification.Name {
 		guard let snapshot = currentLSPStatusSnapshot() else {
 			return
 		}
-		let panel = lspStatusPanel ?? LSPStatusPanel()
+		let panel = lspPresentation.statusPanel ?? LSPStatusPanel()
 		panel.restartRequested = { [weak self] key in
 			self?.restartLSPFromStatusPanel(key)
 		}
 		panel.stopRequested = { [weak self] key in
 			self?.stopLSPFromStatusPanel(key)
 		}
-		lspStatusPanel = panel
+		lspPresentation.statusPanel = panel
 		panel.show(snapshot: snapshot, relativeTo: window)
 	}
 
@@ -1309,8 +1286,8 @@ extension Notification.Name {
 	}
 
 	func lspConfigurationDidReload() {
-		lspConfigurationGeneration &+= 1
-		for key in Set(lspSupervisors.keys).union(lspStatusEntries.keys) {
+		let statusKeys = lspPresentation.entries.keys
+		for key in Set(lspSupervisors.keys).union(statusKeys) {
 			publishEmptyLSPDiagnostics(for: key)
 		}
 		for task in lspSupervisorTasks.values {
@@ -1320,7 +1297,7 @@ extension Notification.Name {
 		lspDocumentVersionsBySession.removeAll()
 		lspSupervisors.removeAll()
 		lspSupervisorTasks.removeAll()
-		lspStatusEntries.removeAll()
+		lspPresentation.resetForConfigurationReload()
 		completionTriggerCharactersBySession.removeAll()
 		signatureHelpTriggerCharactersBySession.removeAll()
 		completionResolveEnabledBySession.removeAll()
@@ -1329,10 +1306,6 @@ extension Notification.Name {
 		typeHierarchyEnabledBySession.removeAll()
 		semanticSurfaceCapabilitiesBySession.removeAll()
 		formattingCapabilitiesBySession.removeAll()
-		activeLSPKey = nil
-		lspRestartKey = nil
-		lspRestartURL = nil
-		lspCrashStatusText = nil
 		if let document = document as? ItsyDocument {
 			refreshLSPMissingBanner(for: document)
 			refreshLSPStatus(for: document)
@@ -1360,7 +1333,7 @@ extension Notification.Name {
 	func lspDocumentDidReload(_ url: URL, content: String) {
 		let coordinators = lspSyncCoordinators
 		let supervisors = lspSupervisors
-		let clients = lspStatusEntries.reduce(into: [LSPSessionKey: LSPProcessClient]()) { result, entry in
+		let clients = lspPresentation.entries.reduce(into: [LSPSessionKey: LSPProcessClient]()) { result, entry in
 			if let client = entry.value.client {
 				result[entry.key] = client
 			}
@@ -1394,7 +1367,7 @@ extension Notification.Name {
 		lspSupervisorTasks[key]?.cancel()
 		lspSupervisorTasks[key] = nil
 		lspSupervisors[key] = nil
-		lspStatusEntries[key] = nil
+		lspPresentation.entries[key] = nil
 		completionTriggerCharactersBySession[key] = nil
 		signatureHelpTriggerCharactersBySession[key] = nil
 		completionResolveEnabledBySession[key] = nil
@@ -1403,18 +1376,18 @@ extension Notification.Name {
 		typeHierarchyEnabledBySession[key] = nil
 		semanticSurfaceCapabilitiesBySession[key] = nil
 		formattingCapabilitiesBySession[key] = nil
-		if activeLSPKey == key {
-			activeLSPKey = nil
+		if lspPresentation.activeKey == key {
+			lspPresentation.activeKey = nil
 			refreshStatusBar()
 		}
 	}
 
 	private func restartLSPFromStatusPanel(_ key: LSPSessionKey) {
-		guard let url = lspStatusEntries[key]?.url ?? lspRestartURL else {
+		guard let url = lspPresentation.entries[key]?.url ?? lspPresentation.restartURL else {
 			return
 		}
-		lspRestartKey = key
-		lspRestartURL = url
+		lspPresentation.restartKey = key
+		lspPresentation.restartURL = url
 		Task { [weak self] in
 			await Self.lspManager.enableSession(key)
 			await MainActor.run { [weak self] in
@@ -1427,7 +1400,7 @@ extension Notification.Name {
 	}
 
 	private func stopLSPFromStatusPanel(_ key: LSPSessionKey) {
-		let entry = lspStatusEntries[key]
+		let entry = lspPresentation.entries[key]
 		let supervisor = lspSupervisors[key]
 		lspSyncCoordinators[key] = nil
 		lspDocumentVersionsBySession[key] = nil
@@ -1442,10 +1415,10 @@ extension Notification.Name {
 	}
 
 	private func refreshLSPStatus(for document: ItsyDocument) {
-		lspStatusGeneration += 1
-		let generation = lspStatusGeneration
+		lspPresentation.statusGeneration += 1
+		let generation = lspPresentation.statusGeneration
 		guard let fileURL = document.fileURL else {
-			activeLSPKey = nil
+			lspPresentation.activeKey = nil
 			refreshStatusBar()
 			return
 		}
@@ -1455,11 +1428,11 @@ extension Notification.Name {
 				guard let self else {
 					return
 				}
-				guard generation == lspStatusGeneration else {
+				guard generation == lspPresentation.statusGeneration else {
 					return
 				}
-				activeLSPKey = key
-				if let key, lspStatusEntries[key] == nil {
+				lspPresentation.activeKey = key
+				if let key, lspPresentation.entries[key] == nil {
 					setLSPStatus(key: key, status: "idle", client: nil, lastError: nil, url: fileURL)
 				} else {
 					refreshStatusBar()
@@ -1477,56 +1450,27 @@ extension Notification.Name {
 		server: String? = nil,
 		health: LSPHealthState? = nil
 	) {
-		let existing = lspStatusEntries[key]
-		let clearsClient = status == "idle" || status == "crashed" || status == "disabled" || status == "unavailable"
-		let resolvedHealth = health ?? (status == "running" && existing?.health == .degraded ? .degraded : Self.health(for: status))
-		let entry = LSPStatusEntry(
+		let entry = lspPresentation.setStatus(
 			key: key,
 			status: status,
-			health: resolvedHealth,
-			server: server ?? client.map(Self.serverName(for:)) ?? existing?.server ?? key.languageID,
-			pid: clearsClient ? nil : client?.processIdentifier ?? existing?.pid,
-			startDate: clearsClient ? nil : client?.startDate ?? existing?.startDate,
-			lastError: lastError ?? existing?.lastError ?? "",
-			output: existing?.output ?? [],
-			url: url ?? existing?.url,
-			client: client ?? (clearsClient ? nil : existing?.client)
+			client: client,
+			lastError: lastError,
+			url: url,
+			server: server,
+			health: health
 		)
-		lspStatusEntries[key] = entry
 		Task {
 			await IntegrationHealthStore.shared.report(
 				service: .lsp,
 				identifier: "\(key.languageID):\(key.workspaceRoot.path)",
 				lifecycle: Self.integrationLifecycle(for: status),
-				state: Self.integrationState(for: resolvedHealth),
+				state: Self.integrationState(for: entry.health),
 				lastError: entry.lastError.isEmpty ? nil : entry.lastError,
 				remediation: Self.integrationRemediation(for: status),
 				detailLogReference: "lsp://\(key.languageID)/\(key.workspaceRoot.path)"
 			)
 		}
-		activeLSPKey = key
-		if status == "crashed" || status == "disabled" {
-			lspRestartKey = key
-			lspRestartURL = url ?? existing?.url
-		}
 		refreshStatusBar()
-	}
-
-	private static func health(for status: String) -> LSPHealthState {
-		switch status {
-		case "starting":
-			return .starting
-		case "running", "ready":
-			return .ready
-		case "degraded", "disabled":
-			return .degraded
-		case "crashed":
-			return .crashed
-		case "unavailable":
-			return .unavailable
-		default:
-			return .idle
-		}
 	}
 
 	private static func integrationLifecycle(for status: String) -> IntegrationLifecycle {
@@ -1567,21 +1511,14 @@ extension Notification.Name {
 	}
 
 	private func appendLSPOutput(_ output: LSPSessionOutput, for key: LSPSessionKey, url: URL?) {
-		guard var entry = lspStatusEntries[key] else {
+		guard lspPresentation.entries[key] != nil else {
 			setLSPStatus(key: key, status: "starting", client: nil, lastError: nil, url: url)
 			appendLSPOutput(output, for: key, url: url)
 			return
 		}
-		entry.output.append(output)
-		if entry.output.count > 200 {
-			entry.output.removeFirst(entry.output.count - 200)
+		guard lspPresentation.append(output, for: key) else {
+			return
 		}
-		if output.kind == .protocolOutput {
-			entry.status = "degraded"
-			entry.health = .degraded
-			entry.lastError = output.text
-		}
-		lspStatusEntries[key] = entry
 		Task {
 			await IntegrationOutputConsole.shared.append(
 				service: .lsp,
@@ -1592,12 +1529,11 @@ extension Notification.Name {
 				timestamp: output.timestamp
 			)
 		}
-		activeLSPKey = key
 		refreshStatusBar()
 	}
 
 	private func refreshLSPStatusPill() {
-		guard let key = activeLSPKey, let entry = lspStatusEntries[key] else {
+		guard let key = lspPresentation.activeKey, let entry = lspPresentation.entries[key] else {
 			lspStatusButton.isHidden = true
 			return
 		}
@@ -1608,23 +1544,7 @@ extension Notification.Name {
 	}
 
 	private func currentLSPStatusSnapshot() -> LSPStatusPanelSnapshot? {
-		guard let key = activeLSPKey, let entry = lspStatusEntries[key] else {
-			return nil
-		}
-		return LSPStatusPanelSnapshot(
-			key: entry.key,
-			status: entry.status,
-			health: entry.health,
-			server: entry.server,
-			pid: entry.pid,
-			startDate: entry.startDate,
-			lastError: entry.lastError,
-			output: entry.output
-		)
-	}
-
-	private static func serverName(for client: LSPProcessClient) -> String {
-		([client.executableURL.path] + client.arguments).joined(separator: " ")
+		lspPresentation.snapshot()
 	}
 
 	override func windowDidLoad() {
@@ -4035,11 +3955,11 @@ extension Notification.Name {
 
 	private func installLSPSupervisor(for key: LSPSessionKey, client: LSPProcessClient, url: URL) {
 		guard lspSupervisors[key] == nil else {
-			lspRestartURL = lspRestartKey == key ? url : lspRestartURL
+			lspPresentation.restartURL = lspPresentation.restartKey == key ? url : lspPresentation.restartURL
 			return
 		}
 		let supervisor = LSPSessionSupervisor(key: key, client: client)
-		let configurationGeneration = lspConfigurationGeneration
+		let configurationGeneration = lspPresentation.configurationGeneration
 		lspSupervisors[key] = supervisor
 		lspSupervisorTasks[key] = Task { [weak self, supervisor] in
 			await supervisor.start()
@@ -4057,7 +3977,7 @@ extension Notification.Name {
 		url: URL,
 		configurationGeneration: Int
 	) {
-		guard configurationGeneration == lspConfigurationGeneration else {
+		guard configurationGeneration == lspPresentation.configurationGeneration else {
 			return
 		}
 		switch event {
@@ -4089,7 +4009,7 @@ extension Notification.Name {
 				applied: applied,
 				failureReason: applied ? nil : "unable to apply workspace edit"
 			)
-			guard let client = lspStatusEntries[key]?.client else {
+			guard let client = lspPresentation.entries[key]?.client else {
 				return
 			}
 			Task {

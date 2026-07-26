@@ -1,4 +1,6 @@
+import AppKit
 @testable import ItsyApp
+import ItsyLSP
 import Testing
 
 @Test func semanticTokenCacheRejectsStaleRefreshesAndInvalidatesOnlyTargetURI() {
@@ -20,4 +22,35 @@ import Testing
 
 	#expect(cache.state(for: firstURI) == nil)
 	#expect(cache.state(for: secondURI) == secondState)
+}
+
+@MainActor @Test func editorDecorationPipelinePrunesStaleFoldsAndRejectsEmptyFoldCommands() {
+	_ = NSApplication.shared
+	let pipeline = EditorDecorationPipeline()
+	let document = ItsyDocument()
+	let uri = "file:///tmp/decoration.swift"
+	let fold = LSPFoldingRange(startLine: 2, endLine: 5)
+	pipeline.apply(
+		uri: uri,
+		content: "",
+		document: document,
+		semanticSpans: [],
+		inlayHints: [],
+		foldingRanges: [fold],
+		documentHighlights: []
+	)
+	#expect(pipeline.toggleFold(startLine: 2, uri: uri, document: document))
+	#expect(pipeline.collapsedStarts(for: uri) == Set([2]))
+
+	pipeline.apply(
+		uri: uri,
+		content: "",
+		document: document,
+		semanticSpans: [],
+		inlayHints: [],
+		foldingRanges: [],
+		documentHighlights: []
+	)
+	#expect(pipeline.collapsedStarts(for: uri).isEmpty)
+	#expect(!pipeline.setAllFolds(collapsed: true, uri: uri, document: document))
 }

@@ -147,6 +147,35 @@ import Testing
 }
 
 @MainActor
+@Test func tabAndStatusBarsUseWorkbenchComponentHostAcrossVisibilityChanges() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let tabBarView = try #require(controller.tabBarHostView.subviews.first)
+	#expect(controller.tabBarComponentLifecycle == .visible)
+
+	var settings = ItsySettings()
+	settings.editor.tabGroups = .pane
+	controller.applySettings(settings)
+	#expect(controller.tabBarComponentLifecycle == .hidden)
+	#expect(controller.tabBarHostView.subviews.first === tabBarView)
+
+	settings.editor.tabGroups = .window
+	controller.applySettings(settings)
+	#expect(controller.tabBarComponentLifecycle == .visible)
+	#expect(controller.tabBarHostView.subviews.first === tabBarView)
+
+	controller.setIndexingStatus("Indexing")
+	let statusBarView = try #require(controller.statusBarHostView.subviews.first)
+	#expect(controller.statusBarComponentLifecycle == .visible)
+	controller.setIndexingStatus(nil)
+	#expect(controller.statusBarComponentLifecycle == .hidden)
+	#expect(controller.statusBarHostView.subviews.first === statusBarView)
+	controller.setIndexingStatus("Indexing")
+	#expect(controller.statusBarComponentLifecycle == .visible)
+	#expect(controller.statusBarHostView.subviews.first === statusBarView)
+}
+
+@MainActor
 @Test func editorWindowHostsTerminalBelowAndGitAtTrailingEdge() throws {
 	let controller = EditorWindowController(document: ItsyDocument())
 	defer { controller.close() }

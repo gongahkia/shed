@@ -495,7 +495,7 @@ final class DebugAppSession: @unchecked Sendable {
 				initializedTask.cancel()
 			}
 			let breakpointTask = Task {
-				try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot)
+				try await DebugBreakpointSync.syncPersistedBreakpoints(from: breakpointStore, using: client, workspaceRoot: workspaceRoot, capabilities: negotiatedCapabilities)
 			}
 			await Task.yield()
 			let exceptionTask = Task {

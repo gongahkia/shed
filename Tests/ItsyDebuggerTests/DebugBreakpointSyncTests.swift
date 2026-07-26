@@ -21,7 +21,7 @@ import Testing
 	let (session, transport) = try await configuredSession()
 
 	let syncTask = Task {
-		try await DebugBreakpointSync.syncPersistedBreakpoints(from: persistedStore, using: session, workspaceRoot: fixture.workspaceRoot)
+		try await DebugBreakpointSync.syncPersistedBreakpoints(from: persistedStore, using: session, workspaceRoot: fixture.workspaceRoot, capabilities: [.conditionalBreakpoints, .hitConditionalBreakpoints, .logPoints])
 	}
 	try await transport.waitForWriteCount(2)
 	let breakpointRequest = try transport.request(at: 1)
@@ -75,7 +75,7 @@ import Testing
 	try await store.save()
 	let (session, transport) = try await configuredSession()
 	let syncTask = Task {
-		try await DebugBreakpointSync.syncPersistedBreakpoints(from: BreakpointStore(fileURL: fixture.storeURL), using: session, workspaceRoot: fixture.workspaceRoot)
+		try await DebugBreakpointSync.syncPersistedBreakpoints(from: BreakpointStore(fileURL: fixture.storeURL), using: session, workspaceRoot: fixture.workspaceRoot, capabilities: [])
 	}
 
 	try await transport.waitForWriteCount(2)
@@ -93,6 +93,43 @@ import Testing
 	await statusStore.replace(verification)
 	await statusStore.apply(DAPBreakpoint(id: 4, verified: true, line: 11))
 	#expect(await statusStore.snapshot().first?.adapterBreakpoint == DAPBreakpoint(id: 4, verified: true, line: 11))
+}
+
+@Test func debugBreakpointSyncStripsUnsupportedConditionalAndLogpointFields() {
+	let workspaceRoot = URL(fileURLWithPath: "/workspace", isDirectory: true)
+	let source = workspaceRoot.appendingPathComponent("main.swift")
+	let breakpoint = SourceBreakpoint(line: 8, column: 3, condition: "value > 0", hitCondition: "3", logMessage: "hit")
+
+	let unsupported = DebugBreakpointSync.setBreakpointsArguments(from: [source: [breakpoint]], workspaceRoot: workspaceRoot, capabilities: [])
+	#expect(unsupported.first?.breakpoints == [SourceBreakpoint(line: 8, column: 3)])
+
+	let supported = DebugBreakpointSync.setBreakpointsArguments(from: [source: [breakpoint]], workspaceRoot: workspaceRoot, capabilities: [.conditionalBreakpoints, .hitConditionalBreakpoints, .logPoints])
+	#expect(supported.first?.breakpoints == [breakpoint])
+}
+
+@Test func debugBreakpointSyncPreservesStoredMetadataWhenAdapterLacksCapabilities() async throws {
+	let fixture = try DebugBreakpointSyncFixture()
+	defer { fixture.cleanup() }
+	let source = fixture.workspaceRoot.appendingPathComponent("Sources/App.swift")
+	let stored = SourceBreakpoint(line: 8, condition: "value > 0", hitCondition: "3", logMessage: "hit")
+	let store = BreakpointStore(fileURL: fixture.storeURL)
+	await store.replace([stored], for: source)
+	try await store.save()
+	let (session, transport) = try await configuredSession()
+	let syncTask = Task {
+		try await DebugBreakpointSync.syncPersistedBreakpoints(from: BreakpointStore(fileURL: fixture.storeURL), using: session, workspaceRoot: fixture.workspaceRoot, capabilities: [])
+	}
+
+	try await transport.waitForWriteCount(2)
+	let request = try transport.request(at: 1)
+	guard case let .object(arguments) = request.arguments else {
+		Issue.record("Expected setBreakpoints arguments object.")
+		return
+	}
+	#expect(arguments["breakpoints"] == .array([.object(["line": .int(8)])]))
+	try await respond(session, request: request, body: DAPSetBreakpointsResponseBody(breakpoints: [DAPBreakpoint(verified: true, line: 8)]))
+	let verification = try await syncTask.value
+	#expect(verification.first?.requested == stored)
 }
 
 private func configuredSession() async throws -> (DAPClientSession, RecordingDAPTransport) {

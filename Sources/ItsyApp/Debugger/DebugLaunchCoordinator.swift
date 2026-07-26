@@ -360,10 +360,11 @@ final class DebugAppSession: @unchecked Sendable {
 	let supportsRestart: Bool
 	let supportsTerminate: Bool
 	let breakpointVerificationStore: DebugBreakpointVerificationStore
+	let outputRecoveryBuffer: DebugOutputRecoveryBuffer
 	private let transport: DAPProcessTransport
 	private let eventPump: Task<Void, Never>
 
-	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL, client: DAPClientSession, capabilities: DAPCapabilities, breakpointVerificationStore: DebugBreakpointVerificationStore, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
+	private init(debugSession: DebugSession, configuration: DebugLaunchConfiguration, adapter: DebugAdapterConfig, workspaceRoot: URL, client: DAPClientSession, capabilities: DAPCapabilities, breakpointVerificationStore: DebugBreakpointVerificationStore, outputRecoveryBuffer: DebugOutputRecoveryBuffer, transport: DAPProcessTransport, eventPump: Task<Void, Never>) {
 		self.debugSession = debugSession
 		self.configuration = configuration
 		self.adapter = adapter
@@ -377,6 +378,7 @@ final class DebugAppSession: @unchecked Sendable {
 		supportsRestart = negotiatedCapabilities.contains(.restart)
 		supportsTerminate = negotiatedCapabilities.contains(.terminate)
 		self.breakpointVerificationStore = breakpointVerificationStore
+		self.outputRecoveryBuffer = outputRecoveryBuffer
 		self.transport = transport
 		self.eventPump = eventPump
 	}
@@ -417,6 +419,7 @@ final class DebugAppSession: @unchecked Sendable {
 		let client = DAPClientSession(transport: transport)
 		let debugSession = DebugSession(client: client)
 		let breakpointVerificationStore = DebugBreakpointVerificationStore()
+		let outputRecoveryBuffer = DebugOutputRecoveryBuffer()
 		let eventPump = Task.detached(priority: .userInitiated) {
 			for await event in transport.events {
 				switch event {
@@ -424,12 +427,17 @@ final class DebugAppSession: @unchecked Sendable {
 					do {
 						let received = try await client.receive(data)
 						for clientEvent in received {
-							guard case let .event(message) = clientEvent,
-							      case let .breakpoint(body) = try? message.typed()
-							else {
+							guard case let .event(message) = clientEvent else {
 								continue
 							}
-							await breakpointVerificationStore.apply(body.breakpoint)
+							switch try? message.typed() {
+							case let .some(.breakpoint(body)):
+								await breakpointVerificationStore.apply(body.breakpoint)
+							case let .some(.output(body)):
+								await outputRecoveryBuffer.append(sequence: message.seq, body: body)
+							default:
+								break
+							}
 						}
 					} catch {
 						NSLog("debug adapter receive failed: \(error)")
@@ -510,7 +518,7 @@ final class DebugAppSession: @unchecked Sendable {
 			}
 			_ = try await launchTask.value
 			await IntegrationHealthStore.shared.report(service: .dap, identifier: healthIdentifier, lifecycle: .running, state: .healthy, detailLogReference: logReference)
-			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, workspaceRoot: workspaceRoot, client: client, capabilities: capabilities, breakpointVerificationStore: breakpointVerificationStore, transport: transport, eventPump: eventPump)
+			return DebugAppSession(debugSession: debugSession, configuration: configuration, adapter: adapter, workspaceRoot: workspaceRoot, client: client, capabilities: capabilities, breakpointVerificationStore: breakpointVerificationStore, outputRecoveryBuffer: outputRecoveryBuffer, transport: transport, eventPump: eventPump)
 		} catch {
 			eventPump.cancel()
 			await client.transportDidTerminate(status: nil)
@@ -522,6 +530,9 @@ final class DebugAppSession: @unchecked Sendable {
 
 	func terminate() {
 		eventPump.cancel()
+		Task { [client] in
+			await client.transportDidTerminate(status: nil)
+		}
 		transport.terminate()
 	}
 

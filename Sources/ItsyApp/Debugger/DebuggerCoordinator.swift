@@ -441,9 +441,12 @@ private enum DebuggerSurface: Int {
 		setCallStackStatus(control.runningStatus, isError: false)
 		Task(priority: .userInitiated) { [weak self] in
 			do {
-				try await self?.send(control, session: session)
+			try await self?.send(control, session: session)
 				Task { @MainActor in
 					guard let self else {
+						return
+					}
+					guard self.activeSession === session else {
 						return
 					}
 					if control == .stop {
@@ -458,7 +461,10 @@ private enum DebuggerSurface: Int {
 				}
 			} catch {
 				Task { @MainActor in
-					self?.setCallStackStatus(String(describing: error), isError: true)
+					guard let self, self.activeSession === session else {
+						return
+					}
+					self.setCallStackStatus(String(describing: error), isError: true)
 				}
 			}
 		}

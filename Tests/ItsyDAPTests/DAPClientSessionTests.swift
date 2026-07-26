@@ -397,6 +397,16 @@ import Testing
 	#expect(await reconnected.state == .configuring)
 }
 
+@Test func dapClientSessionRejectsDisconnectAfterTransportTerminationWithoutWriting() async throws {
+	let (session, transport) = try await runningSession()
+	await session.transportDidTerminate(status: 9)
+
+	await #expect(throws: DAPClientError.transportTerminated(9)) {
+		try await session.disconnect()
+	}
+	#expect(transport.count() == 2)
+}
+
 private enum RecordingDAPTransportError: Error {
 	case timeout(expected: Int, actual: Int)
 	case missingWrite(Int)
@@ -481,6 +491,10 @@ private final class RecordingDAPTransport: DAPClientTransport, @unchecked Sendab
 			throw RecordingDAPTransportError.invalidFrame(index)
 		}
 		return try JSONDecoder().decode(DAPMessage.self, from: payloads[0])
+	}
+
+	func count() -> Int {
+		writeCount
 	}
 
 	private var writeCount: Int {

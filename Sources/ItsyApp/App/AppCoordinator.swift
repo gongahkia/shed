@@ -126,6 +126,7 @@ import ItsyKeymap
 		EditorWindowController.shutdownAllLSP()
 		debuggerCoordinator.terminate()
 		terminalCoordinator.terminate()
+		taskCoordinator.terminate()
 	}
 
 	func application(_: NSApplication, openFile filename: String) -> Bool {

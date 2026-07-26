@@ -807,11 +807,7 @@ public final class WorkspaceTaskWatcher: @unchecked Sendable {
 
 	public func start(fileManager: FileManager = .default) {
 		stop()
-		for path in watch.paths {
-			let url = root.appendingPathComponent(path)
-			guard fileManager.fileExists(atPath: url.path) else {
-				continue
-			}
+		for url in watchURLs(fileManager: fileManager) {
 			let descriptor = open(url.path, O_EVTONLY)
 			guard descriptor >= 0 else {
 				continue
@@ -832,6 +828,40 @@ public final class WorkspaceTaskWatcher: @unchecked Sendable {
 			lock.unlock()
 			source.resume()
 		}
+	}
+
+	private func watchURLs(fileManager: FileManager) -> [URL] {
+		let root = root.standardizedFileURL
+		let rootPath = root.path
+		var urls = Set<URL>()
+		for path in watch.paths where !path.isEmpty {
+			let target = root.appendingPathComponent(path).standardizedFileURL
+			guard target.path == rootPath || target.path.hasPrefix(rootPath + "/") else {
+				continue
+			}
+			if fileManager.fileExists(atPath: target.path) {
+				urls.insert(target)
+			}
+			if let directory = nearestExistingDirectory(from: target.deletingLastPathComponent(), root: root, fileManager: fileManager) {
+				urls.insert(directory)
+			}
+		}
+		return urls.sorted { $0.path < $1.path }
+	}
+
+	private func nearestExistingDirectory(from url: URL, root: URL, fileManager: FileManager) -> URL? {
+		var candidate = url
+		while candidate.path.hasPrefix(root.path) {
+			var isDirectory: ObjCBool = false
+			if fileManager.fileExists(atPath: candidate.path, isDirectory: &isDirectory), isDirectory.boolValue {
+				return candidate
+			}
+			guard candidate != root else {
+				return nil
+			}
+			candidate = candidate.deletingLastPathComponent()
+		}
+		return nil
 	}
 
 	public func stop() {

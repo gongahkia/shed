@@ -51,6 +51,12 @@ enum SnippetCompletionMapper {
 	}
 }
 
+enum SnippetTabStopMove: Equatable {
+	case ranges([Range<Int>])
+	case finished
+	case abandoned
+}
+
 struct SnippetTabStopSession: Equatable {
 	struct Group: Equatable {
 		var index: Int
@@ -80,33 +86,41 @@ struct SnippetTabStopSession: Equatable {
 		return groups[currentGroupOffset].ranges
 	}
 
-	mutating func move(direction: Int, currentSelectionRanges: [Range<Int>]) -> [Range<Int>]? {
-		adjustForCurrentSelection(currentSelectionRanges)
+	mutating func move(direction: Int, currentSelectionRanges: [Range<Int>]) -> SnippetTabStopMove {
+		guard adjustForCurrentSelection(currentSelectionRanges) else {
+			return .abandoned
+		}
 		let delta = direction < 0 ? -1 : 1
 		let next = currentGroupOffset + delta
 		guard groups.indices.contains(next) else {
-			return nil
+			return .finished
 		}
 		currentGroupOffset = next
-		return groups[next].ranges
+		return .ranges(groups[next].ranges)
 	}
 
-	private mutating func adjustForCurrentSelection(_ ranges: [Range<Int>]) {
+	private mutating func adjustForCurrentSelection(_ ranges: [Range<Int>]) -> Bool {
 		guard groups.indices.contains(currentGroupOffset),
-		      let original = groups[currentGroupOffset].ranges.first,
-		      let current = ranges.first
+		      !ranges.isEmpty
 		else {
-			return
+			return false
 		}
-		let delta = current.upperBound - original.upperBound
+		let originalRanges = groups[currentGroupOffset].ranges
+		guard ranges.count <= originalRanges.count else {
+			return false
+		}
 		groups[currentGroupOffset].ranges = ranges
-		guard delta != 0 else {
-			return
-		}
 		for offset in groups.indices where offset > currentGroupOffset {
-			groups[offset].ranges = groups[offset].ranges.map {
-				($0.lowerBound + delta) ..< ($0.upperBound + delta)
+			groups[offset].ranges = groups[offset].ranges.map { target in
+				let delta = zip(originalRanges, ranges).reduce(into: 0) { result, pair in
+					guard pair.0.upperBound <= target.lowerBound else {
+						return
+					}
+					result += pair.1.count - pair.0.count
+				}
+				return (target.lowerBound + delta) ..< (target.upperBound + delta)
 			}
 		}
+		return true
 	}
 }

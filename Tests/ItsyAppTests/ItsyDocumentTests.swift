@@ -328,6 +328,39 @@ private func editorWindowDescendants(in view: NSView) -> [NSView] {
 }
 
 @MainActor
+@Test func workspaceComponentLayoutStateRestoresVisibilitySelectionAndDimensions() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
+	let state = WorkspaceWorkbenchLayoutState(components: [
+		"file_tree": .init(isVisible: false, width: 300),
+		"terminal": .init(isVisible: true, height: 180),
+		"git": .init(isVisible: true, isSelected: false, width: 520),
+		"debugger": .init(isVisible: true, isSelected: true, width: 380),
+		"tab_bar": .init(isVisible: false),
+		"status_bar": .init(isVisible: false),
+	])
+
+	controller.restoreWorkspaceWorkbenchComponentState(state)
+	splitView.layoutSubtreeIfNeeded()
+	#expect(controller.fileTreeComponentLifecycle == .unmounted)
+	#expect(controller.terminalComponentLifecycle == .visible)
+	#expect(controller.gitComponentLifecycle == .hidden)
+	#expect(controller.debuggerComponentLifecycle == .visible)
+	#expect(controller.tabBarComponentLifecycle == .hidden)
+	#expect(controller.statusBarComponentLifecycle == .hidden)
+	#expect(abs(controller.terminalHostView.frame.height - 180) < 2)
+	#expect(controller.workspaceWorkbenchComponentState.componentState(for: "debugger") == state.componentState(for: "debugger"))
+	#expect(controller.workspaceWorkbenchComponentState.componentState(for: "terminal") == state.componentState(for: "terminal"))
+
+	controller.restoreWorkspaceWorkbenchComponentState(.init(components: ["terminal": .init(isVisible: false, height: -1)]))
+	#expect(controller.terminalComponentLifecycle == .hidden)
+	#expect(controller.workspaceWorkbenchComponentState.componentState(for: "terminal")?.height == nil)
+}
+
+@MainActor
 @Test func editorFocusTraversalCyclesVisibleShellControlsWithoutTraps() {
 	let document = ItsyDocument()
 	let controller = EditorWindowController(document: document)

@@ -1047,7 +1047,11 @@ import ItsyKeymap
 			paneStates: state.paneStates,
 			focusedPaneIndex: state.focusedPaneIndex
 		)
-		activeEditorWindowController()?.restoreWorkspaceWorkbenchDividerState(state.workbenchDividers)
+		if let workbenchComponents = state.workbenchComponents {
+			activeEditorWindowController()?.restoreWorkspaceWorkbenchComponentState(workbenchComponents)
+		} else {
+			activeEditorWindowController()?.restoreWorkspaceWorkbenchDividerState(state.workbenchDividers)
+		}
 		ItsyWorkspaceController.persistWindowState(from: activeEditorWindowController())
 		return didOpen
 	}

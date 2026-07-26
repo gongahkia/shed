@@ -2277,6 +2277,9 @@ struct GitResponsiveViewState: Equatable {
 		let textView = NSTextView()
 		textView.isEditable = isEditable
 		textView.isSelectable = true
+		if isEditable {
+			textView.delegate = self
+		}
 		textView.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
 		textView.string = text
 		scrollView.documentView = textView
@@ -2306,7 +2309,7 @@ struct GitResponsiveViewState: Equatable {
 			stack.removeArrangedSubview(view)
 			view.removeFromSuperview()
 		}
-		let regions = GitConflictParser.parse(textView.string)
+		let regions = GitConflictResolutionDocument(text: textView.string).regions
 		if regions.isEmpty {
 			let label = NSTextField(labelWithString: L10n.string("No conflict markers remain"))
 			label.textColor = .secondaryLabelColor
@@ -2347,9 +2350,12 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		let index = sender.tag
-		textView.string = GitConflictParser.resolvedText(textView.string, regionIndex: index, resolution: resolution)
+		var document = GitConflictResolutionDocument(text: textView.string)
+		document.resolve(regionIndex: index, with: resolution)
+		textView.string = document.text
 		refreshGitConflictRegions()
-		let regions = GitConflictParser.parse(textView.string)
+		refreshGitConflictResolutionState()
+		let regions = document.regions
 		guard !regions.isEmpty else {
 			gitConflictSelectedRegionIndex = 0
 			return
@@ -2385,7 +2391,7 @@ struct GitResponsiveViewState: Equatable {
 		guard let textView = gitConflictMergedTextView else {
 			return
 		}
-		let regions = GitConflictParser.parse(textView.string)
+		let regions = GitConflictResolutionDocument(text: textView.string).regions
 		guard !regions.isEmpty else {
 			return
 		}
@@ -2397,7 +2403,7 @@ struct GitResponsiveViewState: Equatable {
 		guard let textView = gitConflictMergedTextView else {
 			return
 		}
-		let regions = GitConflictParser.parse(textView.string)
+		let regions = GitConflictResolutionDocument(text: textView.string).regions
 		guard index >= 0, index < regions.count else {
 			return
 		}
@@ -2414,11 +2420,15 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
-			try textView.string.write(to: root.appendingPathComponent(path), atomically: true, encoding: .utf8)
+			let document = GitConflictResolutionDocument(text: textView.string)
+			try document.textForStaging().write(to: root.appendingPathComponent(path), atomically: true, encoding: .utf8)
 			try repositoryDomain.stage(paths: [path], at: root)
 			refreshGitConflictRegions()
 			refreshGitConflictResolutionState()
 			refreshGitChanges(nil)
+		} catch GitConflictResolutionDocumentError.unresolvedMarkers {
+			gitConflictStateLabel?.textColor = .systemRed
+			gitConflictStateLabel?.stringValue = L10n.string("Resolve all conflict markers before staging.")
 		} catch {
 			gitConflictStateLabel?.textColor = .systemRed
 			gitConflictStateLabel?.stringValue = String(describing: error)
@@ -2458,11 +2468,23 @@ struct GitResponsiveViewState: Equatable {
 			return
 		}
 		do {
+			if let textView = gitConflictMergedTextView {
+				let document = GitConflictResolutionDocument(text: textView.string)
+				if document.hasUnresolvedMarkers {
+					gitConflictStateLabel?.textColor = .secondaryLabelColor
+					gitConflictStateLabel?.stringValue = L10n.string("Resolve all conflict markers before staging.")
+					return
+				}
+			}
 			let state = try repositoryDomain.conflictResolutionState(at: root)
 			gitConflictStateLabel?.textColor = .secondaryLabelColor
-			gitConflictStateLabel?.stringValue = state.isComplete
-				? L10n.string("Resolved in index")
-				: L10n.string("\(state.unresolvedPaths.count) unresolved in index")
+			if let path = gitConflictPath, state.unresolvedPaths.contains(path) {
+				gitConflictStateLabel?.stringValue = L10n.string("Ready to save and add")
+			} else {
+				gitConflictStateLabel?.stringValue = state.isComplete
+					? L10n.string("Resolved in index")
+					: L10n.string("\(state.unresolvedPaths.count) unresolved in index")
+			}
 		} catch {
 			gitConflictStateLabel?.textColor = .systemRed
 			gitConflictStateLabel?.stringValue = String(describing: error)
@@ -2563,7 +2585,15 @@ extension GitCoordinator: NSTextFieldDelegate, NSTextViewDelegate, NSTableViewDa
 	}
 
 	func textDidChange(_ notification: Notification) {
-		guard let textView = notification.object as? NSTextView, textView === gitBodyTextView else {
+		guard let textView = notification.object as? NSTextView else {
+			return
+		}
+		if textView === gitConflictMergedTextView {
+			refreshGitConflictRegions()
+			refreshGitConflictResolutionState()
+			return
+		}
+		guard textView === gitBodyTextView else {
 			return
 		}
 		clearGitCommitHistorySelection()

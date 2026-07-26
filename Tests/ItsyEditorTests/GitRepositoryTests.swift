@@ -1169,7 +1169,9 @@ import Testing
 	try fixture.write("file.txt", "manual edit\n")
 	try repository.restoreConflictMarkers(path: "file.txt")
 	let restored = try String(contentsOf: fixture.root.appendingPathComponent("file.txt"), encoding: .utf8)
-	let resolved = GitConflictParser.resolvedText(restored, regionIndex: 0, resolution: .both)
+	var resolutionDocument = GitConflictResolutionDocument(text: restored)
+	resolutionDocument.resolve(regionIndex: 0, with: .both)
+	let resolved = try resolutionDocument.textForStaging()
 	try fixture.write("file.txt", resolved)
 	try repository.stage(paths: ["file.txt"])
 

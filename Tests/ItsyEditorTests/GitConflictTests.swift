@@ -70,3 +70,39 @@ import Testing
 	two
 	""")
 }
+
+@Test func gitConflictResolutionDocumentRequiresMarkerFreeTextBeforeStaging() throws {
+	var document = GitConflictResolutionDocument(text: """
+	one
+	<<<<<<< ours
+	ours
+	=======
+	theirs
+	>>>>>>> theirs
+	two
+	""")
+
+	#expect(document.hasUnresolvedMarkers)
+	#expect(document.regions.count == 1)
+	#expect(throws: GitConflictResolutionDocumentError.unresolvedMarkers) {
+		try document.textForStaging()
+	}
+	document.resolve(regionIndex: 0, with: .both)
+	#expect(!document.hasUnresolvedMarkers)
+	#expect(try document.textForStaging() == """
+	one
+	ours
+	theirs
+	two
+	""")
+}
+
+@Test func gitConflictResolutionDocumentRejectsMalformedMarkersBeforeStaging() {
+	let document = GitConflictResolutionDocument(text: "<<<<<<< ours\nmanual edit\n")
+
+	#expect(document.regions.isEmpty)
+	#expect(document.hasUnresolvedMarkers)
+	#expect(throws: GitConflictResolutionDocumentError.unresolvedMarkers) {
+		try document.textForStaging()
+	}
+}

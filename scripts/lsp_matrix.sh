@@ -117,7 +117,7 @@ failed=0
 for language in "${selected[@]}"; do
 	probe="$(server_probe "$language")"
 	log_path="$artifacts_dir/$language.log"
-	if (cd "$repo_dir" && ITSY_LSP_MATRIX_LANGUAGES="$language" swift test --filter canonicalInventoryLSPProtocolMatrix --jobs 1) >"$log_path" 2>&1; then
+	if (cd "$repo_dir" && ITSY_LSP_MATRIX_LANGUAGES="$language" swift test --filter 'canonicalInventoryLSPProtocolMatrix|supportedLanguagesRunProcessBackedLSPFixtureMatrix' --jobs 1) >"$log_path" 2>&1; then
 		status=passed
 	else
 		status=failed

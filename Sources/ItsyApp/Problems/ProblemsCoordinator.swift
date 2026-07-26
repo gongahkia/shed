@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ItsyEditor
+import ItsyWorkbenchLayout
 
 @MainActor enum ItsyProblemsBridge {
 	static var publishDiagnostics: ((WorkspaceProblemSnapshot, String) -> Void)?
@@ -17,7 +18,8 @@ import ItsyEditor
 
 @MainActor final class ProblemsCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let documentController: ItsyDocumentController
-	private var problemsPanel: NSPanel?
+	private var problemsSurface: WorkbenchPanelSurface?
+	private var problemsPanel: NSPanel? { problemsSurface?.panel }
 	private var problemsStatusLabel: NSTextField?
 	private var problemsTableView: NSTableView?
 	private var workspaceProblems: [WorkspaceProblem] = []
@@ -81,7 +83,7 @@ import ItsyEditor
 	}
 
 	private func toggleProblems(relativeTo hostWindow: NSWindow?) {
-		if problemsPanel?.isVisible == true {
+		if problemsSurface?.isVisible == true {
 			closeProblems()
 			return
 		}
@@ -89,13 +91,13 @@ import ItsyEditor
 	}
 
 	private func closeProblems() {
-		problemsPanel?.close()
+		problemsSurface?.close()
 	}
 
 	private func showProblems(relativeTo hostWindow: NSWindow?) {
-		let panel = makeProblemsPanelIfNeeded()
-		centerProblemsPanel(panel, relativeTo: hostWindow)
-		panel.makeKeyAndOrderFront(nil)
+		let surface = makeProblemsSurfaceIfNeeded()
+		centerProblemsPanel(surface.panel, relativeTo: hostWindow)
+		surface.show()
 		problemsTableView?.reloadData()
 		if !workspaceProblems.isEmpty, problemsTableView?.selectedRow ?? -1 < 0 {
 			problemsTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -103,23 +105,14 @@ import ItsyEditor
 		refreshProblemsStatus()
 	}
 
-	private func makeProblemsPanelIfNeeded() -> NSPanel {
-		if let panel = problemsPanel {
-			return panel
+	private func makeProblemsSurfaceIfNeeded() -> WorkbenchPanelSurface {
+		if let surface = problemsSurface {
+			return surface
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 720, height: 420),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Problems")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
-		panel.contentView = contentView
-		configureProblemsView(contentView)
-		problemsPanel = panel
-		return panel
+		let surface = WorkbenchPanelSurface(id: .problems, title: L10n.string("Problems"), size: NSSize(width: 720, height: 420))
+		configureProblemsView(surface.contentView)
+		problemsSurface = surface
+		return surface
 	}
 
 	private func configureProblemsView(_ contentView: NSView) {

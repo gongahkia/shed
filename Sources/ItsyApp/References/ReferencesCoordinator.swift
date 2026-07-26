@@ -1,5 +1,6 @@
 import AppKit
 import ItsyLSP
+import ItsyWorkbenchLayout
 
 struct LSPReferenceEntry: Equatable {
 	let url: URL
@@ -71,7 +72,8 @@ struct LSPReferencesSnapshot: Equatable {
 		case reference(LSPReferenceEntry)
 	}
 
-	private let panel: NSPanel
+	private let surface: WorkbenchPanelSurface
+	private var panel: NSPanel { surface.panel }
 	private let modeControl = NSSegmentedControl(labels: [L10n.string("References"), L10n.string("Call Hierarchy")], trackingMode: .selectOne, target: nil, action: nil)
 	private let statusLabel = NSTextField(labelWithString: "")
 	private let tableView = NSTableView()
@@ -80,14 +82,9 @@ struct LSPReferencesSnapshot: Equatable {
 	private var openReference: ((LSPReferenceEntry) -> Void)?
 
 	override init() {
-		panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 760, height: 420),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
+		surface = WorkbenchPanelSurface(id: .references, title: L10n.string("References"), size: NSSize(width: 760, height: 420))
 		super.init()
-		configurePanel()
+		configurePanel(surface.contentView)
 	}
 
 	func showLoading(relativeTo hostWindow: NSWindow?) {
@@ -198,11 +195,7 @@ struct LSPReferencesSnapshot: Equatable {
 		openReference?(entry)
 	}
 
-	private func configurePanel() {
-		panel.title = L10n.string("References")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
-		panel.contentView = contentView
+	private func configurePanel(_ contentView: NSView) {
 		modeControl.selectedSegment = 0
 		modeControl.setEnabled(false, forSegment: 0)
 		modeControl.setEnabled(false, forSegment: 1)
@@ -246,7 +239,7 @@ struct LSPReferencesSnapshot: Equatable {
 		let height = min(460, max(300, hostFrame.height - 120))
 		let frame = NSRect(x: hostFrame.midX - width / 2, y: hostFrame.midY - height / 2, width: width, height: height)
 		panel.setFrame(frame, display: true)
-		panel.makeKeyAndOrderFront(nil)
+		surface.show()
 	}
 
 	private static func rows(for entries: [LSPReferenceEntry]) -> [Row] {

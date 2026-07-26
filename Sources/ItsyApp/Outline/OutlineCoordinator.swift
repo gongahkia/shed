@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import ItsyEditor
+import ItsyWorkbenchLayout
 
 private final class OutlineKindNode: NSObject {
 	let kind: WorkspaceSymbolKind
@@ -56,7 +57,8 @@ private enum OutlineCollapseStore {
 	private let documentController: ItsyDocumentController
 	private let activeDocumentProvider: () -> NSDocument?
 	private let fileSymbolProvider: @MainActor () async throws -> [WorkspaceSymbol]?
-	private var outlinePanel: NSPanel?
+	private var outlineSurface: WorkbenchPanelSurface?
+	private var outlinePanel: NSPanel? { outlineSurface?.panel }
 	private var outlineStatusLabel: NSTextField?
 	private var outlineOutlineView: NSOutlineView?
 	private var outlineKindNodes: [OutlineKindNode] = []
@@ -82,7 +84,7 @@ private enum OutlineCollapseStore {
 	}
 
 	private func toggleOutline(relativeTo hostWindow: NSWindow?) {
-		if outlinePanel?.isVisible == true {
+		if outlineSurface?.isVisible == true {
 			closeOutline()
 			return
 		}
@@ -90,34 +92,25 @@ private enum OutlineCollapseStore {
 	}
 
 	private func closeOutline() {
-		outlinePanel?.close()
+		outlineSurface?.close()
 	}
 
 	private func showOutline(relativeTo hostWindow: NSWindow?) {
-		let panel = makeOutlinePanelIfNeeded()
-		centerOutlinePanel(panel, relativeTo: hostWindow)
-		panel.makeKeyAndOrderFront(nil)
+		let surface = makeOutlineSurfaceIfNeeded()
+		centerOutlinePanel(surface.panel, relativeTo: hostWindow)
+		surface.show()
 		installOutlineWindowObserverIfNeeded()
 		refreshOutline()
 	}
 
-	private func makeOutlinePanelIfNeeded() -> NSPanel {
-		if let panel = outlinePanel {
-			return panel
+	private func makeOutlineSurfaceIfNeeded() -> WorkbenchPanelSurface {
+		if let surface = outlineSurface {
+			return surface
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 320, height: 460),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Outline")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
-		panel.contentView = contentView
-		configureOutlineView(contentView)
-		outlinePanel = panel
-		return panel
+		let surface = WorkbenchPanelSurface(id: .outline, title: L10n.string("Outline"), size: NSSize(width: 320, height: 460))
+		configureOutlineView(surface.contentView)
+		outlineSurface = surface
+		return surface
 	}
 
 	private func configureOutlineView(_ contentView: NSView) {

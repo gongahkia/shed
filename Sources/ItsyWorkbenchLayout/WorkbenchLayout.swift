@@ -6,6 +6,11 @@ public enum WorkbenchComponentID: String, CaseIterable, Codable, Equatable, Hash
 	case terminal
 	case git
 	case debugger
+	case problems
+	case outline
+	case references
+	case tasks
+	case undoTree = "undo_tree"
 	case tabBar = "tab_bar"
 	case statusBar = "status_bar"
 }
@@ -35,6 +40,7 @@ public enum WorkbenchComponentPlacement: String, CaseIterable, Codable, Equatabl
 	case bottomPanel
 	case secondarySidebar
 	case editorChrome
+	case utilityPanel
 }
 
 public struct WorkbenchComponentDescriptor: Equatable, Sendable {
@@ -97,6 +103,11 @@ public enum WorkbenchComponents {
 		.init(id: .terminal, displayName: "Terminal", placement: .bottomPanel, minimumWidth: 320, minimumHeight: 140),
 		.init(id: .git, displayName: "Git", placement: .secondarySidebar, minimumWidth: 320, collapsesBefore: [.editor]),
 		.init(id: .debugger, displayName: "Debugger", placement: .secondarySidebar, minimumWidth: 320, collapsesBefore: [.editor]),
+		.init(id: .problems, displayName: "Problems", placement: .utilityPanel, minimumWidth: 560, minimumHeight: 300),
+		.init(id: .outline, displayName: "Outline", placement: .utilityPanel, minimumWidth: 320, minimumHeight: 360),
+		.init(id: .references, displayName: "References", placement: .utilityPanel, minimumWidth: 560, minimumHeight: 300),
+		.init(id: .tasks, displayName: "Tasks", placement: .utilityPanel, minimumWidth: 560, minimumHeight: 360),
+		.init(id: .undoTree, displayName: "Undo Tree", placement: .utilityPanel, minimumWidth: 360, minimumHeight: 240),
 		.init(id: .tabBar, displayName: "Tabs", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
 		.init(id: .statusBar, displayName: "Status Bar", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
 	])

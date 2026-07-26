@@ -28,9 +28,26 @@ import AppKit
 	])
 
 	#expect(session.currentRanges() == [6 ..< 11])
-	#expect(session.move(direction: 1, currentSelectionRanges: [6 ..< 9]) == [13 ..< 18])
-	#expect(session.move(direction: 1, currentSelectionRanges: [13 ..< 16]) == [20 ..< 20])
-	#expect(session.move(direction: -1, currentSelectionRanges: [20 ..< 20]) == [13 ..< 16])
+	#expect(session.move(direction: 1, currentSelectionRanges: [6 ..< 9]) == .ranges([13 ..< 18]))
+	#expect(session.move(direction: 1, currentSelectionRanges: [13 ..< 16]) == .ranges([20 ..< 20]))
+	#expect(session.move(direction: -1, currentSelectionRanges: [20 ..< 20]) == .ranges([13 ..< 16]))
+}
+
+@Test func snippetTabStopSessionTracksEveryLinkedPlaceholderEdit() {
+	var session = SnippetTabStopSession(tabStopRanges: [
+		1: [0 ..< 1, 2 ..< 3],
+		2: [4 ..< 5],
+		0: [6 ..< 6],
+	])
+
+	#expect(session.move(direction: 1, currentSelectionRanges: [0 ..< 2, 3 ..< 5]) == .ranges([6 ..< 7]))
+	#expect(session.move(direction: 1, currentSelectionRanges: [6 ..< 7]) == .ranges([8 ..< 8]))
+	#expect(session.move(direction: 1, currentSelectionRanges: [8 ..< 8]) == .finished)
+}
+
+@Test func snippetTabStopSessionAbandonsUnexpectedAdditionalCursors() {
+	var session = SnippetTabStopSession(tabStopRanges: [1: [0 ..< 1], 0: [2 ..< 2]])
+	#expect(session.move(direction: 1, currentSelectionRanges: [0 ..< 1, 2 ..< 3]) == .abandoned)
 }
 
 @MainActor

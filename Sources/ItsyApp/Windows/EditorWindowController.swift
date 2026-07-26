@@ -4018,14 +4018,20 @@ extension Notification.Name {
 		}
 		let selectionRanges = [targetView.editor.selections.primary.range] + targetView.editor.selections.secondaries
 			.map(\.range)
-		guard let ranges = session.move(direction: direction, currentSelectionRanges: selectionRanges) else {
+		switch session.move(direction: direction, currentSelectionRanges: selectionRanges) {
+		case .ranges(let ranges):
+			targetView.selectUTF8Ranges(ranges)
+			snippetTabStopSession = session
+			return true
+		case .finished:
+			snippetTabStopSession = nil
+			snippetTabStopView = nil
+			return true
+		case .abandoned:
 			snippetTabStopSession = nil
 			snippetTabStopView = nil
 			return false
 		}
-		targetView.selectUTF8Ranges(ranges)
-		snippetTabStopSession = session
-		return true
 	}
 
 	private func scheduleHover(_ candidate: TextHoverCandidate?, in targetView: MetalTextView?) {

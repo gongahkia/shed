@@ -515,5 +515,8 @@ private final class TabsSnapshotView: NSView {
 	if let compactMode {
 		coordinator.selectGitCompactPaneForTesting(compactMode)
 	}
-	return windowedSnapshotSubject(view: contentView, size: NSSize(width: width, height: 560), retained: [documentController, coordinator])
+	let subject = windowedSnapshotSubject(view: contentView, size: NSSize(width: width, height: 560), retained: [documentController, coordinator])
+	_ = coordinator.makeGitContentViewForTesting(width: width)
+	subject.view.layoutSubtreeIfNeeded()
+	return subject
 }

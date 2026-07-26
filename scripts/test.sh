@@ -9,7 +9,7 @@ coverage_dir="${ITSY_TEST_COVERAGE_DIR:-}"
 parallel_width="${SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH:-1}"
 
 bash "$script_dir/lint_feature_boundaries.sh"
-bash "$script_dir/test_config_cli_json.sh"
+bash "$script_dir/test_settings_json_regression.sh"
 
 if [[ -n "$report_path" ]]; then
 	mkdir -p "$(dirname "$report_path")"

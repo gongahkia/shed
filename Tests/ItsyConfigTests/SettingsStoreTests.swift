@@ -2,6 +2,12 @@ import Foundation
 @testable import ItsyConfig
 import Testing
 
+private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
+	let encoder = JSONEncoder()
+	encoder.keyEncodingStrategy = .convertToSnakeCase
+	return try encoder.encode(ItsySettingsJSONDocument(settings: settings))
+}
+
 @Test func settingsJSONCodecRoundTripsNormalizedSettings() throws {
 	var settings = ItsySettings.default
 	settings.editor.font = "JetBrains Mono"
@@ -24,6 +30,15 @@ import Testing
 		"settings": settings,
 	])
 	#expect(throws: ItsySettingsJSONCodecError.unsupportedSchemaVersion(ItsySettingsSchema.currentVersion + 1)) {
+		try ItsySettingsJSONCodec.decode(data)
+	}
+}
+
+@Test func settingsJSONCodecRejectsValuesThatRequireNormalization() throws {
+	var settings = ItsySettings.default.normalized()
+	settings.editor.fontSize = 99
+	let data = try encodeRawJSONSettings(settings)
+	#expect(throws: ItsySettingsJSONCodecError.invalidSettings) {
 		try ItsySettingsJSONCodec.decode(data)
 	}
 }
@@ -402,7 +417,55 @@ import Testing
 	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
 	#expect(loaded.loadedFromFile)
 	#expect(loaded.settings == fallback)
-	#expect(loaded.warnings.first?.message.contains("failed to read \(url.path)") == true)
+	#expect(loaded.warnings.first?.source == url.path)
+	#expect(loaded.warnings.first?.expected == "valid JSON settings document")
+	#expect(loaded.warnings.first?.retainedFallback == true)
+	#expect(loaded.warnings.first?.message.hasPrefix("invalid JSON settings document") == true)
+}
+
+@Test func settingsStoreReportsInvalidJSONValuesWithFallback() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-json-range-\(UUID().uuidString)",
+		isDirectory: true
+	)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	let url = directory.appendingPathComponent("settings.json")
+	var invalidSettings = ItsySettings.default.normalized()
+	invalidSettings.editor.fontSize = 99
+	try encodeRawJSONSettings(invalidSettings).write(to: url)
+	let fallback = ItsySettings(editor: .init(font: "Monaco", fontSize: 15))
+	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
+	#expect(loaded.loadedFromFile)
+	#expect(loaded.settings == fallback)
+	#expect(loaded.warnings.first?.key == "settings")
+	#expect(loaded.warnings.first?.source == url.path)
+	#expect(loaded.warnings.first?.expected == "values within supported ranges")
+	#expect(loaded.warnings.first?.retainedFallback == true)
+}
+
+@Test func settingsStoreReportsUnsupportedJSONSchemaWithFallback() throws {
+	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+		"itsy-settings-json-schema-\(UUID().uuidString)",
+		isDirectory: true
+	)
+	defer { try? FileManager.default.removeItem(at: directory) }
+	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+	let url = directory.appendingPathComponent("settings.json")
+	let encoder = JSONEncoder()
+	encoder.keyEncodingStrategy = .convertToSnakeCase
+	let data = try encoder.encode(ItsySettingsJSONDocument(
+		schemaVersion: ItsySettingsSchema.currentVersion + 1,
+		settings: .default.normalized()
+	))
+	try data.write(to: url)
+	let fallback = ItsySettings(editor: .init(font: "Monaco"))
+	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
+	#expect(loaded.settings == fallback)
+	#expect(loaded.warnings.first?.key == "schema_version")
+	#expect(loaded.warnings.first?.source == url.path)
+	#expect(loaded.warnings.first?.expected == "version == \(ItsySettingsSchema.currentVersion)")
+	#expect(loaded.warnings.first?.retainedFallback == true)
 }
 
 @Test func terminalFontInheritsEditorFontUnlessOverridden() {

@@ -12,6 +12,7 @@ public struct ItsySettingsJSONDocument: Codable, Equatable, Sendable {
 
 public enum ItsySettingsJSONCodecError: Error, Equatable, Sendable {
 	case unsupportedSchemaVersion(Int)
+	case invalidSettings
 }
 
 public enum ItsySettingsJSONCodec {
@@ -29,6 +30,9 @@ public enum ItsySettingsJSONCodec {
 		guard document.schemaVersion == ItsySettingsSchema.currentVersion else {
 			throw ItsySettingsJSONCodecError.unsupportedSchemaVersion(document.schemaVersion)
 		}
-		return document.settings.normalized()
+		guard document.settings == document.settings.normalized() else {
+			throw ItsySettingsJSONCodecError.invalidSettings
+		}
+		return document.settings
 	}
 }

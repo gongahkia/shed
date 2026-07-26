@@ -441,29 +441,37 @@ public struct GitWorktree: Equatable, Sendable {
 
 public struct GitStashEntry: Equatable, Sendable {
 	public var ref: String
+	public var objectID: String
 	public var date: String
 	public var message: String
 
-	public init(ref: String, date: String, message: String) {
+	public init(ref: String, objectID: String, date: String, message: String) {
 		self.ref = ref
+		self.objectID = objectID
 		self.date = date
 		self.message = message
+	}
+
+	public init(ref: String, date: String, message: String) {
+		self.init(ref: ref, objectID: "", date: date, message: message)
 	}
 }
 
 public enum GitStashError: Error, Equatable, Sendable {
 	case emptyMessage
 	case emptyRef
+	case noStashes
+	case staleEntry
 }
 
 public enum GitStashParser {
 	public static func parse(_ output: String) -> [GitStashEntry] {
 		output.split(whereSeparator: \.isNewline).compactMap { rawLine in
-			let fields = rawLine.split(separator: "|", maxSplits: 2, omittingEmptySubsequences: false).map(String.init)
-			guard fields.count == 3, !fields[0].isEmpty else {
+			let fields = rawLine.split(separator: "|", maxSplits: 3, omittingEmptySubsequences: false).map(String.init)
+			guard fields.count == 4, !fields[0].isEmpty, !fields[1].isEmpty else {
 				return nil
 			}
-			return GitStashEntry(ref: fields[0], date: fields[1], message: fields[2])
+			return GitStashEntry(ref: fields[0], objectID: fields[1], date: fields[2], message: fields[3])
 		}
 	}
 }
@@ -912,7 +920,7 @@ public struct GitRepository: Sendable {
 	}
 
 	public func stashes() throws -> [GitStashEntry] {
-		let output = try runner.runGit(arguments: ["stash", "list", "--format=%gd|%ai|%s"], root: root)
+		let output = try runner.runGit(arguments: ["stash", "list", "--format=%gd|%H|%ai|%s"], root: root)
 		return GitStashParser.parse(output)
 	}
 
@@ -929,6 +937,11 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["stash", "apply", ref], root: root)
 	}
 
+	public func applyStash(_ entry: GitStashEntry) throws {
+		let ref = try validatedStashEntry(entry)
+		_ = try runner.runGit(arguments: ["stash", "apply", ref], root: root)
+	}
+
 	public func popStash() throws {
 		_ = try runner.runGit(arguments: ["stash", "pop"], root: root)
 	}
@@ -938,13 +951,28 @@ public struct GitRepository: Sendable {
 		_ = try runner.runGit(arguments: ["stash", "pop", ref], root: root)
 	}
 
+	public func popStash(_ entry: GitStashEntry) throws {
+		let ref = try validatedStashEntry(entry)
+		_ = try runner.runGit(arguments: ["stash", "pop", ref], root: root)
+	}
+
 	public func dropStash(_ ref: String) throws {
 		let ref = try validatedStashRef(ref)
 		_ = try runner.runGit(arguments: ["stash", "drop", ref], root: root)
 	}
 
+	public func dropStash(_ entry: GitStashEntry) throws {
+		let ref = try validatedStashEntry(entry)
+		_ = try runner.runGit(arguments: ["stash", "drop", ref], root: root)
+	}
+
 	public func stashDiff(_ ref: String) throws -> String {
 		let ref = try validatedStashRef(ref)
+		return try runner.runGit(arguments: ["stash", "show", "--patch", ref], root: root)
+	}
+
+	public func stashDiff(_ entry: GitStashEntry) throws -> String {
+		let ref = try validatedStashEntry(entry)
 		return try runner.runGit(arguments: ["stash", "show", "--patch", ref], root: root)
 	}
 
@@ -1051,6 +1079,16 @@ public struct GitRepository: Sendable {
 		return ref
 	}
 
+	private func validatedStashEntry(_ entry: GitStashEntry) throws -> String {
+		let ref = try validatedStashRef(entry.ref)
+		guard !entry.objectID.isEmpty,
+			try stashes().contains(where: { $0.ref == ref && $0.objectID == entry.objectID })
+		else {
+			throw GitStashError.staleEntry
+		}
+		return ref
+	}
+
 	private func rejectCheckedOutWorktree(branch: String) throws {
 		guard runner is ProcessGitCommandRunner else {
 			return
@@ -1072,7 +1110,7 @@ public struct GitRepository: Sendable {
 				throw error
 			}
 			do {
-				try popStash(stash.ref)
+				try popStash(stash)
 			} catch {
 				throw GitBranchError.checkoutAndStashRestoreFailed(String(describing: error))
 			}
@@ -1082,7 +1120,7 @@ public struct GitRepository: Sendable {
 			return
 		}
 		do {
-			try popStash(stash.ref)
+			try popStash(stash)
 		} catch {
 			throw GitBranchError.stashRestoreFailed(String(describing: error))
 		}

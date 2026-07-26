@@ -55,3 +55,24 @@ import Testing
 		#expect(pane.editorView.cursorStyle == .bar)
 	}
 }
+
+@MainActor @Test func editorPaneLifecycleRespectsModalCursorProfilesAndOverrides() {
+	var settings = ItsySettings.EditorSettings()
+	let pane = EditorPane()
+	let lifecycle = EditorPaneLifecycleController()
+
+	settings.keymap = .emacs
+	settings.cursorStyle = .automatic
+	lifecycle.applyEditorSettings(settings, to: [pane])
+	#expect(pane.editorView.cursorStyle == .block)
+
+	settings.keymap = .vim
+	settings.cursorStyle = .bar
+	lifecycle.applyEditorSettings(settings, to: [pane])
+	#expect(pane.editorView.cursorStyle == .bar)
+
+	settings.keymap = .plain
+	settings.cursorStyle = .block
+	lifecycle.applyEditorSettings(settings, to: [pane])
+	#expect(pane.editorView.cursorStyle == .block)
+}

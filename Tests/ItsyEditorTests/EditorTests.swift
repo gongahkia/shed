@@ -160,6 +160,40 @@ import Testing
 	#expect(editorTextStorageString(editor) == "ell")
 }
 
+@Test func editorTextMutationsCommitOneTransactionAndUndoEntry() throws {
+	var editor = Editor(text: "alpha beta", storage: .pieceTree)
+	let selectionBefore = SelectionSet(
+		primary: Selection(anchor: 0, head: 5),
+		secondaries: [Selection(anchor: 6, head: 10)]
+	)
+	editor.setSelection(selectionBefore)
+	let mutation = editor.insert("x")
+	let transaction = try #require(mutation)
+
+	#expect(editorTextStorageString(editor) == "x x")
+	#expect(transaction.edits == editor.lastEditBatch)
+	#expect(transaction.selectionBefore == selectionBefore)
+	#expect(transaction.selectionAfter == editor.selections)
+	#expect(editor.history.edits.count == 1)
+	editor.undo()
+	#expect(editorTextStorageString(editor) == "alpha beta")
+}
+
+@Test func editorNoOpTextMutationDoesNotCommitTransaction() {
+	var editor = Editor(text: "", storage: .pieceTree)
+	let backwardDelete = editor.deleteBackward()
+	#expect(backwardDelete == nil)
+	#expect(editorTextStorageString(editor) == "")
+	#expect(editor.lastEditBatch.isEmpty)
+	#expect(editor.history.edits.isEmpty)
+
+	let emptyInsert = editor.insert("")
+	#expect(emptyInsert == nil)
+	#expect(editorTextStorageString(editor) == "")
+	#expect(editor.lastEditBatch.isEmpty)
+	#expect(editor.history.edits.isEmpty)
+}
+
 @Test func editorPieceTreeDeletesWholeGraphemeClusters() {
 	let text = "a👩‍💻b"
 	var backward = Editor(text: text, storage: .pieceTree)

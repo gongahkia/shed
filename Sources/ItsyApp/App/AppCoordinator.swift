@@ -697,6 +697,7 @@ import ItsyKeymap
 	}
 
 	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
+		EditorWindowController.reloadLSPConfiguration(settings: settings)
 		AppTheme.update(settings: settings)
 		ItsyUIConfiguration.update(settings.ui)
 		commandPaletteCoordinator.applyUISettings()

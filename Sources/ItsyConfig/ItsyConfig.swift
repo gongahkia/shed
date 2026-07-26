@@ -8,7 +8,7 @@ public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 11
+	public static let currentVersion = 12
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -390,6 +390,27 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
+	public enum LSPMode: String, CaseIterable, Equatable, Sendable {
+		case automatic = "auto"
+		case system
+		case managed
+		case disabled
+	}
+
+	public struct LSPSettings: Equatable, Sendable {
+		public var catalogAutomaticallyCheck: Bool
+		public var modes: [String: LSPMode]
+
+		public init(catalogAutomaticallyCheck: Bool = false, modes: [String: LSPMode] = [:]) {
+			self.catalogAutomaticallyCheck = catalogAutomaticallyCheck
+			self.modes = modes
+		}
+
+		public func mode(for languageID: String) -> LSPMode {
+			modes[languageID] ?? modes[languageID.lowercased()] ?? .automatic
+		}
+	}
+
 	public struct LayoutSettings: Equatable, Sendable {
 		public static let defaultSidebarWidth = 240
 		public static let minSidebarWidth = 160
@@ -433,6 +454,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var find: FindSettings
 	public var recovery: RecoverySettings
 	public var updates: UpdateSettings
+	public var lsp: LSPSettings
 	public var workbench: WorkbenchLayoutConfiguration
 	public var layout: LayoutSettings
 	public var ui: UISettings
@@ -447,6 +469,7 @@ public struct ItsySettings: Equatable, Sendable {
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
 		updates: UpdateSettings = UpdateSettings(),
+		lsp: LSPSettings = LSPSettings(),
 		workbench: WorkbenchLayoutConfiguration = WorkbenchProfileBuilder.workbench(),
 		layout: LayoutSettings = LayoutSettings(),
 		ui: UISettings = UISettings()
@@ -460,6 +483,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.find = find
 		self.recovery = recovery
 		self.updates = updates
+		self.lsp = lsp
 		self.workbench = workbench
 		self.layout = layout
 		self.ui = ui
@@ -517,6 +541,11 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 		if copy.terminal.font?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == true {
 			copy.terminal.font = nil
+		}
+		copy.lsp.modes = copy.lsp.modes.reduce(into: [:]) { result, entry in
+			let languageID = entry.key.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+			guard !languageID.isEmpty else { return }
+			result[languageID] = entry.value
 		}
 		copy.terminal.fontSize = Self.clamp(
 			copy.terminal.fontSize,
@@ -739,10 +768,13 @@ public final class ItsySettingsStore {
 			fileManager: fileManager
 		)
 		var workspace = workspaceStore.load(fallback: global.settings)
-		let workspacePersonalKeys = workspace.assignedKeys.filter { $0.hasPrefix("ui.") || $0.hasPrefix("updates.") }
+		let workspacePersonalKeys = workspace.assignedKeys.filter {
+			$0.hasPrefix("ui.") || $0.hasPrefix("updates.") || $0.hasPrefix("lsp.")
+		}
 		if !workspacePersonalKeys.isEmpty {
 			workspace.settings.ui = global.settings.ui
 			workspace.settings.updates = global.settings.updates
+			workspace.settings.lsp = global.settings.lsp
 			workspace.assignedKeys.subtract(workspacePersonalKeys)
 			workspace.warnings += workspacePersonalKeys.sorted().map {
 				ItsySettingsWarning(
@@ -774,10 +806,13 @@ public final class ItsySettingsStore {
 				fileManager: fileManager
 			)
 			var loadedWorkspace = workspaceStore.load(fallback: global.settings)
-			let workspacePersonalKeys = loadedWorkspace.assignedKeys.filter { $0.hasPrefix("ui.") || $0.hasPrefix("updates.") }
+			let workspacePersonalKeys = loadedWorkspace.assignedKeys.filter {
+				$0.hasPrefix("ui.") || $0.hasPrefix("updates.") || $0.hasPrefix("lsp.")
+			}
 			if !workspacePersonalKeys.isEmpty {
 				loadedWorkspace.settings.ui = global.settings.ui
 				loadedWorkspace.settings.updates = global.settings.updates
+				loadedWorkspace.settings.lsp = global.settings.lsp
 				loadedWorkspace.assignedKeys.subtract(workspacePersonalKeys)
 			}
 			workspace = loadedWorkspace
@@ -856,6 +891,9 @@ public final class ItsySettingsStore {
 		[updates]
 		automatically_check = \(settings.updates.automaticallyCheck ? "true" : "false")
 
+		[lsp]
+		catalog_automatically_check = \(settings.lsp.catalogAutomaticallyCheck ? "true" : "false")
+
 		[workbench]
 		profile = "\(settings.workbench.profile.rawValue)"
 		file_tree = "\(settings.workbench.fileTree.rawValue)"
@@ -877,7 +915,7 @@ public final class ItsySettingsStore {
 		border_width = \(format(settings.ui.borderWidth))
 		padding = \(format(settings.ui.padding))
 		notification_position = "\(settings.ui.notificationPosition.rawValue)"
-		""" + serializeLanguageSettings(settings.editor.language) + serializeUISurfaces(settings.ui.surfaces)
+		""" + serializeLSPModes(settings.lsp.modes) + serializeLanguageSettings(settings.editor.language) + serializeUISurfaces(settings.ui.surfaces)
 	}
 
 	private static func format(_ value: Double) -> String {
@@ -939,6 +977,14 @@ public final class ItsySettingsStore {
 				lines.append("multiple_selections = \(multipleSelections ? "true" : "false")")
 			}
 			return lines.joined(separator: "\n")
+		}.joined(separator: "\n") + "\n"
+	}
+
+	private static func serializeLSPModes(_ modes: [String: ItsySettings.LSPMode]) -> String {
+		guard !modes.isEmpty else { return "" }
+		return modes.keys.sorted().compactMap { languageID in
+			guard let mode = modes[languageID] else { return nil }
+			return "\n[lsp.\(languageID)]\nmode = \"\(mode.rawValue)\""
 		}.joined(separator: "\n") + "\n"
 	}
 
@@ -1027,6 +1073,7 @@ public enum ItsySettingsResolver {
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
 		case "recovery.journal_enabled": target.recovery.journalEnabled = source.recovery.journalEnabled
 		case "updates.automatically_check": target.updates.automaticallyCheck = source.updates.automaticallyCheck
+		case "lsp.catalog_automatically_check": target.lsp.catalogAutomaticallyCheck = source.lsp.catalogAutomaticallyCheck
 		case "workbench.profile": target.workbench.profile = source.workbench.profile
 		case "workbench.file_tree": target.workbench.fileTree = source.workbench.fileTree
 		case "workbench.terminal": target.workbench.terminal = source.workbench.terminal
@@ -1043,8 +1090,24 @@ public enum ItsySettingsResolver {
 		case "ui.border_width": target.ui.borderWidth = source.ui.borderWidth
 		case "ui.padding": target.ui.padding = source.ui.padding
 		case "ui.notification_position": target.ui.notificationPosition = source.ui.notificationPosition
-		default: applyLanguage(key: key, from: source, to: &target)
+		default:
+			if !applyLSP(key: key, from: source, to: &target) {
+				applyLanguage(key: key, from: source, to: &target)
+			}
 		}
+	}
+
+	private static func applyLSP(key: String, from source: ItsySettings, to target: inout ItsySettings) -> Bool {
+		let prefix = "lsp."
+		guard key.hasPrefix(prefix), key != "lsp.catalog_automatically_check" else { return false }
+		let suffix = key.dropFirst(prefix.count)
+		guard let dot = suffix.firstIndex(of: "."), String(suffix[suffix.index(after: dot)...]) == "mode" else {
+			return false
+		}
+		let languageID = String(suffix[..<dot]).lowercased()
+		guard let mode = source.lsp.modes[languageID] else { return false }
+		target.lsp.modes[languageID] = mode
+		return true
 	}
 
 	private static func applyLanguage(key: String, from source: ItsySettings, to target: inout ItsySettings) {
@@ -1198,9 +1261,9 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "debugger", "find", "recovery", "updates", "workbench", "layout", "ui"]
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "debugger", "find", "recovery", "updates", "lsp", "workbench", "layout", "ui"]
 					.contains(section),
-					!section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
+					!section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface."), !section.hasPrefix("lsp.")
 				{
 					warnings.append(ItsySettingsWarning(line: lineNumber, message: "unknown section [\(section)]"))
 				}
@@ -1269,6 +1332,9 @@ struct ItsySettingsParser {
 	}
 
 	private mutating func assign(_ value: ItsySettingsValue, key: String, line: Int) {
+		if assignLSP(value, key: key, line: line) {
+			return
+		}
 		if assignLanguageEditor(value, key: key, line: line) {
 			return
 		}
@@ -1524,6 +1590,12 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "lsp.catalog_automatically_check":
+			if case let .bool(automaticallyCheck) = value {
+				settings.lsp.catalogAutomaticallyCheck = automaticallyCheck
+			} else {
+				warnType(key, line: line, expected: "bool")
+			}
 		case "workbench.profile":
 			if case let .string(profile) = value, let profile = WorkbenchProfile(rawValue: profile.lowercased()) {
 				settings.workbench.profile = profile
@@ -1654,6 +1726,32 @@ struct ItsySettingsParser {
 				message: "unknown setting \(key)"
 			))
 		}
+	}
+
+	private mutating func assignLSP(_ value: ItsySettingsValue, key: String, line: Int) -> Bool {
+		let prefix = "lsp."
+		guard key.hasPrefix(prefix), key != "lsp.catalog_automatically_check" else {
+			return false
+		}
+		let suffix = key.dropFirst(prefix.count)
+		guard let dot = suffix.firstIndex(of: ".") else {
+			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
+			return true
+		}
+		let languageID = String(suffix[..<dot]).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+		let property = String(suffix[suffix.index(after: dot)...])
+		guard !languageID.isEmpty else {
+			warnings.append(ItsySettingsWarning(line: line, key: key, source: source, retainedFallback: true, message: "unknown setting \(key)"))
+			return true
+		}
+		guard property == "mode", case let .string(rawMode) = value,
+		      let mode = ItsySettings.LSPMode(rawValue: rawMode.lowercased())
+		else {
+			warnType(key, line: line, expected: #""auto", "system", "managed", or "disabled""#)
+			return true
+		}
+		settings.lsp.modes[languageID] = mode
+		return true
 	}
 
 	private mutating func workbenchVisibility(

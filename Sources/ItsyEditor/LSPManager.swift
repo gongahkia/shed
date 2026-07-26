@@ -1,4 +1,5 @@
 import Foundation
+import ItsyConfig
 import ItsyLSP
 
 public struct LSPSessionKey: Hashable, Sendable {
@@ -27,6 +28,7 @@ public enum LSPManagerError: Error, Equatable, Sendable {
 	case missingBinary(LSPServerRegistry.MissingBinary)
 	case retryLimitExceeded
 	case serverDisabled(LSPSessionKey)
+	case languageDisabled(String)
 }
 
 public actor LSPManager {
@@ -39,6 +41,7 @@ public actor LSPManager {
 	public let maxSpawnsPerWindow: Int
 
 	private var registry: LSPServerRegistry
+	private var lspSettings: ItsySettings.LSPSettings
 	private let clientFactory: ClientFactory
 	private var clients: [LSPSessionKey: LSPProcessClient] = [:]
 	private var statuses: [LSPSessionKey: LSPSessionStatus] = [:]
@@ -48,11 +51,13 @@ public actor LSPManager {
 
 	public init(
 		registry: LSPServerRegistry = LSPServerRegistry(),
+		lspSettings: ItsySettings.LSPSettings = .init(),
 		retryWindow: TimeInterval = LSPManager.defaultRetryWindow,
 		maxSpawnsPerWindow: Int = LSPManager.defaultMaxSpawnsPerWindow,
 		clientFactory: @escaping ClientFactory = LSPManager.defaultClientFactory
 	) {
 		self.registry = registry
+		self.lspSettings = lspSettings
 		self.retryWindow = retryWindow
 		self.maxSpawnsPerWindow = maxSpawnsPerWindow
 		self.clientFactory = clientFactory
@@ -80,6 +85,7 @@ public actor LSPManager {
 	}
 
 	public func sessionKey(for url: URL) -> LSPSessionKey? {
+		guard mode(for: url) != .disabled else { return nil }
 		guard let config = registry.config(for: url) else {
 			return nil
 		}
@@ -99,14 +105,15 @@ public actor LSPManager {
 
 	public func missingBinary(for url: URL) -> LSPServerRegistry.MissingBinary? {
 		let registry = effectiveRegistry(for: url)
-		if let config = registry.resolvedConfig(for: url), Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
+		let mode = mode(for: url, registry: registry)
+		if let config = registry.resolvedConfig(for: url, mode: mode), Self.requiresNodeRuntime(config), NodeRuntimeDetector.resolve() == nil {
 			return LSPServerRegistry.MissingBinary(
 				languageID: config.languageId,
 				command: "node",
 				hint: "Install Node.js 20 or newer, then restart Itsy."
 			)
 		}
-		return registry.missingBinary(for: url)
+		return registry.missingBinary(for: url, mode: mode)
 	}
 
 	public func unsupportedLanguage(for url: URL) -> LSPServerRegistry.UnsupportedLanguage? {
@@ -119,8 +126,12 @@ public actor LSPManager {
 
 	public func ensureClient(for url: URL, now: Date = .init()) throws -> LSPProcessClient {
 		let effectiveRegistry = effectiveRegistry(for: url)
-		guard let config = effectiveRegistry.resolvedConfig(for: url) else {
-			if let missingBinary = effectiveRegistry.missingBinary(for: url) {
+		let mode = mode(for: url, registry: effectiveRegistry)
+		guard mode != .disabled else {
+			throw LSPManagerError.languageDisabled(effectiveRegistry.languageID(for: url) ?? url.pathExtension)
+		}
+		guard let config = effectiveRegistry.resolvedConfig(for: url, mode: mode) else {
+			if let missingBinary = effectiveRegistry.missingBinary(for: url, mode: mode) {
 				throw LSPManagerError.missingBinary(missingBinary)
 			}
 			if let unsupportedLanguage = effectiveRegistry.unsupportedLanguage(for: url) {
@@ -158,6 +169,9 @@ public actor LSPManager {
 
 	public func symbols(matching query: String, in url: URL) async throws -> [LSPWorkspaceSymbol] {
 		let effectiveRegistry = effectiveRegistry(for: url)
+		guard mode(for: url, registry: effectiveRegistry) != .disabled else {
+			throw LSPManagerError.languageDisabled(effectiveRegistry.languageID(for: url) ?? url.pathExtension)
+		}
 		guard effectiveRegistry.config(for: url) != nil else {
 			throw LSPManagerError.noConfigForDocument
 		}
@@ -220,6 +234,16 @@ public actor LSPManager {
 		synchronizedDocuments.removeAll()
 	}
 
+	public func replaceLSPSettings(_ settings: ItsySettings.LSPSettings) async {
+		guard lspSettings != settings else { return }
+		await shutdownAll()
+		lspSettings = settings
+		statuses.removeAll()
+		spawnTimestamps.removeAll()
+		disabledKeys.removeAll()
+		synchronizedDocuments.removeAll()
+	}
+
 	public func shutdownAll() async {
 		let keys = Array(clients.keys)
 		for key in keys {
@@ -261,6 +285,10 @@ public actor LSPManager {
 			return registry
 		}
 		return registry.merging(override)
+	}
+
+	private func mode(for url: URL, registry: LSPServerRegistry? = nil) -> ItsySettings.LSPMode {
+		(registry ?? self.registry).languageID(for: url).map(lspSettings.mode(for:)) ?? .automatic
 	}
 
 	private static func requiresNodeRuntime(_ config: LSPServerConfig) -> Bool {

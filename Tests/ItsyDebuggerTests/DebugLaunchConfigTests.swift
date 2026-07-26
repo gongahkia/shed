@@ -122,6 +122,54 @@ import Testing
 	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "Debug", field: "adapterOptions.program", reason: "must use a non-reserved adapter option key")) {
 		_ = try DebugLaunchConfigParser.parse(data: reservedOption)
 	}
+
+	let unknownField = Data(#"{"configurations":[{"name":"Debug","type":"lldb","request":"launch","program":"/usr/bin/true","unsupported":true}]}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidJSON) {
+		_ = try DebugLaunchConfigParser.parse(data: unknownField)
+	}
+	let unknownAdapterField = Data(#"{"adapters":[{"id":"lldb","command":"/usr/bin/lldb-dap","unsupported":true}]}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidJSON) {
+		_ = try DebugLaunchConfigParser.parse(data: unknownAdapterField)
+	}
+	let unknownTopLevelField = Data(#"{"unsupported":true}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidJSON) {
+		_ = try DebugLaunchConfigParser.parse(data: unknownTopLevelField)
+	}
+
+	let invalidExceptionFilter = Data(#"{"configurations":[{"name":"Debug","type":"lldb","request":"launch","program":"/usr/bin/true","exceptionFilters":[""]}]}"#.utf8)
+	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "Debug", field: "exceptionFilters", reason: "must be non-empty without control characters")) {
+		_ = try DebugLaunchConfigParser.parse(data: invalidExceptionFilter)
+	}
+}
+
+@Test func debugLaunchConfigStorePersistsValidatedUserAndWorkspaceConfigs() throws {
+	let fixture = try DebugLaunchConfigFixture()
+	defer { fixture.cleanup() }
+	let store = DebugLaunchConfigStore(userConfigURL: fixture.userConfigURL)
+	let user = DebugLaunchConfig(adapters: [DebugAdapterConfig(id: "lldb", command: "/usr/bin/lldb-dap")])
+	let workspace = DebugLaunchConfig(configurations: [DebugLaunchConfiguration(name: "Debug", type: "lldb", request: DebugLaunchRequest.launch, program: "/usr/bin/true")])
+
+	try store.saveUser(user)
+	try store.saveWorkspace(workspace, workspaceRoot: fixture.workspaceRoot)
+
+	#expect(try DebugLaunchConfigParser.parse(data: Data(contentsOf: fixture.userConfigURL)) == user)
+	#expect(try DebugLaunchConfigParser.parse(data: Data(contentsOf: store.workspaceConfigURL(for: fixture.workspaceRoot))) == workspace)
+	#expect(try DebugLaunchConfigLoader(userConfigURL: fixture.userConfigURL).load(workspaceRoot: fixture.workspaceRoot) == user.merging(workspace))
+}
+
+@Test func debugLaunchConfigStoreRejectsInvalidConfigWithoutReplacingPersistedData() throws {
+	let fixture = try DebugLaunchConfigFixture()
+	defer { fixture.cleanup() }
+	let store = DebugLaunchConfigStore(userConfigURL: fixture.userConfigURL)
+	let valid = DebugLaunchConfig(configurations: [DebugLaunchConfiguration(name: "Debug", type: "lldb", request: DebugLaunchRequest.launch, program: "/usr/bin/true")])
+	try store.saveUser(valid)
+	let persisted = try Data(contentsOf: fixture.userConfigURL)
+	let invalid = DebugLaunchConfig(configurations: [DebugLaunchConfiguration(name: "", type: "lldb", request: DebugLaunchRequest.launch, program: "/usr/bin/true")])
+
+	#expect(throws: DebugLaunchConfigError.invalidConfiguration(name: "", field: "name", reason: "must be non-empty without control characters")) {
+		try store.saveUser(invalid)
+	}
+	#expect(try Data(contentsOf: fixture.userConfigURL) == persisted)
 }
 
 private struct DebugLaunchConfigFixture {

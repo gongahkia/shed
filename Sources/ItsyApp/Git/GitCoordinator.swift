@@ -5,6 +5,7 @@ import ItsyConfig
 import ItsyEditor
 import ItsyRender
 import ItsySyntax
+import ItsyWorkbenchLayout
 
 private struct GitCommitDraft: Codable, Equatable {
 	var summary: String
@@ -70,6 +71,15 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	}
 }
 
+private final class ResponsiveGitContentView: NSView {
+	var widthDidChange: ((CGFloat) -> Void)?
+
+	override func layout() {
+		super.layout()
+		widthDidChange?(bounds.width)
+	}
+}
+
 @MainActor final class GitCoordinator: NSObject {
 	private static let historyDateFormatter: DateFormatter = {
 		let formatter = DateFormatter()
@@ -109,12 +119,27 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 	private enum GitDiffMode { case unified, sideBySide }
 	private var gitDiffMode: GitDiffMode = .unified
 	private var gitDiffModeControl: NSSegmentedControl?
+	private var gitCompactPaneControl: NSSegmentedControl?
 	private var gitDiffStatusLabel: NSTextField?
 	private var gitUnifiedDiffView: MetalTextView?
 	private var gitSideOldDiffView: MetalTextView?
 	private var gitSideNewDiffView: MetalTextView?
 	private var gitSideBySideSplitView: NSSplitView?
 	private var gitHunkTableView: NSTableView?
+	private var gitMainSplitView: NSSplitView?
+	private var gitListScrollView: NSScrollView?
+	private var gitDiffPane: NSView?
+	private var gitListMinimumWidthConstraint: NSLayoutConstraint?
+	private var gitListMaximumWidthConstraint: NSLayoutConstraint?
+	private var gitDiffMinimumWidthConstraint: NSLayoutConstraint?
+	private var gitDiffBodySplitView: NSSplitView?
+	private var gitHunkScrollView: NSScrollView?
+	private var gitDiffContentView: NSView?
+	private var gitHunkWidthConstraint: NSLayoutConstraint?
+	private var gitToolbarOverflow: NSPopUpButton?
+	private var gitToolbarCollapsibleViews: [NSView] = []
+	private var gitWorkbenchMode: WorkbenchGitLayoutMode = .full
+	private var gitResponsiveWidth: CGFloat = 0
 	private struct GitDiffHunkItem {
 		var fileIndex: Int
 		var hunkIndex: Int
@@ -300,7 +325,10 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		if let gitContentView {
 			return gitContentView
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 980, height: 560))
+		let contentView = ResponsiveGitContentView(frame: NSRect(x: 0, y: 0, width: 980, height: 560))
+		contentView.widthDidChange = { [weak self] width in
+			self?.applyResponsiveGitLayout(width: width)
+		}
 		configureGitView(contentView)
 		gitContentView = contentView
 		return contentView
@@ -359,7 +387,34 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		])
 		buttonStack.orientation = .horizontal
 		buttonStack.spacing = 8
-		let header = NSStackView(views: [statusLabel, buttonStack])
+		buttonStack.detachesHiddenViews = true
+		let compactPaneControl = NSSegmentedControl(
+			labels: [L10n.string("Files"), L10n.string("Diff")],
+			trackingMode: .selectOne,
+			target: self,
+			action: #selector(changeGitCompactPane(_:))
+		)
+		compactPaneControl.segmentStyle = .rounded
+		compactPaneControl.selectedSegment = 0
+		compactPaneControl.isHidden = true
+		let overflow = NSPopUpButton(frame: .zero, pullsDown: false)
+		overflow.addItem(withTitle: L10n.string("More"))
+		for (title, action) in [
+			(L10n.string("Worktrees"), #selector(showGitWorktrees(_:))),
+			(L10n.string("History"), #selector(showGitRepositoryHistory(_:))),
+			(L10n.string("Fetch"), #selector(fetchGitRemote(_:))),
+			(L10n.string("Pull"), #selector(pullGitRemote(_:))),
+			(L10n.string("Push"), #selector(pushGitRemote(_:))),
+			(L10n.string("Refresh"), #selector(refreshGitChanges(_:))),
+			(L10n.string("Stage"), #selector(stageSelectedGitEntries(_:))),
+			(L10n.string("Unstage"), #selector(unstageSelectedGitEntries(_:))),
+		] {
+			let item = NSMenuItem(title: title, action: action, keyEquivalent: "")
+			item.target = self
+			overflow.menu?.addItem(item)
+		}
+		overflow.isHidden = true
+		let header = NSStackView(views: [statusLabel, compactPaneControl, buttonStack, overflow])
 		header.orientation = .horizontal
 		header.alignment = .centerY
 		header.distribution = .fill
@@ -392,6 +447,9 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		contentView.addSubview(composer)
 		contentView.addSubview(header)
 		contentView.addSubview(splitView)
+		let listMinimumWidthConstraint = listScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 220)
+		let listMaximumWidthConstraint = listScrollView.widthAnchor.constraint(lessThanOrEqualToConstant: 360)
+		let diffMinimumWidthConstraint = diffPane.widthAnchor.constraint(greaterThanOrEqualToConstant: 420)
 		NSLayoutConstraint.activate([
 			composer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 			composer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
@@ -403,14 +461,24 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			splitView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
 			splitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 10),
 			splitView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-			listScrollView.widthAnchor.constraint(greaterThanOrEqualToConstant: 220),
-			listScrollView.widthAnchor.constraint(lessThanOrEqualToConstant: 360),
-			diffPane.widthAnchor.constraint(greaterThanOrEqualToConstant: 420),
+			listMinimumWidthConstraint,
+			listMaximumWidthConstraint,
+			diffMinimumWidthConstraint,
 		])
 		gitStatusLabel = statusLabel
 		gitTableView = tableView
 		gitBranchButton = branchButton
 		gitRemoteCancelButton = cancelButton
+		gitCompactPaneControl = compactPaneControl
+		gitToolbarOverflow = overflow
+		gitToolbarCollapsibleViews = [worktreesButton, historyButton, fetchButton, pullButton, pushButton, cancelButton, refreshButton, stageButton, unstageButton]
+		gitMainSplitView = splitView
+		gitListScrollView = listScrollView
+		gitDiffPane = diffPane
+		gitListMinimumWidthConstraint = listMinimumWidthConstraint
+		gitListMaximumWidthConstraint = listMaximumWidthConstraint
+		gitDiffMinimumWidthConstraint = diffMinimumWidthConstraint
+		applyResponsiveGitLayout(width: contentView.bounds.width)
 	}
 
 	private func makeGitDiffPane() -> NSView {
@@ -477,6 +545,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		container.addSubview(bodySplitView)
 		diffContentView.addSubview(unifiedView)
 		diffContentView.addSubview(sideSplitView)
+		let hunkWidthConstraint = hunkScrollView.widthAnchor.constraint(equalToConstant: 136)
 		NSLayoutConstraint.activate([
 			header.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
 			header.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
@@ -486,7 +555,7 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 			bodySplitView.trailingAnchor.constraint(equalTo: container.trailingAnchor),
 			bodySplitView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
 			bodySplitView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-			hunkScrollView.widthAnchor.constraint(equalToConstant: 136),
+			hunkWidthConstraint,
 			unifiedView.leadingAnchor.constraint(equalTo: diffContentView.leadingAnchor),
 			unifiedView.trailingAnchor.constraint(equalTo: diffContentView.trailingAnchor),
 			unifiedView.topAnchor.constraint(equalTo: diffContentView.topAnchor),
@@ -505,6 +574,10 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		gitSideNewDiffView = newView
 		gitSideBySideSplitView = sideSplitView
 		gitHunkTableView = hunkTableView
+		gitDiffBodySplitView = bodySplitView
+		gitHunkScrollView = hunkScrollView
+		gitDiffContentView = diffContentView
+		gitHunkWidthConstraint = hunkWidthConstraint
 		return container
 	}
 
@@ -1569,6 +1642,85 @@ private enum GitNavigationError: Error, CustomStringConvertible {
 		}
 		updateSelectedGitDiff()
 		updateGitComposerState()
+	}
+
+	private func applyResponsiveGitLayout(width: CGFloat) {
+		guard width > 0,
+		      let splitView = gitMainSplitView,
+		      let listScrollView = gitListScrollView,
+		      let diffPane = gitDiffPane
+		else {
+			return
+		}
+		gitResponsiveWidth = width
+		let mode: WorkbenchGitLayoutMode
+		if width >= 720 {
+			mode = .full
+		} else if width >= 480 {
+			mode = .compact
+		} else {
+			mode = gitCompactPaneControl?.selectedSegment == 1 ? .diff : .files
+		}
+		gitWorkbenchMode = mode
+		let isFull = mode == .full
+		let isTwoPane = isFull || mode == .compact
+		gitCompactPaneControl?.isHidden = isTwoPane
+		gitToolbarOverflow?.isHidden = isFull
+		for view in gitToolbarCollapsibleViews {
+			view.isHidden = !isFull
+		}
+		gitListMinimumWidthConstraint?.constant = isFull ? 220 : 160
+		gitListMaximumWidthConstraint?.constant = isFull ? 360 : 240
+		gitDiffMinimumWidthConstraint?.constant = isFull ? 420 : 220
+		setGitMainPanes(isTwoPane ? [listScrollView, diffPane] : mode == .files ? [listScrollView] : [diffPane], in: splitView)
+		setGitHunkVisible(isFull)
+		gitDiffModeControl?.setEnabled(isFull, forSegment: 1)
+		if !isFull, gitDiffMode == .sideBySide {
+			gitDiffMode = .unified
+			gitDiffModeControl?.selectedSegment = 0
+			renderGitDiff()
+		}
+	}
+
+	private func setGitMainPanes(_ views: [NSView], in splitView: NSSplitView) {
+		guard splitView.arrangedSubviews.map(ObjectIdentifier.init) != views.map(ObjectIdentifier.init) else {
+			return
+		}
+		for view in splitView.arrangedSubviews {
+			splitView.removeArrangedSubview(view)
+			view.removeFromSuperview()
+		}
+		for view in views {
+			splitView.addArrangedSubview(view)
+		}
+	}
+
+	private func setGitHunkVisible(_ visible: Bool) {
+		guard let bodySplitView = gitDiffBodySplitView,
+		      let hunkScrollView = gitHunkScrollView,
+		      let diffContentView = gitDiffContentView
+		else {
+			return
+		}
+		let views = visible ? [hunkScrollView, diffContentView] : [diffContentView]
+		guard bodySplitView.arrangedSubviews.map(ObjectIdentifier.init) != views.map(ObjectIdentifier.init) else {
+			return
+		}
+		for view in bodySplitView.arrangedSubviews {
+			bodySplitView.removeArrangedSubview(view)
+			view.removeFromSuperview()
+		}
+		for view in views {
+			bodySplitView.addArrangedSubview(view)
+		}
+		gitHunkWidthConstraint?.isActive = visible
+	}
+
+	@objc private func changeGitCompactPane(_: Any?) {
+		guard gitResponsiveWidth < 480 else {
+			return
+		}
+		applyResponsiveGitLayout(width: gitResponsiveWidth)
 	}
 
 	@objc private func changeGitDiffMode(_: Any?) {

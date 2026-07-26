@@ -3,6 +3,8 @@ import Foundation
 import ItsyConfig
 import ItsyEditor
 import ItsySyntax
+import ItsyWorkbenchDSL
+import ItsyWorkbenchLayout
 
 @MainActor final class SettingsCoordinator: NSObject {
 	private let documentController: ItsyDocumentController
@@ -29,6 +31,7 @@ import ItsySyntax
 	private var settingsFindWholeWordButton: NSButton?
 	private var settingsRecoveryJournalButton: NSButton?
 	private var settingsAutomaticallyCheckForUpdatesButton: NSButton?
+	private var settingsWorkbenchProfilePopup: NSPopUpButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
 	private var settingsSidebarWidthField: NSTextField?
@@ -56,6 +59,10 @@ import ItsySyntax
 
 	var currentSettings: ItsySettings {
 		appSettings.normalized()
+	}
+
+	var workbenchDiagnostic: String? {
+		settingsWarnings.first(where: { $0.key == "workbench" })?.description
 	}
 
 	init(
@@ -355,6 +362,17 @@ import ItsySyntax
 		contentView.addSubview(recoveryJournalButton)
 		let automaticallyCheckForUpdatesButton = settingsCheckbox("Automatically Check for Updates", action: #selector(settingsAutomaticallyCheckForUpdatesDidChange(_:)))
 		contentView.addSubview(automaticallyCheckForUpdatesButton)
+		let workbenchProfileLabel = settingsLabel("Workbench Profile")
+		contentView.addSubview(workbenchProfileLabel)
+		let workbenchProfilePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		for profile in WorkbenchProfile.allCases {
+			workbenchProfilePopup.addItem(withTitle: profile.rawValue.capitalized)
+			workbenchProfilePopup.lastItem?.representedObject = profile.rawValue
+		}
+		workbenchProfilePopup.target = self
+		workbenchProfilePopup.action = #selector(settingsWorkbenchProfileDidChange(_:))
+		workbenchProfilePopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(workbenchProfilePopup)
 
 		let sidebarVisibleButton = settingsCheckbox("Show Sidebar", action: #selector(settingsSidebarVisibleDidChange(_:)))
 		contentView.addSubview(sidebarVisibleButton)
@@ -588,8 +606,13 @@ import ItsySyntax
 			recoveryJournalButton.topAnchor.constraint(equalTo: findStack.bottomAnchor, constant: 12),
 			automaticallyCheckForUpdatesButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			automaticallyCheckForUpdatesButton.topAnchor.constraint(equalTo: recoveryJournalButton.bottomAnchor, constant: 8),
+			workbenchProfileLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			workbenchProfileLabel.topAnchor.constraint(equalTo: automaticallyCheckForUpdatesButton.bottomAnchor, constant: 16),
+			workbenchProfileLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			workbenchProfilePopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			workbenchProfilePopup.centerYAnchor.constraint(equalTo: workbenchProfileLabel.centerYAnchor),
 			sidebarVisibleButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
-			sidebarVisibleButton.topAnchor.constraint(equalTo: automaticallyCheckForUpdatesButton.bottomAnchor, constant: 16),
+			sidebarVisibleButton.topAnchor.constraint(equalTo: workbenchProfilePopup.bottomAnchor, constant: 16),
 			sidebarPositionLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
 			sidebarPositionLabel.topAnchor.constraint(equalTo: sidebarVisibleButton.bottomAnchor, constant: 12),
 			sidebarPositionLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
@@ -667,6 +690,7 @@ import ItsySyntax
 		settingsFindWholeWordButton = findWholeWordButton
 		settingsRecoveryJournalButton = recoveryJournalButton
 		settingsAutomaticallyCheckForUpdatesButton = automaticallyCheckForUpdatesButton
+		settingsWorkbenchProfilePopup = workbenchProfilePopup
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
 		settingsSidebarWidthField = sidebarWidthField
@@ -791,6 +815,9 @@ import ItsySyntax
 		settingsFindWholeWordButton?.state = appSettings.find.matchesWholeWord ? .on : .off
 		settingsRecoveryJournalButton?.state = appSettings.recovery.journalEnabled ? .on : .off
 		settingsAutomaticallyCheckForUpdatesButton?.state = appSettings.updates.automaticallyCheck ? .on : .off
+		if let item = settingsWorkbenchProfilePopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.workbench.profile.rawValue }) {
+			settingsWorkbenchProfilePopup?.select(item)
+		}
 		settingsSidebarVisibleButton?.state = appSettings.layout.sidebarVisible ? .on : .off
 		if let item = settingsSidebarPositionPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.layout.sidebarPosition.rawValue }) {
 			settingsSidebarPositionPopup?.select(item)
@@ -871,6 +898,33 @@ import ItsySyntax
 			}
 		}
 		_ = documentController.openDocument(at: url)
+	}
+
+	func restoreWorkbenchDefaults() {
+		appSettings.workbench = WorkbenchProfileBuilder.workbench()
+		saveAppSettings()
+		reloadSettingsFromDisk()
+	}
+
+	func generateWorkbenchDoctorFile() -> URL? {
+		let url = settingsStore.fileURL.deletingLastPathComponent().appendingPathComponent("settings.workbench.doctor.toml")
+		let contents = """
+		# Copy this section into settings.toml, then reload settings.
+		[workbench]
+		profile = "workbench"
+		file_tree = "automatic"
+		terminal = "automatic"
+		git = "automatic"
+		"""
+		do {
+			try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+			try contents.write(to: url, atomically: true, encoding: .utf8)
+			return url
+		} catch {
+			settingsStatusLabel?.textColor = .systemRed
+			settingsStatusLabel?.stringValue = L10n.string("Failed to generate workbench doctor file: \(String(describing: error))")
+			return nil
+		}
 	}
 
 	private func reloadSettingsFromDisk() {
@@ -1139,6 +1193,16 @@ import ItsySyntax
 
 	@objc private func settingsAutomaticallyCheckForUpdatesDidChange(_: Any?) {
 		appSettings.updates.automaticallyCheck = settingsAutomaticallyCheckForUpdatesButton?.state == .on
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsWorkbenchProfileDidChange(_: Any?) {
+		guard let rawValue = settingsWorkbenchProfilePopup?.selectedItem?.representedObject as? String,
+		      let profile = WorkbenchProfile(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.workbench.profile = profile
 		saveAndApplyBehaviorSettings()
 	}
 

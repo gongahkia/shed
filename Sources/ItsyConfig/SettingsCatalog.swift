@@ -133,6 +133,10 @@ public enum ItsySettingsCatalog {
 			title: "Automatically Check for Updates",
 			description: "Checks for stable Itsy releases in the background."
 		),
+		.init(key: "workbench.profile", title: "Workbench Profile", description: "Workbench, Focus, or Review layout profile."),
+		.init(key: "workbench.file_tree", title: "File Tree Visibility", description: "Automatic, visible, or hidden in the active workbench profile."),
+		.init(key: "workbench.terminal", title: "Terminal Visibility", description: "Automatic, visible, or hidden in the active workbench profile."),
+		.init(key: "workbench.git", title: "Git Visibility", description: "Automatic, visible, or hidden in the active workbench profile."),
 		.init(key: "layout.sidebar_visible", title: "Show Sidebar", description: "Shows the workspace sidebar."),
 		.init(
 			key: "layout.sidebar_position",
@@ -301,6 +305,10 @@ public enum ItsySettingsCatalog {
 		case "find.whole_word": bool(settings.find.matchesWholeWord)
 		case "recovery.journal_enabled": bool(settings.recovery.journalEnabled)
 		case "updates.automatically_check": bool(settings.updates.automaticallyCheck)
+		case "workbench.profile": settings.workbench.profile.rawValue
+		case "workbench.file_tree": settings.workbench.fileTree.rawValue
+		case "workbench.terminal": settings.workbench.terminal.rawValue
+		case "workbench.git": settings.workbench.git.rawValue
 		case "layout.sidebar_visible": bool(settings.layout.sidebarVisible)
 		case "layout.sidebar_position": settings.layout.sidebarPosition.rawValue
 		case "layout.sidebar_width": String(settings.layout.sidebarWidth)
@@ -355,6 +363,10 @@ public enum ItsySettingsCatalog {
 		case "find.whole_word": settings.find.matchesWholeWord = defaults.find.matchesWholeWord
 		case "recovery.journal_enabled": settings.recovery.journalEnabled = defaults.recovery.journalEnabled
 		case "updates.automatically_check": settings.updates.automaticallyCheck = defaults.updates.automaticallyCheck
+		case "workbench.profile": settings.workbench.profile = defaults.workbench.profile
+		case "workbench.file_tree": settings.workbench.fileTree = defaults.workbench.fileTree
+		case "workbench.terminal": settings.workbench.terminal = defaults.workbench.terminal
+		case "workbench.git": settings.workbench.git = defaults.workbench.git
 		case "layout.sidebar_visible": settings.layout.sidebarVisible = defaults.layout.sidebarVisible
 		case "layout.sidebar_position": settings.layout.sidebarPosition = defaults.layout.sidebarPosition
 		case "layout.sidebar_width": settings.layout.sidebarWidth = defaults.layout.sidebarWidth

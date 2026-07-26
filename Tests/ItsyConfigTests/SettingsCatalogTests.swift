@@ -15,6 +15,7 @@ import Testing
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "ui.surface.command_palette.height" })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "ui.notification_position" })
 	#expect(ItsySettingsCatalog.entries.contains { $0.key == "editor.cursor_style" })
+	#expect(ItsySettingsCatalog.entries.contains { $0.key == "workbench.profile" })
 }
 
 @Test func settingsCatalogSearchEffectiveValueAndResetAreDeterministic() {
@@ -23,6 +24,7 @@ import Testing
 	settings.layout.sidebarPosition = .trailing
 	settings.layout.interfaceScale = 1.25
 	settings.updates.automaticallyCheck = true
+	settings.workbench.profile = .review
 	#expect(ItsySettingsCatalog.matching("side bar") == [])
 	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == [
 		"git.presentation",
@@ -35,6 +37,7 @@ import Testing
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.sidebar_position", in: settings) == "trailing")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "layout.interface_scale", in: settings) == "1.25")
 	#expect(ItsySettingsCatalog.effectiveValue(for: "updates.automatically_check", in: settings) == "true")
+	#expect(ItsySettingsCatalog.effectiveValue(for: "workbench.profile", in: settings) == "review")
 	#expect(ItsySettingsCatalog.reset("editor.tab_width", in: &settings))
 	#expect(ItsySettingsCatalog.reset("layout.sidebar_position", in: &settings))
 	#expect(!ItsySettingsCatalog.reset("editor.language.<language>.font", in: &settings))
@@ -50,6 +53,7 @@ import Testing
 	#expect(ItsySettingsCatalog.update(value: "block", for: "editor.cursor_style", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "Monaco", for: "terminal.font", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "true", for: "updates.automatically_check", in: &settings) == nil)
+	#expect(ItsySettingsCatalog.update(value: "focus", for: "workbench.profile", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "#12AB34", for: "theme.git.gutter.added", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "17", for: "editor.tab_width", in: &settings) != nil)
 	#expect(ItsySettingsCatalog.update(value: "value", for: "editor.language.<language>.font", in: &settings) != nil)
@@ -61,6 +65,7 @@ import Testing
 	#expect(ItsySettingsCatalog.reset("editor.cursor_style", in: &settings))
 	#expect(ItsySettingsCatalog.reset("terminal.font", in: &settings))
 	#expect(ItsySettingsCatalog.reset("updates.automatically_check", in: &settings))
+	#expect(ItsySettingsCatalog.reset("workbench.profile", in: &settings))
 	#expect(ItsySettingsCatalog.effectiveValue(for: "ui.notification_position", in: settings) == "top_right")
 	#expect(ItsySettingsCatalog.reset("ui.notification_position", in: &settings))
 	#expect(ItsySettingsCatalog.reset("ui.surface.command_palette.height", in: &settings))

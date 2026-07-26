@@ -1501,11 +1501,17 @@ struct ItsySettingsParser {
 				warnType(key, line: line, expected: #""workbench", "focus", or "review""#)
 			}
 		case "workbench.file_tree":
-			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.fileTree = $0 }
+			if let visibility = workbenchVisibility(value, key: key, line: line) {
+				settings.workbench.fileTree = visibility
+			}
 		case "workbench.terminal":
-			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.terminal = $0 }
+			if let visibility = workbenchVisibility(value, key: key, line: line) {
+				settings.workbench.terminal = visibility
+			}
 		case "workbench.git":
-			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.git = $0 }
+			if let visibility = workbenchVisibility(value, key: key, line: line) {
+				settings.workbench.git = visibility
+			}
 		case "layout.sidebar_visible":
 			if case let .bool(sidebarVisible) = value {
 				settings.layout.sidebarVisible = sidebarVisible
@@ -1620,18 +1626,18 @@ struct ItsySettingsParser {
 		}
 	}
 
-	private mutating func assignWorkbenchVisibility(
+	private mutating func workbenchVisibility(
 		_ value: ItsySettingsValue,
 		key: String,
-		line: Int,
-		assign: (WorkbenchVisibility) -> Void
-	) {
+		line: Int
+	) -> WorkbenchVisibility? {
 		if case let .string(visibility) = value,
 		   let visibility = WorkbenchVisibility(rawValue: visibility.lowercased())
 		{
-			assign(visibility)
+			return visibility
 		} else {
 			warnType(key, line: line, expected: #""automatic", "visible", or "hidden""#)
+			return nil
 		}
 	}
 

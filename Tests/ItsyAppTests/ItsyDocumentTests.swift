@@ -176,6 +176,25 @@ import Testing
 }
 
 @MainActor
+@Test func terminalUsesWorkbenchComponentHostAcrossVisibilityChanges() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+
+	controller.setEmbeddedTerminalVisible(true)
+	let terminalView = try #require(controller.terminalHostView.subviews.first)
+	#expect(controller.terminalComponentLifecycle == .visible)
+	#expect(terminalView === controller.embeddedTerminalHostView)
+
+	controller.setEmbeddedTerminalVisible(false)
+	#expect(controller.terminalComponentLifecycle == .hidden)
+	#expect(controller.terminalHostView.subviews.first === terminalView)
+
+	controller.setEmbeddedTerminalVisible(true)
+	#expect(controller.terminalComponentLifecycle == .visible)
+	#expect(controller.terminalHostView.subviews.first === terminalView)
+}
+
+@MainActor
 @Test func editorWindowHostsTerminalBelowAndGitAtTrailingEdge() throws {
 	let controller = EditorWindowController(document: ItsyDocument())
 	defer { controller.close() }

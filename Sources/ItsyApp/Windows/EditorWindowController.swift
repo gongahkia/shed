@@ -76,6 +76,7 @@ extension Notification.Name {
 	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
+	private let terminalContainer = NSView()
 	private let embeddedTerminalContainer = NSView()
 	private let secondarySidebarContainer = NSView()
 	private let secondarySidebarHeader = NSStackView()
@@ -129,10 +130,12 @@ extension Notification.Name {
 	private lazy var workbenchComponentHost = WorkbenchComponentHostController(mountPoints: [
 		.fileTree: fileTreeContainer,
 		.tabBar: tabBarContainer,
+		.terminal: terminalContainer,
 		.statusBar: statusBarContainer,
 	])
 	private lazy var fileTreeWorkbenchComponent = FileTreeWorkbenchComponent(controller: fileTreeController)
 	private lazy var tabBarWorkbenchComponent = ViewWorkbenchComponent(id: .tabBar, view: tabBarView)
+	private lazy var terminalWorkbenchComponent = ViewWorkbenchComponent(id: .terminal, view: embeddedTerminalContainer)
 	private lazy var statusBarWorkbenchComponent = ViewWorkbenchComponent(id: .statusBar, view: statusBarView)
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
@@ -211,10 +214,11 @@ extension Notification.Name {
 		statusBarHeightConstraint?.isActive = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
-		embeddedTerminalContainer.translatesAutoresizingMaskIntoConstraints = false
+		terminalContainer.translatesAutoresizingMaskIntoConstraints = false
+		terminalContainer.isHidden = true
 		embeddedTerminalContainer.isHidden = true
-		embeddedTerminalContainer.setContentHuggingPriority(.required, for: .vertical)
-		embeddedTerminalHeightConstraint = embeddedTerminalContainer.heightAnchor.constraint(equalToConstant: 0)
+		terminalContainer.setContentHuggingPriority(.required, for: .vertical)
+		embeddedTerminalHeightConstraint = terminalContainer.heightAnchor.constraint(equalToConstant: 0)
 		embeddedTerminalHeightConstraint?.isActive = true
 		secondarySidebarContainer.translatesAutoresizingMaskIntoConstraints = false
 		embeddedGitContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -249,7 +253,7 @@ extension Notification.Name {
 		])
 		editorStack.addArrangedSubview(tabBarContainer)
 		editorStack.addArrangedSubview(editorContainer)
-		editorStack.addArrangedSubview(embeddedTerminalContainer)
+		editorStack.addArrangedSubview(terminalContainer)
 		editorStack.addArrangedSubview(statusBarContainer)
 
 		rootSplitView.isVertical = true
@@ -448,6 +452,14 @@ extension Notification.Name {
 
 	var embeddedTerminalHostView: NSView {
 		embeddedTerminalContainer
+	}
+
+	var terminalHostView: NSView {
+		terminalContainer
+	}
+
+	var terminalComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .terminal)
 	}
 
 	var fileTreeHostView: NSView {
@@ -771,7 +783,7 @@ extension Notification.Name {
 		responsiveSidebarVisible = result.showsFileTree
 		sidebarWidthConstraint?.constant = result.showsFileTree ? result.sidebarWidth : 0
 		applySidebarVisibility()
-		embeddedTerminalContainer.isHidden = !result.showsTerminal
+		setTerminalVisible(result.showsTerminal)
 		embeddedTerminalHeightConstraint?.constant = result.terminalHeight
 		let gitAllowed = workbenchConfiguration.git != .hidden
 		let gitRequested = gitRequestedVisible && gitAllowed
@@ -2004,6 +2016,13 @@ extension Notification.Name {
 		statusBarWorkbenchComponent.setVisible(visible)
 		statusBarContainer.isHidden = !visible
 		statusBarView.isHidden = !visible
+	}
+
+	private func setTerminalVisible(_ visible: Bool) {
+		precondition(workbenchComponentHost.mount(terminalWorkbenchComponent))
+		terminalWorkbenchComponent.setVisible(visible)
+		terminalContainer.isHidden = !visible
+		embeddedTerminalContainer.isHidden = !visible
 	}
 
 	private func refreshPaneTabBars() {

@@ -196,6 +196,22 @@ import Testing
 	}
 }
 
+@Test func supportedLanguagesRunProcessBackedLSPFixtureMatrix() async throws {
+	let requested = requestedMatrixGrammarIDs()
+	if let requested {
+		#expect(requested.isSubset(of: Set(BundledLanguageInventory.languages.map(\.grammarID))))
+	}
+	let fixture = try LanguageServerMatrixFixture()
+	defer { fixture.cleanup() }
+	let languages = BundledLanguageInventory.languages.filter {
+		(requested?.contains($0.grammarID) ?? true) && $0.support == .supported
+	}
+	guard !languages.isEmpty else {
+		return
+	}
+	try await runProcessFixtureMatrix(languages: languages, fixture: fixture)
+}
+
 private func requestedMatrixGrammarIDs(environment: [String: String] = ProcessInfo.processInfo.environment) -> Set<String>? {
 	guard let raw = environment["ITSY_LSP_MATRIX_LANGUAGES"], !raw.isEmpty else {
 		return nil
@@ -218,6 +234,48 @@ private func runCanonicalScenario(language: BundledLanguage, fixture: LanguageSe
 		#expect(await manager.unsupportedLanguage(for: sourceURL) != nil)
 	}
 	try await runProtocolScenario(language: language)
+}
+
+private func runProcessFixtureMatrix(languages: [BundledLanguage], fixture: LanguageServerMatrixFixture) async throws {
+	let client = LSPProcessClient(executableURL: try fixture.processServerURL(), currentDirectoryURL: fixture.root)
+	try client.start()
+	let eventPump = MatrixProcessEventPump(client: client)
+	let eventTask = await eventPump.start()
+	defer {
+		eventTask.cancel()
+		client.terminate()
+	}
+
+	let initialize = try LSPInitializeResult(result: try await client.initialize(LSPInitializeParams(processId: nil, rootUri: fixture.root.standardizedFileURL.absoluteString)))
+	#expect(await client.session.state == .running)
+	#expect(initialize.capabilities.completionProvider != nil)
+
+	let sync = LSPDocumentSyncCoordinator(sink: MatrixProcessNotificationSink(client: client), debounceMillis: 0)
+	for language in languages {
+		let sourceURL = try fixture.sourceURL(for: language)
+		let uri = sourceURL.standardizedFileURL.absoluteString
+		try await sync.didOpen(url: sourceURL, languageID: language.languageID, content: language.fixture)
+		let diagnostics = try await eventPump.waitForDiagnostics(uri: uri, timeoutSeconds: 10)
+		#expect(diagnostics.diagnostics.first?.source == "matrix")
+
+		let position = LSPPosition(line: 0, character: 0)
+		let completionResponse = try await client.sendRequest(
+			method: LSPMethod.textDocumentCompletion,
+			params: try LSPAny(encoding: LSPCompletionParams(textDocument: LSPTextDocumentIdentifier(uri: uri), position: position))
+		)
+		let completion = try LSPCompletionResult(result: completionResponse.result)
+		#expect(completion.items.map(\.label) == ["matrix-\(language.languageID)"])
+
+		let definition = try await client.definition(uri: uri, position: position)
+		#expect(definition.locations == [LSPLocation(uri: uri, range: MatrixProcessFixture.range)])
+		let rename = try await client.rename(uri: uri, position: position, newName: "renamed")
+		#expect(rename?.changes?[uri]?.first?.newText == "renamed")
+	}
+	let sent = await sync.recordedMessages
+	#expect(sent.filter { $0.method == LSPMethod.textDocumentDidOpen && $0.version == 1 }.count == languages.count)
+
+	try await client.shutdown()
+	#expect(await client.session.state == .exited)
 }
 
 private func runProtocolScenario(language: BundledLanguage, content: String? = nil) async throws {
@@ -371,6 +429,74 @@ private enum MatrixProtocolError: Error {
 	case expectedNotification
 }
 
+private struct MatrixProcessNotificationSink: LSPNotificationSink {
+	let client: LSPProcessClient
+
+	func send(method: String, params: LSPAny) async throws {
+		try await client.sendNotification(method: method, params: params)
+	}
+}
+
+private actor MatrixProcessEventPump {
+	private let client: LSPProcessClient
+	private var diagnostics: [LSPPublishDiagnosticsParams] = []
+	private var failures: [String] = []
+
+	init(client: LSPProcessClient) {
+		self.client = client
+	}
+
+	func start() -> Task<Void, Never> {
+		Task { [client] in
+			for await event in client.events {
+				self.handle(event)
+			}
+		}
+	}
+
+	func waitForDiagnostics(uri: String, timeoutSeconds: TimeInterval) async throws -> LSPPublishDiagnosticsParams {
+		let deadline = Date(timeIntervalSinceNow: timeoutSeconds)
+		while Date() < deadline {
+			if let failure = failures.first {
+				throw MatrixProcessFixtureError.serverFailure(failure)
+			}
+			if let diagnostic = diagnostics.first(where: { $0.uri == uri && !$0.diagnostics.isEmpty }) {
+				return diagnostic
+			}
+			try await Task.sleep(nanoseconds: 10_000_000)
+		}
+		throw MatrixProcessFixtureError.timeout(LSPMethod.textDocumentPublishDiagnostics)
+	}
+
+	private func handle(_ event: LSPProcessClientEvent) {
+		switch event {
+		case let .server(.notification(notification)) where notification.method == LSPMethod.textDocumentPublishDiagnostics:
+			if let diagnostic = try? decode(LSPPublishDiagnosticsParams.self, from: notification.params) {
+				diagnostics.append(diagnostic)
+			}
+		case let .terminated(status) where status != 0:
+			failures.append("fixture server terminated with status \(status)")
+		case let .failure(message):
+			failures.append(message)
+		default:
+			break
+		}
+	}
+
+	private func decode<Value: Decodable>(_ type: Value.Type, from value: LSPAny?) throws -> Value {
+		try JSONDecoder().decode(type, from: JSONEncoder().encode(value ?? .null))
+	}
+}
+
+private enum MatrixProcessFixtureError: Error, Equatable {
+	case serverFailure(String)
+	case timeout(String)
+}
+
+private enum MatrixProcessFixture {
+	static let range = LSPRange(start: LSPPosition(line: 0, character: 0), end: LSPPosition(line: 0, character: 1))
+}
+
 private final class LanguageServerMatrixFixture {
 	let root = FileManager.default.temporaryDirectory.appendingPathComponent("itsy-lsp-matrix-\(UUID().uuidString)", isDirectory: true)
 
@@ -395,7 +521,74 @@ private final class LanguageServerMatrixFixture {
 		return url
 	}
 
+	func processServerURL() throws -> URL {
+		let url = root.appendingPathComponent("matrix-lsp-server.rb")
+		guard !FileManager.default.fileExists(atPath: url.path) else {
+			return url
+		}
+		try Self.processServer.write(to: url, atomically: true, encoding: .utf8)
+		try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+		return url
+	}
+
 	func cleanup() {
 		try? FileManager.default.removeItem(at: root)
 	}
+
+	private static let processServer = """
+	#!/usr/bin/env ruby
+	require "json"
+
+	documents = {}
+	range = { "start" => { "line" => 0, "character" => 0 }, "end" => { "line" => 0, "character" => 1 } }
+
+	def send_message(message)
+		payload = JSON.generate(message)
+		STDOUT.write("Content-Length: #{payload.bytesize}\\r\\n\\r\\n")
+		STDOUT.write(payload)
+		STDOUT.flush
+	end
+
+	def respond(id, result)
+		send_message({ "jsonrpc" => "2.0", "id" => id, "result" => result })
+	end
+
+	loop do
+		headers = {}
+		loop do
+			line = STDIN.gets
+			exit 0 if line.nil?
+			line = line.strip
+			break if line.empty?
+			name, value = line.split(":", 2)
+			headers[name.downcase] = value.strip if value
+		end
+		payload = STDIN.read(Integer(headers.fetch("content-length")))
+		break if payload.nil?
+		message = JSON.parse(payload)
+		method = message["method"]
+		params = message["params"] || {}
+		id = message["id"]
+
+		case method
+		when "initialize"
+			respond(id, { "capabilities" => { "textDocumentSync" => 1, "completionProvider" => {}, "definitionProvider" => true, "renameProvider" => true } })
+		when "textDocument/didOpen"
+			uri = params.dig("textDocument", "uri")
+			documents[uri] = params.dig("textDocument", "languageId")
+			send_message({ "jsonrpc" => "2.0", "method" => "textDocument/publishDiagnostics", "params" => { "uri" => uri, "diagnostics" => [{ "range" => range, "severity" => 3, "source" => "matrix", "message" => "fixture diagnostic" }] } })
+		when "textDocument/completion"
+			respond(id, [{ "label" => "matrix-#{documents[params.dig("textDocument", "uri")]}" }])
+		when "textDocument/definition"
+			respond(id, { "uri" => params.dig("textDocument", "uri"), "range" => range })
+		when "textDocument/rename"
+			uri = params.dig("textDocument", "uri")
+			respond(id, { "changes" => { uri => [{ "range" => range, "newText" => params["newName"] }] } })
+		when "shutdown"
+			respond(id, nil)
+		when "exit"
+			exit 0
+		end
+	end
+	"""
 }

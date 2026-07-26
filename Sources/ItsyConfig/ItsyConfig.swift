@@ -1,12 +1,14 @@
 import Darwin
 import Foundation
+import ItsyWorkbenchDSL
+import ItsyWorkbenchLayout
 
 public enum ItsySettingsCompatibilityPolicy: String, Equatable, Sendable {
 	case warnAndIgnoreUnknownFields
 }
 
 public enum ItsySettingsSchema {
-	public static let currentVersion = 9
+	public static let currentVersion = 10
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
@@ -417,6 +419,7 @@ public struct ItsySettings: Equatable, Sendable {
 	public var find: FindSettings
 	public var recovery: RecoverySettings
 	public var updates: UpdateSettings
+	public var workbench: WorkbenchLayoutConfiguration
 	public var layout: LayoutSettings
 	public var ui: UISettings
 
@@ -429,6 +432,7 @@ public struct ItsySettings: Equatable, Sendable {
 		find: FindSettings = FindSettings(),
 		recovery: RecoverySettings = RecoverySettings(),
 		updates: UpdateSettings = UpdateSettings(),
+		workbench: WorkbenchLayoutConfiguration = WorkbenchProfileBuilder.workbench(),
 		layout: LayoutSettings = LayoutSettings(),
 		ui: UISettings = UISettings()
 	) {
@@ -440,6 +444,7 @@ public struct ItsySettings: Equatable, Sendable {
 		self.find = find
 		self.recovery = recovery
 		self.updates = updates
+		self.workbench = workbench
 		self.layout = layout
 		self.ui = ui
 	}
@@ -832,6 +837,12 @@ public final class ItsySettingsStore {
 		[updates]
 		automatically_check = \(settings.updates.automaticallyCheck ? "true" : "false")
 
+		[workbench]
+		profile = "\(settings.workbench.profile.rawValue)"
+		file_tree = "\(settings.workbench.fileTree.rawValue)"
+		terminal = "\(settings.workbench.terminal.rawValue)"
+		git = "\(settings.workbench.git.rawValue)"
+
 		[layout]
 		sidebar_visible = \(settings.layout.sidebarVisible ? "true" : "false")
 		sidebar_position = "\(settings.layout.sidebarPosition.rawValue)"
@@ -996,6 +1007,10 @@ public enum ItsySettingsResolver {
 		case "find.whole_word": target.find.matchesWholeWord = source.find.matchesWholeWord
 		case "recovery.journal_enabled": target.recovery.journalEnabled = source.recovery.journalEnabled
 		case "updates.automatically_check": target.updates.automaticallyCheck = source.updates.automaticallyCheck
+		case "workbench.profile": target.workbench.profile = source.workbench.profile
+		case "workbench.file_tree": target.workbench.fileTree = source.workbench.fileTree
+		case "workbench.terminal": target.workbench.terminal = source.workbench.terminal
+		case "workbench.git": target.workbench.git = source.workbench.git
 		case "layout.sidebar_visible": target.layout.sidebarVisible = source.layout.sidebarVisible
 		case "layout.sidebar_position": target.layout.sidebarPosition = source.layout.sidebarPosition
 		case "layout.sidebar_width": target.layout.sidebarWidth = source.layout.sidebarWidth
@@ -1161,7 +1176,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "updates", "layout", "ui"]
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "updates", "workbench", "layout", "ui"]
 					.contains(section),
 					!section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
 				{
@@ -1195,6 +1210,15 @@ struct ItsySettingsParser {
 			if warnings.count == warningCount {
 				assignedKeys.insert(key)
 			}
+		}
+		if let message = WorkbenchConfigurationValidator.validate(settings.workbench) {
+			warnings.append(ItsySettingsWarning(
+				key: "workbench",
+				source: source,
+				retainedFallback: true,
+				message: message
+			))
+			settings.workbench.fileTree = .automatic
 		}
 		return ItsySettingsLoadResult(
 			settings: settings,
@@ -1470,6 +1494,18 @@ struct ItsySettingsParser {
 			} else {
 				warnType(key, line: line, expected: "bool")
 			}
+		case "workbench.profile":
+			if case let .string(profile) = value, let profile = WorkbenchProfile(rawValue: profile.lowercased()) {
+				settings.workbench.profile = profile
+			} else {
+				warnType(key, line: line, expected: #""workbench", "focus", or "review""#)
+			}
+		case "workbench.file_tree":
+			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.fileTree = $0 }
+		case "workbench.terminal":
+			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.terminal = $0 }
+		case "workbench.git":
+			assignWorkbenchVisibility(value, key: key, line: line) { settings.workbench.git = $0 }
 		case "layout.sidebar_visible":
 			if case let .bool(sidebarVisible) = value {
 				settings.layout.sidebarVisible = sidebarVisible
@@ -1581,6 +1617,21 @@ struct ItsySettingsParser {
 				retainedFallback: true,
 				message: "unknown setting \(key)"
 			))
+		}
+	}
+
+	private mutating func assignWorkbenchVisibility(
+		_ value: ItsySettingsValue,
+		key: String,
+		line: Int,
+		assign: (WorkbenchVisibility) -> Void
+	) {
+		if case let .string(visibility) = value,
+		   let visibility = WorkbenchVisibility(rawValue: visibility.lowercased())
+		{
+			assign(visibility)
+		} else {
+			warnType(key, line: line, expected: #""automatic", "visible", or "hidden""#)
 		}
 	}
 

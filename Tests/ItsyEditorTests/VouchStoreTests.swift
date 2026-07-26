@@ -66,6 +66,52 @@ private let deniedSHA = "fffffffffffffffffffffffffffffffffffffffffffffffffffffff
 	)) == .missing)
 }
 
+@Test func vouchStoreRequiresExplicitLuaPluginKindAndScopeForAllows() throws {
+	let scoped = try VouchStore.parse("""
+		allow sha256:\(trustedSHA) id:dev.example.lua version:1.0.0 signer:alice kind:lua-plugin scope:workspace
+		""")
+	let workspaceSubject = VouchSubject(
+		sha256: trustedSHA,
+		identifier: "dev.example.lua",
+		version: "1.0.0",
+		packageKind: .luaPlugin,
+		packageScope: .workspace
+	)
+	let globalSubject = VouchSubject(
+		sha256: trustedSHA,
+		identifier: "dev.example.lua",
+		version: "1.0.0",
+		packageKind: .luaPlugin,
+		packageScope: .global
+	)
+
+	#expect(scoped.decision(for: workspaceSubject) == .allow(VouchRecord(
+		directive: .allow,
+		sha256: trustedSHA,
+		identifier: "dev.example.lua",
+		version: "1.0.0",
+		packageKind: .luaPlugin,
+		packageScope: .workspace,
+		signer: "alice",
+		line: 1
+	)))
+	#expect(scoped.decision(for: globalSubject) == .missing)
+	#expect(VouchStore(records: [VouchRecord(
+		directive: .allow,
+		sha256: trustedSHA,
+		identifier: "dev.example.lua",
+		version: "1.0.0",
+		signer: "legacy"
+	)]).decision(for: workspaceSubject) == .missing)
+	let genericDeny = VouchRecord(
+		directive: .deny,
+		sha256: trustedSHA,
+		identifier: "dev.example.lua",
+		reason: "revoked"
+	)
+	#expect(VouchStore(records: [genericDeny]).decision(for: workspaceSubject) == .deny(genericDeny))
+}
+
 @Test func vouchStoreLoadsDefaultURLOrder() throws {
 	let fixture = try TemporaryVouchFixture()
 	let repo = fixture.root.appendingPathComponent("repo", isDirectory: true)
@@ -110,6 +156,15 @@ private let deniedSHA = "fffffffffffffffffffffffffffffffffffffffffffffffffffffff
 	}
 	#expect(throws: VouchParseError.missingField(line: 1, field: "signer")) {
 		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.tools version:0.1.0")
+	}
+	#expect(throws: VouchParseError.luaPluginScopeRequired(line: 1)) {
+		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.lua version:1.0.0 signer:alice kind:lua-plugin")
+	}
+	#expect(throws: VouchParseError.scopeRequiresLuaPlugin(line: 1)) {
+		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.tools version:1.0.0 signer:alice kind:extension scope:workspace")
+	}
+	#expect(throws: VouchParseError.duplicateField(line: 1, field: "kind")) {
+		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.lua version:1.0.0 signer:alice kind:lua-plugin kind:extension scope:workspace")
 	}
 }
 

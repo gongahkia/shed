@@ -146,14 +146,22 @@ import Testing
 	controller.setEmbeddedGitVisible(true)
 	splitView.layoutSubtreeIfNeeded()
 	#expect(splitView.arrangedSubviews.count == 3)
-	#expect(splitView.arrangedSubviews.last === controller.embeddedGitHostView)
+	#expect(controller.embeddedGitHostView.superview != nil)
+	#expect(!controller.embeddedGitHostView.isHidden)
 	#expect(controller.embeddedGitHostView.frame.width > 600)
 
 	controller.setEmbeddedDebuggerVisible(true)
 	splitView.layoutSubtreeIfNeeded()
-	#expect(splitView.arrangedSubviews.count == 4)
-	#expect(splitView.arrangedSubviews.last === controller.embeddedDebuggerHostView)
+	#expect(splitView.arrangedSubviews.count == 3)
+	#expect(controller.embeddedGitHostView.isHidden)
+	#expect(!controller.embeddedDebuggerHostView.isHidden)
 	#expect(controller.embeddedDebuggerHostView.frame.width > 300)
+	let debuggerSidebar = controller.embeddedDebuggerHostView.superview?.superview
+	#expect(debuggerSidebar?.accessibilityLabel() == "Debugger sidebar")
+	#expect(debuggerSidebar?.accessibilityValue() as? String == "Debugger")
+	let debuggerActions = editorWindowDescendants(in: debuggerSidebar ?? NSView()).compactMap { $0 as? NSButton }.compactMap { $0.accessibilityLabel() }
+	#expect(debuggerActions.contains("Focus Debugger sidebar"))
+	#expect(debuggerActions.contains("Close Debugger sidebar"))
 
 	controller.setEmbeddedTerminalVisible(false)
 	controller.setEmbeddedGitVisible(false)
@@ -161,6 +169,24 @@ import Testing
 	splitView.layoutSubtreeIfNeeded()
 	#expect(controller.embeddedTerminalHostView.isHidden)
 	#expect(splitView.arrangedSubviews.count == 2)
+}
+
+private func editorWindowDescendants(in view: NSView) -> [NSView] {
+	view.subviews + view.subviews.flatMap(editorWindowDescendants)
+}
+
+@MainActor
+@Test func editorWindowRestoresDedicatedDebuggerSidebarWidth() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
+	controller.restoreWorkspaceWorkbenchDividerState(.init(debuggerWidth: 410))
+	controller.setEmbeddedDebuggerVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+
+	#expect(abs(controller.embeddedDebuggerHostView.frame.width - 410) < 2)
 }
 
 @MainActor
@@ -180,7 +206,7 @@ import Testing
 
 	controller.restoreWorkspacePaneLayout("V[]")
 	#expect(controller.paneLayoutEncoded == "V[L]")
-	let dividers = WorkspaceWorkbenchDividerState(sidebarWidth: 300, gitWidth: 520)
+	let dividers = WorkspaceWorkbenchDividerState(sidebarWidth: 300, gitWidth: 520, debuggerWidth: 380)
 	controller.restoreWorkspaceWorkbenchDividerState(dividers)
 	#expect(controller.workspaceWorkbenchDividerState == dividers)
 }

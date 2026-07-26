@@ -35,6 +35,8 @@ import ItsyWorkbenchLayout
 	private var settingsWorkbenchFileTreePopup: NSPopUpButton?
 	private var settingsWorkbenchTerminalPopup: NSPopUpButton?
 	private var settingsWorkbenchGitPopup: NSPopUpButton?
+	private var settingsTerminalPresentationPopup: NSPopUpButton?
+	private var settingsGitPresentationPopup: NSPopUpButton?
 	private var settingsDebuggerPresentationPopup: NSPopUpButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
@@ -168,7 +170,7 @@ import ItsyWorkbenchLayout
 		if let controller = settingsWindowController {
 			return controller
 		}
-		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_220))
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 680, height: 1_300))
 		let scrollView = NSScrollView(frame: NSRect(x: 0, y: 0, width: 680, height: 720))
 		scrollView.hasVerticalScroller = true
 		scrollView.autohidesScrollers = true
@@ -396,6 +398,32 @@ import ItsyWorkbenchLayout
 		let workbenchGitPopup = workbenchVisibilityPopup(identifier: "workbench.git", label: "Workbench Git visibility")
 		workbenchGitPopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(workbenchGitPopup)
+		let terminalPresentationLabel = settingsLabel("Terminal Presentation")
+		contentView.addSubview(terminalPresentationLabel)
+		let terminalPresentationPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		for presentation in [ItsySettings.TerminalSettings.Presentation.bottom, .window] {
+			terminalPresentationPopup.addItem(withTitle: presentation.rawValue.capitalized)
+			terminalPresentationPopup.lastItem?.representedObject = presentation.rawValue
+		}
+		terminalPresentationPopup.identifier = NSUserInterfaceItemIdentifier("terminal.presentation")
+		terminalPresentationPopup.setAccessibilityLabel("Terminal presentation")
+		terminalPresentationPopup.target = self
+		terminalPresentationPopup.action = #selector(settingsTerminalPresentationDidChange(_:))
+		terminalPresentationPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(terminalPresentationPopup)
+		let gitPresentationLabel = settingsLabel("Git Presentation")
+		contentView.addSubview(gitPresentationLabel)
+		let gitPresentationPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+		for presentation in [ItsySettings.GitSettings.Presentation.sidebar, .window] {
+			gitPresentationPopup.addItem(withTitle: presentation.rawValue.capitalized)
+			gitPresentationPopup.lastItem?.representedObject = presentation.rawValue
+		}
+		gitPresentationPopup.identifier = NSUserInterfaceItemIdentifier("git.presentation")
+		gitPresentationPopup.setAccessibilityLabel("Git presentation")
+		gitPresentationPopup.target = self
+		gitPresentationPopup.action = #selector(settingsGitPresentationDidChange(_:))
+		gitPresentationPopup.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(gitPresentationPopup)
 		let debuggerPresentationLabel = settingsLabel("Debugger Presentation")
 		contentView.addSubview(debuggerPresentationLabel)
 		let debuggerPresentationPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -662,8 +690,18 @@ import ItsyWorkbenchLayout
 			workbenchGitLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			workbenchGitPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			workbenchGitPopup.centerYAnchor.constraint(equalTo: workbenchGitLabel.centerYAnchor),
+			terminalPresentationLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			terminalPresentationLabel.topAnchor.constraint(equalTo: workbenchGitPopup.bottomAnchor, constant: 12),
+			terminalPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			terminalPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			terminalPresentationPopup.centerYAnchor.constraint(equalTo: terminalPresentationLabel.centerYAnchor),
+			gitPresentationLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
+			gitPresentationLabel.topAnchor.constraint(equalTo: terminalPresentationPopup.bottomAnchor, constant: 12),
+			gitPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
+			gitPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			gitPresentationPopup.centerYAnchor.constraint(equalTo: gitPresentationLabel.centerYAnchor),
 			debuggerPresentationLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			debuggerPresentationLabel.topAnchor.constraint(equalTo: workbenchGitPopup.bottomAnchor, constant: 12),
+			debuggerPresentationLabel.topAnchor.constraint(equalTo: gitPresentationPopup.bottomAnchor, constant: 12),
 			debuggerPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			debuggerPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			debuggerPresentationPopup.centerYAnchor.constraint(equalTo: debuggerPresentationLabel.centerYAnchor),
@@ -750,6 +788,8 @@ import ItsyWorkbenchLayout
 		settingsWorkbenchFileTreePopup = workbenchFileTreePopup
 		settingsWorkbenchTerminalPopup = workbenchTerminalPopup
 		settingsWorkbenchGitPopup = workbenchGitPopup
+		settingsTerminalPresentationPopup = terminalPresentationPopup
+		settingsGitPresentationPopup = gitPresentationPopup
 		settingsDebuggerPresentationPopup = debuggerPresentationPopup
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
@@ -881,6 +921,12 @@ import ItsyWorkbenchLayout
 		syncWorkbenchVisibilityPopup(settingsWorkbenchFileTreePopup, visibility: appSettings.workbench.fileTree)
 		syncWorkbenchVisibilityPopup(settingsWorkbenchTerminalPopup, visibility: appSettings.workbench.terminal)
 		syncWorkbenchVisibilityPopup(settingsWorkbenchGitPopup, visibility: appSettings.workbench.git)
+		if let item = settingsTerminalPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.terminal.presentation.rawValue }) {
+			settingsTerminalPresentationPopup?.select(item)
+		}
+		if let item = settingsGitPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.git.presentation.rawValue }) {
+			settingsGitPresentationPopup?.select(item)
+		}
 		if let item = settingsDebuggerPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.debugger.presentation.rawValue }) {
 			settingsDebuggerPresentationPopup?.select(item)
 		}
@@ -1002,6 +1048,7 @@ import ItsyWorkbenchLayout
 		refreshSettingsThemes()
 		refreshSettingsEditorControls()
 		refreshSettingsTerminalControls()
+		setDefaultSettingsStatus()
 		onSettingsChange(appSettings.normalized())
 		onTerminalSettingsChange(appSettings.terminal)
 		reloadSyntaxThemes()
@@ -1093,10 +1140,25 @@ import ItsyWorkbenchLayout
 	}
 
 	private func publishSettingsChanged() {
+		let isError = !settingsWarnings.isEmpty
 		NotificationCenter.default.post(
 			name: .itsySettingsChanged,
 			object: self,
-			userInfo: [ItsySettingsNotificationUserInfoKey.settings: appSettings.normalized()]
+			userInfo: [
+				ItsySettingsNotificationUserInfoKey.settings: appSettings.normalized(),
+				ItsySettingsNotificationUserInfoKey.statusMessage: settingsApplicationStatusMessage(),
+				ItsySettingsNotificationUserInfoKey.statusIsError: isError,
+			]
+		)
+	}
+
+	private func settingsApplicationStatusMessage() -> String {
+		if let warning = settingsWarnings.first {
+			let fallback = warning.retainedFallback ? L10n.string(" A fallback value remains active.") : ""
+			return L10n.string("Settings error: \(warning.description).\(fallback)")
+		}
+		return L10n.string(
+			"Settings applied · Terminal \(appSettings.terminal.presentation.rawValue) · Git \(appSettings.git.presentation.rawValue) · Debugger \(appSettings.debugger.presentation.rawValue)"
 		)
 	}
 
@@ -1308,6 +1370,28 @@ import ItsyWorkbenchLayout
 		if let item = popup?.itemArray.first(where: { $0.representedObject as? String == visibility.rawValue }) {
 			popup?.select(item)
 		}
+	}
+
+	@objc private func settingsTerminalPresentationDidChange(_: Any?) {
+		guard
+			let rawValue = settingsTerminalPresentationPopup?.selectedItem?.representedObject as? String,
+			let presentation = ItsySettings.TerminalSettings.Presentation(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.terminal.presentation = presentation
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsGitPresentationDidChange(_: Any?) {
+		guard
+			let rawValue = settingsGitPresentationPopup?.selectedItem?.representedObject as? String,
+			let presentation = ItsySettings.GitSettings.Presentation(rawValue: rawValue)
+		else {
+			return
+		}
+		appSettings.git.presentation = presentation
+		saveAndApplyBehaviorSettings()
 	}
 
 	@objc private func settingsDebuggerPresentationDidChange(_: Any?) {

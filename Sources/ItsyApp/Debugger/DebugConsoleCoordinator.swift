@@ -7,6 +7,7 @@ import ItsyEditor
 @MainActor final class DebugConsoleCoordinator: NSObject, NSTextFieldDelegate {
 	private let activeSessionProvider: () -> DebugAppSession?
 	private var panel: NSPanel?
+	private var contentView: NSView?
 	private var statusLabel: NSTextField?
 	private var textView: NSTextView?
 	private var inputField: NSTextField?
@@ -48,23 +49,46 @@ import ItsyEditor
 		setStatus(L10n.string("No active debug session"), isError: true)
 	}
 
+	func debuggerContentView() -> NSView {
+		let contentView = makeContentViewIfNeeded()
+		panel?.orderOut(nil)
+		return contentView
+	}
+
+	func prepareForDebuggerPresentation() {
+		panel?.orderOut(nil)
+		refreshStatus()
+	}
+
 	private func makePanelIfNeeded() -> NSPanel {
-		if let panel {
-			return panel
+		let panel: NSPanel
+		if let existing = self.panel {
+			panel = existing
+		} else {
+			panel = NSPanel(
+				contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
+				styleMask: [.titled, .closable, .resizable, .utilityWindow],
+				backing: .buffered,
+				defer: false
+			)
+			panel.title = L10n.string("Debug Console")
+			panel.isReleasedWhenClosed = false
+			self.panel = panel
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 760, height: 520),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Debug Console")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		let contentView = makeContentViewIfNeeded()
+		contentView.removeFromSuperview()
 		panel.contentView = contentView
-		configureView(contentView)
-		self.panel = panel
 		return panel
+	}
+
+	private func makeContentViewIfNeeded() -> NSView {
+		if let contentView {
+			return contentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 760, height: 520))
+		configureView(contentView)
+		self.contentView = contentView
+		return contentView
 	}
 
 	private func configureView(_ contentView: NSView) {

@@ -1074,6 +1074,8 @@ public enum ItsySettingsResolver {
 
 public enum ItsySettingsNotificationUserInfoKey {
 	public static let settings = "settings"
+	public static let statusMessage = "statusMessage"
+	public static let statusIsError = "statusIsError"
 }
 
 public final class ItsySettingsWatcher: @unchecked Sendable {

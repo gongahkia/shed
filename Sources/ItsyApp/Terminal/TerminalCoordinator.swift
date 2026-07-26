@@ -433,7 +433,8 @@ struct TerminalPaneLayout: Equatable {
 	private let sessionFactory: (URL) -> ItsyTerminalSession
 	private let openLocation: (TerminalOpenLocation) -> Void
 	private let embeddedHostProvider: () -> NSView?
-	private let setEmbeddedTerminalVisible: (Bool) -> Void
+	private let setEmbeddedTerminalVisible: (NSView, Bool) -> Void
+	private weak var presentationHost: NSView?
 
 	init(
 		settingsProvider: @escaping () -> ItsySettings.TerminalSettings,
@@ -441,7 +442,7 @@ struct TerminalPaneLayout: Equatable {
 		sessionFactory: @escaping (URL) -> ItsyTerminalSession = { ItsyTerminalSession(currentDirectoryURL: $0) },
 		openLocation: @escaping (TerminalOpenLocation) -> Void = { NSWorkspace.shared.open($0.url) },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
-		setEmbeddedTerminalVisible: @escaping (Bool) -> Void = { _ in },
+		setEmbeddedTerminalVisible: @escaping (NSView, Bool) -> Void = { _, _ in },
 		editorFontProvider: @escaping () -> String = { ItsySettings.EditorSettings.defaultFont }
 	) {
 		self.settingsProvider = settingsProvider
@@ -540,11 +541,20 @@ struct TerminalPaneLayout: Equatable {
 				pane.view.applyTerminalSettings(settings, inheriting: editorFontName)
 			}
 		}
-		if settings.presentation == .window, embeddedTerminalVisible {
-			embeddedTerminalVisible = false
-			setEmbeddedTerminalVisible(false)
-			detachEmbeddedTerminalContent()
+		switch settings.presentation {
+		case .bottom:
+			if terminalPanel?.isVisible == true {
+				showEmbeddedTerminal(relativeTo: terminalHostWindow())
+			}
+		case .window:
+			if embeddedTerminalVisible {
+				showDetachedTerminal(relativeTo: terminalHostWindow())
+			}
 		}
+	}
+
+	func ensureTerminalVisible() {
+		showTerminal(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	func applyTerminalTheme(_ theme: TerminalThemePalette) {
@@ -570,6 +580,7 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func toggleTerminal(relativeTo hostWindow: NSWindow?) {
+		capturePresentationHostIfNeeded()
 		switch settingsProvider().presentation {
 		case .bottom:
 			toggleEmbeddedTerminal(relativeTo: hostWindow)
@@ -583,6 +594,7 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func showTerminal(relativeTo hostWindow: NSWindow?) {
+		capturePresentationHostIfNeeded()
 		switch settingsProvider().presentation {
 		case .bottom:
 			showEmbeddedTerminal(relativeTo: hostWindow)
@@ -593,7 +605,10 @@ struct TerminalPaneLayout: Equatable {
 
 	private func showDetachedTerminal(relativeTo hostWindow: NSWindow?) {
 		embeddedTerminalVisible = false
-		setEmbeddedTerminalVisible(false)
+		if let host = presentationHost ?? embeddedHostProvider() {
+			presentationHost = host
+			setEmbeddedTerminalVisible(host, false)
+		}
 		let panel = makeTerminalPanelIfNeeded()
 		restoreTerminalStateIfNeeded()
 		if tabs.isEmpty {
@@ -606,34 +621,41 @@ struct TerminalPaneLayout: Equatable {
 	}
 
 	private func toggleEmbeddedTerminal(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedTerminal(relativeTo: hostWindow)
 			return
 		}
+		presentationHost = host
 		if embeddedTerminalVisible, terminalContentView?.superview === host {
 			embeddedTerminalVisible = false
-			setEmbeddedTerminalVisible(false)
+			setEmbeddedTerminalVisible(host, false)
 			return
 		}
 		showEmbeddedTerminal(relativeTo: hostWindow)
 	}
 
 	private func showEmbeddedTerminal(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedTerminal(relativeTo: hostWindow)
 			return
 		}
+		presentationHost = host
 		let contentView = makeTerminalContentViewIfNeeded()
 		terminalPanel?.orderOut(nil)
+		setEmbeddedTerminalVisible(host, true)
 		embedTerminalContent(contentView, in: host)
 		embeddedTerminalVisible = true
-		setEmbeddedTerminalVisible(true)
 		restoreTerminalStateIfNeeded()
 		if tabs.isEmpty {
 			appendTab(currentDirectoryURL: terminalWorkingDirectory(), select: true)
 		}
 		startTerminalIfNeeded()
 		terminalHostWindow()?.makeFirstResponder(activeView)
+	}
+
+	private func capturePresentationHostIfNeeded() {
+		guard !embeddedTerminalVisible, terminalPanel?.isVisible != true else { return }
+		presentationHost = embeddedHostProvider()
 	}
 
 	private func makeTerminalPanelIfNeeded() -> NSPanel {

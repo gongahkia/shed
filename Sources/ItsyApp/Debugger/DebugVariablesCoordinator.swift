@@ -5,6 +5,7 @@ import ItsyDebugger
 @MainActor final class DebugVariablesCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let activeSessionProvider: () -> DebugAppSession?
 	private var panel: NSPanel?
+	private var contentView: NSView?
 	private var statusLabel: NSTextField?
 	private var outlineView: NSOutlineView?
 	private var rootNodes: [DebugVariableNode] = []
@@ -23,9 +24,20 @@ import ItsyDebugger
 	}
 
 	func refreshIfVisible() {
-		if panel?.isVisible == true {
+		if panel?.isVisible == true || (contentView?.window != nil && contentView?.window !== panel) {
 			refreshVariables(nil)
 		}
+	}
+
+	func debuggerContentView() -> NSView {
+		let contentView = makeContentViewIfNeeded()
+		panel?.orderOut(nil)
+		return contentView
+	}
+
+	func prepareForDebuggerPresentation() {
+		panel?.orderOut(nil)
+		refreshVariables(nil)
 	}
 
 	func clear() {
@@ -36,22 +48,34 @@ import ItsyDebugger
 	}
 
 	private func makePanelIfNeeded() -> NSPanel {
-		if let panel {
-			return panel
+		let panel: NSPanel
+		if let existing = self.panel {
+			panel = existing
+		} else {
+			panel = NSPanel(
+				contentRect: NSRect(x: 0, y: 0, width: 620, height: 520),
+				styleMask: [.titled, .closable, .resizable, .utilityWindow],
+				backing: .buffered,
+				defer: false
+			)
+			panel.title = L10n.string("Variables")
+			panel.isReleasedWhenClosed = false
+			self.panel = panel
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 620, height: 520),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Variables")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
+		let contentView = makeContentViewIfNeeded()
+		contentView.removeFromSuperview()
 		panel.contentView = contentView
-		configureView(contentView)
-		self.panel = panel
 		return panel
+	}
+
+	private func makeContentViewIfNeeded() -> NSView {
+		if let contentView {
+			return contentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 520))
+		configureView(contentView)
+		self.contentView = contentView
+		return contentView
 	}
 
 	private func configureView(_ contentView: NSView) {

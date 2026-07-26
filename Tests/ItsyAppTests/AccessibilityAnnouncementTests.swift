@@ -74,6 +74,12 @@ import Testing
 	let debuggerPopup = popups.first { $0.identifier?.rawValue == "debugger.presentation" }
 	#expect(debuggerPopup?.accessibilityLabel() == "Debugger presentation")
 	#expect(debuggerPopup?.itemArray.compactMap { $0.representedObject as? String } == ["sidebar", "window"])
+	let terminalPopup = popups.first { $0.identifier?.rawValue == "terminal.presentation" }
+	#expect(terminalPopup?.accessibilityLabel() == "Terminal presentation")
+	#expect(terminalPopup?.itemArray.compactMap { $0.representedObject as? String } == ["bottom", "window"])
+	let gitPopup = popups.first { $0.identifier?.rawValue == "git.presentation" }
+	#expect(gitPopup?.accessibilityLabel() == "Git presentation")
+	#expect(gitPopup?.itemArray.compactMap { $0.representedObject as? String } == ["sidebar", "window"])
 }
 
 private func accessibilityLabels(in view: NSView) -> [String] {

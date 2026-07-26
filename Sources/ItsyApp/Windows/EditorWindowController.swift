@@ -134,6 +134,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 }
 
+private enum SecondarySidebarSurface: String {
+	case git
+	case debugger
+}
+
+extension Notification.Name {
+	static let itsySecondarySidebarCloseRequested = Notification.Name("dev.itsy.secondary-sidebar.close-requested")
+}
+
 @MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspManager = LSPManager(registry: LSPServerRegistryLoader.loadOrBundled())
@@ -144,6 +153,13 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private let embeddedTerminalContainer = NSView()
+	private let secondarySidebarContainer = NSView()
+	private let secondarySidebarHeader = NSStackView()
+	private let secondarySidebarTitleLabel = NSTextField(labelWithString: "")
+	private let secondarySidebarSurfaceControl = NSSegmentedControl(labels: ["Git", "Debugger"], trackingMode: .selectOne, target: nil, action: nil)
+	private let secondarySidebarFocusButton = NSButton(title: "Focus", target: nil, action: nil)
+	private let secondarySidebarCloseButton = NSButton(title: "Close", target: nil, action: nil)
+	private let secondarySidebarContentContainer = NSView()
 	private let embeddedGitContainer = NSView()
 	private let embeddedDebuggerContainer = NSView()
 	private var findBarController: FindBarController?
@@ -154,6 +170,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private let tabStackView = NSStackView()
 	private let lspMissingBanner = LSPMissingBanner()
 	private let recoveryBanner = RecoveryBanner()
+	private let settingsBanner = SettingsBanner()
 	private let notificationStack = NSStackView()
 	private var notificationPositionConstraints: [NSLayoutConstraint] = []
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
@@ -162,10 +179,10 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var paneCoordinator = EditorPaneCoordinator()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
-	private var embeddedGitWidthConstraint: NSLayoutConstraint?
-	private var embeddedDebuggerWidthConstraint: NSLayoutConstraint?
+	private var secondarySidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedGitVisible = false
 	private var embeddedDebuggerVisible = false
+	private var secondarySidebarVisible = false
 	private var terminalRequestedVisible = false
 	private var gitRequestedVisible = false
 	private var debuggerRequestedVisible = false
@@ -178,6 +195,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var workbenchGitMode: WorkbenchGitLayoutMode = .full
 	private var sessionSidebarWidth: CGFloat?
 	private var sessionGitWidth: CGFloat?
+	private var sessionDebuggerWidth: CGFloat?
+	private var activeSecondarySidebarSurface: SecondarySidebarSurface = .git
 	private var isApplyingWorkbenchLayout = false
 	private var workbenchPersistenceWorkItem: DispatchWorkItem?
 	private var editorView: MetalTextView {
@@ -190,6 +209,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var paneTabDocuments: [ObjectIdentifier: [ItsyDocument]] = [:]
 	private var paneSelectedDocuments: [ObjectIdentifier: ObjectIdentifier] = [:]
 	private var tabBoundsObserver: NSObjectProtocol?
+	private var settingsChangedObserver: NSObjectProtocol?
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
 	private var completionRequestTask: Task<Void, Never>?
@@ -259,6 +279,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		tabBarView.setContentHuggingPriority(.required, for: .vertical)
 		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
 		recoveryBanner.setContentHuggingPriority(.required, for: .vertical)
+		settingsBanner.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.isHidden = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
@@ -268,6 +289,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		embeddedTerminalContainer.setContentHuggingPriority(.required, for: .vertical)
 		embeddedTerminalHeightConstraint = embeddedTerminalContainer.heightAnchor.constraint(equalToConstant: 0)
 		embeddedTerminalHeightConstraint?.isActive = true
+		secondarySidebarContainer.translatesAutoresizingMaskIntoConstraints = false
 		embeddedGitContainer.translatesAutoresizingMaskIntoConstraints = false
 		embeddedDebuggerContainer.translatesAutoresizingMaskIntoConstraints = false
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
@@ -288,6 +310,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		notificationStack.translatesAutoresizingMaskIntoConstraints = false
 		notificationStack.addArrangedSubview(lspMissingBanner)
 		notificationStack.addArrangedSubview(recoveryBanner)
+		notificationStack.addArrangedSubview(settingsBanner)
 		editorContainer.addSubview(notificationStack)
 		let preferredNotificationWidth = notificationStack.widthAnchor.constraint(equalToConstant: 560)
 		preferredNotificationWidth.priority = .defaultHigh
@@ -323,6 +346,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.isRestorable = true
 		window.contentView = rootSplitView
 		super.init(window: window)
+		configureSecondarySidebar()
+		configureSettingsBanner()
+		settingsChangedObserver = NotificationCenter.default.addObserver(
+			forName: .itsySettingsChanged,
+			object: nil,
+			queue: .main
+		) { [weak self] notification in
+			guard let message = notification.userInfo?[ItsySettingsNotificationUserInfoKey.statusMessage] as? String else { return }
+			let isError = notification.userInfo?[ItsySettingsNotificationUserInfoKey.statusIsError] as? Bool ?? false
+			Task { @MainActor [weak self] in
+				self?.showSettingsApplicationStatus(message, isError: isError)
+			}
+		}
 		rootSplitView.delegate = self
 		let initialSettings = ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
@@ -412,6 +448,9 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			if let tabBoundsObserver {
 				NotificationCenter.default.removeObserver(tabBoundsObserver)
 			}
+			if let settingsChangedObserver {
+				NotificationCenter.default.removeObserver(settingsChangedObserver)
+			}
 		}
 	}
 
@@ -497,14 +536,26 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func setEmbeddedGitVisible(_ visible: Bool) {
+		if visible {
+			selectSecondarySidebarSurface(.git)
+		}
 		gitRequestedVisible = visible
+		if !visible, activeSecondarySidebarSurface == .git {
+			selectSecondarySidebarSurface(.debugger)
+		}
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 		rebuildFocusTraversal()
 	}
 
 	func setEmbeddedDebuggerVisible(_ visible: Bool) {
+		if visible {
+			selectSecondarySidebarSurface(.debugger)
+		}
 		debuggerRequestedVisible = visible
+		if !visible, activeSecondarySidebarSurface == .debugger {
+			selectSecondarySidebarSurface(.git)
+		}
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 		rebuildFocusTraversal()
@@ -518,58 +569,144 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
-	private func setActualEmbeddedGitVisible(_ visible: Bool, width: CGFloat) {
-		guard visible != embeddedGitVisible || (visible && embeddedGitWidthConstraint?.constant != width) else {
+	private func configureSecondarySidebar() {
+		secondarySidebarHeader.orientation = .horizontal
+		secondarySidebarHeader.alignment = .centerY
+		secondarySidebarHeader.spacing = 8
+		secondarySidebarHeader.translatesAutoresizingMaskIntoConstraints = false
+		secondarySidebarTitleLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+		secondarySidebarTitleLabel.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+		secondarySidebarSurfaceControl.target = self
+		secondarySidebarSurfaceControl.action = #selector(secondarySidebarSurfaceDidChange(_:))
+		secondarySidebarSurfaceControl.controlSize = .small
+		secondarySidebarSurfaceControl.setAccessibilityLabel(L10n.string("Secondary sidebar surface"))
+		secondarySidebarFocusButton.target = self
+		secondarySidebarFocusButton.action = #selector(focusSecondarySidebar(_:))
+		secondarySidebarFocusButton.controlSize = .small
+		secondarySidebarCloseButton.target = self
+		secondarySidebarCloseButton.action = #selector(closeSecondarySidebar(_:))
+		secondarySidebarCloseButton.controlSize = .small
+		secondarySidebarHeader.addArrangedSubview(secondarySidebarTitleLabel)
+		secondarySidebarHeader.addArrangedSubview(secondarySidebarSurfaceControl)
+		secondarySidebarHeader.addArrangedSubview(NSView())
+		secondarySidebarHeader.addArrangedSubview(secondarySidebarFocusButton)
+		secondarySidebarHeader.addArrangedSubview(secondarySidebarCloseButton)
+		secondarySidebarContentContainer.translatesAutoresizingMaskIntoConstraints = false
+		secondarySidebarContainer.addSubview(secondarySidebarHeader)
+		secondarySidebarContainer.addSubview(secondarySidebarContentContainer)
+		for container in [embeddedGitContainer, embeddedDebuggerContainer] {
+			container.isHidden = true
+			secondarySidebarContentContainer.addSubview(container)
+		}
+		NSLayoutConstraint.activate([
+			secondarySidebarHeader.leadingAnchor.constraint(equalTo: secondarySidebarContainer.leadingAnchor, constant: 10),
+			secondarySidebarHeader.trailingAnchor.constraint(equalTo: secondarySidebarContainer.trailingAnchor, constant: -8),
+			secondarySidebarHeader.topAnchor.constraint(equalTo: secondarySidebarContainer.topAnchor, constant: 8),
+			secondarySidebarContentContainer.leadingAnchor.constraint(equalTo: secondarySidebarContainer.leadingAnchor),
+			secondarySidebarContentContainer.trailingAnchor.constraint(equalTo: secondarySidebarContainer.trailingAnchor),
+			secondarySidebarContentContainer.topAnchor.constraint(equalTo: secondarySidebarHeader.bottomAnchor, constant: 6),
+			secondarySidebarContentContainer.bottomAnchor.constraint(equalTo: secondarySidebarContainer.bottomAnchor),
+		])
+		for container in [embeddedGitContainer, embeddedDebuggerContainer] {
+			NSLayoutConstraint.activate([
+				container.leadingAnchor.constraint(equalTo: secondarySidebarContentContainer.leadingAnchor),
+				container.trailingAnchor.constraint(equalTo: secondarySidebarContentContainer.trailingAnchor),
+				container.topAnchor.constraint(equalTo: secondarySidebarContentContainer.topAnchor),
+				container.bottomAnchor.constraint(equalTo: secondarySidebarContentContainer.bottomAnchor),
+			])
+		}
+		updateSecondarySidebarHeader()
+	}
+
+	private func setActualEmbeddedGitVisible(_ visible: Bool) {
+		embeddedGitVisible = visible
+		embeddedGitContainer.isHidden = !visible
+	}
+
+	private func setActualEmbeddedDebuggerVisible(_ visible: Bool) {
+		embeddedDebuggerVisible = visible
+		embeddedDebuggerContainer.isHidden = !visible
+	}
+
+	private func setActualSecondarySidebarVisible(_ visible: Bool, width: CGFloat) {
+		guard visible != secondarySidebarVisible || (visible && secondarySidebarWidthConstraint?.constant != width) else {
 			return
 		}
-		embeddedGitVisible = visible
+		secondarySidebarVisible = visible
 		if visible {
-			if !rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
-				let index = rootSplitView.arrangedSubviews.firstIndex(of: embeddedDebuggerContainer)
-					?? rootSplitView.arrangedSubviews.count
-				rootSplitView.insertArrangedSubview(embeddedGitContainer, at: index)
+			if !rootSplitView.arrangedSubviews.contains(secondarySidebarContainer) {
+				rootSplitView.addArrangedSubview(secondarySidebarContainer)
 			}
-			if embeddedGitWidthConstraint == nil {
-				let constraint = embeddedGitContainer.widthAnchor.constraint(equalToConstant: width)
+			if secondarySidebarWidthConstraint == nil {
+				let constraint = secondarySidebarContainer.widthAnchor.constraint(equalToConstant: width)
 				constraint.priority = .defaultHigh
 				constraint.isActive = true
-				embeddedGitWidthConstraint = constraint
+				secondarySidebarWidthConstraint = constraint
 			}
-			embeddedGitWidthConstraint?.constant = width
+			secondarySidebarWidthConstraint?.constant = width
 		} else {
-			if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
-				rootSplitView.removeArrangedSubview(embeddedGitContainer)
-				embeddedGitContainer.removeFromSuperview()
+			if rootSplitView.arrangedSubviews.contains(secondarySidebarContainer) {
+				rootSplitView.removeArrangedSubview(secondarySidebarContainer)
+				secondarySidebarContainer.removeFromSuperview()
 			}
-			embeddedGitWidthConstraint?.isActive = false
-			embeddedGitWidthConstraint = nil
+			secondarySidebarWidthConstraint?.isActive = false
+			secondarySidebarWidthConstraint = nil
 		}
 	}
 
-	private func setActualEmbeddedDebuggerVisible(_ visible: Bool, width: CGFloat) {
-		guard visible != embeddedDebuggerVisible || (visible && embeddedDebuggerWidthConstraint?.constant != width) else {
-			return
+	private func selectSecondarySidebarSurface(_ surface: SecondarySidebarSurface) {
+		guard activeSecondarySidebarSurface != surface else { return }
+		rememberActiveSecondarySidebarWidth()
+		activeSecondarySidebarSurface = surface
+		updateSecondarySidebarHeader()
+	}
+
+	private func rememberActiveSecondarySidebarWidth() {
+		guard secondarySidebarVisible, secondarySidebarContainer.frame.width > 0 else { return }
+		switch activeSecondarySidebarSurface {
+		case .git:
+			sessionGitWidth = secondarySidebarContainer.frame.width
+		case .debugger:
+			sessionDebuggerWidth = secondarySidebarContainer.frame.width
 		}
-		embeddedDebuggerVisible = visible
-		if visible {
-			if !rootSplitView.arrangedSubviews.contains(embeddedDebuggerContainer) {
-				rootSplitView.addArrangedSubview(embeddedDebuggerContainer)
-			}
-			if embeddedDebuggerWidthConstraint == nil {
-				let constraint = embeddedDebuggerContainer.widthAnchor.constraint(equalToConstant: width)
-				constraint.priority = .defaultHigh
-				constraint.isActive = true
-				embeddedDebuggerWidthConstraint = constraint
-			}
-			embeddedDebuggerWidthConstraint?.constant = width
-		} else {
-			if rootSplitView.arrangedSubviews.contains(embeddedDebuggerContainer) {
-				rootSplitView.removeArrangedSubview(embeddedDebuggerContainer)
-				embeddedDebuggerContainer.removeFromSuperview()
-			}
-			embeddedDebuggerWidthConstraint?.isActive = false
-			embeddedDebuggerWidthConstraint = nil
-		}
+	}
+
+	private func updateSecondarySidebarHeader() {
+		let isDebugger = activeSecondarySidebarSurface == .debugger
+		let title = isDebugger ? L10n.string("Debugger") : L10n.string("Git")
+		secondarySidebarTitleLabel.stringValue = title
+		secondarySidebarSurfaceControl.selectedSegment = isDebugger ? 1 : 0
+		secondarySidebarSurfaceControl.isHidden = !(gitRequestedVisible && debuggerRequestedVisible)
+		secondarySidebarContainer.setAccessibilityLabel(L10n.string("\(title) sidebar"))
+		secondarySidebarContainer.setAccessibilityValue(title)
+		secondarySidebarFocusButton.setAccessibilityLabel(L10n.string("Focus \(title) sidebar"))
+		secondarySidebarCloseButton.setAccessibilityLabel(L10n.string("Close \(title) sidebar"))
+	}
+
+	@objc private func secondarySidebarSurfaceDidChange(_: Any?) {
+		selectSecondarySidebarSurface(secondarySidebarSurfaceControl.selectedSegment == 1 ? .debugger : .git)
+		applyResponsiveWorkbenchLayout()
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
+	@objc private func focusSecondarySidebar(_: Any?) {
+		focusSecondarySidebar()
+	}
+
+	@objc private func closeSecondarySidebar(_: Any?) {
+		NotificationCenter.default.post(
+			name: .itsySecondarySidebarCloseRequested,
+			object: self,
+			userInfo: ["surface": activeSecondarySidebarSurface.rawValue]
+		)
+	}
+
+	func focusSecondarySidebar() {
+		guard secondarySidebarVisible else { return }
+		let target = activeSecondarySidebarSurface == .git ? embeddedGitContainer : embeddedDebuggerContainer
+		guard let responder = focusTarget(in: target) else { return }
+		window?.makeFirstResponder(responder)
 	}
 
 	func focusSidebar() {
@@ -627,8 +764,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if position == .leading {
 			return 0
 		}
-		return rootSplitView.arrangedSubviews.firstIndex(of: embeddedGitContainer)
-			?? rootSplitView.arrangedSubviews.firstIndex(of: embeddedDebuggerContainer)
+		return rootSplitView.arrangedSubviews.firstIndex(of: secondarySidebarContainer)
 			?? rootSplitView.arrangedSubviews.count
 	}
 
@@ -677,12 +813,32 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		applySidebarVisibility()
 		embeddedTerminalContainer.isHidden = !result.showsTerminal
 		embeddedTerminalHeightConstraint?.constant = result.terminalHeight
-		setActualEmbeddedDebuggerVisible(debuggerRequestedVisible, width: 340)
 		let gitAllowed = workbenchConfiguration.git != .hidden
-		let debuggerWidth: CGFloat = embeddedDebuggerVisible ? 340 : 0
-		let availableGitWidth = max(300, bounds.width - result.sidebarWidth - debuggerWidth - 240)
-		let gitWidth = min(sessionGitWidth ?? result.gitWidth, availableGitWidth)
-		setActualEmbeddedGitVisible(gitRequestedVisible && gitAllowed, width: max(300, gitWidth))
+		let gitRequested = gitRequestedVisible && gitAllowed
+		let debuggerRequested = debuggerRequestedVisible
+		if !gitRequested, activeSecondarySidebarSurface == .git {
+			activeSecondarySidebarSurface = .debugger
+		}
+		if !debuggerRequested, activeSecondarySidebarSurface == .debugger {
+			activeSecondarySidebarSurface = .git
+		}
+		let secondaryRequested = gitRequested || debuggerRequested
+		let scale = max(CGFloat(layoutSettings.interfaceScale), 0.8)
+		let editorMinimum = WorkbenchComponents.registry[.editor]?.minimumWidth ?? 480
+		let secondaryMinimum = max(260 * scale, WorkbenchComponents.registry[.git]?.minimumWidth ?? 320)
+		let availableSecondaryWidth = bounds.width - (result.showsFileTree ? result.sidebarWidth : 0) - editorMinimum * scale
+		let secondaryFits = secondaryRequested && availableSecondaryWidth >= secondaryMinimum
+		let preferredSecondaryWidth: CGFloat = switch activeSecondarySidebarSurface {
+		case .git:
+			sessionGitWidth ?? result.gitWidth
+		case .debugger:
+			sessionDebuggerWidth ?? 340
+		}
+		let secondaryWidth = min(preferredSecondaryWidth, max(secondaryMinimum, availableSecondaryWidth))
+		setActualSecondarySidebarVisible(secondaryFits, width: secondaryWidth)
+		setActualEmbeddedGitVisible(secondaryFits && gitRequested && activeSecondarySidebarSurface == .git)
+		setActualEmbeddedDebuggerVisible(secondaryFits && debuggerRequested && activeSecondarySidebarSurface == .debugger)
+		updateSecondarySidebarHeader()
 	}
 
 	private func invalidateEditorShellLayout() {
@@ -699,6 +855,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 		embeddedTerminalContainer.needsLayout = true
 		embeddedTerminalContainer.layoutSubtreeIfNeeded()
+		secondarySidebarContainer.needsLayout = true
+		secondarySidebarContainer.layoutSubtreeIfNeeded()
 		embeddedGitContainer.needsLayout = true
 		embeddedGitContainer.layoutSubtreeIfNeeded()
 		embeddedDebuggerContainer.needsLayout = true
@@ -909,6 +1067,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		}
 	}
 
+	private func configureSettingsBanner() {
+		settingsBanner.openSettingsRequested = {
+			NSApp.sendAction(#selector(AppCoordinator.showSettings(_:)), to: nil, from: nil)
+		}
+	}
+
+	private func showSettingsApplicationStatus(_ message: String, isError: Bool) {
+		settingsBanner.show(message: message, isError: isError)
+		ItsyUIConfiguration.applyToastStyle(to: settingsBanner)
+		invalidateEditorShellLayout()
+	}
+
 	private func applyNotificationPosition(_ settings: ItsySettings.UISettings) {
 		NSLayoutConstraint.deactivate(notificationPositionConstraints)
 		let inset = max(CGFloat(settings.padding) * 2, 12)
@@ -921,6 +1091,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		NSLayoutConstraint.activate(notificationPositionConstraints)
 		ItsyUIConfiguration.applyToastStyle(to: lspMissingBanner)
 		ItsyUIConfiguration.applyToastStyle(to: recoveryBanner)
+		ItsyUIConfiguration.applyToastStyle(to: settingsBanner)
 	}
 
 	private func refreshRecoveryBanner(for document: ItsyDocument) {
@@ -1519,18 +1690,20 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	var workspaceWorkbenchDividerState: WorkspaceWorkbenchDividerState? {
-		guard sessionSidebarWidth != nil || sessionGitWidth != nil else {
+		guard sessionSidebarWidth != nil || sessionGitWidth != nil || sessionDebuggerWidth != nil else {
 			return nil
 		}
 		return WorkspaceWorkbenchDividerState(
 			sidebarWidth: sessionSidebarWidth.map(Double.init),
-			gitWidth: sessionGitWidth.map(Double.init)
+			gitWidth: sessionGitWidth.map(Double.init),
+			debuggerWidth: sessionDebuggerWidth.map(Double.init)
 		)
 	}
 
 	func restoreWorkspaceWorkbenchDividerState(_ state: WorkspaceWorkbenchDividerState?) {
 		sessionSidebarWidth = state?.sidebarWidth.map { CGFloat($0) }
 		sessionGitWidth = state?.gitWidth.map { CGFloat($0) }
+		sessionDebuggerWidth = state?.debuggerWidth.map { CGFloat($0) }
 		applyResponsiveWorkbenchLayout()
 	}
 
@@ -1648,11 +1821,8 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		if !embeddedTerminalContainer.isHidden, let terminal = focusTarget(in: embeddedTerminalContainer) {
 			targets.append(terminal)
 		}
-		if embeddedGitVisible, let git = focusTarget(in: embeddedGitContainer) {
-			targets.append(git)
-		}
-		if embeddedDebuggerVisible, let debugger = focusTarget(in: embeddedDebuggerContainer) {
-			targets.append(debugger)
+		if secondarySidebarVisible, let secondary = focusTarget(in: activeSecondarySidebarSurface == .git ? embeddedGitContainer : embeddedDebuggerContainer) {
+			targets.append(secondary)
 		}
 		focusTraversalTargetsForTesting = targets
 		guard let first = targets.first else {
@@ -4960,8 +5130,13 @@ extension EditorWindowController: NSWindowDelegate, NSSplitViewDelegate {
 		if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
 			sessionSidebarWidth = fileTreeController.view.frame.width
 		}
-		if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
-			sessionGitWidth = embeddedGitContainer.frame.width
+		if rootSplitView.arrangedSubviews.contains(secondarySidebarContainer) {
+			switch activeSecondarySidebarSurface {
+			case .git:
+				sessionGitWidth = secondarySidebarContainer.frame.width
+			case .debugger:
+				sessionDebuggerWidth = secondarySidebarContainer.frame.width
+			}
 		}
 		persistWorkbenchDividerStateSoon()
 	}

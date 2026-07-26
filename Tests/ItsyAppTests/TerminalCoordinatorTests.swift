@@ -132,7 +132,7 @@ import Testing
 		activeDocumentProvider: { nil },
 		sessionFactory: terminalCoordinatorTestSession,
 		embeddedHostProvider: { host },
-		setEmbeddedTerminalVisible: { visibility.append($0) }
+		setEmbeddedTerminalVisible: { _, visible in visibility.append(visible) }
 	)
 	defer { coordinator.terminate() }
 
@@ -144,6 +144,67 @@ import Testing
 
 	coordinator.showTerminal(nil)
 	#expect(visibility == [true, false])
+}
+
+@Test @MainActor func terminalCoordinatorRelocatesActivePresentation() throws {
+	_ = NSApplication.shared
+	let host = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var settings = ItsySettings.TerminalSettings()
+	var visibility: [Bool] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { settings },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { host },
+		setEmbeddedTerminalVisible: { _, visible in visibility.append(visible) }
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	settings.presentation = .window
+	coordinator.applyTerminalSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Terminal" && $0.isVisible })
+	defer { panel.close() }
+	#expect(host.subviews.isEmpty)
+	#expect(visibility == [true, false])
+
+	settings.presentation = .bottom
+	coordinator.applyTerminalSettings(settings)
+	#expect(!panel.isVisible)
+	#expect(host.subviews.count == 1)
+	#expect(visibility == [true, false, true])
+}
+
+@Test @MainActor func terminalCoordinatorKeepsTheOriginatingHostAcrossPresentationReloads() throws {
+	_ = NSApplication.shared
+	let firstHost = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	let secondHost = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var activeHost = firstHost
+	var settings = ItsySettings.TerminalSettings()
+	var visibility: [String] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { settings },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { activeHost },
+		setEmbeddedTerminalVisible: { host, visible in
+			visibility.append("\(host === firstHost ? "first" : "second"):\(visible)")
+		}
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	activeHost = secondHost
+	settings.presentation = .window
+	coordinator.applyTerminalSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Terminal" && $0.isVisible })
+	defer { panel.close() }
+	settings.presentation = .bottom
+	coordinator.applyTerminalSettings(settings)
+
+	#expect(visibility == ["first:true", "first:false", "first:true"])
+	#expect(firstHost.subviews.count == 1)
+	#expect(secondHost.subviews.isEmpty)
 }
 
 @MainActor private func terminalCoordinatorTestSession(_ directory: URL) -> ItsyTerminalSession {

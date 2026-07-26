@@ -3,6 +3,13 @@ import Foundation
 import ItsyConfig
 import ItsyDebugger
 
+private enum DebuggerSurface: Int {
+	case callStack
+	case variables
+	case watches
+	case console
+}
+
 @MainActor final class DebuggerCoordinator: NSObject, NSOutlineViewDataSource, NSOutlineViewDelegate {
 	private let documentController: ItsyDocumentController
 	private lazy var launchCoordinator = DebugLaunchCoordinator(
@@ -24,12 +31,18 @@ import ItsyDebugger
 	}
 	private var activeSession: DebugAppSession?
 	private var callStackPanel: NSPanel?
+	private var debuggerContentView: NSView?
+	private var debuggerSurfaceHost: NSView?
+	private var debuggerSurfaceControl: NSSegmentedControl?
+	private var debuggerSurfaceConstraints: [NSLayoutConstraint] = []
+	private var activeDebuggerSurface: DebuggerSurface = .callStack
 	private var callStackContentView: NSView?
 	private var callStackEmbeddingConstraints: [NSLayoutConstraint] = []
 	private var embeddedCallStackVisible = false
 	private let settingsProvider: () -> ItsySettings.DebuggerSettings
 	private let embeddedHostProvider: () -> NSView?
-	private let setEmbeddedDebuggerVisible: (Bool) -> Void
+	private let setEmbeddedDebuggerVisible: (NSView, Bool) -> Void
+	private weak var presentationHost: NSView?
 	private var callStackStatusLabel: NSTextField?
 	private var callStackOutlineView: NSOutlineView?
 	private var callStackNodes: [DebugCallStackThreadNode] = []
@@ -42,7 +55,7 @@ import ItsyDebugger
 		documentController: ItsyDocumentController,
 		settingsProvider: @escaping () -> ItsySettings.DebuggerSettings = { ItsySettings.DebuggerSettings() },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
-		setEmbeddedDebuggerVisible: @escaping (Bool) -> Void = { _ in }
+		setEmbeddedDebuggerVisible: @escaping (NSView, Bool) -> Void = { _, _ in }
 	) {
 		self.documentController = documentController
 		self.settingsProvider = settingsProvider
@@ -60,15 +73,15 @@ import ItsyDebugger
 	}
 
 	@objc func showVariables(_ sender: Any?) {
-		variablesCoordinator.showVariables(sender)
+		showDebuggerSurface(.variables, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	@objc func showWatches(_ sender: Any?) {
-		watchesCoordinator.showWatches(sender)
+		showDebuggerSurface(.watches, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	@objc func showConsole(_ sender: Any?) {
-		consoleCoordinator.showConsole(sender)
+		showDebuggerSurface(.console, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	@objc func continueDebug(_ sender: Any?) {
@@ -118,10 +131,15 @@ import ItsyDebugger
 	}
 
 	func applyDebuggerSettings(_ settings: ItsySettings.DebuggerSettings) {
-		if settings.presentation == .window, embeddedCallStackVisible {
-			embeddedCallStackVisible = false
-			setEmbeddedDebuggerVisible(false)
-			detachEmbeddedCallStackContent()
+		switch settings.presentation {
+		case .sidebar:
+			if callStackPanel?.isVisible == true {
+				showEmbeddedCallStack(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+			}
+		case .window:
+			if embeddedCallStackVisible {
+				showDetachedCallStack(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+			}
 		}
 	}
 
@@ -151,7 +169,7 @@ import ItsyDebugger
 			panel.isReleasedWhenClosed = false
 			callStackPanel = panel
 		}
-		let contentView = makeCallStackContentViewIfNeeded()
+		let contentView = makeDebuggerContentViewIfNeeded()
 		detachEmbeddedCallStackContent()
 		contentView.removeFromSuperview()
 		panel.contentView = contentView
@@ -159,11 +177,18 @@ import ItsyDebugger
 	}
 
 	private func toggleCallStack(relativeTo hostWindow: NSWindow?) {
+		let wasActive = activeDebuggerSurface == .callStack
+		selectDebuggerSurface(.callStack)
+		capturePresentationHostIfNeeded()
 		switch settingsProvider().presentation {
 		case .sidebar:
-			toggleEmbeddedCallStack(relativeTo: hostWindow)
+			if embeddedCallStackVisible, wasActive {
+				closeEmbeddedCallStack()
+			} else {
+				showEmbeddedCallStack(relativeTo: hostWindow)
+			}
 		case .window:
-			if callStackPanel?.isVisible == true {
+			if callStackPanel?.isVisible == true, wasActive {
 				callStackPanel?.close()
 				return
 			}
@@ -173,7 +198,10 @@ import ItsyDebugger
 
 	private func showDetachedCallStack(relativeTo hostWindow: NSWindow?) {
 		embeddedCallStackVisible = false
-		setEmbeddedDebuggerVisible(false)
+		if let host = presentationHost ?? embeddedHostProvider() {
+			presentationHost = host
+			setEmbeddedDebuggerVisible(host, false)
+		}
 		let panel = makeCallStackPanelIfNeeded()
 		center(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
@@ -181,29 +209,132 @@ import ItsyDebugger
 	}
 
 	private func toggleEmbeddedCallStack(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedCallStack(relativeTo: hostWindow)
 			return
 		}
-		if embeddedCallStackVisible, callStackContentView?.superview === host {
-			embeddedCallStackVisible = false
-			setEmbeddedDebuggerVisible(false)
+		presentationHost = host
+		if embeddedCallStackVisible, debuggerContentView?.superview === host {
+			closeEmbeddedCallStack()
 			return
 		}
 		showEmbeddedCallStack(relativeTo: hostWindow)
 	}
 
 	private func showEmbeddedCallStack(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedCallStack(relativeTo: hostWindow)
 			return
 		}
-		let contentView = makeCallStackContentViewIfNeeded()
+		presentationHost = host
+		let contentView = makeDebuggerContentViewIfNeeded()
 		callStackPanel?.orderOut(nil)
+		setEmbeddedDebuggerVisible(host, true)
 		embedCallStackContent(contentView, in: host)
 		embeddedCallStackVisible = true
-		setEmbeddedDebuggerVisible(true)
 		refreshCallStack(nil)
+	}
+
+	func closeEmbeddedCallStack() {
+		guard embeddedCallStackVisible, let host = presentationHost else { return }
+		embeddedCallStackVisible = false
+		setEmbeddedDebuggerVisible(host, false)
+	}
+
+	private func capturePresentationHostIfNeeded() {
+		guard !embeddedCallStackVisible, callStackPanel?.isVisible != true else { return }
+		presentationHost = embeddedHostProvider()
+	}
+
+	private func showDebuggerSurface(_ surface: DebuggerSurface, relativeTo hostWindow: NSWindow?) {
+		selectDebuggerSurface(surface)
+		capturePresentationHostIfNeeded()
+		switch settingsProvider().presentation {
+		case .sidebar:
+			showEmbeddedCallStack(relativeTo: hostWindow)
+		case .window:
+			showDetachedCallStack(relativeTo: hostWindow)
+		}
+	}
+
+	private func makeDebuggerContentViewIfNeeded() -> NSView {
+		if let debuggerContentView {
+			return debuggerContentView
+		}
+		let contentView = NSView(frame: NSRect(x: 0, y: 0, width: 620, height: 520))
+		let surfaceControl = NSSegmentedControl(
+			labels: [L10n.string("Call Stack"), L10n.string("Variables"), L10n.string("Watches"), L10n.string("Console")],
+			trackingMode: .selectOne,
+			target: self,
+			action: #selector(debuggerSurfaceDidChange(_:))
+		)
+		surfaceControl.controlSize = .small
+		surfaceControl.setAccessibilityLabel(L10n.string("Debugger surface"))
+		let surfaceHost = NSView()
+		surfaceControl.translatesAutoresizingMaskIntoConstraints = false
+		surfaceHost.translatesAutoresizingMaskIntoConstraints = false
+		contentView.addSubview(surfaceControl)
+		contentView.addSubview(surfaceHost)
+		NSLayoutConstraint.activate([
+			surfaceControl.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
+			surfaceControl.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -10),
+			surfaceControl.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+			surfaceHost.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+			surfaceHost.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+			surfaceHost.topAnchor.constraint(equalTo: surfaceControl.bottomAnchor, constant: 8),
+			surfaceHost.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+		])
+		debuggerContentView = contentView
+		debuggerSurfaceHost = surfaceHost
+		debuggerSurfaceControl = surfaceControl
+		selectDebuggerSurface(activeDebuggerSurface)
+		return contentView
+	}
+
+	private func selectDebuggerSurface(_ surface: DebuggerSurface) {
+		activeDebuggerSurface = surface
+		debuggerSurfaceControl?.selectedSegment = surface.rawValue
+		guard let host = debuggerSurfaceHost else { return }
+		let selectedView: NSView = switch surface {
+		case .callStack:
+			makeCallStackContentViewIfNeeded()
+		case .variables:
+			variablesCoordinator.debuggerContentView()
+		case .watches:
+			watchesCoordinator.debuggerContentView()
+		case .console:
+			consoleCoordinator.debuggerContentView()
+		}
+		if selectedView.superview !== host {
+			selectedView.removeFromSuperview()
+			selectedView.translatesAutoresizingMaskIntoConstraints = false
+			host.addSubview(selectedView)
+			debuggerSurfaceConstraints += [
+				selectedView.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+				selectedView.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+				selectedView.topAnchor.constraint(equalTo: host.topAnchor),
+				selectedView.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+			]
+			NSLayoutConstraint.activate(Array(debuggerSurfaceConstraints.suffix(4)))
+		}
+		for view in host.subviews {
+			view.isHidden = view !== selectedView
+		}
+		switch surface {
+		case .callStack:
+			refreshCallStack(nil)
+		case .variables:
+			variablesCoordinator.prepareForDebuggerPresentation()
+		case .watches:
+			watchesCoordinator.prepareForDebuggerPresentation()
+		case .console:
+			consoleCoordinator.prepareForDebuggerPresentation()
+		}
+	}
+
+	@objc private func debuggerSurfaceDidChange(_: Any?) {
+		guard let control = debuggerSurfaceControl, let surface = DebuggerSurface(rawValue: control.selectedSegment) else { return }
+		selectDebuggerSurface(surface)
 	}
 
 	private func makeCallStackContentViewIfNeeded() -> NSView {

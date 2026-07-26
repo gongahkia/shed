@@ -101,7 +101,8 @@ struct GitResponsiveViewState: Equatable {
 	private var embeddedGitVisible = false
 	private let settingsProvider: () -> ItsySettings.GitSettings
 	private let embeddedHostProvider: () -> NSView?
-	private let setEmbeddedGitVisible: (Bool) -> Void
+	private let setEmbeddedGitVisible: (NSView, Bool) -> Void
+	private weak var presentationHost: NSView?
 	private var gitStatusLabel: NSTextField?
 	private var gitTableView: NSTableView?
 	private var gitBranchButton: NSButton?
@@ -200,7 +201,7 @@ struct GitResponsiveViewState: Equatable {
 		activeDocumentProvider: @escaping () -> NSDocument?,
 		settingsProvider: @escaping () -> ItsySettings.GitSettings = { ItsySettings.GitSettings() },
 		embeddedHostProvider: @escaping () -> NSView? = { nil },
-		setEmbeddedGitVisible: @escaping (Bool) -> Void = { _ in }
+		setEmbeddedGitVisible: @escaping (NSView, Bool) -> Void = { _, _ in }
 	) {
 		self.documentController = documentController
 		self.activeDocumentProvider = activeDocumentProvider
@@ -235,11 +236,20 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	func applyGitSettings(_ settings: ItsySettings.GitSettings) {
-		if settings.presentation == .window, embeddedGitVisible {
-			embeddedGitVisible = false
-			setEmbeddedGitVisible(false)
-			detachEmbeddedGitContent()
+		switch settings.presentation {
+		case .sidebar:
+			if gitPanel?.isVisible == true {
+				showEmbeddedGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+			}
+		case .window:
+			if embeddedGitVisible {
+				showDetachedGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+			}
 		}
+	}
+
+	func ensureGitChangesVisible() {
+		showGitChanges(relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 	}
 
 	func makeGitContentViewForTesting(width: CGFloat) -> NSView {
@@ -277,6 +287,7 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	private func toggleGitChanges(relativeTo hostWindow: NSWindow?) {
+		capturePresentationHostIfNeeded()
 		switch settingsProvider().presentation {
 		case .sidebar:
 			toggleEmbeddedGitChanges(relativeTo: hostWindow)
@@ -289,11 +300,18 @@ struct GitResponsiveViewState: Equatable {
 		}
 	}
 
+	func closeEmbeddedGitChanges() {
+		guard embeddedGitVisible, let host = presentationHost else { return }
+		embeddedGitVisible = false
+		setEmbeddedGitVisible(host, false)
+	}
+
 	private func closeGitChanges() {
 		gitPanel?.close()
 	}
 
 	private func showGitChanges(relativeTo hostWindow: NSWindow?) {
+		capturePresentationHostIfNeeded()
 		switch settingsProvider().presentation {
 		case .sidebar:
 			showEmbeddedGitChanges(relativeTo: hostWindow)
@@ -304,7 +322,10 @@ struct GitResponsiveViewState: Equatable {
 
 	private func showDetachedGitChanges(relativeTo hostWindow: NSWindow?) {
 		embeddedGitVisible = false
-		setEmbeddedGitVisible(false)
+		if let host = presentationHost ?? embeddedHostProvider() {
+			presentationHost = host
+			setEmbeddedGitVisible(host, false)
+		}
 		let panel = makeGitPanelIfNeeded()
 		centerGitPanel(panel, relativeTo: hostWindow)
 		panel.makeKeyAndOrderFront(nil)
@@ -312,29 +333,35 @@ struct GitResponsiveViewState: Equatable {
 	}
 
 	private func toggleEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedGitChanges(relativeTo: hostWindow)
 			return
 		}
+		presentationHost = host
 		if embeddedGitVisible, gitContentView?.superview === host {
-			embeddedGitVisible = false
-			setEmbeddedGitVisible(false)
+			closeEmbeddedGitChanges()
 			return
 		}
 		showEmbeddedGitChanges(relativeTo: hostWindow)
 	}
 
 	private func showEmbeddedGitChanges(relativeTo hostWindow: NSWindow?) {
-		guard let host = embeddedHostProvider() else {
+		guard let host = presentationHost ?? embeddedHostProvider() else {
 			showDetachedGitChanges(relativeTo: hostWindow)
 			return
 		}
+		presentationHost = host
 		let contentView = makeGitContentViewIfNeeded()
 		gitPanel?.orderOut(nil)
+		setEmbeddedGitVisible(host, true)
 		embedGitContent(contentView, in: host)
 		embeddedGitVisible = true
-		setEmbeddedGitVisible(true)
 		refreshGitChanges(nil)
+	}
+
+	private func capturePresentationHostIfNeeded() {
+		guard !embeddedGitVisible, gitPanel?.isVisible != true else { return }
+		presentationHost = embeddedHostProvider()
 	}
 
 	private func makeGitPanelIfNeeded() -> NSPanel {

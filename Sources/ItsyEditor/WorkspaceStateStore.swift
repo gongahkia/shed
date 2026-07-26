@@ -45,10 +45,12 @@ public struct WorkspacePaneState: Codable, Equatable, Sendable {
 public struct WorkspaceWorkbenchDividerState: Codable, Equatable, Sendable {
 	public var sidebarWidth: Double?
 	public var gitWidth: Double?
+	public var debuggerWidth: Double?
 
-	public init(sidebarWidth: Double? = nil, gitWidth: Double? = nil) {
+	public init(sidebarWidth: Double? = nil, gitWidth: Double? = nil, debuggerWidth: Double? = nil) {
 		self.sidebarWidth = sidebarWidth
 		self.gitWidth = gitWidth
+		self.debuggerWidth = debuggerWidth
 	}
 }
 

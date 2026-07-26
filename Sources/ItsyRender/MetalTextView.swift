@@ -151,8 +151,7 @@ struct MetalFragmentUniforms {
 }
 
 private struct LineShapeCacheKey: Hashable {
-	var lowerBound: Int
-	var upperBound: Int
+	var line: String
 	var fontName: String
 	var fontSizeKey: Int
 	var renderingMode: GlyphAtlas.RenderingMode
@@ -380,7 +379,6 @@ public final class MetalTextView: NSView {
 	}
 	public var editor = Editor() {
 		didSet {
-			lineShapeCache.removeAll(keepingCapacity: true)
 			syncEditorState()
 		}
 	}
@@ -1248,15 +1246,15 @@ public final class MetalTextView: NSView {
 		let fontSizeKey = Self.scaleKey(for: textFontPointSize)
 		for slot in visibleLineSlots() {
 			let lineRange = slot.range
+			let line = editor.textStorage.substring(lineRange)
 			let key = LineShapeCacheKey(
-				lowerBound: lineRange.lowerBound,
-				upperBound: lineRange.upperBound,
+				line: line,
 				fontName: fontName,
 				fontSizeKey: fontSizeKey,
 				renderingMode: renderingMode,
 				scaleKey: scaleKey
 			)
-			let glyphs = cachedGlyphs(for: key, lineRange: lineRange, scale: scale, shaper: shaper)
+			let glyphs = cachedGlyphs(for: key, line: line, scale: scale, shaper: shaper)
 			guard !glyphs.isEmpty else {
 				continue
 			}
@@ -1286,15 +1284,15 @@ public final class MetalTextView: NSView {
 		for slot in visibleLineSlots() {
 			let lineIndex = slot.line
 			let lineRange = slot.range
+			let line = editor.textStorage.substring(lineRange)
 			let key = LineShapeCacheKey(
-				lowerBound: lineRange.lowerBound,
-				upperBound: lineRange.upperBound,
+				line: line,
 				fontName: fontName,
 				fontSizeKey: fontSizeKey,
 				renderingMode: renderingMode,
 				scaleKey: scaleKey
 			)
-			let glyphs = cachedGlyphs(for: key, lineRange: lineRange, scale: scale, shaper: shaper)
+			let glyphs = cachedGlyphs(for: key, line: line, scale: scale, shaper: shaper)
 			guard !glyphs.isEmpty else {
 				continue
 			}
@@ -1351,7 +1349,7 @@ public final class MetalTextView: NSView {
 
 	private func cachedGlyphs(
 		for key: LineShapeCacheKey,
-		lineRange: Range<Int>,
+		line: String,
 		scale: CGFloat,
 		shaper: LineShaper
 	) -> [CachedLineGlyph] {
@@ -1360,7 +1358,6 @@ public final class MetalTextView: NSView {
 			return cached
 		}
 		lineShapeCacheMisses += 1
-		let line = editor.textStorage.substring(lineRange)
 		guard !line.isEmpty, let cached = shapeCachedGlyphs(line: line, scale: scale, shaper: shaper) else {
 			return []
 		}

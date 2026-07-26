@@ -89,6 +89,7 @@ extension Notification.Name {
 	private var findBarController: FindBarController?
 	private var findSettings = ItsySettings.FindSettings()
 	private var layoutSettings = ItsySettings.LayoutSettings()
+	private let tabBarContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 32))
 	private let tabScrollView = NSScrollView()
 	private let tabStackView = NSStackView()
@@ -97,6 +98,7 @@ extension Notification.Name {
 	private let settingsBanner = SettingsBanner()
 	private let notificationStack = NSStackView()
 	private var notificationPositionConstraints: [NSLayoutConstraint] = []
+	private let statusBarContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarView = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 18))
 	private let statusBarLabel = NSTextField(labelWithString: "")
 	private let lspStatusButton = NSButton(title: "", target: nil, action: nil)
@@ -124,8 +126,14 @@ extension Notification.Name {
 	private var activeSecondarySidebarSurface: SecondarySidebarSurface = .git
 	private var isApplyingWorkbenchLayout = false
 	private var workbenchPersistenceWorkItem: DispatchWorkItem?
-	private lazy var workbenchComponentHost = WorkbenchComponentHostController(mountPoints: [.fileTree: fileTreeContainer])
+	private lazy var workbenchComponentHost = WorkbenchComponentHostController(mountPoints: [
+		.fileTree: fileTreeContainer,
+		.tabBar: tabBarContainer,
+		.statusBar: statusBarContainer,
+	])
 	private lazy var fileTreeWorkbenchComponent = FileTreeWorkbenchComponent(controller: fileTreeController)
+	private lazy var tabBarWorkbenchComponent = ViewWorkbenchComponent(id: .tabBar, view: tabBarView)
+	private lazy var statusBarWorkbenchComponent = ViewWorkbenchComponent(id: .statusBar, view: statusBarView)
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -188,14 +196,19 @@ extension Notification.Name {
 		editorStack.alignment = .width
 		editorStack.distribution = .fill
 		editorStack.spacing = 0
-		tabBarHeightConstraint = Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
-		statusBarHeightConstraint = Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
-		tabBarView.setContentHuggingPriority(.required, for: .vertical)
+		Self.configureTabBarView(tabBarView, scrollView: tabScrollView, stackView: tabStackView)
+		Self.configureStatusBarView(statusBarView, label: statusBarLabel, lspButton: lspStatusButton)
+		tabBarContainer.setContentHuggingPriority(.required, for: .vertical)
 		lspMissingBanner.setContentHuggingPriority(.required, for: .vertical)
 		recoveryBanner.setContentHuggingPriority(.required, for: .vertical)
 		settingsBanner.setContentHuggingPriority(.required, for: .vertical)
-		statusBarView.setContentHuggingPriority(.required, for: .vertical)
+		statusBarContainer.setContentHuggingPriority(.required, for: .vertical)
 		statusBarView.isHidden = true
+		statusBarContainer.isHidden = true
+		tabBarHeightConstraint = tabBarContainer.heightAnchor.constraint(equalToConstant: 32)
+		statusBarHeightConstraint = statusBarContainer.heightAnchor.constraint(equalToConstant: 20)
+		tabBarHeightConstraint?.isActive = true
+		statusBarHeightConstraint?.isActive = true
 		editorContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
 		editorContainer.setContentCompressionResistancePriority(.defaultLow, for: .vertical)
 		embeddedTerminalContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -234,10 +247,10 @@ extension Notification.Name {
 			notificationStack.widthAnchor.constraint(lessThanOrEqualToConstant: 620),
 			preferredNotificationWidth,
 		])
-		editorStack.addArrangedSubview(tabBarView)
+		editorStack.addArrangedSubview(tabBarContainer)
 		editorStack.addArrangedSubview(editorContainer)
 		editorStack.addArrangedSubview(embeddedTerminalContainer)
-		editorStack.addArrangedSubview(statusBarView)
+		editorStack.addArrangedSubview(statusBarContainer)
 
 		rootSplitView.isVertical = true
 		rootSplitView.dividerStyle = .thin
@@ -445,6 +458,22 @@ extension Notification.Name {
 		workbenchComponentHost.lifecycle(for: .fileTree)
 	}
 
+	var tabBarHostView: NSView {
+		tabBarContainer
+	}
+
+	var tabBarComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .tabBar)
+	}
+
+	var statusBarHostView: NSView {
+		statusBarContainer
+	}
+
+	var statusBarComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .statusBar)
+	}
+
 	var embeddedGitHostView: NSView {
 		embeddedGitContainer
 	}
@@ -642,7 +671,10 @@ extension Notification.Name {
 	}
 
 	func focusTabs() {
-		guard let target = focusTarget(in: tabGroupScope == .pane ? paneCoordinator.activePane.tabBarController.view : tabBarView) else {
+		let tabView = tabGroupScope == .pane ? paneCoordinator.activePane.tabBarController.view : tabBarView
+		guard tabGroupScope == .pane || tabBarComponentLifecycle == .visible,
+		      let target = focusTarget(in: tabView)
+		else {
 			return
 		}
 		window?.makeFirstResponder(target)
@@ -813,7 +845,7 @@ extension Notification.Name {
 		refreshStatusBar()
 	}
 
-	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) -> NSLayoutConstraint {
+	private static func configureTabBarView(_ tabBarView: NSView, scrollView: NSScrollView, stackView: NSStackView) {
 		tabBarView.wantsLayer = true
 		tabBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		scrollView.drawsBackground = false
@@ -830,15 +862,12 @@ extension Notification.Name {
 		stackView.edgeInsets = NSEdgeInsets(top: 3, left: 6, bottom: 3, right: 6)
 		scrollView.documentView = stackView
 		tabBarView.addSubview(scrollView)
-		let heightConstraint = tabBarView.heightAnchor.constraint(equalToConstant: 32)
 		NSLayoutConstraint.activate([
 			scrollView.leadingAnchor.constraint(equalTo: tabBarView.leadingAnchor),
 			scrollView.trailingAnchor.constraint(equalTo: tabBarView.trailingAnchor),
 			scrollView.topAnchor.constraint(equalTo: tabBarView.topAnchor),
 			scrollView.bottomAnchor.constraint(equalTo: tabBarView.bottomAnchor),
-			heightConstraint,
 		])
-		return heightConstraint
 	}
 
 	private func installTabBoundsObserver() {
@@ -942,7 +971,7 @@ extension Notification.Name {
 		ItsyTabCoordinator.closeDocument(tabID)
 	}
 
-	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField, lspButton: NSButton) -> NSLayoutConstraint {
+	private static func configureStatusBarView(_ statusBarView: NSView, label: NSTextField, lspButton: NSButton) {
 		statusBarView.wantsLayer = true
 		statusBarView.layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
 		label.font = .systemFont(ofSize: 11)
@@ -957,16 +986,13 @@ extension Notification.Name {
 		lspButton.translatesAutoresizingMaskIntoConstraints = false
 		statusBarView.addSubview(label)
 		statusBarView.addSubview(lspButton)
-		let heightConstraint = statusBarView.heightAnchor.constraint(equalToConstant: 20)
 		NSLayoutConstraint.activate([
 			label.leadingAnchor.constraint(equalTo: statusBarView.leadingAnchor, constant: 10),
 			label.trailingAnchor.constraint(lessThanOrEqualTo: lspButton.leadingAnchor, constant: -8),
 			label.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
 			lspButton.trailingAnchor.constraint(equalTo: statusBarView.trailingAnchor, constant: -10),
 			lspButton.centerYAnchor.constraint(equalTo: statusBarView.centerYAnchor),
-			heightConstraint,
 		])
-		return heightConstraint
 	}
 
 	private func configureLSPMissingBanner() {
@@ -1182,7 +1208,7 @@ extension Notification.Name {
 		} else {
 			statusBarLabel.stringValue = ""
 		}
-		statusBarView.isHidden = !layoutSettings.statusBarVisible || (statusBarLabel.stringValue.isEmpty && lspStatusButton.isHidden)
+		setStatusBarVisible(layoutSettings.statusBarVisible && !(statusBarLabel.stringValue.isEmpty && lspStatusButton.isHidden))
 	}
 
 	private func showLSPCrashStatus(key: LSPSessionKey, url: URL, reason: LSPSessionFailureReason) {
@@ -1694,7 +1720,7 @@ extension Notification.Name {
 		if sidebarVisible && responsiveSidebarVisible {
 			targets.append(fileTreeController.focusView)
 		}
-		if !tabBarView.isHidden, let tab = focusTarget(in: tabBarView) {
+		if tabBarComponentLifecycle == .visible, let tab = focusTarget(in: tabBarView) {
 			targets.append(tab)
 		}
 		if let findBarController, !findBarController.view.isHidden {
@@ -1959,11 +1985,25 @@ extension Notification.Name {
 	}
 
 	private func syncTabGroupVisibility() {
-		tabBarView.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .pane
+		setTabBarVisible(layoutSettings.tabBarVisible && tabGroupScope != .pane)
 		for pane in paneCoordinator.panes {
 			pane.tabBarController.view.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .window
 		}
 		rebuildFocusTraversal()
+	}
+
+	private func setTabBarVisible(_ visible: Bool) {
+		precondition(workbenchComponentHost.mount(tabBarWorkbenchComponent))
+		tabBarWorkbenchComponent.setVisible(visible)
+		tabBarContainer.isHidden = !visible
+		tabBarView.isHidden = !visible
+	}
+
+	private func setStatusBarVisible(_ visible: Bool) {
+		precondition(workbenchComponentHost.mount(statusBarWorkbenchComponent))
+		statusBarWorkbenchComponent.setVisible(visible)
+		statusBarContainer.isHidden = !visible
+		statusBarView.isHidden = !visible
 	}
 
 	private func refreshPaneTabBars() {

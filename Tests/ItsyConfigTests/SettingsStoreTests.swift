@@ -689,7 +689,7 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	#expect(reloaded.source(for: "editor.tab_width") == .workspace)
 }
 
-@Test func settingsWatcherPublishesFileChangesForHotReload() throws {
+@Test func settingsWatcherPublishesJSONFileChangesForHotReload() throws {
 	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
 		"itsy-settings-watch-\(UUID().uuidString)",
 		isDirectory: true
@@ -698,7 +698,7 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 		try? FileManager.default.removeItem(at: directory)
 	}
 	try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-	let url = directory.appendingPathComponent("settings.toml")
+	let url = directory.appendingPathComponent("settings.json")
 	let semaphore = DispatchSemaphore(value: 0)
 	let watcher = ItsySettingsWatcher(
 		urls: [url],
@@ -708,7 +708,8 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 		semaphore.signal()
 	}
 	#expect(watcher.start())
-	try "[editor]\ntab_width = 7\n".write(to: url, atomically: true, encoding: .utf8)
+	try ItsySettingsStore(fileURL: url).save(ItsySettings(editor: .init(tabWidth: 7)))
+	#expect(try ItsySettingsJSONCodec.decode(Data(contentsOf: url)).editor.tabWidth == 7)
 	#expect(semaphore.wait(timeout: .now() + .seconds(3)) == .success)
 	watcher.stop()
 }

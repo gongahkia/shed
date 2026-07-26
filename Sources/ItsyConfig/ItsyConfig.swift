@@ -745,12 +745,7 @@ public final class ItsySettingsStore {
 		}
 		do {
 			if usesJSONCodec {
-				let settings = try ItsySettingsJSONCodec.decode(Data(contentsOf: fileURL))
-				return ItsySettingsLoadResult(
-					settings: settings,
-					loadedFromFile: true,
-					assignedKeys: Self.jsonAssignedKeys(for: settings)
-				)
+				return loadJSON(fallback: fallback)
 			}
 			let contents = try String(contentsOf: fileURL, encoding: .utf8)
 			var parser = ItsySettingsParser(settings: fallback, source: fileURL.path)
@@ -851,6 +846,50 @@ public final class ItsySettingsStore {
 
 	private var usesJSONCodec: Bool {
 		fileURL.pathExtension.lowercased() == "json"
+	}
+
+	private func loadJSON(fallback: ItsySettings) -> ItsySettingsLoadResult {
+		do {
+			let settings = try ItsySettingsJSONCodec.decode(Data(contentsOf: fileURL))
+			return ItsySettingsLoadResult(
+				settings: settings,
+				loadedFromFile: true,
+				assignedKeys: Self.jsonAssignedKeys(for: settings)
+			)
+		} catch {
+			return ItsySettingsLoadResult(
+				settings: fallback.normalized(),
+				warnings: [jsonWarning(for: error)],
+				loadedFromFile: true
+			)
+		}
+	}
+
+	private func jsonWarning(for error: Error) -> ItsySettingsWarning {
+		let diagnostic: (key: String?, expected: String?, message: String)
+		switch error {
+		case let .unsupportedSchemaVersion(version) as ItsySettingsJSONCodecError:
+			diagnostic = (
+				"schema_version",
+				"version == \(ItsySettingsSchema.currentVersion)",
+				"unsupported schema_version \(version)"
+			)
+		case .invalidSettings as ItsySettingsJSONCodecError:
+			diagnostic = (
+				"settings",
+				"values within supported ranges",
+				"settings contain unsupported values"
+			)
+		default:
+			diagnostic = (nil, "valid JSON settings document", "invalid JSON settings document: \(error)")
+		}
+		return ItsySettingsWarning(
+			key: diagnostic.key,
+			source: fileURL.path,
+			expected: diagnostic.expected,
+			retainedFallback: true,
+			message: diagnostic.message
+		)
 	}
 
 	private static func jsonAssignedKeys(for settings: ItsySettings) -> Set<String> {

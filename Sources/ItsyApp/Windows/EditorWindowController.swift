@@ -2018,11 +2018,20 @@ extension Notification.Name {
 
 	private func configurePaneInteractions(_ view: MetalTextView, document: ItsyDocument) {
 		decorationPipeline.install(on: document)
-		document.lspSurfaceRefreshRequested = { [weak self, weak document] in
+		document.lspSurfaceInvalidationRequested = { [weak self, weak document] in
 			if let document {
 				self?.invalidateLSPSemanticState(for: document)
 			}
+		}
+		document.lspSurfaceRefreshRequested = { [weak self] in
 			self?.scheduleLSPSemanticSurfaceRefresh()
+		}
+		document.lspDocumentHighlightRefreshRequested = { [weak self, weak document] in
+			guard let self, let document else {
+				return
+			}
+			decorationPipeline.invalidateDocumentHighlights(for: document)
+			scheduleLSPSemanticSurfaceRefresh()
 		}
 		document.lspDocumentSaved = { [weak self] in
 			self?.notifyLSPDidSave()

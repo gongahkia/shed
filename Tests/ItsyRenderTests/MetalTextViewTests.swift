@@ -700,6 +700,20 @@ private func windowPoint(local point: NSPoint, height: CGFloat) -> NSPoint {
 	#expect(wide.size.x > narrow.size.x)
 }
 
+@Test func lineShapeCacheReusesUnchangedLinesAfterEdit() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 400))
+	view.editor = Editor(text: "iii\nabc\ndef")
+	_ = view.textGlyphInstances(scale: 1)
+	view.resetLineShapeCacheStats()
+
+	view.editor.setSelection(SelectionSet(primary: Selection(anchor: 0, head: 1)))
+	view.editor.insert("W")
+	_ = view.textGlyphInstances(scale: 1)
+
+	#expect(view.lineShapeCacheMisses == 1)
+	#expect(view.lineShapeCacheHits == 5)
+}
+
 @Test func descendersDoNotShiftGlyphBaseline() throws {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "pa\n")

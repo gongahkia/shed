@@ -850,11 +850,14 @@ public final class ItsySettingsStore {
 
 	private func loadJSON(fallback: ItsySettings) -> ItsySettingsLoadResult {
 		do {
-			let settings = try ItsySettingsJSONCodec.decode(Data(contentsOf: fileURL))
+			let layer = try ItsySettingsJSONCodec.decodeLayer(
+				Data(contentsOf: fileURL),
+				fallback: fallback
+			)
 			return ItsySettingsLoadResult(
-				settings: settings,
+				settings: layer.settings,
 				loadedFromFile: true,
-				assignedKeys: Self.jsonAssignedKeys(for: settings)
+				assignedKeys: layer.assignedKeys
 			)
 		} catch {
 			return ItsySettingsLoadResult(
@@ -890,34 +893,6 @@ public final class ItsySettingsStore {
 			retainedFallback: true,
 			message: diagnostic.message
 		)
-	}
-
-	private static func jsonAssignedKeys(for settings: ItsySettings) -> Set<String> {
-		var keys = Set(ItsySettingsCatalog.baseEntries.map(\.key))
-		for (languageID, language) in settings.editor.language {
-			let prefix = "editor.language.\(languageID)."
-			if language.font != nil { keys.insert(prefix + "font") }
-			if language.fontSize != nil { keys.insert(prefix + "font_size") }
-			if language.fontRendering != nil { keys.insert(prefix + "font_rendering") }
-			if language.lineNumbers != nil { keys.insert(prefix + "line_numbers") }
-			if language.tabWidth != nil { keys.insert(prefix + "tab_width") }
-			if language.useSpaces != nil { keys.insert(prefix + "use_spaces") }
-			if language.autoPairs != nil { keys.insert(prefix + "auto_pairs") }
-			if language.smartIndent != nil { keys.insert(prefix + "smart_indent") }
-			if language.multipleSelections != nil { keys.insert(prefix + "multiple_selections") }
-		}
-		for languageID in settings.lsp.modes.keys {
-			keys.insert("lsp.\(languageID).mode")
-		}
-		for (id, surface) in settings.ui.surfaces {
-			let prefix = "ui.surface.\(id)."
-			if surface.width != nil { keys.insert(prefix + "width") }
-			if surface.height != nil { keys.insert(prefix + "height") }
-			if surface.rowHeight != nil { keys.insert(prefix + "row_height") }
-			if surface.inputFontSize != nil { keys.insert(prefix + "input_font_size") }
-			if surface.itemFontSize != nil { keys.insert(prefix + "item_font_size") }
-		}
-		return keys
 	}
 
 	public static func serialize(_ settings: ItsySettings) -> String {

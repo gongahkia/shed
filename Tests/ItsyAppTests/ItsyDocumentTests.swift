@@ -220,7 +220,7 @@ import Testing
 	#expect(controller.embeddedGitHostView.isHidden)
 	#expect(!controller.embeddedDebuggerHostView.isHidden)
 	#expect(controller.embeddedDebuggerHostView.frame.width > 300)
-	let debuggerSidebar = controller.embeddedDebuggerHostView.superview?.superview
+	let debuggerSidebar = controller.embeddedDebuggerHostView.superview?.superview?.superview
 	#expect(debuggerSidebar?.accessibilityLabel() == "Debugger sidebar")
 	#expect(debuggerSidebar?.accessibilityValue() as? String == "Debugger")
 	let debuggerActions = editorWindowDescendants(in: debuggerSidebar ?? NSView()).compactMap { $0 as? NSButton }.compactMap { $0.accessibilityLabel() }
@@ -233,6 +233,35 @@ import Testing
 	splitView.layoutSubtreeIfNeeded()
 	#expect(controller.embeddedTerminalHostView.isHidden)
 	#expect(splitView.arrangedSubviews.count == 2)
+}
+
+@MainActor
+@Test func gitAndDebuggerUseWorkbenchComponentHostAcrossSurfaceChanges() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
+
+	controller.setEmbeddedGitVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+	let gitView = try #require(controller.gitHostView.subviews.first)
+	#expect(controller.gitComponentLifecycle == .visible)
+	#expect(gitView === controller.embeddedGitHostView)
+
+	controller.setEmbeddedDebuggerVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+	let debuggerView = try #require(controller.debuggerHostView.subviews.first)
+	#expect(controller.gitComponentLifecycle == .hidden)
+	#expect(controller.debuggerComponentLifecycle == .visible)
+	#expect(debuggerView === controller.embeddedDebuggerHostView)
+
+	controller.setEmbeddedDebuggerVisible(false)
+	splitView.layoutSubtreeIfNeeded()
+	#expect(controller.gitComponentLifecycle == .visible)
+	#expect(controller.debuggerComponentLifecycle == .hidden)
+	#expect(controller.gitHostView.subviews.first === gitView)
+	#expect(controller.debuggerHostView.subviews.first === debuggerView)
 }
 
 private func editorWindowDescendants(in view: NSView) -> [NSView] {

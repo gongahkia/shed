@@ -85,7 +85,9 @@ extension Notification.Name {
 	private let secondarySidebarFocusButton = NSButton(title: "Focus", target: nil, action: nil)
 	private let secondarySidebarCloseButton = NSButton(title: "Close", target: nil, action: nil)
 	private let secondarySidebarContentContainer = NSView()
+	private let gitContainer = NSView()
 	private let embeddedGitContainer = NSView()
+	private let debuggerContainer = NSView()
 	private let embeddedDebuggerContainer = NSView()
 	private var findBarController: FindBarController?
 	private var findSettings = ItsySettings.FindSettings()
@@ -131,11 +133,15 @@ extension Notification.Name {
 		.fileTree: fileTreeContainer,
 		.tabBar: tabBarContainer,
 		.terminal: terminalContainer,
+		.git: gitContainer,
+		.debugger: debuggerContainer,
 		.statusBar: statusBarContainer,
 	])
 	private lazy var fileTreeWorkbenchComponent = FileTreeWorkbenchComponent(controller: fileTreeController)
 	private lazy var tabBarWorkbenchComponent = ViewWorkbenchComponent(id: .tabBar, view: tabBarView)
 	private lazy var terminalWorkbenchComponent = ViewWorkbenchComponent(id: .terminal, view: embeddedTerminalContainer)
+	private lazy var gitWorkbenchComponent = ViewWorkbenchComponent(id: .git, view: embeddedGitContainer)
+	private lazy var debuggerWorkbenchComponent = ViewWorkbenchComponent(id: .debugger, view: embeddedDebuggerContainer)
 	private lazy var statusBarWorkbenchComponent = ViewWorkbenchComponent(id: .statusBar, view: statusBarView)
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
@@ -221,8 +227,8 @@ extension Notification.Name {
 		embeddedTerminalHeightConstraint = terminalContainer.heightAnchor.constraint(equalToConstant: 0)
 		embeddedTerminalHeightConstraint?.isActive = true
 		secondarySidebarContainer.translatesAutoresizingMaskIntoConstraints = false
-		embeddedGitContainer.translatesAutoresizingMaskIntoConstraints = false
-		embeddedDebuggerContainer.translatesAutoresizingMaskIntoConstraints = false
+		gitContainer.translatesAutoresizingMaskIntoConstraints = false
+		debuggerContainer.translatesAutoresizingMaskIntoConstraints = false
 		paneCoordinator.view.translatesAutoresizingMaskIntoConstraints = false
 		editorContainer.addSubview(paneCoordinator.view)
 		NSLayoutConstraint.activate([
@@ -490,8 +496,24 @@ extension Notification.Name {
 		embeddedGitContainer
 	}
 
+	var gitHostView: NSView {
+		gitContainer
+	}
+
+	var gitComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .git)
+	}
+
 	var embeddedDebuggerHostView: NSView {
 		embeddedDebuggerContainer
+	}
+
+	var debuggerHostView: NSView {
+		debuggerContainer
+	}
+
+	var debuggerComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .debugger)
 	}
 
 	func setEmbeddedTerminalVisible(_ visible: Bool) {
@@ -560,7 +582,7 @@ extension Notification.Name {
 		secondarySidebarContentContainer.translatesAutoresizingMaskIntoConstraints = false
 		secondarySidebarContainer.addSubview(secondarySidebarHeader)
 		secondarySidebarContainer.addSubview(secondarySidebarContentContainer)
-		for container in [embeddedGitContainer, embeddedDebuggerContainer] {
+		for container in [gitContainer, debuggerContainer] {
 			container.isHidden = true
 			secondarySidebarContentContainer.addSubview(container)
 		}
@@ -573,7 +595,7 @@ extension Notification.Name {
 			secondarySidebarContentContainer.topAnchor.constraint(equalTo: secondarySidebarHeader.bottomAnchor, constant: 6),
 			secondarySidebarContentContainer.bottomAnchor.constraint(equalTo: secondarySidebarContainer.bottomAnchor),
 		])
-		for container in [embeddedGitContainer, embeddedDebuggerContainer] {
+		for container in [gitContainer, debuggerContainer] {
 			NSLayoutConstraint.activate([
 				container.leadingAnchor.constraint(equalTo: secondarySidebarContentContainer.leadingAnchor),
 				container.trailingAnchor.constraint(equalTo: secondarySidebarContentContainer.trailingAnchor),
@@ -586,11 +608,17 @@ extension Notification.Name {
 
 	private func setActualEmbeddedGitVisible(_ visible: Bool) {
 		embeddedGitVisible = visible
+		precondition(workbenchComponentHost.mount(gitWorkbenchComponent))
+		gitWorkbenchComponent.setVisible(visible)
+		gitContainer.isHidden = !visible
 		embeddedGitContainer.isHidden = !visible
 	}
 
 	private func setActualEmbeddedDebuggerVisible(_ visible: Bool) {
 		embeddedDebuggerVisible = visible
+		precondition(workbenchComponentHost.mount(debuggerWorkbenchComponent))
+		debuggerWorkbenchComponent.setVisible(visible)
+		debuggerContainer.isHidden = !visible
 		embeddedDebuggerContainer.isHidden = !visible
 	}
 
@@ -797,7 +825,8 @@ extension Notification.Name {
 		let secondaryRequested = gitRequested || debuggerRequested
 		let scale = max(CGFloat(layoutSettings.interfaceScale), 0.8)
 		let editorMinimum = WorkbenchComponents.registry[.editor]?.minimumWidth ?? 480
-		let secondaryMinimum = max(260 * scale, WorkbenchComponents.registry[.git]?.minimumWidth ?? 320)
+		let secondaryComponent: WorkbenchComponentID = activeSecondarySidebarSurface == .git ? .git : .debugger
+		let secondaryMinimum = max(260 * scale, WorkbenchComponents.registry[secondaryComponent]?.minimumWidth ?? 320)
 		let availableSecondaryWidth = bounds.width - (result.showsFileTree ? result.sidebarWidth : 0) - editorMinimum * scale
 		let secondaryFits = secondaryRequested && availableSecondaryWidth >= secondaryMinimum
 		let preferredSecondaryWidth: CGFloat = switch activeSecondarySidebarSurface {

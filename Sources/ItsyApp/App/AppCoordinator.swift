@@ -218,7 +218,7 @@ import ItsyKeymap
 		let workspaceRoot = workspaceRoot ?? ItsyWorkspaceController.currentRootURL
 		var registry = CommandRegistry()
 		do {
-			try registry.register([
+			let commands = [
 				Command(id: "file.new", title: L10n.string("New File"), defaultKey: "Cmd-N") { [weak self] in
 					self?.documentController.newDocument(nil)
 				},
@@ -555,8 +555,8 @@ import ItsyKeymap
 				Command(id: "editor.moveLineEnd", title: L10n.string("Move Line End"), defaultKey: "Cmd-Right") { [weak self] in
 					self?.performEditorMotion(.lineEnd)
 				},
-			])
-			try registry.register(KeymapCommandCatalog.hiddenCommands)
+			]
+			try AppCommandProviderRegistry.register(commands + KeymapCommandCatalog.hiddenCommands, into: &registry)
 			registerExtensionCommands(from: workspaceRoot, into: &registry)
 			return registry
 		} catch {

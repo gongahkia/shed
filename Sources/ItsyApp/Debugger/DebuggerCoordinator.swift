@@ -253,8 +253,15 @@ import ItsyDebugger
 		stepBackButton = backButton
 		self.restartButton = restartButton
 		updateDebugControls()
-		let buttonStack = NSStackView(views: [continueButton, reverseButton, overButton, backButton, inButton, outButton, pauseButton, restartButton, stopButton, refreshButton])
-		buttonStack.orientation = .horizontal
+		let primaryControls = NSStackView(views: [continueButton, overButton, inButton, outButton, pauseButton])
+		primaryControls.orientation = .horizontal
+		primaryControls.spacing = 6
+		let secondaryControls = NSStackView(views: [reverseButton, backButton, restartButton, stopButton, refreshButton])
+		secondaryControls.orientation = .horizontal
+		secondaryControls.spacing = 6
+		let buttonStack = NSStackView(views: [primaryControls, secondaryControls])
+		buttonStack.orientation = .vertical
+		buttonStack.alignment = .leading
 		buttonStack.spacing = 6
 		let header = NSStackView(views: [statusLabel, buttonStack])
 		header.orientation = .vertical

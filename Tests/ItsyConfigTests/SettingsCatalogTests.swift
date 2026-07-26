@@ -27,8 +27,8 @@ import Testing
 	settings.workbench.profile = .review
 	#expect(ItsySettingsCatalog.matching("side bar") == [])
 	#expect(ItsySettingsCatalog.matching("sidebar").map(\.key) == [
-		"debugger.presentation",
 		"git.presentation",
+		"debugger.presentation",
 		"layout.sidebar_visible",
 		"layout.sidebar_position",
 		"layout.sidebar_width",

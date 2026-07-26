@@ -1196,7 +1196,7 @@ struct ItsySettingsParser {
 			}
 			if line.hasPrefix("["), line.hasSuffix("]") {
 				section = String(line.dropFirst().dropLast()).trimmingCharacters(in: .whitespaces)
-				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "find", "recovery", "updates", "workbench", "layout", "ui"]
+				if !["editor", "editor.experimental", "theme", "syntax", "terminal", "git", "debugger", "find", "recovery", "updates", "workbench", "layout", "ui"]
 					.contains(section),
 					!section.hasPrefix("editor.language."), !section.hasPrefix("ui.surface.")
 				{

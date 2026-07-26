@@ -1229,6 +1229,27 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(editorStorageString(view.editor) == " beta")
 }
 
+@Test func vimSentenceTextObjectsApplyToPendingOperator() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.keymapEngine = KeymapEngine(modeStack: [.normal], bindings: [
+		KeyBinding(mode: .normal, chord: [Key("d")], commandID: "vim.operator.delete"),
+		KeyBinding(mode: .operatorPending, chord: [Key("i"), Key("s")], commandID: "vim.textObject.innerSentence"),
+		KeyBinding(mode: .operatorPending, chord: [Key("a"), Key("s")], commandID: "vim.textObject.aroundSentence"),
+	])
+
+	view.editor = Editor(text: "One. Two? Three!")
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "i", charactersIgnoringModifiers: "i", keyCode: 0))
+	#expect(view.handleKey(characters: "s", charactersIgnoringModifiers: "s", keyCode: 0))
+	#expect(editorStorageString(view.editor) == " Two? Three!")
+
+	view.editor = Editor(text: "One. Two? Three!")
+	#expect(view.handleKey(characters: "d", charactersIgnoringModifiers: "d", keyCode: 0))
+	#expect(view.handleKey(characters: "a", charactersIgnoringModifiers: "a", keyCode: 0))
+	#expect(view.handleKey(characters: "s", charactersIgnoringModifiers: "s", keyCode: 0))
+	#expect(editorStorageString(view.editor) == "Two? Three!")
+}
+
 @Test func vimQuoteTextObjectUsesShiftedQuoteBinding() {
 	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "\"value\" tail")

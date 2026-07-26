@@ -399,11 +399,11 @@ extension ItsyRenderTests {
 @Test func optionDragBuildsColumnCursors() {
 	let view = MetalTextView(frame: .zero)
 	view.editor = Editor(text: "abc\nde\nfghi\n")
-	view.updateColumnCursors(anchor: 1, head: 8)
-	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 1))
+	view.updateColumnCursors(anchor: 2, head: 9)
+	#expect(view.editor.selections.primary == Selection(anchor: 2, head: 2))
 	#expect(view.editor.selections.secondaries == [
-		Selection(anchor: 5, head: 5),
-		Selection(anchor: 8, head: 8),
+		Selection(anchor: 6, head: 6),
+		Selection(anchor: 9, head: 9),
 	])
 }
 
@@ -1330,6 +1330,23 @@ private final class TestGutterDecorator: GutterDecorator {
 	#expect(view.handleKey(characters: "j", charactersIgnoringModifiers: "j", keyCode: 0))
 	#expect(view.editor.selections.primary.range == 0 ..< 1)
 	#expect(view.editor.selections.secondaries == [Selection(anchor: 3, head: 4)])
+}
+
+@Test func rectangularSelectionRendersAndAcceptsTextAcrossShortLines() {
+	let view = MetalTextView(frame: .init(x: 0, y: 0, width: 400, height: 100))
+	view.editor = Editor(text: "abc\nx\nzz\n")
+	view.editor.setSelection(view.blockSelection(anchor: 1, head: 7))
+	view.syncEditorState()
+
+	#expect(view.editor.selections.primary == Selection(anchor: 1, head: 2))
+	#expect(view.editor.selections.secondaries == [
+		Selection(anchor: 5, head: 5),
+		Selection(anchor: 7, head: 8),
+	])
+	#expect(view.solidOverlayInstances(scale: 1).count == 3)
+
+	view.insertText("Q", replacementRange: NSRange(location: NSNotFound, length: 0))
+	#expect(editorStorageString(view.editor) == "aQc\nxQ\nzQ\n")
 }
 
 @Test func vimVisualModeRendersSelectionAndClearsStateOnEscape() {

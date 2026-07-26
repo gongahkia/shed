@@ -759,7 +759,7 @@ extension MetalTextView {
 		let right = max(lowerColumn, upperColumn)
 		return (lowerLine ... upperLine).map { line in
 			let lineStart = editor.rope.offset(forLine: line)
-			let lineEnd = editor.rope.lineRange(line).upperBound
+			let lineEnd = lineContentEnd(for: line)
 			return min(lineStart + left, lineEnd) ..< min(lineStart + right, lineEnd)
 		}
 	}
@@ -1567,12 +1567,20 @@ extension MetalTextView {
 		let upperColumn = max(anchorColumn, headColumn) + 1
 		let selections = (lowerLine ... upperLine).map { line -> Selection in
 			let lineStart = editor.rope.offset(forLine: line)
-			let lineEnd = editor.rope.lineRange(line).upperBound
+			let lineEnd = lineContentEnd(for: line)
 			let lower = min(lineStart + lowerColumn, lineEnd)
 			let upper = min(lineStart + upperColumn, lineEnd)
 			return Selection(anchor: lower, head: upper)
 		}
 		return SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst()))
+	}
+
+	func lineContentEnd(for line: Int) -> Int {
+		let range = editor.rope.lineRange(line)
+		guard editor.rope.slice(range).hasSuffix("\n") else {
+			return range.upperBound
+		}
+		return max(range.lowerBound, range.upperBound - 1)
 	}
 
 	func textObjectRange(_ textObject: TextObject) -> Range<Int>? {

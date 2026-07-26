@@ -895,7 +895,10 @@ public final class MetalTextView: NSView {
 		let column = clampedAnchor - storage.offset(forLine: anchorLine)
 		let selections = (lowerLine ... upperLine).map { line -> Selection in
 			let lineRange = storage.lineRange(line)
-			let offset = min(max(lineRange.lowerBound + column, lineRange.lowerBound), lineRange.upperBound)
+			let lineEnd = lineRange.lowerBound < lineRange.upperBound && storage.substring((lineRange.upperBound - 1) ..< lineRange.upperBound) == "\n"
+				? lineRange.upperBound - 1
+				: lineRange.upperBound
+			let offset = min(max(lineRange.lowerBound + column, lineRange.lowerBound), lineEnd)
 			return Selection(anchor: offset, head: offset)
 		}
 		return SelectionSet(primary: selections[0], secondaries: Array(selections.dropFirst()))

@@ -1,6 +1,28 @@
 import Foundation
 import ItsyDAP
 
+private struct DebugLaunchConfigAnyCodingKey: CodingKey {
+	var stringValue: String
+	var intValue: Int?
+
+	init?(stringValue: String) {
+		self.stringValue = stringValue
+		intValue = nil
+	}
+
+	init?(intValue: Int) {
+		stringValue = "\(intValue)"
+		self.intValue = intValue
+	}
+}
+
+private func rejectUnsupportedFields(_ decoder: Decoder, allowed: Set<String>, context: String) throws {
+	let container = try decoder.container(keyedBy: DebugLaunchConfigAnyCodingKey.self)
+	for key in container.allKeys where !allowed.contains(key.stringValue) {
+		throw DecodingError.dataCorruptedError(forKey: key, in: container, debugDescription: "unsupported \(context) field")
+	}
+}
+
 public enum DebugAdapterType {
 	public static let executable = "executable"
 }
@@ -60,7 +82,7 @@ public struct DebugAdapterConfig: Codable, Equatable, Sendable {
 		self.remediation = remediation
 	}
 
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case id
 		case command
 		case type
@@ -70,6 +92,7 @@ public struct DebugAdapterConfig: Codable, Equatable, Sendable {
 	}
 
 	public init(from decoder: Decoder) throws {
+		try rejectUnsupportedFields(decoder, allowed: Set(CodingKeys.allCases.map(\.stringValue)), context: "debug adapter")
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		id = try container.decode(String.self, forKey: .id)
 		command = try container.decode(String.self, forKey: .command)
@@ -110,6 +133,7 @@ public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
 	}
 
 	public init(from decoder: Decoder) throws {
+		try rejectUnsupportedFields(decoder, allowed: Set(CodingKeys.allCases.map(\.stringValue)), context: "debug launch configuration")
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		name = try container.decode(String.self, forKey: .name)
 		type = try container.decode(String.self, forKey: .type)
@@ -125,7 +149,7 @@ public struct DebugLaunchConfiguration: Codable, Equatable, Sendable {
 		adapterOptions = try container.decodeIfPresent([String: DAPAny].self, forKey: .adapterOptions) ?? [:]
 	}
 
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case name
 		case type
 		case request
@@ -151,6 +175,7 @@ public struct DebugLaunchConfig: Codable, Equatable, Sendable {
 	}
 
 	public init(from decoder: Decoder) throws {
+		try rejectUnsupportedFields(decoder, allowed: Set(CodingKeys.allCases.map(\.stringValue)), context: "debug launch config")
 		let container = try decoder.container(keyedBy: CodingKeys.self)
 		adapters = try container.decodeIfPresent([DebugAdapterConfig].self, forKey: .adapters) ?? []
 		configurations = try container.decodeIfPresent([DebugLaunchConfiguration].self, forKey: .configurations) ?? []
@@ -169,6 +194,11 @@ public struct DebugLaunchConfig: Codable, Equatable, Sendable {
 			adapters: merge(base: adapters, override: override.adapters, key: \.id),
 			configurations: merge(base: configurations, override: override.configurations, key: \.name)
 		)
+	}
+
+	private enum CodingKeys: String, CodingKey, CaseIterable {
+		case adapters
+		case configurations
 	}
 
 	private func merge<Value>(base: [Value], override: [Value], key: (Value) -> String) -> [Value] {
@@ -228,6 +258,39 @@ public struct DebugLaunchConfigLoader {
 	}
 }
 
+public struct DebugLaunchConfigStore {
+	public var userConfigURL: URL
+	public var fileManager: FileManager
+
+	public init(userConfigURL: URL = DebugLaunchConfigLoader.defaultUserConfigURL, fileManager: FileManager = .default) {
+		self.userConfigURL = userConfigURL
+		self.fileManager = fileManager
+	}
+
+	public func workspaceConfigURL(for workspaceRoot: URL) -> URL {
+		workspaceRoot
+			.appendingPathComponent(".itsy", isDirectory: true)
+			.appendingPathComponent("debug.json")
+	}
+
+	public func saveUser(_ config: DebugLaunchConfig) throws {
+		try save(config, to: userConfigURL)
+	}
+
+	public func saveWorkspace(_ config: DebugLaunchConfig, workspaceRoot: URL) throws {
+		try save(config, to: workspaceConfigURL(for: workspaceRoot))
+	}
+
+	private func save(_ config: DebugLaunchConfig, to url: URL) throws {
+		try DebugLaunchConfigParser.validate(config)
+		let encoder = JSONEncoder()
+		encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+		let data = try encoder.encode(config)
+		try fileManager.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+		try data.write(to: url, options: .atomic)
+	}
+}
+
 public enum DebugLaunchConfigError: Error, Equatable, Sendable {
 	case invalidJSON
 	case duplicateAdapterID(String)
@@ -244,6 +307,11 @@ public enum DebugLaunchConfigParser {
 		} catch {
 			throw DebugLaunchConfigError.invalidJSON
 		}
+		try validate(config)
+		return config
+	}
+
+	public static func validate(_ config: DebugLaunchConfig) throws {
 		var adapterIDs = Set<String>()
 		for adapter in config.adapters {
 			guard adapterIDs.insert(adapter.id).inserted else {
@@ -258,7 +326,6 @@ public enum DebugLaunchConfigParser {
 			}
 			try validate(configuration)
 		}
-		return config
 	}
 
 	private static func validate(_ adapter: DebugAdapterConfig) throws {
@@ -300,6 +367,9 @@ public enum DebugLaunchConfigParser {
 		}
 		guard configuration.args.allSatisfy(isPlain) else {
 			throw DebugLaunchConfigError.invalidConfiguration(name: configuration.name, field: "args", reason: "must not contain control characters")
+		}
+		guard configuration.exceptionFilters.allSatisfy(isPlain) else {
+			throw DebugLaunchConfigError.invalidConfiguration(name: configuration.name, field: "exceptionFilters", reason: "must be non-empty without control characters")
 		}
 		for (key, value) in configuration.env {
 			guard isEnvironmentKey(key) else {

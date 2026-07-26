@@ -1,5 +1,6 @@
 import AppKit
 import ItsyEditor
+import ItsyWorkbenchLayout
 
 @MainActor final class UndoTreePanelController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private struct Row {
@@ -8,7 +9,7 @@ import ItsyEditor
 		var title: String
 	}
 
-	private var panel: NSPanel?
+	private var surface: WorkbenchPanelSurface?
 	private let tableView = NSTableView()
 	private var rows: [Row] = []
 	private var currentID: Int?
@@ -16,8 +17,8 @@ import ItsyEditor
 	var jumpRequested: ((Int) -> Void)?
 
 	func toggle(relativeTo hostWindow: NSWindow?, tree: UndoTree) {
-		if panel?.isVisible == true {
-			panel?.close()
+		if surface?.isVisible == true {
+			surface?.close()
 			return
 		}
 		show(relativeTo: hostWindow, tree: tree)
@@ -31,26 +32,19 @@ import ItsyEditor
 	}
 
 	private func show(relativeTo hostWindow: NSWindow?, tree: UndoTree) {
-		let panel = makePanelIfNeeded()
+		let surface = makeSurfaceIfNeeded()
 		update(tree: tree)
-		center(panel, relativeTo: hostWindow)
-		panel.makeKeyAndOrderFront(nil)
-		panel.orderFrontRegardless()
+		center(surface.panel, relativeTo: hostWindow)
+		surface.show()
+		surface.panel.orderFrontRegardless()
 	}
 
-	private func makePanelIfNeeded() -> NSPanel {
-		if let panel {
-			return panel
+	private func makeSurfaceIfNeeded() -> WorkbenchPanelSurface {
+		if let surface {
+			return surface
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 360, height: 420),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Undo Tree")
-		panel.isReleasedWhenClosed = false
-		let scrollView = NSScrollView(frame: panel.contentRect(forFrameRect: panel.frame))
+		let surface = WorkbenchPanelSurface(id: .undoTree, title: L10n.string("Undo Tree"), size: NSSize(width: 360, height: 420))
+		let scrollView = NSScrollView(frame: surface.contentView.bounds)
 		scrollView.autoresizingMask = [.width, .height]
 		scrollView.hasVerticalScroller = true
 		let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("undo"))
@@ -63,9 +57,9 @@ import ItsyEditor
 		tableView.doubleAction = #selector(jumpToSelectedRow(_:))
 		tableView.rowHeight = 24
 		scrollView.documentView = tableView
-		panel.contentView = scrollView
-		self.panel = panel
-		return panel
+		surface.contentView.addSubview(scrollView)
+		self.surface = surface
+		return surface
 	}
 
 	private func center(_ panel: NSPanel, relativeTo hostWindow: NSWindow?) {

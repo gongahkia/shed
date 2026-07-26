@@ -2,11 +2,12 @@ import AppKit
 import Dispatch
 import Foundation
 import ItsyEditor
+import ItsyWorkbenchLayout
 
 @MainActor final class TaskCoordinator: NSObject, NSTableViewDataSource, NSTableViewDelegate {
 	private let problemsCoordinator: ProblemsCoordinator
 	private let activeDocumentProvider: () -> NSDocument?
-	private var taskPanel: NSPanel?
+	private var taskSurface: WorkbenchPanelSurface?
 	private var taskStatusLabel: NSTextField?
 	private var taskTableView: NSTableView?
 	private var taskOutputTextView: NSTextView?
@@ -39,7 +40,7 @@ import ItsyEditor
 	}
 
 	private func toggleTasks(relativeTo hostWindow: NSWindow?) {
-		if taskPanel?.isVisible == true {
+		if taskSurface?.isVisible == true {
 			closeTasks()
 			return
 		}
@@ -47,33 +48,24 @@ import ItsyEditor
 	}
 
 	private func closeTasks() {
-		taskPanel?.close()
+		taskSurface?.close()
 	}
 
 	private func showTasks(relativeTo hostWindow: NSWindow?) {
-		let panel = makeTaskPanelIfNeeded()
-		centerTaskPanel(panel, relativeTo: hostWindow)
-		panel.makeKeyAndOrderFront(nil)
+		let surface = makeTaskSurfaceIfNeeded()
+		centerTaskPanel(surface.panel, relativeTo: hostWindow)
+		surface.show()
 		refreshTasks(nil)
 	}
 
-	private func makeTaskPanelIfNeeded() -> NSPanel {
-		if let panel = taskPanel {
-			return panel
+	private func makeTaskSurfaceIfNeeded() -> WorkbenchPanelSurface {
+		if let surface = taskSurface {
+			return surface
 		}
-		let panel = NSPanel(
-			contentRect: NSRect(x: 0, y: 0, width: 720, height: 520),
-			styleMask: [.titled, .closable, .resizable, .utilityWindow],
-			backing: .buffered,
-			defer: false
-		)
-		panel.title = L10n.string("Tasks")
-		panel.isReleasedWhenClosed = false
-		let contentView = NSView(frame: panel.contentRect(forFrameRect: panel.frame))
-		panel.contentView = contentView
-		configureTaskView(contentView)
-		taskPanel = panel
-		return panel
+		let surface = WorkbenchPanelSurface(id: .tasks, title: L10n.string("Tasks"), size: NSSize(width: 720, height: 520))
+		configureTaskView(surface.contentView)
+		taskSurface = surface
+		return surface
 	}
 
 	private func configureTaskView(_ contentView: NSView) {

@@ -5,6 +5,7 @@ public enum WorkbenchComponentID: String, CaseIterable, Codable, Equatable, Hash
 	case editor
 	case terminal
 	case git
+	case debugger
 	case tabBar = "tab_bar"
 	case statusBar = "status_bar"
 }
@@ -95,6 +96,7 @@ public enum WorkbenchComponents {
 		.init(id: .editor, displayName: "Editor", placement: .editor, defaultLifecycle: .visible, minimumWidth: 480, minimumHeight: 220),
 		.init(id: .terminal, displayName: "Terminal", placement: .bottomPanel, minimumWidth: 320, minimumHeight: 140),
 		.init(id: .git, displayName: "Git", placement: .secondarySidebar, minimumWidth: 320, collapsesBefore: [.editor]),
+		.init(id: .debugger, displayName: "Debugger", placement: .secondarySidebar, minimumWidth: 320, collapsesBefore: [.editor]),
 		.init(id: .tabBar, displayName: "Tabs", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
 		.init(id: .statusBar, displayName: "Status Bar", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
 	])

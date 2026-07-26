@@ -178,13 +178,19 @@ private struct SnapshotSubject {
 	return SnapshotSubject(view: view, retained: retained + [window])
 }
 
-private enum SnapshotHarness {
+@MainActor private enum SnapshotHarness {
 	static func shouldRecord(in environment: [String: String]) -> Bool {
 		environment["ITSY_RECORD_SNAPSHOTS"] == "1" && environment["ITSY_SNAPSHOT_UPDATE_APPROVED"] == "1"
 	}
 
 	static func assertSnapshot(named name: String, size: NSSize? = nil, makeSubject: () throws -> SnapshotSubject) throws {
 		_ = NSApplication.shared
+		AppTheme.update(settings: .default)
+		ItsyUIConfiguration.update(.init())
+		defer {
+			AppTheme.update(settings: .default)
+			ItsyUIConfiguration.update(.init())
+		}
 		let subject = try makeSubject()
 		defer { subject.cleanup() }
 		let targetSize = size ?? subject.view.frame.size

@@ -25,7 +25,7 @@ import ItsyWorkbenchLayout
 		panel.isReleasedWhenClosed = false
 		panel.contentView = mountPoint
 		panel.delegate = self
-		precondition(host.mount(component))
+		_ = host.mount(component)
 		component.setVisible(false)
 	}
 
@@ -38,16 +38,19 @@ import ItsyWorkbenchLayout
 	}
 
 	func show() {
+		host.setVisible(true, for: component.id)
 		component.setVisible(true)
 		panel.makeKeyAndOrderFront(nil)
 	}
 
 	func close() {
+		host.setVisible(false, for: component.id)
 		component.setVisible(false)
 		panel.close()
 	}
 
 	func windowWillClose(_: Notification) {
+		host.setVisible(false, for: component.id)
 		component.setVisible(false)
 	}
 }

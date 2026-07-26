@@ -609,7 +609,13 @@ extension Notification.Name {
 
 	private func setActualEmbeddedGitVisible(_ visible: Bool) {
 		embeddedGitVisible = visible
-		precondition(workbenchComponentHost.mount(gitWorkbenchComponent))
+		workbenchComponentHost.setVisible(visible, for: .git)
+		guard workbenchComponentHost.mount(gitWorkbenchComponent) else {
+			embeddedGitVisible = false
+			gitContainer.isHidden = false
+			embeddedGitContainer.isHidden = true
+			return
+		}
 		gitWorkbenchComponent.setVisible(visible)
 		gitContainer.isHidden = !visible
 		embeddedGitContainer.isHidden = !visible
@@ -617,7 +623,13 @@ extension Notification.Name {
 
 	private func setActualEmbeddedDebuggerVisible(_ visible: Bool) {
 		embeddedDebuggerVisible = visible
-		precondition(workbenchComponentHost.mount(debuggerWorkbenchComponent))
+		workbenchComponentHost.setVisible(visible, for: .debugger)
+		guard workbenchComponentHost.mount(debuggerWorkbenchComponent) else {
+			embeddedDebuggerVisible = false
+			debuggerContainer.isHidden = false
+			embeddedDebuggerContainer.isHidden = true
+			return
+		}
 		debuggerWorkbenchComponent.setVisible(visible)
 		debuggerContainer.isHidden = !visible
 		embeddedDebuggerContainer.isHidden = !visible
@@ -780,7 +792,10 @@ extension Notification.Name {
 			if !rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
 				rootSplitView.insertArrangedSubview(fileTreeContainer, at: sidebarInsertionIndex(for: sidebarPosition))
 			}
-			precondition(workbenchComponentHost.mount(fileTreeWorkbenchComponent))
+			workbenchComponentHost.setVisible(true, for: .fileTree)
+			guard workbenchComponentHost.mount(fileTreeWorkbenchComponent) else {
+				return
+			}
 			fileTreeWorkbenchComponent.setVisible(true)
 		} else {
 			_ = workbenchComponentHost.unmount(.fileTree)
@@ -2113,21 +2128,36 @@ extension Notification.Name {
 	}
 
 	private func setTabBarVisible(_ visible: Bool) {
-		precondition(workbenchComponentHost.mount(tabBarWorkbenchComponent))
+		workbenchComponentHost.setVisible(visible, for: .tabBar)
+		guard workbenchComponentHost.mount(tabBarWorkbenchComponent) else {
+			tabBarContainer.isHidden = false
+			tabBarView.isHidden = true
+			return
+		}
 		tabBarWorkbenchComponent.setVisible(visible)
 		tabBarContainer.isHidden = !visible
 		tabBarView.isHidden = !visible
 	}
 
 	private func setStatusBarVisible(_ visible: Bool) {
-		precondition(workbenchComponentHost.mount(statusBarWorkbenchComponent))
+		workbenchComponentHost.setVisible(visible, for: .statusBar)
+		guard workbenchComponentHost.mount(statusBarWorkbenchComponent) else {
+			statusBarContainer.isHidden = false
+			statusBarView.isHidden = true
+			return
+		}
 		statusBarWorkbenchComponent.setVisible(visible)
 		statusBarContainer.isHidden = !visible
 		statusBarView.isHidden = !visible
 	}
 
 	private func setTerminalVisible(_ visible: Bool) {
-		precondition(workbenchComponentHost.mount(terminalWorkbenchComponent))
+		workbenchComponentHost.setVisible(visible, for: .terminal)
+		guard workbenchComponentHost.mount(terminalWorkbenchComponent) else {
+			terminalContainer.isHidden = false
+			embeddedTerminalContainer.isHidden = true
+			return
+		}
 		terminalWorkbenchComponent.setVisible(visible)
 		terminalContainer.isHidden = !visible
 		embeddedTerminalContainer.isHidden = !visible

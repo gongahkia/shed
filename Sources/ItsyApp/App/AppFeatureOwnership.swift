@@ -27,6 +27,7 @@ enum AppFeatureOwnership {
 		.init(sourceRoot: "Git", kind: .feature, owner: "local Git workflows"),
 		.init(sourceRoot: "GitHub", kind: .feature, owner: "GitHub CLI workflows"),
 		.init(sourceRoot: "Hover", kind: .feature, owner: "LSP hover"),
+		.init(sourceRoot: "LSP", kind: .feature, owner: "LSP presentation state"),
 		.init(sourceRoot: "Menu", kind: .crossCutting, owner: "main menu presentation"),
 		.init(sourceRoot: "Outline", kind: .feature, owner: "document outline"),
 		.init(sourceRoot: "Palette", kind: .feature, owner: "command and navigation palette"),

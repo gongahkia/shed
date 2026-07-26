@@ -158,6 +158,8 @@ extension Notification.Name {
 	private var completionPopup: CompletionPopupController?
 	private var completionRequestGeneration = 0
 	private var completionRequestTask: Task<Void, Never>?
+	private var completionResolveRequestGeneration = 0
+	private var completionResolveRequestTask: Task<Void, Never>?
 	private weak var snippetTabStopView: MetalTextView?
 	private var snippetTabStopSession: SnippetTabStopSession?
 	private var hoverPopover: NSPopover?
@@ -373,6 +375,7 @@ extension Notification.Name {
 			windowLifecycle.uninstall()
 			completionPopup?.dismiss()
 			completionRequestTask?.cancel()
+			completionResolveRequestTask?.cancel()
 			hoverTimer?.invalidate()
 			hoverPopover?.close()
 			hoverRequestTask?.cancel()
@@ -4183,6 +4186,9 @@ extension Notification.Name {
 			requestInvalidated: { [weak self] in
 				self?.cancelCompletionRequest()
 			},
+			resolveInvalidated: { [weak self] in
+				self?.cancelCompletionResolveRequest()
+			},
 			accept: { [weak self, weak targetView] item in
 				guard let self, let targetView else {
 					return
@@ -4196,27 +4202,43 @@ extension Notification.Name {
 		guard let document = document as? ItsyDocument, let fileURL = document.fileURL else {
 			return
 		}
-		Task { [weak self] in
+		cancelCompletionResolveRequest()
+		let generation = completionResolveRequestGeneration
+		completionResolveRequestTask = Task { [weak self] in
 			do {
 				guard let self else {
 					return
 				}
+				try Task.checkCancellation()
 				let session = try await ensureLSPSession(for: fileURL)
-				let response = try await session.client.sendRequest(
-					method: LSPMethod.completionItemResolve,
-					params: LSPAny(encoding: item)
-				)
-				let resolved = try item.mergingResolvedFields(from: LSPCompletionItem(resolveResult: response.result))
-				await MainActor.run {
+				let resolved = try await session.client.resolveCompletion(item)
+				guard !Task.isCancelled else {
+					return
+				}
+				await MainActor.run { [weak self] in
+					guard let self, generation == completionResolveRequestGeneration else {
+						return
+					}
 					completion(resolved)
 				}
 			} catch {
 				await MainActor.run { [weak self] in
-					self?.handleLSPRequestError(error)
+					guard let self, generation == completionResolveRequestGeneration, !Task.isCancelled else {
+						return
+					}
+					self.handleLSPRequestError(error)
 				}
-				NSLog("completion resolve failed: \(error)")
+				if !Task.isCancelled {
+					NSLog("completion resolve failed: \(error)")
+				}
 			}
 		}
+	}
+
+	private func cancelCompletionResolveRequest() {
+		completionResolveRequestGeneration += 1
+		completionResolveRequestTask?.cancel()
+		completionResolveRequestTask = nil
 	}
 
 	private func acceptCompletion(_ item: LSPCompletionItem, in targetView: MetalTextView) {
@@ -4228,8 +4250,8 @@ extension Notification.Name {
 			return
 		}
 		targetView.replaceUTF8Range(
-			application.replacementRange,
-			with: application.replacementText,
+			application.transactionRange,
+			with: application.transactionText,
 			selectUTF8Ranges: application.selectionRanges
 		)
 		installSnippetTabStops(application.tabStopRanges, in: targetView)

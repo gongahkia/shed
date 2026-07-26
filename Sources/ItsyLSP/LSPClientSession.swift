@@ -93,6 +93,14 @@ public actor LSPClientSession {
 		return try LSPDocumentSymbolResult(result: response.result)
 	}
 
+	public func resolveCompletion(_ item: LSPCompletionItem) async throws -> LSPCompletionItem {
+		let response = try await sendRequest(
+			method: LSPMethod.completionItemResolve,
+			params: try LSPAny(encoding: item)
+		)
+		return try item.mergingResolvedFields(from: LSPCompletionItem(resolveResult: response.result))
+	}
+
 	public func prepareRename(uri: String, position: LSPPosition) async throws -> LSPPrepareRenameResult {
 		let response = try await sendRequest(
 			method: LSPMethod.textDocumentPrepareRename,

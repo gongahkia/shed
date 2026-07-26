@@ -169,6 +169,7 @@ import Testing
 		label: "print",
 		insertText: "print($1)",
 		insertTextFormat: .snippet,
+		commitCharacters: ["("],
 		data: .object(["id": .int(42)])
 	)
 	let params = try LSPAny(encoding: original)
@@ -177,8 +178,15 @@ import Testing
 		"label": .string("print"),
 		"detail": .string("Swift.print"),
 		"documentation": .object(["kind": .string("markdown"), "value": .string("prints a value")]),
-		"insertText": .string("print($1)"),
-		"insertTextFormat": .int(2),
+		"additionalTextEdits": .array([
+			.object([
+				"range": .object([
+					"start": .object(["line": .int(0), "character": .int(0)]),
+					"end": .object(["line": .int(0), "character": .int(0)]),
+				]),
+				"newText": .string("import Foundation\n"),
+			]),
+		]),
 		"data": .object(["id": .int(999)]),
 	]))
 	let merged = original.mergingResolvedFields(from: resolved)
@@ -188,10 +196,15 @@ import Testing
 		"label": .string("print"),
 		"insertText": .string("print($1)"),
 		"insertTextFormat": .int(2),
+		"commitCharacters": .array([.string("(")]),
 		"data": .object(["id": .int(42)]),
 	]))
 	#expect(merged.data == .object(["id": .int(42)]))
 	#expect(merged.documentation == .object(["kind": .string("markdown"), "value": .string("prints a value")]))
+	#expect(merged.insertText == "print($1)")
+	#expect(merged.insertTextFormat == .snippet)
+	#expect(merged.commitCharacters == ["("])
+	#expect(merged.additionalTextEdits?.map(\.newText) == ["import Foundation\n"])
 }
 
 @Test func hoverResultDecodesMarkupAndMarkedStrings() throws {

@@ -90,6 +90,37 @@ import Testing
 	#expect(await session.state == .running)
 }
 
+@Test func clientResolvesCompletionAndCancelsItsPendingRequest() async throws {
+	let (session, transport) = try await initializedSession()
+	let item = LSPCompletionItem(label: "print", data: .object(["id": .int(7)]))
+	let task = Task {
+		try await session.resolveCompletion(item)
+	}
+	try await transport.waitForWriteCount(3)
+	#expect(try transport.message(at: 2) == .request(JSONRPCRequestMessage(
+		id: .int(2),
+		method: LSPMethod.completionItemResolve,
+		params: .object([
+			"label": .string("print"),
+			"data": .object(["id": .int(7)]),
+		])
+	)))
+	task.cancel()
+	try await transport.waitForWriteCount(4)
+	#expect(try transport.message(at: 3) == .notification(JSONRPCNotificationMessage(
+		method: LSPMethod.cancelRequest,
+		params: .object(["id": .int(2)])
+	)))
+	await #expect(throws: CancellationError.self) {
+		try await task.value
+	}
+	let events = try await session.receive(LSPMessageFramer.frame(message: .response(JSONRPCResponseMessage(
+		id: .int(2),
+		result: .object(["label": .string("print")])
+	))))
+	#expect(events.isEmpty)
+}
+
 @Test func clientSendsTypedNavigationRequests() async throws {
 	let (session, transport) = try await initializedSession()
 	let position = LSPPosition(line: 2, character: 4)

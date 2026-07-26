@@ -18,6 +18,7 @@ import ItsyRender
 	private var acceptItem: ((LSPCompletionItem) -> Void)?
 	private var isRequestCurrent: (() -> Bool)?
 	private var requestInvalidated: (() -> Void)?
+	private var resolveInvalidated: (() -> Void)?
 	private var resolveItem: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?
 	private var resolvedItemsByKey: [String: LSPCompletionItem] = [:]
 	private var pendingResolveKeys = Set<String>()
@@ -51,8 +52,11 @@ import ItsyRender
 		resolve: ((LSPCompletionItem, @escaping (LSPCompletionItem) -> Void) -> Void)?,
 		isRequestCurrent: @escaping () -> Bool,
 		requestInvalidated: @escaping () -> Void,
+		resolveInvalidated: @escaping () -> Void,
 		accept: @escaping (LSPCompletionItem) -> Void
 	) {
+		cancelResolveTimer()
+		self.resolveInvalidated?()
 		if !panel.isVisible {
 			resolvedItemsByKey = [:]
 			pendingResolveKeys = []
@@ -63,6 +67,7 @@ import ItsyRender
 		resolveItem = resolve
 		self.isRequestCurrent = isRequestCurrent
 		self.requestInvalidated = requestInvalidated
+		self.resolveInvalidated = resolveInvalidated
 		acceptItem = accept
 		allItems = result.items
 		isIncomplete = result.isIncomplete
@@ -86,6 +91,7 @@ import ItsyRender
 	func dismiss() {
 		removeKeyMonitor()
 		cancelResolveTimer()
+		resolveInvalidated?()
 		closeDetailPopover()
 		panel.parent?.removeChildWindow(panel)
 		panel.orderOut(nil)
@@ -95,6 +101,7 @@ import ItsyRender
 		resolveItem = nil
 		isRequestCurrent = nil
 		requestInvalidated = nil
+		resolveInvalidated = nil
 		acceptItem = nil
 		resolvedItemsByKey = [:]
 		pendingResolveKeys = []
@@ -310,6 +317,7 @@ import ItsyRender
 
 	private func scheduleResolveForSelection() {
 		cancelResolveTimer()
+		resolveInvalidated?()
 		let row = tableView.selectedRow
 		guard row >= 0, row < filteredItems.count else {
 			closeDetailPopover()

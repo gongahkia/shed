@@ -956,7 +956,7 @@ import ItsyWorkbenchLayout
 		} else {
 			settingsStatusLabel?.textColor = .secondaryLabelColor
 			settingsStatusLabel?.stringValue = ItsyWorkspaceController.currentRootURL == nil
-				? L10n.string("Config: ~/.config/itsy/settings.toml · LSP: \(LSPServerRegistryLoader.defaultConfigURL.path)")
+				? L10n.string("Config: ~/.config/itsy/settings.json · LSP: \(LSPServerRegistryLoader.defaultConfigURL.path)")
 				: L10n.string("Config: global + workspace · LSP: \(LSPServerRegistryLoader.defaultConfigURL.path)")
 		}
 	}
@@ -1002,7 +1002,7 @@ import ItsyWorkbenchLayout
 		if !FileManager.default.fileExists(atPath: url.path) {
 			do {
 				try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-				try "# Itsy settings. Changes reload while Itsy is running.\n\n".write(to: url, atomically: true, encoding: .utf8)
+				try ItsySettingsJSONCodec.encodeEmptyLayer().write(to: url, options: .atomic)
 			} catch {
 				settingsStatusLabel?.textColor = .systemRed
 				settingsStatusLabel?.stringValue = L10n.string("Failed to create settings file: \(String(describing: error))")
@@ -1019,18 +1019,23 @@ import ItsyWorkbenchLayout
 	}
 
 	func generateWorkbenchDoctorFile() -> URL? {
-		let url = settingsStore.fileURL.deletingLastPathComponent().appendingPathComponent("settings.workbench.doctor.toml")
+		let url = settingsStore.fileURL.deletingLastPathComponent().appendingPathComponent("settings.workbench.doctor.json")
 		let contents = """
-		# Copy this section into settings.toml, then reload settings.
-		[workbench]
-		profile = "workbench"
-		file_tree = "automatic"
-		terminal = "automatic"
-		git = "automatic"
+		{
+		  "schema_version": \(ItsySettingsSchema.currentVersion),
+		  "settings": {
+		    "workbench": {
+		      "profile": "workbench",
+		      "file_tree": "automatic",
+		      "terminal": "automatic",
+		      "git": "automatic"
+		    }
+		  }
+		}
 		"""
 		do {
 			try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-			try contents.write(to: url, atomically: true, encoding: .utf8)
+			try Data(contents.utf8).write(to: url, options: .atomic)
 			return url
 		} catch {
 			settingsStatusLabel?.textColor = .systemRed

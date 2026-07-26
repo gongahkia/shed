@@ -52,8 +52,8 @@ import Foundation
 		diagnostic.setAccessibilityLabel("Workbench layout diagnostic")
 		diagnostic.textColor = .secondaryLabelColor
 		diagnostic.maximumNumberOfLines = 3
-		let open = NSButton(title: "Open TOML", target: self, action: #selector(openSettings(_:)))
-		open.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.open-toml")
+		let open = NSButton(title: "Open JSON", target: self, action: #selector(openSettings(_:)))
+		open.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.open-json")
 		let doctor = NSButton(title: "Generate Doctor", target: self, action: #selector(generateDoctorFile(_:)))
 		doctor.identifier = NSUserInterfaceItemIdentifier("workbench-recovery.generate-doctor")
 		let restore = NSButton(title: "Restore Defaults", target: self, action: #selector(restoreWorkbenchDefaults(_:)))

@@ -49,6 +49,7 @@ import Testing
 	let recovery = WorkbenchRecoveryPanel(openSettings: {}, restoreDefaults: {}, generateDoctor: { nil })
 	let recoveryLabels = accessibilityLabels(in: recovery.contentViewForTesting(diagnostic: "workbench.profile is invalid"))
 	#expect(recoveryLabels.contains("Workbench layout is disabled"))
+	#expect(recoveryLabels.contains("Open JSON"))
 }
 
 @MainActor

@@ -195,7 +195,7 @@ import ItsyConfig
 			sourceButton?.isEnabled = false
 			return
 		}
-		let overrideText = item.entry.isLanguageTemplate ? L10n.string(" Use a concrete language ID in settings.toml.") : ""
+		let overrideText = item.entry.isLanguageTemplate ? L10n.string(" Use a concrete language ID in settings.json.") : ""
 		let errorText = validationError.map { " Validation: \($0)" } ?? ""
 		detailLabel?.stringValue = "\(item.entry.description) \(item.entry.reloadBehavior.displayName).\(overrideText)\(errorText)"
 		detailLabel?.textColor = validationError == nil ? .secondaryLabelColor : .systemRed

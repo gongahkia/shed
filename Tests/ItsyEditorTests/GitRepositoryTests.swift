@@ -619,6 +619,74 @@ import Testing
 	#expect(detachedStatus.branch.head == nil)
 }
 
+@Test func gitHistoryPagerPaginatesLargeRepositoryWithoutOverlap() async throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	for revision in 0 ... 192 {
+		try fixture.write("history.txt", "revision \(revision)\n")
+		try fixture.git(["add", "history.txt"])
+		try fixture.git(["commit", "-m", "revision \(revision)"])
+	}
+
+	let pager = GitHistoryPager()
+	let loader: GitHistoryPager.Loader = { offset, limit in
+		try repository.historyPage(limit: limit, offset: offset).entries
+	}
+	var pages: [GitHistoryPage] = []
+	for offset in stride(from: 0, through: 192, by: 64) {
+		guard let page = try await pager.loadNext(limit: 64, loader: loader) else {
+			Issue.record("expected history page")
+			return
+		}
+		#expect(page.offset == offset)
+		pages.append(page)
+	}
+
+	let entries = pages.flatMap(\.entries)
+	let leadingPagesHaveMore = pages.dropLast().allSatisfy { $0.hasMore }
+	#expect(pages.map(\.entries.count) == [64, 64, 64, 1])
+	#expect(leadingPagesHaveMore)
+	#expect(!pages[3].hasMore)
+	#expect(Set(entries.map(\.history.oid)).count == 193)
+}
+
+@Test func gitRepositoryBlameCompletesLargeFileAttribution() throws {
+	guard FileManager.default.isExecutableFile(atPath: "/usr/bin/git") else {
+		return
+	}
+	let fixture = try TemporaryGitFixture()
+	let repository = GitRepository(root: fixture.root)
+	try fixture.git(["init"])
+	try fixture.git(["config", "user.email", "itsy@example.invalid"])
+	try fixture.git(["config", "user.name", "Itsy"])
+	var lines = (1 ... 2_048).map { "line \($0)" }
+	try fixture.write("blame.txt", lines.joined(separator: "\n") + "\n")
+	try fixture.git(["add", "blame.txt"])
+	try fixture.git(["commit", "-m", "initial"])
+	for revision in 1 ... 32 {
+		let index = revision * 61
+		lines[index] = "line \(index + 1) revision \(revision)"
+		try fixture.write("blame.txt", lines.joined(separator: "\n") + "\n")
+		try fixture.git(["commit", "-am", "revision \(revision)"])
+	}
+
+	let blame = try repository.blame(path: "blame.txt")
+
+	#expect(blame.count == lines.count)
+	#expect(blame.map(\.line) == Array(1 ... lines.count))
+	#expect(blame[0].summary == "initial")
+	for revision in 1 ... 32 {
+		#expect(blame[revision * 61].summary == "revision \(revision)")
+	}
+	#expect(Set(blame.map(\.oid)).count == 33)
+}
+
 @Test func gitBlameCacheReusesRepositoryResultsUntilInvalidated() throws {
 	let output = """
 	aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1

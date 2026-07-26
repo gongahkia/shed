@@ -21,6 +21,13 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	#expect(try ItsySettingsJSONCodec.decode(data) == settings.normalized())
 }
 
+@Test func settingsJSONCodecEncodesEmptyLayerForSettingsFileCreation() throws {
+	let data = try ItsySettingsJSONCodec.encodeEmptyLayer()
+	let layer = try ItsySettingsJSONCodec.decodeLayer(data)
+	#expect(layer.settings == ItsySettings.default.normalized())
+	#expect(layer.assignedKeys.isEmpty)
+}
+
 @Test func settingsJSONCodecMergesPartialLayerAndLanguageOverrides() throws {
 	var fallback = ItsySettings.default.normalized()
 	fallback.editor.font = "Monaco"

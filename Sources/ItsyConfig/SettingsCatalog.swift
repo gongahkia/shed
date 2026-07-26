@@ -46,7 +46,7 @@ public enum ItsySettingsCatalog {
 		.init(
 			key: "schema_version",
 			title: "Schema Version",
-			description: "Version used to validate settings.toml.",
+			description: "Version used to validate settings.json.",
 			isResettable: false
 		),
 		.init(key: "editor.font", title: "Editor Font", description: "Font family for editor text."),

@@ -28,10 +28,11 @@ public enum ItsySettingsJSONCodecError: Error, Equatable, Sendable {
 
 public enum ItsySettingsJSONCodec {
 	public static func encode(_ settings: ItsySettings) throws -> Data {
-		let encoder = JSONEncoder()
-		encoder.keyEncodingStrategy = .convertToSnakeCase
-		encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
-		return try encoder.encode(ItsySettingsJSONDocument(settings: settings.normalized()))
+		try encoder().encode(ItsySettingsJSONDocument(settings: settings.normalized()))
+	}
+
+	public static func encodeEmptyLayer() throws -> Data {
+		try encoder().encode(ItsySettingsJSONEmptyLayerDocument())
 	}
 
 	public static func decode(_ data: Data) throws -> ItsySettings {
@@ -55,7 +56,21 @@ public enum ItsySettingsJSONCodec {
 		}
 		return ItsySettingsJSONLayer(settings: settings, assignedKeys: assignedKeys)
 	}
+
+	private static func encoder() -> JSONEncoder {
+		let encoder = JSONEncoder()
+		encoder.keyEncodingStrategy = .convertToSnakeCase
+		encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+		return encoder
+	}
 }
+
+private struct ItsySettingsJSONEmptyLayerDocument: Encodable {
+	let schemaVersion = ItsySettingsSchema.currentVersion
+	let settings = ItsySettingsJSONEmptyLayer()
+}
+
+private struct ItsySettingsJSONEmptyLayer: Encodable {}
 
 private struct ItsySettingsJSONLayerDocument: Decodable {
 	let schemaVersion: Int

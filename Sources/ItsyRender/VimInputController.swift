@@ -11,6 +11,8 @@ import enum ItsyVim.VimOperator
 import enum ItsyVim.VisualMode
 import struct ItsyVim.VimSelection
 import struct ItsyVim.RecordedKey
+import struct ItsyVim.VimInputRouter
+import enum ItsyVim.VimInputRoute
 
 enum KeyDispatchResult {
 	case handled
@@ -151,12 +153,17 @@ extension MetalTextView {
 		if commandID != "emacs.yank", commandID != "emacs.yankPop" {
 			lastYankRange = nil
 		}
-		if let action = vimEngine.handle(
+		var router = VimInputRouter(engine: vimEngine)
+		switch router.route(
 			commandID: commandID,
 			count: keymapRepeatCount,
 			hasSelection: !editor.selections.primary.isCaret
 		) {
+		case .action(let action):
+			vimEngine = router.engine
 			return applyVimCommandAction(action)
+		case .hostCommand:
+			vimEngine = router.engine
 		}
 		switch commandID {
 		case "edit.cut":

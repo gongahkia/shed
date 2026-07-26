@@ -12,20 +12,20 @@ public enum ItsySettingsSchema {
 	public static let compatibilityPolicy: ItsySettingsCompatibilityPolicy = .warnAndIgnoreUnknownFields
 }
 
-public struct ItsySettings: Equatable, Sendable {
-	public enum UIDensity: String, Equatable, Sendable {
+public struct ItsySettings: Codable, Equatable, Sendable {
+	public enum UIDensity: String, Codable, Equatable, Sendable {
 		case compact
 		case regular
 		case comfortable
 	}
 
-	public enum UINotificationPosition: String, Equatable, Sendable {
+	public enum UINotificationPosition: String, Codable, Equatable, Sendable {
 		case bottomRight = "bottom_right"
 		case topRight = "top_right"
 	}
 
-	public struct UISettings: Equatable, Sendable {
-		public struct SurfaceSettings: Equatable, Sendable {
+	public struct UISettings: Codable, Equatable, Sendable {
+		public struct SurfaceSettings: Codable, Equatable, Sendable {
 			public var width: Double?
 			public var height: Double?
 			public var rowHeight: Double?
@@ -96,58 +96,58 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public enum EditorStorage: String, Equatable, Sendable {
+	public enum EditorStorage: String, Codable, Equatable, Sendable {
 		case rope
 		case pieceTree = "piecetree"
 	}
 
-	public enum SyntaxPreloadGrammars: String, Equatable, Sendable {
+	public enum SyntaxPreloadGrammars: String, Codable, Equatable, Sendable {
 		case none
 		case opened
 		case all
 	}
 
-	public enum TabGroupScope: String, Equatable, Sendable {
+	public enum TabGroupScope: String, Codable, Equatable, Sendable {
 		case window
 		case pane
 	}
 
-	public enum KeymapMode: String, Equatable, Sendable {
+	public enum KeymapMode: String, Codable, Equatable, Sendable {
 		case plain
 		case vim
 		case emacs
 	}
 
-	public enum CursorStyle: String, Equatable, Sendable {
+	public enum CursorStyle: String, Codable, Equatable, Sendable {
 		case automatic
 		case block
 		case bar
 	}
 
-	public enum LineNumberMode: String, Equatable, Sendable {
+	public enum LineNumberMode: String, Codable, Equatable, Sendable {
 		case off
 		case absolute
 		case relative
 	}
 
-	public enum WrapMode: String, Equatable, Sendable {
+	public enum WrapMode: String, Codable, Equatable, Sendable {
 		case none
 		case soft
 		case hard
 	}
 
-	public enum FontRenderingMode: String, Equatable, Sendable {
+	public enum FontRenderingMode: String, Codable, Equatable, Sendable {
 		case grayscale
 		case subpixel
 	}
 
-	public enum SidebarPosition: String, Equatable, Sendable {
+	public enum SidebarPosition: String, Codable, Equatable, Sendable {
 		case leading
 		case trailing
 	}
 
-	public struct EditorSettings: Equatable, Sendable {
-		public struct LanguageSettings: Equatable, Sendable {
+	public struct EditorSettings: Codable, Equatable, Sendable {
+		public struct LanguageSettings: Codable, Equatable, Sendable {
 			public var font: String?
 			public var fontSize: Double?
 			public var lineNumbers: Bool?
@@ -181,7 +181,7 @@ public struct ItsySettings: Equatable, Sendable {
 			}
 		}
 
-		public struct ExperimentalSettings: Equatable, Sendable {
+		public struct ExperimentalSettings: Codable, Equatable, Sendable {
 			public var storage: EditorStorage
 
 			public init(storage: EditorStorage = .pieceTree) {
@@ -257,8 +257,8 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct ThemeSettings: Equatable, Sendable {
-		public struct GitGutterSettings: Equatable, Sendable {
+	public struct ThemeSettings: Codable, Equatable, Sendable {
+		public struct GitGutterSettings: Codable, Equatable, Sendable {
 			public static let defaultAdded = "#47C775"
 			public static let defaultModified = "#F2AD2E"
 			public static let defaultRemoved = "#F24038"
@@ -289,7 +289,7 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct SyntaxSettings: Equatable, Sendable {
+	public struct SyntaxSettings: Codable, Equatable, Sendable {
 		public var preloadGrammars: SyntaxPreloadGrammars
 
 		public init(preloadGrammars: SyntaxPreloadGrammars = .opened) {
@@ -297,8 +297,8 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct TerminalSettings: Equatable, Sendable {
-		public enum Presentation: String, Equatable, Sendable {
+	public struct TerminalSettings: Codable, Equatable, Sendable {
+		public enum Presentation: String, Codable, Equatable, Sendable {
 			case bottom
 			case window
 		}
@@ -336,8 +336,8 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct GitSettings: Equatable, Sendable {
-		public enum Presentation: String, Equatable, Sendable {
+	public struct GitSettings: Codable, Equatable, Sendable {
+		public enum Presentation: String, Codable, Equatable, Sendable {
 			case sidebar
 			case window
 		}
@@ -349,8 +349,8 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct DebuggerSettings: Equatable, Sendable {
-		public enum Presentation: String, Equatable, Sendable {
+	public struct DebuggerSettings: Codable, Equatable, Sendable {
+		public enum Presentation: String, Codable, Equatable, Sendable {
 			case sidebar
 			case window
 		}
@@ -362,7 +362,7 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct FindSettings: Equatable, Sendable {
+	public struct FindSettings: Codable, Equatable, Sendable {
 		public var usesRegex: Bool
 		public var isCaseSensitive: Bool
 		public var matchesWholeWord: Bool
@@ -374,7 +374,7 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct RecoverySettings: Equatable, Sendable {
+	public struct RecoverySettings: Codable, Equatable, Sendable {
 		public var journalEnabled: Bool
 
 		public init(journalEnabled: Bool = true) {
@@ -382,7 +382,7 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct UpdateSettings: Equatable, Sendable {
+	public struct UpdateSettings: Codable, Equatable, Sendable {
 		public var automaticallyCheck: Bool
 
 		public init(automaticallyCheck: Bool = false) {
@@ -390,14 +390,14 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public enum LSPMode: String, CaseIterable, Equatable, Sendable {
+	public enum LSPMode: String, CaseIterable, Codable, Equatable, Sendable {
 		case automatic = "auto"
 		case system
 		case managed
 		case disabled
 	}
 
-	public struct LSPSettings: Equatable, Sendable {
+	public struct LSPSettings: Codable, Equatable, Sendable {
 		public var catalogAutomaticallyCheck: Bool
 		public var modes: [String: LSPMode]
 
@@ -411,7 +411,7 @@ public struct ItsySettings: Equatable, Sendable {
 		}
 	}
 
-	public struct LayoutSettings: Equatable, Sendable {
+	public struct LayoutSettings: Codable, Equatable, Sendable {
 		public static let defaultSidebarWidth = 240
 		public static let minSidebarWidth = 160
 		public static let maxSidebarWidth = 480

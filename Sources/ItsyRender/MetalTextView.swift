@@ -198,6 +198,7 @@ public final class MetalTextView: NSView {
 		didSet { syncEditorState() }
 	}
 	private var selectionRects: [CGRect] = []
+	private var lastReportedSelections: SelectionSet?
 	var findMatchRanges: [Range<Int>] = []
 	var findMatchRects: [CGRect] = []
 	var documentHighlightRanges: [Range<Int>] = []
@@ -383,6 +384,7 @@ public final class MetalTextView: NSView {
 		}
 	}
 	public var editorDidChange: ((Editor) -> Void)?
+	public var selectionDidChange: ((SelectionSet) -> Void)?
 	public var visibleLineRangeDidChange: ((Range<Int>) -> Void)?
 	public var saveRequested: (() -> Void)?
 	public var closeRequested: (() -> Void)?
@@ -1802,6 +1804,15 @@ public final class MetalTextView: NSView {
 		refreshGutterMarkerRects()
 		refreshAccessibilityValue()
 		markDirty()
+		reportSelectionIfNeeded()
+	}
+
+	private func reportSelectionIfNeeded() {
+		guard lastReportedSelections != editor.selections else {
+			return
+		}
+		lastReportedSelections = editor.selections
+		selectionDidChange?(editor.selections)
 	}
 
 	private func cursorWidth(at head: Int, in range: Range<Int>) -> CGFloat {

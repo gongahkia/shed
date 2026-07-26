@@ -22,7 +22,9 @@ import ItsySyntax
 	private(set) var textFileRequiresEncodingChoice = false
 	private var undecidedTextFileData: Data?
 	private var hasPresentedTextFileEncodingChoice = false
+	var lspSurfaceInvalidationRequested: (() -> Void)?
 	var lspSurfaceRefreshRequested: (() -> Void)?
+	var lspDocumentHighlightRefreshRequested: (() -> Void)?
 	var lspDocumentSaved: (() -> Void)?
 	private var editorViews: [MetalTextView] = []
 	private let syntax = DocumentSyntaxController()
@@ -189,6 +191,9 @@ import ItsySyntax
 			self?.refreshSyntaxHighlights()
 			self?.lspSurfaceRefreshRequested?()
 		}
+		view.selectionDidChange = { [weak self] _ in
+			self?.lspDocumentHighlightRefreshRequested?()
+		}
 		view.newlineInsertionTextProvider = { [weak self] editor in
 			guard let self else {
 				return "\n"
@@ -210,6 +215,7 @@ import ItsySyntax
 			self.editor = editor
 			lspHighlightSpans = []
 			refreshSyntaxHighlights(edits: edits, oldRope: oldRope)
+			lspSurfaceInvalidationRequested?()
 			lspSurfaceRefreshRequested?()
 			updateHandoffActivity()
 			syncSiblingEditorViews(source: view, editor: editor)
@@ -236,6 +242,7 @@ import ItsySyntax
 
 	func detach(_ view: MetalTextView) {
 		view.visibleLineRangeDidChange = nil
+		view.selectionDidChange = nil
 		view.newlineInsertionTextProvider = nil
 		editorViews.removeAll { $0 === view }
 		refreshSyntaxHighlights()
@@ -288,6 +295,12 @@ import ItsySyntax
 	func setLSPSemanticSurface(inlayHints: [TextInlineAnnotation], highlights: [Range<Int>]) {
 		for view in editorViews {
 			view.inlayHintAnnotations = inlayHints
+		}
+		setLSPDocumentHighlightRanges(highlights)
+	}
+
+	func setLSPDocumentHighlightRanges(_ highlights: [Range<Int>]) {
+		for view in editorViews {
 			view.setDocumentHighlightRanges(highlights)
 		}
 	}

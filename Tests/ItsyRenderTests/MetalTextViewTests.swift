@@ -164,6 +164,22 @@ extension ItsyRenderTests {
 	#expect(view.editor.selections.secondaries.isEmpty)
 }
 
+@Test func selectionCallbackReportsOnlySelectionChanges() {
+	let view = MetalTextView(frame: .zero)
+	view.editor = Editor(text: "abcdef")
+	var selections: [SelectionSet] = []
+	view.selectionDidChange = { selections.append($0) }
+
+	view.selectUTF8Range(1 ..< 1)
+	view.selectUTF8Range(1 ..< 1)
+	view.selectUTF8Range(2 ..< 4)
+
+	#expect(selections == [
+		SelectionSet(primary: Selection(anchor: 1, head: 1)),
+		SelectionSet(primary: Selection(anchor: 2, head: 4)),
+	])
+}
+
 @Test func mouseDragSelectsTextRange() throws {
 	let view = MetalTextView(frame: NSRect(x: 0, y: 0, width: 400, height: 100))
 	view.editor = Editor(text: "abc\ndef\nghi\n")

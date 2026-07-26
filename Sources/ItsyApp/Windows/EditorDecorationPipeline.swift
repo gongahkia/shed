@@ -91,9 +91,20 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		guard let uri = document.fileURL?.standardizedFileURL.absoluteString else {
 			return
 		}
+		invalidate(uri: uri, document: document)
+	}
+
+	func invalidate(uri: String, document: ItsyDocument) {
 		semanticTokenCache.invalidate(uri)
+		foldingRangesByURI[uri] = nil
+		collapsedFoldStartsByURI[uri] = nil
+		applyFoldState(uri: uri, document: document)
 		document.setLSPSemanticHighlightSpans([])
 		document.setLSPSemanticSurface(inlayHints: [], highlights: [])
+	}
+
+	func invalidateDocumentHighlights(for document: ItsyDocument) {
+		document.setLSPDocumentHighlightRanges([])
 	}
 
 	func semanticTokenState(for uri: String) -> LSPSemanticTokenState? {

@@ -33,7 +33,7 @@ import Testing
 			WorkspacePaneState(openPaths: [], selectedPath: nil),
 		],
 		focusedPaneIndex: 1,
-		workbenchDividers: .init(sidebarWidth: 300, gitWidth: 520)
+		workbenchDividers: .init(sidebarWidth: 300, gitWidth: 520, debuggerWidth: 380)
 	)
 	try store.saveWindowState(state, for: fixture.root)
 	let loadedState = try #require(store.loadWindowState(for: fixture.root))

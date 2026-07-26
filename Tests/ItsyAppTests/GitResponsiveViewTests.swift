@@ -41,3 +41,63 @@ import Testing
 	#expect(diff.focusIdentifiers.contains("git.diff-mode"))
 	#expect(coordinator.gitFocusTraversalIsClosedForTesting())
 }
+
+@Test @MainActor func gitCoordinatorRelocatesActivePresentation() throws {
+	_ = NSApplication.shared
+	let host = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 720))
+	var settings = ItsySettings.GitSettings()
+	var visibility: [Bool] = []
+	let coordinator = GitCoordinator(
+		documentController: ItsyDocumentController(),
+		activeDocumentProvider: { nil },
+		settingsProvider: { settings },
+		embeddedHostProvider: { host },
+		setEmbeddedGitVisible: { _, visible in visibility.append(visible) }
+	)
+
+	coordinator.showGitChanges(nil)
+	#expect(host.subviews.count == 1)
+	settings.presentation = .window
+	coordinator.applyGitSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Git Changes" && $0.isVisible })
+	defer { panel.close() }
+	#expect(host.subviews.isEmpty)
+	#expect(visibility == [true, false])
+
+	settings.presentation = .sidebar
+	coordinator.applyGitSettings(settings)
+	#expect(!panel.isVisible)
+	#expect(host.subviews.count == 1)
+	#expect(visibility == [true, false, true])
+}
+
+@Test @MainActor func gitCoordinatorKeepsTheOriginatingHostAcrossPresentationReloads() throws {
+	_ = NSApplication.shared
+	let firstHost = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 720))
+	let secondHost = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 720))
+	var activeHost = firstHost
+	var settings = ItsySettings.GitSettings()
+	var visibility: [String] = []
+	let coordinator = GitCoordinator(
+		documentController: ItsyDocumentController(),
+		activeDocumentProvider: { nil },
+		settingsProvider: { settings },
+		embeddedHostProvider: { activeHost },
+		setEmbeddedGitVisible: { host, visible in
+			visibility.append("\(host === firstHost ? "first" : "second"):\(visible)")
+		}
+	)
+
+	coordinator.showGitChanges(nil)
+	activeHost = secondHost
+	settings.presentation = .window
+	coordinator.applyGitSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Git Changes" && $0.isVisible })
+	defer { panel.close() }
+	settings.presentation = .sidebar
+	coordinator.applyGitSettings(settings)
+
+	#expect(visibility == ["first:true", "first:false", "first:true"])
+	#expect(firstHost.subviews.count == 1)
+	#expect(secondHost.subviews.isEmpty)
+}

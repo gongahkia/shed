@@ -47,7 +47,9 @@ import ItsyKeymap
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
 		settingsProvider: { [weak self] in self?.currentGitSettings() ?? ItsySettings.GitSettings() },
 		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedGitHostView },
-		setEmbeddedGitVisible: { [weak self] visible in self?.activeEditorWindowController()?.setEmbeddedGitVisible(visible) }
+		setEmbeddedGitVisible: { [weak self] host, visible in
+			self?.editorWindowController(gitHost: host)?.setEmbeddedGitVisible(visible)
+		}
 	)
 	private lazy var gitReviewWorkspaceCoordinator = GitReviewWorkspaceCoordinator(
 		persistWorkspaceState: { [weak self] in
@@ -65,8 +67,8 @@ import ItsyKeymap
 		documentController: documentController,
 		settingsProvider: { [weak self] in self?.currentDebuggerSettings() ?? ItsySettings.DebuggerSettings() },
 		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedDebuggerHostView },
-		setEmbeddedDebuggerVisible: { [weak self] visible in
-			self?.activeEditorWindowController()?.setEmbeddedDebuggerVisible(visible)
+		setEmbeddedDebuggerVisible: { [weak self] host, visible in
+			self?.editorWindowController(debuggerHost: host)?.setEmbeddedDebuggerVisible(visible)
 		}
 	)
 	private lazy var terminalCoordinator = TerminalCoordinator(
@@ -74,8 +76,8 @@ import ItsyKeymap
 		activeDocumentProvider: { [weak self] in self?.activeDocument() },
 		openLocation: { [weak self] location in self?.openTerminalLocation(location) },
 		embeddedHostProvider: { [weak self] in self?.activeEditorWindowController()?.embeddedTerminalHostView },
-		setEmbeddedTerminalVisible: { [weak self] visible in
-			self?.activeEditorWindowController()?.setEmbeddedTerminalVisible(visible)
+		setEmbeddedTerminalVisible: { [weak self] host, visible in
+			self?.editorWindowController(terminalHost: host)?.setEmbeddedTerminalVisible(visible)
 		},
 		editorFontProvider: { [weak self] in
 			self?.settingsCoordinator.currentSettings.editor.font ?? ItsySettings.EditorSettings.defaultFont
@@ -117,6 +119,12 @@ import ItsyKeymap
 		}
 		recordBenchStage("delegate_keymap_end")
 		super.init()
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(closeSecondarySidebar(_:)),
+			name: .itsySecondarySidebarCloseRequested,
+			object: nil
+		)
 		recordBenchStage("delegate_settings_begin")
 		_ = settingsCoordinator.currentSettings
 		AppTheme.install()
@@ -330,6 +338,9 @@ import ItsyKeymap
 				},
 				Command(id: "view.focusSidebar", title: L10n.string("Focus Sidebar"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusSidebar()
+				},
+				Command(id: "view.focusSecondarySidebar", title: L10n.string("Focus Secondary Sidebar"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusSecondarySidebar()
 				},
 				Command(id: "view.focusTabs", title: L10n.string("Focus Tabs"), defaultKey: nil) { [weak self] in
 					self?.activeEditorWindowController()?.focusTabs()
@@ -622,6 +633,33 @@ import ItsyKeymap
 			?? documentController.currentDocument?.windowControllers.first as? EditorWindowController
 	}
 
+	private var editorWindowControllers: [EditorWindowController] {
+		documentController.documents.flatMap(\.windowControllers).compactMap { $0 as? EditorWindowController }
+	}
+
+	private func editorWindowController(gitHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedGitHostView === gitHost }
+	}
+
+	private func editorWindowController(debuggerHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedDebuggerHostView === debuggerHost }
+	}
+
+	private func editorWindowController(terminalHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedTerminalHostView === terminalHost }
+	}
+
+	@objc private func closeSecondarySidebar(_ notification: Notification) {
+		switch notification.userInfo?["surface"] as? String {
+		case "git":
+			gitCoordinator.closeEmbeddedGitChanges()
+		case "debugger":
+			debuggerCoordinator.closeEmbeddedCallStack()
+		default:
+			return
+		}
+	}
+
 	private func selectAdjacentTab(delta: Int) {
 		if let controller = activeEditorWindowController() {
 			controller.selectAdjacentTab(delta: delta)
@@ -671,10 +709,10 @@ import ItsyKeymap
 		terminalCoordinator.applyTerminalSettings(settings.terminal)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
 		if settings.workbench.git == .visible {
-			gitCoordinator.showGitChanges(nil)
+			gitCoordinator.ensureGitChangesVisible()
 		}
 		if settings.workbench.terminal == .visible {
-			terminalCoordinator.showTerminal(nil)
+			terminalCoordinator.ensureTerminalVisible()
 		}
 		sparkleUpdateCoordinator.apply(settings.updates)
 		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)

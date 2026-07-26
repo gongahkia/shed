@@ -60,29 +60,34 @@ public enum DebugBreakpointSync {
 	public static func syncPersistedBreakpoints(
 		from store: BreakpointStore,
 		using client: DAPClientSession,
-		workspaceRoot: URL
+		workspaceRoot: URL,
+		capabilities: Set<DebugAdapterCapability>
 	) async throws -> [DebugBreakpointVerification] {
 		try await store.load()
 		let snapshot = await store.snapshot()
 		var verification: [DebugBreakpointVerification] = []
-		for (sourceURL, arguments) in setBreakpointsRequests(from: snapshot, workspaceRoot: workspaceRoot) {
+		for request in setBreakpointsRequests(from: snapshot, workspaceRoot: workspaceRoot, capabilities: capabilities) {
+			let sourceURL = request.sourceURL
+			let arguments = request.arguments
 			let response = try await client.setBreakpoints(arguments)
-			verification += try reconcile(sourceURL: sourceURL, requested: arguments.breakpoints ?? [], response: response)
+			verification += try reconcile(sourceURL: sourceURL, requested: request.persistedBreakpoints, response: response)
 		}
 		return verification
 	}
 
 	public static func setBreakpointsArguments(
 		from snapshot: [URL: [SourceBreakpoint]],
-		workspaceRoot: URL
+		workspaceRoot: URL,
+		capabilities: Set<DebugAdapterCapability>
 	) -> [DAPSetBreakpointsArguments] {
-		setBreakpointsRequests(from: snapshot, workspaceRoot: workspaceRoot).map(\.arguments)
+		setBreakpointsRequests(from: snapshot, workspaceRoot: workspaceRoot, capabilities: capabilities).map(\.arguments)
 	}
 
 	private static func setBreakpointsRequests(
 		from snapshot: [URL: [SourceBreakpoint]],
-		workspaceRoot: URL
-	) -> [(sourceURL: URL, arguments: DAPSetBreakpointsArguments)] {
+		workspaceRoot: URL,
+		capabilities: Set<DebugAdapterCapability>
+	) -> [(sourceURL: URL, persistedBreakpoints: [SourceBreakpoint], arguments: DAPSetBreakpointsArguments)] {
 		let rootPath = workspaceRoot.standardizedFileURL.path
 		let rootPrefix = rootPath.hasSuffix("/") ? rootPath : rootPath + "/"
 		return snapshot
@@ -97,11 +102,21 @@ public enum DebugBreakpointSync {
 			}
 			.sorted { $0.0.path < $1.0.path }
 			.map { url, breakpoints in
-				(url, DAPSetBreakpointsArguments(
+				(url, breakpoints, DAPSetBreakpointsArguments(
 					source: DAPSource(name: url.lastPathComponent, path: url.path),
-					breakpoints: breakpoints
+					breakpoints: breakpoints.map { requestBreakpoint(from: $0, capabilities: capabilities) }
 				))
 			}
+	}
+
+	private static func requestBreakpoint(from breakpoint: SourceBreakpoint, capabilities: Set<DebugAdapterCapability>) -> SourceBreakpoint {
+		SourceBreakpoint(
+			line: breakpoint.line,
+			column: breakpoint.column,
+			condition: capabilities.contains(.conditionalBreakpoints) ? breakpoint.condition : nil,
+			hitCondition: capabilities.contains(.hitConditionalBreakpoints) ? breakpoint.hitCondition : nil,
+			logMessage: capabilities.contains(.logPoints) ? breakpoint.logMessage : nil
+		)
 	}
 
 	private static func reconcile(sourceURL: URL, requested: [SourceBreakpoint], response: DAPResponse) throws -> [DebugBreakpointVerification] {

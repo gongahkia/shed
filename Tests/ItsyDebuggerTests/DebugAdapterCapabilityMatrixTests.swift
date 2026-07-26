@@ -14,13 +14,16 @@ import Testing
 @Test func debugAdapterCapabilitiesRequireExplicitDAPAdvertisement() {
 	let capabilities = DAPCapabilities(
 		supportsConfigurationDoneRequest: true,
+		supportsConditionalBreakpoints: true,
+		supportsHitConditionalBreakpoints: true,
 		supportsStepBack: true,
 		supportsReverseContinue: false,
 		supportsSetVariable: true,
 		supportsRestartRequest: nil,
+		supportsLogPoints: true,
 		supportsTerminateRequest: true
 	)
-	#expect(DebugAdapterCapabilityMatrix.negotiatedCapabilities(from: capabilities) == [.configurationDone, .setVariable, .stepBack, .terminate])
+	#expect(DebugAdapterCapabilityMatrix.negotiatedCapabilities(from: capabilities) == [.configurationDone, .conditionalBreakpoints, .hitConditionalBreakpoints, .logPoints, .setVariable, .stepBack, .terminate])
 }
 
 @Test func debugAdapterCapabilityMatrixRejectsInvalidContracts() {

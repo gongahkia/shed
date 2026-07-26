@@ -3,6 +3,9 @@ import ItsyEditor
 
 public enum DebugAdapterCapability: String, CaseIterable, Codable, Equatable, Hashable, Sendable {
 	case configurationDone = "configuration_done"
+	case conditionalBreakpoints = "conditional_breakpoints"
+	case hitConditionalBreakpoints = "hit_conditional_breakpoints"
+	case logPoints = "log_points"
 	case setVariable = "set_variable"
 	case stepBack = "step_back"
 	case reverseContinue = "reverse_continue"
@@ -13,6 +16,12 @@ public enum DebugAdapterCapability: String, CaseIterable, Codable, Equatable, Ha
 		switch self {
 		case .configurationDone:
 			return capabilities.supportsConfigurationDoneRequest == true
+		case .conditionalBreakpoints:
+			return capabilities.supportsConditionalBreakpoints == true
+		case .hitConditionalBreakpoints:
+			return capabilities.supportsHitConditionalBreakpoints == true
+		case .logPoints:
+			return capabilities.supportsLogPoints == true
 		case .setVariable:
 			return capabilities.supportsSetVariable == true
 		case .stepBack:

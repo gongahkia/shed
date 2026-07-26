@@ -49,3 +49,28 @@ import Testing
 		.component(.git),
 	]))
 }
+
+@Test func firstPartyComponentRegistryDeclaresCanonicalMetadata() {
+	let registry = WorkbenchComponents.firstParty
+	#expect(registry.descriptors.map(\.id) == WorkbenchComponentID.allCases)
+	#expect(registry.descriptor(for: .terminal) == .init(
+		id: .terminal,
+		displayName: "Terminal",
+		placement: .bottomPanel,
+		defaultLifecycle: .hidden,
+		minimumWidth: 320,
+		minimumHeight: 140
+	))
+	#expect(WorkbenchComponents.registry == registry.descriptorsByID)
+}
+
+@Test func workbenchComponentRegistryRejectsDuplicateComponents() {
+	let descriptor = WorkbenchComponentDescriptor(id: .editor, minimumWidth: 480)
+	var error: WorkbenchComponentRegistryError?
+	do {
+		_ = try WorkbenchComponentRegistry(descriptors: [descriptor, descriptor])
+	} catch let caught as WorkbenchComponentRegistryError {
+		error = caught
+	} catch {}
+	#expect(error == .duplicateComponent(.editor))
+}

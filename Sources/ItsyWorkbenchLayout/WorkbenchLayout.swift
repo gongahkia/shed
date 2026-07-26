@@ -28,34 +28,77 @@ public enum WorkbenchGitLayoutMode: String, Codable, Equatable, Sendable {
 	case diff
 }
 
+public enum WorkbenchComponentPlacement: String, CaseIterable, Codable, Equatable, Sendable {
+	case sidebar
+	case editor
+	case bottomPanel
+	case secondarySidebar
+	case editorChrome
+}
+
 public struct WorkbenchComponentDescriptor: Equatable, Sendable {
 	public let id: WorkbenchComponentID
+	public let displayName: String
+	public let placement: WorkbenchComponentPlacement
+	public let defaultLifecycle: WorkbenchComponentLifecycle
 	public let minimumWidth: CGFloat
 	public let minimumHeight: CGFloat
 	public let collapsesBefore: [WorkbenchComponentID]
 
 	public init(
 		id: WorkbenchComponentID,
+		displayName: String? = nil,
+		placement: WorkbenchComponentPlacement = .editor,
+		defaultLifecycle: WorkbenchComponentLifecycle = .hidden,
 		minimumWidth: CGFloat,
 		minimumHeight: CGFloat = 0,
 		collapsesBefore: [WorkbenchComponentID] = []
 	) {
 		self.id = id
+		self.displayName = displayName ?? id.rawValue
+		self.placement = placement
+		self.defaultLifecycle = defaultLifecycle
 		self.minimumWidth = minimumWidth
 		self.minimumHeight = minimumHeight
 		self.collapsesBefore = collapsesBefore
 	}
+}
+
+public enum WorkbenchComponentRegistryError: Error, Equatable, Sendable {
+	case duplicateComponent(WorkbenchComponentID)
+}
+
+public struct WorkbenchComponentRegistry: Sendable {
+	public let descriptors: [WorkbenchComponentDescriptor]
+	public let descriptorsByID: [WorkbenchComponentID: WorkbenchComponentDescriptor]
+
+	public init(descriptors: [WorkbenchComponentDescriptor]) throws {
+		var descriptorsByID: [WorkbenchComponentID: WorkbenchComponentDescriptor] = [:]
+		for descriptor in descriptors {
+			guard descriptorsByID[descriptor.id] == nil else {
+				throw WorkbenchComponentRegistryError.duplicateComponent(descriptor.id)
+			}
+			descriptorsByID[descriptor.id] = descriptor
+		}
+		self.descriptors = descriptors
+		self.descriptorsByID = descriptorsByID
 	}
 
+	public func descriptor(for id: WorkbenchComponentID) -> WorkbenchComponentDescriptor? {
+		descriptorsByID[id]
+	}
+}
+
 public enum WorkbenchComponents {
-	public static let registry: [WorkbenchComponentID: WorkbenchComponentDescriptor] = [
-		.fileTree: .init(id: .fileTree, minimumWidth: 160, collapsesBefore: [.editor]),
-		.editor: .init(id: .editor, minimumWidth: 480, minimumHeight: 220),
-		.terminal: .init(id: .terminal, minimumWidth: 320, minimumHeight: 140),
-		.git: .init(id: .git, minimumWidth: 320, collapsesBefore: [.editor]),
-		.tabBar: .init(id: .tabBar, minimumWidth: 180),
-		.statusBar: .init(id: .statusBar, minimumWidth: 180),
-	]
+	public static let firstParty = try! WorkbenchComponentRegistry(descriptors: [
+		.init(id: .fileTree, displayName: "File Tree", placement: .sidebar, defaultLifecycle: .visible, minimumWidth: 160, collapsesBefore: [.editor]),
+		.init(id: .editor, displayName: "Editor", placement: .editor, defaultLifecycle: .visible, minimumWidth: 480, minimumHeight: 220),
+		.init(id: .terminal, displayName: "Terminal", placement: .bottomPanel, minimumWidth: 320, minimumHeight: 140),
+		.init(id: .git, displayName: "Git", placement: .secondarySidebar, minimumWidth: 320, collapsesBefore: [.editor]),
+		.init(id: .tabBar, displayName: "Tabs", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
+		.init(id: .statusBar, displayName: "Status Bar", placement: .editorChrome, defaultLifecycle: .visible, minimumWidth: 180),
+	])
+	public static let registry = firstParty.descriptorsByID
 }
 
 public struct WorkbenchLayoutConfiguration: Codable, Equatable, Sendable {

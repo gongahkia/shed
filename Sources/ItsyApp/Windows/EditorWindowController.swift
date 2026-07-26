@@ -152,6 +152,7 @@ extension Notification.Name {
 	)
 	private static let snippetLanguageRegistry = LSPServerRegistryLoader.loadOrBundled()
 	private static var dismissedLSPMissingCommands: Set<String> = []
+	private let windowLifecycle: EditorWindowLifecycleCoordinator
 	private let fileTreeController = FileTreeSidebarController()
 	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
@@ -340,16 +341,13 @@ extension Notification.Name {
 		sidebarWidthConstraint.priority = .defaultHigh
 		sidebarWidthConstraint.isActive = true
 		self.sidebarWidthConstraint = sidebarWidthConstraint
-		let window = NSWindow(
-			contentRect: rootSplitView.frame,
-			styleMask: [.titled, .closable, .miniaturizable, .resizable],
-			backing: .buffered,
-			defer: false
+		let window = EditorWindowLifecycleCoordinator.makeWindow(
+			contentView: rootSplitView,
+			title: document.fileURL?.lastPathComponent ?? L10n.string("Untitled")
 		)
-		window.title = document.fileURL?.lastPathComponent ?? L10n.string("Untitled")
-		window.isRestorable = true
-		window.contentView = rootSplitView
+		windowLifecycle = EditorWindowLifecycleCoordinator(window: window)
 		super.init(window: window)
+		windowLifecycle.handler = self
 		configureSecondarySidebar()
 		configureSettingsBanner()
 		settingsChangedObserver = NotificationCenter.default.addObserver(
@@ -384,7 +382,7 @@ extension Notification.Name {
 		fileTreeController.trashItemRequested = { ItsyWorkspaceController.moveItemToTrash($0) }
 		fileTreeController.moveItemRequested = { ItsyWorkspaceController.moveItem($0, toDirectory: $1) }
 		installTabBoundsObserver()
-		window.delegate = self
+		precondition(windowLifecycle.install())
 		installPane(paneCoordinator.activePane, document: document)
 		applyLayoutSettings(initialSettings.layout)
 		applyWorkbenchConfiguration(initialSettings.workbench)
@@ -438,6 +436,7 @@ extension Notification.Name {
 
 	deinit {
 		MainActor.assumeIsolated {
+			windowLifecycle.uninstall()
 			completionPopup?.dismiss()
 			completionRequestTask?.cancel()
 			hoverTimer?.invalidate()
@@ -1629,14 +1628,13 @@ extension Notification.Name {
 
 	override func windowDidLoad() {
 		super.windowDidLoad()
-		window?.center()
+		windowLifecycle.centerWindow()
 	}
 
 	override func showWindow(_ sender: Any?) {
 		recordBenchStage("window_show_begin")
 		super.showWindow(sender)
-		window?.makeKeyAndOrderFront(sender)
-		window?.orderFrontRegardless()
+		windowLifecycle.bringToFront(sender)
 		focusEditor()
 		ItsyTabCoordinator.refresh()
 		recordBenchStage("window_show_end")
@@ -5158,7 +5156,7 @@ extension Notification.Name {
 	}
 }
 
-extension EditorWindowController: NSWindowDelegate, NSSplitViewDelegate {
+extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDelegate {
 	func splitViewDidResizeSubviews(_ notification: Notification) {
 		guard !isApplyingWorkbenchLayout, notification.object as? NSSplitView === rootSplitView else {
 			return
@@ -5186,34 +5184,34 @@ extension EditorWindowController: NSWindowDelegate, NSSplitViewDelegate {
 		DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: item)
 	}
 
-	func windowDidBecomeKey(_: Notification) {
+	func editorWindowDidBecomeKey() {
 		ItsyTabCoordinator.refresh()
 	}
 
-	func windowDidBecomeMain(_: Notification) {
+	func editorWindowDidBecomeMain() {
 		ItsyTabCoordinator.refresh()
 	}
 
-	func windowDidResize(_: Notification) {
+	func editorWindowDidResize() {
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 	}
 
-	func windowDidEndLiveResize(_: Notification) {
+	func editorWindowDidEndLiveResize() {
 		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 
-	func windowDidEnterFullScreen(_: Notification) {
+	func editorWindowDidEnterFullScreen() {
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 
-	func windowDidExitFullScreen(_: Notification) {
+	func editorWindowDidExitFullScreen() {
 		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 
-	func windowWillClose(_: Notification) {
+	func editorWindowWillClose() {
 		ItsyWorkspaceController.persistWindowState(from: self)
 		ItsyTabCoordinator.refresh()
 	}

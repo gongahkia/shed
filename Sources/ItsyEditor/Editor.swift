@@ -695,28 +695,31 @@ public struct Editor: Sendable {
 		history.endGroup()
 	}
 
-	public mutating func insert(_ string: String) {
+	@discardableResult
+	public mutating func insert(_ string: String) -> EditorMutationTransaction? {
 		replaceSelections(with: string)
 	}
 
-	public mutating func deleteBackward() {
+	@discardableResult
+	public mutating func deleteBackward() -> EditorMutationTransaction? {
 		let ranges = selectionsForEdit().map { selection -> Range<Int> in
 			if !selection.isCaret {
 				return selection.range
 			}
 			return previousCharacterRange(before: selection.head)
 		}
-		replace(ranges: ranges, with: "")
+		return commitTextMutation(ranges: ranges, with: "")
 	}
 
-	public mutating func deleteForward() {
+	@discardableResult
+	public mutating func deleteForward() -> EditorMutationTransaction? {
 		let ranges = selectionsForEdit().map { selection -> Range<Int> in
 			if !selection.isCaret {
 				return selection.range
 			}
 			return nextCharacterRange(after: selection.head)
 		}
-		replace(ranges: ranges, with: "")
+		return commitTextMutation(ranges: ranges, with: "")
 	}
 
 	public mutating func moveCursor(_ motion: Motion) {
@@ -814,15 +817,16 @@ public struct Editor: Sendable {
 		return true
 	}
 
-	private mutating func replaceSelections(with string: String) {
+	private mutating func replaceSelections(with string: String) -> EditorMutationTransaction? {
 		let ranges = selectionsForEdit().map(\.range)
-		replace(ranges: ranges, with: string)
+		return commitTextMutation(ranges: ranges, with: string)
 	}
 
-	private mutating func replace(ranges: [Range<Int>], with string: String) {
+	private mutating func commitTextMutation(ranges: [Range<Int>], with string: String) -> EditorMutationTransaction? {
 		let mergedRanges = merge(ranges.filter { !$0.isEmpty || !string.isEmpty })
 		guard !mergedRanges.isEmpty else {
-			return
+			lastEditBatch = []
+			return nil
 		}
 		let selectionBefore = selections
 		let historyRange = mergedRanges[0].lowerBound ..< mergedRanges[mergedRanges.count - 1].upperBound
@@ -847,6 +851,11 @@ public struct Editor: Sendable {
 			selectionBefore: selectionBefore,
 			selectionAfter: selections,
 			snapshotText: retainsUndoTreeSnapshots ? fullTextData : Data()
+		)
+		return EditorMutationTransaction(
+			edits: lastEditBatch,
+			selectionBefore: selectionBefore,
+			selectionAfter: selections
 		)
 	}
 

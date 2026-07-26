@@ -54,3 +54,15 @@ public struct Edit: Sendable, Equatable {
 		return range.lowerBound + inserted.count
 	}
 }
+
+public struct EditorMutationTransaction: Sendable, Equatable {
+	public let edits: [Edit]
+	public let selectionBefore: SelectionSet
+	public let selectionAfter: SelectionSet
+
+	init(edits: [Edit], selectionBefore: SelectionSet, selectionAfter: SelectionSet) {
+		self.edits = edits
+		self.selectionBefore = selectionBefore
+		self.selectionAfter = selectionAfter
+	}
+}

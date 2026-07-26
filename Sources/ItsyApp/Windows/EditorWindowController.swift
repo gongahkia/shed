@@ -7,6 +7,7 @@ import ItsyEditor
 import ItsyLSP
 import ItsyRender
 import ItsySyntax
+import ItsyWorkbenchLayout
 
 private struct LSPStatusEntry {
 	var key: LSPSessionKey
@@ -162,10 +163,18 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
 	private var embeddedGitWidthConstraint: NSLayoutConstraint?
 	private var embeddedGitVisible = false
+	private var terminalRequestedVisible = false
+	private var gitRequestedVisible = false
 	private var tabBarHeightConstraint: NSLayoutConstraint?
 	private var statusBarHeightConstraint: NSLayoutConstraint?
 	private var sidebarVisible = true
+	private var responsiveSidebarVisible = true
 	private var sidebarPosition = ItsySettings.SidebarPosition.leading
+	private var workbenchConfiguration = WorkbenchLayoutConfiguration()
+	private var workbenchGitMode: WorkbenchGitLayoutMode = .full
+	private var sessionSidebarWidth: CGFloat?
+	private var sessionGitWidth: CGFloat?
+	private var isApplyingWorkbenchLayout = false
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -295,6 +304,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		rootSplitView.addArrangedSubview(fileTreeController.view)
 		rootSplitView.addArrangedSubview(editorStack)
 		let sidebarWidthConstraint = fileTreeController.view.widthAnchor.constraint(equalToConstant: 240)
+		sidebarWidthConstraint.priority = .defaultHigh
 		sidebarWidthConstraint.isActive = true
 		self.sidebarWidthConstraint = sidebarWidthConstraint
 		let window = NSWindow(
@@ -307,6 +317,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.isRestorable = true
 		window.contentView = rootSplitView
 		super.init(window: window)
+		rootSplitView.delegate = self
 		let initialSettings = ItsySettingsStore().load(
 			workspaceRoot: ItsyWorkspaceController.currentRootURL,
 			fallback: EditorPreferences.legacySettings()
@@ -330,6 +341,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		window.delegate = self
 		installPane(paneCoordinator.activePane, document: document)
 		applyLayoutSettings(initialSettings.layout)
+		applyWorkbenchConfiguration(initialSettings.workbench)
 		applyNotificationPosition(initialSettings.ui)
 		applyTheme(AppTheme.palette)
 		recordBenchStage("window_controller_install_pane_end")
@@ -468,14 +480,29 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	func setEmbeddedTerminalVisible(_ visible: Bool) {
-		embeddedTerminalContainer.isHidden = !visible
-		embeddedTerminalHeightConstraint?.constant = visible ? 280 * CGFloat(layoutSettings.interfaceScale) : 0
+		terminalRequestedVisible = visible
+		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 		rebuildFocusTraversal()
 	}
 
 	func setEmbeddedGitVisible(_ visible: Bool) {
-		guard visible != embeddedGitVisible else {
+		gitRequestedVisible = visible
+		applyResponsiveWorkbenchLayout()
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
+	func setWorkbenchRecoveryMode(_ enabled: Bool) {
+		rootSplitView.isHidden = enabled
+		if !enabled {
+			applyResponsiveWorkbenchLayout()
+			invalidateEditorShellLayoutAfterWindowTransition()
+		}
+	}
+
+	private func setActualEmbeddedGitVisible(_ visible: Bool, width: CGFloat) {
+		guard visible != embeddedGitVisible || (visible && embeddedGitWidthConstraint?.constant != width) else {
 			return
 		}
 		embeddedGitVisible = visible
@@ -484,10 +511,12 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				rootSplitView.addArrangedSubview(embeddedGitContainer)
 			}
 			if embeddedGitWidthConstraint == nil {
-				let constraint = embeddedGitContainer.widthAnchor.constraint(equalToConstant: 640 * CGFloat(layoutSettings.interfaceScale))
+				let constraint = embeddedGitContainer.widthAnchor.constraint(equalToConstant: width)
+				constraint.priority = .defaultHigh
 				constraint.isActive = true
 				embeddedGitWidthConstraint = constraint
 			}
+			embeddedGitWidthConstraint?.constant = width
 		} else {
 			if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
 				rootSplitView.removeArrangedSubview(embeddedGitContainer)
@@ -496,8 +525,6 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			embeddedGitWidthConstraint?.isActive = false
 			embeddedGitWidthConstraint = nil
 		}
-		invalidateEditorShellLayout()
-		rebuildFocusTraversal()
 	}
 
 	func focusSidebar() {
@@ -519,18 +546,23 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		let scale = CGFloat(settings.interfaceScale)
 		tabBarHeightConstraint?.constant = 32 * scale
 		statusBarHeightConstraint?.constant = 20 * scale
-		sidebarWidthConstraint?.constant = settings.sidebarVisible ? CGFloat(settings.sidebarWidth) * scale : 0
-		if !embeddedTerminalContainer.isHidden {
-			embeddedTerminalHeightConstraint?.constant = 280 * scale
-		}
-		if embeddedGitVisible {
-			embeddedGitWidthConstraint?.constant = 640 * scale
-		}
 		setSidebarPosition(settings.sidebarPosition)
 		setSidebarVisible(settings.sidebarVisible)
 		syncTabGroupVisibility()
 		refreshStatusBar()
+		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
+	}
+
+	private func applyWorkbenchConfiguration(_ configuration: WorkbenchLayoutConfiguration) {
+		workbenchConfiguration = configuration
+		if configuration.terminal == .visible {
+			terminalRequestedVisible = true
+		}
+		if configuration.git == .visible {
+			gitRequestedVisible = true
+		}
+		applyResponsiveWorkbenchLayout()
 	}
 
 	private func setSidebarPosition(_ position: ItsySettings.SidebarPosition) {
@@ -538,7 +570,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			return
 		}
 		sidebarPosition = position
-		guard sidebarVisible, rootSplitView.arrangedSubviews.contains(fileTreeController.view) else {
+		guard sidebarVisible && responsiveSidebarVisible, rootSplitView.arrangedSubviews.contains(fileTreeController.view) else {
 			return
 		}
 		rootSplitView.removeArrangedSubview(fileTreeController.view)
@@ -554,12 +586,15 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 
 	private func setSidebarVisible(_ visible: Bool) {
-		guard visible != sidebarVisible else {
-			return
-		}
 		sidebarVisible = visible
+		applySidebarVisibility()
+		invalidateEditorShellLayout()
+		rebuildFocusTraversal()
+	}
+
+	private func applySidebarVisibility() {
+		let visible = sidebarVisible && responsiveSidebarVisible
 		if visible {
-			sidebarWidthConstraint?.constant = CGFloat(layoutSettings.sidebarWidth) * CGFloat(layoutSettings.interfaceScale)
 			fileTreeController.view.isHidden = false
 			if !rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
 				rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarInsertionIndex(for: sidebarPosition))
@@ -570,10 +605,35 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 				fileTreeController.view.removeFromSuperview()
 			}
 			fileTreeController.view.isHidden = true
-			sidebarWidthConstraint?.constant = 0
 		}
-		invalidateEditorShellLayout()
-		rebuildFocusTraversal()
+	}
+
+	private func applyResponsiveWorkbenchLayout() {
+		let bounds = rootSplitView.bounds
+		guard bounds.width > 0, bounds.height > 0 else { return }
+		isApplyingWorkbenchLayout = true
+		defer { isApplyingWorkbenchLayout = false }
+		let result = WorkbenchLayoutSolver.resolve(.init(
+			width: bounds.width,
+			height: bounds.height,
+			interfaceScale: CGFloat(layoutSettings.interfaceScale),
+			configuration: workbenchConfiguration,
+			sidebarRequested: sidebarVisible,
+			terminalVisible: terminalRequestedVisible,
+			gitVisible: gitRequestedVisible,
+			preferredSidebarWidth: sessionSidebarWidth ?? CGFloat(layoutSettings.sidebarWidth),
+			previousGitMode: workbenchGitMode
+		))
+		workbenchGitMode = result.gitMode
+		responsiveSidebarVisible = result.showsFileTree
+		sidebarWidthConstraint?.constant = result.showsFileTree ? result.sidebarWidth : 0
+		applySidebarVisibility()
+		embeddedTerminalContainer.isHidden = !result.showsTerminal
+		embeddedTerminalHeightConstraint?.constant = result.terminalHeight
+		let gitAllowed = workbenchConfiguration.git != .hidden
+		let availableGitWidth = max(300, bounds.width - result.sidebarWidth - 240)
+		let gitWidth = min(sessionGitWidth ?? result.gitWidth, availableGitWidth)
+		setActualEmbeddedGitVisible(gitRequestedVisible && gitAllowed, width: max(300, gitWidth))
 	}
 
 	private func invalidateEditorShellLayout() {
@@ -600,6 +660,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 			guard let self else {
 				return
 			}
+			applyResponsiveWorkbenchLayout()
 			window?.contentView?.needsLayout = true
 			window?.contentView?.layoutSubtreeIfNeeded()
 			invalidateEditorShellLayout()
@@ -1493,7 +1554,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	private func rebuildFocusTraversal() {
 		var targets: [NSView] = []
-		if sidebarVisible {
+		if sidebarVisible && responsiveSidebarVisible {
 			targets.append(fileTreeController.focusView)
 		}
 		if !tabBarView.isHidden, let tab = focusTarget(in: tabBarView) {
@@ -1765,6 +1826,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 		applyTheme(AppTheme.palette)
 		setTabGroupScope(settings.editor.tabGroups)
 		applyLayoutSettings(settings.layout)
+		applyWorkbenchConfiguration(settings.workbench)
 		applyNotificationPosition(settings.ui)
 	}
 
@@ -4820,7 +4882,19 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	}
 }
 
-extension EditorWindowController: NSWindowDelegate {
+extension EditorWindowController: NSWindowDelegate, NSSplitViewDelegate {
+	func splitViewDidResizeSubviews(_ notification: Notification) {
+		guard !isApplyingWorkbenchLayout, notification.object as? NSSplitView === rootSplitView else {
+			return
+		}
+		if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
+			sessionSidebarWidth = fileTreeController.view.frame.width
+		}
+		if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
+			sessionGitWidth = embeddedGitContainer.frame.width
+		}
+	}
+
 	func windowDidBecomeKey(_: Notification) {
 		ItsyTabCoordinator.refresh()
 	}
@@ -4830,6 +4904,7 @@ extension EditorWindowController: NSWindowDelegate {
 	}
 
 	func windowDidResize(_: Notification) {
+		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayout()
 	}
 
@@ -4838,10 +4913,12 @@ extension EditorWindowController: NSWindowDelegate {
 	}
 
 	func windowDidEnterFullScreen(_: Notification) {
+		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 
 	func windowDidExitFullScreen(_: Notification) {
+		applyResponsiveWorkbenchLayout()
 		invalidateEditorShellLayoutAfterWindowTransition()
 	}
 

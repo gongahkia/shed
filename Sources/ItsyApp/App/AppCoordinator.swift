@@ -36,6 +36,11 @@ import ItsyKeymap
 			self?.applyTerminalSettings(settings)
 		}
 	)
+	private lazy var workbenchRecoveryPanel = WorkbenchRecoveryPanel(
+		openSettings: { [weak self] in self?.settingsCoordinator.openSettingsFile(workspace: false) },
+		restoreDefaults: { [weak self] in self?.settingsCoordinator.restoreWorkbenchDefaults() },
+		generateDoctor: { [weak self] in self?.settingsCoordinator.generateWorkbenchDoctorFile() }
+	)
 	private lazy var projectFindCoordinator = ProjectFindCoordinator(documentController: documentController)
 	private lazy var gitCoordinator = GitCoordinator(
 		documentController: documentController,
@@ -129,6 +134,7 @@ import ItsyKeymap
 		recordBenchStage("main_menu_installed")
 		recordBenchStage("initial_document_open_begin")
 		openInitialDocument()
+		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)
 		recordBenchStage("initial_document_opened")
 		if CommandLine.arguments.contains("--bench-exit-after-initial-document") {
 			exitForBenchReady()
@@ -656,7 +662,27 @@ import ItsyKeymap
 		gitCoordinator.applyGitSettings(settings.git)
 		terminalCoordinator.applyTerminalSettings(settings.terminal)
 		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
+		if settings.workbench.git == .visible {
+			gitCoordinator.showGitChanges(nil)
+		}
+		if settings.workbench.terminal == .visible {
+			terminalCoordinator.showTerminal(nil)
+		}
 		sparkleUpdateCoordinator.apply(settings.updates)
+		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)
+	}
+
+	private func applyWorkbenchRecovery(_ diagnostic: String?) {
+		for document in documentController.documents {
+			for controller in document.windowControllers {
+				(controller as? EditorWindowController)?.setWorkbenchRecoveryMode(diagnostic != nil)
+			}
+		}
+		if let diagnostic {
+			workbenchRecoveryPanel.show(diagnostic: diagnostic, relativeTo: activeEditorWindowController()?.window)
+		} else {
+			workbenchRecoveryPanel.close()
+		}
 	}
 
 	private func applyKeymapSettings(_ settings: ItsySettings) {

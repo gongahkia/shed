@@ -40,3 +40,12 @@ import Testing
 	#expect(WorkbenchConfigurationValidator.validate(.init(profile: .focus, fileTree: .visible)) != nil)
 	#expect(WorkbenchConfigurationValidator.validate(.init(profile: .workbench, fileTree: .visible)) == nil)
 }
+
+@Test func namedProfilesExposeComposableComponentTrees() {
+	let review = WorkbenchProfileBuilder.definition(for: .review)
+	#expect(review.configuration.git == .visible)
+	#expect(review.root == .split(axis: .horizontal, children: [
+		.split(axis: .vertical, children: [.component(.tabBar), .component(.editor), .component(.terminal), .component(.statusBar)]),
+		.component(.git),
+	]))
+}

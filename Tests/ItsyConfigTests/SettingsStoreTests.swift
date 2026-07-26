@@ -53,6 +53,12 @@ import Testing
 	[updates]
 	automatically_check = true
 
+	[workbench]
+	profile = "review"
+	file_tree = "hidden"
+	terminal = "visible"
+	git = "visible"
+
 	[layout]
 	sidebar_visible = false
 	sidebar_position = "trailing"
@@ -93,6 +99,10 @@ import Testing
 	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
 	#expect(!result.settings.recovery.journalEnabled)
 	#expect(result.settings.updates.automaticallyCheck)
+	#expect(result.settings.workbench.profile.rawValue == "review")
+	#expect(result.settings.workbench.fileTree.rawValue == "hidden")
+	#expect(result.settings.workbench.terminal.rawValue == "visible")
+	#expect(result.settings.workbench.git.rawValue == "visible")
 	#expect(result.settings.layout == .init(
 		sidebarVisible: false,
 		sidebarPosition: .trailing,
@@ -131,12 +141,12 @@ import Testing
 	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
 	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
 	let result = parser.parse("""
-	schema_version = 10
+	schema_version = 11
 	[editor]
 	font_size = 80
 	unknown_toggle = true
 	""")
-	#expect(ItsySettingsSchema.currentVersion == 9)
+	#expect(ItsySettingsSchema.currentVersion == 10)
 	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
 	#expect(result.settings.editor.fontSize == 15)
 	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
@@ -177,6 +187,18 @@ import Testing
 		inputFontSize: 20,
 		itemFontSize: 14
 	))
+}
+
+@Test func settingsParserDisablesInvalidWorkbenchOverride() {
+	var parser = ItsySettingsParser()
+	let result = parser.parse("""
+	[workbench]
+	profile = "focus"
+	file_tree = "visible"
+	""")
+	#expect(result.settings.workbench.profile.rawValue == "focus")
+	#expect(result.settings.workbench.fileTree.rawValue == "automatic")
+	#expect(result.warnings.contains { $0.key == "workbench" })
 }
 
 @Test func settingsParserReadsPerLanguageEditorOverrides() {
@@ -222,7 +244,7 @@ import Testing
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
 	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 9"))
+	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 10"))
 	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
 	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
@@ -237,6 +259,7 @@ import Testing
 	#expect(ItsySettingsStore.serialize(settings).contains("[find]"))
 	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
 	#expect(ItsySettingsStore.serialize(settings).contains("[updates]\nautomatically_check = false"))
+	#expect(ItsySettingsStore.serialize(settings).contains("[workbench]\nprofile = \"workbench\""))
 	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
 	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
 	#expect(ItsySettingsStore.serialize(settings).contains(#"presentation = "bottom""#))

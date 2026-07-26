@@ -46,6 +46,11 @@ import ItsyEditor
 		return host
 	}
 
+	func applySettings(_ settings: ItsySettings) {
+		resolvedHost.applySettingsToOpenWindows(settings)
+		eventBus.publish(ApplicationEvents.SettingsApplied(settings: settings))
+	}
+
 	private var resolvedHost: any ApplicationServiceHost {
 		do {
 			return try connectedHost()
@@ -74,8 +79,7 @@ import ItsyEditor
 	lazy var settingsCoordinator = SettingsCoordinator(
 		documentController: documentController,
 		onSettingsChange: { [weak self] settings in
-			self?.resolvedHost.applySettingsToOpenWindows(settings)
-			self?.eventBus.publish(ApplicationEvents.SettingsApplied(settings: settings))
+			self?.applySettings(settings)
 		},
 		onTerminalSettingsChange: { [weak self] settings in
 			self?.resolvedHost.applyTerminalSettings(settings)

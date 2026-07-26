@@ -24,8 +24,26 @@ import Testing
 	}
 }
 
+@MainActor @Test func applicationServiceContainerRoutesSettingsThroughHostAndTypedEventBus() throws {
+	let services = ApplicationServiceContainer(documentController: ItsyDocumentController())
+	let host = ApplicationServiceHostStub()
+	try services.connect(host: host)
+	var publishedSettings: [ItsySettings] = []
+	let subscription = services.eventBus.subscribe(ApplicationEvents.SettingsApplied.self) {
+		publishedSettings.append($0.settings)
+	}
+	var settings = ItsySettings()
+	settings.editor.tabWidth = 2
+	services.applySettings(settings)
+
+	#expect(host.appliedSettings == [settings])
+	#expect(publishedSettings == [settings])
+	_ = subscription
+}
+
 @MainActor private final class ApplicationServiceHostStub: ApplicationServiceHost {
 	private(set) var commandRegistryRequests = 0
+	private(set) var appliedSettings: [ItsySettings] = []
 
 	func makeCommandRegistry(workspaceRoot _: URL?) -> CommandRegistry {
 		commandRegistryRequests += 1
@@ -37,7 +55,7 @@ import Testing
 	func editorWindowController(gitHost _: NSView) -> EditorWindowController? { nil }
 	func editorWindowController(debuggerHost _: NSView) -> EditorWindowController? { nil }
 	func editorWindowController(terminalHost _: NSView) -> EditorWindowController? { nil }
-	func applySettingsToOpenWindows(_: ItsySettings) {}
+	func applySettingsToOpenWindows(_ settings: ItsySettings) { appliedSettings.append(settings) }
 	func applyTerminalSettings(_: ItsySettings.TerminalSettings) {}
 	func openTerminalLocation(_: TerminalOpenLocation) {}
 	func openWorkspace(at _: URL) -> Bool { false }

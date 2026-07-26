@@ -42,25 +42,38 @@ public struct WorkspacePaneState: Codable, Equatable, Sendable {
 	}
 }
 
+public struct WorkspaceWorkbenchDividerState: Codable, Equatable, Sendable {
+	public var sidebarWidth: Double?
+	public var gitWidth: Double?
+
+	public init(sidebarWidth: Double? = nil, gitWidth: Double? = nil) {
+		self.sidebarWidth = sidebarWidth
+		self.gitWidth = gitWidth
+	}
+}
+
 public struct WorkspaceWindowState: Codable, Equatable, Sendable {
 	public var paneLayout: String
 	public var selectedPath: String?
 	public var openFiles: [WorkspaceWindowFileState]
 	public var paneStates: [WorkspacePaneState]?
 	public var focusedPaneIndex: Int?
+	public var workbenchDividers: WorkspaceWorkbenchDividerState?
 
 	public init(
 		paneLayout: String = "L",
 		selectedPath: String? = nil,
 		openFiles: [WorkspaceWindowFileState] = [],
 		paneStates: [WorkspacePaneState]? = nil,
-		focusedPaneIndex: Int? = nil
+		focusedPaneIndex: Int? = nil,
+		workbenchDividers: WorkspaceWorkbenchDividerState? = nil
 	) {
 		self.paneLayout = paneLayout
 		self.selectedPath = selectedPath
 		self.openFiles = openFiles
 		self.paneStates = paneStates
 		self.focusedPaneIndex = focusedPaneIndex
+		self.workbenchDividers = workbenchDividers
 	}
 }
 

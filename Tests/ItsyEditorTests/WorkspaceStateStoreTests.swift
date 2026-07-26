@@ -32,7 +32,8 @@ import Testing
 			),
 			WorkspacePaneState(openPaths: [], selectedPath: nil),
 		],
-		focusedPaneIndex: 1
+		focusedPaneIndex: 1,
+		workbenchDividers: .init(sidebarWidth: 300, gitWidth: 520)
 	)
 	try store.saveWindowState(state, for: fixture.root)
 	let loadedState = try #require(store.loadWindowState(for: fixture.root))
@@ -48,6 +49,7 @@ import Testing
 	let state = try JSONDecoder().decode(WorkspaceWindowState.self, from: data)
 	#expect(state.paneStates == nil)
 	#expect(state.focusedPaneIndex == nil)
+	#expect(state.workbenchDividers == nil)
 }
 
 private final class TemporaryWorkspaceStateStoreFixture {

@@ -175,6 +175,7 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 	private var sessionSidebarWidth: CGFloat?
 	private var sessionGitWidth: CGFloat?
 	private var isApplyingWorkbenchLayout = false
+	private var workbenchPersistenceWorkItem: DispatchWorkItem?
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -1465,6 +1466,22 @@ private final class LSPFoldGutterDecorator: GutterDecorator {
 
 	var workspaceFocusedPaneIndex: Int? {
 		tabGroupScope == .pane ? paneCoordinator.focusedPaneIndex : nil
+	}
+
+	var workspaceWorkbenchDividerState: WorkspaceWorkbenchDividerState? {
+		guard sessionSidebarWidth != nil || sessionGitWidth != nil else {
+			return nil
+		}
+		return WorkspaceWorkbenchDividerState(
+			sidebarWidth: sessionSidebarWidth.map(Double.init),
+			gitWidth: sessionGitWidth.map(Double.init)
+		)
+	}
+
+	func restoreWorkspaceWorkbenchDividerState(_ state: WorkspaceWorkbenchDividerState?) {
+		sessionSidebarWidth = state?.sidebarWidth.map { CGFloat($0) }
+		sessionGitWidth = state?.gitWidth.map { CGFloat($0) }
+		applyResponsiveWorkbenchLayout()
 	}
 
 	func restoreWorkspacePaneLayout(
@@ -4893,6 +4910,16 @@ extension EditorWindowController: NSWindowDelegate, NSSplitViewDelegate {
 		if rootSplitView.arrangedSubviews.contains(embeddedGitContainer) {
 			sessionGitWidth = embeddedGitContainer.frame.width
 		}
+		persistWorkbenchDividerStateSoon()
+	}
+
+	private func persistWorkbenchDividerStateSoon() {
+		workbenchPersistenceWorkItem?.cancel()
+		let item = DispatchWorkItem { [weak self] in
+			ItsyWorkspaceController.persistWindowState(from: self)
+		}
+		workbenchPersistenceWorkItem = item
+		DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: item)
 	}
 
 	func windowDidBecomeKey(_: Notification) {

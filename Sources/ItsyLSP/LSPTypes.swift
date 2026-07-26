@@ -695,6 +695,15 @@ public enum LSPCodeActionProviderCapability: Codable, Equatable, Sendable {
 	case bool(Bool)
 	case options(LSPCodeActionOptions)
 
+	public var isEnabled: Bool {
+		switch self {
+		case let .bool(value):
+			value
+		case .options:
+			true
+		}
+	}
+
 	public var resolveProvider: Bool {
 		switch self {
 		case .bool:

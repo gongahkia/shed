@@ -325,6 +325,19 @@ import Testing
 	))
 }
 
+@Test func codeActionProviderCapabilityDistinguishesDisabledAndOptions() throws {
+	let disabled = try JSONDecoder().decode(LSPCodeActionProviderCapability.self, from: Data("false".utf8))
+	let options = try JSONDecoder().decode(
+		LSPCodeActionProviderCapability.self,
+		from: Data(#"{"resolveProvider":true}"#.utf8)
+	)
+
+	#expect(!disabled.isEnabled)
+	#expect(!disabled.resolveProvider)
+	#expect(options.isEnabled)
+	#expect(options.resolveProvider)
+}
+
 @Test func documentSymbolParamsEncodeAndResultDecodesHierarchyOrFlatList() throws {
 	let params = try LSPAny(encoding: LSPDocumentSymbolParams(textDocument: LSPTextDocumentIdentifier(uri: "file:///tmp/main.swift")))
 	let hierarchy = try LSPDocumentSymbolResult(decoding: Data(#"""

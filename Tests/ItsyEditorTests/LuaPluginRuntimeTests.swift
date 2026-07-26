@@ -74,6 +74,8 @@ import Testing
 	defer { fixture.remove() }
 	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.api", source: """
 		assert(itsy.api.version() == "1.0.0")
+		assert(io == nil and os == nil and package == nil and debug == nil)
+		assert(dofile == nil and loadfile == nil)
 		assert(itsy.settings.get("theme") == "night")
 		assert(itsy.workspace.root() == "\(fixture.workspace.path)")
 		assert(itsy.editor.active_document() == "\(fixture.workspace.appendingPathComponent("main.swift").path)")

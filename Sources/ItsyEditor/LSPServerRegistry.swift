@@ -446,7 +446,7 @@ public struct LSPServerRegistry: Equatable, Sendable {
 		}
 	}
 
-	public static let bundledDefaults: [LSPServerConfig] = BundledLanguageInventory.lspConfigs
+	public static let bundledDefaults: [LSPServerConfig] = LSPServerRegistrationCatalog.bundled.map(\.config)
 
 	public static var supportCatalog: ManagedSupportCatalog { ManagedSupportCatalogStore.current() }
 

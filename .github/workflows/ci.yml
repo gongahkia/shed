@@ -98,6 +98,10 @@ jobs:
         run: |
           scripts/gen_keymap_docs.swift
           git diff --exit-code -- docs/keymap-reference.md
+      - name: Test feature-boundary lint
+        run: bash scripts/test_feature_boundary_lint.sh
+      - name: Lint feature boundaries
+        run: bash scripts/lint_feature_boundaries.sh
       - name: Build release
         run: swift build -c release
       - name: Strict concurrency

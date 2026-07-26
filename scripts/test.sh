@@ -8,6 +8,8 @@ coverage_raw_dir="${ITSY_TEST_COVERAGE_RAW_DIR:-}"
 coverage_dir="${ITSY_TEST_COVERAGE_DIR:-}"
 parallel_width="${SWT_EXPERIMENTAL_MAXIMUM_PARALLELIZATION_WIDTH:-1}"
 
+bash "$script_dir/lint_feature_boundaries.sh"
+
 if [[ -n "$report_path" ]]; then
 	mkdir -p "$(dirname "$report_path")"
 	: > "$report_path"

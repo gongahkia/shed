@@ -78,330 +78,24 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	}
 }
 
-@Test func settingsParserReadsKnownSectionsAndComments() {
-	let contents = #"""
-	# user-editable config
-	[editor]
-	font = "Monaco" # installed on macOS
-	font_size = 16.5
-	font_rendering = "subpixel"
-	line_numbers = true
-	line_number_mode = "relative"
-	tab_width = 2
-	auto_pairs = false
-	smart_indent = false
-	multiple_selections = false
-	keymap = "vim"
-	cursor_style = "block"
-	tab_groups = "pane"
-	wrap = "soft"
-	wrap_column = 88
 
-	[editor.experimental]
-	storage = "piecetree"
-
-	[theme]
-	id = "bundled:default-dark"
-	git.gutter.added = "#123456"
-	git.gutter.modified = "#abcdef"
-	git.gutter.removed = "#fedcba"
-
-	[syntax]
-	preload_grammars = "all"
-
-	[terminal]
-	font = "Monaco"
-	font_size = 13
-	scrollback_lines = 20000
-	presentation = "window"
-
-	[git]
-	presentation = "window"
-
-	[debugger]
-	presentation = "window"
-
-	[find]
-	uses_regex = true
-	case_sensitive = true
-	whole_word = true
-
-	[recovery]
-	journal_enabled = false
-
-	[updates]
-	automatically_check = true
-
-	[workbench]
-	profile = "review"
-	file_tree = "hidden"
-	terminal = "visible"
-	git = "visible"
-
-	[layout]
-	sidebar_visible = false
-	sidebar_position = "trailing"
-	sidebar_width = 320
-	tab_bar_visible = false
-	status_bar_visible = false
-	interface_scale = 1.4
-	"""#
-	var parser = ItsySettingsParser()
-	let result = parser.parse(contents)
-	#expect(result.warnings.isEmpty)
-	#expect(result.settings.editor.font == "Monaco")
-	#expect(result.settings.editor.fontSize == 16.5)
-	#expect(result.settings.editor.fontRendering == .subpixel)
-	#expect(result.settings.editor.lineNumbers)
-	#expect(result.settings.editor.lineNumberMode == .relative)
-	#expect(result.settings.editor.tabWidth == 2)
-	#expect(!result.settings.editor.autoPairs)
-	#expect(!result.settings.editor.smartIndent)
-	#expect(!result.settings.editor.multipleSelections)
-	#expect(result.settings.editor.keymap == .vim)
-	#expect(result.settings.editor.cursorStyle == .block)
-	#expect(result.settings.editor.tabGroups == .pane)
-	#expect(result.settings.editor.wrap == .soft)
-	#expect(result.settings.editor.wrapColumn == 88)
-	#expect(!result.settings.editor.useSpaces)
-	#expect(result.settings.editor.experimental.storage == .pieceTree)
-	#expect(result.settings.theme.id == "bundled:default-dark")
-	#expect(result.settings.theme.gitGutter.added == "#123456")
-	#expect(result.settings.theme.gitGutter.modified == "#abcdef")
-	#expect(result.settings.theme.gitGutter.removed == "#fedcba")
-	#expect(result.settings.syntax.preloadGrammars == .all)
-	#expect(result.settings.terminal.font == "Monaco")
-	#expect(result.settings.terminal.fontSize == 13)
-	#expect(result.settings.terminal.scrollbackLines == 20000)
-	#expect(result.settings.terminal.presentation == .window)
-	#expect(result.settings.git.presentation == .window)
-	#expect(result.settings.debugger.presentation == .window)
-	#expect(result.settings.find == .init(usesRegex: true, isCaseSensitive: true, matchesWholeWord: true))
-	#expect(!result.settings.recovery.journalEnabled)
-	#expect(result.settings.updates.automaticallyCheck)
-	#expect(result.settings.workbench.profile.rawValue == "review")
-	#expect(result.settings.workbench.fileTree.rawValue == "hidden")
-	#expect(result.settings.workbench.terminal.rawValue == "visible")
-	#expect(result.settings.workbench.git.rawValue == "visible")
-	#expect(result.settings.layout == .init(
-		sidebarVisible: false,
-		sidebarPosition: .trailing,
-		sidebarWidth: 320,
-		tabBarVisible: false,
-		statusBarVisible: false,
-		interfaceScale: 1.4
-	))
+@Test func settingsJSONCodecRoundTripsGlobalLSPModes() throws {
+	let settings = ItsySettings(lsp: .init(catalogAutomaticallyCheck: true, modes: ["python": .managed, "typescript": .disabled]))
+	let roundTrip = try ItsySettingsJSONCodec.decode(ItsySettingsJSONCodec.encode(settings))
+	#expect(roundTrip.lsp == settings.lsp)
 }
 
-@Test func settingsParserReadsAndSerializesGlobalLSPModes() {
-	var parser = ItsySettingsParser()
-	let parsed = parser.parse("""
-	[lsp]
-	catalog_automatically_check = true
 
-	[lsp.python]
-	mode = "managed"
 
-	[lsp.typescript]
-	mode = "disabled"
-	""")
-	#expect(parsed.warnings.isEmpty)
-	#expect(parsed.settings.lsp.catalogAutomaticallyCheck)
-	#expect(parsed.settings.lsp.mode(for: "python") == .managed)
-	#expect(parsed.settings.lsp.mode(for: "typescript") == .disabled)
-	let serialized = ItsySettingsStore.serialize(parsed.settings)
-	let roundTrip = parser.parse(serialized)
-	#expect(roundTrip.settings.lsp == parsed.settings.lsp)
-}
 
-@Test func settingsParserWarnsAndKeepsFallbackForBadValues() {
-	let fallback = ItsySettings(
-		editor: .init(font: "Menlo", fontSize: 15, lineNumbers: false, tabWidth: 4),
-		theme: .init(id: "bundled:default-light"),
-		terminal: .init(fontSize: 12, scrollbackLines: 10000)
-	)
-	let contents = #"""
-	[editor]
-	font_size = "large"
-	line_numbers = maybe
-	nope = true
 
-	[extra]
-	value = 1
-	"""#
-	var parser = ItsySettingsParser(settings: fallback)
-	let result = parser.parse(contents)
-	#expect(result.settings.editor.fontSize == 15)
-	#expect(result.settings.editor.lineNumbers == false)
-	#expect(result.warnings.count == 5)
-	#expect(result.warnings.map(\.description).contains("line 2: editor.font_size expects number"))
-	#expect(result.warnings.map(\.description).contains("line 4: unknown setting editor.nope"))
-}
-
-@Test func settingsSchemaVersionDiagnosticsRetainFallbackAndProvenance() {
-	let fallback = ItsySettings(editor: .init(fontSize: 15, tabWidth: 4))
-	var parser = ItsySettingsParser(settings: fallback, source: "/workspace/.itsy/settings.toml")
-	let result = parser.parse("""
-	schema_version = 13
-	[editor]
-	font_size = 80
-	unknown_toggle = true
-	""")
-	#expect(ItsySettingsSchema.currentVersion == 12)
-	#expect(ItsySettingsSchema.compatibilityPolicy == .warnAndIgnoreUnknownFields)
-	#expect(result.settings.editor.fontSize == 15)
-	let fontWarning = result.warnings.first { $0.key == "editor.font_size" }
-	#expect(fontWarning?.source == "/workspace/.itsy/settings.toml")
-	#expect(fontWarning?.expected == "number between 9.0 and 36.0")
-	#expect(fontWarning?.retainedFallback == true)
-	let versionWarning = result.warnings.first { $0.key == "schema_version" }
-	#expect(versionWarning?.retainedFallback == true)
-	#expect(result.warnings.contains { $0.key == "editor.unknown_toggle" && $0.retainedFallback })
-}
-
-@Test func settingsParserReadsGlobalUIAndSurfaceOverrides() {
-	var parser = ItsySettingsParser()
-	let result = parser.parse("""
-	[ui]
-	font_scale = 1.2
-	density = "compact"
-	corner_radius = 4
-	border_width = 2
-	padding = 10
-	notification_position = "top_right"
-
-	[ui.surface.command_palette]
-	width = 680
-	height = 340
-	row_height = 28
-	input_font_size = 20
-	item_font_size = 14
-	""")
-	#expect(result.warnings.isEmpty)
-	#expect(result.settings.ui.fontScale == 1.2)
-	#expect(result.settings.ui.density == .compact)
-	#expect(result.settings.ui.notificationPosition == .topRight)
-	#expect(result.settings.ui.surface("command_palette") == .init(
-		width: 680,
-		height: 340,
-		rowHeight: 28,
-		inputFontSize: 20,
-		itemFontSize: 14
-	))
-}
-
-@Test func settingsParserDisablesInvalidWorkbenchOverride() {
-	var parser = ItsySettingsParser()
-	let result = parser.parse("""
-	[workbench]
-	profile = "focus"
-	file_tree = "visible"
-	""")
-	#expect(result.settings.workbench.profile.rawValue == "focus")
-	#expect(result.settings.workbench.fileTree.rawValue == "automatic")
-	#expect(result.warnings.contains { $0.key == "workbench" })
-}
-
-@Test func settingsParserReadsPerLanguageEditorOverrides() {
-	let contents = #"""
-	[editor]
-	font_size = 15
-	font_rendering = "grayscale"
-	line_numbers = false
-	tab_width = 8
-	use_spaces = false
-	auto_pairs = true
-	smart_indent = true
-	multiple_selections = true
-
-	[editor.language.python]
-	tab_width = 4
-	use_spaces = true
-	auto_pairs = false
-	smart_indent = false
-	multiple_selections = false
-	font_rendering = "subpixel"
-	line_numbers = true
-	"""#
-	var parser = ItsySettingsParser()
-	let result = parser.parse(contents)
-
-	#expect(result.warnings.isEmpty)
-	#expect(result.settings.editor.tabWidth == 8)
-	#expect(!result.settings.editor.useSpaces)
-	let python = result.settings.editorSettings(languageID: "python")
-	#expect(python.fontSize == 15)
-	#expect(python.fontRendering == .subpixel)
-	#expect(python.tabWidth == 4)
-	#expect(python.useSpaces)
-	#expect(python.lineNumbers)
-	#expect(!python.autoPairs)
-	#expect(!python.smartIndent)
-	#expect(!python.multipleSelections)
-}
 
 @Test func settingsDefaultsUsePieceTreeStorage() {
 	let settings = ItsySettings()
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
-	#expect(ItsySettingsStore.serialize(settings).contains(#"storage = "piecetree""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("schema_version = 12"))
-	#expect(ItsySettingsStore.serialize(settings).contains("[debugger]\npresentation = \"sidebar\""))
-	#expect(!ItsySettingsStore.serialize(settings).contains("[terminal]\nfont ="))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"preload_grammars = "opened""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("use_spaces = false"))
-	#expect(ItsySettingsStore.serialize(settings).contains("auto_pairs = true"))
-	#expect(ItsySettingsStore.serialize(settings).contains("smart_indent = true"))
-	#expect(ItsySettingsStore.serialize(settings).contains("multiple_selections = true"))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"line_number_mode = "off""#))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"keymap = "plain""#))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"tab_groups = "window""#))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"wrap = "none""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("wrap_column = 100"))
-	#expect(ItsySettingsStore.serialize(settings).contains("[find]"))
-	#expect(ItsySettingsStore.serialize(settings).contains("journal_enabled = true"))
-	#expect(ItsySettingsStore.serialize(settings).contains("[updates]\nautomatically_check = false"))
-	#expect(ItsySettingsStore.serialize(settings).contains("[workbench]\nprofile = \"workbench\""))
-	#expect(ItsySettingsStore.serialize(settings).contains("font_rendering = \"grayscale\""))
-	#expect(ItsySettingsStore.serialize(settings).contains("interface_scale = 1"))
-	#expect(ItsySettingsStore.serialize(settings).contains(#"presentation = "bottom""#))
-	#expect(ItsySettingsStore.serialize(settings).contains("[git]\npresentation = \"sidebar\""))
-	#expect(ItsySettingsStore.serialize(settings).contains(##"git.gutter.added = "#47C775""##))
 }
 
-@Test func settingsStoreSavesAndReloadsToml() throws {
-	let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
-		"itsy-settings-\(UUID().uuidString)",
-		isDirectory: true
-	)
-	defer {
-		try? FileManager.default.removeItem(at: directory)
-	}
-	let url = directory.appendingPathComponent("settings.toml")
-	let store = ItsySettingsStore(fileURL: url)
-	let settings = ItsySettings(
-		editor: .init(
-			font: "Monaco",
-			fontSize: 18,
-			lineNumbers: true,
-			lineNumberMode: .relative,
-			tabWidth: 8,
-			tabGroups: .pane,
-			keymap: .emacs,
-			wrap: .hard,
-			wrapColumn: 72,
-			experimental: .init(storage: .pieceTree)
-		),
-		theme: .init(id: "user:night.toml", gitGutter: .init(added: "#101010", modified: "#202020", removed: "#303030")),
-		syntax: .init(preloadGrammars: .none),
-		terminal: .init(fontSize: 14, scrollbackLines: 1234, font: "Monaco")
-	)
-	try store.save(settings)
-	let loaded = store.load()
-	#expect(loaded.loadedFromFile)
-	#expect(loaded.warnings.isEmpty)
-	#expect(loaded.settings == settings)
-}
 
 @Test func settingsStoreUsesJSONForGlobalPath() {
 	let globalURL = ItsySettingsStore.globalFileURL()
@@ -512,7 +206,7 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 @Test func settingsStoreUsesFallbackWhenFileIsMissing() {
 	let url = FileManager.default.temporaryDirectory
 		.appendingPathComponent("missing-\(UUID().uuidString)")
-		.appendingPathComponent("settings.toml")
+		.appendingPathComponent("settings.json")
 	let fallback = ItsySettings(editor: .init(font: "Monaco", fontSize: 17, lineNumbers: true, tabWidth: 3))
 	let loaded = ItsySettingsStore(fileURL: url).load(fallback: fallback)
 	#expect(!loaded.loadedFromFile)
@@ -527,21 +221,18 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	defer {
 		try? FileManager.default.removeItem(at: directory)
 	}
-	let globalURL = directory.appendingPathComponent("settings.toml")
+	let globalURL = directory.appendingPathComponent("settings.json")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
 	try FileManager.default.createDirectory(
 		at: workspaceURL.deletingLastPathComponent(),
 		withIntermediateDirectories: true
 	)
-	try """
-	[editor]
-	tab_width = 2
-	use_spaces = false
-
-	[editor.language.python]
-	tab_width = 3
-	""".write(to: globalURL, atomically: true, encoding: .utf8)
+	var globalSettings = ItsySettings.default
+	globalSettings.editor.tabWidth = 2
+	globalSettings.editor.useSpaces = false
+	globalSettings.editor.language["python"] = .init(tabWidth: 3)
+	try ItsySettingsStore(fileURL: globalURL).save(globalSettings)
 	var workspaceSettings = ItsySettings.default
 	workspaceSettings.editor.fontSize = 18
 	workspaceSettings.editor.tabWidth = 6
@@ -605,14 +296,17 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 		isDirectory: true
 	)
 	defer { try? FileManager.default.removeItem(at: directory) }
-	let globalURL = directory.appendingPathComponent("settings.toml")
+	let globalURL = directory.appendingPathComponent("settings.json")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
 	try FileManager.default.createDirectory(
 		at: workspaceURL.deletingLastPathComponent(),
 		withIntermediateDirectories: true
 	)
-	try "[ui]\nfont_scale = 1.25\n\n[updates]\nautomatically_check = true\n".write(to: globalURL, atomically: true, encoding: .utf8)
+	var globalSettings = ItsySettings.default
+	globalSettings.ui.fontScale = 1.25
+	globalSettings.updates.automaticallyCheck = true
+	try ItsySettingsStore(fileURL: globalURL).save(globalSettings)
 	var workspaceSettings = ItsySettings.default
 	workspaceSettings.ui.fontScale = 1.75
 	try ItsySettingsStore(fileURL: workspaceURL).save(workspaceSettings)
@@ -629,26 +323,21 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 		isDirectory: true
 	)
 	defer { try? FileManager.default.removeItem(at: directory) }
-	let globalURL = directory.appendingPathComponent("settings.toml")
+	let globalURL = directory.appendingPathComponent("settings.json")
 	let workspaceRoot = directory.appendingPathComponent("workspace", isDirectory: true)
 	let workspaceURL = ItsySettingsStore.workspaceFileURL(workspaceRoot: workspaceRoot)
 	try FileManager.default.createDirectory(
 		at: workspaceURL.deletingLastPathComponent(),
 		withIntermediateDirectories: true
 	)
-	try """
-	[editor]
-	tab_width = 2
-	wrap = "soft"
-	multiple_selections = false
-	keymap = "vim"
-
-	[editor.language.python]
-	tab_width = 3
-
-	[updates]
-	automatically_check = true
-	""".write(to: globalURL, atomically: true, encoding: .utf8)
+	var globalSettings = ItsySettings.default
+	globalSettings.editor.tabWidth = 2
+	globalSettings.editor.wrap = .soft
+	globalSettings.editor.multipleSelections = false
+	globalSettings.editor.keymap = .vim
+	globalSettings.editor.language["python"] = .init(tabWidth: 3)
+	globalSettings.updates.automaticallyCheck = true
+	try ItsySettingsStore(fileURL: globalURL).save(globalSettings)
 	var workspaceSettings = ItsySettings.default
 	workspaceSettings.editor.tabWidth = 4
 	workspaceSettings.editor.wrap = .soft

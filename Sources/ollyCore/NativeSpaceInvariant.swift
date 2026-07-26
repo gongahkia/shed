@@ -1,0 +1,158 @@
+import Foundation
+import ollyKit
+
+public struct NativeSpaceID: Codable, Equatable, Hashable, RawRepresentable, Sendable {
+    public let rawValue: UInt64
+
+    public init(rawValue: UInt64) {
+        self.rawValue = rawValue
+    }
+}
+
+public enum NativeSpaceDriftPolicy: String, Codable, Equatable, Sendable {
+    case followWindow = "follow-window"
+    case rehome
+    case unmanage
+}
+
+public enum NativeSpaceInvariantIssue: Equatable, Sendable {
+    case unsupportedNativeSpaces(windowID: WindowID)
+    case unknownSpace(windowID: WindowID)
+    case drifted(windowID: WindowID, expected: NativeSpaceID, actual: NativeSpaceID)
+}
+
+public struct NativeSpaceInvariantResult: Equatable, Sendable {
+    public let expectedSpaceID: NativeSpaceID?
+    public let issues: [NativeSpaceInvariantIssue]
+    public let rehomedWindowIDs: [WindowID]
+    public let unmanagedWindowIDs: [WindowID]
+    public let offSpaceWindowIDs: [WindowID]
+    public let isProviderSupported: Bool
+
+    public var isVerified: Bool {
+        isProviderSupported && expectedSpaceID != nil && issues.isEmpty && offSpaceWindowIDs.isEmpty
+    }
+
+    public init(
+        expectedSpaceID: NativeSpaceID?,
+        issues: [NativeSpaceInvariantIssue],
+        rehomedWindowIDs: [WindowID],
+        unmanagedWindowIDs: [WindowID],
+        offSpaceWindowIDs: [WindowID] = [],
+        isProviderSupported: Bool = true
+    ) {
+        self.expectedSpaceID = expectedSpaceID
+        self.issues = issues
+        self.rehomedWindowIDs = rehomedWindowIDs
+        self.unmanagedWindowIDs = unmanagedWindowIDs
+        self.offSpaceWindowIDs = offSpaceWindowIDs
+        self.isProviderSupported = isProviderSupported
+    }
+}
+
+public protocol WindowNativeSpaceProviding {
+    var isSupported: Bool { get }
+    func nativeSpaceID(for window: WindowState) async -> NativeSpaceID?
+}
+
+public extension WindowNativeSpaceProviding {
+    var isSupported: Bool {
+        true
+    }
+}
+
+public struct PublicWindowNativeSpaceProvider: WindowNativeSpaceProviding {
+    public init() {}
+
+    public var isSupported: Bool {
+        false
+    }
+
+    public func nativeSpaceID(for window: WindowState) async -> NativeSpaceID? {
+        nil
+    }
+}
+
+public typealias NativeSpaceRehomeHandler = (WindowState, NativeSpaceID) async -> Bool
+public typealias NativeSpaceUnmanageHandler = (WindowState) async -> Void
+
+public actor NativeSpaceInvariant {
+    private let windowStore: WindowStore
+    private let spaceProvider: WindowNativeSpaceProviding
+    private let driftPolicy: NativeSpaceDriftPolicy
+    private let rehomeWindow: NativeSpaceRehomeHandler
+    private let unmanageWindow: NativeSpaceUnmanageHandler
+
+    public init(
+        windowStore: WindowStore,
+        spaceProvider: WindowNativeSpaceProviding = PublicWindowNativeSpaceProvider(),
+        driftPolicy: NativeSpaceDriftPolicy = .followWindow,
+        rehomeWindow: @escaping NativeSpaceRehomeHandler = { _, _ in false },
+        unmanageWindow: @escaping NativeSpaceUnmanageHandler = { _ in }
+    ) {
+        self.windowStore = windowStore
+        self.spaceProvider = spaceProvider
+        self.driftPolicy = driftPolicy
+        self.rehomeWindow = rehomeWindow
+        self.unmanageWindow = unmanageWindow
+    }
+
+    public func verify(expectedSpaceID: NativeSpaceID? = nil) async -> NativeSpaceInvariantResult {
+        let windows = await windowStore.allWindows()
+        guard spaceProvider.isSupported else {
+            return NativeSpaceInvariantResult(
+                expectedSpaceID: nil,
+                issues: windows.map { .unsupportedNativeSpaces(windowID: $0.id) },
+                rehomedWindowIDs: [],
+                unmanagedWindowIDs: [],
+                isProviderSupported: false
+            )
+        }
+
+        var baseline = expectedSpaceID
+        var issues: [NativeSpaceInvariantIssue] = [], rehomedWindowIDs: [WindowID] = []
+        var unmanagedWindowIDs: [WindowID] = [], offSpaceWindowIDs: [WindowID] = []
+
+        for window in windows {
+            guard let spaceID = await spaceProvider.nativeSpaceID(for: window) else {
+                issues.append(.unknownSpace(windowID: window.id))
+                continue
+            }
+
+            guard let expected = baseline else {
+                baseline = spaceID
+                continue
+            }
+
+            guard spaceID != expected else {
+                if window.isOffSpace {
+                    await windowStore.upsert(window.withOffSpace(false))
+                }
+                continue
+            }
+
+            issues.append(.drifted(windowID: window.id, expected: expected, actual: spaceID))
+            switch driftPolicy {
+            case .followWindow:
+                await windowStore.upsert(window.withOffSpace(true))
+                offSpaceWindowIDs.append(window.id)
+            case .rehome:
+                if await rehomeWindow(window, expected) {
+                    rehomedWindowIDs.append(window.id)
+                }
+            case .unmanage:
+                await windowStore.remove(id: window.id)
+                await unmanageWindow(window)
+                unmanagedWindowIDs.append(window.id)
+            }
+        }
+
+        return NativeSpaceInvariantResult(
+            expectedSpaceID: baseline,
+            issues: issues,
+            rehomedWindowIDs: rehomedWindowIDs,
+            unmanagedWindowIDs: unmanagedWindowIDs,
+            offSpaceWindowIDs: offSpaceWindowIDs
+        )
+    }
+}

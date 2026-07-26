@@ -19,6 +19,8 @@ let package = Package(
 		.executable(name: "itsy", targets: ["ItsyConfigCLI"]),
 		.executable(name: "ItsyBench", targets: ["ItsyBench"]),
 		.library(name: "ItsyConfig", type: .static, targets: ["ItsyConfig"]),
+		.library(name: "ItsyWorkbenchLayout", type: .static, targets: ["ItsyWorkbenchLayout"]),
+		.library(name: "ItsyWorkbenchDSL", type: .static, targets: ["ItsyWorkbenchDSL"]),
 		.library(name: "ItsyRender", type: .static, targets: ["ItsyRender"]),
 		.library(name: "ItsyEditor", type: .static, targets: ["ItsyEditor"]),
 		.library(name: "ItsySyntax", type: .static, targets: ["ItsySyntax"]),
@@ -38,7 +40,7 @@ let package = Package(
 		.executableTarget(
 			name: "ItsyApp",
 			dependencies: [
-				"ItsyConfig", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP", "ItsyDAP", "ItsyDebugger",
+				"ItsyConfig", "ItsyWorkbenchLayout", "ItsyWorkbenchDSL", "ItsyRender", "ItsyEditor", "ItsySyntax", "ItsyKeymap", "ItsyLSP", "ItsyDAP", "ItsyDebugger",
 				.product(name: "Sparkle", package: "Sparkle"),
 			],
 			exclude: ["README.md"],
@@ -48,7 +50,9 @@ let package = Package(
 			]
 		),
 		.executableTarget(name: "ItsyConfigCLI", dependencies: ["ItsyConfig"], swiftSettings: releaseSwiftSettings),
-		.target(name: "ItsyConfig", swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyConfig", dependencies: ["ItsyWorkbenchDSL"], swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyWorkbenchLayout", swiftSettings: releaseSwiftSettings),
+		.target(name: "ItsyWorkbenchDSL", dependencies: ["ItsyWorkbenchLayout"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyRender", dependencies: ["ItsyEditor", "ItsyKeymap", "ItsyVim"], resources: [.copy("Shaders.metal")], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsyEditor", dependencies: ["CLibgit2", "ItsyConfig", "ItsyLSP"], swiftSettings: releaseSwiftSettings),
 		.target(name: "ItsySyntax", dependencies: ["CTreeSitter", "ItsyEditor"], resources: [.copy("Resources")], swiftSettings: releaseSwiftSettings),
@@ -280,6 +284,7 @@ let package = Package(
 		),
 		.testTarget(name: "ItsyEditorTests", dependencies: ["ItsyEditor", "ItsyConfig", "ItsyLSP"], resources: [.copy("Fixtures")]),
 		.testTarget(name: "ItsyConfigTests", dependencies: ["ItsyConfig"]),
+		.testTarget(name: "ItsyWorkbenchLayoutTests", dependencies: ["ItsyWorkbenchLayout", "ItsyWorkbenchDSL"]),
 		.testTarget(name: "ItsyKeymapTests", dependencies: ["ItsyKeymap"]),
 		.testTarget(name: "ItsyVimTests", dependencies: ["ItsyVim", "ItsyKeymap"]),
 		.testTarget(name: "ItsyRenderTests", dependencies: ["ItsyRender"]),

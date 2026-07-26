@@ -82,6 +82,19 @@ import Testing
 	#expect(gitPopup?.itemArray.compactMap { $0.representedObject as? String } == ["sidebar", "window"])
 }
 
+@MainActor
+@Test func settingsBannerExposesImmediateAppliedAndConfigRecoveryStates() {
+	let banner = SettingsBanner()
+	let buttons = accessibilityDescendants(in: banner).compactMap { $0 as? NSButton }
+	let openConfig = buttons.first { $0.accessibilityLabel() == "Open settings file to resolve configuration error" }
+
+	banner.show(message: "Settings applied · Terminal bottom", isError: false)
+	#expect(!banner.isHidden)
+	#expect(openConfig?.isHidden == true)
+	banner.show(message: "Settings error: line 4: invalid value", isError: true)
+	#expect(openConfig?.isHidden == false)
+}
+
 private func accessibilityLabels(in view: NSView) -> [String] {
 	let label = view.accessibilityLabel().map { [$0] } ?? []
 	return label + view.subviews.flatMap(accessibilityLabels)

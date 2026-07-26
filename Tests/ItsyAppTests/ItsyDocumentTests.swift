@@ -190,6 +190,28 @@ private func editorWindowDescendants(in view: NSView) -> [NSView] {
 }
 
 @MainActor
+@Test func editorWindowCollapsesTheSharedSecondarySidebarBeforeConstrainingTheEditor() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let window = try #require(controller.window)
+	let splitView = try #require(window.contentView as? NSSplitView)
+	window.setFrame(NSRect(x: 0, y: 0, width: 900, height: 700), display: false)
+	controller.setEmbeddedGitVisible(true)
+	controller.setEmbeddedDebuggerVisible(true)
+	splitView.layoutSubtreeIfNeeded()
+
+	#expect(splitView.arrangedSubviews.count == 2)
+	#expect(controller.embeddedGitHostView.isHidden)
+	#expect(controller.embeddedDebuggerHostView.isHidden)
+
+	window.setFrame(NSRect(x: 0, y: 0, width: 1600, height: 900), display: false)
+	controller.windowDidResize(Notification(name: NSWindow.didResizeNotification, object: window))
+	splitView.layoutSubtreeIfNeeded()
+	#expect(splitView.arrangedSubviews.count == 3)
+	#expect(!controller.embeddedDebuggerHostView.isHidden)
+}
+
+@MainActor
 @Test func workspacePaneRestoreRebuildsTopologyAndFallsBackFromInvalidLayout() {
 	let document = ItsyDocument()
 	let controller = EditorWindowController(document: document)

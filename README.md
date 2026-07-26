@@ -89,7 +89,7 @@ Itsy is intentionally narrow:
 | Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings | Named Vim marks deferred |
 | Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.toml` editor/theme/terminal prefs | Additional grammars/themes are incremental |
 | LSP | Lazy external server sessions, document sync, diagnostics gutter, completion/resolve, hover, references panel, signature help, workspace edits/config, smoke/bench coverage | Full LSP surface is incomplete |
-| DAP | Protocol types and message framing | No integrated debugger UI |
+| DAP | Debug launch/control, Call Stack, Variables, Watches, and Debug Console in the Debugger sidebar/window | Adapter-specific debugging coverage remains incremental |
 | Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |
 | Tasks/extensions | Built-in task discovery/run panel; extension manifests contribute tasks only | No executable plugin runtime or marketplace |
 | Workspace/problems | Gitignore-aware file/symbol index, workspace/file symbols, problems panel fed by task/compiler diagnostics | GitHub issues track follow-up slices |

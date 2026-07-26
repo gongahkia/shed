@@ -229,6 +229,7 @@ final class ManagedSupportRequest: NSObject {
 		}
 		let installed = ManagedSupportResolver.executableURL(for: component)
 		let artifact = component.artifacts.artifact(for: .current ?? .arm64)
+		let nodeSupport = component.nodeSupport
 		let discovered = !Set(component.languageIDs).intersection(discovery.languageIDs).isEmpty
 		let enabled = ManagedSupportEnablement.isEnabled(component)
 		let state: String
@@ -241,18 +242,28 @@ final class ManagedSupportRequest: NSObject {
 		} else {
 			state = "Not installed"
 		}
-		installManagedButton.isEnabled = component.installMode == .managed && artifact != nil && installed == nil
-		detailsView.string = [
+		installManagedButton.isEnabled = component.installMode == .managed && (artifact != nil || nodeSupport != nil) && installed == nil
+		var details = [
 			"Name: \(component.displayName)",
 			"Kind: \(component.kind.rawValue)",
 			"Tier: \(component.tier.rawValue)",
 			"Languages: \(component.languageIDs.joined(separator: ", "))",
 			"Workspace need: \(discovered ? "detected" : "not detected")",
 			"State: \(state)",
-			artifact.map { "Verified download: \($0.version)" } ?? (component.installMode == .managed ? "Verified download: unavailable for this tool" : nil),
-			"Source: \(component.officialURL.absoluteString)",
-			component.systemInstallHint.map { "System setup: \($0)" },
-		].compactMap { $0 }.joined(separator: "\n")
+		]
+		if let artifact {
+			details.append("Verified download: \(artifact.version)")
+		} else if let nodeSupport {
+			details.append("Verified Node packages: \(nodeSupport.version)")
+			details.append("Runtime: Node.js 20 or newer")
+		} else if component.installMode == .managed {
+			details.append("Verified download: unavailable for this tool")
+		}
+		details.append("Source: \(component.officialURL.absoluteString)")
+		if let hint = component.systemInstallHint {
+			details.append("System setup: \(hint)")
+		}
+		detailsView.string = details.joined(separator: "\n")
 	}
 
 	@objc private func componentChanged(_: Any?) {
@@ -274,39 +285,50 @@ final class ManagedSupportRequest: NSObject {
 	}
 
 	@objc private func installManagedSupport(_: Any?) {
-		guard let component = selectedComponent, component.installMode == .managed,
-			let artifact = component.artifacts.artifact(for: .current ?? .arm64) else {
+		guard let component = selectedComponent, component.installMode == .managed else {
+			NSSound.beep()
+			return
+		}
+		let artifact = component.artifacts.artifact(for: .current ?? .arm64)
+		let nodeSupport = component.nodeSupport
+		guard artifact != nil || nodeSupport != nil else {
 			NSSound.beep()
 			return
 		}
 		let alert = NSAlert()
 		alert.messageText = L10n.string("Install \(component.displayName) in Itsy?")
-		alert.informativeText = L10n.string("Itsy will download verified version \(artifact.version) from the official project and install it only in Application Support.")
+		let version = artifact?.version ?? nodeSupport!.version
+		let runtime = nodeSupport == nil ? "" : " Node.js 20 or newer is required to run it."
+		alert.informativeText = L10n.string("Itsy will download verified version \(version) from the official project and install it only in Application Support.\(runtime)")
 		alert.addButton(withTitle: L10n.string("Install"))
 		alert.addButton(withTitle: L10n.string("Cancel"))
 		guard alert.runModal() == .alertFirstButtonReturn else { return }
 		installManagedButton.isEnabled = false
 		statusLabel.stringValue = L10n.string("Downloading \(component.displayName)…")
-		let request = ManagedSupportInstallRequest(component: component, artifact: artifact)
 		Task { [weak self] in
 			await IntegrationHealthStore.shared.report(
 				service: .package,
 				identifier: component.id,
 				lifecycle: .starting,
 				state: .retrying,
-				detailLogReference: "package://\(component.id)/\(artifact.version)"
+				detailLogReference: "package://\(component.id)/\(version)"
 			)
 			do {
-				_ = try await ManagedSupportInstaller.downloadAndInstall(request)
+				if let artifact {
+					_ = try await ManagedSupportInstaller.downloadAndInstall(ManagedSupportInstallRequest(component: component, artifact: artifact))
+				} else {
+					_ = try await ManagedNodeSupportInstaller.downloadAndInstall(component: component)
+				}
 				await IntegrationHealthStore.shared.report(
 					service: .package,
 					identifier: component.id,
 					lifecycle: .stopped,
 					state: .healthy,
-					detailLogReference: "package://\(component.id)/\(artifact.version)"
+					detailLogReference: "package://\(component.id)/\(version)"
 				)
 				guard let self else { return }
 				ManagedSupportEnablement.setEnabled(true, for: component)
+				EditorWindowController.reloadLSPConfiguration()
 				statusLabel.stringValue = L10n.string("Installed \(component.displayName) in Itsy.")
 				refreshDetails()
 			} catch {
@@ -317,7 +339,7 @@ final class ManagedSupportRequest: NSObject {
 					state: .degraded,
 					lastError: String(describing: error),
 					remediation: "Review the verified download details and retry.",
-					detailLogReference: "package://\(component.id)/\(artifact.version)"
+					detailLogReference: "package://\(component.id)/\(version)"
 				)
 				guard let self else { return }
 				statusLabel.stringValue = L10n.string("Installation failed: \(String(describing: error))")

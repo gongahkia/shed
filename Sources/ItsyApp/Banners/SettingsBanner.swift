@@ -3,9 +3,10 @@ import AppKit
 final class SettingsBanner: NSView {
 	var openSettingsRequested: (() -> Void)?
 	private let label = NSTextField(labelWithString: "")
-	private let openButton = NSButton(title: L10n.string("Open Settings"), target: nil, action: nil)
+	private let openButton = NSButton(title: L10n.string("Open Config"), target: nil, action: nil)
 	private let dismissButton = NSButton(title: L10n.string("Dismiss"), target: nil, action: nil)
 	private var hideWorkItem: DispatchWorkItem?
+	private var isError = false
 
 	override init(frame frameRect: NSRect) {
 		super.init(frame: frameRect)
@@ -18,6 +19,7 @@ final class SettingsBanner: NSView {
 
 	func show(message: String, isError: Bool) {
 		hideWorkItem?.cancel()
+		self.isError = isError
 		label.stringValue = message
 		label.textColor = isError ? .systemRed : .labelColor
 		openButton.isHidden = !isError
@@ -37,7 +39,7 @@ final class SettingsBanner: NSView {
 
 	func applyTheme(_ palette: AppThemePalette) {
 		layer?.backgroundColor = palette.bannerBackground.withAlphaComponent(1).cgColor
-		if label.textColor != .systemRed {
+		if !isError {
 			label.textColor = palette.bannerForeground
 		}
 		openButton.contentTintColor = palette.buttonForeground
@@ -56,7 +58,7 @@ final class SettingsBanner: NSView {
 		openButton.action = #selector(openSettings(_:))
 		openButton.bezelStyle = .rounded
 		openButton.controlSize = .small
-		openButton.setAccessibilityLabel(L10n.string("Open settings to resolve configuration error"))
+		openButton.setAccessibilityLabel(L10n.string("Open settings file to resolve configuration error"))
 		dismissButton.target = self
 		dismissButton.action = #selector(dismiss(_:))
 		dismissButton.bezelStyle = .rounded

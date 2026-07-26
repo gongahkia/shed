@@ -692,6 +692,10 @@ import ItsyKeymap
 		settingsCoordinator.resetZoom(sender)
 	}
 
+	@objc func openSettingsFile(_: Any?) {
+		settingsCoordinator.openSettingsFile(workspace: false)
+	}
+
 	private func applySettingsToOpenWindows(_ settings: ItsySettings) {
 		AppTheme.update(settings: settings)
 		ItsyUIConfiguration.update(settings.ui)

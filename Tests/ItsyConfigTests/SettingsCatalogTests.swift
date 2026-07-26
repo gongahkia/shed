@@ -46,7 +46,7 @@ import Testing
 	#expect(settings.layout.sidebarPosition == .leading)
 }
 
-@Test func settingsCatalogUpdatesValuesUsingParserValidation() {
+@Test func settingsCatalogUpdatesValuesUsingDirectValidation() {
 	var settings = ItsySettings()
 	#expect(ItsySettingsCatalog.update(value: "8", for: "editor.tab_width", in: &settings) == nil)
 	#expect(ItsySettingsCatalog.update(value: "false", for: "editor.line_numbers", in: &settings) == nil)

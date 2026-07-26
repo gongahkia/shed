@@ -22,7 +22,7 @@ Remaining work is tracked in [GitHub issues](https://github.com/gongahkia/itsy/i
 
 ## Config
 
-Itsy reads user settings from `~/.config/itsy/settings.toml`; see [docs/settings.md](docs/settings.md).
+Itsy reads user settings from `~/.config/itsy/settings.json`; see [docs/settings.md](docs/settings.md).
 Generated keymap docs live at [docs/keymap-reference.md](docs/keymap-reference.md).
 
 ## Build
@@ -87,7 +87,7 @@ Itsy is intentionally narrow:
 |---|---|---|
 | Native editor | AppKit shell, Metal text view, Swift rope buffer, split panes, tabs, file tree, lazy PTY terminal | No Electron, collaboration, or telemetry |
 | Keymaps/search | Plain/vim/emacs profiles, project find, multi-cursor, outline/goto-symbol bindings | Named Vim marks deferred |
-| Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.toml` editor/theme/terminal prefs | Additional grammars/themes are incremental |
+| Syntax/themes/settings | Tree-sitter parsing/highlighting for bundled grammars, local theme files, and `settings.json` editor/theme/terminal prefs | Additional grammars/themes are incremental |
 | LSP | Lazy external server sessions, document sync, diagnostics gutter, completion/resolve, hover, references panel, signature help, workspace edits/config, smoke/bench coverage | Full LSP surface is incomplete |
 | DAP | Debug launch/control, Call Stack, Variables, Watches, and Debug Console in the Debugger sidebar/window | Adapter-specific debugging coverage remains incremental |
 | Git UI | Status panel, unified/side-by-side diff, hunk stage/unstage, commit composer/history/drafts, branch popover, stash-on-switch, fetch/pull/push streaming | Line staging, conflict viewer, gutter hunk indicators, stash panel |

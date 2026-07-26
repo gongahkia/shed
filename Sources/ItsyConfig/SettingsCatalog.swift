@@ -1,4 +1,5 @@
 import Foundation
+import ItsyWorkbenchLayout
 
 public enum ItsySettingsCatalog {
 	public enum ReloadBehavior: String, Equatable, Sendable {
@@ -411,22 +412,84 @@ public enum ItsySettingsCatalog {
 		else {
 			return "This catalog entry is read-only."
 		}
-		let rawValue = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-		guard !rawValue.isEmpty else {
+		let raw = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+		guard !raw.isEmpty else {
 			return "A value is required."
 		}
-		let literals = rawValue.hasPrefix("\"") ? [rawValue] : [rawValue, "\"\(escape(rawValue))\""]
-		var warning: ItsySettingsWarning?
-		for literal in literals {
-			var parser = ItsySettingsParser(settings: settings)
-			let result = parser.parse(tomlAssignment(key: key, literal: literal))
-			if result.warnings.isEmpty {
-				settings = result.settings.normalized()
-				return nil
+		let value = unquote(raw)
+		var updated = settings
+		let boolean = boolValue(value)
+		let integer = Int(value)
+		let number = Double(value)
+		switch key {
+		case "editor.font": updated.editor.font = value
+		case "editor.font_size": guard let number else { return "A number is required." }; updated.editor.fontSize = number
+		case "editor.font_rendering": guard let mode = ItsySettings.FontRenderingMode(rawValue: value.lowercased()) else { return "Invalid font rendering mode." }; updated.editor.fontRendering = mode
+		case "editor.line_numbers": guard let boolean else { return "A boolean is required." }; updated.editor.lineNumbers = boolean; updated.editor.lineNumberMode = boolean ? .absolute : .off
+		case "editor.line_number_mode": guard let mode = ItsySettings.LineNumberMode(rawValue: value.lowercased()) else { return "Invalid line number mode." }; updated.editor.lineNumberMode = mode; updated.editor.lineNumbers = mode != .off
+		case "editor.tab_width": guard let integer else { return "An integer is required." }; updated.editor.tabWidth = integer
+		case "editor.use_spaces": guard let boolean else { return "A boolean is required." }; updated.editor.useSpaces = boolean
+		case "editor.auto_pairs": guard let boolean else { return "A boolean is required." }; updated.editor.autoPairs = boolean
+		case "editor.smart_indent": guard let boolean else { return "A boolean is required." }; updated.editor.smartIndent = boolean
+		case "editor.multiple_selections": guard let boolean else { return "A boolean is required." }; updated.editor.multipleSelections = boolean
+		case "editor.keymap": guard let mode = ItsySettings.KeymapMode(rawValue: value.lowercased()) else { return "Invalid keymap." }; updated.editor.keymap = mode
+		case "editor.cursor_style":
+			if value.lowercased() == "immediate" { updated.editor.cursorStyle = .bar }
+			else if let style = ItsySettings.CursorStyle(rawValue: value.lowercased()) { updated.editor.cursorStyle = style }
+			else { return "Invalid cursor style." }
+		case "editor.tab_groups": guard let scope = ItsySettings.TabGroupScope(rawValue: value.lowercased()) else { return "Invalid tab group scope." }; updated.editor.tabGroups = scope
+		case "editor.wrap": guard let mode = ItsySettings.WrapMode(rawValue: value.lowercased()) else { return "Invalid wrap mode." }; updated.editor.wrap = mode
+		case "editor.wrap_column": guard let integer else { return "An integer is required." }; updated.editor.wrapColumn = integer
+		case "editor.experimental.storage": guard let storage = ItsySettings.EditorStorage(rawValue: value.lowercased()) else { return "Invalid editor storage." }; updated.editor.experimental.storage = storage
+		case "theme.id": updated.theme.id = value
+		case "theme.git.gutter.added": updated.theme.gitGutter.added = value
+		case "theme.git.gutter.modified": updated.theme.gitGutter.modified = value
+		case "theme.git.gutter.removed": updated.theme.gitGutter.removed = value
+		case "syntax.preload_grammars": guard let mode = ItsySettings.SyntaxPreloadGrammars(rawValue: value.lowercased()) else { return "Invalid syntax preload mode." }; updated.syntax.preloadGrammars = mode
+		case "terminal.font": updated.terminal.font = value
+		case "terminal.font_size": guard let number else { return "A number is required." }; updated.terminal.fontSize = number
+		case "terminal.scrollback_lines": guard let integer else { return "An integer is required." }; updated.terminal.scrollbackLines = integer
+		case "terminal.presentation": guard let mode = ItsySettings.TerminalSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid terminal presentation." }; updated.terminal.presentation = mode
+		case "git.presentation": guard let mode = ItsySettings.GitSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid Git presentation." }; updated.git.presentation = mode
+		case "debugger.presentation": guard let mode = ItsySettings.DebuggerSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid debugger presentation." }; updated.debugger.presentation = mode
+		case "find.uses_regex": guard let boolean else { return "A boolean is required." }; updated.find.usesRegex = boolean
+		case "find.case_sensitive": guard let boolean else { return "A boolean is required." }; updated.find.isCaseSensitive = boolean
+		case "find.whole_word": guard let boolean else { return "A boolean is required." }; updated.find.matchesWholeWord = boolean
+		case "recovery.journal_enabled": guard let boolean else { return "A boolean is required." }; updated.recovery.journalEnabled = boolean
+		case "updates.automatically_check": guard let boolean else { return "A boolean is required." }; updated.updates.automaticallyCheck = boolean
+		case "lsp.catalog_automatically_check": guard let boolean else { return "A boolean is required." }; updated.lsp.catalogAutomaticallyCheck = boolean
+		case "workbench.profile": guard let profile = WorkbenchProfile(rawValue: value.lowercased()) else { return "Invalid workbench profile." }; updated.workbench.profile = profile
+		case "workbench.file_tree": guard let visibility = WorkbenchVisibility(rawValue: value.lowercased()) else { return "Invalid workbench visibility." }; updated.workbench.fileTree = visibility
+		case "workbench.terminal": guard let visibility = WorkbenchVisibility(rawValue: value.lowercased()) else { return "Invalid workbench visibility." }; updated.workbench.terminal = visibility
+		case "workbench.git": guard let visibility = WorkbenchVisibility(rawValue: value.lowercased()) else { return "Invalid workbench visibility." }; updated.workbench.git = visibility
+		case "layout.sidebar_visible": guard let boolean else { return "A boolean is required." }; updated.layout.sidebarVisible = boolean
+		case "layout.sidebar_position": guard let position = ItsySettings.SidebarPosition(rawValue: value.lowercased()) else { return "Invalid sidebar position." }; updated.layout.sidebarPosition = position
+		case "layout.sidebar_width": guard let integer else { return "An integer is required." }; updated.layout.sidebarWidth = integer
+		case "layout.tab_bar_visible": guard let boolean else { return "A boolean is required." }; updated.layout.tabBarVisible = boolean
+		case "layout.status_bar_visible": guard let boolean else { return "A boolean is required." }; updated.layout.statusBarVisible = boolean
+		case "layout.interface_scale": guard let number else { return "A number is required." }; updated.layout.interfaceScale = number
+		case "ui.font_scale": guard let number else { return "A number is required." }; updated.ui.fontScale = number
+		case "ui.density": guard let density = ItsySettings.UIDensity(rawValue: value.lowercased()) else { return "Invalid UI density." }; updated.ui.density = density
+		case "ui.corner_radius": guard let number else { return "A number is required." }; updated.ui.cornerRadius = number
+		case "ui.border_width": guard let number else { return "A number is required." }; updated.ui.borderWidth = number
+		case "ui.padding": guard let number else { return "A number is required." }; updated.ui.padding = number
+		case "ui.notification_position": guard let position = ItsySettings.UINotificationPosition(rawValue: value.lowercased()) else { return "Invalid notification position." }; updated.ui.notificationPosition = position
+		default:
+			guard let (id, property) = surfaceKey(key), let number else { return "Invalid setting value." }
+			var surface = updated.ui.surface(id)
+			switch property {
+			case "width": surface.width = number
+			case "height": surface.height = number
+			case "row_height": surface.rowHeight = number
+			case "input_font_size": surface.inputFontSize = number
+			case "item_font_size": surface.itemFontSize = number
+			default: return "Invalid setting value."
 			}
-			warning = result.warnings.first
+			updated.ui.surfaces[id] = surface
 		}
-		return warning?.description ?? "Invalid value."
+		guard updated == updated.normalized() else { return "Value is outside the supported range." }
+		settings = updated
+		return nil
 	}
 
 	private static func surfaceKey(_ key: String) -> (String, String)? {
@@ -484,23 +547,16 @@ public enum ItsySettingsCatalog {
 		return String(rounded)
 	}
 
-	private static func tomlAssignment(key: String, literal: String) -> String {
-		if key.hasPrefix("theme.") {
-			return "[theme]\n\(key.dropFirst("theme.".count)) = \(literal)"
+	private static func boolValue(_ value: String) -> Bool? {
+		switch value.lowercased() {
+		case "true": true
+		case "false": false
+		default: nil
 		}
-		let components = key.split(separator: ".")
-		guard components.count > 1 else {
-			return "\(key) = \(literal)"
-		}
-		let section = components.dropLast().joined(separator: ".")
-		return "[\(section)]\n\(components.last!) = \(literal)"
 	}
 
-	private static func escape(_ value: String) -> String {
-		value
-			.replacingOccurrences(of: "\\", with: "\\\\")
-			.replacingOccurrences(of: "\"", with: "\\\"")
-			.replacingOccurrences(of: "\n", with: "\\n")
-			.replacingOccurrences(of: "\t", with: "\\t")
+	private static func unquote(_ value: String) -> String {
+		guard value.count >= 2, value.first == "\"", value.last == "\"" else { return value }
+		return String(value.dropFirst().dropLast())
 	}
 }

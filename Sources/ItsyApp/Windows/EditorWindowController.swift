@@ -72,6 +72,7 @@ extension Notification.Name {
 	private static var dismissedLSPMissingCommands: Set<String> = []
 	private let windowLifecycle: EditorWindowLifecycleCoordinator
 	private let fileTreeController = FileTreeSidebarController()
+	private let fileTreeContainer = NSView()
 	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
@@ -123,6 +124,8 @@ extension Notification.Name {
 	private var activeSecondarySidebarSurface: SecondarySidebarSurface = .git
 	private var isApplyingWorkbenchLayout = false
 	private var workbenchPersistenceWorkItem: DispatchWorkItem?
+	private lazy var workbenchComponentHost = WorkbenchComponentHostController(mountPoints: [.fileTree: fileTreeContainer])
+	private lazy var fileTreeWorkbenchComponent = FileTreeWorkbenchComponent(controller: fileTreeController)
 	private var editorView: MetalTextView {
 		paneCoordinator.activePane.editorView
 	}
@@ -239,11 +242,11 @@ extension Notification.Name {
 		rootSplitView.isVertical = true
 		rootSplitView.dividerStyle = .thin
 		rootSplitView.autoresizingMask = [.width, .height]
-		fileTreeController.view.translatesAutoresizingMaskIntoConstraints = false
+		fileTreeContainer.translatesAutoresizingMaskIntoConstraints = false
 		editorStack.translatesAutoresizingMaskIntoConstraints = false
-		rootSplitView.addArrangedSubview(fileTreeController.view)
+		rootSplitView.addArrangedSubview(fileTreeContainer)
 		rootSplitView.addArrangedSubview(editorStack)
-		let sidebarWidthConstraint = fileTreeController.view.widthAnchor.constraint(equalToConstant: 240)
+		let sidebarWidthConstraint = fileTreeContainer.widthAnchor.constraint(equalToConstant: 240)
 		sidebarWidthConstraint.priority = .defaultHigh
 		sidebarWidthConstraint.isActive = true
 		self.sidebarWidthConstraint = sidebarWidthConstraint
@@ -432,6 +435,14 @@ extension Notification.Name {
 
 	var embeddedTerminalHostView: NSView {
 		embeddedTerminalContainer
+	}
+
+	var fileTreeHostView: NSView {
+		fileTreeContainer
+	}
+
+	var fileTreeComponentLifecycle: WorkbenchComponentLifecycle {
+		workbenchComponentHost.lifecycle(for: .fileTree)
 	}
 
 	var embeddedGitHostView: NSView {
@@ -666,12 +677,12 @@ extension Notification.Name {
 			return
 		}
 		sidebarPosition = position
-		guard sidebarVisible && responsiveSidebarVisible, rootSplitView.arrangedSubviews.contains(fileTreeController.view) else {
+		guard sidebarVisible && responsiveSidebarVisible, rootSplitView.arrangedSubviews.contains(fileTreeContainer) else {
 			return
 		}
-		rootSplitView.removeArrangedSubview(fileTreeController.view)
-		fileTreeController.view.removeFromSuperview()
-		rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarInsertionIndex(for: position))
+		rootSplitView.removeArrangedSubview(fileTreeContainer)
+		fileTreeContainer.removeFromSuperview()
+		rootSplitView.insertArrangedSubview(fileTreeContainer, at: sidebarInsertionIndex(for: position))
 	}
 
 	private func sidebarInsertionIndex(for position: ItsySettings.SidebarPosition) -> Int {
@@ -692,16 +703,19 @@ extension Notification.Name {
 	private func applySidebarVisibility() {
 		let visible = sidebarVisible && responsiveSidebarVisible
 		if visible {
-			fileTreeController.view.isHidden = false
-			if !rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
-				rootSplitView.insertArrangedSubview(fileTreeController.view, at: sidebarInsertionIndex(for: sidebarPosition))
+			fileTreeContainer.isHidden = false
+			if !rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
+				rootSplitView.insertArrangedSubview(fileTreeContainer, at: sidebarInsertionIndex(for: sidebarPosition))
 			}
+			precondition(workbenchComponentHost.mount(fileTreeWorkbenchComponent))
+			fileTreeWorkbenchComponent.setVisible(true)
 		} else {
-			if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
-				rootSplitView.removeArrangedSubview(fileTreeController.view)
-				fileTreeController.view.removeFromSuperview()
+			_ = workbenchComponentHost.unmount(.fileTree)
+			if rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
+				rootSplitView.removeArrangedSubview(fileTreeContainer)
+				fileTreeContainer.removeFromSuperview()
 			}
-			fileTreeController.view.isHidden = true
+			fileTreeContainer.isHidden = true
 		}
 	}
 
@@ -4798,8 +4812,8 @@ extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDele
 		guard !isApplyingWorkbenchLayout, notification.object as? NSSplitView === rootSplitView else {
 			return
 		}
-		if rootSplitView.arrangedSubviews.contains(fileTreeController.view) {
-			sessionSidebarWidth = fileTreeController.view.frame.width
+		if rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
+			sessionSidebarWidth = fileTreeContainer.frame.width
 		}
 		if rootSplitView.arrangedSubviews.contains(secondarySidebarContainer) {
 			switch activeSecondarySidebarSurface {

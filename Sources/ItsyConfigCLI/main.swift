@@ -10,6 +10,27 @@ private func usage() -> Never {
 	fail("usage: itsy config [--workspace PATH] <path|list|get|set|reset> [key] [value] [--json]")
 }
 
+private struct ConfigPath: Encodable {
+	let path: String
+}
+
+private struct ConfigRecord: Encodable {
+	let key: String
+	let value: String
+}
+
+private func emitJSON<Value: Encodable>(_ value: Value) {
+	do {
+		let encoder = JSONEncoder()
+		encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+		let data = try encoder.encode(value)
+		FileHandle.standardOutput.write(data)
+		FileHandle.standardOutput.write(Data("\n".utf8))
+	} catch {
+		fail("failed to encode JSON output: \(error)")
+	}
+}
+
 var arguments = Array(CommandLine.arguments.dropFirst())
 guard arguments.first == "config" else { usage() }
 arguments.removeFirst()
@@ -33,9 +54,7 @@ if let workspaceRoot {
 
 func emit(_ key: String, _ value: String) {
 	if json {
-		let escapedKey = key.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-		let escapedValue = value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
-		print("{\"key\":\"\(escapedKey)\",\"value\":\"\(escapedValue)\"}")
+		emitJSON(ConfigRecord(key: key, value: value))
 	} else {
 		print(value)
 	}
@@ -44,7 +63,11 @@ func emit(_ key: String, _ value: String) {
 switch command {
 case "path":
 	guard arguments.isEmpty else { usage() }
-	print(store.fileURL.path)
+	if json {
+		emitJSON(ConfigPath(path: store.fileURL.path))
+	} else {
+		print(store.fileURL.path)
+	}
 case "list":
 	guard arguments.isEmpty else { usage() }
 	let settings = store.load().settings
@@ -52,8 +75,9 @@ case "list":
 		["width", "height", "row_height", "input_font_size", "item_font_size"].map { "ui.surface.\(id).\($0)" }
 	}
 	if json {
-		let records = keys.map { key in "{\"key\":\"\(key)\",\"value\":\"\(ItsySettingsCatalog.effectiveValue(for: key, in: settings))\"}" }
-		print("[\(records.joined(separator: ","))]")
+		emitJSON(keys.map { key in
+			ConfigRecord(key: key, value: ItsySettingsCatalog.effectiveValue(for: key, in: settings))
+		})
 	} else {
 		for key in keys { print("\(key) = \(ItsySettingsCatalog.effectiveValue(for: key, in: settings))") }
 	}

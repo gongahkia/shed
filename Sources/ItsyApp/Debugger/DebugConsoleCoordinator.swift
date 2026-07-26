@@ -12,6 +12,7 @@ import ItsyEditor
 	private var textView: NSTextView?
 	private var inputField: NSTextField?
 	private var outputTask: Task<Void, Never>?
+	private var seenOutputSequences = Set<Int>()
 
 	init(activeSessionProvider: @escaping () -> DebugAppSession?) {
 		self.activeSessionProvider = activeSessionProvider
@@ -28,15 +29,19 @@ import ItsyEditor
 
 	func sessionDidStart(_ session: DebugAppSession) {
 		outputTask?.cancel()
-		outputTask = Task { [weak self] in
+		seenOutputSequences.removeAll()
+		textView?.textStorage?.setAttributedString(NSAttributedString())
+		outputTask = Task { @MainActor [weak self] in
 			let stream = await session.client.on(event: DAPEvent.output)
+			let recovered = await session.outputRecoveryBuffer.snapshot()
+			for entry in recovered {
+				self?.appendOutput(entry.body, sequence: entry.sequence, session: session)
+			}
 			for await event in stream {
 				guard case let .output(body) = try? event.typed() else {
 					continue
 				}
-				Task { @MainActor in
-					self?.appendOutput(body)
-				}
+				self?.appendOutput(body, sequence: event.seq, session: session)
 			}
 		}
 		refreshStatus()
@@ -45,6 +50,7 @@ import ItsyEditor
 	func clear() {
 		outputTask?.cancel()
 		outputTask = nil
+		seenOutputSequences.removeAll()
 		textView?.textStorage?.setAttributedString(NSAttributedString())
 		setStatus(L10n.string("No active debug session"), isError: true)
 	}
@@ -144,18 +150,19 @@ import ItsyEditor
 		setStatus(activeSessionProvider() == nil ? L10n.string("No active debug session") : L10n.string("Ready"), isError: activeSessionProvider() == nil)
 	}
 
-	private func appendOutput(_ body: DAPOutputEventBody) {
-		if let session = activeSessionProvider() {
-			let identifier = "\(session.adapter.id):\(session.workspaceRoot.path)"
-			Task {
-				await IntegrationOutputConsole.shared.append(
-					service: .dap,
-					identifier: identifier,
-					kind: body.category == DAPOutputCategory.stderr ? .standardError : .event,
-					text: body.output,
-					errorReference: body.category == DAPOutputCategory.stderr ? "dap://\(session.adapter.id)/\(session.workspaceRoot.path)" : nil
-				)
-			}
+	private func appendOutput(_ body: DAPOutputEventBody, sequence: Int, session: DebugAppSession) {
+		guard activeSessionProvider() === session, seenOutputSequences.insert(sequence).inserted else {
+			return
+		}
+		let identifier = "\(session.adapter.id):\(session.workspaceRoot.path)"
+		Task {
+			await IntegrationOutputConsole.shared.append(
+				service: .dap,
+				identifier: identifier,
+				kind: body.category == DAPOutputCategory.stderr ? .standardError : .event,
+				text: body.output,
+				errorReference: body.category == DAPOutputCategory.stderr ? "dap://\(session.adapter.id)/\(session.workspaceRoot.path)" : nil
+			)
 		}
 		append(body.output, category: body.category)
 	}

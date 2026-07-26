@@ -42,6 +42,7 @@ public actor DAPClientSession {
 	private var cancelledRequestSequences = Set<Int>()
 	private var ignoredResponseSequences = Set<Int>()
 	private var eventContinuations: [UUID: DAPEventSubscription] = [:]
+	private var terminationStatus: Int32?
 
 	public init(transport: any DAPClientTransport) {
 		self.transport = transport
@@ -49,7 +50,7 @@ public actor DAPClientSession {
 
 	public func sendRequest(command: String, arguments: DAPAny? = nil) async throws -> DAPResponse {
 		guard state != .terminated, state != .disconnecting else {
-			throw DAPClientError.transportTerminated(nil)
+			throw DAPClientError.transportTerminated(terminationStatus)
 		}
 		return try await sendRequestUnchecked(command: command, arguments: arguments)
 	}
@@ -105,7 +106,10 @@ public actor DAPClientSession {
 
 	@discardableResult
 	public func disconnect(arguments: DAPDisconnectArguments = DAPDisconnectArguments()) async throws -> DAPResponse {
-		try requireState([.initializing, .configuring, .running, .stopped, .terminated])
+		guard state != .terminated else {
+			throw DAPClientError.transportTerminated(terminationStatus)
+		}
+		try requireState([.initializing, .configuring, .running, .stopped])
 		state = .disconnecting
 		do {
 			return try await sendRequestUnchecked(command: DAPCommand.disconnect, arguments: try DAPAny(encoding: arguments))
@@ -130,7 +134,7 @@ public actor DAPClientSession {
 		return try await withTaskCancellationHandler(operation: {
 			try await withCheckedThrowingContinuation { continuation in
 				guard state != .terminated else {
-					continuation.resume(throwing: DAPClientError.transportTerminated(nil))
+					continuation.resume(throwing: DAPClientError.transportTerminated(terminationStatus))
 					return
 				}
 				guard cancelledRequestSequences.remove(seq) == nil else {
@@ -257,6 +261,7 @@ public actor DAPClientSession {
 		guard state != .terminated else {
 			return
 		}
+		terminationStatus = status
 		state = .terminated
 		let pendingRequests = pending
 		pending.removeAll()

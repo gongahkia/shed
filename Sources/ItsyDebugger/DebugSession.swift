@@ -256,17 +256,20 @@ public actor DebugSession {
 
 	@discardableResult
 	public func restart() async throws -> DAPResponse {
-		try await client.sendRequest(command: DAPCommand.restart)
+		clearCachedExecutionState()
+		return try await client.sendRequest(command: DAPCommand.restart)
 	}
 
 	@discardableResult
 	public func terminate() async throws -> DAPResponse {
-		try await client.sendRequest(command: DAPCommand.terminate, arguments: try DAPAny(encoding: DAPTerminateArguments()))
+		clearCachedExecutionState()
+		return try await client.sendRequest(command: DAPCommand.terminate, arguments: try DAPAny(encoding: DAPTerminateArguments()))
 	}
 
 	@discardableResult
 	public func disconnect(terminateDebuggee: Bool = false) async throws -> DAPResponse {
-		try await client.disconnect(arguments: DAPDisconnectArguments(terminateDebuggee: terminateDebuggee))
+		clearCachedExecutionState()
+		return try await client.disconnect(arguments: DAPDisconnectArguments(terminateDebuggee: terminateDebuggee))
 	}
 
 	public func evaluate(expression: String, frameID: Int? = nil, context: String? = nil) async throws -> DebugValue {
@@ -290,5 +293,11 @@ public actor DebugSession {
 			throw DebugSessionError.missingBody(response.command)
 		}
 		return try decoder.decode(type, from: encoder.encode(body))
+	}
+
+	private func clearCachedExecutionState() {
+		threads = []
+		focusedThreadID = nil
+		focusedFrameID = nil
 	}
 }

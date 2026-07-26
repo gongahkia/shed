@@ -103,6 +103,37 @@ import Testing
 	#expect(await debug.focusedFrameID == 99)
 }
 
+@Test func debugSessionRestartAndTerminateClearCachedExecutionState() async throws {
+	let (debug, client, transport) = makeDebugSession()
+	let refreshTask = Task {
+		try await debug.refreshThreads()
+	}
+	try await transport.waitForWriteCount(1)
+	try await respond(client, request: try transport.request(at: 0), body: DAPThreadsResponseBody(threads: [DAPThread(id: 11, name: "main")]))
+	_ = try await refreshTask.value
+	await debug.focus(threadID: 11, frameID: 99)
+
+	let restartTask = Task {
+		try await debug.restart()
+	}
+	try await transport.waitForWriteCount(2)
+	try await respond(client, request: try transport.request(at: 1), body: DAPAny.object([:]))
+	_ = try await restartTask.value
+	#expect(await debug.threads.isEmpty)
+	#expect(await debug.focusedThreadID == nil)
+	#expect(await debug.focusedFrameID == nil)
+
+	await debug.focus(threadID: 11, frameID: 99)
+	let terminateTask = Task {
+		try await debug.terminate()
+	}
+	try await transport.waitForWriteCount(3)
+	try await respond(client, request: try transport.request(at: 2), body: DAPAny.object([:]))
+	_ = try await terminateTask.value
+	#expect(await debug.focusedThreadID == nil)
+	#expect(await debug.focusedFrameID == nil)
+}
+
 @Test func debugSessionSendsExecutionControlRequests() async throws {
 	let (debug, client, transport) = makeDebugSession()
 	await debug.focus(threadID: 11, frameID: 99)

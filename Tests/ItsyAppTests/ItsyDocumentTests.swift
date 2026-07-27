@@ -206,6 +206,10 @@ import Testing
 	controller.setEmbeddedTerminalVisible(true)
 	#expect(!controller.embeddedTerminalHostView.isHidden)
 	#expect(controller.embeddedTerminalHostView.frame.height > 200)
+	let terminalResizeHandle = try #require(editorWindowDescendants(in: splitView).first {
+		$0.identifier?.rawValue == "terminal.resize"
+	})
+	#expect(!terminalResizeHandle.isHidden)
 
 	controller.setEmbeddedGitVisible(true)
 	splitView.layoutSubtreeIfNeeded()
@@ -232,6 +236,7 @@ import Testing
 	controller.setEmbeddedDebuggerVisible(false)
 	splitView.layoutSubtreeIfNeeded()
 	#expect(controller.embeddedTerminalHostView.isHidden)
+	#expect(terminalResizeHandle.isHidden)
 	#expect(splitView.arrangedSubviews.count == 2)
 }
 

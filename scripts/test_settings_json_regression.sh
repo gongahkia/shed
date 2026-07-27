@@ -5,8 +5,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_dir="$(cd "$script_dir/.." && pwd)"
 
 if rg -n 'ItsySettingsParser|ItsySettingsValue|ItsySettingsStore\.serialize|settings\.toml|Open User TOML|Open Workspace TOML|global TOML|\[terminal\] TOML' \
-	"$repo_dir/README.md" "$repo_dir/docs" "$repo_dir/Sources/ItsyConfig" "$repo_dir/Sources/ItsyConfigCLI" "$repo_dir/Sources/ItsyApp/Settings" "$repo_dir/Tests/ItsyConfigTests" \
-	-g '*.md' -g '*.swift'; then
+	"$repo_dir/README.txt" "$repo_dir/docs" "$repo_dir/Sources/ItsyConfig" "$repo_dir/Sources/ItsyConfigCLI" "$repo_dir/Sources/ItsyApp/Settings" "$repo_dir/Tests/ItsyConfigTests" \
+	-g '*.md' -g '*.txt' -g '*.swift'; then
 	echo "legacy settings TOML reference found" >&2
 	exit 1
 fi

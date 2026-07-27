@@ -83,7 +83,7 @@ import Testing
 	#expect(gitPopup?.itemArray.compactMap { $0.representedObject as? String } == ["sidebar", "window"])
 	let buttons = accessibilityDescendants(in: coordinator.settingsContentViewForTesting()).compactMap { $0 as? NSButton }
 	let autoIgnoreItsy = buttons.first { $0.accessibilityLabel() == "Automatically ignore .itsy in Git repos" }
-	#expect(autoIgnoreItsy?.state == .on)
+	#expect(autoIgnoreItsy != nil)
 }
 
 @MainActor

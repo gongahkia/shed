@@ -125,6 +125,37 @@ extension Notification.Name {
 	static let itsySecondarySidebarCloseRequested = Notification.Name("dev.itsy.secondary-sidebar.close-requested")
 }
 
+private final class TerminalResizeHandle: NSView {
+	var onDragBegan: (() -> Void)?
+	var onDragChanged: ((CGFloat) -> Void)?
+	private var dragOriginY: CGFloat?
+
+	override func draw(_ dirtyRect: NSRect) {
+		NSColor.separatorColor.setFill()
+		NSRect(x: 0, y: bounds.midY, width: bounds.width, height: 1).fill()
+	}
+
+	override func resetCursorRects() {
+		addCursorRect(bounds, cursor: .resizeUpDown)
+	}
+
+	override func mouseDown(with event: NSEvent) {
+		dragOriginY = event.locationInWindow.y
+		onDragBegan?()
+	}
+
+	override func mouseDragged(with event: NSEvent) {
+		guard let dragOriginY else {
+			return
+		}
+		onDragChanged?(event.locationInWindow.y - dragOriginY)
+	}
+
+	override func mouseUp(with event: NSEvent) {
+		dragOriginY = nil
+	}
+}
+
 @MainActor final class EditorWindowController: NSWindowController {
 	private static let paneLayoutStateKey = "dev.itsy.editor.paneLayout"
 	private static let lspInstallPromptPrefix = "dev.itsy.lsp.install-prompted."
@@ -141,6 +172,7 @@ extension Notification.Name {
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private let terminalContainer = NSView()
+	private let terminalResizeHandle = TerminalResizeHandle()
 	private let embeddedTerminalContainer = NSView()
 	private let secondarySidebarContainer = NSView()
 	private let secondarySidebarHeader = NSStackView()
@@ -173,6 +205,8 @@ extension Notification.Name {
 	private let paneLifecycle = EditorPaneLifecycleController()
 	private var sidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedTerminalHeightConstraint: NSLayoutConstraint?
+	private var terminalResizeHandleHeightConstraint: NSLayoutConstraint?
+	private var terminalResizeStartHeight: CGFloat?
 	private var secondarySidebarWidthConstraint: NSLayoutConstraint?
 	private var embeddedGitVisible = false
 	private var embeddedDebuggerVisible = false
@@ -298,6 +332,11 @@ extension Notification.Name {
 		terminalContainer.setContentHuggingPriority(.required, for: .vertical)
 		embeddedTerminalHeightConstraint = terminalContainer.heightAnchor.constraint(equalToConstant: 0)
 		embeddedTerminalHeightConstraint?.isActive = true
+		terminalResizeHandle.identifier = NSUserInterfaceItemIdentifier("terminal.resize")
+		terminalResizeHandle.isHidden = true
+		let terminalResizeHandleHeightConstraint = terminalResizeHandle.heightAnchor.constraint(equalToConstant: 0)
+		terminalResizeHandleHeightConstraint.isActive = true
+		self.terminalResizeHandleHeightConstraint = terminalResizeHandleHeightConstraint
 		secondarySidebarContainer.translatesAutoresizingMaskIntoConstraints = false
 		gitContainer.translatesAutoresizingMaskIntoConstraints = false
 		debuggerContainer.translatesAutoresizingMaskIntoConstraints = false
@@ -331,6 +370,7 @@ extension Notification.Name {
 		])
 		editorStack.addArrangedSubview(tabBarContainer)
 		editorStack.addArrangedSubview(editorContainer)
+		editorStack.addArrangedSubview(terminalResizeHandle)
 		editorStack.addArrangedSubview(terminalContainer)
 		editorStack.addArrangedSubview(statusBarContainer)
 
@@ -352,6 +392,12 @@ extension Notification.Name {
 		windowLifecycle = EditorWindowLifecycleCoordinator(window: window)
 		super.init(window: window)
 		windowLifecycle.handler = self
+		terminalResizeHandle.onDragBegan = { [weak self] in
+			self?.terminalResizeStartHeight = self?.terminalContainer.frame.height
+		}
+		terminalResizeHandle.onDragChanged = { [weak self] delta in
+			self?.resizeTerminal(by: delta)
+		}
 		configureSecondarySidebar()
 		configureSettingsBanner()
 		settingsChangedObserver = NotificationCenter.default.addObserver(
@@ -2253,14 +2299,31 @@ extension Notification.Name {
 
 	private func setTerminalVisible(_ visible: Bool) {
 		workbenchComponentHost.setVisible(visible, for: .terminal)
+		terminalResizeHandleHeightConstraint?.constant = visible ? 5 : 0
 		guard workbenchComponentHost.mount(terminalWorkbenchComponent) else {
 			terminalContainer.isHidden = false
+			terminalResizeHandle.isHidden = false
 			embeddedTerminalContainer.isHidden = true
 			return
 		}
 		terminalWorkbenchComponent.setVisible(visible)
 		terminalContainer.isHidden = !visible
+		terminalResizeHandle.isHidden = !visible
 		embeddedTerminalContainer.isHidden = !visible
+	}
+
+	private func resizeTerminal(by delta: CGFloat) {
+		guard let terminalResizeStartHeight else {
+			return
+		}
+		let scale = max(CGFloat(layoutSettings.interfaceScale), 0.8)
+		let minimum = (WorkbenchComponents.registry[.terminal]?.minimumHeight ?? 140) * scale
+		let maximum = max(minimum, rootSplitView.bounds.height - 220 * scale)
+		let height = min(max(terminalResizeStartHeight + delta, minimum), maximum)
+		embeddedTerminalHeightConstraint?.constant = height
+		sessionTerminalHeight = height
+		editorStack.layoutSubtreeIfNeeded()
+		persistWorkbenchDividerStateSoon()
 	}
 
 	private func refreshPaneTabBars() {

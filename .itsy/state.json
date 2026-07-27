@@ -1,0 +1,50 @@
+{
+  "openFiles" : [
+    {
+      "foldedRanges" : [
+
+      ],
+      "path" : "\/Users\/gongahkia\/Desktop\/coding\/projects\/itsy\/Makefile",
+      "selectionAnchor" : 0,
+      "selectionHead" : 0
+    },
+    {
+      "foldedRanges" : [
+
+      ],
+      "path" : "\/Users\/gongahkia\/Desktop\/coding\/projects\/itsy\/Sources\/ItsyApp\/App\/AppCoordinator.swift",
+      "selectionAnchor" : 0,
+      "selectionHead" : 0
+    }
+  ],
+  "paneLayout" : "V[L]",
+  "selectedPath" : "\/Users\/gongahkia\/Desktop\/coding\/projects\/itsy\/Sources\/ItsyApp\/App\/AppCoordinator.swift",
+  "workbenchComponents" : {
+    "components" : {
+      "debugger" : {
+        "isSelected" : false,
+        "isVisible" : false
+      },
+      "file_tree" : {
+        "isVisible" : true,
+        "width" : 240
+      },
+      "git" : {
+        "isSelected" : true,
+        "isVisible" : false
+      },
+      "status_bar" : {
+        "isVisible" : true
+      },
+      "tab_bar" : {
+        "isVisible" : true
+      },
+      "terminal" : {
+        "isVisible" : false
+      }
+    }
+  },
+  "workbenchDividers" : {
+    "sidebarWidth" : 240
+  }
+}

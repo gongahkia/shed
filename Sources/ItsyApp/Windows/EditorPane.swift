@@ -78,8 +78,7 @@ import ItsyRender
 		stackView.layoutSubtreeIfNeeded()
 		let fit = stackView.fittingSize
 		let height = max(view.bounds.height, 32)
-		let width = max(scrollView.contentView.bounds.width, fit.width)
-		stackView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+		stackView.frame = NSRect(x: 0, y: 0, width: fit.width, height: height)
 		scrollView.documentView = stackView
 	}
 

@@ -216,6 +216,8 @@ private final class TerminalResizeHandle: NSView {
 	private var debuggerRequestedVisible = false
 	private var tabBarHeightConstraint: NSLayoutConstraint?
 	private var statusBarHeightConstraint: NSLayoutConstraint?
+	private weak var emptyWorkspacePlaceholder: ItsyDocument?
+	private var isShowingEmptyWorkspace = false
 	private var sidebarVisible = true
 	private var responsiveSidebarVisible = true
 	private var sidebarPosition = ItsySettings.SidebarPosition.leading
@@ -377,8 +379,8 @@ private final class TerminalResizeHandle: NSView {
 		rootSplitView.isVertical = true
 		rootSplitView.dividerStyle = .thin
 		rootSplitView.autoresizingMask = [.width, .height]
-		fileTreeContainer.translatesAutoresizingMaskIntoConstraints = false
-		editorStack.translatesAutoresizingMaskIntoConstraints = false
+		fileTreeContainer.autoresizingMask = [.height]
+		editorStack.autoresizingMask = [.width, .height]
 		rootSplitView.addArrangedSubview(fileTreeContainer)
 		rootSplitView.addArrangedSubview(editorStack)
 		let sidebarWidthConstraint = fileTreeContainer.widthAnchor.constraint(equalToConstant: 240)
@@ -1094,8 +1096,7 @@ private final class TerminalResizeHandle: NSView {
 		tabStackView.layoutSubtreeIfNeeded()
 		let fit = tabStackView.fittingSize
 		let height = max(tabBarView.bounds.height, 32)
-		let width = max(tabScrollView.contentView.bounds.width, fit.width)
-		tabStackView.frame = NSRect(x: 0, y: 0, width: width, height: height)
+		tabStackView.frame = NSRect(x: 0, y: 0, width: fit.width, height: height)
 		tabScrollView.documentView = tabStackView
 	}
 
@@ -1736,11 +1737,47 @@ private final class TerminalResizeHandle: NSView {
 	}
 
 	func display(document newDocument: ItsyDocument) {
+		leaveEmptyWorkspace(replacingWith: newDocument)
 		guard tabGroupScope == .window else {
 			displayPaneScoped(document: newDocument)
 			return
 		}
 		displayWindowScoped(document: newDocument)
+	}
+
+	@discardableResult
+	func showEmptyWorkspace() -> Bool {
+		guard let placeholder = document as? ItsyDocument,
+		      placeholder.fileURL == nil,
+		      !placeholder.isDocumentEdited
+		else {
+			return false
+		}
+		isShowingEmptyWorkspace = true
+		emptyWorkspacePlaceholder = placeholder
+		paneCoordinator.view.isHidden = true
+		tabBarContainer.isHidden = true
+		tabBarHeightConstraint?.constant = 0
+		window?.title = ItsyWorkspaceController.currentRootURL?.lastPathComponent ?? L10n.string("Itsy")
+		window?.representedURL = nil
+		invalidateEditorShellLayout()
+		return true
+	}
+
+	private func leaveEmptyWorkspace(replacingWith document: ItsyDocument) {
+		guard isShowingEmptyWorkspace else {
+			return
+		}
+		isShowingEmptyWorkspace = false
+		paneCoordinator.view.isHidden = false
+		tabBarContainer.isHidden = !layoutSettings.tabBarVisible || tabGroupScope == .pane
+		tabBarHeightConstraint?.constant = tabBarContainer.isHidden ? 0 : 32 * CGFloat(layoutSettings.interfaceScale)
+		if let placeholder = emptyWorkspacePlaceholder, placeholder !== document {
+			placeholder.removeWindowController(self)
+			(NSDocumentController.shared as? ItsyDocumentController)?.removeDocument(placeholder)
+		}
+		emptyWorkspacePlaceholder = nil
+		invalidateEditorShellLayout()
 	}
 
 	private func displayWindowScoped(document newDocument: ItsyDocument) {

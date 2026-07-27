@@ -1007,6 +1007,9 @@ import ItsyKeymap
 				return false
 			}
 		}
+		if !restored {
+			_ = activeEditorWindowController()?.showEmptyWorkspace()
+		}
 		return true
 	}
 

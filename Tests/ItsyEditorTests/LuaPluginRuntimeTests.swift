@@ -102,6 +102,77 @@ import Testing
 	#expect(eventSnapshot.diagnostics.isEmpty)
 }
 
+@Test func luaPluginRuntimePublishesScopedContributionsAndWorkspaceFilesystem() async throws {
+	let fixture = try LuaPluginRuntimeFixture()
+	defer { fixture.remove() }
+	try fixture.writeWorkspace("input.txt", contents: "input")
+	let outside = fixture.root.appendingPathComponent("outside.txt")
+	try "outside".write(to: outside, atomically: true, encoding: .utf8)
+	try FileManager.default.createSymbolicLink(
+		at: fixture.workspace.appendingPathComponent("linked.txt"),
+		withDestinationURL: outside
+	)
+	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.capabilities", source: """
+		assert(itsy.fs.read("input.txt") == "input")
+		assert(itsy.fs.write("generated.txt", "generated"))
+		assert(itsy.fs.read("generated.txt") == "generated")
+		local escaped, escaped_message = itsy.fs.read("../outside.txt")
+		assert(escaped == nil and escaped_message == "invalid workspace path")
+		local linked, linked_message = itsy.fs.read("linked.txt")
+		assert(linked == nil and linked_message == "workspace symbolic link is not allowed")
+		assert(itsy.ui.register("ui", "UI", "toolbar"))
+		assert(itsy.tasks.register("task", "Task", "swift test"))
+		assert(itsy.terminal.register("terminal", "Terminal", "zsh"))
+		assert(itsy.lsp.register("lsp", "LSP", "workspace/symbol"))
+		assert(itsy.dap.register("dap", "DAP", "threads"))
+		assert(itsy.git.register("git", "Git", "status"))
+		assert(itsy.github.register("github", "GitHub", "GET", "/repos/org/repo/issues"))
+		assert(itsy.process.register("process", "Process", "git status"))
+		assert(itsy.network.register("network", "Network", "GET", "https://example.com/api"))
+		""")
+	try fixture.vouch(packageRoot, scope: .workspace, capabilities: [.process, .network])
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
+
+	let loaded = await runtime.reload()
+
+	#expect(loaded.diagnostics.isEmpty)
+	#expect(try String(contentsOf: fixture.workspace.appendingPathComponent("generated.txt"), encoding: .utf8) == "generated")
+	let contributions = await runtime.contributions()
+	#expect(contributions == [
+		.init(kind: .dap, identifier: "dap", title: "DAP", action: "threads", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .git, identifier: "git", title: "Git", action: "status", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .github, identifier: "github", title: "GitHub", action: "GET", target: "/repos/org/repo/issues", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .lsp, identifier: "lsp", title: "LSP", action: "workspace/symbol", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .network, identifier: "network", title: "Network", action: "GET", target: "https://example.com/api", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .process, identifier: "process", title: "Process", action: "git status", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .task, identifier: "task", title: "Task", action: "swift test", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .terminal, identifier: "terminal", title: "Terminal", action: "zsh", pluginIdentifier: "dev.example.capabilities"),
+		.init(kind: .ui, identifier: "ui", title: "UI", action: "toolbar", pluginIdentifier: "dev.example.capabilities"),
+	])
+}
+
+@Test func luaPluginRuntimeDeniesProcessAndNetworkWithoutScopedVouchCapabilities() async throws {
+	let fixture = try LuaPluginRuntimeFixture()
+	defer { fixture.remove() }
+	let packageRoot = try fixture.writePlugin(scope: .workspace, identifier: "dev.example.restricted", source: """
+		local process, process_message = itsy.process.register("process", "Process", "git status")
+		assert(process == nil and process_message == "capability denied: process")
+		local network, network_message = itsy.network.register("network", "Network", "GET", "https://example.com")
+		assert(network == nil and network_message == "capability denied: network")
+		assert(itsy.ui.register("ui", "UI", "toolbar"))
+		""")
+	try fixture.vouch(packageRoot, scope: .workspace)
+	let runtime = LuaPluginRuntime(configuration: fixture.configuration())
+
+	let loaded = await runtime.reload()
+
+	#expect(loaded.activePlugins.map(\.identifier) == ["dev.example.restricted"])
+	#expect(loaded.diagnostics.map(\.message) == ["capability denied: process", "capability denied: network"])
+	#expect(await runtime.contributions() == [
+		.init(kind: .ui, identifier: "ui", title: "UI", action: "toolbar", pluginIdentifier: "dev.example.restricted"),
+	])
+}
+
 private final class LuaPluginRuntimeFixture {
 	let root: URL
 	let repo: URL
@@ -150,12 +221,19 @@ private final class LuaPluginRuntimeFixture {
 		return packageRoot
 	}
 
-	func vouch(_ packageRoot: URL, scope: LuaPluginScope) throws {
+	func vouch(_ packageRoot: URL, scope: LuaPluginScope, capabilities: Set<LuaPluginCapability> = []) throws {
 		let subject = try LuaPluginTrust.subject(packageRoot: packageRoot, scope: scope)
-		let record = "allow sha256:\(subject.sha256) id:\(subject.identifier) version:\(subject.version) signer:test kind:lua-plugin scope:\(scope.rawValue)\n"
+		let capabilityField = capabilities.isEmpty
+			? ""
+			: " capabilities:\(capabilities.map(\.rawValue).sorted().joined(separator: ","))"
+		let record = "allow sha256:\(subject.sha256) id:\(subject.identifier) version:\(subject.version) signer:test kind:lua-plugin scope:\(scope.rawValue)\(capabilityField)\n"
 		let url = workspace.appendingPathComponent(".itsy/VOUCHED")
 		let existing = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
 		try write(existing + record, to: url)
+	}
+
+	func writeWorkspace(_ relativePath: String, contents: String) throws {
+		try write(contents, to: workspace.appendingPathComponent(relativePath))
 	}
 
 	func remove() {

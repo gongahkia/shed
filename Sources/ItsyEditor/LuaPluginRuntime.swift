@@ -131,6 +131,17 @@ public actor LuaPluginRuntime {
 		bridges.values.flatMap { $0.commands }.sorted { $0.identifier.localizedStandardCompare($1.identifier) == .orderedAscending }
 	}
 
+	public func contributions() -> [LuaPluginContribution] {
+		bridges.values.flatMap { $0.contributions }.sorted {
+			let kind = $0.kind.rawValue.localizedStandardCompare($1.kind.rawValue)
+			if kind != .orderedSame { return kind == .orderedAscending }
+			let identifier = $0.identifier.localizedStandardCompare($1.identifier)
+			return identifier == .orderedSame
+				? $0.pluginIdentifier.localizedStandardCompare($1.pluginIdentifier) == .orderedAscending
+				: identifier == .orderedAscending
+		}
+	}
+
 	public func invokeCommand(identifier: String) -> LuaPluginRuntimeSnapshot {
 		for (pluginID, bridge) in bridges where bridge.commands.contains(where: { $0.identifier == identifier }) {
 			invoke(pluginID: pluginID, reference: bridge.commandReference(identifier: identifier), argument: nil)
@@ -149,8 +160,9 @@ public actor LuaPluginRuntime {
 
 	private func load(_ plugin: LuaDiscoveredPlugin) {
 		let manifest = plugin.manifest
+		let trust: VouchDecision
 		do {
-			_ = try LuaPluginTrust.requireTrust(
+			trust = try LuaPluginTrust.requireTrust(
 				packageRoot: manifest.packageRoot,
 				scope: plugin.scope,
 				repoRoot: configuration.repoRoot,
@@ -167,12 +179,20 @@ public actor LuaPluginRuntime {
 			return
 		}
 		openSandboxLibraries(state)
-		let bridge = LuaPluginAPIBridge(
-			pluginIdentifier: manifest.identifier,
-			workspaceRoot: configuration.workspaceRoot,
-			settingValue: configuration.settingValue,
-			activeEditorDocument: configuration.activeEditorDocument
-		)
+		let bridge: LuaPluginAPIBridge
+		do {
+			bridge = try LuaPluginAPIBridge(
+				pluginIdentifier: manifest.identifier,
+				workspaceRoot: configuration.workspaceRoot,
+				capabilities: capabilities(from: trust),
+				settingValue: configuration.settingValue,
+				activeEditorDocument: configuration.activeEditorDocument
+			)
+		} catch {
+			diagnostics.append(diagnostic(plugin, phase: .initialize, message: "workspace filesystem is unavailable"))
+			lua_close(state)
+			return
+		}
 		LuaPluginAPIBridgeRegistry.register(bridge, for: state)
 		LuaPluginAPIBridge.install(into: state)
 		let loadStatus = manifest.entrypointURL.path.withCString { entrypoint in
@@ -180,14 +200,14 @@ public actor LuaPluginRuntime {
 		}
 		guard loadStatus == 0 else {
 			diagnostics.append(diagnostic(plugin, phase: .load, message: luaError(state)))
-			lua_close(state)
 			LuaPluginAPIBridgeRegistry.remove(state)
+			lua_close(state)
 			return
 		}
 		guard lua_pcallk(state, 0, 0, 0, 0, nil) == 0 else {
 			diagnostics.append(diagnostic(plugin, phase: .execute, message: luaError(state)))
-			lua_close(state)
 			LuaPluginAPIBridgeRegistry.remove(state)
+			lua_close(state)
 			return
 		}
 		let runtimePlugin = LuaPluginRuntimePlugin(
@@ -255,6 +275,13 @@ public actor LuaPluginRuntime {
 			}
 		default:
 			return "plugin trust check failed: \(error)"
+		}
+	}
+
+	private func capabilities(from decision: VouchDecision) -> Set<LuaPluginCapability> {
+		switch decision {
+		case let .allow(record): Set([.filesystem]).union(record.capabilities)
+		case .deny, .missing: Set([.filesystem])
 		}
 	}
 

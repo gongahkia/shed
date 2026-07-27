@@ -25,6 +25,16 @@ import Testing
 	#expect(!FileManager.default.fileExists(atPath: fixture.root.appendingPathComponent(".gitignore").path))
 }
 
+@Test func itsyGitIgnoreCreatesGitignoreWhenMissing() throws {
+	let fixture = try TemporaryItsyGitFixture()
+	defer { fixture.cleanUp() }
+	try fixture.git(["init"])
+
+	let expected = fixture.root.appendingPathComponent(".gitignore")
+	#expect(ItsyGitIgnore.ensureItsyDirectoryIgnored(in: fixture.root) == .appended(expected))
+	#expect(try fixture.contents(".gitignore") == ".itsy/\n")
+}
+
 @Test func itsyGitIgnoreRecognizesExistingEquivalentRule() throws {
 	let fixture = try TemporaryItsyGitFixture()
 	defer { fixture.cleanUp() }

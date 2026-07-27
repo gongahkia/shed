@@ -98,6 +98,7 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	let settings = ItsySettings()
 	#expect(settings.editor.experimental.storage == .pieceTree)
 	#expect(settings.syntax.preloadGrammars == .opened)
+	#expect(settings.git.autoIgnoreItsy)
 }
 
 

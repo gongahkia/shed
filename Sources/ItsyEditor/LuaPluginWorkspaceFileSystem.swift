@@ -6,6 +6,7 @@ public enum LuaPluginWorkspaceFileSystemError: Error, Equatable, Sendable {
 	case workspaceUnavailable(URL)
 	case missing(String)
 	case symbolicLinkRejected(String)
+	case protectedPath(String)
 	case notRegularFile(String)
 	case invalidUTF8(String)
 	case ioFailure(path: String, code: Int32)
@@ -100,6 +101,9 @@ public struct LuaPluginWorkspaceFileSystem: Sendable {
 		let components = relativePath.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
 		guard !components.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else {
 			throw LuaPluginWorkspaceFileSystemError.invalidPath(relativePath)
+		}
+		if [".itsy", ".git"].contains(where: { $0.caseInsensitiveCompare(components[0]) == .orderedSame }) {
+			throw LuaPluginWorkspaceFileSystemError.protectedPath(relativePath)
 		}
 		return components
 	}

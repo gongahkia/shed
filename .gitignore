@@ -21,3 +21,4 @@ bench/results/*.json
 CLAUDE.md
 .claude/
 .codex/
+.itsy/

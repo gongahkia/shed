@@ -5311,6 +5311,27 @@ private final class TerminalResizeHandle: NSView {
 }
 
 extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDelegate {
+	func splitView(_ splitView: NSSplitView, resizeSubviewsWithOldSize _: NSSize) {
+		guard splitView === rootSplitView else {
+			return
+		}
+		let views = splitView.arrangedSubviews
+		let dividerWidth = splitView.dividerThickness * CGFloat(max(0, views.count - 1))
+		let fixedWidth = views.reduce(CGFloat.zero) { partial, view in
+			guard view !== editorStack else {
+				return partial
+			}
+			return partial + view.frame.width
+		}
+		let editorWidth = max(0, splitView.bounds.width - dividerWidth - fixedWidth)
+		var originX = CGFloat.zero
+		for view in views {
+			let width = view === editorStack ? editorWidth : view.frame.width
+			view.frame = NSRect(x: originX, y: 0, width: width, height: splitView.bounds.height)
+			originX += width + splitView.dividerThickness
+		}
+	}
+
 	func splitViewDidResizeSubviews(_ notification: Notification) {
 		guard !isApplyingWorkbenchLayout, notification.object as? NSSplitView === rootSplitView else {
 			return

@@ -112,6 +112,22 @@ private let deniedSHA = "fffffffffffffffffffffffffffffffffffffffffffffffffffffff
 	#expect(VouchStore(records: [genericDeny]).decision(for: workspaceSubject) == .deny(genericDeny))
 }
 
+@Test func vouchStoreScopesLuaPluginCapabilitiesToExplicitAllows() throws {
+	let store = try VouchStore.parse("""
+		allow sha256:\(trustedSHA) id:dev.example.lua version:1.0.0 signer:alice kind:lua-plugin scope:workspace capabilities:process,network
+		""")
+	#expect(store.records[0].capabilities == [.process, .network])
+	#expect(throws: VouchParseError.invalidCapability(line: 1, value: "filesystem")) {
+		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.lua version:1.0.0 signer:alice kind:lua-plugin scope:workspace capabilities:filesystem")
+	}
+	#expect(throws: VouchParseError.capabilitiesRequireAllow(line: 1)) {
+		_ = try VouchStore.parse("deny sha256:\(trustedSHA) id:dev.example.lua kind:lua-plugin scope:workspace capabilities:process")
+	}
+	#expect(throws: VouchParseError.capabilitiesRequireLuaPlugin(line: 1)) {
+		_ = try VouchStore.parse("allow sha256:\(trustedSHA) id:dev.example.extension version:1.0.0 signer:alice capabilities:process")
+	}
+}
+
 @Test func vouchStoreLoadsDefaultURLOrder() throws {
 	let fixture = try TemporaryVouchFixture()
 	let repo = fixture.root.appendingPathComponent("repo", isDirectory: true)

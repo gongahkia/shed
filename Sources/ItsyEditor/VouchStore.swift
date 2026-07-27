@@ -10,6 +10,14 @@ public enum VouchPackageScope: String, Equatable, Sendable {
 	case workspace
 }
 
+public enum LuaPluginCapability: String, CaseIterable, Equatable, Hashable, Sendable {
+	case filesystem
+	case process
+	case network
+
+	static let vouchGrantable: Set<LuaPluginCapability> = [.process, .network]
+}
+
 public struct VouchSubject: Equatable, Sendable {
 	public var sha256: String
 	public var identifier: String
@@ -44,6 +52,7 @@ public struct VouchRecord: Equatable, Sendable {
 	public var version: String?
 	public var packageKind: VouchPackageKind?
 	public var packageScope: VouchPackageScope?
+	public var capabilities: Set<LuaPluginCapability>
 	public var signer: String?
 	public var reason: String?
 	public var source: URL?
@@ -56,6 +65,7 @@ public struct VouchRecord: Equatable, Sendable {
 		version: String? = nil,
 		packageKind: VouchPackageKind? = nil,
 		packageScope: VouchPackageScope? = nil,
+		capabilities: Set<LuaPluginCapability> = [],
 		signer: String? = nil,
 		reason: String? = nil,
 		source: URL? = nil,
@@ -67,6 +77,7 @@ public struct VouchRecord: Equatable, Sendable {
 		self.version = version
 		self.packageKind = packageKind
 		self.packageScope = packageScope
+		self.capabilities = capabilities
 		self.signer = signer
 		self.reason = reason
 		self.source = source
@@ -88,6 +99,10 @@ public enum VouchParseError: Error, Equatable, Sendable {
 	case invalidSHA256(line: Int, value: String)
 	case invalidPackageKind(line: Int, value: String)
 	case invalidPackageScope(line: Int, value: String)
+	case invalidCapability(line: Int, value: String)
+	case duplicateCapability(line: Int, value: String)
+	case capabilitiesRequireLuaPlugin(line: Int)
+	case capabilitiesRequireAllow(line: Int)
 	case scopeRequiresLuaPlugin(line: Int)
 	case luaPluginScopeRequired(line: Int)
 }
@@ -223,6 +238,13 @@ public struct VouchStore: Equatable, Sendable {
 		if packageKind == .luaPlugin, packageScope == nil {
 			throw VouchParseError.luaPluginScopeRequired(line: lineNumber)
 		}
+		let capabilities = try parseCapabilities(fields["capabilities"], line: lineNumber)
+		if !capabilities.isEmpty, packageKind != .luaPlugin {
+			throw VouchParseError.capabilitiesRequireLuaPlugin(line: lineNumber)
+		}
+		if !capabilities.isEmpty, directive != .allow {
+			throw VouchParseError.capabilitiesRequireAllow(line: lineNumber)
+		}
 		if directive == .allow {
 			_ = try requireField("version", in: fields, line: lineNumber)
 			_ = try requireField("signer", in: fields, line: lineNumber)
@@ -234,6 +256,7 @@ public struct VouchStore: Equatable, Sendable {
 			version: version,
 			packageKind: packageKind,
 			packageScope: packageScope,
+			capabilities: capabilities,
 			signer: fields["signer"],
 			reason: fields["reason"],
 			source: source,
@@ -246,6 +269,21 @@ public struct VouchStore: Equatable, Sendable {
 			throw VouchParseError.missingField(line: line, field: field)
 		}
 		return value
+	}
+
+	private static func parseCapabilities(_ value: String?, line: Int) throws -> Set<LuaPluginCapability> {
+		guard let value else { return [] }
+		var capabilities: Set<LuaPluginCapability> = []
+		for rawValue in value.split(separator: ",", omittingEmptySubsequences: false) {
+			let value = String(rawValue)
+			guard let capability = LuaPluginCapability(rawValue: value), LuaPluginCapability.vouchGrantable.contains(capability) else {
+				throw VouchParseError.invalidCapability(line: line, value: value)
+			}
+			guard capabilities.insert(capability).inserted else {
+				throw VouchParseError.duplicateCapability(line: line, value: value)
+			}
+		}
+		return capabilities
 	}
 
 	private static func isSHA256(_ value: String) -> Bool {

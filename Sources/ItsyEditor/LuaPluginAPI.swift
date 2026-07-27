@@ -370,6 +370,7 @@ private func filesystemMessage(_ error: Error) -> String {
 		case .workspaceUnavailable: "workspace is unavailable"
 		case .missing: "workspace file is missing"
 		case .symbolicLinkRejected: "workspace symbolic link is not allowed"
+		case .protectedPath: "workspace control path is not allowed"
 		case .notRegularFile: "workspace path is not a regular file"
 		case .invalidUTF8: "workspace file is not UTF-8"
 		case .ioFailure: "workspace file operation failed"
@@ -386,7 +387,10 @@ private func pushFailure(_ message: String, to state: OpaquePointer) -> Int32 {
 }
 
 private func pushString(_ value: String, to state: OpaquePointer) {
-	_ = value.withCString { lua_pushstring(state, $0) }
+	let bytes = value.utf8.map { CChar(bitPattern: $0) }
+	bytes.withUnsafeBufferPointer { buffer in
+		_ = lua_pushlstring(state, buffer.baseAddress, buffer.count)
+	}
 }
 
 private func luaString(_ state: OpaquePointer, index: Int32) -> String? {

@@ -37,6 +37,7 @@ import ItsyWorkbenchLayout
 	private var settingsWorkbenchGitPopup: NSPopUpButton?
 	private var settingsTerminalPresentationPopup: NSPopUpButton?
 	private var settingsGitPresentationPopup: NSPopUpButton?
+	private var settingsAutoIgnoreItsyButton: NSButton?
 	private var settingsDebuggerPresentationPopup: NSPopUpButton?
 	private var settingsSidebarVisibleButton: NSButton?
 	private var settingsSidebarPositionPopup: NSPopUpButton?
@@ -424,6 +425,9 @@ import ItsyWorkbenchLayout
 		gitPresentationPopup.action = #selector(settingsGitPresentationDidChange(_:))
 		gitPresentationPopup.translatesAutoresizingMaskIntoConstraints = false
 		contentView.addSubview(gitPresentationPopup)
+		let autoIgnoreItsyButton = settingsCheckbox("Automatically ignore .itsy in Git repos", action: #selector(settingsAutoIgnoreItsyDidChange(_:)))
+		autoIgnoreItsyButton.setAccessibilityLabel("Automatically ignore .itsy in Git repos")
+		contentView.addSubview(autoIgnoreItsyButton)
 		let debuggerPresentationLabel = settingsLabel("Debugger Presentation")
 		contentView.addSubview(debuggerPresentationLabel)
 		let debuggerPresentationPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -700,8 +704,10 @@ import ItsyWorkbenchLayout
 			gitPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			gitPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			gitPresentationPopup.centerYAnchor.constraint(equalTo: gitPresentationLabel.centerYAnchor),
+			autoIgnoreItsyButton.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
+			autoIgnoreItsyButton.topAnchor.constraint(equalTo: gitPresentationPopup.bottomAnchor, constant: 10),
 			debuggerPresentationLabel.leadingAnchor.constraint(equalTo: themeLabel.leadingAnchor),
-			debuggerPresentationLabel.topAnchor.constraint(equalTo: gitPresentationPopup.bottomAnchor, constant: 12),
+			debuggerPresentationLabel.topAnchor.constraint(equalTo: autoIgnoreItsyButton.bottomAnchor, constant: 12),
 			debuggerPresentationLabel.widthAnchor.constraint(equalTo: themeLabel.widthAnchor),
 			debuggerPresentationPopup.leadingAnchor.constraint(equalTo: themePopup.leadingAnchor),
 			debuggerPresentationPopup.centerYAnchor.constraint(equalTo: debuggerPresentationLabel.centerYAnchor),
@@ -790,6 +796,7 @@ import ItsyWorkbenchLayout
 		settingsWorkbenchGitPopup = workbenchGitPopup
 		settingsTerminalPresentationPopup = terminalPresentationPopup
 		settingsGitPresentationPopup = gitPresentationPopup
+		settingsAutoIgnoreItsyButton = autoIgnoreItsyButton
 		settingsDebuggerPresentationPopup = debuggerPresentationPopup
 		settingsSidebarVisibleButton = sidebarVisibleButton
 		settingsSidebarPositionPopup = sidebarPositionPopup
@@ -927,6 +934,7 @@ import ItsyWorkbenchLayout
 		if let item = settingsGitPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.git.presentation.rawValue }) {
 			settingsGitPresentationPopup?.select(item)
 		}
+		settingsAutoIgnoreItsyButton?.state = appSettings.git.autoIgnoreItsy ? .on : .off
 		if let item = settingsDebuggerPresentationPopup?.itemArray.first(where: { $0.representedObject as? String == appSettings.debugger.presentation.rawValue }) {
 			settingsDebuggerPresentationPopup?.select(item)
 		}
@@ -1396,6 +1404,11 @@ import ItsyWorkbenchLayout
 			return
 		}
 		appSettings.git.presentation = presentation
+		saveAndApplyBehaviorSettings()
+	}
+
+	@objc private func settingsAutoIgnoreItsyDidChange(_: Any?) {
+		appSettings.git.autoIgnoreItsy = settingsAutoIgnoreItsyButton?.state == .on
 		saveAndApplyBehaviorSettings()
 	}
 

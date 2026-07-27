@@ -123,6 +123,11 @@ public enum ItsySettingsCatalog {
 			description: "Shows Git Changes in the right sidebar or in a separate window."
 		),
 		.init(
+			key: "git.auto_ignore_itsy",
+			title: "Automatically Ignore .itsy",
+			description: "Adds .itsy/ to the containing Git repository's .gitignore when a workspace opens."
+		),
+		.init(
 			key: "debugger.presentation",
 			title: "Debugger Presentation",
 			description: "Shows the debugger Call Stack in the right sidebar or in a separate window."
@@ -325,6 +330,7 @@ public enum ItsySettingsCatalog {
 		case "terminal.scrollback_lines": String(settings.terminal.scrollbackLines)
 		case "terminal.presentation": settings.terminal.presentation.rawValue
 		case "git.presentation": settings.git.presentation.rawValue
+		case "git.auto_ignore_itsy": bool(settings.git.autoIgnoreItsy)
 		case "debugger.presentation": settings.debugger.presentation.rawValue
 		case "find.uses_regex": bool(settings.find.usesRegex)
 		case "find.case_sensitive": bool(settings.find.isCaseSensitive)
@@ -386,6 +392,7 @@ public enum ItsySettingsCatalog {
 		case "terminal.scrollback_lines": settings.terminal.scrollbackLines = defaults.terminal.scrollbackLines
 		case "terminal.presentation": settings.terminal.presentation = defaults.terminal.presentation
 		case "git.presentation": settings.git.presentation = defaults.git.presentation
+		case "git.auto_ignore_itsy": settings.git.autoIgnoreItsy = defaults.git.autoIgnoreItsy
 		case "debugger.presentation": settings.debugger.presentation = defaults.debugger.presentation
 		case "find.uses_regex": settings.find.usesRegex = defaults.find.usesRegex
 		case "find.case_sensitive": settings.find.isCaseSensitive = defaults.find.isCaseSensitive
@@ -461,6 +468,7 @@ public enum ItsySettingsCatalog {
 		case "terminal.scrollback_lines": guard let integer else { return "An integer is required." }; updated.terminal.scrollbackLines = integer
 		case "terminal.presentation": guard let mode = ItsySettings.TerminalSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid terminal presentation." }; updated.terminal.presentation = mode
 		case "git.presentation": guard let mode = ItsySettings.GitSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid Git presentation." }; updated.git.presentation = mode
+		case "git.auto_ignore_itsy": guard let boolean else { return "A boolean is required." }; updated.git.autoIgnoreItsy = boolean
 		case "debugger.presentation": guard let mode = ItsySettings.DebuggerSettings.Presentation(rawValue: value.lowercased()) else { return "Invalid debugger presentation." }; updated.debugger.presentation = mode
 		case "find.uses_regex": guard let boolean else { return "A boolean is required." }; updated.find.usesRegex = boolean
 		case "find.case_sensitive": guard let boolean else { return "A boolean is required." }; updated.find.isCaseSensitive = boolean

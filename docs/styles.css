@@ -31,7 +31,20 @@ nav .active { color: #111; }
   min-height: 112px;
 }
 
-.banner img { height: 86px; width: 86px; }
+.app-mark {
+  align-items: center;
+  background: #1d1f21;
+  border-radius: 15px;
+  color: #7ee787;
+  display: inline-flex;
+  font: 600 27px ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  height: 86px;
+  justify-content: center;
+  letter-spacing: -4px;
+  padding-right: 4px;
+  width: 86px;
+}
+
 h1, h2 { font-weight: 500; margin-top: 0; }
 h1 { font-size: 30px; margin-bottom: 3px; }
 h2 { font-size: 22px; margin: 35px 0 8px; }
@@ -57,6 +70,6 @@ footer a { color: #38f; }
 @media screen and (max-width: 602px) {
   #bigbox { margin-top: 18px; width: 90%; }
   .banner { align-items: flex-start; }
-  .banner img { height: 70px; width: 70px; }
+  .app-mark { border-radius: 12px; font-size: 22px; height: 70px; width: 70px; }
   h1 { font-size: 26px; }
 }

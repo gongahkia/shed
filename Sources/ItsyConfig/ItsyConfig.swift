@@ -349,9 +349,11 @@ public struct ItsySettings: Codable, Equatable, Sendable {
 		}
 
 		public var presentation: Presentation
+		public var autoIgnoreItsy: Bool
 
-		public init(presentation: Presentation = .sidebar) {
+		public init(presentation: Presentation = .sidebar, autoIgnoreItsy: Bool = true) {
 			self.presentation = presentation
+			self.autoIgnoreItsy = autoIgnoreItsy
 		}
 	}
 

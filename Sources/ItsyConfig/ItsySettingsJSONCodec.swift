@@ -154,6 +154,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 
 	struct Git: Decodable {
 		let presentation: ItsySettings.GitSettings.Presentation?
+		let autoIgnoreItsy: Bool?
 	}
 
 	struct Debugger: Decodable {
@@ -267,6 +268,7 @@ private struct ItsySettingsJSONPatch: Decodable {
 			if let presentation = terminal.presentation { settings.terminal.presentation = presentation; assignedKeys.insert("terminal.presentation") }
 		}
 		if let presentation = git?.presentation { settings.git.presentation = presentation; assignedKeys.insert("git.presentation") }
+		if let autoIgnoreItsy = git?.autoIgnoreItsy { settings.git.autoIgnoreItsy = autoIgnoreItsy; assignedKeys.insert("git.auto_ignore_itsy") }
 		if let presentation = debugger?.presentation { settings.debugger.presentation = presentation; assignedKeys.insert("debugger.presentation") }
 		if let find {
 			if let usesRegex = find.usesRegex { settings.find.usesRegex = usesRegex; assignedKeys.insert("find.uses_regex") }

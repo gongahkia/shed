@@ -14,6 +14,7 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	settings.editor.language["swift"] = .init(tabWidth: 2, useSpaces: true)
 	settings.ui.surfaces["terminal"] = .init(width: 860, height: 320)
 	settings.lsp.modes["swift"] = .system
+	settings.git.autoIgnoreItsy = false
 
 	let data = try ItsySettingsJSONCodec.encode(settings)
 	let document = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -40,7 +41,8 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	      "font_size": 18,
 	      "language": { "swift": { "tab_width": 2 } }
 	    },
-	    "layout": { "sidebar_position": "trailing" }
+	    "layout": { "sidebar_position": "trailing" },
+	    "git": { "auto_ignore_itsy": false }
 	  }
 	}
 	"""#.utf8)
@@ -49,10 +51,12 @@ private func encodeRawJSONSettings(_ settings: ItsySettings) throws -> Data {
 	#expect(layer.settings.editor.fontSize == 18)
 	#expect(layer.settings.editor.language["swift"] == .init(tabWidth: 2, useSpaces: false))
 	#expect(layer.settings.layout.sidebarPosition == .trailing)
+	#expect(!layer.settings.git.autoIgnoreItsy)
 	#expect(layer.assignedKeys == [
 		"editor.font_size",
 		"editor.language.swift.tab_width",
 		"layout.sidebar_position",
+		"git.auto_ignore_itsy",
 	])
 }
 

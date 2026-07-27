@@ -46,6 +46,10 @@ Personal UI, update, and LSP provisioning settings are global-only: `ui`, `updat
       "scrollback_lines": 10000,
       "presentation": "bottom"
     },
+    "git": {
+      "presentation": "sidebar",
+      "auto_ignore_itsy": true
+    },
     "updates": {
       "automatically_check": false
     },
@@ -64,7 +68,7 @@ Personal UI, update, and LSP provisioning settings are global-only: `ui`, `updat
 }
 ```
 
-The terminal opens in the editor's bottom split by default; Git Changes and Debugger open in one tabbed right sidebar. Settings exposes Terminal, Git, and Debugger **Presentation** controls as well as the JSON fields. Set `terminal.presentation = "window"`, `git.presentation = "window"`, or `debugger.presentation = "window"` to detach a surface. The Debugger tab includes Call Stack, Variables, Watches, and Debug Console. `terminal.font` is optional and inherits `editor.font` until explicitly set.
+The terminal opens in the editor's bottom split by default; Git Changes and Debugger open in one tabbed right sidebar. Settings exposes Terminal, Git, and Debugger **Presentation** controls as well as the JSON fields. Set `terminal.presentation = "window"`, `git.presentation = "window"`, or `debugger.presentation = "window"` to detach a surface. `git.auto_ignore_itsy` defaults to `true` and appends `.itsy/` to a Git workspace's root `.gitignore` if no equivalent rule exists. The Debugger tab includes Call Stack, Variables, Watches, and Debug Console. `terminal.font` is optional and inherits `editor.font` until explicitly set.
 
 Each workspace stores restorable terminal state at `.itsy/terminal.json`. Schema v2 preserves tab titles, the selected tab and pane, the pane tree, and each pane’s working directory. Legacy unversioned files are migrated and rewritten on first restore. Process IDs, shell output, scrollback, and presentation are never persisted; presentation remains controlled by the `terminal` JSON settings object.
 

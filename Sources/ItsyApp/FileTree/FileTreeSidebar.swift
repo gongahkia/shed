@@ -1,6 +1,7 @@
 // @file workspace file-tree sidebar and file event watching.
 import AppKit
 import CoreServices
+import ItsyConfig
 import ItsyEditor
 import ItsySyntax
 import OSLog
@@ -75,6 +76,9 @@ private let workspaceLogger = Logger(
 		workspaceLogger.info("Opening workspace: \(root.lastPathComponent, privacy: .public)")
 		let descriptorRoots = workspaceStateStore.loadDescriptor(for: root)?.roots.map { URL(fileURLWithPath: $0).standardizedFileURL } ?? [root]
 		rootURLs = normalizedRoots([root] + descriptorRoots)
+		if ItsySettingsStore().load(workspaceRoot: root).settings.git.autoIgnoreItsy {
+			_ = ItsyGitIgnore.ensureItsyDirectoryIgnored(in: root)
+		}
 		ItsyProblemsBridge.resetProblems(root: root)
 		persistWorkspaceDescriptor()
 		loadGitStatus()

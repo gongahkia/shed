@@ -35,6 +35,7 @@ import ItsyKeymap
 	private var extensionsCoordinator: ExtensionsCoordinator { services.extensionsCoordinator }
 	private var integrationHealthPanel: IntegrationHealthPanel?
 	private var integrationOutputConsolePanel: IntegrationOutputConsolePanel?
+	private var benchScenarioFinished = false
 
 	init(documentController: ItsyDocumentController) {
 		self.documentController = documentController
@@ -134,8 +135,12 @@ import ItsyKeymap
 				retryBenchScenario(request, attemptsRemaining: attemptsRemaining)
 				return
 			}
-			controller.runBenchmarkScroll(deltaY: request.scrollDelta)
-			finishBenchScenario(request, succeeded: true)
+			controller.runBenchmarkScroll(deltaY: request.scrollDelta) { [weak self] in
+				self?.finishBenchScenario(request, succeeded: true)
+			}
+			DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+				self?.finishBenchScenario(request, succeeded: false)
+			}
 		}
 	}
 
@@ -150,6 +155,8 @@ import ItsyKeymap
 	}
 
 	private func finishBenchScenario(_ request: BenchScenarioRequest, succeeded: Bool) {
+		guard !benchScenarioFinished else { return }
+		benchScenarioFinished = true
 		if PerformanceTrace.isEnabled {
 			PerformanceTrace.record("scenario.complete", attributes: [
 				"scenario": request.scenario.rawValue,

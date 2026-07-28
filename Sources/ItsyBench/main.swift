@@ -976,7 +976,7 @@ enum ItsyBenchMain {
 		)
 	}
 
-	private static func traceReport(_ options: TraceReportOptions) -> TraceReportResult {
+	private static func traceReport(_ options: TraceReportOptions) throws -> TraceReportResult {
 		let events = loadTraceEvents(path: options.tracePath)
 		let scenarioEvents = events.filter { $0.name == "scenario.complete" }
 		let scenarioFailure = scenarioEvents.last(where: { $0.attributes["outcome"] == "failure" })
@@ -1026,7 +1026,7 @@ enum ItsyBenchMain {
 			failure_reason: failures.isEmpty ? nil : failures.joined(separator: "; "),
 			metadata: TraceReportMetadata(
 				app_commit: options.appCommit,
-				display: display(DisplayOptions(displayID: options.displayID)),
+				display: try display(DisplayOptions(displayID: options.displayID)),
 				fixture_checksum: options.fixtureChecksum,
 				hardware: sysctlString("hw.model"),
 				macos: ProcessInfo.processInfo.operatingSystemVersionString,

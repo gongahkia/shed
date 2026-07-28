@@ -24,7 +24,7 @@ struct BenchScenarioRequest {
 		let query = value(for: "--bench-query", in: arguments) ?? ""
 		let expectedTop = value(for: "--bench-expected-top", in: arguments)
 		let expectedResultCount = value(for: "--bench-expected-results", in: arguments).flatMap(Int.init)
-        let scrollDelta = Double(value(for: "--bench-scroll-delta", in: arguments) ?? "-960").map(CGFloat.init) ?? -960
+		let scrollDelta = CGFloat(Double(value(for: "--bench-scroll-delta", in: arguments) ?? "-960") ?? -960)
         return BenchScenarioRequest(
 			scenario: scenario,
 			query: query,

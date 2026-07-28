@@ -125,14 +125,33 @@ extension Notification.Name {
 	static let itsySecondarySidebarCloseRequested = Notification.Name("dev.itsy.secondary-sidebar.close-requested")
 }
 
+private final class WorkbenchSplitView: NSSplitView {
+	var panelDividerColor = NSColor.separatorColor
+
+	override var dividerThickness: CGFloat { 1 }
+
+	override func drawDivider(in rect: NSRect) {
+		panelDividerColor.setFill()
+		let thickness = 1 / (window?.backingScaleFactor ?? 1)
+		let line = if isVertical {
+			NSRect(x: rect.midX - thickness / 2, y: rect.minY, width: thickness, height: rect.height)
+		} else {
+			NSRect(x: rect.minX, y: rect.midY - thickness / 2, width: rect.width, height: thickness)
+		}
+		line.fill()
+	}
+}
+
 private final class TerminalResizeHandle: NSView {
 	var onDragBegan: (() -> Void)?
 	var onDragChanged: ((CGFloat) -> Void)?
+	var dividerColor = NSColor.separatorColor
 	private var dragOriginY: CGFloat?
 
 	override func draw(_ dirtyRect: NSRect) {
-		NSColor.separatorColor.setFill()
-		NSRect(x: 0, y: bounds.midY, width: bounds.width, height: 1).fill()
+		dividerColor.setFill()
+		let thickness = 1 / (window?.backingScaleFactor ?? 1)
+		NSRect(x: 0, y: bounds.midY - thickness / 2, width: bounds.width, height: thickness).fill()
 	}
 
 	override func resetCursorRects() {
@@ -168,7 +187,7 @@ private final class TerminalResizeHandle: NSView {
 	private let windowLifecycle: EditorWindowLifecycleCoordinator
 	private let fileTreeController = FileTreeSidebarController()
 	private let fileTreeContainer = NSView()
-	private let rootSplitView = NSSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
+	private let rootSplitView = WorkbenchSplitView(frame: NSRect(x: 0, y: 0, width: 1200, height: 672))
 	private let editorStack = NSStackView(frame: NSRect(x: 240, y: 0, width: 960, height: 672))
 	private let editorContainer = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 640))
 	private let terminalContainer = NSView()
@@ -2236,6 +2255,10 @@ private final class TerminalResizeHandle: NSView {
 		if let window {
 			AppThemeApplier.apply(palette, to: window)
 		}
+		rootSplitView.panelDividerColor = palette.border
+		rootSplitView.needsDisplay = true
+		terminalResizeHandle.dividerColor = palette.border
+		terminalResizeHandle.needsDisplay = true
 		tabBarView.layer?.backgroundColor = palette.tabInactiveBackground.cgColor
 		editorContainer.wantsLayer = true
 		editorContainer.layer?.backgroundColor = palette.editor.nsBackgroundColor.cgColor
@@ -5316,6 +5339,15 @@ private final class TerminalResizeHandle: NSView {
 }
 
 extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDelegate {
+	func splitView(_ splitView: NSSplitView, effectiveRect _: NSRect, forDrawnRect drawnRect: NSRect, ofDividerAt _: Int) -> NSRect {
+		guard splitView === rootSplitView else {
+			return drawnRect
+		}
+		return splitView.isVertical
+			? drawnRect.insetBy(dx: -4, dy: 0)
+			: drawnRect.insetBy(dx: 0, dy: -4)
+	}
+
 	func splitView(_ splitView: NSSplitView, resizeSubviewsWithOldSize _: NSSize) {
 		guard splitView === rootSplitView else {
 			return

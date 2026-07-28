@@ -131,6 +131,18 @@ import Testing
 }
 
 @MainActor
+@Test func workspaceDividerHasThinLineAndExpandedDragTarget() throws {
+	let controller = EditorWindowController(document: ItsyDocument())
+	defer { controller.close() }
+	let splitView = try #require(controller.window?.contentView as? NSSplitView)
+	let divider = splitView.rect(ofDividerAt: 0)
+	let dragTarget = controller.splitView(splitView, effectiveRect: divider, forDrawnRect: divider, ofDividerAt: 0)
+
+	#expect(splitView.dividerThickness == 1)
+	#expect(dragTarget.width == divider.width + 8)
+}
+
+@MainActor
 @Test func fileTreeUsesWorkbenchComponentHostAcrossSidebarMounts() throws {
 	let controller = EditorWindowController(document: ItsyDocument())
 	defer { controller.close() }

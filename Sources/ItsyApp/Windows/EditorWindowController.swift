@@ -128,8 +128,6 @@ extension Notification.Name {
 private final class WorkbenchSplitView: NSSplitView {
 	var panelDividerColor = NSColor.separatorColor
 
-	override var dividerThickness: CGFloat { 1 }
-
 	override func drawDivider(in rect: NSRect) {
 		panelDividerColor.setFill()
 		let thickness = 1 / (window?.backingScaleFactor ?? 1)
@@ -932,7 +930,10 @@ private final class TerminalResizeHandle: NSView {
 		if visible {
 			fileTreeContainer.isHidden = false
 			if !rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
+				let width = max(1, sessionSidebarWidth ?? sidebarWidthConstraint?.constant ?? 240)
 				rootSplitView.insertArrangedSubview(fileTreeContainer, at: sidebarInsertionIndex(for: sidebarPosition))
+				fileTreeContainer.frame = NSRect(x: 0, y: 0, width: width, height: rootSplitView.bounds.height)
+				sessionSidebarWidth = width
 			}
 			workbenchComponentHost.setVisible(true, for: .fileTree)
 			guard workbenchComponentHost.mount(fileTreeWorkbenchComponent) else {
@@ -5353,17 +5354,25 @@ extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDele
 			return
 		}
 		let views = splitView.arrangedSubviews
+		let sidebarWidth = max(1, sessionSidebarWidth ?? sidebarWidthConstraint?.constant ?? fileTreeContainer.frame.width)
 		let dividerWidth = splitView.dividerThickness * CGFloat(max(0, views.count - 1))
 		let fixedWidth = views.reduce(CGFloat.zero) { partial, view in
 			guard view !== editorStack else {
 				return partial
 			}
-			return partial + view.frame.width
+			return partial + (view === fileTreeContainer ? sidebarWidth : view.frame.width)
 		}
 		let editorWidth = max(0, splitView.bounds.width - dividerWidth - fixedWidth)
 		var originX = CGFloat.zero
 		for view in views {
-			let width = view === editorStack ? editorWidth : view.frame.width
+			let width: CGFloat
+			if view === editorStack {
+				width = editorWidth
+			} else if view === fileTreeContainer {
+				width = sidebarWidth
+			} else {
+				width = view.frame.width
+			}
 			view.frame = NSRect(x: originX, y: 0, width: width, height: splitView.bounds.height)
 			originX += width + splitView.dividerThickness
 		}
@@ -5374,7 +5383,10 @@ extension EditorWindowController: EditorWindowLifecycleHandling, NSSplitViewDele
 			return
 		}
 		if rootSplitView.arrangedSubviews.contains(fileTreeContainer) {
-			sessionSidebarWidth = fileTreeContainer.frame.width
+			let width = fileTreeContainer.frame.width
+			if width > 1 {
+				sessionSidebarWidth = width
+			}
 		}
 		if rootSplitView.arrangedSubviews.contains(secondarySidebarContainer) {
 			switch activeSecondarySidebarSurface {

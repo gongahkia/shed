@@ -1,4 +1,5 @@
 import AppKit
+import Dispatch
 import Foundation
 import ItsyConfig
 import ItsyEditor
@@ -98,11 +99,67 @@ import ItsyKeymap
 		openInitialDocument()
 		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)
 		recordBenchStage("initial_document_opened")
+		scheduleBenchScenarioIfRequested()
 		if CommandLine.arguments.contains("--bench-exit-after-initial-document") {
 			exitForBenchReady()
 		}
 		NSApp.activate(ignoringOtherApps: true)
 		recordBenchStage("app_activated")
+	}
+
+	private func scheduleBenchScenarioIfRequested() {
+		guard let request = BenchScenarioRequest.current() else { return }
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(250)) { [weak self] in
+			self?.runBenchScenario(request, attemptsRemaining: 120)
+		}
+	}
+
+	private func runBenchScenario(_ request: BenchScenarioRequest, attemptsRemaining: Int) {
+		switch request.scenario {
+		case .palette:
+			guard ItsyWorkspaceController.currentWorkspaceIndex != nil, !ItsyWorkspaceController.isBuildingWorkspaceIndex else {
+				retryBenchScenario(request, attemptsRemaining: attemptsRemaining)
+				return
+			}
+			finishBenchScenario(
+				request,
+				succeeded: commandPaletteCoordinator.runBenchmarkFilePalette(
+					query: request.query,
+					expectedTop: request.expectedTop,
+					expectedResultCount: request.expectedResultCount
+				)
+			)
+		case .scroll:
+			guard let controller = activeEditorWindowController() else {
+				retryBenchScenario(request, attemptsRemaining: attemptsRemaining)
+				return
+			}
+			controller.runBenchmarkScroll(deltaY: request.scrollDelta)
+			finishBenchScenario(request, succeeded: true)
+		}
+	}
+
+	private func retryBenchScenario(_ request: BenchScenarioRequest, attemptsRemaining: Int) {
+		guard attemptsRemaining > 0 else {
+			finishBenchScenario(request, succeeded: false)
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self] in
+			self?.runBenchScenario(request, attemptsRemaining: attemptsRemaining - 1)
+		}
+	}
+
+	private func finishBenchScenario(_ request: BenchScenarioRequest, succeeded: Bool) {
+		if PerformanceTrace.isEnabled {
+			PerformanceTrace.record("scenario.complete", attributes: [
+				"scenario": request.scenario.rawValue,
+				"outcome": succeeded ? "success" : "failure",
+			])
+		}
+		guard request.exitAfterCompletion else { return }
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) {
+			NSApp.terminate(nil)
+		}
 	}
 
 	private func prepareManagedSupportCatalog() {

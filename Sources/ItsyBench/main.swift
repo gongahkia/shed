@@ -89,6 +89,41 @@ private struct DisplayResult: Encodable {
 	var nominal_refresh_hz: Double?
 }
 
+private struct TraceReportOptions {
+	var tracePath: String
+	var scenario: String?
+	var state: String?
+	var fixtureChecksum: String?
+	var appCommit: String?
+	var displayID: CGDirectDisplayID
+}
+
+private struct TraceMetric: Encodable {
+	var max_ms: Double
+	var median_ms: Double
+	var p95_ms: Double
+	var raw_samples_ms: [Double]
+	var sample_count: Int
+}
+
+private struct TraceReportMetadata: Encodable {
+	var app_commit: String?
+	var display: DisplayResult
+	var fixture_checksum: String?
+	var hardware: String?
+	var macos: String
+	var state: String?
+}
+
+private struct TraceReportResult: Encodable {
+	var event_count: Int
+	var failure_reason: String?
+	var metadata: TraceReportMetadata
+	var metrics: [String: TraceMetric]
+	var scenario: String?
+	var trace_path: String
+}
+
 private struct LatencyResult: Encodable {
 	var display_id: UInt32
 	var dirty_rects: Int
@@ -400,6 +435,8 @@ enum ItsyBenchMain {
 		case "rss":
 			let pid = try parsePID(Array(args.dropFirst()))
 			try printJSON(RSSResult(pid: pid, rss_kb: residentSizeKB(pid: pid)))
+		case "trace-report":
+			try printJSON(traceReport(parseTraceReport(Array(args.dropFirst()))))
 		case "undo":
 			try printJSON(undo(parseUndo(Array(args.dropFirst()))))
 		case "workspace-fsevents":
@@ -453,6 +490,75 @@ enum ItsyBenchMain {
 			}
 		}
 		return DisplayOptions(displayID: displayID)
+	}
+
+	private static func parseTraceReport(_ args: [String]) throws -> TraceReportOptions {
+		var tracePath: String?
+		var scenario: String?
+		var state: String?
+		var fixtureChecksum: String?
+		var appCommit: String?
+		var displayID = CGMainDisplayID()
+		var index = args.startIndex
+		while index < args.endIndex {
+			switch args[index] {
+			case "--trace":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, !args[valueIndex].isEmpty else {
+					throw BenchError.usage("missing value for --trace")
+				}
+				tracePath = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--scenario":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex else {
+					throw BenchError.usage("missing value for --scenario")
+				}
+				scenario = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--state":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, ["cold", "warm"].contains(args[valueIndex]) else {
+					throw BenchError.usage("--state must be cold or warm")
+				}
+				state = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--fixture-checksum":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex else {
+					throw BenchError.usage("missing value for --fixture-checksum")
+				}
+				fixtureChecksum = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--app-commit":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex else {
+					throw BenchError.usage("missing value for --app-commit")
+				}
+				appCommit = args[valueIndex]
+				index = args.index(after: valueIndex)
+			case "--display":
+				let valueIndex = args.index(after: index)
+				guard valueIndex < args.endIndex, let value = UInt32(args[valueIndex]) else {
+					throw BenchError.usage("invalid --display")
+				}
+				displayID = CGDirectDisplayID(value)
+				index = args.index(after: valueIndex)
+			default:
+				throw BenchError.usage("unknown trace-report option: \(args[index])")
+			}
+		}
+		guard let tracePath else {
+			throw BenchError.usage("usage: itsybench trace-report --trace <jsonl> [--scenario <name>]")
+		}
+		return TraceReportOptions(
+			tracePath: tracePath,
+			scenario: scenario,
+			state: state,
+			fixtureChecksum: fixtureChecksum,
+			appCommit: appCommit,
+			displayID: displayID
+		)
 	}
 
 	private static func parseLatency(_ args: [String]) throws -> LatencyOptions {
@@ -868,6 +974,118 @@ enum ItsyBenchMain {
 			mode_width: mode.map { $0.width },
 			nominal_refresh_hz: rates.nominal
 		)
+	}
+
+	private static func traceReport(_ options: TraceReportOptions) -> TraceReportResult {
+		let events = loadTraceEvents(path: options.tracePath)
+		let scenarioEvents = events.filter { $0.name == "scenario.complete" }
+		let scenarioFailure = scenarioEvents.last(where: { $0.attributes["outcome"] == "failure" })
+		var metrics: [String: TraceMetric] = [:]
+		var failures: [String] = []
+		if scenarioFailure != nil {
+			failures.append("scenario reported failure")
+		}
+		if events.contains(where: { $0.name == "palette.results" && $0.attributes["top_result_matches_expected"] == "false" }) {
+			failures.append("palette top result differed from expected")
+		}
+		if events.contains(where: { $0.name == "palette.results" && $0.attributes["result_count_matches_expected"] == "false" }) {
+			failures.append("palette result count differed from expected")
+		}
+		if options.scenario == nil || options.scenario == "palette" {
+			let samples = pairedDurations(events, start: "palette.query", end: "palette.results") { event in
+				event.attributes["query_bytes"] != "0"
+			}
+			if samples.isEmpty {
+				failures.append("no palette query/result pairs")
+			} else {
+				metrics["palette_query_to_results"] = traceMetric(samples)
+			}
+		}
+		if options.scenario == nil || options.scenario == "scroll" {
+			let samples = pairedDurations(events, start: "scroll.input", end: "scroll.render_commit")
+			if samples.isEmpty {
+				failures.append("no scroll input/render pairs")
+			} else {
+				metrics["scroll_input_to_render_commit"] = traceMetric(samples)
+			}
+		}
+		let syntaxSamples = events.compactMap { event -> Double? in
+			guard event.name == "syntax.refresh.end", let duration = event.attributes["duration_ns"], let value = Double(duration) else {
+				return nil
+			}
+			return value / 1_000_000
+		}
+		if !syntaxSamples.isEmpty {
+			metrics["syntax_refresh"] = traceMetric(syntaxSamples)
+		}
+		if events.isEmpty {
+			failures.append("trace is empty or invalid")
+		}
+		return TraceReportResult(
+			event_count: events.count,
+			failure_reason: failures.isEmpty ? nil : failures.joined(separator: "; "),
+			metadata: TraceReportMetadata(
+				app_commit: options.appCommit,
+				display: display(DisplayOptions(displayID: options.displayID)),
+				fixture_checksum: options.fixtureChecksum,
+				hardware: sysctlString("hw.model"),
+				macos: ProcessInfo.processInfo.operatingSystemVersionString,
+				state: options.state
+			),
+			metrics: metrics,
+			scenario: options.scenario,
+			trace_path: options.tracePath
+		)
+	}
+
+	private static func loadTraceEvents(path: String) -> [PerformanceTraceEvent] {
+		guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+			return []
+		}
+		let decoder = JSONDecoder()
+		return text.split(whereSeparator: \.isNewline).compactMap { line in
+			try? decoder.decode(PerformanceTraceEvent.self, from: Data(line.utf8))
+		}
+	}
+
+	private static func pairedDurations(
+		_ events: [PerformanceTraceEvent],
+		start: String,
+		end: String,
+		including includeStart: (PerformanceTraceEvent) -> Bool = { _ in true }
+	) -> [Double] {
+		let starts = Dictionary(uniqueKeysWithValues: events.filter { $0.name == start && includeStart($0) }.map { ($0.id, $0.timestampNS) })
+		return events.compactMap { event in
+			guard event.name == end, let startNS = starts[event.id], event.timestampNS >= startNS else {
+				return nil
+			}
+			return Double(event.timestampNS - startNS) / 1_000_000
+		}
+	}
+
+	private static func traceMetric(_ samples: [Double]) -> TraceMetric {
+		let sorted = samples.sorted()
+		let medianIndex = (sorted.count - 1) / 2
+		let p95Index = min(sorted.count - 1, max(0, Int(ceil(Double(sorted.count) * 0.95)) - 1))
+		return TraceMetric(
+			max_ms: sorted.last ?? 0,
+			median_ms: sorted[medianIndex],
+			p95_ms: sorted[p95Index],
+			raw_samples_ms: samples,
+			sample_count: samples.count
+		)
+	}
+
+	private static func sysctlString(_ name: String) -> String? {
+		var size = 0
+		guard sysctlbyname(name, nil, &size, nil, 0) == 0, size > 0 else {
+			return nil
+		}
+		var bytes = [CChar](repeating: 0, count: size)
+		guard sysctlbyname(name, &bytes, &size, nil, 0) == 0 else {
+			return nil
+		}
+		return String(cString: bytes)
 	}
 
 	private static func smoke(runs: Int) throws -> SmokeResult {

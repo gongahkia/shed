@@ -2024,6 +2024,10 @@ private final class TerminalResizeHandle: NSView {
 		window?.makeFirstResponder(editorView)
 	}
 
+	func runBenchmarkScroll(deltaY: CGFloat) {
+		editorView.scroll(deltaX: 0, deltaY: deltaY)
+	}
+
 	private func rebuildFocusTraversal() {
 		var targets: [NSView] = []
 		if sidebarVisible && responsiveSidebarVisible {

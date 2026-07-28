@@ -1,9 +1,10 @@
 import Foundation
+import Dispatch
 import ItsyEditor
 import ItsyRender
 import ItsySyntax
 
-final class DocumentSyntaxController {
+@MainActor final class DocumentSyntaxController {
 	private static let highlightOverscanLineCount = 20
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?
@@ -34,8 +35,28 @@ final class DocumentSyntaxController {
 			setHighlightSpans([])
 			return
 		}
+		let traceID: UInt64?
+		let traceStartNS: UInt64
+		if PerformanceTrace.isEnabled {
+			traceID = PerformanceTrace.record("syntax.refresh.begin", attributes: [
+				"document_bytes": String(editor.textStorage.length),
+				"viewport_line_count": String(viewportLineRange?.count ?? 0),
+				"edit_count": String(edits.count),
+			])
+			traceStartNS = DispatchTime.now().uptimeNanoseconds
+		} else {
+			traceID = nil
+			traceStartNS = 0
+		}
+		var traceOutcome = "success"
 		defer {
 			self.syntaxPipeline = syntaxPipeline
+			if let traceID {
+				PerformanceTrace.record("syntax.refresh.end", id: traceID, attributes: [
+					"duration_ns": String(DispatchTime.now().uptimeNanoseconds &- traceStartNS),
+					"outcome": traceOutcome,
+				])
+			}
 		}
 		do {
 			if syntaxTheme == nil {
@@ -75,6 +96,7 @@ final class DocumentSyntaxController {
 			}
 			setHighlightSpans(renderedSpans)
 		} catch {
+			traceOutcome = "error"
 			setHighlightSpans([])
 		}
 	}

@@ -135,7 +135,8 @@ import Testing
 	let controller = EditorWindowController(document: ItsyDocument())
 	defer { controller.close() }
 	let splitView = try #require(controller.window?.contentView as? NSSplitView)
-	let divider = splitView.rect(ofDividerAt: 0)
+	let sidebar = try #require(splitView.arrangedSubviews.first)
+	let divider = NSRect(x: sidebar.frame.maxX, y: splitView.bounds.minY, width: splitView.dividerThickness, height: splitView.bounds.height)
 	let dragTarget = controller.splitView(splitView, effectiveRect: divider, forDrawnRect: divider, ofDividerAt: 0)
 
 	#expect(splitView.dividerThickness == 1)

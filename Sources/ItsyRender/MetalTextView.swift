@@ -204,6 +204,7 @@ public final class MetalTextView: NSView {
 	var documentHighlightRanges: [Range<Int>] = []
 	var documentHighlightRects: [CGRect] = []
 	private var lastReportedVisibleLineRange: Range<Int> = 0 ..< 0
+	private var pendingScrollTraceID: UInt64?
 	private var gutterTrackingArea: NSTrackingArea?
 	private var gutterPopover: NSPopover?
 	private var hoveredGutterMarkerID: String?
@@ -737,6 +738,19 @@ public final class MetalTextView: NSView {
 	}
 
 	func scroll(deltaX: CGFloat, deltaY: CGFloat) {
+		let traceID: UInt64?
+		if PerformanceTrace.isEnabled {
+			if let pendingScrollTraceID {
+				PerformanceTrace.record("scroll.coalesced", id: pendingScrollTraceID)
+			}
+			traceID = PerformanceTrace.record("scroll.input", attributes: [
+				"delta_x_milli": String(Int((deltaX * 1_000).rounded())),
+				"delta_y_milli": String(Int((deltaY * 1_000).rounded())),
+			])
+			pendingScrollTraceID = traceID
+		} else {
+			traceID = nil
+		}
 		if deltaY != 0, lineCount > 0 {
 			let lineDelta = Int((deltaY / max(lineHeight, 1)).rounded(.toNearestOrAwayFromZero))
 			topLineIndex = min(max(topLineIndex - lineDelta, 0), max(0, lineCount - 1))
@@ -748,6 +762,12 @@ public final class MetalTextView: NSView {
 		refreshGutterMarkerRects()
 		markDirty()
 		reportVisibleLineRangeIfNeeded()
+		if let traceID {
+			PerformanceTrace.record("scroll.viewport", id: traceID, attributes: [
+				"first_line": String(visibleLineRange.lowerBound),
+				"last_line": String(visibleLineRange.upperBound),
+			])
+		}
 	}
 
 	public func performMotion(_ motion: Motion) {
@@ -1486,6 +1506,10 @@ public final class MetalTextView: NSView {
 		renderPass.colorAttachments[0].texture = nil
 		commandBuffer.present(drawable)
 		commandBuffer.commit()
+		if let pendingScrollTraceID {
+			PerformanceTrace.record("scroll.render_commit", id: pendingScrollTraceID)
+			self.pendingScrollTraceID = nil
+		}
 		renderedFrameCount += 1
 		Self.recordBenchStageOnce("first_draw")
 	}

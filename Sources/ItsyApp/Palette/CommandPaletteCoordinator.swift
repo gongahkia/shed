@@ -20,6 +20,8 @@ import ItsyEditor
 	private var commandPaletteFilteredItems: [Command] = []
 	private var commandPaletteFiles: [String] = []
 	private var commandPaletteFilteredFiles: [String] = []
+	private var commandPaletteBenchmarkExpectedTop: String?
+	private var commandPaletteBenchmarkExpectedResultCount: Int?
 	private var commandPaletteShowsFiles = false
 	private var commandPaletteAcceptsRawText = false
 	private var commandPaletteSymbolScope: CommandPaletteSymbolScope?
@@ -70,11 +72,43 @@ import ItsyEditor
 		commandPaletteCancelHandler = nil
 		commandPaletteRunText = nil
 		let files = ItsyWorkspaceController.currentWorkspaceIndex?.files.map(\.relativePath) ?? []
+		if PerformanceTrace.isEnabled {
+			PerformanceTrace.record("palette.open", attributes: ["candidate_count": String(files.count)])
+		}
 		setCommandPaletteFiles(files)
 		centerCommandPalette(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
 		panel.makeKeyAndOrderFront(nil)
 		panel.orderFrontRegardless()
 		focusCommandPaletteInput()
+	}
+
+	func runBenchmarkFilePalette(query: String, expectedTop: String?, expectedResultCount: Int?) -> Bool {
+		guard let index = ItsyWorkspaceController.currentWorkspaceIndex else {
+			PerformanceTrace.record("palette.scenario_failed", attributes: ["reason": "workspace_index_unavailable"])
+			return false
+		}
+		let panel = makeCommandPalettePanelIfNeeded()
+		commandPaletteCancelHandler = nil
+		commandPaletteRunText = nil
+		let files = index.files.map(\.relativePath)
+		if PerformanceTrace.isEnabled {
+			PerformanceTrace.record("palette.open", attributes: ["candidate_count": String(files.count), "benchmark": "true"])
+		}
+		setCommandPaletteFiles(files)
+		centerCommandPalette(panel, relativeTo: NSApp.keyWindow ?? NSApp.mainWindow)
+		panel.makeKeyAndOrderFront(nil)
+		panel.orderFrontRegardless()
+		commandPaletteBenchmarkExpectedTop = expectedTop
+		commandPaletteBenchmarkExpectedResultCount = expectedResultCount
+		defer {
+			commandPaletteBenchmarkExpectedTop = nil
+			commandPaletteBenchmarkExpectedResultCount = nil
+		}
+		commandPaletteInputField?.stringValue = query
+		filterCommandPaletteItems()
+		let topMatches = expectedTop.map { commandPaletteFilteredFiles.first == $0 } ?? true
+		let countMatches = expectedResultCount.map { commandPaletteFilteredFiles.count == $0 } ?? true
+		return topMatches && countMatches
 	}
 
 	@objc func showLinePalette(_ sender: Any?) {
@@ -369,10 +403,29 @@ import ItsyEditor
 		}
 		let raw = commandPaletteInputField?.stringValue ?? ""
 		if commandPaletteShowsFiles {
+			let traceID: UInt64?
+			if PerformanceTrace.isEnabled {
+				traceID = PerformanceTrace.record("palette.query", attributes: [
+					"candidate_count": String(commandPaletteFiles.count),
+					"query_bytes": String(raw.utf8.count),
+				])
+			} else {
+				traceID = nil
+			}
 			commandPaletteFilteredFiles = CommandPaletteFileFilter.ranked(paths: commandPaletteFiles, query: raw)
 			commandPaletteTableView?.reloadData()
 			if !commandPaletteFilteredFiles.isEmpty {
 				commandPaletteTableView?.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+			}
+			if let traceID {
+				var attributes = ["result_count": String(commandPaletteFilteredFiles.count)]
+				if let expectedTop = commandPaletteBenchmarkExpectedTop {
+					attributes["top_result_matches_expected"] = String(commandPaletteFilteredFiles.first == expectedTop)
+				}
+				if let expectedResultCount = commandPaletteBenchmarkExpectedResultCount {
+					attributes["result_count_matches_expected"] = String(commandPaletteFilteredFiles.count == expectedResultCount)
+				}
+				PerformanceTrace.record("palette.results", id: traceID, attributes: attributes)
 			}
 			return
 		}

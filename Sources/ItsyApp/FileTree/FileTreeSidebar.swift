@@ -20,6 +20,7 @@ private let workspaceLogger = Logger(
 	private static let gitStatusRefreshCoordinator = GitStatusRefreshCoordinator()
 	private static var gitStatusRefreshTask: Task<Void, Never>?
 	private static var workspaceIndex: WorkspaceIndex?
+	private static var workspaceIndexIsBuilding = false
 	private static var gitIgnoreMatcher: GitIgnoreMatcher?
 	private static var indexGeneration = 0
 	private static var indexWatchers: [WorkspaceFSEventStream] = []
@@ -37,6 +38,10 @@ private let workspaceLogger = Logger(
 
 	static var currentWorkspaceIndex: WorkspaceIndex? {
 		workspaceIndex
+	}
+
+	static var isBuildingWorkspaceIndex: Bool {
+		workspaceIndexIsBuilding
 	}
 
 	static func searchWorkspaceSymbols(query: String, limit: Int = 50) -> [WorkspaceSymbol] {
@@ -113,6 +118,7 @@ private let workspaceLogger = Logger(
 		let generation = indexGeneration
 		let store = WorkspaceIndexStore()
 		workspaceIndex = try? store.load(for: root)
+		workspaceIndexIsBuilding = true
 		gitIgnoreMatcher = nil
 		broadcastIndexingStatus(L10n.string("Indexing…"))
 		DispatchQueue.global(qos: .utility).async {
@@ -130,6 +136,10 @@ private let workspaceLogger = Logger(
 					return
 				}
 				workspaceIndex = index
+				workspaceIndexIsBuilding = false
+				if PerformanceTrace.isEnabled {
+					PerformanceTrace.record("workspace.index_ready", attributes: ["file_count": String(index.files.count)])
+				}
 				gitIgnoreMatcher = matcher
 				broadcastIndexingStatus(nil)
 				persistWorkspaceIndex(index)

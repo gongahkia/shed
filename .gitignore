@@ -7,6 +7,9 @@ dist/
 bench/traces/*.trace/
 bench/corpus/huge.log
 bench/corpus/huge-text.log
+bench/corpus/interactive/
+bench/traces/interactive/
+bench/results/interactive-perf-*.json
 bench/results/*.json
 !bench/results/baseline-itsy-current.json
 !bench/results/input-latency-baseline.json

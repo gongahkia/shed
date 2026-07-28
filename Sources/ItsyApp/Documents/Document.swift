@@ -187,7 +187,13 @@ import ItsySyntax
 		view.editor = editor
 		view.textEditBehaviorConfiguration = textEditBehaviorConfiguration()
 		view.undoTreeChanged?(editor.history.tree)
-		view.visibleLineRangeDidChange = { [weak self] _ in
+		view.visibleLineRangeDidChange = { [weak self] range in
+			if PerformanceTrace.isEnabled {
+				PerformanceTrace.record("viewport.changed", attributes: [
+					"first_line": String(range.lowerBound),
+					"last_line": String(range.upperBound),
+				])
+			}
 			self?.refreshSyntaxHighlights()
 			self?.lspSurfaceRefreshRequested?()
 		}

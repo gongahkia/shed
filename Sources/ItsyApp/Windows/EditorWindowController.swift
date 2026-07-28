@@ -2024,7 +2024,8 @@ private final class TerminalResizeHandle: NSView {
 		window?.makeFirstResponder(editorView)
 	}
 
-	func runBenchmarkScroll(deltaY: CGFloat) {
+	func runBenchmarkScroll(deltaY: CGFloat, completion: @escaping () -> Void) {
+		editorView.benchmarkScrollDidRender = completion
 		editorView.scroll(deltaX: 0, deltaY: deltaY)
 	}
 

@@ -205,6 +205,7 @@ public final class MetalTextView: NSView {
 	var documentHighlightRects: [CGRect] = []
 	private var lastReportedVisibleLineRange: Range<Int> = 0 ..< 0
 	private var pendingScrollTraceID: UInt64?
+	public var benchmarkScrollDidRender: (() -> Void)?
 	private var gutterTrackingArea: NSTrackingArea?
 	private var gutterPopover: NSPopover?
 	private var hoveredGutterMarkerID: String?
@@ -737,7 +738,7 @@ public final class MetalTextView: NSView {
 		gutterView.fontSize = textFontPointSize
 	}
 
-	func scroll(deltaX: CGFloat, deltaY: CGFloat) {
+	public func scroll(deltaX: CGFloat, deltaY: CGFloat) {
 		let traceID: UInt64?
 		if PerformanceTrace.isEnabled {
 			if let pendingScrollTraceID {
@@ -1510,6 +1511,9 @@ public final class MetalTextView: NSView {
 			PerformanceTrace.record("scroll.render_commit", id: pendingScrollTraceID)
 			self.pendingScrollTraceID = nil
 		}
+		let benchmarkScrollDidRender = benchmarkScrollDidRender
+		self.benchmarkScrollDidRender = nil
+		benchmarkScrollDidRender?()
 		renderedFrameCount += 1
 		Self.recordBenchStageOnce("first_draw")
 	}

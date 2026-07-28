@@ -113,7 +113,11 @@ done
 
 run_case "scroll-1m-precise" scroll "$fixture_root/large/large-1048576.swift" "" "" "" -1
 run_case "scroll-1m-page" scroll "$fixture_root/large/large-1048576.swift" "" "" "" -960
+run_case "scroll-1m-jump" scroll "$fixture_root/large/large-1048576.swift" "" "" "" -10000
+run_case "scroll-100m-precise" scroll "$fixture_root/large/large-104857600.ts" "" "" "" -1
 run_case "scroll-100m-page" scroll "$fixture_root/large/large-104857600.ts" "" "" "" -960
+run_case "scroll-100m-jump" scroll "$fixture_root/large/large-104857600.ts" "" "" "" -10000
+run_case "scroll-1g-precise" scroll "$fixture_root/large/large-1073741824.py" "" "" "" -1
 run_case "scroll-1g-page" scroll "$fixture_root/large/large-1073741824.py" "" "" "" -960
 run_case "scroll-1g-jump" scroll "$fixture_root/large/large-1073741824.py" "" "" "" -10000
 

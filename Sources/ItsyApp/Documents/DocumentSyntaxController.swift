@@ -4,7 +4,7 @@ import ItsyEditor
 import ItsyRender
 import ItsySyntax
 
-@MainActor final class DocumentSyntaxController {
+final class DocumentSyntaxController {
 	private static let highlightOverscanLineCount = 20
 	private var syntaxPipeline: SyntaxPipeline?
 	private var syntaxTheme: SyntaxTheme?

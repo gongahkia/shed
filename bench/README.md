@@ -27,11 +27,20 @@ itsybench piecetree [--ops <count>] [--slice-length <bytes>] [--file <path>] [--
 itsybench rss --pid <pid>
 itsybench latency --pid <pid> [--key-code <code>] [--display <id>] [--timeout-ms <ms>] [--dirty-rects <n>]
 itsybench workflow --file <path> [--repeats <count>] [--pane-transitions <count>]
+itsybench trace-report --trace <jsonl> [--scenario palette|scroll] [--state cold|warm]
 ```
 
 `display` reports CGDisplay mode dimensions plus CVDisplayLink actual/nominal refresh Hz for ProMotion verification.
 
 `latency` activates the target pid, observes routed keydown via `CGEventTap`, posts an ANSI key event, and reports the first `CGDisplayStream` dirty frame as keystroke-to-paint latency.
+
+Interactive local performance suite:
+
+```sh
+bash bench/scripts/interactive_perf.sh --runs 10 --state cold
+```
+
+See `bench/interactive-perf.md` for fixture details, policy, and manual validation; it is local-only and does not add a CI gate.
 
 Representative workflow gate:
 

@@ -15,8 +15,8 @@ public struct PerformanceTraceEvent: Codable, Equatable {
     }
 }
 
-@MainActor
 public enum PerformanceTrace {
+	private static let lock = NSLock()
     private static var nextID: UInt64 = 0
 
     public static var isEnabled: Bool {
@@ -31,6 +31,8 @@ public enum PerformanceTrace {
         path: String? = nil
     ) -> UInt64? {
         guard let destination = path ?? tracePath else { return nil }
+		lock.lock()
+		defer { lock.unlock() }
         let eventID: UInt64
         if let id {
             eventID = id

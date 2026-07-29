@@ -120,6 +120,7 @@ Notes:
 | :--- | :--- |
 | `:settings`, `:shedrc`, `:config` | Open user config file |
 | `:config save`, `:config write` | Persist current runtime config to disk |
+| `:config status` | Show the current config load or recovery report |
 | `:reload`, `:source` | Reload config from disk |
 | `:clean`, `:shedclean` | Remove Shed data under `~/.shed` and reset in-memory history |
 

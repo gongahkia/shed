@@ -54,6 +54,46 @@ public class ConfigManagerTest {
         assertFalse(config.getSessionRestoreOnStart());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
+        assertFalse(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
+    }
+
+    @Test
+    void rejectsPartiallyInvalidConfigWithoutChangingIt() throws IOException {
+        Path home = tempDir.resolve("home-invalid");
+        Path shedDir = home.resolve(".shed");
+        Path configPath = shedDir.resolve("shedrc");
+        String source = "tab.size=8\ninvalid line\nfont.size=18\n";
+        Files.createDirectories(shedDir);
+        Files.writeString(configPath, source);
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertEquals(4, config.getTabSize());
+        assertEquals(16, config.getFontSize());
+        assertEquals(source, Files.readString(configPath));
+        assertEquals("Configuration recovery: " + configPath
+            + "\nInvalid configuration was preserved unchanged.\nSafe defaults are active.\n\nValidation:"
+            + "\n- line 2: expected key=value"
+            + "\n\nRemediation: correct the listed line(s), then run :reload.", config.getConfigLoadReport());
+    }
+
+    @Test
+    void recoversFromUnreadableConfigPath() throws IOException {
+        Path home = tempDir.resolve("home-unreadable");
+        Path configPath = home.resolve(".shed/shedrc");
+        Files.createDirectories(configPath);
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertEquals(4, config.getTabSize());
+        assertTrue(config.getConfigLoadReport().contains("Configuration recovery: " + configPath));
+        assertTrue(config.getConfigLoadReport().contains("read failed:"));
+        assertTrue(Files.isDirectory(configPath));
     }
 
     @Test
@@ -83,6 +123,7 @@ public class ConfigManagerTest {
         assertEquals("work", config.getSessionAutoloadName());
         assertEquals(5000, config.getProcessTimeoutMs());
         assertFalse(config.getShellCommandEnabled());
+        assertFalse(config.hasConfigLoadFailure());
     }
 
     @Test

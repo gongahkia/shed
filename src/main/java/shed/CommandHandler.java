@@ -398,7 +398,10 @@ public class CommandHandler {
         if ("save".equals(trimmed) || "write".equals(trimmed)) {
             return editor.saveConfigToDisk();
         }
-        return "Usage: :config [save]";
+        if ("status".equals(trimmed)) {
+            return editor.showConfigLoadStatus();
+        }
+        return "Usage: :config [save|status]";
     }
 
     private String handleWordCount() {

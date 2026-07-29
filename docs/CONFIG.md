@@ -23,6 +23,8 @@ This is the complete `shedrc` configuration reference for `Shed`.
 | Booleans | Use `true` / `false` (recommended) |
 | Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides |
 
+Shed validates every non-comment line at startup. If any line is malformed, contains an invalid key, or the file cannot be read as UTF-8, Shed leaves the file unchanged and starts with built-in defaults; a `[config recovery]` buffer lists each exact failure and directs you to correct it, then run `:reload`. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
+
 ## Runtime Commands
 
 | Command | Behavior |
@@ -31,6 +33,7 @@ This is the complete `shedrc` configuration reference for `Shed`.
 | `:set key=value` | Set runtime value only |
 | `:set! key=value` | Set and persist one key to disk |
 | `:config save` / `:config write` | Persist current runtime config |
+| `:config status` | Show current config load/recovery details |
 | `:reload` / `:source` | Reload config from disk |
 
 ## Core Editor Keys

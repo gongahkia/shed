@@ -424,6 +424,9 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
 
         this.setVisible(true);
+        if (configManager.hasConfigLoadFailure()) {
+            showScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
+        }
 
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
         externalChangeTimer.start();
@@ -1430,6 +1433,11 @@ public class Texteditor extends JFrame implements KeyListener {
     public String showBuildInfo() {
         showScratchBuffer("[build]", BuildInfo.current().render());
         return "Showing build information";
+    }
+
+    public String showConfigLoadStatus() {
+        showScratchBuffer("[config status]", configManager.getConfigLoadReport());
+        return "Showing config status";
     }
 
     public String cancelJob(String jobIdArgument) {

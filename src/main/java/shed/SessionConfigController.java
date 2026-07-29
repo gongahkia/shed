@@ -1300,11 +1300,6 @@ final class SessionConfigController {
     }
 
 
-    boolean hasUnsavedChanges(FileBuffer buffer) {
-        return buffer != null && buffer.isModified();
-    }
-
-
     int confirmDiscardChanges(String prompt) {
         return JOptionPane.showConfirmDialog(editor,
             prompt,
@@ -1320,9 +1315,9 @@ final class SessionConfigController {
         }
 
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (!force && hasUnsavedChanges(buffer)) {
+        if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
             int result = confirmDiscardChanges("File has unsaved changes. Quit anyway?");
-            if (result != JOptionPane.YES_OPTION) {
+            if (!DocumentLifecycle.discardConfirmed(result)) {
                 return "Quit cancelled";
             }
         }
@@ -1560,9 +1555,9 @@ final class SessionConfigController {
     public String quitAll(boolean force) {
         if (!force) {
             for (FileBuffer buffer : editor.buffers) {
-                if (hasUnsavedChanges(buffer)) {
+                if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
                     int result = confirmDiscardChanges("There are unsaved changes. Quit anyway?");
-                    if (result != JOptionPane.YES_OPTION) {
+                    if (!DocumentLifecycle.discardConfirmed(result)) {
                         return "Quit cancelled";
                     }
                     break;

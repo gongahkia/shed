@@ -2768,10 +2768,6 @@ public class Texteditor extends JFrame implements KeyListener {
         sessionConfigController.handleQuit(force);
     }
 
-    boolean hasUnsavedChanges(FileBuffer buffer) {
-        return sessionConfigController.hasUnsavedChanges(buffer);
-    }
-
     int confirmDiscardChanges(String prompt) {
         return sessionConfigController.confirmDiscardChanges(prompt);
     }

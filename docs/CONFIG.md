@@ -77,9 +77,9 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `session.autoload` | `default` | string | Session name used when autoloading |
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
 | `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
-| `large.file.threshold.mb` | `100` | int | Large-file detection size threshold |
-| `large.file.line.threshold` | `50000` | int | Large-file detection line threshold |
-| `large.file.preview.lines` | `1000` | int | Preview lines shown for large files |
+| `large.file.threshold.mb` | `100` | int | Selects large-file mode above this MiB value; effective minimum `1` |
+| `large.file.line.threshold` | `50000` | int | Selects large-file mode above this logical-line count; effective minimum `1000` |
+| `large.file.preview.lines` | `1000` | int | Initial large-file preview lines; effective minimum `50` |
 | `process.timeout.ms` | `15000` | int | Async shell/LSP helper timeout |
 | `process.output.max.bytes` | `1048576` | int | Max captured process output bytes |
 | `shell.command.enabled` | `true` | bool | Enable `:!` shell commands |

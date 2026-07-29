@@ -85,6 +85,17 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesDeltaEncodedSemanticTokensAndInlayHints() {
+        List<LspClient.SemanticToken> tokens = LspClient.parseSemanticTokens(MiniJson.parse("{\"data\":[0,2,3,1,0,1,4,2,5,0]}"));
+        List<LspClient.InlayHint> hints = LspClient.parseInlayHints(MiniJson.parse(
+            "[{\"position\":{\"line\":2,\"character\":8},\"label\":\": String\"}]"
+        ));
+
+        assertEquals(List.of(new LspClient.SemanticToken(0, 2, 3, 1), new LspClient.SemanticToken(1, 4, 2, 5)), tokens);
+        assertEquals(List.of(new LspClient.InlayHint(2, 8, ": String")), hints);
+    }
+
+    @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));

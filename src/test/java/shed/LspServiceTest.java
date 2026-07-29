@@ -61,6 +61,18 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesSnippetCompletionTextEdits() {
+        List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
+            "[{\"label\":\"fn\",\"insertText\":\"fn ${1:name}\",\"insertTextFormat\":2,\"textEdit\":{\"range\":{\"start\":{\"line\":0,\"character\":0},\"end\":{\"line\":0,\"character\":2}},\"newText\":\"fn ${1:name}\"}}]"
+        ));
+
+        assertEquals(1, items.size());
+        assertTrue(items.get(0).isSnippet());
+        assertEquals("fn ${1:name}", items.get(0).getInsertText());
+        assertEquals(1, items.get(0).getTextEdits().size());
+    }
+
+    @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));

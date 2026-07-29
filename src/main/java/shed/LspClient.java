@@ -22,16 +22,27 @@ public class LspClient {
         private final String detail;
         private final Integer kind;
         private final String documentation;
+        private final String insertText;
+        private final boolean snippet;
+        private final List<CompletionTextEdit> textEdits;
 
         public CompletionItem(String label, String detail, Integer kind) {
             this(label, detail, kind, "");
         }
 
         public CompletionItem(String label, String detail, Integer kind, String documentation) {
+            this(label, detail, kind, documentation, label, false, List.of());
+        }
+
+        public CompletionItem(String label, String detail, Integer kind, String documentation, String insertText,
+                              boolean snippet, List<CompletionTextEdit> textEdits) {
             this.label = label;
             this.detail = detail == null ? "" : detail;
             this.kind = kind;
             this.documentation = documentation == null ? "" : documentation;
+            this.insertText = insertText == null || insertText.isEmpty() ? label : insertText;
+            this.snippet = snippet;
+            this.textEdits = textEdits == null ? List.of() : List.copyOf(textEdits);
         }
 
         public String getLabel() {
@@ -50,10 +61,44 @@ public class LspClient {
             return documentation;
         }
 
+        public String getInsertText() {
+            return insertText;
+        }
+
+        public boolean isSnippet() {
+            return snippet;
+        }
+
+        public List<CompletionTextEdit> getTextEdits() {
+            return textEdits;
+        }
+
         @Override
         public String toString() {
             return detail.isBlank() ? label : label + " — " + detail;
         }
+    }
+
+    public static class CompletionTextEdit {
+        private final int startLine;
+        private final int startCharacter;
+        private final int endLine;
+        private final int endCharacter;
+        private final String newText;
+
+        public CompletionTextEdit(int startLine, int startCharacter, int endLine, int endCharacter, String newText) {
+            this.startLine = startLine;
+            this.startCharacter = startCharacter;
+            this.endLine = endLine;
+            this.endCharacter = endCharacter;
+            this.newText = newText == null ? "" : newText;
+        }
+
+        public int getStartLine() { return startLine; }
+        public int getStartCharacter() { return startCharacter; }
+        public int getEndLine() { return endLine; }
+        public int getEndCharacter() { return endCharacter; }
+        public String getNewText() { return newText; }
     }
 
     public static class Location {
@@ -461,7 +506,11 @@ public class LspClient {
             }
             String detail = MiniJson.asString(itemObject.get("detail"));
             Integer kind = MiniJson.asInt(itemObject.get("kind"));
-            completions.add(new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation"))));
+            String insertText = MiniJson.asString(itemObject.get("insertText"));
+            Integer insertTextFormat = MiniJson.asInt(itemObject.get("insertTextFormat"));
+            List<CompletionTextEdit> textEdits = completionTextEdits(itemObject);
+            completions.add(new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation")),
+                insertText == null ? label : insertText, Integer.valueOf(2).equals(insertTextFormat), textEdits));
         }
         return completions;
     }
@@ -474,6 +523,35 @@ public class LspClient {
         Map<String, Object> markup = MiniJson.asObject(documentation);
         String value = MiniJson.asString(markup == null ? null : markup.get("value"));
         return value == null ? "" : value;
+    }
+
+    private static List<CompletionTextEdit> completionTextEdits(Map<String, Object> item) {
+        List<CompletionTextEdit> edits = new ArrayList<>();
+        CompletionTextEdit primary = completionTextEdit(item == null ? null : MiniJson.asObject(item.get("textEdit")));
+        if (primary != null) edits.add(primary);
+        List<Object> additional = MiniJson.asArray(item == null ? null : item.get("additionalTextEdits"));
+        if (additional != null) {
+            for (Object value : additional) {
+                CompletionTextEdit edit = completionTextEdit(MiniJson.asObject(value));
+                if (edit != null) edits.add(edit);
+            }
+        }
+        return edits;
+    }
+
+    private static CompletionTextEdit completionTextEdit(Map<String, Object> edit) {
+        if (edit == null) return null;
+        Map<String, Object> range = MiniJson.asObject(edit.get("range"));
+        if (range == null) range = MiniJson.asObject(edit.get("replace"));
+        Map<String, Object> start = range == null ? null : MiniJson.asObject(range.get("start"));
+        Map<String, Object> end = range == null ? null : MiniJson.asObject(range.get("end"));
+        Integer startLine = start == null ? null : MiniJson.asInt(start.get("line"));
+        Integer startCharacter = start == null ? null : MiniJson.asInt(start.get("character"));
+        Integer endLine = end == null ? null : MiniJson.asInt(end.get("line"));
+        Integer endCharacter = end == null ? null : MiniJson.asInt(end.get("character"));
+        String newText = MiniJson.asString(edit.get("newText"));
+        if (startLine == null || startCharacter == null || endLine == null || endCharacter == null || newText == null) return null;
+        return new CompletionTextEdit(startLine, startCharacter, endLine, endCharacter, newText);
     }
 
     public String hover(String uri, int line, int character) {

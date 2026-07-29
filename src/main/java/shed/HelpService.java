@@ -173,6 +173,7 @@ public class HelpService {
                     + "  Ctrl-n (insert)  async completion; Tab/Enter applies, Escape cancels\n"
                     + "                    selected LSP items show detail and documentation\n"
                     + "                    stale responses are ignored\n"
+                    + "  Tab/Shift-Tab     move through unchanged LSP snippet placeholders\n"
                     + "  :lsp definition  go to definition\n"
                     + "  :lsp hover       show hover info\n"
                     + "  :lsp references  find references\n"

@@ -313,21 +313,30 @@ public class ConfigManager {
             Object value = entry.getValue();
             if (!(value instanceof String || value instanceof Long || value instanceof Double || value instanceof Boolean)) {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey()))
-                    + "unsupported TOML value for " + key);
+                    + "unsupported TOML value for " + key + fallbackDescription(key));
                 continue;
             }
             String validationError = settings.validateToml(key, value);
             if (validationError != null) {
-                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + validationError);
+                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + validationError + fallbackDescription(key));
                 continue;
             }
             try {
                 parsed.put(normalizePersistedKey(key), value);
             } catch (IOException error) {
-                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage());
+                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage() + fallbackDescription(key));
             }
         }
         return parsed;
+    }
+
+    private String fallbackDescription(String key) {
+        Object typedValue = settings.activeValue(key);
+        if (typedValue != null) {
+            return " (active fallback: " + settings.stringify(typedValue) + ")";
+        }
+        String value = config.get(key);
+        return value == null ? " (active fallback: no override)" : " (active fallback: " + value + ")";
     }
 
     private String tomlLocation(TomlPosition position) {

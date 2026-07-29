@@ -24,7 +24,7 @@ Legacy `shedrc` files (`~/.shed/shedrc`, `~/.shedrc`, and `~/.config/shed/shedrc
 | Booleans | Use `true` / `false` |
 | Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides |
 
-Shed validates the full TOML document at startup. If parsing fails, a value is unsupported, or the file cannot be read, Shed leaves it unchanged and starts with built-in defaults; `[config recovery]` lists each exact failure and directs you to correct it, then run `:reload`. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
+Shed validates the full TOML document at startup. If parsing fails, a value is unsupported, or the file cannot be read, Shed leaves it unchanged and starts with built-in defaults; `[config recovery]` lists each exact failure and directs you to correct it, then run `:reload`. Typed-value diagnostics include the file line and column, expected type or range, and active fallback value. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
 
 ## Schema Version and Ownership
 

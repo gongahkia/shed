@@ -141,6 +141,10 @@ final class TypedSettings {
         return String.valueOf(value);
     }
 
+    Object activeValue(String key) {
+        return values.get(key);
+    }
+
     private Object coerce(Object value, Object defaultValue) {
         if (defaultValue instanceof Integer && value instanceof Long) {
             return Math.toIntExact((Long) value);

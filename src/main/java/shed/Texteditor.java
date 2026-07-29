@@ -2573,6 +2573,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.saveConfigToDisk();
     }
 
+    public String materializeDefaultConfig(boolean overwrite) {
+        return sessionConfigController.materializeDefaultConfig(overwrite);
+    }
+
     public String applyTheaterPreset(String presetArgument) {
         return sessionConfigController.applyTheaterPreset(presetArgument);
     }

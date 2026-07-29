@@ -1156,6 +1156,7 @@ public class ConfigManager {
 
     public String defaultConfigTemplate() {
         StringBuilder template = new StringBuilder("# Shed configuration (TOML)\n")
+            .append("# Core defaults are listed below; see docs/CONFIG.md for descriptions and dynamic namespaces.\n")
             .append("# Remove or change any key; unspecified keys use built-in defaults.\n\n")
             .append(ConfigSchema.VERSION_KEY).append(" = ").append(ConfigSchema.VERSION).append("\n\n");
         List<String> keys = new ArrayList<>(defaultConfig.keySet());
@@ -1168,6 +1169,25 @@ public class ConfigManager {
             .append("# Keybind example: \"keybind.normal.H\" = \"^\"\n")
             .append("# LSP example: \"lsp.py.command\" = \"pyright-langserver\"\n")
             .toString();
+    }
+
+    public void materializeDefaultConfig(boolean overwrite) throws IOException {
+        Path path = Path.of(configPath);
+        Path parent = path.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        if (overwrite) {
+            Files.writeString(path, defaultConfigTemplate(), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+            return;
+        }
+        try {
+            Files.writeString(path, defaultConfigTemplate(), StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+        } catch (java.nio.file.FileAlreadyExistsException error) {
+            throw new IOException("configuration exists; use :config! defaults to overwrite", error);
+        }
     }
 
     private String defaultSessionDirectoryPath() {

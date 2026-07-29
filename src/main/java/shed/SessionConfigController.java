@@ -430,10 +430,6 @@ final class SessionConfigController {
             showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
             return "Configuration rejected; last-known-good configuration remains active";
         }
-        if (editor.configManager.hasConfigLoadNotice()) {
-            showScratchBuffer("[config notice]", editor.configManager.getConfigLoadReport());
-            return "Legacy configuration ignored";
-        }
         return "Settings reloaded";
     }
 

@@ -21,11 +21,17 @@ public class LspClient {
         private final String label;
         private final String detail;
         private final Integer kind;
+        private final String documentation;
 
         public CompletionItem(String label, String detail, Integer kind) {
+            this(label, detail, kind, "");
+        }
+
+        public CompletionItem(String label, String detail, Integer kind, String documentation) {
             this.label = label;
-            this.detail = detail;
+            this.detail = detail == null ? "" : detail;
             this.kind = kind;
+            this.documentation = documentation == null ? "" : documentation;
         }
 
         public String getLabel() {
@@ -38,6 +44,15 @@ public class LspClient {
 
         public Integer getKind() {
             return kind;
+        }
+
+        public String getDocumentation() {
+            return documentation;
+        }
+
+        @Override
+        public String toString() {
+            return detail.isBlank() ? label : label + " — " + detail;
         }
     }
 
@@ -421,7 +436,10 @@ public class LspClient {
             return List.of();
         }
 
-        Object result = response.get("result");
+        return parseCompletionItems(response.get("result"));
+    }
+
+    static List<CompletionItem> parseCompletionItems(Object result) {
         List<Object> items = MiniJson.asArray(result);
         if (items == null) {
             Map<String, Object> resultObject = MiniJson.asObject(result);
@@ -443,9 +461,19 @@ public class LspClient {
             }
             String detail = MiniJson.asString(itemObject.get("detail"));
             Integer kind = MiniJson.asInt(itemObject.get("kind"));
-            completions.add(new CompletionItem(label, detail, kind));
+            completions.add(new CompletionItem(label, detail, kind, completionDocumentation(itemObject.get("documentation"))));
         }
         return completions;
+    }
+
+    private static String completionDocumentation(Object documentation) {
+        String text = MiniJson.asString(documentation);
+        if (text != null) {
+            return text;
+        }
+        Map<String, Object> markup = MiniJson.asObject(documentation);
+        String value = MiniJson.asString(markup == null ? null : markup.get("value"));
+        return value == null ? "" : value;
     }
 
     public String hover(String uri, int line, int character) {
@@ -775,7 +803,7 @@ public class LspClient {
         return sendRequest(method, params, timeoutMs);
     }
 
-    private Map<String, Object> sendRequest(String method, Object params, long timeoutMs) {
+    private synchronized Map<String, Object> sendRequest(String method, Object params, long timeoutMs) {
         int id = nextRequestId();
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("jsonrpc", "2.0");

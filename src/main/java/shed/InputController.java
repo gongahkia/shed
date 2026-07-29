@@ -12,9 +12,15 @@ import java.util.List;
 
 final class InputController {
     private final Texteditor editor;
+    private final CompletionRequestState completionRequestState;
+    private int completionJobId;
+    private CompletionRequestState.Snapshot activeCompletionRequest;
 
     InputController(Texteditor editor) {
         this.editor = editor;
+        this.completionRequestState = new CompletionRequestState();
+        this.completionJobId = -1;
+        this.activeCompletionRequest = null;
     }
 
     public void keyPressed(KeyEvent e) {
@@ -1228,6 +1234,9 @@ final class InputController {
                 dismissCompletionPopup(); e.consume(); return;
             }
         }
+        if (completionJobId >= 0 || isCompletionPopupVisible()) {
+            dismissCompletionPopup();
+        }
         if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
             dismissCompletionPopup();
             editor.registerManager.updateLastInserted(editor.lastInsertedText);
@@ -1907,47 +1916,40 @@ final class InputController {
 
 
     void showInlineCompletion() {
+        cancelCompletionJob();
+        completionRequestState.invalidate();
+        activeCompletionRequest = null;
+        String prefix = editor.currentCompletionPrefix();
+        if (prefix == null || prefix.length() < 2) {
+            dismissCompletionPopup();
+            return;
+        }
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LspClient client = editor.existingLspClient(buffer);
+        if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.COMPLETION)) {
+            showCompletionPopup(localCompletionItems(prefix), prefix);
+            return;
+        }
         try {
-            String prefix = editor.currentCompletionPrefix();
-            if (prefix == null || prefix.length() < 2) { dismissCompletionPopup(); return; }
-            List<String> completions = gatherCompletions(prefix);
-            if (completions.isEmpty()) { dismissCompletionPopup(); return; }
-            editor.completionPrefix = prefix;
-            if (editor.completionPopup == null) {
-                editor.completionModel = new javax.swing.DefaultListModel<>();
-                editor.completionList = new javax.swing.JList<>(editor.completionModel);
-                editor.completionList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
-                editor.completionList.setFocusable(false);
-                editor.completionList.setFont(editor.writingArea.getFont().deriveFont((float) editor.writingArea.getFont().getSize()));
-                editor.completionList.setBackground(editor.configManager.getCommandBarBackground());
-                editor.completionList.setForeground(editor.configManager.getCommandBarForeground());
-                editor.completionList.setSelectionBackground(editor.configManager.getSelectionColor());
-                editor.completionList.setSelectionForeground(editor.configManager.getSelectionTextColor());
-                editor.completionPopup = new javax.swing.JWindow(editor);
-                javax.swing.JScrollPane sp = new javax.swing.JScrollPane(editor.completionList);
-                sp.setBorder(javax.swing.BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
-                editor.completionPopup.add(sp);
-                editor.completionPopup.setFocusableWindowState(false);
-            }
-            editor.completionModel.clear();
-            int max = Math.min(completions.size(), 12);
-            for (int i = 0; i < max; i++) editor.completionModel.addElement(completions.get(i));
-            editor.completionList.setSelectedIndex(0);
-            Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
-            if (caretRect == null) return;
-            if (!editor.writingArea.isShowing()) return;
-            java.awt.Point loc = editor.writingArea.getLocationOnScreen();
-            int px = loc.x + (int) caretRect.getX();
-            int py = loc.y + (int) (caretRect.getY() + caretRect.getHeight());
-            int lineH = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
-            editor.completionPopup.setLocation(px, py);
-            editor.completionPopup.setSize(300, Math.min(max * lineH + 4, 240));
-            editor.completionPopup.setVisible(true);
-        } catch (Exception ignored) { dismissCompletionPopup(); }
+            String uri = editor.bufferUri(buffer);
+            int caretOffset = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caretOffset);
+            int column = caretOffset - editor.writingArea.getLineStartOffset(line);
+            int documentVersion = editor.lspDocumentVersions.getOrDefault(uri, 0);
+            CompletionRequestState.Snapshot request = completionRequestState.begin(uri, documentVersion, caretOffset, prefix);
+            activeCompletionRequest = request;
+            completionJobId = editor.asyncJobService.submit("LSP completion", token -> client.completion(uri, line, column),
+                (snapshot, items, error) -> completeInlineCompletion(request, snapshot, items, error));
+        } catch (BadLocationException ignored) {
+            dismissCompletionPopup();
+        }
     }
 
 
     void dismissCompletionPopup() {
+        cancelCompletionJob();
+        completionRequestState.invalidate();
+        activeCompletionRequest = null;
         if (editor.completionPopup != null && editor.completionPopup.isVisible()) editor.completionPopup.setVisible(false);
     }
 
@@ -1969,31 +1971,131 @@ final class InputController {
 
     void completionPopupAccept() {
         if (editor.completionList == null) return;
-        String selected = editor.completionList.getSelectedValue();
+        LspClient.CompletionItem selected = editor.completionList.getSelectedValue();
+        if (!isCurrentCompletion(editor.completionPrefix)) {
+            dismissCompletionPopup();
+            return;
+        }
         dismissCompletionPopup();
         if (selected != null && editor.completionPrefix != null) {
-            editor.applyCompletion(editor.completionPrefix, selected);
+            editor.applyCompletion(editor.completionPrefix, selected.getLabel());
             editor.markModified();
         }
     }
 
 
     List<String> gatherCompletions(String prefix) {
-        List<String> completions = new ArrayList<>();
-        FileBuffer buffer = editor.getCurrentBuffer();
-        LspClient client = editor.resolveLspClient(buffer);
-        if (buffer != null && client != null && buffer.hasFilePath()) {
-            String uri = editor.bufferUri(buffer);
-            try {
-                int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
-                int col = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
-                for (LspClient.CompletionItem item : client.completion(uri, line, col)) {
-                    if (item.getLabel() != null && !item.getLabel().isEmpty()) completions.add(item.getLabel());
-                }
-            } catch (BadLocationException ignored) {}
+        List<String> labels = new ArrayList<>();
+        for (LspClient.CompletionItem item : localCompletionItems(prefix)) {
+            labels.add(item.getLabel());
         }
-        if (completions.isEmpty()) completions = editor.collectBufferCompletions(prefix);
-        return completions;
+        return labels;
+    }
+
+    private void completeInlineCompletion(CompletionRequestState.Snapshot request, AsyncJobService.JobSnapshot snapshot,
+                                          List<LspClient.CompletionItem> items, Exception error) {
+        if (snapshot == null || snapshot.getStatus() == AsyncJobService.Status.CANCELLED || error != null
+            || !isCurrentCompletion(request)) {
+            return;
+        }
+        completionJobId = -1;
+        List<LspClient.CompletionItem> resolved = items == null || items.isEmpty() ? localCompletionItems(request.prefix()) : items;
+        showCompletionPopup(resolved, request.prefix());
+    }
+
+    private void showCompletionPopup(List<LspClient.CompletionItem> completions, String prefix) {
+        if (completions == null || completions.isEmpty()) {
+            dismissCompletionPopup();
+            return;
+        }
+        try {
+            editor.completionPrefix = prefix;
+            ensureCompletionPopup();
+            editor.completionModel.clear();
+            int max = Math.min(completions.size(), 12);
+            for (int i = 0; i < max; i++) editor.completionModel.addElement(completions.get(i));
+            editor.completionList.setSelectedIndex(0);
+            updateCompletionDocumentation();
+            Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
+            if (caretRect == null || !editor.writingArea.isShowing()) return;
+            Point location = editor.writingArea.getLocationOnScreen();
+            int px = location.x + (int) caretRect.getX();
+            int py = location.y + (int) (caretRect.getY() + caretRect.getHeight());
+            int lineHeight = editor.writingArea.getFontMetrics(editor.writingArea.getFont()).getHeight();
+            editor.completionPopup.setLocation(px, py);
+            editor.completionPopup.setSize(460, Math.min(max * lineHeight + 108, 340));
+            editor.completionPopup.setVisible(true);
+        } catch (Exception ignored) {
+            dismissCompletionPopup();
+        }
+    }
+
+    private void ensureCompletionPopup() {
+        if (editor.completionPopup != null) return;
+        editor.completionModel = new DefaultListModel<>();
+        editor.completionList = new JList<>(editor.completionModel);
+        editor.completionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        editor.completionList.setFocusable(false);
+        editor.completionList.setFont(editor.writingArea.getFont().deriveFont((float) editor.writingArea.getFont().getSize()));
+        editor.completionList.setBackground(editor.configManager.getCommandBarBackground());
+        editor.completionList.setForeground(editor.configManager.getCommandBarForeground());
+        editor.completionList.setSelectionBackground(editor.configManager.getSelectionColor());
+        editor.completionList.setSelectionForeground(editor.configManager.getSelectionTextColor());
+        editor.completionList.addListSelectionListener(event -> {
+            if (!event.getValueIsAdjusting()) updateCompletionDocumentation();
+        });
+        editor.completionDocumentation = new JTextArea();
+        editor.completionDocumentation.setEditable(false);
+        editor.completionDocumentation.setLineWrap(true);
+        editor.completionDocumentation.setWrapStyleWord(true);
+        editor.completionDocumentation.setBackground(editor.configManager.getCommandBarBackground());
+        editor.completionDocumentation.setForeground(editor.configManager.getCommandBarForeground());
+        JScrollPane listScroll = new JScrollPane(editor.completionList);
+        JScrollPane documentationScroll = new JScrollPane(editor.completionDocumentation);
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, listScroll, documentationScroll);
+        split.setResizeWeight(0.7);
+        split.setBorder(BorderFactory.createLineBorder(editor.configManager.getCaretColor()));
+        editor.completionPopup = new JWindow(editor);
+        editor.completionPopup.add(split);
+        editor.completionPopup.setFocusableWindowState(false);
+    }
+
+    private void updateCompletionDocumentation() {
+        if (editor.completionDocumentation == null || editor.completionList == null) return;
+        LspClient.CompletionItem selected = editor.completionList.getSelectedValue();
+        if (selected == null) {
+            editor.completionDocumentation.setText("");
+            return;
+        }
+        String documentation = selected.getDocumentation();
+        editor.completionDocumentation.setText(documentation.isBlank() ? selected.getDetail() : documentation);
+        editor.completionDocumentation.setCaretPosition(0);
+    }
+
+    private void cancelCompletionJob() {
+        if (completionJobId >= 0) editor.asyncJobService.cancel(completionJobId);
+        completionJobId = -1;
+    }
+
+    private boolean isCurrentCompletion(CompletionRequestState.Snapshot request) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) return false;
+        String uri = editor.bufferUri(buffer);
+        return completionRequestState.matches(request, uri, editor.lspDocumentVersions.getOrDefault(uri, 0),
+            editor.writingArea.getCaretPosition(), editor.currentCompletionPrefix());
+    }
+
+    private boolean isCurrentCompletion(String prefix) {
+        return activeCompletionRequest == null
+            ? Objects.equals(prefix, editor.currentCompletionPrefix())
+            : isCurrentCompletion(activeCompletionRequest);
+    }
+
+    private List<LspClient.CompletionItem> localCompletionItems(String prefix) {
+        List<String> completions = editor.collectBufferCompletions(prefix);
+        List<LspClient.CompletionItem> items = new ArrayList<>();
+        for (String completion : completions) items.add(new LspClient.CompletionItem(completion, "", null));
+        return items;
     }
 
 

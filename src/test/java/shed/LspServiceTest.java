@@ -48,6 +48,19 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesCompletionDetailsAndMarkdownDocumentation() {
+        List<LspClient.CompletionItem> items = LspClient.parseCompletionItems(MiniJson.parse(
+            "{\"items\":[{\"label\":\"render\",\"detail\":\"void render()\",\"kind\":3,\"documentation\":{\"kind\":\"markdown\",\"value\":\"Renders a frame.\"}}]}"
+        ));
+
+        assertEquals(1, items.size());
+        assertEquals("render", items.get(0).getLabel());
+        assertEquals("void render()", items.get(0).getDetail());
+        assertEquals("Renders a frame.", items.get(0).getDocumentation());
+        assertEquals("render — void render()", items.get(0).toString());
+    }
+
+    @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));

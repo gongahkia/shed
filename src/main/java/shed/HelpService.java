@@ -170,7 +170,9 @@ public class HelpService {
             case "completion":
                 return "Help: LSP\n\n"
                     + "USAGE\n"
-                    + "  Ctrl-n           trigger completion (falls back to buffer words)\n"
+                    + "  Ctrl-n (insert)  async completion; Tab/Enter applies, Escape cancels\n"
+                    + "                    selected LSP items show detail and documentation\n"
+                    + "                    stale responses are ignored\n"
                     + "  :lsp definition  go to definition\n"
                     + "  :lsp hover       show hover info\n"
                     + "  :lsp references  find references\n"

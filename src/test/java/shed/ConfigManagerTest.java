@@ -75,6 +75,34 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void materializesStableDefaultTemplateOnlyWhenConfirmed() throws IOException {
+        Path home = tempDir.resolve("home-materialize");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        Path configPath = Path.of(config.getConfigPath());
+
+        config.materializeDefaultConfig(false);
+        String expected = config.defaultConfigTemplate();
+        assertEquals(expected, Files.readString(configPath));
+        assertTrue(expected.contains("# Core defaults are listed below"));
+        for (String key : config.typedSettingKeys()) {
+            assertTrue(expected.contains("\"" + key + "\" ="), "missing materialized setting " + key);
+        }
+        config.reload();
+        assertFalse(config.hasConfigLoadFailure());
+
+        IOException existing = assertThrows(IOException.class, () -> config.materializeDefaultConfig(false));
+        assertEquals("configuration exists; use :config! defaults to overwrite", existing.getMessage());
+        assertEquals(expected, Files.readString(configPath));
+
+        Files.writeString(configPath, "schema_version = 1\n\"tab.size\" = 8\n");
+        config.materializeDefaultConfig(true);
+        assertEquals(expected, Files.readString(configPath));
+        config.materializeDefaultConfig(true);
+        assertEquals(expected, Files.readString(configPath));
+    }
+
+    @Test
     void configurationReferenceDocumentsEveryTypedSetting() throws IOException {
         Path home = tempDir.resolve("home-doc-catalog");
         System.setProperty("user.home", home.toString());

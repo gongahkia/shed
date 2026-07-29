@@ -299,6 +299,17 @@ final class SessionConfigController {
         }
     }
 
+    public String materializeDefaultConfig(boolean overwrite) {
+        try {
+            editor.configManager.materializeDefaultConfig(overwrite);
+            editor.configManager.reload();
+            applyRuntimeConfigFromSettings();
+            return "Materialized default configuration";
+        } catch (IOException e) {
+            return "Error materializing defaults: " + e.getMessage();
+        }
+    }
+
 
     public String applyTheaterPreset(String presetArgument) {
         String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);

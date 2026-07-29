@@ -40,6 +40,8 @@ Every global `config.toml` and project `.shed.toml` starts with the unquoted roo
 | `:set key=value` | Set runtime value only |
 | `:set! key=value` | Set and persist one key to disk |
 | `:config save` / `:config write` | Persist current runtime config |
+| `:config defaults` | Create a complete commented default config only when no config exists |
+| `:config! defaults` | Confirm replacement with a complete commented default config |
 | `:config status` | Show current config load/recovery details |
 | `:reload` / `:source` | Reload config from disk |
 

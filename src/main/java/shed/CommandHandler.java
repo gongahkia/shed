@@ -118,7 +118,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.listBuffers(), "ls");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
-        registerCommand((args, range, force) -> handleConfig(args), "settings", "config");
+        registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");
         registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
@@ -390,7 +390,7 @@ public class CommandHandler {
         return "Unknown option: " + option;
     }
 
-    private String handleConfig(String args) {
+    private String handleConfig(String args, boolean force) {
         if (args == null || args.isBlank()) {
             return editor.openSettingsBuffer();
         }
@@ -401,7 +401,10 @@ public class CommandHandler {
         if ("status".equals(trimmed)) {
             return editor.showConfigLoadStatus();
         }
-        return "Usage: :config [save|status]";
+        if ("defaults".equals(trimmed)) {
+            return editor.materializeDefaultConfig(force);
+        }
+        return "Usage: :config[!] [save|status|defaults]";
     }
 
     private String handleWordCount() {

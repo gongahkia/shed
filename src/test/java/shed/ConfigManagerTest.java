@@ -130,6 +130,8 @@ public class ConfigManagerTest {
         assertEquals("4", initial.defaultValue());
         assertEquals("4", initial.currentValue());
         assertEquals("Tab width in spaces", initial.description());
+        assertEquals("integer 1..16", initial.allowedValues());
+        assertEquals("Live: applied immediately and on config reload", initial.applyBehavior());
 
         config.setAndPersist("tab.size", "6");
         TypedSettings.Descriptor updated = config.typedSettingDescriptors().stream()
@@ -140,6 +142,20 @@ public class ConfigManagerTest {
         assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"tab.size\" = 6"));
         assertEquals(List.of("tab.size"), config.searchTypedSettings("tab width").stream()
             .map(TypedSettings.Descriptor::key).toList());
+    }
+
+    @Test
+    void typedSettingsReferenceUsesDescriptorMetadata() {
+        ConfigManager config = new ConfigManager();
+        String reference = config.typedSettingsReference();
+
+        for (TypedSettings.Descriptor descriptor : config.typedSettingDescriptors()) {
+            assertTrue(reference.contains("\n" + descriptor.key() + "\n"));
+            assertTrue(reference.contains("Description: " + descriptor.description()));
+            assertTrue(reference.contains("Allowed: " + descriptor.allowedValues()));
+            assertTrue(reference.contains("Default: " + descriptor.defaultValue()));
+            assertTrue(reference.contains("Behavior: " + descriptor.applyBehavior()));
+        }
     }
 
     @Test

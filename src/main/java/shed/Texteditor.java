@@ -2585,6 +2585,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.showSettingsInspector();
     }
 
+    public String showTypedSettingsReference() {
+        return sessionConfigController.showTypedSettingsReference();
+    }
+
     public String applyTheaterPreset(String presetArgument) {
         return sessionConfigController.applyTheaterPreset(presetArgument);
     }

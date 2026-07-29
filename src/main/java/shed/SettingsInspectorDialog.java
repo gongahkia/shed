@@ -42,7 +42,9 @@ final class SettingsInspectorDialog extends JDialog {
         this.editor = editor;
         this.categoryModel = new DefaultListModel<>();
         this.categories = new JList<>(categoryModel);
-        this.tableModel = new DefaultTableModel(new Object[] {"Category", "Setting", "Current", "Default", "Type", "Description"}, 0) {
+        this.tableModel = new DefaultTableModel(new Object[] {
+            "Category", "Setting", "Current", "Default", "Type", "Description", "Allowed", "Behavior"
+        }, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
                 return column == 2;
@@ -55,7 +57,7 @@ final class SettingsInspectorDialog extends JDialog {
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);
         add(actions(), BorderLayout.SOUTH);
-        setPreferredSize(new Dimension(900, 540));
+        setPreferredSize(new Dimension(1180, 540));
         pack();
         setLocationRelativeTo(editor);
         populateCategories();
@@ -151,7 +153,7 @@ final class SettingsInspectorDialog extends JDialog {
                 if (selected == null || "All".equals(selected) || selected.equals(descriptor.category())) {
                     tableModel.addRow(new Object[] {
                         descriptor.category(), descriptor.key(), descriptor.currentValue(), descriptor.defaultValue(), descriptor.type(),
-                        descriptor.description()
+                        descriptor.description(), descriptor.allowedValues(), descriptor.applyBehavior()
                     });
                 }
             }

@@ -215,6 +215,9 @@ final class TypedSettings {
         if (key.startsWith("recovery.")) {
             return "Reliability";
         }
+        if (key.startsWith("backup.")) {
+            return "Reliability";
+        }
         if (key.startsWith("large.") || key.startsWith("process.") || key.startsWith("shell.")) {
             return "Performance";
         }
@@ -252,6 +255,8 @@ final class TypedSettings {
             case "ui.dramatic.minimap.width" -> "integer >= 40";
             case "recovery.retention.max.entries" -> "integer 1.." + RecoveryJournal.MAX_ENTRIES;
             case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
+            case "backup.directory" -> "string path";
+            case "backup.retention.count" -> "integer 1.." + BackupPolicy.MAX_RETENTION_COUNT;
             case "session.dir" -> "string path";
             default -> value instanceof Integer || value instanceof Long ? "integer >= 0"
                 : value instanceof Double ? "number >= 0" : "string";
@@ -270,6 +275,9 @@ final class TypedSettings {
         }
         if (key.startsWith("recovery.")) {
             return "Live: used by subsequent recovery operations";
+        }
+        if (key.startsWith("backup.")) {
+            return "Live: used by subsequent backup operations";
         }
         if (key.startsWith("process.") || key.startsWith("shell.")) {
             return "Live: used by new helper commands";
@@ -329,6 +337,9 @@ final class TypedSettings {
             if ("recovery.retention.max.content.bytes".equals(key) && (number < 1 || number > RecoveryJournal.MAX_CONTENT_BYTES)) {
                 return key + " must be between 1 and " + RecoveryJournal.MAX_CONTENT_BYTES;
             }
+            if ("backup.retention.count".equals(key) && (number < 1 || number > BackupPolicy.MAX_RETENTION_COUNT)) {
+                return key + " must be between 1 and " + BackupPolicy.MAX_RETENTION_COUNT;
+            }
         }
         if (value instanceof Double) {
             double number = (Double) value;
@@ -345,6 +356,9 @@ final class TypedSettings {
                 && !mode.equals("relativeabsolute") && !mode.equals("hybrid")) {
                 return key + " must be none, absolute, relative, relativeabsolute, or hybrid";
             }
+        }
+        if ("backup.directory".equals(key) && value instanceof String && ((String) value).isBlank()) {
+            return key + " must be a non-empty path";
         }
         return null;
     }

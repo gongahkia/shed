@@ -15,9 +15,16 @@ import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Stream;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.PlainDocument;
 import javax.swing.undo.UndoManager;
@@ -27,6 +34,7 @@ public class FileBuffer {
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
     private static final String LARGE_FILE_PREVIEW_MARKER = "[shed large-file preview: remaining content hidden until save or reload]";
+    private static final AtomicLong BACKUP_STAMP = new AtomicLong();
 
     private File file;
     private String scratchName;
@@ -46,6 +54,7 @@ public class FileBuffer {
     private File backupFile;
     private boolean showingPreviewOnly;
     private long fileSizeBytes;
+    private ConfigManager configManager;
 
     // Constructor for existing file
     public FileBuffer(File file) throws IOException {
@@ -57,6 +66,7 @@ public class FileBuffer {
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
+        this.configManager = configManager;
         this.file = file;
         this.scratch = false;
         this.scratchName = file == null ? "[No Name]" : file.getName();
@@ -71,10 +81,15 @@ public class FileBuffer {
 
     // Constructor for new unsaved file
     public FileBuffer(String filename) {
+        this(filename, null);
+    }
+
+    FileBuffer(String filename, ConfigManager configManager) {
         this.undoManager = new UndoManager();
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
+        this.configManager = configManager;
         this.file = filename == null ? null : new File(filename);
         this.scratch = false;
         this.scratchName = filename == null || filename.isEmpty() ? "[No Name]" : filename;
@@ -85,7 +100,7 @@ public class FileBuffer {
         this.lineCount = 0;
         this.largeFile = false;
         this.largeFileTail = null;
-        this.backupFile = buildBackupFile(this.file);
+        this.backupFile = null;
         this.showingPreviewOnly = false;
         this.lastKnownModifiedTime = 0L;
         this.fileSizeBytes = 0L;
@@ -111,6 +126,9 @@ public class FileBuffer {
     }
 
     public void load(ConfigManager configManager) throws IOException {
+        if (configManager != null) {
+            this.configManager = configManager;
+        }
         if (scratch || file == null) {
             return;
         }
@@ -121,7 +139,7 @@ public class FileBuffer {
         this.encodingName = decoded.charsetName;
         this.lineEnding = detectLineEnding(decoded.content);
         this.fileType = FileType.detect(file, decoded.content);
-        this.backupFile = buildBackupFile(file);
+        this.backupFile = null;
         this.lastKnownModifiedTime = file.exists() ? file.lastModified() : 0L;
 
         String normalized = normalizeLineEndings(decoded.content);
@@ -251,7 +269,6 @@ public class FileBuffer {
         this.modified = false;
         this.savedContent = textToWrite;
         this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
-        removeBackup();
         this.fileSizeBytes = bytes.length;
         this.fileType = FileType.detect(file, textToWrite);
     }
@@ -269,7 +286,7 @@ public class FileBuffer {
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
-        this.backupFile = buildBackupFile(newFile);
+        this.backupFile = null;
         this.fileType = FileType.detect(newFile, getFullContent());
         try {
             save();
@@ -378,7 +395,7 @@ public class FileBuffer {
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
-        this.backupFile = buildBackupFile(newFile);
+        this.backupFile = null;
         this.fileType = FileType.detect(newFile, getFullContent());
         this.lastKnownModifiedTime = newFile != null && newFile.exists() ? newFile.lastModified() : 0L;
     }
@@ -501,10 +518,29 @@ public class FileBuffer {
     }
 
     public void createBackup() throws IOException {
-        if (scratch || backupFile == null || !modified) {
+        if (scratch || file == null || !modified) {
             return;
         }
-        Files.write(backupFile.toPath(), encode(applyLineEndings(getFullContent())), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        BackupPolicy policy = backupPolicy();
+        if (!policy.enabled()) {
+            return;
+        }
+        Path directory = policy.directoryPath();
+        Files.createDirectories(directory);
+        String key = backupKey(file.toPath());
+        Path target = reserveBackupPath(directory, key);
+        try {
+            AtomicFileWriter.write(target, encode(applyLineEndings(getFullContent())));
+        } catch (IOException error) {
+            try {
+                Files.deleteIfExists(target);
+            } catch (IOException cleanupError) {
+                error.addSuppressed(cleanupError);
+            }
+            throw error;
+        }
+        backupFile = target.toFile();
+        pruneBackups(directory, key, policy.retentionCount());
     }
 
     public void removeBackup() {
@@ -530,11 +566,59 @@ public class FileBuffer {
         updateLineCount();
     }
 
-    private static File buildBackupFile(File sourceFile) {
-        if (sourceFile == null) {
-            return null;
+    private BackupPolicy backupPolicy() throws IOException {
+        if (configManager != null) {
+            try {
+                return configManager.getBackupPolicy();
+            } catch (RuntimeException error) {
+                throw new IOException("Backup configuration is invalid; set backup.directory to a valid path", error);
+            }
         }
-        return new File(sourceFile.getParentFile(), "." + sourceFile.getName() + ".swp");
+        Path parent = file.toPath().toAbsolutePath().normalize().getParent();
+        if (parent == null) {
+            throw new IOException("Backup directory is unavailable");
+        }
+        return new BackupPolicy(true, parent.toString(), 1);
+    }
+
+    private static String backupKey(Path source) throws IOException {
+        String name = source.getFileName() == null ? "buffer" : source.getFileName().toString();
+        String safeName = name.replaceAll("[^A-Za-z0-9._-]", "_");
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(source.toAbsolutePath().normalize().toString().getBytes(StandardCharsets.UTF_8));
+            return safeName + "-" + java.util.HexFormat.of().formatHex(digest, 0, 8);
+        } catch (NoSuchAlgorithmException error) {
+            throw new IOException("SHA-256 is unavailable for backup naming", error);
+        }
+    }
+
+    private static long nextBackupStamp() {
+        long now = System.currentTimeMillis();
+        return BACKUP_STAMP.updateAndGet(previous -> Math.max(now, previous + 1));
+    }
+
+    private static Path reserveBackupPath(Path directory, String key) throws IOException {
+        while (true) {
+            Path target = directory.resolve(key + "-" + nextBackupStamp() + "-" + UUID.randomUUID() + ".bak");
+            try {
+                return Files.createFile(target);
+            } catch (java.nio.file.FileAlreadyExistsException ignored) {
+            }
+        }
+    }
+
+    private static void pruneBackups(Path directory, String key, int retentionCount) throws IOException {
+        List<Path> backups;
+        try (Stream<Path> paths = Files.list(directory)) {
+            backups = paths.filter(path -> path.getFileName().toString().startsWith(key + "-"))
+                .filter(path -> path.getFileName().toString().endsWith(".bak"))
+                .sorted(Comparator.comparing((Path path) -> path.getFileName().toString()).reversed())
+                .toList();
+        }
+        for (int index = retentionCount; index < backups.size(); index++) {
+            Files.delete(backups.get(index));
+        }
     }
 
     private static class LargeFilePolicy {

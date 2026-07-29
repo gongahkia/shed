@@ -2,12 +2,14 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -145,5 +147,89 @@ public class FileBufferTest {
         assertTrue(error.getMessage().contains("Check the selected encoding and retry"));
         assertTrue(buffer.isModified());
         assertEquals("original", Files.readString(source, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void writesVersionedBackupsBeforeRetentionPruning() throws Exception {
+        String originalHome = System.getProperty("user.home");
+        Path home = tempDir.resolve("home");
+        Path directory = tempDir.resolve("backups");
+        System.setProperty("user.home", home.toString());
+        try {
+            ConfigManager config = new ConfigManager();
+            config.set("backup.directory", directory.toString());
+            config.set("backup.retention.count", "2");
+            Path source = tempDir.resolve("backup.txt");
+            Files.writeString(source, "source", StandardCharsets.UTF_8);
+            FileBuffer buffer = new FileBuffer(source.toFile(), config);
+
+            buffer.setContent("first");
+            buffer.createBackup();
+            Path first = buffer.getBackupFile().toPath();
+            buffer.setContent("second");
+            buffer.createBackup();
+            Path second = buffer.getBackupFile().toPath();
+
+            assertTrue(Files.isRegularFile(first));
+            assertTrue(Files.isRegularFile(second));
+            assertEquals(List.of("first", "second"), backupContents(directory));
+
+            buffer.setContent("third");
+            buffer.createBackup();
+
+            assertEquals(List.of("second", "third"), backupContents(directory));
+        } finally {
+            if (originalHome == null) {
+                System.clearProperty("user.home");
+            } else {
+                System.setProperty("user.home", originalHome);
+            }
+        }
+    }
+
+    @Test
+    void disabledOrFailedBackupsLeaveDirtyContentRecoverable() throws Exception {
+        String originalHome = System.getProperty("user.home");
+        Path home = tempDir.resolve("home-disabled");
+        System.setProperty("user.home", home.toString());
+        try {
+            ConfigManager config = new ConfigManager();
+            Path source = tempDir.resolve("backup-failure.txt");
+            Files.writeString(source, "source", StandardCharsets.UTF_8);
+            FileBuffer buffer = new FileBuffer(source.toFile(), config);
+            buffer.setContent("draft");
+
+            config.set("backup.enabled", "false");
+            buffer.createBackup();
+            assertNull(buffer.getBackupFile());
+
+            Path blockingFile = tempDir.resolve("not-a-directory");
+            Files.writeString(blockingFile, "block", StandardCharsets.UTF_8);
+            config.set("backup.enabled", "true");
+            config.set("backup.directory", blockingFile.resolve("backups").toString());
+
+            assertThrows(java.io.IOException.class, buffer::createBackup);
+            assertTrue(buffer.isModified());
+            assertEquals("draft", buffer.getContent());
+            assertEquals("source", Files.readString(source, StandardCharsets.UTF_8));
+        } finally {
+            if (originalHome == null) {
+                System.clearProperty("user.home");
+            } else {
+                System.setProperty("user.home", originalHome);
+            }
+        }
+    }
+
+    private List<String> backupContents(Path directory) throws Exception {
+        try (Stream<Path> paths = Files.list(directory)) {
+            return paths.sorted().map(path -> {
+                try {
+                    return Files.readString(path, StandardCharsets.UTF_8);
+                } catch (java.io.IOException error) {
+                    throw new RuntimeException(error);
+                }
+            }).toList();
+        }
     }
 }

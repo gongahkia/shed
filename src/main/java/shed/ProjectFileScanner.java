@@ -72,7 +72,7 @@ final class ProjectFileScanner {
 
     private static String relativePath(Path root, Path child) {
         Path relative = root.relativize(child.toAbsolutePath().normalize());
-        return relative.toString().replace(java.io.File.separatorChar, '/');
+        return relative.toString();
     }
 
     interface Cancellation {

@@ -1,0 +1,222 @@
+import AppKit
+import Foundation
+@testable import ItsyApp
+import ItsyConfig
+import Testing
+
+@Test @MainActor func terminalCoordinatorManagesTabsPanesFocusSearchCloseAndRestart() throws {
+	_ = NSApplication.shared
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { ItsySettings.TerminalSettings(presentation: .window) },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession
+	)
+	coordinator.showTerminal(nil)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Terminal" })
+	let contentView = try #require(panel.contentView)
+	defer {
+		coordinator.terminate()
+		panel.close()
+	}
+
+	#expect(coordinator.state.tabCount == 1)
+	#expect(coordinator.state.paneCount == 1)
+	let newTab = try #require(terminalButton(in: contentView, identifier: "terminal.new-tab"))
+	newTab.performClick(nil)
+	#expect(coordinator.state.tabCount == 2)
+
+	let split = try #require(terminalButton(in: contentView, identifier: "terminal.split-horizontal"))
+	split.performClick(nil)
+	#expect(coordinator.state.paneCount == 2)
+	#expect(Set(coordinator.state.processIdentifiers.compactMap { $0 }).count == 2)
+
+	let terminalViews = terminalDescendants(in: contentView).compactMap { $0 as? ItsyTerminalView }
+	#expect(terminalViews.count == 2)
+	panel.makeFirstResponder(terminalViews[0])
+	#expect(coordinator.state.activePaneIndex == 0)
+	terminalViews[0].ingest(Data("focus-search-target".utf8))
+	let find = try #require(terminalButton(in: contentView, identifier: "terminal.find"))
+	find.performClick(nil)
+	let searchField = try #require(terminalDescendants(in: contentView).compactMap { $0 as? NSSearchField }.first)
+	#expect(searchField.superview?.isHidden == false)
+	#expect(terminalViews[0].setSearch(query: "search-target", regex: false) == 1)
+
+	let activePaneIndex = try #require(coordinator.state.activePaneIndex)
+	let processBeforeRestart = try #require(coordinator.state.processIdentifiers[activePaneIndex])
+	let restart = try #require(terminalButton(in: contentView, identifier: "terminal.restart"))
+	restart.performClick(nil)
+	#expect(try #require(coordinator.state.processIdentifiers[activePaneIndex]) != processBeforeRestart)
+
+	let closePane = try #require(terminalButton(in: contentView, identifier: "terminal.close-pane"))
+	closePane.performClick(nil)
+	#expect(coordinator.state.paneCount == 1)
+	let closeTab = try #require(terminalButton(in: contentView, identifier: "terminal.close-tab.1"))
+	closeTab.performClick(nil)
+	#expect(coordinator.state.tabCount == 1)
+}
+
+@Test func terminalWorkspaceStatePersistsOnlyRestorablePaneConfiguration() throws {
+	let state = TerminalWorkspaceState(
+		selectedTabIndex: 0,
+		tabs: [
+			TerminalTabState(
+				title: "project",
+				activePaneIndex: 1,
+				rootPane: .split(
+					orientation: .horizontal,
+					children: [
+						.leaf(currentDirectoryPath: "/tmp/project"),
+						.leaf(currentDirectoryPath: "/tmp/project/tests"),
+					]
+				)
+			),
+		]
+	)
+	let data = try JSONEncoder().encode(state)
+
+	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: data) == state)
+	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("pid"))
+	#expect(!String(decoding: data, as: UTF8.self).lowercased().contains("session"))
+}
+
+@Test func terminalWorkspaceStateMigratesV1LayoutJSONToV2PaneTree() throws {
+	let v1 = Data(
+		"""
+		{"selectedTabIndex":0,"tabs":[{"currentDirectoryPath":"/tmp/project","layout":"H[L,V[L,L]]","paneCurrentDirectoryPaths":["/tmp/project","/tmp/project/src","/tmp/project/tests"]}]}
+		""".utf8
+	)
+	let state = try JSONDecoder().decode(TerminalWorkspaceState.self, from: v1)
+
+	#expect(TerminalWorkspaceState.requiresMigration(for: v1))
+	#expect(state.schemaVersion == TerminalWorkspaceState.currentSchemaVersion)
+	#expect(state.selectedTabIndex == 0)
+	#expect(state.tabs[0].title == "project")
+	#expect(state.tabs[0].activePaneIndex == 0)
+	#expect(state.tabs[0].rootPane == .split(
+		orientation: .horizontal,
+		children: [
+			.leaf(currentDirectoryPath: "/tmp/project"),
+			.split(
+				orientation: .vertical,
+				children: [
+					.leaf(currentDirectoryPath: "/tmp/project/src"),
+					.leaf(currentDirectoryPath: "/tmp/project/tests"),
+				]
+			),
+		]
+	))
+	let encoded = try JSONEncoder().encode(state)
+	#expect(try JSONDecoder().decode(TerminalWorkspaceState.self, from: encoded) == state)
+	#expect(!TerminalWorkspaceState.requiresMigration(for: encoded))
+	#expect(!String(decoding: encoded, as: UTF8.self).contains("layout"))
+}
+
+@Test func terminalWorkspaceStateRejectsInvalidV2PaneTree() {
+	let invalid = Data(
+		"""
+		{"schemaVersion":2,"selectedTabIndex":0,"tabs":[{"title":"project","activePaneIndex":0,"rootPane":{"kind":"leaf","currentDirectoryPath":"project"}}]}
+		""".utf8
+	)
+
+	#expect(throws: DecodingError.self) {
+		try JSONDecoder().decode(TerminalWorkspaceState.self, from: invalid)
+	}
+}
+
+@Test @MainActor func terminalCoordinatorEmbedsByDefault() {
+	_ = NSApplication.shared
+	let host = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var visibility: [Bool] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { ItsySettings.TerminalSettings() },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { host },
+		setEmbeddedTerminalVisible: { _, visible in visibility.append(visible) }
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	#expect(coordinator.state.tabCount == 1)
+	#expect(host.subviews.count == 1)
+	#expect(visibility == [true])
+	#expect(!NSApp.windows.compactMap { $0 as? NSPanel }.contains { $0.title == "Terminal" && $0.isVisible })
+
+	coordinator.showTerminal(nil)
+	#expect(visibility == [true, false])
+}
+
+@Test @MainActor func terminalCoordinatorRelocatesActivePresentation() throws {
+	_ = NSApplication.shared
+	let host = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var settings = ItsySettings.TerminalSettings()
+	var visibility: [Bool] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { settings },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { host },
+		setEmbeddedTerminalVisible: { _, visible in visibility.append(visible) }
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	settings.presentation = .window
+	coordinator.applyTerminalSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Terminal" && $0.isVisible })
+	defer { panel.close() }
+	#expect(host.subviews.isEmpty)
+	#expect(visibility == [true, false])
+
+	settings.presentation = .bottom
+	coordinator.applyTerminalSettings(settings)
+	#expect(!panel.isVisible)
+	#expect(host.subviews.count == 1)
+	#expect(visibility == [true, false, true])
+}
+
+@Test @MainActor func terminalCoordinatorKeepsTheOriginatingHostAcrossPresentationReloads() throws {
+	_ = NSApplication.shared
+	let firstHost = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	let secondHost = NSView(frame: NSRect(x: 0, y: 0, width: 960, height: 280))
+	var activeHost = firstHost
+	var settings = ItsySettings.TerminalSettings()
+	var visibility: [String] = []
+	let coordinator = TerminalCoordinator(
+		settingsProvider: { settings },
+		activeDocumentProvider: { nil },
+		sessionFactory: terminalCoordinatorTestSession,
+		embeddedHostProvider: { activeHost },
+		setEmbeddedTerminalVisible: { host, visible in
+			visibility.append("\(host === firstHost ? "first" : "second"):\(visible)")
+		}
+	)
+	defer { coordinator.terminate() }
+
+	coordinator.showTerminal(nil)
+	activeHost = secondHost
+	settings.presentation = .window
+	coordinator.applyTerminalSettings(settings)
+	let panel = try #require(NSApp.windows.compactMap { $0 as? NSPanel }.first { $0.title == "Terminal" && $0.isVisible })
+	defer { panel.close() }
+	settings.presentation = .bottom
+	coordinator.applyTerminalSettings(settings)
+
+	#expect(visibility == ["first:true", "first:false", "first:true"])
+	#expect(firstHost.subviews.count == 1)
+	#expect(secondHost.subviews.isEmpty)
+}
+
+@MainActor private func terminalCoordinatorTestSession(_ directory: URL) -> ItsyTerminalSession {
+	var environment = ProcessInfo.processInfo.environment
+	environment["SHELL"] = "/bin/sh"
+	return ItsyTerminalSession(currentDirectoryURL: directory, environment: environment)
+}
+
+private func terminalButton(in view: NSView, identifier: String) -> NSButton? {
+	terminalDescendants(in: view).compactMap { $0 as? NSButton }.first { $0.identifier?.rawValue == identifier }
+}
+
+private func terminalDescendants(in view: NSView) -> [NSView] {
+	view.subviews + view.subviews.flatMap { terminalDescendants(in: $0) }
+}

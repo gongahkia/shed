@@ -1,0 +1,1199 @@
+import AppKit
+import Dispatch
+import Foundation
+import ItsyConfig
+import ItsyEditor
+import ItsyKeymap
+
+@MainActor final class AppCoordinator: NSObject, ApplicationServiceHost {
+	private let documentController: ItsyDocumentController
+	private let services: ApplicationServiceContainer
+	private var activeKeymapProfile = KeymapProfile.plain
+	private var commandLineKeymapProfile: KeymapProfile?
+	private lazy var menuCoordinator = MenuCoordinator(
+		documentController: documentController,
+		actionTarget: self,
+		gitTarget: gitCoordinator,
+		updateTarget: sparkleUpdateCoordinator
+	)
+	private var sparkleUpdateCoordinator: SparkleUpdateCoordinator { services.sparkleUpdateCoordinator }
+	private var commandRegistry: CommandRegistry {
+		get { services.commandRegistry }
+		set { services.commandRegistry = newValue }
+	}
+	private var commandPaletteCoordinator: CommandPaletteCoordinator { services.commandPaletteCoordinator }
+	private var settingsCoordinator: SettingsCoordinator { services.settingsCoordinator }
+	private var workbenchRecoveryPanel: WorkbenchRecoveryPanel { services.workbenchRecoveryPanel }
+	private var projectFindCoordinator: ProjectFindCoordinator { services.projectFindCoordinator }
+	private var gitCoordinator: GitCoordinator { services.gitCoordinator }
+	private var gitReviewWorkspaceCoordinator: GitReviewWorkspaceCoordinator { services.gitReviewWorkspaceCoordinator }
+	private var taskCoordinator: TaskCoordinator { services.taskCoordinator }
+	private var debuggerCoordinator: DebuggerCoordinator { services.debuggerCoordinator }
+	private var terminalCoordinator: TerminalCoordinator { services.terminalCoordinator }
+	private var problemsCoordinator: ProblemsCoordinator { services.problemsCoordinator }
+	private var outlineCoordinator: OutlineCoordinator { services.outlineCoordinator }
+	private var extensionsCoordinator: ExtensionsCoordinator { services.extensionsCoordinator }
+	private var integrationHealthPanel: IntegrationHealthPanel?
+	private var integrationOutputConsolePanel: IntegrationOutputConsolePanel?
+	private var benchScenarioFinished = false
+
+	init(documentController: ItsyDocumentController) {
+		self.documentController = documentController
+		services = ApplicationServiceContainer(documentController: documentController)
+		recordBenchStage("delegate_init")
+		recordBenchStage("delegate_keymap_begin")
+		let initialSettings = ItsySettingsStore().load(
+			workspaceRoot: ItsyWorkspaceController.currentRootURL,
+			fallback: EditorPreferences.legacySettings()
+		).settings.normalized()
+		do {
+			let profile = try KeymapProfile.selected(
+				from: CommandLine.arguments,
+				default: Self.keymapProfile(for: initialSettings.editor.keymap)
+			)
+			activeKeymapProfile = profile
+			commandLineKeymapProfile = Self.hasCommandLineKeymapProfile(CommandLine.arguments) ? profile : nil
+			let bindings = try KeymapConfiguration.load(profile: profile)
+			ItsyAppKeymap.configure(profile: profile, bindings: bindings)
+		} catch {
+			NSLog("failed to load keymap profile: \(error)")
+			activeKeymapProfile = .plain
+			ItsyAppKeymap.configure(profile: .plain, bindings: [])
+		}
+		recordBenchStage("delegate_keymap_end")
+		super.init()
+		do {
+			try services.connect(host: self)
+		} catch {
+			preconditionFailure("failed to connect application services: \(error)")
+		}
+		NotificationCenter.default.addObserver(
+			self,
+			selector: #selector(closeSecondarySidebar(_:)),
+			name: .itsySecondarySidebarCloseRequested,
+			object: nil
+		)
+		recordBenchStage("delegate_settings_begin")
+		_ = settingsCoordinator.currentSettings
+		AppTheme.install()
+		AppTheme.update(settings: settingsCoordinator.currentSettings)
+		ItsyUIConfiguration.install()
+		ItsyUIConfiguration.update(settingsCoordinator.currentSettings.ui)
+		recordBenchStage("delegate_settings_end")
+		recordBenchStage("delegate_palette_bridge_begin")
+		commandPaletteCoordinator.installBridge()
+		recordBenchStage("delegate_palette_bridge_end")
+		recordBenchStage("delegate_command_bridge_begin")
+		installCommandBridge()
+		recordBenchStage("delegate_command_bridge_end")
+		installProblemsBridge()
+	}
+
+	func applicationDidFinishLaunching(_: Notification) {
+		recordBenchStage("app_did_finish_launching")
+		prepareManagedSupportCatalog()
+		installServicesProvider()
+		menuCoordinator.installMainMenu()
+		sparkleUpdateCoordinator.start(automaticallyChecks: settingsCoordinator.currentSettings.updates.automaticallyCheck)
+		recordBenchStage("main_menu_installed")
+		recordBenchStage("initial_document_open_begin")
+		openInitialDocument()
+		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)
+		recordBenchStage("initial_document_opened")
+		scheduleBenchScenarioIfRequested()
+		if CommandLine.arguments.contains("--bench-exit-after-initial-document") {
+			exitForBenchReady()
+		}
+		NSApp.activate(ignoringOtherApps: true)
+		recordBenchStage("app_activated")
+	}
+
+	private func scheduleBenchScenarioIfRequested() {
+		guard let request = BenchScenarioRequest.current() else { return }
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(250)) { [weak self] in
+			self?.runBenchScenario(request, attemptsRemaining: 120)
+		}
+	}
+
+	private func runBenchScenario(_ request: BenchScenarioRequest, attemptsRemaining: Int) {
+		switch request.scenario {
+		case .palette:
+			guard ItsyWorkspaceController.currentWorkspaceIndex != nil, !ItsyWorkspaceController.isBuildingWorkspaceIndex else {
+				retryBenchScenario(request, attemptsRemaining: attemptsRemaining)
+				return
+			}
+			finishBenchScenario(
+				request,
+				succeeded: commandPaletteCoordinator.runBenchmarkFilePalette(
+					query: request.query,
+					expectedTop: request.expectedTop,
+					expectedResultCount: request.expectedResultCount
+				)
+			)
+		case .scroll:
+			guard let controller = activeEditorWindowController() else {
+				retryBenchScenario(request, attemptsRemaining: attemptsRemaining)
+				return
+			}
+			controller.runBenchmarkScroll(deltaY: request.scrollDelta) { [weak self] in
+				self?.finishBenchScenario(request, succeeded: true)
+			}
+			DispatchQueue.main.asyncAfter(deadline: .now() + 30) { [weak self] in
+				self?.finishBenchScenario(request, succeeded: false)
+			}
+		}
+	}
+
+	private func retryBenchScenario(_ request: BenchScenarioRequest, attemptsRemaining: Int) {
+		guard attemptsRemaining > 0 else {
+			finishBenchScenario(request, succeeded: false)
+			return
+		}
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(100)) { [weak self] in
+			self?.runBenchScenario(request, attemptsRemaining: attemptsRemaining - 1)
+		}
+	}
+
+	private func finishBenchScenario(_ request: BenchScenarioRequest, succeeded: Bool) {
+		guard !benchScenarioFinished else { return }
+		benchScenarioFinished = true
+		if PerformanceTrace.isEnabled {
+			PerformanceTrace.record("scenario.complete", attributes: [
+				"scenario": request.scenario.rawValue,
+				"outcome": succeeded ? "success" : "failure",
+			])
+		}
+		guard request.exitAfterCompletion else { return }
+		DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(500)) {
+			NSApp.terminate(nil)
+		}
+	}
+
+	private func prepareManagedSupportCatalog() {
+		guard let configuration = ManagedSupportCatalogUpdateConfiguration.bundled() else { return }
+		do {
+			_ = try ManagedSupportCatalogUpdateClient.loadActive(configuration: configuration)
+		} catch {
+			NSLog("failed to load signed LSP catalog: \(error)")
+		}
+		guard settingsCoordinator.currentSettings.lsp.catalogAutomaticallyCheck else { return }
+		Task {
+			do {
+				_ = try await ManagedSupportCatalogUpdateClient.check(configuration: configuration)
+			} catch {
+				NSLog("signed LSP catalog check failed: \(error)")
+			}
+		}
+	}
+
+	func applicationWillTerminate(_: Notification) {
+		EditorWindowController.shutdownAllLSP()
+		debuggerCoordinator.terminate()
+		terminalCoordinator.terminate()
+		taskCoordinator.terminate()
+	}
+
+	func application(_: NSApplication, openFile filename: String) -> Bool {
+		openPath(URL(fileURLWithPath: filename))
+	}
+
+	func application(
+		_: NSApplication,
+		continue userActivity: NSUserActivity,
+		restorationHandler _: @escaping ([NSUserActivityRestoring]) -> Void
+	) -> Bool {
+		guard userActivity.activityType == ItsyDocument.handoffActivityType,
+		      let value = userActivity.userInfo?[ItsyDocument.handoffURLKey] as? String,
+		      let url = URL(string: value)
+		else {
+			return false
+		}
+		guard documentController.openDocument(at: url),
+		      let document = documentController.document(for: url) as? ItsyDocument
+		else {
+			return false
+		}
+		if let offset = userActivity.userInfo?[ItsyDocument.handoffCursorOffsetKey] as? Int {
+			document.restoreHandoffCursorOffset(offset)
+		}
+		return true
+	}
+
+	@objc func closeCurrentDocument(_ sender: Any?) {
+		if let controller = NSApp.keyWindow?.windowController as? EditorWindowController {
+			controller.closeActiveTabOrDocument()
+			return
+		}
+		if let document = NSApp.keyWindow?.windowController?.document as? NSDocument {
+			document.close()
+			return
+		}
+		if let document = documentController.currentDocument {
+			document.close()
+			return
+		}
+		if let document = documentController.documents.last {
+			document.close()
+			return
+		}
+		NSApp.keyWindow?.performClose(sender)
+	}
+
+	@objc func newWindow(_: Any?) {
+		do {
+			let document = try documentController.makeUntitledDocument(ofType: documentController.defaultType ?? "public.data")
+			documentController.addDocument(document)
+			document.makeWindowControllers()
+			document.showWindows()
+			ItsyTabCoordinator.refresh()
+		} catch {
+			NSLog("failed to create new window: \(error)")
+		}
+	}
+
+	@objc func toggleCommandPalette(_ sender: Any?) {
+		commandPaletteCoordinator.toggleCommandPalette(sender)
+	}
+
+	@objc func showWorkspaceSymbolPalette(_ sender: Any?) {
+		commandPaletteCoordinator.showWorkspaceSymbolPalette(sender)
+	}
+
+	@objc func showFileSymbolPalette(_ sender: Any?) {
+		commandPaletteCoordinator.showFileSymbolPalette(sender)
+	}
+
+	@objc func showFilePalette(_ sender: Any?) {
+		commandPaletteCoordinator.showFilePalette(sender)
+	}
+
+	@objc func showLinePalette(_ sender: Any?) {
+		commandPaletteCoordinator.showLinePalette(sender)
+	}
+
+	func enterGitReviewWorkspace(_ session: GitReviewModeSession) -> GitReviewWorkspaceTransition {
+		gitReviewWorkspaceCoordinator.enter(session)
+	}
+
+	func exitGitReviewWorkspace(_ result: GitReviewModeExitResult) -> GitReviewWorkspaceTransition {
+		gitReviewWorkspaceCoordinator.exit(result)
+	}
+
+	func makeCommandRegistry(workspaceRoot: URL? = nil) -> CommandRegistry {
+		let workspaceRoot = workspaceRoot ?? ItsyWorkspaceController.currentRootURL
+		var registry = CommandRegistry()
+		do {
+			let commands = [
+				Command(id: "file.new", title: L10n.string("New File"), defaultKey: "Cmd-N") { [weak self] in
+					self?.documentController.newDocument(nil)
+				},
+				Command(id: "file.open", title: L10n.string("Open File"), defaultKey: "Cmd-O") { [weak self] in
+					self?.documentController.openDocument(nil)
+				},
+				Command(id: "file.newWindow", title: L10n.string("New Window"), defaultKey: "Cmd-Shift-N") { [weak self] in
+					self?.newWindow(nil)
+				},
+				Command(id: "file.openFolder", title: L10n.string("Open Folder"), defaultKey: "Cmd-Shift-O") { [weak self] in
+					self?.openFolder(nil)
+				},
+				Command(id: "file.addFolderToWorkspace", title: L10n.string("Add Folder to Workspace..."),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.addFolderToWorkspace(nil)
+				},
+				Command(id: "file.save", title: L10n.string("Save File"), defaultKey: "Cmd-S") { [weak self] in
+					self?.activeDocument()?.save(nil)
+				},
+				Command(id: "file.close", title: L10n.string("Close File"), defaultKey: "Cmd-W") { [weak self] in
+					self?.closeCurrentDocument(nil)
+				},
+				Command(id: "file.nextBuffer", title: L10n.string("Next Tab"), defaultKey: "Ctrl-Tab") { [weak self] in
+					self?.selectAdjacentTab(delta: 1)
+				},
+				Command(id: "file.previousBuffer", title: L10n.string("Previous Tab"),
+				        defaultKey: "Ctrl-Shift-Tab")
+				{ [weak self] in
+					self?.selectAdjacentTab(delta: -1)
+				},
+				Command(id: "file.selectTab.1", title: L10n.string("Select Tab 1"), defaultKey: "Cmd-1") { [weak self] in
+					self?.selectTab(atDisplayIndex: 0)
+				},
+				Command(id: "file.selectTab.2", title: L10n.string("Select Tab 2"), defaultKey: "Cmd-2") { [weak self] in
+					self?.selectTab(atDisplayIndex: 1)
+				},
+				Command(id: "file.selectTab.3", title: L10n.string("Select Tab 3"), defaultKey: "Cmd-3") { [weak self] in
+					self?.selectTab(atDisplayIndex: 2)
+				},
+				Command(id: "file.selectTab.4", title: L10n.string("Select Tab 4"), defaultKey: "Cmd-4") { [weak self] in
+					self?.selectTab(atDisplayIndex: 3)
+				},
+				Command(id: "file.selectTab.5", title: L10n.string("Select Tab 5"), defaultKey: "Cmd-5") { [weak self] in
+					self?.selectTab(atDisplayIndex: 4)
+				},
+				Command(id: "file.selectTab.6", title: L10n.string("Select Tab 6"), defaultKey: "Cmd-6") { [weak self] in
+					self?.selectTab(atDisplayIndex: 5)
+				},
+				Command(id: "file.selectTab.7", title: L10n.string("Select Tab 7"), defaultKey: "Cmd-7") { [weak self] in
+					self?.selectTab(atDisplayIndex: 6)
+				},
+				Command(id: "file.selectTab.8", title: L10n.string("Select Tab 8"), defaultKey: "Cmd-8") { [weak self] in
+					self?.selectTab(atDisplayIndex: 7)
+				},
+				Command(id: "file.selectTab.9", title: L10n.string("Select Tab 9"), defaultKey: "Cmd-9") { [weak self] in
+					self?.selectTab(atDisplayIndex: 8)
+				},
+				Command(id: "view.commandPalette", title: L10n.string("Command Palette"),
+				        defaultKey: "Cmd-Shift-P")
+				{ [weak self] in
+					self?.toggleCommandPalette(nil)
+				},
+				Command(id: "view.sidebar.toggle", title: L10n.string("Toggle Sidebar"), defaultKey: "Cmd-B") { [weak self] in
+					self?.activeEditorWindowController()?.toggleSidebar()
+				},
+				Command(id: "view.hiddenFiles.toggle", title: L10n.string("Toggle Hidden Files"),
+				        defaultKey: "Cmd-Shift-.")
+				{ [weak self] in
+					self?.activeEditorWindowController()?.toggleHiddenFiles()
+				},
+				Command(
+					id: "history.undoTree.toggle",
+					title: L10n.string("History: Toggle Undo Tree"),
+					defaultKey: nil
+				) { [weak self] in
+					self?.activeEditorWindowController()?.toggleUndoTree(nil)
+				},
+				Command(id: "view.focusEditor", title: L10n.string("Focus Editor"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusEditor()
+				},
+				Command(id: "view.focusSidebar", title: L10n.string("Focus Sidebar"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusSidebar()
+				},
+				Command(id: "view.focusSecondarySidebar", title: L10n.string("Focus Secondary Sidebar"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusSecondarySidebar()
+				},
+				Command(id: "view.focusTabs", title: L10n.string("Focus Tabs"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.focusTabs()
+				},
+				Command(id: "view.zoomIn", title: L10n.string("Zoom In"), defaultKey: "Cmd-+") { [weak self] in
+					self?.zoomIn(nil)
+				},
+				Command(id: "view.zoomOut", title: L10n.string("Zoom Out"), defaultKey: "Cmd--") { [weak self] in
+					self?.zoomOut(nil)
+				},
+				Command(id: "view.resetZoom", title: L10n.string("Reset Zoom"), defaultKey: "Cmd-0") { [weak self] in
+					self?.resetZoom(nil)
+				},
+				Command(id: "nav.gotoSymbolWorkspace", title: L10n.string("Go to Symbol in Workspace"),
+				        defaultKey: "Cmd-T")
+				{ [weak self] in
+					self?.showWorkspaceSymbolPalette(nil)
+				},
+				Command(id: "nav.gotoSymbolFile", title: L10n.string("Go to Symbol in File"),
+				        defaultKey: "Cmd-Shift-O")
+				{ [weak self] in
+					self?.showFileSymbolPalette(nil)
+				},
+				Command(id: "nav.gotoFile", title: L10n.string("Go to File"), defaultKey: "Cmd-P") { [weak self] in
+					self?.showFilePalette(nil)
+				},
+				Command(id: "nav.gotoLine", title: L10n.string("Go to Line"), defaultKey: "Ctrl-G") { [weak self] in
+					self?.showLinePalette(nil)
+				},
+				Command(id: "view.outline", title: L10n.string("Outline"), defaultKey: "Cmd-Opt-7") { [weak self] in
+					self?.showOutline(nil)
+				},
+				Command(id: "lsp.references", title: L10n.string("Find All References"), defaultKey: "Shift-F12") { [weak self] in
+					_ = self?.activeEditorWindowController()?.findAllReferences(nil)
+				},
+				Command(id: "lsp.callHierarchy", title: L10n.string("Find Callers of Symbol"), defaultKey: nil) { [weak self] in
+					_ = self?.activeEditorWindowController()?.findCallHierarchy(nil)
+				},
+				Command(id: "lsp.rename", title: L10n.string("Rename Symbol"), defaultKey: "F2") { [weak self] in
+					_ = self?.activeEditorWindowController()?.renameSymbol(nil)
+				},
+				Command(id: "lsp.formatDocument", title: L10n.string("Format Document"), defaultKey: "Shift-Opt-F") { [weak self] in
+					_ = self?.activeEditorWindowController()?.formatDocument(nil)
+				},
+				Command(id: "lsp.formatSelection", title: L10n.string("Format Selection"), defaultKey: nil) { [weak self] in
+					_ = self?.activeEditorWindowController()?.formatSelection(nil)
+				},
+				Command(id: "lsp.codeAction", title: L10n.string("Code Action"), defaultKey: "Cmd-.") { [weak self] in
+					_ = self?.activeEditorWindowController()?.showCodeActions(nil)
+				},
+				Command(id: "lsp.status", title: L10n.string("Language Server Status"), defaultKey: nil) { [weak self] in
+					self?.activeEditorWindowController()?.showLSPStatus()
+				},
+				Command(id: "integration.health", title: L10n.string("Integration Health"), defaultKey: nil) { [weak self] in
+					self?.showIntegrationHealth(nil)
+				},
+				Command(id: "integration.output", title: L10n.string("Integration Output"), defaultKey: nil) { [weak self] in
+					self?.showIntegrationOutput(nil)
+				},
+				Command(id: "lsp.configuration", title: L10n.string("Language Server Configuration"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.settingsCoordinator.showLSPConfiguration(nil)
+				},
+				Command(id: "support.manage", title: L10n.string("Language & Debugger Support"), defaultKey: nil) { [weak self] in
+					self?.showManagedSupport(nil)
+				},
+				Command(id: "app.settings", title: L10n.string("Settings"), defaultKey: "Cmd-,") { [weak self] in
+					self?.showSettings(nil)
+				},
+				Command(id: "app.settingsCatalog", title: L10n.string("Settings: Open Catalog"), defaultKey: nil) { [weak self] in
+					self?.settingsCoordinator.showSettingsCatalog(nil)
+				},
+				Command(id: "app.settingsUserFile", title: L10n.string("Settings: Open User TOML"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.settingsCoordinator.openSettingsFile(workspace: false)
+				},
+				Command(id: "app.settingsWorkspaceFile", title: L10n.string("Settings: Open Workspace TOML"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.settingsCoordinator.openSettingsFile(workspace: true)
+				},
+				Command(id: "app.keyboardShortcuts", title: L10n.string("Keyboard Shortcuts"),
+				        defaultKey: "Cmd-K Cmd-S")
+				{ [weak self] in
+					self?.showSettings(nil)
+				},
+				Command(id: "edit.find", title: L10n.string("Find"), defaultKey: "Cmd-F") { [weak self] in
+					self?.toggleFindBar(nil)
+				},
+				Command(id: "edit.findNext", title: L10n.string("Find Next"), defaultKey: "Cmd-G") { [weak self] in
+					self?.findNext(nil)
+				},
+				Command(id: "edit.findPrevious", title: L10n.string("Find Previous"), defaultKey: "Cmd-Shift-G") { [weak self] in
+					self?.findPrevious(nil)
+				},
+				Command(id: "edit.selectAllFindMatches", title: L10n.string("Select All Find Matches"),
+				        defaultKey: "Cmd-Ctrl-G")
+				{ [weak self] in
+					self?.selectAllFindMatches(nil)
+				},
+				Command(id: "edit.findInProject", title: L10n.string("Find in Project"), defaultKey: "Cmd-Shift-F") { [weak self] in
+					self?.showProjectFind(nil)
+				},
+				Command(id: "git.changes", title: L10n.string("Git Changes"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitChanges(_:)))
+				},
+				Command(id: "git.refresh", title: L10n.string("Refresh Git Status"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.refreshGitChanges(_:)))
+				},
+				Command(id: "git.blame", title: L10n.string("Blame Current File"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitBlame(_:)))
+				},
+				Command(id: "git.fileHistory", title: L10n.string("File History"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitFileHistory(_:)))
+				},
+				Command(id: "git.lineHistory", title: L10n.string("Line History"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitLineHistory(_:)))
+				},
+				Command(id: "git.stashes", title: L10n.string("Stashes"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.showGitStashes(_:)))
+				},
+				Command(id: "git.stashSave", title: L10n.string("Git: Save Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
+				},
+				Command(id: "git.stashApply", title: L10n.string("Git: Apply Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.applyLatestGitStash(_:)))
+				},
+				Command(id: "git.stashPop", title: L10n.string("Git: Pop Stash"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.popLatestGitStash(_:)))
+				},
+				Command(id: "git.stashCurrent", title: L10n.string("Stash Current Changes"),
+				        defaultKey: "Cmd-Shift-S")
+				{ [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.stashCurrentGitChanges(_:)))
+				},
+				Command(id: "git.cancelRemote", title: L10n.string("Cancel Remote Operation"), defaultKey: nil) { [weak self] in
+					self?.sendGitAction(#selector(GitCoordinator.cancelGitRemote(_:)))
+				},
+				Command(id: "task.run", title: L10n.string("Run Task"), defaultKey: nil) { [weak self] in
+					self?.showTasks(nil)
+				},
+				Command(id: "task.refresh", title: L10n.string("Refresh Tasks"), defaultKey: nil) { [weak self] in
+					self?.refreshTasks(nil)
+				},
+				Command(id: "extensions.manage", title: L10n.string("Extensions"), defaultKey: nil) { [weak self] in
+					self?.showExtensions(nil)
+				},
+				Command(id: "extensions.reload", title: L10n.string("Reload Extension Contributions"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.reloadExtensionContributions(nil)
+				},
+				Command(id: "debug.start", title: L10n.string("Start Debugging"), defaultKey: "Cmd-F5") { [weak self] in
+					self?.showDebugLaunchConfigPicker(nil)
+				},
+				Command(id: "debug.callStack", title: L10n.string("Call Stack"), defaultKey: nil) { [weak self] in
+					self?.showDebugCallStack(nil)
+				},
+				Command(id: "debug.variables", title: L10n.string("Variables"), defaultKey: nil) { [weak self] in
+					self?.showDebugVariables(nil)
+				},
+				Command(id: "debug.watches", title: L10n.string("Watches"), defaultKey: nil) { [weak self] in
+					self?.showDebugWatches(nil)
+				},
+				Command(id: "debug.console", title: L10n.string("Debug Console"), defaultKey: nil) { [weak self] in
+					self?.showDebugConsole(nil)
+				},
+				Command(id: "debug.continue", title: L10n.string("Continue"), defaultKey: nil) { [weak self] in
+					self?.continueDebug(nil)
+				},
+				Command(id: "debug.stepOver", title: L10n.string("Step Over"), defaultKey: nil) { [weak self] in
+					self?.stepOverDebug(nil)
+				},
+				Command(id: "debug.stepIn", title: L10n.string("Step In"), defaultKey: nil) { [weak self] in
+					self?.stepInDebug(nil)
+				},
+				Command(id: "debug.stepOut", title: L10n.string("Step Out"), defaultKey: nil) { [weak self] in
+					self?.stepOutDebug(nil)
+				},
+				Command(id: "debug.pause", title: L10n.string("Pause"), defaultKey: nil) { [weak self] in
+					self?.pauseDebug(nil)
+				},
+				Command(id: "debug.restart", title: L10n.string("Restart"), defaultKey: nil) { [weak self] in
+					self?.restartDebug(nil)
+				},
+				Command(id: "debug.stop", title: L10n.string("Stop"), defaultKey: nil) { [weak self] in
+					self?.stopDebug(nil)
+				},
+				Command(id: "terminal.toggle", title: L10n.string("Terminal"), defaultKey: "Cmd-J") { [weak self] in
+					self?.showTerminal(nil)
+				},
+				Command(id: "terminal.newTab", title: L10n.string("Terminal: New Tab"), defaultKey: nil) { [weak self] in
+					self?.newTerminalTab(nil)
+				},
+				Command(id: "terminal.splitHorizontal", title: L10n.string("Terminal: Split Horizontal"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.splitTerminalHorizontal(nil)
+				},
+				Command(id: "terminal.splitVertical", title: L10n.string("Terminal: Split Vertical"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.splitTerminalVertical(nil)
+				},
+				Command(id: "terminal.find", title: L10n.string("Terminal: Find"), defaultKey: nil) { [weak self] in
+					self?.findInTerminal(nil)
+				},
+				Command(id: "terminal.findNext", title: L10n.string("Terminal: Find Next"), defaultKey: nil) { [weak self] in
+					self?.findTerminalNext(nil)
+				},
+				Command(id: "terminal.findPrevious", title: L10n.string("Terminal: Find Previous"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.findTerminalPrevious(nil)
+				},
+				Command(
+					id: "terminal.openAtFileDirectory",
+					title: L10n.string("Terminal: Open at File Directory"),
+					defaultKey: nil
+				) { [weak self] in
+					self?.openTerminalAtFileDirectory(nil)
+				},
+				Command(id: "terminal.revealCWD", title: L10n.string("Terminal: Reveal CWD in File Tree"),
+				        defaultKey: nil)
+				{ [weak self] in
+					self?.revealTerminalCWD(nil)
+				},
+				Command(id: "view.problems", title: L10n.string("Problems"), defaultKey: "Cmd-Shift-M") { [weak self] in
+					self?.showProblems(nil)
+				},
+				Command(id: "problems.next", title: L10n.string("Next Problem"), defaultKey: "Ctrl-Alt-N") { [weak self] in
+					self?.showNextProblem(nil)
+				},
+				Command(id: "problems.previous", title: L10n.string("Previous Problem"), defaultKey: "Ctrl-Alt-P") { [weak self] in
+					self?.showPreviousProblem(nil)
+				},
+				Command(id: "editor.moveLeft", title: L10n.string("Move Left"), defaultKey: "Left") { [weak self] in
+					self?.performEditorMotion(.charBackward)
+				},
+				Command(id: "editor.moveRight", title: L10n.string("Move Right"), defaultKey: "Right") { [weak self] in
+					self?.performEditorMotion(.charForward)
+				},
+				Command(id: "editor.moveLineStart", title: L10n.string("Move Line Start"), defaultKey: "Cmd-Left") { [weak self] in
+					self?.performEditorMotion(.lineStart)
+				},
+				Command(id: "editor.moveLineEnd", title: L10n.string("Move Line End"), defaultKey: "Cmd-Right") { [weak self] in
+					self?.performEditorMotion(.lineEnd)
+				},
+			]
+			try AppCommandProviderRegistry.register(commands + KeymapCommandCatalog.hiddenCommands, into: &registry)
+			registerExtensionCommands(from: workspaceRoot, into: &registry)
+			return registry
+		} catch {
+			preconditionFailure("failed to register commands: \(error)")
+		}
+	}
+
+	private func registerExtensionCommands(from workspaceRoot: URL?, into registry: inout CommandRegistry) {
+		guard let workspaceRoot else {
+			return
+		}
+		let commands = ExtensionCommandDiscovery.discover(root: workspaceRoot) { manifest, contribution in
+			NSLog("extension command requested: \(manifest.identifier).\(contribution.id)")
+		}
+		for command in commands {
+			do {
+				try registry.register(command)
+			} catch {
+				NSLog("failed to register extension command \(command.id): \(error)")
+			}
+		}
+	}
+
+	private func extensionKeybindings(from workspaceRoot: URL, commandRegistry: CommandRegistry) -> [KeyBinding] {
+		ExtensionKeybindingMapper.discover(
+			root: workspaceRoot,
+			mode: ItsyAppKeymap.currentInitialMode,
+			validCommandIDs: Set(commandRegistry.allCommands.map(\.id))
+		)
+	}
+
+	func activeDocument() -> NSDocument? {
+		NSApp.keyWindow?.windowController?.document as? NSDocument ?? documentController.currentDocument
+	}
+
+	func activeEditorWindowController() -> EditorWindowController? {
+		NSApp.keyWindow?.windowController as? EditorWindowController
+			?? documentController.currentDocument?.windowControllers.first as? EditorWindowController
+	}
+
+	private var editorWindowControllers: [EditorWindowController] {
+		documentController.documents.flatMap(\.windowControllers).compactMap { $0 as? EditorWindowController }
+	}
+
+	func editorWindowController(gitHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedGitHostView === gitHost }
+	}
+
+	func editorWindowController(debuggerHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedDebuggerHostView === debuggerHost }
+	}
+
+	func editorWindowController(terminalHost: NSView) -> EditorWindowController? {
+		editorWindowControllers.first { $0.embeddedTerminalHostView === terminalHost }
+	}
+
+	@objc private func closeSecondarySidebar(_ notification: Notification) {
+		switch notification.userInfo?["surface"] as? String {
+		case "git":
+			gitCoordinator.closeEmbeddedGitChanges()
+		case "debugger":
+			debuggerCoordinator.closeEmbeddedCallStack()
+		default:
+			return
+		}
+	}
+
+	private func selectAdjacentTab(delta: Int) {
+		if let controller = activeEditorWindowController() {
+			controller.selectAdjacentTab(delta: delta)
+		} else {
+			ItsyTabCoordinator.selectAdjacentDocument(delta: delta)
+		}
+	}
+
+	private func selectTab(atDisplayIndex index: Int) {
+		if let controller = activeEditorWindowController() {
+			_ = controller.selectTab(atDisplayIndex: index)
+		} else {
+			ItsyTabCoordinator.selectDocument(atDisplayIndex: index)
+		}
+	}
+
+	private func performEditorMotion(_ motion: Motion) {
+		activeEditorWindowController()?.performEditorMotion(motion)
+	}
+
+	@objc func zoomIn(_ sender: Any?) {
+		settingsCoordinator.zoomIn(sender)
+	}
+
+	@objc func zoomOut(_ sender: Any?) {
+		settingsCoordinator.zoomOut(sender)
+	}
+
+	@objc func resetZoom(_ sender: Any?) {
+		settingsCoordinator.resetZoom(sender)
+	}
+
+	@objc func openSettingsFile(_: Any?) {
+		settingsCoordinator.openSettingsFile(workspace: false)
+	}
+
+	func applySettingsToOpenWindows(_ settings: ItsySettings) {
+		EditorWindowController.reloadLSPConfiguration(settings: settings)
+		AppTheme.update(settings: settings)
+		ItsyUIConfiguration.update(settings.ui)
+		commandPaletteCoordinator.applyUISettings()
+		applyKeymapSettings(settings)
+		for document in documentController.documents {
+			for controller in document.windowControllers {
+				(controller as? EditorWindowController)?.applySettings(settings)
+			}
+		}
+		ItsyGitHunkGutterCoordinator.applyAll()
+		gitCoordinator.applyEditorPreferences(EditorPreferences(settings: settings.editor))
+		gitCoordinator.applyGitSettings(settings.git)
+		debuggerCoordinator.applyDebuggerSettings(settings.debugger)
+		terminalCoordinator.applyTerminalSettings(settings.terminal)
+		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
+		if settings.workbench.git == .visible {
+			gitCoordinator.ensureGitChangesVisible()
+		}
+		if settings.workbench.terminal == .visible {
+			terminalCoordinator.ensureTerminalVisible()
+		}
+		sparkleUpdateCoordinator.apply(settings.updates)
+		applyWorkbenchRecovery(settingsCoordinator.workbenchDiagnostic)
+	}
+
+	private func applyWorkbenchRecovery(_ diagnostic: String?) {
+		for document in documentController.documents {
+			for controller in document.windowControllers {
+				(controller as? EditorWindowController)?.setWorkbenchRecoveryMode(diagnostic != nil)
+			}
+		}
+		if let diagnostic {
+			workbenchRecoveryPanel.show(diagnostic: diagnostic, relativeTo: activeEditorWindowController()?.window)
+		} else {
+			workbenchRecoveryPanel.close()
+		}
+	}
+
+	private func applyKeymapSettings(_ settings: ItsySettings) {
+		guard commandLineKeymapProfile == nil else {
+			return
+		}
+		let profile = Self.keymapProfile(for: settings.normalized().editor.keymap)
+		guard profile != activeKeymapProfile else {
+			return
+		}
+		do {
+			let bindings = try KeymapConfiguration.load(profile: profile)
+			activeKeymapProfile = profile
+			ItsyAppKeymap.configure(profile: profile, bindings: bindings)
+			if let root = ItsyWorkspaceController.currentRootURL {
+				ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: root, commandRegistry: commandRegistry))
+			}
+			for document in documentController.documents {
+				for controller in document.windowControllers {
+					(controller as? EditorWindowController)?.reloadKeymap()
+				}
+			}
+		} catch {
+			NSLog("failed to apply keymap profile \(profile.rawValue): \(error)")
+		}
+	}
+
+	private static func keymapProfile(for mode: ItsySettings.KeymapMode) -> KeymapProfile {
+		KeymapProfile(rawValue: mode.rawValue) ?? .plain
+	}
+
+	private static func hasCommandLineKeymapProfile(_ arguments: [String]) -> Bool {
+		arguments.contains { $0.hasPrefix("--profile=") }
+	}
+
+	@objc func toggleFindBar(_: Any?) {
+		activeEditorWindowController()?.toggleFindBar()
+	}
+
+	@objc func findNext(_: Any?) {
+		activeEditorWindowController()?.findNext()
+	}
+
+	@objc func findPrevious(_: Any?) {
+		activeEditorWindowController()?.findPrevious()
+	}
+
+	@objc func selectAllFindMatches(_: Any?) {
+		activeEditorWindowController()?.selectAllFindMatches()
+	}
+
+	@objc func showProjectFind(_ sender: Any?) {
+		projectFindCoordinator.showProjectFind(sender)
+	}
+
+	private func sendGitAction(_ selector: Selector, sender: Any? = nil) {
+		NSApp.sendAction(selector, to: gitCoordinator, from: sender)
+	}
+
+	@objc func showTasks(_ sender: Any?) {
+		taskCoordinator.showTasks(sender)
+	}
+
+	@objc func refreshTasks(_ sender: Any?) {
+		taskCoordinator.refreshTasks(sender)
+	}
+
+	@objc func showExtensions(_ sender: Any?) {
+		extensionsCoordinator.showExtensions(sender)
+	}
+
+	@objc func reloadExtensionContributions(_: Any?) {
+		guard let root = ItsyWorkspaceController.currentRootURL else {
+			return
+		}
+		commandRegistry = makeCommandRegistry(workspaceRoot: root)
+		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: root, commandRegistry: commandRegistry))
+	}
+
+	@objc func showDebugLaunchConfigPicker(_ sender: Any?) {
+		debuggerCoordinator.showLaunchConfigPicker(sender)
+	}
+
+	@objc func showDebugCallStack(_ sender: Any?) {
+		debuggerCoordinator.showCallStack(sender)
+	}
+
+	@objc func showDebugVariables(_ sender: Any?) {
+		debuggerCoordinator.showVariables(sender)
+	}
+
+	@objc func showDebugWatches(_ sender: Any?) {
+		debuggerCoordinator.showWatches(sender)
+	}
+
+	@objc func showDebugConsole(_ sender: Any?) {
+		debuggerCoordinator.showConsole(sender)
+	}
+
+	@objc func continueDebug(_ sender: Any?) {
+		debuggerCoordinator.continueDebug(sender)
+	}
+
+	@objc func stepOverDebug(_ sender: Any?) {
+		debuggerCoordinator.stepOverDebug(sender)
+	}
+
+	@objc func stepInDebug(_ sender: Any?) {
+		debuggerCoordinator.stepInDebug(sender)
+	}
+
+	@objc func stepOutDebug(_ sender: Any?) {
+		debuggerCoordinator.stepOutDebug(sender)
+	}
+
+	@objc func pauseDebug(_ sender: Any?) {
+		debuggerCoordinator.pauseDebug(sender)
+	}
+
+	@objc func restartDebug(_ sender: Any?) {
+		debuggerCoordinator.restartDebug(sender)
+	}
+
+	@objc func stopDebug(_ sender: Any?) {
+		debuggerCoordinator.stopDebug(sender)
+	}
+
+	@objc func showTerminal(_ sender: Any?) {
+		terminalCoordinator.showTerminal(sender)
+	}
+
+	@objc func newTerminalTab(_ sender: Any?) {
+		terminalCoordinator.newTerminalTab(sender)
+	}
+
+	@objc func splitTerminalHorizontal(_ sender: Any?) {
+		terminalCoordinator.splitTerminalHorizontal(sender)
+	}
+
+	@objc func splitTerminalVertical(_ sender: Any?) {
+		terminalCoordinator.splitTerminalVertical(sender)
+	}
+
+	@objc func findInTerminal(_ sender: Any?) {
+		terminalCoordinator.showTerminalFind(sender)
+	}
+
+	@objc func findTerminalNext(_ sender: Any?) {
+		terminalCoordinator.findTerminalNext(sender)
+	}
+
+	@objc func findTerminalPrevious(_ sender: Any?) {
+		terminalCoordinator.findTerminalPrevious(sender)
+	}
+
+	@objc func openTerminalAtFileDirectory(_ sender: Any?) {
+		terminalCoordinator.openTerminalAtActiveDocumentDirectory(sender)
+	}
+
+	@objc func revealTerminalCWD(_ sender: Any?) {
+		terminalCoordinator.revealTerminalCWDInFileTree(sender)
+	}
+
+	func openTerminalLocation(_ location: TerminalOpenLocation) {
+		if location.isFile {
+			guard FileManager.default.fileExists(atPath: location.url.path) else {
+				return
+			}
+			_ = documentController.openDocument(at: location.url, line: location.line, column: location.column)
+			return
+		}
+		NSWorkspace.shared.open(location.url)
+	}
+
+	func applyTerminalSettings(_ settings: ItsySettings.TerminalSettings) {
+		terminalCoordinator.applyTerminalSettings(settings)
+		terminalCoordinator.applyTerminalTheme(AppTheme.palette.terminal)
+	}
+
+	@objc func showProblems(_ sender: Any?) {
+		problemsCoordinator.showProblems(sender)
+	}
+
+	@objc func showNextProblem(_ sender: Any?) {
+		problemsCoordinator.showNextProblem(sender)
+	}
+
+	@objc func showPreviousProblem(_ sender: Any?) {
+		problemsCoordinator.showPreviousProblem(sender)
+	}
+
+	private func setProblems(_ snapshot: WorkspaceProblemSnapshot) {
+		problemsCoordinator.setProblems(snapshot)
+	}
+
+	@objc func showOutline(_ sender: Any?) {
+		outlineCoordinator.showOutline(sender)
+	}
+
+	@objc func showSettings(_ sender: Any?) {
+		settingsCoordinator.showSettings(sender)
+	}
+
+	@objc func showManagedSupport(_ sender: Any?) {
+		settingsCoordinator.showManagedSupport(sender)
+	}
+
+	@objc func showIntegrationHealth(_: Any?) {
+		Task { [weak self] in
+			let records = await IntegrationHealthStore.shared.allRecords()
+			guard let self else {
+				return
+			}
+			let panel = integrationHealthPanel ?? IntegrationHealthPanel()
+			integrationHealthPanel = panel
+			panel.show(
+				snapshot: IntegrationHealthPanelSnapshot(records: records),
+				relativeTo: activeEditorWindowController()?.window
+			)
+		}
+	}
+
+	@objc func showIntegrationOutput(_: Any?) {
+		Task { [weak self] in
+			let snapshot = await IntegrationOutputConsolePanelSnapshot(
+				entries: IntegrationOutputConsole.shared.entries(),
+				scopes: IntegrationOutputConsole.shared.scopes()
+			)
+			guard let self else {
+				return
+			}
+			let panel = integrationOutputConsolePanel ?? IntegrationOutputConsolePanel()
+			integrationOutputConsolePanel = panel
+			panel.show(snapshot: snapshot, relativeTo: activeEditorWindowController()?.window)
+		}
+	}
+
+	private func openInitialDocument() {
+		let files = CommandLine.arguments.dropFirst().filter { !$0.hasPrefix("--") }
+		if let path = files.first {
+			_ = openPath(URL(fileURLWithPath: path))
+			return
+		}
+		do {
+			recordBenchStage("initial_untitled_make_begin")
+			let document = try documentController.makeUntitledDocument(ofType: documentController.defaultType ?? "public.data")
+			recordBenchStage("initial_untitled_make_end")
+			documentController.addDocument(document)
+			recordBenchStage("initial_make_window_controllers_begin")
+			document.makeWindowControllers()
+			recordBenchStage("initial_make_window_controllers_end")
+			recordBenchStage("initial_show_windows_begin")
+			document.showWindows()
+			recordBenchStage("initial_show_windows_end")
+		} catch {
+			NSLog("failed to open untitled document: \(error)")
+		}
+	}
+
+	@objc func openFolder(_: Any?) {
+		let panel = NSOpenPanel()
+		panel.canChooseDirectories = true
+		panel.canChooseFiles = false
+		panel.allowsMultipleSelection = false
+		guard panel.runModal() == .OK, let url = panel.url else {
+			return
+		}
+		_ = openWorkspace(at: url)
+	}
+
+	@objc func addFolderToWorkspace(_: Any?) {
+		let panel = NSOpenPanel()
+		panel.canChooseDirectories = true
+		panel.canChooseFiles = false
+		panel.allowsMultipleSelection = false
+		guard panel.runModal() == .OK, let url = panel.url else {
+			return
+		}
+		guard ItsyWorkspaceController.currentRootURL != nil else {
+			_ = openWorkspace(at: url)
+			return
+		}
+		ItsyWorkspaceController.addWorkspaceRoot(url)
+	}
+
+	private func openPath(_ url: URL) -> Bool {
+		var isDirectory: ObjCBool = false
+		FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory)
+		if isDirectory.boolValue {
+			return openWorkspace(at: url)
+		}
+		return documentController.openDocument(at: url)
+	}
+
+	func openWorkspace(at url: URL) -> Bool {
+		ItsyWorkspaceController.openWorkspace(at: url)
+		settingsCoordinator.workspaceDidChange()
+		commandRegistry = makeCommandRegistry(workspaceRoot: url)
+		ItsyAppKeymap.setExtensionBindings(extensionKeybindings(from: url, commandRegistry: commandRegistry))
+		let restored = restoreWorkspaceWindowState()
+		if documentController.documents.isEmpty, !restored {
+			do {
+				_ = try documentController.openUntitledDocumentAndDisplay(true)
+			} catch {
+				NSLog("failed to open untitled document for workspace \(url.path): \(error)")
+				return false
+			}
+		}
+		if !restored {
+			_ = activeEditorWindowController()?.showEmptyWorkspace()
+		}
+		return true
+	}
+
+	private func restoreWorkspaceWindowState() -> Bool {
+		guard let state = ItsyWorkspaceController.loadWindowState() else {
+			return false
+		}
+		var didOpen = false
+		var openedPaths = Set<String>()
+		for fileState in state.openFiles {
+			let url = URL(fileURLWithPath: fileState.path)
+			guard openedPaths.insert(url.standardizedFileURL.path).inserted,
+			      FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			else {
+				continue
+			}
+			(documentController.document(for: url) as? ItsyDocument)?.restoreWorkspaceWindowFileState(fileState)
+			didOpen = true
+		}
+		for path in state.paneStates?.flatMap(\.openPaths) ?? [] {
+			let url = URL(fileURLWithPath: path)
+			guard openedPaths.insert(url.standardizedFileURL.path).inserted,
+			      FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			else {
+				continue
+			}
+			didOpen = true
+		}
+		if let selectedPath = state.selectedPath {
+			let url = URL(fileURLWithPath: selectedPath)
+			if openedPaths.insert(url.standardizedFileURL.path).inserted,
+			   FileManager.default.fileExists(atPath: url.path), documentController.openDocument(at: url)
+			{
+				didOpen = true
+			}
+		}
+		activeEditorWindowController()?.restoreWorkspacePaneLayout(
+			state.paneLayout,
+			paneStates: state.paneStates,
+			focusedPaneIndex: state.focusedPaneIndex
+		)
+		if let workbenchComponents = state.workbenchComponents {
+			activeEditorWindowController()?.restoreWorkspaceWorkbenchComponentState(workbenchComponents)
+		} else {
+			activeEditorWindowController()?.restoreWorkspaceWorkbenchDividerState(state.workbenchDividers)
+		}
+		ItsyWorkspaceController.persistWindowState(from: activeEditorWindowController())
+		return didOpen
+	}
+
+	private func installServicesProvider() {
+		NSApp.servicesProvider = self
+		NSRegisterServicesProvider(self, "Itsy")
+		NSUpdateDynamicServices()
+	}
+
+	private func installCommandBridge() {
+		ItsyAppCommandBridge.runCommand = { [weak self] commandID in
+			guard let self else {
+				return false
+			}
+			do {
+				try commandRegistry.run(id: commandID)
+				return true
+			} catch {
+				NSLog("failed to run command \(commandID): \(error)")
+				return false
+			}
+		}
+		ItsyAppCommandBridge.commandIDs = { [weak self] in
+			self?.commandRegistry.allCommands.map(\.id) ?? []
+		}
+	}
+
+	private func installProblemsBridge() {
+		ItsyProblemsBridge.publishDiagnostics = { [weak self] snapshot, sourceID in
+			self?.problemsCoordinator.setProblems(snapshot, sourceID: sourceID)
+		}
+		ItsyProblemsBridge.resetProblems = { [weak self] root in
+			self?.problemsCoordinator.resetProblems(root: root)
+		}
+	}
+
+	@objc func openSelection(
+		_ pasteboard: NSPasteboard,
+		userData _: String,
+		error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>
+	) {
+		guard let text = pasteboard.string(forType: .string), !text.isEmpty else {
+			serviceError.pointee = L10n.string("No text selection was provided") as NSString
+			return
+		}
+		do {
+			let url = FileManager.default.temporaryDirectory.appendingPathComponent("Itsy-Service-\(UUID().uuidString).txt")
+			try text.write(to: url, atomically: true, encoding: .utf8)
+			if !documentController.openDocument(at: url) {
+				serviceError.pointee = L10n.string("Itsy could not open the service text") as NSString
+			}
+		} catch {
+			self.error(serviceError, "Itsy could not create the service file")
+		}
+	}
+
+	@objc func openFile(
+		_ pasteboard: NSPasteboard,
+		userData _: String,
+		error serviceError: AutoreleasingUnsafeMutablePointer<NSString?>
+	) {
+		let urls = (pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL]) ?? []
+		guard !urls.isEmpty else {
+			serviceError.pointee = L10n.string("No file was provided") as NSString
+			return
+		}
+		for url in urls where !documentController.openDocument(at: url) {
+			serviceError.pointee = L10n.string("Itsy could not open \(url.lastPathComponent)") as NSString
+			return
+		}
+	}
+
+	private func error(_ pointer: AutoreleasingUnsafeMutablePointer<NSString?>, _ message: String.LocalizationValue) {
+		pointer.pointee = L10n.string(message) as NSString
+	}
+}

@@ -1,0 +1,72 @@
+{
+  "schema": 1,
+  "threshold": 0.05,
+  "metrics": [
+    {
+      "name": "cold_start_ready_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "baseline": 8.0
+    },
+    {
+      "name": "first_window_visible_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "baseline": 150.0,
+      "limit": 150.0,
+      "threshold": 0.0
+    },
+    {
+      "name": "piecetree_random_insert_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 1000.0
+    },
+    {
+      "name": "piecetree_random_remove_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 350000.0
+    },
+    {
+      "name": "piecetree_sequential_insert_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 800.0
+    },
+    {
+      "name": "piecetree_slice_ns_per_op",
+      "unit": "ns/op",
+      "direction": "lower",
+      "baseline": 200.0
+    },
+    {
+      "name": "binary_size_kb",
+      "unit": "KB",
+      "direction": "lower",
+      "baseline": 16009.3203125
+    },
+    {
+      "name": "physical_footprint_kb",
+      "unit": "KB",
+      "direction": "lower",
+      "baseline": 98611.0,
+      "limit": 102400.0,
+      "threshold": 0.0
+    },
+    {
+      "name": "swift_loc",
+      "unit": "LOC",
+      "direction": "lower",
+      "baseline": 59316
+    },
+    {
+      "name": "lsp_didopen_to_diagnostics_ms",
+      "unit": "ms",
+      "direction": "lower",
+      "baseline": 5000.0,
+      "limit": 5000.0,
+      "threshold": 0.0
+    }
+  ]
+}

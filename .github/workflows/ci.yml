@@ -1,43 +1,154 @@
-name: Shed CI/CD on push
+name: CI
 
 on:
   push:
-    branches:
-      - main
   pull_request:
 
-permissions:
-  contents: read
-
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  capability-shards:
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [unit, ui, integration, performance]
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
         with:
-          distribution: temurin
-          java-version: '21'
-
-      - name: Run tests
-        run: mvn -B -q test
-
-      - name: Build jar
-        run: mvn -B -q -DskipTests package
-
-      - name: Verify jar artifact
+          submodules: recursive
+      - name: Verify native dependencies
+        run: scripts/verify_native_dependencies.sh
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-${{ runner.arch }}-ci-${{ matrix.shard }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-ci-${{ matrix.shard }}-
+      - name: Provision isolated integration fixtures
+        if: matrix.shard == 'integration'
         run: |
-          test -f target/shed-2.0.0.jar
-          unzip -p target/shed-2.0.0.jar META-INF/MANIFEST.MF | grep 'Main-Class: shed.Texteditor'
-          jar tf target/shed-2.0.0.jar | grep 'assets/hackregfont.ttf'
-
-      - name: Upload jar artifact
+          fixture_root="$RUNNER_TEMP/itsy-external-tool-fixtures"
+          fixture_env="$fixture_root/environment"
+          scripts/provision_external_tool_fixtures.sh --root "$fixture_root" --env "$fixture_env"
+          cat "$fixture_env" >> "$GITHUB_ENV"
+      - name: Run capability shard
+        run: scripts/ci_shard.sh --shard '${{ matrix.shard }}' --artifacts .build/ci-shards
+      - name: Upload capability shard artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: shed-jar
-          path: target/shed-2.0.0.jar
-          if-no-files-found: error
+          name: ci-${{ matrix.shard }}
+          path: .build/ci-shards
+
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Verify native dependencies
+        run: scripts/verify_native_dependencies.sh
+      - name: Test native dependency preflight
+        run: scripts/test_native_dependency_preflight.sh
+      - name: Test bootstrap CLI
+        run: scripts/test_bootstrap.sh
+      - name: Test CI shard CLI
+        run: scripts/test_ci_shard.sh
+      - name: Test external tool fixture CLI
+        run: scripts/test_external_tool_fixtures.sh
+      - name: Test alpha promotion gate
+        run: scripts/test_alpha_promotion.sh
+      - name: Test release-note extraction
+        run: scripts/test_release_notes.sh
+      - name: Test appcast release-note packaging
+        run: scripts/test_make_appcast.sh
+      - name: Resolve pinned SwiftPM dependencies
+        run: swift package resolve
+      - name: Verify dependency metadata
+        run: scripts/verify_dependency_metadata.sh --require-native
+      - name: Test dependency verification
+        run: scripts/test_dependency_verification.sh
+      - name: Require review for dependency pin changes
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          changed="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files" --paginate --jq '.[].filename')"
+          if ! grep -Eq '^(Package\.resolved|\.gitmodules|docs/dependency-metadata\.json)$' <<<"$changed"; then
+            exit 0
+          fi
+          labels="$(gh pr view "$PR_NUMBER" --json labels --jq '.labels[].name')"
+          grep -Fxq 'dependency-update' <<<"$labels" || {
+            printf 'error: dependency pin changes require the dependency-update PR label\n' >&2
+            exit 1
+          }
+      - name: Cache SwiftPM
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-${{ runner.arch }}-spm-${{ hashFiles('Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-spm-
+      - name: Install hyperfine
+        run: brew install hyperfine
+      - name: Validate keymaps
+        run: scripts/validate_keymaps.swift
+      - name: Verify generated keymap docs
+        run: |
+          scripts/gen_keymap_docs.swift
+          git diff --exit-code -- docs/keymap-reference.md
+      - name: Test feature-boundary lint
+        run: bash scripts/test_feature_boundary_lint.sh
+      - name: Lint feature boundaries
+        run: bash scripts/lint_feature_boundaries.sh
+      - name: Build release
+        run: swift build -c release
+      - name: Strict concurrency
+        run: scripts/strict_concurrency.sh
+      - name: Test with coverage
+        run: ITSY_TEST_REPORT=.build/swift-test-report.json ITSY_COVERAGE_DATE=current ITSY_COVERAGE_GATE=1 bench/scripts/coverage.sh
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: |
+            bench/results/coverage-current.lcov
+            bench/results/coverage-current.json
+            bench/results/coverage-current.md
+            .build/swift-test-report.json
+      - name: LSP smoke
+        run: swift test --filter ItsyLSPSmokeTests
+      - name: Canonical LSP matrix
+        run: scripts/lsp_matrix.sh --all --artifacts .build/lsp-matrix
+      - name: Upload LSP matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lsp-matrix
+          path: .build/lsp-matrix
+      - name: UI snapshots
+        run: swift test --filter ItsyUISnapshotTests
+      - name: Provision isolated DAP fixtures
+        run: |
+          fixture_root="$RUNNER_TEMP/itsy-external-tool-fixtures"
+          fixture_env="$fixture_root/environment"
+          scripts/provision_external_tool_fixtures.sh --root "$fixture_root" --env "$fixture_env"
+          cat "$fixture_env" >> "$GITHUB_ENV"
+      - name: DAP smoke
+        run: bench/scripts/dap_smoke.sh
+      - name: Integration tests
+        run: swift test --filter ItsyIntegrationTests
+      - name: Bench smoke
+        run: .build/release/ItsyBench --smoke --runs 1
+      - name: Workflow benchmark contract
+        run: .build/release/ItsyBench workflow --file bench/corpus/small.ts --repeats 1 >/dev/null
+      - name: Soak harness contract
+        run: bench/scripts/soak.sh --dry-run
+      - name: Large text release gate
+        if: github.event_name == 'pull_request'
+        run: bench/scripts/large_text_gate.sh
+      - name: Regression bench
+        if: github.event_name == 'pull_request'
+        run: bench/scripts/regression.sh

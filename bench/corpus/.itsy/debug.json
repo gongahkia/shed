@@ -1,0 +1,19 @@
+{
+  "adapters": [
+    {
+      "id": "lldb",
+      "type": "executable",
+      "command": "lldb-dap"
+    }
+  ],
+  "configurations": [
+    {
+      "name": "Debug Hello",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/.build/debug-hello",
+      "cwd": "${workspaceFolder}",
+      "stopOnEntry": false
+    }
+  ]
+}

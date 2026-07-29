@@ -94,6 +94,7 @@ public class Texteditor extends JFrame implements KeyListener {
     RecoveryController recoveryController;
     SearchReplaceController searchReplaceController;
     PerfService perfService;
+    ApplicationErrorReporter errorReporter;
 
     // Buffer management
     List<FileBuffer> buffers;
@@ -234,6 +235,11 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Constructor
     public Texteditor(String[] args) {
+        this(args, new ApplicationErrorReporter());
+    }
+
+    Texteditor(String[] args, ApplicationErrorReporter errorReporter) {
+        this.errorReporter = errorReporter == null ? new ApplicationErrorReporter() : errorReporter;
         // Initialize managers
         configManager = new ConfigManager();
         helpService = new HelpService();
@@ -243,7 +249,7 @@ public class Texteditor extends JFrame implements KeyListener {
         lspService = new LspService();
         lspController = new LspController(this);
         syntaxHighlightService = new SyntaxHighlightService();
-        asyncJobService = new AsyncJobService();
+        asyncJobService = new AsyncJobService(200, this.errorReporter);
         quickfixService = new QuickfixService();
         jobQuickfixController = new JobQuickfixController(this);
         editorState = new EditorState();
@@ -2943,6 +2949,8 @@ public class Texteditor extends JFrame implements KeyListener {
 
     // Main method
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new Texteditor(args));
+        ApplicationErrorReporter reporter = new ApplicationErrorReporter();
+        reporter.install();
+        SwingUtilities.invokeLater(() -> new Texteditor(args, reporter));
     }
 }

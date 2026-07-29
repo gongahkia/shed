@@ -143,16 +143,22 @@ public class AsyncJobService {
     private final AtomicInteger nextId;
     private final Map<Integer, JobRecord> jobs;
     private final int maxHistoryEntries;
+    private final ApplicationErrorReporter errorReporter;
 
     public AsyncJobService() {
-        this(200);
+        this(200, null);
     }
 
     public AsyncJobService(int maxHistoryEntries) {
+        this(maxHistoryEntries, null);
+    }
+
+    public AsyncJobService(int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
         this.executor = Executors.newCachedThreadPool();
         this.nextId = new AtomicInteger(1);
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
+        this.errorReporter = errorReporter;
     }
 
     public <T> int submit(String description, JobTask<T> task, JobCompletion<T> completion) {
@@ -182,11 +188,20 @@ public class AsyncJobService {
                 record.status = record.token.isCancelled() ? Status.CANCELLED : Status.FAILED;
                 record.errorMessage = e.getMessage() == null ? "" : e.getMessage();
                 error = e;
+            } catch (Throwable failure) {
+                record.status = record.token.isCancelled() ? Status.CANCELLED : Status.FAILED;
+                record.errorMessage = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
+                error = new Exception("Unexpected background job failure", failure);
+                reportUnexpected(failure, "running async job " + record.description);
             } finally {
                 record.finishedAtMillis = System.currentTimeMillis();
                 trimHistoryIfNeeded();
                 if (completion != null) {
-                    completion.onComplete(record.snapshot(), result, error);
+                    try {
+                        completion.onComplete(record.snapshot(), result, error);
+                    } catch (Throwable failure) {
+                        reportUnexpected(failure, "completing async job " + record.description);
+                    }
                 }
             }
         });
@@ -249,6 +264,12 @@ public class AsyncJobService {
         for (int i = 0; i < finished.size() && trimCount > 0; i++) {
             jobs.remove(finished.get(i).id);
             trimCount--;
+        }
+    }
+
+    private void reportUnexpected(Throwable failure, String context) {
+        if (errorReporter != null) {
+            errorReporter.report(failure, context);
         }
     }
 }

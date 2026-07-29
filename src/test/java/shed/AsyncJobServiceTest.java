@@ -6,12 +6,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class AsyncJobServiceTest {
+    @TempDir
+    Path tempDir;
+
     @Test
     void runsJobAndMarksSucceeded() throws Exception {
         AsyncJobService service = new AsyncJobService(20);
@@ -124,6 +132,29 @@ public class AsyncJobServiceTest {
 
         assertTrue(latch.await(3, TimeUnit.SECONDS));
         assertTrue(service.list().size() <= 10);
+        service.shutdownNow();
+    }
+
+    @Test
+    void reportsUnexpectedBackgroundFailures() throws Exception {
+        Path logPath = tempDir.resolve("shed-errors.log");
+        List<String> notifications = new ArrayList<>();
+        ApplicationErrorReporter reporter = new ApplicationErrorReporter(logPath, notifications::add);
+        AsyncJobService service = new AsyncJobService(20, reporter);
+        CountDownLatch completion = new CountDownLatch(1);
+        AtomicReference<AsyncJobService.JobSnapshot> snapshotRef = new AtomicReference<>();
+
+        service.submit("unexpected", token -> {
+            throw new AssertionError("background secret");
+        }, (snapshot, result, error) -> {
+            snapshotRef.set(snapshot);
+            completion.countDown();
+        });
+
+        assertTrue(completion.await(2, TimeUnit.SECONDS));
+        assertEquals(AsyncJobService.Status.FAILED, snapshotRef.get().getStatus());
+        assertEquals(1, notifications.size());
+        assertTrue(Files.readString(logPath).contains("background secret"));
         service.shutdownNow();
     }
 }

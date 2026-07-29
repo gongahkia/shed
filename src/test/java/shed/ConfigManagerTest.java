@@ -112,6 +112,48 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresLspFeaturesAndExposesTheirRestartBehavior() throws IOException {
+        Path home = tempDir.resolve("home-lsp-features");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals(LspFeatureSettings.defaults(), config.getLspFeatureSettings());
+        config.setAndPersist("lsp.completion.enabled", "false");
+        config.setAndPersist("lsp.snippets.enabled", "true");
+        config.setAndPersist("lsp.signature.help.enabled", "false");
+        config.setAndPersist("lsp.hover.enabled", "false");
+        config.setAndPersist("lsp.semantic.tokens.enabled", "false");
+        config.setAndPersist("lsp.inlay.hints.enabled", "false");
+        config.setAndPersist("lsp.definition.enabled", "false");
+        config.setAndPersist("lsp.references.enabled", "false");
+        config.setAndPersist("lsp.rename.enabled", "false");
+        config.setAndPersist("lsp.code.actions.enabled", "false");
+        config.setAndPersist("lsp.command.execution.enabled", "false");
+        config.setAndPersist("lsp.formatting.enabled", "false");
+
+        LspFeatureSettings features = config.getLspFeatureSettings();
+        assertEquals(new LspFeatureSettings(false, true, false, false, false, false, false, false, false, false, false, false), features);
+        assertFalse(features.capabilityEnablement().get(LspCapability.COMPLETION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.SIGNATURE_HELP));
+        assertFalse(features.capabilityEnablement().get(LspCapability.HOVER));
+        assertFalse(features.capabilityEnablement().get(LspCapability.DEFINITION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.REFERENCES));
+        assertFalse(features.capabilityEnablement().get(LspCapability.RENAME));
+        assertFalse(features.capabilityEnablement().get(LspCapability.CODE_ACTION));
+        assertFalse(features.capabilityEnablement().get(LspCapability.EXECUTE_COMMAND));
+        assertFalse(features.capabilityEnablement().get(LspCapability.FORMATTING));
+        assertFalse(features.capabilityEnablement().get(LspCapability.SEMANTIC_TOKENS));
+        assertFalse(features.capabilityEnablement().get(LspCapability.INLAY_HINTS));
+        TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("lsp.command.execution.enabled"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("Language Server", descriptor.category());
+        assertEquals("Restart: takes effect when an LSP server is started or restarted", descriptor.applyBehavior());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"lsp.formatting.enabled\" = false"));
+    }
+
+    @Test
     void materializesStableDefaultTemplateOnlyWhenConfirmed() throws IOException {
         Path home = tempDir.resolve("home-materialize");
         System.setProperty("user.home", home.toString());

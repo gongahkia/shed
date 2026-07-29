@@ -244,6 +244,19 @@ public class ConfigManager {
         defineDefault("minimap", DEFAULT_MINIMAP);
         defineDefault("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED);
         defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
+        LspFeatureSettings lspFeatures = LspFeatureSettings.defaults();
+        defineDefault("lsp.completion.enabled", lspFeatures.completion());
+        defineDefault("lsp.snippets.enabled", lspFeatures.snippets());
+        defineDefault("lsp.signature.help.enabled", lspFeatures.signatureHelp());
+        defineDefault("lsp.hover.enabled", lspFeatures.hover());
+        defineDefault("lsp.semantic.tokens.enabled", lspFeatures.semanticTokens());
+        defineDefault("lsp.inlay.hints.enabled", lspFeatures.inlayHints());
+        defineDefault("lsp.definition.enabled", lspFeatures.definition());
+        defineDefault("lsp.references.enabled", lspFeatures.references());
+        defineDefault("lsp.rename.enabled", lspFeatures.rename());
+        defineDefault("lsp.code.actions.enabled", lspFeatures.codeActions());
+        defineDefault("lsp.command.execution.enabled", lspFeatures.commandExecution());
+        defineDefault("lsp.formatting.enabled", lspFeatures.formatting());
         defineDefault("ui.dramatic", DEFAULT_DRAMATIC_UI);
         defineDefault("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
         defineDefault("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
@@ -324,6 +337,18 @@ public class ConfigManager {
             case "minimap" -> "Persisted minimap visibility setting";
             case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
             case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
+            case "lsp.completion.enabled" -> "Enable LSP completion requests";
+            case "lsp.snippets.enabled" -> "Advertise LSP snippet-completion support";
+            case "lsp.signature.help.enabled" -> "Enable LSP signature-help requests";
+            case "lsp.hover.enabled" -> "Enable LSP hover requests";
+            case "lsp.semantic.tokens.enabled" -> "Enable LSP semantic-token requests";
+            case "lsp.inlay.hints.enabled" -> "Enable LSP inlay-hint requests";
+            case "lsp.definition.enabled" -> "Enable LSP definition requests";
+            case "lsp.references.enabled" -> "Enable LSP reference requests";
+            case "lsp.rename.enabled" -> "Enable LSP rename requests";
+            case "lsp.code.actions.enabled" -> "Enable LSP code-action requests";
+            case "lsp.command.execution.enabled" -> "Enable LSP execute-command requests";
+            case "lsp.formatting.enabled" -> "Enable LSP document-formatting requests";
             case "ui.dramatic" -> "Enable dramatic interface effects";
             case "ui.dramatic.identity" -> "Show dramatic identity accents";
             case "ui.dramatic.mode.transitions" -> "Animate editor mode transitions";
@@ -811,6 +836,24 @@ public class ConfigManager {
         return new MultiSelectionPolicy(
             getBoolean("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED),
             getInt("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS)
+        );
+    }
+
+    public LspFeatureSettings getLspFeatureSettings() {
+        LspFeatureSettings defaults = LspFeatureSettings.defaults();
+        return new LspFeatureSettings(
+            getBoolean("lsp.completion.enabled", defaults.completion()),
+            getBoolean("lsp.snippets.enabled", defaults.snippets()),
+            getBoolean("lsp.signature.help.enabled", defaults.signatureHelp()),
+            getBoolean("lsp.hover.enabled", defaults.hover()),
+            getBoolean("lsp.semantic.tokens.enabled", defaults.semanticTokens()),
+            getBoolean("lsp.inlay.hints.enabled", defaults.inlayHints()),
+            getBoolean("lsp.definition.enabled", defaults.definition()),
+            getBoolean("lsp.references.enabled", defaults.references()),
+            getBoolean("lsp.rename.enabled", defaults.rename()),
+            getBoolean("lsp.code.actions.enabled", defaults.codeActions()),
+            getBoolean("lsp.command.execution.enabled", defaults.commandExecution()),
+            getBoolean("lsp.formatting.enabled", defaults.formatting())
         );
     }
 

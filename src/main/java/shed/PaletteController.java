@@ -314,7 +314,6 @@ final class PaletteController {
             case "set":
                 return "Set runtime option (use :set! key=value to persist).";
             case "settings":
-            case "shedrc":
                 return "Open global settings file.";
             case "config":
                 return "Open settings or persist with :config save.";
@@ -427,7 +426,7 @@ final class PaletteController {
                 return "Execute normal-mode keys on current/ranged lines.";
             case "reload":
             case "source":
-                return "Reload ~/.shed/shedrc from disk.";
+                return "Reload ~/.shed/config.toml from disk.";
             case "clean":
             case "shedclean":
                 return "Remove Shed metadata files.";

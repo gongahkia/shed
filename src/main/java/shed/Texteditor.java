@@ -424,8 +424,9 @@ public class Texteditor extends JFrame implements KeyListener {
         updateStatusBar();
 
         this.setVisible(true);
-        if (configManager.hasConfigLoadFailure()) {
-            showScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
+        if (configManager.hasConfigLoadFailure() || configManager.hasConfigLoadNotice()) {
+            showScratchBuffer(configManager.hasConfigLoadFailure() ? "[config recovery]" : "[config notice]",
+                configManager.getConfigLoadReport());
         }
 
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());

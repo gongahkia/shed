@@ -90,7 +90,7 @@ public class CommandHandler {
                 return action.execute(args, range, force);
             }
 
-            // Check user-defined commands from ~/.shed/shedrc
+            // Check user-defined commands from ~/.shed/config.toml
             Map<String, String> userCommands = editor.getConfigManager().getUserCommands();
             if (userCommands.containsKey(resolvedCmd)) {
                 String shellCmd = userCommands.get(resolvedCmd);
@@ -118,7 +118,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.listBuffers(), "ls");
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
-        registerCommand((args, range, force) -> handleConfig(args), "settings", "config", "shedrc");
+        registerCommand((args, range, force) -> handleConfig(args), "settings", "config");
         registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");

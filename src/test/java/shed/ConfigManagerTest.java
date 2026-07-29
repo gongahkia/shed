@@ -209,6 +209,26 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresProjectReplaceSafetyPolicy() throws IOException {
+        Path home = tempDir.resolve("home-project-replace-policy");
+        Path backupDirectory = tempDir.resolve("project-replace-backups");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertFalse(config.getProjectReplacePolicy().enabled());
+        assertTrue(config.getProjectReplacePolicy().confirmRequired());
+        config.setAndPersist("project.replace.enabled", "true");
+        config.setAndPersist("project.replace.confirm.required", "false");
+        config.setAndPersist("project.replace.backup.directory", backupDirectory.toString());
+        config.setAndPersist("project.replace.scope", "current-file");
+
+        assertEquals(new ProjectReplacePolicy(true, true, false, true, backupDirectory.toString(), "current-file"),
+            config.getProjectReplacePolicy());
+        assertEquals("project.replace.scope must be workspace or current-file",
+            config.validateSettingValue("project.replace.scope", "selection"));
+    }
+
+    @Test
     void resetAndPersistRestoresOneTypedDefaultWithoutDisturbingOtherOverrides() throws IOException {
         Path home = tempDir.resolve("home-reset-setting");
         System.setProperty("user.home", home.toString());

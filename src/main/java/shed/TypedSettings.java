@@ -262,6 +262,8 @@ final class TypedSettings {
             case "recovery.retention.max.entries" -> "integer 1.." + RecoveryJournal.MAX_ENTRIES;
             case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
             case "backup.directory" -> "string path";
+            case "project.replace.backup.directory" -> "string path";
+            case "project.replace.scope" -> "workspace | current-file";
             case "backup.retention.count" -> "integer 1.." + BackupPolicy.MAX_RETENTION_COUNT;
             case "undo.history.max.entries" -> "integer 1.." + UndoHistoryPolicy.MAX_ENTRIES;
             case "undo.history.max.bytes" -> "integer 1.." + UndoHistoryPolicy.MAX_BYTES;
@@ -377,8 +379,13 @@ final class TypedSettings {
                 return key + " must be none, absolute, relative, relativeabsolute, or hybrid";
             }
         }
-        if ("backup.directory".equals(key) && value instanceof String && ((String) value).isBlank()) {
+        if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key))
+            && value instanceof String && ((String) value).isBlank()) {
             return key + " must be a non-empty path";
+        }
+        if ("project.replace.scope".equals(key) && value instanceof String
+            && !"workspace".equals(value) && !"current-file".equals(value)) {
+            return key + " must be workspace or current-file";
         }
         return null;
     }

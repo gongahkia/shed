@@ -134,11 +134,16 @@ Notes:
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
+| `:projectreplace settings` | Show persisted project-replace safety controls |
+| `:projectreplace enable`, `:projectreplace disable` | Persist the project-replace opt-in gate |
 | `:projectreplace preview /find/replacement/` | Build an in-memory literal replacement preview; no file is written |
+| `:projectreplace replace /find/replacement/ [confirm]` | Run the non-preview path only when preview is deliberately disabled |
 | `:projectreplace file <id> [on\|off\|toggle]` | Select or deselect all previewed matches in a file |
 | `:projectreplace match <id> [on\|off\|toggle]` | Select or deselect one previewed match |
-| `:projectreplace apply` | Start an explicit cancellable atomic apply for selected unchanged files |
+| `:projectreplace apply confirm` | Start an explicit cancellable atomic apply for selected unchanged files when confirmation is required |
 | `:projectreplace cancel` | Discard the current replacement preview |
+| `:projectreplace preview-required on\|off`, `:projectreplace confirm on\|off`, `:projectreplace backup on\|off` | Persist preview, confirmation, or backup controls |
+| `:projectreplace scope workspace\|current-file` | Persist replacement preview scope |
 | `:palette`, `:commands` | Command palette |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |

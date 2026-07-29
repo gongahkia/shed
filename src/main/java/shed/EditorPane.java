@@ -10,6 +10,7 @@ public class EditorPane {
     private final JScrollPane scrollPane;
     private final SearchManager searchManager;
     private FileBuffer buffer;
+    private LargeFileProjection largeFileProjection;
     private PtyTerminalPane terminalPane;
 
     public EditorPane(JTextArea textArea, LineNumberPanel lineNumberPanel, JScrollPane scrollPane, SearchManager searchManager) {
@@ -45,6 +46,14 @@ public class EditorPane {
 
     public void setBuffer(FileBuffer buffer) {
         this.buffer = buffer;
+    }
+
+    LargeFileProjection getLargeFileProjection() {
+        return largeFileProjection;
+    }
+
+    void setLargeFileProjection(LargeFileProjection largeFileProjection) {
+        this.largeFileProjection = largeFileProjection;
     }
 
     public PtyTerminalPane getTerminalPane() {

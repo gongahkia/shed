@@ -162,6 +162,9 @@ final class EditorUiController {
                 activateEditorPane(paneRef[0]);
             }
             editor.ensureCaretVisible(textArea);
+            if (paneRef[0] != null) {
+                editor.handleLargeFileCaret(paneRef[0]);
+            }
             editor.updateCurrentLineHighlight();
             editor.updateMatchingBracketHighlight();
             if (editor.lineNumberPanel != null) {
@@ -189,6 +192,17 @@ final class EditorUiController {
 
         EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
         paneRef[0] = pane;
+        paneScrollPane.getVerticalScrollBar().addAdjustmentListener(event -> {
+            if (!event.getValueIsAdjusting()) {
+                editor.handleLargeFileScroll(pane);
+            }
+        });
+        paneScrollPane.getViewport().addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override
+            public void componentResized(java.awt.event.ComponentEvent event) {
+                editor.handleLargeFileResize(pane);
+            }
+        });
         return pane;
     }
 

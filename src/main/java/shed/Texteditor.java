@@ -2363,6 +2363,18 @@ public class Texteditor extends JFrame implements KeyListener {
         paneBufferController.loadBufferIntoPane(pane, buffer, caretPosition);
     }
 
+    void handleLargeFileScroll(EditorPane pane) {
+        paneBufferController.handleLargeFileScroll(pane);
+    }
+
+    void handleLargeFileCaret(EditorPane pane) {
+        paneBufferController.handleLargeFileCaret(pane);
+    }
+
+    void handleLargeFileResize(EditorPane pane) {
+        paneBufferController.handleLargeFileResize(pane);
+    }
+
     void persistCurrentBufferState() {
         paneBufferController.persistCurrentBufferState();
     }

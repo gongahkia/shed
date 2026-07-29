@@ -76,6 +76,14 @@ final class PaneBufferController {
             pane.closeTerminalPane();
         }
         pane.setBuffer(buffer);
+        pane.setLargeFileProjection(buffer.isLargeFile() && !buffer.isLargeFileUnavailable() ? new LargeFileProjection(buffer) : null);
+        if (pane.getLargeFileProjection() != null) {
+            try {
+                withSuppressedDocumentEvents(() -> renderLargeFileProjection(pane));
+            } catch (RuntimeException error) {
+                editor.showMessage("Large-file window failed: " + error.getMessage());
+            }
+        }
         withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
         pane.getTextArea().setEditable(!buffer.isLargeFile() && editor.editorState.mode.isEditable());
         pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
@@ -110,6 +118,9 @@ final class PaneBufferController {
 
     void markModified() {
         FileBuffer buffer = getCurrentBuffer();
+        if (buffer != null && buffer.isLargeFile()) {
+            return;
+        }
         if (buffer != null) {
             buffer.setModified(true);
             try {
@@ -123,6 +134,62 @@ final class PaneBufferController {
             editor.updateStatusBar();
             editor.persistRecoverySnapshotsSafely();
         }
+    }
+
+    void handleLargeFileScroll(EditorPane pane) {
+        if (pane == null || pane.getLargeFileProjection() == null || pane.getLargeFileProjection().rendering()) {
+            return;
+        }
+        JScrollBar bar = pane.getScrollPane().getVerticalScrollBar();
+        try {
+            boolean changed = bar.getValue() <= 0
+                ? pane.getLargeFileProjection().moveBackward(visibleLines(pane))
+                : bar.getValue() + bar.getVisibleAmount() >= bar.getMaximum()
+                    && pane.getLargeFileProjection().moveForward(visibleLines(pane));
+            if (changed) {
+                bar.setValue(Math.max(0, (bar.getMaximum() - bar.getVisibleAmount()) / 2));
+            }
+        } catch (IOException error) {
+            editor.showMessage("Large-file window failed: " + error.getMessage());
+        }
+    }
+
+    void handleLargeFileCaret(EditorPane pane) {
+        if (pane == null || pane.getLargeFileProjection() == null || pane.getLargeFileProjection().rendering()) {
+            return;
+        }
+        try {
+            JTextArea area = pane.getTextArea();
+            int localLine = area.getLineOfOffset(area.getCaretPosition());
+            if (pane.getLargeFileProjection().ensureCaretMargin(localLine, area.getLineCount(), visibleLines(pane))) {
+                area.setCaretPosition(Math.min(area.getDocument().getLength(), area.getCaretPosition()));
+            }
+        } catch (BadLocationException | IOException error) {
+            editor.showMessage("Large-file window failed: " + error.getMessage());
+        }
+    }
+
+    void handleLargeFileResize(EditorPane pane) {
+        if (pane != null && pane.getLargeFileProjection() != null) {
+            try {
+                withSuppressedDocumentEvents(() -> renderLargeFileProjection(pane));
+            } catch (RuntimeException error) {
+                editor.showMessage("Large-file window failed: " + error.getMessage());
+            }
+        }
+    }
+
+    private void renderLargeFileProjection(EditorPane pane) {
+        try {
+            pane.getLargeFileProjection().render(visibleLines(pane));
+        } catch (IOException error) {
+            throw new IllegalStateException(error.getMessage(), error);
+        }
+    }
+
+    private int visibleLines(EditorPane pane) {
+        int lineHeight = Math.max(1, pane.getTextArea().getFontMetrics(pane.getTextArea().getFont()).getHeight());
+        return Math.max(1, pane.getScrollPane().getViewport().getExtentSize().height / lineHeight);
     }
 
 

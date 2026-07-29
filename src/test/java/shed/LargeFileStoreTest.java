@@ -59,4 +59,22 @@ public class LargeFileStoreTest {
         assertFalse(result.opened());
         assertTrue(result.error().contains("well-formed UTF-8"));
     }
+
+    @Test
+    void readsRequestedWindowFromSparseLineCheckpoint() throws Exception {
+        Path file = tempDir.resolve("window.txt");
+        StringBuilder content = new StringBuilder();
+        for (int line = 1; line <= LargeFileStore.CHECKPOINT_LINES * 2 + 5; line++) {
+            content.append("line-").append(line).append('\n');
+        }
+        Files.writeString(file, content, StandardCharsets.UTF_8);
+        LargeFileStore store = LargeFileStore.open(file, 2).store();
+
+        LargeFileStore.Window window = store.readWindow(LargeFileStore.CHECKPOINT_LINES + 1L, 3);
+
+        assertEquals(LargeFileStore.CHECKPOINT_LINES + 1L, window.firstLine());
+        assertEquals("line-" + (LargeFileStore.CHECKPOINT_LINES + 1) + "\nline-"
+            + (LargeFileStore.CHECKPOINT_LINES + 2) + "\nline-" + (LargeFileStore.CHECKPOINT_LINES + 3) + "\n", window.content());
+        assertFalse(window.truncated());
+    }
 }

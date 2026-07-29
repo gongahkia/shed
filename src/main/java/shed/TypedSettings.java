@@ -212,6 +212,9 @@ final class TypedSettings {
         if (key.startsWith("session.")) {
             return "Session";
         }
+        if (key.startsWith("recovery.")) {
+            return "Reliability";
+        }
         if (key.startsWith("large.") || key.startsWith("process.") || key.startsWith("shell.")) {
             return "Performance";
         }
@@ -247,6 +250,8 @@ final class TypedSettings {
             case "ui.dramatic.performance.line.threshold" -> "integer >= 1000";
             case "ui.dramatic.animation.ms" -> "integer >= 80";
             case "ui.dramatic.minimap.width" -> "integer >= 40";
+            case "recovery.retention.max.entries" -> "integer 1.." + RecoveryJournal.MAX_ENTRIES;
+            case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
             case "session.dir" -> "string path";
             default -> value instanceof Integer || value instanceof Long ? "integer >= 0"
                 : value instanceof Double ? "number >= 0" : "string";
@@ -262,6 +267,9 @@ final class TypedSettings {
         }
         if (key.startsWith("large.")) {
             return "Live: used when opening files";
+        }
+        if (key.startsWith("recovery.")) {
+            return "Live: used by subsequent recovery operations";
         }
         if (key.startsWith("process.") || key.startsWith("shell.")) {
             return "Live: used by new helper commands";
@@ -314,6 +322,12 @@ final class TypedSettings {
             }
             if ("ui.dramatic.performance.line.threshold".equals(key) && number < 1000) {
                 return key + " must be at least 1000";
+            }
+            if ("recovery.retention.max.entries".equals(key) && (number < 1 || number > RecoveryJournal.MAX_ENTRIES)) {
+                return key + " must be between 1 and " + RecoveryJournal.MAX_ENTRIES;
+            }
+            if ("recovery.retention.max.content.bytes".equals(key) && (number < 1 || number > RecoveryJournal.MAX_CONTENT_BYTES)) {
+                return key + " must be between 1 and " + RecoveryJournal.MAX_CONTENT_BYTES;
             }
         }
         if (value instanceof Double) {

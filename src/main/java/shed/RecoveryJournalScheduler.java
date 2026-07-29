@@ -18,6 +18,7 @@ final class RecoveryJournalScheduler {
     private final Clearer clearer;
     private final Observer observer;
     private ScheduledFuture<?> pendingTask;
+    private Snapshot latestSnapshot;
     private long generation;
     private boolean closed;
 
@@ -44,6 +45,7 @@ final class RecoveryJournalScheduler {
                 return;
             }
             generation++;
+            latestSnapshot = snapshot;
             if (pendingTask != null) {
                 pendingTask.cancel(false);
             }
@@ -58,6 +60,7 @@ final class RecoveryJournalScheduler {
                 return;
             }
             generation++;
+            latestSnapshot = null;
             if (pendingTask != null) {
                 pendingTask.cancel(false);
                 pendingTask = null;
@@ -67,6 +70,11 @@ final class RecoveryJournalScheduler {
     }
 
     void closeAndClear() {
+        close(ShutdownMode.CLEAR);
+    }
+
+    void close(ShutdownMode mode) {
+        Snapshot finalSnapshot;
         synchronized (lock) {
             if (closed) {
                 return;
@@ -77,11 +85,22 @@ final class RecoveryJournalScheduler {
                 pendingTask.cancel(true);
                 pendingTask = null;
             }
+            finalSnapshot = latestSnapshot;
         }
         executor.shutdownNow();
         try {
-            executor.awaitTermination(2, TimeUnit.SECONDS);
-            clearer.clear();
+            if (!executor.awaitTermination(2, TimeUnit.SECONDS)) {
+                observer.onFailure(new IOException("recovery journal worker did not stop before shutdown"));
+                return;
+            }
+            if (mode == ShutdownMode.CLEAR) {
+                clearer.clear();
+            } else if (mode == ShutdownMode.FLUSH && finalSnapshot != null) {
+                writer.write(finalSnapshot);
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            observer.onFailure(error);
         } catch (Exception error) {
             observer.onFailure(error);
         }
@@ -97,6 +116,11 @@ final class RecoveryJournalScheduler {
         long startedAtNanos = System.nanoTime();
         try {
             writer.write(snapshot);
+            synchronized (lock) {
+                if (snapshot.equals(latestSnapshot)) {
+                    latestSnapshot = null;
+                }
+            }
             observer.onWrite(startedAtNanos, snapshot);
         } catch (Exception error) {
             observer.onFailure(error);
@@ -133,6 +157,12 @@ final class RecoveryJournalScheduler {
         void onWrite(long startedAtNanos, Snapshot snapshot);
 
         void onFailure(Exception error);
+    }
+
+    enum ShutdownMode {
+        CLEAR,
+        FLUSH,
+        PRESERVE
     }
 
     record Snapshot(RecoveryJournal.Workspace workspace, List<RecoveryJournal.Entry> entries) {

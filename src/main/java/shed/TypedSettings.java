@@ -212,6 +212,9 @@ final class TypedSettings {
         if (key.startsWith("session.")) {
             return "Session";
         }
+        if (key.startsWith("workspace.")) {
+            return "Workspace";
+        }
         if (key.startsWith("recovery.")) {
             return "Reliability";
         }
@@ -274,6 +277,9 @@ final class TypedSettings {
         }
         if (key.equals("session.dir")) {
             return "Live: used by future session operations";
+        }
+        if (key.startsWith("workspace.index.")) {
+            return "Live: used by subsequent workspace index operations";
         }
         if (key.startsWith("large.")) {
             return "Live: used when opening files";

@@ -53,6 +53,7 @@ public class ConfigManagerTest {
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
+        assertFalse(config.getWorkspaceIndexEnabled());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
         assertEquals(UndoHistoryPolicy.defaults(), config.getUndoHistoryPolicy());

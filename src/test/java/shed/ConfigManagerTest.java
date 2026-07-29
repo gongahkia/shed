@@ -11,6 +11,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -128,6 +129,7 @@ public class ConfigManagerTest {
         assertEquals("integer", initial.type());
         assertEquals("4", initial.defaultValue());
         assertEquals("4", initial.currentValue());
+        assertEquals("Tab width in spaces", initial.description());
 
         config.setAndPersist("tab.size", "6");
         TypedSettings.Descriptor updated = config.typedSettingDescriptors().stream()
@@ -136,6 +138,8 @@ public class ConfigManagerTest {
             .orElseThrow();
         assertEquals("6", updated.currentValue());
         assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"tab.size\" = 6"));
+        assertEquals(List.of("tab.size"), config.searchTypedSettings("tab width").stream()
+            .map(TypedSettings.Descriptor::key).toList());
     }
 
     @Test

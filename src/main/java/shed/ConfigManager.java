@@ -254,8 +254,65 @@ public class ConfigManager {
     }
 
     private void defineDefault(String key, Object value) {
-        settings.define(key, value);
+        settings.define(key, value, settingDescription(key));
         config.put(key, settings.stringify(value));
+    }
+
+    private String settingDescription(String key) {
+        return switch (key) {
+            case "theme" -> "Built-in theme identifier";
+            case "font.family" -> "Editor font family";
+            case "font.size" -> "Editor font size";
+            case "tab.size" -> "Tab width in spaces";
+            case "line.numbers" -> "Line number display mode";
+            case "show.current.line" -> "Highlight the active line";
+            case "expand.tab" -> "Insert spaces for tab input";
+            case "auto.indent" -> "Continue indentation on new lines";
+            case "highlight.search" -> "Highlight search results";
+            case "zen.mode.width" -> "Preferred zen-mode content width";
+            case "ruler.column" -> "Vertical ruler column, zero disables it";
+            case "list" -> "Show whitespace markers";
+            case "session.restore.on.start" -> "Restore the saved session at startup";
+            case "session.autoload" -> "Session name loaded at startup";
+            case "session.dir" -> "Directory for saved sessions";
+            case "large.file.threshold.mb" -> "Large-file size threshold in megabytes";
+            case "large.file.line.threshold" -> "Large-file line-count threshold";
+            case "large.file.preview.lines" -> "Lines shown in a large-file preview";
+            case "process.timeout.ms" -> "Timeout for helper processes";
+            case "process.output.max.bytes" -> "Maximum captured helper-process output";
+            case "shell.command.enabled" -> "Enable shell command execution";
+            case "shell.command.max.length" -> "Maximum accepted shell command length";
+            case "scrolloff" -> "Context lines retained while scrolling";
+            case "auto.pairs" -> "Insert matching brackets and quotes";
+            case "textwidth" -> "Paragraph width, zero disables wrapping";
+            case "minimap" -> "Persisted minimap visibility setting";
+            case "ui.dramatic" -> "Enable dramatic interface effects";
+            case "ui.dramatic.identity" -> "Show dramatic identity accents";
+            case "ui.dramatic.mode.transitions" -> "Animate editor mode transitions";
+            case "ui.dramatic.command.palette" -> "Animate the command palette";
+            case "ui.dramatic.editing.feedback" -> "Show editing feedback effects";
+            case "ui.dramatic.panel.animations" -> "Animate interface panels";
+            case "ui.dramatic.sound" -> "Enable dramatic sound cues";
+            case "ui.dramatic.sound.pack" -> "Active sound cue pack";
+            case "ui.dramatic.sound.volume" -> "Sound cue volume percentage";
+            case "ui.dramatic.sound.cue.mode" -> "Enable mode-change sound cues";
+            case "ui.dramatic.sound.cue.navigate" -> "Enable navigation sound cues";
+            case "ui.dramatic.sound.cue.success" -> "Enable success sound cues";
+            case "ui.dramatic.sound.cue.error" -> "Enable error sound cues";
+            case "ui.dramatic.reduced.motion" -> "Force reduced-motion effects";
+            case "ui.dramatic.reduced.motion.sync" -> "Use system reduced-motion preference";
+            case "ui.dramatic.performance.guardrails" -> "Enable dramatic UI performance guardrails";
+            case "ui.dramatic.performance.cpu.threshold" -> "CPU threshold for dramatic UI guardrails";
+            case "ui.dramatic.performance.line.threshold" -> "Line-count threshold for dramatic UI guardrails";
+            case "ui.dramatic.animation.ms" -> "Animation duration in milliseconds";
+            case "ui.dramatic.minimap.width" -> "Dramatic minimap width";
+            case "ui.whichkey.hints" -> "Show prefix-key hint overlays";
+            case "project.config.enabled" -> "Enable project-local configuration";
+            case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";
+            case "project.config.require.trusted.file" -> "Require trusted project configuration files";
+            case "tree.delete.protect.critical" -> "Protect critical paths from tree deletion";
+            default -> key;
+        };
     }
 
     private void loadConfig() {
@@ -1164,6 +1221,10 @@ public class ConfigManager {
 
     List<TypedSettings.Descriptor> typedSettingDescriptors() {
         return settings.descriptors();
+    }
+
+    List<TypedSettings.Descriptor> searchTypedSettings(String query) {
+        return settings.search(query);
     }
 
     public boolean hasConfigLoadFailure() {

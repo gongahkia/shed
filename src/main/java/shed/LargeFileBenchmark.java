@@ -1,6 +1,7 @@
 package shed;
 
 import java.io.IOException;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -14,53 +15,75 @@ import java.util.Objects;
 public final class LargeFileBenchmark {
     private static final int DEFAULT_ITERATIONS = 3;
     private static final int MAX_ITERATIONS = 25;
+    private static final int SCROLL_VISIBLE_LINES = 40;
+    private static final List<String> OPERATION_NAMES = List.of("coldOpen", "warmOpen", "scroll", "edit", "save");
 
     private final int iterations;
+    private final long maxP95Nanos;
 
     LargeFileBenchmark(int iterations) {
+        this(iterations, -1L);
+    }
+
+    LargeFileBenchmark(int iterations, long maxP95Nanos) {
         if (iterations < 1 || iterations > MAX_ITERATIONS) {
             throw new IllegalArgumentException("iterations must be between 1 and " + MAX_ITERATIONS);
         }
+        if (maxP95Nanos == 0L || maxP95Nanos < -1L) {
+            throw new IllegalArgumentException("max p95 nanos must be positive or disabled");
+        }
         this.iterations = iterations;
+        this.maxP95Nanos = maxP95Nanos;
     }
 
     public static void main(String[] args) {
+        System.exit(run(args, System.out, System.err));
+    }
+
+    static int run(String[] args, PrintStream output, PrintStream error) {
         Arguments arguments;
         try {
             arguments = Arguments.parse(args);
-        } catch (IllegalArgumentException error) {
-            System.err.println(error.getMessage());
-            System.err.println(Arguments.usage());
-            return;
+        } catch (IllegalArgumentException exception) {
+            error.println(exception.getMessage());
+            error.println(Arguments.usage());
+            return ResultState.ERROR.exitCode();
         }
         if (arguments.help()) {
-            System.out.println(Arguments.usage());
-            return;
+            output.println(Arguments.usage());
+            return ResultState.PASS.exitCode();
         }
-        LargeFileBenchmark benchmark = new LargeFileBenchmark(arguments.iterations());
+        LargeFileBenchmark benchmark = new LargeFileBenchmark(arguments.iterations(), arguments.maxP95Nanos());
+        int exitCode = ResultState.PASS.exitCode();
         for (Path file : arguments.files()) {
-            System.out.print(benchmark.measure(file).format());
+            Report report = benchmark.measure(file);
+            output.print(report.format());
+            exitCode = Math.max(exitCode, report.state().exitCode());
         }
+        return exitCode;
     }
 
     Report measure(Path input) {
         Path source = Objects.requireNonNull(input, "input").toAbsolutePath().normalize();
         Map<String, List<Sample>> samples = new LinkedHashMap<>();
-        samples.put("open", new ArrayList<>());
-        samples.put("edit", new ArrayList<>());
-        samples.put("save", new ArrayList<>());
+        for (String operation : OPERATION_NAMES) {
+            samples.put(operation, new ArrayList<>());
+        }
+        Map<String, String> unavailable = new LinkedHashMap<>();
         List<Failure> failures = new ArrayList<>();
         long inputBytes = inputBytes(source, failures);
-        if (inputBytes >= 0) {
+        if (inputBytes >= 0L) {
             for (int iteration = 1; iteration <= iterations; iteration++) {
-                measureIteration(source, iteration, samples, failures);
+                measureIteration(source, iteration, samples, unavailable, failures);
             }
         }
         Map<String, OperationStats> operations = new LinkedHashMap<>();
         for (Map.Entry<String, List<Sample>> entry : samples.entrySet()) {
-            operations.put(entry.getKey(), OperationStats.from(entry.getValue()));
+            String operation = entry.getKey();
+            boolean failed = failures.stream().anyMatch(failure -> failure.operation().equals(operation));
+            operations.put(operation, OperationStats.from(entry.getValue(), iterations, unavailable.get(operation), failed));
         }
-        return new Report(Environment.current(), source, Math.max(0L, inputBytes), iterations, operations, failures);
+        return new Report(Environment.current(), source, Math.max(0L, inputBytes), iterations, maxP95Nanos, operations, failures);
     }
 
     private static long inputBytes(Path source, List<Failure> failures) {
@@ -76,25 +99,47 @@ public final class LargeFileBenchmark {
         }
     }
 
-    private static void measureIteration(Path source, int iteration, Map<String, List<Sample>> samples, List<Failure> failures) {
+    private static void measureIteration(Path source, int iteration, Map<String, List<Sample>> samples,
+                                         Map<String, String> unavailable, List<Failure> failures) {
         Path copy = null;
         try {
             copy = Files.createTempFile("shed-large-file-benchmark-", suffix(source));
             Files.copy(source, copy, StandardCopyOption.REPLACE_EXISTING);
             Path target = copy;
-            FileBuffer buffer = measure("open", iteration, samples, failures, () -> new FileBuffer(target.toFile()));
-            if (buffer == null) {
+            FileBuffer cold = measure("coldOpen", iteration, samples, failures, () -> new FileBuffer(target.toFile()));
+            if (cold == null) {
+                markUnavailable(unavailable, "warmOpen", "cold open did not complete");
+                markUnavailable(unavailable, "scroll", "cold open did not complete");
+                markUnavailable(unavailable, "edit", "cold open did not complete");
+                markUnavailable(unavailable, "save", "cold open did not complete");
                 return;
             }
-            boolean edited = measure("edit", iteration, samples, failures, () -> {
-                buffer.setContent(buffer.getContent() + " ");
-                return true;
-            });
-            if (!edited) {
+            if (cold.isLargeFileUnavailable()) {
+                failures.add(new Failure(iteration, "coldOpen", "LargeFileUnavailable", cold.getLargeFileStatus()));
+                markUnavailable(unavailable, "warmOpen", "cold open selected an unavailable large-file source");
+                markUnavailable(unavailable, "scroll", "cold open selected an unavailable large-file source");
+                markUnavailable(unavailable, "edit", "cold open selected an unavailable large-file source");
+                markUnavailable(unavailable, "save", "cold open selected an unavailable large-file source");
                 return;
             }
+            FileBuffer warm = measure("warmOpen", iteration, samples, failures, () -> new FileBuffer(target.toFile()));
+            if (warm == null) {
+                markUnavailable(unavailable, "scroll", "warm open did not complete");
+                markUnavailable(unavailable, "edit", "warm open did not complete");
+                markUnavailable(unavailable, "save", "warm open did not complete");
+                return;
+            }
+            if (warm.isLargeFileUnavailable()) {
+                failures.add(new Failure(iteration, "warmOpen", "LargeFileUnavailable", warm.getLargeFileStatus()));
+                markUnavailable(unavailable, "scroll", "warm open selected an unavailable large-file source");
+                markUnavailable(unavailable, "edit", "warm open selected an unavailable large-file source");
+                markUnavailable(unavailable, "save", "warm open selected an unavailable large-file source");
+                return;
+            }
+            measureScroll(warm, iteration, samples, unavailable, failures);
+            measureEdit(warm, iteration, samples, unavailable, failures);
             measure("save", iteration, samples, failures, () -> {
-                buffer.save();
+                warm.save();
                 return true;
             });
         } catch (IOException | SecurityException error) {
@@ -108,6 +153,41 @@ public final class LargeFileBenchmark {
                 }
             }
         }
+    }
+
+    private static void measureScroll(FileBuffer buffer, int iteration, Map<String, List<Sample>> samples,
+                                      Map<String, String> unavailable, List<Failure> failures) {
+        if (!buffer.isLargeFile()) {
+            markUnavailable(unavailable, "scroll", "input did not select large-file projection");
+            return;
+        }
+        try {
+            LargeFileProjection projection = new LargeFileProjection(buffer);
+            projection.render(SCROLL_VISIBLE_LINES);
+            Boolean moved = measure("scroll", iteration, samples, failures,
+                () -> projection.moveForward(SCROLL_VISIBLE_LINES));
+            if (Boolean.FALSE.equals(moved)) {
+                failures.add(new Failure(iteration, "scroll", "NoScrollableWindow", "large-file projection could not move forward"));
+            }
+        } catch (IOException | IllegalArgumentException error) {
+            failures.add(Failure.from(iteration, "scroll", error));
+        }
+    }
+
+    private static void measureEdit(FileBuffer buffer, int iteration, Map<String, List<Sample>> samples,
+                                    Map<String, String> unavailable, List<Failure> failures) {
+        if (buffer.isLargeFile()) {
+            markUnavailable(unavailable, "edit", "large-file bounded editing is unavailable");
+            return;
+        }
+        measure("edit", iteration, samples, failures, () -> {
+            buffer.setContent(buffer.getContent() + " ");
+            return true;
+        });
+    }
+
+    private static void markUnavailable(Map<String, String> unavailable, String operation, String reason) {
+        unavailable.putIfAbsent(operation, reason);
     }
 
     private static String suffix(Path source) {
@@ -136,21 +216,34 @@ public final class LargeFileBenchmark {
         return runtime.totalMemory() - runtime.freeMemory();
     }
 
-    record Report(Environment environment, Path input, long inputBytes, int iterations, Map<String, OperationStats> operations,
-                  List<Failure> failures) {
+    record Report(Environment environment, Path input, long inputBytes, int iterations, long maxP95Nanos,
+                  Map<String, OperationStats> operations, List<Failure> failures) {
         Report {
             environment = Objects.requireNonNull(environment, "environment");
             input = Objects.requireNonNull(input, "input");
-            if (inputBytes < 0 || iterations < 1) {
+            if (inputBytes < 0L || iterations < 1 || maxP95Nanos == 0L || maxP95Nanos < -1L) {
                 throw new IllegalArgumentException("invalid benchmark report");
             }
             operations = Collections.unmodifiableMap(new LinkedHashMap<>(operations));
             failures = List.copyOf(failures);
         }
 
+        ResultState state() {
+            if (!failures.isEmpty() || operations.values().stream().anyMatch(stats -> stats.state() == OperationState.ERROR)) {
+                return ResultState.ERROR;
+            }
+            if (maxP95Nanos > 0L && operations.values().stream()
+                .filter(stats -> stats.state() == OperationState.PASS)
+                .anyMatch(stats -> stats.p95Nanos() > maxP95Nanos)) {
+                return ResultState.FAIL;
+            }
+            return ResultState.PASS;
+        }
+
         String format() {
             StringBuilder output = new StringBuilder();
-            output.append("report.version=1\n");
+            output.append("report.version=2\n");
+            output.append("result.state=").append(state()).append('\n');
             output.append("environment.javaVersion=").append(environment.javaVersion()).append('\n');
             output.append("environment.javaVendor=").append(environment.javaVendor()).append('\n');
             output.append("environment.vmName=").append(environment.vmName()).append('\n');
@@ -162,12 +255,19 @@ public final class LargeFileBenchmark {
             output.append("workload.input=").append(input).append('\n');
             output.append("workload.inputBytes=").append(inputBytes).append('\n');
             output.append("workload.iterations=").append(iterations).append('\n');
-            output.append("workload.operations=open,edit,save\n");
+            output.append("workload.maxP95Nanos=").append(maxP95Nanos).append('\n');
+            output.append("workload.operations=").append(String.join(",", operations.keySet())).append('\n');
             output.append("reproduction.command=java -cp target/shed-2.0.0.jar shed.LargeFileBenchmark --iterations ")
-                .append(iterations).append(' ').append(input).append('\n');
+                .append(iterations);
+            if (maxP95Nanos > 0L) {
+                output.append(" --max-p95-ms ").append(maxP95Nanos / 1_000_000L);
+            }
+            output.append(' ').append(input).append('\n');
             for (Map.Entry<String, OperationStats> entry : operations.entrySet()) {
                 String name = entry.getKey();
                 OperationStats stats = entry.getValue();
+                output.append(name).append(".state=").append(stats.state()).append('\n');
+                output.append(name).append(".reason=").append(stats.reason()).append('\n');
                 output.append(name).append(".samples=").append(stats.samples()).append('\n');
                 output.append(name).append(".medianNanos=").append(stats.medianNanos()).append('\n');
                 output.append(name).append(".p95Nanos=").append(stats.p95Nanos()).append('\n');
@@ -196,18 +296,53 @@ public final class LargeFileBenchmark {
         }
     }
 
-    record OperationStats(int samples, long medianNanos, long p95Nanos, long medianHeapDeltaBytes, long p95HeapDeltaBytes) {
-        static OperationStats from(List<Sample> samples) {
-            if (samples.isEmpty()) {
-                return new OperationStats(0, -1L, -1L, -1L, -1L);
-            }
-            List<Long> durations = samples.stream().map(Sample::durationNanos).sorted().toList();
-            List<Long> heapDeltas = samples.stream().map(Sample::heapDeltaBytes).sorted().toList();
-            return new OperationStats(samples.size(), percentile(durations, 0.50), percentile(durations, 0.95),
-                percentile(heapDeltas, 0.50), percentile(heapDeltas, 0.95));
+    enum ResultState {
+        PASS(0),
+        FAIL(1),
+        ERROR(2);
+
+        private final int exitCode;
+
+        ResultState(int exitCode) {
+            this.exitCode = exitCode;
         }
 
-        private static long percentile(List<Long> sorted, double percentile) {
+        int exitCode() {
+            return exitCode;
+        }
+    }
+
+    enum OperationState {
+        PASS,
+        UNSUPPORTED,
+        ERROR
+    }
+
+    record OperationStats(OperationState state, String reason, int samples, long medianNanos, long p95Nanos,
+                          long medianHeapDeltaBytes, long p95HeapDeltaBytes) {
+        static OperationStats from(List<Sample> samples, int iterations, String unavailableReason, boolean failed) {
+            if (unavailableReason != null) {
+                return new OperationStats(OperationState.UNSUPPORTED, unavailableReason, 0, -1L, -1L, -1L, -1L);
+            }
+            if (failed || samples.size() != iterations) {
+                return new OperationStats(OperationState.ERROR, "operation did not complete every iteration", samples.size(),
+                    percentile(samples, Sample::durationNanos), percentile(samples, Sample::durationNanos, 0.95),
+                    percentile(samples, Sample::heapDeltaBytes), percentile(samples, Sample::heapDeltaBytes, 0.95));
+            }
+            return new OperationStats(OperationState.PASS, "", samples.size(), percentile(samples, Sample::durationNanos),
+                percentile(samples, Sample::durationNanos, 0.95), percentile(samples, Sample::heapDeltaBytes),
+                percentile(samples, Sample::heapDeltaBytes, 0.95));
+        }
+
+        private static long percentile(List<Sample> samples, SampleValue value) {
+            return percentile(samples, value, 0.50);
+        }
+
+        private static long percentile(List<Sample> samples, SampleValue value, double percentile) {
+            if (samples.isEmpty()) {
+                return -1L;
+            }
+            List<Long> sorted = samples.stream().map(value::value).sorted().toList();
             int index = Math.min(sorted.size() - 1, Math.max(0, (int) Math.ceil(percentile * sorted.size()) - 1));
             return sorted.get(index);
         }
@@ -229,18 +364,24 @@ public final class LargeFileBenchmark {
     }
 
     @FunctionalInterface
+    private interface SampleValue {
+        long value(Sample sample);
+    }
+
+    @FunctionalInterface
     private interface ThrowingSupplier<T> {
         T get() throws Exception;
     }
 
-    private record Arguments(int iterations, List<Path> files, boolean help) {
+    private record Arguments(int iterations, long maxP95Nanos, List<Path> files, boolean help) {
         static Arguments parse(String[] args) {
             int iterations = DEFAULT_ITERATIONS;
+            long maxP95Nanos = -1L;
             List<Path> files = new ArrayList<>();
             for (int index = 0; index < args.length; index++) {
                 String argument = args[index];
                 if ("--help".equals(argument) || "-h".equals(argument)) {
-                    return new Arguments(iterations, List.of(), true);
+                    return new Arguments(iterations, maxP95Nanos, List.of(), true);
                 }
                 if ("--iterations".equals(argument)) {
                     if (++index >= args.length) {
@@ -253,17 +394,32 @@ public final class LargeFileBenchmark {
                     }
                     continue;
                 }
+                if ("--max-p95-ms".equals(argument)) {
+                    if (++index >= args.length) {
+                        throw new IllegalArgumentException("--max-p95-ms requires a value");
+                    }
+                    try {
+                        long milliseconds = Long.parseLong(args[index]);
+                        if (milliseconds < 1L) {
+                            throw new NumberFormatException();
+                        }
+                        maxP95Nanos = Math.multiplyExact(milliseconds, 1_000_000L);
+                    } catch (NumberFormatException | ArithmeticException error) {
+                        throw new IllegalArgumentException("--max-p95-ms must be a positive whole number");
+                    }
+                    continue;
+                }
                 files.add(Path.of(argument));
             }
             if (files.isEmpty()) {
                 throw new IllegalArgumentException("at least one input file is required");
             }
-            new LargeFileBenchmark(iterations);
-            return new Arguments(iterations, List.copyOf(files), false);
+            new LargeFileBenchmark(iterations, maxP95Nanos);
+            return new Arguments(iterations, maxP95Nanos, List.copyOf(files), false);
         }
 
         static String usage() {
-            return "Usage: java -cp target/shed-2.0.0.jar shed.LargeFileBenchmark [--iterations 1..25] <file>...";
+            return "Usage: java -cp target/shed-2.0.0.jar shed.LargeFileBenchmark [--iterations 1..25] [--max-p95-ms <positive>] <file>...";
         }
     }
 }

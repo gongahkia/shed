@@ -11,7 +11,12 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Check out repository
@@ -30,14 +35,27 @@ jobs:
         run: mvn -B -q -DskipTests package
 
       - name: Verify jar artifact
+        shell: pwsh
         run: |
-          test -f target/shed-2.0.0.jar
-          unzip -p target/shed-2.0.0.jar META-INF/MANIFEST.MF | grep 'Main-Class: shed.Texteditor'
-          jar tf target/shed-2.0.0.jar | grep 'assets/hackregfont.ttf'
+          $jar = Join-Path $PWD 'target/shed-2.0.0.jar'
+          if (-not (Test-Path -LiteralPath $jar -PathType Leaf)) { throw "Missing artifact: $jar" }
+          $entries = & jar tf $jar
+          if ($LASTEXITCODE -ne 0) { throw 'Could not inspect jar contents' }
+          if ($entries -notcontains 'assets/hackregfont.ttf') { throw 'Missing bundled font resource' }
+          $verificationDirectory = Join-Path $env:RUNNER_TEMP 'shed-jar-verification'
+          New-Item -ItemType Directory -Path $verificationDirectory -Force | Out-Null
+          Push-Location $verificationDirectory
+          try {
+            & jar xf $jar META-INF/MANIFEST.MF
+            if ($LASTEXITCODE -ne 0) { throw 'Could not extract jar manifest' }
+            if (-not (Select-String -Path 'META-INF/MANIFEST.MF' -SimpleMatch 'Main-Class: shed.Texteditor' -Quiet)) { throw 'Missing Shed main class' }
+          } finally {
+            Pop-Location
+          }
 
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         with:
-          name: shed-jar
+          name: shed-jar-${{ matrix.os }}
           path: target/shed-2.0.0.jar
           if-no-files-found: error

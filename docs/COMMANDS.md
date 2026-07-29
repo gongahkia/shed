@@ -134,6 +134,7 @@ Notes:
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
+| `:largefile`, `:lf` | Show active large-file mode, limits, and remediation |
 | `:projectreplace settings` | Show persisted project-replace safety controls |
 | `:projectreplace enable`, `:projectreplace disable` | Persist the project-replace opt-in gate |
 | `:projectreplace preview /find/replacement/` | Build an in-memory literal replacement preview; no file is written |

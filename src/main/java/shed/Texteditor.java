@@ -1430,6 +1430,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing perf";
     }
 
+    public String showLargeFileStatus() {
+        showScratchBuffer("[large file]", LargeFileMode.report(getCurrentBuffer()));
+        return "Showing large-file status";
+    }
+
     public String showBuildInfo() {
         showScratchBuffer("[build]", BuildInfo.current().render());
         return "Showing build information";

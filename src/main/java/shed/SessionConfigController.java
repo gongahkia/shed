@@ -242,6 +242,10 @@ final class SessionConfigController {
         if (editor.configManager.isSchemaVersionKey(key)) {
             return "Error: schema_version is managed by Shed";
         }
+        String validationError = editor.configManager.validateSettingValue(key, value);
+        if (validationError != null) {
+            return "Error: " + validationError;
+        }
         editor.configManager.set(key, value == null ? "" : value);
         applyRuntimeConfigFromSettings();
         if (isThemeRelatedConfigKey(key)) {
@@ -257,6 +261,10 @@ final class SessionConfigController {
         }
         if (editor.configManager.isSchemaVersionKey(key)) {
             return "Error: schema_version is managed by Shed";
+        }
+        String validationError = editor.configManager.validateSettingValue(key, value);
+        if (validationError != null) {
+            return "Error: " + validationError;
         }
         try {
             editor.configManager.setAndPersist(key, value == null ? "" : value);

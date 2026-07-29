@@ -108,6 +108,30 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void rejectsInvalidTypedTomlSettingsWithDiagnostics() throws IOException {
+        Path home = tempDir.resolve("home-typed-invalid");
+        Path configPath = home.resolve(".shed/config.toml");
+        String source = "schema_version = 1\n"
+            + "\"tab.size\" = \"8\"\n"
+            + "\"ui.dramatic.sound.volume\" = 101\n"
+            + "\"line.numbers\" = \"diagonal\"\n";
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, source);
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertEquals(4, config.getTabSize());
+        assertEquals(75, config.getDramaticSoundVolume());
+        assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
+        assertEquals(source, Files.readString(configPath));
+        assertTrue(config.getConfigLoadReport().contains("tab.size must be TOML integer"));
+        assertTrue(config.getConfigLoadReport().contains("ui.dramatic.sound.volume must be between 0 and 100"));
+        assertTrue(config.getConfigLoadReport().contains("line.numbers must be none, absolute, relative, relativeabsolute, or hybrid"));
+    }
+
+    @Test
     void rejectsPartiallyInvalidConfigWithoutChangingIt() throws IOException {
         Path home = tempDir.resolve("home-invalid");
         Path shedDir = home.resolve(".shed");
@@ -351,6 +375,8 @@ public class ConfigManagerTest {
         assertThrows(IOException.class, () -> config.setAndPersist("bad=key", "value"));
         assertThrows(IOException.class, () -> config.setAndPersist("ui.test", "bad\0value"));
         assertThrows(IOException.class, () -> config.setAndPersist("schema_version", "2"));
+        IOException tabError = assertThrows(IOException.class, () -> config.setAndPersist("tab.size", "0"));
+        assertEquals("tab.size must be between 1 and 16", tabError.getMessage());
     }
 
     @Test

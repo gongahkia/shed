@@ -32,6 +32,7 @@ public class ConfigManager {
     private final Map<String, String> persistedConfig;
     private final Map<String, String> projectConfig;
     private final Map<String, String> projectPreviousValues;
+    private final TypedSettings settings;
     private File activeProjectConfigFile;
     private final String shedDirectoryPath;
     private String configPath;
@@ -178,6 +179,7 @@ public class ConfigManager {
         this.persistedConfig = new HashMap<>();
         this.projectConfig = new HashMap<>();
         this.projectPreviousValues = new HashMap<>();
+        this.settings = new TypedSettings();
         this.activeProjectConfigFile = null;
         this.configLoadReport = "";
         this.configLoadFailed = false;
@@ -192,57 +194,67 @@ public class ConfigManager {
 
     // Load default configuration
     private void loadDefaults() {
-        config.put("theme", DEFAULT_THEME);
-        config.put("font.family", DEFAULT_FONT_FAMILY);
-        config.put("font.size", String.valueOf(DEFAULT_FONT_SIZE));
-        config.put("tab.size", String.valueOf(DEFAULT_TAB_SIZE));
-        config.put("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
-        config.put("show.current.line", String.valueOf(DEFAULT_SHOW_CURRENT_LINE));
-        config.put("expand.tab", String.valueOf(DEFAULT_EXPAND_TAB));
-        config.put("auto.indent", String.valueOf(DEFAULT_AUTO_INDENT));
-        config.put("highlight.search", String.valueOf(DEFAULT_HIGHLIGHT_SEARCH));
-        config.put("zen.mode.width", String.valueOf(DEFAULT_ZEN_MODE_WIDTH));
-        config.put("session.restore.on.start", String.valueOf(DEFAULT_SESSION_RESTORE_ON_START));
-        config.put("session.autoload", DEFAULT_SESSION_AUTOLOAD);
-        config.put("session.dir", defaultSessionDirectoryPath());
-        config.put("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB));
-        config.put("large.file.line.threshold", String.valueOf(DEFAULT_LARGE_FILE_LINE_THRESHOLD));
-        config.put("large.file.preview.lines", String.valueOf(DEFAULT_LARGE_FILE_PREVIEW_LINES));
-        config.put("process.timeout.ms", String.valueOf(DEFAULT_PROCESS_TIMEOUT_MS));
-        config.put("process.output.max.bytes", String.valueOf(DEFAULT_PROCESS_OUTPUT_MAX_BYTES));
-        config.put("shell.command.enabled", String.valueOf(DEFAULT_SHELL_COMMAND_ENABLED));
-        config.put("shell.command.max.length", String.valueOf(DEFAULT_SHELL_COMMAND_MAX_LENGTH));
-        config.put("scrolloff", String.valueOf(DEFAULT_SCROLLOFF));
-        config.put("auto.pairs", String.valueOf(DEFAULT_AUTO_PAIRS));
-        config.put("textwidth", String.valueOf(DEFAULT_TEXTWIDTH));
-        config.put("minimap", String.valueOf(DEFAULT_MINIMAP));
-        config.put("ui.dramatic", String.valueOf(DEFAULT_DRAMATIC_UI));
-        config.put("ui.dramatic.identity", String.valueOf(DEFAULT_DRAMATIC_IDENTITY));
-        config.put("ui.dramatic.mode.transitions", String.valueOf(DEFAULT_DRAMATIC_MODE_TRANSITIONS));
-        config.put("ui.dramatic.command.palette", String.valueOf(DEFAULT_DRAMATIC_COMMAND_PALETTE));
-        config.put("ui.dramatic.editing.feedback", String.valueOf(DEFAULT_DRAMATIC_EDITING_FEEDBACK));
-        config.put("ui.dramatic.panel.animations", String.valueOf(DEFAULT_DRAMATIC_PANEL_ANIMATIONS));
-        config.put("ui.dramatic.sound", String.valueOf(DEFAULT_DRAMATIC_SOUND));
-        config.put("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
-        config.put("ui.dramatic.sound.volume", String.valueOf(DEFAULT_DRAMATIC_SOUND_VOLUME));
-        config.put("ui.dramatic.sound.cue.mode", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_MODE));
-        config.put("ui.dramatic.sound.cue.navigate", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE));
-        config.put("ui.dramatic.sound.cue.success", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS));
-        config.put("ui.dramatic.sound.cue.error", String.valueOf(DEFAULT_DRAMATIC_SOUND_CUE_ERROR));
-        config.put("ui.dramatic.reduced.motion", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION));
-        config.put("ui.dramatic.reduced.motion.sync", String.valueOf(DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC));
-        config.put("ui.dramatic.performance.guardrails", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS));
-        config.put("ui.dramatic.performance.cpu.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD));
-        config.put("ui.dramatic.performance.line.threshold", String.valueOf(DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD));
-        config.put("ui.dramatic.animation.ms", String.valueOf(DEFAULT_DRAMATIC_ANIMATION_MS));
-        config.put("ui.dramatic.minimap.width", String.valueOf(DEFAULT_DRAMATIC_MINIMAP_WIDTH));
-        config.put("ui.whichkey.hints", String.valueOf(DEFAULT_UI_WHICHKEY_HINTS));
-        config.put("project.config.enabled", String.valueOf(DEFAULT_PROJECT_CONFIG_ENABLED));
-        config.put("project.config.allow.unsafe", String.valueOf(DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE));
-        config.put("project.config.require.trusted.file", String.valueOf(DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE));
-        config.put("tree.delete.protect.critical", String.valueOf(DEFAULT_TREE_DELETE_PROTECT_CRITICAL));
+        config.clear();
+        settings.clearDefaults();
+        defineDefault("theme", DEFAULT_THEME);
+        defineDefault("font.family", DEFAULT_FONT_FAMILY);
+        defineDefault("font.size", DEFAULT_FONT_SIZE);
+        defineDefault("tab.size", DEFAULT_TAB_SIZE);
+        defineDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue());
+        defineDefault("show.current.line", DEFAULT_SHOW_CURRENT_LINE);
+        defineDefault("expand.tab", DEFAULT_EXPAND_TAB);
+        defineDefault("auto.indent", DEFAULT_AUTO_INDENT);
+        defineDefault("highlight.search", DEFAULT_HIGHLIGHT_SEARCH);
+        defineDefault("zen.mode.width", DEFAULT_ZEN_MODE_WIDTH);
+        defineDefault("ruler.column", 0);
+        defineDefault("list", false);
+        defineDefault("session.restore.on.start", DEFAULT_SESSION_RESTORE_ON_START);
+        defineDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
+        defineDefault("session.dir", defaultSessionDirectoryPath());
+        defineDefault("large.file.threshold.mb", DEFAULT_LARGE_FILE_THRESHOLD_MB);
+        defineDefault("large.file.line.threshold", DEFAULT_LARGE_FILE_LINE_THRESHOLD);
+        defineDefault("large.file.preview.lines", DEFAULT_LARGE_FILE_PREVIEW_LINES);
+        defineDefault("process.timeout.ms", DEFAULT_PROCESS_TIMEOUT_MS);
+        defineDefault("process.output.max.bytes", DEFAULT_PROCESS_OUTPUT_MAX_BYTES);
+        defineDefault("shell.command.enabled", DEFAULT_SHELL_COMMAND_ENABLED);
+        defineDefault("shell.command.max.length", DEFAULT_SHELL_COMMAND_MAX_LENGTH);
+        defineDefault("scrolloff", DEFAULT_SCROLLOFF);
+        defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
+        defineDefault("textwidth", DEFAULT_TEXTWIDTH);
+        defineDefault("minimap", DEFAULT_MINIMAP);
+        defineDefault("ui.dramatic", DEFAULT_DRAMATIC_UI);
+        defineDefault("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
+        defineDefault("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
+        defineDefault("ui.dramatic.command.palette", DEFAULT_DRAMATIC_COMMAND_PALETTE);
+        defineDefault("ui.dramatic.editing.feedback", DEFAULT_DRAMATIC_EDITING_FEEDBACK);
+        defineDefault("ui.dramatic.panel.animations", DEFAULT_DRAMATIC_PANEL_ANIMATIONS);
+        defineDefault("ui.dramatic.sound", DEFAULT_DRAMATIC_SOUND);
+        defineDefault("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
+        defineDefault("ui.dramatic.sound.volume", DEFAULT_DRAMATIC_SOUND_VOLUME);
+        defineDefault("ui.dramatic.sound.cue.mode", DEFAULT_DRAMATIC_SOUND_CUE_MODE);
+        defineDefault("ui.dramatic.sound.cue.navigate", DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE);
+        defineDefault("ui.dramatic.sound.cue.success", DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS);
+        defineDefault("ui.dramatic.sound.cue.error", DEFAULT_DRAMATIC_SOUND_CUE_ERROR);
+        defineDefault("ui.dramatic.reduced.motion", DEFAULT_DRAMATIC_REDUCED_MOTION);
+        defineDefault("ui.dramatic.reduced.motion.sync", DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC);
+        defineDefault("ui.dramatic.performance.guardrails", DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS);
+        defineDefault("ui.dramatic.performance.cpu.threshold", DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD);
+        defineDefault("ui.dramatic.performance.line.threshold", DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD);
+        defineDefault("ui.dramatic.animation.ms", DEFAULT_DRAMATIC_ANIMATION_MS);
+        defineDefault("ui.dramatic.minimap.width", DEFAULT_DRAMATIC_MINIMAP_WIDTH);
+        defineDefault("ui.whichkey.hints", DEFAULT_UI_WHICHKEY_HINTS);
+        defineDefault("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
+        defineDefault("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
+        defineDefault("project.config.require.trusted.file", DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE);
+        defineDefault("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
+        settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
+    }
+
+    private void defineDefault(String key, Object value) {
+        settings.define(key, value);
+        config.put(key, settings.stringify(value));
     }
 
     private void loadConfig() {
@@ -252,7 +264,7 @@ public class ConfigManager {
         Path path = Path.of(configPath);
         List<String> errors = new ArrayList<>();
         String legacyNotice = legacyConfigNotice();
-        Map<String, String> parsed;
+        Map<String, Object> parsed;
         try {
             parsed = parseTomlConfig(path, errors);
         } catch (java.nio.file.NoSuchFileException error) {
@@ -268,12 +280,16 @@ public class ConfigManager {
             configLoadReport = withLegacyNotice(legacyNotice, configRecoveryReport(path, errors));
             return;
         }
-        persistedConfig.putAll(parsed);
-        config.putAll(parsed);
+        for (Map.Entry<String, Object> entry : parsed.entrySet()) {
+            settings.apply(entry.getKey(), entry.getValue());
+            String value = settings.stringify(entry.getValue());
+            persistedConfig.put(entry.getKey(), value);
+            config.put(entry.getKey(), value);
+        }
         configLoadReport = withLegacyNotice(legacyNotice, "Configuration loaded: " + path);
     }
 
-    private Map<String, String> parseTomlConfig(Path path, List<String> errors) throws IOException {
+    private Map<String, Object> parseTomlConfig(Path path, List<String> errors) throws IOException {
         TomlParseResult result = Toml.parse(path);
         for (TomlParseError error : result.errors()) {
             errors.add(tomlLocation(error.position()) + error.getMessage());
@@ -288,7 +304,7 @@ public class ConfigManager {
         if (!errors.isEmpty()) {
             return Map.of();
         }
-        Map<String, String> parsed = new LinkedHashMap<>();
+        Map<String, Object> parsed = new LinkedHashMap<>();
         for (Map.Entry<List<String>, Object> entry : result.entryPathSet()) {
             if (ConfigSchema.isVersionEntry(entry.getKey())) {
                 continue;
@@ -300,8 +316,13 @@ public class ConfigManager {
                     + "unsupported TOML value for " + key);
                 continue;
             }
+            String validationError = settings.validateToml(key, value);
+            if (validationError != null) {
+                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + validationError);
+                continue;
+            }
             try {
-                parsed.put(normalizePersistedKey(key), normalizePersistedValue(String.valueOf(value)));
+                parsed.put(normalizePersistedKey(key), value);
             } catch (IOException error) {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage());
             }
@@ -547,6 +568,7 @@ public class ConfigManager {
             return null;
         }
         config.put("theme", alias);
+        settings.applyRuntime("theme", alias);
         return alias;
     }
 
@@ -571,25 +593,17 @@ public class ConfigManager {
 
     // Get font family
     public String getFontFamily() {
-        return config.getOrDefault("font.family", DEFAULT_FONT_FAMILY);
+        return getString("font.family", DEFAULT_FONT_FAMILY);
     }
 
     // Get font size
     public int getFontSize() {
-        try {
-            return Integer.parseInt(config.getOrDefault("font.size", String.valueOf(DEFAULT_FONT_SIZE)));
-        } catch (NumberFormatException e) {
-            return DEFAULT_FONT_SIZE;
-        }
+        return getInt("font.size", DEFAULT_FONT_SIZE);
     }
 
     // Get tab size
     public int getTabSize() {
-        try {
-            return Integer.parseInt(config.getOrDefault("tab.size", String.valueOf(DEFAULT_TAB_SIZE)));
-        } catch (NumberFormatException e) {
-            return DEFAULT_TAB_SIZE;
-        }
+        return getInt("tab.size", DEFAULT_TAB_SIZE);
     }
 
     // Get line numbers preference
@@ -598,11 +612,12 @@ public class ConfigManager {
     }
 
     public LineNumberMode getLineNumberMode() {
-        return LineNumberMode.fromConfigValue(config.getOrDefault("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue()));
+        return LineNumberMode.fromConfigValue(getString("line.numbers", DEFAULT_LINE_NUMBER_MODE.toConfigValue()));
     }
 
     public void setLineNumberMode(LineNumberMode mode) {
         config.put("line.numbers", mode.toConfigValue());
+        settings.applyRuntime("line.numbers", mode.toConfigValue());
     }
 
     public boolean getShowCurrentLine() {
@@ -638,13 +653,13 @@ public class ConfigManager {
     }
 
     public String getSessionAutoloadName() {
-        String configured = config.getOrDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
+        String configured = getString("session.autoload", DEFAULT_SESSION_AUTOLOAD);
         String trimmed = configured == null ? "" : configured.trim();
         return trimmed.isEmpty() ? DEFAULT_SESSION_AUTOLOAD : trimmed;
     }
 
     public String getSessionDirectory() {
-        String configured = config.get("session.dir");
+        String configured = getString("session.dir", "");
         if (configured == null || configured.isBlank()) {
             return defaultSessionDirectoryPath();
         }
@@ -652,11 +667,7 @@ public class ConfigManager {
     }
 
     public long getLargeFileThresholdMb() {
-        try {
-            return Long.parseLong(config.getOrDefault("large.file.threshold.mb", String.valueOf(DEFAULT_LARGE_FILE_THRESHOLD_MB)));
-        } catch (NumberFormatException e) {
-            return DEFAULT_LARGE_FILE_THRESHOLD_MB;
-        }
+        return getLong("large.file.threshold.mb", DEFAULT_LARGE_FILE_THRESHOLD_MB);
     }
 
     public int getLargeFileLineThreshold() {
@@ -723,7 +734,7 @@ public class ConfigManager {
     }
 
     public String getDramaticSoundPack() {
-        String pack = config.getOrDefault("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
+        String pack = getString("ui.dramatic.sound.pack", DEFAULT_DRAMATIC_SOUND_PACK);
         if (pack == null || pack.isBlank()) {
             return DEFAULT_DRAMATIC_SOUND_PACK;
         }
@@ -830,7 +841,11 @@ public class ConfigManager {
         if (isSchemaVersionKey(key)) {
             return;
         }
+        if (settings.validateRuntime(key, value == null ? "" : value) != null) {
+            return;
+        }
         config.put(key, value);
+        settings.applyRuntime(key, value);
     }
 
     public void setAndPersist(String key, String value) throws IOException {
@@ -839,7 +854,12 @@ public class ConfigManager {
         }
         String normalizedKey = normalizePersistedKey(key);
         String normalizedValue = normalizePersistedValue(value == null ? "" : value);
+        String validationError = settings.validateRuntime(normalizedKey, normalizedValue);
+        if (validationError != null) {
+            throw new IOException(validationError);
+        }
         config.put(normalizedKey, normalizedValue);
+        settings.applyRuntime(normalizedKey, normalizedValue);
         persistedConfig.put(normalizedKey, normalizedValue);
         writeConfigFile();
     }
@@ -948,6 +968,7 @@ public class ConfigManager {
                 }
                 projectConfig.put(key, entry.getValue());
                 config.put(key, entry.getValue());
+                settings.applyRuntime(key, entry.getValue());
             }
             activeProjectConfigFile = localConfig;
             if (allowed.isEmpty()) {
@@ -968,23 +989,23 @@ public class ConfigManager {
     }
 
     private boolean getBoolean(String key, boolean defaultValue) {
-        return Boolean.parseBoolean(config.getOrDefault(key, String.valueOf(defaultValue)));
+        return settings.booleanValue(key, defaultValue);
     }
 
     private int getInt(String key, int defaultValue) {
-        try {
-            return Integer.parseInt(config.getOrDefault(key, String.valueOf(defaultValue)));
-        } catch (NumberFormatException e) {
-            return defaultValue;
-        }
+        return settings.intValue(key, defaultValue);
+    }
+
+    private long getLong(String key, long defaultValue) {
+        return settings.longValue(key, defaultValue);
     }
 
     private double getDouble(String key, double defaultValue) {
-        try {
-            return Double.parseDouble(config.getOrDefault(key, String.valueOf(defaultValue)));
-        } catch (NumberFormatException e) {
-            return defaultValue;
-        }
+        return settings.doubleValue(key, defaultValue);
+    }
+
+    private String getString(String key, String defaultValue) {
+        return settings.stringValue(key, defaultValue);
     }
 
     // Get any config value by key
@@ -1091,6 +1112,10 @@ public class ConfigManager {
         return ConfigSchema.VERSION_KEY.equals(key == null ? "" : key.trim());
     }
 
+    public String validateSettingValue(String key, String value) {
+        return settings.validateRuntime(key == null ? "" : key.trim(), value == null ? "" : value);
+    }
+
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
     }
@@ -1146,6 +1171,16 @@ public class ConfigManager {
                 config.put(key, previous);
             }
         }
+        syncTypedSettings();
+    }
+
+    private void syncTypedSettings() {
+        settings.reset();
+        for (Map.Entry<String, String> entry : config.entrySet()) {
+            if (settings.knows(entry.getKey())) {
+                settings.applyRuntime(entry.getKey(), entry.getValue());
+            }
+        }
     }
 
     private File findProjectConfig(File file) {
@@ -1165,9 +1200,13 @@ public class ConfigManager {
 
     private Map<String, String> parseConfigFile(File file) throws IOException {
         List<String> errors = new ArrayList<>();
-        Map<String, String> parsed = parseTomlConfig(file.toPath(), errors);
+        Map<String, Object> typed = parseTomlConfig(file.toPath(), errors);
         if (!errors.isEmpty()) {
             throw new IOException(String.join("; ", errors));
+        }
+        Map<String, String> parsed = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> entry : typed.entrySet()) {
+            parsed.put(entry.getKey(), settings.stringify(entry.getValue()));
         }
         return parsed;
     }
@@ -1370,7 +1409,7 @@ public class ConfigManager {
     }
 
     private ThemePalette activeTheme() {
-        String raw = config.getOrDefault("theme", DEFAULT_THEME);
+        String raw = getString("theme", DEFAULT_THEME);
         String alias = THEME_ALIASES.get(normalizeThemeName(raw));
         if (alias == null) {
             alias = DEFAULT_THEME;

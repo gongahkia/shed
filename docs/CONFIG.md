@@ -11,8 +11,6 @@ This is the complete TOML configuration reference for `Shed`.
 | `~/.shed/sessions/` | Saved session/workspace data (default) |
 | `.shed.toml` | Optional per-project override file (nearest parent directory) |
 
-Legacy `shedrc` files (`~/.shed/shedrc`, `~/.shedrc`, and `~/.config/shed/shedrc`) are ignored and never migrated. Shed shows one notice for the detected legacy paths, then uses `~/.shed/config.toml` as the global configuration.
-
 ## File Format
 
 | Rule | Details |

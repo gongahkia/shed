@@ -339,22 +339,30 @@ public class ConfigManagerTest {
     }
 
     @Test
-    void ignoresLegacyShedrcOnceWithoutMigration() throws IOException {
-        Path home = tempDir.resolve("home-legacy");
-        Path legacyPath = home.resolve(".shed/shedrc");
-        Files.createDirectories(legacyPath.getParent());
-        String legacy = "tab.size=6\n";
-        Files.writeString(legacyPath, legacy);
+    void readsOnlyTomlGlobalConfig() throws IOException {
+        Path home = tempDir.resolve("home-toml-only");
+        List<Path> nonTomlPaths = List.of(
+            home.resolve(".shed/shedrc"),
+            home.resolve(".shedrc"),
+            home.resolve(".config/shed/shedrc")
+        );
+        for (Path path : nonTomlPaths) {
+            Files.createDirectories(path.getParent());
+            Files.writeString(path, "tab.size=6\n");
+        }
 
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
         assertEquals(4, config.getTabSize());
-        assertEquals(legacy, Files.readString(legacyPath));
         assertEquals(home.resolve(".shed/config.toml").toString(), config.getConfigPath());
-        assertTrue(config.hasConfigLoadNotice());
-        assertTrue(config.getConfigLoadReport().contains("Legacy shedrc configuration ignored"));
-        assertFalse(new ConfigManager().hasConfigLoadNotice());
+        for (Path path : nonTomlPaths) {
+            assertEquals("tab.size=6\n", Files.readString(path));
+        }
+
+        Path tomlPath = Path.of(config.getConfigPath());
+        Files.writeString(tomlPath, "schema_version = 1\n\"tab.size\" = 8\n");
+        assertEquals(8, new ConfigManager().getTabSize());
     }
 
     @Test

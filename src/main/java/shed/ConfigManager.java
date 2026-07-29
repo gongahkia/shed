@@ -38,7 +38,6 @@ public class ConfigManager {
     private String configPath;
     private String configLoadReport;
     private boolean configLoadFailed;
-    private boolean configLoadNotice;
     private Map<String, String> reloadFallbackConfig;
 
     // Default configuration values
@@ -98,10 +97,8 @@ public class ConfigManager {
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
-    private static final String LEGACY_NOTICE_NAME = "legacy-shedrc-notice-v1";
     private static final String SHED_SESSIONS_NAME = "sessions";
     private static final String SHED_PLUGINS_NAME = "plugins";
-    private static final String LEGACY_CONFIG_NAME = ".shedrc";
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
@@ -184,7 +181,6 @@ public class ConfigManager {
         this.activeProjectConfigFile = null;
         this.configLoadReport = "";
         this.configLoadFailed = false;
-        this.configLoadNotice = false;
         Path home = Path.of(System.getProperty("user.home"));
         this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
         this.configPath = Path.of(shedDirectoryPath).resolve(SHED_CONFIG_NAME).toString();
@@ -318,16 +314,14 @@ public class ConfigManager {
     private void loadConfig() {
         persistedConfig.clear();
         configLoadFailed = false;
-        configLoadNotice = false;
         Path path = Path.of(configPath);
         List<String> errors = new ArrayList<>();
-        String legacyNotice = legacyConfigNotice();
         Map<String, Object> parsed;
         try {
             parsed = parseTomlConfig(path, errors);
         } catch (java.nio.file.NoSuchFileException error) {
-            configLoadReport = withLegacyNotice(legacyNotice, "Configuration not found: " + path
-                + "\nSafe defaults are active. Run :config save to create it.");
+            configLoadReport = "Configuration not found: " + path
+                + "\nSafe defaults are active. Run :config save to create it.";
             return;
         } catch (IOException | SecurityException error) {
             errors.add("read failed: " + loadErrorMessage(error));
@@ -335,7 +329,7 @@ public class ConfigManager {
         }
         if (!errors.isEmpty()) {
             configLoadFailed = true;
-            configLoadReport = withLegacyNotice(legacyNotice, configRecoveryReport(path, errors));
+            configLoadReport = configRecoveryReport(path, errors);
             return;
         }
         for (Map.Entry<String, Object> entry : parsed.entrySet()) {
@@ -344,7 +338,7 @@ public class ConfigManager {
             persistedConfig.put(entry.getKey(), value);
             config.put(entry.getKey(), value);
         }
-        configLoadReport = withLegacyNotice(legacyNotice, "Configuration loaded: " + path);
+        configLoadReport = "Configuration loaded: " + path;
     }
 
     private Map<String, Object> parseTomlConfig(Path path, List<String> errors) throws IOException {
@@ -417,56 +411,6 @@ public class ConfigManager {
             report.append("\n- ").append(error);
         }
         return report.append("\n\nRemediation: correct the listed line(s), then run :reload.").toString();
-    }
-
-    private String withLegacyNotice(String notice, String report) {
-        if (notice == null || notice.isBlank()) {
-            return report;
-        }
-        configLoadNotice = true;
-        return notice + "\n\n" + report;
-    }
-
-    private String legacyConfigNotice() {
-        List<Path> legacyPaths = legacyConfigPaths();
-        if (legacyPaths.isEmpty()) {
-            return "";
-        }
-        String fingerprint = legacyPaths.stream().map(Path::toString).sorted().collect(java.util.stream.Collectors.joining("\n"));
-        Path noticePath = Path.of(shedDirectoryPath, LEGACY_NOTICE_NAME);
-        try {
-            if (Files.isRegularFile(noticePath) && fingerprint.equals(Files.readString(noticePath, StandardCharsets.UTF_8))) {
-                return "";
-            }
-            Path parent = noticePath.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            Files.writeString(noticePath, fingerprint, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
-        } catch (IOException | SecurityException ignored) {
-        }
-        StringBuilder notice = new StringBuilder("Legacy shedrc configuration ignored; no migration was performed:");
-        for (Path legacyPath : legacyPaths) {
-            notice.append("\n- ").append(legacyPath);
-        }
-        return notice.append("\nUse ").append(configPath).append(" instead.").toString();
-    }
-
-    private List<Path> legacyConfigPaths() {
-        String home = System.getProperty("user.home", ".");
-        List<Path> candidates = List.of(
-            Path.of(shedDirectoryPath, "shedrc"),
-            Path.of(home, LEGACY_CONFIG_NAME),
-            Path.of(home, ".config", "shed", "shedrc")
-        );
-        List<Path> legacyPaths = new ArrayList<>();
-        for (Path candidate : candidates) {
-            if (Files.isRegularFile(candidate)) {
-                legacyPaths.add(candidate.toAbsolutePath().normalize());
-            }
-        }
-        return legacyPaths;
     }
 
     // Get color setting
@@ -1256,10 +1200,6 @@ public class ConfigManager {
 
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
-    }
-
-    public boolean hasConfigLoadNotice() {
-        return configLoadNotice;
     }
 
     public String getConfigLoadReport() {

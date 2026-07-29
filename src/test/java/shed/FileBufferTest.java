@@ -97,6 +97,34 @@ public class FileBufferTest {
     }
 
     @Test
+    void externalFileStatesAreDeterministicAndPreserveBufferContent() throws Exception {
+        Path file = tempDir.resolve("external.txt");
+        Files.writeString(file, "source", StandardCharsets.UTF_8);
+        FileBuffer buffer = new FileBuffer(file.toFile());
+
+        assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+        Files.writeString(file, "changed source", StandardCharsets.UTF_8);
+        assertEquals(FileBuffer.ExternalFileState.EXTERNALLY_CHANGED, buffer.getExternalFileState());
+        buffer.refreshExternalTimestamp();
+        assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+
+        buffer.setContent("dirty buffer");
+        Files.delete(file);
+        assertEquals(FileBuffer.ExternalFileState.DELETED, buffer.getExternalFileState());
+        assertEquals("dirty buffer", buffer.getContent());
+        buffer.refreshExternalTimestamp();
+        assertEquals(FileBuffer.ExternalFileState.UNCHANGED, buffer.getExternalFileState());
+
+        Files.writeString(file, "replacement", StandardCharsets.UTF_8);
+        assertEquals(FileBuffer.ExternalFileState.REPLACED, buffer.getExternalFileState());
+        buffer.refreshExternalTimestamp();
+        Files.delete(file);
+        Files.createDirectory(file);
+        assertEquals(FileBuffer.ExternalFileState.UNSUPPORTED, buffer.getExternalFileState());
+        assertEquals("dirty buffer", buffer.getContent());
+    }
+
+    @Test
     void verifiesAtomicWriteAndRestoresSourceAfterVerificationFailure() throws Exception {
         Path file = tempDir.resolve("atomic.txt");
         Files.writeString(file, "original", StandardCharsets.UTF_8);

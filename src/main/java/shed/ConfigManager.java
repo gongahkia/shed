@@ -1,14 +1,14 @@
 package shed;
 
-// Config Manager Class
-// Loads and manages user configuration from ~/.shed/shedrc
+import org.tomlj.Toml;
+import org.tomlj.TomlParseError;
+import org.tomlj.TomlParseResult;
+import org.tomlj.TomlPosition;
 
 import java.io.File;
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.attribute.PosixFileAttributeView;
@@ -37,6 +37,7 @@ public class ConfigManager {
     private String configPath;
     private String configLoadReport;
     private boolean configLoadFailed;
+    private boolean configLoadNotice;
 
     // Default configuration values
     private static final String DEFAULT_THEME = "one-dark-pro";
@@ -93,7 +94,9 @@ public class ConfigManager {
     private static final boolean DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE = true;
     private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
-    private static final String SHED_CONFIG_NAME = "shedrc";
+    private static final String SHED_CONFIG_NAME = "config.toml";
+    private static final String PROJECT_CONFIG_NAME = ".shed.toml";
+    private static final String LEGACY_NOTICE_NAME = "legacy-shedrc-notice-v1";
     private static final String SHED_SESSIONS_NAME = "sessions";
     private static final String SHED_PLUGINS_NAME = "plugins";
     private static final String LEGACY_CONFIG_NAME = ".shedrc";
@@ -178,10 +181,10 @@ public class ConfigManager {
         this.activeProjectConfigFile = null;
         this.configLoadReport = "";
         this.configLoadFailed = false;
+        this.configLoadNotice = false;
         Path home = Path.of(System.getProperty("user.home"));
         this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
         this.configPath = Path.of(shedDirectoryPath).resolve(SHED_CONFIG_NAME).toString();
-        migrateLegacyConfigIfNeeded();
 
         loadDefaults();
         loadConfig();
@@ -245,46 +248,59 @@ public class ConfigManager {
     private void loadConfig() {
         persistedConfig.clear();
         configLoadFailed = false;
+        configLoadNotice = false;
         Path path = Path.of(configPath);
-        Map<String, String> parsed = new LinkedHashMap<>();
         List<String> errors = new ArrayList<>();
-        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            String line;
-            int lineNumber = 0;
-            while ((line = reader.readLine()) != null) {
-                lineNumber++;
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                int separator = trimmed.indexOf('=');
-                if (separator <= 0) {
-                    errors.add("line " + lineNumber + ": expected key=value");
-                    continue;
-                }
-                try {
-                    String key = normalizePersistedKey(trimmed.substring(0, separator));
-                    String value = normalizePersistedValue(trimmed.substring(separator + 1).trim());
-                    parsed.put(key, value);
-                } catch (IOException error) {
-                    errors.add("line " + lineNumber + ": " + error.getMessage());
-                }
-            }
+        String legacyNotice = legacyConfigNotice();
+        Map<String, String> parsed;
+        try {
+            parsed = parseTomlConfig(path, errors);
         } catch (java.nio.file.NoSuchFileException error) {
-            configLoadReport = "Configuration not found: " + path
-                + "\nSafe defaults are active. Run :config save to create it.";
+            configLoadReport = withLegacyNotice(legacyNotice, "Configuration not found: " + path
+                + "\nSafe defaults are active. Run :config save to create it.");
             return;
         } catch (IOException | SecurityException error) {
             errors.add("read failed: " + loadErrorMessage(error));
+            parsed = Map.of();
         }
         if (!errors.isEmpty()) {
             configLoadFailed = true;
-            configLoadReport = configRecoveryReport(path, errors);
+            configLoadReport = withLegacyNotice(legacyNotice, configRecoveryReport(path, errors));
             return;
         }
         persistedConfig.putAll(parsed);
         config.putAll(parsed);
-        configLoadReport = "Configuration loaded: " + path;
+        configLoadReport = withLegacyNotice(legacyNotice, "Configuration loaded: " + path);
+    }
+
+    private Map<String, String> parseTomlConfig(Path path, List<String> errors) throws IOException {
+        TomlParseResult result = Toml.parse(path);
+        for (TomlParseError error : result.errors()) {
+            errors.add(tomlLocation(error.position()) + error.getMessage());
+        }
+        if (!errors.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> parsed = new LinkedHashMap<>();
+        for (Map.Entry<List<String>, Object> entry : result.entryPathSet()) {
+            String key = String.join(".", entry.getKey());
+            Object value = entry.getValue();
+            if (!(value instanceof String || value instanceof Long || value instanceof Double || value instanceof Boolean)) {
+                errors.add(tomlLocation(result.inputPositionOf(entry.getKey()))
+                    + "unsupported TOML value for " + key);
+                continue;
+            }
+            try {
+                parsed.put(normalizePersistedKey(key), normalizePersistedValue(String.valueOf(value)));
+            } catch (IOException error) {
+                errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage());
+            }
+        }
+        return parsed;
+    }
+
+    private String tomlLocation(TomlPosition position) {
+        return position == null ? "" : "line " + position.line() + ", column " + position.column() + ": ";
     }
 
     private String loadErrorMessage(Exception error) {
@@ -299,6 +315,56 @@ public class ConfigManager {
             report.append("\n- ").append(error);
         }
         return report.append("\n\nRemediation: correct the listed line(s), then run :reload.").toString();
+    }
+
+    private String withLegacyNotice(String notice, String report) {
+        if (notice == null || notice.isBlank()) {
+            return report;
+        }
+        configLoadNotice = true;
+        return notice + "\n\n" + report;
+    }
+
+    private String legacyConfigNotice() {
+        List<Path> legacyPaths = legacyConfigPaths();
+        if (legacyPaths.isEmpty()) {
+            return "";
+        }
+        String fingerprint = legacyPaths.stream().map(Path::toString).sorted().collect(java.util.stream.Collectors.joining("\n"));
+        Path noticePath = Path.of(shedDirectoryPath, LEGACY_NOTICE_NAME);
+        try {
+            if (Files.isRegularFile(noticePath) && fingerprint.equals(Files.readString(noticePath, StandardCharsets.UTF_8))) {
+                return "";
+            }
+            Path parent = noticePath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.writeString(noticePath, fingerprint, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE);
+        } catch (IOException | SecurityException ignored) {
+        }
+        StringBuilder notice = new StringBuilder("Legacy shedrc configuration ignored; no migration was performed:");
+        for (Path legacyPath : legacyPaths) {
+            notice.append("\n- ").append(legacyPath);
+        }
+        return notice.append("\nUse ").append(configPath).append(" instead.").toString();
+    }
+
+    private List<Path> legacyConfigPaths() {
+        String home = System.getProperty("user.home", ".");
+        List<Path> candidates = List.of(
+            Path.of(shedDirectoryPath, "shedrc"),
+            Path.of(home, LEGACY_CONFIG_NAME),
+            Path.of(home, ".config", "shed", "shedrc")
+        );
+        List<Path> legacyPaths = new ArrayList<>();
+        for (Path candidate : candidates) {
+            if (Files.isRegularFile(candidate)) {
+                legacyPaths.add(candidate.toAbsolutePath().normalize());
+            }
+        }
+        return legacyPaths;
     }
 
     // Get color setting
@@ -1003,6 +1069,10 @@ public class ConfigManager {
         return configLoadFailed;
     }
 
+    public boolean hasConfigLoadNotice() {
+        return configLoadNotice;
+    }
+
     public String getConfigLoadReport() {
         return configLoadReport;
     }
@@ -1021,113 +1091,22 @@ public class ConfigManager {
     }
 
     public String defaultConfigTemplate() {
-        return "# Shed config\n"
-            + "# Generated because ~/.shed/shedrc was missing or empty.\n"
-            + "# Remove or change any key; unspecified keys use built-in defaults.\n\n"
-            + "theme=" + DEFAULT_THEME + "\n"
-            + "font.family=" + DEFAULT_FONT_FAMILY + "\n"
-            + "font.size=" + DEFAULT_FONT_SIZE + "\n"
-            + "tab.size=" + DEFAULT_TAB_SIZE + "\n"
-            + "line.numbers=" + DEFAULT_LINE_NUMBER_MODE.toConfigValue() + "\n"
-            + "show.current.line=" + DEFAULT_SHOW_CURRENT_LINE + "\n"
-            + "expand.tab=" + DEFAULT_EXPAND_TAB + "\n"
-            + "auto.indent=" + DEFAULT_AUTO_INDENT + "\n"
-            + "highlight.search=" + DEFAULT_HIGHLIGHT_SEARCH + "\n"
-            + "zen.mode.width=" + DEFAULT_ZEN_MODE_WIDTH + "\n"
-            + "scrolloff=" + DEFAULT_SCROLLOFF + "\n\n"
-            + "session.restore.on.start=" + DEFAULT_SESSION_RESTORE_ON_START + "\n"
-            + "session.autoload=" + DEFAULT_SESSION_AUTOLOAD + "\n"
-            + "session.dir=" + defaultSessionDirectoryPath() + "\n\n"
-            + "process.timeout.ms=" + DEFAULT_PROCESS_TIMEOUT_MS + "\n"
-            + "process.output.max.bytes=" + DEFAULT_PROCESS_OUTPUT_MAX_BYTES + "\n"
-            + "shell.command.enabled=" + DEFAULT_SHELL_COMMAND_ENABLED + "\n"
-            + "shell.command.max.length=" + DEFAULT_SHELL_COMMAND_MAX_LENGTH + "\n\n"
-            + "# Dramatic UI (theater mode)\n"
-            + "ui.dramatic=" + DEFAULT_DRAMATIC_UI + "\n"
-            + "ui.dramatic.identity=" + DEFAULT_DRAMATIC_IDENTITY + "\n"
-            + "ui.dramatic.mode.transitions=" + DEFAULT_DRAMATIC_MODE_TRANSITIONS + "\n"
-            + "ui.dramatic.command.palette=" + DEFAULT_DRAMATIC_COMMAND_PALETTE + "\n"
-            + "ui.dramatic.editing.feedback=" + DEFAULT_DRAMATIC_EDITING_FEEDBACK + "\n"
-            + "ui.dramatic.panel.animations=" + DEFAULT_DRAMATIC_PANEL_ANIMATIONS + "\n"
-            + "ui.dramatic.sound=" + DEFAULT_DRAMATIC_SOUND + "\n"
-            + "ui.dramatic.sound.pack=" + DEFAULT_DRAMATIC_SOUND_PACK + "\n"
-            + "ui.dramatic.sound.volume=" + DEFAULT_DRAMATIC_SOUND_VOLUME + "\n"
-            + "ui.dramatic.sound.cue.mode=" + DEFAULT_DRAMATIC_SOUND_CUE_MODE + "\n"
-            + "ui.dramatic.sound.cue.navigate=" + DEFAULT_DRAMATIC_SOUND_CUE_NAVIGATE + "\n"
-            + "ui.dramatic.sound.cue.success=" + DEFAULT_DRAMATIC_SOUND_CUE_SUCCESS + "\n"
-            + "ui.dramatic.sound.cue.error=" + DEFAULT_DRAMATIC_SOUND_CUE_ERROR + "\n"
-            + "ui.dramatic.reduced.motion=" + DEFAULT_DRAMATIC_REDUCED_MOTION + "\n"
-            + "ui.dramatic.reduced.motion.sync=" + DEFAULT_DRAMATIC_REDUCED_MOTION_SYNC + "\n"
-            + "ui.dramatic.performance.guardrails=" + DEFAULT_DRAMATIC_PERFORMANCE_GUARDRAILS + "\n"
-            + "ui.dramatic.performance.cpu.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_CPU_THRESHOLD + "\n"
-            + "ui.dramatic.performance.line.threshold=" + DEFAULT_DRAMATIC_PERFORMANCE_LINE_THRESHOLD + "\n"
-            + "ui.dramatic.animation.ms=" + DEFAULT_DRAMATIC_ANIMATION_MS + "\n"
-            + "ui.dramatic.minimap.width=" + DEFAULT_DRAMATIC_MINIMAP_WIDTH + "\n"
-            + "ui.whichkey.hints=" + DEFAULT_UI_WHICHKEY_HINTS + "\n\n"
-            + "project.config.enabled=" + DEFAULT_PROJECT_CONFIG_ENABLED + "\n"
-            + "project.config.allow.unsafe=" + DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE + "\n"
-            + "project.config.require.trusted.file=" + DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE + "\n"
-            + "tree.delete.protect.critical=" + DEFAULT_TREE_DELETE_PROTECT_CRITICAL + "\n\n"
-            + "# Per-project override file support\n"
-            + "# Place .shedrc.local at a repo root (or parent folder).\n"
-            + "# It is auto-applied when opening files under that folder.\n"
-            + "# By default, only UI/editor keys are applied from .shedrc.local.\n"
-            + "# Set project.config.allow.unsafe=true to allow all keys.\n\n"
-            + "# Plugins\n"
-            + "# Place .shed or .lua files in ~/.shed/plugins/ to load plugins.\n"
-            + "# .shed files: declarative (# @command, # @bind, # @event directives)\n"
-            + "# .lua files: scripted via shed.* API (shed.command, shed.on, etc.)\n"
-            + "# Use :help plugins for full reference, :plugin to list, :plugin reload.\n\n"
-            + "# Command aliases (left side is what you type after :, right side is built-in command)\n"
-            + "# command.alias.ww=w\n"
-            + "# command.alias.qq=q\n\n"
-            + "# Keybindings\n"
-            + "# keybind.<mode>.<lhs>=<rhs>\n"
-            + "# modes: normal, insert, visual, visual_line, replace, command, search, global\n"
-            + "# tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n"
-            + "# examples\n"
-            + "# keybind.normal.H=^\n"
-            + "# keybind.normal.L=$\n"
-            + "# keybind.insert.<c-s>=<esc>:w<enter>\n\n"
-            + "# LSP examples\n"
-            + "# lsp.py.command=pyright-langserver\n"
-            + "# lsp.py.args=--stdio\n";
+        StringBuilder template = new StringBuilder("# Shed configuration (TOML)\n")
+            .append("# Remove or change any key; unspecified keys use built-in defaults.\n\n");
+        List<String> keys = new ArrayList<>(defaultConfig.keySet());
+        Collections.sort(keys);
+        for (String key : keys) {
+            template.append(tomlKey(key)).append(" = ").append(tomlValue(key, defaultConfig.get(key))).append("\n");
+        }
+        return template.append("\n# Per-project override: .shed.toml\n")
+            .append("# Command alias example: \"command.alias.ww\" = \"w\"\n")
+            .append("# Keybind example: \"keybind.normal.H\" = \"^\"\n")
+            .append("# LSP example: \"lsp.py.command\" = \"pyright-langserver\"\n")
+            .toString();
     }
 
     private String defaultSessionDirectoryPath() {
         return Path.of(shedDirectoryPath).resolve(SHED_SESSIONS_NAME).toString();
-    }
-
-    private void migrateLegacyConfigIfNeeded() {
-        File currentConfig = new File(configPath);
-        if (currentConfig.exists()) {
-            return;
-        }
-        File legacy = resolveLegacyConfigFile();
-        if (legacy == null) {
-            return;
-        }
-        try {
-            File parent = currentConfig.getParentFile();
-            if (parent != null && !parent.exists()) {
-                Files.createDirectories(parent.toPath());
-            }
-            Files.copy(legacy.toPath(), currentConfig.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        } catch (IOException ignored) {
-        }
-    }
-
-    private File resolveLegacyConfigFile() {
-        String home = System.getProperty("user.home");
-        File legacy = new File(home, LEGACY_CONFIG_NAME);
-        if (legacy.exists()) {
-            return legacy;
-        }
-        File legacyAlt = Path.of(home, ".config", "shed", SHED_CONFIG_NAME).toFile();
-        if (legacyAlt.exists()) {
-            return legacyAlt;
-        }
-        return null;
     }
 
     private void restoreProjectOverrides() {
@@ -1148,7 +1127,7 @@ public class ConfigManager {
         }
         File cursor = file.isDirectory() ? file : file.getParentFile();
         while (cursor != null) {
-            File candidate = new File(cursor, ".shedrc.local");
+            File candidate = new File(cursor, PROJECT_CONFIG_NAME);
             if (candidate.isFile()) {
                 return candidate;
             }
@@ -1158,30 +1137,10 @@ public class ConfigManager {
     }
 
     private Map<String, String> parseConfigFile(File file) throws IOException {
-        Map<String, String> parsed = new LinkedHashMap<>();
-        List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
-        for (String line : lines) {
-            String trimmed = line == null ? "" : line.trim();
-            if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                continue;
-            }
-            int separator = trimmed.indexOf('=');
-            if (separator <= 0) {
-                continue;
-            }
-            String key = trimmed.substring(0, separator).trim();
-            String value = trimmed.substring(separator + 1).trim();
-            if (!key.isEmpty()) {
-                String normalizedKey;
-                String normalizedValue;
-                try {
-                    normalizedKey = normalizePersistedKey(key);
-                    normalizedValue = normalizePersistedValue(value);
-                } catch (IOException ignored) {
-                    continue;
-                }
-                parsed.put(normalizedKey, normalizedValue);
-            }
+        List<String> errors = new ArrayList<>();
+        Map<String, String> parsed = parseTomlConfig(file.toPath(), errors);
+        if (!errors.isEmpty()) {
+            throw new IOException(String.join("; ", errors));
         }
         return parsed;
     }
@@ -1255,7 +1214,7 @@ public class ConfigManager {
             Files.createDirectories(parent.toPath());
         }
         List<String> lines = new ArrayList<>();
-        lines.add("# Shed config");
+        lines.add("# Shed configuration (TOML)");
         lines.add("# Auto-generated by :set! and :config save");
         lines.add("");
         List<String> keys = new ArrayList<>(persistedConfig.keySet());
@@ -1265,7 +1224,7 @@ public class ConfigManager {
             if (value == null) {
                 continue;
             }
-            lines.add(key + "=" + value);
+            lines.add(tomlKey(key) + " = " + tomlValue(key, value));
         }
         Files.write(
             configFile.toPath(),
@@ -1275,6 +1234,57 @@ public class ConfigManager {
             StandardOpenOption.TRUNCATE_EXISTING,
             StandardOpenOption.WRITE
         );
+    }
+
+    private String tomlKey(String key) {
+        return tomlString(key);
+    }
+
+    private String tomlValue(String key, String value) {
+        String defaultValue = defaultConfig.get(key);
+        if (defaultValue != null && ("true".equals(defaultValue) || "false".equals(defaultValue))
+            && ("true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value))) {
+            return value.toLowerCase(Locale.ROOT);
+        }
+        if (defaultValue != null && defaultValue.matches("-?\\d+") && value.matches("-?\\d+")) {
+            return value;
+        }
+        if (defaultValue != null && defaultValue.matches("-?\\d+\\.\\d+") && value.matches("-?\\d+\\.\\d+")) {
+            return value;
+        }
+        return tomlString(value);
+    }
+
+    private String tomlString(String value) {
+        String source = value == null ? "" : value;
+        StringBuilder escaped = new StringBuilder(source.length() + 2).append('"');
+        for (int index = 0; index < source.length(); index++) {
+            char current = source.charAt(index);
+            switch (current) {
+                case '\\':
+                    escaped.append("\\\\");
+                    break;
+                case '"':
+                    escaped.append("\\\"");
+                    break;
+                case '\b':
+                    escaped.append("\\b");
+                    break;
+                case '\f':
+                    escaped.append("\\f");
+                    break;
+                case '\t':
+                    escaped.append("\\t");
+                    break;
+                default:
+                    if (current < 0x20 || current == 0x7f) {
+                        escaped.append(String.format("\\u%04x", (int) current));
+                    } else {
+                        escaped.append(current);
+                    }
+            }
+        }
+        return escaped.append('"').toString();
     }
 
     private boolean detectSystemReducedMotionPreference() {

@@ -119,8 +119,8 @@ shed.shell(cmd)         -- run shell command, return stdout as string
 #### Config
 
 ```lua
-shed.config_get(key)    -- get a shedrc config value (nil if not set)
-shed.config_set(key, v[, persist]) -- set config, optionally persist to ~/.shed/shedrc
+shed.config_get(key)    -- get a TOML config value (nil if not set)
+shed.config_set(key, v[, persist]) -- set config, optionally persist to ~/.shed/config.toml
 ```
 
 #### Theme

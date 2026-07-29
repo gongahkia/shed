@@ -198,7 +198,7 @@ final class LspController {
         sb.append("LSP Servers\n");
         sb.append("=".repeat(40)).append("\n\n");
         Map<String, String> configured = editor.configManager.getConfiguredLspServers();
-        sb.append("Configured (shedrc):\n");
+        sb.append("Configured (config.toml):\n");
         if (configured.isEmpty()) {
             sb.append("  (none)\n");
         } else {

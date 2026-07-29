@@ -365,11 +365,15 @@ final class SessionConfigController {
     }
 
     private String configReloadResult() {
-        if (!editor.configManager.hasConfigLoadFailure()) {
-            return "Settings reloaded";
+        if (editor.configManager.hasConfigLoadFailure()) {
+            showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
+            return "Configuration rejected; safe defaults active";
         }
-        showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
-        return "Configuration rejected; safe defaults active";
+        if (editor.configManager.hasConfigLoadNotice()) {
+            showScratchBuffer("[config notice]", editor.configManager.getConfigLoadReport());
+            return "Legacy configuration ignored";
+        }
+        return "Settings reloaded";
     }
 
 
@@ -1639,7 +1643,7 @@ final class SessionConfigController {
 
         int result = JOptionPane.showConfirmDialog(
             editor,
-            "This project contains local execution surfaces (.shedrc.local and/or .shed/plugins).\n"
+            "This project contains local execution surfaces (.shed.toml and/or .shed/plugins).\n"
                 + "Trust this project root for local config/plugin behavior?\n"
                 + canonicalRoot,
             "Project Trust",
@@ -1666,7 +1670,7 @@ final class SessionConfigController {
             if (gitDir.exists()) {
                 return cursor;
             }
-            File localConfig = new File(cursor, ".shedrc.local");
+            File localConfig = new File(cursor, ".shed.toml");
             if (localConfig.isFile() && firstConfigRoot == null) {
                 firstConfigRoot = cursor;
             }
@@ -1680,7 +1684,7 @@ final class SessionConfigController {
         if (projectRoot == null || !projectRoot.isDirectory()) {
             return false;
         }
-        File localConfig = new File(projectRoot, ".shedrc.local");
+        File localConfig = new File(projectRoot, ".shed.toml");
         if (localConfig.isFile()) {
             return true;
         }

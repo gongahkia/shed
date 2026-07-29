@@ -45,7 +45,7 @@ public class HelpService {
                    "  :bd            Delete buffer\n" +
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
-                   "  :config save   Persist current runtime config to ~/.shed/shedrc\n" +
+                   "  :config save   Persist current runtime config to ~/.shed/config.toml\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
@@ -87,14 +87,14 @@ public class HelpService {
                    "  :themes        Show built-in themes\n" +
                    "  :theater X     Dramatic UI preset (off/subtle/full)\n" +
                    "  :zen           Toggle zen mode\n" +
-                   "  :reload        Reload ~/.shed/shedrc now\n" +
+                   "  :reload        Reload ~/.shed/config.toml now\n" +
                    "  :config status Show config load/recovery details\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +
                    "  :set theme=x   Switch color theme\n" +
                    "  :set k=v       Set any config key in-memory\n" +
-                   "  :set! k=v      Set and persist key to ~/.shed/shedrc\n" +
+                   "  :set! k=v      Set and persist key to ~/.shed/config.toml\n" +
                    "  :45            Go to line 45\n" +
                    "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +
@@ -112,13 +112,13 @@ public class HelpService {
                    "  :plugin new <name> Create + open plugin template\n" +
                    "  :help plugins     Plugin authoring guide\n\n" +
                    "SETTINGS KEYS\n" +
-                   "  project override file: .shedrc.local (nearest parent)\n" +
+                   "  project override file: .shed.toml (nearest parent)\n" +
                    "  project.config.allow.unsafe=false limits local overrides to UI/editor keys\n" +
                    "  tree.delete.protect.critical=true blocks deleting /, home, and cwd via :tree rm\n" +
                    "  ui.whichkey.hints=true shows prefix-key hints (g/z/Ctrl-w/...)\n" +
-                   "  first-open trust prompts gate local .shedrc.local/.shed plugins per project\n" +
-                   "  command.alias.<name>=<builtin>\n" +
-                   "  keybind.<mode>.<lhs>=<rhs>\n" +
+                   "  first-open trust prompts gate local .shed.toml/.shed plugins per project\n" +
+                   "  \"command.alias.<name>\" = \"<builtin>\"\n" +
+                   "  \"keybind.<mode>.<lhs>\" = \"<rhs>\"\n" +
                    "  modes: normal/insert/visual/visual_line/replace/command/search/global\n" +
                    "  tokens: <esc> <enter> <tab> <space> <bs> <del> <up>/<down>/<left>/<right> <c-x>\n\n" +
                    "note: this is a help buffer. use :q to return.\n";
@@ -178,13 +178,13 @@ public class HelpService {
                     + "  :dnext/:dprev    jump through diagnostics\n\n"
                     + "MANAGEMENT\n"
                     + "  :lsp status      show running servers and errors\n"
-                    + "  :lsp servers     list configured (shedrc) + builtin servers\n"
+                    + "  :lsp servers     list configured (config.toml) + builtin servers\n"
                     + "  :lsp restart [ext] restart server (default: current buffer ext)\n"
                     + "  :lsp stop [ext]  stop a server\n"
                     + "  :lsp log         show LSP error log\n\n"
                     + "CONFIGURATION\n"
-                    + "  lsp.<ext>.command=<binary>   server command in ~/.shed/shedrc\n"
-                    + "  lsp.<ext>.args=<flags>       server arguments\n"
+                    + "  \"lsp.<ext>.command\" = \"<binary>\"   server command in ~/.shed/config.toml\n"
+                    + "  \"lsp.<ext>.args\" = \"<flags>\"       server arguments\n"
                     + "  Builtin servers: rs py js jsx ts tsx go c cpp h hpp\n";
             case "symbols":
             case "symbol":
@@ -228,12 +228,12 @@ public class HelpService {
                     + ":session load! [name] restores even when buffers are modified.\n"
                     + ":session list lists all saved sessions.\n"
                     + ":workspace save/load/list is similar, with project-profile naming + UI settings.\n"
-                    + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/shedrc.\n";
+                    + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/config.toml.\n";
             case "keybind":
             case "keybinding":
             case "keybindings":
                 return "Help: keybindings\n\n"
-                    + "Define in ~/.shed/shedrc as keybind.<mode>.<lhs>=<rhs>.\n"
+                    + "Define in ~/.shed/config.toml as \"keybind.<mode>.<lhs>\" = \"<rhs>\".\n"
                     + "LHS/RHS accept raw characters and tokens like <esc>, <enter>, <c-w>.\n"
                     + "Use mode global for mappings active in every mode.\n"
                     + "Use value <nop> to disable a key.\n";
@@ -241,8 +241,8 @@ public class HelpService {
             case "alias":
             case "aliases":
                 return "Help: command aliases\n\n"
-                    + "Define in ~/.shed/shedrc as command.alias.<newname>=<builtin>.\n"
-                    + "Example: command.alias.ww=w and command.alias.qq=q.\n"
+                    + "Define in ~/.shed/config.toml as \"command.alias.<newname>\" = \"<builtin>\".\n"
+                    + "Example: \"command.alias.ww\" = \"w\".\n"
                     + "Aliases are used by command execution and command completion.\n";
             case "plugin":
             case "plugins":

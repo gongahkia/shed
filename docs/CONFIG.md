@@ -1,35 +1,35 @@
 # `Shed` Configuration
 
-This is the complete `shedrc` configuration reference for `Shed`.
+This is the complete TOML configuration reference for `Shed`.
 
 ## Config Location
 
 | Path | Purpose |
 | :--- | :--- |
-| `~/.shed/shedrc` | Main user config file loaded at startup |
+| `~/.shed/config.toml` | Main user config file loaded at startup |
 | `~/.shed/plugins/` | User plugin directory (`.shed` + `.lua`) |
 | `~/.shed/sessions/` | Saved session/workspace data (default) |
-| `.shedrc.local` | Optional per-project override file (nearest parent directory) |
+| `.shed.toml` | Optional per-project override file (nearest parent directory) |
 
-`Shed` will also migrate legacy config files from `~/.shedrc` or `~/.config/shed/shedrc` into `~/.shed/shedrc` when needed.
+Legacy `shedrc` files (`~/.shed/shedrc`, `~/.shedrc`, and `~/.config/shed/shedrc`) are ignored and never migrated. Shed shows one notice for the detected legacy paths, then uses `~/.shed/config.toml` as the global configuration.
 
 ## File Format
 
 | Rule | Details |
 | :--- | :--- |
-| Line format | `key=value` |
-| Comments | Lines beginning with `#` |
-| Empty lines | Ignored |
-| Booleans | Use `true` / `false` (recommended) |
+| Format | TOML v1.0, UTF-8 |
+| Keys | Quote the full Shed key: `"tab.size" = 4` |
+| Strings | Quote values: `"theme" = "nightfox"` |
+| Booleans | Use `true` / `false` |
 | Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides |
 
-Shed validates every non-comment line at startup. If any line is malformed, contains an invalid key, or the file cannot be read as UTF-8, Shed leaves the file unchanged and starts with built-in defaults; a `[config recovery]` buffer lists each exact failure and directs you to correct it, then run `:reload`. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
+Shed validates the full TOML document at startup. If parsing fails, a value is unsupported, or the file cannot be read, Shed leaves it unchanged and starts with built-in defaults; `[config recovery]` lists each exact failure and directs you to correct it, then run `:reload`. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
 
 ## Runtime Commands
 
 | Command | Behavior |
 | :--- | :--- |
-| `:settings`, `:shedrc`, `:config` | Open `~/.shed/shedrc` |
+| `:settings`, `:config` | Open `~/.shed/config.toml` |
 | `:set key=value` | Set runtime value only |
 | `:set! key=value` | Set and persist one key to disk |
 | `:config save` / `:config write` | Persist current runtime config |
@@ -101,9 +101,9 @@ Shed validates every non-comment line at startup. If any line is malformed, cont
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `project.config.enabled` | `true` | bool | Enable `.shedrc.local` loading |
+| `project.config.enabled` | `true` | bool | Enable `.shed.toml` loading |
 | `project.config.allow.unsafe` | `false` | bool | Allow unsafe local keys (`command.user.*`, `keybind.*`, etc.) |
-| `project.config.require.trusted.file` | `true` | bool | Require trusted owner/permissions for `.shedrc.local` |
+| `project.config.require.trusted.file` | `true` | bool | Require trusted owner/permissions for `.shed.toml` |
 | `tree.delete.protect.critical` | `true` | bool | Blocks deleting filesystem root, home, and cwd via `:tree rm` |
 
 When `project.config.allow.unsafe=false`, project-local config only applies:
@@ -126,11 +126,11 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 
 | Key Pattern | Purpose | Example |
 | :--- | :--- | :--- |
-| `command.alias.<name>` | Ex-command alias to built-in command | `command.alias.ww=w` |
-| `command.user.<name>` | User shell command callable as `:<name>` | `command.user.build=make -j4` |
-| `keybind.<mode>.<lhs>` | Key remap by mode | `keybind.normal.H=^` |
-| `lsp.<ext>.command` | LSP server command for extension | `lsp.py.command=pyright-langserver` |
-| `lsp.<ext>.args` | LSP server args | `lsp.py.args=--stdio` |
+| `command.alias.<name>` | Ex-command alias to built-in command | `"command.alias.ww" = "w"` |
+| `command.user.<name>` | User shell command callable as `:<name>` | `"command.user.build" = "make -j4"` |
+| `keybind.<mode>.<lhs>` | Key remap by mode | `"keybind.normal.H" = "^"` |
+| `lsp.<ext>.command` | LSP server command for extension | `"lsp.py.command" = "pyright-langserver"` |
+| `lsp.<ext>.args` | LSP server args | `"lsp.py.args" = "--stdio"` |
 
 Supported keybind modes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 
@@ -182,49 +182,49 @@ Color values should be hex (`#RRGGBB` or `#RGB`).
 
 `one-dark-pro`, `dracula`, `material-theme`, `night-owl`, `ayu-mirage`, `monokai-pro`, `tokyo-night`, `nord`, `gruvbox-dark`, `shades-of-purple`, `palenight`, `catppuccin-mocha`, `github-dark`, `rose-pine`, `synthwave-84`, `cobalt2`, `andromeda`, `everforest-dark`, `kanagawa`, `poimandres`, `solarized-dark`, `noctis`, `oxocarbon-dark`, `vesper`, `sonokai`, `doom-one`, `horizon`, `papercolor-dark`, `xcode-dark`, `dimmed-monokai`, `fleet-dark`, `nightfox`.
 
-## Example `~/.shed/shedrc`
+## Example `~/.shed/config.toml`
 
-```ini
+```toml
 # Editor
-theme=nightfox
-font.family=Hack
-font.size=16
-tab.size=4
-line.numbers=relative
-show.current.line=true
-expand.tab=true
-auto.indent=true
-highlight.search=true
-scrolloff=3
-textwidth=88
-ruler.column=88
+"theme" = "nightfox"
+"font.family" = "Hack"
+"font.size" = 16
+"tab.size" = 4
+"line.numbers" = "relative"
+"show.current.line" = true
+"expand.tab" = true
+"auto.indent" = true
+"highlight.search" = true
+"scrolloff" = 3
+"textwidth" = 88
+"ruler.column" = 88
 
 # Session + safety
-session.restore.on.start=true
-session.autoload=work
-tree.delete.protect.critical=true
+"session.restore.on.start" = true
+"session.autoload" = "work"
+"tree.delete.protect.critical" = true
 
 # Shell/process limits
-process.timeout.ms=20000
-process.output.max.bytes=2097152
-shell.command.max.length=4096
+"process.timeout.ms" = 20000
+"process.output.max.bytes" = 2097152
+"shell.command.max.length" = 4096
 
 # LSP override
-lsp.py.command=pyright-langserver
-lsp.py.args=--stdio
+"lsp.py.command" = "pyright-langserver"
+"lsp.py.args" = "--stdio"
 
 # Aliases + keybinds
-command.alias.ww=w
-keybind.normal.H=^
-keybind.insert.<c-s>=<esc>:w<enter>
+"command.alias.ww" = "w"
+"keybind.normal.H" = "^"
+"keybind.insert.<c-s>" = "<esc>:w<enter>"
 
 # Palette override
-ui.caret=#7AA2F7
-ui.currentline=#202738
+"ui.caret" = "#7AA2F7"
+"ui.currentline" = "#202738"
 ```
 
 ## Notes
 
-- `wrap` and `conceallevel` are command-level features (`:set wrap`, `:conceal`) rather than startup-applied `shedrc` defaults.
+- `wrap` and `conceallevel` are command-level features (`:set wrap`, `:conceal`) rather than startup-applied TOML defaults.
 - `:config save` persists runtime differences from built-in defaults, not a full expanded template.
-- `.shedrc.local` is applied per project root and is cleared automatically when switching out of that project scope.
+- `.shed.toml` is applied per project root and is cleared automatically when switching out of that project scope.

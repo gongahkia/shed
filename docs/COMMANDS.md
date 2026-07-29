@@ -112,13 +112,13 @@ Notes:
 | `:set textwidth=<n>`, `:set tw=<n>` | Set text width |
 | `:set scrolloff=<n>`, `:set so=<n>` | Set scrolloff |
 | `:set <key>=<value>` | Set arbitrary runtime config key |
-| `:set! <key>=<value>` | Set and persist key to `~/.shed/shedrc` |
+| `:set! <key>=<value>` | Set and persist key to `~/.shed/config.toml` |
 
 ### Config file commands
 
 | Command | Action |
 | :--- | :--- |
-| `:settings`, `:shedrc`, `:config` | Open user config file |
+| `:settings`, `:config` | Open user config file |
 | `:config save`, `:config write` | Persist current runtime config to disk |
 | `:config status` | Show the current config load or recovery report |
 | `:reload`, `:source` | Reload config from disk |
@@ -302,6 +302,6 @@ Notes:
 
 | Mechanism | What it adds |
 | :--- | :--- |
-| `command.alias.<new>=<builtin>` in `~/.shed/shedrc` | Adds command aliases resolved before execution |
-| `command.user.<name>=<shell>` in `~/.shed/shedrc` | Adds `:<name>` shell-backed user commands |
+| `"command.alias.<new>" = "<builtin>"` in `~/.shed/config.toml` | Adds command aliases resolved before execution |
+| `"command.user.<name>" = "<shell>"` in `~/.shed/config.toml` | Adds `:<name>` shell-backed user commands |
 | `.shed` plugins (`# @command name=shell`) | Adds plugin-defined `:<name>` commands |

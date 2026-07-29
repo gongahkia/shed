@@ -23,6 +23,7 @@ final class MultiSelectionEditService {
 
     private static List<MultiSelection> replace(JTextArea area, List<MultiSelection> selections, String replacement,
                                                 boolean backward, boolean forward) {
+        validate(area.getText(), selections);
         List<MultiSelection> ordered = new ArrayList<>(selections);
         ordered.sort(Comparator.comparingInt(MultiSelection::start).reversed().thenComparing(Comparator.comparingInt(MultiSelection::end).reversed()));
         List<MultiSelection> updated = new ArrayList<>();
@@ -39,6 +40,23 @@ final class MultiSelectionEditService {
         }
         updated.sort(Comparator.comparingInt(MultiSelection::start));
         return updated;
+    }
+
+    private static void validate(String text, List<MultiSelection> selections) {
+        List<MultiSelection> ordered = new ArrayList<>(selections);
+        ordered.sort(Comparator.comparingInt(MultiSelection::start).thenComparingInt(MultiSelection::end));
+        MultiSelection previous = null;
+        for (MultiSelection selection : ordered) {
+            if (selection.end() > text.length() || !GraphemeBoundary.isBoundary(text, selection.start())
+                || !GraphemeBoundary.isBoundary(text, selection.end())) {
+                throw new IllegalArgumentException("multi-selection range is outside text or not at a grapheme boundary");
+            }
+            if (previous != null && (selection.start() < previous.end()
+                || selection.start() == previous.start() && (selection.collapsed() || previous.collapsed()))) {
+                throw new IllegalArgumentException("multi-selection ranges overlap");
+            }
+            previous = selection;
+        }
     }
 
     private static GraphemeEditRange.Range resolve(String text, MultiSelection selection, boolean backward, boolean forward) {

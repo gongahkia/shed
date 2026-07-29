@@ -69,6 +69,21 @@ public class BoundedUndoManagerTest {
         assertEquals(1, manager.retainedEditCount());
     }
 
+    @Test
+    void recoveredContentStartsWithNoUndoHistory() throws Exception {
+        FileBuffer buffer = FileBuffer.createScratch("[recovered]", "saved");
+        append(buffer.getDocument(), " draft");
+        BoundedUndoManager manager = (BoundedUndoManager) buffer.getUndoManager();
+        assertTrue(manager.canUndo());
+
+        buffer.setContent("recovered", true);
+
+        assertEquals("recovered", buffer.getContent());
+        assertTrue(buffer.isModified());
+        assertFalse(manager.canUndo());
+        assertFalse(manager.canRedo());
+    }
+
     private void append(PlainDocument document, String text) throws Exception {
         document.insertString(document.getLength(), text, null);
     }

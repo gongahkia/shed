@@ -37,7 +37,7 @@ The outer envelope has `payload` and `integrity`. `integrity` is `sha256:` follo
 
 Shed writes a fully forced temporary file in the recovery directory, then atomically replaces `journal-v1.json`. If the filesystem cannot provide an atomic move, the write fails and the prior journal remains authoritative. Reads validate the envelope, version, retention metadata, and SHA-256 digest before exposing any entry. An invalid journal is not restored.
 
-Workspace context records the working directory, active file path, and caret position. Restored buffers are dirty and require an explicit save; recovery never writes restored content to a source file automatically.
+Workspace context records the working directory, active file path, and caret position. The journal stores no undo/redo edits. Restored buffers are dirty, start with empty undo/redo history, and require an explicit save; recovery never writes restored content to a source file automatically.
 
 At startup, the Crash Recovery Workspace presents each snapshot beside its current on-disk content when available. Restore applies only checked snapshots. Defer leaves the journal unchanged, and discarding all snapshots requires confirmation. A partial restore keeps unselected snapshots for a later startup; a full restore rewrites the journal from its restored dirty buffers.
 

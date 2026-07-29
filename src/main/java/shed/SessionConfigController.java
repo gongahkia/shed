@@ -15,9 +15,11 @@ import java.util.regex.Matcher;
 
 final class SessionConfigController {
     private final Texteditor editor;
+    private final ConfigLiveReloadService configLiveReloadService;
 
     SessionConfigController(Texteditor editor) {
         this.editor = editor;
+        this.configLiveReloadService = new ConfigLiveReloadService(editor.configManager);
     }
 
     public void toggleLineNumbers(boolean enabled) {
@@ -365,6 +367,14 @@ final class SessionConfigController {
         return configReloadResult();
     }
 
+    String reloadConfigIfChanged() {
+        if (!configLiveReloadService.reloadIfChanged()) {
+            return null;
+        }
+        applyRuntimeConfigFromSettings();
+        return configReloadResult();
+    }
+
 
     public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {
         return reloadConfigIfSettingsBuffer(buffer, null, null);
@@ -392,7 +402,7 @@ final class SessionConfigController {
     private String configReloadResult() {
         if (editor.configManager.hasConfigLoadFailure()) {
             showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
-            return "Configuration rejected; safe defaults active";
+            return "Configuration rejected; last-known-good configuration remains active";
         }
         if (editor.configManager.hasConfigLoadNotice()) {
             showScratchBuffer("[config notice]", editor.configManager.getConfigLoadReport());

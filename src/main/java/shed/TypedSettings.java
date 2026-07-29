@@ -145,6 +145,15 @@ final class TypedSettings {
         return values.get(key);
     }
 
+    Map<String, Object> copyValues() {
+        return new LinkedHashMap<>(values);
+    }
+
+    void restoreValues(Map<String, Object> snapshot) {
+        values.clear();
+        values.putAll(snapshot);
+    }
+
     private Object coerce(Object value, Object defaultValue) {
         if (defaultValue instanceof Integer && value instanceof Long) {
             return Math.toIntExact((Long) value);

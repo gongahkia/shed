@@ -50,7 +50,7 @@ public class HelpService {
                    "  :config inspector Open typed settings inspector\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
-                   "  :workspace ... Workspace profile save/load/list\n" +
+                   "  :workspace ... Workspace profiles or index status/controls\n" +
                    "  :clean         Remove Shed data files\n" +
                    "  :jobs          Show async job list\n" +
                    "  :version       Show local version and support metadata\n" +
@@ -231,6 +231,8 @@ public class HelpService {
                     + ":session load! [name] restores even when buffers are modified.\n"
                     + ":session list lists all saved sessions.\n"
                     + ":workspace save/load/list is similar, with project-profile naming + UI settings.\n"
+                    + ":workspace index status shows ad-hoc versus persistent-index status and cost.\n"
+                    + ":workspace index enable/disable persists the explicit index preference; :workspace index benchmark measures an explicit build.\n"
                     + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/config.toml.\n";
             case "keybind":
             case "keybinding":

@@ -595,11 +595,14 @@ final class SessionConfigController {
     public String handleWorkspaceProfileCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty()) {
-            return "Usage: :workspace save [name] | load[!] [name] | list";
+            return "Usage: :workspace save [name] | load[!] [name] | list | index [status|enable|disable|benchmark]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase(Locale.ROOT) : trimmed.substring(0, split).toLowerCase(Locale.ROOT);
         String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        if ("index".equals(subcommand)) {
+            return handleWorkspaceIndexCommand(args);
+        }
         String profileName = args.isBlank() ? defaultWorkspaceProfileName() : sanitizeSessionName(args);
         String sessionName = editor.WORKSPACE_PROFILE_PREFIX + profileName;
         switch (subcommand) {
@@ -612,8 +615,90 @@ final class SessionConfigController {
             case "list":
                 return listWorkspaceProfiles();
             default:
-                return "Usage: :workspace save [name] | load[!] [name] | list";
+                return "Usage: :workspace save [name] | load[!] [name] | list | index [status|enable|disable|benchmark]";
         }
+    }
+
+
+    private String handleWorkspaceIndexCommand(String argument) {
+        String subcommand = argument == null || argument.isBlank() ? "status" : argument.trim().toLowerCase(Locale.ROOT);
+        Path workspaceRoot = workspaceIndexRoot();
+        switch (subcommand) {
+            case "status":
+                return showWorkspaceIndexComparison(workspaceRoot);
+            case "enable":
+                return setWorkspaceIndexEnabled(true, workspaceRoot);
+            case "disable":
+                return setWorkspaceIndexEnabled(false, workspaceRoot);
+            case "benchmark":
+                return benchmarkWorkspaceIndex(workspaceRoot);
+            default:
+                return "Usage: :workspace index [status|enable|disable|benchmark]";
+        }
+    }
+
+
+    private String setWorkspaceIndexEnabled(boolean enabled, Path workspaceRoot) {
+        try {
+            editor.configManager.setAndPersist("workspace.index.enabled", Boolean.toString(enabled));
+            showWorkspaceIndexComparison(workspaceRoot);
+            return "Persistent workspace indexing " + (enabled ? "enabled" : "disabled");
+        } catch (IOException error) {
+            return "Unable to update workspace index preference: " + error.getMessage();
+        }
+    }
+
+
+    private String showWorkspaceIndexComparison(Path workspaceRoot) {
+        WorkspaceIndexComparison.Report report = workspaceIndexComparison().inspect(editor.configManager.getWorkspaceIndexEnabled(), workspaceRoot);
+        showScratchBuffer("[workspace index]", report.format());
+        return "Showing workspace index comparison";
+    }
+
+
+    private String benchmarkWorkspaceIndex(Path workspaceRoot) {
+        if (workspaceRoot == null) {
+            return "Workspace index benchmark requires a file-backed buffer or tree root";
+        }
+        WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
+        int jobId = editor.asyncJobService.submit("workspace index benchmark: " + workspaceRoot,
+            token -> {
+                token.onCancel(cancellation::cancel);
+                return new WorkspaceIndexBenchmark(workspaceIndexService()).measure(workspaceRoot, cancellation);
+            },
+            (snapshot, report, error) -> {
+                if (snapshot.getStatus() == AsyncJobService.Status.CANCELLED) {
+                    editor.showMessage("Workspace index benchmark cancelled");
+                } else if (error != null) {
+                    editor.showMessage("Workspace index benchmark failed: " + error.getMessage());
+                } else if (report != null) {
+                    showScratchBuffer("[workspace index benchmark]", report.format());
+                    editor.showMessage("Workspace index benchmark completed");
+                }
+            });
+        return "Started workspace index benchmark job " + jobId;
+    }
+
+
+    private WorkspaceIndexComparison workspaceIndexComparison() {
+        return new WorkspaceIndexComparison(workspaceIndexService());
+    }
+
+
+    private WorkspaceIndexService workspaceIndexService() {
+        return new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+    }
+
+
+    private Path workspaceIndexRoot() {
+        FileBuffer current = editor.getCurrentBuffer();
+        if (current != null && current.hasFilePath()) {
+            File file = new File(current.getFilePath());
+            File root = detectProjectTrustRoot(file);
+            File directory = root == null ? file.getParentFile() : root;
+            return directory == null ? null : directory.toPath();
+        }
+        return editor.treeRoot != null && editor.treeRoot.isDirectory() ? editor.treeRoot.toPath() : null;
     }
 
 

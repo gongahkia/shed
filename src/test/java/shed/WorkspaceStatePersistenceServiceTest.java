@@ -140,7 +140,8 @@ public class WorkspaceStatePersistenceServiceTest {
         Path file = root.resolve("notes.txt");
         return new WorkspaceState(
             List.of(root.toString()),
-            List.of(new WorkspaceState.BufferState("file-1", WorkspaceState.BufferKind.FILE, file.toString(), null, true, content)),
+            List.of(new WorkspaceState.BufferState("file-1", WorkspaceState.BufferKind.FILE, file.toString(), null, true, content,
+                new WorkspaceState.FileSnapshot("test-file", 1L, 1L, content.length(), "0".repeat(64)))),
             List.of(new WorkspaceState.PaneState("pane-1", "file-1", 0)),
             new WorkspaceState.ActiveSelection("pane-1", "file-1", 0),
             List.of(new WorkspaceState.ToolState("tree", Map.of("root", root.toString())))

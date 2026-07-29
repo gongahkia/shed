@@ -1,6 +1,13 @@
 package shed;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -10,16 +17,22 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
-record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneState> panes,
+record WorkspaceState(int version, List<String> roots, List<BufferState> buffers, List<PaneState> panes,
                       ActiveSelection activeSelection, List<ToolState> tools) {
-    static final int VERSION = 1;
+    static final int VERSION = 2;
+    static final int LEGACY_VERSION = 1;
+
+    WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneState> panes,
+                   ActiveSelection activeSelection, List<ToolState> tools) {
+        this(VERSION, roots, buffers, panes, activeSelection, tools);
+    }
 
     WorkspaceState {
         roots = List.copyOf(Objects.requireNonNull(roots, "roots"));
         buffers = List.copyOf(Objects.requireNonNull(buffers, "buffers"));
         panes = List.copyOf(Objects.requireNonNull(panes, "panes"));
         tools = List.copyOf(Objects.requireNonNull(tools, "tools"));
-        validate(roots, buffers, panes, activeSelection, tools);
+        validate(version, roots, buffers, panes, activeSelection, tools);
     }
 
     String serialize() {
@@ -28,7 +41,7 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
 
     Map<String, Object> toMap() {
         Map<String, Object> root = new LinkedHashMap<>();
-        root.put("version", VERSION);
+        root.put("version", version);
         root.put("roots", roots);
         List<Object> encodedBuffers = new ArrayList<>();
         for (BufferState buffer : buffers) {
@@ -39,6 +52,9 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
             entry.put("name", buffer.name());
             entry.put("modified", buffer.modified());
             entry.put("content", buffer.content());
+            if (version == VERSION) {
+                entry.put("fileSnapshot", buffer.fileSnapshot() == null ? null : buffer.fileSnapshot().toMap());
+            }
             encodedBuffers.add(entry);
         }
         root.put("buffers", encodedBuffers);
@@ -81,30 +97,35 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
 
     static WorkspaceState fromMap(Map<String, Object> root) {
         requireKeys(root, Set.of("version", "roots", "buffers", "panes", "activeSelection", "tools"), "workspace");
-        if (requireInteger(root.get("version"), "workspace.version") != VERSION) {
-            throw new IllegalArgumentException("workspace.version must be " + VERSION);
+        int version = requireInteger(root.get("version"), "workspace.version");
+        if (version != LEGACY_VERSION && version != VERSION) {
+            throw new IllegalArgumentException("workspace.version is unsupported");
         }
         List<String> roots = stringList(root.get("roots"), "workspace.roots");
-        List<BufferState> buffers = buffers(root.get("buffers"));
+        List<BufferState> buffers = buffers(root.get("buffers"), version);
         List<PaneState> panes = panes(root.get("panes"));
         ActiveSelection active = activeSelection(root.get("activeSelection"));
         List<ToolState> tools = tools(root.get("tools"));
-        return new WorkspaceState(roots, buffers, panes, active, tools);
+        return new WorkspaceState(version, roots, buffers, panes, active, tools);
     }
 
-    private static List<BufferState> buffers(Object value) {
+    private static List<BufferState> buffers(Object value, int version) {
         List<BufferState> buffers = new ArrayList<>();
         List<Object> entries = requireArray(value, "workspace.buffers");
         for (int index = 0; index < entries.size(); index++) {
             Map<String, Object> entry = requireObject(entries.get(index), "workspace.buffers[" + index + "]");
-            requireKeys(entry, Set.of("id", "type", "path", "name", "modified", "content"), "workspace.buffers[" + index + "]");
+            Set<String> fields = version == VERSION
+                ? Set.of("id", "type", "path", "name", "modified", "content", "fileSnapshot")
+                : Set.of("id", "type", "path", "name", "modified", "content");
+            requireKeys(entry, fields, "workspace.buffers[" + index + "]");
             buffers.add(new BufferState(
                 requireString(entry.get("id"), "workspace.buffers[" + index + "].id"),
                 BufferKind.fromWireValue(requireString(entry.get("type"), "workspace.buffers[" + index + "].type")),
                 nullableString(entry.get("path"), "workspace.buffers[" + index + "].path"),
                 nullableString(entry.get("name"), "workspace.buffers[" + index + "].name"),
                 requireBoolean(entry.get("modified"), "workspace.buffers[" + index + "].modified"),
-                nullableString(entry.get("content"), "workspace.buffers[" + index + "].content")
+                nullableString(entry.get("content"), "workspace.buffers[" + index + "].content"),
+                version == VERSION ? fileSnapshot(entry.get("fileSnapshot"), "workspace.buffers[" + index + "].fileSnapshot") : null
             ));
         }
         return buffers;
@@ -156,8 +177,26 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
         return tools;
     }
 
-    private static void validate(List<String> roots, List<BufferState> buffers, List<PaneState> panes,
+    private static FileSnapshot fileSnapshot(Object value, String field) {
+        if (value == null) {
+            return null;
+        }
+        Map<String, Object> fields = requireObject(value, field);
+        requireKeys(fields, Set.of("fileKey", "createdAtMillis", "modifiedAtMillis", "size", "sha256"), field);
+        return new FileSnapshot(
+            nullableString(fields.get("fileKey"), field + ".fileKey"),
+            requireNonNegativeLong(fields.get("createdAtMillis"), field + ".createdAtMillis"),
+            requireNonNegativeLong(fields.get("modifiedAtMillis"), field + ".modifiedAtMillis"),
+            requireNonNegativeLong(fields.get("size"), field + ".size"),
+            requireString(fields.get("sha256"), field + ".sha256")
+        );
+    }
+
+    private static void validate(int version, List<String> roots, List<BufferState> buffers, List<PaneState> panes,
                                  ActiveSelection active, List<ToolState> tools) {
+        if (version != LEGACY_VERSION && version != VERSION) {
+            throw new IllegalArgumentException("workspace.version is unsupported");
+        }
         Set<String> rootPaths = new HashSet<>();
         for (String root : roots) {
             requireAbsolutePath(root, "workspace root");
@@ -176,8 +215,16 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
                 if (buffer.name() != null || (buffer.modified() && buffer.content() == null) || (!buffer.modified() && buffer.content() != null)) {
                     throw new IllegalArgumentException("file buffer content and name do not match its modified state");
                 }
-            } else if (buffer.path() != null || buffer.name() == null || buffer.name().isBlank() || buffer.content() == null) {
-                throw new IllegalArgumentException("scratch buffers require name and content only");
+                if (version == VERSION && buffer.fileSnapshot() == null) {
+                    throw new IllegalArgumentException("version 2 file buffers require a file snapshot");
+                }
+                if (version == LEGACY_VERSION && buffer.fileSnapshot() != null) {
+                    throw new IllegalArgumentException("version 1 file buffers cannot contain a file snapshot");
+                }
+            } else {
+                if (buffer.path() != null || buffer.name() == null || buffer.name().isBlank() || buffer.content() == null || buffer.fileSnapshot() != null) {
+                    throw new IllegalArgumentException("scratch buffers require name and content only");
+                }
             }
         }
         Set<String> paneIds = new HashSet<>();
@@ -278,6 +325,21 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
         return number;
     }
 
+    private static long requireNonNegativeLong(Object value, String field) {
+        long number;
+        if (value instanceof Long) {
+            number = (Long) value;
+        } else if (value instanceof Integer) {
+            number = (Integer) value;
+        } else {
+            throw new IllegalArgumentException(field + " must be an integer");
+        }
+        if (number < 0) {
+            throw new IllegalArgumentException(field + " must be non-negative");
+        }
+        return number;
+    }
+
     private static String requireIdentifier(String value, String field) {
         if (value == null || !value.matches("[A-Za-z0-9._-]+")) {
             throw new IllegalArgumentException(field + " must use letters, digits, dot, underscore, or hyphen");
@@ -315,7 +377,77 @@ record WorkspaceState(List<String> roots, List<BufferState> buffers, List<PaneSt
         }
     }
 
-    record BufferState(String id, BufferKind kind, String path, String name, boolean modified, String content) {
+    record BufferState(String id, BufferKind kind, String path, String name, boolean modified, String content, FileSnapshot fileSnapshot) {
+        BufferState(String id, BufferKind kind, String path, String name, boolean modified, String content) {
+            this(id, kind, path, name, modified, content, null);
+        }
+    }
+
+    record FileSnapshot(String fileKey, long createdAtMillis, long modifiedAtMillis, long size, String sha256) {
+        FileSnapshot {
+            if (fileKey != null && fileKey.isBlank()) {
+                throw new IllegalArgumentException("file snapshot key must not be blank");
+            }
+            if (createdAtMillis < 0 || modifiedAtMillis < 0 || size < 0 || sha256 == null || !sha256.matches("[0-9a-f]{64}")) {
+                throw new IllegalArgumentException("file snapshot is invalid");
+            }
+        }
+
+        static FileSnapshot capture(Path path) throws IOException {
+            Path resolved = Objects.requireNonNull(path, "path").toAbsolutePath().normalize();
+            BasicFileAttributes before = readRegularAttributes(resolved);
+            String sha256 = sha256(resolved);
+            BasicFileAttributes after = readRegularAttributes(resolved);
+            if (!sameMetadata(before, after)) {
+                throw new IOException("file changed while capturing workspace state: " + resolved);
+            }
+            return fromAttributes(after, sha256);
+        }
+
+        Map<String, Object> toMap() {
+            Map<String, Object> fields = new LinkedHashMap<>();
+            fields.put("fileKey", fileKey);
+            fields.put("createdAtMillis", createdAtMillis);
+            fields.put("modifiedAtMillis", modifiedAtMillis);
+            fields.put("size", size);
+            fields.put("sha256", sha256);
+            return fields;
+        }
+
+        private static FileSnapshot fromAttributes(BasicFileAttributes attributes, String sha256) {
+            Object key = attributes.fileKey();
+            return new FileSnapshot(key == null ? null : key.toString(), attributes.creationTime().toMillis(),
+                attributes.lastModifiedTime().toMillis(), attributes.size(), sha256);
+        }
+
+        private static BasicFileAttributes readRegularAttributes(Path path) throws IOException {
+            BasicFileAttributes attributes = Files.readAttributes(path, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink()) {
+                throw new IOException("workspace file is not a regular file: " + path);
+            }
+            return attributes;
+        }
+
+        private static boolean sameMetadata(BasicFileAttributes first, BasicFileAttributes second) {
+            return Objects.equals(first.fileKey(), second.fileKey())
+                && first.creationTime().equals(second.creationTime())
+                && first.lastModifiedTime().equals(second.lastModifiedTime())
+                && first.size() == second.size();
+        }
+
+        private static String sha256(Path path) throws IOException {
+            try (InputStream input = Files.newInputStream(path)) {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] buffer = new byte[8192];
+                int read;
+                while ((read = input.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read);
+                }
+                return java.util.HexFormat.of().formatHex(digest.digest());
+            } catch (NoSuchAlgorithmException error) {
+                throw new IOException("SHA-256 is unavailable", error);
+            }
+        }
     }
 
     record PaneState(String id, String bufferId, int caret) {

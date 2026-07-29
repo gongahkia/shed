@@ -789,6 +789,15 @@ public class LspClient {
         return parseWorkspaceEdits(result);
     }
 
+    public List<TextEdit> formatting(String uri, int tabSize, boolean insertSpaces) {
+        if (!supports(LspCapability.FORMATTING)) return List.of();
+        Map<String, Object> options = new LinkedHashMap<>();
+        options.put("tabSize", Math.max(1, tabSize));
+        options.put("insertSpaces", insertSpaces);
+        Map<String, Object> response = sendRequest("textDocument/formatting", Map.of("textDocument", Map.of("uri", uri), "options", options), 3000L);
+        return parseTextEdits(uri, MiniJson.asArray(response == null ? null : response.get("result")), null);
+    }
+
     public List<CodeAction> codeActions(String uri, int line, int character, List<Diagnostic> diagnosticsAtCursor) {
         if (!supports(LspCapability.CODE_ACTION)) {
             return List.of();

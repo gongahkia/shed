@@ -10,14 +10,17 @@ import java.util.Set;
 final class TypedSettings {
     private final Map<String, Object> defaults = new LinkedHashMap<>();
     private final Map<String, Object> values = new LinkedHashMap<>();
+    private final Map<String, String> descriptions = new LinkedHashMap<>();
 
     void clearDefaults() {
         defaults.clear();
         values.clear();
+        descriptions.clear();
     }
 
-    void define(String key, Object value) {
+    void define(String key, Object value, String description) {
         defaults.put(key, value);
+        descriptions.put(key, description);
     }
 
     void reset() {
@@ -38,10 +41,35 @@ final class TypedSettings {
         for (Map.Entry<String, Object> entry : defaults.entrySet()) {
             String key = entry.getKey();
             descriptors.add(new Descriptor(key, category(key), type(entry.getValue()),
-                stringify(values.get(key)), stringify(entry.getValue())));
+                stringify(values.get(key)), stringify(entry.getValue()), descriptions.getOrDefault(key, "")));
         }
         descriptors.sort(java.util.Comparator.comparing(Descriptor::key));
         return descriptors;
+    }
+
+    List<Descriptor> search(String query) {
+        String normalized = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isEmpty()) {
+            return descriptors();
+        }
+        String[] terms = normalized.split("\\s+");
+        List<Descriptor> matches = new ArrayList<>();
+        for (Descriptor descriptor : descriptors()) {
+            String haystack = (descriptor.key() + " " + descriptor.category() + " " + descriptor.type() + " "
+                + descriptor.currentValue() + " " + descriptor.defaultValue() + " " + descriptor.description())
+                .toLowerCase(Locale.ROOT);
+            boolean matched = true;
+            for (String term : terms) {
+                if (!haystack.contains(term)) {
+                    matched = false;
+                    break;
+                }
+            }
+            if (matched) {
+                matches.add(descriptor);
+            }
+        }
+        return matches;
     }
 
     String validateToml(String key, Object value) {
@@ -256,6 +284,6 @@ final class TypedSettings {
         return null;
     }
 
-    record Descriptor(String key, String category, String type, String currentValue, String defaultValue) {
+    record Descriptor(String key, String category, String type, String currentValue, String defaultValue, String description) {
     }
 }

@@ -205,7 +205,8 @@ Notes:
 | `:lsp rename <newName>` | Prepare rename preview |
 | `:lsp renameapply`, `:lsp rename!` | Apply pending rename edits |
 | `:lsp renamecancel`, `:lsp renameclear` | Discard pending rename |
-| `:lsp codeaction [index]`, `:lsp codeactions [index]`, `:lsp actions [index]`, `:lsp ca [index]` | List/apply code actions |
+| `:lsp codeaction [index]`, `:lsp codeactions [index]`, `:lsp actions [index]`, `:lsp ca [index]` | List/preview code actions |
+| `:lsp codeaction apply` | Apply the reviewed code-action preview |
 | `:lsp diagnostics`, `:lsp diag` | Same as `:diagnostics` |
 | `:lsp status` | Show running servers + errors |
 | `:lsp restart [ext]` | Restart LSP for extension (defaults to current buffer extension) |

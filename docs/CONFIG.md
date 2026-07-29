@@ -92,6 +92,14 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `recovery.retention.max.content.bytes` | `8388608` | int | Retained UTF-8 recovery content bytes; `1..8388608` |
 | `recovery.cleanup.on.clean.exit` | `true` | bool | Remove the journal only on a clean exit without deferred recovery |
 
+## Backup Policy
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `backup.enabled` | `true` | bool | Create local versioned backups while editing |
+| `backup.directory` | `~/.shed/backups` | path | Directory for versioned backups; created on first backup |
+| `backup.retention.count` | `10` | int | Retained backups per source file; `1..100` |
+
 ## Dramatic UI / Theater Keys
 
 | Key | Default | Type | Notes |

@@ -175,6 +175,22 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresBackupPolicy() throws IOException {
+        Path home = tempDir.resolve("home-backup-policy");
+        Path backupDirectory = tempDir.resolve("backup-store");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("backup.enabled", "false");
+        config.setAndPersist("backup.directory", backupDirectory.toString());
+        config.setAndPersist("backup.retention.count", "2");
+
+        assertEquals(new BackupPolicy(false, backupDirectory.toString(), 2), config.getBackupPolicy());
+        assertEquals("backup.retention.count must be between 1 and " + BackupPolicy.MAX_RETENTION_COUNT,
+            config.validateSettingValue("backup.retention.count", "101"));
+    }
+
+    @Test
     void resetAndPersistRestoresOneTypedDefaultWithoutDisturbingOtherOverrides() throws IOException {
         Path home = tempDir.resolve("home-reset-setting");
         System.setProperty("user.home", home.toString());

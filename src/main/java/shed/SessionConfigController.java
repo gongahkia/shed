@@ -936,7 +936,7 @@ final class SessionConfigController {
                     } else {
                         String content = MiniJson.asString(entry.get("content"));
                         if (content != null) {
-                            restoredBuffer = new FileBuffer(path);
+                            restoredBuffer = new FileBuffer(path, editor.configManager);
                             restoredBuffer.setContent(content, true);
                         }
                     }

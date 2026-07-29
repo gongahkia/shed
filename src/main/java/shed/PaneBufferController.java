@@ -113,7 +113,8 @@ final class PaneBufferController {
             buffer.setModified(true);
             try {
                 buffer.createBackup();
-            } catch (IOException ignored) {
+            } catch (IOException error) {
+                editor.errorReporter.report(error, "backup", "creating a local backup", "docs/BACKUPS.md");
             }
             editor.recordChangePosition();
             editor.syncLspChange(buffer);
@@ -197,7 +198,7 @@ final class PaneBufferController {
         if (file.exists()) {
             buffer = new FileBuffer(file, editor.configManager);
         } else {
-            buffer = new FileBuffer(file.getAbsolutePath());
+            buffer = new FileBuffer(file.getAbsolutePath(), editor.configManager);
         }
 
         if (shouldReplaceSingleLandingBuffer()) {

@@ -320,7 +320,8 @@ final class RecoveryController {
                 File file = new File(entry.path());
                 FileBuffer existing = editor.findBufferByPath(file);
                 if (existing == null) {
-                    FileBuffer buffer = file.exists() ? new FileBuffer(file, editor.configManager) : new FileBuffer(file.getAbsolutePath());
+                    FileBuffer buffer = file.exists() ? new FileBuffer(file, editor.configManager)
+                        : new FileBuffer(file.getAbsolutePath(), editor.configManager);
                     if (editor.shouldReplaceSingleLandingBuffer()) {
                         editor.buffers.set(0, buffer);
                     } else {

@@ -45,9 +45,25 @@ final class RecoveryController {
             }
             promptExternalConflictForModifiedBuffer(buffer);
         }
+        if (!hasModifiedSettingsBuffer()) {
+            String configReload = editor.reloadConfigIfChanged();
+            if (configReload != null) {
+                editor.showMessage(configReload);
+                return;
+            }
+        }
         if (autoReloaded > 0) {
             editor.showMessage("Auto-reloaded " + autoReloaded + " externally changed buffer" + (autoReloaded == 1 ? "" : "s"));
         }
+    }
+
+    private boolean hasModifiedSettingsBuffer() {
+        for (FileBuffer buffer : editor.buffers) {
+            if (buffer != null && buffer.isModified() && editor.isSettingsFile(buffer.getFile())) {
+                return true;
+            }
+        }
+        return false;
     }
 
 

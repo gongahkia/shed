@@ -2585,6 +2585,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.reloadConfigFromDisk();
     }
 
+    String reloadConfigIfChanged() {
+        return sessionConfigController.reloadConfigIfChanged();
+    }
+
     public String reloadConfigIfSettingsBuffer(FileBuffer buffer) {
         return sessionConfigController.reloadConfigIfSettingsBuffer(buffer);
     }

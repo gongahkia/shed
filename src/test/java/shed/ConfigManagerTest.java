@@ -244,6 +244,35 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void liveReloadKeepsLastKnownGoodConfigurationAfterInvalidEdit() throws IOException {
+        Path home = tempDir.resolve("home-live-reload");
+        Path configPath = home.resolve(".shed/config.toml");
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, "schema_version = 1\n\"tab.size\" = 8\n");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        ConfigLiveReloadService liveReload = new ConfigLiveReloadService(config);
+
+        assertFalse(liveReload.reloadIfChanged());
+        Files.writeString(configPath, "schema_version = 1\n\"tab.size\" = 12\n");
+        assertTrue(liveReload.reloadIfChanged());
+        assertEquals(12, config.getTabSize());
+        assertFalse(config.hasConfigLoadFailure());
+
+        Files.writeString(configPath, "schema_version = 1\n\"tab.size\" = \"invalid\"\n");
+        assertTrue(liveReload.reloadIfChanged());
+        assertEquals(12, config.getTabSize());
+        assertTrue(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().contains("Last-known-good configuration remains active."));
+        assertTrue(config.getConfigLoadReport().contains("active fallback: 12"));
+
+        Files.writeString(configPath, "schema_version = 1\n\"tab.size\" = 6\n");
+        assertTrue(liveReload.reloadIfChanged());
+        assertEquals(6, config.getTabSize());
+        assertFalse(config.hasConfigLoadFailure());
+    }
+
+    @Test
     void ignoresLegacyShedrcOnceWithoutMigration() throws IOException {
         Path home = tempDir.resolve("home-legacy");
         Path legacyPath = home.resolve(".shed/shedrc");

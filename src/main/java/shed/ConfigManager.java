@@ -39,6 +39,7 @@ public class ConfigManager {
     private String configLoadReport;
     private boolean configLoadFailed;
     private boolean configLoadNotice;
+    private Map<String, String> reloadFallbackConfig;
 
     // Default configuration values
     private static final String DEFAULT_THEME = "one-dark-pro";
@@ -331,6 +332,10 @@ public class ConfigManager {
     }
 
     private String fallbackDescription(String key) {
+        if (reloadFallbackConfig != null) {
+            String retained = reloadFallbackConfig.get(key);
+            return retained == null ? " (active fallback: no override)" : " (active fallback: " + retained + ")";
+        }
         Object typedValue = settings.activeValue(key);
         if (typedValue != null) {
             return " (active fallback: " + settings.stringify(typedValue) + ")";
@@ -906,12 +911,40 @@ public class ConfigManager {
     }
 
     public void reload() {
+        Map<String, String> configBeforeReload = new HashMap<>(config);
+        Map<String, String> defaultsBeforeReload = new HashMap<>(defaultConfig);
+        Map<String, String> persistedBeforeReload = new HashMap<>(persistedConfig);
+        Map<String, String> projectBeforeReload = new HashMap<>(projectConfig);
+        Map<String, String> projectPreviousBeforeReload = new HashMap<>(projectPreviousValues);
+        Map<String, Object> settingsBeforeReload = settings.copyValues();
+        File activeProjectBeforeReload = activeProjectConfigFile;
+        reloadFallbackConfig = configBeforeReload;
+        try {
+            config.clear();
+            projectConfig.clear();
+            projectPreviousValues.clear();
+            activeProjectConfigFile = null;
+            loadDefaults();
+            loadConfig();
+        } finally {
+            reloadFallbackConfig = null;
+        }
+        if (!configLoadFailed) {
+            return;
+        }
         config.clear();
+        config.putAll(configBeforeReload);
+        defaultConfig.clear();
+        defaultConfig.putAll(defaultsBeforeReload);
+        persistedConfig.clear();
+        persistedConfig.putAll(persistedBeforeReload);
         projectConfig.clear();
+        projectConfig.putAll(projectBeforeReload);
         projectPreviousValues.clear();
-        activeProjectConfigFile = null;
-        loadDefaults();
-        loadConfig();
+        projectPreviousValues.putAll(projectPreviousBeforeReload);
+        settings.restoreValues(settingsBeforeReload);
+        activeProjectConfigFile = activeProjectBeforeReload;
+        configLoadReport = configLoadReport.replace("Safe defaults are active.", "Last-known-good configuration remains active.");
     }
 
     public String applyProjectConfigForFile(File file) {

@@ -2,6 +2,8 @@ package shed;
 
 import javax.swing.*;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultHighlighter;
+import javax.swing.text.Highlighter;
 import java.awt.*;
 import java.awt.event.KeyEvent;
 import java.awt.geom.Rectangle2D;
@@ -838,26 +840,24 @@ final class EditActionController {
     void addCursorAtNextMatch() {
         if (!canAddExtraCursor()) return;
         String text = editor.writingArea.getText();
-        String selected = editor.writingArea.getSelectedText();
-        if (selected == null || selected.isEmpty()) {
-            // Get word under cursor
-            int pos = editor.writingArea.getCaretPosition();
-            int start = pos, end = pos;
-            while (start > 0 && Character.isLetterOrDigit(text.charAt(start - 1))) start--;
-            while (end < text.length() && Character.isLetterOrDigit(text.charAt(end))) end++;
-            if (start == end) return;
-            selected = text.substring(start, end);
+        MultiSelection primary = selectedRange(text);
+        if (primary == null) {
+            primary = wordRange(text, editor.writingArea.getCaretPosition());
+            if (primary == null) return;
+            editor.writingArea.setCaretPosition(primary.start());
+            editor.writingArea.moveCaretPosition(primary.end());
         }
-        // Find next occurrence after last cursor
-        int searchFrom = editor.writingArea.getCaretPosition();
-        for (int ec : editor.extraCursors) {
-            searchFrom = Math.max(searchFrom, ec);
+        String selected = text.substring(primary.start(), primary.end());
+        int searchFrom = primary.end();
+        for (MultiSelection selection : editor.extraSelections) {
+            searchFrom = Math.max(searchFrom, selection.end());
         }
-        int nextIdx = text.indexOf(selected, searchFrom + 1);
-        if (nextIdx < 0) nextIdx = text.indexOf(selected); // wrap around
-        if (nextIdx >= 0 && !editor.extraCursors.contains(nextIdx)) {
-            editor.extraCursors.add(nextIdx);
-            editor.showMessage("Added cursor (" + editor.extraCursors.size() + " extra)");
+        MultiSelection next = nextMatch(text, selected, primary, searchFrom);
+        if (next != null) {
+            editor.extraSelections.add(next);
+            editor.extraSelections.sort(Comparator.comparingInt(MultiSelection::start));
+            refreshExtraSelectionHighlights();
+            editor.showMessage("Added selection (" + (editor.extraSelections.size() + 1) + " total)");
         }
     }
 
@@ -1018,46 +1018,19 @@ final class EditActionController {
 
     void applyMultiCursorInsert(char c) {
         if (!hasActiveExtraCursors()) return;
-        // Sort cursors descending so insertions don't shift earlier positions
-        List<Integer> sorted = new ArrayList<>(editor.extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        String s = String.valueOf(c);
-        for (int pos : sorted) {
-            if (pos >= 0 && pos <= editor.writingArea.getText().length()) {
-                editor.writingArea.insert(s, pos);
-            }
-        }
-        // Shift all cursors forward by 1
-        for (int i = 0; i < editor.extraCursors.size(); i++) {
-            editor.extraCursors.set(i, editor.extraCursors.get(i) + 1);
-        }
+        replaceExtraSelections(MultiSelectionEditService.insert(editor.writingArea, editor.extraSelections, String.valueOf(c)));
     }
 
 
     void applyMultiCursorBackspace() {
         if (!hasActiveExtraCursors()) return;
-        List<Integer> sorted = new ArrayList<>(editor.extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        for (int pos : sorted) {
-            if (pos > 0 && pos <= editor.writingArea.getText().length()) {
-                editor.writingArea.replaceRange("", pos - 1, pos);
-            }
-        }
-        for (int i = 0; i < editor.extraCursors.size(); i++) {
-            editor.extraCursors.set(i, Math.max(0, editor.extraCursors.get(i) - 1));
-        }
+        replaceExtraSelections(MultiSelectionEditService.backspace(editor.writingArea, editor.extraSelections));
     }
 
 
     void applyMultiCursorDelete() {
         if (!hasActiveExtraCursors()) return;
-        List<Integer> sorted = new ArrayList<>(editor.extraCursors);
-        sorted.sort(Collections.reverseOrder());
-        for (int pos : sorted) {
-            if (pos >= 0 && pos < editor.writingArea.getText().length()) {
-                editor.writingArea.replaceRange("", pos, pos + 1);
-            }
-        }
+        replaceExtraSelections(MultiSelectionEditService.delete(editor.writingArea, editor.extraSelections));
     }
 
 
@@ -1070,10 +1043,9 @@ final class EditActionController {
             int col = pos - editor.writingArea.getLineStartOffset(line);
             int prevLineStart = editor.writingArea.getLineStartOffset(line - 1);
             int prevLineEnd = editor.writingArea.getLineEndOffset(line - 1);
-            int newPos = Math.min(prevLineStart + col, prevLineEnd - 1);
-            if (!editor.extraCursors.contains(newPos)) {
-                editor.extraCursors.add(newPos);
-                editor.showMessage("Added cursor above (" + editor.extraCursors.size() + " extra)");
+            int newPos = GraphemeBoundary.floor(editor.writingArea.getText(), Math.min(prevLineStart + col, prevLineEnd - 1));
+            if (addExtraSelection(MultiSelection.caret(newPos))) {
+                editor.showMessage("Added cursor above (" + (editor.extraSelections.size() + 1) + " total)");
             }
         } catch (BadLocationException ignored) {}
     }
@@ -1088,29 +1060,48 @@ final class EditActionController {
             int col = pos - editor.writingArea.getLineStartOffset(line);
             int nextLineStart = editor.writingArea.getLineStartOffset(line + 1);
             int nextLineEnd = editor.writingArea.getLineEndOffset(line + 1);
-            int newPos = Math.min(nextLineStart + col, nextLineEnd - 1);
-            if (!editor.extraCursors.contains(newPos)) {
-                editor.extraCursors.add(newPos);
-                editor.showMessage("Added cursor below (" + editor.extraCursors.size() + " extra)");
+            int newPos = GraphemeBoundary.floor(editor.writingArea.getText(), Math.min(nextLineStart + col, nextLineEnd - 1));
+            if (addExtraSelection(MultiSelection.caret(newPos))) {
+                editor.showMessage("Added cursor below (" + (editor.extraSelections.size() + 1) + " total)");
             }
         } catch (BadLocationException ignored) {}
     }
 
 
     void clearExtraCursors() {
-        if (!editor.extraCursors.isEmpty()) {
-            editor.extraCursors.clear();
+        if (!editor.extraSelections.isEmpty() || !editor.extraSelectionHighlightTags.isEmpty()) {
+            editor.extraSelections.clear();
+            refreshExtraSelectionHighlights();
         }
+    }
+
+    void refreshExtraSelectionHighlights() {
+        Highlighter highlighter = editor.writingArea.getHighlighter();
+        for (Object tag : editor.extraSelectionHighlightTags) {
+            highlighter.removeHighlight(tag);
+        }
+        editor.extraSelectionHighlightTags.clear();
+        Color color = editor.configManager.getSelectionColor();
+        Color selectionColor = new Color(color.getRed(), color.getGreen(), color.getBlue(), 150);
+        for (MultiSelection selection : editor.extraSelections) {
+            if (selection.collapsed()) continue;
+            try {
+                editor.extraSelectionHighlightTags.add(highlighter.addHighlight(selection.start(), selection.end(),
+                    new DefaultHighlighter.DefaultHighlightPainter(selectionColor)));
+            } catch (BadLocationException ignored) {
+            }
+        }
+        editor.writingArea.repaint();
     }
 
     private boolean canAddExtraCursor() {
         MultiSelectionPolicy policy = editor.configManager.getMultiSelectionPolicy();
         if (!policy.enabled()) {
-            editor.extraCursors.clear();
+            clearExtraCursors();
             editor.showMessage("Multi-selection disabled; set multi.selection.enabled=true");
             return false;
         }
-        if (editor.extraCursors.size() >= policy.maxCursors() - 1) {
+        if (editor.extraSelections.size() >= policy.maxCursors() - 1) {
             editor.showMessage("Multi-selection limit reached (" + policy.maxCursors() + " cursors)");
             return false;
         }
@@ -1120,14 +1111,89 @@ final class EditActionController {
     private boolean hasActiveExtraCursors() {
         MultiSelectionPolicy policy = editor.configManager.getMultiSelectionPolicy();
         if (!policy.enabled()) {
-            editor.extraCursors.clear();
+            clearExtraCursors();
             return false;
         }
         int maxExtraCursors = policy.maxCursors() - 1;
-        if (editor.extraCursors.size() > maxExtraCursors) {
-            editor.extraCursors.subList(maxExtraCursors, editor.extraCursors.size()).clear();
+        if (editor.extraSelections.size() > maxExtraCursors) {
+            editor.extraSelections.subList(maxExtraCursors, editor.extraSelections.size()).clear();
+            refreshExtraSelectionHighlights();
         }
-        return !editor.extraCursors.isEmpty();
+        return !editor.extraSelections.isEmpty();
+    }
+
+    private MultiSelection selectedRange(String text) {
+        int start = editor.writingArea.getSelectionStart();
+        int end = editor.writingArea.getSelectionEnd();
+        if (start == end) return null;
+        GraphemeEditRange.Range range = GraphemeEditRange.selection(text, start, end);
+        if (range.empty()) return null;
+        editor.writingArea.setSelectionStart(range.start());
+        editor.writingArea.setSelectionEnd(range.end());
+        return new MultiSelection(range.start(), range.end());
+    }
+
+    private MultiSelection wordRange(String text, int offset) {
+        int caret = GraphemeBoundary.floor(text, offset);
+        int start = caret;
+        while (start > 0) {
+            int previous = GraphemeBoundary.previous(text, start);
+            if (!isWordCluster(text, previous)) break;
+            start = previous;
+        }
+        int end = caret;
+        while (end < text.length() && isWordCluster(text, end)) {
+            end = GraphemeBoundary.next(text, end);
+        }
+        return start == end ? null : new MultiSelection(start, end);
+    }
+
+    private boolean isWordCluster(String text, int offset) {
+        int codePoint = text.codePointAt(offset);
+        return Character.isLetterOrDigit(codePoint) || codePoint == '_';
+    }
+
+    private MultiSelection nextMatch(String text, String selected, MultiSelection primary, int searchFrom) {
+        int searchStart = Math.max(0, Math.min(searchFrom, text.length()));
+        MultiSelection match = findMatch(text, selected, primary, searchStart);
+        return match == null && searchStart > 0 ? findMatch(text, selected, primary, 0) : match;
+    }
+
+    private MultiSelection findMatch(String text, String selected, MultiSelection primary, int searchFrom) {
+        int index = text.indexOf(selected, searchFrom);
+        while (index >= 0) {
+            GraphemeEditRange.Range range = GraphemeEditRange.selection(text, index, index + selected.length());
+            MultiSelection candidate = new MultiSelection(range.start(), range.end());
+            if (!overlaps(candidate, primary) && editor.extraSelections.stream().noneMatch(selection -> overlaps(candidate, selection))) {
+                return candidate;
+            }
+            index = text.indexOf(selected, index + 1);
+        }
+        return null;
+    }
+
+    private boolean overlaps(MultiSelection first, MultiSelection second) {
+        if (first.collapsed()) {
+            return second.start() <= first.start() && first.start() <= second.end();
+        }
+        if (second.collapsed()) {
+            return first.start() <= second.start() && second.start() <= first.end();
+        }
+        return first.start() < second.end() && second.start() < first.end();
+    }
+
+    private boolean addExtraSelection(MultiSelection selection) {
+        if (editor.extraSelections.stream().anyMatch(existing -> overlaps(selection, existing))) return false;
+        editor.extraSelections.add(selection);
+        editor.extraSelections.sort(Comparator.comparingInt(MultiSelection::start));
+        refreshExtraSelectionHighlights();
+        return true;
+    }
+
+    private void replaceExtraSelections(List<MultiSelection> selections) {
+        editor.extraSelections.clear();
+        editor.extraSelections.addAll(selections);
+        refreshExtraSelectionHighlights();
     }
 
 

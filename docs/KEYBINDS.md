@@ -97,6 +97,10 @@
 | :---: | :---: |
 | `.` | Repeat last command |
 
+#### Experimental multi-selection
+
+Enable ``multi.selection.enabled`` first. ``Ctrl+Shift+D`` adds the next matching selection, and ``Alt+J`` / ``Alt+K`` add a cursor below / above (``Shift`` reverses either direction). Insert text, ``Backspace``, and ``Delete`` apply to every active selection; ``Esc`` clears extras. The total includes the primary cursor and is capped by ``multi.selection.max.cursors``.
+
 ### `Insert` mode
 
 | Key-binds | Function |

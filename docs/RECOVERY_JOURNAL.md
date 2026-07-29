@@ -38,3 +38,7 @@ The outer envelope has `payload` and `integrity`. `integrity` is `sha256:` follo
 Shed writes a fully forced temporary file in the recovery directory, then atomically replaces `journal-v1.json`. If the filesystem cannot provide an atomic move, the write fails and the prior journal remains authoritative. Reads validate the envelope, version, retention metadata, and SHA-256 digest before exposing any entry. An invalid journal is not restored.
 
 Workspace context records the working directory, active file path, and caret position. Restored buffers are dirty and require an explicit save; recovery never writes restored content to a source file automatically.
+
+## Write scheduling
+
+Shed captures recovery input on the EDT, then replaces one pending write after a 750 ms debounce. Disk serialization runs on a daemon worker, so editing does not wait for journal I/O and queued recovery state is bounded to one snapshot. Successful writes are recorded by `:perf` as `recovery.journal.write`; failures are recorded in the local diagnostic log.

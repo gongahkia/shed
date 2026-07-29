@@ -9,9 +9,35 @@ import java.util.List;
 
 final class RecoveryController {
     private final Texteditor editor;
+    private final RecoveryJournalScheduler recoveryJournalScheduler;
 
     RecoveryController(Texteditor editor) {
         this.editor = editor;
+        this.recoveryJournalScheduler = new RecoveryJournalScheduler(
+            snapshot -> {
+                if (snapshot.entries().isEmpty()) {
+                    RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
+                } else {
+                    RecoveryJournal.write(editor.recoveryStoreDir.toPath(), snapshot.workspace(), snapshot.entries());
+                }
+            },
+            () -> RecoveryJournal.clear(editor.recoveryStoreDir.toPath()),
+            new RecoveryJournalScheduler.Observer() {
+                @Override
+                public void onWrite(long startedAtNanos, RecoveryJournalScheduler.Snapshot snapshot) {
+                    if (editor.perfService != null) {
+                        editor.perfService.recordDuration("recovery.journal.write", startedAtNanos,
+                            "entries=" + snapshot.entries().size());
+                    }
+                }
+
+                @Override
+                public void onFailure(Exception error) {
+                    editor.errorReporter.report(error, "recovery-journal", "writing the local recovery journal",
+                        "docs/RECOVERY_JOURNAL.md#read-and-write-semantics");
+                }
+            }
+        );
     }
 
     void checkForExternalChanges() {
@@ -131,25 +157,43 @@ final class RecoveryController {
     void startRecoverySnapshotTimer() {
         if (editor.recoverySnapshotTimer != null) {
             editor.recoverySnapshotTimer.stop();
+            editor.recoverySnapshotTimer = null;
         }
-        editor.recoverySnapshotTimer = new javax.swing.Timer(5000, e -> persistRecoverySnapshotsSafely());
-        editor.recoverySnapshotTimer.setRepeats(true);
-        editor.recoverySnapshotTimer.start();
     }
 
 
     void persistRecoverySnapshotsSafely() {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            SwingUtilities.invokeLater(this::persistRecoverySnapshotsSafely);
+            return;
+        }
         try {
             persistRecoverySnapshots();
-        } catch (Exception ignored) {
+        } catch (Exception error) {
+            editor.errorReporter.report(error, "recovery-journal", "capturing recovery journal input",
+                "docs/RECOVERY_JOURNAL.md#read-and-write-semantics");
         }
     }
 
 
     void persistRecoverySnapshots() throws IOException {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            throw new IOException("recovery journal capture must run on the EDT");
+        }
         if (editor.recoveryStoreDir == null) {
             return;
         }
+        recoveryJournalScheduler.request(captureRecoveryJournalWorkspace(), captureRecoveryJournalEntries());
+    }
+
+    private RecoveryJournal.Workspace captureRecoveryJournalWorkspace() {
+        FileBuffer active = editor.getCurrentBuffer();
+        int caret = active == null ? 0 : editor.writingArea.getCaretPosition();
+        return new RecoveryJournal.Workspace(new File(".").getAbsolutePath(),
+            active != null && active.hasFilePath() ? active.getFilePath() : null, caret);
+    }
+
+    private List<RecoveryJournal.Entry> captureRecoveryJournalEntries() {
         List<RecoveryJournal.Entry> entries = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : editor.buffers) {
@@ -162,15 +206,7 @@ final class RecoveryController {
             entries.add(new RecoveryJournal.Entry(snapshotId, buffer.getDisplayName(),
                 buffer.hasFilePath() ? buffer.getFilePath() : null, buffer.getFullContent()));
         }
-        if (entries.isEmpty()) {
-            RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
-            return;
-        }
-        FileBuffer active = editor.getCurrentBuffer();
-        int caret = active == null ? 0 : editor.writingArea.getCaretPosition();
-        RecoveryJournal.write(editor.recoveryStoreDir.toPath(), new RecoveryJournal.Workspace(
-            new File(".").getAbsolutePath(), active != null && active.hasFilePath() ? active.getFilePath() : null, caret
-        ), entries);
+        return entries;
     }
 
 
@@ -178,10 +214,11 @@ final class RecoveryController {
         if (editor.recoveryStoreDir == null) {
             return;
         }
-        try {
-            RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
-        } catch (IOException ignored) {
-        }
+        recoveryJournalScheduler.clear();
+    }
+
+    void shutdownRecoveryJournalScheduling() {
+        recoveryJournalScheduler.closeAndClear();
     }
 
 

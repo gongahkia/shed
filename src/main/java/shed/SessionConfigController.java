@@ -1548,6 +1548,7 @@ final class SessionConfigController {
                 }
             }
         }
+        editor.persistRecoverySnapshotsSafely();
         return saved + " file(s) written";
     }
 

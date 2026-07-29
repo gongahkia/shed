@@ -319,6 +319,7 @@ final class PaneBufferController {
         }
         editor.closeTerminalSession(buffer);
         editor.buffers.remove(buffer);
+        editor.persistRecoverySnapshotsSafely();
         if (editor.buffers.isEmpty()) {
             openLandingPage();
             return "Buffer deleted";

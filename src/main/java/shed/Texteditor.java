@@ -1128,6 +1128,10 @@ public class Texteditor extends JFrame implements KeyListener {
         recoveryController.clearRecoverySnapshots();
     }
 
+    void shutdownRecoveryJournalScheduling() {
+        recoveryController.shutdownRecoveryJournalScheduling();
+    }
+
     void promptRecoveryRestoreIfAvailable() {
         recoveryController.promptRecoveryRestoreIfAvailable();
     }
@@ -2084,6 +2088,7 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public void notifyCurrentBufferSaved() {
         lspController.notifyCurrentBufferSaved();
+        persistRecoverySnapshotsSafely();
     }
 
     void pollLspNotifications(FileBuffer buffer) {
@@ -2944,7 +2949,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (recoverySnapshotTimer != null) {
             recoverySnapshotTimer.stop();
         }
-        clearRecoverySnapshots();
+        shutdownRecoveryJournalScheduling();
         if (ptyTerminalPanes != null) {
             for (PtyTerminalPane terminalPane : new ArrayList<>(ptyTerminalPanes.values())) {
                 terminalPane.close();

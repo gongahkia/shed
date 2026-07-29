@@ -254,6 +254,7 @@ final class TypedSettings {
             case "tab.size" -> "integer 1..16";
             case "font.size" -> "integer >= 1";
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
+            case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
             case "ui.dramatic.sound.volume" -> "integer 0..100";
             case "ui.dramatic.performance.cpu.threshold" -> "number 0.1..1.0";
             case "ui.dramatic.performance.line.threshold" -> "integer >= 1000";
@@ -282,6 +283,9 @@ final class TypedSettings {
         }
         if (key.startsWith("workspace.index.")) {
             return "Live: used by subsequent workspace index operations";
+        }
+        if (key.startsWith("multi.selection.")) {
+            return "Live: disabled clears extra cursors; limit applies to new cursors";
         }
         if (key.startsWith("large.")) {
             return "Live: used when opening files";
@@ -334,6 +338,10 @@ final class TypedSettings {
             }
             if ("font.size".equals(key) && number < 1) {
                 return key + " must be at least 1";
+            }
+            if ("multi.selection.max.cursors".equals(key)
+                && (number < MultiSelectionPolicy.MIN_MAX_CURSORS || number > MultiSelectionPolicy.MAX_MAX_CURSORS)) {
+                return key + " must be between " + MultiSelectionPolicy.MIN_MAX_CURSORS + " and " + MultiSelectionPolicy.MAX_MAX_CURSORS;
             }
             if ("ui.dramatic.sound.volume".equals(key) && number > 100) {
                 return key + " must be between 0 and 100";

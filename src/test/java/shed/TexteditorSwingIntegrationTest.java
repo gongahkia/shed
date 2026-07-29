@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.Callable;
 import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
@@ -219,8 +220,33 @@ public class TexteditorSwingIntegrationTest {
 
             assertEquals("Persistent workspace indexing enabled", result);
             assertTrue(onEdt(() -> editor.configManager.getWorkspaceIndexEnabled()));
-            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Current search source: ad-hoc project scan"));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Current search source: persistent workspace index"));
             assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Persistent-index preference: enabled"));
+            assertFalse(Files.exists(home.resolve(".shed/workspace-index")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
+    void workspaceSearchAddsExactQuickfixLocationWithoutPersistentIndex() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-search");
+        Path file = tempDir.resolve("workspace-search.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "alpha\nprefix needle\n", StandardCharsets.UTF_8);
+        initializeGit(tempDir);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            String result = onEdt(() -> editor.commandHandler.execute("grep needle"));
+            int jobId = Integer.parseInt(result.substring("Started workspace search job ".length()));
+            assertTrue(awaitSearchCompletion(editor, jobId));
+
+            QuickfixService.Entry entry = onEdt(() -> editor.quickfixService.entries().getFirst());
+            assertEquals(file.toString(), entry.getFilePath());
+            assertEquals(2, entry.getLine());
+            assertEquals(8, entry.getColumn());
             assertFalse(Files.exists(home.resolve(".shed/workspace-index")));
         } finally {
             disposeEditor(editor);
@@ -229,6 +255,28 @@ public class TexteditorSwingIntegrationTest {
 
     private static void assumeSwingAvailable() {
         assumeFalse(GraphicsEnvironment.isHeadless(), "Swing display unavailable");
+    }
+
+    private static boolean awaitSearchCompletion(Texteditor editor, int jobId) throws Exception {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        while (System.nanoTime() < deadline) {
+            AsyncJobService.JobSnapshot snapshot = onEdt(() -> editor.asyncJobService.get(jobId));
+            if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.SUCCEEDED
+                && onEdt(() -> editor.quickfixService.hasEntries())) {
+                return true;
+            }
+            if (snapshot != null && snapshot.getStatus() != AsyncJobService.Status.RUNNING
+                && snapshot.getStatus() != AsyncJobService.Status.SUCCEEDED) {
+                return false;
+            }
+            Thread.sleep(20);
+        }
+        return false;
+    }
+
+    private static void initializeGit(Path root) throws Exception {
+        Process process = new ProcessBuilder("git", "init", "--quiet", root.toString()).start();
+        assertEquals(0, process.waitFor());
     }
 
     private static Texteditor createEditor(Path home, Path file) throws Exception {

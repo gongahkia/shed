@@ -13,9 +13,11 @@ import java.util.List;
 
 final class PaletteController {
     private final Texteditor editor;
+    private final WorkspaceSearchCoordinator workspaceSearchCoordinator;
 
     PaletteController(Texteditor editor) {
         this.editor = editor;
+        this.workspaceSearchCoordinator = new WorkspaceSearchCoordinator(editor);
     }
 
     public String showCommandPalette() {
@@ -54,24 +56,7 @@ final class PaletteController {
 
 
     public String showGrepFinder(String pattern) {
-        List<String> candidates = grepFiles(pattern);
-        editor.updateQuickfixEntries("grep " + (pattern == null ? "" : pattern), editor.parseQuickfixEntries(String.join("\n", candidates), "grep"));
-        String selection = showPaletteDialog("Grep", candidates, this::describeGrepCandidate);
-        if (selection == null || selection.isEmpty()) {
-            return "Grep cancelled";
-        }
-
-        String[] parts = selection.split(":", 3);
-        if (parts.length < 2) {
-            return "Invalid grep selection";
-        }
-
-        try {
-            editor.openFile(new File(parts[0]));
-            return editor.gotoLine(Integer.parseInt(parts[1]));
-        } catch (Exception e) {
-            return "Error opening grep match: " + e.getMessage();
-        }
+        return workspaceSearchCoordinator.search(pattern);
     }
 
 

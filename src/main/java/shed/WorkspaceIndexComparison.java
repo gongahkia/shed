@@ -59,9 +59,9 @@ final class WorkspaceIndexComparison {
 
         String format() {
             StringBuilder result = new StringBuilder();
-            result.append("Current search source: ad-hoc project scan\n");
+            result.append("Current search source: ").append(persistentIndexEnabled ? "persistent workspace index" : "ad-hoc project scan").append('\n');
             result.append("Persistent-index preference: ").append(persistentIndexEnabled ? "enabled" : "disabled (default)").append('\n');
-            result.append("Indexed project search: unavailable; ad-hoc scanning remains active\n");
+            result.append("Indexed project search: ").append(persistentIndexEnabled ? "enabled" : "disabled; ad-hoc scanning remains active").append('\n');
             result.append("Workspace: ").append(workspaceRoot == null ? "unavailable" : workspaceRoot).append('\n');
             result.append("Index status: ").append(indexStatus).append(" (").append(detail).append(")\n");
             result.append("Index entries: ").append(indexedFiles).append('\n');

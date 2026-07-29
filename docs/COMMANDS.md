@@ -133,7 +133,7 @@ Notes:
 | `:close`, `:clo` | Close active window |
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
-| `:grep <text>`, `:rg <text>` | Grep finder (also populates quickfix) |
+| `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
 | `:palette`, `:commands` | Command palette |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |
@@ -146,7 +146,7 @@ Notes:
 
 | Command | Action |
 | :--- | :--- |
-| `:workspace index`, `:workspace index status` | Show ad-hoc scan source, persistent-index preference, cache status, and local cache cost |
+| `:workspace index`, `:workspace index status` | Show selected search source, persistent-index preference, cache status, and local cache cost |
 | `:workspace index enable` | Persist the explicit persistent-index preference without building an index |
 | `:workspace index disable` | Persist the ad-hoc default without deleting existing cache files |
 | `:workspace index benchmark` | Start an explicit cancellable local index-build measurement |

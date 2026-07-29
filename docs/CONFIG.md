@@ -91,6 +91,8 @@ The inspector and generated reference derive each typed setting's identifier, de
 
 All LSP feature keys are typed booleans and appear in `:config inspector` under **Language Server**. Changing one writes/reloads immediately, but its effective capability state is negotiated when that language server starts; run `:lsp restart [ext]` for an existing server. `true` permits a server-advertised request and `false` prevents Shed from invoking it; the snippets key instead controls the client capability advertised at initialization. These toggles do not create network access, and diagnostics remain stored locally.
 
+Managed language support has no configuration key or network path yet. Its planned ownership, consent, catalog, integrity, cache, platform, and revocation policy is documented in [Managed Language Support Trust Model](MANAGED_LANGUAGE_SUPPORT.md); existing `lsp.<ext>.command` and `lsp.<ext>.args` remain user-managed local commands.
+
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `lsp.completion.enabled` | `true` | bool | Completion requests |

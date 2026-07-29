@@ -166,6 +166,7 @@ public class Texteditor extends JFrame implements KeyListener {
     Map<String, String> lspErrors;
     List<LspClient.TextEdit> pendingLspRenameEdits;
     String pendingLspRenameTarget;
+    LspClient.CodeAction pendingLspCodeAction;
     EditorPane treePane;
     FileBuffer treeBuffer;
     File treeRoot;

@@ -117,6 +117,7 @@ final class LspController {
             case "codeactions":
             case "actions":
             case "ca":
+                if ("apply".equalsIgnoreCase(args)) return lspCodeActionApply();
                 return lspCodeActions(args);
             case "diagnostics":
             case "diag":
@@ -540,46 +541,10 @@ final class LspController {
                     return "Code action index out of range: " + requestedIndex;
                 }
                 LspClient.CodeAction action = actions.get(requestedIndex - 1);
-                WorkspaceEditApplyResult applyResult = applyWorkspaceOperations(action.getOperations());
-                String commandUnavailable = action.getCommandId() == null || action.getCommandId().isBlank()
-                    ? null : capabilityUnavailable(client, LspCapability.EXECUTE_COMMAND);
-                boolean executed = false;
-                if (commandUnavailable == null && action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    executed = client.executeCommand(action.getCommandId(), action.getCommandArguments());
-                }
-                if (applyResult.appliedEditCount == 0 && applyResult.appliedResourceOperationCount == 0 && !executed) {
-                    if (commandUnavailable != null) return commandUnavailable;
-                    return applyResult.failureReason == null || applyResult.failureReason.isBlank()
-                        ? "Code action produced no local edit and no executable command"
-                        : "Code action failed: " + applyResult.failureReason;
-                }
-                StringBuilder message = new StringBuilder();
-                message.append("Applied code action ").append(requestedIndex).append(": ").append(action.getTitle());
-                if (applyResult.appliedEditCount > 0) {
-                    message.append(" (")
-                        .append(applyResult.appliedEditCount)
-                        .append(" edit")
-                        .append(applyResult.appliedEditCount == 1 ? "" : "s")
-                        .append(")");
-                }
-                if (applyResult.appliedResourceOperationCount > 0) {
-                    message.append(" (")
-                        .append(applyResult.appliedResourceOperationCount)
-                        .append(" resource op")
-                        .append(applyResult.appliedResourceOperationCount == 1 ? "" : "s")
-                        .append(")");
-                }
-                if (executed) {
-                    message.append(" [command executed]");
-                } else if (commandUnavailable != null) {
-                    message.append(" [").append(commandUnavailable).append("]");
-                } else if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
-                    message.append(" [command failed]");
-                }
-                if (applyResult.failedFiles > 0) {
-                    message.append(" [").append(applyResult.failedFiles).append(" file failures]");
-                }
-                return message.toString();
+                editor.pendingLspCodeAction = action;
+                editor.showScratchBuffer("[lsp code action preview]", buildWorkspaceEditPreview(action.getTitle(), action.getOperations(), new WorkspaceEditApplyResult())
+                    + "\nRun :lsp codeaction apply to confirm, or choose another action to replace this preview.\n");
+                return "Prepared code action preview. Run :lsp codeaction apply to confirm.";
             }
 
             StringBuilder builder = new StringBuilder();
@@ -610,6 +575,17 @@ final class LspController {
         } catch (BadLocationException e) {
             return "LSP code actions failed: " + e.getMessage();
         }
+    }
+
+    public String lspCodeActionApply() {
+        LspClient.CodeAction action = editor.pendingLspCodeAction;
+        if (action == null) return "No pending code action preview";
+        WorkspaceEditApplyResult applyResult = applyWorkspaceOperations(action.getOperations());
+        editor.pendingLspCodeAction = null;
+        if (applyResult.appliedEditCount == 0 && applyResult.appliedResourceOperationCount == 0) {
+            return applyResult.failureReason == null || applyResult.failureReason.isBlank() ? "Code action produced no applicable edit" : "Code action failed: " + applyResult.failureReason;
+        }
+        return "Applied code action: " + action.getTitle();
     }
 
 
@@ -812,15 +788,9 @@ final class LspController {
 
 
     LspClient.WorkspaceEditResponse applyWorkspaceEditFromServer(String label, List<LspClient.WorkspaceEditOperation> operations) {
-        WorkspaceEditApplyResult result = applyWorkspaceOperations(operations);
-        boolean applied = result.failedFiles == 0 && (result.appliedEditCount > 0 || result.appliedResourceOperationCount > 0 || operations == null || operations.isEmpty());
-        if (!applied && result.failureReason == null) {
-            result.failureReason = "workspace edit failed";
-        }
-        if (operations != null && hasResourceOperation(operations)) {
-            editor.showScratchBuffer("[lsp workspace edit]", buildWorkspaceEditPreview(label, operations, result));
-        }
-        return new LspClient.WorkspaceEditResponse(applied, result.failureReason);
+        editor.showScratchBuffer("[lsp workspace edit review]", buildWorkspaceEditPreview(label, operations, new WorkspaceEditApplyResult())
+            + "\nServer-originated workspace edits require review and were not applied.\n");
+        return new LspClient.WorkspaceEditResponse(false, "workspace edit requires user review");
     }
 
 

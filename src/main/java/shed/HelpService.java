@@ -47,6 +47,7 @@ public class HelpService {
                    "  :settings      Open user settings file\n" +
                    "  :config save   Persist current runtime config to ~/.shed/config.toml\n" +
                    "  :config status Show config load/recovery details\n" +
+                   "  :config inspector Open typed settings inspector\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
                    "  :workspace ... Workspace profile save/load/list\n" +

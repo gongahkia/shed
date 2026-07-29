@@ -42,6 +42,7 @@ Every global `config.toml` and project `.shed.toml` starts with the unquoted roo
 | `:config save` / `:config write` | Persist current runtime config |
 | `:config defaults` | Create a complete commented default config only when no config exists |
 | `:config! defaults` | Confirm replacement with a complete commented default config |
+| `:config inspector` | Open the typed settings inspector; edit a current value to persist it |
 | `:config status` | Show current config load/recovery details |
 | `:reload` / `:source` | Reload config from disk |
 

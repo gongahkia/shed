@@ -484,8 +484,9 @@ final class SessionConfigController {
         MultiSelectionPolicy multiSelection = editor.configManager.getMultiSelectionPolicy();
         if (!multiSelection.enabled()) {
             editor.clearExtraCursors();
-        } else if (editor.extraCursors.size() > multiSelection.maxCursors() - 1) {
-            editor.extraCursors.subList(multiSelection.maxCursors() - 1, editor.extraCursors.size()).clear();
+        } else if (editor.extraSelections.size() > multiSelection.maxCursors() - 1) {
+            editor.extraSelections.subList(multiSelection.maxCursors() - 1, editor.extraSelections.size()).clear();
+            editor.refreshExtraSelectionHighlights();
         }
         editor.lineNumberMode = editor.configManager.getLineNumberMode();
         for (FileBuffer buffer : editor.buffers) {

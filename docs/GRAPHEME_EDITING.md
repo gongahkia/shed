@@ -2,7 +2,7 @@
 
 ## Status
 
-This is the contract for the grapheme-aware cursor, deletion, and regression work in #72 through #74. #72 applies boundary-safe single-caret left/right and relevant word/line motions. #73 applies boundary-safe single-caret backspace/delete and visual-selection expansion. Complete regression coverage remains pending #74. Large-file mode remains read-only and is outside this contract.
+This is the contract for the grapheme-aware cursor, deletion, and regression work in #72 through #77. #72 applies boundary-safe single-caret left/right and relevant word/line motions. #73 applies boundary-safe single-caret backspace/delete and visual-selection expansion. #74 provides deterministic single-caret Unicode fixtures; multi-selection coverage remains pending #77. Large-file mode remains read-only and is outside this contract.
 
 ## Terms and coordinate systems
 

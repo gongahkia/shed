@@ -1240,10 +1240,14 @@ final class InputController {
             return;
         }
 
-        if (code == KeyEvent.VK_BACK_SPACE && !editor.extraCursors.isEmpty()) {
-            editor.applyMultiCursorBackspace();
+        if ((code == KeyEvent.VK_BACK_SPACE || code == KeyEvent.VK_DELETE) && !editor.extraSelections.isEmpty()) {
+            if (code == KeyEvent.VK_BACK_SPACE) {
+                editor.applyMultiCursorBackspace();
+            } else {
+                editor.applyMultiCursorDelete();
+            }
         }
-        if ((code == KeyEvent.VK_BACK_SPACE || code == KeyEvent.VK_DELETE) && editor.extraCursors.isEmpty()
+        if ((code == KeyEvent.VK_BACK_SPACE || code == KeyEvent.VK_DELETE) && editor.extraSelections.isEmpty()
             && !e.isControlDown() && !e.isAltDown() && !e.isMetaDown()) {
             String text = editor.writingArea.getText();
             int selectionStart = editor.writingArea.getSelectionStart();

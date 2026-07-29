@@ -158,7 +158,8 @@ public class Texteditor extends JFrame implements KeyListener {
     Character pendingSurroundOld;
     Character pendingSurroundTarget;
     boolean insertNormalOneShot;
-    final List<Integer> extraCursors = new ArrayList<>();
+    final List<MultiSelection> extraSelections = new ArrayList<>();
+    final List<Object> extraSelectionHighlightTags = new ArrayList<>();
     Map<String, LspClient> lspClients;
     Map<String, Path> lspClientRoots;
     Map<String, Integer> lspDocumentVersions;
@@ -1026,6 +1027,9 @@ public class Texteditor extends JFrame implements KeyListener {
     }
     void clearExtraCursors() {
         editActionController.clearExtraCursors();
+    }
+    void refreshExtraSelectionHighlights() {
+        editActionController.refreshExtraSelectionHighlights();
     }
 
     void deleteWordBackwardInsert() {

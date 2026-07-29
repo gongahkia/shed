@@ -63,6 +63,18 @@ public class RecoveryJournalTest {
     }
 
     @Test
+    void storesRecoverableContentWithoutUndoOrRedoHistory() throws Exception {
+        RecoveryJournal.write(tempDir, new RecoveryJournal.Workspace("/work", null, 0),
+            List.of(new RecoveryJournal.Entry("scratch-1", "scratch", null, "recoverable draft")));
+
+        String serialized = Files.readString(tempDir.resolve(RecoveryJournal.FILE_NAME));
+
+        assertTrue(serialized.contains("recoverable draft"));
+        assertFalse(serialized.contains("\"undo\""));
+        assertFalse(serialized.contains("\"redo\""));
+    }
+
+    @Test
     void dropsOversizedEntriesWithoutWritingPartialContent() throws Exception {
         String oversized = "x".repeat(RecoveryJournal.MAX_CONTENT_BYTES + 1);
         RecoveryJournal.write(tempDir, new RecoveryJournal.Workspace("/work", null, 0), List.of(

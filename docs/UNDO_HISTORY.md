@@ -5,3 +5,5 @@ Each buffer keeps a bounded undo/redo history. `undo.history.max.entries` limits
 Shed estimates a document edit as its UTF-16 payload length plus fixed bookkeeping. When either limit is exceeded, it evicts the oldest retained edit until both limits are met. An edit larger than the byte limit is not retained. Undo and redo remain valid for every retained edit; evicted edits cannot be recovered through undo.
 
 Changing either setting applies immediately to open buffers and may trim their retained history. `:undolist` reports retained edits, estimated bytes, and whether undo or redo is currently available.
+
+Undo/redo history is process-local. On restart, Shed restores only recovery-journal content and starts every restored buffer with empty undo/redo history; see `docs/UNDO_RECOVERY.md`.

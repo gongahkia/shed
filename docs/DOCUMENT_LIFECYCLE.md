@@ -10,7 +10,7 @@ This contract defines Shed's authoritative document state. `FileBuffer.modified`
 | Dirty file buffer | Has a file path; `modified=true`; in-memory content is authoritative until saved, discarded, or reloaded. |
 | Named unsaved buffer | Has a target path that may not exist; starts clean and becomes a clean file buffer only after a successful save. |
 | Scratch buffer | Has no file path; may be clean or dirty; `:w <path>` is required to persist it. |
-| Recovery snapshot | Serialized dirty editor content; restoring creates or updates a dirty buffer and never writes the recovered content automatically. |
+| Recovery snapshot | Serialized dirty editor content; restoring creates or updates a dirty buffer with empty undo/redo history and never writes the recovered content automatically. |
 
 Large-file preview is an overlay on a file-buffer state, not a separate lifecycle state. Its hidden tail remains part of full content and is preserved by save.
 

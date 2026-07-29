@@ -8,7 +8,6 @@ import java.lang.reflect.Modifier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
@@ -56,14 +55,76 @@ public class ArchitectureBoundaryTest {
     }
 
     private static void assertNoTypeReference(Path source, String code, String typeName) {
-        Pattern type = Pattern.compile("\\b" + Pattern.quote(typeName) + "\\b");
-        assertFalse(type.matcher(code).find(), source + " must not depend on " + typeName);
+        assertFalse(containsIdentifier(code, typeName), source + " must not depend on " + typeName);
     }
 
     private static String codeOnly(String source) {
-        String withoutBlockComments = source.replaceAll("(?s)/\\*.*?\\*/", " ");
-        String withoutLineComments = withoutBlockComments.replaceAll("(?m)//.*$", " ");
-        return withoutLineComments.replaceAll("\"(?:\\\\.|[^\"\\\\])*\"|'(?:\\\\.|[^'\\\\])*'", " ");
+        StringBuilder code = new StringBuilder(source.length());
+        boolean lineComment = false;
+        boolean blockComment = false;
+        char quoted = '\0';
+        boolean escaped = false;
+        for (int index = 0; index < source.length(); index++) {
+            char current = source.charAt(index);
+            char next = index + 1 < source.length() ? source.charAt(index + 1) : '\0';
+            if (lineComment) {
+                if (current == '\n') {
+                    lineComment = false;
+                    code.append(current);
+                } else {
+                    code.append(' ');
+                }
+                continue;
+            }
+            if (blockComment) {
+                if (current == '*' && next == '/') {
+                    blockComment = false;
+                    code.append("  ");
+                    index++;
+                } else {
+                    code.append(current == '\n' ? '\n' : ' ');
+                }
+                continue;
+            }
+            if (quoted != '\0') {
+                code.append(' ');
+                if (!escaped && current == quoted) {
+                    quoted = '\0';
+                }
+                escaped = !escaped && current == '\\';
+                continue;
+            }
+            if (current == '/' && next == '/') {
+                lineComment = true;
+                code.append("  ");
+                index++;
+            } else if (current == '/' && next == '*') {
+                blockComment = true;
+                code.append("  ");
+                index++;
+            } else if (current == '\"' || current == '\'') {
+                quoted = current;
+                escaped = false;
+                code.append(' ');
+            } else {
+                code.append(current);
+            }
+        }
+        return code.toString();
+    }
+
+    private static boolean containsIdentifier(String source, String identifier) {
+        int start = source.indexOf(identifier);
+        while (start >= 0) {
+            int end = start + identifier.length();
+            boolean startsIdentifier = start > 0 && Character.isJavaIdentifierPart(source.charAt(start - 1));
+            boolean endsIdentifier = end < source.length() && Character.isJavaIdentifierPart(source.charAt(end));
+            if (!startsIdentifier && !endsIdentifier) {
+                return true;
+            }
+            start = source.indexOf(identifier, end);
+        }
+        return false;
     }
 
     private static String globToRegex(String glob) {

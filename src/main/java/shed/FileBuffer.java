@@ -614,6 +614,18 @@ public class FileBuffer {
         return largeFileStore == null ? 0L : largeFileStore.lineCount();
     }
 
+    void showLargeFileWindow(long firstLine, int requestedLines) throws IOException {
+        if (largeFileStore == null) {
+            throw new IOException("Large-file source is unavailable");
+        }
+        LargeFileStore.Window window = largeFileStore.readWindow(firstLine, requestedLines);
+        String content = window.content();
+        if (window.truncated()) {
+            content += (content.isEmpty() || content.endsWith("\n") ? "" : "\n") + LARGE_FILE_PREVIEW_MARKER;
+        }
+        setDocumentText(content, false);
+    }
+
     public boolean isShowingPreviewOnly() {
         return showingPreviewOnly;
     }

@@ -17,6 +17,8 @@ The prior `FileBuffer` preview path read and split all bytes; #62 measured that 
 
 The #64 foundation now selects the large-file path when a regular file exceeds the configured byte or line threshold. It validates UTF-8 through a 64 KiB channel page scanner, stores source metadata and a preview capped at 256 Ki UTF-16 code units, and does not retain full source content. Large files are read-only until the bounded projection, edit, and streamed-save milestones land. Save, backup, LSP synchronization, Markdown preview, and recovery snapshots are deliberately unavailable for this state; malformed UTF-8 and unsupported file types surface a visible unavailable state without an in-memory fallback.
 
+The #65 projection replaces that initial preview with a read-only source window. It uses sparse checkpoints every 1,024 logical lines, keeps at least 64 projected lines with 16-line caret margins, and replaces only the Swing document window on scroll, caret-edge movement, or viewport resize. Each projected window remains capped at 256 Ki UTF-16 code units; a single overlong line is visibly truncated rather than forcing a full-document allocation.
+
 ## Encoding and line index
 
 The target large-file path will support well-formed UTF-8, including an optional UTF-8 BOM retained as file metadata. It will decode pages with carry-over bytes at page boundaries and record only safe UTF-8 decode boundaries.

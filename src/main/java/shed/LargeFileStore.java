@@ -14,10 +14,13 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.ArrayList;
+import java.util.List;
 
 final class LargeFileStore {
     static final int PAGE_BYTES = 64 * 1024;
     static final int MAX_PREVIEW_CHARS = 256 * 1024;
+    static final int CHECKPOINT_LINES = 1024;
 
     private final Path source;
     private final long byteSize;
@@ -25,14 +28,17 @@ final class LargeFileStore {
     private final String preview;
     private final boolean previewTruncated;
     private final String lineEnding;
+    private final List<Checkpoint> checkpoints;
 
-    private LargeFileStore(Path source, long byteSize, long lineCount, String preview, boolean previewTruncated, String lineEnding) {
+    private LargeFileStore(Path source, long byteSize, long lineCount, String preview, boolean previewTruncated, String lineEnding,
+                           List<Checkpoint> checkpoints) {
         this.source = source;
         this.byteSize = byteSize;
         this.lineCount = lineCount;
         this.preview = preview;
         this.previewTruncated = previewTruncated;
         this.lineEnding = lineEnding;
+        this.checkpoints = List.copyOf(checkpoints);
     }
 
     static boolean exceedsLineLimit(Path source, int maximumLines) throws IOException {
@@ -84,8 +90,9 @@ final class LargeFileStore {
             try (FileChannel channel = FileChannel.open(source, StandardOpenOption.READ)) {
                 scan = scan(channel, previewLines);
             }
+            List<Checkpoint> checkpoints = buildCheckpoints(source);
             return OpenResult.success(new LargeFileStore(source, attributes.size(), scan.lineCount(), scan.preview(),
-                scan.previewTruncated(), scan.lineEnding()));
+                scan.previewTruncated(), scan.lineEnding(), checkpoints));
         } catch (CharacterCodingException error) {
             return OpenResult.failure("large-file path requires well-formed UTF-8");
         } catch (IOException | SecurityException error) {
@@ -111,6 +118,53 @@ final class LargeFileStore {
         }
         flush(decoder, characters, builder);
         return builder.build();
+    }
+
+    private static List<Checkpoint> buildCheckpoints(Path source) throws IOException {
+        List<Checkpoint> checkpoints = new ArrayList<>();
+        checkpoints.add(new Checkpoint(1L, 0L));
+        try (FileChannel channel = FileChannel.open(source, StandardOpenOption.READ)) {
+            ByteBuffer page = ByteBuffer.allocate(PAGE_BYTES);
+            long byteOffset = 0L;
+            long line = 1L;
+            boolean pendingCarriageReturn = false;
+            while (channel.read(page) >= 0) {
+                page.flip();
+                while (page.hasRemaining()) {
+                    byte value = page.get();
+                    byteOffset++;
+                    if (pendingCarriageReturn) {
+                        if (value == '\n') {
+                            line++;
+                            addCheckpoint(checkpoints, line, byteOffset);
+                            pendingCarriageReturn = false;
+                            continue;
+                        }
+                        line++;
+                        addCheckpoint(checkpoints, line, byteOffset - 1L);
+                        pendingCarriageReturn = false;
+                    }
+                    if (value == '\r') {
+                        pendingCarriageReturn = true;
+                    } else if (value == '\n') {
+                        line++;
+                        addCheckpoint(checkpoints, line, byteOffset);
+                    }
+                }
+                page.clear();
+            }
+            if (pendingCarriageReturn) {
+                line++;
+                addCheckpoint(checkpoints, line, byteOffset);
+            }
+        }
+        return checkpoints;
+    }
+
+    private static void addCheckpoint(List<Checkpoint> checkpoints, long line, long byteOffset) {
+        if ((line - 1L) % CHECKPOINT_LINES == 0L) {
+            checkpoints.add(new Checkpoint(line, byteOffset));
+        }
     }
 
     private static void decode(CharsetDecoder decoder, ByteBuffer bytes, CharBuffer characters, boolean endOfInput,
@@ -148,6 +202,14 @@ final class LargeFileStore {
         characters.clear();
     }
 
+    private static void appendWindow(CharBuffer characters, WindowBuilder builder) {
+        characters.flip();
+        while (characters.hasRemaining() && !builder.complete()) {
+            builder.append(characters.get());
+        }
+        characters.clear();
+    }
+
     Path source() {
         return source;
     }
@@ -172,6 +234,45 @@ final class LargeFileStore {
         return lineEnding;
     }
 
+    Window readWindow(long firstLine, int requestedLines) throws IOException {
+        if (firstLine < 1L || requestedLines < 1) {
+            throw new IllegalArgumentException("invalid large-file window");
+        }
+        if (lineCount == 0L || firstLine > lineCount) {
+            return new Window(Math.min(firstLine, lineCount + 1L), "", false);
+        }
+        Checkpoint checkpoint = checkpoints.get(Math.min(checkpoints.size() - 1, (int) ((firstLine - 1L) / CHECKPOINT_LINES)));
+        WindowBuilder builder = new WindowBuilder(checkpoint.line(), firstLine, requestedLines);
+        try (FileChannel channel = FileChannel.open(source, StandardOpenOption.READ)) {
+            channel.position(checkpoint.byteOffset());
+            CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT);
+            ByteBuffer bytes = ByteBuffer.allocate(PAGE_BYTES + 4);
+            CharBuffer characters = CharBuffer.allocate(PAGE_BYTES);
+            boolean endOfInput = false;
+            while (!endOfInput && !builder.complete()) {
+                int read = channel.read(bytes);
+                endOfInput = read < 0;
+                bytes.flip();
+                while (true) {
+                    CoderResult result = decoder.decode(bytes, characters, endOfInput);
+                    appendWindow(characters, builder);
+                    if (result.isError()) {
+                        result.throwException();
+                    }
+                    if (!result.isOverflow() || builder.complete()) {
+                        break;
+                    }
+                }
+                bytes.compact();
+            }
+        } catch (CharacterCodingException error) {
+            throw new IOException("large-file source is no longer valid UTF-8", error);
+        }
+        return new Window(firstLine, builder.content(), builder.truncated());
+    }
+
     record OpenResult(LargeFileStore store, String error) {
         static OpenResult success(LargeFileStore store) {
             return new OpenResult(store, "");
@@ -187,6 +288,12 @@ final class LargeFileStore {
     }
 
     private record Scan(long lineCount, String preview, boolean previewTruncated, String lineEnding) {
+    }
+
+    record Window(long firstLine, String content, boolean truncated) {
+    }
+
+    private record Checkpoint(long line, long byteOffset) {
     }
 
     private static final class ScanBuilder {
@@ -238,6 +345,54 @@ final class LargeFileStore {
 
         private Scan build() {
             return new Scan(hasContent ? lineBreaks + 1L : 0L, preview.toString(), previewTruncated, lineEnding);
+        }
+    }
+
+    private static final class WindowBuilder {
+        private final long firstLine;
+        private final long endLineExclusive;
+        private final StringBuilder content = new StringBuilder(Math.min(MAX_PREVIEW_CHARS, 4096));
+        private long currentLine;
+        private boolean previousCarriageReturn;
+        private boolean truncated;
+
+        private WindowBuilder(long checkpointLine, long firstLine, int requestedLines) {
+            this.currentLine = checkpointLine;
+            this.firstLine = firstLine;
+            this.endLineExclusive = firstLine + requestedLines;
+        }
+
+        private void append(char value) {
+            if (currentLine >= firstLine) {
+                if (content.length() < MAX_PREVIEW_CHARS) {
+                    content.append(value);
+                } else {
+                    truncated = true;
+                }
+            }
+            if (value == '\r') {
+                currentLine++;
+                previousCarriageReturn = true;
+            } else if (value == '\n') {
+                if (!previousCarriageReturn) {
+                    currentLine++;
+                }
+                previousCarriageReturn = false;
+            } else {
+                previousCarriageReturn = false;
+            }
+        }
+
+        private boolean complete() {
+            return currentLine >= endLineExclusive || truncated;
+        }
+
+        private String content() {
+            return content.toString();
+        }
+
+        private boolean truncated() {
+            return truncated;
         }
     }
 }

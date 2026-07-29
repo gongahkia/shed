@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -310,11 +311,17 @@ public class LspClient {
     private final List<Map<String, Object>> deferredMessages;
     private final Map<String, List<Diagnostic>> diagnostics;
     private final Set<Integer> staleRequestIds;
+    private final Map<LspCapability, Boolean> clientEnabledCapabilities;
     private WorkspaceEditHandler workspaceEditHandler;
     private int requestId;
     private boolean initialized;
+    private LspCapabilityModel capabilityModel;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
+        this(command, args, rootPath, null);
+    }
+
+    LspClient(String command, String[] args, Path rootPath, Map<LspCapability, Boolean> clientEnabledCapabilities) throws IOException {
         List<String> commandLine = new ArrayList<>();
         commandLine.add(command);
         if (args != null) {
@@ -333,8 +340,13 @@ public class LspClient {
         this.deferredMessages = new ArrayList<>();
         this.diagnostics = new HashMap<>();
         this.staleRequestIds = ConcurrentHashMap.newKeySet();
+        this.clientEnabledCapabilities = new EnumMap<>(LspCapability.class);
+        if (clientEnabledCapabilities != null) {
+            this.clientEnabledCapabilities.putAll(clientEnabledCapabilities);
+        }
         this.requestId = 0;
         this.initialized = false;
+        this.capabilityModel = LspCapabilityModel.uninitialized();
         startReaderThread();
         initialize(rootPath);
     }
@@ -345,6 +357,18 @@ public class LspClient {
 
     public boolean isAlive() {
         return initialized && process.isAlive();
+    }
+
+    public boolean supports(LspCapability capability) {
+        return capabilityModel.allows(capability);
+    }
+
+    public String capabilityUnavailableReason(LspCapability capability) {
+        return capabilityModel.unavailableReason(capability);
+    }
+
+    public LspCapabilityModel.Availability capabilityAvailability(LspCapability capability) {
+        return capabilityModel.availability(capability);
     }
 
     public void didOpen(String uri, String languageId, String text) {
@@ -382,6 +406,9 @@ public class LspClient {
     }
 
     public List<CompletionItem> completion(String uri, int line, int character) {
+        if (!supports(LspCapability.COMPLETION)) {
+            return List.of();
+        }
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("uri", uri);
 
@@ -426,6 +453,9 @@ public class LspClient {
     }
 
     public String hover(String uri, int line, int character) {
+        if (!supports(LspCapability.HOVER)) {
+            return null;
+        }
         Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/hover", uri, line, character, 2000L);
         if (response == null) {
             return null;
@@ -466,6 +496,9 @@ public class LspClient {
     }
 
     public Location definition(String uri, int line, int character) {
+        if (!supports(LspCapability.DEFINITION)) {
+            return null;
+        }
         Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/definition", uri, line, character, 2000L);
         if (response == null) {
             return null;
@@ -486,6 +519,9 @@ public class LspClient {
     }
 
     public List<Location> references(String uri, int line, int character, boolean includeDeclaration) {
+        if (!supports(LspCapability.REFERENCES)) {
+            return List.of();
+        }
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("uri", uri);
         Map<String, Object> position = new LinkedHashMap<>();
@@ -521,7 +557,7 @@ public class LspClient {
     }
 
     public List<TextEdit> rename(String uri, int line, int character, String newName) {
-        if (newName == null || newName.isBlank()) {
+        if (!supports(LspCapability.RENAME) || newName == null || newName.isBlank()) {
             return List.of();
         }
         Map<String, Object> textDocument = new LinkedHashMap<>();
@@ -546,6 +582,9 @@ public class LspClient {
     }
 
     public List<CodeAction> codeActions(String uri, int line, int character, List<Diagnostic> diagnosticsAtCursor) {
+        if (!supports(LspCapability.CODE_ACTION)) {
+            return List.of();
+        }
         Map<String, Object> textDocument = new LinkedHashMap<>();
         textDocument.put("uri", uri);
         Map<String, Object> start = new LinkedHashMap<>();
@@ -634,7 +673,7 @@ public class LspClient {
     }
 
     public boolean executeCommand(String commandId, Object arguments) {
-        if (commandId == null || commandId.isBlank()) {
+        if (!supports(LspCapability.EXECUTE_COMMAND) || commandId == null || commandId.isBlank()) {
             return false;
         }
         Map<String, Object> params = new LinkedHashMap<>();
@@ -723,6 +762,7 @@ public class LspClient {
         if (response == null) {
             throw new IOException("LSP initialize timed out");
         }
+        capabilityModel = LspCapabilityModel.fromInitializeResult(response, clientEnabledCapabilities);
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
     }

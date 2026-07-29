@@ -39,17 +39,21 @@ final class LspController {
         LspClient client = resolveLspClient(buffer);
         String fallbackReason = null;
         if (buffer != null && client != null && buffer.hasFilePath()) {
-            String uri = bufferUri(buffer);
-            try {
-                int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
-                int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
-                List<LspClient.CompletionItem> items = client.completion(uri, line, column);
-                for (LspClient.CompletionItem item : items) {
-                    if (item.getLabel() != null && !item.getLabel().isEmpty()) {
-                        completions.add(item.getLabel());
+            if (!client.supports(LspCapability.COMPLETION)) {
+                fallbackReason = client.capabilityUnavailableReason(LspCapability.COMPLETION);
+            } else {
+                String uri = bufferUri(buffer);
+                try {
+                    int line = editor.writingArea.getLineOfOffset(editor.writingArea.getCaretPosition());
+                    int column = editor.writingArea.getCaretPosition() - editor.writingArea.getLineStartOffset(line);
+                    List<LspClient.CompletionItem> items = client.completion(uri, line, column);
+                    for (LspClient.CompletionItem item : items) {
+                        if (item.getLabel() != null && !item.getLabel().isEmpty()) {
+                            completions.add(item.getLabel());
+                        }
                     }
+                } catch (BadLocationException ignored) {
                 }
-            } catch (BadLocationException ignored) {
             }
         } else if (buffer != null) {
             String extension = bufferExtension(buffer);
@@ -145,6 +149,11 @@ final class LspController {
                 sb.append("  ").append(root);
             }
             sb.append("\n");
+            for (LspCapability capability : LspCapability.values()) {
+                if (client.capabilityAvailability(capability) != LspCapabilityModel.Availability.AVAILABLE) {
+                    sb.append("    ").append(client.capabilityUnavailableReason(capability)).append("\n");
+                }
+            }
         }
         if (!editor.lspErrors.isEmpty()) {
             sb.append("\nErrors:\n");
@@ -248,6 +257,8 @@ final class LspController {
         if (client == null) {
             return "LSP unavailable";
         }
+        String unavailable = capabilityUnavailable(client, LspCapability.DEFINITION);
+        if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         try {
@@ -273,6 +284,8 @@ final class LspController {
         if (client == null) {
             return "LSP unavailable";
         }
+        String unavailable = capabilityUnavailable(client, LspCapability.HOVER);
+        if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         try {
@@ -299,6 +312,8 @@ final class LspController {
         if (client == null) {
             return "LSP unavailable";
         }
+        String unavailable = capabilityUnavailable(client, LspCapability.REFERENCES);
+        if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         try {
@@ -339,6 +354,8 @@ final class LspController {
         if (client == null) {
             return "LSP unavailable";
         }
+        String unavailable = capabilityUnavailable(client, LspCapability.RENAME);
+        if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         try {
@@ -450,6 +467,8 @@ final class LspController {
         if (client == null) {
             return "LSP unavailable";
         }
+        String unavailable = capabilityUnavailable(client, LspCapability.CODE_ACTION);
+        if (unavailable != null) return unavailable;
         syncLspOpen(buffer);
         String uri = bufferUri(buffer);
         try {
@@ -470,11 +489,14 @@ final class LspController {
                 }
                 LspClient.CodeAction action = actions.get(requestedIndex - 1);
                 WorkspaceEditApplyResult applyResult = applyWorkspaceOperations(action.getOperations());
+                String commandUnavailable = action.getCommandId() == null || action.getCommandId().isBlank()
+                    ? null : capabilityUnavailable(client, LspCapability.EXECUTE_COMMAND);
                 boolean executed = false;
-                if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
+                if (commandUnavailable == null && action.getCommandId() != null && !action.getCommandId().isBlank()) {
                     executed = client.executeCommand(action.getCommandId(), action.getCommandArguments());
                 }
                 if (applyResult.appliedEditCount == 0 && applyResult.appliedResourceOperationCount == 0 && !executed) {
+                    if (commandUnavailable != null) return commandUnavailable;
                     return applyResult.failureReason == null || applyResult.failureReason.isBlank()
                         ? "Code action produced no local edit and no executable command"
                         : "Code action failed: " + applyResult.failureReason;
@@ -497,6 +519,8 @@ final class LspController {
                 }
                 if (executed) {
                     message.append(" [command executed]");
+                } else if (commandUnavailable != null) {
+                    message.append(" [").append(commandUnavailable).append("]");
                 } else if (action.getCommandId() != null && !action.getCommandId().isBlank()) {
                     message.append(" [command failed]");
                 }
@@ -546,6 +570,10 @@ final class LspController {
             }
         }
         return client.codeActions(uri, line, column, scoped);
+    }
+
+    private String capabilityUnavailable(LspClient client, LspCapability capability) {
+        return client.supports(capability) ? null : client.capabilityUnavailableReason(capability);
     }
 
 

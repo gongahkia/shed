@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -9,11 +10,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 public class LspServiceTest {
+    @Test
+    void negotiatesAdvertisedDisabledAndUnsupportedCapabilities() {
+        Map<String, Object> response = MiniJson.asObject(MiniJson.parse(
+            "{\"result\":{\"capabilities\":{\"completionProvider\":{},\"hoverProvider\":true,\"renameProvider\":{\"prepareProvider\":true}},\"serverInfo\":{\"name\":\"testls\",\"version\":\"1.2\"}}}"
+        ));
+        Map<LspCapability, Boolean> clientEnabled = new EnumMap<>(LspCapability.class);
+        clientEnabled.put(LspCapability.HOVER, Boolean.FALSE);
+
+        LspCapabilityModel model = LspCapabilityModel.fromInitializeResult(response, clientEnabled);
+
+        assertTrue(model.allows(LspCapability.COMPLETION));
+        assertTrue(model.allows(LspCapability.RENAME));
+        assertFalse(model.allows(LspCapability.HOVER));
+        assertEquals(LspCapabilityModel.Availability.DISABLED, model.availability(LspCapability.HOVER));
+        assertEquals("LSP hover is disabled by client policy; enable it in LSP settings",
+            model.unavailableReason(LspCapability.HOVER));
+        assertEquals(LspCapabilityModel.Availability.UNSUPPORTED, model.availability(LspCapability.DEFINITION));
+        assertEquals("LSP definition is unavailable: server did not advertise definitionProvider (testls 1.2)",
+            model.unavailableReason(LspCapability.DEFINITION));
+    }
+
+    @Test
+    void marksCapabilitiesUnavailableUntilInitializationCompletes() {
+        LspCapabilityModel model = LspCapabilityModel.uninitialized();
+
+        assertFalse(model.allows(LspCapability.CODE_ACTION));
+        assertEquals(LspCapabilityModel.Availability.UNINITIALIZED, model.availability(LspCapability.CODE_ACTION));
+        assertEquals("LSP code actions is unavailable: server initialization is incomplete",
+            model.unavailableReason(LspCapability.CODE_ACTION));
+    }
+
     @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();

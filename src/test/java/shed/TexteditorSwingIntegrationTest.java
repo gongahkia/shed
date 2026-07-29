@@ -205,6 +205,28 @@ public class TexteditorSwingIntegrationTest {
         }
     }
 
+    @Test
+    void workspaceIndexControlsPersistOnlyExplicitPreference() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-workspace-index");
+        Path file = tempDir.resolve("workspace-index.txt");
+        Files.createDirectories(home);
+        Files.writeString(file, "index\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            String result = onEdt(() -> editor.commandHandler.execute("workspace index enable"));
+
+            assertEquals("Persistent workspace indexing enabled", result);
+            assertTrue(onEdt(() -> editor.configManager.getWorkspaceIndexEnabled()));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Current search source: ad-hoc project scan"));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Persistent-index preference: enabled"));
+            assertFalse(Files.exists(home.resolve(".shed/workspace-index")));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
     private static void assumeSwingAvailable() {
         assumeFalse(GraphicsEnvironment.isHeadless(), "Swing display unavailable");
     }

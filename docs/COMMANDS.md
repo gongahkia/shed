@@ -142,6 +142,15 @@ Notes:
 | `:minimap` | Toggle minimap panel |
 | `:term`, `:terminal` | Open integrated terminal split |
 
+## Workspace Index Commands
+
+| Command | Action |
+| :--- | :--- |
+| `:workspace index`, `:workspace index status` | Show ad-hoc scan source, persistent-index preference, cache status, and local cache cost |
+| `:workspace index enable` | Persist the explicit persistent-index preference without building an index |
+| `:workspace index disable` | Persist the ad-hoc default without deleting existing cache files |
+| `:workspace index benchmark` | Start an explicit cancellable local index-build measurement |
+
 ## Quickfix and Diagnostics Commands
 
 | Command | Action |

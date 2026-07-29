@@ -325,7 +325,7 @@ final class PaletteController {
                 return "Save/load/list named sessions.";
             case "workspace":
             case "ws":
-                return "Save/load/list workspace profiles (layout + UI settings).";
+                return "Save/load/list profiles; inspect or control persistent workspace indexing.";
             case "jobs":
                 return "Show async job list.";
             case "jobcancel":

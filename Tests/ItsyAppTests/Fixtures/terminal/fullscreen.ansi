@@ -1,4 +1,0 @@
-shell ready
-<ESC>[?1049h<ESC>[?25l<ESC>[H<ESC>[2J<ESC>[1;36mTEST DASHBOARD<ESC>[0m
-<ESC>[2;1H<ESC>[32mPASS<ESC>[0m interactive refresh
-<ESC>[?25h<ESC>[?1049l

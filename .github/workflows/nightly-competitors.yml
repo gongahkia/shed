@@ -1,0 +1,70 @@
+name: Nightly Competitors
+
+on:
+  workflow_dispatch:
+    inputs:
+      runs:
+        description: Runs per app
+        required: false
+        default: "20"
+  schedule:
+    - cron: "30 7 * * *"
+
+permissions:
+  contents: write
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  competitors:
+    runs-on: macos-14
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Set baseline date
+        run: echo "BASELINE_DATE=$(date +%F)" >> "$GITHUB_ENV"
+      - name: Install competitor apps
+        run: |
+          brew update
+          brew install --cask zed sublime-text codeedit
+      - name: Build Itsy app
+        run: |
+          swift build -c release
+          bench/scripts/make_app.sh
+      - name: Run competitor baseline
+        run: |
+          runs="${{ inputs.runs }}"
+          if [[ -z "$runs" ]]; then runs="20"; fi
+          RUNS="$runs" \
+          BASELINE_PREFIX=nightly-competitors \
+          ITSY_BASELINE_INCLUDE_ITSY=1 \
+          ITSY_BASELINE_INCLUDE="Itsy,Zed,Sublime Text,CodeEdit" \
+          ITSY_BASELINE_PURGE=0 \
+          bench/scripts/run_baseline.sh
+      - name: Compare competitors
+        run: bench/scripts/competitor_gate.sh "bench/results/nightly-competitors-$BASELINE_DATE.json"
+      - name: Upload competitor results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-competitors
+          if-no-files-found: warn
+          path: |
+            bench/results/nightly-competitors-${{ env.BASELINE_DATE }}.json
+            bench/results/nightly-competitors-${{ env.BASELINE_DATE }}.md
+      - name: Commit competitor results
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add bench/results/nightly-competitors-"$BASELINE_DATE".json bench/results/nightly-competitors-"$BASELINE_DATE".md
+          if git diff --cached --quiet; then
+            echo "No competitor result changes"
+            exit 0
+          fi
+          git commit -m "update nightly competitors $BASELINE_DATE"
+          git pull --rebase --autostash
+          git push

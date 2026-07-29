@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "generated_at": "2026-07-23T17:11:30Z",
+  "parameters": {
+    "repeats": 5,
+    "pane_transitions": 200,
+    "lsp_file": "/Users/gongahkia/Desktop/coding/projects/itsy/Sources/ItsyBench/main.swift"
+  },
+  "policy": {
+    "direction": "lower",
+    "relative_threshold": 0.1,
+    "variance_multiplier": 3.0
+  },
+  "metrics": [
+    {
+      "name": "git.refresh_ms",
+      "unit": "ms",
+      "owner": "environment",
+      "value": 6.425399998261128,
+      "variance": 0.20824983888137324,
+      "samples": 5
+    },
+    {
+      "name": "large.edit_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 7.268633800000001,
+      "variance": 0.0006322389701600064,
+      "samples": 5
+    },
+    {
+      "name": "large.open_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 11.210124799999999,
+      "variance": 0.026479811405760112,
+      "samples": 5
+    },
+    {
+      "name": "large.pane_transition_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.015898667999999998,
+      "variance": 0.0000001493681205059996,
+      "samples": 5
+    },
+    {
+      "name": "large.rss_delta_kb",
+      "unit": "KB",
+      "owner": "app",
+      "value": 2188.8,
+      "variance": 18745896.96,
+      "samples": 5
+    },
+    {
+      "name": "large.save_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 3.2627499999999996,
+      "variance": 0.012747420672400001,
+      "samples": 5
+    },
+    {
+      "name": "large.search_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 4.6080834,
+      "variance": 0.002198765872239981,
+      "samples": 5
+    },
+    {
+      "name": "lsp.didopen_to_diagnostics_ms",
+      "unit": "ms",
+      "owner": "environment",
+      "value": 1068.1228000001283,
+      "variance": 169.39985820046425,
+      "samples": 5
+    },
+    {
+      "name": "small.edit_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.07305819999999999,
+      "variance": 0.0000011024657600000012,
+      "samples": 5
+    },
+    {
+      "name": "small.open_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.1146414,
+      "variance": 0.00011064539784000006,
+      "samples": 5
+    },
+    {
+      "name": "small.pane_transition_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.015801542000000002,
+      "variance": 0.00000027296894508599965,
+      "samples": 5
+    },
+    {
+      "name": "small.rss_delta_kb",
+      "unit": "KB",
+      "owner": "app",
+      "value": 393.6,
+      "variance": 535101.4400000001,
+      "samples": 5
+    },
+    {
+      "name": "small.save_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.29897500000000005,
+      "variance": 0.008438796428,
+      "samples": 5
+    },
+    {
+      "name": "small.search_ms",
+      "unit": "ms",
+      "owner": "app",
+      "value": 0.0471416,
+      "variance": 0.000004114457839999997,
+      "samples": 5
+    },
+    {
+      "name": "task.output_ms",
+      "unit": "ms",
+      "owner": "environment",
+      "value": 3.2851999989361502,
+      "variance": 0.17440096033364438,
+      "samples": 5
+    }
+  ]
+}

@@ -18,12 +18,19 @@ Legacy `shedrc` files (`~/.shed/shedrc`, `~/.shedrc`, and `~/.config/shed/shedrc
 | Rule | Details |
 | :--- | :--- |
 | Format | TOML v1.0, UTF-8 |
+| Schema root | `schema_version = 1` |
 | Keys | Quote the full Shed key: `"tab.size" = 4` |
 | Strings | Quote values: `"theme" = "nightfox"` |
 | Booleans | Use `true` / `false` |
 | Persistence | `:set! key=value` writes one key, `:config save` writes current runtime overrides |
 
 Shed validates the full TOML document at startup. If parsing fails, a value is unsupported, or the file cannot be read, Shed leaves it unchanged and starts with built-in defaults; `[config recovery]` lists each exact failure and directs you to correct it, then run `:reload`. Use `:config status` to reopen the report. A missing config file also uses built-in defaults and can be created with `:config save`.
+
+## Schema Version and Ownership
+
+Every global `config.toml` and project `.shed.toml` starts with the unquoted root key `schema_version = 1`. Missing, non-integer, or unsupported versions reject the complete file, retain the file unchanged, and activate safe defaults. Version `1` is the only supported schema version; Shed does not infer or migrate a version. `:set` and `:set!` cannot override it; persistence emits the supported version.
+
+`ConfigSchema` owns schema-version validation. `ConfigManager` owns the canonical settings map, built-in defaults, scalar TOML value validation, recovery reports, and TOML persistence.
 
 ## Runtime Commands
 
@@ -185,6 +192,8 @@ Color values should be hex (`#RRGGBB` or `#RGB`).
 ## Example `~/.shed/config.toml`
 
 ```toml
+schema_version = 1
+
 # Editor
 "theme" = "nightfox"
 "font.family" = "Hack"

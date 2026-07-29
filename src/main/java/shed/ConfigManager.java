@@ -1162,6 +1162,10 @@ public class ConfigManager {
         return settings.keys();
     }
 
+    List<TypedSettings.Descriptor> typedSettingDescriptors() {
+        return settings.descriptors();
+    }
+
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
     }

@@ -404,7 +404,10 @@ public class CommandHandler {
         if ("defaults".equals(trimmed)) {
             return editor.materializeDefaultConfig(force);
         }
-        return "Usage: :config[!] [save|status|defaults]";
+        if ("inspector".equals(trimmed)) {
+            return editor.showSettingsInspector();
+        }
+        return "Usage: :config[!] [save|status|defaults|inspector]";
     }
 
     private String handleWordCount() {

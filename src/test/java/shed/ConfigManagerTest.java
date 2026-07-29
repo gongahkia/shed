@@ -115,6 +115,30 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void typedSettingDescriptorsStayInSyncWithPersistedToml() throws IOException {
+        Path home = tempDir.resolve("home-inspector-model");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        TypedSettings.Descriptor initial = config.typedSettingDescriptors().stream()
+            .filter(descriptor -> descriptor.key().equals("tab.size"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("Editor", initial.category());
+        assertEquals("integer", initial.type());
+        assertEquals("4", initial.defaultValue());
+        assertEquals("4", initial.currentValue());
+
+        config.setAndPersist("tab.size", "6");
+        TypedSettings.Descriptor updated = config.typedSettingDescriptors().stream()
+            .filter(descriptor -> descriptor.key().equals("tab.size"))
+            .findFirst()
+            .orElseThrow();
+        assertEquals("6", updated.currentValue());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"tab.size\" = 6"));
+    }
+
+    @Test
     void rejectsMissingSchemaVersion() throws IOException {
         Path home = tempDir.resolve("home-schema-missing");
         Path configPath = home.resolve(".shed/config.toml");

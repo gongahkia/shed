@@ -312,6 +312,11 @@ final class SessionConfigController {
         }
     }
 
+    public String showSettingsInspector() {
+        SettingsInspectorDialog.showFor(editor);
+        return "Settings inspector opened";
+    }
+
 
     public String applyTheaterPreset(String presetArgument) {
         String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);

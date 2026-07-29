@@ -1,6 +1,8 @@
 package shed;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -29,6 +31,17 @@ final class TypedSettings {
 
     Set<String> keys() {
         return Set.copyOf(defaults.keySet());
+    }
+
+    List<Descriptor> descriptors() {
+        List<Descriptor> descriptors = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : defaults.entrySet()) {
+            String key = entry.getKey();
+            descriptors.add(new Descriptor(key, category(key), type(entry.getValue()),
+                stringify(values.get(key)), stringify(entry.getValue())));
+        }
+        descriptors.sort(java.util.Comparator.comparing(Descriptor::key));
+        return descriptors;
     }
 
     String validateToml(String key, Object value) {
@@ -154,6 +167,38 @@ final class TypedSettings {
         values.putAll(snapshot);
     }
 
+    private String category(String key) {
+        if (key.equals("theme") || key.startsWith("font.")) {
+            return "Appearance";
+        }
+        if (key.startsWith("ui.")) {
+            return "Interface";
+        }
+        if (key.startsWith("session.")) {
+            return "Session";
+        }
+        if (key.startsWith("large.") || key.startsWith("process.") || key.startsWith("shell.")) {
+            return "Performance";
+        }
+        if (key.startsWith("project.") || key.startsWith("tree.")) {
+            return "Project & Safety";
+        }
+        return "Editor";
+    }
+
+    private String type(Object value) {
+        if (value instanceof Boolean) {
+            return "boolean";
+        }
+        if (value instanceof Integer || value instanceof Long) {
+            return "integer";
+        }
+        if (value instanceof Double) {
+            return "number";
+        }
+        return "string";
+    }
+
     private Object coerce(Object value, Object defaultValue) {
         if (defaultValue instanceof Integer && value instanceof Long) {
             return Math.toIntExact((Long) value);
@@ -209,5 +254,8 @@ final class TypedSettings {
             }
         }
         return null;
+    }
+
+    record Descriptor(String key, String category, String type, String currentValue, String defaultValue) {
     }
 }

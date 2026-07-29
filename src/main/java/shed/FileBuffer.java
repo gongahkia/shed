@@ -44,7 +44,7 @@ public class FileBuffer {
     private boolean modified;
     private String encodingName;
     private int lineCount;
-    private final UndoManager undoManager;
+    private final BoundedUndoManager undoManager;
     private final PlainDocument document;
     private String lineEnding;
     private FileType fileType;
@@ -66,7 +66,8 @@ public class FileBuffer {
     }
 
     public FileBuffer(File file, ConfigManager configManager) throws IOException {
-        this.undoManager = new UndoManager();
+        this.undoManager = new BoundedUndoManager(configManager == null
+            ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
@@ -89,7 +90,8 @@ public class FileBuffer {
     }
 
     FileBuffer(String filename, ConfigManager configManager) {
-        this.undoManager = new UndoManager();
+        this.undoManager = new BoundedUndoManager(configManager == null
+            ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy());
         this.document = new PlainDocument();
         this.document.addUndoableEditListener(undoManager);
         this.marks = new LinkedHashMap<>();
@@ -189,6 +191,14 @@ public class FileBuffer {
         int maxLines = configManager == null ? DEFAULT_LARGE_FILE_LINE_THRESHOLD : configManager.getLargeFileLineThreshold();
         int previewLines = configManager == null ? DEFAULT_LARGE_FILE_PREVIEW_LINES : configManager.getLargeFilePreviewLines();
         return new LargeFilePolicy(Math.max(1L, maxMb) * 1024L * 1024L, Math.max(1000, maxLines), Math.max(50, previewLines));
+    }
+
+    void applyUndoHistoryPolicy() {
+        undoManager.configure(resolveUndoHistoryPolicy());
+    }
+
+    private UndoHistoryPolicy resolveUndoHistoryPolicy() {
+        return configManager == null ? UndoHistoryPolicy.defaults() : configManager.getUndoHistoryPolicy();
     }
 
     private String buildTail(String[] lines, int previewLineCount) {

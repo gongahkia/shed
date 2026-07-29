@@ -8,7 +8,6 @@ import javax.swing.text.Highlighter;
 import javax.swing.text.Segment;
 import javax.swing.text.TabExpander;
 import javax.swing.text.Utilities;
-import javax.swing.undo.UndoManager;
 import java.awt.*;
 import java.awt.geom.Rectangle2D;
 import java.io.File;
@@ -33,7 +32,7 @@ final class EditorUiController {
         editor.setSize(screenSize.width / 2, screenSize.height);
         editor.setLayout(new BorderLayout(5, 5));
         editor.editorHostPanel = new JPanel(new BorderLayout());
-        editor.undoManager = new UndoManager();
+        editor.undoManager = new BoundedUndoManager(UndoHistoryPolicy.defaults());
         editor.bufferDocumentListener = new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { editor.handleDocumentChange(); }
             public void removeUpdate(DocumentEvent e) { editor.handleDocumentChange(); }

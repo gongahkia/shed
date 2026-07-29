@@ -482,6 +482,9 @@ final class SessionConfigController {
     void applyRuntimeConfigFromSettings() {
         editor.refreshDramaticSettings();
         editor.lineNumberMode = editor.configManager.getLineNumberMode();
+        for (FileBuffer buffer : editor.buffers) {
+            buffer.applyUndoHistoryPolicy();
+        }
         Font editorFont = editor.resolveEditorFont();
         int tabSize = Math.max(1, editor.configManager.getTabSize());
         for (EditorPane pane : editor.editorPanes) {
@@ -1490,39 +1493,16 @@ final class SessionConfigController {
         StringBuilder sb = new StringBuilder();
         sb.append("Undo History\n");
         sb.append("=".repeat(40)).append("\n\n");
-        // UndoManager doesn't expose its edit list, but we can show state
-        int canUndo = 0;
-        int canRedo = 0;
         javax.swing.undo.UndoManager um = editor.undoManager;
-        // Count available undos by trying to get presentation names
-        try {
-            while (um.canUndo()) {
-                canUndo++;
-                um.undo();
-            }
-            // Redo them all back
-            int redone = 0;
-            while (um.canRedo() && redone < canUndo) {
-                um.redo();
-                redone++;
-            }
-            // Count remaining redos
-            javax.swing.undo.UndoManager probe = um;
-            while (probe.canRedo()) {
-                canRedo++;
-                probe.redo();
-            }
-            // Undo back to current position
-            for (int i = 0; i < canRedo; i++) {
-                probe.undo();
-            }
-        } catch (Exception ignored) {
-            sb.append("(unable to inspect undo state)\n");
+        if (um instanceof BoundedUndoManager bounded) {
+            UndoHistoryPolicy policy = bounded.policy();
+            sb.append("Retained edits: ").append(bounded.retainedEditCount()).append(" / ")
+                .append(policy.maxEntries()).append("\n");
+            sb.append("Estimated bytes: ").append(bounded.retainedBytes()).append(" / ")
+                .append(policy.maxBytes()).append("\n");
         }
-        sb.append("Position: ").append(canUndo).append(" edits deep\n");
-        sb.append("Can undo: ").append(canUndo).append(" steps\n");
-        sb.append("Can redo: ").append(canRedo).append(" steps\n");
-        sb.append("Total edits: ").append(canUndo + canRedo).append("\n\n");
+        sb.append("Can undo: ").append(um.canUndo()).append("\n");
+        sb.append("Can redo: ").append(um.canRedo()).append("\n\n");
         sb.append("  u     = undo one step\n");
         sb.append("  Ctrl+r = redo one step\n");
         showScratchBuffer("[Undo History]", sb.toString());

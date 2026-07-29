@@ -218,6 +218,9 @@ final class TypedSettings {
         if (key.startsWith("backup.")) {
             return "Reliability";
         }
+        if (key.startsWith("undo.")) {
+            return "Reliability";
+        }
         if (key.startsWith("large.") || key.startsWith("process.") || key.startsWith("shell.")) {
             return "Performance";
         }
@@ -257,6 +260,8 @@ final class TypedSettings {
             case "recovery.retention.max.content.bytes" -> "integer 1.." + RecoveryJournal.MAX_CONTENT_BYTES;
             case "backup.directory" -> "string path";
             case "backup.retention.count" -> "integer 1.." + BackupPolicy.MAX_RETENTION_COUNT;
+            case "undo.history.max.entries" -> "integer 1.." + UndoHistoryPolicy.MAX_ENTRIES;
+            case "undo.history.max.bytes" -> "integer 1.." + UndoHistoryPolicy.MAX_BYTES;
             case "session.dir" -> "string path";
             default -> value instanceof Integer || value instanceof Long ? "integer >= 0"
                 : value instanceof Double ? "number >= 0" : "string";
@@ -278,6 +283,9 @@ final class TypedSettings {
         }
         if (key.startsWith("backup.")) {
             return "Live: used by subsequent backup operations";
+        }
+        if (key.startsWith("undo.")) {
+            return "Live: trims existing undo and redo history";
         }
         if (key.startsWith("process.") || key.startsWith("shell.")) {
             return "Live: used by new helper commands";
@@ -339,6 +347,12 @@ final class TypedSettings {
             }
             if ("backup.retention.count".equals(key) && (number < 1 || number > BackupPolicy.MAX_RETENTION_COUNT)) {
                 return key + " must be between 1 and " + BackupPolicy.MAX_RETENTION_COUNT;
+            }
+            if ("undo.history.max.entries".equals(key) && (number < 1 || number > UndoHistoryPolicy.MAX_ENTRIES)) {
+                return key + " must be between 1 and " + UndoHistoryPolicy.MAX_ENTRIES;
+            }
+            if ("undo.history.max.bytes".equals(key) && (number < 1 || number > UndoHistoryPolicy.MAX_BYTES)) {
+                return key + " must be between 1 and " + UndoHistoryPolicy.MAX_BYTES;
             }
         }
         if (value instanceof Double) {

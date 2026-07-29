@@ -100,6 +100,13 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `backup.directory` | `~/.shed/backups` | path | Directory for versioned backups; created on first backup |
 | `backup.retention.count` | `10` | int | Retained backups per source file; `1..100` |
 
+## Undo History Policy
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `undo.history.max.entries` | `500` | int | Retained undo/redo edits per buffer; `1..100000` |
+| `undo.history.max.bytes` | `8388608` | int | Estimated retained UTF-16 edit payload bytes per buffer; `1..1073741824` |
+
 ## Dramatic UI / Theater Keys
 
 | Key | Default | Type | Notes |

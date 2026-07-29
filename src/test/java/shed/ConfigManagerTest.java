@@ -143,6 +143,28 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void resetAndPersistRestoresOneTypedDefaultWithoutDisturbingOtherOverrides() throws IOException {
+        Path home = tempDir.resolve("home-reset-setting");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("tab.size", "6");
+        config.setAndPersist("theme", "gruvbox");
+        config.resetAndPersist("tab.size");
+
+        assertEquals(4, config.getTabSize());
+        assertEquals("gruvbox", config.get("theme"));
+        String file = Files.readString(Path.of(config.getConfigPath()));
+        assertFalse(file.contains("\"tab.size\""));
+        assertTrue(file.contains("\"theme\" = \"gruvbox\""));
+        assertThrows(IOException.class, () -> config.resetAndPersist("color.background"));
+
+        ConfigManager reloaded = new ConfigManager();
+        assertEquals(4, reloaded.getTabSize());
+        assertEquals("gruvbox", reloaded.get("theme"));
+    }
+
+    @Test
     void rejectsMissingSchemaVersion() throws IOException {
         Path home = tempDir.resolve("home-schema-missing");
         Path configPath = home.resolve(".shed/config.toml");

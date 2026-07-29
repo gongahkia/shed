@@ -407,7 +407,10 @@ public class CommandHandler {
         if ("inspector".equals(trimmed)) {
             return editor.showSettingsInspector();
         }
-        return "Usage: :config[!] [save|status|defaults|inspector]";
+        if (trimmed.startsWith("reset ")) {
+            return editor.resetConfigOptionPersistent(args.substring("reset".length()).trim());
+        }
+        return "Usage: :config[!] [save|status|defaults|inspector|reset <key>]";
     }
 
     private String handleWordCount() {

@@ -280,6 +280,22 @@ final class SessionConfigController {
         }
     }
 
+    public String resetConfigOptionPersistent(String key) {
+        if (key == null || key.isBlank()) {
+            return "Error: Missing config key";
+        }
+        try {
+            editor.configManager.resetAndPersist(key);
+            applyRuntimeConfigFromSettings();
+            if (isThemeRelatedConfigKey(key)) {
+                firePluginEvent("ThemeChange");
+            }
+            return "Reset and saved " + key;
+        } catch (IOException e) {
+            return "Error resetting config: " + e.getMessage();
+        }
+    }
+
 
     boolean isThemeRelatedConfigKey(String key) {
         if (key == null) {

@@ -12,7 +12,7 @@ This contract defines Shed's authoritative document state. `FileBuffer.modified`
 | Scratch buffer | Has no file path; may be clean or dirty; `:w <path>` is required to persist it. |
 | Recovery snapshot | Serialized dirty editor content; restoring creates or updates a dirty buffer with empty undo/redo history and never writes the recovered content automatically. |
 
-Large-file preview is an overlay on a file-buffer state, not a separate lifecycle state. Its hidden tail remains part of full content and is preserved by save.
+Large-file mode is a read-only file-buffer state with bounded source windows. It does not retain hidden full content; its unchanged source can be streamed through atomic save. `:largefile` shows available operations, disabled paths, reasons, and remediation.
 
 ## Transitions
 

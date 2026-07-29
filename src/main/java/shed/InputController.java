@@ -1772,6 +1772,8 @@ final class InputController {
         knownCommands.add("workspace");
         knownCommands.add("ws");
         knownCommands.add("projectreplace");
+        knownCommands.add("largefile");
+        knownCommands.add("lf");
         knownCommands.add("preplace");
         knownCommands.add("jobs");
         knownCommands.add("jobcancel");

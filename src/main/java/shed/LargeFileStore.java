@@ -273,6 +273,21 @@ final class LargeFileStore {
         return new Window(firstLine, builder.content(), builder.truncated());
     }
 
+    long writeTo(FileChannel output) throws IOException {
+        long written = 0L;
+        ByteBuffer page = ByteBuffer.allocate(PAGE_BYTES);
+        try (FileChannel input = FileChannel.open(source, StandardOpenOption.READ)) {
+            while (input.read(page) >= 0) {
+                page.flip();
+                while (page.hasRemaining()) {
+                    written += output.write(page);
+                }
+                page.clear();
+            }
+        }
+        return written;
+    }
+
     record OpenResult(LargeFileStore store, String error) {
         static OpenResult success(LargeFileStore store) {
             return new OpenResult(store, "");

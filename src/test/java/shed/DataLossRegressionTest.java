@@ -43,6 +43,18 @@ public class DataLossRegressionTest {
     }
 
     @Test
+    void failedStreamedWriteRetainsOriginalSource() throws Exception {
+        Path source = tempDir.resolve("stream-save.txt");
+        Files.writeString(source, "saved", StandardCharsets.UTF_8);
+
+        IOException error = assertThrows(IOException.class, () -> AtomicFileWriter.writeStream(source,
+            output -> { throw new IOException("simulated stream failure"); }));
+
+        assertTrue(error.getMessage().contains("target was not replaced"));
+        assertEquals("saved", Files.readString(source, StandardCharsets.UTF_8));
+    }
+
+    @Test
     void restartRecoveryRestoresDirtyContentWithoutWritingSourceOrUndoHistory() throws Exception {
         Path source = tempDir.resolve("recovery.txt");
         Path journalDirectory = tempDir.resolve("recovery");

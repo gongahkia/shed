@@ -291,14 +291,14 @@ final class PaneBufferController {
         }
 
         FileBuffer buffer = getCurrentBuffer();
-        if (!force && buffer != null && buffer.isModified() && editor.buffers.size() > 1) {
+        if (DocumentLifecycle.needsDiscardConfirmation(buffer, force) && editor.buffers.size() > 1) {
             return "Error: No write since last change (use :bd! to override)";
         }
 
         if (editor.buffers.size() == 1) {
-            if (!force && editor.hasUnsavedChanges(buffer)) {
+            if (DocumentLifecycle.needsDiscardConfirmation(buffer, force)) {
                 int result = editor.confirmDiscardChanges("Close the last buffer and quit anyway?");
-                if (result != JOptionPane.YES_OPTION) {
+                if (!DocumentLifecycle.discardConfirmed(result)) {
                     return "Buffer close cancelled";
                 }
             }

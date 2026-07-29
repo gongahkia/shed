@@ -91,6 +91,7 @@ public class FileBuffer {
         this.lastKnownModifiedTime = 0L;
         this.fileSizeBytes = 0L;
         setDocumentText("", false);
+        this.savedContent = "";
     }
 
     public static FileBuffer createScratch(String name, String content) {
@@ -157,6 +158,7 @@ public class FileBuffer {
         }
 
         updateLineCount();
+        this.savedContent = getFullContent();
     }
 
     private LargeFilePolicy resolveLargeFilePolicy(ConfigManager configManager) {
@@ -288,9 +290,10 @@ public class FileBuffer {
 
     // Update content while explicitly controlling modification state
     public void setContent(String content, boolean modified) {
-        setDocumentText(content == null ? "" : content, modified);
+        String normalized = content == null ? "" : content;
+        setDocumentText(normalized, modified);
         if (!modified) {
-            this.savedContent = content;
+            this.savedContent = normalized;
         }
     }
 

@@ -5,7 +5,6 @@ package shed;
 
 import java.io.File;
 import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +35,8 @@ public class ConfigManager {
     private File activeProjectConfigFile;
     private final String shedDirectoryPath;
     private String configPath;
+    private String configLoadReport;
+    private boolean configLoadFailed;
 
     // Default configuration values
     private static final String DEFAULT_THEME = "one-dark-pro";
@@ -175,6 +176,8 @@ public class ConfigManager {
         this.projectConfig = new HashMap<>();
         this.projectPreviousValues = new HashMap<>();
         this.activeProjectConfigFile = null;
+        this.configLoadReport = "";
+        this.configLoadFailed = false;
         Path home = Path.of(System.getProperty("user.home"));
         this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
         this.configPath = Path.of(shedDirectoryPath).resolve(SHED_CONFIG_NAME).toString();
@@ -239,40 +242,63 @@ public class ConfigManager {
         defaultConfig.putAll(config);
     }
 
-    // Load configuration from file
     private void loadConfig() {
-        File configFile = new File(configPath);
         persistedConfig.clear();
-        if (!configFile.exists()) {
-            return; // Use defaults
-        }
-
-        try {
-            BufferedReader reader = new BufferedReader(new FileReader(configFile));
+        configLoadFailed = false;
+        Path path = Path.of(configPath);
+        Map<String, String> parsed = new LinkedHashMap<>();
+        List<String> errors = new ArrayList<>();
+        try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             String line;
-
+            int lineNumber = 0;
             while ((line = reader.readLine()) != null) {
-                line = line.trim();
-
-                // Skip comments and empty lines
-                if (line.isEmpty() || line.startsWith("#")) {
+                lineNumber++;
+                String trimmed = line.trim();
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                     continue;
                 }
-
-                // Parse key=value pairs
-                String[] parts = line.split("=", 2);
-                if (parts.length == 2) {
-                    String key = parts[0].trim();
-                    String value = parts[1].trim();
-                    persistedConfig.put(key, value);
-                    config.put(key, value);
+                int separator = trimmed.indexOf('=');
+                if (separator <= 0) {
+                    errors.add("line " + lineNumber + ": expected key=value");
+                    continue;
+                }
+                try {
+                    String key = normalizePersistedKey(trimmed.substring(0, separator));
+                    String value = normalizePersistedValue(trimmed.substring(separator + 1).trim());
+                    parsed.put(key, value);
+                } catch (IOException error) {
+                    errors.add("line " + lineNumber + ": " + error.getMessage());
                 }
             }
-
-            reader.close();
-        } catch (IOException e) {
-            System.err.println("Error loading config: " + e.getMessage());
+        } catch (java.nio.file.NoSuchFileException error) {
+            configLoadReport = "Configuration not found: " + path
+                + "\nSafe defaults are active. Run :config save to create it.";
+            return;
+        } catch (IOException | SecurityException error) {
+            errors.add("read failed: " + loadErrorMessage(error));
         }
+        if (!errors.isEmpty()) {
+            configLoadFailed = true;
+            configLoadReport = configRecoveryReport(path, errors);
+            return;
+        }
+        persistedConfig.putAll(parsed);
+        config.putAll(parsed);
+        configLoadReport = "Configuration loaded: " + path;
+    }
+
+    private String loadErrorMessage(Exception error) {
+        String message = error.getMessage();
+        return (message == null || message.isBlank()) ? error.getClass().getSimpleName() : message;
+    }
+
+    private String configRecoveryReport(Path path, List<String> errors) {
+        StringBuilder report = new StringBuilder("Configuration recovery: ").append(path)
+            .append("\nInvalid configuration was preserved unchanged.\nSafe defaults are active.\n\nValidation:");
+        for (String error : errors) {
+            report.append("\n- ").append(error);
+        }
+        return report.append("\n\nRemediation: correct the listed line(s), then run :reload.").toString();
     }
 
     // Get color setting
@@ -971,6 +997,14 @@ public class ConfigManager {
     // Get config file path
     public String getConfigPath() {
         return configPath;
+    }
+
+    public boolean hasConfigLoadFailure() {
+        return configLoadFailed;
+    }
+
+    public String getConfigLoadReport() {
+        return configLoadReport;
     }
 
     public String getShedDirectoryPath() {

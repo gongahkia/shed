@@ -337,7 +337,7 @@ final class SessionConfigController {
     public String reloadConfigFromDisk() {
         editor.configManager.reload();
         applyRuntimeConfigFromSettings();
-        return "Settings reloaded";
+        return configReloadResult();
     }
 
 
@@ -357,11 +357,19 @@ final class SessionConfigController {
         boolean themeChangedInFile = canDetectThemeChange && didConfigKeyChange(previousContent, updatedContent, "theme");
         String activeThemeBeforeReload = editor.configManager.getThemeId();
         editor.configManager.reload();
-        if (canDetectThemeChange && !themeChangedInFile) {
+        if (!editor.configManager.hasConfigLoadFailure() && canDetectThemeChange && !themeChangedInFile) {
             editor.configManager.setTheme(activeThemeBeforeReload);
         }
         applyRuntimeConfigFromSettings();
-        return "Settings reloaded";
+        return configReloadResult();
+    }
+
+    private String configReloadResult() {
+        if (!editor.configManager.hasConfigLoadFailure()) {
+            return "Settings reloaded";
+        }
+        showScratchBuffer("[config recovery]", editor.configManager.getConfigLoadReport());
+        return "Configuration rejected; safe defaults active";
     }
 
 

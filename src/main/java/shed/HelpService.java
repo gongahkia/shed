@@ -46,6 +46,7 @@ public class HelpService {
                    "  :recent        Show recent files\n" +
                    "  :settings      Open user settings file\n" +
                    "  :config save   Persist current runtime config to ~/.shed/shedrc\n" +
+                   "  :config status Show config load/recovery details\n" +
                    "  :log           Open command log file\n" +
                    "  :session ...   Session save/load/list\n" +
                    "  :workspace ... Workspace profile save/load/list\n" +
@@ -87,6 +88,7 @@ public class HelpService {
                    "  :theater X     Dramatic UI preset (off/subtle/full)\n" +
                    "  :zen           Toggle zen mode\n" +
                    "  :reload        Reload ~/.shed/shedrc now\n" +
+                   "  :config status Show config load/recovery details\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +

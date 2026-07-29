@@ -1771,6 +1771,8 @@ final class InputController {
         knownCommands.add("sessions");
         knownCommands.add("workspace");
         knownCommands.add("ws");
+        knownCommands.add("projectreplace");
+        knownCommands.add("preplace");
         knownCommands.add("jobs");
         knownCommands.add("jobcancel");
         knownCommands.add("jobkill");

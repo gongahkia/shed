@@ -68,6 +68,7 @@ public class HelpService {
                    "  :tree rm p     Delete file/empty directory\n" +
                    "  :buffers       Buffer finder\n" +
                    "  :grep text     Grep finder\n" +
+                   "  :projectreplace ... Preview/apply selected project replacements\n" +
                    "  :copen         Open quickfix list\n" +
                    "  :cnext/:cprev  Next/previous quickfix entry\n" +
                    "  :cc [n]        Jump to quickfix entry\n" +

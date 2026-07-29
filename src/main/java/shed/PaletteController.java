@@ -14,10 +14,12 @@ import java.util.List;
 final class PaletteController {
     private final Texteditor editor;
     private final WorkspaceSearchCoordinator workspaceSearchCoordinator;
+    private final WorkspaceReplaceCoordinator workspaceReplaceCoordinator;
 
     PaletteController(Texteditor editor) {
         this.editor = editor;
         this.workspaceSearchCoordinator = new WorkspaceSearchCoordinator(editor);
+        this.workspaceReplaceCoordinator = new WorkspaceReplaceCoordinator(editor);
     }
 
     public String showCommandPalette() {
@@ -57,6 +59,11 @@ final class PaletteController {
 
     public String showGrepFinder(String pattern) {
         return workspaceSearchCoordinator.search(pattern);
+    }
+
+
+    String handleProjectReplace(String argument) {
+        return workspaceReplaceCoordinator.handle(argument);
     }
 
 
@@ -333,6 +340,9 @@ final class PaletteController {
                 return "Delete current line or a range.";
             case "files":
                 return "Open project file finder.";
+            case "projectreplace":
+            case "preplace":
+                return "Preview and explicitly apply selected project-wide literal replacements.";
             case "folder":
             case "folders":
                 return "Pick folder, then open file picker.";

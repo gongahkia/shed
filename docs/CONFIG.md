@@ -101,6 +101,17 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `backup.directory` | `~/.shed/backups` | path | Directory for versioned backups; created on first backup |
 | `backup.retention.count` | `10` | int | Retained backups per source file; `1..100` |
 
+## Project Replace Policy
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- |
+| `project.replace.enabled` | `false` | bool | Opt in before project replacement commands run |
+| `project.replace.preview.required` | `true` | bool | Require preview; `false` enables the explicit non-preview command |
+| `project.replace.confirm.required` | `true` | bool | Require `:projectreplace apply confirm` |
+| `project.replace.backup.enabled` | `true` | bool | Retain original content before each changed file is written |
+| `project.replace.backup.directory` | `~/.shed/project-replace-backups` | path | Directory for retained replacement backups |
+| `project.replace.scope` | `workspace` | enum | `workspace` or `current-file` |
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

@@ -1,8 +1,8 @@
 package shed;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
 
 final class WorkspaceReplaceCoordinator {
     private final Texteditor editor;
@@ -23,16 +23,28 @@ final class WorkspaceReplaceCoordinator {
         String args = split < 0 ? "" : input.substring(split + 1).trim();
         return switch (subcommand) {
             case "preview" -> preview(args);
+            case "replace" -> replace(args);
             case "status" -> showPlan();
             case "file" -> selectFile(args);
             case "match" -> selectMatch(args);
-            case "apply" -> apply();
+            case "apply" -> apply(args);
             case "cancel" -> cancel();
+            case "settings" -> showSettings();
+            case "enable" -> setSetting("project.replace.enabled", "true");
+            case "disable" -> setSetting("project.replace.enabled", "false");
+            case "preview-required" -> setBooleanSetting("project.replace.preview.required", "preview-required", args);
+            case "confirm" -> setBooleanSetting("project.replace.confirm.required", "confirm", args);
+            case "backup" -> setBooleanSetting("project.replace.backup.enabled", "backup", args);
+            case "scope" -> setScope(args);
             default -> usage();
         };
     }
 
     private String preview(String argument) {
+        ProjectReplacePolicy policy = policy();
+        if (!policy.enabled()) {
+            return "Project replacement is disabled; run :projectreplace enable";
+        }
         ReplacementSpec spec = ReplacementSpec.parse(argument);
         if (spec == null) {
             return "Usage: :projectreplace preview /find/replacement/";
@@ -40,6 +52,10 @@ final class WorkspaceReplaceCoordinator {
         Path root = workspaceRoot();
         if (root == null) {
             return "Project replace requires a directory";
+        }
+        Path scopeFile = scopeFile(policy, root);
+        if ("current-file".equals(policy.scope()) && scopeFile == null) {
+            return "Current-file scope requires an open workspace file";
         }
         boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
         long request = ++activeRequest;
@@ -49,10 +65,84 @@ final class WorkspaceReplaceCoordinator {
             token -> {
                 token.onCancel(cancellation::cancel);
                 WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
-                return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), cancellation);
+                return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), scopeFile, cancellation);
             },
             (snapshot, result, error) -> completePreview(request, snapshot, result, error));
         return "Started project replace preview job " + jobId;
+    }
+
+    private String replace(String argument) {
+        ProjectReplacePolicy policy = policy();
+        if (!policy.enabled()) {
+            return "Project replacement is disabled; run :projectreplace enable";
+        }
+        if (policy.previewRequired()) {
+            return "Preview is required; run :projectreplace preview /find/replacement/";
+        }
+        ReplacementSpec spec = ReplacementSpec.parse(policy.confirmRequired() ? confirmedArgument(argument) : argument);
+        if (spec == null) {
+            return policy.confirmRequired()
+                ? "Usage: :projectreplace replace /find/replacement/ confirm"
+                : "Usage: :projectreplace replace /find/replacement/";
+        }
+        Path root = workspaceRoot();
+        if (root == null) {
+            return "Project replace requires a directory";
+        }
+        Path scopeFile = scopeFile(policy, root);
+        if ("current-file".equals(policy.scope()) && scopeFile == null) {
+            return "Current-file scope requires an open workspace file";
+        }
+        boolean persistentIndexEnabled = editor.configManager.getWorkspaceIndexEnabled();
+        long request = ++activeRequest;
+        plan = null;
+        WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
+        int jobId = editor.asyncJobService.submit("project replace: " + spec.find(),
+            token -> {
+                token.onCancel(cancellation::cancel);
+                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                return new WorkspaceReplaceService(index).preview(persistentIndexEnabled, root, spec.find(), spec.replacement(), scopeFile, cancellation);
+            },
+            (snapshot, result, error) -> completeDirectReplace(request, policy, snapshot, result, error));
+        return "Started project replace job " + jobId;
+    }
+
+    private void completeDirectReplace(long request, ProjectReplacePolicy policy, AsyncJobService.JobSnapshot snapshot,
+                                       WorkspaceReplaceService.Preview preview, Exception error) {
+        if (editor.closingDown || request != activeRequest) {
+            return;
+        }
+        int jobId = snapshot == null ? -1 : snapshot.getId();
+        if (snapshot != null && snapshot.getStatus() == AsyncJobService.Status.CANCELLED
+            || preview != null && preview.state() == WorkspaceReplaceService.State.CANCELLED) {
+            editor.showMessage("Project replace job " + jobId + " cancelled");
+            return;
+        }
+        if (error != null || preview == null || preview.state() != WorkspaceReplaceService.State.READY) {
+            String message = error == null ? preview == null ? "unknown error" : preview.message() : error.getMessage();
+            editor.showMessage("Project replace job " + jobId + " failed: " + (message == null ? "" : message));
+            return;
+        }
+        if (preview.plan().truncated()) {
+            editor.showMessage("Project replace job " + jobId + " requires preview: match limit reached");
+            return;
+        }
+        if (preview.plan().files().isEmpty()) {
+            editor.showMessage("Project replace job " + jobId + " found no matches");
+            return;
+        }
+        WorkspaceReplaceService.ApplyOptions options = new WorkspaceReplaceService.ApplyOptions(policy.backupEnabled(),
+            policy.backupEnabled() ? policy.backupDirectoryPath() : null);
+        WorkspaceReplaceService.Plan applying = preview.plan().snapshot();
+        WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
+        int applyJobId = editor.asyncJobService.submit("project replace apply",
+            token -> {
+                token.onCancel(cancellation::cancel);
+                WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
+                return new WorkspaceReplaceService(index).apply(applying, cancellation, options);
+            },
+            (applySnapshot, result, applyError) -> completeApply(applySnapshot, result, applyError));
+        editor.showMessage("Started project replace apply job " + applyJobId);
     }
 
     private void completePreview(long request, AsyncJobService.JobSnapshot snapshot, WorkspaceReplaceService.Preview preview, Exception error) {
@@ -97,17 +187,29 @@ final class WorkspaceReplaceCoordinator {
         return showPlan();
     }
 
-    private String apply() {
+    private String apply(String argument) {
+        ProjectReplacePolicy policy = policy();
+        if (!policy.enabled()) {
+            return "Project replacement is disabled; run :projectreplace enable";
+        }
         if (plan == null) {
             return "No project replace preview";
         }
+        if (policy.confirmRequired() && !"confirm".equals(argument)) {
+            return "Run :projectreplace apply confirm to apply the preview";
+        }
+        if (!policy.confirmRequired() && !argument.isEmpty()) {
+            return "Usage: :projectreplace apply";
+        }
         WorkspaceReplaceService.Plan applying = plan.snapshot();
+        WorkspaceReplaceService.ApplyOptions options = new WorkspaceReplaceService.ApplyOptions(policy.backupEnabled(),
+            policy.backupEnabled() ? policy.backupDirectoryPath() : null);
         WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
         int jobId = editor.asyncJobService.submit("project replace apply",
             token -> {
                 token.onCancel(cancellation::cancel);
                 WorkspaceIndexService index = new WorkspaceIndexService(Path.of(editor.configManager.getShedDirectoryPath(), "workspace-index"));
-                return new WorkspaceReplaceService(index).apply(applying, cancellation);
+                return new WorkspaceReplaceService(index).apply(applying, cancellation, options);
             },
             (snapshot, result, error) -> completeApply(snapshot, result, error));
         return "Started project replace apply job " + jobId;
@@ -142,8 +244,74 @@ final class WorkspaceReplaceCoordinator {
         if (plan == null) {
             return "No project replace preview";
         }
-        editor.showScratchBuffer("[project replace preview]", formatPlan(plan));
+        editor.showScratchBuffer("[project replace preview]", formatPlan(plan, policy().confirmRequired()));
         return "Showing project replace preview";
+    }
+
+    private String showSettings() {
+        ProjectReplacePolicy policy = policy();
+        String settings = "Project Replace Settings\n\n"
+            + "enabled: " + policy.enabled() + '\n'
+            + "preview.required: " + policy.previewRequired()
+            + (policy.previewRequired() ? " (preview is mandatory)\n" : " (explicit replace allowed)\n")
+            + "confirm.required: " + policy.confirmRequired() + '\n'
+            + "backup.enabled: " + policy.backupEnabled() + '\n'
+            + "backup.directory: " + policy.backupDirectoryPath() + '\n'
+            + "scope: " + policy.scope() + "\n\n"
+            + ":projectreplace enable|disable\n"
+            + ":projectreplace preview-required on|off\n"
+            + ":projectreplace confirm on|off\n"
+            + ":projectreplace backup on|off\n"
+            + ":projectreplace scope workspace|current-file\n";
+        editor.showScratchBuffer("[project replace settings]", settings);
+        return "Showing project replace settings";
+    }
+
+    private String setBooleanSetting(String key, String command, String value) {
+        return switch (value) {
+            case "on" -> setSetting(key, "true");
+            case "off" -> setSetting(key, "false");
+            default -> "Usage: :projectreplace " + command + " on|off";
+        };
+    }
+
+    private String setScope(String value) {
+        if (!"workspace".equals(value) && !"current-file".equals(value)) {
+            return "Usage: :projectreplace scope workspace|current-file";
+        }
+        return setSetting("project.replace.scope", value);
+    }
+
+    private String setSetting(String key, String value) {
+        try {
+            editor.configManager.setAndPersist(key, value);
+            if ("project.replace.enabled".equals(key) && !Boolean.parseBoolean(value)) {
+                cancel();
+            }
+            return "Updated " + key;
+        } catch (IOException error) {
+            return "Unable to update " + key + ": " + error.getMessage();
+        }
+    }
+
+    private ProjectReplacePolicy policy() {
+        try {
+            return editor.configManager.getProjectReplacePolicy();
+        } catch (RuntimeException error) {
+            throw new IllegalStateException("Invalid project replace configuration", error);
+        }
+    }
+
+    private Path scopeFile(ProjectReplacePolicy policy, Path root) {
+        if (!"current-file".equals(policy.scope())) {
+            return null;
+        }
+        FileBuffer current = editor.getCurrentBuffer();
+        if (current == null || !current.hasFilePath()) {
+            return null;
+        }
+        Path file = Path.of(current.getFilePath()).toAbsolutePath().normalize();
+        return file.startsWith(root) ? file : null;
     }
 
     private Path workspaceRoot() {
@@ -162,7 +330,7 @@ final class WorkspaceReplaceCoordinator {
         return projectRoot.isDirectory() ? projectRoot.toPath() : null;
     }
 
-    private static String formatPlan(WorkspaceReplaceService.Plan plan) {
+    private static String formatPlan(WorkspaceReplaceService.Plan plan, boolean confirmationRequired) {
         StringBuilder result = new StringBuilder();
         result.append("Project Replace Preview\n\n");
         result.append("Source: ").append(plan.source().name().toLowerCase(java.util.Locale.ROOT)).append('\n');
@@ -186,7 +354,7 @@ final class WorkspaceReplaceCoordinator {
         }
         result.append("\n:projectreplace file <id> [on|off|toggle]\n");
         result.append(":projectreplace match <id> [on|off|toggle]\n");
-        result.append(":projectreplace apply\n");
+        result.append(confirmationRequired ? ":projectreplace apply confirm\n" : ":projectreplace apply\n");
         result.append(":projectreplace cancel\n");
         return result.toString();
     }
@@ -202,7 +370,12 @@ final class WorkspaceReplaceCoordinator {
     }
 
     private static String usage() {
-        return "Usage: :projectreplace preview /find/replacement/ | status | file <id> [on|off|toggle] | match <id> [on|off|toggle] | apply | cancel";
+        return "Usage: :projectreplace settings | enable|disable | preview /find/replacement/ | replace /find/replacement/ [confirm] | status | file <id> [on|off|toggle] | match <id> [on|off|toggle] | apply [confirm] | cancel";
+    }
+
+    private static String confirmedArgument(String argument) {
+        String suffix = " confirm";
+        return argument != null && argument.endsWith(suffix) ? argument.substring(0, argument.length() - suffix.length()).trim() : "";
     }
 
     private record ReplacementSpec(String find, String replacement) {

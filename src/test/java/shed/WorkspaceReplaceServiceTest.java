@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -79,5 +80,42 @@ public class WorkspaceReplaceServiceTest {
         assertEquals(WorkspaceReplaceService.State.CANCELLED, applied.state());
         assertTrue(applied.files().isEmpty());
         assertEquals("old\n", Files.readString(file));
+    }
+
+    @Test
+    void retainsOriginalContentBeforeApplyingWhenBackupIsEnabled() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace"));
+        Path file = root.resolve("notes.txt");
+        Path backups = tempDir.resolve("backups");
+        Files.writeString(file, "old\n", StandardCharsets.UTF_8);
+        WorkspaceReplaceService service = new WorkspaceReplaceService(new WorkspaceIndexService(tempDir.resolve("index-store"),
+            (workspaceRoot, relativePath) -> false));
+        WorkspaceReplaceService.Preview preview = service.preview(false, root, "old", "new", WorkspaceIndexService.Cancellation.NONE);
+
+        WorkspaceReplaceService.ApplyResult applied = service.apply(preview.plan(), WorkspaceIndexService.Cancellation.NONE,
+            new WorkspaceReplaceService.ApplyOptions(true, backups));
+
+        assertEquals(WorkspaceReplaceService.FileState.CHANGED, applied.files().getFirst().state());
+        assertEquals("new\n", Files.readString(file));
+        try (var entries = Files.list(backups)) {
+            Path backup = entries.findFirst().orElseThrow();
+            assertEquals("old\n", Files.readString(backup));
+        }
+    }
+
+    @Test
+    void previewsOnlyTheSelectedFileWhenScopeIsCurrentFile() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace"));
+        Path selected = root.resolve("selected.txt");
+        Path other = root.resolve("other.txt");
+        Files.writeString(selected, "old\n", StandardCharsets.UTF_8);
+        Files.writeString(other, "old\n", StandardCharsets.UTF_8);
+        WorkspaceReplaceService service = new WorkspaceReplaceService(new WorkspaceIndexService(tempDir.resolve("index-store"),
+            (workspaceRoot, relativePath) -> false));
+
+        WorkspaceReplaceService.Preview preview = service.preview(false, root, "old", "new", selected,
+            WorkspaceIndexService.Cancellation.NONE);
+
+        assertEquals(List.of(selected), preview.plan().files().stream().map(WorkspaceReplaceService.FilePlan::path).toList());
     }
 }

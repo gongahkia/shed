@@ -101,6 +101,11 @@ public class ConfigManager {
     private static final boolean DEFAULT_PROJECT_CONFIG_ENABLED = true;
     private static final boolean DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE = false;
     private static final boolean DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE = true;
+    private static final boolean DEFAULT_PROJECT_REPLACE_ENABLED = false;
+    private static final boolean DEFAULT_PROJECT_REPLACE_PREVIEW_REQUIRED = true;
+    private static final boolean DEFAULT_PROJECT_REPLACE_CONFIRM_REQUIRED = true;
+    private static final boolean DEFAULT_PROJECT_REPLACE_BACKUP_ENABLED = true;
+    private static final String DEFAULT_PROJECT_REPLACE_SCOPE = "workspace";
     private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
@@ -260,6 +265,12 @@ public class ConfigManager {
         defineDefault("project.config.enabled", DEFAULT_PROJECT_CONFIG_ENABLED);
         defineDefault("project.config.allow.unsafe", DEFAULT_PROJECT_CONFIG_ALLOW_UNSAFE);
         defineDefault("project.config.require.trusted.file", DEFAULT_PROJECT_CONFIG_REQUIRE_TRUSTED_FILE);
+        defineDefault("project.replace.enabled", DEFAULT_PROJECT_REPLACE_ENABLED);
+        defineDefault("project.replace.preview.required", DEFAULT_PROJECT_REPLACE_PREVIEW_REQUIRED);
+        defineDefault("project.replace.confirm.required", DEFAULT_PROJECT_REPLACE_CONFIRM_REQUIRED);
+        defineDefault("project.replace.backup.enabled", DEFAULT_PROJECT_REPLACE_BACKUP_ENABLED);
+        defineDefault("project.replace.backup.directory", Path.of(shedDirectoryPath).resolve("project-replace-backups").toString());
+        defineDefault("project.replace.scope", DEFAULT_PROJECT_REPLACE_SCOPE);
         defineDefault("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
         settings.reset();
         defaultConfig.clear();
@@ -332,6 +343,12 @@ public class ConfigManager {
             case "project.config.enabled" -> "Enable project-local configuration";
             case "project.config.allow.unsafe" -> "Allow unsafe project-local keys";
             case "project.config.require.trusted.file" -> "Require trusted project configuration files";
+            case "project.replace.enabled" -> "Enable project-wide replacement commands";
+            case "project.replace.preview.required" -> "Require an in-memory preview before project replacement";
+            case "project.replace.confirm.required" -> "Require the explicit apply confirm argument";
+            case "project.replace.backup.enabled" -> "Create retained backups before project replacement";
+            case "project.replace.backup.directory" -> "Directory for project replacement backups";
+            case "project.replace.scope" -> "Project replacement scope";
             case "tree.delete.protect.critical" -> "Protect critical paths from tree deletion";
             default -> key;
         };
@@ -709,6 +726,17 @@ public class ConfigManager {
 
     public boolean getWorkspaceIndexEnabled() {
         return getBoolean("workspace.index.enabled", DEFAULT_WORKSPACE_INDEX_ENABLED);
+    }
+
+    public ProjectReplacePolicy getProjectReplacePolicy() {
+        return new ProjectReplacePolicy(
+            getBoolean("project.replace.enabled", DEFAULT_PROJECT_REPLACE_ENABLED),
+            getBoolean("project.replace.preview.required", DEFAULT_PROJECT_REPLACE_PREVIEW_REQUIRED),
+            getBoolean("project.replace.confirm.required", DEFAULT_PROJECT_REPLACE_CONFIRM_REQUIRED),
+            getBoolean("project.replace.backup.enabled", DEFAULT_PROJECT_REPLACE_BACKUP_ENABLED),
+            getString("project.replace.backup.directory", Path.of(shedDirectoryPath).resolve("project-replace-backups").toString()),
+            getString("project.replace.scope", DEFAULT_PROJECT_REPLACE_SCOPE)
+        );
     }
 
     public long getLargeFileThresholdMb() {

@@ -30,6 +30,11 @@ final class WorkspaceReplaceService {
 
     Preview preview(boolean persistentIndexEnabled, Path workspaceRoot, String needle, String replacement,
                     WorkspaceIndexService.Cancellation cancellation) {
+        return preview(persistentIndexEnabled, workspaceRoot, needle, replacement, null, cancellation);
+    }
+
+    Preview preview(boolean persistentIndexEnabled, Path workspaceRoot, String needle, String replacement, Path scopeFile,
+                    WorkspaceIndexService.Cancellation cancellation) {
         String find = requireFind(needle);
         String replace = replacement == null ? "" : replacement;
         WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
@@ -45,6 +50,7 @@ final class WorkspaceReplaceService {
         }
 
         Path root = Path.of(indexed.index().root()).toAbsolutePath().normalize();
+        Path selectedFile = scopeFile == null ? null : scopeFile.toAbsolutePath().normalize();
         List<FilePlan> files = new ArrayList<>();
         int nextFileId = 1;
         int nextMatchId = 1;
@@ -53,7 +59,7 @@ final class WorkspaceReplaceService {
                 return new Preview(source, State.CANCELLED, null, "preview cancelled");
             }
             Path file = root.resolve(entry.relativePath()).normalize();
-            if (!file.startsWith(root) || !readableRegularFile(file)) {
+            if (!file.startsWith(root) || selectedFile != null && !file.equals(selectedFile) || !readableRegularFile(file)) {
                 continue;
             }
             String content;
@@ -79,8 +85,13 @@ final class WorkspaceReplaceService {
     }
 
     ApplyResult apply(Plan plan, WorkspaceIndexService.Cancellation cancellation) {
+        return apply(plan, cancellation, ApplyOptions.NO_BACKUP);
+    }
+
+    ApplyResult apply(Plan plan, WorkspaceIndexService.Cancellation cancellation, ApplyOptions options) {
         Plan snapshot = Objects.requireNonNull(plan, "plan").snapshot();
         WorkspaceIndexService.Cancellation effectiveCancellation = cancellation == null ? WorkspaceIndexService.Cancellation.NONE : cancellation;
+        ApplyOptions effectiveOptions = options == null ? ApplyOptions.NO_BACKUP : options;
         List<FileResult> results = new ArrayList<>();
         for (FilePlan file : snapshot.files()) {
             if (effectiveCancellation.isCancelled()) {
@@ -101,6 +112,7 @@ final class WorkspaceReplaceService {
                     continue;
                 }
                 String updated = applySelections(file, snapshot.replacement());
+                writeBackup(file, effectiveOptions);
                 AtomicFileWriter.write(file.path(), updated.getBytes(StandardCharsets.UTF_8));
                 results.add(new FileResult(file.fileId(), file.path(), FileState.CHANGED, "applied " + file.selectedMatchCount() + " match(es)"));
             } catch (IOException | SecurityException error) {
@@ -108,6 +120,16 @@ final class WorkspaceReplaceService {
             }
         }
         return new ApplyResult(State.COMPLETE, results, "apply complete");
+    }
+
+    private static void writeBackup(FilePlan file, ApplyOptions options) throws IOException {
+        if (!options.backupEnabled()) {
+            return;
+        }
+        Path directory = options.backupDirectory();
+        Files.createDirectories(directory);
+        Path backup = Files.createTempFile(directory, "replace-" + file.fileId() + "-", ".bak");
+        Files.writeString(backup, file.originalContent(), StandardCharsets.UTF_8);
     }
 
     private List<MatchPlan> matches(String content, String needle, int firstId, int limit, WorkspaceIndexService.Cancellation cancellation) {
@@ -216,6 +238,16 @@ final class WorkspaceReplaceService {
     }
 
     record FileResult(int fileId, Path path, FileState state, String message) {
+    }
+
+    record ApplyOptions(boolean backupEnabled, Path backupDirectory) {
+        static final ApplyOptions NO_BACKUP = new ApplyOptions(false, null);
+
+        ApplyOptions {
+            if (backupEnabled && backupDirectory == null) {
+                throw new IllegalArgumentException("backup directory is required");
+            }
+        }
     }
 
     private record LineColumn(int line, int column) {

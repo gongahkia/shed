@@ -194,6 +194,7 @@ Notes:
 | Command | Action |
 | :--- | :--- |
 | `:lsp completion`, `:lsp complete`, `:lsp comp` | Completion picker (LSP with local fallback) |
+| Insert-mode `Ctrl-n` | Asynchronous completion popup; Up/Down or Ctrl-p/Ctrl-n selects, Tab/Enter applies, Escape cancels; selected LSP item shows detail and documentation |
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp hover` | Show hover info |
 | `:lsp references`, `:lsp refs` | Find references and open quickfix |

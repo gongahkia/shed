@@ -944,8 +944,9 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     javax.swing.JWindow completionPopup;
-    javax.swing.JList<String> completionList;
-    javax.swing.DefaultListModel<String> completionModel;
+    javax.swing.JList<LspClient.CompletionItem> completionList;
+    javax.swing.DefaultListModel<LspClient.CompletionItem> completionModel;
+    javax.swing.JTextArea completionDocumentation;
     String completionPrefix;
     void showInlineCompletion() {
         inputController.showInlineCompletion();

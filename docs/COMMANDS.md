@@ -134,6 +134,11 @@ Notes:
 | `:files` | Project file finder |
 | `:folder`, `:folders` | Folder chooser + file picker |
 | `:grep <text>`, `:rg <text>` | Start cancellable incremental workspace text search; opens quickfix on completion |
+| `:projectreplace preview /find/replacement/` | Build an in-memory literal replacement preview; no file is written |
+| `:projectreplace file <id> [on\|off\|toggle]` | Select or deselect all previewed matches in a file |
+| `:projectreplace match <id> [on\|off\|toggle]` | Select or deselect one previewed match |
+| `:projectreplace apply` | Start an explicit cancellable atomic apply for selected unchanged files |
+| `:projectreplace cancel` | Discard the current replacement preview |
 | `:palette`, `:commands` | Command palette |
 | `:undolist`, `:undotree` | Show undo state summary |
 | `:themes` | Show built-in themes |

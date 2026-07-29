@@ -1323,7 +1323,7 @@ public class Texteditor extends JFrame implements KeyListener {
         commands.add("bd"); commands.add("set"); commands.add("settings"); commands.add("config");
         commands.add("log"); commands.add("session"); commands.add("workspace"); commands.add("jobs"); commands.add("jobcancel");
         commands.add("drop"); commands.add("task"); commands.add("help"); commands.add("wc"); commands.add("recent");
-        commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder");
+        commands.add("d"); commands.add("delete"); commands.add("files"); commands.add("folder"); commands.add("projectreplace");
         commands.add("tree"); commands.add("git"); commands.add("grep"); commands.add("copen");
         commands.add("cclose"); commands.add("cnext"); commands.add("cprev"); commands.add("cc");
         commands.add("lsp"); commands.add("definition"); commands.add("hover"); commands.add("references");
@@ -1730,6 +1730,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String showGrepFinder(String pattern) {
         return paletteController.showGrepFinder(pattern);
+    }
+
+    public String handleProjectReplace(String argument) {
+        return paletteController.handleProjectReplace(argument);
     }
 
     public String showSymbols(String argument) {

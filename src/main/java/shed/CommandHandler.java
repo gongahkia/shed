@@ -144,6 +144,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.splitWindow(true), "vsplit", "vsp");
         registerCommand((args, range, force) -> editor.closeActiveWindow(), "close", "clo");
         registerCommand((args, range, force) -> editor.showGrepFinder(args), "grep", "rg");
+        registerCommand((args, range, force) -> editor.handleProjectReplace(args), "projectreplace", "preplace");
         registerCommand((args, range, force) -> editor.openQuickfixList(), "copen");
         registerCommand((args, range, force) -> editor.closeQuickfixList(), "cclose");
         registerCommand((args, range, force) -> editor.quickfixNext(), "cnext", "cn");

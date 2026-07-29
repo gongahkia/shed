@@ -77,6 +77,7 @@ final class PaneBufferController {
         }
         pane.setBuffer(buffer);
         withSuppressedDocumentEvents(() -> pane.getTextArea().setDocument(buffer.getDocument()));
+        pane.getTextArea().setEditable(!buffer.isLargeFile() && editor.editorState.mode.isEditable());
         pane.getTextArea().setCaretPosition(Math.min(caretPosition, pane.getTextArea().getDocument().getLength()));
         if (replacedTerminalPane) {
             editor.renderWindowLayout();
@@ -211,8 +212,10 @@ final class PaneBufferController {
         editor.registerFileWatch(buffer);
         editor.firePluginEvent("BufOpen");
         editor.refreshGitGutter();
-        if (buffer.isShowingPreviewOnly()) {
-            editor.showMessage("Large-file preview loaded");
+        if (buffer.isLargeFileUnavailable()) {
+            editor.showMessage("Large-file unavailable: " + buffer.getLargeFileStatus());
+        } else if (buffer.isShowingPreviewOnly()) {
+            editor.showMessage("Large-file bounded preview loaded");
         } else if (projectConfigMessage != null && !projectConfigMessage.isEmpty()) {
             editor.showMessage(projectConfigMessage);
         }

@@ -321,7 +321,7 @@ final class RecoveryController {
         List<RecoveryJournal.Entry> entries = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : editor.buffers) {
-            if (buffer == null || !buffer.isModified() || buffer == editor.treeBuffer || buffer == editor.quickfixBuffer) {
+            if (buffer == null || !buffer.isModified() || buffer.isLargeFile() || buffer == editor.treeBuffer || buffer == editor.quickfixBuffer) {
                 continue;
             }
             String snapshotId = buffer.hasFilePath()

@@ -306,7 +306,8 @@ final class EditorUiController {
             editor.editorState.lastVisualMode = oldMode;
         }
         editor.editorState.mode = mode;
-        editor.writingArea.setEditable(mode.isEditable());
+        FileBuffer buffer = editor.getCurrentBuffer();
+        editor.writingArea.setEditable(mode.isEditable() && (buffer == null || !buffer.isLargeFile()));
         editor.writingArea.setBackground(getModeBackground(mode));
         editor.updateZenModeLayout();
         if (mode != EditorMode.COMMAND) {

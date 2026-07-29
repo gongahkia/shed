@@ -11,7 +11,11 @@ Future large-file support uses a Java `FileChannel`-backed UTF-8 piece table, no
 | `LargeFileProjection` | Own the visible Swing `Document` window and cursor translation | Keep only viewport content plus bounded margins in `PlainDocument` |
 | `FileBuffer` | Select normal or large-file path and expose save/reload/error state | Must not retain a duplicate full-content snapshot for a large file |
 
-The current `FileBuffer` preview path remains the baseline until the replacement path is implemented. It currently reads and splits all bytes, so it is not the bounded-memory implementation described here.
+The prior `FileBuffer` preview path read and split all bytes; #62 measured that baseline. It is not the bounded-memory implementation described here.
+
+## Current open foundation
+
+The #64 foundation now selects the large-file path when a regular file exceeds the configured byte or line threshold. It validates UTF-8 through a 64 KiB channel page scanner, stores source metadata and a preview capped at 256 Ki UTF-16 code units, and does not retain full source content. Large files are read-only until the bounded projection, edit, and streamed-save milestones land. Save, backup, LSP synchronization, Markdown preview, and recovery snapshots are deliberately unavailable for this state; malformed UTF-8 and unsupported file types surface a visible unavailable state without an in-memory fallback.
 
 ## Encoding and line index
 

@@ -1242,6 +1242,18 @@ public class ConfigManager {
         return settings.search(query);
     }
 
+    String typedSettingsReference() {
+        StringBuilder reference = new StringBuilder("Shed typed settings reference\n");
+        for (TypedSettings.Descriptor descriptor : settings.descriptors()) {
+            reference.append("\n").append(descriptor.key()).append("\n")
+                .append("Description: ").append(descriptor.description()).append("\n")
+                .append("Allowed: ").append(descriptor.allowedValues()).append("\n")
+                .append("Default: ").append(descriptor.defaultValue()).append("\n")
+                .append("Behavior: ").append(descriptor.applyBehavior()).append("\n");
+        }
+        return reference.toString();
+    }
+
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
     }

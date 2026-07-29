@@ -333,6 +333,11 @@ final class SessionConfigController {
         return "Settings inspector opened";
     }
 
+    public String showTypedSettingsReference() {
+        showScratchBuffer("[settings reference]", editor.configManager.typedSettingsReference());
+        return "Showing typed settings reference";
+    }
+
 
     public String applyTheaterPreset(String presetArgument) {
         String preset = presetArgument == null ? "" : presetArgument.trim().toLowerCase(Locale.ROOT);
@@ -1234,6 +1239,11 @@ final class SessionConfigController {
 
 
     public void showHelp(String topic) {
+        String normalized = topic == null ? "" : topic.trim().toLowerCase(Locale.ROOT);
+        if (normalized.equals("settings") || normalized.equals("config")) {
+            showTypedSettingsReference();
+            return;
+        }
         String helpText = getHelpText(topic);
         openScratchBuffer(topic == null || topic.isEmpty() ? "[help]" : "[help " + topic + "]", helpText, true);
     }

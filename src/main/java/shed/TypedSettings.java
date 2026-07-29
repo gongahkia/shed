@@ -46,7 +46,8 @@ final class TypedSettings {
         for (Map.Entry<String, Object> entry : defaults.entrySet()) {
             String key = entry.getKey();
             descriptors.add(new Descriptor(key, category(key), type(entry.getValue()),
-                stringify(values.get(key)), stringify(entry.getValue()), descriptions.getOrDefault(key, "")));
+                stringify(values.get(key)), stringify(entry.getValue()), descriptions.getOrDefault(key, ""),
+                allowedValues(key, entry.getValue()), applyBehavior(key)));
         }
         descriptors.sort(java.util.Comparator.comparing(Descriptor::key));
         return descriptors;
@@ -61,7 +62,8 @@ final class TypedSettings {
         List<Descriptor> matches = new ArrayList<>();
         for (Descriptor descriptor : descriptors()) {
             String haystack = (descriptor.key() + " " + descriptor.category() + " " + descriptor.type() + " "
-                + descriptor.currentValue() + " " + descriptor.defaultValue() + " " + descriptor.description())
+                + descriptor.currentValue() + " " + descriptor.defaultValue() + " " + descriptor.description() + " "
+                + descriptor.allowedValues() + " " + descriptor.applyBehavior())
                 .toLowerCase(Locale.ROOT);
             boolean matched = true;
             for (String term : terms) {
@@ -232,6 +234,50 @@ final class TypedSettings {
         return "string";
     }
 
+    private String allowedValues(String key, Object value) {
+        if (value instanceof Boolean) {
+            return "true | false";
+        }
+        return switch (key) {
+            case "tab.size" -> "integer 1..16";
+            case "font.size" -> "integer >= 1";
+            case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
+            case "ui.dramatic.sound.volume" -> "integer 0..100";
+            case "ui.dramatic.performance.cpu.threshold" -> "number 0.1..1.0";
+            case "ui.dramatic.performance.line.threshold" -> "integer >= 1000";
+            case "ui.dramatic.animation.ms" -> "integer >= 80";
+            case "ui.dramatic.minimap.width" -> "integer >= 40";
+            case "session.dir" -> "string path";
+            default -> value instanceof Integer || value instanceof Long ? "integer >= 0"
+                : value instanceof Double ? "number >= 0" : "string";
+        };
+    }
+
+    private String applyBehavior(String key) {
+        if (key.equals("session.restore.on.start") || key.equals("session.autoload")) {
+            return "Restart: read at next startup";
+        }
+        if (key.equals("session.dir")) {
+            return "Live: used by future session operations";
+        }
+        if (key.startsWith("large.")) {
+            return "Live: used when opening files";
+        }
+        if (key.startsWith("process.") || key.startsWith("shell.")) {
+            return "Live: used by new helper commands";
+        }
+        if (key.startsWith("project.")) {
+            return "Live: used when project config is next evaluated";
+        }
+        if (key.startsWith("tree.")) {
+            return "Live: used by subsequent tree operations";
+        }
+        if (key.equals("minimap")) {
+            return "Live: stored; :minimap controls visibility";
+        }
+        return "Live: applied immediately and on config reload";
+    }
+
     private Object coerce(Object value, Object defaultValue) {
         if (defaultValue instanceof Integer && value instanceof Long) {
             return Math.toIntExact((Long) value);
@@ -289,6 +335,7 @@ final class TypedSettings {
         return null;
     }
 
-    record Descriptor(String key, String category, String type, String currentValue, String defaultValue, String description) {
+    record Descriptor(String key, String category, String type, String currentValue, String defaultValue, String description,
+                      String allowedValues, String applyBehavior) {
     }
 }

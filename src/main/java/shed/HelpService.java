@@ -90,6 +90,8 @@ public class HelpService {
                    "  :zen           Toggle zen mode\n" +
                    "  :reload        Reload ~/.shed/config.toml now\n" +
                    "  :config status Show config load/recovery details\n" +
+                   "  :config reference Open generated typed settings reference\n" +
+                   "  :help settings  Open generated typed settings reference\n" +
                    "  :normal keys   Replay normal keys\n" +
                    "  :!cmd          Run shell command (async)\n" +
                    "  :set nu        Enable line numbers\n" +

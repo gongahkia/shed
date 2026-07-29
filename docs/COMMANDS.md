@@ -36,6 +36,14 @@ This is the complete built-in command reference for command mode in `Shed`.
 | `:qa!`, `:qall!` | Force quit all |
 | `:wqa`, `:wqall`, `:xa`, `:xall` | Write all then quit all |
 
+## Support Information
+
+| Command | Action |
+| :--- | :--- |
+| `:version`, `:about`, `:buildinfo` | Show version, available build commit/target, and local Java/OS details |
+
+Packaged jars include deterministic version and Java-target manifest entries. `Shed-Commit` is emitted only when the build supplies `-Dshed.build.commit=<commit>`; otherwise the manifest and support display omit it.
+
 ## Search, Replace, and Text Operators
 
 | Command | Action |

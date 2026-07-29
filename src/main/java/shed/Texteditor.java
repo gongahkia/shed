@@ -1427,6 +1427,11 @@ public class Texteditor extends JFrame implements KeyListener {
         return "Showing perf";
     }
 
+    public String showBuildInfo() {
+        showScratchBuffer("[build]", BuildInfo.current().render());
+        return "Showing build information";
+    }
+
     public String cancelJob(String jobIdArgument) {
         return jobQuickfixController.cancelJob(jobIdArgument);
     }

@@ -48,11 +48,23 @@ final class WorkspaceIndexService {
             publish(disabled, effectiveObserver);
             return new BuildResult(null, disabled, null);
         }
+        return scanWorkspace(workspaceRoot, effectiveCancellation, effectiveObserver, true);
+    }
+
+    BuildResult scan(Path workspaceRoot, Cancellation cancellation, Observer observer) {
+        return scanWorkspace(workspaceRoot, cancellation == null ? Cancellation.NONE : cancellation,
+            observer == null ? Observer.NO_OP : observer, false);
+    }
+
+    private BuildResult scanWorkspace(Path workspaceRoot, Cancellation cancellation, Observer observer, boolean persist) {
+        Cancellation effectiveCancellation = cancellation;
+        Observer effectiveObserver = observer;
         Progress progress = new Progress();
         try {
             Path root = normalizedDirectory(workspaceRoot);
             progress.root = root;
-            publish(progress.status(State.BUILDING, "indexing"), effectiveObserver);
+            String activity = persist ? "indexing" : "scanning";
+            publish(progress.status(State.BUILDING, activity), effectiveObserver);
             List<Entry> entries = new ArrayList<>();
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
@@ -62,7 +74,7 @@ final class WorkspaceIndexService {
                     }
                     if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
                         progress.excludedDirectories++;
-                        publish(progress.status(State.BUILDING, "indexing"), effectiveObserver);
+                        publish(progress.status(State.BUILDING, activity), effectiveObserver);
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     return FileVisitResult.CONTINUE;
@@ -93,27 +105,30 @@ final class WorkspaceIndexService {
                             progress.indexed++;
                         }
                     }
-                    publish(progress.status(State.BUILDING, "indexing"), effectiveObserver);
+                    publish(progress.status(State.BUILDING, activity), effectiveObserver);
                     return FileVisitResult.CONTINUE;
                 }
 
                 @Override
                 public FileVisitResult visitFileFailed(Path file, IOException error) {
                     progress.unreadable++;
-                    publish(progress.status(State.BUILDING, "indexing"), effectiveObserver);
+                    publish(progress.status(State.BUILDING, activity), effectiveObserver);
                     return FileVisitResult.CONTINUE;
                 }
             });
             if (effectiveCancellation.isCancelled()) {
-                Status cancelled = progress.status(State.CANCELLED, "indexing cancelled");
+                Status cancelled = progress.status(State.CANCELLED, activity + " cancelled");
                 publish(cancelled, effectiveObserver);
                 return new BuildResult(null, cancelled, null);
             }
             WorkspaceIndex index = new WorkspaceIndex(root.toString(), entries);
-            Path target = indexPath(root);
-            Files.createDirectories(storageDirectory);
-            AtomicFileWriter.write(target, MiniJson.stringify(index.toMap()).getBytes(StandardCharsets.UTF_8));
-            Status ready = progress.status(State.READY, "indexed");
+            Path target = null;
+            if (persist) {
+                target = indexPath(root);
+                Files.createDirectories(storageDirectory);
+                AtomicFileWriter.write(target, MiniJson.stringify(index.toMap()).getBytes(StandardCharsets.UTF_8));
+            }
+            Status ready = progress.status(State.READY, persist ? "indexed" : "scanned");
             publish(ready, effectiveObserver);
             return new BuildResult(index, ready, target);
         } catch (IOException | SecurityException error) {

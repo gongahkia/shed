@@ -603,7 +603,7 @@ final class JobQuickfixController {
 
 
     void updateQuickfixEntries(String title, List<QuickfixService.Entry> entries) {
-        if (entries == null || entries.isEmpty()) {
+        if (entries == null) {
             return;
         }
         editor.quickfixService.setEntries(title, entries);

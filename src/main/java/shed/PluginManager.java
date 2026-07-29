@@ -799,19 +799,9 @@ public class PluginManager {
             return tokens;
         }
         StringBuilder current = new StringBuilder();
-        boolean escaped = false;
         char quote = '\0';
         for (int i = 0; i < raw.length(); i++) {
             char c = raw.charAt(i);
-            if (escaped) {
-                current.append(c);
-                escaped = false;
-                continue;
-            }
-            if (c == '\\') {
-                escaped = true;
-                continue;
-            }
             if (quote != '\0') {
                 if (c == quote) {
                     quote = '\0';
@@ -819,6 +809,14 @@ public class PluginManager {
                     current.append(c);
                 }
                 continue;
+            }
+            if (c == '\\' && i + 1 < raw.length()) {
+                char next = raw.charAt(i + 1);
+                if (Character.isWhitespace(next) || next == '\'' || next == '"') {
+                    current.append(next);
+                    i++;
+                    continue;
+                }
             }
             if (c == '\'' || c == '"') {
                 quote = c;
@@ -832,9 +830,6 @@ public class PluginManager {
                 continue;
             }
             current.append(c);
-        }
-        if (escaped) {
-            current.append('\\');
         }
         if (!current.isEmpty()) {
             tokens.add(current.toString());

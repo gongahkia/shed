@@ -3,6 +3,7 @@ package shed;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 final class TypedSettings {
     private final Map<String, Object> defaults = new LinkedHashMap<>();
@@ -24,6 +25,10 @@ final class TypedSettings {
 
     boolean knows(String key) {
         return defaults.containsKey(key);
+    }
+
+    Set<String> keys() {
+        return Set.copyOf(defaults.keySet());
     }
 
     String validateToml(String key, Object value) {

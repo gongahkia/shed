@@ -19,6 +19,8 @@ The #64 foundation now selects the large-file path when a regular file exceeds t
 
 The #65 projection replaces that initial preview with a read-only source window. It uses sparse checkpoints every 1,024 logical lines, keeps at least 64 projected lines with 16-line caret margins, and replaces only the Swing document window on scroll, caret-edge movement, or viewport resize. Each projected window remains capped at 256 Ki UTF-16 code units; a single overlong line is visibly truncated rather than forcing a full-document allocation.
 
+The #66 save path streams the unchanged large-file source through a sibling temporary file in 64 KiB chunks, forces it, verifies output size and SHA-256 digest, and atomically replaces the target. A stream, move, or verification failure leaves the original target intact or restores it from the forced sibling backup. Bounded editing and save-as remain unavailable until the piece-table milestone.
+
 ## Encoding and line index
 
 The target large-file path will support well-formed UTF-8, including an optional UTF-8 BOM retained as file metadata. It will decode pages with carry-over bytes at page boundaries and record only safe UTF-8 decode boundaries.

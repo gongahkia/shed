@@ -293,7 +293,17 @@ public class FileBuffer {
             throw new IOException("Scratch buffer has no file path; use :w <file>");
         }
         if (largeFile) {
-            throw new IOException("Large-file save is unavailable until streamed save support is enabled");
+            if (largeFileStore == null) {
+                throw new IOException("Large-file source is unavailable");
+            }
+            Path target = file.toPath();
+            AtomicFileWriter.writeStream(target, largeFileStore::writeTo);
+            this.modified = false;
+            this.savedContent = "";
+            this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
+            this.fileSizeBytes = Files.size(target);
+            this.externalFileStamp = observeExternalFile();
+            return;
         }
 
         String textToWrite = getFullContent();
@@ -322,7 +332,7 @@ public class FileBuffer {
             throw new IOException("Save target is required; use :w <file>");
         }
         if (largeFile) {
-            throw new IOException("Large-file save is unavailable until streamed save support is enabled");
+            throw new IOException("Large-file save as is unavailable until bounded editing support is enabled");
         }
         File previousFile = this.file;
         String previousScratchName = this.scratchName;

@@ -20,7 +20,7 @@ public class FileBufferTest {
     Path tempDir;
 
     @Test
-    void largeFileOpenKeepsBoundedPreviewAndRefusesUnimplementedSave() throws Exception {
+    void largeFileOpenKeepsBoundedPreviewAndStreamsAtomicSave() throws Exception {
         Path file = tempDir.resolve("large.txt");
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < 50001; i++) {
@@ -39,8 +39,7 @@ public class FileBufferTest {
         assertEquals(50001, buffer.getLargeFileLineCount());
         assertTrue(buffer.getLargeFileStatus().contains("bounded preview"));
 
-        IOException error = assertThrows(IOException.class, buffer::save);
-        assertEquals("Large-file save is unavailable until streamed save support is enabled", error.getMessage());
+        buffer.save();
         assertEquals(original, Files.readString(file, StandardCharsets.UTF_8));
         assertThrows(IllegalStateException.class, buffer::getFullContent);
     }

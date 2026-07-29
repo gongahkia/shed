@@ -97,14 +97,15 @@ public class ClipboardManager {
             int caretPos = textArea.getCaretPosition();
             String text = textArea.getText();
 
-            if (caretPos < text.length()) {
-                String deleted = text.substring(caretPos, caretPos + 1);
+            GraphemeEditRange.Range range = GraphemeEditRange.next(text, caretPos);
+            if (!range.empty()) {
+                String deleted = text.substring(range.start(), range.end());
                 this.clipboardBuffer = deleted;
                 this.lastYankWasLine = false;
                 systemClipboard.setContents(new StringSelection(deleted), null);
-                String newText = text.substring(0, caretPos) + text.substring(caretPos + 1);
+                String newText = text.substring(0, range.start()) + text.substring(range.end());
                 textArea.setText(newText);
-                textArea.setCaretPosition(caretPos);
+                textArea.setCaretPosition(range.start());
                 return deleted;
             }
         } catch (Exception e) {

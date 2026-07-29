@@ -372,7 +372,9 @@ final class InputController {
             return;
         } else if (c == 'v') {
             editor.setMode(EditorMode.VISUAL);
-            editor.editorState.visualStartPos = editor.writingArea.getCaretPosition();
+            int start = GraphemeBoundary.floor(editor.writingArea.getText(), editor.writingArea.getCaretPosition());
+            editor.writingArea.setCaretPosition(start);
+            editor.editorState.visualStartPos = start;
             return;
         } else if (c == 'V') {
             editor.setMode(EditorMode.VISUAL_LINE);
@@ -525,8 +527,11 @@ final class InputController {
                 int pos = editor.writingArea.getCaretPosition();
                 if (pos <= 0) break;
                 String text = editor.writingArea.getText();
-                deleted.insert(0, text.charAt(pos - 1));
-                editor.writingArea.replaceRange("", pos - 1, pos);
+                GraphemeEditRange.Range range = GraphemeEditRange.previous(text, pos);
+                if (range.empty()) break;
+                deleted.insert(0, text, range.start(), range.end());
+                editor.writingArea.replaceRange("", range.start(), range.end());
+                editor.writingArea.setCaretPosition(range.start());
             }
             if (deleted.length() > 0) {
                 editor.storeDelete(editor.consumePendingRegister(), deleted.toString(), false);
@@ -894,11 +899,15 @@ final class InputController {
                         && editor.editorState.lastVisualStart <= editor.writingArea.getText().length()
                         && editor.editorState.lastVisualEnd <= editor.writingArea.getText().length()) {
                     EditorMode vm = editor.editorState.lastVisualMode != null ? editor.editorState.lastVisualMode : EditorMode.VISUAL;
-                    editor.editorState.visualStartPos = editor.editorState.lastVisualStart;
+                    editor.editorState.visualStartPos = GraphemeBoundary.floor(editor.writingArea.getText(), editor.editorState.lastVisualStart);
                     editor.setMode(vm);
-                    editor.writingArea.setSelectionStart(editor.editorState.lastVisualStart);
-                    editor.writingArea.setSelectionEnd(editor.editorState.lastVisualEnd);
-                    editor.writingArea.setCaretPosition(editor.editorState.lastVisualEnd);
+                    editor.writingArea.setCaretPosition(GraphemeBoundary.ceiling(editor.writingArea.getText(), editor.editorState.lastVisualEnd));
+                    if (vm == EditorMode.VISUAL) {
+                        selectGraphemeRange(editor.editorState.lastVisualStart, editor.editorState.lastVisualEnd);
+                    } else {
+                        editor.writingArea.setSelectionStart(editor.editorState.lastVisualStart);
+                        editor.writingArea.setSelectionEnd(editor.editorState.lastVisualEnd);
+                    }
                 } else {
                     editor.showMessage("No previous visual selection");
                 }
@@ -1234,6 +1243,24 @@ final class InputController {
         if (code == KeyEvent.VK_BACK_SPACE && !editor.extraCursors.isEmpty()) {
             editor.applyMultiCursorBackspace();
         }
+        if ((code == KeyEvent.VK_BACK_SPACE || code == KeyEvent.VK_DELETE) && editor.extraCursors.isEmpty()
+            && !e.isControlDown() && !e.isAltDown() && !e.isMetaDown()) {
+            String text = editor.writingArea.getText();
+            int selectionStart = editor.writingArea.getSelectionStart();
+            int selectionEnd = editor.writingArea.getSelectionEnd();
+            GraphemeEditRange.Range range = selectionStart == selectionEnd
+                ? code == KeyEvent.VK_BACK_SPACE
+                    ? GraphemeEditRange.previous(text, editor.writingArea.getCaretPosition())
+                    : GraphemeEditRange.next(text, editor.writingArea.getCaretPosition())
+                : GraphemeEditRange.selection(text, selectionStart, selectionEnd);
+            if (!range.empty()) {
+                editor.writingArea.replaceRange("", range.start(), range.end());
+                editor.writingArea.setCaretPosition(range.start());
+                editor.markModified();
+            }
+            e.consume();
+            return;
+        }
         if (code == KeyEvent.VK_BACK_SPACE && editor.configManager.getAutoPairs()) {
             String text = editor.writingArea.getText();
             int pos = editor.writingArea.getCaretPosition();
@@ -1391,13 +1418,7 @@ final class InputController {
         } else if (lineMode) {
             editor.selectLineRange(editor.editorState.visualStartPos, newPos);
         } else {
-            if (editor.editorState.visualStartPos < newPos) {
-                editor.writingArea.setSelectionStart(editor.editorState.visualStartPos);
-                editor.writingArea.setSelectionEnd(newPos);
-            } else {
-                editor.writingArea.setSelectionStart(newPos);
-                editor.writingArea.setSelectionEnd(editor.editorState.visualStartPos);
-            }
+            selectGraphemeRange(editor.editorState.visualStartPos, newPos);
         }
 
         // Operations on selection
@@ -1485,10 +1506,15 @@ final class InputController {
             if (lineMode) {
                 editor.selectLineRange(editor.editorState.visualStartPos, swappedPos);
             } else {
-                editor.writingArea.setSelectionStart(Math.min(editor.editorState.visualStartPos, swappedPos));
-                editor.writingArea.setSelectionEnd(Math.max(editor.editorState.visualStartPos, swappedPos));
+                selectGraphemeRange(editor.editorState.visualStartPos, swappedPos);
             }
         }
+    }
+
+    private void selectGraphemeRange(int start, int end) {
+        GraphemeEditRange.Range range = GraphemeEditRange.selection(editor.writingArea.getText(), start, end);
+        editor.writingArea.setSelectionStart(range.start());
+        editor.writingArea.setSelectionEnd(range.end());
     }
 
 

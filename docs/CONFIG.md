@@ -30,7 +30,7 @@ Shed validates the full TOML document at startup. If parsing fails, a value is u
 
 Every global `config.toml` and project `.shed.toml` starts with the unquoted root key `schema_version = 1`. Missing, non-integer, or unsupported versions reject the complete file, retain the file unchanged, and activate safe defaults. Version `1` is the only supported schema version; Shed does not infer or migrate a version. `:set` and `:set!` cannot override it; persistence emits the supported version.
 
-`ConfigSchema` owns schema-version validation. `ConfigManager` owns the canonical settings map, built-in defaults, scalar TOML value validation, recovery reports, and TOML persistence.
+`ConfigSchema` owns schema-version validation. `TypedSettings` owns core defaults and their TOML type, range, and enum validation. `ConfigManager` coordinates recovery reports, dynamic string namespaces, and TOML persistence.
 
 ## Runtime Commands
 

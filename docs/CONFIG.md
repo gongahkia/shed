@@ -84,6 +84,14 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `shell.command.enabled` | `true` | bool | Enable `:!` shell commands |
 | `shell.command.max.length` | `4096` | int | Max accepted shell command length |
 
+## Recovery Journal Policy
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `recovery.retention.max.entries` | `32` | int | Retained recovery entries; `1..32` |
+| `recovery.retention.max.content.bytes` | `8388608` | int | Retained UTF-8 recovery content bytes; `1..8388608` |
+| `recovery.cleanup.on.clean.exit` | `true` | bool | Remove the journal only on a clean exit without deferred recovery |
+
 ## Dramatic UI / Theater Keys
 
 | Key | Default | Type | Notes |

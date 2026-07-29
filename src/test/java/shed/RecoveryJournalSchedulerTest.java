@@ -90,6 +90,51 @@ public class RecoveryJournalSchedulerTest {
         }
     }
 
+    @Test
+    void shutdownFlushesLatestSnapshotOrPreservesExistingJournal() {
+        AtomicInteger flushedWrites = new AtomicInteger();
+        AtomicInteger flushedClears = new AtomicInteger();
+        RecoveryJournalScheduler flushing = new RecoveryJournalScheduler(Duration.ofSeconds(1), snapshot -> flushedWrites.incrementAndGet(),
+            flushedClears::incrementAndGet, RecoveryJournalScheduler.Observer.NO_OP);
+        flushing.request(new RecoveryJournal.Workspace("/work", null, 0), List.of(entry("latest")));
+        flushing.close(RecoveryJournalScheduler.ShutdownMode.FLUSH);
+
+        assertEquals(1, flushedWrites.get());
+        assertEquals(0, flushedClears.get());
+
+        AtomicInteger preservedWrites = new AtomicInteger();
+        AtomicInteger preservedClears = new AtomicInteger();
+        RecoveryJournalScheduler preserving = new RecoveryJournalScheduler(Duration.ofSeconds(1), snapshot -> preservedWrites.incrementAndGet(),
+            preservedClears::incrementAndGet, RecoveryJournalScheduler.Observer.NO_OP);
+        preserving.request(new RecoveryJournal.Workspace("/work", null, 0), List.of(entry("latest")));
+        preserving.close(RecoveryJournalScheduler.ShutdownMode.PRESERVE);
+
+        assertEquals(0, preservedWrites.get());
+        assertEquals(0, preservedClears.get());
+    }
+
+    @Test
+    void reportsCleanupFailureWithoutWritingReplacementData() {
+        AtomicInteger writes = new AtomicInteger();
+        AtomicReference<Exception> failure = new AtomicReference<>();
+        RecoveryJournalScheduler scheduler = new RecoveryJournalScheduler(Duration.ofSeconds(1), snapshot -> writes.incrementAndGet(),
+            () -> { throw new IOException("cleanup denied"); }, new RecoveryJournalScheduler.Observer() {
+                @Override
+                public void onWrite(long startedAtNanos, RecoveryJournalScheduler.Snapshot snapshot) {
+                }
+
+                @Override
+                public void onFailure(Exception error) {
+                    failure.set(error);
+                }
+            });
+
+        scheduler.close(RecoveryJournalScheduler.ShutdownMode.CLEAR);
+
+        assertEquals(0, writes.get());
+        assertEquals("cleanup denied", failure.get().getMessage());
+    }
+
     private RecoveryJournal.Entry entry(String content) {
         return new RecoveryJournal.Entry("scratch", "scratch", null, content);
     }

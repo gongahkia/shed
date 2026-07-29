@@ -10,6 +10,8 @@ import java.util.List;
 final class RecoveryController {
     private final Texteditor editor;
     private final RecoveryJournalScheduler recoveryJournalScheduler;
+    private boolean recoveryJournalDeferred;
+    private boolean recoveryJournalDiscardConfirmed;
 
     RecoveryController(Texteditor editor) {
         this.editor = editor;
@@ -18,7 +20,8 @@ final class RecoveryController {
                 if (snapshot.entries().isEmpty()) {
                     RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
                 } else {
-                    RecoveryJournal.write(editor.recoveryStoreDir.toPath(), snapshot.workspace(), snapshot.entries());
+                    RecoveryJournal.write(editor.recoveryStoreDir.toPath(), snapshot.workspace(), snapshot.entries(),
+                        editor.configManager.getRecoveryRetentionPolicy());
                 }
             },
             () -> RecoveryJournal.clear(editor.recoveryStoreDir.toPath()),
@@ -38,6 +41,8 @@ final class RecoveryController {
                 }
             }
         );
+        this.recoveryJournalDeferred = false;
+        this.recoveryJournalDiscardConfirmed = false;
     }
 
     void checkForExternalChanges() {
@@ -180,7 +185,7 @@ final class RecoveryController {
         if (!SwingUtilities.isEventDispatchThread()) {
             throw new IOException("recovery journal capture must run on the EDT");
         }
-        if (editor.recoveryStoreDir == null) {
+        if (editor.recoveryStoreDir == null || recoveryJournalDeferred) {
             return;
         }
         recoveryJournalScheduler.request(captureRecoveryJournalWorkspace(), captureRecoveryJournalEntries());
@@ -218,7 +223,31 @@ final class RecoveryController {
     }
 
     void shutdownRecoveryJournalScheduling() {
-        recoveryJournalScheduler.closeAndClear();
+        recoveryJournalScheduler.close(shutdownMode());
+    }
+
+    private RecoveryJournalScheduler.ShutdownMode shutdownMode() {
+        if (recoveryJournalDiscardConfirmed) {
+            return RecoveryJournalScheduler.ShutdownMode.CLEAR;
+        }
+        if (recoveryJournalDeferred) {
+            return RecoveryJournalScheduler.ShutdownMode.PRESERVE;
+        }
+        if (hasModifiedRecoverableBuffer()) {
+            return RecoveryJournalScheduler.ShutdownMode.FLUSH;
+        }
+        return editor.configManager.getRecoveryCleanupOnCleanExit()
+            ? RecoveryJournalScheduler.ShutdownMode.CLEAR
+            : RecoveryJournalScheduler.ShutdownMode.PRESERVE;
+    }
+
+    private boolean hasModifiedRecoverableBuffer() {
+        for (FileBuffer buffer : editor.buffers) {
+            if (buffer != null && buffer.isModified() && buffer != editor.treeBuffer && buffer != editor.quickfixBuffer) {
+                return true;
+            }
+        }
+        return false;
     }
 
 
@@ -238,9 +267,12 @@ final class RecoveryController {
         }
         RecoveryWorkspaceDialog.Result result = RecoveryWorkspaceDialog.showFor(editor, journal);
         if (result.decision() == RecoveryWorkspaceDialog.Decision.DEFER) {
+            recoveryJournalDeferred = true;
             return;
         }
         if (result.decision() == RecoveryWorkspaceDialog.Decision.DISCARD) {
+            recoveryJournalDeferred = false;
+            recoveryJournalDiscardConfirmed = true;
             clearRecoverySnapshots();
             editor.showMessage("Recovery snapshots scheduled for discard");
             return;
@@ -248,6 +280,8 @@ final class RecoveryController {
 
         int restored = 0;
         FileBuffer lastRestored = null;
+        recoveryJournalDeferred = result.entries().size() != journal.entries().size();
+        recoveryJournalDiscardConfirmed = false;
         for (RecoveryJournal.Entry entry : result.entries()) {
             FileBuffer restoredBuffer = restoreRecoveryEntry(entry);
             if (restoredBuffer != null) {

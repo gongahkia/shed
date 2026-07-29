@@ -20,17 +20,22 @@ final class RecoveryJournal {
     static final int VERSION = 1;
     static final int MAX_ENTRIES = 32;
     static final int MAX_CONTENT_BYTES = 8 * 1024 * 1024;
+    static final RetentionPolicy DEFAULT_RETENTION_POLICY = new RetentionPolicy(MAX_ENTRIES, MAX_CONTENT_BYTES);
     static final String FILE_NAME = "journal-v1.json";
 
     private RecoveryJournal() {
     }
 
     static void write(Path directory, Workspace workspace, List<Entry> entries) throws IOException {
+        write(directory, workspace, entries, DEFAULT_RETENTION_POLICY);
+    }
+
+    static void write(Path directory, Workspace workspace, List<Entry> entries, RetentionPolicy policy) throws IOException {
         if (directory == null) {
             throw new IOException("recovery directory required");
         }
         Files.createDirectories(directory);
-        Journal journal = bounded(workspace, entries);
+        Journal journal = bounded(workspace, entries, policy == null ? DEFAULT_RETENTION_POLICY : policy);
         Map<String, Object> payload = payload(journal);
         Map<String, Object> envelope = new LinkedHashMap<>();
         envelope.put("payload", payload);
@@ -66,7 +71,7 @@ final class RecoveryJournal {
         }
     }
 
-    private static Journal bounded(Workspace workspace, List<Entry> source) {
+    private static Journal bounded(Workspace workspace, List<Entry> source, RetentionPolicy policy) {
         Workspace effectiveWorkspace = workspace == null ? new Workspace("", null, 0) : workspace;
         List<Entry> retained = new ArrayList<>();
         int bytes = 0;
@@ -76,7 +81,7 @@ final class RecoveryJournal {
                 continue;
             }
             int entryBytes = entry.content().getBytes(StandardCharsets.UTF_8).length;
-            if (retained.size() >= MAX_ENTRIES || entryBytes > MAX_CONTENT_BYTES - bytes) {
+            if (retained.size() >= policy.maxEntries() || entryBytes > policy.maxContentBytes() - bytes) {
                 dropped++;
                 continue;
             }
@@ -84,7 +89,7 @@ final class RecoveryJournal {
             bytes += entryBytes;
         }
         return new Journal(Instant.now().toString(), effectiveWorkspace,
-            List.copyOf(retained), new Retention(MAX_ENTRIES, MAX_CONTENT_BYTES, retained.size(), bytes, dropped));
+            List.copyOf(retained), new Retention(policy.maxEntries(), policy.maxContentBytes(), retained.size(), bytes, dropped));
     }
 
     private static Map<String, Object> payload(Journal journal) {
@@ -164,7 +169,8 @@ final class RecoveryJournal {
         for (Entry entry : entries) {
             bytes += entry.content().getBytes(StandardCharsets.UTF_8).length;
         }
-        if (retention.maxEntries() != MAX_ENTRIES || retention.maxContentBytes() != MAX_CONTENT_BYTES
+        if (retention.maxEntries() < 1 || retention.maxEntries() > MAX_ENTRIES
+            || retention.maxContentBytes() < 1 || retention.maxContentBytes() > MAX_CONTENT_BYTES
             || retention.retainedEntries() != entries.size() || retention.retainedContentBytes() != bytes
             || entries.size() > retention.maxEntries() || bytes > retention.maxContentBytes()) {
             throw new IllegalArgumentException("journal retention metadata does not match entries");
@@ -269,6 +275,14 @@ final class RecoveryJournal {
     }
 
     record Retention(int maxEntries, int maxContentBytes, int retainedEntries, int retainedContentBytes, int droppedEntries) {
+    }
+
+    record RetentionPolicy(int maxEntries, int maxContentBytes) {
+        RetentionPolicy {
+            if (maxEntries < 1 || maxEntries > MAX_ENTRIES || maxContentBytes < 1 || maxContentBytes > MAX_CONTENT_BYTES) {
+                throw new IllegalArgumentException("invalid recovery retention policy");
+            }
+        }
     }
 
     record Journal(String writtenAt, Workspace workspace, List<Entry> entries, Retention retention) {

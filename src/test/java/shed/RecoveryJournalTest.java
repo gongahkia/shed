@@ -75,4 +75,22 @@ public class RecoveryJournalTest {
         assertEquals(1, journal.retention().droppedEntries());
         assertEquals(4, journal.retention().retainedContentBytes());
     }
+
+    @Test
+    void appliesConfiguredRetentionWithinHardBounds() throws Exception {
+        RecoveryJournal.RetentionPolicy policy = new RecoveryJournal.RetentionPolicy(2, 6);
+        RecoveryJournal.write(tempDir, new RecoveryJournal.Workspace("/work", null, 0), List.of(
+            new RecoveryJournal.Entry("one", "one", null, "abc"),
+            new RecoveryJournal.Entry("two", "two", null, "def"),
+            new RecoveryJournal.Entry("three", "three", null, "ghi")
+        ), policy);
+
+        RecoveryJournal.Journal journal = RecoveryJournal.read(tempDir);
+        assertEquals(2, journal.retention().maxEntries());
+        assertEquals(6, journal.retention().maxContentBytes());
+        assertEquals(List.of("one", "two"), journal.entries().stream().map(RecoveryJournal.Entry::id).toList());
+        assertEquals(1, journal.retention().droppedEntries());
+        assertThrows(IllegalArgumentException.class,
+            () -> new RecoveryJournal.RetentionPolicy(RecoveryJournal.MAX_ENTRIES + 1, RecoveryJournal.MAX_CONTENT_BYTES));
+    }
 }

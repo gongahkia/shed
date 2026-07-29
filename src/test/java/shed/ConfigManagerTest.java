@@ -159,6 +159,22 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresRecoveryRetentionAndCleanExitPolicy() throws IOException {
+        Path home = tempDir.resolve("home-recovery-policy");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("recovery.retention.max.entries", "2");
+        config.setAndPersist("recovery.retention.max.content.bytes", "1024");
+        config.setAndPersist("recovery.cleanup.on.clean.exit", "false");
+
+        assertEquals(new RecoveryJournal.RetentionPolicy(2, 1024), config.getRecoveryRetentionPolicy());
+        assertFalse(config.getRecoveryCleanupOnCleanExit());
+        assertEquals("recovery.retention.max.entries must be between 1 and " + RecoveryJournal.MAX_ENTRIES,
+            config.validateSettingValue("recovery.retention.max.entries", "33"));
+    }
+
+    @Test
     void resetAndPersistRestoresOneTypedDefaultWithoutDisturbingOtherOverrides() throws IOException {
         Path home = tempDir.resolve("home-reset-setting");
         System.setProperty("user.home", home.toString());

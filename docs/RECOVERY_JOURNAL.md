@@ -31,7 +31,7 @@ The outer envelope has `payload` and `integrity`. `integrity` is `sha256:` follo
 }
 ```
 
-`version=1` is required. Each entry is a complete buffer payload; Shed never writes a partial document to satisfy retention. Entries are retained in editor-buffer order, up to 32 entries and 8 MiB of UTF-8 content. `droppedEntries` makes bounded retention explicit.
+`version=1` is required. Each entry is a complete buffer payload; Shed never writes a partial document to satisfy retention. Entries are retained in editor-buffer order. Defaults retain up to 32 entries and 8 MiB of UTF-8 content; `recovery.retention.max.entries` and `recovery.retention.max.content.bytes` can lower either bound, never raise the hard maximum. `droppedEntries` makes bounded retention explicit.
 
 ## Read and write semantics
 
@@ -44,3 +44,7 @@ At startup, the Crash Recovery Workspace presents each snapshot beside its curre
 ## Write scheduling
 
 Shed captures recovery input on the EDT, then replaces one pending write after a 750 ms debounce. Disk serialization runs on a daemon worker, so editing does not wait for journal I/O and queued recovery state is bounded to one snapshot. Successful writes are recorded by `:perf` as `recovery.journal.write`; failures are recorded in the local diagnostic log.
+
+## Cleanup policy
+
+With `recovery.cleanup.on.clean.exit=true`, Shed removes the journal only after a clean exit with no dirty recoverable buffer and no deferred recovery decision. Unsaved buffers are flushed before shutdown; deferred recovery preserves the prior journal and pauses replacement writes. An explicit discard requests deletion, but a deletion failure is recorded locally and leaves recoverable data in place.

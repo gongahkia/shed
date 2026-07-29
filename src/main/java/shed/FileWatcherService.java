@@ -76,7 +76,8 @@ public class FileWatcherService {
             try {
                 WatchKey key = parentPath.register(watchService,
                     StandardWatchEventKinds.ENTRY_MODIFY,
-                    StandardWatchEventKinds.ENTRY_CREATE);
+                    StandardWatchEventKinds.ENTRY_CREATE,
+                    StandardWatchEventKinds.ENTRY_DELETE);
                 watchedDirs.put(key, parentPath);
             } catch (IOException e) {
                 System.err.println("FileWatcher: failed to watch " + parentPath + ": " + e.getMessage());

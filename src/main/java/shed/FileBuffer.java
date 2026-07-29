@@ -13,8 +13,11 @@ import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
@@ -55,6 +58,7 @@ public class FileBuffer {
     private boolean showingPreviewOnly;
     private long fileSizeBytes;
     private ConfigManager configManager;
+    private ExternalFileStamp externalFileStamp;
 
     // Constructor for existing file
     public FileBuffer(File file) throws IOException {
@@ -104,6 +108,7 @@ public class FileBuffer {
         this.showingPreviewOnly = false;
         this.lastKnownModifiedTime = 0L;
         this.fileSizeBytes = 0L;
+        this.externalFileStamp = observeExternalFile();
         setDocumentText("", false);
         this.savedContent = "";
     }
@@ -176,6 +181,7 @@ public class FileBuffer {
 
         updateLineCount();
         this.savedContent = getFullContent();
+        this.externalFileStamp = observeExternalFile();
     }
 
     private LargeFilePolicy resolveLargeFilePolicy(ConfigManager configManager) {
@@ -271,6 +277,7 @@ public class FileBuffer {
         this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
         this.fileSizeBytes = bytes.length;
         this.fileType = FileType.detect(file, textToWrite);
+        this.externalFileStamp = observeExternalFile();
     }
 
     // Save to a different file
@@ -398,6 +405,7 @@ public class FileBuffer {
         this.backupFile = null;
         this.fileType = FileType.detect(newFile, getFullContent());
         this.lastKnownModifiedTime = newFile != null && newFile.exists() ? newFile.lastModified() : 0L;
+        this.externalFileStamp = observeExternalFile();
     }
 
     public boolean hasFilePath() {
@@ -481,12 +489,61 @@ public class FileBuffer {
     }
 
     public boolean hasExternalChanges() {
-        return file != null && file.exists() && file.lastModified() > lastKnownModifiedTime;
+        return getExternalFileState() != ExternalFileState.UNCHANGED;
     }
 
     public void refreshExternalTimestamp() {
+        externalFileStamp = observeExternalFile();
         if (file != null && file.exists()) {
-            this.lastKnownModifiedTime = file.lastModified();
+            lastKnownModifiedTime = file.lastModified();
+        }
+    }
+
+    public ExternalFileState getExternalFileState() {
+        ExternalFileStamp current = observeExternalFile();
+        if (externalFileStamp == null || current.kind() == ExternalFileKind.REGULAR && externalFileStamp.kind() == ExternalFileKind.REGULAR
+            && current.equals(externalFileStamp)) {
+            return ExternalFileState.UNCHANGED;
+        }
+        return switch (current.kind()) {
+            case MISSING -> externalFileStamp != null && externalFileStamp.kind() == ExternalFileKind.MISSING
+                ? ExternalFileState.UNCHANGED : ExternalFileState.DELETED;
+            case UNSUPPORTED -> externalFileStamp != null && externalFileStamp.kind() == ExternalFileKind.UNSUPPORTED
+                ? ExternalFileState.UNCHANGED : ExternalFileState.UNSUPPORTED;
+            case REGULAR -> {
+                if (externalFileStamp == null) {
+                    yield ExternalFileState.UNCHANGED;
+                }
+                if (externalFileStamp.kind() != ExternalFileKind.REGULAR || !sameIdentity(current, externalFileStamp)) {
+                    yield ExternalFileState.REPLACED;
+                }
+                yield ExternalFileState.EXTERNALLY_CHANGED;
+            }
+        };
+    }
+
+    private boolean sameIdentity(ExternalFileStamp current, ExternalFileStamp previous) {
+        if (current.fileKey() != null && previous.fileKey() != null && !current.fileKey().equals(previous.fileKey())) {
+            return false;
+        }
+        return current.creationTime().equals(previous.creationTime());
+    }
+
+    private ExternalFileStamp observeExternalFile() {
+        if (file == null) {
+            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L);
+        }
+        try {
+            BasicFileAttributes attributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
+            if (!attributes.isRegularFile() || attributes.isSymbolicLink()) {
+                return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L);
+            }
+            return new ExternalFileStamp(ExternalFileKind.REGULAR, attributes.fileKey(), attributes.creationTime(),
+                attributes.lastModifiedTime(), attributes.size());
+        } catch (java.nio.file.NoSuchFileException error) {
+            return new ExternalFileStamp(ExternalFileKind.MISSING, null, null, null, 0L);
+        } catch (IOException | SecurityException error) {
+            return new ExternalFileStamp(ExternalFileKind.UNSUPPORTED, null, null, null, 0L);
         }
     }
 
@@ -631,6 +688,23 @@ public class FileBuffer {
             this.maxLineCount = maxLineCount;
             this.previewLineCount = previewLineCount;
         }
+    }
+
+    public enum ExternalFileState {
+        UNCHANGED,
+        EXTERNALLY_CHANGED,
+        DELETED,
+        REPLACED,
+        UNSUPPORTED
+    }
+
+    private enum ExternalFileKind {
+        MISSING,
+        REGULAR,
+        UNSUPPORTED
+    }
+
+    private record ExternalFileStamp(ExternalFileKind kind, Object fileKey, FileTime creationTime, FileTime modifiedTime, long size) {
     }
 
     private static class DecodedContent {

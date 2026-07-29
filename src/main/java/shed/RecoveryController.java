@@ -50,28 +50,44 @@ final class RecoveryController {
             return;
         }
         int autoReloaded = 0;
+        int retainedAfterDeletion = 0;
+        int unsupportedExternalTargets = 0;
         for (FileBuffer buffer : editor.buffers) {
-            if (buffer == null || !buffer.hasFilePath() || !buffer.hasExternalChanges()) {
+            if (buffer == null || !buffer.hasFilePath()) {
+                continue;
+            }
+            FileBuffer.ExternalFileState state = buffer.getExternalFileState();
+            if (state == FileBuffer.ExternalFileState.UNCHANGED) {
                 continue;
             }
             if (!buffer.isModified()) {
-                try {
-                    int caret = 0;
-                    if (buffer == editor.getCurrentBuffer()) {
-                        caret = editor.writingArea.getCaretPosition();
+                if (state == FileBuffer.ExternalFileState.EXTERNALLY_CHANGED
+                    || state == FileBuffer.ExternalFileState.REPLACED) {
+                    try {
+                        int caret = 0;
+                        if (buffer == editor.getCurrentBuffer()) {
+                            caret = editor.writingArea.getCaretPosition();
+                        }
+                        buffer.load(editor.configManager);
+                        if (buffer == editor.getCurrentBuffer()) {
+                            editor.loadBufferIntoEditor(buffer);
+                            editor.writingArea.setCaretPosition(Math.min(caret, editor.writingArea.getText().length()));
+                        }
+                        autoReloaded++;
+                    } catch (IOException e) {
+                        editor.showMessage("Reload failed: " + e.getMessage());
                     }
-                    buffer.load(editor.configManager);
-                    if (buffer == editor.getCurrentBuffer()) {
-                        editor.loadBufferIntoEditor(buffer);
-                        editor.writingArea.setCaretPosition(Math.min(caret, editor.writingArea.getText().length()));
+                } else {
+                    buffer.refreshExternalTimestamp();
+                    if (state == FileBuffer.ExternalFileState.DELETED) {
+                        retainedAfterDeletion++;
+                    } else {
+                        unsupportedExternalTargets++;
                     }
-                    autoReloaded++;
-                } catch (IOException e) {
-                    editor.showMessage("Reload failed: " + e.getMessage());
                 }
                 continue;
             }
-            promptExternalConflictForModifiedBuffer(buffer);
+            promptExternalConflictForModifiedBuffer(buffer, state);
         }
         if (!hasModifiedSettingsBuffer()) {
             String configReload = editor.reloadConfigIfChanged();
@@ -82,6 +98,12 @@ final class RecoveryController {
         }
         if (autoReloaded > 0) {
             editor.showMessage("Auto-reloaded " + autoReloaded + " externally changed buffer" + (autoReloaded == 1 ? "" : "s"));
+        } else if (retainedAfterDeletion > 0) {
+            editor.showMessage("Retained " + retainedAfterDeletion + " buffer" + (retainedAfterDeletion == 1 ? "" : "s")
+                + " after external deletion");
+        } else if (unsupportedExternalTargets > 0) {
+            editor.showMessage("Retained " + unsupportedExternalTargets + " buffer" + (unsupportedExternalTargets == 1 ? "" : "s")
+                + " with unsupported external target");
         }
     }
 
@@ -96,6 +118,13 @@ final class RecoveryController {
 
 
     void promptExternalConflictForModifiedBuffer(FileBuffer buffer) {
+        if (buffer == null) {
+            return;
+        }
+        promptExternalConflictForModifiedBuffer(buffer, buffer.getExternalFileState());
+    }
+
+    private void promptExternalConflictForModifiedBuffer(FileBuffer buffer, FileBuffer.ExternalFileState state) {
         if (buffer == null || buffer.getFile() == null) {
             return;
         }
@@ -103,7 +132,7 @@ final class RecoveryController {
         String[] options = {"Keep Mine", "Reload Theirs", "View Both"};
         int result = JOptionPane.showOptionDialog(
             editor,
-            "File changed on disk while modified in editor:\n"
+            externalStateDescription(state) + " while modified in editor:\n"
                 + buffer.getDisplayName()
                 + "\nChoose how to resolve this conflict.",
             "External Change Conflict",
@@ -116,6 +145,11 @@ final class RecoveryController {
         editor.reloadPromptActive = false;
 
         if (result == 1) {
+            if (!canReloadFromDisk(state)) {
+                buffer.refreshExternalTimestamp();
+                editor.showMessage("Cannot reload: " + externalStateDescription(state) + "; dirty buffer retained");
+                return;
+            }
             try {
                 int caret = buffer == editor.getCurrentBuffer() ? editor.writingArea.getCaretPosition() : 0;
                 buffer.load(editor.configManager);
@@ -130,7 +164,7 @@ final class RecoveryController {
             return;
         }
         if (result == 2) {
-            showExternalConflictPreview(buffer);
+            showExternalConflictPreview(buffer, state);
             buffer.refreshExternalTimestamp();
             return;
         }
@@ -139,7 +173,21 @@ final class RecoveryController {
 
 
     void showExternalConflictPreview(FileBuffer buffer) {
+        if (buffer == null) {
+            return;
+        }
+        showExternalConflictPreview(buffer, buffer.getExternalFileState());
+    }
+
+    private void showExternalConflictPreview(FileBuffer buffer, FileBuffer.ExternalFileState state) {
         if (buffer == null || buffer.getFile() == null) {
+            return;
+        }
+        if (!canReloadFromDisk(state)) {
+            String preview = "External Conflict Preview\nFile: " + buffer.getFilePath() + "\n\n===== YOUR BUFFER =====\n"
+                + buffer.getContent() + "\n===== EXTERNAL STATE =====\n" + externalStateDescription(state)
+                + "\nNo disk version is available. Your buffer was retained.\n";
+            editor.showScratchBuffer("[external conflict] " + buffer.getDisplayName(), preview);
             return;
         }
         try {
@@ -156,6 +204,20 @@ final class RecoveryController {
         } catch (IOException e) {
             editor.showMessage("Conflict preview failed: " + e.getMessage());
         }
+    }
+
+    private boolean canReloadFromDisk(FileBuffer.ExternalFileState state) {
+        return state == FileBuffer.ExternalFileState.EXTERNALLY_CHANGED || state == FileBuffer.ExternalFileState.REPLACED;
+    }
+
+    private String externalStateDescription(FileBuffer.ExternalFileState state) {
+        return switch (state) {
+            case EXTERNALLY_CHANGED -> "File changed on disk";
+            case DELETED -> "File was deleted externally";
+            case REPLACED -> "File was replaced externally";
+            case UNSUPPORTED -> "File has an unsupported external target";
+            case UNCHANGED -> "File is unchanged";
+        };
     }
 
 
@@ -354,7 +416,8 @@ final class RecoveryController {
         if (buffer == null || buffer.getFile() == null || buffer.isScratch()) return;
         editor.fileWatcherService.watch(buffer.getFile(), file -> {
             SwingUtilities.invokeLater(() -> {
-                if (!editor.reloadPromptActive && buffer.getFile() != null && buffer.getFile().equals(file)) {
+                if (!editor.reloadPromptActive && buffer.getFile() != null
+                    && buffer.getFile().getAbsoluteFile().equals(file.getAbsoluteFile())) {
                     checkForExternalChanges();
                 }
             });

@@ -46,6 +46,19 @@ public class WorkspaceStateTest {
     }
 
     @Test
+    void requiresFileSnapshotForVersionTwoFileBuffers() {
+        Path root = tempDir.resolve("project").toAbsolutePath();
+        Path file = root.resolve("notes.txt");
+
+        assertThrows(IllegalArgumentException.class, () -> new WorkspaceState(
+            List.of(root.toString()),
+            List.of(new WorkspaceState.BufferState("file-1", WorkspaceState.BufferKind.FILE, file.toString(), null, false, null)),
+            List.of(new WorkspaceState.PaneState("pane-1", "file-1", 0)),
+            new WorkspaceState.ActiveSelection("pane-1", "file-1", 0), List.of()
+        ));
+    }
+
+    @Test
     void retainsLastKnownGoodWorkspaceAfterParseFailure() {
         WorkspaceState state = workspace();
         WorkspaceStateCodec codec = new WorkspaceStateCodec();
@@ -70,7 +83,7 @@ public class WorkspaceStateTest {
         return new WorkspaceState(
             List.of(root.toString(), secondRoot.toString()),
             List.of(
-                new WorkspaceState.BufferState("file-1", WorkspaceState.BufferKind.FILE, file.toString(), null, true, "draft"),
+                new WorkspaceState.BufferState("file-1", WorkspaceState.BufferKind.FILE, file.toString(), null, true, "draft", snapshot()),
                 new WorkspaceState.BufferState("scratch-1", WorkspaceState.BufferKind.SCRATCH, null, "Scratch", false, "notes")
             ),
             List.of(
@@ -80,5 +93,9 @@ public class WorkspaceStateTest {
             new WorkspaceState.ActiveSelection("pane-1", "file-1", 3),
             List.of(new WorkspaceState.ToolState("tree", Map.of("root", root.toString())))
         );
+    }
+
+    private WorkspaceState.FileSnapshot snapshot() {
+        return new WorkspaceState.FileSnapshot("test-file", 1L, 1L, 5L, "0".repeat(64));
     }
 }

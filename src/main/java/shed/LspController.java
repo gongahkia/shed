@@ -102,6 +102,8 @@ final class LspController {
             case "inlay":
             case "inlayhints":
                 return lspInlayHints();
+            case "format":
+                return lspFormat();
             case "references":
             case "refs":
                 return lspReferences();
@@ -353,6 +355,24 @@ final class LspController {
         } catch (BadLocationException error) {
             return "LSP inlay hints failed: " + error.getMessage();
         }
+    }
+
+    public String lspFormat() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP formatting requires a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.FORMATTING);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.TextEdit> edits = client.formatting(uri, editor.writingArea.getTabSize(), editor.configManager.getExpandTab());
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Formatting became stale; document was not changed";
+        if (edits.isEmpty()) return "No formatting edits";
+        WorkspaceEditApplyResult result = applyWorkspaceTextEdits(edits);
+        if (result.appliedEditCount <= 0) return result.failureReason == null ? "Formatting produced no applicable edits" : "Formatting failed: " + result.failureReason;
+        return "Applied " + result.appliedEditCount + " formatting edit" + (result.appliedEditCount == 1 ? "" : "s");
     }
 
 
@@ -758,6 +778,7 @@ final class LspController {
             if (!targetFile.exists()) {
                 return "LSP " + label + " target missing: " + targetPath;
             }
+            editor.recordJumpPosition();
             editor.openFile(targetFile);
             String lineResult = editor.gotoLine(location.getLine() + 1);
             if (lineResult.startsWith("Error") || lineResult.startsWith("Invalid")) {

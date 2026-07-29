@@ -201,6 +201,7 @@ Notes:
 | `:lsp hover` | Show hover info |
 | `:lsp semantic`, `:lsp semantictokens` | Show current-document semantic tokens when supported |
 | `:lsp inlay`, `:lsp inlayhints` | Show current-document inlay hints when supported |
+| `:lsp format` | Apply server formatting edits to the current document when supported |
 | `:lsp references`, `:lsp refs` | Find references and open quickfix |
 | `:lsp rename <newName>` | Prepare rename preview |
 | `:lsp renameapply`, `:lsp rename!` | Apply pending rename edits |

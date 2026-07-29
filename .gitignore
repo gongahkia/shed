@@ -2,3 +2,4 @@
 build/Shed.jar
 AGENTS.md
 target/
+.shed-large-file-fixtures/

@@ -276,7 +276,7 @@ public class AsyncJobService {
 
     private void reportUnexpected(Throwable failure, String context) {
         if (errorReporter != null) {
-            errorReporter.report(failure, context);
+            errorReporter.report(failure, "async-jobs", context, "docs/THREADING.md#background-work");
         }
     }
 

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.io.File;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -28,7 +29,7 @@ public class ProjectFileScannerTest {
         ProjectFileScanner.ScanResult full = scanner.scan(tempDir, tempDir, 10, ProjectFileScanner.Cancellation.NONE);
         ProjectFileScanner.ScanResult limited = scanner.scan(tempDir, tempDir, 2, ProjectFileScanner.Cancellation.NONE);
 
-        assertEquals(List.of("a.txt", "z.txt", "dir/b.txt"), full.files());
+        assertEquals(List.of("a.txt", "z.txt", "dir" + File.separator + "b.txt"), full.files());
         assertFalse(full.cancelled());
         assertEquals(List.of("a.txt", "z.txt"), limited.files());
     }

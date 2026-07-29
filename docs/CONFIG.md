@@ -87,6 +87,25 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `shell.command.enabled` | `true` | bool | Enable `:!` shell commands |
 | `shell.command.max.length` | `4096` | int | Max accepted shell command length |
 
+## LSP Feature Settings
+
+All LSP feature keys are typed booleans and appear in `:config inspector` under **Language Server**. Changing one writes/reloads immediately, but its effective capability state is negotiated when that language server starts; run `:lsp restart [ext]` for an existing server. `true` permits a server-advertised request and `false` prevents Shed from invoking it; the snippets key instead controls the client capability advertised at initialization. These toggles do not create network access, and diagnostics remain stored locally.
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `lsp.completion.enabled` | `true` | bool | Completion requests |
+| `lsp.snippets.enabled` | `false` | bool | Advertises snippet-completion support during initialization |
+| `lsp.signature.help.enabled` | `true` | bool | Signature-help requests |
+| `lsp.hover.enabled` | `true` | bool | Hover requests |
+| `lsp.semantic.tokens.enabled` | `true` | bool | Semantic-token requests |
+| `lsp.inlay.hints.enabled` | `true` | bool | Inlay-hint requests |
+| `lsp.definition.enabled` | `true` | bool | Navigation: definition requests |
+| `lsp.references.enabled` | `true` | bool | Navigation: reference requests |
+| `lsp.rename.enabled` | `true` | bool | Rename requests |
+| `lsp.code.actions.enabled` | `true` | bool | Actions: code-action requests |
+| `lsp.command.execution.enabled` | `true` | bool | Actions: execute-command requests |
+| `lsp.formatting.enabled` | `true` | bool | Document-formatting requests |
+
 ## Recovery Journal Policy
 
 | Key | Default | Type | Notes |
@@ -264,6 +283,7 @@ schema_version = 1
 # LSP override
 "lsp.py.command" = "pyright-langserver"
 "lsp.py.args" = "--stdio"
+"lsp.snippets.enabled" = true # restart the Python LSP client to apply
 
 # Aliases + keybinds
 "command.alias.ww" = "w"

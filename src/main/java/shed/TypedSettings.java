@@ -215,6 +215,9 @@ final class TypedSettings {
         if (key.startsWith("workspace.")) {
             return "Workspace";
         }
+        if (key.startsWith("lsp.")) {
+            return "Language Server";
+        }
         if (key.startsWith("recovery.")) {
             return "Reliability";
         }
@@ -286,6 +289,9 @@ final class TypedSettings {
         }
         if (key.startsWith("multi.selection.")) {
             return "Live: disabled clears extra cursors; limit applies to new cursors";
+        }
+        if (key.startsWith("lsp.")) {
+            return "Restart: takes effect when an LSP server is started or restarted";
         }
         if (key.startsWith("large.")) {
             return "Live: used when opening files";

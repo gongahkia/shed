@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -311,17 +310,17 @@ public class LspClient {
     private final List<Map<String, Object>> deferredMessages;
     private final Map<String, List<Diagnostic>> diagnostics;
     private final Set<Integer> staleRequestIds;
-    private final Map<LspCapability, Boolean> clientEnabledCapabilities;
+    private final LspFeatureSettings featureSettings;
     private WorkspaceEditHandler workspaceEditHandler;
     private int requestId;
     private boolean initialized;
     private LspCapabilityModel capabilityModel;
 
     public LspClient(String command, String[] args, Path rootPath) throws IOException {
-        this(command, args, rootPath, null);
+        this(command, args, rootPath, LspFeatureSettings.defaults());
     }
 
-    LspClient(String command, String[] args, Path rootPath, Map<LspCapability, Boolean> clientEnabledCapabilities) throws IOException {
+    LspClient(String command, String[] args, Path rootPath, LspFeatureSettings featureSettings) throws IOException {
         List<String> commandLine = new ArrayList<>();
         commandLine.add(command);
         if (args != null) {
@@ -340,10 +339,7 @@ public class LspClient {
         this.deferredMessages = new ArrayList<>();
         this.diagnostics = new HashMap<>();
         this.staleRequestIds = ConcurrentHashMap.newKeySet();
-        this.clientEnabledCapabilities = new EnumMap<>(LspCapability.class);
-        if (clientEnabledCapabilities != null) {
-            this.clientEnabledCapabilities.putAll(clientEnabledCapabilities);
-        }
+        this.featureSettings = featureSettings == null ? LspFeatureSettings.defaults() : featureSettings;
         this.requestId = 0;
         this.initialized = false;
         this.capabilityModel = LspCapabilityModel.uninitialized();
@@ -728,7 +724,7 @@ public class LspClient {
         Map<String, Object> capabilities = new LinkedHashMap<>();
 
         Map<String, Object> completionItem = new LinkedHashMap<>();
-        completionItem.put("snippetSupport", Boolean.FALSE);
+        completionItem.put("snippetSupport", featureSettings.snippets());
         Map<String, Object> completion = new LinkedHashMap<>();
         completion.put("completionItem", completionItem);
         Map<String, Object> hover = new LinkedHashMap<>();
@@ -762,7 +758,7 @@ public class LspClient {
         if (response == null) {
             throw new IOException("LSP initialize timed out");
         }
-        capabilityModel = LspCapabilityModel.fromInitializeResult(response, clientEnabledCapabilities);
+        capabilityModel = LspCapabilityModel.fromInitializeResult(response, featureSettings.capabilityEnablement());
         sendNotification("initialized", new LinkedHashMap<>());
         initialized = true;
     }

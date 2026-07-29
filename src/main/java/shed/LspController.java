@@ -1565,7 +1565,7 @@ final class LspController {
         }
 
         try {
-            LspClient client = new LspClient(command, args, workspaceRoot);
+            LspClient client = new LspClient(command, args, workspaceRoot, editor.configManager.getLspFeatureSettings());
             client.setWorkspaceEditHandler(this::applyWorkspaceEditFromServer);
             editor.lspClients.put(extension, client);
             editor.lspClientRoots.put(extension, workspaceRoot);

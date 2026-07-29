@@ -13,9 +13,11 @@ final class TreeGitController {
     private final Texteditor editor;
     private File cachedGitRoot;
     private boolean cachedGitRootResolved;
+    private final ProjectFileScanner projectFileScanner;
 
     TreeGitController(Texteditor editor) {
         this.editor = editor;
+        this.projectFileScanner = new ProjectFileScanner();
     }
 
     public String showFileFinder() {
@@ -46,22 +48,12 @@ final class TreeGitController {
 
 
     void collectProjectFiles(File dir, String rootPath, List<String> result, int limit) {
-        if (result.size() >= limit || dir == null || !dir.isDirectory()) return;
-        File[] children = dir.listFiles();
-        if (children == null) return;
-        for (File child : children) {
-            if (result.size() >= limit) return;
-            if (child.getName().startsWith(".") || "node_modules".equals(child.getName())
-                    || "target".equals(child.getName()) || "build".equals(child.getName())
-                    || "__pycache__".equals(child.getName()) || ".git".equals(child.getName())) continue;
-            if (child.isFile()) {
-                String rel = child.getAbsolutePath().substring(rootPath.length());
-                if (rel.startsWith(File.separator)) rel = rel.substring(1);
-                result.add(rel);
-            } else if (child.isDirectory()) {
-                collectProjectFiles(child, rootPath, result, limit);
-            }
+        if (dir == null || rootPath == null || result.size() >= limit) {
+            return;
         }
+        int remaining = limit - result.size();
+        ProjectFileScanner.ScanResult scan = projectFileScanner.scan(dir.toPath(), Path.of(rootPath), remaining, ProjectFileScanner.Cancellation.NONE);
+        result.addAll(scan.files());
     }
 
 

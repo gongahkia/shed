@@ -935,6 +935,21 @@ public class ConfigManager {
         writeConfigFile();
     }
 
+    public void resetAndPersist(String key) throws IOException {
+        if (isSchemaVersionKey(key)) {
+            throw new IOException(ConfigSchema.VERSION_KEY + " is managed by Shed");
+        }
+        String normalizedKey = normalizePersistedKey(key);
+        String defaultValue = settings.defaultValue(normalizedKey);
+        if (defaultValue == null) {
+            throw new IOException("no canonical default for " + normalizedKey);
+        }
+        config.put(normalizedKey, defaultValue);
+        settings.applyRuntime(normalizedKey, defaultValue);
+        persistedConfig.remove(normalizedKey);
+        writeConfigFile();
+    }
+
     public int persistCurrentConfig() throws IOException {
         persistedConfig.clear();
         List<String> keys = new ArrayList<>(config.keySet());

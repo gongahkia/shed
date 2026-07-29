@@ -2565,6 +2565,10 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.setConfigOptionPersistent(key, value);
     }
 
+    public String resetConfigOptionPersistent(String key) {
+        return sessionConfigController.resetConfigOptionPersistent(key);
+    }
+
     boolean isThemeRelatedConfigKey(String key) {
         return sessionConfigController.isThemeRelatedConfigKey(key);
     }

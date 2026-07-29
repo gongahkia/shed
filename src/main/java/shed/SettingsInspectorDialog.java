@@ -94,7 +94,7 @@ final class SettingsInspectorDialog extends JDialog {
         search.add(searchField, BorderLayout.CENTER);
         JPanel panel = new JPanel(new BorderLayout(0, 4));
         panel.add(search, BorderLayout.NORTH);
-        panel.add(new JLabel("Changes save immediately to ~/.shed/config.toml", SwingConstants.CENTER), BorderLayout.SOUTH);
+        panel.add(new JLabel("Changes and resets save immediately to ~/.shed/config.toml", SwingConstants.CENTER), BorderLayout.SOUTH);
         return panel;
     }
 
@@ -111,11 +111,14 @@ final class SettingsInspectorDialog extends JDialog {
     }
 
     private JPanel actions() {
+        JButton reset = new JButton("Reset Selected");
+        reset.addActionListener(event -> resetSelected());
         JButton refresh = new JButton("Refresh");
         refresh.addActionListener(event -> refreshTable());
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         JPanel panel = new JPanel();
+        panel.add(reset);
         panel.add(refresh);
         panel.add(close);
         return panel;
@@ -167,6 +170,20 @@ final class SettingsInspectorDialog extends JDialog {
         String key = String.valueOf(tableModel.getValueAt(row, 1));
         String value = String.valueOf(tableModel.getValueAt(row, 2));
         String result = editor.setConfigOptionPersistent(key, value);
+        if (result.startsWith("Error")) {
+            JOptionPane.showMessageDialog(this, result, "Settings Inspector", JOptionPane.ERROR_MESSAGE);
+        }
+        refreshTable();
+    }
+
+    private void resetSelected() {
+        int row = table.getSelectedRow();
+        if (row < 0) {
+            JOptionPane.showMessageDialog(this, "Select a setting to reset", "Settings Inspector", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        String key = String.valueOf(tableModel.getValueAt(row, 1));
+        String result = editor.resetConfigOptionPersistent(key);
         if (result.startsWith("Error")) {
             JOptionPane.showMessageDialog(this, result, "Settings Inspector", JOptionPane.ERROR_MESSAGE);
         }

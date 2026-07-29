@@ -32,6 +32,11 @@ final class TypedSettings {
         return defaults.containsKey(key);
     }
 
+    String defaultValue(String key) {
+        Object value = defaults.get(key);
+        return value == null ? null : stringify(value);
+    }
+
     Set<String> keys() {
         return Set.copyOf(defaults.keySet());
     }

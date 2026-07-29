@@ -77,6 +77,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_AUTO_PAIRS = true;
     private static final int DEFAULT_TEXTWIDTH = 0;
     private static final boolean DEFAULT_MINIMAP = false;
+    private static final boolean DEFAULT_MULTI_SELECTION_ENABLED = false;
     private static final boolean DEFAULT_DRAMATIC_UI = false;
     private static final boolean DEFAULT_DRAMATIC_IDENTITY = true;
     private static final boolean DEFAULT_DRAMATIC_MODE_TRANSITIONS = true;
@@ -241,6 +242,8 @@ public class ConfigManager {
         defineDefault("auto.pairs", DEFAULT_AUTO_PAIRS);
         defineDefault("textwidth", DEFAULT_TEXTWIDTH);
         defineDefault("minimap", DEFAULT_MINIMAP);
+        defineDefault("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED);
+        defineDefault("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS);
         defineDefault("ui.dramatic", DEFAULT_DRAMATIC_UI);
         defineDefault("ui.dramatic.identity", DEFAULT_DRAMATIC_IDENTITY);
         defineDefault("ui.dramatic.mode.transitions", DEFAULT_DRAMATIC_MODE_TRANSITIONS);
@@ -319,6 +322,8 @@ public class ConfigManager {
             case "auto.pairs" -> "Insert matching brackets and quotes";
             case "textwidth" -> "Paragraph width, zero disables wrapping";
             case "minimap" -> "Persisted minimap visibility setting";
+            case "multi.selection.enabled" -> "Enable experimental multi-selection editing";
+            case "multi.selection.max.cursors" -> "Maximum total cursors for experimental multi-selection";
             case "ui.dramatic" -> "Enable dramatic interface effects";
             case "ui.dramatic.identity" -> "Show dramatic identity accents";
             case "ui.dramatic.mode.transitions" -> "Animate editor mode transitions";
@@ -800,6 +805,13 @@ public class ConfigManager {
     }
     public boolean getMinimap() {
         return getBoolean("minimap", DEFAULT_MINIMAP);
+    }
+
+    public MultiSelectionPolicy getMultiSelectionPolicy() {
+        return new MultiSelectionPolicy(
+            getBoolean("multi.selection.enabled", DEFAULT_MULTI_SELECTION_ENABLED),
+            getInt("multi.selection.max.cursors", MultiSelectionPolicy.DEFAULT_MAX_CURSORS)
+        );
     }
 
     public boolean getDramaticUiEnabled() {

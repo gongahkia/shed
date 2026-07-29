@@ -481,6 +481,12 @@ final class SessionConfigController {
 
     void applyRuntimeConfigFromSettings() {
         editor.refreshDramaticSettings();
+        MultiSelectionPolicy multiSelection = editor.configManager.getMultiSelectionPolicy();
+        if (!multiSelection.enabled()) {
+            editor.clearExtraCursors();
+        } else if (editor.extraCursors.size() > multiSelection.maxCursors() - 1) {
+            editor.extraCursors.subList(multiSelection.maxCursors() - 1, editor.extraCursors.size()).clear();
+        }
         editor.lineNumberMode = editor.configManager.getLineNumberMode();
         for (FileBuffer buffer : editor.buffers) {
             buffer.applyUndoHistoryPolicy();

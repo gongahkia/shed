@@ -68,6 +68,8 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `auto.pairs` | `true` | bool | Auto-pair brackets/quotes |
 | `zen.mode.width` | `80` | int | Preferred zen-mode content width |
 | `minimap` | `false` | bool | Stored key; minimap visibility is currently controlled by `:minimap` |
+| `multi.selection.enabled` | `false` | bool | Enable experimental multi-selection editing |
+| `multi.selection.max.cursors` | `16` | int | Maximum total cursors when enabled; `2..256` |
 
 ## Session, File, and Shell Limits
 

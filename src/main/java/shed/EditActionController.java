@@ -836,6 +836,7 @@ final class EditActionController {
 
 
     void addCursorAtNextMatch() {
+        if (!canAddExtraCursor()) return;
         String text = editor.writingArea.getText();
         String selected = editor.writingArea.getSelectedText();
         if (selected == null || selected.isEmpty()) {
@@ -1016,7 +1017,7 @@ final class EditActionController {
 
 
     void applyMultiCursorInsert(char c) {
-        if (editor.extraCursors.isEmpty()) return;
+        if (!hasActiveExtraCursors()) return;
         // Sort cursors descending so insertions don't shift earlier positions
         List<Integer> sorted = new ArrayList<>(editor.extraCursors);
         sorted.sort(Collections.reverseOrder());
@@ -1034,7 +1035,7 @@ final class EditActionController {
 
 
     void applyMultiCursorBackspace() {
-        if (editor.extraCursors.isEmpty()) return;
+        if (!hasActiveExtraCursors()) return;
         List<Integer> sorted = new ArrayList<>(editor.extraCursors);
         sorted.sort(Collections.reverseOrder());
         for (int pos : sorted) {
@@ -1049,7 +1050,7 @@ final class EditActionController {
 
 
     void applyMultiCursorDelete() {
-        if (editor.extraCursors.isEmpty()) return;
+        if (!hasActiveExtraCursors()) return;
         List<Integer> sorted = new ArrayList<>(editor.extraCursors);
         sorted.sort(Collections.reverseOrder());
         for (int pos : sorted) {
@@ -1061,6 +1062,7 @@ final class EditActionController {
 
 
     void addCursorAbove() {
+        if (!canAddExtraCursor()) return;
         try {
             int pos = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(pos);
@@ -1078,6 +1080,7 @@ final class EditActionController {
 
 
     void addCursorBelow() {
+        if (!canAddExtraCursor()) return;
         try {
             int pos = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(pos);
@@ -1098,6 +1101,33 @@ final class EditActionController {
         if (!editor.extraCursors.isEmpty()) {
             editor.extraCursors.clear();
         }
+    }
+
+    private boolean canAddExtraCursor() {
+        MultiSelectionPolicy policy = editor.configManager.getMultiSelectionPolicy();
+        if (!policy.enabled()) {
+            editor.extraCursors.clear();
+            editor.showMessage("Multi-selection disabled; set multi.selection.enabled=true");
+            return false;
+        }
+        if (editor.extraCursors.size() >= policy.maxCursors() - 1) {
+            editor.showMessage("Multi-selection limit reached (" + policy.maxCursors() + " cursors)");
+            return false;
+        }
+        return true;
+    }
+
+    private boolean hasActiveExtraCursors() {
+        MultiSelectionPolicy policy = editor.configManager.getMultiSelectionPolicy();
+        if (!policy.enabled()) {
+            editor.extraCursors.clear();
+            return false;
+        }
+        int maxExtraCursors = policy.maxCursors() - 1;
+        if (editor.extraCursors.size() > maxExtraCursors) {
+            editor.extraCursors.subList(maxExtraCursors, editor.extraCursors.size()).clear();
+        }
+        return !editor.extraCursors.isEmpty();
     }
 
 

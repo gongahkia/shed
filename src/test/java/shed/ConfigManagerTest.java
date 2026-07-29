@@ -57,6 +57,7 @@ public class ConfigManagerTest {
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
         assertEquals(UndoHistoryPolicy.defaults(), config.getUndoHistoryPolicy());
+        assertEquals(new MultiSelectionPolicy(false, MultiSelectionPolicy.DEFAULT_MAX_CURSORS), config.getMultiSelectionPolicy());
         assertFalse(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
     }
@@ -91,6 +92,23 @@ public class ConfigManagerTest {
             config.validateSettingValue("undo.history.max.entries", "0"));
         assertEquals("undo.history.max.bytes must be between 1 and " + UndoHistoryPolicy.MAX_BYTES,
             config.validateSettingValue("undo.history.max.bytes", "0"));
+    }
+
+    @Test
+    void configuresExperimentalMultiSelectionPolicy() throws IOException {
+        Path home = tempDir.resolve("home-multi-selection");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("multi.selection.enabled", "true");
+        config.setAndPersist("multi.selection.max.cursors", "24");
+
+        assertEquals(new MultiSelectionPolicy(true, 24), config.getMultiSelectionPolicy());
+        assertEquals("multi.selection.max.cursors must be between " + MultiSelectionPolicy.MIN_MAX_CURSORS + " and "
+            + MultiSelectionPolicy.MAX_MAX_CURSORS, config.validateSettingValue("multi.selection.max.cursors", "1"));
+        List<String> matching = config.searchTypedSettings("multi selection").stream().map(TypedSettings.Descriptor::key).toList();
+        assertTrue(matching.containsAll(List.of("multi.selection.enabled", "multi.selection.max.cursors")));
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"multi.selection.enabled\" = true"));
     }
 
     @Test

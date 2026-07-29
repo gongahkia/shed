@@ -75,11 +75,44 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void rejectsMissingSchemaVersion() throws IOException {
+        Path home = tempDir.resolve("home-schema-missing");
+        Path configPath = home.resolve(".shed/config.toml");
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, "\"tab.size\" = 8\n");
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertEquals(4, config.getTabSize());
+        assertTrue(config.getConfigLoadReport().contains("schema_version is required at the TOML root (expected 1)"));
+    }
+
+    @Test
+    void rejectsInvalidAndUnsupportedSchemaVersions() throws IOException {
+        Path home = tempDir.resolve("home-schema-invalid");
+        Path configPath = home.resolve(".shed/config.toml");
+        Files.createDirectories(configPath.getParent());
+        Files.writeString(configPath, "schema_version = \"1\"\n");
+        System.setProperty("user.home", home.toString());
+
+        ConfigManager config = new ConfigManager();
+        assertTrue(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().contains("schema_version must be integer 1"));
+
+        Files.writeString(configPath, "schema_version = 2\n");
+        config.reload();
+        assertTrue(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().contains("unsupported schema_version 2 (supported: 1)"));
+    }
+
+    @Test
     void rejectsPartiallyInvalidConfigWithoutChangingIt() throws IOException {
         Path home = tempDir.resolve("home-invalid");
         Path shedDir = home.resolve(".shed");
         Path configPath = shedDir.resolve("config.toml");
-        String source = "tab.size = 8\ninvalid line\nfont.size = 18\n";
+        String source = "schema_version = 1\ntab.size = 8\ninvalid line\nfont.size = 18\n";
         Files.createDirectories(shedDir);
         Files.writeString(configPath, source);
         System.setProperty("user.home", home.toString());
@@ -91,7 +124,7 @@ public class ConfigManagerTest {
         assertEquals(16, config.getFontSize());
         assertEquals(source, Files.readString(configPath));
         assertTrue(config.getConfigLoadReport().contains("Configuration recovery: " + configPath));
-        assertTrue(config.getConfigLoadReport().contains("line 2"));
+        assertTrue(config.getConfigLoadReport().contains("line 3"));
         assertTrue(config.getConfigLoadReport().contains("Remediation:"));
     }
 
@@ -118,7 +151,8 @@ public class ConfigManagerTest {
         Files.createDirectories(shedDir);
         Path configPath = shedDir.resolve("config.toml");
         Files.writeString(configPath,
-            "\"tab.size\" = 8\n"
+            "schema_version = 1\n"
+                + "\"tab.size\" = 8\n"
                 + "\"line.numbers\" = \"relative\"\n"
                 + "\"highlight.search\" = false\n"
                 + "\"command.alias.ww\" = \"w\"\n"
@@ -208,7 +242,8 @@ public class ConfigManagerTest {
         Path shedDir = home.resolve(".shed");
         Files.createDirectories(shedDir);
         Files.writeString(shedDir.resolve("config.toml"),
-            "\"lsp.py.command\" = \"pyright-langserver\"\n"
+            "schema_version = 1\n"
+            + "\"lsp.py.command\" = \"pyright-langserver\"\n"
             + "\"lsp.py.args\" = \"--stdio\"\n"
             + "\"lsp.rs.command\" = \"rust-analyzer\"\n");
         System.setProperty("user.home", home.toString());
@@ -226,7 +261,8 @@ public class ConfigManagerTest {
         Path shedDir = home.resolve(".shed");
         Files.createDirectories(shedDir);
         Files.writeString(shedDir.resolve("config.toml"),
-            "\"command.user.build\" = \"make -j4\"\n"
+            "schema_version = 1\n"
+            + "\"command.user.build\" = \"make -j4\"\n"
             + "\"command.user.test\" = \"./test.sh\"\n");
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
@@ -267,7 +303,8 @@ public class ConfigManagerTest {
         Path shedDir = home.resolve(".shed");
         Files.createDirectories(shedDir);
         Files.writeString(shedDir.resolve("config.toml"),
-            "\"ui.dramatic\" = true\n"
+            "schema_version = 1\n"
+            + "\"ui.dramatic\" = true\n"
             + "\"ui.dramatic.sound\" = true\n"
             + "\"ui.dramatic.sound.pack\" = \"soft\"\n"
             + "\"ui.dramatic.sound.volume\" = 40\n"
@@ -297,6 +334,7 @@ public class ConfigManagerTest {
         config.setAndPersist("ui.dramatic.sound.pack", "cinema");
 
         String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("schema_version = 1"));
         assertTrue(file.contains("\"ui.dramatic\" = true"));
         assertTrue(file.contains("\"ui.dramatic.sound.pack\" = \"cinema\""));
         ConfigManager reloaded = new ConfigManager();
@@ -312,6 +350,7 @@ public class ConfigManagerTest {
 
         assertThrows(IOException.class, () -> config.setAndPersist("bad=key", "value"));
         assertThrows(IOException.class, () -> config.setAndPersist("ui.test", "bad\0value"));
+        assertThrows(IOException.class, () -> config.setAndPersist("schema_version", "2"));
     }
 
     @Test
@@ -339,6 +378,7 @@ public class ConfigManagerTest {
 
         assertTrue(persisted >= 3);
         String file = Files.readString(Path.of(config.getConfigPath()));
+        assertTrue(file.contains("schema_version = 1"));
         assertTrue(file.contains("\"ui.dramatic\" = true"));
         assertTrue(file.contains("\"ui.dramatic.sound\" = true"));
         assertTrue(file.contains("\"ui.dramatic.sound.volume\" = 88"));
@@ -379,7 +419,7 @@ public class ConfigManagerTest {
         Path home = tempDir.resolve("home-session-autoload-blank");
         Path shedDir = home.resolve(".shed");
         Files.createDirectories(shedDir);
-        Files.writeString(shedDir.resolve("config.toml"), "\"session.autoload\" = \"\"\n");
+        Files.writeString(shedDir.resolve("config.toml"), "schema_version = 1\n\"session.autoload\" = \"\"\n");
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
@@ -396,7 +436,7 @@ public class ConfigManagerTest {
         Path projectB = tempDir.resolve("project-b");
         Files.createDirectories(projectA.resolve("src"));
         Files.createDirectories(projectB.resolve("src"));
-        Files.writeString(projectA.resolve(".shed.toml"), "\"ui.dramatic\" = true\n\"ui.dramatic.sound.pack\" = \"cinema\"\n");
+        Files.writeString(projectA.resolve(".shed.toml"), "schema_version = 1\n\"ui.dramatic\" = true\n\"ui.dramatic.sound.pack\" = \"cinema\"\n");
 
         File fileA = projectA.resolve("src/App.java").toFile();
         Files.writeString(fileA.toPath(), "class App {}\n");
@@ -423,7 +463,8 @@ public class ConfigManagerTest {
         Path project = tempDir.resolve("project-safe");
         Files.createDirectories(project.resolve("src"));
         Files.writeString(project.resolve(".shed.toml"),
-            "ui.dramatic = true\n"
+            "schema_version = 1\n"
+                + "ui.dramatic = true\n"
                 + "command.user.pwn = \"echo hacked\"\n"
                 + "keybind.normal.q = \":q!\"\n");
         File file = project.resolve("src/Main.java").toFile();
@@ -446,7 +487,8 @@ public class ConfigManagerTest {
         Path project = tempDir.resolve("project-unsafe");
         Files.createDirectories(project.resolve("src"));
         Files.writeString(project.resolve(".shed.toml"),
-            "command.user.local = \"echo ok\"\n"
+            "schema_version = 1\n"
+                + "command.user.local = \"echo ok\"\n"
                 + "keybind.normal.q = \":q!\"\n");
         File file = project.resolve("src/Main.java").toFile();
         Files.writeString(file.toPath(), "class Main {}\n");
@@ -465,7 +507,7 @@ public class ConfigManagerTest {
 
         Path project = tempDir.resolve("project-disabled");
         Files.createDirectories(project.resolve("src"));
-        Files.writeString(project.resolve(".shed.toml"), "ui.dramatic = true\n");
+        Files.writeString(project.resolve(".shed.toml"), "schema_version = 1\nui.dramatic = true\n");
         File file = project.resolve("src/Main.java").toFile();
         Files.writeString(file.toPath(), "class Main {}\n");
 

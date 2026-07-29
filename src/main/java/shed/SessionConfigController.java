@@ -239,6 +239,9 @@ final class SessionConfigController {
         if (key == null || key.isEmpty()) {
             return "Error: Missing config key";
         }
+        if (editor.configManager.isSchemaVersionKey(key)) {
+            return "Error: schema_version is managed by Shed";
+        }
         editor.configManager.set(key, value == null ? "" : value);
         applyRuntimeConfigFromSettings();
         if (isThemeRelatedConfigKey(key)) {
@@ -251,6 +254,9 @@ final class SessionConfigController {
     public String setConfigOptionPersistent(String key, String value) {
         if (key == null || key.isEmpty()) {
             return "Error: Missing config key";
+        }
+        if (editor.configManager.isSchemaVersionKey(key)) {
+            return "Error: schema_version is managed by Shed";
         }
         try {
             editor.configManager.setAndPersist(key, value == null ? "" : value);

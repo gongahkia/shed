@@ -73,6 +73,18 @@ public class LspServiceTest {
     }
 
     @Test
+    void parsesActiveSignatureAndDocumentation() {
+        LspClient.SignatureHelp help = LspClient.parseSignatureHelp(MiniJson.parse(
+            "{\"activeSignature\":0,\"activeParameter\":1,\"signatures\":[{\"label\":\"sum(int left, int right)\",\"documentation\":\"Adds values.\"}]}"
+        ));
+
+        assertNotNull(help);
+        assertEquals("sum(int left, int right)", help.getLabel());
+        assertEquals("Adds values.", help.getDocumentation());
+        assertEquals(1, help.getActiveParameter());
+    }
+
+    @Test
     void mapsFileTypesToLanguageIds() {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));

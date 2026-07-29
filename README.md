@@ -29,14 +29,14 @@ Shed is a [bare-bones](https://www.merriam-webster.com/dictionary/bare-bones), [
 
 ## Stack
 
-* *Scripting*: [Java 20](https://www.oracle.com/java/technologies/downloads/#java20), [Java Swing](https://docs.oracle.com/en/java/javase/20/docs/api/java.desktop/javax/swing/package-summary.html)
+* *Scripting*: [Java 21](https://www.oracle.com/java/technologies/downloads/#java21), [Java Swing](https://docs.oracle.com/en/java/javase/21/docs/api/java.desktop/javax/swing/package-summary.html)
 * *Build*: [Maven](https://maven.apache.org/download.cgi)
 * *Test*: [JUnit 5](https://junit.org/junit5/)
 
 ## Usage
 
 > [!IMPORTANT]
-> Please use either [JDK 17](https://www.oracle.com/java/technologies/downloads/#java17) or [JDK 20](https://www.oracle.com/java/technologies/downloads/#java20) as the specified JDK version for either of these instructions.
+> Please use [JDK 21](https://www.oracle.com/java/technologies/downloads/#java21) for either of these instructions.
 
 Note you can either choose to run the precompiled [`Shed.jar`](build/Shed.jar) file or build Shed yourself. 
 
@@ -47,13 +47,13 @@ Note you can either choose to run the precompiled [`Shed.jar`](build/Shed.jar) f
 
 #### Linux
 
-1. Download the Java Development Kit (JDK) [Linux distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-linux).
+1. Download the Java Development Kit (JDK) 21 [Linux distribution](https://www.oracle.com/java/technologies/downloads/#java21).
 2. Assuming the JDK file has been downloaded to the *Downloads* directory, run the following commands in your terminal.
 
 ```console
 $ cd Downloads
-$ sudo apt install jdk-20_linux-x64_bin.rpm # debain
-$ sudo dnf install jdk-20_linux-x64_bin.rpm` # fedora
+$ sudo apt install ./jdk-21_linux-x64_bin.deb # Debian/Ubuntu
+$ sudo dnf install ./jdk-21_linux-x64_bin.rpm # Fedora
 ```
 
 3. Download the [`Shed.jar`](build/Shed.jar) file.q
@@ -61,18 +61,18 @@ $ sudo dnf install jdk-20_linux-x64_bin.rpm` # fedora
 
 #### OSX
 
-1. Download the [MacOS distribution of the Java Development Kit (JDK)](https://www.oracle.com/java/technologies/downloads/#jdk20-mac).
+1. Download the [macOS distribution of JDK 21](https://www.oracle.com/java/technologies/downloads/#java21).
 2. Follow the JDK installer to install JDK to your machine.
 3. Download the [`Shed.jar`](build/Shed.jar) file.
 4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.
 
 <p align="center">
-  <img src="https://www.codejava.net/images/articles/javase/install-jdk-17/oracle_jdk_17_installer_macos.png" width="60%"/>
+  <a href="https://docs.oracle.com/en/java/javase/21/install/installation-guide.pdf">JDK 21 installation guide</a>
 </p>
 
 #### Windows
 
-1. Download the Java Development Kit (JDK) [Windows distribution](https://www.oracle.com/java/technologies/downloads/#jdk20-windows).
+1. Download the JDK 21 [Windows distribution](https://www.oracle.com/java/technologies/downloads/#java21).
 2. Follow the set-up instructions to install JDK to your machine.
 3. Download the [`Shed.jar`](build/Shed.jar) file.
 4. Run `Shed.jar` as you would any other file on your machine, by *double-clicking* it.

@@ -1,6 +1,5 @@
 package shed;
 
-import javax.swing.*;
 import javax.swing.text.BadLocationException;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -76,7 +75,7 @@ final class JobQuickfixController {
         int jobId = editor.asyncJobService.submit(
             "shell: " + trimmed,
             token -> runShellProcess(trimmed, null, token),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
+            this::handleShellJobCompletion
         );
         return "Shell job " + jobId + " started";
     }
@@ -101,7 +100,7 @@ final class JobQuickfixController {
         int jobId = editor.asyncJobService.submit(
             "drop: " + expanded,
             token -> runShellProcess(expanded, null, token),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() -> handleShellJobCompletion(snapshot, result, error))
+            this::handleShellJobCompletion
         );
         return "Drop job " + jobId + " started";
     }
@@ -281,8 +280,7 @@ final class JobQuickfixController {
                 editor.configManager.getProcessOutputMaxBytes(),
                 true
             ),
-            (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
-                handleTaskJobCompletion(normalizedName, snapshot, result, error))
+            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, snapshot, result, error)
         );
         return "Task job " + jobId + " started (" + normalizedName + ")";
     }
@@ -381,8 +379,17 @@ final class JobQuickfixController {
             int jobId = editor.asyncJobService.submit(
                 "filter " + safeStart + "," + safeEnd + ": " + trimmed,
                 token -> runShellProcess(trimmed, input, token),
-                (snapshot, result, error) -> SwingUtilities.invokeLater(() ->
-                    handleFilterJobCompletion(snapshot, result, error, targetBuffer, startOffset, endOffset, input, safeStart, safeEnd))
+                (snapshot, result, error) -> handleFilterJobCompletion(
+                    snapshot,
+                    result,
+                    error,
+                    targetBuffer,
+                    startOffset,
+                    endOffset,
+                    input,
+                    safeStart,
+                    safeEnd
+                )
             );
             return "Filter job " + jobId + " started";
         } catch (BadLocationException e) {

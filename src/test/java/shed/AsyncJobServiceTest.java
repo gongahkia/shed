@@ -12,7 +12,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import javax.swing.JLabel;
+import javax.swing.SwingUtilities;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,6 +42,32 @@ public class AsyncJobServiceTest {
         assertEquals(id, snapshot.getId());
         assertEquals(AsyncJobService.Status.SUCCEEDED, snapshot.getStatus());
         assertEquals("ok", resultRef.get());
+        service.shutdownNow();
+    }
+
+    @Test
+    void returnsAsyncUiUpdateToEventDispatchThread() throws Exception {
+        AsyncJobService service = new AsyncJobService(20);
+        CountDownLatch completion = new CountDownLatch(1);
+        AtomicBoolean workerRanOffEdt = new AtomicBoolean();
+        AtomicBoolean completionRanOnEdt = new AtomicBoolean();
+        AtomicReference<String> renderedText = new AtomicReference<>();
+        JLabel status = new JLabel();
+
+        service.submit("render status", token -> {
+            workerRanOffEdt.set(!SwingUtilities.isEventDispatchThread());
+            return "ready";
+        }, (snapshot, result, error) -> {
+            completionRanOnEdt.set(SwingUtilities.isEventDispatchThread());
+            status.setText(result);
+            renderedText.set(status.getText());
+            completion.countDown();
+        });
+
+        assertTrue(completion.await(2, TimeUnit.SECONDS));
+        assertTrue(workerRanOffEdt.get());
+        assertTrue(completionRanOnEdt.get());
+        assertEquals("ready", renderedText.get());
         service.shutdownNow();
     }
 

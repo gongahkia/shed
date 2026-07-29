@@ -10,6 +10,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.swing.SwingUtilities;
 
 public class AsyncJobService {
     public enum Status {
@@ -24,6 +25,7 @@ public class AsyncJobService {
     }
 
     public interface JobCompletion<T> {
+        // invoked on the Swing event dispatch thread
         void onComplete(JobSnapshot snapshot, T result, Exception error);
     }
 
@@ -197,11 +199,16 @@ public class AsyncJobService {
                 record.finishedAtMillis = System.currentTimeMillis();
                 trimHistoryIfNeeded();
                 if (completion != null) {
-                    try {
-                        completion.onComplete(record.snapshot(), result, error);
-                    } catch (Throwable failure) {
-                        reportUnexpected(failure, "completing async job " + record.description);
-                    }
+                    JobSnapshot snapshot = record.snapshot();
+                    T completedResult = result;
+                    Exception completedError = error;
+                    SwingUtilities.invokeLater(() -> completeOnEventDispatchThread(
+                        completion,
+                        snapshot,
+                        completedResult,
+                        completedError,
+                        record.description
+                    ));
                 }
             }
         });
@@ -270,6 +277,20 @@ public class AsyncJobService {
     private void reportUnexpected(Throwable failure, String context) {
         if (errorReporter != null) {
             errorReporter.report(failure, context);
+        }
+    }
+
+    private <T> void completeOnEventDispatchThread(
+        JobCompletion<T> completion,
+        JobSnapshot snapshot,
+        T result,
+        Exception error,
+        String description
+    ) {
+        try {
+            completion.onComplete(snapshot, result, error);
+        } catch (Throwable failure) {
+            reportUnexpected(failure, "completing async job " + description);
         }
     }
 }

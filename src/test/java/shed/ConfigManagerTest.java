@@ -138,8 +138,11 @@ public class ConfigManagerTest {
         assertEquals(75, config.getDramaticSoundVolume());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertEquals(source, Files.readString(configPath));
+        assertTrue(config.getConfigLoadReport().contains("line 2, column"));
         assertTrue(config.getConfigLoadReport().contains("tab.size must be TOML integer"));
+        assertTrue(config.getConfigLoadReport().contains("tab.size must be TOML integer (active fallback: 4)"));
         assertTrue(config.getConfigLoadReport().contains("ui.dramatic.sound.volume must be between 0 and 100"));
+        assertTrue(config.getConfigLoadReport().contains("ui.dramatic.sound.volume must be between 0 and 100 (active fallback: 75)"));
         assertTrue(config.getConfigLoadReport().contains("line.numbers must be none, absolute, relative, relativeabsolute, or hybrid"));
     }
 
@@ -161,6 +164,7 @@ public class ConfigManagerTest {
         assertEquals(source, Files.readString(configPath));
         assertTrue(config.getConfigLoadReport().contains("Configuration recovery: " + configPath));
         assertTrue(config.getConfigLoadReport().contains("line 3"));
+        assertTrue(config.getConfigLoadReport().contains("line 3, column"));
         assertTrue(config.getConfigLoadReport().contains("Remediation:"));
     }
 

@@ -20,7 +20,7 @@ Large-file preview is an overlay on a file-buffer state, not a separate lifecycl
 | :--- | :--- | :--- | :--- |
 | Open existing file | Read and decode succeed | Clean file buffer; full content becomes `savedContent` | No buffer is added when opening throws. |
 | Open absent target | Target does not exist | Empty named unsaved buffer | No disk file is created. |
-| Edit | Any editable buffer | Dirty; versioned backup and recovery snapshot attempts are best-effort | Backup/snapshot failure is recorded locally and does not clear dirty content. |
+| Edit | Any editable buffer | Dirty; bounded undo history, versioned backup, and recovery snapshot attempts are best-effort | Backup/snapshot failure is recorded locally and does not clear dirty content. |
 | Save / save-as | File path is available or supplied | Forced temporary write, atomic replacement, and target size/digest verification succeed; clean; `savedContent` and timestamp advance; versioned backups remain subject to retention policy | Write failure leaves the buffer dirty and its in-memory content unchanged; post-move verification restores the prior source when possible and reports retry/remediation details. |
 | Reload from disk | Explicit reload, or an unmodified externally changed or replaced file | Clean file buffer with new disk content and snapshot | Read/decode failure leaves the current buffer state unchanged. |
 | External change while dirty | Filesystem state is changed, deleted, replaced, or unsupported | Keep Mine and View Both retain dirty content; Reload Theirs replaces it only when a regular disk file is available | Dialog dismissal is Keep Mine: content remains dirty and the external state is acknowledged. |

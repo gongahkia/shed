@@ -55,6 +55,7 @@ public class ConfigManagerTest {
         assertFalse(config.getSessionRestoreOnStart());
         assertEquals("default", config.getSessionAutoloadName());
         assertEquals(15000, config.getProcessTimeoutMs());
+        assertEquals(UndoHistoryPolicy.defaults(), config.getUndoHistoryPolicy());
         assertFalse(config.hasConfigLoadFailure());
         assertTrue(config.getConfigLoadReport().startsWith("Configuration not found: "));
     }
@@ -73,6 +74,22 @@ public class ConfigManagerTest {
         assertFalse(config.hasConfigLoadFailure());
         assertEquals(4, config.getTabSize());
         assertEquals("one-dark-pro", config.getThemeId());
+    }
+
+    @Test
+    void validatesUndoHistoryLimits() {
+        Path home = tempDir.resolve("home-undo-policy");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.set("undo.history.max.entries", "12");
+        config.set("undo.history.max.bytes", "4096");
+
+        assertEquals(new UndoHistoryPolicy(12, 4096), config.getUndoHistoryPolicy());
+        assertEquals("undo.history.max.entries must be between 1 and " + UndoHistoryPolicy.MAX_ENTRIES,
+            config.validateSettingValue("undo.history.max.entries", "0"));
+        assertEquals("undo.history.max.bytes must be between 1 and " + UndoHistoryPolicy.MAX_BYTES,
+            config.validateSettingValue("undo.history.max.bytes", "0"));
     }
 
     @Test

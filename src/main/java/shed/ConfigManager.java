@@ -66,6 +66,8 @@ public class ConfigManager {
     private static final boolean DEFAULT_RECOVERY_CLEANUP_ON_CLEAN_EXIT = true;
     private static final boolean DEFAULT_BACKUP_ENABLED = true;
     private static final int DEFAULT_BACKUP_RETENTION_COUNT = BackupPolicy.DEFAULT_RETENTION_COUNT;
+    private static final int DEFAULT_UNDO_HISTORY_MAX_ENTRIES = UndoHistoryPolicy.DEFAULT_MAX_ENTRIES;
+    private static final long DEFAULT_UNDO_HISTORY_MAX_BYTES = UndoHistoryPolicy.DEFAULT_MAX_BYTES;
     private static final int DEFAULT_PROCESS_TIMEOUT_MS = 15000;
     private static final int DEFAULT_PROCESS_OUTPUT_MAX_BYTES = 1024 * 1024;
     private static final boolean DEFAULT_SHELL_COMMAND_ENABLED = true;
@@ -222,6 +224,8 @@ public class ConfigManager {
         defineDefault("backup.enabled", DEFAULT_BACKUP_ENABLED);
         defineDefault("backup.directory", Path.of(shedDirectoryPath).resolve("backups").toString());
         defineDefault("backup.retention.count", DEFAULT_BACKUP_RETENTION_COUNT);
+        defineDefault("undo.history.max.entries", DEFAULT_UNDO_HISTORY_MAX_ENTRIES);
+        defineDefault("undo.history.max.bytes", DEFAULT_UNDO_HISTORY_MAX_BYTES);
         defineDefault("process.timeout.ms", DEFAULT_PROCESS_TIMEOUT_MS);
         defineDefault("process.output.max.bytes", DEFAULT_PROCESS_OUTPUT_MAX_BYTES);
         defineDefault("shell.command.enabled", DEFAULT_SHELL_COMMAND_ENABLED);
@@ -291,6 +295,8 @@ public class ConfigManager {
             case "backup.enabled" -> "Create local versioned backups while editing";
             case "backup.directory" -> "Directory for local versioned backups";
             case "backup.retention.count" -> "Maximum retained backups per source file";
+            case "undo.history.max.entries" -> "Maximum retained undo and redo edits per buffer";
+            case "undo.history.max.bytes" -> "Maximum estimated retained undo and redo payload bytes per buffer";
             case "process.timeout.ms" -> "Timeout for helper processes";
             case "process.output.max.bytes" -> "Maximum captured helper-process output";
             case "shell.command.enabled" -> "Enable shell command execution";
@@ -725,6 +731,13 @@ public class ConfigManager {
         String directory = getString("backup.directory", Path.of(shedDirectoryPath).resolve("backups").toString());
         return new BackupPolicy(getBoolean("backup.enabled", DEFAULT_BACKUP_ENABLED), directory,
             getInt("backup.retention.count", DEFAULT_BACKUP_RETENTION_COUNT));
+    }
+
+    public UndoHistoryPolicy getUndoHistoryPolicy() {
+        return new UndoHistoryPolicy(
+            getInt("undo.history.max.entries", DEFAULT_UNDO_HISTORY_MAX_ENTRIES),
+            getLong("undo.history.max.bytes", DEFAULT_UNDO_HISTORY_MAX_BYTES)
+        );
     }
 
     public int getProcessTimeoutMs() {

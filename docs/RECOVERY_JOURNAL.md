@@ -39,6 +39,8 @@ Shed writes a fully forced temporary file in the recovery directory, then atomic
 
 Workspace context records the working directory, active file path, and caret position. Restored buffers are dirty and require an explicit save; recovery never writes restored content to a source file automatically.
 
+At startup, the Crash Recovery Workspace presents each snapshot beside its current on-disk content when available. Restore applies only checked snapshots. Defer leaves the journal unchanged, and discarding all snapshots requires confirmation. A partial restore keeps unselected snapshots for a later startup; a full restore rewrites the journal from its restored dirty buffers.
+
 ## Write scheduling
 
 Shed captures recovery input on the EDT, then replaces one pending write after a 750 ms debounce. Disk serialization runs on a daemon worker, so editing does not wait for journal I/O and queued recovery state is bounded to one snapshot. Successful writes are recorded by `:perf` as `recovery.journal.write`; failures are recorded in the local diagnostic log.

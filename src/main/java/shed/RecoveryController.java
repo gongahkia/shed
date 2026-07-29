@@ -236,27 +236,28 @@ final class RecoveryController {
         if (journal == null || journal.entries().isEmpty()) {
             return;
         }
-        int result = JOptionPane.showConfirmDialog(
-            editor,
-            journal.entries().size() + " crash-recovery snapshot(s) were found. Restore now?",
-            "Crash Recovery",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.WARNING_MESSAGE
-        );
-        if (result != JOptionPane.YES_OPTION) {
+        RecoveryWorkspaceDialog.Result result = RecoveryWorkspaceDialog.showFor(editor, journal);
+        if (result.decision() == RecoveryWorkspaceDialog.Decision.DEFER) {
+            return;
+        }
+        if (result.decision() == RecoveryWorkspaceDialog.Decision.DISCARD) {
+            clearRecoverySnapshots();
+            editor.showMessage("Recovery snapshots scheduled for discard");
             return;
         }
 
         int restored = 0;
         FileBuffer lastRestored = null;
-        for (RecoveryJournal.Entry entry : journal.entries()) {
+        for (RecoveryJournal.Entry entry : result.entries()) {
             FileBuffer restoredBuffer = restoreRecoveryEntry(entry);
             if (restoredBuffer != null) {
                 restored++;
                 lastRestored = restoredBuffer;
             }
         }
-        FileBuffer workspaceActive = journal.workspace().activePath() == null ? null
+        boolean restoredActive = result.entries().stream().anyMatch(entry -> journal.workspace().activePath() != null
+            && journal.workspace().activePath().equals(entry.path()));
+        FileBuffer workspaceActive = !restoredActive || journal.workspace().activePath() == null ? null
             : editor.findBufferByPath(new File(journal.workspace().activePath()));
         if (workspaceActive != null) {
             editor.loadBufferIntoEditor(workspaceActive);
@@ -265,10 +266,11 @@ final class RecoveryController {
             editor.loadBufferIntoEditor(lastRestored);
         }
         if (restored == journal.entries().size()) {
-            clearRecoverySnapshots();
+            persistRecoverySnapshotsSafely();
         }
         if (restored > 0) {
-            editor.showMessage("Recovered " + restored + " buffer" + (restored == 1 ? "" : "s") + " from crash snapshots");
+            String retained = result.entries().size() == journal.entries().size() ? "" : "; unselected snapshots remain deferred";
+            editor.showMessage("Recovered " + restored + " buffer" + (restored == 1 ? "" : "s") + " from crash snapshots" + retained);
         }
     }
 

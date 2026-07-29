@@ -1116,6 +1116,10 @@ public class ConfigManager {
         return settings.validateRuntime(key == null ? "" : key.trim(), value == null ? "" : value);
     }
 
+    Set<String> typedSettingKeys() {
+        return settings.keys();
+    }
+
     public boolean hasConfigLoadFailure() {
         return configLoadFailed;
     }

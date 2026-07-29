@@ -75,6 +75,18 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configurationReferenceDocumentsEveryTypedSetting() throws IOException {
+        Path home = tempDir.resolve("home-doc-catalog");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        String reference = Files.readString(Path.of("docs/CONFIG.md"));
+
+        for (String key : config.typedSettingKeys()) {
+            assertTrue(reference.contains("| `" + key + "` |"), "missing configuration reference for " + key);
+        }
+    }
+
+    @Test
     void rejectsMissingSchemaVersion() throws IOException {
         Path home = tempDir.resolve("home-schema-missing");
         Path configPath = home.resolve(".shed/config.toml");

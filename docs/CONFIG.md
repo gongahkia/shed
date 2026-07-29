@@ -76,6 +76,7 @@ Every global `config.toml` and project `.shed.toml` starts with the unquoted roo
 | `large.file.preview.lines` | `1000` | int | Preview lines shown for large files |
 | `process.timeout.ms` | `15000` | int | Async shell/LSP helper timeout |
 | `process.output.max.bytes` | `1048576` | int | Max captured process output bytes |
+| `shell.command.enabled` | `true` | bool | Enable `:!` shell commands |
 | `shell.command.max.length` | `4096` | int | Max accepted shell command length |
 
 ## Dramatic UI / Theater Keys

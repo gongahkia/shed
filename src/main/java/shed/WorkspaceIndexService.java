@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 final class WorkspaceIndexService {
     static final int VERSION = 1;
@@ -36,6 +37,11 @@ final class WorkspaceIndexService {
     }
 
     BuildResult build(boolean enabled, Path workspaceRoot, Observer observer) {
+        return build(enabled, workspaceRoot, Cancellation.NONE, observer);
+    }
+
+    BuildResult build(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
+        Cancellation effectiveCancellation = cancellation == null ? Cancellation.NONE : cancellation;
         Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
         if (!enabled) {
             Status disabled = Status.disabled();
@@ -51,6 +57,9 @@ final class WorkspaceIndexService {
             Files.walkFileTree(root, new SimpleFileVisitor<>() {
                 @Override
                 public FileVisitResult preVisitDirectory(Path directory, BasicFileAttributes attributes) {
+                    if (effectiveCancellation.isCancelled()) {
+                        return FileVisitResult.TERMINATE;
+                    }
                     if (!directory.equals(root) && ".git".equals(directory.getFileName().toString())) {
                         progress.excludedDirectories++;
                         publish(progress.status(State.BUILDING, "indexing"), effectiveObserver);
@@ -61,6 +70,9 @@ final class WorkspaceIndexService {
 
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                    if (effectiveCancellation.isCancelled()) {
+                        return FileVisitResult.TERMINATE;
+                    }
                     Path normalized = file.toAbsolutePath().normalize();
                     if (".git".equals(normalized.getFileName().toString())) {
                         progress.skipped++;
@@ -74,6 +86,9 @@ final class WorkspaceIndexService {
                         if (ignoreMatcher.isIgnored(root, relative)) {
                             progress.ignored++;
                         } else {
+                            if (effectiveCancellation.isCancelled()) {
+                                return FileVisitResult.TERMINATE;
+                            }
                             entries.add(new Entry(relativePath(relative), attributes.size(), attributes.lastModifiedTime().toMillis()));
                             progress.indexed++;
                         }
@@ -89,6 +104,11 @@ final class WorkspaceIndexService {
                     return FileVisitResult.CONTINUE;
                 }
             });
+            if (effectiveCancellation.isCancelled()) {
+                Status cancelled = progress.status(State.CANCELLED, "indexing cancelled");
+                publish(cancelled, effectiveObserver);
+                return new BuildResult(null, cancelled, null);
+            }
             WorkspaceIndex index = new WorkspaceIndex(root.toString(), entries);
             Path target = indexPath(root);
             Files.createDirectories(storageDirectory);
@@ -101,6 +121,34 @@ final class WorkspaceIndexService {
             publish(failed, effectiveObserver);
             return new BuildResult(null, failed, null);
         }
+    }
+
+    BuildResult recover(boolean enabled, Path workspaceRoot, Cancellation cancellation, Observer observer) {
+        if (!enabled) {
+            return build(false, workspaceRoot, cancellation, observer);
+        }
+        WorkspaceIndex previous = null;
+        String priorState = "missing";
+        try {
+            previous = load(workspaceRoot);
+            if (previous != null) {
+                priorState = "present";
+            }
+        } catch (IOException error) {
+            priorState = "incomplete";
+        }
+        BuildResult rebuilt = build(true, workspaceRoot, cancellation, observer);
+        if (rebuilt.status().state() != State.READY) {
+            return rebuilt;
+        }
+        String message = previous == null ? "rebuilt " + priorState + " index"
+            : previous.equals(rebuilt.index()) ? "revalidated persisted index" : "rebuilt stale index";
+        Status recovered = new Status(State.READY, rebuilt.status().workspaceRoot(), rebuilt.status().visited(), rebuilt.status().indexed(),
+            rebuilt.status().ignored(), rebuilt.status().skipped(), rebuilt.status().unreadable(), rebuilt.status().outsideBoundary(),
+            rebuilt.status().excludedDirectories(), message);
+        Observer effectiveObserver = observer == null ? Observer.NO_OP : observer;
+        publish(recovered, effectiveObserver);
+        return new BuildResult(rebuilt.index(), recovered, rebuilt.persistedPath());
     }
 
     Status status() {
@@ -163,6 +211,25 @@ final class WorkspaceIndexService {
         boolean isIgnored(Path workspaceRoot, Path relativePath) throws IOException;
     }
 
+    interface Cancellation {
+        Cancellation NONE = () -> false;
+
+        boolean isCancelled();
+    }
+
+    static final class CancellationSource implements Cancellation {
+        private final AtomicBoolean cancelled = new AtomicBoolean();
+
+        void cancel() {
+            cancelled.set(true);
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return cancelled.get();
+        }
+    }
+
     interface Observer {
         Observer NO_OP = status -> { };
 
@@ -173,6 +240,7 @@ final class WorkspaceIndexService {
         DISABLED,
         BUILDING,
         READY,
+        CANCELLED,
         FAILED
     }
 

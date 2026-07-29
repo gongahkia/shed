@@ -17,19 +17,21 @@ public class ApplicationErrorReporterTest {
     Path tempDir;
 
     @Test
-    void writesLocalDetailsAndShowsOneSanitizedNotification() throws Exception {
-        Path logPath = tempDir.resolve("logs/shed-errors.log");
+    void writesStructuredLocalDetailsAndShowsOneSanitizedNotification() throws Exception {
+        Path logPath = tempDir.resolve("logs/shed-diagnostics.jsonl");
         List<String> notifications = new ArrayList<>();
         ApplicationErrorReporter reporter = new ApplicationErrorReporter(logPath, notifications::add);
 
-        reporter.report(new IllegalStateException("first secret"), "first context");
-        reporter.report(new IllegalArgumentException("second secret"), "second context");
+        reporter.report(new IllegalStateException("first secret"), "async-jobs", "first context", "docs/THREADING.md#background-work");
+        reporter.report(new IllegalArgumentException("second secret"), "ui", "second context", "docs/THREADING.md#edt-ownership");
 
         String log = Files.readString(logPath);
-        assertTrue(log.contains("first context"));
-        assertTrue(log.contains("java.lang.IllegalStateException"));
-        assertTrue(log.contains("second context"));
-        assertTrue(log.contains("java.lang.IllegalArgumentException"));
+        assertTrue(log.contains("\"severity\":\"ERROR\""));
+        assertTrue(log.contains("\"subsystem\":\"async-jobs\""));
+        assertTrue(log.contains("\"type\":\"java.lang.IllegalStateException\""));
+        assertTrue(log.contains("\"subsystem\":\"ui\""));
+        assertTrue(log.contains("\"type\":\"java.lang.IllegalArgumentException\""));
+        assertTrue(log.contains("\"remediation\":\"docs/THREADING.md#background-work\""));
         assertEquals(1, notifications.size());
         assertTrue(notifications.get(0).contains(logPath.toString()));
         assertFalse(notifications.get(0).contains("secret"));
@@ -38,7 +40,7 @@ public class ApplicationErrorReporterTest {
 
     @Test
     void guardedEventQueueLogsUiFailuresWithoutRethrowing() throws Exception {
-        Path logPath = tempDir.resolve("ui-errors.log");
+        Path logPath = tempDir.resolve("ui-diagnostics.jsonl");
         List<String> notifications = new ArrayList<>();
         ApplicationErrorReporter reporter = new ApplicationErrorReporter(logPath, notifications::add);
         ApplicationErrorReporter.GuardedEventQueue queue = new ApplicationErrorReporter.GuardedEventQueue(reporter);
@@ -47,7 +49,10 @@ public class ApplicationErrorReporterTest {
             throw new IllegalStateException("ui secret");
         }));
 
-        assertTrue(Files.readString(logPath).contains("ui secret"));
+        String log = Files.readString(logPath);
+        assertTrue(log.contains("\"subsystem\":\"ui\""));
+        assertTrue(log.contains("\"remediation\":\"docs/THREADING.md#edt-ownership\""));
+        assertTrue(log.contains("ui secret"));
         assertEquals(1, notifications.size());
         assertFalse(notifications.get(0).contains("ui secret"));
     }

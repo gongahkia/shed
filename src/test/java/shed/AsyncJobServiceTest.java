@@ -166,7 +166,7 @@ public class AsyncJobServiceTest {
 
     @Test
     void reportsUnexpectedBackgroundFailures() throws Exception {
-        Path logPath = tempDir.resolve("shed-errors.log");
+        Path logPath = tempDir.resolve("shed-diagnostics.jsonl");
         List<String> notifications = new ArrayList<>();
         ApplicationErrorReporter reporter = new ApplicationErrorReporter(logPath, notifications::add);
         AsyncJobService service = new AsyncJobService(20, reporter);
@@ -183,7 +183,9 @@ public class AsyncJobServiceTest {
         assertTrue(completion.await(2, TimeUnit.SECONDS));
         assertEquals(AsyncJobService.Status.FAILED, snapshotRef.get().getStatus());
         assertEquals(1, notifications.size());
-        assertTrue(Files.readString(logPath).contains("background secret"));
+        String log = Files.readString(logPath);
+        assertTrue(log.contains("\"subsystem\":\"async-jobs\""));
+        assertTrue(log.contains("background secret"));
         service.shutdownNow();
     }
 }

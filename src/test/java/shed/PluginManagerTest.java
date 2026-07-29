@@ -188,6 +188,20 @@ public class PluginManagerTest {
     }
 
     @Test
+    void packageInstallPreservesQuotedWindowsSourcePath() {
+        Path home = tempDir.resolve("home-windows-source");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+        PluginManager manager = new PluginManager(config, null);
+        String source = "C:\\plugins\\demo.shed";
+
+        assertEquals(
+            "Plugin install failed: source file not found: " + source,
+            manager.installPackage("demo 1.0 \"" + source + "\"")
+        );
+    }
+
+    @Test
     void remotePackageInstallRequiresChecksumBeforeNetworkRead() throws IOException {
         Path home = tempDir.resolve("home-remote-checksum-required");
         System.setProperty("user.home", home.toString());

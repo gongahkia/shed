@@ -18,6 +18,8 @@ final class InputController {
     private List<LspCompletionApplication.Placeholder> lspSnippetPlaceholders;
     private int lspSnippetPlaceholderIndex;
     private int lspSnippetDocumentVersion;
+    private final CompletionRequestState signatureHelpRequestState;
+    private int signatureHelpJobId;
 
     InputController(Texteditor editor) {
         this.editor = editor;
@@ -27,6 +29,8 @@ final class InputController {
         this.lspSnippetPlaceholders = List.of();
         this.lspSnippetPlaceholderIndex = -1;
         this.lspSnippetDocumentVersion = -1;
+        this.signatureHelpRequestState = new CompletionRequestState();
+        this.signatureHelpJobId = -1;
     }
 
     public void keyPressed(KeyEvent e) {
@@ -1247,6 +1251,9 @@ final class InputController {
         if (completionJobId >= 0 || isCompletionPopupVisible()) {
             dismissCompletionPopup();
         }
+        if (signatureHelpJobId >= 0 || isSignatureHelpVisible()) {
+            dismissSignatureHelp();
+        }
         if (code == KeyEvent.VK_ESCAPE || (e.isControlDown() && code == KeyEvent.VK_OPEN_BRACKET)) {
             dismissCompletionPopup();
             editor.registerManager.updateLastInserted(editor.lastInsertedText);
@@ -2158,6 +2165,79 @@ final class InputController {
         lspSnippetDocumentVersion = -1;
     }
 
+    private void showSignatureHelp() {
+        dismissSignatureHelp();
+        FileBuffer buffer = editor.getCurrentBuffer();
+        LspClient client = editor.existingLspClient(buffer);
+        if (buffer == null || client == null || !buffer.hasFilePath() || !client.supports(LspCapability.SIGNATURE_HELP)) return;
+        try {
+            String uri = editor.bufferUri(buffer);
+            int caret = editor.writingArea.getCaretPosition();
+            int line = editor.writingArea.getLineOfOffset(caret);
+            int column = caret - editor.writingArea.getLineStartOffset(line);
+            CompletionRequestState.Snapshot request = signatureHelpRequestState.begin(uri,
+                editor.lspDocumentVersions.getOrDefault(uri, 0), caret, "");
+            signatureHelpJobId = editor.asyncJobService.submit("LSP signature help", token -> client.signatureHelp(uri, line, column),
+                (snapshot, help, error) -> completeSignatureHelp(request, snapshot, help, error));
+        } catch (BadLocationException ignored) {
+        }
+    }
+
+    private void completeSignatureHelp(CompletionRequestState.Snapshot request, AsyncJobService.JobSnapshot snapshot,
+                                       LspClient.SignatureHelp help, Exception error) {
+        if (snapshot == null || snapshot.getStatus() == AsyncJobService.Status.CANCELLED || error != null
+            || !isCurrentSignatureHelp(request) || help == null) return;
+        signatureHelpJobId = -1;
+        ensureSignatureHelpPopup();
+        String parameter = help.getActiveParameter() < 0 ? "" : "\nParameter " + (help.getActiveParameter() + 1);
+        String text = help.getDocumentation().isBlank() ? help.getLabel() + parameter
+            : help.getLabel() + parameter + "\n" + help.getDocumentation();
+        editor.signatureHelpText.setText(text);
+        editor.signatureHelpText.setCaretPosition(0);
+        try {
+            Rectangle2D caretRect = editor.writingArea.modelToView2D(editor.writingArea.getCaretPosition());
+            if (caretRect == null || !editor.writingArea.isShowing()) return;
+            Point location = editor.writingArea.getLocationOnScreen();
+            editor.signatureHelpPopup.setLocation(location.x + (int) caretRect.getX(), location.y + (int) caretRect.getY() - 88);
+            editor.signatureHelpPopup.setSize(460, 84);
+            editor.signatureHelpPopup.setVisible(true);
+        } catch (Exception ignored) {
+            dismissSignatureHelp();
+        }
+    }
+
+    private void ensureSignatureHelpPopup() {
+        if (editor.signatureHelpPopup != null) return;
+        editor.signatureHelpText = new JTextArea();
+        editor.signatureHelpText.setEditable(false);
+        editor.signatureHelpText.setLineWrap(true);
+        editor.signatureHelpText.setWrapStyleWord(true);
+        editor.signatureHelpText.setBackground(editor.configManager.getCommandBarBackground());
+        editor.signatureHelpText.setForeground(editor.configManager.getCommandBarForeground());
+        editor.signatureHelpPopup = new JWindow(editor);
+        editor.signatureHelpPopup.add(new JScrollPane(editor.signatureHelpText));
+        editor.signatureHelpPopup.setFocusableWindowState(false);
+    }
+
+    private boolean isCurrentSignatureHelp(CompletionRequestState.Snapshot request) {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath()) return false;
+        String uri = editor.bufferUri(buffer);
+        return signatureHelpRequestState.matches(request, uri, editor.lspDocumentVersions.getOrDefault(uri, 0),
+            editor.writingArea.getCaretPosition(), "");
+    }
+
+    private void dismissSignatureHelp() {
+        if (signatureHelpJobId >= 0) editor.asyncJobService.cancel(signatureHelpJobId);
+        signatureHelpJobId = -1;
+        signatureHelpRequestState.invalidate();
+        if (editor.signatureHelpPopup != null && editor.signatureHelpPopup.isVisible()) editor.signatureHelpPopup.setVisible(false);
+    }
+
+    private boolean isSignatureHelpVisible() {
+        return editor.signatureHelpPopup != null && editor.signatureHelpPopup.isVisible();
+    }
+
 
     public void keyTyped(KeyEvent e) {
         if (editor.suppressNextTypedChar) {
@@ -2167,7 +2247,9 @@ final class InputController {
         }
         if (editor.editorState.mode != EditorMode.INSERT) {
             e.consume();
+            return;
         }
+        if (e.getKeyChar() == '(' || e.getKeyChar() == ',') SwingUtilities.invokeLater(this::showSignatureHelp);
     }
 
 

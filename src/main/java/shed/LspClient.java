@@ -101,6 +101,22 @@ public class LspClient {
         public String getNewText() { return newText; }
     }
 
+    public static class SignatureHelp {
+        private final String label;
+        private final String documentation;
+        private final int activeParameter;
+
+        public SignatureHelp(String label, String documentation, int activeParameter) {
+            this.label = label == null ? "" : label;
+            this.documentation = documentation == null ? "" : documentation;
+            this.activeParameter = activeParameter;
+        }
+
+        public String getLabel() { return label; }
+        public String getDocumentation() { return documentation; }
+        public int getActiveParameter() { return activeParameter; }
+    }
+
     public static class Location {
         private final String uri;
         private final int line;
@@ -595,6 +611,25 @@ public class LspClient {
             }
         }
         return parts.isEmpty() ? null : String.join("\n", parts);
+    }
+
+    public SignatureHelp signatureHelp(String uri, int line, int character) {
+        if (!supports(LspCapability.SIGNATURE_HELP)) return null;
+        Map<String, Object> response = sendTextDocumentPositionRequest("textDocument/signatureHelp", uri, line, character, 2000L);
+        return parseSignatureHelp(response == null ? null : response.get("result"));
+    }
+
+    static SignatureHelp parseSignatureHelp(Object value) {
+        Map<String, Object> result = MiniJson.asObject(value);
+        List<Object> signatures = result == null ? null : MiniJson.asArray(result.get("signatures"));
+        if (signatures == null || signatures.isEmpty()) return null;
+        Integer activeSignature = MiniJson.asInt(result.get("activeSignature"));
+        int index = activeSignature == null ? 0 : Math.max(0, Math.min(activeSignature, signatures.size() - 1));
+        Map<String, Object> signature = MiniJson.asObject(signatures.get(index));
+        String label = MiniJson.asString(signature == null ? null : signature.get("label"));
+        if (label == null || label.isBlank()) return null;
+        Integer activeParameter = MiniJson.asInt(result.get("activeParameter"));
+        return new SignatureHelp(label, completionDocumentation(signature.get("documentation")), activeParameter == null ? -1 : activeParameter);
     }
 
     public Location definition(String uri, int line, int character) {

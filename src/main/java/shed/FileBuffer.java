@@ -14,7 +14,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -239,16 +238,19 @@ public class FileBuffer {
 
         String textToWrite = getFullContent();
         String contentWithLineEndings = applyLineEndings(textToWrite);
-        byte[] bytes = encode(contentWithLineEndings);
+        byte[] bytes;
+        try {
+            bytes = encode(contentWithLineEndings);
+        } catch (IOException error) {
+            throw new IOException("Save failed for " + file + ": content cannot be encoded. Check the selected encoding and retry.", error);
+        }
 
         Path target = file.toPath();
-        Path tempFile = Files.createTempFile(target.getParent(), "shed-", ".tmp");
-        Files.write(tempFile, bytes, StandardOpenOption.TRUNCATE_EXISTING);
-        Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        AtomicFileWriter.write(target, bytes);
 
         this.modified = false;
         this.savedContent = textToWrite;
-        this.lastKnownModifiedTime = file.lastModified();
+        this.lastKnownModifiedTime = Files.getLastModifiedTime(target).toMillis();
         removeBackup();
         this.fileSizeBytes = bytes.length;
         this.fileType = FileType.detect(file, textToWrite);
@@ -256,12 +258,29 @@ public class FileBuffer {
 
     // Save to a different file
     public void saveAs(File newFile) throws IOException {
+        if (newFile == null) {
+            throw new IOException("Save target is required; use :w <file>");
+        }
+        File previousFile = this.file;
+        String previousScratchName = this.scratchName;
+        boolean previousScratch = this.scratch;
+        File previousBackupFile = this.backupFile;
+        FileType previousFileType = this.fileType;
         this.file = newFile;
         this.scratch = false;
         this.scratchName = newFile == null ? "[No Name]" : newFile.getName();
         this.backupFile = buildBackupFile(newFile);
         this.fileType = FileType.detect(newFile, getFullContent());
-        save();
+        try {
+            save();
+        } catch (IOException error) {
+            this.file = previousFile;
+            this.scratchName = previousScratchName;
+            this.scratch = previousScratch;
+            this.backupFile = previousBackupFile;
+            this.fileType = previousFileType;
+            throw error;
+        }
     }
 
     private byte[] encode(String content) throws IOException {

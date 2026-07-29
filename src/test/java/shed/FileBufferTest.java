@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -91,5 +92,58 @@ public class FileBufferTest {
         assertFalse(recovered.isModified());
         assertEquals("recovered\n", recovered.getSavedContent());
         assertEquals("recovered\n", Files.readString(file, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void verifiesAtomicWriteAndRestoresSourceAfterVerificationFailure() throws Exception {
+        Path file = tempDir.resolve("atomic.txt");
+        Files.writeString(file, "original", StandardCharsets.UTF_8);
+
+        AtomicFileWriter.write(file, "saved".getBytes(StandardCharsets.UTF_8));
+        assertEquals("saved", Files.readString(file, StandardCharsets.UTF_8));
+
+        java.io.IOException error = assertThrows(java.io.IOException.class,
+            () -> AtomicFileWriter.write(file, "unexpected".getBytes(StandardCharsets.UTF_8),
+                (target, expected) -> { throw new java.io.IOException("simulated verification failure"); }));
+
+        assertTrue(error.getMessage().contains("original source was restored"));
+        assertEquals("saved", Files.readString(file, StandardCharsets.UTF_8));
+        try (Stream<Path> paths = Files.list(tempDir)) {
+            assertEquals(0, paths.filter(path -> path.getFileName().toString().startsWith(".shed-")).count());
+        }
+    }
+
+    @Test
+    void failedSaveAsPreservesSourceBindingAndDirtyContent() throws Exception {
+        Path source = tempDir.resolve("source.txt");
+        Files.writeString(source, "original", StandardCharsets.UTF_8);
+        Path parentFile = tempDir.resolve("not-a-directory");
+        Files.writeString(parentFile, "block", StandardCharsets.UTF_8);
+        FileBuffer buffer = new FileBuffer(source.toFile());
+        buffer.setContent("draft");
+
+        java.io.IOException error = assertThrows(java.io.IOException.class,
+            () -> buffer.saveAs(parentFile.resolve("target.txt").toFile()));
+
+        assertTrue(error.getMessage().contains("Check disk space and permissions"));
+        assertEquals(source.toFile().getAbsolutePath(), buffer.getFilePath());
+        assertTrue(buffer.isModified());
+        assertEquals("draft", buffer.getContent());
+        assertEquals("original", Files.readString(source, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void failedEncodingSavePreservesSourceAndReportsRemediation() throws Exception {
+        Path source = tempDir.resolve("encoding.txt");
+        Files.writeString(source, "original", StandardCharsets.UTF_8);
+        FileBuffer buffer = new FileBuffer(source.toFile());
+        buffer.setContent("draft");
+        buffer.setEncoding("not-a-real-charset");
+
+        java.io.IOException error = assertThrows(java.io.IOException.class, buffer::save);
+
+        assertTrue(error.getMessage().contains("Check the selected encoding and retry"));
+        assertTrue(buffer.isModified());
+        assertEquals("original", Files.readString(source, StandardCharsets.UTF_8));
     }
 }

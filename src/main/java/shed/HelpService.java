@@ -51,6 +51,7 @@ public class HelpService {
                    "  :workspace ... Workspace profile save/load/list\n" +
                    "  :clean         Remove Shed data files\n" +
                    "  :jobs          Show async job list\n" +
+                   "  :version       Show local version and support metadata\n" +
                    "  :jobcancel id  Cancel async job\n" +
                    "  :drop cmd      Run async command with current file path\n" +
                    "  :task ...      Run/save project tasks with quickfix integration\n" +

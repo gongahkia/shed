@@ -67,6 +67,11 @@
             <manifest>
               <mainClass>shed.Texteditor</mainClass>
             </manifest>
+            <manifestEntries>
+              <Implementation-Title>Shed</Implementation-Title>
+              <Implementation-Version>${project.version}</Implementation-Version>
+              <Shed-Build-Java>${maven.compiler.release}</Shed-Build-Java>
+            </manifestEntries>
           </archive>
         </configuration>
       </plugin>
@@ -83,6 +88,11 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <mainClass>shed.Texteditor</mainClass>
+                  <manifestEntries>
+                    <Implementation-Title>Shed</Implementation-Title>
+                    <Implementation-Version>${project.version}</Implementation-Version>
+                    <Shed-Build-Java>${maven.compiler.release}</Shed-Build-Java>
+                  </manifestEntries>
                 </transformer>
               </transformers>
             </configuration>
@@ -124,4 +134,53 @@
       <scope>test</scope>
     </dependency>
   </dependencies>
+  <profiles>
+    <profile>
+      <id>build-commit-metadata</id>
+      <activation>
+        <property>
+          <name>shed.build.commit</name>
+        </property>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-jar-plugin</artifactId>
+            <configuration combine.self="override">
+              <archive>
+                <manifest>
+                  <mainClass>shed.Texteditor</mainClass>
+                </manifest>
+                <manifestEntries>
+                  <Implementation-Title>Shed</Implementation-Title>
+                  <Implementation-Version>${project.version}</Implementation-Version>
+                  <Shed-Build-Java>${maven.compiler.release}</Shed-Build-Java>
+                  <Shed-Commit>${shed.build.commit}</Shed-Commit>
+                </manifestEntries>
+              </archive>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-shade-plugin</artifactId>
+            <configuration combine.self="override">
+              <createDependencyReducedPom>false</createDependencyReducedPom>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>shed.Texteditor</mainClass>
+                  <manifestEntries>
+                    <Implementation-Title>Shed</Implementation-Title>
+                    <Implementation-Version>${project.version}</Implementation-Version>
+                    <Shed-Build-Java>${maven.compiler.release}</Shed-Build-Java>
+                    <Shed-Commit>${shed.build.commit}</Shed-Commit>
+                  </manifestEntries>
+                </transformer>
+              </transformers>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

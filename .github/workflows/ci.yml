@@ -32,7 +32,7 @@ jobs:
         run: mvn -B -q test
 
       - name: Build jar
-        run: mvn -B -q -DskipTests package
+        run: mvn -B -q -DskipTests -Dshed.build.commit=${{ github.sha }} package
 
       - name: Verify jar artifact
         shell: pwsh
@@ -49,6 +49,9 @@ jobs:
             & jar xf $jar META-INF/MANIFEST.MF
             if ($LASTEXITCODE -ne 0) { throw 'Could not extract jar manifest' }
             if (-not (Select-String -Path 'META-INF/MANIFEST.MF' -SimpleMatch 'Main-Class: shed.Texteditor' -Quiet)) { throw 'Missing Shed main class' }
+            if (-not (Select-String -Path 'META-INF/MANIFEST.MF' -SimpleMatch 'Implementation-Version: 2.0.0' -Quiet)) { throw 'Missing Shed version metadata' }
+            if (-not (Select-String -Path 'META-INF/MANIFEST.MF' -SimpleMatch 'Shed-Build-Java: 21' -Quiet)) { throw 'Missing Shed Java build metadata' }
+            if (-not (Select-String -Path 'META-INF/MANIFEST.MF' -SimpleMatch 'Shed-Commit: ${{ github.sha }}' -Quiet)) { throw 'Missing Shed commit metadata' }
           } finally {
             Pop-Location
           }

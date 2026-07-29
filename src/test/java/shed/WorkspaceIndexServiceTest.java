@@ -70,6 +70,49 @@ public class WorkspaceIndexServiceTest {
         assertFalse(result.index().entries().stream().anyMatch(entry -> entry.relativePath().contains("outside")));
     }
 
+    @Test
+    void cancellationStopsIndexingWithoutWritingPartialIndex() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace"));
+        write(root.resolve("one.txt"), "one");
+        write(root.resolve("two.txt"), "two");
+        WorkspaceIndexService.CancellationSource cancellation = new WorkspaceIndexService.CancellationSource();
+        WorkspaceIndexService service = new WorkspaceIndexService(tempDir.resolve("index-store"), (workspaceRoot, relativePath) -> {
+            cancellation.cancel();
+            return false;
+        });
+
+        WorkspaceIndexService.BuildResult result = service.build(true, root, cancellation, WorkspaceIndexService.Observer.NO_OP);
+
+        assertEquals(WorkspaceIndexService.State.CANCELLED, result.status().state());
+        assertNull(result.index());
+        assertNull(result.persistedPath());
+        assertFalse(Files.exists(tempDir.resolve("index-store")));
+    }
+
+    @Test
+    void rebuildsStaleAndIncompleteIndexesWithoutReturningOldEntries() throws Exception {
+        Path root = Files.createDirectory(tempDir.resolve("workspace"));
+        Path file = root.resolve("document.txt");
+        write(file, "old");
+        WorkspaceIndexService service = new WorkspaceIndexService(tempDir.resolve("index-store"), (workspaceRoot, relativePath) -> false);
+        WorkspaceIndexService.BuildResult initial = service.build(true, root, WorkspaceIndexService.Observer.NO_OP);
+        Files.writeString(file, "new content", StandardCharsets.UTF_8);
+        WorkspaceIndexService restarted = new WorkspaceIndexService(tempDir.resolve("index-store"), (workspaceRoot, relativePath) -> false);
+
+        WorkspaceIndexService.BuildResult stale = restarted.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
+            WorkspaceIndexService.Observer.NO_OP);
+
+        assertEquals("rebuilt stale index", stale.status().message());
+        assertEquals(Files.size(file), stale.index().entries().getFirst().size());
+
+        Files.writeString(initial.persistedPath(), "{broken", StandardCharsets.UTF_8);
+        WorkspaceIndexService.BuildResult incomplete = restarted.recover(true, root, WorkspaceIndexService.Cancellation.NONE,
+            WorkspaceIndexService.Observer.NO_OP);
+
+        assertEquals("rebuilt incomplete index", incomplete.status().message());
+        assertEquals(incomplete.index(), restarted.load(root));
+    }
+
     private void initializeGit(Path root) throws Exception {
         Process process = new ProcessBuilder("git", "init", "--quiet", root.toString()).redirectErrorStream(true).start();
         int exitCode = process.waitFor();

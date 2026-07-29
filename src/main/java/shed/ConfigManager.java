@@ -58,6 +58,7 @@ public class ConfigManager {
     private static final int DEFAULT_ZEN_MODE_WIDTH = 80;
     private static final boolean DEFAULT_SESSION_RESTORE_ON_START = false;
     private static final String DEFAULT_SESSION_AUTOLOAD = "default";
+    private static final boolean DEFAULT_WORKSPACE_INDEX_ENABLED = false;
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
@@ -215,6 +216,7 @@ public class ConfigManager {
         defineDefault("session.restore.on.start", DEFAULT_SESSION_RESTORE_ON_START);
         defineDefault("session.autoload", DEFAULT_SESSION_AUTOLOAD);
         defineDefault("session.dir", defaultSessionDirectoryPath());
+        defineDefault("workspace.index.enabled", DEFAULT_WORKSPACE_INDEX_ENABLED);
         defineDefault("large.file.threshold.mb", DEFAULT_LARGE_FILE_THRESHOLD_MB);
         defineDefault("large.file.line.threshold", DEFAULT_LARGE_FILE_LINE_THRESHOLD);
         defineDefault("large.file.preview.lines", DEFAULT_LARGE_FILE_PREVIEW_LINES);
@@ -286,6 +288,7 @@ public class ConfigManager {
             case "session.restore.on.start" -> "Restore the saved session at startup";
             case "session.autoload" -> "Session name loaded at startup";
             case "session.dir" -> "Directory for saved sessions";
+            case "workspace.index.enabled" -> "Enable persisted Git-ignore-aware workspace indexing";
             case "large.file.threshold.mb" -> "Large-file size threshold in megabytes";
             case "large.file.line.threshold" -> "Large-file line-count threshold";
             case "large.file.preview.lines" -> "Lines shown in a large-file preview";
@@ -702,6 +705,10 @@ public class ConfigManager {
             return defaultSessionDirectoryPath();
         }
         return configured.trim();
+    }
+
+    public boolean getWorkspaceIndexEnabled() {
+        return getBoolean("workspace.index.enabled", DEFAULT_WORKSPACE_INDEX_ENABLED);
     }
 
     public long getLargeFileThresholdMb() {

@@ -76,6 +76,7 @@ The inspector and generated reference derive each typed setting's identifier, de
 | `session.restore.on.start` | `false` | bool | Restore session/workspace on launch |
 | `session.autoload` | `default` | string | Session name used when autoloading |
 | `session.dir` | `~/.shed/sessions` | path | Session storage directory |
+| `workspace.index.enabled` | `false` | bool | Enable persisted Git-ignore-aware workspace indexing |
 | `large.file.threshold.mb` | `100` | int | Large-file detection size threshold |
 | `large.file.line.threshold` | `50000` | int | Large-file detection line threshold |
 | `large.file.preview.lines` | `1000` | int | Preview lines shown for large files |

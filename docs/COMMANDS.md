@@ -199,6 +199,8 @@ Notes:
 | Insert `(` or `,` | Shows capability-gated asynchronous signature help; the next edit or Escape cancels it |
 | `:lsp definition`, `:lsp def` | Go to definition |
 | `:lsp hover` | Show hover info |
+| `:lsp semantic`, `:lsp semantictokens` | Show current-document semantic tokens when supported |
+| `:lsp inlay`, `:lsp inlayhints` | Show current-document inlay hints when supported |
 | `:lsp references`, `:lsp refs` | Find references and open quickfix |
 | `:lsp rename <newName>` | Prepare rename preview |
 | `:lsp renameapply`, `:lsp rename!` | Apply pending rename edits |

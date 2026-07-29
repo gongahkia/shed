@@ -117,6 +117,12 @@ public class LspClient {
         public int getActiveParameter() { return activeParameter; }
     }
 
+    public record SemanticToken(int line, int character, int length, int type) {
+    }
+
+    public record InlayHint(int line, int character, String label) {
+    }
+
     public static class Location {
         private final String uri;
         private final int line;
@@ -630,6 +636,71 @@ public class LspClient {
         if (label == null || label.isBlank()) return null;
         Integer activeParameter = MiniJson.asInt(result.get("activeParameter"));
         return new SignatureHelp(label, completionDocumentation(signature.get("documentation")), activeParameter == null ? -1 : activeParameter);
+    }
+
+    public List<SemanticToken> semanticTokens(String uri) {
+        if (!supports(LspCapability.SEMANTIC_TOKENS)) return List.of();
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("textDocument", textDocument);
+        Map<String, Object> response = sendRequest("textDocument/semanticTokens/full", params, 2500L);
+        return parseSemanticTokens(response == null ? null : response.get("result"));
+    }
+
+    static List<SemanticToken> parseSemanticTokens(Object value) {
+        Map<String, Object> result = MiniJson.asObject(value);
+        List<Object> data = MiniJson.asArray(result == null ? null : result.get("data"));
+        if (data == null || data.size() % 5 != 0) return List.of();
+        List<SemanticToken> tokens = new ArrayList<>();
+        int line = 0;
+        int character = 0;
+        for (int i = 0; i < data.size(); i += 5) {
+            Integer lineDelta = MiniJson.asInt(data.get(i));
+            Integer characterDelta = MiniJson.asInt(data.get(i + 1));
+            Integer length = MiniJson.asInt(data.get(i + 2));
+            Integer type = MiniJson.asInt(data.get(i + 3));
+            if (lineDelta == null || characterDelta == null || length == null || type == null || lineDelta < 0 || characterDelta < 0 || length < 0) return List.of();
+            line += lineDelta;
+            character = lineDelta == 0 ? character + characterDelta : characterDelta;
+            tokens.add(new SemanticToken(line, character, length, type));
+        }
+        return tokens;
+    }
+
+    public List<InlayHint> inlayHints(String uri, int endLine, int endCharacter) {
+        if (!supports(LspCapability.INLAY_HINTS)) return List.of();
+        Map<String, Object> textDocument = new LinkedHashMap<>();
+        textDocument.put("uri", uri);
+        Map<String, Object> end = new LinkedHashMap<>();
+        end.put("line", Math.max(0, endLine));
+        end.put("character", Math.max(0, endCharacter));
+        Map<String, Object> range = new LinkedHashMap<>();
+        range.put("start", Map.of("line", 0, "character", 0));
+        range.put("end", end);
+        Map<String, Object> response = sendRequest("textDocument/inlayHint", Map.of("textDocument", textDocument, "range", range), 2500L);
+        return parseInlayHints(response == null ? null : response.get("result"));
+    }
+
+    static List<InlayHint> parseInlayHints(Object value) {
+        List<Object> values = MiniJson.asArray(value);
+        if (values == null) return List.of();
+        List<InlayHint> hints = new ArrayList<>();
+        for (Object valueItem : values) {
+            Map<String, Object> hint = MiniJson.asObject(valueItem);
+            Map<String, Object> position = hint == null ? null : MiniJson.asObject(hint.get("position"));
+            Integer line = position == null ? null : MiniJson.asInt(position.get("line"));
+            Integer character = position == null ? null : MiniJson.asInt(position.get("character"));
+            String label = MiniJson.asString(hint == null ? null : hint.get("label"));
+            if (label == null) {
+                List<Object> parts = MiniJson.asArray(hint == null ? null : hint.get("label"));
+                StringBuilder joined = new StringBuilder();
+                if (parts != null) for (Object part : parts) joined.append(MiniJson.asString(MiniJson.asObject(part) == null ? part : MiniJson.asObject(part).get("value")));
+                label = joined.toString();
+            }
+            if (line != null && character != null && label != null && !label.isBlank()) hints.add(new InlayHint(line, character, label));
+        }
+        return hints;
     }
 
     public Location definition(String uri, int line, int character) {

@@ -81,7 +81,7 @@ final class LspController {
     public String handleLspCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equals(trimmed)) {
-            return "Usage: :lsp completion|definition|hover|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
+            return "Usage: :lsp completion|definition|hover|semantic|inlay|references|rename <newName>|renameapply|renamecancel|codeaction [index]";
         }
         int split = trimmed.indexOf(' ');
         String subcommand = split < 0 ? trimmed.toLowerCase() : trimmed.substring(0, split).toLowerCase();
@@ -96,6 +96,12 @@ final class LspController {
                 return lspGoToDefinition();
             case "hover":
                 return lspHover();
+            case "semantic":
+            case "semantictokens":
+                return lspSemanticTokens();
+            case "inlay":
+            case "inlayhints":
+                return lspInlayHints();
             case "references":
             case "refs":
                 return lspReferences();
@@ -299,6 +305,52 @@ final class LspController {
             return "Showing hover";
         } catch (BadLocationException e) {
             return "LSP hover failed: " + e.getMessage();
+        }
+    }
+
+    public String lspSemanticTokens() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP semantic tokens require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.SEMANTIC_TOKENS);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        Integer version = editor.lspDocumentVersions.get(uri);
+        List<LspClient.SemanticToken> tokens = client.semanticTokens(uri);
+        if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Semantic tokens became stale; refresh again";
+        StringBuilder text = new StringBuilder("LSP Semantic Tokens\n\n");
+        for (LspClient.SemanticToken token : tokens) text.append(token.line() + 1).append(":").append(token.character() + 1)
+            .append(" length ").append(token.length()).append(" type ").append(token.type()).append("\n");
+        if (tokens.isEmpty()) text.append("No semantic tokens\n");
+        editor.showScratchBuffer("[lsp semantic]", text.toString());
+        return "Showing semantic tokens";
+    }
+
+    public String lspInlayHints() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) return "LSP inlay hints require a file-backed buffer";
+        LspClient client = resolveLspClient(buffer);
+        if (client == null) return "LSP unavailable";
+        String unavailable = capabilityUnavailable(client, LspCapability.INLAY_HINTS);
+        if (unavailable != null) return unavailable;
+        syncLspOpen(buffer);
+        String uri = bufferUri(buffer);
+        try {
+            int lastLine = Math.max(0, editor.writingArea.getLineCount() - 1);
+            int lastCharacter = editor.writingArea.getDocument().getLength() - editor.writingArea.getLineStartOffset(lastLine);
+            Integer version = editor.lspDocumentVersions.get(uri);
+            List<LspClient.InlayHint> hints = client.inlayHints(uri, lastLine, lastCharacter);
+            if (!Objects.equals(version, editor.lspDocumentVersions.get(uri))) return "Inlay hints became stale; refresh again";
+            StringBuilder text = new StringBuilder("LSP Inlay Hints\n\n");
+            for (LspClient.InlayHint hint : hints) text.append(hint.line() + 1).append(":").append(hint.character() + 1)
+                .append("  ").append(hint.label()).append("\n");
+            if (hints.isEmpty()) text.append("No inlay hints\n");
+            editor.showScratchBuffer("[lsp inlay]", text.toString());
+            return "Showing inlay hints";
+        } catch (BadLocationException error) {
+            return "LSP inlay hints failed: " + error.getMessage();
         }
     }
 

@@ -129,7 +129,7 @@ final class RecoveryController {
             return;
         }
         editor.reloadPromptActive = true;
-        String[] options = {"Keep Mine", "Reload Theirs", "View Both"};
+        String[] options = {"Keep Mine", "Reload Theirs", "View Both", "Save Mine As"};
         int result = JOptionPane.showOptionDialog(
             editor,
             externalStateDescription(state) + " while modified in editor:\n"
@@ -168,7 +168,64 @@ final class RecoveryController {
             buffer.refreshExternalTimestamp();
             return;
         }
+        if (result == 3) {
+            saveConflictAs(buffer);
+            return;
+        }
         buffer.refreshExternalTimestamp();
+    }
+
+    private void saveConflictAs(FileBuffer buffer) {
+        JFileChooser chooser = new JFileChooser();
+        File source = buffer.getFile();
+        File parent = source == null ? null : source.getAbsoluteFile().getParentFile();
+        if (parent != null && parent.isDirectory()) {
+            chooser.setCurrentDirectory(parent);
+        }
+        String name = source == null ? "conflict-copy" : source.getName() + ".conflict";
+        chooser.setSelectedFile(new File(chooser.getCurrentDirectory(), name));
+        chooser.setDialogTitle("Save My Conflict Copy");
+        if (chooser.showSaveDialog(editor) != JFileChooser.APPROVE_OPTION) {
+            buffer.refreshExternalTimestamp();
+            editor.showMessage("Save As cancelled; dirty buffer retained");
+            return;
+        }
+
+        File target = chooser.getSelectedFile().getAbsoluteFile();
+        if (target.exists() && JOptionPane.showConfirmDialog(editor,
+            "Replace the selected file?\n" + target.getAbsolutePath(), "Confirm Save As",
+            JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+            buffer.refreshExternalTimestamp();
+            editor.showMessage("Save As cancelled; dirty buffer retained");
+            return;
+        }
+        try {
+            saveConflictAs(buffer, target);
+        } catch (IOException error) {
+            buffer.refreshExternalTimestamp();
+            editor.showMessage("Save As failed; dirty buffer retained: " + error.getMessage());
+        }
+    }
+
+    void saveConflictAs(FileBuffer buffer, File target) throws IOException {
+        if (buffer == null || target == null) {
+            throw new IOException("Conflict buffer and save target are required");
+        }
+        File previousFile = buffer.getFile();
+        int caret = buffer == editor.getCurrentBuffer() ? editor.writingArea.getCaretPosition() : 0;
+        buffer.saveAs(target);
+        if (previousFile != null && !previousFile.getAbsoluteFile().equals(target.getAbsoluteFile())) {
+            editor.fileWatcherService.unwatch(previousFile);
+        }
+        editor.registerFileWatch(buffer);
+        editor.addToRecentFiles(target.getAbsolutePath());
+        editor.notifyCurrentBufferSaved();
+        if (buffer == editor.getCurrentBuffer()) {
+            editor.loadBufferIntoEditor(buffer);
+            editor.writingArea.setCaretPosition(Math.min(caret, editor.writingArea.getText().length()));
+        }
+        editor.refreshGitGutter();
+        editor.showMessage("Saved conflict copy as " + target.getAbsolutePath());
     }
 
 

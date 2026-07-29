@@ -156,6 +156,38 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void conflictSaveAsPreservesExternalVersion() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-conflict-save-as");
+        Path source = tempDir.resolve("source.txt");
+        Path target = tempDir.resolve("mine.txt");
+        Files.createDirectories(home);
+        Files.writeString(source, "before\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, source);
+        try {
+            onEdt(() -> {
+                editor.writingArea.setText("mine\n");
+                return null;
+            });
+            Files.writeString(source, "theirs\n", StandardCharsets.UTF_8);
+
+            onEdt(() -> {
+                editor.recoveryController.saveConflictAs(editor.getCurrentBuffer(), target.toFile());
+                return null;
+            });
+
+            assertEquals("theirs\n", Files.readString(source, StandardCharsets.UTF_8));
+            assertEquals("mine\n", Files.readString(target, StandardCharsets.UTF_8));
+            assertEquals(target.toFile().getAbsolutePath(), onEdt(() -> editor.getCurrentBuffer().getFilePath()));
+            assertFalse(onEdt(() -> editor.getCurrentBuffer().isModified()));
+            assertTrue(onEdt(() -> editor.lastMessage).startsWith("Saved conflict copy as "));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void lspStatusSmokeForUnconfiguredFile() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-lsp");

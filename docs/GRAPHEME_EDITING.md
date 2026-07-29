@@ -2,7 +2,7 @@
 
 ## Status
 
-This is the contract for the grapheme-aware cursor, deletion, and regression work in #72 through #74. The current editor still has UTF-16 code-unit motions in several paths and does not yet claim this behavior. Large-file mode remains read-only and is outside this contract.
+This is the contract for the grapheme-aware cursor, deletion, and regression work in #72 through #74. #72 applies boundary-safe single-caret left/right and relevant word/line motions. Selection expansion and deletion remain pending #73; complete regression coverage remains pending #74. Large-file mode remains read-only and is outside this contract.
 
 ## Terms and coordinate systems
 

@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -49,5 +50,17 @@ public class MotionServiceTest {
         assertEquals(0, MotionService.charClass('\t'));
         assertEquals(2, MotionService.charClass('.'));
         assertEquals(2, MotionService.charClass('('));
+    }
+
+    @Test
+    void wordMotionsStayAtGraphemeBoundaries() {
+        MotionService motion = new MotionService();
+        String text = "e\u0301 👩‍💻";
+
+        assertEquals(3, motion.moveWordForward(text, 0));
+        assertEquals(0, motion.moveWordBackward(text, 3));
+        assertEquals(0, motion.moveWordEnd("e\u0301", 0));
+        assertTrue(GraphemeBoundary.isBoundary(text, motion.moveWordForward(text, 0)));
+        assertTrue(GraphemeBoundary.isBoundary(text, motion.moveWordBackward(text, text.length())));
     }
 }

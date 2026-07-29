@@ -14,9 +14,15 @@ import java.util.List;
 
 final class EditActionController {
     private final Texteditor editor;
+    private final MotionService motionService = new MotionService();
 
     EditActionController(Texteditor editor) {
         this.editor = editor;
+    }
+
+    private void setGraphemeCaret(int offset) {
+        String text = editor.writingArea.getText();
+        editor.writingArea.setCaretPosition(GraphemeBoundary.floor(text, offset));
     }
 
     void normalizeVisualLineCaretForMotion() {
@@ -210,7 +216,7 @@ final class EditActionController {
                 int prevLineEnd = editor.writingArea.getLineEndOffset(line - 1);
                 int col = pos - editor.writingArea.getLineStartOffset(line);
                 int newPos = Math.min(prevLineStart + col, prevLineEnd - 1);
-                editor.writingArea.setCaretPosition(newPos);
+                setGraphemeCaret(newPos);
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
@@ -228,7 +234,7 @@ final class EditActionController {
                 int nextLineEnd = editor.writingArea.getLineEndOffset(line + 1);
                 int col = pos - editor.writingArea.getLineStartOffset(line);
                 int newPos = Math.min(nextLineStart + col, nextLineEnd - 1);
-                editor.writingArea.setCaretPosition(newPos);
+                setGraphemeCaret(newPos);
             }
         } catch (BadLocationException e) {
             e.printStackTrace();
@@ -237,67 +243,32 @@ final class EditActionController {
 
 
     void moveLeft() {
-        int pos = editor.writingArea.getCaretPosition();
-        if (pos > 0) {
-            editor.writingArea.setCaretPosition(pos - 1);
-        }
+        String text = editor.writingArea.getText();
+        editor.writingArea.setCaretPosition(GraphemeBoundary.previous(text, editor.writingArea.getCaretPosition()));
     }
 
 
     void moveRight() {
-        int pos = editor.writingArea.getCaretPosition();
-        if (pos < editor.writingArea.getText().length()) {
-            editor.writingArea.setCaretPosition(pos + 1);
-        }
+        String text = editor.writingArea.getText();
+        editor.writingArea.setCaretPosition(GraphemeBoundary.next(text, editor.writingArea.getCaretPosition()));
     }
 
 
     void moveWordForward() {
         String text = editor.writingArea.getText();
-        int pos = editor.writingArea.getCaretPosition();
-        int len = text.length();
-        if (pos >= len) return;
-
-        int cls = editor.vimCharClass(text.charAt(pos));
-        if (cls > 0) {
-            while (pos < len && editor.vimCharClass(text.charAt(pos)) == cls) pos++;
-        }
-        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
-
-        editor.writingArea.setCaretPosition(Math.min(pos, len));
+        editor.writingArea.setCaretPosition(motionService.moveWordForward(text, editor.writingArea.getCaretPosition()));
     }
 
 
     void moveWordBackward() {
         String text = editor.writingArea.getText();
-        int pos = editor.writingArea.getCaretPosition();
-        if (pos <= 0) return;
-
-        pos--;
-        while (pos > 0 && Character.isWhitespace(text.charAt(pos))) pos--;
-        if (pos >= 0) {
-            int cls = editor.vimCharClass(text.charAt(pos));
-            while (pos > 0 && editor.vimCharClass(text.charAt(pos - 1)) == cls) pos--;
-        }
-
-        editor.writingArea.setCaretPosition(pos);
+        editor.writingArea.setCaretPosition(motionService.moveWordBackward(text, editor.writingArea.getCaretPosition()));
     }
 
 
     void moveWordEnd() {
         String text = editor.writingArea.getText();
-        int pos = editor.writingArea.getCaretPosition();
-        int len = text.length();
-        if (pos >= len - 1) return;
-
-        pos++;
-        while (pos < len && Character.isWhitespace(text.charAt(pos))) pos++;
-        if (pos < len) {
-            int cls = editor.vimCharClass(text.charAt(pos));
-            while (pos + 1 < len && editor.vimCharClass(text.charAt(pos + 1)) == cls) pos++;
-        }
-
-        editor.writingArea.setCaretPosition(Math.min(pos, len));
+        editor.writingArea.setCaretPosition(motionService.moveWordEnd(text, editor.writingArea.getCaretPosition()));
     }
 
 
@@ -310,7 +281,7 @@ final class EditActionController {
         while (pos < text.length() && Character.isWhitespace(text.charAt(pos))) {
             pos++;
         }
-        editor.writingArea.setCaretPosition(Math.min(pos, text.length()));
+        setGraphemeCaret(pos);
     }
 
 
@@ -326,7 +297,7 @@ final class EditActionController {
                 pos--;
             }
         }
-        editor.writingArea.setCaretPosition(pos);
+        setGraphemeCaret(pos);
     }
 
 
@@ -344,7 +315,7 @@ final class EditActionController {
                 pos--;
             }
         }
-        editor.writingArea.setCaretPosition(Math.min(pos, text.length()));
+        setGraphemeCaret(pos);
     }
 
 
@@ -372,7 +343,7 @@ final class EditActionController {
                 pos++;
             }
         }
-        editor.writingArea.setCaretPosition(Math.max(0, pos));
+        setGraphemeCaret(Math.max(0, pos));
     }
 
 
@@ -386,7 +357,7 @@ final class EditActionController {
             int pos = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(pos);
             int lineStart = editor.writingArea.getLineStartOffset(line);
-            editor.writingArea.setCaretPosition(lineStart);
+            setGraphemeCaret(lineStart);
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
@@ -398,7 +369,7 @@ final class EditActionController {
             int pos = editor.writingArea.getCaretPosition();
             int line = editor.writingArea.getLineOfOffset(pos);
             int lineEnd = editor.writingArea.getLineEndOffset(line);
-            editor.writingArea.setCaretPosition(Math.max(lineEnd - 1, 0));
+            setGraphemeCaret(Math.max(lineEnd - 1, 0));
         } catch (BadLocationException e) {
             e.printStackTrace();
         }
@@ -416,7 +387,7 @@ final class EditActionController {
             while (offset < lineText.length() && Character.isWhitespace(lineText.charAt(offset)) && lineText.charAt(offset) != '\n') {
                 offset++;
             }
-            editor.writingArea.setCaretPosition(Math.min(lineStart + offset, editor.writingArea.getText().length()));
+            setGraphemeCaret(Math.min(lineStart + offset, editor.writingArea.getText().length()));
         } catch (BadLocationException ignored) {
         }
     }
@@ -433,7 +404,7 @@ final class EditActionController {
             while (offset > 0 && Character.isWhitespace(lineText.charAt(offset))) {
                 offset--;
             }
-            editor.writingArea.setCaretPosition(Math.min(lineStart + offset, Math.max(lineStart, editor.writingArea.getText().length())));
+            setGraphemeCaret(Math.min(lineStart + offset, Math.max(lineStart, editor.writingArea.getText().length())));
         } catch (BadLocationException ignored) {
         }
     }

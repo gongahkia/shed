@@ -1,1 +1,0 @@
-; no upstream highlights query

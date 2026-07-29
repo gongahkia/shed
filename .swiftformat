@@ -1,8 +1,0 @@
---swift-version 5.9
---indent tab
---max-width 120
---enable sortImports
---disable trailingClosures
---exclude .build
---exclude Sources/CTreeSitter/upstream
---exclude Sources/CTSGrammars/grammars

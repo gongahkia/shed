@@ -32,7 +32,7 @@ jobs:
         run: mvn -B -q test
 
       - name: Build jar
-        run: mvn -B -q -DskipTests -Dshed.build.commit=${{ github.sha }} package
+        run: mvn -B -q -DskipTests "-Dshed.build.commit=${{ github.sha }}" package
 
       - name: Verify jar artifact
         shell: pwsh

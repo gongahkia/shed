@@ -4,9 +4,6 @@ import javax.swing.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 
@@ -153,11 +150,7 @@ final class RecoveryController {
         if (editor.recoveryStoreDir == null) {
             return;
         }
-        if (!editor.recoveryStoreDir.exists()) {
-            Files.createDirectories(editor.recoveryStoreDir.toPath());
-        }
-
-        Set<String> activeSnapshotFiles = new HashSet<>();
+        List<RecoveryJournal.Entry> entries = new ArrayList<>();
         int scratchIndex = 1;
         for (FileBuffer buffer : editor.buffers) {
             if (buffer == null || !buffer.isModified() || buffer == editor.treeBuffer || buffer == editor.quickfixBuffer) {
@@ -166,68 +159,49 @@ final class RecoveryController {
             String snapshotId = buffer.hasFilePath()
                 ? "file-" + Integer.toHexString(buffer.getFilePath().hashCode())
                 : "scratch-" + (scratchIndex++);
-            String snapshotFileName = snapshotId + ".json";
-            activeSnapshotFiles.add(snapshotFileName);
-
-            Map<String, Object> payload = new LinkedHashMap<>();
-            payload.put("id", snapshotId);
-            payload.put("name", buffer.getDisplayName());
-            payload.put("path", buffer.hasFilePath() ? buffer.getFilePath() : null);
-            payload.put("modified", true);
-            payload.put("content", buffer.getContent());
-            payload.put("savedAt", editor.commandLogTimeFormat.format(LocalDateTime.now()));
-
-            Files.writeString(
-                new File(editor.recoveryStoreDir, snapshotFileName).toPath(),
-                MiniJson.stringify(payload),
-                StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-                StandardOpenOption.WRITE
-            );
+            entries.add(new RecoveryJournal.Entry(snapshotId, buffer.getDisplayName(),
+                buffer.hasFilePath() ? buffer.getFilePath() : null, buffer.getFullContent()));
         }
-
-        File[] existing = editor.recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (existing == null) {
+        if (entries.isEmpty()) {
+            RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
             return;
         }
-        for (File file : existing) {
-            if (!activeSnapshotFiles.contains(file.getName())) {
-                Files.deleteIfExists(file.toPath());
-            }
-        }
+        FileBuffer active = editor.getCurrentBuffer();
+        int caret = active == null ? 0 : editor.writingArea.getCaretPosition();
+        RecoveryJournal.write(editor.recoveryStoreDir.toPath(), new RecoveryJournal.Workspace(
+            new File(".").getAbsolutePath(), active != null && active.hasFilePath() ? active.getFilePath() : null, caret
+        ), entries);
     }
 
 
     void clearRecoverySnapshots() {
-        if (editor.recoveryStoreDir == null || !editor.recoveryStoreDir.exists()) {
+        if (editor.recoveryStoreDir == null) {
             return;
         }
-        File[] snapshots = editor.recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (snapshots == null) {
-            return;
-        }
-        for (File snapshot : snapshots) {
-            try {
-                Files.deleteIfExists(snapshot.toPath());
-            } catch (IOException ignored) {
-            }
+        try {
+            RecoveryJournal.clear(editor.recoveryStoreDir.toPath());
+        } catch (IOException ignored) {
         }
     }
 
 
     void promptRecoveryRestoreIfAvailable() {
-        if (editor.recoveryStoreDir == null || !editor.recoveryStoreDir.exists()) {
+        if (editor.recoveryStoreDir == null) {
             return;
         }
-        File[] snapshots = editor.recoveryStoreDir.listFiles(file -> file.isFile() && file.getName().endsWith(".json"));
-        if (snapshots == null || snapshots.length == 0) {
+        RecoveryJournal.Journal journal;
+        try {
+            journal = RecoveryJournal.read(editor.recoveryStoreDir.toPath());
+        } catch (IOException error) {
+            editor.showMessage("Recovery journal rejected: " + error.getMessage());
             return;
         }
-        java.util.Arrays.sort(snapshots, Comparator.comparing(File::getName));
+        if (journal == null || journal.entries().isEmpty()) {
+            return;
+        }
         int result = JOptionPane.showConfirmDialog(
             editor,
-            snapshots.length + " crash-recovery snapshot(s) were found. Restore now?",
+            journal.entries().size() + " crash-recovery snapshot(s) were found. Restore now?",
             "Crash Recovery",
             JOptionPane.YES_NO_OPTION,
             JOptionPane.WARNING_MESSAGE
@@ -238,19 +212,23 @@ final class RecoveryController {
 
         int restored = 0;
         FileBuffer lastRestored = null;
-        for (File snapshot : snapshots) {
-            FileBuffer restoredBuffer = restoreRecoverySnapshot(snapshot);
+        for (RecoveryJournal.Entry entry : journal.entries()) {
+            FileBuffer restoredBuffer = restoreRecoveryEntry(entry);
             if (restoredBuffer != null) {
                 restored++;
                 lastRestored = restoredBuffer;
             }
-            try {
-                Files.deleteIfExists(snapshot.toPath());
-            } catch (IOException ignored) {
-            }
         }
-        if (lastRestored != null) {
+        FileBuffer workspaceActive = journal.workspace().activePath() == null ? null
+            : editor.findBufferByPath(new File(journal.workspace().activePath()));
+        if (workspaceActive != null) {
+            editor.loadBufferIntoEditor(workspaceActive);
+            editor.writingArea.setCaretPosition(Math.min(journal.workspace().activeCaretPosition(), editor.writingArea.getText().length()));
+        } else if (lastRestored != null) {
             editor.loadBufferIntoEditor(lastRestored);
+        }
+        if (restored == journal.entries().size()) {
+            clearRecoverySnapshots();
         }
         if (restored > 0) {
             editor.showMessage("Recovered " + restored + " buffer" + (restored == 1 ? "" : "s") + " from crash snapshots");
@@ -258,23 +236,15 @@ final class RecoveryController {
     }
 
 
-    FileBuffer restoreRecoverySnapshot(File snapshotFile) {
-        if (snapshotFile == null || !snapshotFile.isFile()) {
+    FileBuffer restoreRecoveryEntry(RecoveryJournal.Entry entry) {
+        if (entry == null) {
             return null;
         }
         try {
-            String json = Files.readString(snapshotFile.toPath(), StandardCharsets.UTF_8);
-            Map<String, Object> payload = MiniJson.asObject(MiniJson.parse(json));
-            if (payload == null) {
-                return null;
-            }
-            String content = MiniJson.asString(payload.get("content"));
-            String path = MiniJson.asString(payload.get("path"));
-            String name = MiniJson.asString(payload.get("name"));
-            String restoredContent = content == null ? "" : content;
+            String restoredContent = entry.content();
 
-            if (path != null && !path.isBlank()) {
-                File file = new File(path);
+            if (entry.path() != null && !entry.path().isBlank()) {
+                File file = new File(entry.path());
                 FileBuffer existing = editor.findBufferByPath(file);
                 if (existing == null) {
                     FileBuffer buffer = file.exists() ? new FileBuffer(file, editor.configManager) : new FileBuffer(file.getAbsolutePath());
@@ -291,7 +261,7 @@ final class RecoveryController {
                 return existing;
             }
 
-            String scratchName = name == null || name.isBlank() ? "[Recovered Scratch]" : "[Recovered] " + name;
+            String scratchName = entry.name().isBlank() ? "[Recovered Scratch]" : "[Recovered] " + entry.name();
             FileBuffer scratch = FileBuffer.createScratch(scratchName, restoredContent);
             scratch.setModified(true);
             if (editor.shouldReplaceSingleLandingBuffer()) {

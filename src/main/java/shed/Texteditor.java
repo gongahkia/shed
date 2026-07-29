@@ -1132,10 +1132,6 @@ public class Texteditor extends JFrame implements KeyListener {
         recoveryController.promptRecoveryRestoreIfAvailable();
     }
 
-    FileBuffer restoreRecoverySnapshot(File snapshotFile) {
-        return recoveryController.restoreRecoverySnapshot(snapshotFile);
-    }
-
     void maybePreviewMarkdown(FileBuffer buffer) {
         markdownController.maybePreviewMarkdown(buffer);
     }

@@ -39,4 +39,6 @@ Revocation data changes arrive only with an explicit Shed release/update flow. S
 
 ## Current Scope
 
-This issue defines the policy and its executable decision model only. There is no managed-language catalog, download, installer, network request, cache creation, or consent UI yet. Subsequent catalog, installer, integrity, cache-policy, and UI work must call this gate before performing I/O.
+The Java catalog records the Eclipse JDT LS command, Java 21 runtime requirement, desktop-platform support, Eclipse Public License 2.0, and its `java.eclipse-jdtls@1.50.0` install coordinate. It does not contain an approved binary source, checksum, signature, downloader, installer, cache creation, or consent UI. A user-managed `jdtls` command can run locally after its runtime is validated; a managed install remains unavailable until a later catalog revision supplies a signed, integrity-pinned artifact and the user approves the install.
+
+Subsequent catalog, installer, integrity, cache-policy, and UI work must call this gate before performing I/O. Eclipse JDT LS documents its Java 21 minimum runtime, platform-specific configuration directories, and Eclipse Public License 2.0 source at [its project repository](https://github.com/eclipse-jdtls/eclipse.jdt.ls).

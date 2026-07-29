@@ -32,11 +32,13 @@ public class LspService {
     }
 
     public java.util.List<String> getBuiltinExtensions() {
-        return java.util.List.of("rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cpp", "h", "hpp");
+        return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cpp", "h", "hpp");
     }
 
     public String[] builtinCommand(String extension) {
         switch (extension) {
+            case "java":
+                return new String[] {ManagedLanguageCatalog.java().command()};
             case "rs":
                 return new String[] {"rust-analyzer"};
             case "py":

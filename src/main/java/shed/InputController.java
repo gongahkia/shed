@@ -15,12 +15,18 @@ final class InputController {
     private final CompletionRequestState completionRequestState;
     private int completionJobId;
     private CompletionRequestState.Snapshot activeCompletionRequest;
+    private List<LspCompletionApplication.Placeholder> lspSnippetPlaceholders;
+    private int lspSnippetPlaceholderIndex;
+    private int lspSnippetDocumentVersion;
 
     InputController(Texteditor editor) {
         this.editor = editor;
         this.completionRequestState = new CompletionRequestState();
         this.completionJobId = -1;
         this.activeCompletionRequest = null;
+        this.lspSnippetPlaceholders = List.of();
+        this.lspSnippetPlaceholderIndex = -1;
+        this.lspSnippetDocumentVersion = -1;
     }
 
     public void keyPressed(KeyEvent e) {
@@ -1223,6 +1229,10 @@ final class InputController {
 
     void handleInsertMode(KeyEvent e) {
         int code = e.getKeyCode();
+        if ((code == KeyEvent.VK_TAB || (e.isShiftDown() && code == KeyEvent.VK_TAB)) && moveLspSnippetPlaceholder(e.isShiftDown() ? -1 : 1)) {
+            e.consume();
+            return;
+        }
         if (isCompletionPopupVisible()) {
             if (code == KeyEvent.VK_DOWN || (e.isControlDown() && code == KeyEvent.VK_N)) {
                 completionPopupNavigate(1); e.consume(); return;
@@ -1950,6 +1960,7 @@ final class InputController {
         cancelCompletionJob();
         completionRequestState.invalidate();
         activeCompletionRequest = null;
+        clearLspSnippetSession();
         if (editor.completionPopup != null && editor.completionPopup.isVisible()) editor.completionPopup.setVisible(false);
     }
 
@@ -1976,11 +1987,25 @@ final class InputController {
             dismissCompletionPopup();
             return;
         }
+        String prefix = editor.completionPrefix;
+        LspCompletionApplication.Result result = LspCompletionApplication.apply(editor.writingArea.getText(),
+            editor.writingArea.getCaretPosition(), prefix, selected);
         dismissCompletionPopup();
-        if (selected != null && editor.completionPrefix != null) {
-            editor.applyCompletion(editor.completionPrefix, selected.getLabel());
-            editor.markModified();
+        editor.suppressDocumentEvents = true;
+        editor.writingArea.setText(result.text());
+        editor.suppressDocumentEvents = false;
+        editor.markModified();
+        if (result.placeholders().isEmpty()) {
+            editor.writingArea.setCaretPosition(Math.min(result.caret(), editor.writingArea.getDocument().getLength()));
+        } else {
+            FileBuffer buffer = editor.getCurrentBuffer();
+            String uri = buffer == null || !buffer.hasFilePath() ? null : editor.bufferUri(buffer);
+            lspSnippetPlaceholders = result.placeholders();
+            lspSnippetPlaceholderIndex = 0;
+            lspSnippetDocumentVersion = uri == null ? -1 : editor.lspDocumentVersions.getOrDefault(uri, -1);
+            selectLspSnippetPlaceholder();
         }
+        if (result.fallback()) editor.showMessage("LSP completion edit was invalid; inserted label");
     }
 
 
@@ -2096,6 +2121,41 @@ final class InputController {
         List<LspClient.CompletionItem> items = new ArrayList<>();
         for (String completion : completions) items.add(new LspClient.CompletionItem(completion, "", null));
         return items;
+    }
+
+    private boolean moveLspSnippetPlaceholder(int direction) {
+        if (lspSnippetPlaceholders.isEmpty()) return false;
+        FileBuffer buffer = editor.getCurrentBuffer();
+        String uri = buffer == null || !buffer.hasFilePath() ? null : editor.bufferUri(buffer);
+        if (uri == null || editor.lspDocumentVersions.getOrDefault(uri, -1) != lspSnippetDocumentVersion) {
+            clearLspSnippetSession();
+            return false;
+        }
+        int next = lspSnippetPlaceholderIndex + direction;
+        if (next < 0 || next >= lspSnippetPlaceholders.size()) {
+            clearLspSnippetSession();
+            return false;
+        }
+        lspSnippetPlaceholderIndex = next;
+        selectLspSnippetPlaceholder();
+        return true;
+    }
+
+    private void selectLspSnippetPlaceholder() {
+        LspCompletionApplication.Placeholder placeholder = lspSnippetPlaceholders.get(lspSnippetPlaceholderIndex);
+        int length = editor.writingArea.getDocument().getLength();
+        if (placeholder.start() < 0 || placeholder.end() < placeholder.start() || placeholder.end() > length) {
+            clearLspSnippetSession();
+            return;
+        }
+        editor.writingArea.setCaretPosition(placeholder.start());
+        editor.writingArea.moveCaretPosition(placeholder.end());
+    }
+
+    private void clearLspSnippetSession() {
+        lspSnippetPlaceholders = List.of();
+        lspSnippetPlaceholderIndex = -1;
+        lspSnippetDocumentVersion = -1;
     }
 
 

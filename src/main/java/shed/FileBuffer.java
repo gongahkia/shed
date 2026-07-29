@@ -36,7 +36,7 @@ public class FileBuffer {
     private static final long DEFAULT_LARGE_FILE_THRESHOLD_MB = 100L;
     private static final int DEFAULT_LARGE_FILE_LINE_THRESHOLD = 50000;
     private static final int DEFAULT_LARGE_FILE_PREVIEW_LINES = 1000;
-    private static final String LARGE_FILE_PREVIEW_MARKER = "[shed large-file preview: remaining content hidden until save or reload]";
+    private static final String LARGE_FILE_PREVIEW_MARKER = "[shed large-file preview: remaining content is not loaded]";
     private static final AtomicLong BACKUP_STAMP = new AtomicLong();
 
     private File file;
@@ -54,6 +54,8 @@ public class FileBuffer {
     private boolean scratch;
     private boolean largeFile;
     private String largeFileTail;
+    private LargeFileStore largeFileStore;
+    private String largeFileError;
     private File backupFile;
     private boolean showingPreviewOnly;
     private long fileSizeBytes;
@@ -79,6 +81,8 @@ public class FileBuffer {
         this.lineEnding = System.lineSeparator().equals("\r\n") ? "\r\n" : "\n";
         this.largeFile = false;
         this.largeFileTail = null;
+        this.largeFileStore = null;
+        this.largeFileError = null;
         this.showingPreviewOnly = false;
         this.fileSizeBytes = 0L;
         load(configManager);
@@ -106,6 +110,8 @@ public class FileBuffer {
         this.lineCount = 0;
         this.largeFile = false;
         this.largeFileTail = null;
+        this.largeFileStore = null;
+        this.largeFileError = null;
         this.backupFile = null;
         this.showingPreviewOnly = false;
         this.lastKnownModifiedTime = 0L;
@@ -140,7 +146,17 @@ public class FileBuffer {
             return;
         }
 
-        byte[] bytes = Files.readAllBytes(file.toPath());
+        LargeFilePolicy policy = resolveLargeFilePolicy(configManager);
+        Path source = file.toPath();
+        long sourceBytes = Files.size(source);
+        if (sourceBytes > policy.maxSizeBytes || LargeFileStore.exceedsLineLimit(source, policy.maxLineCount)) {
+            loadLargeFile(source, sourceBytes, policy);
+            return;
+        }
+
+        this.largeFileStore = null;
+        this.largeFileError = null;
+        byte[] bytes = Files.readAllBytes(source);
         this.fileSizeBytes = bytes.length;
         DecodedContent decoded = decode(bytes);
         this.encodingName = decoded.charsetName;
@@ -150,39 +166,46 @@ public class FileBuffer {
         this.lastKnownModifiedTime = file.exists() ? file.lastModified() : 0L;
 
         String normalized = normalizeLineEndings(decoded.content);
-        LargeFilePolicy policy = resolveLargeFilePolicy(configManager);
         int detectedLineCount = countLines(normalized);
-        boolean isLargeBySize = bytes.length > policy.maxSizeBytes;
-        boolean isLargeByLines = detectedLineCount > policy.maxLineCount;
-        this.largeFile = isLargeBySize || isLargeByLines;
-
-        if (largeFile) {
-            this.showingPreviewOnly = true;
-            String[] lines = normalized.split("\n", -1);
-            int previewLineCount = Math.min(policy.previewLineCount, lines.length);
-            StringBuilder previewBuilder = new StringBuilder();
-            for (int i = 0; i < previewLineCount; i++) {
-                if (i > 0) {
-                    previewBuilder.append("\n");
-                }
-                previewBuilder.append(lines[i]);
-            }
-            if (previewLineCount < lines.length) {
-                if (previewBuilder.length() > 0) {
-                    previewBuilder.append("\n");
-                }
-                previewBuilder.append(LARGE_FILE_PREVIEW_MARKER);
-            }
-            this.largeFileTail = buildTail(lines, previewLineCount);
-            setDocumentText(previewBuilder.toString(), false);
-        } else {
-            this.showingPreviewOnly = false;
-            this.largeFileTail = null;
-            setDocumentText(normalized, false);
-        }
+        this.largeFile = false;
+        this.showingPreviewOnly = false;
+        this.largeFileTail = null;
+        setDocumentText(normalized, false);
 
         updateLineCount();
         this.savedContent = getFullContent();
+        this.externalFileStamp = observeExternalFile();
+    }
+
+    private void loadLargeFile(Path source, long sourceBytes, LargeFilePolicy policy) {
+        this.fileSizeBytes = sourceBytes;
+        this.backupFile = null;
+        this.lastKnownModifiedTime = file.exists() ? file.lastModified() : 0L;
+        this.largeFile = true;
+        this.showingPreviewOnly = true;
+        this.largeFileTail = null;
+        LargeFileStore.OpenResult result = LargeFileStore.open(source, policy.previewLineCount);
+        if (result.opened()) {
+            this.largeFileStore = result.store();
+            this.largeFileError = null;
+            this.encodingName = StandardCharsets.UTF_8.name();
+            this.lineEnding = largeFileStore.lineEnding();
+            this.fileType = FileType.detect(file, largeFileStore.preview());
+            String preview = largeFileStore.preview();
+            if (largeFileStore.previewTruncated()) {
+                preview += (preview.isEmpty() || preview.endsWith("\n") ? "" : "\n") + LARGE_FILE_PREVIEW_MARKER;
+            }
+            setDocumentText(preview, false);
+        } else {
+            this.largeFileStore = null;
+            this.largeFileError = result.error();
+            this.encodingName = StandardCharsets.UTF_8.name();
+            this.lineEnding = "\n";
+            this.fileType = FileType.detect(file, "");
+            setDocumentText("[shed large-file unavailable: " + largeFileError + "]", false);
+        }
+        updateLineCount();
+        this.savedContent = "";
         this.externalFileStamp = observeExternalFile();
     }
 
@@ -269,6 +292,9 @@ public class FileBuffer {
         if (scratch || file == null) {
             throw new IOException("Scratch buffer has no file path; use :w <file>");
         }
+        if (largeFile) {
+            throw new IOException("Large-file save is unavailable until streamed save support is enabled");
+        }
 
         String textToWrite = getFullContent();
         String contentWithLineEndings = applyLineEndings(textToWrite);
@@ -294,6 +320,9 @@ public class FileBuffer {
     public void saveAs(File newFile) throws IOException {
         if (newFile == null) {
             throw new IOException("Save target is required; use :w <file>");
+        }
+        if (largeFile) {
+            throw new IOException("Large-file save is unavailable until streamed save support is enabled");
         }
         File previousFile = this.file;
         String previousScratchName = this.scratchName;
@@ -343,6 +372,9 @@ public class FileBuffer {
 
     // Update content while explicitly controlling modification state
     public void setContent(String content, boolean modified) {
+        if (largeFile) {
+            throw new IllegalStateException("Large-file editing is unavailable until bounded editing support is enabled");
+        }
         String normalized = content == null ? "" : content;
         setDocumentText(normalized, modified);
         if (!modified) {
@@ -363,6 +395,9 @@ public class FileBuffer {
     }
 
     public String getFullContent() {
+        if (largeFile) {
+            throw new IllegalStateException("Large-file content is not materialized");
+        }
         String content = getContent();
         if (largeFile && largeFileTail != null) {
             String visibleContent = removeLargeFilePreviewMarker(content);
@@ -561,11 +596,32 @@ public class FileBuffer {
         return largeFile;
     }
 
+    public boolean isLargeFileUnavailable() {
+        return largeFile && largeFileStore == null;
+    }
+
+    public String getLargeFileStatus() {
+        if (!largeFile) {
+            return "";
+        }
+        if (largeFileError != null) {
+            return largeFileError;
+        }
+        return "bounded preview: " + largeFileStore.byteSize() + " bytes, " + largeFileStore.lineCount() + " lines";
+    }
+
+    public long getLargeFileLineCount() {
+        return largeFileStore == null ? 0L : largeFileStore.lineCount();
+    }
+
     public boolean isShowingPreviewOnly() {
         return showingPreviewOnly;
     }
 
     public void expandLargeFilePreview() {
+        if (largeFileStore != null || largeFileError != null) {
+            return;
+        }
         String content = getContent();
         if (largeFile && largeFileTail != null && content.contains("[shed large-file preview:")) {
             int markerIndex = content.indexOf("[shed large-file preview:");
@@ -585,7 +641,7 @@ public class FileBuffer {
     }
 
     public void createBackup() throws IOException {
-        if (scratch || file == null || !modified) {
+        if (scratch || file == null || !modified || largeFile) {
             return;
         }
         BackupPolicy policy = backupPolicy();
@@ -629,7 +685,7 @@ public class FileBuffer {
         }
         undoManager.discardAllEdits();
         this.modified = modified;
-        this.fileType = FileType.detect(file, getFullContent());
+        this.fileType = FileType.detect(file, largeFile ? getContent() : getFullContent());
         updateLineCount();
     }
 

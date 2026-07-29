@@ -241,7 +241,7 @@ final class LspController {
 
     public String lspGoToDefinition() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return "LSP definition requires a file-backed buffer";
         }
         LspClient client = resolveLspClient(buffer);
@@ -266,7 +266,7 @@ final class LspController {
 
     public String lspHover() {
         FileBuffer buffer = editor.getCurrentBuffer();
-        if (buffer == null || !buffer.hasFilePath()) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return "LSP hover requires a file-backed buffer";
         }
         LspClient client = resolveLspClient(buffer);
@@ -1551,7 +1551,7 @@ final class LspController {
 
 
     void syncLspOpen(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
         LspClient client = resolveLspClient(buffer);
@@ -1568,7 +1568,7 @@ final class LspController {
 
 
     void syncLspChange(FileBuffer buffer) {
-        if (buffer == null || !buffer.hasFilePath()) {
+        if (buffer == null || !buffer.hasFilePath() || buffer.isLargeFile()) {
             return;
         }
         LspClient client = resolveLspClient(buffer);

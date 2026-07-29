@@ -23,6 +23,10 @@ final class MarkdownController {
         if (buffer == null || buffer.getFileType() != FileType.MARKDOWN || buffer.getFile() == null) {
             return;
         }
+        if (buffer.isLargeFile()) {
+            editor.showMessage("Markdown preview unavailable for a large file");
+            return;
+        }
         if (buffer.getFile().equals(editor.lastPreviewedMarkdown)) {
             return;
         }

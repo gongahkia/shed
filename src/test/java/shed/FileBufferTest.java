@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,7 +20,7 @@ public class FileBufferTest {
     Path tempDir;
 
     @Test
-    void largeFilePreviewSavePreservesHiddenTail() throws Exception {
+    void largeFileOpenKeepsBoundedPreviewAndRefusesUnimplementedSave() throws Exception {
         Path file = tempDir.resolve("large.txt");
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < 50001; i++) {
@@ -34,12 +35,33 @@ public class FileBufferTest {
         FileBuffer buffer = new FileBuffer(file.toFile());
         assertTrue(buffer.isShowingPreviewOnly());
         assertTrue(buffer.getContent().contains("shed large-file preview"));
+        assertTrue(buffer.getContent().length() <= LargeFileStore.MAX_PREVIEW_CHARS + 128);
+        assertEquals(50001, buffer.getLargeFileLineCount());
+        assertTrue(buffer.getLargeFileStatus().contains("bounded preview"));
 
-        buffer.save();
+        IOException error = assertThrows(IOException.class, buffer::save);
+        assertEquals("Large-file save is unavailable until streamed save support is enabled", error.getMessage());
+        assertEquals(original, Files.readString(file, StandardCharsets.UTF_8));
+        assertThrows(IllegalStateException.class, buffer::getFullContent);
+    }
 
-        String saved = Files.readString(file, StandardCharsets.UTF_8);
-        assertEquals(original, saved);
-        assertFalse(saved.contains("shed large-file preview"));
+    @Test
+    void largeFileWithMalformedUtf8PreservesUnavailableStateWithoutFallback() throws Exception {
+        Path file = tempDir.resolve("malformed-large.txt");
+        byte[] content = new byte[100_002];
+        for (int index = 0; index < content.length; index += 2) {
+            content[index] = (byte) 0xFF;
+            content[index + 1] = '\n';
+        }
+        Files.write(file, content);
+
+        FileBuffer buffer = new FileBuffer(file.toFile());
+
+        assertTrue(buffer.isLargeFile());
+        assertTrue(buffer.isLargeFileUnavailable());
+        assertTrue(buffer.getLargeFileStatus().contains("well-formed UTF-8"));
+        assertTrue(buffer.getContent().contains("large-file unavailable"));
+        assertThrows(IllegalStateException.class, buffer::getFullContent);
     }
 
     @Test

@@ -8,9 +8,11 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.UserPrincipal;
 import java.util.ArrayList;
@@ -94,7 +96,6 @@ public class ConfigManager {
     private static final String SHED_SESSIONS_NAME = "sessions";
     private static final String SHED_PLUGINS_NAME = "plugins";
     private static final String LEGACY_CONFIG_NAME = ".shedrc";
-    private static final String LEGACY_CONFIG_ALT_RELATIVE = ".config/shed/shedrc";
 
     private static final Map<String, ThemePalette> THEMES = new LinkedHashMap<>();
     private static final Map<String, String> THEME_ALIASES = new HashMap<>();
@@ -174,9 +175,9 @@ public class ConfigManager {
         this.projectConfig = new HashMap<>();
         this.projectPreviousValues = new HashMap<>();
         this.activeProjectConfigFile = null;
-        String home = System.getProperty("user.home");
-        this.shedDirectoryPath = home + "/" + SHED_DIRECTORY_NAME;
-        this.configPath = shedDirectoryPath + "/" + SHED_CONFIG_NAME;
+        Path home = Path.of(System.getProperty("user.home"));
+        this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
+        this.configPath = Path.of(shedDirectoryPath).resolve(SHED_CONFIG_NAME).toString();
         migrateLegacyConfigIfNeeded();
 
         loadDefaults();
@@ -977,7 +978,7 @@ public class ConfigManager {
     }
 
     public String getPluginsDirectoryPath() {
-        return shedDirectoryPath + "/" + SHED_PLUGINS_NAME;
+        return Path.of(shedDirectoryPath).resolve(SHED_PLUGINS_NAME).toString();
     }
 
     // Check if config file exists
@@ -1060,7 +1061,7 @@ public class ConfigManager {
     }
 
     private String defaultSessionDirectoryPath() {
-        return shedDirectoryPath + "/" + SHED_SESSIONS_NAME;
+        return Path.of(shedDirectoryPath).resolve(SHED_SESSIONS_NAME).toString();
     }
 
     private void migrateLegacyConfigIfNeeded() {
@@ -1088,7 +1089,7 @@ public class ConfigManager {
         if (legacy.exists()) {
             return legacy;
         }
-        File legacyAlt = new File(home + "/" + LEGACY_CONFIG_ALT_RELATIVE);
+        File legacyAlt = Path.of(home, ".config", "shed", SHED_CONFIG_NAME).toFile();
         if (legacyAlt.exists()) {
             return legacyAlt;
         }
@@ -1174,7 +1175,10 @@ public class ConfigManager {
         if (file == null || !file.isFile()) {
             return false;
         }
-        java.nio.file.Path path = file.toPath();
+        Path path = file.toPath();
+        if (!supportsPosixAttributes(path)) {
+            return true;
+        }
         String expectedUser = System.getProperty("user.name");
         try {
             UserPrincipal owner = Files.getOwner(path);
@@ -1193,6 +1197,10 @@ public class ConfigManager {
         } catch (IOException | UnsupportedOperationException | SecurityException ignored) {
         }
         return true;
+    }
+
+    private boolean supportsPosixAttributes(Path path) {
+        return Files.getFileAttributeView(path, PosixFileAttributeView.class) != null;
     }
 
     private boolean matchesLocalUsername(String ownerName, String expectedUser) {

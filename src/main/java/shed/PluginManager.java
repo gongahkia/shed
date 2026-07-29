@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.UserPrincipal;
 import java.security.MessageDigest;
@@ -214,6 +215,9 @@ public class PluginManager {
             if (Files.isSymbolicLink(path)) {
                 return false;
             }
+            if (!supportsPosixAttributes(path)) {
+                return true;
+            }
             UserPrincipal owner = Files.getOwner(path);
             if (owner != null && !matchesLocalUser(owner.getName())) {
                 return false;
@@ -230,6 +234,10 @@ public class PluginManager {
         } catch (IOException | SecurityException e) {
             return false;
         }
+    }
+
+    private boolean supportsPosixAttributes(Path path) {
+        return Files.getFileAttributeView(path, PosixFileAttributeView.class) != null;
     }
 
     private boolean matchesLocalUser(String ownerName) {

@@ -25,7 +25,6 @@ final class GitHistoryRemoteDialog extends JDialog {
 
     private final Texteditor editor;
     private final Loader loader;
-    private final boolean remoteActionsEnabled;
     private final JLabel repository = new JLabel("Repository: resolving…");
     private final JLabel state = new JLabel("Loading local Git history…");
     private final JProgressBar progress = new JProgressBar();
@@ -41,17 +40,16 @@ final class GitHistoryRemoteDialog extends JDialog {
     private GitHistoryModel.Snapshot snapshot;
     private int activeJobId = -1;
 
-    static void showFor(Texteditor editor, Loader loader, boolean remoteActionsEnabled) {
-        GitHistoryRemoteDialog dialog = new GitHistoryRemoteDialog(editor, loader, remoteActionsEnabled);
+    static void showFor(Texteditor editor, Loader loader) {
+        GitHistoryRemoteDialog dialog = new GitHistoryRemoteDialog(editor, loader);
         dialog.setVisible(true);
         dialog.refresh();
     }
 
-    private GitHistoryRemoteDialog(Texteditor editor, Loader loader, boolean remoteActionsEnabled) {
+    private GitHistoryRemoteDialog(Texteditor editor, Loader loader) {
         super(editor, "Git History and Remote Operations", false);
         this.editor = editor;
         this.loader = loader;
-        this.remoteActionsEnabled = remoteActionsEnabled;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout(8, 8));
         add(header(), BorderLayout.NORTH);
@@ -148,7 +146,7 @@ final class GitHistoryRemoteDialog extends JDialog {
 
     private void startRemote(GitHistoryModel.RemoteAction action) {
         if (activeJobId >= 0) return;
-        if (!remoteActionsEnabled) {
+        if (!remoteActionsEnabled()) {
             state.setText("Remote actions disabled by git.remote.actions.enabled=false");
             return;
         }
@@ -216,10 +214,14 @@ final class GitHistoryRemoteDialog extends JDialog {
     }
 
     private void updateRemoteActions() {
-        boolean enabled = remoteActionsEnabled && snapshot != null && snapshot.available() && !snapshot.remotes().isEmpty();
+        boolean enabled = remoteActionsEnabled() && snapshot != null && snapshot.available() && !snapshot.remotes().isEmpty();
         fetch.setEnabled(enabled);
         pull.setEnabled(enabled);
         push.setEnabled(enabled);
+    }
+
+    private boolean remoteActionsEnabled() {
+        return editor.configManager.getGitRemoteActionsEnabled();
     }
 
     private void showCommit(GitHistoryModel.Commit commit) {

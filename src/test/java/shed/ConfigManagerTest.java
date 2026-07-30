@@ -154,20 +154,41 @@ public class ConfigManagerTest {
     }
 
     @Test
-    void configuresGitHistoryAndRemoteActionSurfacesIndependently() throws IOException {
+    void configuresGitWorkbenchSurfacesIndependently() throws IOException {
         Path home = tempDir.resolve("home-git-history");
         System.setProperty("user.home", home.toString());
         ConfigManager config = new ConfigManager();
 
+        assertTrue(config.getGitChangesEnabled());
+        assertTrue(config.getGitDiffsEnabled());
+        assertTrue(config.getGitStagingEnabled());
         assertTrue(config.getGitHistoryEnabled());
         assertTrue(config.getGitRemoteActionsEnabled());
+        assertTrue(config.getGitPanelPresentationEnabled());
+        config.setAndPersist("git.changes.enabled", "false");
+        config.setAndPersist("git.diffs.enabled", "false");
+        config.setAndPersist("git.staging.enabled", "false");
         config.setAndPersist("git.history.enabled", "false");
         config.setAndPersist("git.remote.actions.enabled", "false");
+        config.setAndPersist("git.panel.presentation.enabled", "false");
 
+        assertFalse(config.getGitChangesEnabled());
+        assertFalse(config.getGitDiffsEnabled());
+        assertFalse(config.getGitStagingEnabled());
         assertFalse(config.getGitHistoryEnabled());
         assertFalse(config.getGitRemoteActionsEnabled());
+        assertFalse(config.getGitPanelPresentationEnabled());
         List<String> keys = config.searchTypedSettings("remote actions").stream().map(TypedSettings.Descriptor::key).toList();
         assertEquals(List.of("git.remote.actions.enabled"), keys);
+        List<String> surfaces = List.of("git.changes.enabled", "git.diffs.enabled", "git.staging.enabled", "git.conflict.resolution.enabled",
+            "git.history.enabled", "git.remote.actions.enabled", "git.panel.presentation.enabled");
+        for (String key : surfaces) {
+            TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+                .filter(setting -> setting.key().equals(key)).findFirst().orElseThrow();
+            assertEquals("Git", descriptor.category());
+        }
+        assertEquals("Live: used by subsequent staging and unstaging commands", config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("git.staging.enabled")).findFirst().orElseThrow().applyBehavior());
     }
 
     @Test

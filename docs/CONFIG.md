@@ -139,10 +139,16 @@ Managed language support has no configuration key or network path yet. Its plann
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `git.workbench.enabled` | `true` | bool | Enables `:git workbench`, a read-only asynchronous repository-status, diff, and hunk-navigation view |
+| `git.workbench.enabled` | `true` | bool | Existing top-level gate for `:git workbench`; keep enabled with `git.changes.enabled` for the changes document |
+| `git.changes.enabled` | `true` | bool | Enables the graphical changes document opened by `:git workbench` |
+| `git.diffs.enabled` | `true` | bool | Enables diff loading and hunk navigation inside the graphical changes document |
+| `git.staging.enabled` | `true` | bool | Enables `:git add`, `:git stage`, `:git restore`, `:git unstage`, and hunk stage/unstage actions |
 | `git.conflict.resolution.enabled` | `true` | bool | Enables `:git conflict`, an explicit conflict-resolution document with preserved Git sides |
 | `git.history.enabled` | `true` | bool | Enables `:git history`, an asynchronous local-history document |
 | `git.remote.actions.enabled` | `true` | bool | Enables explicit Fetch, Pull (fast-forward only), and Push controls in `:git history` |
+| `git.panel.presentation.enabled` | `true` | bool | Enables all graphical Git documents while leaving command-mode Git commands available |
+
+The changes document is effective only when `git.workbench.enabled`, `git.changes.enabled`, and `git.panel.presentation.enabled` are all `true`. Diff controls require `git.diffs.enabled`; direct `:git diff` remains available. Conflict and history documents each require their own key plus `git.panel.presentation.enabled`; direct `:git log` remains available. Remote controls further require `git.remote.actions.enabled` after the history document opens. `git.staging.enabled` blocks only index-mutating staging and unstaging commands, including hunk stage/unstage; commit, checkout, switch, and hunk revert retain their existing command-mode behaviour. `git.panel.presentation.enabled=false` blocks graphical documents only.
 
 `:git history` never starts network activity when opened or refreshed. Fetch requires its button click; Pull uses `git pull --ff-only` and Push each require a second confirmation. Each remote operation runs in a cancellable background job, exposes captured output or failure in the document, and can be disabled independently with `git.remote.actions.enabled`.
 

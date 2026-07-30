@@ -97,3 +97,7 @@ $ java -jar target/shed-2.0.0.jar
 $ java -jar target/shed-2.0.0.jar # opens file chooser dialog
 $ java -jar target/shed-2.0.0.jar filename.txt # opens specific file
 ```
+
+### macOS arm64 installer
+
+On macOS arm64 with JDK 21, run `bash scripts/package-macos.sh` to create a DMG with a bundled runtime. See [macOS packaging](./docs/MACOS_PACKAGING.md) for verification and signing/notarization boundaries.

@@ -39,10 +39,10 @@ public class LanguageServerDetectorTest {
         LanguageServerDetector.Result result = detector.detect(ManagedLanguageCatalog.python(), ManagedLanguageSupportTrust.Platform.LINUX);
 
         assertTrue(result.usable());
-        assertEquals("/tools/pyright-langserver", result.executable());
+        assertEquals(Path.of("/tools/pyright-langserver").toString(), result.executable());
         assertEquals("pyright 1.1.411", result.serverVersion());
         assertEquals("v20.19.1", result.runtimeVersion());
-        assertEquals(List.of("/tools/pyright-langserver", "--version"), commands.get(0));
+        assertEquals(List.of(Path.of("/tools/pyright-langserver").toString(), "--version"), commands.get(0));
         assertEquals(List.of("node", "--version"), commands.get(1));
         assertFalse(commands.stream().flatMap(List::stream).anyMatch(value -> value.contains("install") || value.contains("update")));
     }
@@ -63,6 +63,6 @@ public class LanguageServerDetectorTest {
         assertTrue(old.status().detail().contains("Node.js 14.21.3"));
         assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNKNOWN, failed.status().availability());
         assertEquals("permission denied", failed.failure());
-        assertEquals("/tools/gopls", failed.executable());
+        assertEquals(Path.of("/tools/gopls").toString(), failed.executable());
     }
 }

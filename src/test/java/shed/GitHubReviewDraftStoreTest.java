@@ -49,4 +49,19 @@ public class GitHubReviewDraftStoreTest {
         assertTrue(error.getMessage().contains("unsupported"));
         assertTrue(Files.exists(file));
     }
+
+    @Test
+    void recordsAcknowledgementsAndRemovesTheAcknowledgedDraft() throws Exception {
+        GitHubReviewDraftStore store = new GitHubReviewDraftStore(temporaryDirectory.resolve(GitHubReviewDraftStore.FILE_NAME));
+        GitHubReviewDraftStore.Target target = new GitHubReviewDraftStore.Target("owner/repo", "42");
+
+        store.save(target, "review body");
+        store.acknowledge(target, "COMMENT", "review body");
+
+        assertNull(store.load(target));
+        assertTrue(store.acknowledged(target, "COMMENT", "review body"));
+        GitHubReviewDraftStore reloaded = new GitHubReviewDraftStore(temporaryDirectory.resolve(GitHubReviewDraftStore.FILE_NAME));
+        assertTrue(reloaded.acknowledged(target, "COMMENT", "review body"));
+        assertFalse(store.acknowledged(target, "APPROVE", "review body"));
+    }
 }

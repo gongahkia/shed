@@ -3,14 +3,18 @@ package shed;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JList;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
@@ -21,6 +25,7 @@ final class GitHubPullRequestDialog extends JDialog {
     interface Loader {
         GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token);
         GitHubPullRequestDetailModel.Detail detail(String repository, GitHubPullRequestModel.PullRequest pullRequest, AsyncJobService.JobToken token);
+        GitHubReviewSubmissionModel.Result submit(GitHubReviewSubmissionModel.Request request, AsyncJobService.JobToken token);
     }
     private final Texteditor editor;
     private final Loader loader;
@@ -33,12 +38,17 @@ final class GitHubPullRequestDialog extends JDialog {
     private final JTextArea details = new JTextArea();
     private final JLabel draftTarget = new JLabel("Select a pull request to create a local unsent draft.");
     private final JTextArea draft = new JTextArea();
+    private final JComboBox<GitHubReviewSubmissionModel.Action> reviewAction = new JComboBox<>(GitHubReviewSubmissionModel.Action.values());
+    private final JTextArea submissionResult = new JTextArea("No review submission attempted.");
     private final JButton refresh = new JButton("Refresh");
     private final JButton viewDetails = new JButton("View Details and Diff");
     private final JButton saveDraft = new JButton("Save Local Draft");
     private final JButton discardDraft = new JButton("Discard Local Draft");
+    private final JButton submitReview = new JButton("Submit Review…");
     private final JButton cancel = new JButton("Cancel");
     private final Map<GitHubReviewDraftStore.Target, String> workingDrafts = new HashMap<>();
+    private final Map<GitHubReviewDraftStore.Target, GitHubReviewSubmissionModel.Result> submissionResults = new HashMap<>();
+    private final Set<GitHubReviewSubmissionModel.Request> acknowledgedReviews = new HashSet<>();
     private GitHubReviewDraftStore.Target selectedDraftTarget;
     private int jobId = -1;
 
@@ -71,9 +81,14 @@ final class GitHubPullRequestDialog extends JDialog {
         draftPanel.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         draftPanel.add(draftTarget, BorderLayout.NORTH);
         draftPanel.add(new JScrollPane(draft), BorderLayout.CENTER);
+        JPanel submissionPanel = new JPanel(new BorderLayout(0, 4));
+        submissionResult.setEditable(false);
+        submissionPanel.add(new JLabel("Exact gh server result"), BorderLayout.NORTH);
+        submissionPanel.add(new JScrollPane(submissionResult), BorderLayout.CENTER);
         JTabbedPane content = new JTabbedPane();
         content.addTab("Details and Diff", detailPane);
         content.addTab("Local Unsent Draft", draftPanel);
+        content.addTab("Submission Result", submissionPanel);
         javax.swing.JSplitPane split = new javax.swing.JSplitPane(javax.swing.JSplitPane.HORIZONTAL_SPLIT, entries, content);
         split.setResizeWeight(0.55);
         add(split, BorderLayout.CENTER);
@@ -83,12 +98,14 @@ final class GitHubPullRequestDialog extends JDialog {
         viewDetails.addActionListener(event -> loadDetails());
         saveDraft.addActionListener(event -> saveDraft());
         discardDraft.addActionListener(event -> discardDraft());
+        submitReview.addActionListener(event -> submitReview());
         cancel.addActionListener(event -> cancel());
         cancel.setEnabled(false);
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         JPanel actions = new JPanel();
-        actions.add(progress); actions.add(refresh); actions.add(viewDetails); actions.add(saveDraft); actions.add(discardDraft); actions.add(cancel); actions.add(close);
+        actions.add(progress); actions.add(refresh); actions.add(viewDetails); actions.add(reviewAction); actions.add(saveDraft); actions.add(discardDraft);
+        actions.add(submitReview); actions.add(cancel); actions.add(close);
         add(actions, BorderLayout.SOUTH);
         setPreferredSize(new Dimension(760, 440));
         pack(); setLocationRelativeTo(editor);
@@ -114,7 +131,7 @@ final class GitHubPullRequestDialog extends JDialog {
     private void setBusy(boolean busy) {
         progress.setVisible(busy); refresh.setEnabled(!busy); viewDetails.setEnabled(!busy); cancel.setEnabled(busy);
         boolean editable = !busy && selectedDraftTarget != null;
-        draft.setEditable(editable); saveDraft.setEnabled(editable); discardDraft.setEnabled(editable);
+        draft.setEditable(editable); reviewAction.setEnabled(editable); saveDraft.setEnabled(editable); discardDraft.setEnabled(editable); submitReview.setEnabled(editable);
     }
     private void loadDetails() {
         GitHubPullRequestModel.PullRequest pullRequest = list.getSelectedValue();
@@ -153,6 +170,7 @@ final class GitHubPullRequestDialog extends JDialog {
             draft.setText(body);
             draftTarget.setText("Local unsent draft for " + selectedDraftTarget.repository() + " PR #" + selectedDraftTarget.pullRequest()
                 + ". No server comment has been created.");
+            renderSubmissionResult(submissionResults.get(selectedDraftTarget));
         } catch (IOException | IllegalArgumentException error) {
             selectedDraftTarget = null; draft.setText("");
             draftTarget.setText("Local draft unavailable: " + error.getMessage()); state.setText("Unable to load local draft: " + error.getMessage());
@@ -182,6 +200,61 @@ final class GitHubPullRequestDialog extends JDialog {
         } catch (IOException error) {
             state.setText("Unable to discard local draft: " + error.getMessage());
         }
+    }
+
+    private void submitReview() {
+        if (jobId >= 0 || selectedDraftTarget == null) { state.setText("Select a pull request before submitting a review."); return; }
+        GitHubReviewSubmissionModel.Request request;
+        try {
+            request = new GitHubReviewSubmissionModel.Request(selectedDraftTarget,
+                (GitHubReviewSubmissionModel.Action) reviewAction.getSelectedItem(), draft.getText());
+            if (acknowledgedReviews.contains(request) || draftStore.acknowledged(request.target(), request.action().name(), request.body())) {
+                GitHubReviewSubmissionModel.Result acknowledged = GitHubReviewSubmissionModel.alreadyAcknowledged();
+                submissionResults.put(request.target(), acknowledged); renderSubmissionResult(acknowledged);
+                state.setText(acknowledged.detail()); return;
+            }
+        } catch (IOException | IllegalArgumentException error) {
+            state.setText("Unable to verify review submission: " + error.getMessage()); return;
+        }
+        if (!confirmSubmission(request)) return;
+        setBusy(true); state.setText("Submitting " + request.action() + " review for " + request.target().repository() + " PR #" + request.target().pullRequest() + "…");
+        int expected = editor.asyncJobService.submit("GitHub pull-request review #" + request.target().pullRequest(), token -> loader.submit(request, token), (job, result, error) -> {
+            if (!isDisplayable() || job.getId() != jobId) return;
+            jobId = -1; setBusy(false);
+            if (job.getStatus() == AsyncJobService.Status.CANCELLED) { state.setText("Review submission cancelled; no automatic retry will run."); return; }
+            if (error != null || result == null) {
+                GitHubReviewSubmissionModel.Result unavailable = GitHubReviewSubmissionModel.unavailable(
+                    "Review submission returned no acknowledgement: " + (error == null ? job.getErrorMessage() : error.getMessage()));
+                submissionResults.put(request.target(), unavailable); renderSubmissionResult(unavailable); state.setText(unavailable.detail()); return;
+            }
+            submissionResults.put(request.target(), result); renderSubmissionResult(result);
+            if (!result.acknowledged()) { state.setText(result.detail() + " Local draft retained."); return; }
+            acknowledgedReviews.add(request);
+            workingDrafts.remove(request.target()); draft.setText("");
+            try {
+                draftStore.acknowledge(request.target(), request.action().name(), request.body());
+                state.setText(result.detail() + " Local draft removed and acknowledgement recorded; no duplicate submission will be sent.");
+            } catch (IOException storageError) {
+                state.setText(result.detail() + " Local acknowledgement storage failed: " + storageError.getMessage() + ". Do not retry this review.");
+            }
+        });
+        jobId = expected;
+    }
+
+    private boolean confirmSubmission(GitHubReviewSubmissionModel.Request request) {
+        String message = "Submit a GitHub " + request.action() + " review?\n\n"
+            + "Target: " + request.target().repository() + " PR #" + request.target().pullRequest() + "\n"
+            + (request.body().isBlank() ? "Body: none\n" : "Body: current local draft\n")
+            + "\nThis invokes the user-installed gh CLI once. It creates server-side review state and is not retried automatically.";
+        return JOptionPane.showConfirmDialog(this, message, "Confirm GitHub Review Submission", JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE) == JOptionPane.YES_OPTION;
+    }
+
+    private void renderSubmissionResult(GitHubReviewSubmissionModel.Result result) {
+        if (result == null) { submissionResult.setText("No review submission attempted."); return; }
+        submissionResult.setText("State: " + result.state() + "\n" + result.detail() + "\n\nExact gh server result:\n"
+            + (result.serverResult().isBlank() ? "(no output)" : result.serverResult()));
+        submissionResult.setCaretPosition(0);
     }
 
     private void preserveWorkingDraft() {

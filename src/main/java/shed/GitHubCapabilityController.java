@@ -69,6 +69,9 @@ final class GitHubCapabilityController {
             @Override public GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token) { return loadPullRequests(token); }
             @Override public GitHubPullRequestDetailModel.Detail detail(String repository, GitHubPullRequestModel.PullRequest pullRequest,
                 AsyncJobService.JobToken token) { return loadPullRequestDetail(repository, pullRequest, token); }
+            @Override public GitHubReviewSubmissionModel.Result submit(GitHubReviewSubmissionModel.Request request, AsyncJobService.JobToken token) {
+                return submitReview(request, token);
+            }
         });
         return "GitHub pull-request discovery opened";
     }
@@ -98,6 +101,16 @@ final class GitHubCapabilityController {
         CommandResult files = run(root, List.of("gh", "pr", "diff", pullRequest.number(), "--repo", repository, "--name-only"), token);
         CommandResult patch = run(root, List.of("gh", "pr", "diff", pullRequest.number(), "--repo", repository), token);
         return GitHubPullRequestDetailModel.fromResults(metadata, files, patch);
+    }
+
+    private GitHubReviewSubmissionModel.Result submitReview(GitHubReviewSubmissionModel.Request request, AsyncJobService.JobToken token) {
+        if (request == null) return GitHubReviewSubmissionModel.unavailable("Review request is unavailable; no gh command was run.");
+        if (!editor.configManager.getGitHubReviewEnabled()) {
+            return GitHubReviewSubmissionModel.unavailable("GitHub review consent was revoked; no gh command was run.");
+        }
+        File root = editor.resolveGitRoot();
+        if (root == null) return GitHubReviewSubmissionModel.unavailable("Current workspace is not a Git repository; no gh command was run.");
+        return GitHubReviewSubmissionModel.fromResult(run(root, GitHubReviewSubmissionModel.command(request), token));
     }
 
     private GitHubCapabilityModel.Report inspect(AsyncJobService.JobToken token) {

@@ -227,6 +227,9 @@ final class TypedSettings {
         if (key.startsWith("github.")) {
             return "GitHub";
         }
+        if (key.startsWith("updates.")) {
+            return "Updates";
+        }
         if (key.startsWith("git.")) {
             return "Git";
         }
@@ -285,6 +288,9 @@ final class TypedSettings {
             case "undo.history.max.entries" -> "integer 1.." + UndoHistoryPolicy.MAX_ENTRIES;
             case "undo.history.max.bytes" -> "integer 1.." + UndoHistoryPolicy.MAX_BYTES;
             case "session.dir" -> "string path";
+            case "updates.metadata.url" -> "HTTPS URL or empty";
+            case "updates.metadata.public.key" -> "base64 Ed25519 key or empty";
+            case "updates.check.timeout.ms" -> "integer 1000..30000";
             default -> value instanceof Integer || value instanceof Long ? "integer >= 0"
                 : value instanceof Double ? "number >= 0" : "string";
         };
@@ -345,6 +351,9 @@ final class TypedSettings {
         if (key.startsWith("github.")) {
             return "Live: checked before explicit GitHub review actions";
         }
+        if (key.startsWith("updates.")) {
+            return "Live: checked before update requests; automatic checks run only after explicit consent";
+        }
         if (key.startsWith("git.")) {
             return "Live: used when opening graphical Git documents";
         }
@@ -378,6 +387,9 @@ final class TypedSettings {
             }
             if ("font.size".equals(key) && number < 1) {
                 return key + " must be at least 1";
+            }
+            if ("updates.check.timeout.ms".equals(key) && (number < 1000 || number > 30000)) {
+                return key + " must be between 1000 and 30000";
             }
             if ("multi.selection.max.cursors".equals(key)
                 && (number < MultiSelectionPolicy.MIN_MAX_CURSORS || number > MultiSelectionPolicy.MAX_MAX_CURSORS)) {

@@ -86,6 +86,7 @@ public class HelpService {
                    "  :symbols [q]   Symbol picker (class/function/heading)\n" +
                    "  :git ...       Git status/diff/log/add/commit; workbench, conflicts, and history UI\n" +
                    "  :github ...    Local capability, consent, or consent-gated PR discovery\n" +
+                   "  :update ...    Consent-gated signed update metadata controls\n" +
                    "  :split/:vsplit Split the active window\n" +
                    "  Ctrl-w s/v/c   Split/vertical-split/close window\n" +
                    "  Ctrl-w h/j/k/l Move window focus\n" +
@@ -266,6 +267,15 @@ public class HelpService {
                     + ":git add|stage <paths...>, :git restore|unstage <paths...> modify staging.\n"
                     + ":git checkout <arg>, :git switch <branch> move HEAD.\n"
                     + ":git commit <message>, :git amend <message|--no-edit> create/update commits.\n";
+            case "update":
+            case "updates":
+                return "Help: update checks\n\n"
+                    + ":update status is local-only and shows consent/configuration/check state.\n"
+                    + ":update consent enables a signed metadata check only after confirmation.\n"
+                    + ":update disable revokes consent and cancels the tracked check.\n"
+                    + ":update check verifies signed HTTPS metadata in a background job.\n"
+                    + ":update open delegates a verified installer URL to the system browser.\n"
+                    + "Shed never downloads, installs, replaces, or restarts itself.\n";
             case "tree":
                 return "Help: tree\n\n"
                     + ":tree toggles the left side tree pane open/closed.\n"

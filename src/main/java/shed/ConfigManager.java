@@ -121,6 +121,11 @@ public class ConfigManager {
     private static final boolean DEFAULT_GIT_PANEL_PRESENTATION_ENABLED = true;
     private static final boolean DEFAULT_GITHUB_REVIEW_ENABLED = false;
     private static final boolean DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED = false;
+    private static final boolean DEFAULT_UPDATES_ENABLED = false;
+    private static final boolean DEFAULT_UPDATES_CONSENT_GRANTED = false;
+    private static final String DEFAULT_UPDATES_METADATA_URL = "";
+    private static final String DEFAULT_UPDATES_METADATA_PUBLIC_KEY = "";
+    private static final int DEFAULT_UPDATES_CHECK_TIMEOUT_MS = 5000;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -314,6 +319,11 @@ public class ConfigManager {
         defineDefault("git.panel.presentation.enabled", DEFAULT_GIT_PANEL_PRESENTATION_ENABLED);
         defineDefault("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED);
         defineDefault("github.review.consent.granted", DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED);
+        defineDefault("updates.enabled", DEFAULT_UPDATES_ENABLED);
+        defineDefault("updates.consent.granted", DEFAULT_UPDATES_CONSENT_GRANTED);
+        defineDefault("updates.metadata.url", DEFAULT_UPDATES_METADATA_URL);
+        defineDefault("updates.metadata.public.key", DEFAULT_UPDATES_METADATA_PUBLIC_KEY);
+        defineDefault("updates.check.timeout.ms", DEFAULT_UPDATES_CHECK_TIMEOUT_MS);
         DebugFeatureSettings debugFeatures = DebugFeatureSettings.defaults();
         defineDefault("debug.enabled", debugFeatures.enabled());
         defineDefault("debug.breakpoints.enabled", debugFeatures.breakpoints());
@@ -427,6 +437,11 @@ public class ConfigManager {
             case "git.panel.presentation.enabled" -> "Enable graphical Git workbench documents";
             case "github.review.enabled" -> "Enable explicit GitHub review integration actions";
             case "github.review.consent.granted" -> "Record explicit GitHub review integration consent";
+            case "updates.enabled" -> "Enable automatic signed update metadata checks only with consent";
+            case "updates.consent.granted" -> "Record explicit consent for automatic update metadata checks";
+            case "updates.metadata.url" -> "HTTPS endpoint for signed update metadata; empty disables checks";
+            case "updates.metadata.public.key" -> "Base64 Ed25519 SubjectPublicKeyInfo used to verify update metadata";
+            case "updates.check.timeout.ms" -> "Connect and request timeout for an explicit update metadata check";
             case "debug.enabled" -> "Enable explicit debug-session planning";
             case "debug.breakpoints.enabled" -> "Enable debug breakpoint configuration";
             case "debug.threads.enabled" -> "Enable debug thread presentation";
@@ -1083,6 +1098,30 @@ public class ConfigManager {
 
     public GitHubReviewConsent.State getGitHubReviewConsent() {
         return GitHubReviewConsent.from(getBoolean("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED), getGitHubReviewConsentGranted());
+    }
+
+    public boolean getUpdatesEnabled() {
+        return getUpdateConsent().enabled();
+    }
+
+    public boolean getUpdateConsentGranted() {
+        return getBoolean("updates.consent.granted", DEFAULT_UPDATES_CONSENT_GRANTED);
+    }
+
+    public UpdateConsent.State getUpdateConsent() {
+        return UpdateConsent.from(getBoolean("updates.enabled", DEFAULT_UPDATES_ENABLED), getUpdateConsentGranted());
+    }
+
+    public String getUpdateMetadataUrl() {
+        return getString("updates.metadata.url", DEFAULT_UPDATES_METADATA_URL).trim();
+    }
+
+    public String getUpdateMetadataPublicKey() {
+        return getString("updates.metadata.public.key", DEFAULT_UPDATES_METADATA_PUBLIC_KEY).trim();
+    }
+
+    public int getUpdateCheckTimeoutMs() {
+        return getInt("updates.check.timeout.ms", DEFAULT_UPDATES_CHECK_TIMEOUT_MS);
     }
 
     public DebugFeatureSettings getDebugFeatureSettings() {

@@ -259,6 +259,19 @@ Notes:
 | `:git hunk unstage [line]` | Unstage hunk at current or explicit line |
 | `:git hunk revert [line]` | Revert hunk at current or explicit line |
 
+## Update Commands
+
+| Command | Action |
+| :--- | :--- |
+| `:update`, `:update status` | Show local consent, configuration, trusted-metadata, and error state; no request |
+| `:update consent`, `:update enable` | Show consent boundary, then enable signed metadata checks |
+| `:update disable` | Revoke consent and cancel the tracked check |
+| `:update check` | Start a consent-gated signed metadata check |
+| `:update open` | Open a verified platform installer URL in the system browser |
+| `:update rollback` | Report the no-op rollback boundary because Shed never replaces itself |
+
+See [Update Checks](UPDATES.md) for endpoint/key configuration and metadata validation.
+
 ## Tree Commands
 
 | Command | Action |

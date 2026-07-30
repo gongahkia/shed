@@ -76,6 +76,7 @@ public class Texteditor extends JFrame implements KeyListener {
     LspService lspService;
     SyntaxHighlightService syntaxHighlightService;
     AsyncJobService asyncJobService;
+    UpdateController updateController;
     QuickfixService quickfixService;
     PluginManager pluginManager;
     TreeGitController treeGitController;
@@ -257,6 +258,7 @@ public class Texteditor extends JFrame implements KeyListener {
         syntaxHighlightService = new SyntaxHighlightService();
         asyncJobService = new AsyncJobService(200, this.errorReporter);
         gitHubCapabilityController = new GitHubCapabilityController(this);
+        updateController = new UpdateController(this);
         quickfixService = new QuickfixService();
         jobQuickfixController = new JobQuickfixController(this);
         editorState = new EditorState();
@@ -435,6 +437,7 @@ public class Texteditor extends JFrame implements KeyListener {
         if (configManager.hasConfigLoadFailure()) {
             showScratchBuffer("[config recovery]", configManager.getConfigLoadReport());
         }
+        updateController.startOnLaunch();
 
         externalChangeTimer = new Timer(2000, e -> checkForExternalChanges());
         externalChangeTimer.start();
@@ -1675,6 +1678,10 @@ public class Texteditor extends JFrame implements KeyListener {
 
     public String handleGitHubCommand(String argument) {
         return gitHubCapabilityController.handle(argument);
+    }
+
+    public String handleUpdateCommand(String argument) {
+        return updateController.handle(argument);
     }
 
     File resolveGitRoot() {

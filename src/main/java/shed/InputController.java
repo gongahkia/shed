@@ -34,6 +34,11 @@ final class InputController {
     }
 
     public void keyPressed(KeyEvent e) {
+        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
+            handlePlainKeymap(e);
+            editor.updateStatusBar();
+            return;
+        }
         // Ctrl+[ as Escape alternative
         if (e.isControlDown() && e.getKeyCode() == KeyEvent.VK_OPEN_BRACKET) {
             e = new KeyEvent(e.getComponent(), e.getID(), e.getWhen(), 0, KeyEvent.VK_ESCAPE, KeyEvent.CHAR_UNDEFINED);
@@ -56,6 +61,18 @@ final class InputController {
             editor.setMode(EditorMode.INSERT);
         }
         editor.updateStatusBar();
+    }
+
+    private void handlePlainKeymap(KeyEvent event) {
+        if (editor.editorState.mode != EditorMode.INSERT) {
+            editor.setMode(EditorMode.INSERT);
+        }
+        PlainKeymap.Action action = PlainKeymap.actionFor(event);
+        if (action == PlainKeymap.Action.NONE) {
+            return;
+        }
+        event.consume();
+        editor.commandHandler.execute(action.exCommand());
     }
 
 
@@ -2240,6 +2257,9 @@ final class InputController {
 
 
     public void keyTyped(KeyEvent e) {
+        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
+            return;
+        }
         if (editor.suppressNextTypedChar) {
             editor.suppressNextTypedChar = false;
             e.consume();

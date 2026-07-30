@@ -35,6 +35,9 @@ public class HelpService {
                    "  n/N            Next/previous match\n" +
                    "  * / #          Search word under cursor\n" +
                    "  .              Repeat last command\n\n" +
+                   "PLAIN PROFILE\n" +
+                   "  keymap.profile=plain keeps native text input active and bypasses Vim modes.\n" +
+                   "  F1 or :help keymap lists its fixed shortcuts.\n\n" +
                    "COMMANDS\n" +
                    "  :w [file]      Write current buffer\n" +
                    "  :q / :q!       Quit buffer/editor\n" +
@@ -131,6 +134,19 @@ public class HelpService {
         }
 
         switch (normalizedTopic) {
+            case "keymap":
+            case "keymaps":
+            case "plain":
+                return "Help: Plain keymap\n\n"
+                    + "Set keymap.profile=plain in config.toml or with :set keymap.profile=plain.\n"
+                    + "Text input, navigation, selection, clipboard, undo, and redo use native Swing bindings.\n"
+                    + "Ctrl/Cmd-S       Save current file\n"
+                    + "Ctrl/Cmd-O/P     Find file\n"
+                    + "Ctrl/Cmd-Shift-P Command palette\n"
+                    + "Ctrl/Cmd-B       Buffer picker\n"
+                    + "Ctrl/Cmd-W       Close active split\n"
+                    + "F1               This help\n\n"
+                    + "Plain bypasses Vim mode handling and keybind.<mode> remaps.\n";
             case "windows":
             case "split":
             case "vsplit":

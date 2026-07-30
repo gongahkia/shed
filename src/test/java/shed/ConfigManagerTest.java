@@ -50,6 +50,7 @@ public class ConfigManagerTest {
         ConfigManager config = new ConfigManager();
 
         assertEquals(4, config.getTabSize());
+        assertEquals(KeymapProfile.VIM, config.getKeymapProfile());
         assertEquals(LineNumberMode.ABSOLUTE, config.getLineNumberMode());
         assertTrue(config.getHighlightSearch());
         assertFalse(config.getSessionRestoreOnStart());
@@ -97,6 +98,22 @@ public class ConfigManagerTest {
             config.validateSettingValue("undo.history.max.entries", "0"));
         assertEquals("undo.history.max.bytes must be between 1 and " + UndoHistoryPolicy.MAX_BYTES,
             config.validateSettingValue("undo.history.max.bytes", "0"));
+    }
+
+    @Test
+    void configuresPlainKeymapProfile() throws IOException {
+        Path home = tempDir.resolve("home-plain-keymap");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("keymap.profile", "plain");
+
+        assertEquals(KeymapProfile.PLAIN, config.getKeymapProfile());
+        assertEquals("keymap.profile must be vim or plain", config.validateSettingValue("keymap.profile", "emacs"));
+        TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("keymap.profile")).findFirst().orElseThrow();
+        assertEquals("vim | plain", descriptor.allowedValues());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"keymap.profile\" = \"plain\""));
     }
 
     @Test

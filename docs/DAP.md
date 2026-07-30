@@ -67,6 +67,12 @@ Adapter versions are `NOT_PROBED`: the published DAP schema has no adapter-disco
 
 ## Explicit Session Lifecycle
 
-Use `:debug configurations` to inspect configured adapters without starting one, `:debug select <name>` to choose a configuration, and `:debug start [name]` to explicitly begin a session. The editor starts the validated adapter, sends DAP `initialize`, then sends the configured `launch` or `attach` request. `:debug stop`, `:debug restart [name]`, and `:debug status` provide visible lifecycle state and retained diagnostics.
+Use `:debug configurations` to inspect configured adapters without starting one, `:debug select <name>` to choose a configuration, and `:debug start [name]` to explicitly begin a session. The editor starts the validated adapter, sends DAP `initialize`, then sends the configured `launch` or `attach` request. When the adapter emits `initialized`, Shed sends configuration requests before `configurationDone` only when both the declared adapter capability and the DAP initialize response support it. `:debug stop`, `:debug restart [name]`, and `:debug status` provide visible lifecycle state and retained diagnostics.
 
 Shed never starts a debug adapter while inspecting configurations or selecting one. A rejected configuration, adapter start error, timeout, or failed DAP response leaves the session `FAILED` with diagnostics visible in `[debug status]`; normal editing remains available. The generic launch arguments are only `program`, `cwd`, and `args`; attach arguments are only `host`, `port`, `cwd`, and `args`, so adapters that require additional adapter-specific settings fail visibly rather than receiving inferred values.
+
+## Source Breakpoints
+
+Click the left gutter to add or remove a source breakpoint. Shed stores workspace-scoped breakpoint JSON beneath the configured `session.dir` in `breakpoints/`; it writes no source file or project metadata. The store records requested lines plus verified, rejected, or adapter-adjusted locations and uses atomic replacement.
+
+Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoints.enabled=true` and the selected adapter declares `breakpoints`. A `setBreakpoints` response replaces the displayed state for that source: rejected locations use an outlined red gutter marker, adjusted locations use yellow, and details remain in `:debug status`. The request contains the complete set for the source, not an incremental delta. If an adapter does not emit `initialized`, Shed retains the breakpoint state and performs the compatible post-start synchronization with a retained diagnostic.

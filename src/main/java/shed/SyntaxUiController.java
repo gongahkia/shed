@@ -207,6 +207,7 @@ final class SyntaxUiController {
             }
             pane.getLineNumberPanel().repaint();
         }
+        if (editor.debugSessionController != null) editor.debugSessionController.refreshBreakpointMarkers();
         editor.editorHostPanel.revalidate();
         editor.editorHostPanel.repaint();
     }

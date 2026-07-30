@@ -9,10 +9,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
 final class DebugSessionService {
     enum Lifecycle { IDLE, STARTING, RUNNING, STOPPED, FAILED }
+    private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
 
     interface Connection extends AutoCloseable {
         DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
@@ -43,6 +46,8 @@ final class DebugSessionService {
         private String detail = "No debug session selected.";
         private final List<String> diagnostics = new ArrayList<>();
         private Connection connection;
+        private DebugAdapterRegistry.Plan plan;
+        private DebugFeatureSettings features;
         private long generation;
     }
 
@@ -64,6 +69,11 @@ final class DebugSessionService {
 
     Result start(Path workspace, Path activeFile, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
         String requestedConfiguration, Duration timeout, Starter starter) {
+        return start(workspace, activeFile, validation, features, requestedConfiguration, timeout, starter, null);
+    }
+
+    Result start(Path workspace, Path activeFile, DebugAdapterRegistry.Validation validation, DebugFeatureSettings features,
+        String requestedConfiguration, Duration timeout, Starter starter, BreakpointStore breakpointStore) {
         Path root = root(workspace);
         DebugFeatureSettings settings = features == null ? DebugFeatureSettings.defaults() : features;
         String name;
@@ -88,25 +98,57 @@ final class DebugSessionService {
             generation = ++session.generation;
             plan = planned.plan();
         }
+        CompletableFuture<Void> initialized = new CompletableFuture<>();
         Connection connection = null;
         try {
             Connection started = Objects.requireNonNull(starter, "starter").start(plan, settings, new DebugAdapterTransport.Listener() {
+                @Override public void onEvent(DebugAdapterTransport.Event event) {
+                    if (event != null && "initialized".equals(event.event())) initialized.complete(null);
+                }
                 @Override public void onDiagnostic(DebugAdapterTransport.Diagnostic diagnostic) { addDiagnostic(root, diagnostic.code() + ": " + diagnostic.message()); }
             });
             connection = started;
             DebugAdapterTransport.Response initialize = connection.request("initialize", initializeArguments(plan), timeout);
             if (!initialize.success()) throw new IOException(responseFailure("initialize", initialize));
             String command = plan.configuration().request() == DebugAdapterRegistry.Request.LAUNCH ? "launch" : "attach";
-            DebugAdapterTransport.Response request = connection.request(command, startArguments(plan), timeout);
+            Connection activeConnection = connection;
+            CompletableFuture<DebugAdapterTransport.Response> startRequest = CompletableFuture.supplyAsync(() -> {
+                try {
+                    return activeConnection.request(command, startArguments(plan), timeout);
+                } catch (IOException | TimeoutException | InterruptedException error) {
+                    if (error instanceof InterruptedException) Thread.currentThread().interrupt();
+                    throw new java.util.concurrent.CompletionException(error);
+                }
+            });
+            boolean configurationReady = waitForInitializationOrStart(initialized, startRequest, timeout);
+            List<String> synchronizationDiagnostics = new ArrayList<>();
+            if (configurationReady) {
+                synchronizationDiagnostics.addAll(synchronizeBreakpoints(plan, settings, connection, breakpointStore, timeout).diagnostics());
+                if (supportsConfigurationDone(plan, initialize)) {
+                    DebugAdapterTransport.Response configurationDone = connection.request("configurationDone", Map.of(), timeout);
+                    if (!configurationDone.success()) throw new IOException(responseFailure("configurationDone", configurationDone));
+                }
+            }
+            DebugAdapterTransport.Response request = await(startRequest, timeout);
             if (!request.success()) throw new IOException(responseFailure(command, request));
+            if (!configurationReady) {
+                BreakpointSynchronization synchronization = synchronizeBreakpoints(plan, settings, connection, breakpointStore, timeout);
+                if (synchronization.attempted()) {
+                    synchronizationDiagnostics.add("Debug adapter did not emit initialized; source breakpoints synchronized after " + command + ".");
+                }
+                synchronizationDiagnostics.addAll(synchronization.diagnostics());
+            }
             synchronized (this) {
                 if (session.generation != generation || session.lifecycle != Lifecycle.STARTING) {
                     connection.close();
                     return new Result(snapshot(root, session), false);
                 }
                 session.connection = connection;
+                session.plan = plan;
+                session.features = settings;
                 session.lifecycle = Lifecycle.RUNNING;
                 session.detail = "Debug " + command + " request succeeded for '" + name + "'.";
+                session.diagnostics.addAll(synchronizationDiagnostics);
                 return new Result(snapshot(root, session), true);
             }
         } catch (IOException | TimeoutException error) {
@@ -127,6 +169,8 @@ final class DebugSessionService {
         Session session = session(root);
         Connection connection = session.connection;
         session.connection = null;
+        session.plan = null;
+        session.features = null;
         session.generation++;
         if (connection != null) connection.close();
         session.lifecycle = Lifecycle.STOPPED;
@@ -153,9 +197,93 @@ final class DebugSessionService {
         return result;
     }
 
+    Result synchronizeBreakpoints(Path workspace, BreakpointStore breakpointStore, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugFeatureSettings settings;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return new Result(snapshot(root, session), false);
+            }
+            connection = session.connection;
+            plan = session.plan;
+            settings = session.features;
+        }
+        List<String> diagnostics = synchronizeBreakpoints(plan, settings, connection, breakpointStore, timeout).diagnostics();
+        synchronized (this) {
+            Session session = session(root);
+            if (session.connection != connection || session.lifecycle != Lifecycle.RUNNING) return new Result(snapshot(root, session), false);
+            session.diagnostics.addAll(diagnostics);
+            return new Result(snapshot(root, session), true);
+        }
+    }
+
     private synchronized void addDiagnostic(Path workspace, String diagnostic) {
         Session session = session(root(workspace));
         session.diagnostics.add(diagnostic == null ? "Debug adapter diagnostic" : diagnostic);
+    }
+
+    private static BreakpointSynchronization synchronizeBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings, Connection connection,
+        BreakpointStore breakpointStore, Duration timeout) {
+        if (breakpointStore == null || settings == null || !settings.breakpoints() || plan == null || connection == null
+            || !plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.BREAKPOINTS)) return new BreakpointSynchronization(false, List.of());
+        List<String> diagnostics = new ArrayList<>();
+        try {
+            Map<Path, List<BreakpointStore.Breakpoint>> sources = breakpointStore.sources(plan.workspace());
+            if (sources.isEmpty()) return new BreakpointSynchronization(false, diagnostics);
+            for (Map.Entry<Path, List<BreakpointStore.Breakpoint>> entry : sources.entrySet()) {
+                List<Map<String, Object>> requested = entry.getValue().stream().map(breakpoint -> Map.<String, Object>of("line", breakpoint.line())).toList();
+                DebugAdapterTransport.Response response = connection.request("setBreakpoints",
+                    Map.of("source", Map.of("path", entry.getKey().toString()), "breakpoints", requested), timeout);
+                if (!response.success()) {
+                    diagnostics.add("DAP setBreakpoints failed for " + entry.getKey() + (response.message().isBlank() ? "." : ": " + response.message()));
+                    continue;
+                }
+                diagnostics.addAll(breakpointStore.apply(plan.workspace(), entry.getKey(), entry.getValue(), response.body()).diagnostics());
+            }
+        } catch (IOException | TimeoutException error) {
+            diagnostics.add("Source breakpoint synchronization failed: " + message(error));
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            diagnostics.add("Source breakpoint synchronization interrupted.");
+        }
+        return new BreakpointSynchronization(true, diagnostics);
+    }
+
+    private static boolean waitForInitializationOrStart(CompletableFuture<Void> initialized, CompletableFuture<DebugAdapterTransport.Response> start,
+        Duration timeout) throws IOException, TimeoutException, InterruptedException {
+        try {
+            CompletableFuture.anyOf(initialized, start).get(Math.max(1L, timeout.toMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+            return initialized.isDone();
+        } catch (ExecutionException error) {
+            throw executionFailure(error);
+        }
+    }
+
+    private static DebugAdapterTransport.Response await(CompletableFuture<DebugAdapterTransport.Response> response, Duration timeout)
+        throws IOException, TimeoutException, InterruptedException {
+        try {
+            return response.get(Math.max(1L, timeout.toMillis()), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (ExecutionException error) {
+            throw executionFailure(error);
+        }
+    }
+
+    private static IOException executionFailure(ExecutionException error) throws InterruptedException {
+        Throwable cause = error.getCause();
+        while (cause instanceof java.util.concurrent.CompletionException && cause.getCause() != null) cause = cause.getCause();
+        if (cause instanceof InterruptedException interrupted) throw interrupted;
+        if (cause instanceof IOException io) return io;
+        if (cause instanceof TimeoutException timeout) return new IOException(message(timeout), timeout);
+        return new IOException("Debug adapter request failed", cause);
+    }
+
+    private static boolean supportsConfigurationDone(DebugAdapterRegistry.Plan plan, DebugAdapterTransport.Response initialize) {
+        if (!plan.adapter().capabilities().contains(DebugAdapterRegistry.Capability.CONFIGURATION_DONE)) return false;
+        Map<String, Object> capabilities = initialize == null ? null : MiniJson.asObject(initialize.body());
+        return Boolean.TRUE.equals(capabilities == null ? null : capabilities.get("supportsConfigurationDoneRequest"));
     }
 
     private Result fail(Path root, Session session, String detail, List<String> diagnostics) {

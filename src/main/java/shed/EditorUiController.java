@@ -192,6 +192,11 @@ final class EditorUiController {
 
         EditorPane pane = new EditorPane(textArea, paneLineNumberPanel, paneScrollPane, paneSearchManager);
         paneRef[0] = pane;
+        paneLineNumberPanel.setBreakpointToggleListener(line -> {
+            if (paneRef[0] == null) return;
+            activateEditorPane(paneRef[0]);
+            if (editor.debugSessionController != null) editor.debugSessionController.toggleBreakpoint(paneRef[0].getBuffer(), line);
+        });
         paneScrollPane.getVerticalScrollBar().addAdjustmentListener(event -> {
             if (!event.getValueIsAdjusting()) {
                 editor.handleLargeFileScroll(pane);

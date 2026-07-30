@@ -131,6 +131,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.handleTaskCommand(args), "task");
         registerCommand((args, range, force) -> editor.handleTreeCommand(args), "tree");
         registerCommand((args, range, force) -> editor.handleGitCommand(args), "git");
+        registerCommand((args, range, force) -> editor.handleGitHubCommand(args), "github", "gh");
         registerCommand((args, range, force) -> {
             editor.showHelp(args);
             return "Showing help";

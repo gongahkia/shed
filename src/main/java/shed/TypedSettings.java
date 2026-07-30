@@ -218,6 +218,9 @@ final class TypedSettings {
         if (key.startsWith("lsp.")) {
             return "Language Server";
         }
+        if (key.startsWith("github.")) {
+            return "GitHub";
+        }
         if (key.startsWith("git.")) {
             return "Git";
         }
@@ -325,6 +328,9 @@ final class TypedSettings {
         }
         if (key.equals("git.remote.actions.enabled")) {
             return "Live: checked before each graphical remote action";
+        }
+        if (key.startsWith("github.")) {
+            return "Live: checked before explicit GitHub review actions";
         }
         if (key.startsWith("git.")) {
             return "Live: used when opening graphical Git documents";

@@ -152,6 +152,14 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 `:git history` never starts network activity when opened or refreshed. Fetch requires its button click; Pull uses `git pull --ff-only` and Push each require a second confirmation. Each remote operation runs in a cancellable background job, exposes captured output or failure in the document, and can be disabled independently with `git.remote.actions.enabled`.
 
+## GitHub Review Integration
+
+| Key | Default | Type | Notes |
+| :--- | :--- | :--- | :--- |
+| `github.review.enabled` | `false` | bool | Enables future explicit GitHub review actions; `:github status` remains a local-only capability check |
+
+`:github status` is explicit and asynchronous. It checks the user-installed `gh` version, local authentication state, local origin URL, and local help for `gh pr list`, `gh pr view`, and `gh api`; it makes no GitHub API request and never changes Git state. Review integration is disabled until the user sets `github.review.enabled=true` through TOML or the settings GUI.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

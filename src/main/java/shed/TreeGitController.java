@@ -5,6 +5,7 @@ import java.awt.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.*;
@@ -564,6 +565,9 @@ final class TreeGitController {
 
     public String handleGitCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
+        if ("conflict".equalsIgnoreCase(trimmed) || "conflicts".equalsIgnoreCase(trimmed)) {
+            return showGitConflictResolutionDocument();
+        }
         if ("workbench".equalsIgnoreCase(trimmed) || "changes".equalsIgnoreCase(trimmed)) {
             return showGitChangesWorkbench();
         }
@@ -662,6 +666,113 @@ final class TreeGitController {
             }
         });
         return "Git workbench opened";
+    }
+
+    String showGitConflictResolutionDocument() {
+        if (!editor.configManager.getGitConflictResolutionEnabled()) {
+            return "Git conflict resolution disabled by git.conflict.resolution.enabled=false";
+        }
+        GitConflictResolutionDialog.showFor(editor, new GitConflictResolutionDialog.Loader() {
+            @Override
+            public GitConflictResolutionDialog.Load load() {
+                return loadGitConflicts();
+            }
+
+            @Override
+            public String apply(GitConflictResolutionModel.Conflict conflict, String result) {
+                return applyGitConflictResolution(conflict, result);
+            }
+        });
+        return "Git conflict resolution opened";
+    }
+
+    private GitConflictResolutionDialog.Load loadGitConflicts() {
+        File root = resolveGitRoot();
+        if (root == null) return new GitConflictResolutionDialog.Load(List.of(), "Not inside a Git repository.");
+        CommandResult status = runCommand(root, List.of("git", "diff", "--name-only", "--diff-filter=U", "-z"));
+        if (status.exitCode != 0) return new GitConflictResolutionDialog.Load(List.of(), gitError(status));
+        if (outputTruncated(status)) {
+            return new GitConflictResolutionDialog.Load(List.of(), "Git conflict list was truncated; increase process.output.max.bytes before resolving.");
+        }
+        List<GitConflictResolutionModel.Conflict> conflicts = new ArrayList<>();
+        for (String path : nulSeparated(status.stdout)) {
+            if (path.isEmpty()) continue;
+            Path target = conflictPath(root, path);
+            if (target == null || !Files.isRegularFile(target)) {
+                return new GitConflictResolutionDialog.Load(List.of(), "Conflict file is missing or escapes the repository: " + path);
+            }
+            try {
+                String content = Files.readString(target, StandardCharsets.UTF_8);
+                GitConflictResolutionModel.Side base = readConflictSide(root, path, 1);
+                GitConflictResolutionModel.Side ours = readConflictSide(root, path, 2);
+                GitConflictResolutionModel.Side theirs = readConflictSide(root, path, 3);
+                if (base == null || ours == null || theirs == null) {
+                    return new GitConflictResolutionDialog.Load(List.of(), "Git conflict stage output was truncated; increase process.output.max.bytes before resolving.");
+                }
+                conflicts.add(new GitConflictResolutionModel.Conflict(path, workbenchDigest(target), content, base, ours, theirs));
+            } catch (IOException e) {
+                return new GitConflictResolutionDialog.Load(List.of(), "Could not load conflict file " + path + ": " + e.getMessage());
+            }
+        }
+        String detail = conflicts.isEmpty() ? "No unresolved Git conflicts." : conflicts.size() + " unresolved conflict" + (conflicts.size() == 1 ? "" : "s") + ".";
+        return new GitConflictResolutionDialog.Load(conflicts, detail);
+    }
+
+    private GitConflictResolutionModel.Side readConflictSide(File root, String path, int stage) {
+        CommandResult result = runCommand(root, List.of("git", "show", ":" + stage + ":" + path));
+        if (outputTruncated(result)) return null;
+        return result.exitCode == 0 ? new GitConflictResolutionModel.Side(true, result.stdout) : new GitConflictResolutionModel.Side(false, "");
+    }
+
+    private boolean outputTruncated(CommandResult result) {
+        return result != null && result.stdout.endsWith("\n[shed: output truncated]");
+    }
+
+    private String applyGitConflictResolution(GitConflictResolutionModel.Conflict conflict, String resolution) {
+        String validation = GitConflictResolutionModel.validateResult(resolution);
+        if (validation != null) return validation;
+        File root = resolveGitRoot();
+        if (root == null || conflict == null) return "Git conflict resolution unavailable: repository or conflict is missing.";
+        Path target = conflictPath(root, conflict.path());
+        if (target == null || !Files.isRegularFile(target)) return "Git conflict resolution unavailable: conflict file is missing or unsafe.";
+        if (!Objects.equals(conflict.sourceDigest(), workbenchDigest(target))) return "Conflict source changed; refresh before applying a resolution.";
+        FileBuffer buffer = editor.findBufferByPath(target.toFile());
+        if (buffer != null && buffer.isModified()) return "Conflict source has unsaved editor changes; save or discard them before applying a resolution.";
+        try {
+            AtomicFileWriter.write(target, resolution.getBytes(StandardCharsets.UTF_8));
+            if (buffer != null) {
+                buffer.load(editor.configManager);
+                if (buffer == editor.getCurrentBuffer()) editor.loadBufferIntoEditor(buffer);
+            }
+            editor.refreshGitGutter();
+            return "Resolution written to working tree; explicitly stage it with :git add " + conflict.path();
+        } catch (IOException e) {
+            return "Conflict resolution apply failed; working file was retained: " + e.getMessage();
+        }
+    }
+
+    private Path conflictPath(File root, String path) {
+        try {
+            Path rootPath = root.toPath().toRealPath();
+            Path target = rootPath.resolve(path).normalize();
+            return target.startsWith(rootPath) ? target : null;
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private List<String> nulSeparated(String value) {
+        List<String> paths = new ArrayList<>();
+        String source = value == null ? "" : value;
+        int start = 0;
+        for (int index = 0; index < source.length(); index++) {
+            if (source.charAt(index) == '\u0000') {
+                paths.add(source.substring(start, index));
+                start = index + 1;
+            }
+        }
+        paths.add(source.substring(start));
+        return paths;
     }
 
     private GitChangesWorkbenchModel.Snapshot loadGitChangesWorkbench() {
@@ -1243,6 +1354,7 @@ final class TreeGitController {
                 + ":git                  Show status\n"
                 + ":git status|st        Show status\n"
                 + ":git workbench        Open graphical read-only changes/diff/hunk workbench\n"
+                + ":git conflict         Open graphical conflict-resolution document\n"
                 + ":git diff [args]      Show diff\n"
                 + ":git log [count]      Show compact history\n"
                 + ":git branch           Show branch list\n"

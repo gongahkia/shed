@@ -109,6 +109,7 @@ public class LspServiceTest {
     void providesBuiltinServerCommandsByExtension() {
         LspService service = new LspService();
         assertArrayEquals(new String[] {"jdtls"}, service.builtinCommand("java"));
+        assertArrayEquals(new String[] {"rust-analyzer"}, service.builtinCommand("rs"));
         assertArrayEquals(new String[] {"pyright-langserver", "--stdio"}, service.builtinCommand("py"));
         assertArrayEquals(new String[] {"typescript-language-server", "--stdio"}, service.builtinCommand("tsx"));
         assertArrayEquals(new String[] {"gopls"}, service.builtinCommand("go"));

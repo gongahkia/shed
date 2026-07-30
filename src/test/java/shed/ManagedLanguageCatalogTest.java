@@ -19,7 +19,8 @@ public class ManagedLanguageCatalogTest {
         assertEquals(entry, ManagedLanguageCatalog.forExtension("java"));
         assertEquals(entry, ManagedLanguageCatalog.forExtension(".JAVA"));
         assertEquals(ManagedLanguageCatalog.python(), ManagedLanguageCatalog.forExtension("py"));
-        assertNull(ManagedLanguageCatalog.forExtension("rs"));
+        assertEquals(ManagedLanguageCatalog.rust(), ManagedLanguageCatalog.forExtension("rs"));
+        assertNull(ManagedLanguageCatalog.forExtension("md"));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
         assertEquals("jdtls", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
         assertEquals("jdtls.bat", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
@@ -190,6 +191,46 @@ public class ManagedLanguageCatalogTest {
             ManagedLanguageSupportTrust.Platform.WINDOWS, false);
         ManagedLanguageCatalog.Status ready = entry.assessManagedInstall(trust,
             ManagedLanguageSupportTrust.Platform.WINDOWS, true);
+
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
+        assertFalse(consent.permitsManagedInstall());
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
+        assertTrue(ready.permitsManagedInstall());
+    }
+
+    @Test
+    void rustEntryRequiresLocallyValidatedLatestStableToolchain() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.rust();
+
+        ManagedLanguageCatalog.Status unknown = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
+            new ManagedLanguageCatalog.ToolDetection("rust-analyzer", "rustc 1.89.0", null));
+        ManagedLanguageCatalog.Status unsupported = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
+            new ManagedLanguageCatalog.ToolDetection("rust-analyzer", "rustc 1.89.0", false));
+        ManagedLanguageCatalog.Status valid = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
+            new ManagedLanguageCatalog.ToolDetection("rust-analyzer", "rustc 1.90.0", true));
+
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("rs"));
+        assertEquals("rust-analyzer", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
+        assertEquals("rust-analyzer.exe", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("rust.rust-analyzer@2026-07-27", entry.installMetadata().coordinate().displayName());
+        assertEquals(ManagedLanguageCatalog.RuntimeRequirementKind.LATEST_STABLE,
+            entry.installMetadata().runtimeRequirementKind());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNKNOWN, unknown.availability());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, unsupported.availability());
+        assertTrue(unsupported.detail().contains("Rust latest stable"));
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, valid.availability());
+        assertTrue(valid.usable());
+    }
+
+    @Test
+    void managedRustInstallRequiresConsentAndTrustedArtifact() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.rust();
+        ManagedLanguageSupportTrust trust = trustWith(entry.installMetadata().coordinate());
+
+        ManagedLanguageCatalog.Status consent = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.MACOS, false);
+        ManagedLanguageCatalog.Status ready = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.MACOS, true);
 
         assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
         assertFalse(consent.permitsManagedInstall());

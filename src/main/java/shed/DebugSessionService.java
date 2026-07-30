@@ -12,10 +12,14 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
+import java.util.function.BooleanSupplier;
 
 final class DebugSessionService {
     enum Lifecycle { IDLE, STARTING, RUNNING, STOPPED, FAILED }
     private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
+    record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
+    private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
+        List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
     interface Connection extends AutoCloseable {
         DebugAdapterTransport.Response request(String command, Map<String, Object> arguments, Duration timeout)
@@ -48,6 +52,7 @@ final class DebugSessionService {
         private Connection connection;
         private DebugAdapterRegistry.Plan plan;
         private DebugFeatureSettings features;
+        private final DebugInspection inspection = new DebugInspection();
         private long generation;
     }
 
@@ -104,6 +109,7 @@ final class DebugSessionService {
             Connection started = Objects.requireNonNull(starter, "starter").start(plan, settings, new DebugAdapterTransport.Listener() {
                 @Override public void onEvent(DebugAdapterTransport.Event event) {
                     if (event != null && "initialized".equals(event.event())) initialized.complete(null);
+                    handleEvent(root, event);
                 }
                 @Override public void onDiagnostic(DebugAdapterTransport.Diagnostic diagnostic) { addDiagnostic(root, diagnostic.code() + ": " + diagnostic.message()); }
             });
@@ -171,6 +177,7 @@ final class DebugSessionService {
         session.connection = null;
         session.plan = null;
         session.features = null;
+        session.inspection.invalidated("Debug session stopped.");
         session.generation++;
         if (connection != null) connection.close();
         session.lifecycle = Lifecycle.STOPPED;
@@ -186,6 +193,7 @@ final class DebugSessionService {
             session.detail = "Debug adapter transport stopped unexpectedly.";
             session.diagnostics.add(session.detail);
             session.connection = null;
+            session.inspection.invalidated(session.detail);
         }
         return snapshot(root, session);
     }
@@ -220,9 +228,262 @@ final class DebugSessionService {
         }
     }
 
+    synchronized DebugInspection.Snapshot inspection(Path workspace) {
+        return session(root(workspace)).inspection.snapshot();
+    }
+
+    synchronized InspectionResult addWatch(Path workspace, String expression) {
+        DebugInspection.Result result = session(root(workspace)).inspection.addWatch(expression);
+        return new InspectionResult(result.snapshot(), result.succeeded());
+    }
+
+    synchronized InspectionResult removeWatch(Path workspace, String expression) {
+        DebugInspection.Result result = session(root(workspace)).inspection.removeWatch(expression);
+        return new InspectionResult(result.snapshot(), result.succeeded());
+    }
+
+    synchronized InspectionResult clearWatches(Path workspace) {
+        DebugInspection.Result result = session(root(workspace)).inspection.clearWatches();
+        return new InspectionResult(result.snapshot(), result.succeeded());
+    }
+
+    synchronized InspectionResult selectFrame(Path workspace, int frameId) {
+        DebugInspection.Result result = session(root(workspace)).inspection.selectFrame(frameId);
+        return new InspectionResult(result.snapshot(), result.succeeded());
+    }
+
+    InspectionResult refreshInspection(Path workspace, Duration timeout) {
+        Path root = root(workspace);
+        Connection connection;
+        DebugAdapterRegistry.Plan plan;
+        DebugFeatureSettings settings;
+        DebugInspection.Load load;
+        synchronized (this) {
+            Session session = session(root);
+            if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.plan == null) {
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+            load = session.inspection.beginLoad();
+            if (load == null) return new InspectionResult(session.inspection.snapshot(), false);
+            connection = session.connection;
+            plan = session.plan;
+            settings = session.features;
+        }
+        try {
+            InspectionPayload payload = loadInspection(plan, settings, connection, load, timeout,
+                () -> inspectionLoading(root, connection, load.generation()));
+            synchronized (this) {
+                Session session = session(root);
+                boolean applied = session.connection == connection && session.inspection.complete(load.generation(), payload.threads(), payload.frames(),
+                    payload.frameId(), payload.scopes(), payload.watches(), payload.detail(), payload.state());
+                return new InspectionResult(session.inspection.snapshot(), applied);
+            }
+        } catch (IOException | TimeoutException error) {
+            synchronized (this) {
+                Session session = session(root);
+                boolean applied = session.connection == connection && session.inspection.failed(load.generation(), "Paused-frame inspection failed: " + message(error),
+                    DebugInspection.State.ERROR);
+                if (applied) session.diagnostics.add("Paused-frame inspection failed: " + message(error));
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
+            synchronized (this) {
+                Session session = session(root);
+                boolean applied = session.connection == connection && session.inspection.failed(load.generation(), "Paused-frame inspection interrupted.",
+                    DebugInspection.State.ERROR);
+                if (applied) session.diagnostics.add("Paused-frame inspection interrupted.");
+                return new InspectionResult(session.inspection.snapshot(), false);
+            }
+        }
+    }
+
     private synchronized void addDiagnostic(Path workspace, String diagnostic) {
         Session session = session(root(workspace));
         session.diagnostics.add(diagnostic == null ? "Debug adapter diagnostic" : diagnostic);
+    }
+
+    private synchronized void handleEvent(Path workspace, DebugAdapterTransport.Event event) {
+        if (event == null) return;
+        Session session = session(root(workspace));
+        if ("stopped".equals(event.event())) {
+            Map<String, Object> body = MiniJson.asObject(event.body());
+            int threadId = integer(body == null ? null : body.get("threadId"));
+            String reason = string(body == null ? null : body.get("reason"));
+            String description = string(body == null ? null : body.get("description"));
+            session.inspection.stopped(threadId, reason, description);
+        } else if ("continued".equals(event.event()) || "terminated".equals(event.event()) || "exited".equals(event.event())) {
+            session.inspection.invalidated("Debug execution " + event.event() + ".");
+        }
+    }
+
+    private synchronized boolean inspectionLoading(Path workspace, Connection connection, long generation) {
+        Session session = session(root(workspace));
+        return session.connection == connection && session.inspection.loading(generation);
+    }
+
+    private static InspectionPayload loadInspection(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings, Connection connection,
+        DebugInspection.Load load, Duration timeout, BooleanSupplier active) throws IOException, TimeoutException, InterruptedException {
+        requireActive(active);
+        List<DebugInspection.ThreadInfo> threads = supports(plan, settings, DebugAdapterRegistry.Capability.THREADS)
+            ? threads(connection, timeout, active) : List.of();
+        requireActive(active);
+        if (!supports(plan, settings, DebugAdapterRegistry.Capability.STACK_TRACE)) {
+            return new InspectionPayload(threads, List.of(), 0, List.of(), unavailableWatches(load.watches(), "No paused frame is available."),
+                "Stack traces are unavailable for the active adapter.", DebugInspection.State.UNAVAILABLE);
+        }
+        int threadId = load.threadId();
+        if (threadId < 1 && !threads.isEmpty()) threadId = threads.getFirst().id();
+        if (threadId < 1) {
+            return new InspectionPayload(threads, List.of(), 0, List.of(), unavailableWatches(load.watches(), "No paused frame is available."),
+                "The stopped event did not identify a thread.", DebugInspection.State.UNAVAILABLE);
+        }
+        List<DebugInspection.Frame> frames = frames(connection, threadId, timeout, active);
+        requireActive(active);
+        if (frames.isEmpty()) {
+            return new InspectionPayload(threads, frames, 0, List.of(), unavailableWatches(load.watches(), "No paused frame is available."),
+                "The adapter returned no stack frames.", DebugInspection.State.UNAVAILABLE);
+        }
+        int frameId = frames.stream().anyMatch(frame -> frame.id() == load.frameId()) ? load.frameId() : frames.getFirst().id();
+        List<DebugInspection.Scope> scopes = supports(plan, settings, DebugAdapterRegistry.Capability.SCOPES)
+            ? scopes(connection, frameId, supports(plan, settings, DebugAdapterRegistry.Capability.VARIABLES), timeout, active) : List.of();
+        requireActive(active);
+        List<DebugInspection.Watch> watches = supports(plan, settings, DebugAdapterRegistry.Capability.EVALUATE)
+            ? watches(connection, load.watches(), frameId, timeout, active) : unavailableWatches(load.watches(), "Evaluate is unavailable for this adapter.");
+        List<String> unavailable = new ArrayList<>();
+        if (!supports(plan, settings, DebugAdapterRegistry.Capability.THREADS)) unavailable.add("thread list unavailable");
+        if (!supports(plan, settings, DebugAdapterRegistry.Capability.SCOPES)) unavailable.add("scopes unavailable");
+        else if (!supports(plan, settings, DebugAdapterRegistry.Capability.VARIABLES)) unavailable.add("variables unavailable");
+        if (!supports(plan, settings, DebugAdapterRegistry.Capability.EVALUATE)) unavailable.add("watch evaluation unavailable");
+        String detail = "Paused thread " + threadId + ", frame " + frameId + "." + (unavailable.isEmpty() ? "" : " " + String.join("; ", unavailable) + ".");
+        return new InspectionPayload(threads, frames, frameId, scopes, watches, detail, DebugInspection.State.READY);
+    }
+
+    private static List<DebugInspection.ThreadInfo> threads(Connection connection, Duration timeout, BooleanSupplier active)
+        throws IOException, TimeoutException, InterruptedException {
+        requireActive(active);
+        Map<String, Object> body = body(connection.request("threads", Map.of(), timeout), "threads");
+        List<Object> values = MiniJson.asArray(body.get("threads"));
+        if (values == null) throw new IOException("DAP threads response is missing threads");
+        List<DebugInspection.ThreadInfo> threads = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> thread = MiniJson.asObject(value);
+            int id = integer(thread == null ? null : thread.get("id"));
+            if (id < 1) throw new IOException("DAP threads response contains an invalid thread id");
+            threads.add(new DebugInspection.ThreadInfo(id, string(thread.get("name"))));
+        }
+        return List.copyOf(threads);
+    }
+
+    private static List<DebugInspection.Frame> frames(Connection connection, int threadId, Duration timeout, BooleanSupplier active)
+        throws IOException, TimeoutException, InterruptedException {
+        requireActive(active);
+        Map<String, Object> body = body(connection.request("stackTrace", Map.of("threadId", threadId), timeout), "stackTrace");
+        List<Object> values = MiniJson.asArray(body.get("stackFrames"));
+        if (values == null) throw new IOException("DAP stackTrace response is missing stackFrames");
+        List<DebugInspection.Frame> frames = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> frame = MiniJson.asObject(value);
+            int id = integer(frame == null ? null : frame.get("id"));
+            if (id < 1) throw new IOException("DAP stackTrace response contains an invalid frame id");
+            Map<String, Object> source = MiniJson.asObject(frame.get("source"));
+            String path = source == null ? "" : string(source.get("path"));
+            if (path.isBlank() && source != null) path = string(source.get("name"));
+            frames.add(new DebugInspection.Frame(id, string(frame.get("name")), path, integer(frame.get("line")), integer(frame.get("column"))));
+        }
+        return List.copyOf(frames);
+    }
+
+    private static List<DebugInspection.Scope> scopes(Connection connection, int frameId, boolean variablesEnabled, Duration timeout, BooleanSupplier active)
+        throws IOException, TimeoutException, InterruptedException {
+        requireActive(active);
+        Map<String, Object> body = body(connection.request("scopes", Map.of("frameId", frameId), timeout), "scopes");
+        List<Object> values = MiniJson.asArray(body.get("scopes"));
+        if (values == null) throw new IOException("DAP scopes response is missing scopes");
+        List<DebugInspection.Scope> scopes = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> scope = MiniJson.asObject(value);
+            if (scope == null) throw new IOException("DAP scopes response contains an invalid scope");
+            int reference = integer(scope.get("variablesReference"));
+            List<DebugInspection.Variable> variables = variablesEnabled && reference > 0 ? variables(connection, reference, timeout, active) : List.of();
+            scopes.add(new DebugInspection.Scope(string(scope.get("name")), reference, Boolean.TRUE.equals(scope.get("expensive")), variables));
+        }
+        return List.copyOf(scopes);
+    }
+
+    private static List<DebugInspection.Variable> variables(Connection connection, int reference, Duration timeout, BooleanSupplier active)
+        throws IOException, TimeoutException, InterruptedException {
+        requireActive(active);
+        Map<String, Object> body = body(connection.request("variables", Map.of("variablesReference", reference), timeout), "variables");
+        List<Object> values = MiniJson.asArray(body.get("variables"));
+        if (values == null) throw new IOException("DAP variables response is missing variables");
+        List<DebugInspection.Variable> variables = new ArrayList<>();
+        for (Object value : values) {
+            Map<String, Object> variable = MiniJson.asObject(value);
+            if (variable == null) throw new IOException("DAP variables response contains an invalid variable");
+            variables.add(new DebugInspection.Variable(string(variable.get("name")), string(variable.get("value")), string(variable.get("type")),
+                integer(variable.get("variablesReference"))));
+        }
+        return List.copyOf(variables);
+    }
+
+    private static List<DebugInspection.Watch> watches(Connection connection, List<String> expressions, int frameId, Duration timeout, BooleanSupplier active)
+        throws IOException, TimeoutException, InterruptedException {
+        List<DebugInspection.Watch> watches = new ArrayList<>();
+        for (String expression : expressions) {
+            requireActive(active);
+            Map<String, Object> arguments = new LinkedHashMap<>();
+            arguments.put("expression", expression);
+            arguments.put("context", "watch");
+            arguments.put("frameId", frameId);
+            DebugAdapterTransport.Response response = connection.request("evaluate", arguments, timeout);
+            if (!response.success()) {
+                watches.add(new DebugInspection.Watch(expression, DebugInspection.WatchState.ERROR, "", "", response.message()));
+                continue;
+            }
+            Map<String, Object> body = MiniJson.asObject(response.body());
+            String result = body == null ? null : MiniJson.asString(body.get("result"));
+            if (result == null) watches.add(new DebugInspection.Watch(expression, DebugInspection.WatchState.ERROR, "", "", "DAP evaluate response is missing result"));
+            else watches.add(new DebugInspection.Watch(expression, DebugInspection.WatchState.READY, result, string(body.get("type")), ""));
+        }
+        return List.copyOf(watches);
+    }
+
+    private static List<DebugInspection.Watch> unavailableWatches(List<String> expressions, String detail) {
+        return expressions.stream().map(expression -> new DebugInspection.Watch(expression, DebugInspection.WatchState.UNAVAILABLE, "", "", detail)).toList();
+    }
+
+    private static void requireActive(BooleanSupplier active) throws IOException {
+        if (active == null || !active.getAsBoolean()) throw new IOException("Paused-frame state changed before inspection completed");
+    }
+
+    private static Map<String, Object> body(DebugAdapterTransport.Response response, String command) throws IOException {
+        if (response == null || !response.success()) throw new IOException(responseFailure(command, response));
+        Map<String, Object> body = MiniJson.asObject(response.body());
+        if (body == null) throw new IOException("DAP " + command + " response body is invalid");
+        return body;
+    }
+
+    private static boolean supports(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings, DebugAdapterRegistry.Capability capability) {
+        if (plan == null || settings == null || !plan.adapter().capabilities().contains(capability)) return false;
+        return switch (capability) {
+            case THREADS -> settings.threads();
+            case STACK_TRACE -> settings.stackTrace();
+            case SCOPES -> settings.scopes();
+            case VARIABLES -> settings.variables();
+            case EVALUATE -> settings.evaluate();
+            default -> true;
+        };
+    }
+
+    private static int integer(Object value) {
+        if (!(value instanceof Number number) || number.doubleValue() != number.longValue() || number.longValue() < 0 || number.longValue() > Integer.MAX_VALUE) return 0;
+        return (int) number.longValue();
+    }
+
+    private static String string(Object value) {
+        String string = MiniJson.asString(value);
+        return string == null ? "" : string;
     }
 
     private static BreakpointSynchronization synchronizeBreakpoints(DebugAdapterRegistry.Plan plan, DebugFeatureSettings settings, Connection connection,

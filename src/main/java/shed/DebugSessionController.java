@@ -30,7 +30,9 @@ final class DebugSessionController {
 
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
-        if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart";
+        if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
+            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|stack|variables|frame <id>|watch add|remove|list|clear";
+        }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
         String args = split < 0 ? "" : trimmed.substring(split + 1).trim();
@@ -41,6 +43,9 @@ final class DebugSessionController {
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
             case "restart" -> restart(args);
+            case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
+            case "frame" -> selectFrame(args);
+            case "watch", "watches" -> watch(args);
             default -> "Unknown :debug subcommand: " + command;
         };
     }
@@ -133,6 +138,49 @@ final class DebugSessionController {
         return result.snapshot().detail();
     }
 
+    private String selectFrame(String argument) {
+        int frameId;
+        try { frameId = Integer.parseInt(argument); }
+        catch (NumberFormatException error) { return "Usage: :debug frame <positive-id>"; }
+        if (frameId < 1) return "Usage: :debug frame <positive-id>";
+        DebugSessionService.InspectionResult result = sessions.selectFrame(workspace(), frameId);
+        if (!result.succeeded()) return "Debug frame " + frameId + " is unavailable for the active paused session.";
+        return submitInspection();
+    }
+
+    private String watch(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
+            showInspection(workspace());
+            return "Showing debug watches";
+        }
+        int split = trimmed.indexOf(' ');
+        String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
+        String expression = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        Path workspace = workspace();
+        return switch (command) {
+            case "add" -> {
+                DebugSessionService.InspectionResult result = sessions.addWatch(workspace, expression);
+                if (!result.succeeded()) yield "Watch expression is empty, invalid, too long, or already exists.";
+                yield result.snapshot().paused() ? submitInspection() : "Watch added. It will evaluate when debugging pauses.";
+            }
+            case "remove", "delete" -> sessions.removeWatch(workspace, expression).succeeded() ? "Watch removed." : "Watch was not found.";
+            case "clear" -> sessions.clearWatches(workspace).succeeded() ? "Debug watches cleared." : "No debug watches are defined.";
+            default -> "Usage: :debug watch add <expression>|remove <expression>|list|clear";
+        };
+    }
+
+    private String submitInspection() {
+        Path workspace = workspace();
+        int jobId = editor.asyncJobService.submit("debug inspect", token -> sessions.refreshInspection(workspace,
+            Duration.ofMillis(Math.max(1, editor.configManager.getProcessTimeoutMs()))), (job, result, error) -> {
+                showInspection(workspace);
+                if (error != null || result == null || !result.succeeded()) editor.showMessage("Debug inspection is unavailable; inspect [debug inspector].");
+            });
+        showInspection(workspace);
+        return "Debug inspection requested (job " + jobId + ").";
+    }
+
     void toggleBreakpoint(FileBuffer buffer, int zeroBasedLine) {
         if (buffer == null || !buffer.hasFilePath() || zeroBasedLine < 0) {
             editor.showMessage("Source breakpoints require a file-backed editor buffer.");
@@ -185,6 +233,45 @@ final class DebugSessionController {
     private String status() {
         showStatus(workspace());
         return "Showing debug status";
+    }
+
+    private void showInspection(Path workspace) {
+        DebugInspection.Snapshot snapshot = sessions.inspection(workspace);
+        StringBuilder output = new StringBuilder("Debug Inspector\n\nState: ").append(snapshot.state()).append("\nDetail: ")
+            .append(snapshot.detail()).append("\nPaused: ").append(snapshot.paused()).append("\nThread: ")
+            .append(snapshot.threadId() == 0 ? "(none)" : snapshot.threadId()).append("\nActive frame: ")
+            .append(snapshot.frameId() == 0 ? "(none)" : snapshot.frameId()).append("\n\nThreads:\n");
+        if (snapshot.threads().isEmpty()) output.append("  (none or unavailable)\n");
+        for (DebugInspection.ThreadInfo thread : snapshot.threads()) output.append("  ").append(thread.id()).append("  ").append(thread.name()).append("\n");
+        output.append("\nCall Stack:\n");
+        if (snapshot.frames().isEmpty()) output.append("  (none or unavailable)\n");
+        for (DebugInspection.Frame frame : snapshot.frames()) {
+            output.append(frame.id() == snapshot.frameId() ? "* " : "  ").append(frame.id()).append("  ").append(frame.name());
+            if (!frame.source().isBlank()) output.append("  ").append(frame.source()).append(":").append(frame.line());
+            output.append("\n");
+        }
+        output.append("\nScopes and Variables:\n");
+        if (snapshot.scopes().isEmpty()) output.append("  (none or unavailable)\n");
+        for (DebugInspection.Scope scope : snapshot.scopes()) {
+            output.append("  ").append(scope.name()).append(scope.expensive() ? " (expensive)" : "").append("\n");
+            if (scope.variables().isEmpty()) output.append("    (none or unavailable)\n");
+            for (DebugInspection.Variable variable : scope.variables()) {
+                output.append("    ").append(variable.name()).append(" = ").append(variable.value());
+                if (!variable.type().isBlank()) output.append("  : ").append(variable.type());
+                output.append("\n");
+            }
+        }
+        output.append("\nWatches:\n");
+        if (snapshot.watches().isEmpty()) output.append("  (none)\n");
+        for (DebugInspection.Watch watch : snapshot.watches()) {
+            output.append("  ").append(watch.expression()).append("  ").append(watch.state());
+            if (!watch.value().isBlank()) output.append("  = ").append(watch.value());
+            if (!watch.type().isBlank()) output.append("  : ").append(watch.type());
+            if (!watch.message().isBlank()) output.append("  ").append(watch.message());
+            output.append("\n");
+        }
+        output.append("\nActions: :debug stack | :debug variables | :debug frame <id> | :debug watch add <expression> | :debug watch remove <expression>\n");
+        editor.showScratchBuffer("[debug inspector]", output.toString());
     }
 
     private void showStatus(Path workspace) {

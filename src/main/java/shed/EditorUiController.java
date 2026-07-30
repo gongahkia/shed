@@ -32,6 +32,9 @@ final class EditorUiController {
         editor.setSize(screenSize.width / 2, screenSize.height);
         editor.setLayout(new BorderLayout(5, 5));
         editor.editorHostPanel = new JPanel(new BorderLayout());
+        editor.editorHostPanel.addComponentListener(new java.awt.event.ComponentAdapter() {
+            @Override public void componentResized(java.awt.event.ComponentEvent event) { renderWindowLayout(); }
+        });
         editor.undoManager = new BoundedUndoManager(UndoHistoryPolicy.defaults());
         editor.bufferDocumentListener = new DocumentListener() {
             public void insertUpdate(DocumentEvent e) { editor.handleDocumentChange(); }
@@ -263,7 +266,10 @@ final class EditorUiController {
         if (editor.renderedLayoutComponent != null) {
             editor.editorHostPanel.remove(editor.renderedLayoutComponent);
         }
-        editor.renderedLayoutComponent = editor.windowLayoutRoot == null ? new JPanel() : editor.windowLayoutRoot.render();
+        int width = Math.max(editor.editorHostPanel.getWidth(), editor.getWidth());
+        int height = Math.max(editor.editorHostPanel.getHeight(), editor.getHeight());
+        editor.renderedLayoutComponent = editor.windowLayoutRoot == null ? new JPanel()
+            : editor.windowLayoutRoot.render(getActivePane(), width, height);
         editor.editorHostPanel.add(editor.renderedLayoutComponent, BorderLayout.CENTER);
         editor.updateZenModeLayout();
         editor.editorHostPanel.revalidate();

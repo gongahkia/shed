@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
+import java.awt.Component;
 import java.awt.GraphicsEnvironment;
 import java.awt.event.FocusEvent;
+import java.awt.event.FocusListener;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -148,15 +150,15 @@ public class TexteditorSwingIntegrationTest {
 
             onEdt(() -> {
                 editor.activateEditorPane(editorPane);
-                terminalPane.getInputComponent().dispatchEvent(new FocusEvent(terminalPane.getInputComponent(), FocusEvent.FOCUS_GAINED));
+                fireFocusGained(terminalPane.getInputComponent());
                 return null;
             });
             assertSame(terminalEditorPane, onEdt(editor::getActivePane));
             assertSame(terminalBuffer, onEdt(editor::getCurrentBuffer));
 
             onEdt(() -> {
-                terminalPane.getInputComponent().dispatchEvent(new FocusEvent(terminalPane.getInputComponent(), FocusEvent.FOCUS_GAINED));
-                editorPane.getTextArea().dispatchEvent(new FocusEvent(editorPane.getTextArea(), FocusEvent.FOCUS_GAINED));
+                fireFocusGained(terminalPane.getInputComponent());
+                fireFocusGained(editorPane.getTextArea());
                 return null;
             });
             assertSame(editorPane, onEdt(editor::getActivePane));
@@ -334,6 +336,13 @@ public class TexteditorSwingIntegrationTest {
 
     private static void assumeSwingAvailable() {
         assumeFalse(GraphicsEnvironment.isHeadless(), "Swing display unavailable");
+    }
+
+    private static void fireFocusGained(Component component) {
+        FocusEvent event = new FocusEvent(component, FocusEvent.FOCUS_GAINED);
+        for (FocusListener listener : component.getFocusListeners()) {
+            listener.focusGained(event);
+        }
     }
 
     private static boolean awaitSearchCompletion(Texteditor editor, int jobId) throws Exception {

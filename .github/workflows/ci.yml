@@ -107,3 +107,54 @@ jobs:
           name: shed-linux-x64-installer
           path: target/linux-package/dist/*
           if-no-files-found: error
+
+  release-verify:
+    name: release artifact verification
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Download macOS installer
+        uses: actions/download-artifact@v4
+        with:
+          name: shed-macos-arm64-installer
+          path: ${{ runner.temp }}/shed-release-artifacts
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: shed-windows-x64-installer
+          path: ${{ runner.temp }}/shed-release-artifacts
+
+      - name: Download Linux installer
+        uses: actions/download-artifact@v4
+        with:
+          name: shed-linux-x64-installer
+          path: ${{ runner.temp }}/shed-release-artifacts
+
+      - name: Test release verifier
+        shell: bash
+        run: bash scripts/test-release-artifact-verifier.sh
+
+      - name: Verify release artifacts
+        shell: bash
+        run: |
+          VERSION="$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)"
+          bash scripts/verify-release-artifacts.sh --artifacts "${RUNNER_TEMP}/shed-release-artifacts" --version "$VERSION"
+
+      - name: Upload release verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shed-release-verification
+          path: |
+            ${{ runner.temp }}/shed-release-artifacts/SHA256SUMS
+            ${{ runner.temp }}/shed-release-artifacts/RELEASE_VERIFICATION.txt
+          if-no-files-found: error

@@ -1,11 +1,15 @@
 package shed;
 
 import java.awt.Component;
+import java.awt.Dimension;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JSplitPane;
 
 public class WindowLayoutNode {
+    static final int MINIMUM_LEAF_WIDTH = 280;
+    static final int MINIMUM_LEAF_HEIGHT = 180;
+    private static final int DIVIDER_SIZE = 10;
     public enum Direction {
         LEFT,
         RIGHT,
@@ -65,15 +69,73 @@ public class WindowLayoutNode {
     }
 
     public Component render() {
+        return render(null, Integer.MAX_VALUE, Integer.MAX_VALUE);
+    }
+
+    Component render(EditorPane activePane, int availableWidth, int availableHeight) {
         if (isLeaf()) {
             return pane.getComponent();
         }
 
+        int safeWidth = Math.max(0, availableWidth);
+        int safeHeight = Math.max(0, availableHeight);
+        if (shouldCollapse(safeWidth, safeHeight)) {
+            WindowLayoutNode visible = childContaining(activePane);
+            if (visible == null) visible = first == null ? second : first;
+            return visible == null ? new javax.swing.JPanel() : visible.render(activePane, safeWidth, safeHeight);
+        }
+
         int splitOrientation = orientation == Orientation.HORIZONTAL ? JSplitPane.HORIZONTAL_SPLIT : JSplitPane.VERTICAL_SPLIT;
-        JSplitPane splitPane = new JSplitPane(splitOrientation, first.render(), second.render());
+        int firstWidth = orientation == Orientation.HORIZONTAL ? (int) Math.round(safeWidth * ratio) : safeWidth;
+        int secondWidth = orientation == Orientation.HORIZONTAL ? Math.max(0, safeWidth - firstWidth - DIVIDER_SIZE) : safeWidth;
+        int firstHeight = orientation == Orientation.VERTICAL ? (int) Math.round(safeHeight * ratio) : safeHeight;
+        int secondHeight = orientation == Orientation.VERTICAL ? Math.max(0, safeHeight - firstHeight - DIVIDER_SIZE) : safeHeight;
+        JSplitPane splitPane = new JSplitPane(splitOrientation,
+            first.render(activePane, firstWidth, firstHeight), second.render(activePane, secondWidth, secondHeight));
         splitPane.setResizeWeight(ratio);
         splitPane.setContinuousLayout(true);
+        splitPane.setDividerSize(DIVIDER_SIZE);
+        splitPane.setMinimumSize(new Dimension(MINIMUM_LEAF_WIDTH, MINIMUM_LEAF_HEIGHT));
+        int dividerLocation = orientation == Orientation.HORIZONTAL ? firstWidth : firstHeight;
+        javax.swing.SwingUtilities.invokeLater(() -> splitPane.setDividerLocation(Math.max(0, dividerLocation)));
         return splitPane;
+    }
+
+    private boolean shouldCollapse(int width, int height) {
+        if (orientation == Orientation.HORIZONTAL) return width < minimumWidth();
+        return height < minimumHeight();
+    }
+
+    private int minimumWidth() {
+        if (isLeaf()) return MINIMUM_LEAF_WIDTH;
+        if (orientation == Orientation.HORIZONTAL) return childMinimumWidth(first) + childMinimumWidth(second) + DIVIDER_SIZE;
+        return Math.max(childMinimumWidth(first), childMinimumWidth(second));
+    }
+
+    private int minimumHeight() {
+        if (isLeaf()) return MINIMUM_LEAF_HEIGHT;
+        if (orientation == Orientation.VERTICAL) return childMinimumHeight(first) + childMinimumHeight(second) + DIVIDER_SIZE;
+        return Math.max(childMinimumHeight(first), childMinimumHeight(second));
+    }
+
+    private int childMinimumWidth(WindowLayoutNode child) {
+        return child == null ? 0 : child.minimumWidth();
+    }
+
+    private int childMinimumHeight(WindowLayoutNode child) {
+        return child == null ? 0 : child.minimumHeight();
+    }
+
+    private WindowLayoutNode childContaining(EditorPane target) {
+        if (target == null) return first == null ? second : first;
+        if (first != null && first.contains(target)) return first;
+        if (second != null && second.contains(target)) return second;
+        return first == null ? second : first;
+    }
+
+    private boolean contains(EditorPane target) {
+        if (isLeaf()) return pane == target;
+        return (first != null && first.contains(target)) || (second != null && second.contains(target));
     }
 
     public boolean splitLeaf(EditorPane target, EditorPane newPane, Orientation newOrientation) {

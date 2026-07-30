@@ -118,7 +118,10 @@ final class GitHubPullRequestDialog extends JDialog {
             if (!isDisplayable() || job.getId() != jobId) return;
             jobId = -1; setBusy(false);
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) { state.setText("Pull-request discovery cancelled."); return; }
-            if (error != null || snapshot == null) { state.setText(error == null ? job.getErrorMessage() : error.getMessage()); return; }
+            if (error != null || snapshot == null) {
+                state.setText(GitHubReviewFailureModel.unavailable("GitHub pull-request discovery failed: "
+                    + (error == null ? job.getErrorMessage() : error.getMessage())).format()); return;
+            }
             repository.setText(snapshot.repository().isBlank() ? "Repository: unavailable" : "Repository: " + snapshot.repository());
             state.setText(snapshot.detail()); pullRequests.clear(); details.setText("");
             for (GitHubPullRequestModel.PullRequest pullRequest : snapshot.pullRequests()) pullRequests.addElement(pullRequest);
@@ -143,7 +146,10 @@ final class GitHubPullRequestDialog extends JDialog {
             if (!isDisplayable() || job.getId() != jobId) return;
             jobId = -1; setBusy(false);
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) { state.setText("Pull-request detail loading cancelled."); return; }
-            if (error != null || detail == null) { state.setText(error == null ? job.getErrorMessage() : error.getMessage()); return; }
+            if (error != null || detail == null) {
+                state.setText(GitHubReviewFailureModel.unavailable("GitHub pull-request detail loading failed: "
+                    + (error == null ? job.getErrorMessage() : error.getMessage())).format()); return;
+            }
             if (!detail.available()) { state.setText(detail.error()); return; }
             details.setText("#" + pullRequest.number() + " " + pullRequest.title() + "\nState: " + detail.state() + "\nAuthor: " + detail.author()
                 + "\nUpdated: " + detail.updatedAt() + "\nChanges: +" + detail.additions() + " -" + detail.deletions() + " across " + detail.changedFiles()

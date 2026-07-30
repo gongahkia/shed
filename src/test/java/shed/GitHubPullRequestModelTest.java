@@ -25,6 +25,8 @@ public class GitHubPullRequestModelTest {
         assertEquals(GitHubPullRequestModel.State.EMPTY, empty.state());
         assertEquals(GitHubPullRequestModel.State.UNAUTHENTICATED, auth.state());
         assertTrue(auth.detail().contains("auth login"));
+        assertTrue(auth.detail().contains("Retry safe: yes"));
         assertEquals(GitHubPullRequestModel.State.ERROR, malformed.state());
+        assertTrue(malformed.detail().contains("Non-GitHub fallback"));
     }
 }

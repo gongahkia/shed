@@ -25,7 +25,8 @@ final class GitHubCapabilityController {
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                 editor.showMessage("GitHub CLI capability check cancelled");
             } else if (error != null || report == null) {
-                editor.showMessage("GitHub CLI capability check failed: " + (error == null ? job.getErrorMessage() : error.getMessage()));
+                editor.showMessage(GitHubReviewFailureModel.unavailable("GitHub CLI capability check failed: "
+                    + (error == null ? job.getErrorMessage() : error.getMessage())).format());
             } else {
                 editor.showScratchBuffer("[github status]", report.format());
                 editor.showMessage(report.ready() ? "GitHub CLI capability check completed" : "GitHub CLI capability check requires remediation");

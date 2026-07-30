@@ -76,3 +76,9 @@ Shed never starts a debug adapter while inspecting configurations or selecting o
 Click the left gutter to add or remove a source breakpoint. Shed stores workspace-scoped breakpoint JSON beneath the configured `session.dir` in `breakpoints/`; it writes no source file or project metadata. The store records requested lines plus verified, rejected, or adapter-adjusted locations and uses atomic replacement.
 
 Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoints.enabled=true` and the selected adapter declares `breakpoints`. A `setBreakpoints` response replaces the displayed state for that source: rejected locations use an outlined red gutter marker, adjusted locations use yellow, and details remain in `:debug status`. The request contains the complete set for the source, not an incremental delta. If an adapter does not emit `initialized`, Shed retains the breakpoint state and performs the compatible post-start synchronization with a retained diagnostic.
+
+## Paused-frame Inspection
+
+On a DAP `stopped` event, use `:debug stack` or `:debug variables` to load `[debug inspector]`; loading, unavailable capability, and error states remain visible there. `:debug frame <id>` selects a returned frame before reloading its scopes and variables. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
+
+Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only when their corresponding configured adapter capabilities and feature settings are enabled. A later `continued`, `terminated`, or `exited` event invalidates paused-frame references and leaves watches pending until the next stop; stale responses from a prior suspended state are discarded.

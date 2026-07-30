@@ -152,6 +152,100 @@ public class DebugSessionServiceTest {
         assertFalse(result.snapshot().diagnostics().stream().anyMatch(value -> value.contains("did not emit initialized")));
     }
 
+    @Test
+    void loadsPausedFrameScopesVariablesAndWatchesOnlyForDeclaredCapabilities(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("threads", response("threads", true, Map.of("threads", List.of(Map.of("id", 7, "name", "main"))), ""));
+        connection.responses.put("stackTrace", response("stackTrace", true, Map.of("stackFrames", List.of(Map.of("id", 44, "name", "main",
+            "source", Map.of("path", file.toString()), "line", 8, "column", 1))), ""));
+        connection.responses.put("scopes", response("scopes", true, Map.of("scopes", List.of(Map.of("name", "Locals", "variablesReference", 55))), ""));
+        connection.responses.put("variables", response("variables", true, Map.of("variables", List.of(Map.of("name", "count", "value", "2", "type", "int"))), ""));
+        connection.responses.put("evaluate", response("evaluate", true, Map.of("result", "2", "type", "int"), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch,threads,stack_trace,scopes,variables,evaluate"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        assertTrue(service.addWatch(workspace, "count").succeeded());
+
+        DebugSessionService.InspectionResult result = service.refreshInspection(workspace, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals(DebugInspection.State.READY, result.snapshot().state());
+        assertEquals(44, result.snapshot().frameId());
+        assertEquals("count", result.snapshot().scopes().getFirst().variables().getFirst().name());
+        assertEquals(DebugInspection.WatchState.READY, result.snapshot().watches().getFirst().state());
+        assertEquals(List.of("initialize", "launch", "threads", "stackTrace", "scopes", "variables", "evaluate"), connection.commands);
+    }
+
+    @Test
+    void leavesPausedInspectionUnavailableWithoutUndeclaredRequests(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        service.addWatch(workspace, "count");
+
+        DebugSessionService.InspectionResult result = service.refreshInspection(workspace, Duration.ofSeconds(1));
+
+        assertTrue(result.succeeded());
+        assertEquals(DebugInspection.State.UNAVAILABLE, result.snapshot().state());
+        assertEquals(DebugInspection.WatchState.UNAVAILABLE, result.snapshot().watches().getFirst().state());
+        assertEquals(List.of("initialize", "launch"), connection.commands);
+    }
+
+    @Test
+    void stopsInspectionRequestsWhenThePausedStateChanges(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("threads", response("threads", true, Map.of("threads", List.of(Map.of("id", 7, "name", "main"))), ""));
+        connection.responses.put("stackTrace", response("stackTrace", true, Map.of("stackFrames", List.of(Map.of("id", 44, "name", "main"))), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+        connection.requestHook = command -> {
+            if ("stackTrace".equals(command)) listener.get().onEvent(new DebugAdapterTransport.Event(2, "continued", Map.of("threadId", 7)));
+        };
+
+        assertTrue(service.start(workspace, file, validation("launch,threads,stack_trace,scopes,variables"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+
+        assertFalse(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+        assertFalse(service.inspection(workspace).paused());
+        assertEquals(List.of("initialize", "launch", "threads", "stackTrace"), connection.commands);
+    }
+
+    @Test
+    void reloadsScopesForOnlyTheSelectedActiveFrame(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        connection.responses.put("stackTrace", response("stackTrace", true, Map.of("stackFrames", List.of(
+            Map.of("id", 44, "name", "main"), Map.of("id", 45, "name", "caller"))), ""));
+        connection.responses.put("scopes", response("scopes", true, Map.of("scopes", List.of()), ""));
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch,stack_trace,scopes"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "stopped", Map.of("reason", "breakpoint", "threadId", 7)));
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+        assertTrue(service.selectFrame(workspace, 45).succeeded());
+
+        assertTrue(service.refreshInspection(workspace, Duration.ofSeconds(1)).succeeded());
+        int scopesIndex = connection.commands.lastIndexOf("scopes");
+        assertEquals(45, connection.arguments.get(scopesIndex).get("frameId"));
+    }
+
     private static DebugAdapterRegistry.Validation validation() {
         return validation("launch,attach");
     }

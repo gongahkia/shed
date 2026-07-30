@@ -100,6 +100,8 @@ public class LspServiceTest {
         LspService service = new LspService();
         assertEquals("java", service.languageId(FileType.JAVA));
         assertEquals("python", service.languageId(FileType.PYTHON));
+        assertEquals("c", service.languageId(FileType.C));
+        assertEquals("cpp", service.languageId(FileType.CPP));
         assertEquals(FileType.JAVASCRIPT, FileType.detect(new java.io.File("component.jsx"), ""));
         assertEquals(FileType.TYPESCRIPT, FileType.detect(new java.io.File("component.tsx"), ""));
         assertEquals("text", service.languageId(FileType.UNKNOWN));
@@ -113,6 +115,7 @@ public class LspServiceTest {
         assertArrayEquals(new String[] {"pyright-langserver", "--stdio"}, service.builtinCommand("py"));
         assertArrayEquals(new String[] {"typescript-language-server", "--stdio"}, service.builtinCommand("tsx"));
         assertArrayEquals(new String[] {"gopls"}, service.builtinCommand("go"));
+        assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cxx"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cpp"));
         assertNull(service.builtinCommand("md"));
     }

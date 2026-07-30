@@ -14,8 +14,9 @@ public class LspService {
             case GO:
                 return "go";
             case C:
-            case CPP:
                 return "c";
+            case CPP:
+                return "cpp";
             case JAVA:
                 return "java";
             case HTML:
@@ -32,7 +33,7 @@ public class LspService {
     }
 
     public java.util.List<String> getBuiltinExtensions() {
-        return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cpp", "h", "hpp");
+        return java.util.List.of("java", "rs", "py", "js", "jsx", "ts", "tsx", "go", "c", "cc", "cpp", "cxx", "h", "hpp", "hxx");
     }
 
     public String[] builtinCommand(String extension) {
@@ -51,10 +52,13 @@ public class LspService {
             case "go":
                 return new String[] {ManagedLanguageCatalog.go().command()};
             case "c":
+            case "cc":
             case "cpp":
+            case "cxx":
             case "h":
             case "hpp":
-                return new String[] {"clangd"};
+            case "hxx":
+                return new String[] {ManagedLanguageCatalog.cCpp().command()};
             default:
                 return null;
         }

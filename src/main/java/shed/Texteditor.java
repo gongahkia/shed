@@ -1448,8 +1448,26 @@ public class Texteditor extends JFrame implements KeyListener {
     }
 
     public String showPerfReport() {
-        showScratchBuffer("[perf]", perfService == null ? "No perf service.\n" : perfService.report());
-        return "Showing perf";
+        return showPerfReport("");
+    }
+
+    public String showPerfReport(String argument) {
+        String action = argument == null ? "" : argument.trim().toLowerCase(java.util.Locale.ROOT);
+        if (action.isEmpty() || "status".equals(action)) {
+            PerfService service = perfService == null ? new PerfService() : perfService;
+            showScratchBuffer("[perf]", LocalPerformanceDiagnostics.overview(
+                new DiagnosticLog(errorReporter.getLogPath()), service, sessionConfigController.canBenchmarkWorkspaceIndex()
+            ));
+            return "Showing local performance diagnostics";
+        }
+        if ("diagnostics".equals(action) || "log".equals(action)) {
+            showScratchBuffer("[diagnostics]", LocalPerformanceDiagnostics.diagnostics(new DiagnosticLog(errorReporter.getLogPath())));
+            return "Showing local diagnostic log";
+        }
+        if ("benchmark".equals(action)) {
+            return handleWorkspaceProfileCommand("index benchmark");
+        }
+        return "Usage: :perf [status|diagnostics|benchmark]";
     }
 
     public String showLargeFileStatus() {

@@ -39,6 +39,18 @@ final class PerfService {
         return sb.toString();
     }
 
+    synchronized int metricCount() {
+        return metrics.size();
+    }
+
+    synchronized long sampleCount() {
+        long samples = 0;
+        for (Metric metric : metrics.values()) {
+            samples += metric.count;
+        }
+        return samples;
+    }
+
     private static final class Metric {
         long count;
         long totalNanos;

@@ -9,6 +9,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public final class DiagnosticLog {
@@ -62,6 +63,60 @@ public final class DiagnosticLog {
             return true;
         } catch (Exception ignored) {
             return false;
+        }
+    }
+
+    synchronized Snapshot inspect(int maximumEntries) {
+        if (!Files.exists(path)) {
+            return new Snapshot(path, Status.MISSING, 0, 0, 0, List.of());
+        }
+        try {
+            long bytes = Files.size(path);
+            List<Entry> latestEntries = new ArrayList<>();
+            int entries = 0;
+            int malformedEntries = 0;
+            for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                Entry entry = parseEntry(line);
+                if (entry == null) {
+                    malformedEntries++;
+                    continue;
+                }
+                entries++;
+                latestEntries.add(entry);
+            }
+            int visibleEntries = Math.max(0, maximumEntries);
+            int start = Math.max(0, latestEntries.size() - visibleEntries);
+            List<Entry> newestFirst = new ArrayList<>();
+            for (int index = latestEntries.size() - 1; index >= start; index--) {
+                newestFirst.add(latestEntries.get(index));
+            }
+            return new Snapshot(path, Status.AVAILABLE, bytes, entries, malformedEntries, List.copyOf(newestFirst));
+        } catch (Exception ignored) {
+            return new Snapshot(path, Status.UNREADABLE, 0, 0, 0, List.of());
+        }
+    }
+
+    private static Entry parseEntry(String line) {
+        try {
+            Map<String, Object> values = MiniJson.asObject(MiniJson.parse(line));
+            if (values == null) {
+                return null;
+            }
+            Map<String, Object> cause = MiniJson.asObject(values.get("cause"));
+            return new Entry(
+                MiniJson.asString(values.get("timestamp")),
+                MiniJson.asString(values.get("severity")),
+                MiniJson.asString(values.get("subsystem")),
+                MiniJson.asString(values.get("context")),
+                cause == null ? "" : MiniJson.asString(cause.get("type")),
+                cause == null ? "" : MiniJson.asString(cause.get("message")),
+                MiniJson.asString(values.get("remediation"))
+            );
+        } catch (RuntimeException ignored) {
+            return null;
         }
     }
 
@@ -154,5 +209,30 @@ public final class DiagnosticLog {
             }
         }
         return escaped.toString();
+    }
+
+    enum Status {
+        MISSING,
+        AVAILABLE,
+        UNREADABLE
+    }
+
+    record Entry(String timestamp, String severity, String subsystem, String context, String causeType, String causeMessage,
+                 String remediation) {
+        Entry {
+            timestamp = timestamp == null ? "" : timestamp;
+            severity = severity == null ? "" : severity;
+            subsystem = subsystem == null ? "" : subsystem;
+            context = context == null ? "" : context;
+            causeType = causeType == null ? "" : causeType;
+            causeMessage = causeMessage == null ? "" : causeMessage;
+            remediation = remediation == null ? "" : remediation;
+        }
+    }
+
+    record Snapshot(Path path, Status status, long bytes, int entries, int malformedEntries, List<Entry> latestEntries) {
+        Snapshot {
+            latestEntries = latestEntries == null ? List.of() : List.copyOf(latestEntries);
+        }
     }
 }

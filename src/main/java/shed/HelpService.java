@@ -286,6 +286,13 @@ public class HelpService {
                     + ":workspace index status shows ad-hoc versus persistent-index status and cost.\n"
                     + ":workspace index enable/disable persists the explicit index preference; :workspace index benchmark measures an explicit build.\n"
                     + "Configure session.restore.on.start/session.autoload/session.dir in ~/.shed/config.toml.\n";
+            case "perf":
+            case "performance":
+                return "Help: local performance diagnostics\n\n"
+                    + ":perf opens the local-only timing, diagnostic-log, and benchmark dashboard.\n"
+                    + ":perf diagnostics shows readable entries from the local diagnostic log.\n"
+                    + ":perf benchmark starts a cancellable workspace-index measurement when a workspace is available.\n"
+                    + "Timings and heap observations are local measurements, not portability guarantees.\n";
             case "keybind":
             case "keybinding":
             case "keybindings":

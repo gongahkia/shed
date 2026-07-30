@@ -164,6 +164,14 @@ Notes:
 | `:workspace index disable` | Persist the ad-hoc default without deleting existing cache files |
 | `:workspace index benchmark` | Start an explicit cancellable local index-build measurement |
 
+## Performance and Local Diagnostics Commands
+
+| Command | Action |
+| :--- | :--- |
+| `:perf`, `:perf status` | Show local-only timing, diagnostic-log, and workspace-index benchmark status with measurement limits |
+| `:perf diagnostics`, `:perf log` | Show the newest readable structured entries from the local diagnostic log |
+| `:perf benchmark` | Start the existing cancellable local workspace-index benchmark |
+
 ## Quickfix and Diagnostics Commands
 
 | Command | Action |

@@ -717,6 +717,11 @@ final class SessionConfigController {
     }
 
 
+    boolean canBenchmarkWorkspaceIndex() {
+        return workspaceIndexRoot() != null;
+    }
+
+
     private WorkspaceIndexComparison workspaceIndexComparison() {
         return new WorkspaceIndexComparison(workspaceIndexService());
     }

@@ -11,6 +11,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -146,6 +148,33 @@ public class AsyncJobServiceTest {
         assertTrue(latch.await(2, TimeUnit.SECONDS));
         assertNotNull(snapshotRef.get());
         assertFalse(service.cancel(id));
+        service.shutdownNow();
+    }
+
+    @Test
+    void cancellationBeforeWorkerStartCompletesAsCancelled() throws Exception {
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        AsyncJobService service = new AsyncJobService(executor, 20, null);
+        CountDownLatch firstStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        CountDownLatch cancelledCompletion = new CountDownLatch(1);
+        service.submit("blocker", token -> {
+            firstStarted.countDown();
+            releaseFirst.await(2, TimeUnit.SECONDS);
+            return "done";
+        }, null);
+        assertTrue(firstStarted.await(1, TimeUnit.SECONDS));
+
+        AtomicReference<AsyncJobService.JobSnapshot> snapshotRef = new AtomicReference<>();
+        int id = service.submit("queued", token -> "never", (snapshot, result, error) -> {
+            snapshotRef.set(snapshot);
+            cancelledCompletion.countDown();
+        });
+
+        assertTrue(service.cancel(id));
+        assertTrue(cancelledCompletion.await(2, TimeUnit.SECONDS));
+        assertEquals(AsyncJobService.Status.CANCELLED, snapshotRef.get().getStatus());
+        releaseFirst.countDown();
         service.shutdownNow();
     }
 

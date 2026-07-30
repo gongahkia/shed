@@ -28,6 +28,56 @@ final class ShellCommand {
         return List.of(shell, flag, command);
     }
 
+    static List<String> directCommand(String command) {
+        if (command == null || command.isBlank()) {
+            throw new IllegalArgumentException("task command required");
+        }
+        java.util.ArrayList<String> tokens = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean escaped = false;
+        boolean tokenStarted = false;
+        char quote = '\0';
+        for (int index = 0; index < command.length(); index++) {
+            char character = command.charAt(index);
+            if (escaped) {
+                current.append(character);
+                escaped = false;
+                tokenStarted = true;
+                continue;
+            }
+            if (character == '\\') {
+                escaped = true;
+                tokenStarted = true;
+                continue;
+            }
+            if (quote != '\0') {
+                if (character == quote) quote = '\0';
+                else current.append(character);
+                continue;
+            }
+            if (character == '\'' || character == '\"') {
+                quote = character;
+                tokenStarted = true;
+                continue;
+            }
+            if (Character.isWhitespace(character)) {
+                if (tokenStarted) {
+                    tokens.add(current.toString());
+                    current.setLength(0);
+                    tokenStarted = false;
+                }
+                continue;
+            }
+            current.append(character);
+            tokenStarted = true;
+        }
+        if (escaped) throw new IllegalArgumentException("direct task command ends with an escape");
+        if (quote != '\0') throw new IllegalArgumentException("direct task command has an unclosed quote");
+        if (tokenStarted) tokens.add(current.toString());
+        if (tokens.isEmpty()) throw new IllegalArgumentException("task command required");
+        return List.copyOf(tokens);
+    }
+
     static List<String> interactiveCommand() {
         return interactiveCommand(System.getenv(), path -> new File(path).canExecute());
     }

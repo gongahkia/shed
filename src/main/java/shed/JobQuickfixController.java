@@ -109,19 +109,22 @@ final class JobQuickfixController {
     public String handleTaskCommand(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         File projectRoot = resolveTaskProjectRoot();
-        Map<String, String> tasks = editor.taskService.loadTasks(projectRoot);
+        TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(projectRoot);
+        if (!loaded.isValid()) {
+            return showTaskConfigurationDiagnostics(projectRoot, loaded.diagnostics());
+        }
         if (trimmed.isEmpty() || "list".equalsIgnoreCase(trimmed)) {
-            return showProjectTasks(projectRoot, tasks);
+            return showWorkspaceTasks(projectRoot, loaded.tasks());
         }
         List<String> args = editor.parseQuotedArguments(trimmed);
         if (args.isEmpty()) {
-            return showProjectTasks(projectRoot, tasks);
+            return showWorkspaceTasks(projectRoot, loaded.tasks());
         }
 
         String sub = args.get(0).toLowerCase(Locale.ROOT);
         switch (sub) {
             case "list":
-                return showProjectTasks(projectRoot, tasks);
+                return showWorkspaceTasks(projectRoot, loaded.tasks());
             case "add":
                 if (args.size() < 3) {
                     return "Usage: :task add <name> <command>";
@@ -145,9 +148,20 @@ final class JobQuickfixController {
                 if (args.size() < 2) {
                     return "Usage: :task run <name>";
                 }
-                return runNamedTask(args.get(1), projectRoot, tasks);
+                return runLoadedTask(args.get(1), projectRoot, loaded.tasks(), false);
+            case "dry-run":
+            case "dryrun":
+                if (args.size() < 2) {
+                    return "Usage: :task dry-run <name>";
+                }
+                return runLoadedTask(args.get(1), projectRoot, loaded.tasks(), true);
+            case "cancel":
+                if (args.size() < 2) {
+                    return "Usage: :task cancel <job-id>";
+                }
+                return cancelTaskJob(args.get(1));
             default:
-                return runNamedTask(args.get(0), projectRoot, tasks);
+                return "Usage: :task run <name> (use :task list)";
         }
     }
 
@@ -193,19 +207,31 @@ final class JobQuickfixController {
 
 
     String showProjectTasks(File projectRoot, Map<String, String> tasks) {
+        Map<String, TaskService.WorkspaceTask> workspaceTasks = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : tasks.entrySet()) {
+            workspaceTasks.put(entry.getKey(), TaskService.defaultWorkspaceTask(entry.getKey(), entry.getValue()));
+        }
+        return showWorkspaceTasks(projectRoot, workspaceTasks);
+    }
+
+    String showWorkspaceTasks(File projectRoot, Map<String, TaskService.WorkspaceTask> tasks) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Project tasks\n\n");
+        sb.append("Workspace tasks\n\n");
         sb.append("root: ").append(projectRoot.getAbsolutePath()).append("\n");
         sb.append("file: ").append(editor.taskService.taskFile(projectRoot).getAbsolutePath()).append("\n\n");
         if (tasks.isEmpty()) {
             sb.append("No saved tasks.\n");
             sb.append("Use :task add <name> <command>\n");
-            sb.append("Example: :task add test \"mvn -q test\"\n");
+            sb.append("Run only with :task run <name>.\n");
         } else {
             List<String> names = new ArrayList<>(tasks.keySet());
             Collections.sort(names);
             for (String name : names) {
-                sb.append("  ").append(name).append(" = ").append(tasks.get(name)).append("\n");
+                TaskService.WorkspaceTask task = tasks.get(name);
+                sb.append("  ").append(name).append(" = ").append(task.command())
+                    .append("  [").append(task.shell().configValue())
+                    .append(", ").append(task.problemMatcher().configValue())
+                    .append(", ").append(task.presentation().configValue()).append("]\n");
             }
         }
         editor.showScratchBuffer("[tasks]", sb.toString());
@@ -213,21 +239,31 @@ final class JobQuickfixController {
     }
 
 
+    String showTaskConfigurationDiagnostics(File projectRoot, List<String> diagnostics) {
+        StringBuilder output = new StringBuilder("Task configuration invalid\n\n");
+        output.append("file: ").append(editor.taskService.taskFile(projectRoot).getAbsolutePath()).append("\n\n");
+        for (String diagnostic : diagnostics) output.append("- ").append(diagnostic).append("\n");
+        editor.showScratchBuffer("[tasks]", output.toString());
+        return "Task configuration invalid";
+    }
+
+
     String saveProjectTask(File projectRoot, String name, String command) {
         String normalizedName = name == null ? "" : name.trim();
         String normalizedCommand = command == null ? "" : command.trim();
-        if (normalizedName.isEmpty()) {
-            return "Task name required";
-        }
+        if (normalizedName.isEmpty()) return "Task name required";
+        if (!TaskService.isValidTaskName(normalizedName)) return "Invalid task name: " + normalizedName;
         if (normalizedCommand.isEmpty()) {
             return "Task command required";
         }
-        Map<String, String> tasks = editor.taskService.loadTasks(projectRoot);
-        tasks.put(normalizedName, normalizedCommand);
+        TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(projectRoot);
+        if (!loaded.isValid()) return showTaskConfigurationDiagnostics(projectRoot, loaded.diagnostics());
+        Map<String, TaskService.WorkspaceTask> tasks = new LinkedHashMap<>(loaded.tasks());
         try {
-            editor.taskService.saveTasks(projectRoot, tasks);
+            tasks.put(normalizedName, TaskService.defaultWorkspaceTask(normalizedName, normalizedCommand));
+            editor.taskService.saveWorkspaceTasks(projectRoot, tasks);
             return "Saved task '" + normalizedName + "'";
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             return "Task save failed: " + e.getMessage();
         }
     }
@@ -238,13 +274,15 @@ final class JobQuickfixController {
         if (normalizedName.isEmpty()) {
             return "Task name required";
         }
-        Map<String, String> tasks = editor.taskService.loadTasks(projectRoot);
+        TaskService.TaskLoadResult loaded = editor.taskService.loadWorkspaceTasks(projectRoot);
+        if (!loaded.isValid()) return showTaskConfigurationDiagnostics(projectRoot, loaded.diagnostics());
+        Map<String, TaskService.WorkspaceTask> tasks = new LinkedHashMap<>(loaded.tasks());
         if (!tasks.containsKey(normalizedName)) {
             return "Task not found: " + normalizedName;
         }
         tasks.remove(normalizedName);
         try {
-            editor.taskService.saveTasks(projectRoot, tasks);
+            editor.taskService.saveWorkspaceTasks(projectRoot, tasks);
             return "Removed task '" + normalizedName + "'";
         } catch (IOException e) {
             return "Task remove failed: " + e.getMessage();
@@ -253,36 +291,98 @@ final class JobQuickfixController {
 
 
     String runNamedTask(String taskName, File projectRoot, Map<String, String> tasks) {
+        Map<String, TaskService.WorkspaceTask> workspaceTasks = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : tasks.entrySet()) {
+            workspaceTasks.put(entry.getKey(), TaskService.defaultWorkspaceTask(entry.getKey(), entry.getValue()));
+        }
+        return runLoadedTask(taskName, projectRoot, workspaceTasks, false);
+    }
+
+
+    String runLoadedTask(String taskName, File projectRoot, Map<String, TaskService.WorkspaceTask> tasks, boolean dryRun) {
         String normalizedName = taskName == null ? "" : taskName.trim();
-        if (normalizedName.isEmpty()) {
-            return "Task name required";
+        if (normalizedName.isEmpty()) return "Task name required";
+        TaskService.WorkspaceTask task = tasks.get(normalizedName);
+        if (task == null) {
+            String taskCommand = inferBuiltInTaskCommand(normalizedName, projectRoot);
+            if (taskCommand != null && !taskCommand.isBlank()) {
+                task = TaskService.defaultWorkspaceTask(normalizedName, taskCommand);
+            }
         }
-        String taskCommand = tasks.get(normalizedName);
-        if (taskCommand == null || taskCommand.isBlank()) {
-            taskCommand = inferBuiltInTaskCommand(normalizedName, projectRoot);
-        }
-        if (taskCommand == null || taskCommand.isBlank()) {
+        if (task == null) {
             return "Task not found: " + normalizedName + " (use :task list or :task add)";
         }
-        String validationError = validateShellCommand(taskCommand);
+        File activeFile = activeTaskFile();
+        TaskService.TaskExecutionPlan plan;
+        try {
+            plan = editor.taskService.buildExecutionPlan(task, projectRoot, activeFile);
+        } catch (IOException | IllegalArgumentException error) {
+            return "Task validation failed: " + error.getMessage();
+        }
+        String validationError = validateTaskPlan(plan);
         if (validationError != null) {
             return validationError;
         }
-        final String commandToRun = taskCommand;
+        if (dryRun) return showTaskDryRun(plan);
         int jobId = editor.asyncJobService.submit(
-            "task " + normalizedName + ": " + commandToRun,
+            "task " + normalizedName + ": " + plan.expandedCommand(),
             token -> runExternalCommand(
-                ShellCommand.forCommand(commandToRun),
-                projectRoot,
+                plan.processCommand(),
+                plan.workingDirectory(),
                 null,
                 token,
                 editor.configManager.getProcessTimeoutMs(),
                 editor.configManager.getProcessOutputMaxBytes(),
-                true
+                true,
+                plan.environment()
             ),
-            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, snapshot, result, error)
+            (snapshot, result, error) -> handleTaskJobCompletion(normalizedName, plan, snapshot, result, error)
         );
         return "Task job " + jobId + " started (" + normalizedName + ")";
+    }
+
+
+    File activeTaskFile() {
+        FileBuffer buffer = editor.getCurrentBuffer();
+        return buffer != null && buffer.hasFilePath() ? new File(buffer.getFilePath()) : null;
+    }
+
+
+    String validateTaskPlan(TaskService.TaskExecutionPlan plan) {
+        String command = plan.expandedCommand();
+        if (command.length() > editor.configManager.getShellCommandMaxLength()) {
+            return "Error: command length exceeds shell.command.max.length";
+        }
+        if (plan.task().shell() == TaskService.ShellPolicy.LOGIN && !editor.configManager.getShellCommandEnabled()) {
+            return "Error: shell tasks disabled by shell.command.enabled=false";
+        }
+        return null;
+    }
+
+
+    String showTaskDryRun(TaskService.TaskExecutionPlan plan) {
+        StringBuilder output = new StringBuilder("Task dry run: ").append(plan.task().name()).append("\n\n");
+        output.append("command: ").append(plan.expandedCommand()).append("\n");
+        output.append("shell: ").append(plan.task().shell().configValue()).append("\n");
+        output.append("cwd: ").append(plan.workingDirectory().getAbsolutePath()).append("\n");
+        output.append("problem_matcher: ").append(plan.task().problemMatcher().configValue()).append("\n");
+        output.append("presentation: ").append(plan.task().presentation().configValue()).append("\n");
+        output.append("env keys: ").append(plan.environment().isEmpty() ? "(none)" : String.join(", ", plan.environment().keySet())).append("\n");
+        editor.showScratchBuffer("[task dry-run " + plan.task().name() + "]", output.toString());
+        return "Task dry run shown (not started)";
+    }
+
+
+    String cancelTaskJob(String jobIdArgument) {
+        try {
+            int jobId = Integer.parseInt(jobIdArgument.trim());
+            AsyncJobService.JobSnapshot job = editor.asyncJobService.get(jobId);
+            if (job == null || !job.getDescription().startsWith("task ")) return "Task job not running: " + jobId;
+            boolean cancelled = editor.asyncJobService.cancel(jobId);
+            return cancelled ? "Task job " + jobId + " cancellation sent" : "Task job not running: " + jobId;
+        } catch (NumberFormatException error) {
+            return "Invalid job id: " + jobIdArgument;
+        }
     }
 
 
@@ -315,6 +415,14 @@ final class JobQuickfixController {
 
 
     void handleTaskJobCompletion(String taskName, AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
+        TaskService.WorkspaceTask task = TaskService.defaultWorkspaceTask(taskName, "true");
+        TaskService.TaskExecutionPlan plan = new TaskService.TaskExecutionPlan(task, "true", List.of("true"), new File("."), Map.of());
+        handleTaskJobCompletion(taskName, plan, snapshot, result, error);
+    }
+
+
+    void handleTaskJobCompletion(String taskName, TaskService.TaskExecutionPlan plan,
+                                 AsyncJobService.JobSnapshot snapshot, CommandResult result, Exception error) {
         if (editor.closingDown) {
             return;
         }
@@ -328,34 +436,50 @@ final class JobQuickfixController {
             editor.showMessage("Task job " + jobId + " failed: " + (message == null ? "" : message));
             return;
         }
-        String output = result.stdout == null ? "" : result.stdout.stripTrailing();
-        List<QuickfixService.Entry> parsedEntries = parseQuickfixEntries(output, "task:" + taskName);
+        String output = taskOutput(result);
+        List<QuickfixService.Entry> parsedEntries = plan.task().problemMatcher() == TaskService.ProblemMatcher.NONE
+            ? List.of()
+            : parseTaskQuickfixEntries(output, "task:" + taskName, plan.workingDirectory());
         if (!parsedEntries.isEmpty()) {
             updateQuickfixEntries("task " + taskName + " #" + jobId, parsedEntries);
         }
 
         if (result.exitCode != 0) {
-            if (!output.isEmpty()) {
+            if (shouldPresentTaskOutput(plan.task().presentation(), false) && !output.isEmpty()) {
                 editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
             }
+            String failure = result.stderr == null || result.stderr.isBlank() ? "exit " + result.exitCode : result.stderr.strip();
             editor.showMessage(parsedEntries.isEmpty()
-                ? "Task '" + taskName + "' failed (exit " + result.exitCode + ")"
-                : "Task '" + taskName + "' failed (exit " + result.exitCode + ", quickfix updated)");
+                ? "Task '" + taskName + "' failed (" + failure + ")"
+                : "Task '" + taskName + "' failed (" + failure + ", quickfix updated)");
             return;
         }
 
-        if (output.isEmpty()) {
-            editor.showMessage("Task '" + taskName + "' complete");
-            return;
+        if (shouldPresentTaskOutput(plan.task().presentation(), true) && !output.isEmpty()) {
+            editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
         }
-        if (output.lines().count() <= 1) {
-            editor.showMessage(output);
-            return;
-        }
-        editor.showScratchBuffer("[task " + taskName + " #" + jobId + "]", output + "\n");
         editor.showMessage(parsedEntries.isEmpty()
             ? "Task '" + taskName + "' complete"
             : "Task '" + taskName + "' complete (quickfix updated)");
+    }
+
+
+    boolean shouldPresentTaskOutput(TaskService.Presentation presentation, boolean succeeded) {
+        return presentation == TaskService.Presentation.ALWAYS
+            || (!succeeded && presentation == TaskService.Presentation.ON_FAILURE);
+    }
+
+
+    String taskOutput(CommandResult result) {
+        String stdout = result.stdout == null ? "" : result.stdout.stripTrailing();
+        String stderr = result.stderr == null ? "" : result.stderr.stripTrailing();
+        if (stderr.isEmpty() || stderr.equals(stdout)) return stdout;
+        return stdout.isEmpty() ? stderr : stdout + "\n" + stderr;
+    }
+
+
+    List<QuickfixService.Entry> parseTaskQuickfixEntries(String output, String source, File workingDirectory) {
+        return TaskProblemParser.parseGeneric(output, source, workingDirectory);
     }
 
 
@@ -694,11 +818,29 @@ final class JobQuickfixController {
         int outputLimitBytes,
         boolean redirectErrorStream
     ) {
+        return runExternalCommand(command, workingDirectory, input, token, timeoutMs, outputLimitBytes,
+            redirectErrorStream, Map.of());
+    }
+
+
+    CommandResult runExternalCommand(
+        List<String> command,
+        File workingDirectory,
+        String input,
+        AsyncJobService.JobToken token,
+        int timeoutMs,
+        int outputLimitBytes,
+        boolean redirectErrorStream,
+        Map<String, String> environment
+    ) {
         Process process = null;
         try {
             ProcessBuilder builder = new ProcessBuilder(command);
             builder.directory(workingDirectory == null ? new File(".") : workingDirectory);
             builder.redirectErrorStream(redirectErrorStream);
+            if (environment != null && !environment.isEmpty()) {
+                builder.environment().putAll(environment);
+            }
             process = builder.start();
             Process runningProcess = process;
             if (token != null) {

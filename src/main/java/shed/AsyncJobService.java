@@ -124,6 +124,8 @@ public class AsyncJobService {
         private volatile Status status;
         private volatile String errorMessage;
         private volatile Future<?> future;
+        private volatile boolean started;
+        private volatile Runnable cancelledBeforeStart;
         private final JobToken token;
 
         private JobRecord(int id, String description) {
@@ -133,6 +135,8 @@ public class AsyncJobService {
             this.finishedAtMillis = null;
             this.status = Status.RUNNING;
             this.errorMessage = "";
+            this.started = false;
+            this.cancelledBeforeStart = null;
             this.token = new JobToken();
         }
 
@@ -156,7 +160,11 @@ public class AsyncJobService {
     }
 
     public AsyncJobService(int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
-        this.executor = Executors.newCachedThreadPool();
+        this(Executors.newCachedThreadPool(), maxHistoryEntries, errorReporter);
+    }
+
+    AsyncJobService(ExecutorService executor, int maxHistoryEntries, ApplicationErrorReporter errorReporter) {
+        this.executor = executor == null ? Executors.newCachedThreadPool() : executor;
         this.nextId = new AtomicInteger(1);
         this.jobs = new ConcurrentHashMap<>();
         this.maxHistoryEntries = Math.max(10, maxHistoryEntries);
@@ -170,8 +178,18 @@ public class AsyncJobService {
         int id = nextId.getAndIncrement();
         JobRecord record = new JobRecord(id, description == null ? "job-" + id : description);
         jobs.put(id, record);
+        java.util.concurrent.atomic.AtomicBoolean completionDelivered = new java.util.concurrent.atomic.AtomicBoolean(false);
+        record.cancelledBeforeStart = () -> {
+            if (completion != null && completionDelivered.compareAndSet(false, true)) {
+                JobSnapshot snapshot = record.snapshot();
+                SwingUtilities.invokeLater(() -> completeOnEventDispatchThread(
+                    completion, snapshot, null, new CancellationException("cancelled"), record.description
+                ));
+            }
+        };
 
         Future<?> future = executor.submit(() -> {
+            record.started = true;
             T result = null;
             Exception error = null;
             try {
@@ -198,7 +216,7 @@ public class AsyncJobService {
             } finally {
                 record.finishedAtMillis = System.currentTimeMillis();
                 trimHistoryIfNeeded();
-                if (completion != null) {
+                if (completion != null && completionDelivered.compareAndSet(false, true)) {
                     JobSnapshot snapshot = record.snapshot();
                     T completedResult = result;
                     Exception completedError = error;
@@ -227,8 +245,13 @@ public class AsyncJobService {
         }
         record.token.cancel();
         Future<?> future = record.future;
-        if (future != null) {
-            future.cancel(true);
+        if (future != null && future.cancel(true) && !record.started) {
+            record.status = Status.CANCELLED;
+            record.errorMessage = "cancelled";
+            record.finishedAtMillis = System.currentTimeMillis();
+            trimHistoryIfNeeded();
+            Runnable completion = record.cancelledBeforeStart;
+            if (completion != null) completion.run();
         }
         return true;
     }

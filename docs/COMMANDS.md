@@ -70,14 +70,16 @@ Packaged jars include deterministic version and Java-target manifest entries. `S
 | `:drop <cmd>` | Run async command against current file path (`%` expands to quoted file path) |
 | `:jobs` | Show async jobs buffer |
 | `:jobcancel <id>`, `:jobkill <id>` | Cancel running async job |
-| `:task`, `:task list` | Show project tasks (`.shedtasks`) |
+| `:task`, `:task list` | Show validated workspace tasks (`.shedtasks`) |
 | `:task add <name> <command>` | Save task |
 | `:task remove <name>`, `:task rm <name>`, `:task delete <name>` | Remove task |
-| `:task run <name>` | Run named task |
-| `:task <name>` | Shortcut for running named task |
+| `:task dry-run <name>` | Resolve and show task execution plan without starting it |
+| `:task run <name>` | Explicitly run named task |
+| `:task cancel <id>` | Cancel a running task job |
 
 Notes:
-- `:task test` and `:task build` have built-in fallbacks for Maven/npm/Make projects if not explicitly defined.
+- `:task run test` and `:task run build` have built-in fallbacks for Maven/npm/Make projects if not explicitly defined.
+- Task schema, variable, shell, quickfix, and presentation policy: [Workspace Tasks](TASKS.md).
 
 ## Settings and Configuration
 

@@ -154,6 +154,23 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresGitHistoryAndRemoteActionSurfacesIndependently() throws IOException {
+        Path home = tempDir.resolve("home-git-history");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertTrue(config.getGitHistoryEnabled());
+        assertTrue(config.getGitRemoteActionsEnabled());
+        config.setAndPersist("git.history.enabled", "false");
+        config.setAndPersist("git.remote.actions.enabled", "false");
+
+        assertFalse(config.getGitHistoryEnabled());
+        assertFalse(config.getGitRemoteActionsEnabled());
+        List<String> keys = config.searchTypedSettings("remote actions").stream().map(TypedSettings.Descriptor::key).toList();
+        assertEquals(List.of("git.remote.actions.enabled"), keys);
+    }
+
+    @Test
     void materializesStableDefaultTemplateOnlyWhenConfirmed() throws IOException {
         Path home = tempDir.resolve("home-materialize");
         System.setProperty("user.home", home.toString());

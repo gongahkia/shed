@@ -196,7 +196,7 @@ See [DAP Architecture](DAP.md) for the adapter registry, workspace-safe launch/a
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `keymap.profile` | `vim` | string | `vim` or non-modal `plain`; Plain bypasses `keybind.<mode>.*` |
+| `keymap.profile` | `vim` | string | `vim`, non-modal `plain`, or chorded `emacs`; non-Vim profiles bypass `keybind.<mode>.*` |
 
 ## Dramatic UI / Theater Keys
 
@@ -352,6 +352,9 @@ schema_version = 1
 
 # Non-modal profile
 "keymap.profile" = "plain"
+
+# Emacs profile
+"keymap.profile" = "emacs"
 
 # Palette override
 "ui.caret" = "#7AA2F7"

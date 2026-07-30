@@ -37,7 +37,8 @@ public class HelpService {
                    "  .              Repeat last command\n\n" +
                    "PLAIN PROFILE\n" +
                    "  keymap.profile=plain keeps native text input active and bypasses Vim modes.\n" +
-                   "  F1 or :help keymap lists its fixed shortcuts.\n\n" +
+                   "  keymap.profile=emacs enables fixed Emacs chords without Vim modes.\n" +
+                   "  F1 or :help plain/:help emacs lists fixed shortcuts.\n\n" +
                    "COMMANDS\n" +
                    "  :w [file]      Write current buffer\n" +
                    "  :q / :q!       Quit buffer/editor\n" +
@@ -136,6 +137,11 @@ public class HelpService {
         switch (normalizedTopic) {
             case "keymap":
             case "keymaps":
+                return "Help: keymaps\n\n"
+                    + "keymap.profile=vim is the default modal profile.\n"
+                    + "keymap.profile=plain provides non-modal native text input.\n"
+                    + "keymap.profile=emacs provides Emacs navigation and Ctrl-X chords.\n"
+                    + "Use :help plain or :help emacs for profile bindings.\n";
             case "plain":
                 return "Help: Plain keymap\n\n"
                     + "Set keymap.profile=plain in config.toml or with :set keymap.profile=plain.\n"
@@ -147,6 +153,19 @@ public class HelpService {
                     + "Ctrl/Cmd-W       Close active split\n"
                     + "F1               This help\n\n"
                     + "Plain bypasses Vim mode handling and keybind.<mode> remaps.\n";
+            case "emacs":
+                return "Help: Emacs keymap\n\n"
+                    + "Set keymap.profile=emacs in config.toml or with :set keymap.profile=emacs.\n"
+                    + "C-f/C-b/C-n/C-p     Character and line navigation\n"
+                    + "C-a/C-e, M-f/M-b    Line and word navigation\n"
+                    + "C-v/M-v, M-</M->    Page and file navigation\n"
+                    + "C-d/C-k/C-w/M-w/C-y Delete, kill, copy, and yank\n"
+                    + "C-x C-s/C-f/C-b/C-c Save, find file, buffers, quit\n"
+                    + "C-x b/k             Buffers or kill current buffer\n"
+                    + "M-x                 Command palette\n"
+                    + "C-g                 Cancel a pending C-x chord\n"
+                    + "C-h or F1           This help\n\n"
+                    + "C-x accepts one next key; unsupported chords are ignored. Emacs bypasses Vim mode handling and keybind.<mode> remaps.\n";
             case "windows":
             case "split":
             case "vsplit":

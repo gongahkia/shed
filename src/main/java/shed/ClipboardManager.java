@@ -184,6 +184,21 @@ public class ClipboardManager {
         }
     }
 
+    public boolean pasteAtCaret(JTextArea textArea) {
+        try {
+            String content = clipboardBuffer;
+            if (content.isEmpty()) {
+                content = (String) systemClipboard.getData(DataFlavor.stringFlavor);
+            }
+            if (content != null) {
+                textArea.replaceSelection(content);
+                return true;
+            }
+        } catch (Exception ignored) {
+        }
+        return false;
+    }
+
     public void pasteContent(JTextArea textArea, String content, boolean lineWise, boolean before) {
         try {
             String text = textArea.getText();

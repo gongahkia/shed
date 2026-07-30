@@ -10,7 +10,7 @@ final class PlainKeymap {
         COMMANDS("palette"),
         BUFFERS("buffers"),
         CLOSE("close"),
-        HELP("help keymap");
+        HELP("help plain");
 
         private final String exCommand;
 

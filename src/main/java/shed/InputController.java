@@ -20,6 +20,7 @@ final class InputController {
     private int lspSnippetDocumentVersion;
     private final CompletionRequestState signatureHelpRequestState;
     private int signatureHelpJobId;
+    private EmacsKeymap.Prefix emacsPrefix;
 
     InputController(Texteditor editor) {
         this.editor = editor;
@@ -31,11 +32,21 @@ final class InputController {
         this.lspSnippetDocumentVersion = -1;
         this.signatureHelpRequestState = new CompletionRequestState();
         this.signatureHelpJobId = -1;
+        this.emacsPrefix = EmacsKeymap.Prefix.NONE;
     }
 
     public void keyPressed(KeyEvent e) {
-        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
+        KeymapProfile profile = editor.configManager.getKeymapProfile();
+        if (profile != KeymapProfile.EMACS) {
+            emacsPrefix = EmacsKeymap.Prefix.NONE;
+        }
+        if (profile == KeymapProfile.PLAIN) {
             handlePlainKeymap(e);
+            editor.updateStatusBar();
+            return;
+        }
+        if (profile == KeymapProfile.EMACS) {
+            handleEmacsKeymap(e);
             editor.updateStatusBar();
             return;
         }
@@ -64,15 +75,104 @@ final class InputController {
     }
 
     private void handlePlainKeymap(KeyEvent event) {
-        if (editor.editorState.mode != EditorMode.INSERT) {
-            editor.setMode(EditorMode.INSERT);
-        }
+        ensureNonModalEditing();
         PlainKeymap.Action action = PlainKeymap.actionFor(event);
         if (action == PlainKeymap.Action.NONE) {
             return;
         }
         event.consume();
         editor.commandHandler.execute(action.exCommand());
+    }
+
+    private void handleEmacsKeymap(KeyEvent event) {
+        ensureNonModalEditing();
+        EmacsKeymap.Resolution resolution = EmacsKeymap.resolve(emacsPrefix, event);
+        emacsPrefix = resolution.nextPrefix();
+        if (resolution.consume()) {
+            event.consume();
+        }
+        executeEmacsAction(resolution.action());
+    }
+
+    private void ensureNonModalEditing() {
+        if (editor.editorState.mode != EditorMode.INSERT) {
+            editor.setMode(EditorMode.INSERT);
+        }
+    }
+
+    private void executeEmacsAction(EmacsKeymap.Action action) {
+        switch (action) {
+            case SAVE, FIND_FILE, BUFFERS, KILL_BUFFER, QUIT, COMMANDS, HELP -> editor.commandHandler.execute(action.exCommand());
+            case FORWARD_CHAR -> editor.moveRight();
+            case BACKWARD_CHAR -> editor.moveLeft();
+            case NEXT_LINE -> editor.moveDown();
+            case PREVIOUS_LINE -> editor.moveUp();
+            case LINE_START -> editor.moveLineStart();
+            case LINE_END -> editor.moveLineEnd();
+            case FORWARD_WORD -> editor.moveWordForward();
+            case BACKWARD_WORD -> editor.moveWordBackward();
+            case FILE_START -> editor.moveFileStart();
+            case FILE_END -> editor.moveFileEnd();
+            case PAGE_DOWN -> editor.scrollFullPageDown();
+            case PAGE_UP -> editor.scrollFullPageUp();
+            case DELETE_FORWARD -> deleteEmacsForward();
+            case KILL_LINE -> killEmacsLine();
+            case KILL_REGION -> killEmacsRegion();
+            case COPY_REGION -> copyEmacsRegion();
+            case YANK -> yankEmacs();
+            case CANCEL -> cancelEmacsPrefix();
+            case NONE -> { }
+        }
+    }
+
+    private void deleteEmacsForward() {
+        if (!editor.clipboardManager.deleteChar(editor.writingArea).isEmpty()) {
+            editor.markModified();
+        }
+    }
+
+    private void killEmacsLine() {
+        int start = editor.writingArea.getCaretPosition();
+        String text = editor.writingArea.getText();
+        int end = text.indexOf('\n', start);
+        if (end >= 0) {
+            end++;
+        } else {
+            end = text.length();
+        }
+        if (end > start) {
+            editor.clipboardManager.yankSelection(text.substring(start, end));
+            editor.writingArea.replaceRange("", start, end);
+            editor.markModified();
+        }
+    }
+
+    private void killEmacsRegion() {
+        String selected = editor.writingArea.getSelectedText();
+        if (selected == null || selected.isEmpty()) {
+            return;
+        }
+        editor.clipboardManager.yankSelection(selected);
+        editor.writingArea.replaceSelection("");
+        editor.markModified();
+    }
+
+    private void copyEmacsRegion() {
+        String selected = editor.writingArea.getSelectedText();
+        if (selected != null && !selected.isEmpty()) {
+            editor.clipboardManager.yankSelection(selected);
+        }
+    }
+
+    private void yankEmacs() {
+        if (editor.clipboardManager.pasteAtCaret(editor.writingArea)) {
+            editor.markModified();
+        }
+    }
+
+    private void cancelEmacsPrefix() {
+        emacsPrefix = EmacsKeymap.Prefix.NONE;
+        editor.writingArea.setCaretPosition(editor.writingArea.getCaretPosition());
     }
 
 
@@ -2257,7 +2357,7 @@ final class InputController {
 
 
     public void keyTyped(KeyEvent e) {
-        if (editor.configManager.getKeymapProfile() == KeymapProfile.PLAIN) {
+        if (!editor.configManager.getKeymapProfile().usesVimModeHandling()) {
             return;
         }
         if (editor.suppressNextTypedChar) {

@@ -109,11 +109,13 @@ public class ConfigManagerTest {
         config.setAndPersist("keymap.profile", "plain");
 
         assertEquals(KeymapProfile.PLAIN, config.getKeymapProfile());
-        assertEquals("keymap.profile must be vim or plain", config.validateSettingValue("keymap.profile", "emacs"));
+        config.setAndPersist("keymap.profile", "emacs");
+        assertEquals(KeymapProfile.EMACS, config.getKeymapProfile());
+        assertEquals("keymap.profile must be vim, plain, or emacs", config.validateSettingValue("keymap.profile", "editor"));
         TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("keymap.profile")).findFirst().orElseThrow();
-        assertEquals("vim | plain", descriptor.allowedValues());
-        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"keymap.profile\" = \"plain\""));
+        assertEquals("vim | plain | emacs", descriptor.allowedValues());
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"keymap.profile\" = \"emacs\""));
     }
 
     @Test

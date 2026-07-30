@@ -109,3 +109,7 @@ On Windows x64 with JDK 21 and WiX available to `jpackage`, run `./scripts/packa
 ### Linux x64 installer
 
 On Debian-family Linux x64 with JDK 21, `dpkg-deb`, and `fakeroot`, run `bash scripts/package-linux.sh` to create a DEB with a bundled runtime. See [Linux packaging](./docs/LINUX_PACKAGING.md) for installation, verification, and signing boundaries.
+
+### Release verification
+
+CI verifies the three installer checksums, content reports, and current development-signing policy before release artifacts are exposed. See [release verification](./docs/RELEASE_VERIFICATION.md) for checksum verification and public-release limitations.

@@ -70,6 +70,13 @@ jobs:
           SHED_BUILD_COMMIT: ${{ github.sha }}
         run: ./scripts/package-windows.ps1
 
+      - name: Build Linux installer
+        if: matrix.os == 'ubuntu-latest'
+        shell: bash
+        env:
+          SHED_BUILD_COMMIT: ${{ github.sha }}
+        run: bash scripts/package-linux.sh
+
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         with:
@@ -91,4 +98,12 @@ jobs:
         with:
           name: shed-windows-x64-installer
           path: target/windows-package/dist/*
+          if-no-files-found: error
+
+      - name: Upload Linux installer artifact
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: shed-linux-x64-installer
+          path: target/linux-package/dist/*
           if-no-files-found: error

@@ -117,6 +117,7 @@ public class ConfigManager {
     private static final boolean DEFAULT_GIT_REMOTE_ACTIONS_ENABLED = true;
     private static final boolean DEFAULT_GIT_PANEL_PRESENTATION_ENABLED = true;
     private static final boolean DEFAULT_GITHUB_REVIEW_ENABLED = false;
+    private static final boolean DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED = false;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -306,6 +307,7 @@ public class ConfigManager {
         defineDefault("git.remote.actions.enabled", DEFAULT_GIT_REMOTE_ACTIONS_ENABLED);
         defineDefault("git.panel.presentation.enabled", DEFAULT_GIT_PANEL_PRESENTATION_ENABLED);
         defineDefault("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED);
+        defineDefault("github.review.consent.granted", DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED);
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -407,6 +409,7 @@ public class ConfigManager {
             case "git.remote.actions.enabled" -> "Enable explicit Fetch, Pull, and Push controls in Git history";
             case "git.panel.presentation.enabled" -> "Enable graphical Git workbench documents";
             case "github.review.enabled" -> "Enable explicit GitHub review integration actions";
+            case "github.review.consent.granted" -> "Record explicit GitHub review integration consent";
             default -> key;
         };
     }
@@ -1023,7 +1026,15 @@ public class ConfigManager {
     }
 
     public boolean getGitHubReviewEnabled() {
-        return getBoolean("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED);
+        return getGitHubReviewConsent().enabled();
+    }
+
+    public boolean getGitHubReviewConsentGranted() {
+        return getBoolean("github.review.consent.granted", DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED);
+    }
+
+    public GitHubReviewConsent.State getGitHubReviewConsent() {
+        return GitHubReviewConsent.from(getBoolean("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED), getGitHubReviewConsentGranted());
     }
 
     public boolean isProjectConfigKeyAllowed(String key) {

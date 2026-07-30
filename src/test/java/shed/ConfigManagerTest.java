@@ -199,6 +199,8 @@ public class ConfigManagerTest {
 
         assertFalse(config.getGitHubReviewEnabled());
         config.setAndPersist("github.review.enabled", "true");
+        assertFalse(config.getGitHubReviewEnabled());
+        config.setAndPersist("github.review.consent.granted", "true");
         assertTrue(config.getGitHubReviewEnabled());
         TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
             .filter(setting -> setting.key().equals("github.review.enabled")).findFirst().orElseThrow();

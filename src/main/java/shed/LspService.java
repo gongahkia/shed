@@ -47,7 +47,7 @@ public class LspService {
             case "jsx":
             case "ts":
             case "tsx":
-                return new String[] {"typescript-language-server", "--stdio"};
+                return new String[] {ManagedLanguageCatalog.typescriptJavascript().command(), "--stdio"};
             case "go":
                 return new String[] {"gopls"};
             case "c":

@@ -26,13 +26,36 @@ final class ManagedLanguageCatalog {
         }
     }
 
+    record RuntimeVersion(int major, int minor, int patch) implements Comparable<RuntimeVersion> {
+        RuntimeVersion {
+            if (major < 0 || minor < 0 || patch < 0) {
+                throw new IllegalArgumentException("runtime version parts must be non-negative");
+            }
+        }
+
+        @Override
+        public int compareTo(RuntimeVersion other) {
+            int majorComparison = Integer.compare(major, other.major);
+            if (majorComparison != 0) {
+                return majorComparison;
+            }
+            int minorComparison = Integer.compare(minor, other.minor);
+            return minorComparison != 0 ? minorComparison : Integer.compare(patch, other.patch);
+        }
+
+        @Override
+        public String toString() {
+            return major + "." + minor + "." + patch;
+        }
+    }
+
     record InstallMetadata(
         ManagedLanguageSupportTrust.ArtifactCoordinate coordinate,
         URI projectUrl,
         URI licenseUrl,
         String licenseName,
         String runtimeName,
-        int minimumRuntimeMajor,
+        String minimumRuntimeVersion,
         Set<ManagedLanguageSupportTrust.Platform> supportedPlatforms
     ) {
         InstallMetadata {
@@ -41,7 +64,15 @@ final class ManagedLanguageCatalog {
             licenseUrl = Objects.requireNonNull(licenseUrl, "license url");
             licenseName = Objects.requireNonNull(licenseName, "license name");
             runtimeName = requireText(runtimeName, "runtime name");
+            minimumRuntimeVersion = requireText(minimumRuntimeVersion, "minimum runtime version");
+            if (parseRuntimeVersion(minimumRuntimeVersion) == null) {
+                throw new IllegalArgumentException("minimum runtime version is invalid");
+            }
             supportedPlatforms = supportedPlatforms == null ? Set.of() : Set.copyOf(supportedPlatforms);
+        }
+
+        RuntimeVersion minimumRuntime() {
+            return parseRuntimeVersion(minimumRuntimeVersion);
         }
     }
 
@@ -91,17 +122,17 @@ final class ManagedLanguageCatalog {
                 return status(Availability.EXECUTABLE_MISSING, displayName + " executable was not found",
                     "Install " + displayName + " and set lsp." + defaultExtension() + ".command, or review the managed install option.");
             }
-            Integer major = runtimeMajor(detection.runtimeVersion());
-            if (major == null) {
+            RuntimeVersion version = parseRuntimeVersion(detection.runtimeVersion());
+            if (version == null) {
                 return status(Availability.RUNTIME_VERSION_UNKNOWN, installMetadata.runtimeName() + " runtime version could not be validated",
                     "Use " + runtimeRequirement() + " for " + displayName + ", then restart the LSP client.");
             }
-            if (major < installMetadata.minimumRuntimeMajor()) {
+            if (version.compareTo(installMetadata.minimumRuntime()) < 0) {
                 return status(Availability.RUNTIME_VERSION_UNSUPPORTED,
-                    displayName + " requires " + runtimeRequirement() + " (detected " + installMetadata.runtimeName() + " " + major + ")",
+                    displayName + " requires " + runtimeRequirement() + " (detected " + installMetadata.runtimeName() + " " + version + ")",
                     "Install or select " + runtimeRequirement() + ", then restart the LSP client.");
             }
-            return status(Availability.AVAILABLE, displayName + " is available with " + installMetadata.runtimeName() + " " + major,
+            return status(Availability.AVAILABLE, displayName + " is available with " + installMetadata.runtimeName() + " " + version,
                 "Use :lsp restart " + defaultExtension() + " after changing its command or runtime.");
         }
 
@@ -139,7 +170,7 @@ final class ManagedLanguageCatalog {
         }
 
         private String runtimeRequirement() {
-            return installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeMajor() + "+";
+            return installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeVersion() + "+";
         }
 
         private Status status(Availability availability, String detail, String remediation) {
@@ -147,7 +178,9 @@ final class ManagedLanguageCatalog {
         }
     }
 
-    private static final Pattern JAVA_VERSION = Pattern.compile("(?:^|[^0-9])(?:1\\.)?(\\d{1,3})(?:[._+\\-]|$)");
+    private static final Pattern RUNTIME_VERSION = Pattern.compile(
+        "(?:^|[^0-9])(?:1\\.)?(\\d{1,3})(?:\\.(\\d{1,3}))?(?:\\.(\\d{1,3}))?(?:[._+\\-]|$)"
+    );
     private static final Set<ManagedLanguageSupportTrust.Platform> DESKTOP_PLATFORMS = Set.of(
         ManagedLanguageSupportTrust.Platform.MACOS,
         ManagedLanguageSupportTrust.Platform.WINDOWS,
@@ -165,7 +198,7 @@ final class ManagedLanguageCatalog {
             URI.create("https://www.eclipse.org/legal/epl-2.0/"),
             "Eclipse Public License 2.0",
             "Java",
-            21,
+            "21",
             DESKTOP_PLATFORMS
         )
     );
@@ -181,11 +214,27 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/microsoft/pyright/blob/main/LICENSE.txt"),
             "MIT License",
             "Node.js",
-            14,
+            "14",
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON);
+    private static final Entry TYPESCRIPT_JAVASCRIPT = new Entry(
+        "typescript-javascript",
+        Set.of("js", "jsx", "ts", "tsx"),
+        "TypeScript Language Server",
+        "typescript-language-server",
+        "typescript-language-server.cmd",
+        new InstallMetadata(
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("typescript.typescript-language-server", "5.3.0"),
+            URI.create("https://github.com/typescript-language-server/typescript-language-server"),
+            URI.create("https://github.com/typescript-language-server/typescript-language-server/blob/master/LICENSE"),
+            "Apache License 2.0",
+            "Node.js",
+            "22.22.2",
+            DESKTOP_PLATFORMS
+        )
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT);
 
     private ManagedLanguageCatalog() {
     }
@@ -202,6 +251,10 @@ final class ManagedLanguageCatalog {
         return PYTHON;
     }
 
+    static Entry typescriptJavascript() {
+        return TYPESCRIPT_JAVASCRIPT;
+    }
+
     static Entry forExtension(String extension) {
         if (extension == null || extension.isBlank()) {
             return null;
@@ -216,15 +269,23 @@ final class ManagedLanguageCatalog {
     }
 
     static Integer runtimeMajor(String version) {
+        RuntimeVersion parsed = parseRuntimeVersion(version);
+        return parsed == null ? null : parsed.major();
+    }
+
+    static RuntimeVersion parseRuntimeVersion(String version) {
         if (version == null || version.isBlank()) {
             return null;
         }
-        Matcher matcher = JAVA_VERSION.matcher(version.trim());
+        Matcher matcher = RUNTIME_VERSION.matcher(version.trim());
         if (!matcher.find()) {
             return null;
         }
         try {
-            return Integer.parseInt(matcher.group(1));
+            int major = Integer.parseInt(matcher.group(1));
+            int minor = matcher.group(2) == null ? 0 : Integer.parseInt(matcher.group(2));
+            int patch = matcher.group(3) == null ? 0 : Integer.parseInt(matcher.group(3));
+            return new RuntimeVersion(major, minor, patch);
         } catch (NumberFormatException ignored) {
             return null;
         }

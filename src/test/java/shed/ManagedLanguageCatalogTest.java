@@ -25,7 +25,7 @@ public class ManagedLanguageCatalogTest {
         assertEquals("jdtls.bat", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
         assertEquals("java.eclipse-jdtls@1.50.0", entry.installMetadata().coordinate().displayName());
         assertEquals("Eclipse Public License 2.0", entry.installMetadata().licenseName());
-        assertEquals(21, entry.installMetadata().minimumRuntimeMajor());
+        assertEquals("21", entry.installMetadata().minimumRuntimeVersion());
         assertEquals(3, entry.installMetadata().supportedPlatforms().size());
     }
 
@@ -90,7 +90,7 @@ public class ManagedLanguageCatalogTest {
         assertEquals("pyright-langserver.cmd", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
         assertEquals("python.pyright@1.1.411", entry.installMetadata().coordinate().displayName());
         assertEquals("Node.js", entry.installMetadata().runtimeName());
-        assertEquals(14, entry.installMetadata().minimumRuntimeMajor());
+        assertEquals("14", entry.installMetadata().minimumRuntimeVersion());
         assertEquals(ManagedLanguageCatalog.Availability.EXECUTABLE_MISSING, missing.availability());
         assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, old.availability());
         assertTrue(old.detail().contains("Node.js 12"));
@@ -113,6 +113,47 @@ public class ManagedLanguageCatalogTest {
         assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
         assertTrue(ready.permitsManagedInstall());
         assertTrue(ready.detail().contains("Node.js 14+"));
+    }
+
+    @Test
+    void typescriptJavaScriptEntryValidatesNodePatchVersionsAndExtensions() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.typescriptJavascript();
+
+        ManagedLanguageCatalog.Status tooOld = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
+            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v22.22.1"));
+        ManagedLanguageCatalog.Status valid = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.MACOS,
+            new ManagedLanguageCatalog.ToolDetection("typescript-language-server", "v22.22.2"));
+
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("js"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("jsx"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("ts"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("tsx"));
+        assertEquals("typescript-language-server", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
+        assertEquals("typescript-language-server.cmd", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("typescript.typescript-language-server@5.3.0", entry.installMetadata().coordinate().displayName());
+        assertEquals("22.22.2", entry.installMetadata().minimumRuntimeVersion());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, tooOld.availability());
+        assertTrue(tooOld.detail().contains("Node.js 22.22.1"));
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, valid.availability());
+        assertTrue(valid.usable());
+        assertEquals(new ManagedLanguageCatalog.RuntimeVersion(22, 22, 2),
+            ManagedLanguageCatalog.parseRuntimeVersion("v22.22.2"));
+    }
+
+    @Test
+    void managedTypeScriptJavaScriptInstallRequiresConsentAndTrustedArtifact() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.typescriptJavascript();
+        ManagedLanguageSupportTrust trust = trustWith(entry.installMetadata().coordinate());
+
+        ManagedLanguageCatalog.Status consent = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.LINUX, false);
+        ManagedLanguageCatalog.Status ready = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.LINUX, true);
+
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
+        assertFalse(consent.permitsManagedInstall());
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
+        assertTrue(ready.permitsManagedInstall());
     }
 
     private ManagedLanguageSupportTrust trustWith(ManagedLanguageSupportTrust.ArtifactCoordinate coordinate) {

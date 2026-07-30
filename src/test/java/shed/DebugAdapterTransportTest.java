@@ -85,7 +85,7 @@ public class DebugAdapterTransportTest {
             Map<String, Object> cancel = DebugAdapterTransport.readMessage(frames);
             assertEquals("threads", MiniJson.asString(request.get("command")));
             assertEquals("cancel", MiniJson.asString(cancel.get("command")));
-            assertEquals(1, MiniJson.asInt(MiniJson.asObject(cancel.get("arguments")).get("requestId")));
+            assertEquals(2, MiniJson.asInt(MiniJson.asObject(cancel.get("arguments")).get("requestId")));
         } finally {
             transport.close();
             adapterWriter.close();

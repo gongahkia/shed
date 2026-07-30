@@ -498,6 +498,9 @@ public class ConfigManager {
                 continue;
             }
             String validationError = settings.validateToml(key, value);
+            if (validationError == null && KeymapOverlay.isKeybindKey(key)) {
+                validationError = value instanceof String ? KeymapOverlay.validate(key, (String) value) : key + " must be a TOML string";
+            }
             if (validationError != null) {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + validationError + fallbackDescription(key));
                 continue;
@@ -1124,11 +1127,18 @@ public class ConfigManager {
         if (isSchemaVersionKey(key)) {
             return;
         }
-        if (settings.validateRuntime(key, value == null ? "" : value) != null) {
+        String normalizedKey;
+        try {
+            normalizedKey = normalizePersistedKey(key);
+        } catch (IOException error) {
             return;
         }
-        config.put(key, value);
-        settings.applyRuntime(key, value);
+        String normalizedValue = value == null ? "" : value;
+        if (validateSettingValue(normalizedKey, normalizedValue) != null) {
+            return;
+        }
+        config.put(normalizedKey, normalizedValue);
+        settings.applyRuntime(normalizedKey, normalizedValue);
     }
 
     public void setAndPersist(String key, String value) throws IOException {
@@ -1137,7 +1147,7 @@ public class ConfigManager {
         }
         String normalizedKey = normalizePersistedKey(key);
         String normalizedValue = normalizePersistedValue(value == null ? "" : value);
-        String validationError = settings.validateRuntime(normalizedKey, normalizedValue);
+        String validationError = validateSettingValue(normalizedKey, normalizedValue);
         if (validationError != null) {
             throw new IOException(validationError);
         }
@@ -1159,6 +1169,13 @@ public class ConfigManager {
         config.put(normalizedKey, defaultValue);
         settings.applyRuntime(normalizedKey, defaultValue);
         persistedConfig.remove(normalizedKey);
+        writeConfigFile();
+    }
+
+    public void resetKeybindingAndPersist(String scope, String lhs) throws IOException {
+        String key = KeymapOverlay.normalizeKey("keybind." + (scope == null ? "" : scope) + "." + (lhs == null ? "" : lhs));
+        config.remove(key);
+        persistedConfig.remove(key);
         writeConfigFile();
     }
 
@@ -1420,11 +1437,17 @@ public class ConfigManager {
             return null;
         }
         String normalizedMode = mode == null ? "normal" : mode.toLowerCase(Locale.ROOT);
-        String modeSpecific = config.get("keybind." + normalizedMode + "." + keySpec);
+        String normalizedKeySpec;
+        try {
+            normalizedKeySpec = KeymapOverlay.parseKey("keybind.normal." + keySpec).lhs();
+        } catch (IllegalArgumentException error) {
+            return null;
+        }
+        String modeSpecific = config.get("keybind." + normalizedMode + "." + normalizedKeySpec);
         if (modeSpecific != null) {
             return modeSpecific.trim();
         }
-        String global = config.get("keybind.global." + keySpec);
+        String global = config.get("keybind.global." + normalizedKeySpec);
         if (global != null) {
             return global.trim();
         }
@@ -1441,7 +1464,13 @@ public class ConfigManager {
     }
 
     public String validateSettingValue(String key, String value) {
-        return settings.validateRuntime(key == null ? "" : key.trim(), value == null ? "" : value);
+        String normalizedKey = key == null ? "" : key.trim();
+        String normalizedValue = value == null ? "" : value;
+        String typedError = settings.validateRuntime(normalizedKey, normalizedValue);
+        if (typedError != null) {
+            return typedError;
+        }
+        return KeymapOverlay.isKeybindKey(normalizedKey) ? KeymapOverlay.validate(normalizedKey, normalizedValue) : null;
     }
 
     Set<String> typedSettingKeys() {
@@ -1454,6 +1483,14 @@ public class ConfigManager {
 
     List<TypedSettings.Descriptor> searchTypedSettings(String query) {
         return settings.search(query);
+    }
+
+    List<KeymapOverlay.Binding> effectiveKeybindings() {
+        return KeymapOverlay.effectiveBindings(config, getKeymapProfile());
+    }
+
+    String effectiveKeybindingsText(String query) {
+        return KeymapOverlay.formatBindings(effectiveKeybindings(), query);
     }
 
     String typedSettingsReference() {
@@ -1586,6 +1623,13 @@ public class ConfigManager {
         }
         if (key.indexOf('\0') >= 0 || key.indexOf('\n') >= 0 || key.indexOf('\r') >= 0 || key.indexOf('=') >= 0) {
             throw new IOException("invalid config key: " + key);
+        }
+        if (KeymapOverlay.isKeybindKey(key)) {
+            try {
+                return KeymapOverlay.normalizeKey(key);
+            } catch (IllegalArgumentException error) {
+                throw new IOException(error.getMessage(), error);
+            }
         }
         return key;
     }

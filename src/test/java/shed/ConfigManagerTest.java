@@ -119,6 +119,27 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void persistsAndResetsValidatedKeymapOverlays() throws IOException {
+        Path home = tempDir.resolve("home-keymap-overlay");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        config.setAndPersist("keybind.NORMAL.<C-S>", "<esc>:w<enter>");
+        config.setAndPersist("keybind.normal.x", "a");
+
+        assertEquals("<esc>:w<enter>", config.getKeybinding("normal", "<c-s>"));
+        assertTrue(Files.readString(Path.of(config.getConfigPath())).contains("\"keybind.normal.<c-s>\" = \"<esc>:w<enter>\""));
+        IOException invalid = assertThrows(IOException.class, () -> config.setAndPersist("keybind.normal.x", "<f1>"));
+        assertEquals("keybinding rhs token has unsupported token <f1>", invalid.getMessage());
+        assertEquals("a", config.getKeybinding("normal", "x"));
+
+        config.resetKeybindingAndPersist("normal", "<c-s>");
+
+        assertNull(config.getKeybinding("normal", "<c-s>"));
+        assertFalse(Files.readString(Path.of(config.getConfigPath())).contains("keybind.normal.<c-s>"));
+    }
+
+    @Test
     void configuresExperimentalMultiSelectionPolicy() throws IOException {
         Path home = tempDir.resolve("home-multi-selection");
         System.setProperty("user.home", home.toString());

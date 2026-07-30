@@ -119,6 +119,7 @@ public class CommandHandler {
         registerCommand((args, range, force) -> editor.deleteBuffer(force), "bd", "bdelete");
         registerCommand((args, range, force) -> handleSet(args, force), "set");
         registerCommand((args, range, force) -> handleConfig(args, force), "settings", "config");
+        registerCommand((args, range, force) -> handleKeymap(args), "keymap", "keymaps");
         registerCommand((args, range, force) -> editor.openCommandLogBuffer(), "log", "commandlog");
         registerCommand((args, range, force) -> editor.handleSessionCommand(args), "session", "sessions");
         registerCommand((args, range, force) -> editor.handleWorkspaceProfileCommand(args), "workspace", "ws");
@@ -418,6 +419,33 @@ public class CommandHandler {
             return editor.resetConfigOptionPersistent(args.substring("reset".length()).trim());
         }
         return "Usage: :config[!] [save|status|defaults|inspector|reference|reset <key>]";
+    }
+
+    private String handleKeymap(String args) {
+        String value = args == null ? "" : args.trim();
+        if (value.isEmpty() || value.equalsIgnoreCase("inspector")) {
+            return editor.showKeymapInspector();
+        }
+        if (value.equalsIgnoreCase("list")) {
+            return editor.showEffectiveKeybindings("");
+        }
+        if (value.regionMatches(true, 0, "list ", 0, 5)) {
+            return editor.showEffectiveKeybindings(value.substring(5).trim());
+        }
+        if (value.regionMatches(true, 0, "reset ", 0, 6)) {
+            String[] parts = value.substring(6).trim().split("\\s+", 2);
+            return parts.length == 2 ? editor.resetKeybindingPersistent(parts[0], parts[1]) : "Usage: :keymap reset <scope> <lhs>";
+        }
+        if (value.regionMatches(true, 0, "set ", 0, 4)) {
+            String remaining = value.substring(4).trim();
+            int firstSpace = remaining.indexOf(' ');
+            int equals = remaining.indexOf('=');
+            if (firstSpace <= 0 || equals <= firstSpace + 1) {
+                return "Usage: :keymap set <scope> <lhs>=<rhs>";
+            }
+            return editor.setKeybindingPersistent(remaining.substring(0, firstSpace), remaining.substring(firstSpace + 1, equals), remaining.substring(equals + 1));
+        }
+        return "Usage: :keymap [inspector|list [query]|set <scope> <lhs>=<rhs>|reset <scope> <lhs>]";
     }
 
     private String handleWordCount() {

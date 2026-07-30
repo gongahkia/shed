@@ -123,7 +123,7 @@ public class DebugAdapterTransportTest {
         try {
             adapterWriter.write("Content-Length: nope\r\n\r\n".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
             adapterWriter.flush();
-            await(() -> transport.state() == DebugAdapterTransport.State.FAILED);
+            await(() -> transport.state() == DebugAdapterTransport.State.FAILED && process.destroyed);
             assertTrue(process.destroyed);
             assertFalse(diagnostics.isEmpty());
             assertEquals("malformed-adapter-output", diagnostics.get(0).code());

@@ -20,6 +20,7 @@ write_fixture() {
   local artifact="$2"
   local signing="$3"
   local notarization="$4"
+  local architecture="$5"
   local artifact_path="$TEST_ROOT/$artifact"
   local report="$TEST_ROOT/${artifact%.*}.validation.txt"
   local hash
@@ -29,7 +30,7 @@ write_fixture() {
   printf '%s\n' \
     "artifact=$artifact" \
     "artifact_sha256=$hash" \
-    "architecture=x64" \
+    "architecture=$architecture" \
     "bundle_version=2.0.0" \
     "java_feature=21" \
     "maven_build_plan=reproducible" \
@@ -38,9 +39,9 @@ write_fixture() {
     "notarization=$notarization" > "$report"
 }
 
-write_fixture macos Shed-2.0.0-macos-arm64.dmg adhoc not-requested
-write_fixture windows Shed-2.0.0-windows-x64.msi NotSigned not-applicable
-write_fixture linux Shed-2.0.0-linux-x64.deb not-applicable not-applicable
+write_fixture macos Shed-2.0.0-macos-arm64.dmg adhoc not-requested arm64
+write_fixture windows Shed-2.0.0-windows-x64.msi NotSigned not-applicable x64
+write_fixture linux Shed-2.0.0-linux-x64.deb not-applicable not-applicable x64
 "$VERIFY" --artifacts "$TEST_ROOT" --version 2.0.0 >/dev/null
 [[ -f "$TEST_ROOT/SHA256SUMS" ]] || fail 'missing aggregate checksums'
 [[ -f "$TEST_ROOT/RELEASE_VERIFICATION.txt" ]] || fail 'missing release verification report'

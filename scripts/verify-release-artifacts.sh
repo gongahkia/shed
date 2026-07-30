@@ -55,6 +55,7 @@ declare -a REPORT_NAMES=(
   "Shed-$VERSION-windows-x64.validation.txt"
   "Shed-$VERSION-linux-x64.validation.txt"
 )
+declare -a EXPECTED_ARCHITECTURES=(arm64 x64 x64)
 declare -a EXPECTED_SIGNING=(adhoc NotSigned not-applicable)
 declare -a EXPECTED_NOTARIZATION=(not-requested not-applicable not-applicable)
 
@@ -74,7 +75,7 @@ for index in "${!ARTIFACT_NAMES[@]}"; do
   [[ "$(sha256_file "$artifact_path")" == "$expected_sha256" ]] || fail "checksum mismatch: $artifact_name"
   [[ "$(report_value "$report_path" artifact)" == "$artifact_name" ]] || fail "unexpected artifact in $(basename "$report_path")"
   [[ "$(report_value "$report_path" artifact_sha256)" == "$expected_sha256" ]] || fail "report checksum mismatch: $(basename "$report_path")"
-  [[ "$(report_value "$report_path" architecture)" == "x64" ]] || fail "unexpected architecture in $(basename "$report_path")"
+  [[ "$(report_value "$report_path" architecture)" == "${EXPECTED_ARCHITECTURES[$index]}" ]] || fail "unexpected architecture in $(basename "$report_path")"
   [[ "$(report_value "$report_path" bundle_version)" == "$VERSION" ]] || fail "unexpected version in $(basename "$report_path")"
   [[ "$(report_value "$report_path" java_feature)" == "21" ]] || fail "unexpected Java feature in $(basename "$report_path")"
   [[ "$(report_value "$report_path" maven_build_plan)" == "reproducible" ]] || fail "unverified Maven build plan in $(basename "$report_path")"

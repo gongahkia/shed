@@ -1,6 +1,6 @@
 # Debug Adapter Protocol Architecture
 
-Shed's debug architecture is adapter-capability driven. The Debug Adapter Protocol separates the editor from language-specific debuggers; this phase defines configuration and validation only. It does not launch a process, open a socket, send DAP messages, collect telemetry, or download adapters.
+Shed's debug architecture is adapter-capability driven. The Debug Adapter Protocol separates the editor from language-specific debuggers. Configuration is validated before a transport can start; the transport does not select configurations, launch a debuggee, collect telemetry, or download adapters.
 
 ## Safe Defaults
 
@@ -44,4 +44,17 @@ Each configuration requires `adapter` and `request` (`launch` or `attach`). A la
 
 ## Future Session Boundary
 
-A later debug session implementation must only receive a validated `Plan`: selected adapter, declared capabilities, configuration, workspace root, resolved working directory, and resolved program. It must perform DAP initialization before later adapter-specific launch or attach requests and honor the capabilities returned by the adapter. Adapter-specific request arguments are intentionally deferred because DAP leaves them adapter-defined.
+A debug session may only give the transport a validated `Plan`: selected adapter, declared capabilities, configuration, workspace root, resolved working directory, and resolved program. It must perform DAP initialization before later adapter-specific launch or attach requests and honor the capabilities returned by the adapter. Adapter-specific request arguments remain deferred because DAP leaves them adapter-defined.
+
+## Transport Boundary
+
+`DebugAdapterTransport` implements the DAP base framing: ASCII `Content-Length` headers and UTF-8 JSON objects. It accepts only bounded frames (16 KiB headers and 8 MiB bodies), validates JSON syntax before dispatch, and treats malformed or truncated adapter output as an isolated session failure. A failure completes outstanding requests, closes streams/sockets, stops a stdio adapter process, and reports a local diagnostic; it does not crash the editor.
+
+- It requires `debug.enabled`; attach plans also require `debug.attach.enabled` before opening a process or socket.
+- `stdio` starts the configured direct executable in the validated workspace `cwd`. Adapter stderr is drained separately, never mixed into the DAP stdout stream.
+- `tcp` connects only to the validated loopback host and port. It never starts a local adapter process.
+- Request timeouts issue the DAP `cancel` request with the timed-out request sequence, then ignore a late response.
+- Closing a transport sends `disconnect` when possible, setting `terminateDebuggee` for launch sessions only, then closes the connection and terminates a stdio adapter if it remains alive.
+- Adapter-initiated requests receive a deterministic unsupported response until a later feature supplies a handler. Events and responses are delivered separately.
+
+The transport has no UI dependency and records to `DiagnosticLog` only when its caller supplies one; it performs no telemetry or network access other than an explicitly configured loopback TCP connection.

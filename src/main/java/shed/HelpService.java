@@ -105,6 +105,8 @@ public class HelpService {
                    "  :set theme=x   Switch color theme\n" +
                    "  :set k=v       Set any config key in-memory\n" +
                    "  :set! k=v      Set and persist key to ~/.shed/config.toml\n" +
+                   "  :keymap        Open searchable keymap inspector\n" +
+                   "  :keymap list   Show effective bindings and precedence\n" +
                    "  :45            Go to line 45\n" +
                    "  :1,5d          Delete a line range\n" +
                    "  :s/a/b         Substitute current line\n" +
@@ -141,7 +143,13 @@ public class HelpService {
                     + "keymap.profile=vim is the default modal profile.\n"
                     + "keymap.profile=plain provides non-modal native text input.\n"
                     + "keymap.profile=emacs provides Emacs navigation and Ctrl-X chords.\n"
-                    + "Use :help plain or :help emacs for profile bindings.\n";
+                    + "Use :help plain or :help emacs for profile bindings.\n"
+                    + ":keymap opens a searchable GUI with effective bindings and conflicts.\n"
+                    + ":keymap list [query] shows the same surface in a buffer.\n"
+                    + ":keymap set <scope> <lhs>=<rhs> saves a validated Vim overlay.\n"
+                    + ":keymap reset <scope> <lhs> removes that persisted overlay.\n"
+                    + "Vim precedence is scope-specific overlay, global overlay, then built-in dispatch.\n"
+                    + "Plain and Emacs fixed bindings bypass Vim overlays.\n";
             case "plain":
                 return "Help: Plain keymap\n\n"
                     + "Set keymap.profile=plain in config.toml or with :set keymap.profile=plain.\n"

@@ -1,5 +1,9 @@
 # `Shed` Keybinds
 
+### User overlays
+
+Use `keybind.<scope>.<lhs>` in TOML or `:keymap` for a searchable GUI. In the Vim profile, a scope-specific overlay wins over `global`; Plain and Emacs retain their fixed bindings. `:keymap reset <scope> <lhs>` removes the persisted overlay.
+
 ### Plain profile
 
 Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode handling and `keybind.<mode>.*` remaps; standard Swing text, selection, clipboard, undo, and redo bindings remain active.

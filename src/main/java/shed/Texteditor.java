@@ -2620,6 +2620,26 @@ public class Texteditor extends JFrame implements KeyListener {
         return sessionConfigController.resetConfigOptionPersistent(key);
     }
 
+    String setKeybindingPersistent(String scope, String lhs, String mapping) {
+        return sessionConfigController.setKeybindingPersistent(scope, lhs, mapping);
+    }
+
+    String resetKeybindingPersistent(String scope, String lhs) {
+        return sessionConfigController.resetKeybindingPersistent(scope, lhs);
+    }
+
+    List<KeymapOverlay.Binding> getEffectiveKeybindings() {
+        return sessionConfigController.getEffectiveKeybindings();
+    }
+
+    String showKeymapInspector() {
+        return sessionConfigController.showKeymapInspector();
+    }
+
+    String showEffectiveKeybindings(String query) {
+        return sessionConfigController.showEffectiveKeybindings(query);
+    }
+
     boolean isThemeRelatedConfigKey(String key) {
         return sessionConfigController.isThemeRelatedConfigKey(key);
     }

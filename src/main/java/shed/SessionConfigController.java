@@ -298,6 +298,34 @@ final class SessionConfigController {
         }
     }
 
+    String setKeybindingPersistent(String scope, String lhs, String mapping) {
+        String key = "keybind." + (scope == null ? "" : scope.trim()) + "." + (lhs == null ? "" : lhs.trim());
+        return setConfigOptionPersistent(key, mapping == null ? "" : mapping);
+    }
+
+    String resetKeybindingPersistent(String scope, String lhs) {
+        try {
+            editor.configManager.resetKeybindingAndPersist(scope, lhs);
+            return "Reset keybinding keybind." + scope + "." + lhs;
+        } catch (IOException e) {
+            return "Error resetting keybinding: " + e.getMessage();
+        }
+    }
+
+    List<KeymapOverlay.Binding> getEffectiveKeybindings() {
+        return editor.configManager.effectiveKeybindings();
+    }
+
+    String showKeymapInspector() {
+        KeymapInspectorDialog.showFor(editor);
+        return "Keymap inspector opened";
+    }
+
+    String showEffectiveKeybindings(String query) {
+        showScratchBuffer("[keymap]", editor.configManager.effectiveKeybindingsText(query));
+        return "Showing effective keybindings";
+    }
+
 
     boolean isThemeRelatedConfigKey(String key) {
         if (key == null) {

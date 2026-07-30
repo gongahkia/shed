@@ -255,17 +255,19 @@ When `project.config.allow.unsafe=false`, project-local config only applies:
 | :--- | :--- | :--- |
 | `command.alias.<name>` | Ex-command alias to built-in command | `"command.alias.ww" = "w"` |
 | `command.user.<name>` | User shell command callable as `:<name>` | `"command.user.build" = "make -j4"` |
-| `keybind.<mode>.<lhs>` | Key remap by mode | `"keybind.normal.H" = "^"` |
+| `keybind.<scope>.<lhs>` | Validated Vim keymap overlay | `"keybind.normal.H" = "^"` |
 | `lsp.<ext>.command` | LSP server command for extension | `"lsp.py.command" = "pyright-langserver"` |
 | `lsp.<ext>.args` | LSP server args | `"lsp.py.args" = "--stdio"` |
 | `debug.adapter.<id>.<field>` | User-managed DAP adapter (`command`, `args`, `transport`, `capabilities`) | `"debug.adapter.java.command" = "java-debug-adapter"` |
 | `debug.configuration.<name>.<field>` | DAP launch/attach configuration | `"debug.configuration.main.request" = "launch"` |
 
-Supported keybind modes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
+Supported keybind scopes: `normal`, `insert`, `visual`, `visual_line`, `replace`, `command`, `search`, `global`.
 
 Common key tokens: `<esc>`, `<enter>`, `<tab>`, `<space>`, `<bs>`, `<del>`, `<up>`, `<down>`, `<left>`, `<right>`, `<c-x>`, `<lt>`.
 
 Use `<nop>` as RHS to disable a key.
+
+Overlays apply only while `keymap.profile = "vim"`. Scope-specific overlays take precedence over `global` for that mode; `global` remains active in all other Vim modes. Plain and Emacs fixed bindings intentionally bypass these Vim overlays. Invalid scope, LHS token, or RHS token rejects the setting without changing active bindings. Use `:keymap`, `:keymap list [query]`, `:keymap set <scope> <lhs>=<rhs>`, or `:keymap reset <scope> <lhs>` for the searchable GUI/list, persisted edits, and reset.
 
 ## Theme and Palette Keys
 

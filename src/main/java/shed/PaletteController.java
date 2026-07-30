@@ -309,6 +309,9 @@ final class PaletteController {
                 return "Open global settings file.";
             case "config":
                 return "Open settings or persist with :config save.";
+            case "keymap":
+            case "keymaps":
+                return "Inspect, search, save, or reset validated Vim keymap overlays.";
             case "log":
             case "commandlog":
                 return "Open command log scratch buffer.";

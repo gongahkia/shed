@@ -51,6 +51,8 @@ final class GitConflictResolutionDialog extends JDialog {
         super(editor, "Git Conflict Resolution", false);
         this.editor = editor;
         this.loader = loader;
+        AccessibilitySupport.describe(conflictList, "Git conflicts", "Unresolved files in the current repository.");
+        AccessibilitySupport.describe(result, "Conflict resolution result", "Editable resolution content for the selected conflict.");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));

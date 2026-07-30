@@ -81,6 +81,7 @@ final class RecoveryWorkspaceDialog extends JDialog {
             }
         };
         this.table = new JTable(tableModel);
+        AccessibilitySupport.describe(table, "Recovery snapshots", "Recoverable documents. Toggle Restore before choosing Restore Selected.");
         this.originalPreview = previewArea();
         this.recoveryPreview = previewArea();
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);

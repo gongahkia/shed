@@ -55,6 +55,9 @@ final class GitChangesWorkbenchDialog extends JDialog {
         super(editor, "Git Changes", false);
         this.editor = editor;
         this.loader = loader;
+        AccessibilitySupport.describe(changeTable, "Git changed files", "Changed files in the current repository.");
+        AccessibilitySupport.describe(hunkList, "Git diff hunks", "Diff hunks for the selected changed file.");
+        AccessibilitySupport.describe(diffText, "Git diff", "Read-only diff for the selected file or hunk.");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));

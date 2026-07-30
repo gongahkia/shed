@@ -42,6 +42,7 @@ final class SettingsInspectorDialog extends JDialog {
         this.editor = editor;
         this.categoryModel = new DefaultListModel<>();
         this.categories = new JList<>(categoryModel);
+        AccessibilitySupport.describe(categories, "Settings categories", "Filter typed settings by category.");
         this.tableModel = new DefaultTableModel(new Object[] {
             "Category", "Setting", "Current", "Default", "Type", "Description", "Allowed", "Behavior"
         }, 0) {
@@ -51,7 +52,9 @@ final class SettingsInspectorDialog extends JDialog {
             }
         };
         this.searchField = new JTextField();
+        AccessibilitySupport.describe(searchField, "Settings search", "Search settings by key, description, type, or behavior.");
         this.table = new JTable(tableModel);
+        AccessibilitySupport.describe(table, "Settings", "Typed settings table. Edit the Current column to save a setting immediately.");
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));

@@ -105,6 +105,7 @@ public class Texteditor extends JFrame implements KeyListener {
     int activePaneIndex;
     WindowLayoutNode windowLayoutRoot;
     Component renderedLayoutComponent;
+    WorkbenchPlacementState workbenchPlacementState;
 
     // State variables
     String lastMessage;
@@ -324,6 +325,7 @@ public class Texteditor extends JFrame implements KeyListener {
         keymapReplayDepth = 0;
         yankRing = new ArrayList<>();
         ptyTerminalPanes = new HashMap<>();
+        workbenchPlacementState = new WorkbenchPlacementState();
         terminalBufferCounter = 1;
         terminalController = new TerminalController(this);
         treePane = null;

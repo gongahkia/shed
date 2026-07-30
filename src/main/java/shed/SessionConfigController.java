@@ -729,6 +729,7 @@ final class SessionConfigController {
             payload.put("terminals", editor.serializeTerminalSessionMetadata());
         }
         payload.put("layout", serializeWindowLayout(editor.windowLayoutRoot));
+        payload.put("toolPlacements", editor.workbenchPlacementState.toList());
         payload.put("activePaneIndex", editor.activePaneIndex);
         FileBuffer current = editor.getCurrentBuffer();
         if (current != null) {
@@ -869,6 +870,7 @@ final class SessionConfigController {
         } else {
             editor.treeRoot = null;
         }
+        editor.workbenchPlacementState = WorkbenchPlacementState.fromList(payload.get("toolPlacements"));
         applySessionUiSettings(MiniJson.asObject(payload.get("uiSettings")));
         return true;
     }
@@ -889,6 +891,7 @@ final class SessionConfigController {
         editor.treeBuffer = null;
         editor.treePane = null;
         editor.quickfixBuffer = null;
+        editor.workbenchPlacementState = new WorkbenchPlacementState();
         editor.buffers.clear();
 
         for (String filePath : filePaths) {

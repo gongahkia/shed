@@ -140,6 +140,7 @@ Managed language support has no configuration key or network path yet. Its plann
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
 | `git.workbench.enabled` | `true` | bool | Enables `:git workbench`, a read-only asynchronous repository-status, diff, and hunk-navigation view |
+| `git.conflict.resolution.enabled` | `true` | bool | Enables `:git conflict`, an explicit conflict-resolution document with preserved Git sides |
 
 ## Undo History Policy
 

@@ -109,6 +109,7 @@ public class ConfigManager {
     private static final String DEFAULT_PROJECT_REPLACE_SCOPE = "workspace";
     private static final boolean DEFAULT_TREE_DELETE_PROTECT_CRITICAL = true;
     private static final boolean DEFAULT_GIT_WORKBENCH_ENABLED = true;
+    private static final boolean DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED = true;
     private static final String SHED_DIRECTORY_NAME = ".shed";
     private static final String SHED_CONFIG_NAME = "config.toml";
     private static final String PROJECT_CONFIG_NAME = ".shed.toml";
@@ -290,6 +291,7 @@ public class ConfigManager {
         defineDefault("project.replace.scope", DEFAULT_PROJECT_REPLACE_SCOPE);
         defineDefault("tree.delete.protect.critical", DEFAULT_TREE_DELETE_PROTECT_CRITICAL);
         defineDefault("git.workbench.enabled", DEFAULT_GIT_WORKBENCH_ENABLED);
+        defineDefault("git.conflict.resolution.enabled", DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED);
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -383,6 +385,7 @@ public class ConfigManager {
             case "project.replace.scope" -> "Project replacement scope";
             case "tree.delete.protect.critical" -> "Protect critical paths from tree deletion";
             case "git.workbench.enabled" -> "Enable the graphical read-only Git changes workbench";
+            case "git.conflict.resolution.enabled" -> "Enable the graphical Git conflict-resolution document";
             default -> key;
         };
     }
@@ -968,6 +971,10 @@ public class ConfigManager {
 
     public boolean getGitWorkbenchEnabled() {
         return getBoolean("git.workbench.enabled", DEFAULT_GIT_WORKBENCH_ENABLED);
+    }
+
+    public boolean getGitConflictResolutionEnabled() {
+        return getBoolean("git.conflict.resolution.enabled", DEFAULT_GIT_CONFLICT_RESOLUTION_ENABLED);
     }
 
     public boolean isProjectConfigKeyAllowed(String key) {

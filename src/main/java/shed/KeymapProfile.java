@@ -4,7 +4,8 @@ import java.util.Locale;
 
 enum KeymapProfile {
     VIM("vim"),
-    PLAIN("plain");
+    PLAIN("plain"),
+    EMACS("emacs");
 
     static final String CONFIG_KEY = "keymap.profile";
 
@@ -19,9 +20,17 @@ enum KeymapProfile {
     }
 
     static KeymapProfile fromConfig(String value) {
-        if (value != null && PLAIN.configValue.equals(value.trim().toLowerCase(Locale.ROOT))) {
-            return PLAIN;
+        if (value == null) {
+            return VIM;
         }
-        return VIM;
+        return switch (value.trim().toLowerCase(Locale.ROOT)) {
+            case "plain" -> PLAIN;
+            case "emacs" -> EMACS;
+            default -> VIM;
+        };
+    }
+
+    boolean usesVimModeHandling() {
+        return this == VIM;
     }
 }

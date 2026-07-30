@@ -267,7 +267,7 @@ final class TypedSettings {
         }
         return switch (key) {
             case "tab.size" -> "integer 1..16";
-            case "keymap.profile" -> "vim | plain";
+            case "keymap.profile" -> "vim | plain | emacs";
             case "font.size" -> "integer >= 1";
             case "line.numbers" -> "none | absolute | relative | relativeabsolute | hybrid";
             case "multi.selection.max.cursors" -> "integer " + MultiSelectionPolicy.MIN_MAX_CURSORS + ".." + MultiSelectionPolicy.MAX_MAX_CURSORS;
@@ -428,8 +428,9 @@ final class TypedSettings {
             }
         }
         if ("keymap.profile".equals(key) && value instanceof String
-            && !"vim".equalsIgnoreCase(((String) value).trim()) && !"plain".equalsIgnoreCase(((String) value).trim())) {
-            return key + " must be vim or plain";
+            && !"vim".equalsIgnoreCase(((String) value).trim()) && !"plain".equalsIgnoreCase(((String) value).trim())
+            && !"emacs".equalsIgnoreCase(((String) value).trim())) {
+            return key + " must be vim, plain, or emacs";
         }
         if (("backup.directory".equals(key) || "project.replace.backup.directory".equals(key))
             && value instanceof String && ((String) value).isBlank()) {

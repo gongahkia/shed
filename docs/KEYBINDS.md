@@ -13,6 +13,23 @@ Set `keymap.profile = "plain"` for non-modal editing. Plain bypasses Vim mode ha
 | `Ctrl`/`Cmd` + `W` | Close active split |
 | `F1` | Plain-keymap help |
 
+### Emacs profile
+
+Set `keymap.profile = "emacs"` for fixed Emacs bindings. Emacs bypasses Vim mode handling and `keybind.<mode>.*` remaps. `C-x` accepts exactly one following key; unsupported chords and `C-g` cancel harmlessly.
+
+| Key-binds | Function |
+| :---: | :---: |
+| `C-f` / `C-b` / `C-n` / `C-p` | Character and line navigation |
+| `C-a` / `C-e` | Beginning/end of line |
+| `M-f` / `M-b` | Word navigation |
+| `C-v` / `M-v` / `M-<` / `M->` | Page/file navigation |
+| `C-d` / `C-k` / `C-w` / `M-w` / `C-y` | Delete, kill, copy, yank |
+| `C-x C-s` / `C-x C-f` / `C-x C-b` | Save, find file, buffer picker |
+| `C-x b` / `C-x k` / `C-x C-c` | Buffer picker, kill buffer, quit |
+| `M-x` | Command palette |
+| `C-g` | Cancel pending `C-x` chord |
+| `C-h` or `F1` | Emacs-keymap help |
+
 ### Mode Switching
 
 | Key-binds | Function |

@@ -399,7 +399,7 @@ public class Texteditor extends JFrame implements KeyListener {
         // Initialize UI
         initializeUI();
         // Set initial mode before any status rendering hooks
-        setMode(configManager.getKeymapProfile() == KeymapProfile.PLAIN ? EditorMode.INSERT : EditorMode.NORMAL);
+        setMode(configManager.getKeymapProfile().usesVimModeHandling() ? EditorMode.NORMAL : EditorMode.INSERT);
         applyThemeColors();
 
         // Initialize managers that depend on UI

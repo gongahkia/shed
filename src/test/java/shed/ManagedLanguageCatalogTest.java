@@ -156,6 +156,47 @@ public class ManagedLanguageCatalogTest {
         assertTrue(ready.permitsManagedInstall());
     }
 
+    @Test
+    void goEntryUsesGoVersionSemanticsAndCrossPlatformCommands() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.go();
+
+        ManagedLanguageCatalog.Status old = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+            new ManagedLanguageCatalog.ToolDetection("gopls", "go version go1.20.14 linux/amd64"));
+        ManagedLanguageCatalog.Status valid = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.LINUX,
+            new ManagedLanguageCatalog.ToolDetection("gopls", "go version go1.21.6 linux/amd64"));
+
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("go"));
+        assertEquals("gopls", entry.commandFor(ManagedLanguageSupportTrust.Platform.MACOS));
+        assertEquals("gopls.exe", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("go.gopls@0.23.0", entry.installMetadata().coordinate().displayName());
+        assertEquals("Go", entry.installMetadata().runtimeName());
+        assertEquals("1.21", entry.installMetadata().minimumRuntimeVersion());
+        assertEquals(ManagedLanguageCatalog.RuntimeVersionScheme.STANDARD, entry.installMetadata().runtimeVersionScheme());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, old.availability());
+        assertTrue(old.detail().contains("Go 1.20.14"));
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, valid.availability());
+        assertEquals(new ManagedLanguageCatalog.RuntimeVersion(1, 21, 6),
+            ManagedLanguageCatalog.parseRuntimeVersion("go version go1.21.6 linux/amd64"));
+        assertEquals(new ManagedLanguageCatalog.RuntimeVersion(8, 0, 402),
+            ManagedLanguageCatalog.parseRuntimeVersion("1.8.0_402", ManagedLanguageCatalog.RuntimeVersionScheme.JAVA_LEGACY));
+    }
+
+    @Test
+    void managedGoInstallRequiresConsentAndTrustedArtifact() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.go();
+        ManagedLanguageSupportTrust trust = trustWith(entry.installMetadata().coordinate());
+
+        ManagedLanguageCatalog.Status consent = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.WINDOWS, false);
+        ManagedLanguageCatalog.Status ready = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.WINDOWS, true);
+
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
+        assertFalse(consent.permitsManagedInstall());
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
+        assertTrue(ready.permitsManagedInstall());
+    }
+
     private ManagedLanguageSupportTrust trustWith(ManagedLanguageSupportTrust.ArtifactCoordinate coordinate) {
         ManagedLanguageSupportTrust.CatalogArtifact artifact = new ManagedLanguageSupportTrust.CatalogArtifact(
             coordinate,

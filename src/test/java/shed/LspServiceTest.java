@@ -111,6 +111,7 @@ public class LspServiceTest {
         assertArrayEquals(new String[] {"jdtls"}, service.builtinCommand("java"));
         assertArrayEquals(new String[] {"pyright-langserver", "--stdio"}, service.builtinCommand("py"));
         assertArrayEquals(new String[] {"typescript-language-server", "--stdio"}, service.builtinCommand("tsx"));
+        assertArrayEquals(new String[] {"gopls"}, service.builtinCommand("go"));
         assertArrayEquals(new String[] {"clangd"}, service.builtinCommand("cpp"));
         assertNull(service.builtinCommand("md"));
     }

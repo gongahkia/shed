@@ -49,7 +49,7 @@ public class LspService {
             case "tsx":
                 return new String[] {ManagedLanguageCatalog.typescriptJavascript().command(), "--stdio"};
             case "go":
-                return new String[] {"gopls"};
+                return new String[] {ManagedLanguageCatalog.go().command()};
             case "c":
             case "cpp":
             case "h":

@@ -20,6 +20,11 @@ final class ManagedLanguageCatalog {
         MANAGED_INSTALL_READY
     }
 
+    enum RuntimeVersionScheme {
+        STANDARD,
+        JAVA_LEGACY
+    }
+
     record ToolDetection(String executable, String runtimeVersion) {
         boolean executableFound() {
             return executable != null && !executable.isBlank();
@@ -56,6 +61,7 @@ final class ManagedLanguageCatalog {
         String licenseName,
         String runtimeName,
         String minimumRuntimeVersion,
+        RuntimeVersionScheme runtimeVersionScheme,
         Set<ManagedLanguageSupportTrust.Platform> supportedPlatforms
     ) {
         InstallMetadata {
@@ -65,14 +71,15 @@ final class ManagedLanguageCatalog {
             licenseName = Objects.requireNonNull(licenseName, "license name");
             runtimeName = requireText(runtimeName, "runtime name");
             minimumRuntimeVersion = requireText(minimumRuntimeVersion, "minimum runtime version");
-            if (parseRuntimeVersion(minimumRuntimeVersion) == null) {
+            runtimeVersionScheme = Objects.requireNonNull(runtimeVersionScheme, "runtime version scheme");
+            if (parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme) == null) {
                 throw new IllegalArgumentException("minimum runtime version is invalid");
             }
             supportedPlatforms = supportedPlatforms == null ? Set.of() : Set.copyOf(supportedPlatforms);
         }
 
         RuntimeVersion minimumRuntime() {
-            return parseRuntimeVersion(minimumRuntimeVersion);
+            return parseRuntimeVersion(minimumRuntimeVersion, runtimeVersionScheme);
         }
     }
 
@@ -122,7 +129,7 @@ final class ManagedLanguageCatalog {
                 return status(Availability.EXECUTABLE_MISSING, displayName + " executable was not found",
                     "Install " + displayName + " and set lsp." + defaultExtension() + ".command, or review the managed install option.");
             }
-            RuntimeVersion version = parseRuntimeVersion(detection.runtimeVersion());
+            RuntimeVersion version = parseRuntimeVersion(detection.runtimeVersion(), installMetadata.runtimeVersionScheme());
             if (version == null) {
                 return status(Availability.RUNTIME_VERSION_UNKNOWN, installMetadata.runtimeName() + " runtime version could not be validated",
                     "Use " + runtimeRequirement() + " for " + displayName + ", then restart the LSP client.");
@@ -178,8 +185,11 @@ final class ManagedLanguageCatalog {
         }
     }
 
-    private static final Pattern RUNTIME_VERSION = Pattern.compile(
-        "(?:^|[^0-9])(?:1\\.)?(\\d{1,3})(?:\\.(\\d{1,3}))?(?:\\.(\\d{1,3}))?(?:[._+\\-]|$)"
+    private static final Pattern STANDARD_RUNTIME_VERSION = Pattern.compile(
+        "(?:^|[^0-9])(\\d{1,3})(?:[._](\\d{1,3}))?(?:[._](\\d{1,3}))?(?=[^0-9]|$)"
+    );
+    private static final Pattern JAVA_LEGACY_RUNTIME_VERSION = Pattern.compile(
+        "(?:^|[^0-9])(?:1\\.)?(\\d{1,3})(?:[._](\\d{1,3}))?(?:[._](\\d{1,3}))?(?=[^0-9]|$)"
     );
     private static final Set<ManagedLanguageSupportTrust.Platform> DESKTOP_PLATFORMS = Set.of(
         ManagedLanguageSupportTrust.Platform.MACOS,
@@ -199,6 +209,7 @@ final class ManagedLanguageCatalog {
             "Eclipse Public License 2.0",
             "Java",
             "21",
+            RuntimeVersionScheme.JAVA_LEGACY,
             DESKTOP_PLATFORMS
         )
     );
@@ -215,6 +226,7 @@ final class ManagedLanguageCatalog {
             "MIT License",
             "Node.js",
             "14",
+            RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS
         )
     );
@@ -231,10 +243,28 @@ final class ManagedLanguageCatalog {
             "Apache License 2.0",
             "Node.js",
             "22.22.2",
+            RuntimeVersionScheme.STANDARD,
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT);
+    private static final Entry GO = new Entry(
+        "go",
+        Set.of("go"),
+        "gopls",
+        "gopls",
+        "gopls.exe",
+        new InstallMetadata(
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("go.gopls", "0.23.0"),
+            URI.create("https://go.dev/gopls/"),
+            URI.create("https://github.com/golang/tools/blob/master/LICENSE"),
+            "BSD 3-Clause License",
+            "Go",
+            "1.21",
+            RuntimeVersionScheme.STANDARD,
+            DESKTOP_PLATFORMS
+        )
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO);
 
     private ManagedLanguageCatalog() {
     }
@@ -253,6 +283,10 @@ final class ManagedLanguageCatalog {
 
     static Entry typescriptJavascript() {
         return TYPESCRIPT_JAVASCRIPT;
+    }
+
+    static Entry go() {
+        return GO;
     }
 
     static Entry forExtension(String extension) {
@@ -274,10 +308,15 @@ final class ManagedLanguageCatalog {
     }
 
     static RuntimeVersion parseRuntimeVersion(String version) {
+        return parseRuntimeVersion(version, RuntimeVersionScheme.STANDARD);
+    }
+
+    static RuntimeVersion parseRuntimeVersion(String version, RuntimeVersionScheme scheme) {
         if (version == null || version.isBlank()) {
             return null;
         }
-        Matcher matcher = RUNTIME_VERSION.matcher(version.trim());
+        Pattern pattern = scheme == RuntimeVersionScheme.JAVA_LEGACY ? JAVA_LEGACY_RUNTIME_VERSION : STANDARD_RUNTIME_VERSION;
+        Matcher matcher = pattern.matcher(version.trim());
         if (!matcher.find()) {
             return null;
         }
@@ -292,7 +331,8 @@ final class ManagedLanguageCatalog {
     }
 
     static Integer javaMajor(String version) {
-        return runtimeMajor(version);
+        RuntimeVersion parsed = parseRuntimeVersion(version, RuntimeVersionScheme.JAVA_LEGACY);
+        return parsed == null ? null : parsed.major();
     }
 
     private static String requireText(String value, String label) {

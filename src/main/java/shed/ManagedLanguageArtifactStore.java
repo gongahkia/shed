@@ -28,6 +28,7 @@ final class ManagedLanguageArtifactStore {
         REJECTED,
         ACTIVATED,
         ROLLED_BACK,
+        REMOVED,
         FAILED
     }
 
@@ -135,6 +136,22 @@ final class ManagedLanguageArtifactStore {
             return new Result(Outcome.ROLLED_BACK, "managed artifact rolled back to " + rollback.displayName(), verified.launchPath());
         } catch (IOException | RuntimeException e) {
             return new Result(Outcome.FAILED, "managed artifact rollback failed: " + failureDetail(e), null);
+        }
+    }
+
+    Result remove(String toolId) {
+        try {
+            Path toolDirectory = toolDirectory(toolId);
+            if (!Files.exists(toolDirectory, LinkOption.NOFOLLOW_LINKS)) {
+                return new Result(Outcome.REMOVED, "managed artifact cache is already absent: " + toolId, null);
+            }
+            if (!Files.isDirectory(toolDirectory, LinkOption.NOFOLLOW_LINKS)) {
+                return rejected("managed artifact cache path is not a directory");
+            }
+            deleteTree(toolDirectory);
+            return new Result(Outcome.REMOVED, "removed managed artifact cache: " + toolId, null);
+        } catch (IOException | RuntimeException e) {
+            return new Result(Outcome.FAILED, "managed artifact removal failed: " + failureDetail(e), null);
         }
     }
 

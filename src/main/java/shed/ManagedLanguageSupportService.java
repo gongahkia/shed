@@ -1,0 +1,135 @@
+package shed;
+
+import java.nio.file.Path;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+
+final class ManagedLanguageSupportService {
+    private final LanguageServerDetector detector;
+    private final ManagedLanguageSupportTrust trust;
+    private final ManagedLanguageArtifactStore artifactStore;
+    private final ManagedLanguageSupportTrust.Platform platform;
+    private final Map<String, LanguageServerDetector.Result> detections = new ConcurrentHashMap<>();
+
+    ManagedLanguageSupportService(LanguageServerDetector detector, ManagedLanguageSupportTrust trust, Path shedDirectory,
+        ManagedLanguageSupportTrust.Platform platform) {
+        this.detector = Objects.requireNonNull(detector, "detector");
+        this.trust = Objects.requireNonNull(trust, "trust");
+        this.artifactStore = new ManagedLanguageArtifactStore(trust, Objects.requireNonNull(shedDirectory, "Shed directory"));
+        this.platform = platform;
+    }
+
+    ManagedLanguageCatalog.Entry entryFor(String extensionOrLanguage) {
+        if (extensionOrLanguage == null || extensionOrLanguage.isBlank()) return null;
+        String normalized = extensionOrLanguage.trim().replaceFirst("^\\.", "").toLowerCase(Locale.ROOT);
+        ManagedLanguageCatalog.Entry byExtension = ManagedLanguageCatalog.forExtension(normalized);
+        if (byExtension != null) return byExtension;
+        return ManagedLanguageCatalog.entries().stream().filter(entry -> entry.languageId().equals(normalized)).findFirst().orElse(null);
+    }
+
+    LanguageServerDetector.Result detect(ManagedLanguageCatalog.Entry entry) {
+        if (entry == null) return new LanguageServerDetector.Result(null, null, "", "", "", "language server is not in the catalog");
+        LanguageServerDetector.Result result = detector.detect(entry, platform);
+        detections.put(entry.languageId(), result);
+        return result;
+    }
+
+    ManagedLanguageArtifactStore.Result remove(ManagedLanguageCatalog.Entry entry) {
+        return entry == null ? new ManagedLanguageArtifactStore.Result(ManagedLanguageArtifactStore.Outcome.REJECTED,
+            "language server is not in the catalog", null) : artifactStore.remove(entry.installMetadata().coordinate().toolId());
+    }
+
+    String overview() {
+        StringBuilder text = new StringBuilder("Managed LSP Support\n");
+        text.append("=".repeat(40)).append("\n\n");
+        text.append("This view performs no detection, download, update, or network request.\n");
+        text.append("Run :lsp manage detect <ext> for an explicit local-only version probe.\n\n");
+        for (ManagedLanguageCatalog.Entry entry : ManagedLanguageCatalog.entries()) appendEntry(text, entry);
+        text.append("Actions\n");
+        text.append("  :lsp manage detect <ext>  explicit local probe; runs in a background job\n");
+        text.append("  :lsp manage retry <ext>   repeat an explicit local probe\n");
+        text.append("  :lsp manage install <ext> review managed-install availability; no download without consent\n");
+        text.append("  :lsp manage update <ext>  review managed-update availability; no download without consent\n");
+        text.append("  :lsp manage remove <ext>  remove only Shed-managed cache content\n");
+        text.append("  :lsp manage manual <ext> show user-managed config.toml settings\n");
+        return text.toString();
+    }
+
+    String detectionReport(LanguageServerDetector.Result result) {
+        if (result == null || result.entry() == null || result.status() == null) return "LSP detection failed: language server is not in the catalog";
+        StringBuilder text = new StringBuilder();
+        text.append(result.entry().displayName()).append(" local detection\n\n");
+        text.append("Status: ").append(result.status().availability()).append("\n");
+        text.append("Detail: ").append(result.status().detail()).append("\n");
+        text.append("Executable: ").append(result.executable()).append("\n");
+        if (!result.serverVersion().isBlank()) text.append("Server version: ").append(result.serverVersion()).append("\n");
+        if (!result.runtimeVersion().isBlank()) text.append("Runtime version: ").append(result.runtimeVersion()).append("\n");
+        if (!result.failure().isBlank()) text.append("Probe result: ").append(result.failure()).append("\n");
+        text.append("Next step: ").append(result.status().remediation()).append("\n");
+        return text.toString();
+    }
+
+    String managedAvailability(ManagedLanguageCatalog.Entry entry, String operation) {
+        if (entry == null) return "LSP " + operation + " failed: language server is not in the catalog";
+        ManagedLanguageCatalog.Status status = entry.assessManagedInstall(trust, platform, false);
+        StringBuilder text = new StringBuilder(entry.displayName()).append(" managed ").append(operation).append("\n\n");
+        text.append("Status: ").append(status.availability()).append("\n");
+        text.append("Detail: ").append(status.detail()).append("\n");
+        text.append("No download or update was started.\n\n");
+        text.append(manualInstructions(entry));
+        return text.toString();
+    }
+
+    String manualInstructions(ManagedLanguageCatalog.Entry entry) {
+        if (entry == null) return "Manual configuration unavailable: language server is not in the catalog";
+        String extension = primaryExtension(entry);
+        String[] command = new LspService().builtinCommand(extension);
+        String executable = command == null ? entry.commandFor(platform) : command[0];
+        String args = command == null || command.length < 2 ? "" : String.join(" ", java.util.Arrays.copyOfRange(command, 1, command.length));
+        StringBuilder text = new StringBuilder(entry.displayName()).append(" manual-tool alternative\n\n");
+        text.append("Install/select the user-managed executable: ").append(executable).append("\n");
+        text.append("Add to ~/.shed/config.toml:\n");
+        text.append("  \"lsp.").append(extension).append(".command\" = \"").append(executable).append("\"\n");
+        if (!args.isBlank()) text.append("  \"lsp.").append(extension).append(".args\" = \"").append(args).append("\"\n");
+        text.append("Then run: :lsp restart ").append(extension).append("\n");
+        return text.toString();
+    }
+
+    static ManagedLanguageSupportTrust.Platform platformFor(String osName) {
+        String normalized = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
+        if (normalized.contains("mac") || normalized.contains("darwin")) return ManagedLanguageSupportTrust.Platform.MACOS;
+        if (normalized.contains("win")) return ManagedLanguageSupportTrust.Platform.WINDOWS;
+        if (normalized.contains("nux") || normalized.contains("nix") || normalized.contains("aix") || normalized.contains("bsd")) {
+            return ManagedLanguageSupportTrust.Platform.LINUX;
+        }
+        return null;
+    }
+
+    private void appendEntry(StringBuilder text, ManagedLanguageCatalog.Entry entry) {
+        text.append(entry.displayName()).append(" (").append(String.join(", ", extensions(entry))).append(")\n");
+        LanguageServerDetector.Result detection = detections.get(entry.languageId());
+        if (detection == null) {
+            text.append("  Local status: not checked\n");
+        } else if (detection.status() == null) {
+            text.append("  Local status: ").append(detection.failure()).append("\n");
+        } else {
+            text.append("  Local status: ").append(detection.status().availability()).append(" — ").append(detection.status().detail()).append("\n");
+            text.append("  Next step: ").append(detection.status().remediation()).append("\n");
+        }
+        ManagedLanguageCatalog.Status managed = entry.assessManagedInstall(trust, platform, false);
+        text.append("  Managed status: ").append(managed.availability()).append(" — ").append(managed.detail()).append("\n");
+        text.append("  Manual: :lsp manage manual ").append(primaryExtension(entry)).append("\n\n");
+    }
+
+    private static List<String> extensions(ManagedLanguageCatalog.Entry entry) {
+        return entry.extensions().stream().sorted(Comparator.naturalOrder()).map(extension -> "." + extension).toList();
+    }
+
+    private static String primaryExtension(ManagedLanguageCatalog.Entry entry) {
+        return entry.extensions().stream().sorted().findFirst().orElse(entry.languageId());
+    }
+}

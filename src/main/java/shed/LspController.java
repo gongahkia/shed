@@ -16,9 +16,13 @@ import java.util.List;
 
 final class LspController {
     private final Texteditor editor;
+    private final ManagedLanguageSupportService managedLanguageSupport;
 
     LspController(Texteditor editor) {
         this.editor = editor;
+        this.managedLanguageSupport = new ManagedLanguageSupportService(new LanguageServerDetector(null, null, null),
+            new ManagedLanguageSupportTrust(List.of(), Set.of()), Path.of(System.getProperty("user.home"), ".shed"),
+            ManagedLanguageSupportService.platformFor(System.getProperty("os.name")));
     }
 
     String getWordAtCaret() {
@@ -132,6 +136,9 @@ final class LspController {
                 return lspStop(args);
             case "servers":
                 return lspServers();
+            case "manage":
+            case "manager":
+                return lspManage(args);
             case "log":
                 return lspLog();
             default:
@@ -171,6 +178,7 @@ final class LspController {
                 sb.append("  ").append(ext).append(": ").append(entry.getValue()).append("\n");
             }
         }
+        sb.append("\nManaged support: :lsp manage (detect/install/update/remove/retry/manual)\n");
         editor.showScratchBuffer("[lsp status]", sb.toString());
         return "Showing LSP status";
     }
@@ -234,6 +242,47 @@ final class LspController {
         }
         editor.showScratchBuffer("[lsp servers]", sb.toString());
         return "Showing LSP servers";
+    }
+
+    private String lspManage(String argument) {
+        String trimmed = argument == null ? "" : argument.trim();
+        if (trimmed.isEmpty() || "status".equalsIgnoreCase(trimmed) || "list".equalsIgnoreCase(trimmed)) {
+            editor.showScratchBuffer("[lsp manage]", managedLanguageSupport.overview());
+            return "Showing managed LSP support";
+        }
+        int split = trimmed.indexOf(' ');
+        String action = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase(Locale.ROOT);
+        String target = split < 0 ? "" : trimmed.substring(split + 1).trim();
+        if (target.isEmpty()) target = currentBufferExtension();
+        if (target.isEmpty()) return "Usage: :lsp manage detect|install|update|remove|retry|manual <extension>";
+        ManagedLanguageCatalog.Entry entry = managedLanguageSupport.entryFor(target);
+        if (entry == null) return "No managed LSP catalog entry for: " + target;
+        return switch (action) {
+            case "detect", "retry" -> startManagedLspDetection(entry);
+            case "install", "update" -> showManagedLspText("[lsp " + action + " " + target + "]",
+                managedLanguageSupport.managedAvailability(entry, action), "Showing managed LSP " + action + " guidance");
+            case "remove", "uninstall" -> managedLanguageSupport.remove(entry).detail();
+            case "manual", "configure", "config" -> showManagedLspText("[lsp manual " + target + "]",
+                managedLanguageSupport.manualInstructions(entry), "Showing manual LSP setup");
+            default -> "Unknown :lsp manage action: " + action;
+        };
+    }
+
+    private String startManagedLspDetection(ManagedLanguageCatalog.Entry entry) {
+        int jobId = editor.asyncJobService.submit("LSP detection: " + entry.displayName(), token -> managedLanguageSupport.detect(entry),
+            (snapshot, result, error) -> {
+                if (snapshot.getStatus() == AsyncJobService.Status.SUCCEEDED && result != null) {
+                    editor.showMessage(entry.displayName() + " detection complete; run :lsp manage to review");
+                } else {
+                    editor.showMessage(entry.displayName() + " detection failed: " + (error == null ? snapshot.getErrorMessage() : error.getMessage()));
+                }
+            });
+        return "LSP detection job " + jobId + " started";
+    }
+
+    private String showManagedLspText(String title, String text, String result) {
+        editor.showScratchBuffer(title, text);
+        return result;
     }
 
 

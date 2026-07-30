@@ -64,11 +64,13 @@ final class ManagedLanguageInstaller {
     private final ManagedLanguageSupportTrust trust;
     private final ArtifactFetcher fetcher;
     private final Path shedDirectory;
+    private final ManagedLanguageArtifactStore artifactStore;
 
     ManagedLanguageInstaller(ManagedLanguageSupportTrust trust, ArtifactFetcher fetcher, Path shedDirectory) {
         this.trust = Objects.requireNonNull(trust, "trust");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
         this.shedDirectory = Objects.requireNonNull(shedDirectory, "Shed directory");
+        this.artifactStore = new ManagedLanguageArtifactStore(trust, shedDirectory);
     }
 
     Result install(Review review, ManagedLanguageSupportTrust.Platform platform, boolean explicitConsent, Cancellation cancellation) {
@@ -99,6 +101,11 @@ final class ManagedLanguageInstaller {
             }
             moveAtomically(temporary, target);
             temporary = null;
+            artifactStore.recordVerifiedArtifact(review.artifact(), review.fileName(), transfer.size());
+            ManagedLanguageArtifactStore.Result activation = artifactStore.activate(review.artifact().coordinate(), platform);
+            if (activation.outcome() != ManagedLanguageArtifactStore.Outcome.ACTIVATED) {
+                return new Result(Outcome.FAILED, activation.detail(), null);
+            }
             return new Result(Outcome.INSTALLED, "installed " + review.artifact().coordinate().displayName(), target);
         } catch (IOException e) {
             return new Result(Outcome.FAILED, e.getMessage() == null ? "install failed" : e.getMessage(), null);

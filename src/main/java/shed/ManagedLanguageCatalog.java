@@ -320,7 +320,25 @@ final class ManagedLanguageCatalog {
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST);
+    private static final Entry C_CPP = new Entry(
+        "c-cpp",
+        Set.of("c", "cc", "cpp", "cxx", "h", "hpp", "hxx"),
+        "clangd",
+        "clangd",
+        "clangd.exe",
+        new InstallMetadata(
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("c-cpp.clangd", "22.1.8"),
+            URI.create("https://clangd.llvm.org/installation.html"),
+            URI.create("https://github.com/llvm/llvm-project/blob/main/LICENSE.TXT"),
+            "Apache License 2.0 with LLVM Exceptions",
+            "clangd",
+            "7",
+            RuntimeRequirementKind.MINIMUM_VERSION,
+            RuntimeVersionScheme.STANDARD,
+            DESKTOP_PLATFORMS
+        )
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON, TYPESCRIPT_JAVASCRIPT, GO, RUST, C_CPP);
 
     private ManagedLanguageCatalog() {
     }
@@ -347,6 +365,10 @@ final class ManagedLanguageCatalog {
 
     static Entry rust() {
         return RUST;
+    }
+
+    static Entry cCpp() {
+        return C_CPP;
     }
 
     static Entry forExtension(String extension) {

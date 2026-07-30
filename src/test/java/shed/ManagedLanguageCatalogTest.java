@@ -238,6 +238,45 @@ public class ManagedLanguageCatalogTest {
         assertTrue(ready.permitsManagedInstall());
     }
 
+    @Test
+    void cCppEntryCoversRecognizedExtensionsAndClangdVersions() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.cCpp();
+
+        ManagedLanguageCatalog.Status old = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.WINDOWS,
+            new ManagedLanguageCatalog.ToolDetection("clangd.exe", "clangd version 6.0.1"));
+        ManagedLanguageCatalog.Status valid = entry.assessUserManaged(ManagedLanguageSupportTrust.Platform.WINDOWS,
+            new ManagedLanguageCatalog.ToolDetection("clangd.exe", "clangd version 22.1.8"));
+
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("c"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("cc"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("cpp"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("cxx"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("h"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("hpp"));
+        assertEquals(entry, ManagedLanguageCatalog.forExtension("hxx"));
+        assertEquals("clangd", entry.commandFor(ManagedLanguageSupportTrust.Platform.LINUX));
+        assertEquals("clangd.exe", entry.commandFor(ManagedLanguageSupportTrust.Platform.WINDOWS));
+        assertEquals("c-cpp.clangd@22.1.8", entry.installMetadata().coordinate().displayName());
+        assertEquals(ManagedLanguageCatalog.Availability.RUNTIME_VERSION_UNSUPPORTED, old.availability());
+        assertEquals(ManagedLanguageCatalog.Availability.AVAILABLE, valid.availability());
+    }
+
+    @Test
+    void managedCcppInstallRequiresConsentAndTrustedArtifact() {
+        ManagedLanguageCatalog.Entry entry = ManagedLanguageCatalog.cCpp();
+        ManagedLanguageSupportTrust trust = trustWith(entry.installMetadata().coordinate());
+
+        ManagedLanguageCatalog.Status consent = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.WINDOWS, false);
+        ManagedLanguageCatalog.Status ready = entry.assessManagedInstall(trust,
+            ManagedLanguageSupportTrust.Platform.WINDOWS, true);
+
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_CONSENT_REQUIRED, consent.availability());
+        assertFalse(consent.permitsManagedInstall());
+        assertEquals(ManagedLanguageCatalog.Availability.MANAGED_INSTALL_READY, ready.availability());
+        assertTrue(ready.permitsManagedInstall());
+    }
+
     private ManagedLanguageSupportTrust trustWith(ManagedLanguageSupportTrust.ArtifactCoordinate coordinate) {
         ManagedLanguageSupportTrust.CatalogArtifact artifact = new ManagedLanguageSupportTrust.CatalogArtifact(
             coordinate,

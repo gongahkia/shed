@@ -207,6 +207,30 @@ public class TexteditorSwingIntegrationTest {
     }
 
     @Test
+    void managedLspCommandsExposeInertStatusAndManualRemediation() throws Exception {
+        assumeSwingAvailable();
+        Path home = tempDir.resolve("home-managed-lsp");
+        Path file = tempDir.resolve("managed.py");
+        Files.createDirectories(home);
+        Files.writeString(file, "print('shed')\n", StandardCharsets.UTF_8);
+
+        Texteditor editor = createEditor(home, file);
+        try {
+            assertEquals("Showing managed LSP support", onEdt(() -> editor.handleLspCommand("manage")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("Managed LSP Support"));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains(":lsp manage detect <ext>"));
+
+            assertEquals("Showing managed LSP install guidance", onEdt(() -> editor.handleLspCommand("manage install py")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("No download or update was started."));
+
+            assertEquals("Showing manual LSP setup", onEdt(() -> editor.handleLspCommand("manage manual py")));
+            assertTrue(onEdt(() -> editor.getCurrentBuffer().getContent()).contains("\"lsp.py.command\""));
+        } finally {
+            disposeEditor(editor);
+        }
+    }
+
+    @Test
     void workspaceIndexControlsPersistOnlyExplicitPreference() throws Exception {
         assumeSwingAvailable();
         Path home = tempDir.resolve("home-workspace-index");

@@ -75,6 +75,7 @@ public class HelpService {
                    "  :lsp ...       LSP commands (def/hover/refs/rename/actions)\n" +
                    "  :lsp status    Show running LSP servers\n" +
                    "  :lsp servers   List all configured + builtin LSP servers\n" +
+                   "  :lsp manage    Managed-LSP status and explicit actions\n" +
                    "  :lsp restart   Restart LSP server for current extension\n" +
                    "  :diagnostics   Push diagnostics into quickfix\n" +
                    "  :dnext/:dprev  Jump next/prev diagnostic\n" +
@@ -187,6 +188,8 @@ public class HelpService {
                     + "MANAGEMENT\n"
                     + "  :lsp status      show running servers and errors\n"
                     + "  :lsp servers     list configured (config.toml) + builtin servers\n"
+                    + "  :lsp manage      show managed-LSP status/actions; detect runs only when requested\n"
+                    + "  :lsp manage manual <ext>  show config.toml user-managed alternative\n"
                     + "  :lsp restart [ext] restart server (default: current buffer ext)\n"
                     + "  :lsp stop [ext]  stop a server\n"
                     + "  :lsp log         show LSP error log\n\n"

@@ -101,3 +101,7 @@ $ java -jar target/shed-2.0.0.jar filename.txt # opens specific file
 ### macOS arm64 installer
 
 On macOS arm64 with JDK 21, run `bash scripts/package-macos.sh` to create a DMG with a bundled runtime. See [macOS packaging](./docs/MACOS_PACKAGING.md) for verification and signing/notarization boundaries.
+
+### Windows x64 installer
+
+On Windows x64 with JDK 21 and WiX available to `jpackage`, run `./scripts/package-windows.ps1` to create an MSI with a bundled runtime. See [Windows packaging](./docs/WINDOWS_PACKAGING.md) for verification and signing boundaries.

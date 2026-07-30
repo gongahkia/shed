@@ -63,6 +63,13 @@ jobs:
           SHED_BUILD_COMMIT: ${{ github.sha }}
         run: bash scripts/package-macos.sh
 
+      - name: Build Windows installer
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        env:
+          SHED_BUILD_COMMIT: ${{ github.sha }}
+        run: ./scripts/package-windows.ps1
+
       - name: Upload jar artifact
         uses: actions/upload-artifact@v4
         with:
@@ -76,4 +83,12 @@ jobs:
         with:
           name: shed-macos-arm64-installer
           path: target/macos-package/dist/*
+          if-no-files-found: error
+
+      - name: Upload Windows installer artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: shed-windows-x64-installer
+          path: target/windows-package/dist/*
           if-no-files-found: error

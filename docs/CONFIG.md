@@ -156,9 +156,10 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 | Key | Default | Type | Notes |
 | :--- | :--- | :--- | :--- |
-| `github.review.enabled` | `false` | bool | Enables future explicit GitHub review actions; `:github status` remains a local-only capability check |
+| `github.review.enabled` | `false` | bool | Requests explicit GitHub review actions; effective only with granted consent |
+| `github.review.consent.granted` | `false` | bool | Consent receipt written by `:github consent`; clearing it disables review integration |
 
-`:github status` is explicit and asynchronous. It checks the user-installed `gh` version, local authentication state, local origin URL, and local help for `gh pr list`, `gh pr view`, and `gh api`; it makes no GitHub API request and never changes Git state. Review integration is disabled until the user sets `github.review.enabled=true` through TOML or the settings GUI.
+`:github status` is explicit and asynchronous. It checks the user-installed `gh` version, local authentication state, local origin URL, and local help for `gh pr list`, `gh pr view`, and `gh api`; it makes no GitHub API request and never changes Git state. `:github consent` presents the reviewable first-use consent before persisting both flags. `:github disable` clears both flags, revoking consent. Review integration is ineffective unless both values are `true`.
 
 ## Undo History Policy
 

@@ -651,6 +651,12 @@ final class TreeGitController {
         if (!editor.configManager.getGitWorkbenchEnabled()) {
             return "Git workbench disabled by git.workbench.enabled=false";
         }
+        if (!editor.configManager.getGitChangesEnabled()) {
+            return "Git changes disabled by git.changes.enabled=false";
+        }
+        if (!editor.configManager.getGitPanelPresentationEnabled()) {
+            return "Git documents disabled by git.panel.presentation.enabled=false";
+        }
         GitChangesWorkbenchDialog.showFor(editor, new GitChangesWorkbenchDialog.Loader() {
             @Override
             public GitChangesWorkbenchModel.Snapshot status() {
@@ -675,6 +681,9 @@ final class TreeGitController {
         if (!editor.configManager.getGitConflictResolutionEnabled()) {
             return "Git conflict resolution disabled by git.conflict.resolution.enabled=false";
         }
+        if (!editor.configManager.getGitPanelPresentationEnabled()) {
+            return "Git documents disabled by git.panel.presentation.enabled=false";
+        }
         GitConflictResolutionDialog.showFor(editor, new GitConflictResolutionDialog.Loader() {
             @Override
             public GitConflictResolutionDialog.Load load() {
@@ -693,6 +702,9 @@ final class TreeGitController {
         if (!editor.configManager.getGitHistoryEnabled()) {
             return "Git history disabled by git.history.enabled=false";
         }
+        if (!editor.configManager.getGitPanelPresentationEnabled()) {
+            return "Git documents disabled by git.panel.presentation.enabled=false";
+        }
         GitHistoryRemoteDialog.showFor(editor, new GitHistoryRemoteDialog.Loader() {
             @Override
             public GitHistoryModel.Snapshot load(AsyncJobService.JobToken token) {
@@ -703,7 +715,7 @@ final class TreeGitController {
             public GitHistoryModel.RemoteResult run(GitHistoryModel.RemoteAction action, AsyncJobService.JobToken token) {
                 return runGitRemoteOperation(action, token);
             }
-        }, editor.configManager.getGitRemoteActionsEnabled());
+        });
         return "Git history opened";
     }
 
@@ -787,7 +799,9 @@ final class TreeGitController {
                 if (buffer == editor.getCurrentBuffer()) editor.loadBufferIntoEditor(buffer);
             }
             editor.refreshGitGutter();
-            return "Resolution written to working tree; explicitly stage it with :git add " + conflict.path();
+            return editor.configManager.getGitStagingEnabled()
+                ? "Resolution written to working tree; explicitly stage it with :git add " + conflict.path()
+                : "Resolution written to working tree; staging is disabled by git.staging.enabled=false";
         } catch (IOException e) {
             return "Conflict resolution apply failed; working file was retained: " + e.getMessage();
         }
@@ -826,6 +840,9 @@ final class TreeGitController {
 
     private GitChangesWorkbenchModel.Diff loadGitChangesWorkbenchDiff(GitChangesWorkbenchModel.Snapshot snapshot,
         GitChangesWorkbenchModel.Change change) {
+        if (!editor.configManager.getGitDiffsEnabled()) {
+            return workbenchDiffFailure("Git diff navigation disabled by git.diffs.enabled=false");
+        }
         if (snapshot == null || !snapshot.available() || change == null) {
             return workbenchDiffFailure("Git status is unavailable; refresh the workbench.");
         }
@@ -889,6 +906,9 @@ final class TreeGitController {
             return "Diff navigation unavailable: " + e.getMessage();
         }
         if (hunk != null) {
+            if (!editor.configManager.getGitDiffsEnabled()) {
+                return "Diff navigation disabled by git.diffs.enabled=false";
+            }
             if (diff == null || !diff.available() || diff.sourceDigest() == null) {
                 return "Diff navigation unavailable: load a current text diff first.";
             }
@@ -1092,6 +1112,9 @@ final class TreeGitController {
 
 
     String runGitAdd(File gitRoot, String args) {
+        if (!editor.configManager.getGitStagingEnabled()) {
+            return "Git staging disabled by git.staging.enabled=false";
+        }
         List<String> pathSpecs = splitWhitespaceArgs(args);
         if (pathSpecs.isEmpty()) {
             return "Usage: :git add <pathspec...>";
@@ -1110,6 +1133,9 @@ final class TreeGitController {
 
 
     String runGitRestoreStaged(File gitRoot, String args) {
+        if (!editor.configManager.getGitStagingEnabled()) {
+            return "Git staging disabled by git.staging.enabled=false";
+        }
         List<String> pathSpecs = splitWhitespaceArgs(args);
         if (pathSpecs.isEmpty()) {
             return "Usage: :git restore <pathspec...>";
@@ -1233,6 +1259,9 @@ final class TreeGitController {
             return "Usage: :git hunk stage|unstage|revert [line]";
         }
         String action = args.get(0).toLowerCase(Locale.ROOT);
+        if (("stage".equals(action) || "unstage".equals(action)) && !editor.configManager.getGitStagingEnabled()) {
+            return "Git staging disabled by git.staging.enabled=false";
+        }
         int line = editor.getCurrentLineNumber();
         if (args.size() >= 2) {
             try {

@@ -317,8 +317,17 @@ final class TypedSettings {
         if (key.startsWith("tree.")) {
             return "Live: used by subsequent tree operations";
         }
+        if (key.equals("git.staging.enabled")) {
+            return "Live: used by subsequent staging and unstaging commands";
+        }
+        if (key.equals("git.diffs.enabled")) {
+            return "Live: used when loading graphical Git diffs and hunks";
+        }
+        if (key.equals("git.remote.actions.enabled")) {
+            return "Live: checked before each graphical remote action";
+        }
         if (key.startsWith("git.")) {
-            return "Live: used when opening or refreshing the Git workbench";
+            return "Live: used when opening graphical Git documents";
         }
         if (key.equals("minimap")) {
             return "Live: stored; :minimap controls visibility";

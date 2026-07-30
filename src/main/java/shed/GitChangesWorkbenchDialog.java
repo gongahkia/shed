@@ -104,6 +104,8 @@ final class GitChangesWorkbenchDialog extends JDialog {
         panel.add(openFile);
         panel.add(goToHunk);
         panel.add(close);
+        viewDiff.setEnabled(diffEnabled());
+        goToHunk.setEnabled(diffEnabled());
         return panel;
     }
 
@@ -142,9 +144,15 @@ final class GitChangesWorkbenchDialog extends JDialog {
         }
         hunks.clear();
         diffText.setText("");
+        viewDiff.setEnabled(diffEnabled());
+        goToHunk.setEnabled(diffEnabled());
     }
 
     private void viewDiff() {
+        if (!diffEnabled()) {
+            state.setText("Git diff navigation disabled by git.diffs.enabled=false");
+            return;
+        }
         GitChangesWorkbenchModel.Change change = selectedChange();
         if (change == null) {
             state.setText("Select a changed file first.");
@@ -155,9 +163,17 @@ final class GitChangesWorkbenchDialog extends JDialog {
         state.setText("Loading diff for " + change.displayPath() + "…");
         editor.asyncJobService.submit("Git diff: " + change.path(), token -> loader.diff(snapshot, change), (job, result, error) -> {
             if (!isDisplayable() || expectedRequest != diffRequestId) return;
-            viewDiff.setEnabled(true);
+            viewDiff.setEnabled(diffEnabled());
             if (job.getStatus() != AsyncJobService.Status.SUCCEEDED || result == null) {
                 state.setText(error == null ? job.getErrorMessage() : error.getMessage());
+                return;
+            }
+            if (!diffEnabled()) {
+                diff = null;
+                diffChange = null;
+                hunks.clear();
+                diffText.setText("");
+                state.setText("Git diff navigation disabled by git.diffs.enabled=false");
                 return;
             }
             diff = result;
@@ -179,6 +195,10 @@ final class GitChangesWorkbenchDialog extends JDialog {
     }
 
     private void goToHunk() {
+        if (!diffEnabled()) {
+            state.setText("Git diff navigation disabled by git.diffs.enabled=false");
+            return;
+        }
         GitChangesWorkbenchModel.Change change = selectedChange();
         GitHunkNavigation.Hunk hunk = hunkList.getSelectedValue();
         if (change == null || hunk == null) {
@@ -196,5 +216,9 @@ final class GitChangesWorkbenchDialog extends JDialog {
         if (snapshot == null) return null;
         int row = changes.getRowCount() == 0 ? -1 : changeTable.getSelectedRow();
         return row < 0 || row >= snapshot.changes().size() ? null : snapshot.changes().get(row);
+    }
+
+    private boolean diffEnabled() {
+        return editor.configManager.getGitDiffsEnabled();
     }
 }

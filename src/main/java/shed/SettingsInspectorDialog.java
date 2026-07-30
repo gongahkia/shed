@@ -53,6 +53,7 @@ final class SettingsInspectorDialog extends JDialog {
         this.searchField = new JTextField();
         this.table = new JTable(tableModel);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);

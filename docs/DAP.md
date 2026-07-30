@@ -86,3 +86,7 @@ Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only w
 ## Debug Console
 
 DAP `output` events are retained in received order as categorized `stdout`, `stderr`, or `console` text. They never open or focus a buffer. Use `:debug console` to inspect the explicit `[debug console]` scratch view and `:debug console clear` to discard retained output. The recovery buffer retains only its most recent 64 KiB and labels truncation. `terminated`, `exited`, transport failure, and explicit stop update the visible console connection state without deleting retained output.
+
+## Integration Fixture
+
+`ReferenceDebugAdapter` is an in-process framed DAP fixture used by automated tests. It exercises initialize, delayed launch completion, `initialized`, full-source breakpoints, `configurationDone`, stopped-frame inspection, watch evaluation, disconnect, timeout cancellation, malformed adapter output, and process cleanup without relying on a platform-specific debugger executable.

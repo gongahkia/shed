@@ -38,6 +38,7 @@ Set `keymap.profile = "emacs"` for fixed Emacs bindings. Emacs bypasses Vim mode
 
 | Key-binds | Function |
 | :---: | :---: |
+| `Ctrl`/`Cmd` + `Shift` + `P` | Command palette |
 | `i` | Enter `Insert` mode |
 | `v` | Enter `Visual` mode |
 | `R` | Enter `Replace` mode |

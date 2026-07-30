@@ -82,3 +82,7 @@ Shed sends one DAP `setBreakpoints` request per source only when `debug.breakpoi
 On a DAP `stopped` event, use `:debug stack` or `:debug variables` to load `[debug inspector]`; loading, unavailable capability, and error states remain visible there. `:debug frame <id>` selects a returned frame before reloading its scopes and variables. `:debug watch add <expression>`, `:debug watch remove <expression>`, `:debug watch list`, and `:debug watch clear` manage session-local watches; evaluation uses DAP `evaluate` with `context: watch` for the selected paused frame.
 
 Shed sends `threads`, `stackTrace`, `scopes`, `variables`, and `evaluate` only when their corresponding configured adapter capabilities and feature settings are enabled. A later `continued`, `terminated`, or `exited` event invalidates paused-frame references and leaves watches pending until the next stop; stale responses from a prior suspended state are discarded.
+
+## Debug Console
+
+DAP `output` events are retained in received order as categorized `stdout`, `stderr`, or `console` text. They never open or focus a buffer. Use `:debug console` to inspect the explicit `[debug console]` scratch view and `:debug console clear` to discard retained output. The recovery buffer retains only its most recent 64 KiB and labels truncation. `terminated`, `exited`, transport failure, and explicit stop update the visible console connection state without deleting retained output.

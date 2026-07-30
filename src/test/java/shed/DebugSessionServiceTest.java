@@ -246,6 +246,40 @@ public class DebugSessionServiceTest {
         assertEquals(45, connection.arguments.get(scopesIndex).get("frameId"));
     }
 
+    @Test
+    void retainsOrderedDapOutputAndReportsAConsoleDisconnect(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+        AtomicReference<DebugAdapterTransport.Listener> listener = new AtomicReference<>();
+
+        assertTrue(service.start(workspace, file, validation("launch"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> { listener.set(value); return connection; }).succeeded());
+        listener.get().onEvent(new DebugAdapterTransport.Event(1, "output", Map.of("category", "stdout", "output", "one\n")));
+        listener.get().onEvent(new DebugAdapterTransport.Event(2, "output", Map.of("category", "stderr", "output", "two\n")));
+        listener.get().onEvent(new DebugAdapterTransport.Event(3, "terminated", Map.of()));
+
+        DebugConsole.Snapshot snapshot = service.console(workspace);
+        assertEquals(DebugConsole.State.DISCONNECTED, snapshot.state());
+        assertEquals("[stdout] one\n[stderr] two\n", snapshot.output());
+        assertEquals(2, snapshot.events());
+    }
+
+    @Test
+    void consoleDetectsTransportDisconnectionWhenOpened(@TempDir Path tempDir) throws Exception {
+        DebugSessionService service = new DebugSessionService();
+        Path workspace = tempDir.resolve("workspace");
+        Path file = workspace.resolve("Main.java");
+        FakeConnection connection = new FakeConnection();
+
+        assertTrue(service.start(workspace, file, validation("launch"), enabled(), "main", Duration.ofSeconds(1),
+            (plan, features, value) -> connection).succeeded());
+        connection.close();
+
+        assertEquals(DebugConsole.State.DISCONNECTED, service.console(workspace).state());
+    }
+
     private static DebugAdapterRegistry.Validation validation() {
         return validation("launch,attach");
     }

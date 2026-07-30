@@ -31,7 +31,7 @@ final class DebugSessionController {
     String handle(String argument) {
         String trimmed = argument == null ? "" : argument.trim();
         if (trimmed.isEmpty() || "help".equalsIgnoreCase(trimmed)) {
-            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|stack|variables|frame <id>|watch add|remove|list|clear";
+            return "Usage: :debug status|configurations|select [name]|start [name]|stop|restart|console [clear]|stack|variables|frame <id>|watch add|remove|list|clear";
         }
         int split = trimmed.indexOf(' ');
         String command = (split < 0 ? trimmed : trimmed.substring(0, split)).toLowerCase();
@@ -43,6 +43,7 @@ final class DebugSessionController {
             case "start", "launch", "attach" -> start(args);
             case "stop" -> stop();
             case "restart" -> restart(args);
+            case "console", "output" -> console(args);
             case "stack", "frames", "variables", "inspect", "refresh" -> submitInspection();
             case "frame" -> selectFrame(args);
             case "watch", "watches" -> watch(args);
@@ -136,6 +137,21 @@ final class DebugSessionController {
         DebugSessionService.Result result = sessions.stop(workspace());
         showStatus(workspace());
         return result.snapshot().detail();
+    }
+
+    private String console(String argument) {
+        Path workspace = workspace();
+        String command = argument == null ? "" : argument.trim();
+        if (command.isEmpty() || "show".equalsIgnoreCase(command)) {
+            showConsole(workspace);
+            return "Showing debug console";
+        }
+        if ("clear".equalsIgnoreCase(command)) {
+            sessions.clearConsole(workspace);
+            showConsole(workspace);
+            return "Debug console cleared";
+        }
+        return "Usage: :debug console [clear]";
     }
 
     private String selectFrame(String argument) {
@@ -274,11 +290,26 @@ final class DebugSessionController {
         editor.showScratchBuffer("[debug inspector]", output.toString());
     }
 
+    private void showConsole(Path workspace) {
+        DebugConsole.Snapshot snapshot = sessions.console(workspace);
+        StringBuilder output = new StringBuilder("Debug Console\n\nState: ").append(snapshot.state()).append("\nDetail: ")
+            .append(snapshot.detail()).append("\nEvents retained: ").append(snapshot.events()).append("\n");
+        if (snapshot.truncated()) output.append("Recovery buffer truncated to the most recent ").append(DebugConsole.MAX_CHARACTERS).append(" characters.\n");
+        output.append("\nOutput:\n");
+        if (snapshot.output().isEmpty()) output.append("  (none)\n");
+        else output.append(snapshot.output());
+        if (!snapshot.output().isEmpty() && !snapshot.output().endsWith("\n")) output.append("\n");
+        output.append("\nActions: :debug console clear\n");
+        editor.showScratchBuffer("[debug console]", output.toString());
+    }
+
     private void showStatus(Path workspace) {
         DebugSessionService.Snapshot snapshot = sessions.snapshot(workspace);
         StringBuilder output = new StringBuilder("Debug Lifecycle\n\nWorkspace: ").append(snapshot.workspace()).append("\nConfiguration: ")
             .append(snapshot.configuration().isBlank() ? "(none)" : snapshot.configuration()).append("\nState: ").append(snapshot.lifecycle())
             .append("\nDetail: ").append(snapshot.detail()).append("\n");
+        DebugConsole.Snapshot console = sessions.console(workspace);
+        output.append("Console: ").append(console.state()).append(" — ").append(console.detail()).append("\n");
         if (!snapshot.diagnostics().isEmpty()) output.append("\nDiagnostics:\n  ").append(String.join("\n  ", snapshot.diagnostics())).append("\n");
         output.append("\nActions: :debug configurations | :debug select <name> | :debug start [name] | :debug stop | :debug restart [name]\n");
         editor.showScratchBuffer("[debug status]", output.toString());

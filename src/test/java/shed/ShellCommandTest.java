@@ -1,6 +1,7 @@
 package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -52,5 +53,14 @@ public class ShellCommandTest {
             java.util.List.of("/bin/sh"),
             ShellCommand.interactiveCommand(Map.of("SHELL", "/bin/sh"), "/bin/sh"::equals)
         );
+    }
+
+    @Test
+    void directCommandPreservesQuotedArgumentsWithoutStartingAShell() {
+        assertEquals(
+            java.util.List.of("tool", "two words", "plain value", ""),
+            ShellCommand.directCommand("tool \"two words\" plain\\ value \"\"")
+        );
+        assertThrows(IllegalArgumentException.class, () -> ShellCommand.directCommand("tool 'unterminated"));
     }
 }

@@ -14,9 +14,10 @@ final class GitHubCapabilityController {
 
     String handle(String argument) {
         String subcommand = argument == null || argument.isBlank() ? "status" : argument.trim().toLowerCase();
+        if ("prs".equals(subcommand) || "pulls".equals(subcommand)) return showPullRequests();
         if ("consent".equals(subcommand) || "enable".equals(subcommand)) return requestConsent();
         if ("disable".equals(subcommand)) return revokeConsent();
-        if (!"status".equals(subcommand) && !"check".equals(subcommand)) return "Usage: :github [status|consent|disable]";
+        if (!"status".equals(subcommand) && !"check".equals(subcommand)) return "Usage: :github [status|prs|consent|disable]";
         int jobId = editor.asyncJobService.submit("GitHub CLI capability check", token -> inspect(token), (job, report, error) -> {
             if (job.getStatus() == AsyncJobService.Status.CANCELLED) {
                 editor.showMessage("GitHub CLI capability check cancelled");
@@ -57,6 +58,25 @@ final class GitHubCapabilityController {
         } catch (IOException error) {
             return "Unable to revoke GitHub review consent: " + error.getMessage();
         }
+    }
+
+    private String showPullRequests() {
+        if (!editor.configManager.getGitHubReviewEnabled()) return "GitHub review requires explicit consent; run :github consent first.";
+        GitHubPullRequestDialog.showFor(editor, this::loadPullRequests);
+        return "GitHub pull-request discovery opened";
+    }
+
+    private GitHubPullRequestModel.Snapshot loadPullRequests(AsyncJobService.JobToken token) {
+        File root = editor.resolveGitRoot();
+        if (root == null) return GitHubPullRequestModel.unavailable("Current workspace is not a Git repository.");
+        CommandResult remote = run(root, List.of("git", "remote", "get-url", "origin"), token);
+        String repository = GitHubCapabilityModel.repository(remote.stdout);
+        if (remote.exitCode != 0 || repository.isBlank()) return GitHubPullRequestModel.unavailable("Origin is not a GitHub repository.");
+        if (!editor.configManager.getGitHubReviewEnabled()) return GitHubPullRequestModel.unavailable("GitHub review consent was revoked before discovery.");
+        String template = "{{range .}}{{.number}}{{\"\\x00\"}}{{.title}}{{\"\\x00\"}}{{.author.login}}{{\"\\x00\"}}{{.updatedAt}}{{\"\\x00\"}}{{.isDraft}}{{\"\\x00\"}}{{.url}}{{\"\\x00\"}}{{end}}";
+        CommandResult result = run(root, List.of("gh", "pr", "list", "--repo", repository, "--state", "open", "--limit", "100", "--json",
+            "number,title,author,updatedAt,isDraft,url", "--template", template), token);
+        return GitHubPullRequestModel.fromResult(repository, result);
     }
 
     private GitHubCapabilityModel.Report inspect(AsyncJobService.JobToken token) {

@@ -67,7 +67,7 @@ final class GitHubCapabilityModel {
         return matcher.find() && Integer.parseInt(matcher.group(1)) >= 2;
     }
 
-    private static String repository(String remote) {
+    static String repository(String remote) {
         Matcher matcher = GITHUB_REMOTE.matcher((remote == null ? "" : remote).strip());
         return matcher.find() ? matcher.group(1) + "/" + matcher.group(2) : "";
     }

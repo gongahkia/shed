@@ -42,7 +42,7 @@ public class LspService {
             case "rs":
                 return new String[] {"rust-analyzer"};
             case "py":
-                return new String[] {"pyright-langserver", "--stdio"};
+                return new String[] {ManagedLanguageCatalog.python().command(), "--stdio"};
             case "js":
             case "jsx":
             case "ts":

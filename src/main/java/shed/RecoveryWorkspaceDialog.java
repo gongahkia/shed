@@ -84,6 +84,7 @@ final class RecoveryWorkspaceDialog extends JDialog {
         this.originalPreview = previewArea();
         this.recoveryPreview = previewArea();
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
+        KeyboardFocusSupport.installEscape(getRootPane(), this::defer);
         addWindowListener(new WindowAdapter() {
             @Override
             public void windowClosing(WindowEvent event) {

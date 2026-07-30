@@ -64,6 +64,7 @@ final class GitHubPullRequestDialog extends JDialog {
         this.draftStore = draftStore;
         this.loader = loader;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
         JPanel header = new JPanel(new BorderLayout(0, 4));
         header.setBorder(BorderFactory.createEmptyBorder(8, 8, 0, 8));

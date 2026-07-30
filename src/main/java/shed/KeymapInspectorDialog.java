@@ -47,6 +47,7 @@ final class KeymapInspectorDialog extends JDialog {
         this.table = new JTable(tableModel);
         this.visibleBindings = List.of();
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
         add(header(), BorderLayout.NORTH);
         add(new JScrollPane(table), BorderLayout.CENTER);

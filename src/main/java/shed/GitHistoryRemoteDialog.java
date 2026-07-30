@@ -51,6 +51,7 @@ final class GitHistoryRemoteDialog extends JDialog {
         this.editor = editor;
         this.loader = loader;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
+        KeyboardFocusSupport.installEscape(getRootPane(), this::dispose);
         setLayout(new BorderLayout(8, 8));
         add(header(), BorderLayout.NORTH);
         add(content(), BorderLayout.CENTER);

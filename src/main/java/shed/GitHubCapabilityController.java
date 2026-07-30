@@ -62,7 +62,11 @@ final class GitHubCapabilityController {
 
     private String showPullRequests() {
         if (!editor.configManager.getGitHubReviewEnabled()) return "GitHub review requires explicit consent; run :github consent first.";
-        GitHubPullRequestDialog.showFor(editor, this::loadPullRequests);
+        GitHubPullRequestDialog.showFor(editor, new GitHubPullRequestDialog.Loader() {
+            @Override public GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token) { return loadPullRequests(token); }
+            @Override public GitHubPullRequestDetailModel.Detail detail(String repository, GitHubPullRequestModel.PullRequest pullRequest,
+                AsyncJobService.JobToken token) { return loadPullRequestDetail(repository, pullRequest, token); }
+        });
         return "GitHub pull-request discovery opened";
     }
 
@@ -77,6 +81,20 @@ final class GitHubCapabilityController {
         CommandResult result = run(root, List.of("gh", "pr", "list", "--repo", repository, "--state", "open", "--limit", "100", "--json",
             "number,title,author,updatedAt,isDraft,url", "--template", template), token);
         return GitHubPullRequestModel.fromResult(repository, result);
+    }
+
+    private GitHubPullRequestDetailModel.Detail loadPullRequestDetail(String repository, GitHubPullRequestModel.PullRequest pullRequest,
+        AsyncJobService.JobToken token) {
+        if (pullRequest == null || pullRequest.number().isBlank()) return GitHubPullRequestDetailModel.fromResults(null, null, null);
+        if (!editor.configManager.getGitHubReviewEnabled()) return GitHubPullRequestDetailModel.fromResults(null, null, null);
+        File root = editor.resolveGitRoot();
+        if (root == null) return GitHubPullRequestDetailModel.fromResults(null, null, null);
+        String template = "{{.state}}{{\"\\x00\"}}{{.author.login}}{{\"\\x00\"}}{{.updatedAt}}{{\"\\x00\"}}{{.additions}}{{\"\\x00\"}}{{.deletions}}{{\"\\x00\"}}{{.changedFiles}}{{\"\\x00\"}}{{.body}}";
+        CommandResult metadata = run(root, List.of("gh", "pr", "view", pullRequest.number(), "--repo", repository, "--json",
+            "state,author,updatedAt,additions,deletions,changedFiles,body", "--template", template), token);
+        CommandResult files = run(root, List.of("gh", "pr", "diff", pullRequest.number(), "--repo", repository, "--name-only"), token);
+        CommandResult patch = run(root, List.of("gh", "pr", "diff", pullRequest.number(), "--repo", repository), token);
+        return GitHubPullRequestDetailModel.fromResults(metadata, files, patch);
     }
 
     private GitHubCapabilityModel.Report inspect(AsyncJobService.JobToken token) {

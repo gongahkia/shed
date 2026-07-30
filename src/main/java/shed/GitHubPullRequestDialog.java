@@ -14,7 +14,10 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 
 final class GitHubPullRequestDialog extends JDialog {
-    interface Loader { GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token); }
+    interface Loader {
+        GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token);
+        GitHubPullRequestDetailModel.Detail detail(String repository, GitHubPullRequestModel.PullRequest pullRequest, AsyncJobService.JobToken token);
+    }
     private final Texteditor editor;
     private final Loader loader;
     private final JLabel state = new JLabel("Loading pull requests…");
@@ -24,6 +27,7 @@ final class GitHubPullRequestDialog extends JDialog {
     private final JList<GitHubPullRequestModel.PullRequest> list = new JList<>(pullRequests);
     private final JTextArea details = new JTextArea();
     private final JButton refresh = new JButton("Refresh");
+    private final JButton viewDetails = new JButton("View Details and Diff");
     private final JButton cancel = new JButton("Cancel");
     private int jobId = -1;
 
@@ -56,12 +60,13 @@ final class GitHubPullRequestDialog extends JDialog {
         progress.setIndeterminate(true);
         progress.setVisible(false);
         refresh.addActionListener(event -> refresh());
+        viewDetails.addActionListener(event -> loadDetails());
         cancel.addActionListener(event -> cancel());
         cancel.setEnabled(false);
         JButton close = new JButton("Close");
         close.addActionListener(event -> dispose());
         JPanel actions = new JPanel();
-        actions.add(progress); actions.add(refresh); actions.add(cancel); actions.add(close);
+        actions.add(progress); actions.add(refresh); actions.add(viewDetails); actions.add(cancel); actions.add(close);
         add(actions, BorderLayout.SOUTH);
         setPreferredSize(new Dimension(760, 440));
         pack(); setLocationRelativeTo(editor);
@@ -84,7 +89,26 @@ final class GitHubPullRequestDialog extends JDialog {
     }
 
     private void cancel() { if (jobId >= 0 && editor.asyncJobService.cancel(jobId)) cancel.setEnabled(false); }
-    private void setBusy(boolean busy) { progress.setVisible(busy); refresh.setEnabled(!busy); cancel.setEnabled(busy); }
+    private void setBusy(boolean busy) { progress.setVisible(busy); refresh.setEnabled(!busy); viewDetails.setEnabled(!busy); cancel.setEnabled(busy); }
+    private void loadDetails() {
+        GitHubPullRequestModel.PullRequest pullRequest = list.getSelectedValue();
+        if (jobId >= 0 || pullRequest == null) { if (pullRequest == null) state.setText("Select a pull request first."); return; }
+        String repo = repository.getText().replaceFirst("^Repository: ", "");
+        if (repo.isBlank() || "unavailable".equals(repo)) { state.setText("Refresh pull requests first."); return; }
+        setBusy(true); state.setText("Loading read-only details and diff for #" + pullRequest.number() + "…");
+        int expected = editor.asyncJobService.submit("GitHub pull-request detail #" + pullRequest.number(), token -> loader.detail(repo, pullRequest, token), (job, detail, error) -> {
+            if (!isDisplayable() || job.getId() != jobId) return;
+            jobId = -1; setBusy(false);
+            if (job.getStatus() == AsyncJobService.Status.CANCELLED) { state.setText("Pull-request detail loading cancelled."); return; }
+            if (error != null || detail == null) { state.setText(error == null ? job.getErrorMessage() : error.getMessage()); return; }
+            if (!detail.available()) { state.setText(detail.error()); return; }
+            details.setText("#" + pullRequest.number() + " " + pullRequest.title() + "\nState: " + detail.state() + "\nAuthor: " + detail.author()
+                + "\nUpdated: " + detail.updatedAt() + "\nChanges: +" + detail.additions() + " -" + detail.deletions() + " across " + detail.changedFiles()
+                + " files\nURL: " + pullRequest.url() + "\n\n" + detail.body() + "\n\nFiles:\n" + String.join("\n", detail.files()) + "\n\nDiff:\n" + detail.patch());
+            details.setCaretPosition(0); state.setText("Read-only details and diff loaded for #" + pullRequest.number() + ".");
+        });
+        jobId = expected;
+    }
     private void showDetails(GitHubPullRequestModel.PullRequest pullRequest) {
         if (pullRequest == null) { details.setText(""); return; }
         details.setText("#" + pullRequest.number() + "\nAuthor: " + pullRequest.author() + "\nUpdated: " + pullRequest.updatedAt()

@@ -2,6 +2,7 @@ package shed;
 
 import java.net.URI;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -30,6 +31,7 @@ final class ManagedLanguageCatalog {
         URI projectUrl,
         URI licenseUrl,
         String licenseName,
+        String runtimeName,
         int minimumRuntimeMajor,
         Set<ManagedLanguageSupportTrust.Platform> supportedPlatforms
     ) {
@@ -38,6 +40,7 @@ final class ManagedLanguageCatalog {
             projectUrl = Objects.requireNonNull(projectUrl, "project url");
             licenseUrl = Objects.requireNonNull(licenseUrl, "license url");
             licenseName = Objects.requireNonNull(licenseName, "license name");
+            runtimeName = requireText(runtimeName, "runtime name");
             supportedPlatforms = supportedPlatforms == null ? Set.of() : Set.copyOf(supportedPlatforms);
         }
     }
@@ -66,6 +69,9 @@ final class ManagedLanguageCatalog {
         Entry {
             languageId = requireText(languageId, "language id");
             extensions = extensions == null ? Set.of() : Set.copyOf(extensions);
+            if (extensions.isEmpty()) {
+                throw new IllegalArgumentException("at least one extension is required");
+            }
             displayName = requireText(displayName, "display name");
             command = requireText(command, "command");
             windowsCommand = requireText(windowsCommand, "Windows command");
@@ -78,32 +84,32 @@ final class ManagedLanguageCatalog {
 
         Status assessUserManaged(ManagedLanguageSupportTrust.Platform platform, ToolDetection detection) {
             if (!supports(platform)) {
-                return status(Availability.UNSUPPORTED_PLATFORM, "Java language support is unsupported on " + platformName(platform),
-                    "Configure a user-managed Java language server for this platform.");
+                return status(Availability.UNSUPPORTED_PLATFORM, displayName + " is unsupported on " + platformName(platform),
+                    "Configure a user-managed " + languageId + " language server for this platform.");
             }
             if (detection == null || !detection.executableFound()) {
-                return status(Availability.EXECUTABLE_MISSING, "Eclipse JDT LS executable was not found",
-                    "Install Eclipse JDT LS and set lsp.java.command, or review the managed install option.");
+                return status(Availability.EXECUTABLE_MISSING, displayName + " executable was not found",
+                    "Install " + displayName + " and set lsp." + defaultExtension() + ".command, or review the managed install option.");
             }
-            Integer major = javaMajor(detection.runtimeVersion());
+            Integer major = runtimeMajor(detection.runtimeVersion());
             if (major == null) {
-                return status(Availability.RUNTIME_VERSION_UNKNOWN, "Java runtime version could not be validated",
-                    "Use Java " + installMetadata.minimumRuntimeMajor() + "+ for Eclipse JDT LS, then restart the LSP client.");
+                return status(Availability.RUNTIME_VERSION_UNKNOWN, installMetadata.runtimeName() + " runtime version could not be validated",
+                    "Use " + runtimeRequirement() + " for " + displayName + ", then restart the LSP client.");
             }
             if (major < installMetadata.minimumRuntimeMajor()) {
                 return status(Availability.RUNTIME_VERSION_UNSUPPORTED,
-                    "Eclipse JDT LS requires Java " + installMetadata.minimumRuntimeMajor() + "+ (detected Java " + major + ")",
-                    "Install or select Java " + installMetadata.minimumRuntimeMajor() + "+, then restart the LSP client.");
+                    displayName + " requires " + runtimeRequirement() + " (detected " + installMetadata.runtimeName() + " " + major + ")",
+                    "Install or select " + runtimeRequirement() + ", then restart the LSP client.");
             }
-            return status(Availability.AVAILABLE, "Eclipse JDT LS is available with Java " + major,
-                "Use :lsp restart java after changing its command or runtime.");
+            return status(Availability.AVAILABLE, displayName + " is available with " + installMetadata.runtimeName() + " " + major,
+                "Use :lsp restart " + defaultExtension() + " after changing its command or runtime.");
         }
 
         Status assessManagedInstall(ManagedLanguageSupportTrust trust, ManagedLanguageSupportTrust.Platform platform,
             boolean explicitConsent) {
             if (trust == null) {
                 return status(Availability.MANAGED_ARTIFACT_UNAVAILABLE, "managed language trust policy is unavailable",
-                    "Install Eclipse JDT LS manually and set lsp.java.command.");
+                    "Install " + displayName + " manually and set lsp." + defaultExtension() + ".command.");
             }
             ManagedLanguageSupportTrust.Assessment assessment = trust.assess(
                 ManagedLanguageSupportTrust.Ownership.SHED_MANAGED,
@@ -113,19 +119,27 @@ final class ManagedLanguageCatalog {
             );
             if (assessment.decision() == ManagedLanguageSupportTrust.Decision.CONSENT_REQUIRED) {
                 return new Status(Availability.MANAGED_CONSENT_REQUIRED, assessment.reason(),
-                    "Review the Eclipse Public License 2.0 and explicitly approve this managed install.", assessment);
+                    "Review the " + installMetadata.licenseName() + " and explicitly approve this managed install.", assessment);
             }
             if (assessment.decision() == ManagedLanguageSupportTrust.Decision.REJECTED) {
                 return new Status(Availability.MANAGED_ARTIFACT_UNAVAILABLE, assessment.reason(),
-                    "Install Eclipse JDT LS manually and set lsp.java.command.", assessment);
+                    "Install " + displayName + " manually and set lsp." + defaultExtension() + ".command.", assessment);
             }
             return new Status(Availability.MANAGED_INSTALL_READY,
-                "Eclipse JDT LS install is approved for Java " + installMetadata.minimumRuntimeMajor() + "+",
+                displayName + " install is approved for " + runtimeRequirement(),
                 "The installer may now fetch the cataloged artifact; no installer is available yet.", assessment);
         }
 
         private boolean supports(ManagedLanguageSupportTrust.Platform platform) {
             return platform != null && installMetadata.supportedPlatforms().contains(platform);
+        }
+
+        private String defaultExtension() {
+            return extensions.iterator().next();
+        }
+
+        private String runtimeRequirement() {
+            return installMetadata.runtimeName() + " " + installMetadata.minimumRuntimeMajor() + "+";
         }
 
         private Status status(Availability availability, String detail, String remediation) {
@@ -150,11 +164,28 @@ final class ManagedLanguageCatalog {
             URI.create("https://github.com/eclipse-jdtls/eclipse.jdt.ls"),
             URI.create("https://www.eclipse.org/legal/epl-2.0/"),
             "Eclipse Public License 2.0",
+            "Java",
             21,
             DESKTOP_PLATFORMS
         )
     );
-    private static final List<Entry> CORE = List.of(JAVA);
+    private static final Entry PYTHON = new Entry(
+        "python",
+        Set.of("py"),
+        "Pyright",
+        "pyright-langserver",
+        "pyright-langserver.cmd",
+        new InstallMetadata(
+            new ManagedLanguageSupportTrust.ArtifactCoordinate("python.pyright", "1.1.411"),
+            URI.create("https://github.com/microsoft/pyright"),
+            URI.create("https://github.com/microsoft/pyright/blob/main/LICENSE.txt"),
+            "MIT License",
+            "Node.js",
+            14,
+            DESKTOP_PLATFORMS
+        )
+    );
+    private static final List<Entry> CORE = List.of(JAVA, PYTHON);
 
     private ManagedLanguageCatalog() {
     }
@@ -167,20 +198,24 @@ final class ManagedLanguageCatalog {
         return JAVA;
     }
 
+    static Entry python() {
+        return PYTHON;
+    }
+
     static Entry forExtension(String extension) {
         if (extension == null || extension.isBlank()) {
             return null;
         }
         String normalized = extension.startsWith(".") ? extension.substring(1) : extension;
         for (Entry entry : CORE) {
-            if (entry.extensions().contains(normalized.toLowerCase())) {
+            if (entry.extensions().contains(normalized.toLowerCase(Locale.ROOT))) {
                 return entry;
             }
         }
         return null;
     }
 
-    static Integer javaMajor(String version) {
+    static Integer runtimeMajor(String version) {
         if (version == null || version.isBlank()) {
             return null;
         }
@@ -193,6 +228,10 @@ final class ManagedLanguageCatalog {
         } catch (NumberFormatException ignored) {
             return null;
         }
+    }
+
+    static Integer javaMajor(String version) {
+        return runtimeMajor(version);
     }
 
     private static String requireText(String value, String label) {

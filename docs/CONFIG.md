@@ -163,6 +163,8 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 `:github prs` is an explicit, cancellable, read-only network request permitted only after consent. It runs `gh pr list --repo OWNER/REPO --state open` against the current local origin and never invokes a write subcommand.
 
+Selecting **View Details and Diff** in that workspace explicitly runs read-only `gh pr view` and `gh pr diff` for the selected pull request. Metadata, changed-file names, and patch output are rejected if malformed or truncated; review actions remain unavailable.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

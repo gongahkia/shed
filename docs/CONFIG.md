@@ -161,6 +161,8 @@ The changes document is effective only when `git.workbench.enabled`, `git.change
 
 `:github status` is explicit and asynchronous. It checks the user-installed `gh` version, local authentication state, local origin URL, and local help for `gh pr list`, `gh pr view`, and `gh api`; it makes no GitHub API request and never changes Git state. `:github consent` presents the reviewable first-use consent before persisting both flags. `:github disable` clears both flags, revoking consent. Review integration is ineffective unless both values are `true`.
 
+`:github prs` is an explicit, cancellable, read-only network request permitted only after consent. It runs `gh pr list --repo OWNER/REPO --state open` against the current local origin and never invokes a write subcommand.
+
 ## Undo History Policy
 
 | Key | Default | Type | Notes |

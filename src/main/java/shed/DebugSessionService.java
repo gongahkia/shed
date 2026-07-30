@@ -18,6 +18,7 @@ final class DebugSessionService {
     enum Lifecycle { IDLE, STARTING, RUNNING, STOPPED, FAILED }
     private record BreakpointSynchronization(boolean attempted, List<String> diagnostics) { }
     record InspectionResult(DebugInspection.Snapshot snapshot, boolean succeeded) { }
+    record ConsoleResult(DebugConsole.Snapshot snapshot, boolean succeeded) { }
     private record InspectionPayload(List<DebugInspection.ThreadInfo> threads, List<DebugInspection.Frame> frames, int frameId,
         List<DebugInspection.Scope> scopes, List<DebugInspection.Watch> watches, String detail, DebugInspection.State state) { }
 
@@ -53,6 +54,7 @@ final class DebugSessionService {
         private DebugAdapterRegistry.Plan plan;
         private DebugFeatureSettings features;
         private final DebugInspection inspection = new DebugInspection();
+        private final DebugConsole console = new DebugConsole();
         private long generation;
     }
 
@@ -100,6 +102,7 @@ final class DebugSessionService {
             session.lifecycle = Lifecycle.STARTING;
             session.detail = "Starting debug configuration '" + name + "'.";
             session.diagnostics.clear();
+            session.console.start();
             generation = ++session.generation;
             plan = planned.plan();
         }
@@ -178,6 +181,7 @@ final class DebugSessionService {
         session.plan = null;
         session.features = null;
         session.inspection.invalidated("Debug session stopped.");
+        session.console.stopped();
         session.generation++;
         if (connection != null) connection.close();
         session.lifecycle = Lifecycle.STOPPED;
@@ -188,13 +192,7 @@ final class DebugSessionService {
     synchronized Snapshot snapshot(Path workspace) {
         Path root = root(workspace);
         Session session = session(root);
-        if (session.lifecycle == Lifecycle.RUNNING && session.connection != null && session.connection.state() != DebugAdapterTransport.State.RUNNING) {
-            session.lifecycle = Lifecycle.FAILED;
-            session.detail = "Debug adapter transport stopped unexpectedly.";
-            session.diagnostics.add(session.detail);
-            session.connection = null;
-            session.inspection.invalidated(session.detail);
-        }
+        reconcileTransport(session);
         return snapshot(root, session);
     }
 
@@ -230,6 +228,19 @@ final class DebugSessionService {
 
     synchronized DebugInspection.Snapshot inspection(Path workspace) {
         return session(root(workspace)).inspection.snapshot();
+    }
+
+    synchronized DebugConsole.Snapshot console(Path workspace) {
+        Path root = root(workspace);
+        Session session = session(root);
+        reconcileTransport(session);
+        return session.console.snapshot();
+    }
+
+    synchronized ConsoleResult clearConsole(Path workspace) {
+        Session session = session(root(workspace));
+        session.console.clear();
+        return new ConsoleResult(session.console.snapshot(), true);
     }
 
     synchronized InspectionResult addWatch(Path workspace, String expression) {
@@ -303,6 +314,16 @@ final class DebugSessionService {
         session.diagnostics.add(diagnostic == null ? "Debug adapter diagnostic" : diagnostic);
     }
 
+    private static void reconcileTransport(Session session) {
+        if (session.lifecycle != Lifecycle.RUNNING || session.connection == null || session.connection.state() == DebugAdapterTransport.State.RUNNING) return;
+        session.lifecycle = Lifecycle.FAILED;
+        session.detail = "Debug adapter transport stopped unexpectedly.";
+        session.diagnostics.add(session.detail);
+        session.connection = null;
+        session.inspection.invalidated(session.detail);
+        session.console.disconnected(session.detail);
+    }
+
     private synchronized void handleEvent(Path workspace, DebugAdapterTransport.Event event) {
         if (event == null) return;
         Session session = session(root(workspace));
@@ -312,8 +333,14 @@ final class DebugSessionService {
             String reason = string(body == null ? null : body.get("reason"));
             String description = string(body == null ? null : body.get("description"));
             session.inspection.stopped(threadId, reason, description);
+        } else if ("output".equals(event.event())) {
+            Map<String, Object> body = MiniJson.asObject(event.body());
+            String output = body == null ? null : MiniJson.asString(body.get("output"));
+            if (output == null) session.diagnostics.add("DAP output event is missing text.");
+            else session.console.append(string(body.get("category")), output);
         } else if ("continued".equals(event.event()) || "terminated".equals(event.event()) || "exited".equals(event.event())) {
             session.inspection.invalidated("Debug execution " + event.event() + ".");
+            if ("terminated".equals(event.event()) || "exited".equals(event.event())) session.console.disconnected("Debug adapter " + event.event() + ".");
         }
     }
 
@@ -551,6 +578,7 @@ final class DebugSessionService {
         session.connection = null;
         session.lifecycle = Lifecycle.FAILED;
         session.detail = detail == null ? "Debug session failed." : detail;
+        if (session.console.snapshot().state() == DebugConsole.State.CONNECTED) session.console.failed(session.detail);
         if (diagnostics != null) for (String diagnostic : diagnostics) if (diagnostic != null && !diagnostic.isBlank()) session.diagnostics.add(diagnostic);
         return new Result(snapshot(root, session), false);
     }

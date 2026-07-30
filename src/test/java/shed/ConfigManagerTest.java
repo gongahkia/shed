@@ -154,6 +154,30 @@ public class ConfigManagerTest {
     }
 
     @Test
+    void configuresDebugFeaturesAndRejectsInvalidDebugTomlWithSourceLocation() throws IOException {
+        Path home = tempDir.resolve("home-debug");
+        System.setProperty("user.home", home.toString());
+        ConfigManager config = new ConfigManager();
+
+        assertEquals(DebugFeatureSettings.defaults(), config.getDebugFeatureSettings());
+        config.setAndPersist("debug.variables.enabled", "false");
+        assertFalse(config.getDebugFeatureSettings().variables());
+        TypedSettings.Descriptor descriptor = config.typedSettingDescriptors().stream()
+            .filter(setting -> setting.key().equals("debug.variables.enabled")).findFirst().orElseThrow();
+        assertEquals("Debug", descriptor.category());
+        assertEquals("Live: checked when explicit debug-session planning begins", descriptor.applyBehavior());
+
+        Path configPath = Path.of(config.getConfigPath());
+        Files.writeString(configPath, "schema_version = 1\n\"debug.configuration.main.request\" = \"run\"\n");
+        config.reload();
+
+        assertTrue(config.hasConfigLoadFailure());
+        assertTrue(config.getConfigLoadReport().contains("line 2, column"));
+        assertTrue(config.getConfigLoadReport().contains("debug.configuration.main.request must be launch or attach"));
+        assertTrue(config.getDebugConfiguration().configurations().isEmpty());
+    }
+
+    @Test
     void configuresGitWorkbenchSurfacesIndependently() throws IOException {
         Path home = tempDir.resolve("home-git-history");
         System.setProperty("user.home", home.toString());

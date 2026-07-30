@@ -39,6 +39,7 @@ public class ConfigManager {
     private String configLoadReport;
     private boolean configLoadFailed;
     private Map<String, String> reloadFallbackConfig;
+    private DebugAdapterRegistry.Validation debugConfiguration;
 
     // Default configuration values
     private static final String DEFAULT_THEME = "one-dark-pro";
@@ -205,6 +206,7 @@ public class ConfigManager {
         this.activeProjectConfigFile = null;
         this.configLoadReport = "";
         this.configLoadFailed = false;
+        this.debugConfiguration = DebugAdapterRegistry.validate(Map.of());
         Path home = Path.of(System.getProperty("user.home"));
         this.shedDirectoryPath = home.resolve(SHED_DIRECTORY_NAME).toString();
         this.configPath = Path.of(shedDirectoryPath).resolve(SHED_CONFIG_NAME).toString();
@@ -308,6 +310,15 @@ public class ConfigManager {
         defineDefault("git.panel.presentation.enabled", DEFAULT_GIT_PANEL_PRESENTATION_ENABLED);
         defineDefault("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED);
         defineDefault("github.review.consent.granted", DEFAULT_GITHUB_REVIEW_CONSENT_GRANTED);
+        DebugFeatureSettings debugFeatures = DebugFeatureSettings.defaults();
+        defineDefault("debug.enabled", debugFeatures.enabled());
+        defineDefault("debug.breakpoints.enabled", debugFeatures.breakpoints());
+        defineDefault("debug.threads.enabled", debugFeatures.threads());
+        defineDefault("debug.stacktrace.enabled", debugFeatures.stackTrace());
+        defineDefault("debug.scopes.enabled", debugFeatures.scopes());
+        defineDefault("debug.variables.enabled", debugFeatures.variables());
+        defineDefault("debug.evaluate.enabled", debugFeatures.evaluate());
+        defineDefault("debug.attach.enabled", debugFeatures.attach());
         settings.reset();
         defaultConfig.clear();
         defaultConfig.putAll(config);
@@ -410,6 +421,14 @@ public class ConfigManager {
             case "git.panel.presentation.enabled" -> "Enable graphical Git workbench documents";
             case "github.review.enabled" -> "Enable explicit GitHub review integration actions";
             case "github.review.consent.granted" -> "Record explicit GitHub review integration consent";
+            case "debug.enabled" -> "Enable explicit debug-session planning";
+            case "debug.breakpoints.enabled" -> "Enable debug breakpoint configuration";
+            case "debug.threads.enabled" -> "Enable debug thread presentation";
+            case "debug.stacktrace.enabled" -> "Enable debug stack-trace presentation";
+            case "debug.scopes.enabled" -> "Enable debug scope presentation";
+            case "debug.variables.enabled" -> "Enable debug variable presentation";
+            case "debug.evaluate.enabled" -> "Enable debug expression evaluation";
+            case "debug.attach.enabled" -> "Enable debug attach planning";
             default -> key;
         };
     }
@@ -435,6 +454,7 @@ public class ConfigManager {
             configLoadReport = configRecoveryReport(path, errors);
             return;
         }
+        debugConfiguration = DebugAdapterRegistry.validate(parsed);
         for (Map.Entry<String, Object> entry : parsed.entrySet()) {
             settings.apply(entry.getKey(), entry.getValue());
             String value = settings.stringify(entry.getValue());
@@ -482,7 +502,18 @@ public class ConfigManager {
                 errors.add(tomlLocation(result.inputPositionOf(entry.getKey())) + error.getMessage() + fallbackDescription(key));
             }
         }
+        DebugAdapterRegistry.Validation debug = DebugAdapterRegistry.validate(parsed);
+        for (DebugAdapterRegistry.Error error : debug.errors()) {
+            errors.add(tomlLocation(debugTomlPosition(result, error.key())) + error.message() + fallbackDescription(error.key()));
+        }
         return parsed;
+    }
+
+    private TomlPosition debugTomlPosition(TomlParseResult result, String key) {
+        for (Map.Entry<List<String>, Object> entry : result.entryPathSet()) {
+            if (key.equals(String.join(".", entry.getKey()))) return result.inputPositionOf(entry.getKey());
+        }
+        return null;
     }
 
     private String fallbackDescription(String key) {
@@ -1037,6 +1068,18 @@ public class ConfigManager {
         return GitHubReviewConsent.from(getBoolean("github.review.enabled", DEFAULT_GITHUB_REVIEW_ENABLED), getGitHubReviewConsentGranted());
     }
 
+    public DebugFeatureSettings getDebugFeatureSettings() {
+        DebugFeatureSettings defaults = DebugFeatureSettings.defaults();
+        return new DebugFeatureSettings(getBoolean("debug.enabled", defaults.enabled()), getBoolean("debug.breakpoints.enabled", defaults.breakpoints()),
+            getBoolean("debug.threads.enabled", defaults.threads()), getBoolean("debug.stacktrace.enabled", defaults.stackTrace()),
+            getBoolean("debug.scopes.enabled", defaults.scopes()), getBoolean("debug.variables.enabled", defaults.variables()),
+            getBoolean("debug.evaluate.enabled", defaults.evaluate()), getBoolean("debug.attach.enabled", defaults.attach()));
+    }
+
+    DebugAdapterRegistry.Validation getDebugConfiguration() {
+        return debugConfiguration;
+    }
+
     public boolean isProjectConfigKeyAllowed(String key) {
         if (key == null || key.isBlank()) {
             return false;
@@ -1145,6 +1188,7 @@ public class ConfigManager {
         Map<String, String> projectPreviousBeforeReload = new HashMap<>(projectPreviousValues);
         Map<String, Object> settingsBeforeReload = settings.copyValues();
         File activeProjectBeforeReload = activeProjectConfigFile;
+        DebugAdapterRegistry.Validation debugBeforeReload = debugConfiguration;
         reloadFallbackConfig = configBeforeReload;
         try {
             config.clear();
@@ -1171,6 +1215,7 @@ public class ConfigManager {
         projectPreviousValues.putAll(projectPreviousBeforeReload);
         settings.restoreValues(settingsBeforeReload);
         activeProjectConfigFile = activeProjectBeforeReload;
+        debugConfiguration = debugBeforeReload;
         configLoadReport = configLoadReport.replace("Safe defaults are active.", "Last-known-good configuration remains active.");
     }
 

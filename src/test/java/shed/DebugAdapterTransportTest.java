@@ -2,6 +2,7 @@ package shed;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -38,11 +39,22 @@ public class DebugAdapterTransportTest {
             Map<String, Object> outbound = DebugAdapterTransport.readMessage(new ByteArrayInputStream(clientOutput.toByteArray()));
             assertEquals("request", MiniJson.asString(outbound.get("type")));
             assertEquals("initialize", MiniJson.asString(outbound.get("command")));
-            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 1, "type", "response", "request_seq", 1, "success", true, "command", "initialize"));
+            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 1, "type", "response", "request_seq", 1, "success", true,
+                "command", "initialize", "body", Map.of("supportsCancelRequest", true)));
             assertTrue(response.get(1, TimeUnit.SECONDS).success());
-            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 2, "type", "event", "event", "initialized"));
+            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 2, "type", "event", "event", "initialized", "body", List.of("ready")));
             await(() -> events.size() == 1);
             assertEquals("initialized", events.get(0).event());
+            assertEquals(List.of("ready"), events.get(0).body());
+            int initialBytes = clientOutput.size();
+            CompletableFuture<DebugAdapterTransport.Response> threads = CompletableFuture.supplyAsync(() -> {
+                try { return transport.request("threads", Map.of(), Duration.ofSeconds(1)); }
+                catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            });
+            await(() -> clientOutput.size() > initialBytes);
+            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 3, "type", "response", "request_seq", 2, "success", true,
+                "command", "threads", "body", List.of("thread")));
+            assertEquals(List.of("thread"), threads.get(1, TimeUnit.SECONDS).body());
         } finally {
             transport.close();
             adapterWriter.close();
@@ -50,12 +62,22 @@ public class DebugAdapterTransportTest {
     }
 
     @Test
-    void timesOutThenSendsDapCancellation() throws Exception {
+    void timesOutThenSendsDapCancellationAfterInitializeCapability() throws Exception {
         java.io.PipedInputStream adapterOutput = new java.io.PipedInputStream();
         java.io.PipedOutputStream adapterWriter = new java.io.PipedOutputStream(adapterOutput);
         ByteArrayOutputStream clientOutput = new ByteArrayOutputStream();
         DebugAdapterTransport transport = DebugAdapterTransport.forStreams(adapterOutput, clientOutput, null);
         try {
+            CompletableFuture<DebugAdapterTransport.Response> initialize = CompletableFuture.supplyAsync(() -> {
+                try { return transport.request("initialize", Map.of(), Duration.ofSeconds(1)); }
+                catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
+            });
+            await(() -> clientOutput.size() > 0);
+            DebugAdapterTransport.readMessage(new ByteArrayInputStream(clientOutput.toByteArray()));
+            clientOutput.reset();
+            DebugAdapterTransport.writeMessage(adapterWriter, Map.of("seq", 1, "type", "response", "request_seq", 1, "success", true,
+                "command", "initialize", "body", Map.of("supportsCancelRequest", true)));
+            assertTrue(initialize.get(1, TimeUnit.SECONDS).success());
             assertThrows(TimeoutException.class, () -> transport.request("threads", Map.of(), Duration.ofMillis(80)));
             await(() -> clientOutput.size() > 0);
             ByteArrayInputStream frames = new ByteArrayInputStream(clientOutput.toByteArray());
@@ -64,6 +86,24 @@ public class DebugAdapterTransportTest {
             assertEquals("threads", MiniJson.asString(request.get("command")));
             assertEquals("cancel", MiniJson.asString(cancel.get("command")));
             assertEquals(1, MiniJson.asInt(MiniJson.asObject(cancel.get("arguments")).get("requestId")));
+        } finally {
+            transport.close();
+            adapterWriter.close();
+        }
+    }
+
+    @Test
+    void timeoutWithoutCancelCapabilityIgnoresLateResponseWithoutSendingCancel() throws Exception {
+        java.io.PipedInputStream adapterOutput = new java.io.PipedInputStream();
+        java.io.PipedOutputStream adapterWriter = new java.io.PipedOutputStream(adapterOutput);
+        ByteArrayOutputStream clientOutput = new ByteArrayOutputStream();
+        DebugAdapterTransport transport = DebugAdapterTransport.forStreams(adapterOutput, clientOutput, null);
+        try {
+            assertThrows(TimeoutException.class, () -> transport.request("threads", Map.of(), Duration.ofMillis(80)));
+            ByteArrayInputStream frames = new ByteArrayInputStream(clientOutput.toByteArray());
+            Map<String, Object> request = DebugAdapterTransport.readMessage(frames);
+            assertEquals("threads", MiniJson.asString(request.get("command")));
+            assertNull(DebugAdapterTransport.readMessage(frames));
         } finally {
             transport.close();
             adapterWriter.close();

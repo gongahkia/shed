@@ -218,6 +218,9 @@ final class TypedSettings {
         if (key.startsWith("lsp.")) {
             return "Language Server";
         }
+        if (key.startsWith("git.")) {
+            return "Git";
+        }
         if (key.startsWith("recovery.")) {
             return "Reliability";
         }
@@ -313,6 +316,9 @@ final class TypedSettings {
         }
         if (key.startsWith("tree.")) {
             return "Live: used by subsequent tree operations";
+        }
+        if (key.startsWith("git.")) {
+            return "Live: used when opening or refreshing the Git workbench";
         }
         if (key.equals("minimap")) {
             return "Live: stored; :minimap controls visibility";

@@ -2,14 +2,17 @@ package shed;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import javax.swing.JOptionPane;
 
 final class GitHubCapabilityController {
     private final Texteditor editor;
+    private final GitHubReviewDraftStore reviewDraftStore;
 
     GitHubCapabilityController(Texteditor editor) {
         this.editor = editor;
+        this.reviewDraftStore = new GitHubReviewDraftStore(Path.of(editor.configManager.getShedDirectoryPath(), GitHubReviewDraftStore.FILE_NAME));
     }
 
     String handle(String argument) {
@@ -62,7 +65,7 @@ final class GitHubCapabilityController {
 
     private String showPullRequests() {
         if (!editor.configManager.getGitHubReviewEnabled()) return "GitHub review requires explicit consent; run :github consent first.";
-        GitHubPullRequestDialog.showFor(editor, new GitHubPullRequestDialog.Loader() {
+        GitHubPullRequestDialog.showFor(editor, reviewDraftStore, new GitHubPullRequestDialog.Loader() {
             @Override public GitHubPullRequestModel.Snapshot load(AsyncJobService.JobToken token) { return loadPullRequests(token); }
             @Override public GitHubPullRequestDetailModel.Detail detail(String repository, GitHubPullRequestModel.PullRequest pullRequest,
                 AsyncJobService.JobToken token) { return loadPullRequestDetail(repository, pullRequest, token); }
